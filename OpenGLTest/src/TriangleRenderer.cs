@@ -9,27 +9,40 @@ public class TriangleRenderer : IDisposable
     private readonly GL _gl;
     private uint _vao;
     private uint _vbo;
+    private uint _ebo;
     private Shader _shader;
-
     private bool _disposed;
 
     public TriangleRenderer(GL gl)
     {
         _gl = gl;
 
-        Span<Vertex> vertexData = 
+        Span<Vertex> vertexData =
         [
-            new(new Vector3(-0.5f, -0.5f, 0), 255, 0, 0, 255),
-            new(new Vector3(0, 0.5f, 0), 0, 255, 0, 255),
-            new(new Vector3(0.5f, -0.5f, 0), 0, 0, 255, 255)
+            new(new Vector3(-0.5f, -0.5f, 0f), 255, 0, 0, 255), // Bottom left: Red
+            new(new Vector3(-0.5f, 0.5f, 0f), 0, 255, 0, 255), // Top left: Green
+            new(new Vector3(0.5f, 0.5f, 0f), 0, 0, 255, 255), // Top right: Blue
+            new(new Vector3(0.5f, -0.5f, 0f), 255, 255, 0, 255) // Bottom right: Yellow
         ];
 
+        // Define indices for two triangles (square)
+        Span<uint> indices =
+        [
+            0, 1, 2, // First triangle
+            0, 2, 3 // Second triangle
+        ];
+
+        _vao = _gl.GenVertexArray();
         _vbo = _gl.GenBuffer();
+        _ebo = _gl.GenBuffer();
+
+        _gl.BindVertexArray(_vao);
+
         _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
         _gl.BufferData<Vertex>(BufferTargetARB.ArrayBuffer, vertexData, BufferUsageARB.StaticDraw);
 
-        _vao = _gl.GenVertexArray();
-        _gl.BindVertexArray(_vao);
+        _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _ebo);
+        _gl.BufferData<uint>(BufferTargetARB.ElementArrayBuffer, indices, BufferUsageARB.StaticDraw);
 
         unsafe
         {
@@ -49,13 +62,16 @@ public class TriangleRenderer : IDisposable
     {
         _gl.BindVertexArray(_vao);
         _shader.Use();
-        _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
+        unsafe
+        {
+            _gl.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, null);
+        }
     }
 
     public void Dispose()
     {
         Dispose(disposing: true);
-        GC.SuppressFinalize(this); // Recommended
+        GC.SuppressFinalize(this);
     }
 
     protected virtual void Dispose(bool disposing)
@@ -68,8 +84,8 @@ public class TriangleRenderer : IDisposable
         }
 
         _gl.DeleteBuffer(_vbo);
+        _gl.DeleteBuffer(_ebo);
         _gl.DeleteVertexArray(_vao);
-
         _disposed = true;
     }
 }
