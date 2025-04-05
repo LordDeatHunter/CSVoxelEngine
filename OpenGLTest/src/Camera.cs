@@ -52,13 +52,18 @@ public class Camera
     {
         var direction = GetForward();
         var right = Vector3.Normalize(Vector3.Cross(direction, Vector3.UnitY));
+        var forward = Vector3.Normalize(Vector3.Cross(Vector3.UnitY, right));
 
         if (keyboard == null) return;
+        
+        var moveSpeed = keyboard.IsKeyPressed(Key.ShiftLeft) ? _speed * 2 : _speed;
 
-        if (keyboard.IsKeyPressed(Key.W)) Position += direction * _speed * deltaTime;
-        if (keyboard.IsKeyPressed(Key.S)) Position -= direction * _speed * deltaTime;
-        if (keyboard.IsKeyPressed(Key.A)) Position -= right * _speed * deltaTime;
-        if (keyboard.IsKeyPressed(Key.D)) Position += right * _speed * deltaTime;
+        if (keyboard.IsKeyPressed(Key.W)) Position += forward * moveSpeed * deltaTime;
+        if (keyboard.IsKeyPressed(Key.S)) Position -= forward * moveSpeed * deltaTime;
+        if (keyboard.IsKeyPressed(Key.A)) Position -= right * moveSpeed * deltaTime;
+        if (keyboard.IsKeyPressed(Key.D)) Position += right * moveSpeed * deltaTime;
+        if (keyboard.IsKeyPressed(Key.Space)) Position += Vector3.UnitY * _speed * deltaTime;
+        if (keyboard.IsKeyPressed(Key.ControlLeft)) Position -= Vector3.UnitY * _speed * deltaTime;
     }
 
     public Matrix4x4 GetViewMatrix() => Matrix4x4.CreateLookAt(Position, Position + GetForward(), Vector3.UnitY);
