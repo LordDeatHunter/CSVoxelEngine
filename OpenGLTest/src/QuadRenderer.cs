@@ -4,7 +4,7 @@ using System.Numerics;
 
 namespace silkgltriangle;
 
-public class TriangleRenderer : IDisposable
+public class QuadRenderer : IDisposable
 {
     private readonly GL _gl;
     private uint _vao;
@@ -13,7 +13,7 @@ public class TriangleRenderer : IDisposable
     private Shader _shader;
     private bool _disposed;
 
-    public TriangleRenderer(GL gl)
+    public QuadRenderer(GL gl)
     {
         _gl = gl;
 

@@ -19,14 +19,14 @@ internal static class Program
         using var window = Window.Create(windowOptions);
         IInputContext inputContext = null!;
         GL gl = null!;
-        TriangleRenderer? renderer = null;
+        QuadRenderer? renderer = null;
 
         window.Load += () =>
         {
             gl = window.CreateOpenGL();
             inputContext = window.CreateInput();
 
-            renderer = new TriangleRenderer(gl);
+            renderer = new QuadRenderer(gl);
             gl.Viewport(window.FramebufferSize);
         };
 
