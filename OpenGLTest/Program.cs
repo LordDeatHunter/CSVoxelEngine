@@ -4,117 +4,125 @@ using Silk.NET.Input;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 
-var windowOptions = WindowOptions.Default with
+namespace silkgltriangle;
+
+internal static class Program
 {
-    Title = "OpenGL Test",
-    PreferredDepthBufferBits = 24,
-    PreferredStencilBufferBits = 8,
-    API = new GraphicsAPI(ContextAPI.OpenGL, new APIVersion(3, 3))
-};
-
-using var window = Window.Create(windowOptions);
-IInputContext inputContext = null!;
-GL gl = null!;
-
-uint vbo = 0;
-uint vao = 0;
-uint shader = 0;
-
-const string vertexShaderCode = """
-                                #version 330 core
-                                layout (location = 0) in vec3 vPosition;
-                                layout (location = 1) in vec4 vColor;
-
-                                out vec4 fColor;
-
-                                void main() {
-                                    gl_Position = vec4(vPosition, 1.0);
-                                    fColor = vColor;
-                                }
-                                """;
-
-const string fragmentShaderCode = """
-                                  #version 330 core
-                                  in vec4 fColor;
-
-                                  out vec4 FragColor;
-
-                                  void main() {
-                                      FragColor = fColor;
-                                  }
-                                  """;
-
-window.Load += () =>
-{
-    gl = window.CreateOpenGL();
-    inputContext = window.CreateInput();
-
-    Span<Vertex> vertexData =
-    [
-        new(new Vector3(-0.5f, -0.5f, 0), 255, 0, 0, 255),
-        new(new Vector3(0, 0.5f, 0), 0, 255, 0, 255),
-        new(new Vector3(0.5f, -0.5f, 0), 0, 0, 255, 255)
-    ];
-
-    vbo = gl.GenBuffer();
-    gl.BindBuffer(BufferTargetARB.ArrayBuffer, vbo);
-    gl.BufferData<Vertex>(BufferTargetARB.ArrayBuffer, vertexData, BufferUsageARB.StaticDraw);
-
-    vao = gl.GenVertexArray();
-    gl.BindVertexArray(vao);
-    unsafe
+    public static void Main(string[] args)
     {
-        // Attrib 0: 3 floats (a vec3)
-        gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, Vertex.Size, (void*)0);
-        // Attrib 1: 4 unsigned bytes, normalized into a vec4
-        gl.VertexAttribPointer(1, 4, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)12);
+        var windowOptions = WindowOptions.Default with
+        {
+            Title = "OpenGL Test",
+            PreferredDepthBufferBits = 24,
+            PreferredStencilBufferBits = 8,
+            API = new GraphicsAPI(ContextAPI.OpenGL, new APIVersion(3, 3))
+        };
+
+        using var window = Window.Create(windowOptions);
+        IInputContext inputContext = null!;
+        GL gl = null!;
+
+        uint vbo = 0;
+        uint vao = 0;
+        uint shader = 0;
+
+        const string vertexShaderCode = """
+                                        #version 330 core
+                                        layout (location = 0) in vec3 vPosition;
+                                        layout (location = 1) in vec4 vColor;
+
+                                        out vec4 fColor;
+
+                                        void main() {
+                                            gl_Position = vec4(vPosition, 1.0);
+                                            fColor = vColor;
+                                        }
+                                        """;
+
+        const string fragmentShaderCode = """
+                                          #version 330 core
+                                          in vec4 fColor;
+
+                                          out vec4 FragColor;
+
+                                          void main() {
+                                              FragColor = fColor;
+                                          }
+                                          """;
+
+        window.Load += () =>
+        {
+            gl = window.CreateOpenGL();
+            inputContext = window.CreateInput();
+
+            Span<Vertex> vertexData =
+            [
+                new(new Vector3(-0.5f, -0.5f, 0), 255, 0, 0, 255),
+                new(new Vector3(0, 0.5f, 0), 0, 255, 0, 255),
+                new(new Vector3(0.5f, -0.5f, 0), 0, 0, 255, 255)
+            ];
+
+            vbo = gl.GenBuffer();
+            gl.BindBuffer(BufferTargetARB.ArrayBuffer, vbo);
+            gl.BufferData<Vertex>(BufferTargetARB.ArrayBuffer, vertexData, BufferUsageARB.StaticDraw);
+
+            vao = gl.GenVertexArray();
+            gl.BindVertexArray(vao);
+            unsafe
+            {
+                // Attrib 0: 3 floats (a vec3)
+                gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, Vertex.Size, (void*)0);
+                // Attrib 1: 4 unsigned bytes, normalized into a vec4
+                gl.VertexAttribPointer(1, 4, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)12);
+            }
+
+            gl.EnableVertexAttribArray(0);
+            gl.EnableVertexAttribArray(1);
+
+            var vs = gl.CreateShader(ShaderType.VertexShader);
+            gl.ShaderSource(vs, vertexShaderCode);
+            gl.CompileShader(vs);
+
+            var fs = gl.CreateShader(ShaderType.FragmentShader);
+            gl.ShaderSource(fs, fragmentShaderCode);
+            gl.CompileShader(fs);
+
+            shader = gl.CreateProgram();
+            gl.AttachShader(shader, vs);
+            gl.AttachShader(shader, fs);
+            gl.LinkProgram(shader);
+
+            gl.DetachShader(shader, vs);
+            gl.DetachShader(shader, fs);
+            gl.DeleteShader(vs);
+            gl.DeleteShader(fs);
+
+            gl.Viewport(window.FramebufferSize);
+        };
+
+        window.Update += deltaSeconds => { };
+
+        window.Render += deltaSeconds =>
+        {
+            gl.ClearColor(0f, 0f, 0f, 1f);
+            gl.Clear(ClearBufferMask.ColorBufferBit);
+
+            gl.BindVertexArray(vao);
+            gl.UseProgram(shader);
+            gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
+        };
+
+        window.FramebufferResize += newSize => { gl.Viewport(newSize); };
+
+        window.Closing += () =>
+        {
+            gl.DeleteProgram(shader);
+            gl.DeleteVertexArray(vao);
+            gl.DeleteBuffer(vbo);
+        };
+
+        window.Run();
+        gl.Dispose();
+        inputContext.Dispose();
     }
-
-    gl.EnableVertexAttribArray(0);
-    gl.EnableVertexAttribArray(1);
-
-    var vs = gl.CreateShader(ShaderType.VertexShader);
-    gl.ShaderSource(vs, vertexShaderCode);
-    gl.CompileShader(vs);
-
-    var fs = gl.CreateShader(ShaderType.FragmentShader);
-    gl.ShaderSource(fs, fragmentShaderCode);
-    gl.CompileShader(fs);
-
-    shader = gl.CreateProgram();
-    gl.AttachShader(shader, vs);
-    gl.AttachShader(shader, fs);
-    gl.LinkProgram(shader);
-
-    gl.DetachShader(shader, vs);
-    gl.DetachShader(shader, fs);
-    gl.DeleteShader(vs);
-    gl.DeleteShader(fs);
-
-    gl.Viewport(window.FramebufferSize);
-};
-
-window.Update += deltaSeconds => { };
-
-window.Render += deltaSeconds =>
-{
-    gl.ClearColor(0f, 0f, 0f, 1f);
-    gl.Clear(ClearBufferMask.ColorBufferBit);
-
-    gl.BindVertexArray(vao);
-    gl.UseProgram(shader);
-    gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
-};
-
-window.FramebufferResize += newSize => { gl.Viewport(newSize); };
-
-window.Closing += () =>
-{
-    gl.DeleteProgram(shader);
-    gl.DeleteVertexArray(vao);
-    gl.DeleteBuffer(vbo);
-};
-
-window.Run();
-gl.Dispose();
-inputContext.Dispose();
+}
