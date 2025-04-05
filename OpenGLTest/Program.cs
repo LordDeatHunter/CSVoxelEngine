@@ -26,29 +26,8 @@ internal static class Program
         uint vao = 0;
         uint shader = 0;
 
-        const string vertexShaderCode = """
-                                        #version 330 core
-                                        layout (location = 0) in vec3 vPosition;
-                                        layout (location = 1) in vec4 vColor;
-
-                                        out vec4 fColor;
-
-                                        void main() {
-                                            gl_Position = vec4(vPosition, 1.0);
-                                            fColor = vColor;
-                                        }
-                                        """;
-
-        const string fragmentShaderCode = """
-                                          #version 330 core
-                                          in vec4 fColor;
-
-                                          out vec4 FragColor;
-
-                                          void main() {
-                                              FragColor = fColor;
-                                          }
-                                          """;
+        var vertexShaderCode = FileUtils.ReadFile("assets/shaders/test-vertex.glsl");
+        var fragmentShaderCode = FileUtils.ReadFile("assets/shaders/test-fragment.glsl");
 
         window.Load += () =>
         {
