@@ -1,17 +1,15 @@
-using Silk.NET.Input;
+using System;
+using System.Collections.Generic;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 using System.Linq;
 using System.Numerics;
+using Silk.NET.Input;
 
 namespace silkgltriangle;
 
-internal static class Program
+public static class Program
 {
-    private static Shader _shader;
-    private static uint _texture = 0;
-    private static Mesh _chunkMesh = null!;
-
     public static void Main()
     {
         var windowOptions = WindowOptions.Default with
@@ -25,9 +23,12 @@ internal static class Program
         using var window = Window.Create(windowOptions);
         IInputContext inputContext = null!;
         GL gl = null!;
-        Mesh? mesh = null;
-        Camera? camera = null;
-        IKeyboard? keyboard = null;
+        List<Chunk> chunks = [];
+        Mesh mesh = null!;
+        Camera camera = null!;
+        IKeyboard keyboard = null!;
+        Shader shader = null!;
+        uint texture = 0;
 
         window.Load += () =>
         {
@@ -35,17 +36,14 @@ internal static class Program
             inputContext = window.CreateInput();
             keyboard = inputContext.Keyboards.FirstOrDefault();
 
-            var chunk = new Chunk();
-            _chunkMesh = chunk.GenerateMesh(gl);
-
             var vs = FileUtils.ReadFile("assets/shaders/test-vertex.glsl");
             var fs = FileUtils.ReadFile("assets/shaders/test-fragment.glsl");
-            _texture = TextureLoader.LoadFromFile(gl, "assets/textures/atlas.png");
-            _shader = new Shader(gl, vs, fs);
-            _shader.Use();
+            texture = TextureLoader.LoadFromFile(gl, "assets/textures/atlas.png");
+            shader = new Shader(gl, vs, fs);
+            shader.Use();
             gl.ActiveTexture(TextureUnit.Texture0);
-            gl.BindTexture(TextureTarget.Texture2D, _texture);
-            _shader.SetUniform("uTextureAtlas", 0);
+            gl.BindTexture(TextureTarget.Texture2D, texture);
+            shader.SetUniform("uTextureAtlas", 0);
 
             camera = new Camera(window, inputContext);
             mesh = Mesh.CreateCube(gl);
@@ -54,6 +52,20 @@ internal static class Program
             gl.Enable(GLEnum.DepthTest);
             gl.Enable(GLEnum.DebugOutput);
             gl.DepthFunc(GLEnum.Lequal);
+
+            const int chunkAmount = 50;
+            var currentGeneratedChunks = 0;
+            const int maxChunks = chunkAmount * chunkAmount * 2;
+            for (var cx = 0; cx < chunkAmount; cx++)
+            for (var cy = -1; cy <= 0; cy++)
+            for (var cz = 0; cz < chunkAmount; cz++)
+            {
+                Console.WriteLine("Chunk: " + ++currentGeneratedChunks + "/" + maxChunks);
+                var chunk = new Chunk(gl, new Vector3(cx, cy, cz));
+
+                chunk.GenerateMesh();
+                chunks.Add(chunk);
+            }
         };
 
         window.FramebufferResize += newSize => { gl.Viewport(newSize); };
@@ -61,7 +73,7 @@ internal static class Program
         window.Closing += () =>
         {
             mesh?.Dispose();
-            _shader.Dispose();
+            shader.Dispose();
         };
 
         window.Update += delta =>
@@ -74,21 +86,24 @@ internal static class Program
 
         window.Render += delta =>
         {
-            _shader.Use();
+            shader.Use();
             gl.ClearColor(0.3f, 0.6f, 0.9f, 1f);
             gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             if (camera == null) return;
 
-            _shader.SetUniform("uTime", (float)window.Time);
+            shader.SetUniform("uTime", (float)window.Time);
             gl.ActiveTexture(TextureUnit.Texture0);
-            gl.BindTexture(TextureTarget.Texture2D, _texture);
+            gl.BindTexture(TextureTarget.Texture2D, texture);
 
             var viewProj = camera.GetViewProjection();
-            var mvp = Matrix4x4.CreateTranslation(0, 0, 0) * viewProj;
-            _shader.SetUniform("uMVP", mvp);
-            
-            _chunkMesh.Render();
+
+            foreach (var chunk in chunks)
+            {
+                var mvp = Matrix4x4.CreateTranslation(chunk.Position * Chunk.Size) * viewProj;
+                shader.SetUniform("uMVP", mvp);
+                chunk.Render();
+            }
         };
 
         window.Run();

@@ -12,6 +12,10 @@ public class Chunk
     private readonly byte[,,] _blocks = new byte[Size, Size, Size];
     private static readonly FastNoiseLite Noise;
 
+    public Vector3 Position { get; }
+    private Mesh? _mesh;
+    private readonly GL _gl;
+
     static Chunk()
     {
         Noise = new FastNoiseLite();
@@ -21,20 +25,40 @@ public class Chunk
         Noise.SetFractalType(FastNoiseLite.FractalType.FBm);
         Noise.SetFractalOctaves(6);
     }
-    
-    public Chunk()
+
+    public Chunk(GL gl, Vector3 position)
     {
+        _gl = gl;
+        Position = position;
+
         for (var x = 0; x < Size; x++)
         for (var z = 0; z < Size; z++)
         {
-            var y = (int)(Noise.GetNoise(x, z) * 8F);
-            SetBlock(x, y, z, 1);
-            for (var i = 0; i < y; i++)
+            var y = (int)(Noise.GetNoise(x + position.X * Size, z + position.Z * Size) * 16F);
+
+            if (y < LowerBoundY) continue;
+
+            if (y >= UpperBoundY)
             {
-                SetBlock(x, i, z, 1);
+                for (var yi = 0; yi < Size; yi++)
+                {
+                    SetBlock(x, yi, z, 1);
+                }
+
+                continue;
+            }
+
+            if (y < 0) y = Size + y;
+
+            for (var yi = 0; yi < y; yi++)
+            {
+                SetBlock(x, yi, z, 1);
             }
         }
     }
+    
+    public int LowerBoundY => (int)Position.Y * Size;
+    public int UpperBoundY => (int)Position.Y * Size + Size;
 
     public void SetBlock(int x, int y, int z, byte id)
     {
@@ -46,7 +70,7 @@ public class Chunk
     private static bool InBounds(int x, int y, int z)
         => x >= 0 && y >= 0 && z >= 0 && x < Size && y < Size && z < Size;
 
-    public Mesh GenerateMesh(GL gl)
+    public void GenerateMesh()
     {
         List<Vertex> vertices = [];
         List<ushort> indices = [];
@@ -83,7 +107,13 @@ public class Chunk
             }
         }
 
-        return new Mesh(gl, CollectionsMarshal.AsSpan(vertices), CollectionsMarshal.AsSpan(indices));
+        _mesh?.Dispose();
+        _mesh = new Mesh(_gl, CollectionsMarshal.AsSpan(vertices), CollectionsMarshal.AsSpan(indices));
+    }
+
+    public void Render()
+    {
+        _mesh?.Render();
     }
 
     private static Vector2[] FaceUV(int tileX, int tileY, int tileSize = 4)

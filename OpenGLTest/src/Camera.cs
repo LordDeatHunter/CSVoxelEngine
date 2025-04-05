@@ -56,20 +56,20 @@ public class Camera
 
         if (keyboard == null) return;
         
-        var moveSpeed = keyboard.IsKeyPressed(Key.ShiftLeft) ? _speed * 2 : _speed;
+        var moveSpeed = keyboard.IsKeyPressed(Key.ShiftLeft) ? _speed * 4 : _speed;
 
         if (keyboard.IsKeyPressed(Key.W)) Position += forward * moveSpeed * deltaTime;
         if (keyboard.IsKeyPressed(Key.S)) Position -= forward * moveSpeed * deltaTime;
         if (keyboard.IsKeyPressed(Key.A)) Position -= right * moveSpeed * deltaTime;
         if (keyboard.IsKeyPressed(Key.D)) Position += right * moveSpeed * deltaTime;
-        if (keyboard.IsKeyPressed(Key.Space)) Position += Vector3.UnitY * _speed * deltaTime;
-        if (keyboard.IsKeyPressed(Key.ControlLeft)) Position -= Vector3.UnitY * _speed * deltaTime;
+        if (keyboard.IsKeyPressed(Key.Space)) Position += Vector3.UnitY * moveSpeed * deltaTime;
+        if (keyboard.IsKeyPressed(Key.ControlLeft)) Position -= Vector3.UnitY * moveSpeed * deltaTime;
     }
 
     public Matrix4x4 GetViewMatrix() => Matrix4x4.CreateLookAt(Position, Position + GetForward(), Vector3.UnitY);
 
     public Matrix4x4 GetProjectionMatrix() =>
-        Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI * _fov / 180f, _aspectRatio, 0.01f, 100f);
+        Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI * _fov / 180f, _aspectRatio, 0.01f, 1000f);
 
     public Matrix4x4 GetViewProjection() => GetViewMatrix() * GetProjectionMatrix();
 
