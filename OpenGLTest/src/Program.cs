@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Silk.NET.Input;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
@@ -11,9 +9,8 @@ namespace silkgltriangle;
 internal static class Program
 {
     private static Shader _shader;
-    private static readonly List<Vector3> CubePositions = [];
-    private static readonly Random Rng = new();
     private static uint _texture = 0;
+    private static Mesh _chunkMesh = null!;
 
     public static void Main()
     {
@@ -32,27 +29,14 @@ internal static class Program
         Camera? camera = null;
         IKeyboard? keyboard = null;
 
-        var noise = new FastNoiseLite();
-        noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-        noise.SetFrequency(0.01f);
-        noise.SetSeed(1337);
-        noise.SetFractalType(FastNoiseLite.FractalType.FBm);
-        noise.SetFractalOctaves(6);
-
-        for (var x = 0; x < 100; x++)
-        {
-            for (var z = 0; z < 100; z++)
-            {
-                var y = (int)(noise.GetNoise(x, z) * 8F);
-                CubePositions.Add(new Vector3(x, y, z));
-            }
-        }
-
         window.Load += () =>
         {
             gl = window.CreateOpenGL();
             inputContext = window.CreateInput();
             keyboard = inputContext.Keyboards.FirstOrDefault();
+
+            var chunk = new Chunk();
+            _chunkMesh = chunk.GenerateMesh(gl);
 
             var vs = FileUtils.ReadFile("assets/shaders/test-vertex.glsl");
             var fs = FileUtils.ReadFile("assets/shaders/test-fragment.glsl");
@@ -100,13 +84,11 @@ internal static class Program
             gl.ActiveTexture(TextureUnit.Texture0);
             gl.BindTexture(TextureTarget.Texture2D, _texture);
 
-            foreach (var pos in CubePositions)
-            {
-                var model = Matrix4x4.CreateTranslation(pos);
-                var mvp = model * camera.GetViewProjection();
-                _shader.SetUniform("uMVP", mvp);
-                mesh?.Render();
-            }
+            var viewProj = camera.GetViewProjection();
+            var mvp = Matrix4x4.CreateTranslation(0, 0, 0) * viewProj;
+            _shader.SetUniform("uMVP", mvp);
+            
+            _chunkMesh.Render();
         };
 
         window.Run();
