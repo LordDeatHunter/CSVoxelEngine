@@ -7,6 +7,8 @@ namespace silkgltriangle;
 
 internal static class Program
 {
+    private static Shader _shader;
+
     public static void Main()
     {
         var windowOptions = WindowOptions.Default with
@@ -20,7 +22,7 @@ internal static class Program
         using var window = Window.Create(windowOptions);
         IInputContext inputContext = null!;
         GL gl = null!;
-        QuadRenderer? renderer = null;
+        Mesh? renderer = null;
         Camera? camera = null;
         IKeyboard? keyboard = null;
 
@@ -30,8 +32,13 @@ internal static class Program
             inputContext = window.CreateInput();
             keyboard = inputContext.Keyboards.FirstOrDefault();
 
+            var vs = FileUtils.ReadFile("assets/shaders/test-vertex.glsl");
+            var fs = FileUtils.ReadFile("assets/shaders/test-fragment.glsl");
+            _shader = new Shader(gl, vs, fs);
+            _shader.Use();
+            
             camera = new Camera(window, inputContext);
-            renderer = new QuadRenderer(gl);
+            renderer = Mesh.CreateCube(gl);
             gl.Viewport(window.FramebufferSize);
 
             gl.Enable(GLEnum.DepthTest);
@@ -52,12 +59,15 @@ internal static class Program
 
         window.Render += delta =>
         {
+            _shader.Use();
             gl.ClearColor(1f, 1f, 1f, 1f);
             gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             if (camera == null) return;
             var mvp = camera.GetViewProjection();
-            renderer?.Render(mvp);
+            _shader.SetUniform("uMVP", mvp);
+            _shader.SetUniform("uTime", (float)window.Time);
+            renderer?.Render();
         };
 
         window.Run();

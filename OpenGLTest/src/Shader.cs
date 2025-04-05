@@ -1,5 +1,9 @@
 using Silk.NET.OpenGL;
 using System;
+using System.Numerics;
+using System.Runtime.InteropServices;
+
+namespace silkgltriangle;
 
 public class Shader : IDisposable
 {
@@ -47,15 +51,12 @@ public class Shader : IDisposable
         throw new Exception($"{type} compilation failed:\n{infoLog}");
     }
 
-    public void Use()
-    {
-        _gl.UseProgram(Handle);
-    }
+    public void Use() => _gl.UseProgram(Handle);
 
     public void Dispose()
     {
         Dispose(disposing: true);
-        GC.SuppressFinalize(this); // CA1816: Recommended
+        GC.SuppressFinalize(this);
     }
 
     protected virtual void Dispose(bool disposing)
@@ -64,5 +65,37 @@ public class Shader : IDisposable
 
         _gl.DeleteProgram(Handle);
         _disposed = true;
+    }
+
+    public int GetUniformLocation(string name) => _gl.GetUniformLocation(Handle, name);
+
+    public void SetUniform(string name, float value)
+    {
+        var loc = GetUniformLocation(name);
+        _gl.Uniform1(loc, value);
+    }
+
+    public void SetUniform(string name, int value)
+    {
+        var loc = GetUniformLocation(name);
+        _gl.Uniform1(loc, value);
+    }
+
+    public void SetUniform(string name, Vector3 value)
+    {
+        var loc = GetUniformLocation(name);
+        _gl.Uniform3(loc, value.X, value.Y, value.Z);
+    }
+
+    public void SetUniform(string name, Matrix4x4 value, bool transpose = false)
+    {
+        var loc = GetUniformLocation(name);
+        unsafe
+        {
+            fixed (float* ptr = &MemoryMarshal.GetReference(MemoryMarshal.CreateSpan(ref value.M11, 16)))
+            {
+                _gl.UniformMatrix4(loc, 1, transpose, ptr);
+            }
+        }
     }
 }
