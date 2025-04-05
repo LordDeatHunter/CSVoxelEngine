@@ -12,6 +12,7 @@ public class QuadRenderer : IDisposable
     private readonly Shader _shader;
     private readonly int _mvpLocation;
     private bool _disposed;
+    private readonly uint _indicesCount;
 
     public QuadRenderer(GL gl)
     {
@@ -19,19 +20,34 @@ public class QuadRenderer : IDisposable
 
         Span<Vertex> vertexData =
         [
-            new(new Vector3(-0.5f, -0.5f, 0f), 255, 0, 0, 255), // Bottom left: Red
-            new(new Vector3(-0.5f, 0.5f, 0f), 0, 255, 0, 255), // Top left: Green
-            new(new Vector3(0.5f, 0.5f, 0f), 0, 0, 255, 255), // Top right: Blue
-            new(new Vector3(0.5f, -0.5f, 0f), 255, 255, 0, 255) // Bottom right: Yellow
+            new(new Vector3(-0.5f, -0.5f, -0.5f), 255, 0, 0, 255),    // 0
+            new(new Vector3( 0.5f, -0.5f, -0.5f), 0, 255, 0, 255),    // 1
+            new(new Vector3( 0.5f,  0.5f, -0.5f), 0, 0, 255, 255),    // 2
+            new(new Vector3(-0.5f,  0.5f, -0.5f), 255, 255, 0, 255),  // 3
+            new(new Vector3(-0.5f, -0.5f,  0.5f), 0, 255, 255, 255),  // 4
+            new(new Vector3( 0.5f, -0.5f,  0.5f), 255, 0, 255, 255),  // 5
+            new(new Vector3( 0.5f,  0.5f,  0.5f), 255, 255, 255, 255),// 6
+            new(new Vector3(-0.5f,  0.5f,  0.5f), 128, 128, 128, 255) // 7
         ];
         var vertexDataSize = (nuint)(vertexData.Length * Vertex.Size);
 
         Span<ushort> indices =
         [
-            0, 1, 2, // First triangle
-            0, 2, 3 // Second triangle
+            // Front face
+            0, 1, 2, 2, 3, 0,
+            // Right face
+            1, 5, 6, 6, 2, 1,
+            // Back face
+            5, 4, 7, 7, 6, 5,
+            // Left face
+            4, 0, 3, 3, 7, 4,
+            // Top face
+            3, 2, 6, 6, 7, 3,
+            // Bottom face
+            4, 5, 1, 1, 0, 4
         ];
-        var indicesSize = (nuint)(indices.Length * sizeof(ushort));
+        _indicesCount = (uint)indices.Length;
+        var indicesSize = (nuint)(_indicesCount * sizeof(ushort));
 
         _vao = _gl.GenVertexArray();
         _gl.BindVertexArray(_vao);
@@ -75,8 +91,7 @@ public class QuadRenderer : IDisposable
             {
                 _gl.UniformMatrix4(_mvpLocation, 1, false, ptr);
             }
-
-            _gl.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedShort, null);
+            _gl.DrawElements(PrimitiveType.Triangles, _indicesCount, DrawElementsType.UnsignedShort, null);
         }
     }
 
