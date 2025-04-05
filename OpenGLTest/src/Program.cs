@@ -31,15 +31,20 @@ internal static class Program
         Camera? camera = null;
         IKeyboard? keyboard = null;
 
-        for (var i = 0; i < 10_000; i++)
+        var noise = new FastNoiseLite();
+        noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        noise.SetFrequency(0.01f);
+        noise.SetSeed(1337);
+        noise.SetFractalType(FastNoiseLite.FractalType.FBm);
+        noise.SetFractalOctaves(6);
+
+        for (var x = 0; x < 100; x++)
         {
-            CubePositions.Add(
-                new Vector3(
-                    Rng.Next(-30, 30),
-                    Rng.Next(-30, 30),
-                    Rng.Next(-30, 30)
-                )
-            );
+            for (var z = 0; z < 100; z++)
+            {
+                var y = (int)(noise.GetNoise(x, z) * 8F);
+                CubePositions.Add(new Vector3(x, y, z));
+            }
         }
 
         window.Load += () =>
@@ -90,12 +95,7 @@ internal static class Program
 
             foreach (var pos in CubePositions)
             {
-                var scale = 0.5f + MathF.Abs(pos.X % 2f);
-                var model = Matrix4x4.CreateTranslation(pos) *
-                            Matrix4x4.CreateRotationX(pos.X) *
-                            Matrix4x4.CreateRotationY(pos.Y) *
-                            Matrix4x4.CreateRotationZ(pos.Z) *
-                            Matrix4x4.CreateScale(scale);
+                var model = Matrix4x4.CreateTranslation(pos);
                 var mvp = model * camera.GetViewProjection();
                 _shader.SetUniform("uMVP", mvp);
                 mesh?.Render();
