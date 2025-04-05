@@ -11,6 +11,7 @@ public class QuadRenderer : IDisposable
     private readonly uint _vao, _vbo, _ebo;
     private readonly Shader _shader;
     private readonly int _mvpLocation;
+    private readonly int _timeLocation;
     private bool _disposed;
     private readonly uint _indicesCount;
 
@@ -75,6 +76,7 @@ public class QuadRenderer : IDisposable
         }
 
         _mvpLocation = _gl.GetUniformLocation(_shader.Handle, "uMVP");
+        _timeLocation = _gl.GetUniformLocation(_shader.Handle, "uTime");
 
         _gl.BindVertexArray(0);
     }
@@ -90,6 +92,7 @@ public class QuadRenderer : IDisposable
             fixed (float* ptr = &MemoryMarshal.GetReference(MemoryMarshal.CreateSpan(ref mvp.M11, 16)))
             {
                 _gl.UniformMatrix4(_mvpLocation, 1, false, ptr);
+                _gl.Uniform1(_timeLocation, (float)DateTime.Now.TimeOfDay.TotalSeconds);
             }
             _gl.DrawElements(PrimitiveType.Triangles, _indicesCount, DrawElementsType.UnsignedShort, null);
         }
