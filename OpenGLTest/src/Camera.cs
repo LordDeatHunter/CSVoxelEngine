@@ -69,7 +69,7 @@ public class Camera
     public Matrix4x4 GetViewMatrix() => Matrix4x4.CreateLookAt(Position, Position + GetForward(), Vector3.UnitY);
 
     public Matrix4x4 GetProjectionMatrix() =>
-        Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI * _fov / 180f, _aspectRatio, 0.1f, 100f);
+        Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI * _fov / 180f, _aspectRatio, 0.01f, 100f);
 
     public Matrix4x4 GetViewProjection() => GetViewMatrix() * GetProjectionMatrix();
 
