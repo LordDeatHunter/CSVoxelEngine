@@ -13,6 +13,7 @@ internal static class Program
     private static Shader _shader;
     private static readonly List<Vector3> CubePositions = [];
     private static readonly Random Rng = new();
+    private static uint _texture = 0;
 
     public static void Main()
     {
@@ -55,8 +56,12 @@ internal static class Program
 
             var vs = FileUtils.ReadFile("assets/shaders/test-vertex.glsl");
             var fs = FileUtils.ReadFile("assets/shaders/test-fragment.glsl");
+            _texture = TextureLoader.LoadFromFile(gl, "assets/textures/atlas.png");
             _shader = new Shader(gl, vs, fs);
             _shader.Use();
+            gl.ActiveTexture(TextureUnit.Texture0);
+            gl.BindTexture(TextureTarget.Texture2D, _texture);
+            _shader.SetUniform("uTextureAtlas", 0);
 
             camera = new Camera(window, inputContext);
             mesh = Mesh.CreateCube(gl);
@@ -92,6 +97,8 @@ internal static class Program
             if (camera == null) return;
 
             _shader.SetUniform("uTime", (float)window.Time);
+            gl.ActiveTexture(TextureUnit.Texture0);
+            gl.BindTexture(TextureTarget.Texture2D, _texture);
 
             foreach (var pos in CubePositions)
             {
