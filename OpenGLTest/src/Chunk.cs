@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Silk.NET.OpenGL;
@@ -65,7 +66,29 @@ public class Chunk
         if (InBounds(x, y, z)) _blocks[x, y, z] = id;
     }
 
-    public byte GetBlock(int x, int y, int z) => InBounds(x, y, z) ? _blocks[x, y, z] : (byte)0;
+    public byte GetBlock(int x, int y, int z)
+    {
+        if (InBounds(x, y, z))
+            return _blocks[x, y, z];
+
+        var globalX = (int)(Position.X * Size) + x;
+        var globalY = (int)(Position.Y * Size) + y;
+        var globalZ = (int)(Position.Z * Size) + z;
+
+        var chunkX = MathF.Floor(globalX / (float)Size);
+        var chunkY = MathF.Floor(globalY / (float)Size);
+        var chunkZ = MathF.Floor(globalZ / (float)Size);
+
+        var localX = ((globalX % Size) + Size) % Size;
+        var localY = ((globalY % Size) + Size) % Size;
+        var localZ = ((globalZ % Size) + Size) % Size;
+
+        var neighborPos = new Vector3(chunkX, chunkY, chunkZ);
+
+        return Program.Chunks.TryGetValue(neighborPos, out var neighbor)
+            ? neighbor.GetBlock(localX, localY, localZ)
+            : (byte)0;
+    }
 
     private static bool InBounds(int x, int y, int z)
         => x >= 0 && y >= 0 && z >= 0 && x < Size && y < Size && z < Size;

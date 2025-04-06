@@ -10,6 +10,7 @@ namespace silkgltriangle;
 
 public static class Program
 {
+    public static readonly Dictionary<Vector3, Chunk> Chunks = new();
     public static void Main()
     {
         var windowOptions = WindowOptions.Default with
@@ -23,7 +24,6 @@ public static class Program
         using var window = Window.Create(windowOptions);
         IInputContext inputContext = null!;
         GL gl = null!;
-        List<Chunk> chunks = [];
         Mesh mesh = null!;
         Camera camera = null!;
         IKeyboard keyboard = null!;
@@ -54,17 +54,25 @@ public static class Program
             gl.DepthFunc(GLEnum.Lequal);
 
             const int chunkAmount = 50;
-            var currentGeneratedChunks = 0;
+            var currentChunk = 0;
             const int maxChunks = chunkAmount * chunkAmount * 2;
             for (var cx = 0; cx < chunkAmount; cx++)
             for (var cy = -1; cy <= 0; cy++)
             for (var cz = 0; cz < chunkAmount; cz++)
             {
-                Console.WriteLine("Chunk: " + ++currentGeneratedChunks + "/" + maxChunks);
-                var chunk = new Chunk(gl, new Vector3(cx, cy, cz));
+                Console.WriteLine("Generating chunk: " + ++currentChunk + "/" + maxChunks);
+                var chunkPos = new Vector3(cx, cy, cz);
+                var chunk = new Chunk(gl, chunkPos);
 
                 chunk.GenerateMesh();
-                chunks.Add(chunk);
+                Chunks[chunkPos] = chunk;
+            }
+            
+            currentChunk = 0;
+            foreach (var chunk in Chunks.Values)
+            {
+                Console.WriteLine("Regenerating chunk mesh: " + ++currentChunk + "/" + maxChunks);
+                chunk.GenerateMesh();
             }
         };
 
@@ -98,7 +106,7 @@ public static class Program
 
             var viewProj = camera.GetViewProjection();
 
-            foreach (var chunk in chunks)
+            foreach (var chunk in Chunks.Values)
             {
                 var mvp = Matrix4x4.CreateTranslation(chunk.Position * Chunk.Size) * viewProj;
                 shader.SetUniform("uMVP", mvp);
