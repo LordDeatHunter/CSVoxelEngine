@@ -68,9 +68,9 @@ public static class Program
 
             const int chunkAmount = 20;
             var currentChunk = 0;
-            const int maxChunks = chunkAmount * chunkAmount * 2;
+            const int maxChunks = chunkAmount * chunkAmount * 4;
             for (var cx = 0; cx < chunkAmount; cx++)
-            for (var cy = -1; cy <= 0; cy++)
+            for (var cy = -2; cy <= 1; cy++)
             for (var cz = 0; cz < chunkAmount; cz++)
             {
                 Console.WriteLine("Generating chunk: " + ++currentChunk + "/" + maxChunks);
