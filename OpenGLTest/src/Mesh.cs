@@ -144,4 +144,33 @@ public class Mesh : IDisposable
         Span<ushort> indices = [0, 1, 2, 0, 2, 3];
         return new Mesh(gl, vertices, indices);
     }
+
+    public static Mesh CreateUIQuad(GL gl, float pixelSize = 16)
+    {
+        var half = pixelSize / 2f;
+        var positions = new[]
+        {
+            new Vector3(-half, -half, 0),
+            new Vector3(-half,  half, 0),
+            new Vector3( half,  half, 0),
+            new Vector3( half, -half, 0)
+        };
+
+        var uvs = new[]
+        {
+            new Vector2(0, 1),
+            new Vector2(0, 0),
+            new Vector2(1, 0),
+            new Vector2(1, 1)
+        };
+
+        var vertices = new Vertex[4];
+        for (var i = 0; i < 4; i++)
+        {
+            vertices[i] = new Vertex(positions[i], 255, 255, 255, 255, uvs[i]);
+        }
+
+        var indices = new ushort[] { 0, 1, 2, 0, 2, 3 };
+        return new Mesh(gl, vertices, indices);
+    }
 }

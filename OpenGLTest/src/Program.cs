@@ -25,11 +25,13 @@ public static class Program
         IInputContext inputContext = null!;
         IMouse? mouse = null;
         GL gl = null!;
-        Mesh mesh = null!;
+        Mesh crosshairMesh = null!;
         Camera camera = null!;
         IKeyboard keyboard = null!;
         Shader shader = null!;
+        Shader uiShader = null!;
         uint texture = 0;
+        uint crosshairTex = 0;
 
         window.Load += () =>
         {
@@ -40,15 +42,24 @@ public static class Program
 
             var vs = FileUtils.ReadFile("assets/shaders/test-vertex.glsl");
             var fs = FileUtils.ReadFile("assets/shaders/test-fragment.glsl");
+            var uivs = FileUtils.ReadFile("assets/shaders/ui-vertex.glsl");
+            var uifs = FileUtils.ReadFile("assets/shaders/ui-fragment.glsl");
             texture = TextureLoader.LoadFromFile(gl, "assets/textures/atlas.png");
+            crosshairTex = TextureLoader.LoadFromFile(gl, "assets/textures/crosshair.png");
+
+            uiShader = new Shader(gl, uivs, uifs);
+            uiShader.SetUniform("uTex", 0);
+
             shader = new Shader(gl, vs, fs);
+            shader.SetUniform("uTextureAtlas", 0);
             shader.Use();
+            
             gl.ActiveTexture(TextureUnit.Texture0);
             gl.BindTexture(TextureTarget.Texture2D, texture);
-            shader.SetUniform("uTextureAtlas", 0);
 
             camera = new Camera(window, inputContext);
-            mesh = Mesh.CreateCube(gl);
+            crosshairMesh = Mesh.CreateUIQuad(gl, 32);
+
             gl.Viewport(window.FramebufferSize);
 
             gl.Enable(GLEnum.DepthTest);
@@ -82,7 +93,7 @@ public static class Program
 
         window.Closing += () =>
         {
-            mesh?.Dispose();
+            crosshairMesh?.Dispose();
             shader.Dispose();
         };
 
@@ -129,6 +140,27 @@ public static class Program
                 shader.SetUniform("uMVP", mvp);
                 chunk.Render();
             }
+            
+            gl.Disable(EnableCap.DepthTest);
+            gl.Enable(EnableCap.Blend);
+            gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+
+            uiShader.Use();
+            gl.BindTexture(TextureTarget.Texture2D, crosshairTex);
+
+            float w = window.Size.X;
+            float h = window.Size.Y;
+            var projection = Matrix4x4.CreateOrthographicOffCenter(0, w, h, 0, -1f, 1f);
+            var center = new Vector3(w / 2f, h / 2f, 0f);
+            var model = Matrix4x4.CreateTranslation(center);
+
+            uiShader.SetUniform("uProjection", projection);
+            uiShader.SetUniform("uModel", model);
+
+            crosshairMesh.Render();
+
+            gl.Disable(EnableCap.Blend);
+            gl.Enable(EnableCap.DepthTest);
         };
 
         window.Run();
