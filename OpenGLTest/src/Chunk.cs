@@ -120,8 +120,21 @@ public class Chunk
                 var basePos = new Vector3(x, y, z);
                 var uv = FaceUV(tile.X, tile.Y);
 
+                var brightness = normal switch
+                {
+                    _ when normal == Vector3.UnitY => 1.0f,
+                    _ when normal == Vector3.UnitZ => 0.9f,
+                    _ when normal == Vector3.UnitX => 0.85f,
+                    _ when normal == -Vector3.UnitZ => 0.8f,
+                    _ when normal == -Vector3.UnitX => 0.75f,
+                    _ when normal == -Vector3.UnitY => 0.6f,
+                    _ => 1.0f
+                };
+
+                var shade = (byte)(brightness * 255);
+
                 foreach (var (pos, uvCoord) in face.Zip(uv))
-                    vertices.Add(new Vertex(basePos + pos, 255, 255, 255, 255, uvCoord));
+                    vertices.Add(new Vertex(basePos + pos, shade, shade, shade, 255, uvCoord));
 
                 indices.Add((ushort)(indexOffset + 0));
                 indices.Add((ushort)(indexOffset + 1));
