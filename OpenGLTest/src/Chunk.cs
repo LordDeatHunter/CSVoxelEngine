@@ -14,12 +14,12 @@ public class Chunk
     private static readonly FastNoiseLite Noise;
     private static readonly Vector3[] NeighborOffsets =
     [
-        new Vector3(1, 0, 0),
-        new Vector3(-1, 0, 0),
-        new Vector3(0, 1, 0),
-        new Vector3(0, -1, 0),
-        new Vector3(0, 0, 1),
-        new Vector3(0, 0, -1)
+        new(1, 0, 0),
+        new(-1, 0, 0),
+        new(0, 1, 0),
+        new(0, -1, 0),
+        new(0, 0, 1),
+        new(0, 0, -1)
     ];
 
     public Vector3 Position { get; }
@@ -30,7 +30,7 @@ public class Chunk
     {
         Noise = new FastNoiseLite();
         Noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-        Noise.SetFrequency(0.01f);
+        Noise.SetFrequency(0.0025f);
         Noise.SetSeed(1337);
         Noise.SetFractalType(FastNoiseLite.FractalType.FBm);
         Noise.SetFractalOctaves(6);
@@ -112,7 +112,6 @@ public class Chunk
         HashSet<Vector3> chunksForUpdate = [Position];
         foreach (var neighborOffset in NeighborOffsets)
         {
-            // check the chunk of the neighboring blocks of the removed block
             var neighborPos = worldPos + neighborOffset;
             var chunkPos = new Vector3(
                 MathF.Floor(neighborPos.X / Size),
@@ -124,7 +123,7 @@ public class Chunk
                 chunksForUpdate.Add(neighbor.Position);
             }
         }
-        
+
         foreach (var chunkPos in chunksForUpdate)
         {
             if (Program.Chunks.TryGetValue(chunkPos, out var chunk))

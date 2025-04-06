@@ -5,6 +5,7 @@ using Silk.NET.Windowing;
 using System.Linq;
 using System.Numerics;
 using Silk.NET.Input;
+using Silk.NET.Maths;
 
 namespace silkgltriangle;
 
@@ -18,6 +19,7 @@ public static class Program
             Title = "OpenGL Test",
             PreferredDepthBufferBits = 24,
             PreferredStencilBufferBits = 8,
+            Size = new Vector2D<int>(1920, 1080),
             API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.Debug, new APIVersion(3, 3)),
         };
 
