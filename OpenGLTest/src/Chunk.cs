@@ -43,17 +43,17 @@ public class Chunk
             {
                 for (var yi = 0; yi < Size; yi++)
                 {
-                    SetBlock(x, yi, z, 1);
+                    SetBlock(x, yi, z, 2);
                 }
 
                 continue;
             }
 
-            if (y < 0) y = Size + y;
+            if (y < 0) y = (int)(Size - MathF.Abs(y) % Size);
 
-            for (var yi = 0; yi < y; yi++)
+            for (var yi = 0; yi <= y; yi++)
             {
-                SetBlock(x, yi, z, 1);
+                SetBlock(x, yi, z, (byte)(yi == y ? 1 : 2));
             }
         }
     }
@@ -105,7 +105,10 @@ public class Chunk
         {
             if (_blocks[x, y, z] == 0) continue;
 
-            foreach (var (normal, face, tile) in CubeFaces)
+            var blockId = _blocks[x, y, z];
+            var type = BlockType.Types[blockId];
+            
+            foreach (var (normal, face) in CubeFaces)
             {
                 var nx = x + (int)normal.X;
                 var ny = y + (int)normal.Y;
@@ -113,6 +116,7 @@ public class Chunk
 
                 if (GetBlock(nx, ny, nz) != 0) continue;
 
+                var tile = type.GetTile(normal);
                 var basePos = new Vector3(x, y, z);
                 var uv = FaceUV(tile.X, tile.Y);
 
@@ -154,7 +158,7 @@ public class Chunk
         ];
     }
 
-    private static readonly (Vector3 normal, Vector3[] face, Point tile)[] CubeFaces =
+    private static readonly (Vector3 normal, Vector3[] face)[] CubeFaces =
     [
         // Back
         (new Vector3(0, 0, -1),
@@ -163,7 +167,7 @@ public class Chunk
             new Vector3(0, 1, 0),
             new Vector3(1, 1, 0),
             new Vector3(1, 0, 0)
-        ], new Point(1, 0)),
+        ]),
 
         // Front
         (new Vector3(0, 0, 1),
@@ -172,7 +176,7 @@ public class Chunk
             new Vector3(1, 1, 1),
             new Vector3(0, 1, 1),
             new Vector3(0, 0, 1)
-        ], new Point(1, 0)),
+        ]),
 
         // Left
         (new Vector3(-1, 0, 0),
@@ -181,7 +185,7 @@ public class Chunk
             new Vector3(0, 1, 1),
             new Vector3(0, 1, 0),
             new Vector3(0, 0, 0)
-        ], new Point(1, 0)),
+        ]),
 
         // Right
         (new Vector3(1, 0, 0),
@@ -190,7 +194,7 @@ public class Chunk
             new Vector3(1, 1, 0),
             new Vector3(1, 1, 1),
             new Vector3(1, 0, 1)
-        ], new Point(1, 0)),
+        ]),
 
         // Top
         (new Vector3(0, 1, 0),
@@ -199,7 +203,7 @@ public class Chunk
             new Vector3(0, 1, 1),
             new Vector3(1, 1, 1),
             new Vector3(1, 1, 0)
-        ], new Point(0, 0)),
+        ]),
 
         // Bottom
         (new Vector3(0, -1, 0),
@@ -208,7 +212,7 @@ public class Chunk
             new Vector3(0, 0, 0),
             new Vector3(1, 0, 0),
             new Vector3(1, 0, 1)
-        ], new Point(2, 0))
+        ])
     ];
 
     private record struct Point(int X, int Y);

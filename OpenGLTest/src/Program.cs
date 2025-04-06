@@ -53,7 +53,7 @@ public static class Program
             gl.Enable(GLEnum.DebugOutput);
             gl.DepthFunc(GLEnum.Lequal);
 
-            const int chunkAmount = 50;
+            const int chunkAmount = 20;
             var currentChunk = 0;
             const int maxChunks = chunkAmount * chunkAmount * 2;
             for (var cx = 0; cx < chunkAmount; cx++)
