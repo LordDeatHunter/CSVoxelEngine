@@ -12,6 +12,15 @@ public class Chunk
     public const int Size = 16;
     private readonly byte[,,] _blocks = new byte[Size, Size, Size];
     private static readonly FastNoiseLite Noise;
+    private static readonly Vector3[] NeighborOffsets =
+    [
+        new Vector3(1, 0, 0),
+        new Vector3(-1, 0, 0),
+        new Vector3(0, 1, 0),
+        new Vector3(0, -1, 0),
+        new Vector3(0, 0, 1),
+        new Vector3(0, 0, -1)
+    ];
 
     public Vector3 Position { get; }
     private Mesh? _mesh;
@@ -98,7 +107,30 @@ public class Chunk
 
         if (!InBounds(localX, localY, localZ)) return;
         _blocks[localX, localY, localZ] = 0;
-        GenerateMesh();
+
+        HashSet<Vector3> chunksForUpdate = [Position];
+        foreach (var neighborOffset in NeighborOffsets)
+        {
+            // check the chunk of the neighboring blocks of the removed block
+            var neighborPos = worldPos + neighborOffset;
+            var chunkPos = new Vector3(
+                MathF.Floor(neighborPos.X / Size),
+                MathF.Floor(neighborPos.Y / Size),
+                MathF.Floor(neighborPos.Z / Size)
+            );
+            if (Program.Chunks.TryGetValue(chunkPos, out var neighbor))
+            {
+                chunksForUpdate.Add(neighbor.Position);
+            }
+        }
+        
+        foreach (var chunkPos in chunksForUpdate)
+        {
+            if (Program.Chunks.TryGetValue(chunkPos, out var chunk))
+            {
+                chunk.GenerateMesh();
+            }
+        }
     }
 
     private static bool InBounds(int x, int y, int z)
