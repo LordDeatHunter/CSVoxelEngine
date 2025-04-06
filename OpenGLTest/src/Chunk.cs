@@ -57,7 +57,7 @@ public class Chunk
             }
         }
     }
-    
+
     public int LowerBoundY => (int)Position.Y * Size;
     public int UpperBoundY => (int)Position.Y * Size + Size;
 
@@ -88,6 +88,17 @@ public class Chunk
         return Program.Chunks.TryGetValue(neighborPos, out var neighbor)
             ? neighbor.GetBlock(localX, localY, localZ)
             : (byte)0;
+    }
+
+    public void RemoveBlockAt(Vector3 worldPos)
+    {
+        var localX = (int)(worldPos.X - Position.X * Size);
+        var localY = (int)(worldPos.Y - Position.Y * Size);
+        var localZ = (int)(worldPos.Z - Position.Z * Size);
+
+        if (!InBounds(localX, localY, localZ)) return;
+        _blocks[localX, localY, localZ] = 0;
+        GenerateMesh();
     }
 
     private static bool InBounds(int x, int y, int z)

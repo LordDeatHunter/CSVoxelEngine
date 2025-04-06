@@ -23,6 +23,7 @@ public static class Program
 
         using var window = Window.Create(windowOptions);
         IInputContext inputContext = null!;
+        IMouse? mouse = null;
         GL gl = null!;
         Mesh mesh = null!;
         Camera camera = null!;
@@ -35,6 +36,7 @@ public static class Program
             gl = window.CreateOpenGL();
             inputContext = window.CreateInput();
             keyboard = inputContext.Keyboards.FirstOrDefault();
+            mouse = inputContext.Mice.FirstOrDefault();
 
             var vs = FileUtils.ReadFile("assets/shaders/test-vertex.glsl");
             var fs = FileUtils.ReadFile("assets/shaders/test-fragment.glsl");
@@ -86,10 +88,25 @@ public static class Program
 
         window.Update += delta =>
         {
-            if (camera == null || keyboard == null) return;
+            if (camera == null || keyboard == null || mouse == null) return;
 
             camera.Update((float)delta, keyboard);
             if (keyboard.IsKeyPressed(Key.Escape)) window.Close();
+
+            if (mouse.IsButtonPressed(MouseButton.Left))
+            {
+                if (!camera.Raycast(10f, out var hitPos, out _)) return;
+                var chunkPos = new Vector3(
+                    MathF.Floor(hitPos.X / Chunk.Size),
+                    MathF.Floor(hitPos.Y / Chunk.Size),
+                    MathF.Floor(hitPos.Z / Chunk.Size)
+                );
+
+                if (Chunks.TryGetValue(chunkPos, out var chunk))
+                {
+                    chunk.RemoveBlockAt(hitPos);
+                }
+            }
         };
 
         window.Render += delta =>

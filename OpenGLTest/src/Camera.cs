@@ -55,7 +55,7 @@ public class Camera
         var forward = Vector3.Normalize(Vector3.Cross(Vector3.UnitY, right));
 
         if (keyboard == null) return;
-        
+
         var moveSpeed = keyboard.IsKeyPressed(Key.ShiftLeft) ? _speed * 4 : _speed;
 
         if (keyboard.IsKeyPressed(Key.W)) Position += forward * moveSpeed * deltaTime;
@@ -83,5 +83,72 @@ public class Camera
             MathF.Sin(pitchRad),
             MathF.Cos(pitchRad) * MathF.Sin(yawRad)
         ));
+    }
+
+    public bool Raycast(float maxDistance, out Vector3 hitPos, out Vector3 hitNormal)
+    {
+        var direction = GetForward();
+        var pos = Position.Floor();
+        var step = direction.Sign();
+        var tDelta = Vector3.Abs(Vector3.One / direction);
+        var dist = Vector3.Distance(Vector3.Zero, direction);
+
+        var tMax = new Vector3(
+            (step.X > 0 ? pos.X + 1 - Position.X : Position.X - pos.X) * tDelta.X,
+            (step.Y > 0 ? pos.Y + 1 - Position.Y : Position.Y - pos.Y) * tDelta.Y,
+            (step.Z > 0 ? pos.Z + 1 - Position.Z : Position.Z - pos.Z) * tDelta.Z
+        );
+
+        hitPos = Vector3.Zero;
+        hitNormal = Vector3.Zero;
+
+        for (var i = 0; i < maxDistance * dist; i++)
+        {
+            var chunkPos = new Vector3(
+                MathF.Floor(pos.X / Chunk.Size),
+                MathF.Floor(pos.Y / Chunk.Size),
+                MathF.Floor(pos.Z / Chunk.Size)
+            );
+
+            if (Program.Chunks.TryGetValue(chunkPos, out var chunk))
+            {
+                var localX = (int)((pos.X % Chunk.Size + Chunk.Size) % Chunk.Size);
+                var localY = (int)((pos.Y % Chunk.Size + Chunk.Size) % Chunk.Size);
+                var localZ = (int)((pos.Z % Chunk.Size + Chunk.Size) % Chunk.Size);
+
+                if (chunk.GetBlock(localX, localY, localZ) != 0)
+                {
+                    hitPos = pos;
+                    hitNormal = Vector3.Zero;
+
+                    if (tMax.X < tMax.Y && tMax.X < tMax.Z)
+                        hitNormal.X = -step.X;
+                    else if (tMax.Y < tMax.Z)
+                        hitNormal.Y = -step.Y;
+                    else
+                        hitNormal.Z = -step.Z;
+
+                    return true;
+                }
+            }
+
+            if (tMax.X < tMax.Y && tMax.X < tMax.Z)
+            {
+                pos.X += step.X;
+                tMax.X += tDelta.X;
+            }
+            else if (tMax.Y < tMax.Z)
+            {
+                pos.Y += step.Y;
+                tMax.Y += tDelta.Y;
+            }
+            else
+            {
+                pos.Z += step.Z;
+                tMax.Z += tDelta.Z;
+            }
+        }
+
+        return false;
     }
 }
