@@ -145,8 +145,9 @@ public class Chunk
             var type = BlockType.Types[blockId];
             var basePos = new Vector3(x, y, z);
 
-            foreach (var (key, (normal, faces)) in CubeFaces)
+            for (var i = 0; i < CubeFaces.Length; i++)
             {
+                var (normal, face) = CubeFaces[i];
                 var nx = x + (int)normal.X;
                 var ny = y + (int)normal.Y;
                 var nz = z + (int)normal.Z;
@@ -156,21 +157,21 @@ public class Chunk
                 var tile = type.GetTile(normal);
                 var uv = FaceUV(tile.X, tile.Y);
 
-                for (var i = 0; i < 4; i++)
+                for (var j = 0; j < 4; j++)
                 {
-                    var face = faces[i];
-                    var aoNeighbor = AONeighbors[key][face];
-                    var pos = basePos + face;
-                    var uvCoord = uv[i];
+                    var faceCorner = face[j];
+                    var aoNeighbor = AONeighbors[i][j];
+                    var pos = basePos + faceCorner;
+                    var uvCoord = uv[j];
 
                     var side1AoNeighbor = aoNeighbor[0];
                     var side2AoNeighbor = aoNeighbor[1];
                     var cornerAoNeighbor = aoNeighbor[2];
-                    
+
                     var side1 = GetBlock(basePos + side1AoNeighbor) != 0;
                     var side2 = GetBlock(basePos + side2AoNeighbor) != 0;
                     var corner = GetBlock(basePos + cornerAoNeighbor) != 0;
-                    
+
                     var ao = VertexAO(side1, side2, corner);
 
                     var baseBrightness = normal switch
@@ -203,7 +204,7 @@ public class Chunk
         _mesh?.Dispose();
         _mesh = new Mesh(_gl, CollectionsMarshal.AsSpan(vertices), CollectionsMarshal.AsSpan(indices));
     }
-    
+
     public int VertexAO(bool side1, bool side2, bool corner) {
         if(side1 && side2)
         {
@@ -238,72 +239,55 @@ public class Chunk
         ];
     }
 
-    private static readonly Dictionary<string, (Vector3 normal, Vector3[] face)> CubeFaces = new()
-    {
-       { "BACK",   (new Vector3(0,  0, -1), [CubeVertexPositions.BackLeftBottom, CubeVertexPositions.BackLeftTop, CubeVertexPositions.BackRightTop, CubeVertexPositions.BackRightBottom])},
-       { "FRONT",  (new Vector3(0,  0,  1), [CubeVertexPositions.FrontRightBottom, CubeVertexPositions.FrontRightTop, CubeVertexPositions.FrontLeftTop, CubeVertexPositions.FrontLeftBottom])},
-       { "LEFT",   (new Vector3(-1, 0,  0), [CubeVertexPositions.FrontLeftBottom, CubeVertexPositions.FrontLeftTop, CubeVertexPositions.BackLeftTop, CubeVertexPositions.BackLeftBottom])},
-       { "RIGHT",  (new Vector3(1,  0,  0), [CubeVertexPositions.BackRightBottom, CubeVertexPositions.BackRightTop, CubeVertexPositions.FrontRightTop, CubeVertexPositions.FrontRightBottom])},
-       { "TOP",    (new Vector3(0,  1,  0), [CubeVertexPositions.BackLeftTop, CubeVertexPositions.FrontLeftTop, CubeVertexPositions.FrontRightTop, CubeVertexPositions.BackRightTop])},
-       { "BOTTOM", (new Vector3(0, -1,  0), [CubeVertexPositions.FrontLeftBottom, CubeVertexPositions.BackLeftBottom, CubeVertexPositions.BackRightBottom, CubeVertexPositions.FrontRightBottom])}
-    };
- 
-    private static readonly Dictionary<string, Dictionary<Vector3, Vector3[]>> AONeighbors =
-        new()
-        {
-            {
-                "BACK", new Dictionary<Vector3, Vector3[]>
-                {
-                    { CubeVertexPositions.BackLeftBottom, [Vector3Directions.LeftBackward, Vector3Directions.DownBackward, Vector3Directions.DownLeftBackward] },
-                    { CubeVertexPositions.BackLeftTop, [Vector3Directions.LeftBackward, Vector3Directions.UpBackward, Vector3Directions.UpLeftBackward] },
-                    { CubeVertexPositions.BackRightTop, [Vector3Directions.RightBackward, Vector3Directions.UpBackward, Vector3Directions.UpRightBackward] },
-                    { CubeVertexPositions.BackRightBottom, [Vector3Directions.RightBackward, Vector3Directions.DownBackward, Vector3Directions.DownRightBackward] }
-                }
-            },
-            {
-                "FRONT", new Dictionary<Vector3, Vector3[]>
-                {
-                    { CubeVertexPositions.FrontLeftBottom, [Vector3Directions.LeftForward, Vector3Directions.DownForward, Vector3Directions.DownLeftForward] },
-                    { CubeVertexPositions.FrontLeftTop, [Vector3Directions.LeftForward, Vector3Directions.UpForward, Vector3Directions.UpLeftForward] },
-                    { CubeVertexPositions.FrontRightTop, [Vector3Directions.RightForward, Vector3Directions.UpForward, Vector3Directions.UpRightForward] },
-                    { CubeVertexPositions.FrontRightBottom, [Vector3Directions.RightForward, Vector3Directions.DownForward, Vector3Directions.DownRightForward] }
-                }
-            },
-            {
-                "LEFT", new Dictionary<Vector3, Vector3[]>
-                {
-                    { CubeVertexPositions.BackLeftBottom, [Vector3Directions.DownLeft, Vector3Directions.LeftBackward, Vector3Directions.DownLeftBackward] },
-                    { CubeVertexPositions.BackLeftTop, [Vector3Directions.UpLeft, Vector3Directions.LeftBackward, Vector3Directions.UpLeftBackward] },
-                    { CubeVertexPositions.FrontLeftTop, [Vector3Directions.UpLeft, Vector3Directions.LeftForward, Vector3Directions.UpLeftForward] },
-                    { CubeVertexPositions.FrontLeftBottom, [Vector3Directions.DownLeft, Vector3Directions.LeftForward, Vector3Directions.DownLeftForward] }
-                }
-            },
-            {
-                "RIGHT", new Dictionary<Vector3, Vector3[]>
-                {
-                    { CubeVertexPositions.BackRightBottom, [Vector3Directions.DownRight, Vector3Directions.RightBackward, Vector3Directions.DownRightBackward] },
-                    { CubeVertexPositions.BackRightTop, [Vector3Directions.UpRight, Vector3Directions.RightBackward, Vector3Directions.UpRightBackward] },
-                    { CubeVertexPositions.FrontRightTop, [Vector3Directions.UpRight, Vector3Directions.RightForward, Vector3Directions.UpRightForward] },
-                    { CubeVertexPositions.FrontRightBottom, [Vector3Directions.DownRight, Vector3Directions.RightForward, Vector3Directions.DownRightForward] }
-                }
-            },
-            {
-                "TOP", new Dictionary<Vector3, Vector3[]>
-                {
-                    { CubeVertexPositions.BackLeftTop, [Vector3Directions.UpLeft, Vector3Directions.UpBackward, Vector3Directions.UpLeftBackward] },
-                    { CubeVertexPositions.FrontLeftTop, [Vector3Directions.UpLeft, Vector3Directions.UpForward, Vector3Directions.UpLeftForward] },
-                    { CubeVertexPositions.FrontRightTop, [Vector3Directions.UpRight, Vector3Directions.UpForward, Vector3Directions.UpRightForward] },
-                    { CubeVertexPositions.BackRightTop, [Vector3Directions.UpRight, Vector3Directions.UpBackward, Vector3Directions.UpRightBackward] }
-                }
-            },
-            {
-                "BOTTOM", new Dictionary<Vector3, Vector3[]>
-                {
-                    { CubeVertexPositions.BackLeftBottom, [Vector3Directions.DownLeft, Vector3Directions.DownBackward, Vector3Directions.DownLeftBackward] },
-                    { CubeVertexPositions.FrontLeftBottom, [Vector3Directions.DownLeft, Vector3Directions.DownForward, Vector3Directions.DownLeftForward] },
-                    { CubeVertexPositions.FrontRightBottom, [Vector3Directions.DownRight, Vector3Directions.DownForward, Vector3Directions.DownRightForward] },
-                    { CubeVertexPositions.BackRightBottom, [Vector3Directions.DownRight, Vector3Directions.DownBackward, Vector3Directions.DownRightBackward] }
-                }
-            }
-        };
+    private static readonly (Vector3 normal, Vector3[] face)[] CubeFaces =
+    [
+       (new Vector3(0,  0, -1), [CubeVertexPositions.BackLeftBottom, CubeVertexPositions.BackLeftTop, CubeVertexPositions.BackRightTop, CubeVertexPositions.BackRightBottom]),
+       (new Vector3(0,  0,  1), [CubeVertexPositions.FrontRightBottom, CubeVertexPositions.FrontRightTop, CubeVertexPositions.FrontLeftTop, CubeVertexPositions.FrontLeftBottom]),
+       (new Vector3(-1, 0,  0), [CubeVertexPositions.FrontLeftBottom, CubeVertexPositions.FrontLeftTop, CubeVertexPositions.BackLeftTop, CubeVertexPositions.BackLeftBottom]),
+       (new Vector3(1,  0,  0), [CubeVertexPositions.BackRightBottom, CubeVertexPositions.BackRightTop, CubeVertexPositions.FrontRightTop, CubeVertexPositions.FrontRightBottom]),
+       (new Vector3(0,  1,  0), [CubeVertexPositions.BackLeftTop, CubeVertexPositions.FrontLeftTop, CubeVertexPositions.FrontRightTop, CubeVertexPositions.BackRightTop]),
+       (new Vector3(0, -1,  0), [CubeVertexPositions.FrontLeftBottom, CubeVertexPositions.BackLeftBottom, CubeVertexPositions.BackRightBottom, CubeVertexPositions.FrontRightBottom])
+    ];
+
+    private static readonly Vector3[][][] AONeighbors =
+    [
+        [
+            [Vector3Directions.LeftBackward, Vector3Directions.DownBackward, Vector3Directions.DownLeftBackward],
+            [Vector3Directions.LeftBackward, Vector3Directions.UpBackward, Vector3Directions.UpLeftBackward],
+            [Vector3Directions.RightBackward, Vector3Directions.UpBackward, Vector3Directions.UpRightBackward],
+            [Vector3Directions.RightBackward, Vector3Directions.DownBackward, Vector3Directions.DownRightBackward],
+        ],
+        [
+            [Vector3Directions.RightForward, Vector3Directions.DownForward, Vector3Directions.DownRightForward],
+            [Vector3Directions.RightForward, Vector3Directions.UpForward, Vector3Directions.UpRightForward],
+            [Vector3Directions.LeftForward, Vector3Directions.UpForward, Vector3Directions.UpLeftForward],
+            [Vector3Directions.LeftForward, Vector3Directions.DownForward, Vector3Directions.DownLeftForward],
+        ],
+        [
+            [Vector3Directions.DownLeft, Vector3Directions.LeftForward, Vector3Directions.DownLeftForward],
+            [Vector3Directions.UpLeft, Vector3Directions.LeftForward, Vector3Directions.UpLeftForward],
+            [Vector3Directions.UpLeft, Vector3Directions.LeftBackward, Vector3Directions.UpLeftBackward],
+            [Vector3Directions.DownLeft, Vector3Directions.LeftBackward, Vector3Directions.DownLeftBackward],
+        ],
+        [
+            [Vector3Directions.DownRight, Vector3Directions.RightBackward, Vector3Directions.DownRightBackward],
+            [Vector3Directions.UpRight, Vector3Directions.RightBackward, Vector3Directions.UpRightBackward],
+            [Vector3Directions.UpRight, Vector3Directions.RightForward, Vector3Directions.UpRightForward],
+            [Vector3Directions.DownRight, Vector3Directions.RightForward, Vector3Directions.DownRightForward],
+        ],
+        [
+            [Vector3Directions.UpLeft, Vector3Directions.UpBackward, Vector3Directions.UpLeftBackward],
+            [Vector3Directions.UpLeft, Vector3Directions.UpForward, Vector3Directions.UpLeftForward],
+            [Vector3Directions.UpRight, Vector3Directions.UpForward, Vector3Directions.UpRightForward],
+            [Vector3Directions.UpRight, Vector3Directions.UpBackward, Vector3Directions.UpRightBackward],
+        ],
+        [
+            [Vector3Directions.DownLeft, Vector3Directions.DownForward, Vector3Directions.DownLeftForward],
+            [Vector3Directions.DownLeft, Vector3Directions.DownBackward, Vector3Directions.DownLeftBackward],
+            [Vector3Directions.DownRight, Vector3Directions.DownBackward, Vector3Directions.DownRightBackward],
+            [Vector3Directions.DownRight, Vector3Directions.DownForward, Vector3Directions.DownRightForward],
+        ]
+    ];
 }
+
+public record ChunkMeshData(List<Vertex> Vertices, List<ushort> Indices);
