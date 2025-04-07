@@ -21,7 +21,7 @@ public class Chunk
     {
         Noise = new FastNoiseLite();
         Noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-        Noise.SetFrequency(0.0025f);
+        Noise.SetFrequency(0.001f);
         Noise.SetSeed(1337);
         Noise.SetFractalType(FastNoiseLite.FractalType.FBm);
         Noise.SetFractalOctaves(6);
@@ -35,7 +35,7 @@ public class Chunk
         for (var x = 0; x < Size; x++)
         for (var z = 0; z < Size; z++)
         {
-            var y = (int)(Noise.GetNoise(x + position.X * Size, z + position.Z * Size) * 32F);
+            var y = (int)(Noise.GetNoise(x + position.X * Size, z + position.Z * Size) * 128F);
 
             if (y < LowerBoundY) continue;
 
@@ -121,7 +121,7 @@ public class Chunk
         {
             if (Program.Chunks.TryGetValue(chunkPos, out var chunk))
             {
-                chunk.GenerateMesh();
+                Program.ChunkQueue.Enqueue((chunkPos, chunk, chunk.GenerateMeshData()));
             }
         }
     }
@@ -129,7 +129,7 @@ public class Chunk
     private static bool InBounds(int x, int y, int z)
         => x >= 0 && y >= 0 && z >= 0 && x < Size && y < Size && z < Size;
 
-    public void GenerateMesh()
+    public ChunkMeshData GenerateMeshData()
     {
         List<Vertex> vertices = [];
         List<ushort> indices = [];
@@ -201,8 +201,13 @@ public class Chunk
             }
         }
 
+        return new ChunkMeshData(vertices, indices);
+    }
+
+    public void UpdateMesh(ChunkMeshData meshData)
+    {
         _mesh?.Dispose();
-        _mesh = new Mesh(_gl, CollectionsMarshal.AsSpan(vertices), CollectionsMarshal.AsSpan(indices));
+        _mesh = new Mesh(_gl, CollectionsMarshal.AsSpan(meshData.Vertices), CollectionsMarshal.AsSpan(meshData.Indices));
     }
 
     public int VertexAO(bool side1, bool side2, bool corner) {

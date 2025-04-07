@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 using System.Linq;
 using System.Numerics;
+using System.Threading.Tasks;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 
@@ -12,6 +14,9 @@ namespace silkgltriangle;
 public static class Program
 {
     public static readonly Dictionary<Vector3, Chunk> Chunks = new();
+    public static readonly ConcurrentQueue<(Vector3 pos, Chunk chunk, ChunkMeshData meshData)> ChunkQueue = new();
+    public static readonly ConcurrentQueue<Vector3> DirtyChunks = new();
+
     public static void Main()
     {
         var windowOptions = WindowOptions.Default with
@@ -35,6 +40,9 @@ public static class Program
         uint texture = 0;
         uint crosshairTex = 0;
 
+        const int maxChunksPerFrame = 256;
+        const int maxDirtyPerFrame = 256;
+
         window.Load += () =>
         {
             gl = window.CreateOpenGL();
@@ -55,7 +63,7 @@ public static class Program
             shader = new Shader(gl, vs, fs);
             shader.SetUniform("uTextureAtlas", 0);
             shader.Use();
-            
+
             gl.ActiveTexture(TextureUnit.Texture0);
             gl.BindTexture(TextureTarget.Texture2D, texture);
 
@@ -68,27 +76,20 @@ public static class Program
             gl.Enable(GLEnum.DebugOutput);
             gl.DepthFunc(GLEnum.Lequal);
 
-            const int chunkAmount = 20;
-            var currentChunk = 0;
-            const int maxChunks = chunkAmount * chunkAmount * 4;
-            for (var cx = 0; cx < chunkAmount; cx++)
-            for (var cy = -2; cy <= 1; cy++)
-            for (var cz = 0; cz < chunkAmount; cz++)
-            {
-                Console.WriteLine("Generating chunk: " + ++currentChunk + "/" + maxChunks);
-                var chunkPos = new Vector3(cx, cy, cz);
-                var chunk = new Chunk(gl, chunkPos);
+            const int chunkAmount = 60;
 
-                chunk.GenerateMesh();
-                Chunks[chunkPos] = chunk;
-            }
-            
-            currentChunk = 0;
-            foreach (var chunk in Chunks.Values)
+            Task.Run(() =>
             {
-                Console.WriteLine("Regenerating chunk mesh: " + ++currentChunk + "/" + maxChunks);
-                chunk.GenerateMesh();
-            }
+                for (var cx = 0; cx < chunkAmount; cx++)
+                for (var cy = -6; cy <= 6; cy++)
+                for (var cz = 0; cz < chunkAmount; cz++)
+                {
+                    var chunkPos = new Vector3(cx, cy, cz);
+                    var chunk = new Chunk(gl, chunkPos);
+                    var meshData = chunk.GenerateMeshData();
+                    ChunkQueue.Enqueue((chunkPos, chunk, meshData));
+                }
+            });
         };
 
         window.FramebufferResize += newSize => { gl.Viewport(newSize); };
@@ -101,6 +102,39 @@ public static class Program
 
         window.Update += delta =>
         {
+            Console.WriteLine(1 / delta);
+
+            var chunkCount = 0;
+            while (chunkCount < maxChunksPerFrame && ChunkQueue.TryDequeue(out var item))
+            {
+                var (pos, chunk, meshData) = item;
+                chunk.UpdateMesh(meshData);
+                Chunks[pos] = chunk;
+
+                foreach (var offset in Vector3Directions.CardinalDirections)
+                {
+                    var neighborPos = pos + offset;
+                    if (Chunks.ContainsKey(neighborPos))
+                    {
+                        DirtyChunks.Enqueue(neighborPos);
+                    }
+                }
+
+                chunkCount++;
+            }
+
+            var dirtyProcessed = 0;
+            while (dirtyProcessed < maxDirtyPerFrame && DirtyChunks.TryDequeue(out var pos))
+            {
+                if (Chunks.TryGetValue(pos, out var chunk))
+                {
+                    var meshData = chunk.GenerateMeshData();
+                    chunk.UpdateMesh(meshData);
+                }
+
+                dirtyProcessed++;
+            }
+
             if (camera == null || keyboard == null || mouse == null) return;
 
             camera.Update((float)delta, keyboard);
@@ -142,7 +176,7 @@ public static class Program
                 shader.SetUniform("uMVP", mvp);
                 chunk.Render();
             }
-            
+
             gl.Disable(EnableCap.DepthTest);
             gl.Enable(EnableCap.Blend);
             gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
