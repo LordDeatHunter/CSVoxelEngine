@@ -243,10 +243,17 @@ public static class Program
             gl.BindTexture(TextureTarget.Texture2D, texture);
 
             var viewProj = camera.GetViewProjection();
+            var frustum = new Frustum(viewProj);
 
             foreach (var chunk in Chunks.Values)
             {
                 chunk.lifetime += delta;
+                var min = chunk.Position * Chunk.Size;
+                var max = min + new Vector3(Chunk.Size);
+
+                if (!frustum.IntersectsAABB(min, max))
+                    continue;
+
                 var mvp = Matrix4x4.CreateTranslation(chunk.Position * Chunk.Size) * viewProj;
                 shader.SetUniform("uMVP", mvp);
                 shader.SetUniform("uAlpha", MathF.Min(1F, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
