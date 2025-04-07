@@ -37,7 +37,7 @@ public class Chunk
         {
             for (var z = 0; z < Size; z++)
             {
-                var y = (int)(Noise.GetNoise(x + position.X * Size, z + position.Z * Size) * 32f);
+                var y = (int)(Noise.GetNoise(x + position.X * Size, z + position.Z * Size) * 128f);
 
                 if (y < LowerBoundY) continue;
 

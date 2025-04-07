@@ -16,6 +16,7 @@ public static class Program
     public static readonly Dictionary<Vector3, Chunk> Chunks = new();
     public static readonly ConcurrentQueue<(Vector3 pos, Chunk chunk, ChunkMeshData meshData)> ChunkQueue = new();
     public static readonly ConcurrentQueue<Vector3> DirtyChunks = new();
+    public static readonly HashSet<Vector3> QueuedChunkPositions = new();
 
     public static void Main()
     {
@@ -76,18 +77,57 @@ public static class Program
             gl.Enable(GLEnum.DebugOutput);
             gl.DepthFunc(GLEnum.Lequal);
 
-            const int chunkAmount = 60;
-
-            Task.Run(() =>
+            Task.Run(async () =>
             {
-                for (var cx = 0; cx < chunkAmount; cx++)
-                for (var cy = -6; cy <= 6; cy++)
-                for (var cz = 0; cz < chunkAmount; cz++)
+                while (true)
                 {
-                    var chunkPos = new Vector3(cx, cy, cz);
-                    var chunk = new Chunk(gl, chunkPos);
-                    var meshData = chunk.GenerateMeshData();
-                    ChunkQueue.Enqueue((chunkPos, chunk, meshData));
+                    if (camera == null)
+                    {
+                        await Task.Delay(100);
+                        continue;
+                    }
+
+                    var camPos = camera.Position;
+                    var camChunk = (camPos / Chunk.Size).Floor();
+
+                    var candidates = new List<Vector3>();
+
+                    const int radius = 12;
+                    const int radiusSq = radius * radius;
+
+                    for (int dx = -radius; dx <= radius; dx++)
+                    for (int dy = -radius; dy <= radius; dy++)
+                    for (int dz = -radius; dz <= radius; dz++)
+                    {
+                        var offset = new Vector3(dx, dy, dz);
+                        var distSq = dx * dx + dy * dy + dz * dz;
+
+                        if (distSq > radiusSq)
+                            continue;
+
+                        var pos = camChunk + offset;
+
+                        if (Chunks.ContainsKey(pos) || !QueuedChunkPositions.Add(pos))
+                            continue;
+
+                        candidates.Add(pos);
+                    }
+
+                    candidates.Sort((a, b) =>
+                    {
+                        var da = Vector3.DistanceSquared(a, camChunk);
+                        var db = Vector3.DistanceSquared(b, camChunk);
+                        return da.CompareTo(db);
+                    });
+
+                    foreach (var pos in candidates)
+                    {
+                        var chunk = new Chunk(gl, pos);
+                        var meshData = chunk.GenerateMeshData();
+                        ChunkQueue.Enqueue((pos, chunk, meshData));
+                    }
+
+                    await Task.Delay(100);
                 }
             });
         };
