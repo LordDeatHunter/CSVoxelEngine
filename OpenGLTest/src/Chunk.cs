@@ -13,6 +13,8 @@ public class Chunk : IDisposable
     private readonly byte[,,] _blocks = new byte[Size, Size, Size];
     private static readonly FastNoiseLite Noise;
     private static readonly Vector3[] NeighborOffsets = Vector3Directions.CardinalDirections;
+    public double lifetime = 0.0f;
+    public const float MAX_LIFETIME = 0.5f;
 
     public Vector3 Position { get; }
     private Mesh? _mesh;

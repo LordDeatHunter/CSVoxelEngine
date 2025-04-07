@@ -172,6 +172,7 @@ public static class Program
                         DirtyChunks.Enqueue(neighborPos);
                     }
                 }
+
                 Chunks.Remove(pos);
                 QueuedChunkPositions.Remove(pos);
             }
@@ -233,6 +234,7 @@ public static class Program
             shader.Use();
             gl.ClearColor(0.3f, 0.6f, 0.9f, 1f);
             gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+            gl.Enable(EnableCap.Blend);
 
             if (camera == null) return;
 
@@ -244,13 +246,14 @@ public static class Program
 
             foreach (var chunk in Chunks.Values)
             {
+                chunk.lifetime += delta;
                 var mvp = Matrix4x4.CreateTranslation(chunk.Position * Chunk.Size) * viewProj;
                 shader.SetUniform("uMVP", mvp);
+                shader.SetUniform("uAlpha", MathF.Min(1F, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
                 chunk.Render();
             }
 
             gl.Disable(EnableCap.DepthTest);
-            gl.Enable(EnableCap.Blend);
             gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
             uiShader.Use();
@@ -267,7 +270,6 @@ public static class Program
 
             crosshairMesh.Render();
 
-            gl.Disable(EnableCap.Blend);
             gl.Enable(EnableCap.DepthTest);
         };
 
