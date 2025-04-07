@@ -14,7 +14,7 @@ public class Camera
 
     private float _fov = 70f;
     private float _aspectRatio = 1.6f;
-    private float _speed = 4f;
+    private float _speed = 8f;
     private float _sensitivity = 0.2f;
 
     private Vector2 _lastMouse;
@@ -56,7 +56,7 @@ public class Camera
 
         if (keyboard == null) return;
 
-        var moveSpeed = keyboard.IsKeyPressed(Key.ShiftLeft) ? _speed * 4 : _speed;
+        var moveSpeed = keyboard.IsKeyPressed(Key.ShiftLeft) ? _speed * 10 : _speed;
 
         if (keyboard.IsKeyPressed(Key.W)) Position += forward * moveSpeed * deltaTime;
         if (keyboard.IsKeyPressed(Key.S)) Position -= forward * moveSpeed * deltaTime;
