@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace silkgltriangle;
 
-public class Chunk
+public class Chunk : IDisposable
 {
     public const int Size = 16;
     private readonly byte[,,] _blocks = new byte[Size, Size, Size];
@@ -264,6 +264,13 @@ public class Chunk
             new Vector2(u + du, v),
             new Vector2(u + du, v + dv)
         ];
+    }
+    
+    public void Dispose()
+    {
+        _mesh?.Dispose();
+        _mesh = null;
+        GC.SuppressFinalize(this);
     }
 
     private static readonly (Vector3 normal, Vector3[] face)[] CubeFaces =

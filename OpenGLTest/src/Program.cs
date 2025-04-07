@@ -17,6 +17,8 @@ public static class Program
     public static readonly ConcurrentQueue<(Vector3 pos, Chunk chunk, ChunkMeshData meshData)> ChunkQueue = new();
     public static readonly ConcurrentQueue<Vector3> DirtyChunks = new();
     public static readonly HashSet<Vector3> QueuedChunkPositions = new();
+    public const int ActiveChunkRadius = 12;
+    private static readonly float ActiveChunkRadiusSq = ActiveChunkRadius * ActiveChunkRadius;
 
     public static void Main()
     {
@@ -143,6 +145,36 @@ public static class Program
         window.Update += delta =>
         {
             Console.WriteLine(1 / delta);
+
+            var camChunk = (camera.Position / Chunk.Size).Floor();
+            var chunksToRemove = new List<Vector3>();
+
+            foreach (var chunkPos in Chunks.Keys)
+            {
+                var offset = chunkPos - camChunk;
+                var distSq = offset.LengthSquared();
+
+                if (distSq > ActiveChunkRadiusSq)
+                {
+                    chunksToRemove.Add(chunkPos);
+                }
+            }
+
+            foreach (var pos in chunksToRemove)
+            {
+                if (!Chunks.TryGetValue(pos, out var chunk)) continue;
+                chunk.Dispose();
+                foreach (var offset in Vector3Directions.CardinalDirections)
+                {
+                    var neighborPos = pos + offset;
+                    if (Chunks.ContainsKey(neighborPos))
+                    {
+                        DirtyChunks.Enqueue(neighborPos);
+                    }
+                }
+                Chunks.Remove(pos);
+                QueuedChunkPositions.Remove(pos);
+            }
 
             var chunkCount = 0;
             while (chunkCount < maxChunksPerFrame && ChunkQueue.TryDequeue(out var item))
