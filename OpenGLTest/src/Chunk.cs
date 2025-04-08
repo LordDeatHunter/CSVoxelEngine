@@ -189,15 +189,15 @@ public class Chunk : IDisposable
                         var baseBrightness = normal switch
                         {
                             _ when normal == Vector3.UnitY => 1.0f,
-                            _ when normal == Vector3.UnitZ => 0.9f,
-                            _ when normal == Vector3.UnitX => 0.85f,
-                            _ when normal == -Vector3.UnitZ => 0.8f,
-                            _ when normal == -Vector3.UnitX => 0.75f,
-                            _ when normal == -Vector3.UnitY => 0.6f,
+                            _ when normal == Vector3.UnitZ => 0.95f,
+                            _ when normal == Vector3.UnitX => 0.9f,
+                            _ when normal == -Vector3.UnitZ => 0.85f,
+                            _ when normal == -Vector3.UnitX => 0.8f,
+                            _ when normal == -Vector3.UnitY => 0.75f,
                             _ => 1.0f
                         };
 
-                        var brightness = baseBrightness * ao * 0.2f;
+                        var brightness = baseBrightness * ao * MathUtils.ONE_THIRD;
                         var shade = (byte)(brightness * 255);
                         localVertices.Add(new Vertex(pos, shade, shade, shade, 255, uvCoord));
                     }
