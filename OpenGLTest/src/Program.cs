@@ -13,10 +13,10 @@ namespace silkgltriangle;
 
 public static class Program
 {
-    public static readonly Dictionary<Vector3, Chunk> Chunks = new();
+    public static readonly ConcurrentDictionary<Vector3, Chunk> Chunks = new();
     public static readonly ConcurrentQueue<(Vector3 pos, Chunk chunk, ChunkMeshData meshData)> ChunkQueue = new();
     public static readonly ConcurrentQueue<Vector3> DirtyChunks = new();
-    public static readonly HashSet<Vector3> QueuedChunkPositions = new();
+    public static readonly ConcurrentDictionary<Vector3, byte> QueuedChunkPositions = new();
     public const int ActiveChunkRadius = 12;
     private static readonly float ActiveChunkRadiusSq = ActiveChunkRadius * ActiveChunkRadius;
 
@@ -109,7 +109,7 @@ public static class Program
 
                         var pos = camChunk + offset;
 
-                        if (Chunks.ContainsKey(pos) || !QueuedChunkPositions.Add(pos))
+                        if (Chunks.ContainsKey(pos) || !QueuedChunkPositions.TryAdd(pos, 0))
                             continue;
 
                         candidates.Add(pos);
@@ -173,8 +173,8 @@ public static class Program
                     }
                 }
 
-                Chunks.Remove(pos);
-                QueuedChunkPositions.Remove(pos);
+                Chunks.TryRemove(pos, out _);
+                QueuedChunkPositions.TryRemove(pos, out _);
             }
 
             var chunkCount = 0;
