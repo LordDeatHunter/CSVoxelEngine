@@ -83,53 +83,60 @@ public static class Program
             {
                 while (true)
                 {
-                    if (camera == null)
+                    try
                     {
+                        if (camera == null)
+                        {
+                            await Task.Delay(100);
+                            continue;
+                        }
+
+                        var camPos = camera.Position;
+                        var camChunk = (camPos / Chunk.Size).Floor();
+
+                        var candidates = new List<Vector3>();
+
+                        const int radius = 12;
+                        const int radiusSq = radius * radius;
+
+                        for (int dx = -radius; dx <= radius; dx++)
+                        for (int dy = -radius; dy <= radius; dy++)
+                        for (int dz = -radius; dz <= radius; dz++)
+                        {
+                            var offset = new Vector3(dx, dy, dz);
+                            var distSq = dx * dx + dy * dy + dz * dz;
+
+                            if (distSq > radiusSq)
+                                continue;
+
+                            var pos = camChunk + offset;
+
+                            if (Chunks.ContainsKey(pos) || !QueuedChunkPositions.TryAdd(pos, 0))
+                                continue;
+
+                            candidates.Add(pos);
+                        }
+
+                        candidates.Sort((a, b) =>
+                        {
+                            var da = Vector3.DistanceSquared(a, camChunk);
+                            var db = Vector3.DistanceSquared(b, camChunk);
+                            return da.CompareTo(db);
+                        });
+
+                        foreach (var pos in candidates)
+                        {
+                            var chunk = new Chunk(gl, pos);
+                            var meshData = chunk.GenerateMeshData();
+                            ChunkQueue.Enqueue((pos, chunk, meshData));
+                        }
+
                         await Task.Delay(100);
-                        continue;
                     }
-
-                    var camPos = camera.Position;
-                    var camChunk = (camPos / Chunk.Size).Floor();
-
-                    var candidates = new List<Vector3>();
-
-                    const int radius = 12;
-                    const int radiusSq = radius * radius;
-
-                    for (int dx = -radius; dx <= radius; dx++)
-                    for (int dy = -radius; dy <= radius; dy++)
-                    for (int dz = -radius; dz <= radius; dz++)
+                    catch (Exception e)
                     {
-                        var offset = new Vector3(dx, dy, dz);
-                        var distSq = dx * dx + dy * dy + dz * dz;
-
-                        if (distSq > radiusSq)
-                            continue;
-
-                        var pos = camChunk + offset;
-
-                        if (Chunks.ContainsKey(pos) || !QueuedChunkPositions.TryAdd(pos, 0))
-                            continue;
-
-                        candidates.Add(pos);
+                        Console.WriteLine($"Error while generating chunks: {e}");
                     }
-
-                    candidates.Sort((a, b) =>
-                    {
-                        var da = Vector3.DistanceSquared(a, camChunk);
-                        var db = Vector3.DistanceSquared(b, camChunk);
-                        return da.CompareTo(db);
-                    });
-
-                    foreach (var pos in candidates)
-                    {
-                        var chunk = new Chunk(gl, pos);
-                        var meshData = chunk.GenerateMeshData();
-                        ChunkQueue.Enqueue((pos, chunk, meshData));
-                    }
-
-                    await Task.Delay(100);
                 }
             });
         };
@@ -144,7 +151,7 @@ public static class Program
 
         window.Update += delta =>
         {
-            Console.WriteLine(1 / delta);
+            Console.WriteLine($"FPS: {(int)(1 / delta)}");
 
             var camChunk = (camera.Position / Chunk.Size).Floor();
             var chunksToRemove = new List<Vector3>();
@@ -245,7 +252,8 @@ public static class Program
             var viewProj = camera.GetViewProjection();
             var frustum = new Frustum(viewProj);
 
-            foreach (var chunk in Chunks.Values)
+            var chunkList = Chunks.Values.ToList();
+            foreach (var chunk in chunkList)
             {
                 chunk.lifetime += delta;
                 var min = chunk.Position * Chunk.Size;
