@@ -68,4 +68,34 @@ public static class Vector3Directions
         DownRightForward,
         DownRightBackward
     ];
+    
+    public static readonly Vector3[] AllDirections =
+    [
+        Up,
+        Down,
+        Left,
+        Right,
+        Forward,
+        Backward,
+        UpRight,
+        UpLeft,
+        DownRight,
+        DownLeft,
+        UpForward,
+        UpBackward,
+        DownForward,
+        DownBackward,
+        LeftForward,
+        LeftBackward,
+        RightForward,
+        RightBackward,
+        UpLeftForward,
+        UpLeftBackward,
+        UpRightForward,
+        UpRightBackward,
+        DownLeftForward,
+        DownLeftBackward,
+        DownRightForward,
+        DownRightBackward
+    ];
 }

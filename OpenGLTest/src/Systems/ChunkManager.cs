@@ -49,7 +49,7 @@ public class ChunkManager
             if (!Chunks.TryGetValue(pos, out var chunk)) continue;
             chunk.Dispose();
 
-            foreach (var offset in Vector3Directions.CardinalDirections)
+            foreach (var offset in Vector3Directions.AllDirections)
             {
                 var neighborPos = pos + offset;
                 if (Chunks.ContainsKey(neighborPos))
@@ -69,7 +69,7 @@ public class ChunkManager
             chunk.UpdateMesh(meshData);
             Chunks[pos] = chunk;
 
-            foreach (var offset in Vector3Directions.CardinalDirections)
+            foreach (var offset in Vector3Directions.AllDirections)
             {
                 var neighborPos = pos + offset;
                 if (Chunks.ContainsKey(neighborPos))
@@ -109,18 +109,30 @@ public class ChunkManager
         Chunks[pos] = chunk;
 
         dirtyChunks.Enqueue(pos);
-        foreach (var offset in Vector3Directions.CardinalDirections)
+        foreach (var offset in Vector3Directions.AllDirections)
         {
             var neighborPos = pos + offset;
             if (Chunks.ContainsKey(neighborPos))
                 dirtyChunks.Enqueue(neighborPos);
         }
     }
-    
+
+    public void MarkDirty(Vector3 pos)
+    {
+        dirtyChunks.Enqueue(pos);
+    }
+
+    public void ImmediateRemesh(Vector3 pos)
+    {
+        if (!Chunks.TryGetValue(pos, out var chunk) || !HasAllNeighbors(pos)) return;
+        var meshData = chunk.GenerateMeshData(this);
+        chunk.UpdateMesh(meshData);
+    }
+
     public bool NeedsChunk(Vector3 pos)
     {
         return !Chunks.ContainsKey(pos) && !queuedChunkPositions.ContainsKey(pos);
     }
     
-    private bool HasAllNeighbors(Vector3 pos) => Vector3Directions.CardinalDirections.All(offset => Chunks.ContainsKey(pos + offset));
+    private bool HasAllNeighbors(Vector3 pos) => Vector3Directions.AllDirections.All(offset => Chunks.ContainsKey(pos + offset));
 }

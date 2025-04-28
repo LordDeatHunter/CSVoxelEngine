@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Silk.NET.OpenGL;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -107,7 +106,9 @@ public class Chunk : IDisposable
         if (!InBounds(localX, localY, localZ)) return;
         _blocks[localX, localY, localZ] = 0;
 
-        HashSet<Vector3> chunksForUpdate = [Position];
+        chunkManager.ImmediateRemesh(Position);
+
+        HashSet<Vector3> chunksForUpdate = [];
         foreach (var neighborOffset in NeighborOffsets)
         {
             var neighborPos = worldPos + neighborOffset;
@@ -116,6 +117,7 @@ public class Chunk : IDisposable
                 MathF.Floor(neighborPos.Y / Size),
                 MathF.Floor(neighborPos.Z / Size)
             );
+
             if (chunkManager.Chunks.TryGetValue(chunkPos, out var neighbor))
             {
                 chunksForUpdate.Add(neighbor.Position);
@@ -124,10 +126,7 @@ public class Chunk : IDisposable
 
         foreach (var chunkPos in chunksForUpdate)
         {
-            if (chunkManager.Chunks.TryGetValue(chunkPos, out var chunk))
-            {
-                chunkManager.QueueChunk(chunkPos);
-            }
+            chunkManager.MarkDirty(chunkPos);
         }
     }
 
