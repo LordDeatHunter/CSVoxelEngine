@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Threading.Tasks;
 using Silk.NET.OpenGL;
 
 namespace silkgltriangle;
@@ -99,7 +100,16 @@ public class ChunkManager
             return;
 
         var chunk = new Chunk(gl, pos);
-        var meshData = chunk.GenerateMeshData(this);
-        chunkQueue.Enqueue((pos, chunk, meshData));
+
+        Task.Run(() =>
+        {
+            var meshData = chunk.GenerateMeshData(this);
+            chunkQueue.Enqueue((pos, chunk, meshData));
+        });
+    }
+    
+    public bool NeedsChunk(Vector3 pos)
+    {
+        return !Chunks.ContainsKey(pos) && !queuedChunkPositions.ContainsKey(pos);
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Silk.NET.OpenGL;
@@ -63,7 +64,6 @@ public class World
                             continue;
 
                         var pos = camChunk + offset;
-
                         candidates.Add(pos);
                     }
 
@@ -74,7 +74,7 @@ public class World
                         return da.CompareTo(db);
                     });
 
-                    foreach (var pos in candidates)
+                    foreach (var pos in candidates.Where(pos => chunkManager.NeedsChunk(pos)))
                     {
                         chunkManager.QueueChunk(pos);
                     }
