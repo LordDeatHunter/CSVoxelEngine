@@ -17,6 +17,9 @@ public class WindowManager : IDisposable
             PreferredStencilBufferBits = 8,
             Size = new Vector2D<int>(1920, 1080),
             API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.Debug, new APIVersion(3, 3)),
+            VSync = false,
+            UpdatesPerSecond = 0,
+            FramesPerSecond = 0,
         };
 
         Window = Silk.NET.Windowing.Window.Create(windowOptions);
