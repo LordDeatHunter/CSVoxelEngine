@@ -71,9 +71,9 @@ public class Chunk : IDisposable
         if (InBounds(x, y, z)) _blocks[x, y, z] = id;
     }
 
-    public byte GetBlock(Vector3 pos) => GetBlock((int)pos.X, (int)pos.Y, (int)pos.Z);
+    public byte GetBlock(Vector3 pos, ChunkManager chunkManager) => GetBlock((int)pos.X, (int)pos.Y, (int)pos.Z, chunkManager);
 
-    public byte GetBlock(int x, int y, int z)
+    public byte GetBlock(int x, int y, int z, ChunkManager chunkManager)
     {
         if (InBounds(x, y, z))
             return _blocks[x, y, z];
@@ -92,12 +92,12 @@ public class Chunk : IDisposable
 
         var neighborPos = new Vector3(chunkX, chunkY, chunkZ);
 
-        return Program.Chunks.TryGetValue(neighborPos, out var neighbor)
-            ? neighbor.GetBlock(localX, localY, localZ)
+        return chunkManager.Chunks.TryGetValue(neighborPos, out var neighbor)
+            ? neighbor.GetBlock(localX, localY, localZ, chunkManager)
             : (byte)0;
     }
 
-    public void RemoveBlockAt(Vector3 worldPos)
+    public void RemoveBlockAt(Vector3 worldPos, ChunkManager chunkManager)
     {
         var localX = (int)(worldPos.X - Position.X * Size);
         var localY = (int)(worldPos.Y - Position.Y * Size);
@@ -115,7 +115,7 @@ public class Chunk : IDisposable
                 MathF.Floor(neighborPos.Y / Size),
                 MathF.Floor(neighborPos.Z / Size)
             );
-            if (Program.Chunks.TryGetValue(chunkPos, out var neighbor))
+            if (chunkManager.Chunks.TryGetValue(chunkPos, out var neighbor))
             {
                 chunksForUpdate.Add(neighbor.Position);
             }
@@ -123,9 +123,9 @@ public class Chunk : IDisposable
 
         foreach (var chunkPos in chunksForUpdate)
         {
-            if (Program.Chunks.TryGetValue(chunkPos, out var chunk))
+            if (chunkManager.Chunks.TryGetValue(chunkPos, out var chunk))
             {
-                Program.ChunkQueue.Enqueue((chunkPos, chunk, chunk.GenerateMeshData()));
+                chunkManager.QueueChunk(chunkPos);
             }
         }
     }
@@ -133,7 +133,7 @@ public class Chunk : IDisposable
     private static bool InBounds(int x, int y, int z)
         => x >= 0 && y >= 0 && z >= 0 && x < Size && y < Size && z < Size;
 
-    public ChunkMeshData GenerateMeshData()
+    public ChunkMeshData GenerateMeshData(ChunkManager chunkManager)
     {
         var finalVertices = new List<Vertex>();
         var finalIndices = new List<ushort>();
@@ -164,7 +164,7 @@ public class Chunk : IDisposable
                     var ny = y + (int)normal.Y;
                     var nz = z + (int)normal.Z;
 
-                    if (GetBlock(nx, ny, nz) != 0) continue;
+                    if (GetBlock(nx, ny, nz, chunkManager) != 0) continue;
 
                     var tile = type.GetTile(normal);
                     var uv = FaceUV(tile.X, tile.Y);
@@ -180,9 +180,9 @@ public class Chunk : IDisposable
                         var side2AoNeighbor = aoNeighbor[1];
                         var cornerAoNeighbor = aoNeighbor[2];
 
-                        var side1 = GetBlock(basePos + side1AoNeighbor) != 0;
-                        var side2 = GetBlock(basePos + side2AoNeighbor) != 0;
-                        var corner = GetBlock(basePos + cornerAoNeighbor) != 0;
+                        var side1 = GetBlock(basePos + side1AoNeighbor, chunkManager) != 0;
+                        var side2 = GetBlock(basePos + side2AoNeighbor, chunkManager) != 0;
+                        var corner = GetBlock(basePos + cornerAoNeighbor, chunkManager) != 0;
 
                         var ao = VertexAO(side1, side2, corner);
 
