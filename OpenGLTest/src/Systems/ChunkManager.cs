@@ -1,7 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
-using System.Threading.Tasks;
 using Silk.NET.OpenGL;
 
 namespace silkgltriangle;
@@ -81,15 +81,21 @@ public class ChunkManager
             chunkCount++;
         }
 
-        int dirtyProcessed = 0;
+        var dirtyProcessed = 0;
         while (dirtyProcessed < maxDirtyPerFrame && dirtyChunks.TryDequeue(out var pos))
         {
             if (Chunks.TryGetValue(pos, out var chunk))
             {
-                var meshData = chunk.GenerateMeshData(this);
-                chunk.UpdateMesh(meshData);
+                if (HasAllNeighbors(pos))
+                {
+                    var meshData = chunk.GenerateMeshData(this);
+                    chunk.UpdateMesh(meshData);
+                }
+                else
+                {
+                    dirtyChunks.Enqueue(pos);
+                }
             }
-
             dirtyProcessed++;
         }
     }
@@ -100,16 +106,21 @@ public class ChunkManager
             return;
 
         var chunk = new Chunk(gl, pos);
+        Chunks[pos] = chunk;
 
-        Task.Run(() =>
+        dirtyChunks.Enqueue(pos);
+        foreach (var offset in Vector3Directions.CardinalDirections)
         {
-            var meshData = chunk.GenerateMeshData(this);
-            chunkQueue.Enqueue((pos, chunk, meshData));
-        });
+            var neighborPos = pos + offset;
+            if (Chunks.ContainsKey(neighborPos))
+                dirtyChunks.Enqueue(neighborPos);
+        }
     }
     
     public bool NeedsChunk(Vector3 pos)
     {
         return !Chunks.ContainsKey(pos) && !queuedChunkPositions.ContainsKey(pos);
     }
+    
+    private bool HasAllNeighbors(Vector3 pos) => Vector3Directions.CardinalDirections.All(offset => Chunks.ContainsKey(pos + offset));
 }

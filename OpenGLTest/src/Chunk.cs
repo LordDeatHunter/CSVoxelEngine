@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Silk.NET.OpenGL;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -234,8 +235,9 @@ public class Chunk : IDisposable
         _mesh = new Mesh(_gl, CollectionsMarshal.AsSpan(meshData.Vertices), CollectionsMarshal.AsSpan(meshData.Indices));
     }
 
-    public int VertexAO(bool side1, bool side2, bool corner) {
-        if(side1 && side2)
+    public int VertexAO(bool side1, bool side2, bool corner)
+    {
+        if (side1 && side2)
         {
             return 0;
         }
@@ -267,7 +269,7 @@ public class Chunk : IDisposable
             new Vector2(u + du, v + dv)
         ];
     }
-    
+
     public void Dispose()
     {
         _mesh?.Dispose();
