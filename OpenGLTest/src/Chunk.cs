@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace silkgltriangle;
 
+/// <summary>
+/// Represents a 16x16x16 chunk of blocks in the world.
+/// </summary>
 public class Chunk : IDisposable
 {
     public const int Size = 16;
@@ -35,32 +38,47 @@ public class Chunk : IDisposable
         _gl = gl;
         Position = position;
 
+        GenerateBlockData();
+    }
+
+    private void GenerateBlockData()
+    {
         Parallel.For(0, Size, x =>
         {
             for (var z = 0; z < Size; z++)
             {
-                var y = (int)(Noise.GetNoise(x + position.X * Size, z + position.Z * Size) * Noise.GetNoise(z + position.Z * Size, x + position.X * Size) * 256F);
-
-                if (y < LowerBoundY) continue;
-
-                if (y >= UpperBoundY)
-                {
-                    for (var yi = 0; yi < Size; yi++)
-                    {
-                        SetBlock(x, yi, z, 2);
-                    }
-                    continue;
-                }
-
-                if (y < 0) y = Size - (int)MathF.Abs(y) % Size;
-                y %= Size;
-
-                for (var yi = 0; yi <= y; yi++)
-                {
-                    SetBlock(x, yi, z, (byte)(yi == y ? 1 : 2));
-                }
+                GenerateColumn(x, z);
             }
         });
+    }
+
+    private void GenerateColumn(int x, int z)
+    {
+        var worldX = x + Position.X * Size;
+        var worldZ = z + Position.Z * Size;
+        
+        var heightNoise = Noise.GetNoise(worldX, worldZ) * Noise.GetNoise(worldZ, worldX);
+        var terrainHeight = (int)(heightNoise * 256f);
+
+        if (terrainHeight < LowerBoundY) return;
+
+        if (terrainHeight >= UpperBoundY)
+        {
+            for (var y = 0; y < Size; y++)
+                SetBlock(x, y, z, 2);
+            return;
+        }
+
+        if (terrainHeight < 0) 
+            terrainHeight = Size - (int)MathF.Abs(terrainHeight) % Size;
+        
+        var localHeight = terrainHeight % Size;
+
+        for (var y = 0; y <= localHeight; y++)
+        {
+            var blockType = (byte)(y == localHeight ? 1 : 2);
+            SetBlock(x, y, z, blockType);
+        }
     }
 
     public int LowerBoundY => (int)Position.Y * Size;

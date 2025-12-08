@@ -69,16 +69,30 @@ public class RenderManager : IDisposable
 
         var viewProj = camera.GetViewProjection();
         var frustum = new Frustum(viewProj);
+        var camChunkPos = (camera.Position / Chunk.Size).Floor();
 
+        // Sort chunks by distance for better cache coherency and early z-rejection
+        var visibleChunks = new List<(Chunk chunk, float distSq)>();
+        
         foreach (var chunk in chunks)
         {
-            chunk.lifetime += 1.0 / 60.0; // TODO: Pass delta time eventually
             var min = chunk.Position * Chunk.Size;
             var max = min + new Vector3(Chunk.Size);
 
             if (!frustum.IntersectsAABB(min, max))
                 continue;
+                
+            var distSq = Vector3.DistanceSquared(chunk.Position, camChunkPos);
+            visibleChunks.Add((chunk, distSq));
+        }
+        
+        // Sort by distance (front to back for better z-buffer performance)
+        visibleChunks.Sort((a, b) => a.distSq.CompareTo(b.distSq));
 
+        foreach (var (chunk, _) in visibleChunks)
+        {
+            chunk.lifetime += 1.0 / 60.0; // TODO: Pass delta time eventually
+            
             var mvp = Matrix4x4.CreateTranslation(chunk.Position * Chunk.Size) * viewProj;
             worldShader.SetUniform("uMVP", mvp);
             worldShader.SetUniform("uAlpha", MathF.Min(1F, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));

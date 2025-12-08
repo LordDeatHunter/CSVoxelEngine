@@ -1,97 +1,50 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Threading.Tasks;
 using Silk.NET.OpenGL;
 using Silk.NET.Input;
 using Silk.NET.Windowing;
 
 namespace silkgltriangle;
 
+/// <summary>
+/// Main world class that manages the camera, chunks, and world generation.
+/// </summary>
 public class World
 {
-    private readonly Camera camera;
-    private readonly ChunkManager chunkManager;
-    private readonly IWindow window;
+    private readonly Camera _camera;
+    private readonly ChunkManager _chunkManager;
+    private readonly ChunkGenerationWorker _generationWorker;
+    private readonly IWindow _window;
 
     public World(GL gl, IWindow window, IInputContext input)
     {
-        this.window = window;
-        camera = new Camera(window, input);
-        chunkManager = new ChunkManager(gl);
-
-        StartChunkGeneration();
+        _window = window;
+        _camera = new Camera(window, input);
+        _chunkManager = new ChunkManager(gl);
+        _generationWorker = new ChunkGenerationWorker(_chunkManager, _camera);
+        
+        _generationWorker.Start();
     }
 
     public void Update(double deltaTime, IKeyboard? keyboard)
     {
-        camera.Update((float)deltaTime, keyboard);
-        chunkManager.Update(camera);
+        _camera.Update((float)deltaTime, keyboard);
+        _chunkManager.Update(_camera);
     }
 
     public void Render(RenderManager renderManager)
     {
-        renderManager.RenderWorld(camera, chunkManager.Chunks.Values, window.Time);
+        renderManager.RenderWorld(_camera, _chunkManager.Chunks.Values, _window.Time);
     }
 
     public void RenderUI(RenderManager renderManager)
     {
-        renderManager.RenderUI(window);
-    }
-
-    private async void StartChunkGeneration()
-    {
-        await Task.Run(async () =>
-        {
-            while (true)
-            {
-                try
-                {
-                    var camChunk = (camera.Position / Chunk.Size).Floor();
-                    var candidates = new List<Vector3>();
-                    const int radius = 12;
-                    const int radiusSq = radius * radius;
-
-                    for (int dx = -radius; dx <= radius; dx++)
-                    for (int dy = -radius; dy <= radius; dy++)
-                    for (int dz = -radius; dz <= radius; dz++)
-                    {
-                        var offset = new Vector3(dx, dy, dz);
-                        var distSq = dx * dx + dy * dy + dz * dz;
-
-                        if (distSq > radiusSq)
-                            continue;
-
-                        var pos = camChunk + offset;
-                        candidates.Add(pos);
-                    }
-
-                    candidates.Sort((a, b) =>
-                    {
-                        var da = Vector3.DistanceSquared(a, camChunk);
-                        var db = Vector3.DistanceSquared(b, camChunk);
-                        return da.CompareTo(db);
-                    });
-
-                    foreach (var pos in candidates.Where(pos => chunkManager.NeedsChunk(pos)))
-                    {
-                        chunkManager.QueueChunk(pos);
-                    }
-
-                    await Task.Delay(100);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error generating chunks: {ex}");
-                }
-            }
-        });
+        renderManager.RenderUI(_window);
     }
     
     public void TryRemoveBlockFromRaycast(float maxDistance)
     {
-        if (!camera.Raycast(maxDistance, chunkManager, out var hitPos, out var hitNormal))
+        if (!_camera.Raycast(maxDistance, _chunkManager, out var hitPos, out _))
             return;
 
         var chunkPos = new Vector3(
@@ -100,11 +53,11 @@ public class World
             MathF.Floor(hitPos.Z / Chunk.Size)
         );
 
-        if (chunkManager.Chunks.TryGetValue(chunkPos, out var chunk))
+        if (_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk))
         {
-            chunk.RemoveBlockAt(hitPos, chunkManager);
+            chunk.RemoveBlockAt(hitPos, _chunkManager);
         }
     }
     
-    public ChunkManager GetChunkManager() => chunkManager;
+    public ChunkManager GetChunkManager() => _chunkManager;
 }
