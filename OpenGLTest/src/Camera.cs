@@ -11,14 +11,23 @@ public class Camera
     public Vector3 Position { get; private set; } = new(0, 0, 3);
     public float Yaw { get; private set; } = -90f;
     public float Pitch { get; private set; } = 0f;
+    public bool IsGrounded { get; private set; }
+    public float VerticalVelocity => _verticalVelocity;
 
     private const float DefaultFov = 70f;
     private const float NearPlane = 0.01f;
     private const float FarPlane = 1000f;
     private const float BaseSpeed = 8f;
     private const float MouseSensitivity = 0.2f;
+    private const float Gravity = 34f;
+    private const float JumpSpeed = 11f;
+    private const float PlayerHeight = 1.8f;
+    private const float EyeHeight = 1.62f;
+    private const float PlayerRadius = 0.30f;
+    private const float CollisionStepSize = 0.05f;
 
     private float _aspectRatio = 16f / 10f;
+    private float _verticalVelocity;
     private Vector2 _lastMousePosition;
     private bool _firstMouseMovement = true;
 
@@ -55,23 +64,135 @@ public class Camera
         Pitch = Math.Clamp(Pitch, -89f, 89f);
     }
 
-    public void Update(float deltaTime, IKeyboard? keyboard)
+    public void Update(float deltaTime, IKeyboard? keyboard, ChunkManager chunkManager)
     {
-        if (keyboard == null)
+        if (keyboard == null || chunkManager == null)
             return;
-        
-        var moveSpeed = keyboard.IsKeyPressed(Key.ShiftLeft) ? BaseSpeed * 10f : BaseSpeed;
 
+        var moveSpeed = keyboard.IsKeyPressed(Key.ShiftLeft) ? BaseSpeed * 10f : BaseSpeed;
         var direction = GetForwardVector();
         var right = Vector3.Normalize(Vector3.Cross(direction, Vector3.UnitY));
-        var forward = Vector3.Normalize(Vector3.Cross(Vector3.UnitY, right));
+        var forward = Vector3.Normalize(new Vector3(direction.X, 0f, direction.Z));
 
-        if (keyboard.IsKeyPressed(Key.W)) Position += forward * moveSpeed * deltaTime;
-        if (keyboard.IsKeyPressed(Key.S)) Position -= forward * moveSpeed * deltaTime;
-        if (keyboard.IsKeyPressed(Key.A)) Position -= right * moveSpeed * deltaTime;
-        if (keyboard.IsKeyPressed(Key.D)) Position += right * moveSpeed * deltaTime;
-        if (keyboard.IsKeyPressed(Key.Space)) Position += Vector3.UnitY * moveSpeed * deltaTime;
-        if (keyboard.IsKeyPressed(Key.ControlLeft)) Position -= Vector3.UnitY * moveSpeed * deltaTime;
+        Vector3 moveInput = Vector3.Zero;
+        if (keyboard.IsKeyPressed(Key.W)) moveInput += forward;
+        if (keyboard.IsKeyPressed(Key.S)) moveInput -= forward;
+        if (keyboard.IsKeyPressed(Key.A)) moveInput -= right;
+        if (keyboard.IsKeyPressed(Key.D)) moveInput += right;
+
+        if (moveInput.LengthSquared() > 1f)
+            moveInput = Vector3.Normalize(moveInput);
+
+        if (IsGrounded && keyboard.IsKeyPressed(Key.Space))
+        {
+            _verticalVelocity = JumpSpeed;
+            IsGrounded = false;
+        }
+
+        _verticalVelocity -= Gravity * deltaTime;
+
+        var frameMovement = moveInput * moveSpeed * deltaTime;
+        frameMovement.Y = _verticalVelocity * deltaTime;
+
+        Position = MoveOnAxis(Position, frameMovement.X, 0, chunkManager, out _);
+        Position = MoveOnAxis(Position, frameMovement.Z, 2, chunkManager, out _);
+
+        Position = MoveOnAxis(Position, frameMovement.Y, 1, chunkManager, out var collidedY);
+        if (collidedY)
+        {
+            if (frameMovement.Y < 0f)
+                IsGrounded = true;
+
+            _verticalVelocity = 0f;
+        }
+        else
+        {
+            IsGrounded = false;
+        }
+    }
+
+    private Vector3 MoveOnAxis(Vector3 start, float delta, int axis, ChunkManager chunkManager, out bool collided)
+    {
+        collided = false;
+        if (MathF.Abs(delta) < float.Epsilon)
+            return start;
+
+        var position = start;
+        var remaining = delta;
+
+        while (MathF.Abs(remaining) > float.Epsilon)
+        {
+            var step = Math.Clamp(remaining, -CollisionStepSize, CollisionStepSize);
+            var candidate = OffsetAxis(position, axis, step);
+
+            if (IsColliding(candidate, chunkManager))
+            {
+                collided = true;
+                break;
+            }
+
+            position = candidate;
+            remaining -= step;
+        }
+
+        return position;
+    }
+
+    private static Vector3 OffsetAxis(Vector3 value, int axis, float delta)
+    {
+        return axis switch
+        {
+            0 => new Vector3(value.X + delta, value.Y, value.Z),
+            1 => new Vector3(value.X, value.Y + delta, value.Z),
+            2 => new Vector3(value.X, value.Y, value.Z + delta),
+            _ => value
+        };
+    }
+
+    private bool IsColliding(Vector3 eyePosition, ChunkManager chunkManager)
+    {
+        var min = new Vector3(
+            eyePosition.X - PlayerRadius,
+            eyePosition.Y - EyeHeight,
+            eyePosition.Z - PlayerRadius);
+        var max = new Vector3(
+            eyePosition.X + PlayerRadius,
+            eyePosition.Y - EyeHeight + PlayerHeight,
+            eyePosition.Z + PlayerRadius);
+
+        var minX = (int)MathF.Floor(min.X);
+        var minY = (int)MathF.Floor(min.Y);
+        var minZ = (int)MathF.Floor(min.Z);
+        var maxX = (int)MathF.Floor(max.X);
+        var maxY = (int)MathF.Floor(max.Y);
+        var maxZ = (int)MathF.Floor(max.Z);
+
+        for (var x = minX; x <= maxX; x++)
+        for (var y = minY; y <= maxY; y++)
+        for (var z = minZ; z <= maxZ; z++)
+        {
+            if (IsSolidBlock(x, y, z, chunkManager))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsSolidBlock(int worldX, int worldY, int worldZ, ChunkManager chunkManager)
+    {
+        var chunkPos = new Vector3(
+            MathF.Floor(worldX / (float)Chunk.Size),
+            MathF.Floor(worldY / (float)Chunk.Size),
+            MathF.Floor(worldZ / (float)Chunk.Size));
+
+        if (!chunkManager.Chunks.TryGetValue(chunkPos, out var chunk))
+            return false;
+
+        var localX = ((worldX % Chunk.Size) + Chunk.Size) % Chunk.Size;
+        var localY = ((worldY % Chunk.Size) + Chunk.Size) % Chunk.Size;
+        var localZ = ((worldZ % Chunk.Size) + Chunk.Size) % Chunk.Size;
+
+        return chunk.GetBlock(localX, localY, localZ, chunkManager) != 0;
     }
 
     public Matrix4x4 GetViewMatrix() => Matrix4x4.CreateLookAt(Position, Position + GetForwardVector(), Vector3.UnitY);

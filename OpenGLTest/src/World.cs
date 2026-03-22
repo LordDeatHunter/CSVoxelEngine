@@ -31,11 +31,13 @@ public class World
 
     public void Update(double deltaTime, IKeyboard? keyboard)
     {
-        _camera.Update((float)deltaTime, keyboard);
+        _camera.Update((float)deltaTime, keyboard, _chunkManager);
         _chunkManager.Update(_camera);
 
         _hasSelectedBlock = _camera.Raycast(10f, _chunkManager, out _selectedBlockPosition, out _selectedFaceNormal);
     }
+
+    public Camera Camera => _camera;
 
     public void Render(RenderManager renderManager)
     {

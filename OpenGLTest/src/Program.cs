@@ -10,6 +10,9 @@ public static class Program
     private static InputManager inputManager;
     private static RenderManager renderManager;
     private static World world;
+    private static bool debugEnabled;
+    private static bool xWasPressed;
+    private static double debugLogTimer;
 
     public static void Main()
     {
@@ -33,7 +36,13 @@ public static class Program
     
     private static void OnUpdate(double deltaTime)
     {
-        Console.WriteLine($"FPS: {(int)(1 / deltaTime)}");
+        var xPressed = inputManager.Keyboard?.IsKeyPressed(Key.X) == true;
+        if (xPressed && !xWasPressed)
+        {
+            debugEnabled = !debugEnabled;
+            Console.WriteLine($"Debug {(debugEnabled ? "ON" : "OFF")}");
+        }
+        xWasPressed = xPressed;
 
         if (inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true)
         {
@@ -46,6 +55,19 @@ public static class Program
         }
 
         world?.Update((float)deltaTime, inputManager.Keyboard);
+
+        if (debugEnabled && world != null)
+        {
+            debugLogTimer += deltaTime;
+            if (debugLogTimer >= 0.2)
+            {
+                var fps = deltaTime > 0 ? (int)(1 / deltaTime) : 0;
+                var position = world.Camera.Position;
+                Console.WriteLine(
+                    $"FPS {fps} | Pos ({position.X:F2}, {position.Y:F2}, {position.Z:F2}) | Grounded {world.Camera.IsGrounded} | Vy {world.Camera.VerticalVelocity:F2}");
+                debugLogTimer = 0;
+            }
+        }
 
         if (inputManager.Keyboard?.IsKeyPressed(Key.Escape) == true)
             windowManager.Window.Close();
