@@ -1,6 +1,9 @@
-﻿using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
 using System.Threading.Tasks;
 using Silk.NET.OpenGL;
 
@@ -16,8 +19,10 @@ public class ChunkManager(GL gl)
     private readonly ConcurrentQueue<(Vector3 pos, Chunk chunk, ChunkMeshData meshData)> _completedMeshQueue = new();
     private readonly ConcurrentDictionary<Vector3, byte> _dirtyChunks = new();
     private readonly ConcurrentDictionary<Vector3, byte> _queuedChunkPositions = new();
-    private readonly ConcurrentDictionary<Vector3, byte> _generatingChunks = new();
 
+    // Track active mesh generation to avoid duplicates
+    private readonly ConcurrentDictionary<Vector3, byte> _generatingMeshes = new();
+    private readonly SemaphoreSlim _meshSemaphore = new(WorldGenerationConfig.MaxConcurrentMeshGenerations);
 
     public void Update(Camera camera)
     {
@@ -26,161 +31,152 @@ public class ChunkManager(GL gl)
         var camChunk = (camera.Position / Chunk.Size).Floor();
 
         UnloadDistantChunks(camChunk);
-        CleanupStaleGenerations(camChunk);
         ApplyCompletedMeshes(camChunk);
-        CleanupDistantDirtyChunks(camChunk);
         ProcessDirtyChunks(camChunk);
     }
 
     private void UnloadDistantChunks(Vector3 camChunk)
     {
-        var chunksToRemove = Chunks.Keys
-            .Where(pos => Vector3.DistanceSquared(pos, camChunk) > WorldGenerationConfig.ChunkRadiusSq)
-            .ToList();
-
-        foreach (var pos in chunksToRemove)
+        foreach (var pos in Chunks.Keys)
         {
+            if (Vector3.DistanceSquared(pos, camChunk) <= WorldGenerationConfig.ChunkRadiusSq)
+                continue;
+                
             if (!Chunks.TryRemove(pos, out var chunk)) continue;
             
             chunk.Dispose();
             _queuedChunkPositions.TryRemove(pos, out _);
-            _generatingChunks.TryRemove(pos, out _);
-
-            foreach (var offset in Vector3Directions.AllDirections)
-            {
-                var neighborPos = pos + offset;
-                if (Chunks.ContainsKey(neighborPos))
-                    _dirtyChunks.TryAdd(neighborPos, 0);
-            }
-        }
-    }
-
-    private void CleanupStaleGenerations(Vector3 camChunk)
-    {
-        var staleGenerations = _generatingChunks.Keys
-            .Where(pos => Vector3.DistanceSquared(pos, camChunk) > WorldGenerationConfig.ChunkRadiusSq)
-            .ToList();
-        
-        foreach (var pos in staleGenerations)
-        {
-            _generatingChunks.TryRemove(pos, out _);
+            _generatingMeshes.TryRemove(pos, out _);
+            _dirtyChunks.TryRemove(pos, out _);
         }
     }
 
     private void ApplyCompletedMeshes(Vector3 camChunk)
     {
+        // Drain into a temporary list to sort by distance
+        var pending = new List<(Vector3 pos, Chunk chunk, ChunkMeshData meshData)>();
+        while (_completedMeshQueue.TryDequeue(out var item))
+        {
+            pending.Add(item);
+        }
+        
+        if (pending.Count == 0) return;
+        
+        // Sort closest first
+        pending.Sort((a, b) =>
+            Vector3.DistanceSquared(a.pos, camChunk)
+                .CompareTo(Vector3.DistanceSquared(b.pos, camChunk)));
+
         var appliedCount = 0;
         
-        while (appliedCount < WorldGenerationConfig.MaxChunksPerFrame && 
-               _completedMeshQueue.TryDequeue(out var item))
+        foreach (var (pos, chunk, meshData) in pending)
         {
-            var (pos, chunk, meshData) = item;
-            
-            if (Vector3.DistanceSquared(pos, camChunk) > WorldGenerationConfig.ChunkRadiusSq)
-            {
-                _generatingChunks.TryRemove(pos, out _);
+            // Skip chunks that moved out of range or were unloaded
+            if (Vector3.DistanceSquared(pos, camChunk) > WorldGenerationConfig.ChunkRadiusSq ||
+                !Chunks.ContainsKey(pos))
                 continue;
-            }
             
-            chunk.UpdateMesh(meshData);
-            _generatingChunks.TryRemove(pos, out _);
-
-            foreach (var offset in Vector3Directions.AllDirections)
+            if (appliedCount < WorldGenerationConfig.MaxMeshUploadsPerFrame)
             {
-                var neighborPos = pos + offset;
-                if (Chunks.ContainsKey(neighborPos))
-                    _dirtyChunks.TryAdd(neighborPos, 0);
+                chunk.UpdateMesh(meshData);
+                appliedCount++;
             }
-
-            appliedCount++;
-        }
-    }
-
-    private void CleanupDistantDirtyChunks(Vector3 camChunk)
-    {
-        var distantDirtyChunks = _dirtyChunks.Keys
-            .Where(pos => Vector3.DistanceSquared(pos, camChunk) > WorldGenerationConfig.ChunkRadiusSq)
-            .ToList();
-        
-        foreach (var pos in distantDirtyChunks)
-        {
-            _dirtyChunks.TryRemove(pos, out _);
+            else
+            {
+                // Re-queue for next frame
+                _completedMeshQueue.Enqueue((pos, chunk, meshData));
+            }
         }
     }
 
     private void ProcessDirtyChunks(Vector3 camChunk)
     {
-        var sortedDirtyChunks = _dirtyChunks.Keys
-            .Select(pos => new { pos, distSq = Vector3.DistanceSquared(pos, camChunk) })
-            .OrderBy(x => x.distSq)
-            .Select(x => x.pos)
-            .ToList();
+        // Snapshot and sort dirty chunks by distance
+        var dirtyPositions = _dirtyChunks.Keys.ToArray();
+        
+        Array.Sort(dirtyPositions, (a, b) =>
+            Vector3.DistanceSquared(a, camChunk)
+                .CompareTo(Vector3.DistanceSquared(b, camChunk)));
 
         var processedCount = 0;
 
-        foreach (var pos in sortedDirtyChunks)
+        foreach (var pos in dirtyPositions)
         {
             if (processedCount >= WorldGenerationConfig.MaxDirtyChunksPerFrame)
                 break;
 
-            if (_generatingChunks.Count >= WorldGenerationConfig.MaxConcurrentMeshGenerations)
-                break;
+            // Out of range - just remove
+            if (Vector3.DistanceSquared(pos, camChunk) > WorldGenerationConfig.ChunkRadiusSq)
+            {
+                _dirtyChunks.TryRemove(pos, out _);
+                continue;
+            }
 
+            if (!Chunks.TryGetValue(pos, out var chunk))
+            {
+                _dirtyChunks.TryRemove(pos, out _);
+                continue;
+            }
+
+            // Not ready yet or already meshing - skip, will retry next frame
+            if (!chunk.IsBlockDataReady || _generatingMeshes.ContainsKey(pos))
+                continue;
+
+            if (!HasAllNeighbors(pos))
+                continue;
+
+            // Ready to mesh
             if (!_dirtyChunks.TryRemove(pos, out _))
                 continue;
 
-            if (Vector3.DistanceSquared(pos, camChunk) > WorldGenerationConfig.ChunkRadiusSq)
-                continue;
-
-            if (!Chunks.TryGetValue(pos, out var chunk))
-                continue;
-
-            if (HasAllNeighbors(pos) && !_generatingChunks.ContainsKey(pos))
-            {
-                StartMeshGeneration(pos, chunk);
-            }
-            else if (!HasAllNeighbors(pos))
-            {
-                _dirtyChunks.TryAdd(pos, 0);
-            }
-
+            StartMeshGeneration(pos, chunk);
             processedCount++;
         }
     }
 
     private void StartMeshGeneration(Vector3 pos, Chunk chunk)
     {
-        _generatingChunks.TryAdd(pos, 0);
+        if (!_generatingMeshes.TryAdd(pos, 0))
+            return;
         
-        Task.Run(() =>
+        Task.Run(async () =>
         {
+            await _meshSemaphore.WaitAsync();
             try
             {
+                if (!Chunks.ContainsKey(pos))
+                    return;
+                    
                 var meshData = chunk.GenerateMeshData(this);
                 _completedMeshQueue.Enqueue((pos, chunk, meshData));
             }
             finally
             {
-                _generatingChunks.TryRemove(pos, out _);
+                _generatingMeshes.TryRemove(pos, out _);
+                _meshSemaphore.Release();
             }
         });
     }
 
-
     /// <summary>
-    /// Queues a new chunk for creation and marks it for mesh generation.
+    /// Creates a chunk and generates its block data synchronously.
+    /// Called from the generation worker thread which already iterates by distance.
     /// </summary>
     public void QueueChunk(Vector3 pos)
     {
         if (Chunks.ContainsKey(pos) || !_queuedChunkPositions.TryAdd(pos, 0))
             return;
 
-        var chunk = new Chunk(gl, pos);
+        // Create chunk AND generate block data right here.
+        // This is called from the generation worker's background thread,
+        // which already processes closest chunks first.
+        var chunk = new Chunk(gl, pos, generateBlockData: true);
         Chunks[pos] = chunk;
 
+        // Mark this chunk and neighbors dirty for meshing
         _dirtyChunks.TryAdd(pos, 0);
         
-        foreach (var offset in Vector3Directions.AllDirections)
+        foreach (var offset in Vector3Directions.CardinalDirections)
         {
             var neighborPos = pos + offset;
             if (Chunks.ContainsKey(neighborPos))
@@ -202,6 +198,7 @@ public class ChunkManager(GL gl)
     public void ImmediateRemesh(Vector3 pos)
     {
         if (!Chunks.TryGetValue(pos, out var chunk)) return;
+        if (!chunk.IsBlockDataReady) return;
         if (!HasAllNeighbors(pos)) return;
         
         var meshData = chunk.GenerateMeshData(this);
@@ -217,10 +214,15 @@ public class ChunkManager(GL gl)
     }
     
     /// <summary>
-    /// Checks if all 6 cardinal neighbors of a chunk are loaded.
+    /// Checks if all 6 cardinal neighbors of a chunk are loaded and have block data ready.
     /// </summary>
     private bool HasAllNeighbors(Vector3 pos)
     {
-        return Vector3Directions.AllDirections.All(offset => Chunks.ContainsKey(pos + offset));
+        foreach (var offset in Vector3Directions.CardinalDirections)
+        {
+            if (!Chunks.TryGetValue(pos + offset, out var neighbor) || !neighbor.IsBlockDataReady)
+                return false;
+        }
+        return true;
     }
 }

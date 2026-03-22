@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Silk.NET.OpenGL;
 using System.Numerics;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 
 namespace silkgltriangle;
 
@@ -22,6 +21,11 @@ public class Chunk : IDisposable
     public Vector3 Position { get; }
     private Mesh? _mesh;
     private readonly GL _gl;
+    
+    /// <summary>
+    /// Whether block data has been fully generated and is ready for meshing.
+    /// </summary>
+    public volatile bool IsBlockDataReady;
 
     static Chunk()
     {
@@ -33,23 +37,27 @@ public class Chunk : IDisposable
         Noise.SetFractalOctaves(6);
     }
 
-    public Chunk(GL gl, Vector3 position)
+    public Chunk(GL gl, Vector3 position, bool generateBlockData = true)
     {
         _gl = gl;
         Position = position;
 
-        GenerateBlockData();
+        if (generateBlockData)
+        {
+            GenerateBlockData();
+        }
     }
 
-    private void GenerateBlockData()
+    public void GenerateBlockData()
     {
-        Parallel.For(0, Size, x =>
+        for (int x = 0; x < Size; x++)
         {
             for (var z = 0; z < Size; z++)
             {
                 GenerateColumn(x, z);
             }
-        });
+        }
+        IsBlockDataReady = true;
     }
 
     private void GenerateColumn(int x, int z)
@@ -153,97 +161,77 @@ public class Chunk : IDisposable
 
     public ChunkMeshData GenerateMeshData(ChunkManager chunkManager)
     {
-        var finalVertices = new List<Vertex>();
-        var finalIndices = new List<ushort>();
+        var vertices = new List<Vertex>();
+        var indices = new List<ushort>();
+        ushort indexOffset = 0;
 
-        object lockObj = new();
-
-        ushort globalIndexOffset = 0;
-
-        Parallel.For(0, Size, x =>
+        for (int x = 0; x < Size; x++)
+        for (int y = 0; y < Size; y++)
+        for (int z = 0; z < Size; z++)
         {
-            var localVertices = new List<Vertex>();
-            var localIndices = new List<ushort>();
-            ushort indexOffset = 0;
+            if (_blocks[x, y, z] == 0) continue;
 
-            for (int y = 0; y < Size; y++)
-            for (int z = 0; z < Size; z++)
+            var blockId = _blocks[x, y, z];
+            var type = BlockType.Types[blockId];
+            var basePos = new Vector3(x, y, z);
+
+            for (var i = 0; i < CubeFaces.Length; i++)
             {
-                if (_blocks[x, y, z] == 0) continue;
+                var (normal, face) = CubeFaces[i];
+                var nx = x + (int)normal.X;
+                var ny = y + (int)normal.Y;
+                var nz = z + (int)normal.Z;
 
-                var blockId = _blocks[x, y, z];
-                var type = BlockType.Types[blockId];
-                var basePos = new Vector3(x, y, z);
+                if (GetBlock(nx, ny, nz, chunkManager) != 0) continue;
 
-                for (var i = 0; i < CubeFaces.Length; i++)
+                var tile = type.GetTile(normal);
+                var uv = FaceUV(tile.X, tile.Y);
+
+                for (var j = 0; j < 4; j++)
                 {
-                    var (normal, face) = CubeFaces[i];
-                    var nx = x + (int)normal.X;
-                    var ny = y + (int)normal.Y;
-                    var nz = z + (int)normal.Z;
+                    var faceCorner = face[j];
+                    var aoNeighbor = AONeighbors[i][j];
+                    var pos = basePos + faceCorner;
+                    var uvCoord = uv[j];
 
-                    if (GetBlock(nx, ny, nz, chunkManager) != 0) continue;
+                    var side1AoNeighbor = aoNeighbor[0];
+                    var side2AoNeighbor = aoNeighbor[1];
+                    var cornerAoNeighbor = aoNeighbor[2];
 
-                    var tile = type.GetTile(normal);
-                    var uv = FaceUV(tile.X, tile.Y);
+                    var side1 = GetBlock(basePos + side1AoNeighbor, chunkManager) != 0;
+                    var side2 = GetBlock(basePos + side2AoNeighbor, chunkManager) != 0;
+                    var corner = GetBlock(basePos + cornerAoNeighbor, chunkManager) != 0;
 
-                    for (var j = 0; j < 4; j++)
+                    var ao = VertexAO(side1, side2, corner);
+
+                    var baseBrightness = normal switch
                     {
-                        var faceCorner = face[j];
-                        var aoNeighbor = AONeighbors[i][j];
-                        var pos = basePos + faceCorner;
-                        var uvCoord = uv[j];
+                        _ when normal == Vector3.UnitY => 1.0f,
+                        _ when normal == Vector3.UnitZ => 0.95f,
+                        _ when normal == Vector3.UnitX => 0.9f,
+                        _ when normal == -Vector3.UnitZ => 0.85f,
+                        _ when normal == -Vector3.UnitX => 0.8f,
+                        _ when normal == -Vector3.UnitY => 0.75f,
+                        _ => 1.0f
+                    };
 
-                        var side1AoNeighbor = aoNeighbor[0];
-                        var side2AoNeighbor = aoNeighbor[1];
-                        var cornerAoNeighbor = aoNeighbor[2];
-
-                        var side1 = GetBlock(basePos + side1AoNeighbor, chunkManager) != 0;
-                        var side2 = GetBlock(basePos + side2AoNeighbor, chunkManager) != 0;
-                        var corner = GetBlock(basePos + cornerAoNeighbor, chunkManager) != 0;
-
-                        var ao = VertexAO(side1, side2, corner);
-
-                        var baseBrightness = normal switch
-                        {
-                            _ when normal == Vector3.UnitY => 1.0f,
-                            _ when normal == Vector3.UnitZ => 0.95f,
-                            _ when normal == Vector3.UnitX => 0.9f,
-                            _ when normal == -Vector3.UnitZ => 0.85f,
-                            _ when normal == -Vector3.UnitX => 0.8f,
-                            _ when normal == -Vector3.UnitY => 0.75f,
-                            _ => 1.0f
-                        };
-
-                        var brightness = baseBrightness * ao * MathUtils.ONE_THIRD;
-                        var shade = (byte)(brightness * 255);
-                        localVertices.Add(new Vertex(pos, shade, shade, shade, 255, uvCoord));
-                    }
-
-                    localIndices.Add((ushort)(indexOffset + 0));
-                    localIndices.Add((ushort)(indexOffset + 1));
-                    localIndices.Add((ushort)(indexOffset + 2));
-                    localIndices.Add((ushort)(indexOffset + 0));
-                    localIndices.Add((ushort)(indexOffset + 2));
-                    localIndices.Add((ushort)(indexOffset + 3));
-
-                    indexOffset += 4;
+                    var brightness = baseBrightness * ao * MathUtils.ONE_THIRD;
+                    var shade = (byte)(brightness * 255);
+                    vertices.Add(new Vertex(pos, shade, shade, shade, 255, uvCoord));
                 }
+
+                indices.Add((ushort)(indexOffset + 0));
+                indices.Add((ushort)(indexOffset + 1));
+                indices.Add((ushort)(indexOffset + 2));
+                indices.Add((ushort)(indexOffset + 0));
+                indices.Add((ushort)(indexOffset + 2));
+                indices.Add((ushort)(indexOffset + 3));
+
+                indexOffset += 4;
             }
+        }
 
-            lock (lockObj)
-            {
-                foreach (var v in localVertices)
-                    finalVertices.Add(v);
-
-                foreach (var i in localIndices)
-                    finalIndices.Add((ushort)(i + globalIndexOffset));
-
-                globalIndexOffset += indexOffset;
-            }
-        });
-
-        return new ChunkMeshData(finalVertices, finalIndices);
+        return new ChunkMeshData(vertices, indices);
     }
 
     public void UpdateMesh(ChunkMeshData meshData)

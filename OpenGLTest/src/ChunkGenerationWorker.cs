@@ -1,111 +1,97 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Numerics;
-using System.Threading.Tasks;
+using System.Threading;
 
 namespace silkgltriangle;
 
 /// <summary>
-/// Handles continuous chunk generation in a background task.
-/// Generates chunks in concentric rings radiating from the player.
+/// Handles continuous chunk generation in background threads.
+/// Each worker thread independently finds and generates the closest needed chunk.
 /// </summary>
 public class ChunkGenerationWorker(ChunkManager chunkManager, Camera camera)
 {
-    private bool _isRunning;
+    private volatile bool _isRunning;
 
     /// <summary>
-    /// Starts the chunk generation worker in a background task.
+    /// Starts the chunk generation workers.
     /// </summary>
     public void Start()
     {
         if (_isRunning) return;
-        
         _isRunning = true;
-        Task.Run(GenerationLoop);
+
+        var workerCount = WorldGenerationConfig.MaxConcurrentBlockDataGenerations;
+        for (int i = 0; i < workerCount; i++)
+        {
+            var thread = new Thread(WorkerLoop)
+            {
+                IsBackground = true,
+                Name = $"ChunkGen-{i}",
+                Priority = ThreadPriority.BelowNormal
+            };
+            thread.Start();
+        }
     }
 
     /// <summary>
-    /// Stops the chunk generation worker.
+    /// Stops the chunk generation workers.
     /// </summary>
     public void Stop()
     {
         _isRunning = false;
     }
 
-    private async Task GenerationLoop()
+    private void WorkerLoop()
     {
         while (_isRunning)
         {
             try
             {
-                var queuedCount = await GenerateChunksInRings();
-                
-                var delay = queuedCount > 0 
-                    ? WorldGenerationConfig.GenerationDelayActiveMs 
-                    : WorldGenerationConfig.GenerationDelayIdleMs;
-                    
-                await Task.Delay(delay);
+                var pos = FindClosestNeededChunk();
+
+                if (pos.HasValue)
+                {
+                    // QueueChunk generates block data synchronously and is guarded 
+                    // against duplicate generation via _queuedChunkPositions
+                    chunkManager.QueueChunk(pos.Value);
+                }
+                else
+                {
+                    Thread.Sleep(WorldGenerationConfig.GenerationDelayIdleMs);
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in chunk generation: {ex}");
-                await Task.Delay(1000);
+                Thread.Sleep(1000);
             }
         }
     }
 
-    private async Task<int> GenerateChunksInRings()
+    private Vector3? FindClosestNeededChunk()
     {
         var camChunk = (camera.Position / Chunk.Size).Floor();
-        var queuedCount = 0;
-
-        for (var ring = 0; ring <= WorldGenerationConfig.ChunkRadius && 
-             queuedCount < WorldGenerationConfig.MaxChunksQueuedPerCycle; ring++)
-        {
-            var candidatesInRing = GetCandidatesInRing(camChunk, ring);
-            
-            foreach (var pos in candidatesInRing)
-            {
-                if (queuedCount >= WorldGenerationConfig.MaxChunksQueuedPerCycle)
-                    break;
-                
-                chunkManager.QueueChunk(pos);
-                queuedCount++;
-
-                if (queuedCount % WorldGenerationConfig.YieldEveryNChunks == 0)
-                    await Task.Delay(WorldGenerationConfig.YieldDelayMs);
-            }
-
-            if (candidatesInRing.Count > 0 && ring < WorldGenerationConfig.CloseRingThreshold)
-                await Task.Delay(WorldGenerationConfig.CloseRingDelayMs);
-        }
-
-        return queuedCount;
-    }
-
-    private List<Vector3> GetCandidatesInRing(Vector3 center, int ring)
-    {
-        var candidates = new List<Vector3>();
-        var ringDistSqMin = ring * ring;
+        const int radius = WorldGenerationConfig.ChunkRadius;
         const int maxDistSq = WorldGenerationConfig.ChunkRadiusSq;
 
-        for (int dx = -ring; dx <= ring; dx++)
-        for (int dy = -ring; dy <= ring; dy++)
-        for (int dz = -ring; dz <= ring; dz++)
+        Vector3? bestPos = null;
+        var bestDistSq = int.MaxValue;
+
+        for (int dx = -radius; dx <= radius; dx++)
+        for (int dy = -radius; dy <= radius; dy++)
+        for (int dz = -radius; dz <= radius; dz++)
         {
             var distSq = dx * dx + dy * dy + dz * dz;
-            
-            if (distSq < ringDistSqMin || distSq > maxDistSq)
+            if (distSq > maxDistSq || distSq >= bestDistSq)
                 continue;
 
-            var pos = center + new Vector3(dx, dy, dz);
-            if (chunkManager.NeedsChunk(pos))
-            {
-                candidates.Add(pos);
-            }
+            var pos = camChunk + new Vector3(dx, dy, dz);
+            if (!chunkManager.NeedsChunk(pos)) continue;
+            bestPos = pos;
+            bestDistSq = distSq;
         }
 
-        return candidates;
+        return bestPos;
     }
 }
 
