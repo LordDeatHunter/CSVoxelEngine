@@ -15,6 +15,9 @@ public class World
     private readonly ChunkManager _chunkManager;
     private readonly ChunkGenerationWorker _generationWorker;
     private readonly IWindow _window;
+    private bool _hasSelectedBlock;
+    private Vector3 _selectedBlockPosition;
+    private Vector3 _selectedFaceNormal;
 
     public World(GL gl, IWindow window, IInputContext input)
     {
@@ -30,11 +33,18 @@ public class World
     {
         _camera.Update((float)deltaTime, keyboard);
         _chunkManager.Update(_camera);
+
+        _hasSelectedBlock = _camera.Raycast(10f, _chunkManager, out _selectedBlockPosition, out _selectedFaceNormal);
     }
 
     public void Render(RenderManager renderManager)
     {
         renderManager.RenderWorld(_camera, _chunkManager.Chunks.Values, _window.Time);
+
+        if (_hasSelectedBlock)
+        {
+            renderManager.RenderBlockSelection(_camera, _selectedBlockPosition, _selectedFaceNormal);
+        }
     }
 
     public void RenderUI(RenderManager renderManager)

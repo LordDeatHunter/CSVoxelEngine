@@ -100,6 +100,7 @@ public class Camera
         var step = direction.Sign();
         var tDelta = Vector3.Abs(Vector3.One / direction);
         var dist = Vector3.Distance(Vector3.Zero, direction);
+        var lastStepNormal = Vector3.Zero;
 
         var tMax = new Vector3(
             (step.X > 0 ? currentPosition.X + 1 - Position.X : Position.X - currentPosition.X) * tDelta.X,
@@ -128,12 +129,8 @@ public class Camera
                 {
                     hitPosition = currentPosition;
 
-                    if (tMax.X < tMax.Y && tMax.X < tMax.Z)
-                        hitNormal = new Vector3(-step.X, 0, 0);
-                    else if (tMax.Y < tMax.Z)
-                        hitNormal = new Vector3(0, -step.Y, 0);
-                    else
-                        hitNormal = new Vector3(0, 0, -step.Z);
+                    // If we start inside a solid voxel, approximate with opposite view direction.
+                    hitNormal = lastStepNormal == Vector3.Zero ? -direction.Sign() : lastStepNormal;
 
                     return true;
                 }
@@ -143,16 +140,19 @@ public class Camera
             {
                 currentPosition.X += step.X;
                 tMax.X += tDelta.X;
+                lastStepNormal = new Vector3(-step.X, 0, 0);
             }
             else if (tMax.Y < tMax.Z)
             {
                 currentPosition.Y += step.Y;
                 tMax.Y += tDelta.Y;
+                lastStepNormal = new Vector3(0, -step.Y, 0);
             }
             else
             {
                 currentPosition.Z += step.Z;
                 tMax.Z += tDelta.Z;
+                lastStepNormal = new Vector3(0, 0, -step.Z);
             }
         }
 

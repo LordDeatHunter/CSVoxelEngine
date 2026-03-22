@@ -12,9 +12,15 @@ public class RenderManager : IDisposable
     public readonly GL gl;
     private Shader worldShader;
     private Shader uiShader;
+    private Shader selectionShader;
     private uint textureAtlas;
     private uint crosshairTexture;
     private Mesh crosshairMesh;
+    private uint outlineVao;
+    private uint outlineVbo;
+    private uint outlineEbo;
+    private uint faceVao;
+    private uint faceVbo;
 
     public RenderManager(IWindow window)
     {
@@ -32,6 +38,8 @@ public class RenderManager : IDisposable
         var fs = FileUtils.ReadFile("assets/shaders/test-fragment.glsl");
         var uivs = FileUtils.ReadFile("assets/shaders/ui-vertex.glsl");
         var uifs = FileUtils.ReadFile("assets/shaders/ui-fragment.glsl");
+        var selectionVs = FileUtils.ReadFile("assets/shaders/selection-vertex.glsl");
+        var selectionFs = FileUtils.ReadFile("assets/shaders/selection-fragment.glsl");
 
         textureAtlas = TextureLoader.LoadFromFile(gl, "assets/textures/atlas.png");
         crosshairTexture = TextureLoader.LoadFromFile(gl, "assets/textures/crosshair.png");
@@ -42,7 +50,10 @@ public class RenderManager : IDisposable
         uiShader = new Shader(gl, uivs, uifs);
         uiShader.SetUniform("uTex", 0);
 
+        selectionShader = new Shader(gl, selectionVs, selectionFs);
+
         crosshairMesh = Mesh.CreateUIQuad(gl, 32);
+        CreateSelectionGeometry();
     }
 
     public void SetViewport(Vector2D<int> size)
@@ -101,6 +112,112 @@ public class RenderManager : IDisposable
         }
     }
 
+    public void RenderBlockSelection(Camera camera, Vector3 blockPosition, Vector3 hitNormal)
+    {
+        selectionShader.Use();
+
+        var viewProj = camera.GetViewProjection();
+        gl.DepthMask(false);
+        gl.Enable(EnableCap.Blend);
+        gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+
+        var center = blockPosition + new Vector3(0.5f);
+        var outlineModel = Matrix4x4.CreateScale(1.01f) * Matrix4x4.CreateTranslation(center);
+        selectionShader.SetUniform("uMVP", outlineModel * viewProj);
+        selectionShader.SetUniform("uColor", new Vector3(1.0f, 0.95f, 0.35f));
+        selectionShader.SetUniform("uOpacity", 0.95f);
+
+        gl.LineWidth(2f);
+        gl.BindVertexArray(outlineVao);
+        unsafe { gl.DrawElements(PrimitiveType.Lines, 24, DrawElementsType.UnsignedInt, null); }
+
+        var faceIndex = FaceIndexFromNormal(hitNormal);
+        if (faceIndex >= 0)
+        {
+            var faceOffset = hitNormal * 0.003f;
+            var faceModel = Matrix4x4.CreateTranslation(blockPosition + faceOffset);
+            selectionShader.SetUniform("uMVP", faceModel * viewProj);
+            selectionShader.SetUniform("uColor", new Vector3(1.0f, 1.0f, 0.5f));
+            selectionShader.SetUniform("uOpacity", 0.3f);
+
+            gl.BindVertexArray(faceVao);
+            gl.DrawArrays(GLEnum.TriangleFan, faceIndex * 4, 4);
+        }
+
+        gl.BindVertexArray(0);
+        gl.DepthMask(true);
+    }
+
+    private void CreateSelectionGeometry()
+    {
+        Span<float> outlineVertices =
+        [
+            -0.5f, -0.5f, -0.5f,
+            0.5f, -0.5f, -0.5f,
+            0.5f, 0.5f, -0.5f,
+            -0.5f, 0.5f, -0.5f,
+            -0.5f, -0.5f, 0.5f,
+            0.5f, -0.5f, 0.5f,
+            0.5f, 0.5f, 0.5f,
+            -0.5f, 0.5f, 0.5f
+        ];
+
+        Span<uint> outlineIndices =
+        [
+            0, 1, 1, 2, 2, 3, 3, 0,
+            4, 5, 5, 6, 6, 7, 7, 4,
+            0, 4, 1, 5, 2, 6, 3, 7
+        ];
+
+        outlineVao = gl.GenVertexArray();
+        outlineVbo = gl.GenBuffer();
+        outlineEbo = gl.GenBuffer();
+
+        gl.BindVertexArray(outlineVao);
+        gl.BindBuffer(BufferTargetARB.ArrayBuffer, outlineVbo);
+        gl.BufferData<float>(BufferTargetARB.ArrayBuffer, outlineVertices, BufferUsageARB.StaticDraw);
+        gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, outlineEbo);
+        gl.BufferData<uint>(BufferTargetARB.ElementArrayBuffer, outlineIndices, BufferUsageARB.StaticDraw);
+        unsafe
+        {
+            gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), (void*)0);
+        }
+        gl.EnableVertexAttribArray(0);
+
+        Span<float> faceVertices =
+        [
+            0f, 0f, 0f, 1f, 0f, 0f, 1f, 1f, 0f, 0f, 1f, 0f,
+            1f, 0f, 1f, 0f, 0f, 1f, 0f, 1f, 1f, 1f, 1f, 1f,
+            0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 1f, 1f,
+            1f, 0f, 0f, 1f, 0f, 1f, 1f, 1f, 1f, 1f, 1f, 0f,
+            0f, 1f, 0f, 0f, 1f, 1f, 1f, 1f, 1f, 1f, 1f, 0f,
+            0f, 0f, 1f, 1f, 0f, 1f, 1f, 0f, 0f, 0f, 0f, 0f
+        ];
+
+        faceVao = gl.GenVertexArray();
+        faceVbo = gl.GenBuffer();
+        gl.BindVertexArray(faceVao);
+        gl.BindBuffer(BufferTargetARB.ArrayBuffer, faceVbo);
+        gl.BufferData<float>(BufferTargetARB.ArrayBuffer, faceVertices, BufferUsageARB.StaticDraw);
+        unsafe
+        {
+            gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), (void*)0);
+        }
+        gl.EnableVertexAttribArray(0);
+        gl.BindVertexArray(0);
+    }
+
+    private static int FaceIndexFromNormal(Vector3 normal)
+    {
+        if (normal == new Vector3(0, 0, -1)) return 0;
+        if (normal == new Vector3(0, 0, 1)) return 1;
+        if (normal == new Vector3(-1, 0, 0)) return 2;
+        if (normal == new Vector3(1, 0, 0)) return 3;
+        if (normal == new Vector3(0, 1, 0)) return 4;
+        if (normal == new Vector3(0, -1, 0)) return 5;
+        return -1;
+    }
+
     public void RenderUI(IWindow window)
     {
         gl.Disable(EnableCap.DepthTest);
@@ -128,6 +245,12 @@ public class RenderManager : IDisposable
         crosshairMesh.Dispose();
         worldShader.Dispose();
         uiShader.Dispose();
+        selectionShader.Dispose();
+        gl.DeleteBuffer(outlineVbo);
+        gl.DeleteBuffer(outlineEbo);
+        gl.DeleteVertexArray(outlineVao);
+        gl.DeleteBuffer(faceVbo);
+        gl.DeleteVertexArray(faceVao);
         gl.Dispose();
     }
 }
