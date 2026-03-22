@@ -40,6 +40,11 @@ public static class Program
             world.TryRemoveBlockFromRaycast(10f);
         }
 
+        if (inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true)
+        {
+            world.TryPlaceBlockFromRaycast(10f, 3);
+        }
+
         world?.Update((float)deltaTime, inputManager.Keyboard);
 
         if (inputManager.Keyboard?.IsKeyPressed(Key.Escape) == true)

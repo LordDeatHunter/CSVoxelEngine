@@ -68,6 +68,24 @@ public class World
             chunk.RemoveBlockAt(hitPos, _chunkManager);
         }
     }
+
+    public void TryPlaceBlockFromRaycast(float maxDistance, byte blockId)
+    {
+        if (!_camera.Raycast(maxDistance, _chunkManager, out var hitPos, out var hitNormal))
+            return;
+
+        var placePos = hitPos + hitNormal;
+        var chunkPos = new Vector3(
+            MathF.Floor(placePos.X / Chunk.Size),
+            MathF.Floor(placePos.Y / Chunk.Size),
+            MathF.Floor(placePos.Z / Chunk.Size)
+        );
+
+        if (_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk))
+        {
+            chunk.PlaceBlockAt(placePos, blockId, _chunkManager);
+        }
+    }
     
     public ChunkManager GetChunkManager() => _chunkManager;
 }

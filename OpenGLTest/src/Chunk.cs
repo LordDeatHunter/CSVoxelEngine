@@ -156,6 +156,41 @@ public class Chunk : IDisposable
         }
     }
 
+    public void PlaceBlockAt(Vector3 worldPos, byte blockId, ChunkManager chunkManager)
+    {
+        var localX = (int)(worldPos.X - Position.X * Size);
+        var localY = (int)(worldPos.Y - Position.Y * Size);
+        var localZ = (int)(worldPos.Z - Position.Z * Size);
+
+        if (!InBounds(localX, localY, localZ)) return;
+        if (_blocks[localX, localY, localZ] != 0) return;
+
+        _blocks[localX, localY, localZ] = blockId;
+
+        chunkManager.ImmediateRemesh(Position);
+
+        HashSet<Vector3> chunksForUpdate = [];
+        foreach (var neighborOffset in NeighborOffsets)
+        {
+            var neighborPos = worldPos + neighborOffset;
+            var chunkPos = new Vector3(
+                MathF.Floor(neighborPos.X / Size),
+                MathF.Floor(neighborPos.Y / Size),
+                MathF.Floor(neighborPos.Z / Size)
+            );
+
+            if (chunkManager.Chunks.TryGetValue(chunkPos, out var neighbor))
+            {
+                chunksForUpdate.Add(neighbor.Position);
+            }
+        }
+
+        foreach (var chunkPos in chunksForUpdate)
+        {
+            chunkManager.MarkDirty(chunkPos);
+        }
+    }
+
     private static bool InBounds(int x, int y, int z)
         => x >= 0 && y >= 0 && z >= 0 && x < Size && y < Size && z < Size;
 
