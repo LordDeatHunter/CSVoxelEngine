@@ -484,3 +484,6 @@ src/Website/Silk.NET.Statiq/cache
 
 website/
 version.txt
+
+# AI sloppa
+.omo
