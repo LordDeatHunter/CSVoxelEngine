@@ -12,6 +12,7 @@ public class Camera
     public float Yaw { get; private set; } = -90f;
     public float Pitch { get; private set; } = 0f;
     public bool IsGrounded { get; private set; }
+    public bool IsFlying { get; private set; }
     public float VerticalVelocity => _verticalVelocity;
 
     private const float DefaultFov = 70f;
@@ -28,10 +29,15 @@ public class Camera
     private const float PlayerRadius = 0.30f * WorldScale.BlocksPerMeter;
     private const float CollisionStepSize = 0.05f * WorldScale.BlocksPerMeter;
 
+    // Two Space presses within this window toggle flight
+    private const float DoubleTapWindow = 0.3f;
+
     private float _aspectRatio = 16f / 10f;
     private float _verticalVelocity;
     private Vector2 _lastMousePosition;
     private bool _firstMouseMovement = true;
+    private bool _spaceWasPressed;
+    private float _timeSinceSpacePress = float.MaxValue;
 
     private readonly IWindow window;
     private readonly IMouse? mouse;
@@ -85,22 +91,39 @@ public class Camera
         if (moveInput.LengthSquared() > 1f)
             moveInput = Vector3.Normalize(moveInput);
 
-        if (IsGrounded && keyboard.IsKeyPressed(Key.Space))
-        {
-            _verticalVelocity = JumpSpeed;
-            IsGrounded = false;
-        }
-
-        _verticalVelocity -= Gravity * deltaTime;
+        UpdateFlightToggle(deltaTime, keyboard);
 
         var frameMovement = moveInput * moveSpeed * deltaTime;
-        frameMovement.Y = _verticalVelocity * deltaTime;
+
+        if (IsFlying)
+        {
+            var verticalInput = 0f;
+            if (keyboard.IsKeyPressed(Key.Space)) verticalInput += 1f;
+            if (keyboard.IsKeyPressed(Key.ControlLeft)) verticalInput -= 1f;
+            frameMovement.Y = verticalInput * moveSpeed * deltaTime;
+        }
+        else
+        {
+            if (IsGrounded && keyboard.IsKeyPressed(Key.Space))
+            {
+                _verticalVelocity = JumpSpeed;
+                IsGrounded = false;
+            }
+
+            _verticalVelocity -= Gravity * deltaTime;
+            frameMovement.Y = _verticalVelocity * deltaTime;
+        }
 
         Position = MoveOnAxis(Position, frameMovement.X, 0, chunkManager, out _);
         Position = MoveOnAxis(Position, frameMovement.Z, 2, chunkManager, out _);
 
         Position = MoveOnAxis(Position, frameMovement.Y, 1, chunkManager, out var collidedY);
-        if (collidedY)
+
+        if (IsFlying)
+        {
+            IsGrounded = false; // blocked vertical movement just stops while flying
+        }
+        else if (collidedY)
         {
             if (frameMovement.Y < 0f)
                 IsGrounded = true;
@@ -111,6 +134,29 @@ public class Camera
         {
             IsGrounded = false;
         }
+    }
+
+    private void UpdateFlightToggle(float deltaTime, IKeyboard keyboard)
+    {
+        _timeSinceSpacePress += deltaTime;
+
+        var spacePressed = keyboard.IsKeyPressed(Key.Space);
+        if (spacePressed && !_spaceWasPressed)
+        {
+            if (_timeSinceSpacePress <= DoubleTapWindow)
+            {
+                IsFlying = !IsFlying;
+                _verticalVelocity = 0f;
+                _timeSinceSpacePress = float.MaxValue; // a toggle requires a fresh double tap
+                Console.WriteLine($"Flight {(IsFlying ? "ON" : "OFF")}");
+            }
+            else
+            {
+                _timeSinceSpacePress = 0f;
+            }
+        }
+
+        _spaceWasPressed = spacePressed;
     }
 
     private Vector3 MoveOnAxis(Vector3 start, float delta, int axis, ChunkManager chunkManager, out bool collided)
