@@ -173,14 +173,13 @@ public class LodRegion : IDisposable
         Span<int> sideFaces = [0, 1, 2, 3];
         const int topFace = 4;
 
-        void AddQuad(int faceIndex, Vector3 cellOrigin, BlockType.Point tile)
+        void AddQuad(int faceIndex, Vector3 cellOrigin, BlockType.Point tile, Span<byte> shades)
         {
             // Meshes are indexed with ushort; a region can't realistically exceed this,
             // but degrade gracefully instead of overflowing if terrain is extreme
             if (vertices.Count > ushort.MaxValue - 3)
                 return;
 
-            var shade = (byte)(Chunk.FaceBrightness[faceIndex] * 255);
             var u0 = tile.X * Chunk.TileUVSize;
             var v0 = tile.Y * Chunk.TileUVSize;
             Span<Vector2> uv =
@@ -198,6 +197,7 @@ public class LodRegion : IDisposable
                 var pos = cellOrigin + face[c] * cellSize;
                 if (pos.Y < yMin) yMin = pos.Y;
                 if (pos.Y > yMax) yMax = pos.Y;
+                var shade = shades[c];
                 vertices.Add(new Vertex(pos, shade, shade, shade, 255, uv[c]));
             }
 
@@ -209,23 +209,60 @@ public class LodRegion : IDisposable
             indices.Add((ushort)(indexOffset + 3));
         }
 
+        // Per-vertex ambient occlusion derived from the column-top grid (same formula and
+        // shade table as chunk meshing): a neighboring column rising above a face corner
+        // occludes it. Cell-scale AO, so the soft shadows match the LOD resolution.
+        Span<byte> shades = stackalloc byte[4];
+
         for (var i = 0; i < cells; i++)
         {
             for (var j = 0; j < cells; j++)
             {
-                var top = topCell[(i + 1) * heightGrid + (j + 1)];
+                var gi = i + 1;
+                var gj = j + 1;
+                var top = topCell[gi * heightGrid + gj];
 
-                AddQuad(topFace, new Vector3(i * cellSize, top * cellSize, j * cellSize), grass.FaceTiles[topFace]);
+                var topCorners = Chunk.CubeFaces[topFace].face;
+                for (var c = 0; c < 4; c++)
+                {
+                    var dx = topCorners[c].X == 0 ? -1 : 1;
+                    var dz = topCorners[c].Z == 0 ? -1 : 1;
+                    var side1 = topCell[(gi + dx) * heightGrid + gj] > top;
+                    var side2 = topCell[gi * heightGrid + (gj + dz)] > top;
+                    var diagonal = topCell[(gi + dx) * heightGrid + (gj + dz)] > top;
+                    shades[c] = Chunk.ShadeLut[(topFace << 2) | Chunk.VertexAO(side1, side2, diagonal)];
+                }
+
+                AddQuad(topFace, new Vector3(i * cellSize, top * cellSize, j * cellSize), grass.FaceTiles[topFace], shades);
 
                 foreach (var f in sideFaces)
                 {
                     var normal = Chunk.CubeFaces[f].normal;
-                    var neighborTop = topCell[(i + 1 + (int)normal.X) * heightGrid + (j + 1 + (int)normal.Z)];
+                    var ni = gi + (int)normal.X;
+                    var nj = gj + (int)normal.Z;
+                    var neighborTop = topCell[ni * heightGrid + nj];
+                    var faceCorners = Chunk.CubeFaces[f].face;
 
                     for (var cy = neighborTop + 1; cy <= top; cy++)
                     {
+                        for (var c = 0; c < 4; c++)
+                        {
+                            var corner = faceCorners[c];
+                            var v = corner.Y == 0 ? -1 : 1;
+
+                            // Column diagonally in front of the face, toward this corner's tangent side
+                            var lateralTop = normal.X != 0
+                                ? topCell[ni * heightGrid + (nj + (corner.Z == 0 ? -1 : 1))]
+                                : topCell[(ni + (corner.X == 0 ? -1 : 1)) * heightGrid + nj];
+
+                            var side1 = lateralTop >= cy;
+                            var side2 = neighborTop >= cy + v;
+                            var diagonal = lateralTop >= cy + v;
+                            shades[c] = Chunk.ShadeLut[(f << 2) | Chunk.VertexAO(side1, side2, diagonal)];
+                        }
+
                         var tile = cy == top ? grass.FaceTiles[f] : dirt.FaceTiles[f];
-                        AddQuad(f, new Vector3(i * cellSize, cy * cellSize, j * cellSize), tile);
+                        AddQuad(f, new Vector3(i * cellSize, cy * cellSize, j * cellSize), tile, shades);
                     }
                 }
             }

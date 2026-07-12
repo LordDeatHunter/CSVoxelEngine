@@ -60,7 +60,7 @@ public class Chunk : IDisposable
     private static readonly int[] FaceNeighborDelta = new int[6];
     private static readonly int[][] AODeltas = new int[6][]; // 12 per face: (side1, side2, corner) x 4 corners
     internal static readonly float[] FaceBrightness = [0.85f, 0.95f, 0.8f, 0.9f, 1.0f, 0.75f]; // matches CubeFaces order
-    private static readonly byte[] ShadeLut = new byte[6 * 4]; // [face * 4 + ao]
+    internal static readonly byte[] ShadeLut = new byte[6 * 4]; // [face * 4 + ao]
 
     static Chunk()
     {
@@ -378,7 +378,7 @@ public class Chunk : IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int VertexAO(bool side1, bool side2, bool corner)
+    internal static int VertexAO(bool side1, bool side2, bool corner)
     {
         if (side1 && side2) return 0;
         return 3 - ((side1 ? 1 : 0) + (side2 ? 1 : 0) + (corner ? 1 : 0));
