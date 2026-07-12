@@ -53,11 +53,6 @@ public static class Program
         }
         xWasPressed = xPressed;
 
-        if (inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true)
-        {
-            world.TryRemoveBlockFromRaycast(World.InteractionReach);
-        }
-
         if (inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true && placeTimer >= MAX_PLACE_TIMER)
         {
             placeTimer = 0;
@@ -65,6 +60,7 @@ public static class Program
         }
 
         world.Update((float)deltaTime, inputManager.Keyboard);
+        world.UpdateBlockBreaking(deltaTime, inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true);
 
         if (debugEnabled)
         {

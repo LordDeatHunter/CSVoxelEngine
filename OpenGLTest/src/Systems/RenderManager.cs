@@ -13,6 +13,7 @@ public class RenderManager : IDisposable
     private Shader worldShader;
     private Shader uiShader;
     private Shader selectionShader;
+    private Shader breakShader;
     private uint textureAtlas;
     private uint crosshairTexture;
     private Mesh crosshairMesh;
@@ -39,6 +40,8 @@ public class RenderManager : IDisposable
         var uifs = FileUtils.ReadFile("assets/shaders/ui-fragment.glsl");
         var selectionVs = FileUtils.ReadFile("assets/shaders/selection-vertex.glsl");
         var selectionFs = FileUtils.ReadFile("assets/shaders/selection-fragment.glsl");
+        var breakVs = FileUtils.ReadFile("assets/shaders/break-vertex.glsl");
+        var breakFs = FileUtils.ReadFile("assets/shaders/break-fragment.glsl");
 
         textureAtlas = TextureLoader.LoadFromFile(gl, "assets/textures/atlas.png");
         crosshairTexture = TextureLoader.LoadFromFile(gl, "assets/textures/crosshair.png");
@@ -50,6 +53,7 @@ public class RenderManager : IDisposable
         uiShader.SetUniform("uTex", 0);
 
         selectionShader = new Shader(gl, selectionVs, selectionFs);
+        breakShader = new Shader(gl, breakVs, breakFs);
 
         crosshairMesh = Mesh.CreateUIQuad(gl, 32);
         CreateSelectionGeometry();
@@ -207,6 +211,36 @@ public class RenderManager : IDisposable
         gl.DepthMask(true);
     }
 
+    /// <summary>
+    /// Draws the block-breaking progress overlay on all faces of the targeted block:
+    /// a dark fill with a bright leading edge grows from the face centers as progress
+    /// goes 0 -> 1 (see break-fragment.glsl).
+    /// </summary>
+    public void RenderBlockBreaking(Camera camera, Vector3 blockPosition, float progress)
+    {
+        if (progress <= 0f) return;
+
+        breakShader.Use();
+        gl.DepthMask(false);
+        gl.Enable(EnableCap.Blend);
+        gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+
+        // Inflate slightly around the block center so the overlay never z-fights the block
+        var center = new Vector3(0.5f);
+        var model = Matrix4x4.CreateTranslation(-center)
+                    * Matrix4x4.CreateScale(1.004f)
+                    * Matrix4x4.CreateTranslation(blockPosition + center);
+        breakShader.SetUniform("uMVP", model * camera.GetViewProjection());
+        breakShader.SetUniform("uProgress", progress);
+
+        gl.BindVertexArray(faceVao);
+        for (var face = 0; face < 6; face++)
+            gl.DrawArrays(GLEnum.TriangleFan, face * 4, 4);
+
+        gl.BindVertexArray(0);
+        gl.DepthMask(true);
+    }
+
     private void CreateSelectionGeometry()
     {
         Span<float> outlineVertices =
@@ -305,6 +339,7 @@ public class RenderManager : IDisposable
         worldShader.Dispose();
         uiShader.Dispose();
         selectionShader.Dispose();
+        breakShader.Dispose();
         gl.DeleteBuffer(outlineVbo);
         gl.DeleteBuffer(outlineEbo);
         gl.DeleteVertexArray(outlineVao);

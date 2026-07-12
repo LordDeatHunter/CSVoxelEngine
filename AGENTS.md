@@ -18,7 +18,7 @@ dotnet build OpenGLTest.sln
 dotnet run --project OpenGLTest/silkgltriangle.csproj
 ```
 
-The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, double-tap Space to toggle flight (Space/Left Ctrl for up/down while flying), `C` to toggle noclip, Left Shift for 10x speed, left-click to break blocks, right-click to place stone, `X` to toggle debug logging (FPS/position to console), Escape to quit.
+The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, double-tap Space to toggle flight (Space/Left Ctrl for up/down while flying), `C` to toggle noclip, Left Shift for 10x speed, hold left-click ~1s to break a block (instant while noclip; progress overlay via `break-*.glsl`), right-click to place stone, `X` to toggle debug logging (FPS/position to console), Escape to quit.
 
 Shaders (`assets/shaders/**/*.glsl`) and textures (`assets/textures/**/*.png`) are copied to the output directory via `CopyToOutputDirectory` rules in the csproj — **new asset types/extensions need a matching `<None Update>` entry** or they won't be found at runtime.
 
