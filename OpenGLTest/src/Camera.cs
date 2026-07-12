@@ -17,14 +17,16 @@ public class Camera
     private const float DefaultFov = 70f;
     private const float NearPlane = 0.01f;
     private const float FarPlane = 1000f;
-    private const float BaseSpeed = 8f;
     private const float MouseSensitivity = 0.2f;
-    private const float Gravity = 34f;
-    private const float JumpSpeed = 11f;
-    private const float PlayerHeight = 1.8f;
-    private const float EyeHeight = 1.62f;
-    private const float PlayerRadius = 0.30f;
-    private const float CollisionStepSize = 0.05f;
+
+    // Physical quantities in meters (or m/s, m/s^2), converted to block units
+    private const float BaseSpeed = 8f * WorldScale.BlocksPerMeter;
+    private const float Gravity = 34f * WorldScale.BlocksPerMeter;
+    private const float JumpSpeed = 11f * WorldScale.BlocksPerMeter;
+    private const float PlayerHeight = 1.8f * WorldScale.BlocksPerMeter;
+    private const float EyeHeight = 1.62f * WorldScale.BlocksPerMeter;
+    private const float PlayerRadius = 0.30f * WorldScale.BlocksPerMeter;
+    private const float CollisionStepSize = 0.05f * WorldScale.BlocksPerMeter;
 
     private float _aspectRatio = 16f / 10f;
     private float _verticalVelocity;

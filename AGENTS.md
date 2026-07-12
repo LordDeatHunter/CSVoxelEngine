@@ -63,6 +63,7 @@ Rules that follow from this:
 Other invariants:
 
 - World/chunk coordinates: `Chunk.Position` is in chunk units; world pos = chunk pos × `Chunk.Size` (16). Chunks are cubic and stacked vertically too (3D chunk grid, not 2D columns).
+- One block is **0.5 m** (1 world unit = 1 block). Quantities defined in physical units — player size, speeds, gravity, interaction reach — are written as `<meters> * WorldScale.BlocksPerMeter` (see `WorldScale.cs`); keep new physical constants in that form.
 - Blocks are `byte` IDs; `0` is air. New block types are registered in `BlockType.Types` with atlas tile coordinates into `assets/textures/atlas.png`.
 - Terrain noise is seeded statically in `Chunk`'s static constructor (seed 1337) — worldgen must stay deterministic and thread-safe (`FastNoiseLite.GetNoise` is read-only after setup).
 

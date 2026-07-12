@@ -46,12 +46,12 @@ public static class Program
 
         if (inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true)
         {
-            world.TryRemoveBlockFromRaycast(10f);
+            world.TryRemoveBlockFromRaycast(World.InteractionReach);
         }
 
         if (inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true)
         {
-            world.TryPlaceBlockFromRaycast(10f, 3);
+            world.TryPlaceBlockFromRaycast(World.InteractionReach, 3);
         }
 
         world?.Update((float)deltaTime, inputManager.Keyboard);

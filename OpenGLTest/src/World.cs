@@ -11,6 +11,9 @@ namespace silkgltriangle;
 /// </summary>
 public class World
 {
+    // How far the player can target blocks (10 m)
+    public const float InteractionReach = 10f * WorldScale.BlocksPerMeter;
+
     private readonly Camera _camera;
     private readonly ChunkManager _chunkManager;
     private readonly ChunkGenerationWorker _generationWorker;
@@ -34,7 +37,7 @@ public class World
         _camera.Update((float)deltaTime, keyboard, _chunkManager);
         _chunkManager.Update(_camera);
 
-        _hasSelectedBlock = _camera.Raycast(10f, _chunkManager, out _selectedBlockPosition, out _selectedFaceNormal);
+        _hasSelectedBlock = _camera.Raycast(InteractionReach, _chunkManager, out _selectedBlockPosition, out _selectedFaceNormal);
     }
 
     public Camera Camera => _camera;
