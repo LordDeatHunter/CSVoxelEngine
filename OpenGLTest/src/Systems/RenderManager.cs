@@ -118,6 +118,55 @@ public class RenderManager : IDisposable
         }
     }
 
+    private readonly List<(LodRegion region, float distSq)> _visibleRegions = new(256);
+
+    /// <summary>
+    /// Draws far-terrain LOD regions. Called before RenderWorld so full-detail chunks
+    /// draw over the LOD wherever both exist (the LOD sits strictly below the real surface).
+    /// </summary>
+    public void RenderLod(Camera camera, IEnumerable<LodRegion> regions)
+    {
+        if (camera == null) return;
+
+        worldShader.Use();
+        gl.ActiveTexture(TextureUnit.Texture0);
+        gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
+
+        var viewProj = camera.GetViewProjection();
+        var frustum = new Frustum(viewProj);
+        var camPos = camera.Position;
+
+        _visibleRegions.Clear();
+
+        foreach (var region in regions)
+        {
+            if (!region.HasMesh)
+                continue;
+
+            var min = new Vector3(region.X * LodRegion.SizeBlocks, region.YMin, region.Z * LodRegion.SizeBlocks);
+            var max = new Vector3(min.X + LodRegion.SizeBlocks, region.YMax, min.Z + LodRegion.SizeBlocks);
+
+            if (!frustum.IntersectsAABB(min, max))
+                continue;
+
+            var center = (min + max) * 0.5f;
+            _visibleRegions.Add((region, Vector3.DistanceSquared(center, camPos)));
+        }
+
+        _visibleRegions.Sort((a, b) => a.distSq.CompareTo(b.distSq));
+
+        foreach (var (region, _) in _visibleRegions)
+        {
+            region.Lifetime += 1.0 / 60.0;
+
+            var model = Matrix4x4.CreateTranslation(region.X * LodRegion.SizeBlocks, 0f, region.Z * LodRegion.SizeBlocks);
+            worldShader.SetUniform("uMVP", model * viewProj);
+            worldShader.SetUniform("uAlpha", MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)));
+
+            region.Render();
+        }
+    }
+
     public void RenderBlockSelection(Camera camera, Vector3 blockPosition, Vector3 hitNormal)
     {
         selectionShader.Use();

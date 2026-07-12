@@ -17,6 +17,7 @@ public class World
     private readonly Camera _camera;
     private readonly ChunkManager _chunkManager;
     private readonly ChunkGenerationWorker _generationWorker;
+    private readonly LodManager _lodManager;
     private readonly IWindow _window;
     private bool _hasSelectedBlock;
     private Vector3 _selectedBlockPosition;
@@ -28,14 +29,17 @@ public class World
         _camera = new Camera(window, input);
         _chunkManager = new ChunkManager(gl);
         _generationWorker = new ChunkGenerationWorker(_chunkManager, _camera);
-        
+        _lodManager = new LodManager(gl);
+
         _generationWorker.Start();
+        _lodManager.Start(_camera);
     }
 
     public void Update(double deltaTime, IKeyboard? keyboard)
     {
         _camera.Update((float)deltaTime, keyboard, _chunkManager);
         _chunkManager.Update(_camera);
+        _lodManager.Update();
 
         _hasSelectedBlock = _camera.Raycast(InteractionReach, _chunkManager, out _selectedBlockPosition, out _selectedFaceNormal);
     }
@@ -44,6 +48,7 @@ public class World
 
     public void Render(RenderManager renderManager)
     {
+        renderManager.RenderLod(_camera, _lodManager.Regions.Values);
         renderManager.RenderWorld(_camera, _chunkManager.Chunks.Values, _window.Time);
 
         if (_hasSelectedBlock)
@@ -71,6 +76,11 @@ public class World
         if (_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk))
         {
             chunk.RemoveBlockAt(hitPos, _chunkManager);
+
+            // Keep the buried LOD mesh below the newly exposed hole
+            // (hitPos components are floored floats, so the int casts are exact)
+            if (LodRegion.LowerColumnBelow((int)hitPos.X, (int)hitPos.Y, (int)hitPos.Z))
+                _lodManager.MarkEditedColumn((int)hitPos.X, (int)hitPos.Z);
         }
     }
 

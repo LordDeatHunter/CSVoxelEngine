@@ -24,7 +24,7 @@ public class Chunk : IDisposable
     private const int PaddedSq = Padded * Padded;
     private const int PaddedCount = Padded * PaddedSq;
 
-    private const float TileUVSize = 1f / 4f; // atlas is 4x4 tiles
+    internal const float TileUVSize = 1f / 4f; // atlas is 4x4 tiles
 
     // Flat block storage; index = (x << 8) | (y << 4) | z
     private readonly byte[] _blocks = new byte[BlockCount];
@@ -50,13 +50,15 @@ public class Chunk : IDisposable
     public bool HasMesh => _mesh != null;
 
     // Column heights only depend on (x, z), so vertical chunk stacks share one heightmap.
+    // Must comfortably exceed the ~(2 * LodChunkRadius)^2 columns the LOD system keeps warm,
+    // or the cache thrashes. 16k entries is ~16 MB.
     private static readonly ConcurrentDictionary<(int X, int Z), int[]> HeightmapCache = new();
-    private const int HeightmapCacheLimit = 4096;
+    private const int HeightmapCacheLimit = 16384;
 
     // Meshing lookup tables, flattened from CubeFaces/AONeighbors into padded-snapshot index deltas
     private static readonly int[] FaceNeighborDelta = new int[6];
     private static readonly int[][] AODeltas = new int[6][]; // 12 per face: (side1, side2, corner) x 4 corners
-    private static readonly float[] FaceBrightness = [0.85f, 0.95f, 0.8f, 0.9f, 1.0f, 0.75f]; // matches CubeFaces order
+    internal static readonly float[] FaceBrightness = [0.85f, 0.95f, 0.8f, 0.9f, 1.0f, 0.75f]; // matches CubeFaces order
     private static readonly byte[] ShadeLut = new byte[6 * 4]; // [face * 4 + ao]
 
     static Chunk()
@@ -105,7 +107,7 @@ public class Chunk : IDisposable
 
     public void GenerateBlockData()
     {
-        var heights = GetHeightmap();
+        var heights = GetColumnHeights((int)Position.X, (int)Position.Z);
         var lowerBoundY = LowerBoundY;
         var upperBoundY = UpperBoundY;
 
@@ -120,15 +122,20 @@ public class Chunk : IDisposable
         IsBlockDataReady = true;
     }
 
-    private int[] GetHeightmap()
+    /// <summary>
+    /// Returns the terrain heightmap for a chunk column, indexed by (x &lt;&lt; SizeShift) | z.
+    /// Terrain (before player edits) is exactly "solid iff worldY &lt;= height"; the far-LOD
+    /// mesher relies on this. Cached, deterministic, and safe to call from any thread.
+    /// </summary>
+    public static int[] GetColumnHeights(int chunkX, int chunkZ)
     {
-        var key = ((int)Position.X, (int)Position.Z);
+        var key = (chunkX, chunkZ);
         if (HeightmapCache.TryGetValue(key, out var cached))
             return cached;
 
         var heights = new int[Size * Size];
-        var baseX = Position.X * Size;
-        var baseZ = Position.Z * Size;
+        var baseX = (float)chunkX * Size;
+        var baseZ = (float)chunkZ * Size;
 
         for (var x = 0; x < Size; x++)
         {
@@ -388,7 +395,7 @@ public class Chunk : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private static readonly (Vector3 normal, Vector3[] face)[] CubeFaces =
+    internal static readonly (Vector3 normal, Vector3[] face)[] CubeFaces =
     [
        (new Vector3(0,  0, -1), [CubeVertexPositions.BackLeftBottom, CubeVertexPositions.BackLeftTop, CubeVertexPositions.BackRightTop, CubeVertexPositions.BackRightBottom]),
        (new Vector3(0,  0,  1), [CubeVertexPositions.FrontRightBottom, CubeVertexPositions.FrontRightTop, CubeVertexPositions.FrontLeftTop, CubeVertexPositions.FrontLeftBottom]),

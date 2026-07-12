@@ -28,10 +28,11 @@ Shaders (`assets/shaders/**/*.glsl`) and textures (`assets/textures/**/*.png`) a
 OpenGLTest/
   src/
     Program.cs                 # entry point, wires window callbacks, input polling
-    World.cs                   # owns Camera, ChunkManager, ChunkGenerationWorker; raycast block edit API
+    World.cs                   # owns Camera, ChunkManager, ChunkGenerationWorker, LodManager; raycast block edit API
     Chunk.cs                   # 16^3 block storage (byte IDs), terrain gen, mesh data generation + AO
     ChunkGenerationWorker.cs   # background threads creating chunks around the camera
     Camera.cs                  # FPS camera, physics (gravity/jump/collision), DDA raycast
+    LodRegion.cs               # far-terrain LOD: 4x4-chunk columns meshed at half res from heightmaps
     BlockType.cs               # block ID -> atlas tile mapping (1=grass, 2=dirt, 3=stone; 0=air)
     WorldGenerationConfig.cs   # all tuning constants (view radius, per-frame budgets, thread counts)
     Mesh.cs, Shader.cs, TextureLoader.cs, FileUtils.cs, FastNoiseLite.cs (vendored, don't reformat)
@@ -41,6 +42,7 @@ OpenGLTest/
       InputManager.cs          # keyboard/mouse context
       RenderManager.cs         # GL state, world/selection/UI passes, viewport
       ChunkManager.cs          # chunk lifecycle: load/unload, dirty tracking, mesh scheduling
+      LodManager.cs            # LOD region lifecycle: worker thread builds, main thread uploads/unloads
   assets/shaders/, assets/textures/   # GLSL shaders and texture atlas (atlas.png, crosshair.png)
 ```
 
@@ -65,7 +67,8 @@ Other invariants:
 - World/chunk coordinates: `Chunk.Position` is in chunk units; world pos = chunk pos × `Chunk.Size` (16). Chunks are cubic and stacked vertically too (3D chunk grid, not 2D columns).
 - One block is **0.5 m** (1 world unit = 1 block). Quantities defined in physical units — player size, speeds, gravity, interaction reach — are written as `<meters> * WorldScale.BlocksPerMeter` (see `WorldScale.cs`); keep new physical constants in that form.
 - Blocks are `byte` IDs; `0` is air. New block types are registered in `BlockType.Types` with atlas tile coordinates into `assets/textures/atlas.png`.
-- Terrain noise is seeded statically in `Chunk`'s static constructor (seed 1337) — worldgen must stay deterministic and thread-safe (`FastNoiseLite.GetNoise` is read-only after setup).
+- Terrain noise is seeded statically in `Chunk`'s static constructor (seed 1337) — worldgen must stay deterministic and thread-safe (`FastNoiseLite.GetNoise` is read-only after setup). Terrain (before player edits) is exactly "solid iff worldY <= height(x,z)" where heights come from `Chunk.GetColumnHeights`; the LOD system depends on this invariant.
+- **Far-terrain LOD**: full-detail chunks load to `ChunkRadius` (16); LOD regions (`LodRegion` + `LodManager`) extend the render distance to `LodChunkRadius` (32). Regions are 4x4-chunk columns meshed at half resolution straight from the heightmap cache (no block data). LOD heights are eroded (min over a 4x4 fine-column neighborhood, one block down) so the LOD mesh sits strictly *inside* real terrain — full-detail chunks always bury it via the depth buffer, which is why no masking or camera-driven remeshing exists. LOD is drawn before chunks (`RenderManager.RenderLod`). Destroying a block would expose the buried LOD, so removals cap that column's LOD height below the removed block (`LodRegion.LowerColumnBelow`) and the affected regions rebuild (`LodManager.MarkEditedColumn`); placements need nothing.
 
 ## Conventions
 

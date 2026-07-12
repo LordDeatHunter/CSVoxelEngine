@@ -23,4 +23,16 @@ public static class WorldGenerationConfig
     
     // Delay when no chunks need generating (ms)
     public const int GenerationDelayIdleMs = 200;
+
+    // --- Far-terrain LOD ---
+
+    // Total render distance in chunks; the 16..32 ring is covered by LOD regions only
+    public const int LodChunkRadius = ChunkRadius * 2;
+
+    // A LOD region is a column of RegionChunkSpan x RegionChunkSpan chunks, meshed at half block resolution
+    public const int RegionChunkSpan = 4;
+    public const int LodRegionRadius = LodChunkRadius / RegionChunkSpan;
+
+    // How many completed LOD region meshes to upload to GPU per frame
+    public const int MaxLodUploadsPerFrame = 8;
 }
