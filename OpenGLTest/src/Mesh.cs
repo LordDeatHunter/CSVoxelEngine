@@ -45,8 +45,8 @@ public class Mesh : IDisposable
 
     public void Render()
     {
+        // The VAO already captures the element buffer binding; no need to rebind the EBO
         _gl.BindVertexArray(_vao);
-        _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _ebo);
         unsafe { _gl.DrawElements(PrimitiveType.Triangles, _indicesCount, DrawElementsType.UnsignedShort, null); }
     }
 

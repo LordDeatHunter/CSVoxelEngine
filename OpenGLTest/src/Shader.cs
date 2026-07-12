@@ -1,5 +1,6 @@
 using Silk.NET.OpenGL;
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
@@ -67,7 +68,19 @@ public class Shader : IDisposable
         _disposed = true;
     }
 
-    public int GetUniformLocation(string name) => _gl.GetUniformLocation(Handle, name);
+    // glGetUniformLocation does a string lookup in the driver; cache locations since
+    // uniforms are set per chunk per frame
+    private readonly Dictionary<string, int> _uniformLocations = new();
+
+    public int GetUniformLocation(string name)
+    {
+        if (_uniformLocations.TryGetValue(name, out var location))
+            return location;
+
+        location = _gl.GetUniformLocation(Handle, name);
+        _uniformLocations[name] = location;
+        return location;
+    }
 
     public void SetUniform(string name, float value)
     {

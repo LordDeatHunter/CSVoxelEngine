@@ -1,7 +1,10 @@
 using System;
+using System.Buffers;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Silk.NET.OpenGL;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace silkgltriangle;
@@ -12,7 +15,21 @@ namespace silkgltriangle;
 public class Chunk : IDisposable
 {
     public const int Size = 16;
-    private readonly byte[,,] _blocks = new byte[Size, Size, Size];
+    public const int SizeShift = 4; // log2(Size), for shift/mask coordinate math
+    public const int SizeMask = Size - 1;
+    private const int BlockCount = Size * Size * Size;
+
+    // Meshing reads a snapshot of this chunk plus a 1-block border from neighbors
+    private const int Padded = Size + 2;
+    private const int PaddedSq = Padded * Padded;
+    private const int PaddedCount = Padded * PaddedSq;
+
+    private const float TileUVSize = 1f / 4f; // atlas is 4x4 tiles
+
+    // Flat block storage; index = (x << 8) | (y << 4) | z
+    private readonly byte[] _blocks = new byte[BlockCount];
+    private int _solidCount;
+
     private static readonly FastNoiseLite Noise;
     private static readonly Vector3[] NeighborOffsets = Vector3Directions.CardinalDirections;
     public double lifetime = 0.0f;
@@ -21,11 +38,26 @@ public class Chunk : IDisposable
     public Vector3 Position { get; }
     private Mesh? _mesh;
     private readonly GL _gl;
-    
+
     /// <summary>
     /// Whether block data has been fully generated and is ready for meshing.
     /// </summary>
     public volatile bool IsBlockDataReady;
+
+    /// <summary>
+    /// Whether this chunk has an uploaded, non-empty mesh worth drawing.
+    /// </summary>
+    public bool HasMesh => _mesh != null;
+
+    // Column heights only depend on (x, z), so vertical chunk stacks share one heightmap.
+    private static readonly ConcurrentDictionary<(int X, int Z), int[]> HeightmapCache = new();
+    private const int HeightmapCacheLimit = 4096;
+
+    // Meshing lookup tables, flattened from CubeFaces/AONeighbors into padded-snapshot index deltas
+    private static readonly int[] FaceNeighborDelta = new int[6];
+    private static readonly int[][] AODeltas = new int[6][]; // 12 per face: (side1, side2, corner) x 4 corners
+    private static readonly float[] FaceBrightness = [0.85f, 0.95f, 0.8f, 0.9f, 1.0f, 0.75f]; // matches CubeFaces order
+    private static readonly byte[] ShadeLut = new byte[6 * 4]; // [face * 4 + ao]
 
     static Chunk()
     {
@@ -35,7 +67,30 @@ public class Chunk : IDisposable
         Noise.SetSeed(1337);
         Noise.SetFractalType(FastNoiseLite.FractalType.FBm);
         Noise.SetFractalOctaves(6);
+
+        for (var i = 0; i < 6; i++)
+        {
+            FaceNeighborDelta[i] = PaddedDelta(CubeFaces[i].normal);
+
+            var deltas = new int[12];
+            for (var j = 0; j < 4; j++)
+            {
+                deltas[j * 3 + 0] = PaddedDelta(AONeighbors[i][j][0]);
+                deltas[j * 3 + 1] = PaddedDelta(AONeighbors[i][j][1]);
+                deltas[j * 3 + 2] = PaddedDelta(AONeighbors[i][j][2]);
+            }
+            AODeltas[i] = deltas;
+
+            for (var ao = 0; ao <= 3; ao++)
+                ShadeLut[(i << 2) | ao] = (byte)(FaceBrightness[i] * ao * MathUtils.ONE_THIRD * 255);
+        }
     }
+
+    private static int PaddedDelta(Vector3 offset) =>
+        (int)offset.X * PaddedSq + (int)offset.Y * Padded + (int)offset.Z;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int Idx(int x, int y, int z) => (x << (2 * SizeShift)) | (y << SizeShift) | z;
 
     public Chunk(GL gl, Vector3 position, bool generateBlockData = true)
     {
@@ -50,78 +105,80 @@ public class Chunk : IDisposable
 
     public void GenerateBlockData()
     {
-        for (int x = 0; x < Size; x++)
+        var heights = GetHeightmap();
+        var lowerBoundY = LowerBoundY;
+        var upperBoundY = UpperBoundY;
+
+        for (var x = 0; x < Size; x++)
         {
             for (var z = 0; z < Size; z++)
             {
-                GenerateColumn(x, z);
+                GenerateColumn(x, z, heights[(x << SizeShift) | z], lowerBoundY, upperBoundY);
             }
         }
+
         IsBlockDataReady = true;
     }
 
-    private void GenerateColumn(int x, int z)
+    private int[] GetHeightmap()
     {
-        var worldX = x + Position.X * Size;
-        var worldZ = z + Position.Z * Size;
-        
-        var heightNoise = Noise.GetNoise(worldX, worldZ) * Noise.GetNoise(worldZ, worldX);
-        var terrainHeight = (int)(heightNoise * 256f);
+        var key = ((int)Position.X, (int)Position.Z);
+        if (HeightmapCache.TryGetValue(key, out var cached))
+            return cached;
 
-        if (terrainHeight < LowerBoundY) return;
+        var heights = new int[Size * Size];
+        var baseX = Position.X * Size;
+        var baseZ = Position.Z * Size;
 
-        if (terrainHeight >= UpperBoundY)
+        for (var x = 0; x < Size; x++)
+        {
+            var worldX = x + baseX;
+            for (var z = 0; z < Size; z++)
+            {
+                var worldZ = z + baseZ;
+                var heightNoise = Noise.GetNoise(worldX, worldZ) * Noise.GetNoise(worldZ, worldX);
+                heights[(x << SizeShift) | z] = (int)(heightNoise * 256f);
+            }
+        }
+
+        // Crude growth cap; entries are deterministic so a full reset is harmless
+        if (HeightmapCache.Count >= HeightmapCacheLimit)
+            HeightmapCache.Clear();
+
+        HeightmapCache[key] = heights;
+        return heights;
+    }
+
+    private void GenerateColumn(int x, int z, int terrainHeight, int lowerBoundY, int upperBoundY)
+    {
+        if (terrainHeight < lowerBoundY) return;
+
+        if (terrainHeight >= upperBoundY)
         {
             for (var y = 0; y < Size; y++)
-                SetBlock(x, y, z, 2);
+                _blocks[Idx(x, y, z)] = 2;
+            _solidCount += Size;
             return;
         }
 
-        if (terrainHeight < 0) 
+        if (terrainHeight < 0)
             terrainHeight = Size - (int)MathF.Abs(terrainHeight) % Size;
-        
+
         var localHeight = terrainHeight % Size;
 
         for (var y = 0; y <= localHeight; y++)
-        {
-            var blockType = (byte)(y == localHeight ? 1 : 2);
-            SetBlock(x, y, z, blockType);
-        }
+            _blocks[Idx(x, y, z)] = (byte)(y == localHeight ? 1 : 2);
+        _solidCount += localHeight + 1;
     }
 
     public int LowerBoundY => (int)Position.Y * Size;
     public int UpperBoundY => (int)Position.Y * Size + Size;
 
-    public void SetBlock(int x, int y, int z, byte id)
-    {
-        if (InBounds(x, y, z)) _blocks[x, y, z] = id;
-    }
-
-    public byte GetBlock(Vector3 pos, ChunkManager chunkManager) => GetBlock((int)pos.X, (int)pos.Y, (int)pos.Z, chunkManager);
-
-    public byte GetBlock(int x, int y, int z, ChunkManager chunkManager)
-    {
-        if (InBounds(x, y, z))
-            return _blocks[x, y, z];
-
-        var globalX = (int)(Position.X * Size) + x;
-        var globalY = (int)(Position.Y * Size) + y;
-        var globalZ = (int)(Position.Z * Size) + z;
-
-        var chunkX = MathF.Floor(globalX / (float)Size);
-        var chunkY = MathF.Floor(globalY / (float)Size);
-        var chunkZ = MathF.Floor(globalZ / (float)Size);
-
-        var localX = ((globalX % Size) + Size) % Size;
-        var localY = ((globalY % Size) + Size) % Size;
-        var localZ = ((globalZ % Size) + Size) % Size;
-
-        var neighborPos = new Vector3(chunkX, chunkY, chunkZ);
-
-        return chunkManager.Chunks.TryGetValue(neighborPos, out var neighbor)
-            ? neighbor.GetBlock(localX, localY, localZ, chunkManager)
-            : (byte)0;
-    }
+    /// <summary>
+    /// Reads a block using chunk-local coordinates. Coordinates must be in [0, Size).
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public byte GetLocalBlock(int x, int y, int z) => _blocks[Idx(x, y, z)];
 
     public void RemoveBlockAt(Vector3 worldPos, ChunkManager chunkManager)
     {
@@ -130,30 +187,12 @@ public class Chunk : IDisposable
         var localZ = (int)(worldPos.Z - Position.Z * Size);
 
         if (!InBounds(localX, localY, localZ)) return;
-        _blocks[localX, localY, localZ] = 0;
+        if (_blocks[Idx(localX, localY, localZ)] == 0) return;
+        _blocks[Idx(localX, localY, localZ)] = 0;
+        _solidCount--;
 
         chunkManager.ImmediateRemesh(Position);
-
-        HashSet<Vector3> chunksForUpdate = [];
-        foreach (var neighborOffset in NeighborOffsets)
-        {
-            var neighborPos = worldPos + neighborOffset;
-            var chunkPos = new Vector3(
-                MathF.Floor(neighborPos.X / Size),
-                MathF.Floor(neighborPos.Y / Size),
-                MathF.Floor(neighborPos.Z / Size)
-            );
-
-            if (chunkManager.Chunks.TryGetValue(chunkPos, out var neighbor))
-            {
-                chunksForUpdate.Add(neighbor.Position);
-            }
-        }
-
-        foreach (var chunkPos in chunksForUpdate)
-        {
-            chunkManager.MarkDirty(chunkPos);
-        }
+        MarkNeighborsDirty(worldPos, chunkManager);
     }
 
     public void PlaceBlockAt(Vector3 worldPos, byte blockId, ChunkManager chunkManager)
@@ -163,12 +202,17 @@ public class Chunk : IDisposable
         var localZ = (int)(worldPos.Z - Position.Z * Size);
 
         if (!InBounds(localX, localY, localZ)) return;
-        if (_blocks[localX, localY, localZ] != 0) return;
+        if (_blocks[Idx(localX, localY, localZ)] != 0) return;
 
-        _blocks[localX, localY, localZ] = blockId;
+        _blocks[Idx(localX, localY, localZ)] = blockId;
+        _solidCount++;
 
         chunkManager.ImmediateRemesh(Position);
+        MarkNeighborsDirty(worldPos, chunkManager);
+    }
 
+    private void MarkNeighborsDirty(Vector3 worldPos, ChunkManager chunkManager)
+    {
         HashSet<Vector3> chunksForUpdate = [];
         foreach (var neighborOffset in NeighborOffsets)
         {
@@ -196,63 +240,111 @@ public class Chunk : IDisposable
 
     public ChunkMeshData GenerateMeshData(ChunkManager chunkManager)
     {
-        var vertices = new List<Vertex>();
-        var indices = new List<ushort>();
-        ushort indexOffset = 0;
+        if (_solidCount == 0)
+            return new ChunkMeshData([], []);
 
-        for (int x = 0; x < Size; x++)
-        for (int y = 0; y < Size; y++)
-        for (int z = 0; z < Size; z++)
+        var padded = ArrayPool<byte>.Shared.Rent(PaddedCount);
+        try
         {
-            if (_blocks[x, y, z] == 0) continue;
+            FillPaddedSnapshot(padded, chunkManager);
+            return GenerateMeshDataFromSnapshot(padded);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(padded);
+        }
+    }
 
-            var blockId = _blocks[x, y, z];
-            var type = BlockType.Types[blockId];
-            var basePos = new Vector3(x, y, z);
-
-            for (var i = 0; i < CubeFaces.Length; i++)
+    /// <summary>
+    /// Copies this chunk plus a 1-block border from the 26 surrounding chunks into a flat
+    /// snapshot, so meshing does zero dictionary lookups. Missing neighbors read as air.
+    /// </summary>
+    private void FillPaddedSnapshot(byte[] padded, ChunkManager chunkManager)
+    {
+        var neighbors = new Chunk?[27];
+        for (var cx = 0; cx < 3; cx++)
+        for (var cy = 0; cy < 3; cy++)
+        for (var cz = 0; cz < 3; cz++)
+        {
+            var ni = (cx * 3 + cy) * 3 + cz;
+            if (ni == 13)
             {
-                var (normal, face) = CubeFaces[i];
-                var nx = x + (int)normal.X;
-                var ny = y + (int)normal.Y;
-                var nz = z + (int)normal.Z;
+                neighbors[ni] = this;
+                continue;
+            }
 
-                if (GetBlock(nx, ny, nz, chunkManager) != 0) continue;
+            var pos = Position + new Vector3(cx - 1, cy - 1, cz - 1);
+            if (chunkManager.Chunks.TryGetValue(pos, out var neighbor))
+                neighbors[ni] = neighbor;
+        }
 
-                var tile = type.GetTile(normal);
-                var uv = FaceUV(tile.X, tile.Y);
+        for (var px = 0; px < Padded; px++)
+        {
+            var cx = px == 0 ? 0 : px == Padded - 1 ? 2 : 1;
+            var lx = (px - 1) & SizeMask;
+
+            for (var py = 0; py < Padded; py++)
+            {
+                var cy = py == 0 ? 0 : py == Padded - 1 ? 2 : 1;
+                var ly = (py - 1) & SizeMask;
+                var rowBase = px * PaddedSq + py * Padded;
+                var neighborRow = (cx * 3 + cy) * 3;
+
+                for (var pz = 0; pz < Padded; pz++)
+                {
+                    var cz = pz == 0 ? 0 : pz == Padded - 1 ? 2 : 1;
+                    var neighbor = neighbors[neighborRow + cz];
+                    padded[rowBase + pz] = neighbor?._blocks[Idx(lx, ly, (pz - 1) & SizeMask)] ?? 0;
+                }
+            }
+        }
+    }
+
+    private ChunkMeshData GenerateMeshDataFromSnapshot(byte[] padded)
+    {
+        var vertices = new List<Vertex>(4096);
+        var indices = new List<ushort>(6144);
+        ushort indexOffset = 0;
+        Span<Vector2> uv = stackalloc Vector2[4];
+
+        for (var x = 0; x < Size; x++)
+        for (var y = 0; y < Size; y++)
+        for (var z = 0; z < Size; z++)
+        {
+            var blockId = _blocks[Idx(x, y, z)];
+            if (blockId == 0) continue;
+
+            var type = BlockType.ById[blockId];
+            if (type == null) continue;
+
+            var basePos = new Vector3(x, y, z);
+            var pIdx = (x + 1) * PaddedSq + (y + 1) * Padded + (z + 1);
+
+            for (var i = 0; i < 6; i++)
+            {
+                if (padded[pIdx + FaceNeighborDelta[i]] != 0) continue;
+
+                var tile = type.FaceTiles[i];
+                var u0 = tile.X * TileUVSize;
+                var v0 = tile.Y * TileUVSize;
+                uv[0] = new Vector2(u0, v0 + TileUVSize);
+                uv[1] = new Vector2(u0, v0);
+                uv[2] = new Vector2(u0 + TileUVSize, v0);
+                uv[3] = new Vector2(u0 + TileUVSize, v0 + TileUVSize);
+
+                var face = CubeFaces[i].face;
+                var aoDeltas = AODeltas[i];
 
                 for (var j = 0; j < 4; j++)
                 {
-                    var faceCorner = face[j];
-                    var aoNeighbor = AONeighbors[i][j];
-                    var pos = basePos + faceCorner;
-                    var uvCoord = uv[j];
-
-                    var side1AoNeighbor = aoNeighbor[0];
-                    var side2AoNeighbor = aoNeighbor[1];
-                    var cornerAoNeighbor = aoNeighbor[2];
-
-                    var side1 = GetBlock(basePos + side1AoNeighbor, chunkManager) != 0;
-                    var side2 = GetBlock(basePos + side2AoNeighbor, chunkManager) != 0;
-                    var corner = GetBlock(basePos + cornerAoNeighbor, chunkManager) != 0;
+                    var side1 = padded[pIdx + aoDeltas[j * 3 + 0]] != 0;
+                    var side2 = padded[pIdx + aoDeltas[j * 3 + 1]] != 0;
+                    var corner = padded[pIdx + aoDeltas[j * 3 + 2]] != 0;
 
                     var ao = VertexAO(side1, side2, corner);
+                    var shade = ShadeLut[(i << 2) | ao];
 
-                    var baseBrightness = normal switch
-                    {
-                        _ when normal == Vector3.UnitY => 1.0f,
-                        _ when normal == Vector3.UnitZ => 0.95f,
-                        _ when normal == Vector3.UnitX => 0.9f,
-                        _ when normal == -Vector3.UnitZ => 0.85f,
-                        _ when normal == -Vector3.UnitX => 0.8f,
-                        _ when normal == -Vector3.UnitY => 0.75f,
-                        _ => 1.0f
-                    };
-
-                    var brightness = baseBrightness * ao * MathUtils.ONE_THIRD;
-                    var shade = (byte)(brightness * 255);
-                    vertices.Add(new Vertex(pos, shade, shade, shade, 255, uvCoord));
+                    vertices.Add(new Vertex(basePos + face[j], shade, shade, shade, 255, uv[j]));
                 }
 
                 indices.Add((ushort)(indexOffset + 0));
@@ -272,42 +364,21 @@ public class Chunk : IDisposable
     public void UpdateMesh(ChunkMeshData meshData)
     {
         _mesh?.Dispose();
-        _mesh = new Mesh(_gl, CollectionsMarshal.AsSpan(meshData.Vertices), CollectionsMarshal.AsSpan(meshData.Indices));
+        _mesh = meshData.Vertices.Count == 0
+            ? null
+            : new Mesh(_gl, CollectionsMarshal.AsSpan(meshData.Vertices), CollectionsMarshal.AsSpan(meshData.Indices));
     }
 
-    public int VertexAO(bool side1, bool side2, bool corner)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int VertexAO(bool side1, bool side2, bool corner)
     {
-        if (side1 && side2)
-        {
-            return 0;
-        }
-
-        return 3 - (Convert.ToInt16(side1) + Convert.ToInt16(side2) + Convert.ToInt16(corner));
-    }
-
-    public bool IsSolidBlock(int x, int y, int z)
-    {
-        return InBounds(x, y, z) && _blocks[x, y, z] != 0;
+        if (side1 && side2) return 0;
+        return 3 - ((side1 ? 1 : 0) + (side2 ? 1 : 0) + (corner ? 1 : 0));
     }
 
     public void Render()
     {
         _mesh?.Render();
-    }
-
-    private static Vector2[] FaceUV(int tileX, int tileY, int tileSize = 4)
-    {
-        var u = tileX / (float)tileSize;
-        var v = tileY / (float)tileSize;
-        var du = 1f / tileSize;
-        var dv = 1f / tileSize;
-        return
-        [
-            new Vector2(u, v + dv),
-            new Vector2(u, v),
-            new Vector2(u + du, v),
-            new Vector2(u + du, v + dv)
-        ];
     }
 
     public void Dispose()

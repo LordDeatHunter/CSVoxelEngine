@@ -26,7 +26,6 @@ public class RenderManager : IDisposable
     {
         gl = window.CreateOpenGL();
         gl.Enable(GLEnum.DepthTest);
-        gl.Enable(GLEnum.DebugOutput);
         gl.DepthFunc(GLEnum.Lequal);
 
         LoadResources();
@@ -69,6 +68,9 @@ public class RenderManager : IDisposable
         gl.Enable(EnableCap.Blend);
     }
 
+    // Reused across frames to avoid a per-frame allocation
+    private readonly List<(Chunk chunk, float distSq)> _visibleChunks = new(1024);
+
     public void RenderWorld(Camera camera, IEnumerable<Chunk> chunks, double time)
     {
         if (camera == null) return;
@@ -83,24 +85,28 @@ public class RenderManager : IDisposable
         var camChunkPos = (camera.Position / Chunk.Size).Floor();
 
         // Sort chunks by distance for better cache coherency and early z-rejection
-        var visibleChunks = new List<(Chunk chunk, float distSq)>();
-        
+        _visibleChunks.Clear();
+
         foreach (var chunk in chunks)
         {
+            // Air-only chunks (the majority) have no mesh — skip before the frustum test
+            if (!chunk.HasMesh)
+                continue;
+
             var min = chunk.Position * Chunk.Size;
             var max = min + new Vector3(Chunk.Size);
 
             if (!frustum.IntersectsAABB(min, max))
                 continue;
-                
-            var distSq = Vector3.DistanceSquared(chunk.Position, camChunkPos);
-            visibleChunks.Add((chunk, distSq));
-        }
-        
-        // Sort by distance (front to back for better z-buffer performance)
-        visibleChunks.Sort((a, b) => a.distSq.CompareTo(b.distSq));
 
-        foreach (var (chunk, _) in visibleChunks)
+            var distSq = Vector3.DistanceSquared(chunk.Position, camChunkPos);
+            _visibleChunks.Add((chunk, distSq));
+        }
+
+        // Sort by distance (front to back for better z-buffer performance)
+        _visibleChunks.Sort((a, b) => a.distSq.CompareTo(b.distSq));
+
+        foreach (var (chunk, _) in _visibleChunks)
         {
             chunk.lifetime += 1.0 / 60.0; // TODO: Pass delta time eventually
             

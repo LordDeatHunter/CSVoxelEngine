@@ -5,6 +5,7 @@
         <TargetFramework>net9.0</TargetFramework>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>default</LangVersion>
+        <Nullable>annotations</Nullable>
     </PropertyGroup>
 
     <ItemGroup>

@@ -179,21 +179,7 @@ public class Camera
     }
 
     private static bool IsSolidBlock(int worldX, int worldY, int worldZ, ChunkManager chunkManager)
-    {
-        var chunkPos = new Vector3(
-            MathF.Floor(worldX / (float)Chunk.Size),
-            MathF.Floor(worldY / (float)Chunk.Size),
-            MathF.Floor(worldZ / (float)Chunk.Size));
-
-        if (!chunkManager.Chunks.TryGetValue(chunkPos, out var chunk))
-            return false;
-
-        var localX = ((worldX % Chunk.Size) + Chunk.Size) % Chunk.Size;
-        var localY = ((worldY % Chunk.Size) + Chunk.Size) % Chunk.Size;
-        var localZ = ((worldZ % Chunk.Size) + Chunk.Size) % Chunk.Size;
-
-        return chunk.GetBlock(localX, localY, localZ, chunkManager) != 0;
-    }
+        => chunkManager.GetBlockGlobal(worldX, worldY, worldZ) != 0;
 
     public Matrix4x4 GetViewMatrix() => Matrix4x4.CreateLookAt(Position, Position + GetForwardVector(), Vector3.UnitY);
 
@@ -234,27 +220,15 @@ public class Camera
 
         for (var i = 0; i < maxDistance * dist; i++)
         {
-            var chunkPos = new Vector3(
-                MathF.Floor(currentPosition.X / Chunk.Size),
-                MathF.Floor(currentPosition.Y / Chunk.Size),
-                MathF.Floor(currentPosition.Z / Chunk.Size)
-            );
-
-            if (chunkManager.Chunks.TryGetValue(chunkPos, out var chunk))
+            // currentPosition components are floored floats, so the int casts are exact
+            if (chunkManager.GetBlockGlobal((int)currentPosition.X, (int)currentPosition.Y, (int)currentPosition.Z) != 0)
             {
-                var localX = (int)((currentPosition.X % Chunk.Size + Chunk.Size) % Chunk.Size);
-                var localY = (int)((currentPosition.Y % Chunk.Size + Chunk.Size) % Chunk.Size);
-                var localZ = (int)((currentPosition.Z % Chunk.Size + Chunk.Size) % Chunk.Size);
+                hitPosition = currentPosition;
 
-                if (chunk.GetBlock(localX, localY, localZ, chunkManager) != 0)
-                {
-                    hitPosition = currentPosition;
+                // If we start inside a solid voxel, approximate with opposite view direction.
+                hitNormal = lastStepNormal == Vector3.Zero ? -direction.Sign() : lastStepNormal;
 
-                    // If we start inside a solid voxel, approximate with opposite view direction.
-                    hitNormal = lastStepNormal == Vector3.Zero ? -direction.Sign() : lastStepNormal;
-
-                    return true;
-                }
+                return true;
             }
 
             if (tMax.X < tMax.Y && tMax.X < tMax.Z)

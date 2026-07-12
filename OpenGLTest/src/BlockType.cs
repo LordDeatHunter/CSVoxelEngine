@@ -1,9 +1,8 @@
 using System.Collections.Generic;
-using System.Numerics;
 
 namespace silkgltriangle;
 
-public class BlockType(BlockType.Point top, BlockType.Point bottom, BlockType.Point side)
+public class BlockType
 {
     public static readonly Dictionary<byte, BlockType> Types = new()
     {
@@ -12,13 +11,28 @@ public class BlockType(BlockType.Point top, BlockType.Point bottom, BlockType.Po
         { 3, new BlockType(new Point(3, 0), new Point(3, 0), new Point(3, 0)) }, // stone
     };
 
-    public Point Top = top, Bottom = bottom, Side = side;
+    // Array-indexed view of Types for the meshing hot path (no dictionary hashing per block)
+    public static readonly BlockType?[] ById = BuildById();
 
-    public Point GetTile(Vector3 normal)
+    public Point Top, Bottom, Side;
+
+    // Tile per face, indexed in Chunk.CubeFaces order: -Z, +Z, -X, +X, +Y, -Y
+    public readonly Point[] FaceTiles;
+
+    public BlockType(Point top, Point bottom, Point side)
     {
-        if (normal == Vector3.UnitY) return Top;
-        if (normal == -Vector3.UnitY) return Bottom;
-        return Side;
+        Top = top;
+        Bottom = bottom;
+        Side = side;
+        FaceTiles = [side, side, side, side, top, bottom];
+    }
+
+    private static BlockType?[] BuildById()
+    {
+        var byId = new BlockType?[256];
+        foreach (var (id, type) in Types)
+            byId[id] = type;
+        return byId;
     }
 
     public record struct Point(int X, int Y);

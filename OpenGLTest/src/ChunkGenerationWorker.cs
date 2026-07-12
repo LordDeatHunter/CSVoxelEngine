@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
 
@@ -68,30 +69,46 @@ public class ChunkGenerationWorker(ChunkManager chunkManager, Camera camera)
         }
     }
 
-    private Vector3? FindClosestNeededChunk()
+    // Offsets within the view radius, sorted closest-first, so the scan below can
+    // return at the first needed chunk instead of testing the whole 33^3 box.
+    private static readonly Vector3[] SortedOffsets = BuildSortedOffsets();
+
+    private static Vector3[] BuildSortedOffsets()
     {
-        var camChunk = (camera.Position / Chunk.Size).Floor();
         const int radius = WorldGenerationConfig.ChunkRadius;
         const int maxDistSq = WorldGenerationConfig.ChunkRadiusSq;
 
-        Vector3? bestPos = null;
-        var bestDistSq = int.MaxValue;
+        var offsets = new List<(Vector3 offset, int distSq)>();
 
         for (int dx = -radius; dx <= radius; dx++)
         for (int dy = -radius; dy <= radius; dy++)
         for (int dz = -radius; dz <= radius; dz++)
         {
             var distSq = dx * dx + dy * dy + dz * dz;
-            if (distSq > maxDistSq || distSq >= bestDistSq)
-                continue;
-
-            var pos = camChunk + new Vector3(dx, dy, dz);
-            if (!chunkManager.NeedsChunk(pos)) continue;
-            bestPos = pos;
-            bestDistSq = distSq;
+            if (distSq <= maxDistSq)
+                offsets.Add((new Vector3(dx, dy, dz), distSq));
         }
 
-        return bestPos;
+        offsets.Sort((a, b) => a.distSq.CompareTo(b.distSq));
+
+        var result = new Vector3[offsets.Count];
+        for (var i = 0; i < offsets.Count; i++)
+            result[i] = offsets[i].offset;
+        return result;
+    }
+
+    private Vector3? FindClosestNeededChunk()
+    {
+        var camChunk = (camera.Position / Chunk.Size).Floor();
+
+        foreach (var offset in SortedOffsets)
+        {
+            var pos = camChunk + offset;
+            if (chunkManager.NeedsChunk(pos))
+                return pos;
+        }
+
+        return null;
     }
 }
 

@@ -1,82 +1,81 @@
-﻿using System.Numerics;
+using System.Numerics;
 
 namespace silkgltriangle;
 
-public struct Frustum
+public readonly struct Frustum
 {
-    public Plane[] Planes;
+    // Individual fields instead of a Plane[] so constructing a frustum every frame is allocation-free
+    private readonly Plane _left, _right, _bottom, _top, _near, _far;
 
     public Frustum(Matrix4x4 m)
     {
-        Planes = new Plane[6];
-
-        // Left
-        Planes[0] = new Plane(
+        _left = MakePlane(
             m.M14 + m.M11,
             m.M24 + m.M21,
             m.M34 + m.M31,
             m.M44 + m.M41
         );
 
-        // Right
-        Planes[1] = new Plane(
+        _right = MakePlane(
             m.M14 - m.M11,
             m.M24 - m.M21,
             m.M34 - m.M31,
             m.M44 - m.M41
         );
 
-        // Bottom
-        Planes[2] = new Plane(
+        _bottom = MakePlane(
             m.M14 + m.M12,
             m.M24 + m.M22,
             m.M34 + m.M32,
             m.M44 + m.M42
         );
 
-        // Top
-        Planes[3] = new Plane(
+        _top = MakePlane(
             m.M14 - m.M12,
             m.M24 - m.M22,
             m.M34 - m.M32,
             m.M44 - m.M42
         );
 
-        // Near
-        Planes[4] = new Plane(
+        _near = MakePlane(
             m.M13,
             m.M23,
             m.M33,
             m.M43
         );
 
-        // Far
-        Planes[5] = new Plane(
+        _far = MakePlane(
             m.M14 - m.M13,
             m.M24 - m.M23,
             m.M34 - m.M33,
             m.M44 - m.M43
         );
-
-        // Normalize all planes
-        for (int i = 0; i < 6; i++)
-            Planes[i].Normalize();
     }
 
-    public bool IntersectsAABB(Vector3 min, Vector3 max)
+    private static Plane MakePlane(float a, float b, float c, float d)
     {
-        foreach (var plane in Planes)
-        {
-            Vector3 p = new(
-                plane.Normal.X >= 0 ? max.X : min.X,
-                plane.Normal.Y >= 0 ? max.Y : min.Y,
-                plane.Normal.Z >= 0 ? max.Z : min.Z
-            );
+        var plane = new Plane(a, b, c, d);
+        plane.Normalize();
+        return plane;
+    }
 
-            if (plane.DistanceToPoint(p) < 0)
-                return false;
-        }
+    public bool IntersectsAABB(Vector3 min, Vector3 max) =>
+        InFront(in _left, min, max) &&
+        InFront(in _right, min, max) &&
+        InFront(in _bottom, min, max) &&
+        InFront(in _top, min, max) &&
+        InFront(in _near, min, max) &&
+        InFront(in _far, min, max);
 
-        return true;
+    private static bool InFront(in Plane plane, Vector3 min, Vector3 max)
+    {
+        // Test the AABB corner furthest along the plane normal
+        var p = new Vector3(
+            plane.Normal.X >= 0 ? max.X : min.X,
+            plane.Normal.Y >= 0 ? max.Y : min.Y,
+            plane.Normal.Z >= 0 ? max.Z : min.Z
+        );
+
+        return plane.DistanceToPoint(p) >= 0;
     }
 }

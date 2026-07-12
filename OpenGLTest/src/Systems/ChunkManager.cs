@@ -91,6 +91,8 @@ public class ChunkManager(GL gl)
 
     private void ProcessDirtyChunks(Vector3 camChunk)
     {
+        if (_dirtyChunks.IsEmpty) return;
+
         // Snapshot and sort dirty chunks by distance
         var dirtyPositions = _dirtyChunks.Keys.ToArray();
         
@@ -203,6 +205,17 @@ public class ChunkManager(GL gl)
         
         var meshData = chunk.GenerateMeshData(this);
         chunk.UpdateMesh(meshData);
+    }
+
+    /// <summary>
+    /// Reads a block at world coordinates. Unloaded chunks read as air.
+    /// </summary>
+    public byte GetBlockGlobal(int x, int y, int z)
+    {
+        var chunkPos = new Vector3(x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift);
+        return Chunks.TryGetValue(chunkPos, out var chunk)
+            ? chunk.GetLocalBlock(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask)
+            : (byte)0;
     }
 
     /// <summary>
