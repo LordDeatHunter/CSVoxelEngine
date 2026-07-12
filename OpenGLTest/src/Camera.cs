@@ -13,6 +13,7 @@ public class Camera
     public float Pitch { get; private set; } = 0f;
     public bool IsGrounded { get; private set; }
     public bool IsFlying { get; private set; }
+    public bool IsNoclip { get; private set; }
     public float VerticalVelocity => _verticalVelocity;
 
     private const float DefaultFov = 70f;
@@ -40,6 +41,7 @@ public class Camera
     private Vector2 _lastMousePosition;
     private bool _firstMouseMovement = true;
     private bool _spaceWasPressed;
+    private bool _noclipWasPressed;
     private float _timeSinceSpacePress = float.MaxValue;
 
     private readonly IWindow window;
@@ -95,10 +97,11 @@ public class Camera
             moveInput = Vector3.Normalize(moveInput);
 
         UpdateFlightToggle(deltaTime, keyboard);
+        UpdateNoclipToggle(keyboard);
 
         var frameMovement = moveInput * moveSpeed * deltaTime;
 
-        if (IsFlying)
+        if (IsFlying || IsNoclip)
         {
             var verticalInput = 0f;
             if (keyboard.IsKeyPressed(Key.Space)) verticalInput += 1f;
@@ -115,6 +118,13 @@ public class Camera
 
             _verticalVelocity -= Gravity * deltaTime;
             frameMovement.Y = _verticalVelocity * deltaTime;
+        }
+
+        if (IsNoclip)
+        {
+            Position += frameMovement;
+            IsGrounded = false;
+            return;
         }
 
         Position = MoveOnAxis(Position, frameMovement.X, 0, chunkManager, out _);
@@ -137,6 +147,19 @@ public class Camera
         {
             IsGrounded = false;
         }
+    }
+
+    private void UpdateNoclipToggle(IKeyboard keyboard)
+    {
+        var noclipPressed = keyboard.IsKeyPressed(Key.C);
+        if (noclipPressed && !_noclipWasPressed)
+        {
+            IsNoclip = !IsNoclip;
+            _verticalVelocity = 0f;
+            Console.WriteLine($"Noclip {(IsNoclip ? "ON" : "OFF")}");
+        }
+
+        _noclipWasPressed = noclipPressed;
     }
 
     private void UpdateFlightToggle(float deltaTime, IKeyboard keyboard)
