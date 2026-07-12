@@ -50,8 +50,9 @@ public class Chunk : IDisposable
     public bool HasMesh => _mesh != null;
 
     // Column heights only depend on (x, z), so vertical chunk stacks share one heightmap.
-    // Must comfortably exceed the ~(2 * LodChunkRadius)^2 columns the LOD system keeps warm,
-    // or the cache thrashes. 16k entries is ~16 MB.
+    // The outermost LOD ring touches more columns than this (they're computed once per region
+    // build and rarely revisited), so occasional Clear + recompute is cheaper than a bigger
+    // cache. 16k entries is ~16 MB.
     private static readonly ConcurrentDictionary<(int X, int Z), int[]> HeightmapCache = new();
     private const int HeightmapCacheLimit = 16384;
 

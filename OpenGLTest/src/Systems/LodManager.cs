@@ -1,47 +1,55 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Threading;
 
 namespace silkgltriangle;
 
 /// <summary>
-/// Manages far-terrain LOD regions: a background thread builds region meshes from the
-/// heightmap cache (CPU only), the main thread uploads them to the GPU with a per-frame
-/// cap and unloads regions that fall out of range.
+/// Manages far-terrain LOD regions across all LOD levels: a background thread builds
+/// region meshes from the heightmap cache (CPU only), the main thread uploads them to
+/// the GPU with a per-frame cap and unloads regions that fall out of range.
+/// Levels are filled finest-first so detail appears near the player before the horizon.
 /// </summary>
 public class LodManager(Silk.NET.OpenGL.GL gl)
 {
-    public readonly ConcurrentDictionary<(int X, int Z), LodRegion> Regions = new();
+    public readonly ConcurrentDictionary<(int Level, int X, int Z), LodRegion> Regions = new();
 
-    private readonly ConcurrentDictionary<(int X, int Z), byte> _queued = new();
-    private readonly ConcurrentDictionary<(int X, int Z), byte> _dirtyRegions = new();
+    private readonly ConcurrentDictionary<(int Level, int X, int Z), byte> _queued = new();
+    private readonly ConcurrentDictionary<(int Level, int X, int Z), byte> _dirtyRegions = new();
     private readonly ConcurrentQueue<LodMeshData> _completedMeshes = new();
     private volatile bool _isRunning;
     private Camera? _camera;
 
-    // 2D region offsets within the LOD radius, sorted closest-first
-    private static readonly (int dx, int dz)[] SortedOffsets = BuildSortedOffsets();
+    // Per level: 2D region offsets within that level's radius, sorted closest-first
+    private static readonly (int dx, int dz)[][] SortedOffsets = BuildSortedOffsets();
 
-    private static (int dx, int dz)[] BuildSortedOffsets()
+    private static (int dx, int dz)[][] BuildSortedOffsets()
     {
-        const int radius = WorldGenerationConfig.LodRegionRadius;
+        var perLevel = new (int dx, int dz)[LodRegion.Levels.Length][];
 
-        var offsets = new List<(int dx, int dz, int distSq)>();
-        for (var dx = -radius; dx <= radius; dx++)
-        for (var dz = -radius; dz <= radius; dz++)
+        for (var level = 0; level < LodRegion.Levels.Length; level++)
         {
-            var distSq = dx * dx + dz * dz;
-            if (distSq <= radius * radius)
-                offsets.Add((dx, dz, distSq));
+            var radius = LodRegion.Levels[level].RegionRadius;
+            var offsets = new List<(int dx, int dz, int distSq)>();
+
+            for (var dx = -radius; dx <= radius; dx++)
+            for (var dz = -radius; dz <= radius; dz++)
+            {
+                var distSq = dx * dx + dz * dz;
+                if (distSq <= radius * radius)
+                    offsets.Add((dx, dz, distSq));
+            }
+
+            offsets.Sort((a, b) => a.distSq.CompareTo(b.distSq));
+
+            perLevel[level] = new (int, int)[offsets.Count];
+            for (var i = 0; i < offsets.Count; i++)
+                perLevel[level][i] = (offsets[i].dx, offsets[i].dz);
         }
 
-        offsets.Sort((a, b) => a.distSq.CompareTo(b.distSq));
-
-        var result = new (int, int)[offsets.Count];
-        for (var i = 0; i < offsets.Count; i++)
-            result[i] = (offsets[i].dx, offsets[i].dz);
-        return result;
+        return perLevel;
     }
 
     public void Start(Camera camera)
@@ -73,7 +81,8 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
                 var next = TakeDirtyRegion() ?? FindClosestNeededRegion();
                 if (next.HasValue)
                 {
-                    _completedMeshes.Enqueue(LodRegion.BuildMeshData(next.Value.X, next.Value.Z));
+                    var (level, x, z) = next.Value;
+                    _completedMeshes.Enqueue(LodRegion.BuildMeshData(level, x, z));
                 }
                 else
                 {
@@ -89,29 +98,36 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
     }
 
     /// <summary>
-    /// Marks the LOD regions whose sampling window covers the edited column for rebuild.
-    /// The erosion window reaches 3 fine blocks past region bounds, so an edit near a
-    /// region border can affect up to 4 regions.
+    /// Marks the LOD regions (on every level) whose sampling window covers the edited
+    /// column for rebuild. An edit near a region border can affect adjacent regions.
     /// </summary>
     public void MarkEditedColumn(int x, int z)
     {
-        var rxMin = (x - 3) >> 6; // fine coords / LodRegion.SizeBlocks (64), floor division
-        var rxMax = (x + 3) >> 6;
-        var rzMin = (z - 3) >> 6;
-        var rzMax = (z + 3) >> 6;
-
-        for (var rx = rxMin; rx <= rxMax; rx++)
-        for (var rz = rzMin; rz <= rzMax; rz++)
+        for (var level = 0; level < LodRegion.Levels.Length; level++)
         {
-            var key = (rx, rz);
-            // Only rebuild regions that are loaded or being built; anything else picks up
-            // the column caps when it gets built later
-            if (_queued.ContainsKey(key))
-                _dirtyRegions.TryAdd(key, 0);
+            var spec = LodRegion.Levels[level];
+            var reach = spec.SampleMargin + spec.CellSize;
+
+            var rxMin = FloorDiv(x - reach, spec.RegionBlocks);
+            var rxMax = FloorDiv(x + reach, spec.RegionBlocks);
+            var rzMin = FloorDiv(z - reach, spec.RegionBlocks);
+            var rzMax = FloorDiv(z + reach, spec.RegionBlocks);
+
+            for (var rx = rxMin; rx <= rxMax; rx++)
+            for (var rz = rzMin; rz <= rzMax; rz++)
+            {
+                var key = (level, rx, rz);
+                // Only rebuild regions that are loaded or being built; anything else picks
+                // up the column caps when it gets built later
+                if (_queued.ContainsKey(key))
+                    _dirtyRegions.TryAdd(key, 0);
+            }
         }
     }
 
-    private (int X, int Z)? TakeDirtyRegion()
+    private static int FloorDiv(int a, int b) => a >= 0 ? a / b : -((-a + b - 1) / b);
+
+    private (int Level, int X, int Z)? TakeDirtyRegion()
     {
         foreach (var key in _dirtyRegions.Keys)
         {
@@ -122,39 +138,45 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
         return null;
     }
 
-    private (int X, int Z)? FindClosestNeededRegion()
+    private (int Level, int X, int Z)? FindClosestNeededRegion()
     {
-        var (camX, camZ) = CameraRegion();
-
-        foreach (var (dx, dz) in SortedOffsets)
+        for (var level = 0; level < LodRegion.Levels.Length; level++)
         {
-            var key = (camX + dx, camZ + dz);
-            if (Regions.ContainsKey(key)) continue;
-            if (_queued.TryAdd(key, 0))
-                return key;
+            var (camX, camZ) = CameraRegion(level);
+
+            foreach (var (dx, dz) in SortedOffsets[level])
+            {
+                var key = (level, camX + dx, camZ + dz);
+                if (Regions.ContainsKey(key)) continue;
+                if (_queued.TryAdd(key, 0))
+                    return key;
+            }
         }
 
         return null;
     }
 
-    private (int X, int Z) CameraRegion()
+    private (int X, int Z) CameraRegion(int level)
     {
         var pos = _camera!.Position;
-        return ((int)MathF.Floor(pos.X / LodRegion.SizeBlocks), (int)MathF.Floor(pos.Z / LodRegion.SizeBlocks));
+        var size = LodRegion.Levels[level].RegionBlocks;
+        return ((int)MathF.Floor(pos.X / size), (int)MathF.Floor(pos.Z / size));
     }
 
     public void Update()
     {
         if (_camera == null) return;
 
-        var (camX, camZ) = CameraRegion();
-        const int unloadRadiusSq = (WorldGenerationConfig.LodRegionRadius + 1) * (WorldGenerationConfig.LodRegionRadius + 1);
+        Span<(int camX, int camZ)> camRegions = stackalloc (int, int)[LodRegion.Levels.Length];
+        for (var level = 0; level < LodRegion.Levels.Length; level++)
+            camRegions[level] = CameraRegion(level);
 
         foreach (var (key, region) in Regions)
         {
-            var dx = key.X - camX;
-            var dz = key.Z - camZ;
-            if (dx * dx + dz * dz <= unloadRadiusSq)
+            var radius = LodRegion.Levels[key.Level].RegionRadius + 1;
+            var dx = key.X - camRegions[key.Level].camX;
+            var dz = key.Z - camRegions[key.Level].camZ;
+            if (dx * dx + dz * dz <= radius * radius)
                 continue;
 
             if (!Regions.TryRemove(key, out var removed)) continue;
@@ -165,12 +187,13 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
         var uploaded = 0;
         while (uploaded < WorldGenerationConfig.MaxLodUploadsPerFrame && _completedMeshes.TryDequeue(out var data))
         {
-            var key = (data.X, data.Z);
-            var dx = data.X - camX;
-            var dz = data.Z - camZ;
+            var key = (data.Level, data.X, data.Z);
+            var radius = LodRegion.Levels[data.Level].RegionRadius + 1;
+            var dx = data.X - camRegions[data.Level].camX;
+            var dz = data.Z - camRegions[data.Level].camZ;
 
             // Moved out of range while queued; allow it to regenerate later
-            if (dx * dx + dz * dz > unloadRadiusSq)
+            if (dx * dx + dz * dz > radius * radius)
             {
                 _queued.TryRemove(key, out _);
                 continue;

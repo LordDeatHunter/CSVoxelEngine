@@ -143,8 +143,8 @@ public class RenderManager : IDisposable
             if (!region.HasMesh)
                 continue;
 
-            var min = new Vector3(region.X * LodRegion.SizeBlocks, region.YMin, region.Z * LodRegion.SizeBlocks);
-            var max = new Vector3(min.X + LodRegion.SizeBlocks, region.YMax, min.Z + LodRegion.SizeBlocks);
+            var min = new Vector3(region.X * region.SizeBlocks, region.YMin, region.Z * region.SizeBlocks);
+            var max = new Vector3(min.X + region.SizeBlocks, region.YMax, min.Z + region.SizeBlocks);
 
             if (!frustum.IntersectsAABB(min, max))
                 continue;
@@ -153,13 +153,17 @@ public class RenderManager : IDisposable
             _visibleRegions.Add((region, Vector3.DistanceSquared(center, camPos)));
         }
 
-        _visibleRegions.Sort((a, b) => a.distSq.CompareTo(b.distSq));
+        // Coarsest level first, then front to back within a level; finer geometry
+        // always draws over the coarser mesh buried beneath it
+        _visibleRegions.Sort((a, b) => a.region.Level != b.region.Level
+            ? b.region.Level.CompareTo(a.region.Level)
+            : a.distSq.CompareTo(b.distSq));
 
         foreach (var (region, _) in _visibleRegions)
         {
             region.Lifetime += 1.0 / 60.0;
 
-            var model = Matrix4x4.CreateTranslation(region.X * LodRegion.SizeBlocks, 0f, region.Z * LodRegion.SizeBlocks);
+            var model = Matrix4x4.CreateTranslation(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks);
             worldShader.SetUniform("uMVP", model * viewProj);
             worldShader.SetUniform("uAlpha", MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)));
 

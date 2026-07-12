@@ -16,8 +16,11 @@ public class Camera
     public float VerticalVelocity => _verticalVelocity;
 
     private const float DefaultFov = 70f;
-    private const float NearPlane = 0.01f;
-    private const float FarPlane = 1000f;
+    // Near plane sets depth precision at distance (error ~ z^2 / (near * 2^24)); it must be
+    // large enough that stacked LOD levels ~4 blocks apart don't z-fight at 2048 blocks.
+    // Collision keeps geometry at least PlayerRadius (0.6) away, so 0.2 never clips.
+    private const float NearPlane = 0.2f;
+    private const float FarPlane = 4096f; // past the outermost LOD ring (2048 blocks + terrain height)
     private const float MouseSensitivity = 0.2f;
 
     // Physical quantities in meters (or m/s, m/s^2), converted to block units
