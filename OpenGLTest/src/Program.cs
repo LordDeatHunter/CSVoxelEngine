@@ -13,6 +13,9 @@ public static class Program
     private static bool debugEnabled;
     private static bool xWasPressed;
     private static double debugLogTimer;
+    // TODO: move this to player class
+    private static double placeTimer = MAX_PLACE_TIMER;
+    private static readonly double MAX_PLACE_TIMER = 0.2;
 
     public static void Main()
     {
@@ -32,10 +35,16 @@ public static class Program
         inputManager = new InputManager(windowManager.Window);
         renderManager = new RenderManager(windowManager.Window);
         world = new World(renderManager.gl, windowManager.Window, inputManager.InputContext);
+
+        inputManager.Mouse?.MouseUp += (_, button) =>
+        {
+            if (button == MouseButton.Right) placeTimer = MAX_PLACE_TIMER;
+        };
     }
     
     private static void OnUpdate(double deltaTime)
     {
+        placeTimer = Math.Min(MAX_PLACE_TIMER, placeTimer + deltaTime);
         var xPressed = inputManager.Keyboard?.IsKeyPressed(Key.X) == true;
         if (xPressed && !xWasPressed)
         {
@@ -49,14 +58,15 @@ public static class Program
             world.TryRemoveBlockFromRaycast(World.InteractionReach);
         }
 
-        if (inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true)
+        if (inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true && placeTimer >= MAX_PLACE_TIMER)
         {
+            placeTimer = 0;
             world.TryPlaceBlockFromRaycast(World.InteractionReach, 3);
         }
 
-        world?.Update((float)deltaTime, inputManager.Keyboard);
+        world.Update((float)deltaTime, inputManager.Keyboard);
 
-        if (debugEnabled && world != null)
+        if (debugEnabled)
         {
             debugLogTimer += deltaTime;
             if (debugLogTimer >= 0.2)

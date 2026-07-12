@@ -73,15 +73,14 @@ public class World
             MathF.Floor(hitPos.Z / Chunk.Size)
         );
 
-        if (_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk))
-        {
-            chunk.RemoveBlockAt(hitPos, _chunkManager);
+        if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk)) return;
 
-            // Keep the buried LOD mesh below the newly exposed hole
-            // (hitPos components are floored floats, so the int casts are exact)
-            if (LodRegion.LowerColumnBelow((int)hitPos.X, (int)hitPos.Y, (int)hitPos.Z))
-                _lodManager.MarkEditedColumn((int)hitPos.X, (int)hitPos.Z);
-        }
+        chunk.RemoveBlockAt(hitPos, _chunkManager);
+
+        // Keep the buried LOD mesh below the newly exposed hole
+        // (hitPos components are floored floats, so the int casts are exact)
+        if (LodRegion.LowerColumnBelow((int)hitPos.X, (int)hitPos.Y, (int)hitPos.Z))
+            _lodManager.MarkEditedColumn((int)hitPos.X, (int)hitPos.Z);
     }
 
     public void TryPlaceBlockFromRaycast(float maxDistance, byte blockId)
