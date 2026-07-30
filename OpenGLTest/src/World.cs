@@ -17,6 +17,13 @@ public class World
     // Seconds of holding left-click per mining hit. Each hit removes 1 HP from the
     // targeted block; time short of a full interval deals nothing (noclip breaks instantly).
     public const float BlockHitSeconds = 0.2f;
+dc c 
+    // A hit makes the block jump out and settle back. Kept below BlockHitSeconds so the
+    // pop always finishes before the next hit restarts it.
+    public const float BlockPopSeconds = 0.15f;
+
+    // Uniform scale the block reaches at the peak of a hit
+    public const float BlockPopScale = 1.3f;
 
     private readonly ChunkManager _chunkManager;
     private readonly ChunkGenerationWorker _generationWorker;
@@ -27,14 +34,21 @@ public class World
     private Vector3 _selectedFaceNormal;
     private bool _isBreaking;
     private Vector3 _breakingBlockPosition;
+    private byte _breakingBlockId;
     private int _breakDamage;
     private int _breakMaxHealth;
     private float _hitTimer;
+    private float _popElapsed = BlockPopSeconds;
     public Camera Camera { get; }
 
     // Break overlay strength. Quantized to whole hits, so it steps with the damage dealt
     // instead of sweeping continuously.
     private float BreakProgress => _breakMaxHealth > 0 ? _breakDamage / (float)_breakMaxHealth : 0f;
+
+    // Scale of the block being mined: 1 at rest, eased up to BlockPopScale and back down
+    // over BlockPopSeconds after each hit lands
+    private float BlockPopScaleNow =>
+        MathUtils.Lerp(1f, BlockPopScale, MathUtils.Pulse(_popElapsed / BlockPopSeconds));
 
     public World(GL gl, IWindow window, IInputContext input)
     {
@@ -63,10 +77,19 @@ public class World
         renderManager.RenderWorld(Camera, _chunkManager.Chunks.Values, _window.Time);
 
         if (!_hasSelectedBlock) return;
-        renderManager.RenderBlockSelection(Camera, _selectedBlockPosition, _selectedFaceNormal);
+
+        // While mining, the outline and the break overlay ride along with the popping block
+        var popScale = _isBreaking ? BlockPopScaleNow : 1f;
+
+        // The chunk mesh still holds the block at rest size, so the popped cube is only
+        // needed (and only hides it) while it is scaled up
+        if (popScale > 1f)
+            renderManager.RenderBlockPop(Camera, _breakingBlockPosition, _breakingBlockId, popScale);
+
+        renderManager.RenderBlockSelection(Camera, _selectedBlockPosition, _selectedFaceNormal, popScale);
 
         if (_isBreaking)
-            renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress);
+            renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress, popScale);
     }
 
     public void RenderUI(RenderManager renderManager)
@@ -100,9 +123,11 @@ public class World
         {
             _isBreaking = true;
             _breakingBlockPosition = _selectedBlockPosition;
-            _breakMaxHealth = BlockHealthAt(_selectedBlockPosition);
+            _breakingBlockId = BlockIdAt(_selectedBlockPosition);
+            _breakMaxHealth = BlockType.ById[_breakingBlockId]?.MaxHealth ?? 0;
             _breakDamage = 0;
             _hitTimer = 0f;
+            _popElapsed = BlockPopSeconds;
         }
 
         // Air or an unloaded chunk: nothing to mine
@@ -113,12 +138,17 @@ public class World
         }
 
         _hitTimer += (float)deltaTime;
+        _popElapsed += (float)deltaTime;
 
         // A long frame can carry more than one hit; the leftover time rolls into the next
         while (_hitTimer >= BlockHitSeconds)
         {
             _hitTimer -= BlockHitSeconds;
             _breakDamage++;
+
+            // Start the pop from where the hit actually landed inside this frame, not from
+            // the frame boundary, so the animation stays in step with the hit rhythm
+            _popElapsed = _hitTimer;
 
             if (_breakDamage < _breakMaxHealth) continue;
 
@@ -134,16 +164,16 @@ public class World
         _breakDamage = 0;
         _breakMaxHealth = 0;
         _hitTimer = 0f;
+        _popElapsed = BlockPopSeconds;
     }
 
     /// <summary>
-    /// HP of the block at a world position, or 0 for air and unloaded chunks.
+    /// Block id at a world position; 0 (air) for unloaded chunks.
     /// </summary>
-    private int BlockHealthAt(Vector3 blockPos)
+    private byte BlockIdAt(Vector3 blockPos)
     {
         // blockPos components are floored floats, so the int casts are exact
-        var id = _chunkManager.GetBlockGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
-        return BlockType.ById[id]?.MaxHealth ?? 0;
+        return _chunkManager.GetBlockGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
     }
 
     private void RemoveBlock(Vector3 blockPos)

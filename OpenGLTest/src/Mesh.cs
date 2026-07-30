@@ -131,6 +131,45 @@ public class Mesh : IDisposable
         return new Mesh(gl, vertices, indices);
     }
 
+    /// <summary>
+    /// Builds a standalone cube for one block type, in the same local 0..1 space the chunk
+    /// mesher uses per block, with that type's atlas tiles and per-face brightness. Faces are
+    /// shaded as fully unoccluded (AO 3) since a popped-out block has nothing beside it.
+    /// </summary>
+    public static Mesh CreateBlockCube(GL gl, BlockType type)
+    {
+        var vertices = new Vertex[24];
+        var indices = new ushort[36];
+        Span<Vector2> uv = stackalloc Vector2[4];
+
+        for (var f = 0; f < 6; f++)
+        {
+            var tile = type.FaceTiles[f];
+            var u0 = tile.X * Chunk.TileUVSize;
+            var v0 = tile.Y * Chunk.TileUVSize;
+            uv[0] = new Vector2(u0, v0 + Chunk.TileUVSize);
+            uv[1] = new Vector2(u0, v0);
+            uv[2] = new Vector2(u0 + Chunk.TileUVSize, v0);
+            uv[3] = new Vector2(u0 + Chunk.TileUVSize, v0 + Chunk.TileUVSize);
+
+            var shade = Chunk.ShadeLut[(f << 2) | 3];
+            var face = Chunk.CubeFaces[f].face;
+
+            for (var c = 0; c < 4; c++)
+                vertices[f * 4 + c] = new Vertex(face[c], shade, shade, shade, 255, uv[c]);
+
+            var offset = (ushort)(f * 4);
+            indices[f * 6 + 0] = (ushort)(offset + 0);
+            indices[f * 6 + 1] = (ushort)(offset + 1);
+            indices[f * 6 + 2] = (ushort)(offset + 2);
+            indices[f * 6 + 3] = (ushort)(offset + 0);
+            indices[f * 6 + 4] = (ushort)(offset + 2);
+            indices[f * 6 + 5] = (ushort)(offset + 3);
+        }
+
+        return new Mesh(gl, vertices, indices);
+    }
+
     public static Mesh CreateQuad(GL gl)
     {
         Span<Vertex> vertices =

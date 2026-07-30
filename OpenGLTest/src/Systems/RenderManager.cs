@@ -178,7 +178,45 @@ public class RenderManager : IDisposable
         }
     }
 
-    public void RenderBlockSelection(Camera camera, Vector3 blockPosition, Vector3 hitNormal)
+    // One cube per block type, built on first use and reused for the mining pop
+    private readonly Dictionary<byte, Mesh> _blockCubes = new();
+
+    /// <summary>
+    /// Draws a single block as a standalone cube scaled about its center. Used for the
+    /// mining pop: at scale > 1 the cube encloses the block baked into the chunk mesh, so
+    /// the block appears to jump out of the terrain.
+    /// </summary>
+    public void RenderBlockPop(Camera camera, Vector3 blockPosition, byte blockId, float scale)
+    {
+        var type = BlockType.ById[blockId];
+        if (type == null) return;
+
+        if (!_blockCubes.TryGetValue(blockId, out var mesh))
+        {
+            mesh = Mesh.CreateBlockCube(gl, type);
+            _blockCubes[blockId] = mesh;
+        }
+
+        worldShader.Use();
+        gl.ActiveTexture(TextureUnit.Texture0);
+        gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
+
+        var center = new Vector3(0.5f);
+        var model = Matrix4x4.CreateTranslation(-center)
+                    * Matrix4x4.CreateScale(scale)
+                    * Matrix4x4.CreateTranslation(blockPosition + center);
+
+        worldShader.SetUniform("uMVP", model * camera.GetViewProjection());
+        worldShader.SetUniform("uAlpha", 1f);
+
+        mesh.Render();
+    }
+
+    /// <summary>
+    /// Draws the targeted block's outline and face highlight. <paramref name="scale"/> is the
+    /// block's current pop scale so the highlight tracks it while mining.
+    /// </summary>
+    public void RenderBlockSelection(Camera camera, Vector3 blockPosition, Vector3 hitNormal, float scale = 1f)
     {
         selectionShader.Use();
 
@@ -188,7 +226,7 @@ public class RenderManager : IDisposable
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
         var center = blockPosition + new Vector3(0.5f);
-        var outlineModel = Matrix4x4.CreateScale(1.01f) * Matrix4x4.CreateTranslation(center);
+        var outlineModel = Matrix4x4.CreateScale(1.01f * scale) * Matrix4x4.CreateTranslation(center);
         selectionShader.SetUniform("uMVP", outlineModel * viewProj);
         selectionShader.SetUniform("uColor", new Vector3(1.0f, 0.95f, 0.35f));
         selectionShader.SetUniform("uOpacity", 0.95f);
@@ -200,8 +238,11 @@ public class RenderManager : IDisposable
         var faceIndex = FaceIndexFromNormal(hitNormal);
         if (faceIndex >= 0)
         {
-            var faceOffset = hitNormal * 0.003f;
-            var faceModel = Matrix4x4.CreateTranslation(blockPosition + faceOffset);
+            // Face geometry is local 0..1, so scale about the block center, then nudge the
+            // quad off the (now possibly moved) face so it never z-fights the block
+            var faceModel = Matrix4x4.CreateTranslation(new Vector3(-0.5f))
+                            * Matrix4x4.CreateScale(scale)
+                            * Matrix4x4.CreateTranslation(center + hitNormal * 0.003f);
             selectionShader.SetUniform("uMVP", faceModel * viewProj);
             selectionShader.SetUniform("uColor", new Vector3(1.0f, 1.0f, 0.5f));
             selectionShader.SetUniform("uOpacity", 0.3f);
@@ -217,9 +258,10 @@ public class RenderManager : IDisposable
     /// <summary>
     /// Draws the block-breaking progress overlay on all faces of the targeted block:
     /// a dark fill with a bright leading edge grows from the face centers as progress
-    /// goes 0 -> 1 (see break-fragment.glsl).
+    /// goes 0 -> 1 (see break-fragment.glsl). <paramref name="scale"/> is the block's
+    /// current pop scale so the overlay tracks it while mining.
     /// </summary>
-    public void RenderBlockBreaking(Camera camera, Vector3 blockPosition, float progress)
+    public void RenderBlockBreaking(Camera camera, Vector3 blockPosition, float progress, float scale = 1f)
     {
         if (progress <= 0f) return;
 
@@ -231,7 +273,7 @@ public class RenderManager : IDisposable
         // Inflate slightly around the block center so the overlay never z-fights the block
         var center = new Vector3(0.5f);
         var model = Matrix4x4.CreateTranslation(-center)
-                    * Matrix4x4.CreateScale(1.004f)
+                    * Matrix4x4.CreateScale(1.004f * scale)
                     * Matrix4x4.CreateTranslation(blockPosition + center);
         breakShader.SetUniform("uMVP", model * camera.GetViewProjection());
         breakShader.SetUniform("uProgress", progress);
@@ -338,6 +380,10 @@ public class RenderManager : IDisposable
 
     public void Dispose()
     {
+        foreach (var mesh in _blockCubes.Values)
+            mesh.Dispose();
+        _blockCubes.Clear();
+
         crosshairMesh.Dispose();
         worldShader.Dispose();
         uiShader.Dispose();

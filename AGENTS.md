@@ -18,7 +18,7 @@ dotnet build OpenGLTest.sln
 dotnet run --project OpenGLTest/silkgltriangle.csproj
 ```
 
-The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, double-tap Space to toggle flight (Space/Left Ctrl for up/down while flying), `C` to toggle noclip, Left Shift for 10x speed, hold left-click to mine a block (hit-based: one hit per `World.BlockHitSeconds` = 200 ms removes 1 HP of the block's `BlockType.MaxHealth` = 5, so ~1s; damage resets if you release or switch target; instant while noclip; stepped progress overlay via `break-*.glsl`), right-click to place stone, `X` to toggle debug logging (FPS/position to console), Escape to quit.
+The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, double-tap Space to toggle flight (Space/Left Ctrl for up/down while flying), `C` to toggle noclip, Left Shift for 10x speed, hold left-click to mine a block (hit-based: one hit per `World.BlockHitSeconds` = 200 ms removes 1 HP of the block's `BlockType.MaxHealth` = 5, so ~1s; damage resets if you release or switch target; instant while noclip; stepped progress overlay via `break-*.glsl`; each hit pops the block out and back via `RenderManager.RenderBlockPop`), right-click to place stone, `X` to toggle debug logging (FPS/position to console), Escape to quit.
 
 Shaders (`assets/shaders/**/*.glsl`) and textures (`assets/textures/**/*.png`) are copied to the output directory via `CopyToOutputDirectory` rules in the csproj — **new asset types/extensions need a matching `<None Update>` entry** or they won't be found at runtime.
 
@@ -35,6 +35,7 @@ OpenGLTest/
     LodRegion.cs               # far-terrain LOD: 4x4-chunk columns meshed at half res from heightmaps
     BlockType.cs               # block ID -> atlas tiles + mining HP (1=grass, 2=dirt, 3=stone; 0=air)
     WorldGenerationConfig.cs   # all tuning constants (view radius, per-frame budgets, thread counts)
+    MathUtils.cs               # lerp/easing/pulse helpers for animation curves + shared constants
     Mesh.cs, Shader.cs, TextureLoader.cs, FileUtils.cs, FastNoiseLite.cs (vendored, don't reformat)
     Data/                      # Vertex struct, cube geometry, frustum/plane math, direction tables
     Systems/
@@ -61,6 +62,7 @@ Rules that follow from this:
 - Shared state uses `ConcurrentDictionary`/`ConcurrentQueue`; `Chunk.IsBlockDataReady` is `volatile`. Keep new shared state lock-free in the same style.
 - Editing a block on a chunk border must also remesh the affected neighbor chunk(s) — block edits use `ChunkManager.ImmediateRemesh` / `MarkDirty`.
 - Performance tuning knobs all live in `WorldGenerationConfig`; change constants there rather than hardcoding budgets elsewhere.
+- Animation curves (interpolation, easing, one-shot pulses) belong in `MathUtils`, not inline in gameplay or render code — everything time-driven should be lerped through one of those helpers rather than snapped.
 
 Other invariants:
 
