@@ -45,6 +45,13 @@ public static class MathUtils
     }
 
     /// <summary>
+    /// Continuous -1..1 oscillation, completing one cycle every <paramref name="period"/>
+    /// seconds. Starts at 0 and rises first, so an animation using it begins from rest.
+    /// </summary>
+    public static float Oscillate(float time, float period) =>
+        period <= 0f ? 0f : MathF.Sin(time / period * MathF.Tau);
+
+    /// <summary>
     /// One-shot 0 -> 1 -> 0 pulse across t in 0..1. The rise is short and eased-out and the
     /// fall is smooth, so it reads as an impact rather than a symmetric wobble.
     /// <paramref name="peakAt"/> is where the pulse tops out and is clamped away from the

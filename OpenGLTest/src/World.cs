@@ -28,6 +28,7 @@ public class World
     private readonly ChunkManager _chunkManager;
     private readonly ChunkGenerationWorker _generationWorker;
     private readonly LodManager _lodManager;
+    private readonly DropManager _dropManager = new();
     private readonly IWindow _window;
     private bool _hasSelectedBlock;
     private Vector3 _selectedBlockPosition;
@@ -71,6 +72,14 @@ public class World
         _chunkManager.Update(Camera);
         _lodManager.Update();
 
+        // Drops collected this tick land in the hotbar, which pops the matching icon. A block
+        // with no slot is simply discarded.
+        _dropManager.Update((float)deltaTime, Camera.Position);
+        foreach (var blockId in _dropManager.Collected)
+            Inventory.Add(blockId);
+
+        Inventory.Update((float)deltaTime);
+
         _hasSelectedBlock = Camera.Raycast(InteractionReach, _chunkManager, out _selectedBlockPosition, out _selectedFaceNormal);
     }
 
@@ -78,6 +87,7 @@ public class World
     {
         renderManager.RenderLod(Camera, _lodManager.Regions.Values);
         renderManager.RenderWorld(Camera, _chunkManager.Chunks.Values, _window.Time);
+        renderManager.RenderItemDrops(Camera, _dropManager.Drops);
 
         if (!_hasSelectedBlock) return;
 
@@ -189,7 +199,12 @@ public class World
 
         if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk)) return;
 
-        chunk.RemoveBlockAt(blockPos, _chunkManager);
+        // Read the id before the block goes away, so the drop knows what it is
+        var brokenId = BlockIdAt(blockPos);
+
+        // Only drop something if a block was actually cleared
+        if (chunk.RemoveBlockAt(blockPos, _chunkManager))
+            _dropManager.Spawn(brokenId, blockPos);
 
         // Keep the buried LOD mesh below the newly exposed hole
         // (blockPos components are floored floats, so the int casts are exact)
@@ -198,18 +213,25 @@ public class World
     }
 
     /// <summary>
-    /// Places the hotbar's selected block against the face the player is looking at. Does
-    /// nothing when the selected slot is empty.
+    /// Places the hotbar's selected block against the face the player is looking at and spends
+    /// one from that slot. Does nothing when the slot is empty or holds no blocks.
     /// </summary>
-    public void TryPlaceSelectedBlock(float maxDistance) =>
-        TryPlaceBlockFromRaycast(maxDistance, Inventory.SelectedBlockId);
-
-    public void TryPlaceBlockFromRaycast(float maxDistance, byte blockId)
+    public void TryPlaceSelectedBlock(float maxDistance)
     {
-        if (blockId == 0) return;
+        if (!Inventory.CanPlaceSelected) return;
+
+        // Only spend a block if one actually went down
+        if (TryPlaceBlockFromRaycast(maxDistance, Inventory.SelectedBlockId))
+            Inventory.ConsumeSelected();
+    }
+
+    /// <summary>Places a block against the targeted face. Returns whether one was placed.</summary>
+    public bool TryPlaceBlockFromRaycast(float maxDistance, byte blockId)
+    {
+        if (blockId == 0) return false;
 
         if (!Camera.Raycast(maxDistance, _chunkManager, out var hitPos, out var hitNormal))
-            return;
+            return false;
 
         var placePos = hitPos + hitNormal;
         var chunkPos = new Vector3(
@@ -218,10 +240,8 @@ public class World
             MathF.Floor(placePos.Z / Chunk.Size)
         );
 
-        if (_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk))
-        {
-            chunk.PlaceBlockAt(placePos, blockId, _chunkManager);
-        }
+        return _chunkManager.Chunks.TryGetValue(chunkPos, out var chunk)
+               && chunk.PlaceBlockAt(placePos, blockId, _chunkManager);
     }
     
     public ChunkManager GetChunkManager() => _chunkManager;

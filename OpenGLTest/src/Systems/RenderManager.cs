@@ -14,6 +14,7 @@ public class RenderManager : IDisposable
     private Shader selectionShader;
     private Shader breakShader;
     private UIRenderer ui;
+    private BlockCubeCache blockCubes;
     private uint textureAtlas;
     private uint outlineVao;
     private uint outlineVbo;
@@ -47,7 +48,8 @@ public class RenderManager : IDisposable
         selectionShader = new Shader(gl, selectionVs, selectionFs);
         breakShader = new Shader(gl, breakVs, breakFs);
 
-        ui = new UIRenderer(gl, textureAtlas);
+        blockCubes = new BlockCubeCache(gl);
+        ui = new UIRenderer(gl, textureAtlas, blockCubes);
         CreateSelectionGeometry();
     }
 
@@ -170,9 +172,6 @@ public class RenderManager : IDisposable
         }
     }
 
-    // One cube per block type, built on first use and reused for the mining pop
-    private readonly Dictionary<byte, Mesh> _blockCubes = new();
-
     /// <summary>
     /// Draws a single block as a standalone cube scaled about its center. Used for the
     /// mining pop: at scale > 1 the cube encloses the block baked into the chunk mesh, so
@@ -180,14 +179,8 @@ public class RenderManager : IDisposable
     /// </summary>
     public void RenderBlockPop(Camera camera, Vector3 blockPosition, byte blockId, float scale)
     {
-        var type = BlockType.ById[blockId];
-        if (type == null) return;
-
-        if (!_blockCubes.TryGetValue(blockId, out var mesh))
-        {
-            mesh = Primitives.CreateBlockCube(gl, type);
-            _blockCubes[blockId] = mesh;
-        }
+        var mesh = blockCubes.Get(blockId);
+        if (mesh == null) return;
 
         worldShader.Use();
         gl.ActiveTexture(TextureUnit.Texture0);
@@ -201,6 +194,35 @@ public class RenderManager : IDisposable
         worldShader.SetUniform("uAlpha", 1f);
 
         mesh.Render();
+    }
+
+    /// <summary>
+    /// Draws the floating item drops, each spinning about its own centre and pulsing in scale.
+    /// </summary>
+    public void RenderItemDrops(Camera camera, IReadOnlyList<ItemDrop> drops)
+    {
+        if (camera == null || drops.Count == 0) return;
+
+        worldShader.Use();
+        worldShader.SetUniform("uAlpha", 1f);
+        gl.ActiveTexture(TextureUnit.Texture0);
+        gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
+
+        var viewProj = camera.GetViewProjection();
+
+        foreach (var drop in drops)
+        {
+            var mesh = blockCubes.Get(drop.BlockId);
+            if (mesh == null) continue;
+
+            // The cube is centred on its own origin, so it spins in place
+            var model = Matrix4x4.CreateScale(drop.Scale)
+                        * Matrix4x4.CreateRotationY(drop.Spin)
+                        * Matrix4x4.CreateTranslation(drop.Position);
+
+            worldShader.SetUniform("uMVP", model * viewProj);
+            mesh.Render();
+        }
     }
 
     /// <summary>
@@ -357,11 +379,8 @@ public class RenderManager : IDisposable
 
     public void Dispose()
     {
-        foreach (var mesh in _blockCubes.Values)
-            mesh.Dispose();
-        _blockCubes.Clear();
-
         ui.Dispose();
+        blockCubes.Dispose();
         worldShader.Dispose();
         selectionShader.Dispose();
         breakShader.Dispose();

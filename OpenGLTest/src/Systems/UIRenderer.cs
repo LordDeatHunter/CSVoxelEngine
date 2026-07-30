@@ -53,21 +53,20 @@ public class UIRenderer : IDisposable
     private readonly Shader _shader;
     private readonly uint _atlasTexture;
     private readonly uint _crosshairTexture;
+    private readonly BlockCubeCache _blockCubes;
 
     // Unit shapes, scaled per draw so a colour or size change costs no buffer work
     private readonly Mesh _unitSquare;
-
-    // One cube per block type, built on first use
-    private readonly Dictionary<byte, Mesh> _blockIcons = new();
 
     private Matrix4x4 _projection;
     private Vector2 _screenSize;
     private bool _depthCleared;
 
-    public UIRenderer(GL gl, uint atlasTexture)
+    public UIRenderer(GL gl, uint atlasTexture, BlockCubeCache blockCubes)
     {
         _gl = gl;
         _atlasTexture = atlasTexture;
+        _blockCubes = blockCubes;
 
         var vertexSource = FileUtils.ReadFile("assets/shaders/ui-vertex.glsl");
         var fragmentSource = FileUtils.ReadFile("assets/shaders/ui-fragment.glsl");
@@ -140,14 +139,8 @@ public class UIRenderer : IDisposable
     /// </param>
     public void DrawBlockIcon(Vector2 centre, float size, byte blockId)
     {
-        var type = BlockType.ById[blockId];
-        if (type == null) return;
-
-        if (!_blockIcons.TryGetValue(blockId, out var mesh))
-        {
-            mesh = Primitives.CreateBlockCube(_gl, type);
-            _blockIcons[blockId] = mesh;
-        }
+        var mesh = _blockCubes.Get(blockId);
+        if (mesh == null) return;
 
         // Icons are convex and never overlap each other, so one clear per pass is enough
         // sorting. Flat shapes draw with the depth test off, which also stops them writing
@@ -196,7 +189,8 @@ public class UIRenderer : IDisposable
         for (var i = 0; i < slots.Length; i++)
         {
             var centre = new Vector2(firstCentreX + i * stride, centreY);
-            DrawBlockIcon(centre, SlotSize * IconFill, slots[i]);
+            // The pop marks a pickup; IconFill leaves enough margin for it to stay in the slot
+            DrawBlockIcon(centre, SlotSize * IconFill * inventory.PopScaleAt(i), slots[i]);
         }
     }
 
@@ -243,10 +237,7 @@ public class UIRenderer : IDisposable
 
     public void Dispose()
     {
-        foreach (var mesh in _blockIcons.Values)
-            mesh.Dispose();
-        _blockIcons.Clear();
-
+        // _blockCubes is owned by RenderManager and shared with the world passes
         _unitSquare.Dispose();
         _shader.Dispose();
         _gl.DeleteTexture(_crosshairTexture);

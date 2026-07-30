@@ -189,35 +189,42 @@ public class Chunk : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public byte GetLocalBlock(int x, int y, int z) => _blocks[Idx(x, y, z)];
 
-    public void RemoveBlockAt(Vector3 worldPos, ChunkManager chunkManager)
+    /// <summary>Clears a block. Returns false if the cell is outside this chunk or already air.</summary>
+    public bool RemoveBlockAt(Vector3 worldPos, ChunkManager chunkManager)
     {
         var localX = (int)(worldPos.X - Position.X * Size);
         var localY = (int)(worldPos.Y - Position.Y * Size);
         var localZ = (int)(worldPos.Z - Position.Z * Size);
 
-        if (!InBounds(localX, localY, localZ)) return;
-        if (_blocks[Idx(localX, localY, localZ)] == 0) return;
+        if (!InBounds(localX, localY, localZ)) return false;
+        if (_blocks[Idx(localX, localY, localZ)] == 0) return false;
         _blocks[Idx(localX, localY, localZ)] = 0;
         _solidCount--;
 
         chunkManager.ImmediateRemesh(Position);
         MarkNeighborsDirty(worldPos, chunkManager);
+        return true;
     }
 
-    public void PlaceBlockAt(Vector3 worldPos, byte blockId, ChunkManager chunkManager)
+    /// <summary>
+    /// Fills a block. Returns false if the cell is outside this chunk or already occupied, so
+    /// callers can avoid spending an item on a placement that never happened.
+    /// </summary>
+    public bool PlaceBlockAt(Vector3 worldPos, byte blockId, ChunkManager chunkManager)
     {
         var localX = (int)(worldPos.X - Position.X * Size);
         var localY = (int)(worldPos.Y - Position.Y * Size);
         var localZ = (int)(worldPos.Z - Position.Z * Size);
 
-        if (!InBounds(localX, localY, localZ)) return;
-        if (_blocks[Idx(localX, localY, localZ)] != 0) return;
+        if (!InBounds(localX, localY, localZ)) return false;
+        if (_blocks[Idx(localX, localY, localZ)] != 0) return false;
 
         _blocks[Idx(localX, localY, localZ)] = blockId;
         _solidCount++;
 
         chunkManager.ImmediateRemesh(Position);
         MarkNeighborsDirty(worldPos, chunkManager);
+        return true;
     }
 
     private void MarkNeighborsDirty(Vector3 worldPos, ChunkManager chunkManager)
