@@ -100,6 +100,19 @@ public class Shader : IDisposable
         _gl.Uniform3(loc, value.X, value.Y, value.Z);
     }
 
+    public void SetUniform(string name, Vector4 value)
+    {
+        var loc = GetUniformLocation(name);
+        _gl.Uniform4(loc, value.X, value.Y, value.Z, value.W);
+    }
+
+    /// <summary>Sets a GLSL bool uniform, which the API takes as an int.</summary>
+    public void SetUniform(string name, bool value)
+    {
+        var loc = GetUniformLocation(name);
+        _gl.Uniform1(loc, value ? 1 : 0);
+    }
+
     public void SetUniform(string name, Matrix4x4 value, bool transpose = false)
     {
         var loc = GetUniformLocation(name);

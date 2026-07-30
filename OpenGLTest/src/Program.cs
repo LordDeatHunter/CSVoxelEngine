@@ -40,6 +40,8 @@ public static class Program
         {
             if (button == MouseButton.Right) placeTimer = MAX_PLACE_TIMER;
         };
+
+        inputManager.Mouse?.Scroll += (_, wheel) => world.Inventory.Scroll(wheel.Y);
     }
     
     private static void OnUpdate(double deltaTime)
@@ -56,7 +58,7 @@ public static class Program
         if (inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true && placeTimer >= MAX_PLACE_TIMER)
         {
             placeTimer = 0;
-            world.TryPlaceBlockFromRaycast(World.InteractionReach, 3);
+            world.TryPlaceSelectedBlock(World.InteractionReach);
         }
 
         world.Update((float)deltaTime, inputManager.Keyboard);

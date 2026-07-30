@@ -11,12 +11,10 @@ public class RenderManager : IDisposable
 {
     public readonly GL gl;
     private Shader worldShader;
-    private Shader uiShader;
     private Shader selectionShader;
     private Shader breakShader;
+    private UIRenderer ui;
     private uint textureAtlas;
-    private uint crosshairTexture;
-    private Mesh crosshairMesh;
     private uint outlineVao;
     private uint outlineVbo;
     private uint outlineEbo;
@@ -36,26 +34,20 @@ public class RenderManager : IDisposable
     {
         var vs = FileUtils.ReadFile("assets/shaders/test-vertex.glsl");
         var fs = FileUtils.ReadFile("assets/shaders/test-fragment.glsl");
-        var uivs = FileUtils.ReadFile("assets/shaders/ui-vertex.glsl");
-        var uifs = FileUtils.ReadFile("assets/shaders/ui-fragment.glsl");
         var selectionVs = FileUtils.ReadFile("assets/shaders/selection-vertex.glsl");
         var selectionFs = FileUtils.ReadFile("assets/shaders/selection-fragment.glsl");
         var breakVs = FileUtils.ReadFile("assets/shaders/break-vertex.glsl");
         var breakFs = FileUtils.ReadFile("assets/shaders/break-fragment.glsl");
 
         textureAtlas = TextureLoader.LoadFromFile(gl, "assets/textures/atlas.png");
-        crosshairTexture = TextureLoader.LoadFromFile(gl, "assets/textures/crosshair.png");
 
         worldShader = new Shader(gl, vs, fs);
         worldShader.SetUniform("uTextureAtlas", 0);
 
-        uiShader = new Shader(gl, uivs, uifs);
-        uiShader.SetUniform("uTex", 0);
-
         selectionShader = new Shader(gl, selectionVs, selectionFs);
         breakShader = new Shader(gl, breakVs, breakFs);
 
-        crosshairMesh = Mesh.CreateUIQuad(gl, 32);
+        ui = new UIRenderer(gl, textureAtlas);
         CreateSelectionGeometry();
     }
 
@@ -193,7 +185,7 @@ public class RenderManager : IDisposable
 
         if (!_blockCubes.TryGetValue(blockId, out var mesh))
         {
-            mesh = Mesh.CreateBlockCube(gl, type);
+            mesh = Primitives.CreateBlockCube(gl, type);
             _blockCubes[blockId] = mesh;
         }
 
@@ -201,10 +193,9 @@ public class RenderManager : IDisposable
         gl.ActiveTexture(TextureUnit.Texture0);
         gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
 
-        var center = new Vector3(0.5f);
-        var model = Matrix4x4.CreateTranslation(-center)
-                    * Matrix4x4.CreateScale(scale)
-                    * Matrix4x4.CreateTranslation(blockPosition + center);
+        // The cube is centred on its own origin, so scaling happens about the block's centre
+        var model = Matrix4x4.CreateScale(scale)
+                    * Matrix4x4.CreateTranslation(blockPosition + new Vector3(0.5f));
 
         worldShader.SetUniform("uMVP", model * camera.GetViewProjection());
         worldShader.SetUniform("uAlpha", 1f);
@@ -356,26 +347,12 @@ public class RenderManager : IDisposable
         return -1;
     }
 
-    public void RenderUI(IWindow window)
+    public void RenderUI(IWindow window, Inventory inventory)
     {
-        gl.Disable(EnableCap.DepthTest);
-        gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-
-        uiShader.Use();
-        gl.BindTexture(TextureTarget.Texture2D, crosshairTexture);
-
-        float w = window.Size.X;
-        float h = window.Size.Y;
-        var projection = Matrix4x4.CreateOrthographicOffCenter(0, w, h, 0, -1f, 1f);
-        var center = new Vector3(w / 2f, h / 2f, 0f);
-        var model = Matrix4x4.CreateTranslation(center);
-
-        uiShader.SetUniform("uProjection", projection);
-        uiShader.SetUniform("uModel", model);
-
-        crosshairMesh.Render();
-
-        gl.Enable(EnableCap.DepthTest);
+        ui.Begin(window.Size);
+        ui.DrawCrosshair();
+        ui.DrawHotbar(inventory);
+        ui.End();
     }
 
     public void Dispose()
@@ -384,9 +361,8 @@ public class RenderManager : IDisposable
             mesh.Dispose();
         _blockCubes.Clear();
 
-        crosshairMesh.Dispose();
+        ui.Dispose();
         worldShader.Dispose();
-        uiShader.Dispose();
         selectionShader.Dispose();
         breakShader.Dispose();
         gl.DeleteBuffer(outlineVbo);

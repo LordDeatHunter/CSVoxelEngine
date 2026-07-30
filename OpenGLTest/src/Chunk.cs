@@ -24,7 +24,8 @@ public class Chunk : IDisposable
     private const int PaddedSq = Padded * Padded;
     private const int PaddedCount = Padded * PaddedSq;
 
-    internal const float TileUVSize = 1f / 4f; // atlas is 4x4 tiles
+    internal const int AtlasTilesPerSide = 4;
+    internal const float TileUVSize = 1f / AtlasTilesPerSide;
 
     // Flat block storage; index = (x << 8) | (y << 4) | z
     private readonly byte[] _blocks = new byte[BlockCount];

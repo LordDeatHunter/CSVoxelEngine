@@ -17,7 +17,7 @@ public class World
     // Seconds of holding left-click per mining hit. Each hit removes 1 HP from the
     // targeted block; time short of a full interval deals nothing (noclip breaks instantly).
     public const float BlockHitSeconds = 0.2f;
-dc c 
+
     // A hit makes the block jump out and settle back. Kept below BlockHitSeconds so the
     // pop always finishes before the next hit restarts it.
     public const float BlockPopSeconds = 0.15f;
@@ -40,6 +40,9 @@ dc c
     private float _hitTimer;
     private float _popElapsed = BlockPopSeconds;
     public Camera Camera { get; }
+
+    /// <summary>The player's hotbar; its selected slot decides what block placing puts down.</summary>
+    public Inventory Inventory { get; } = new();
 
     // Break overlay strength. Quantized to whole hits, so it steps with the damage dealt
     // instead of sweeping continuously.
@@ -94,7 +97,7 @@ dc c
 
     public void RenderUI(RenderManager renderManager)
     {
-        renderManager.RenderUI(_window);
+        renderManager.RenderUI(_window, Inventory);
     }
     
     /// <summary>
@@ -194,8 +197,17 @@ dc c
             _lodManager.MarkEditedColumn((int)blockPos.X, (int)blockPos.Z);
     }
 
+    /// <summary>
+    /// Places the hotbar's selected block against the face the player is looking at. Does
+    /// nothing when the selected slot is empty.
+    /// </summary>
+    public void TryPlaceSelectedBlock(float maxDistance) =>
+        TryPlaceBlockFromRaycast(maxDistance, Inventory.SelectedBlockId);
+
     public void TryPlaceBlockFromRaycast(float maxDistance, byte blockId)
     {
+        if (blockId == 0) return;
+
         if (!Camera.Raycast(maxDistance, _chunkManager, out var hitPos, out var hitNormal))
             return;
 
