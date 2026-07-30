@@ -144,7 +144,9 @@ public class RenderManager : IDisposable
 
         foreach (var region in regions)
         {
-            if (!region.HasMesh)
+            // Buried regions are fully covered by a finer level; drawing them too would
+            // stack shells that are visible from inside the terrain
+            if (!region.HasMesh || region.IsBuried)
                 continue;
 
             var min = new Vector3(region.X * region.SizeBlocks, region.YMin, region.Z * region.SizeBlocks);
@@ -157,8 +159,9 @@ public class RenderManager : IDisposable
             _visibleRegions.Add((region, Vector3.DistanceSquared(center, camPos)));
         }
 
-        // Coarsest level first, then front to back within a level; finer geometry
-        // always draws over the coarser mesh buried beneath it
+        // Coarsest level first, then front to back within a level; where levels still
+        // overlap (a coarse region only partly covered by finer ones) finer geometry
+        // draws over the coarser mesh buried beneath it
         _visibleRegions.Sort((a, b) => a.region.Level != b.region.Level
             ? b.region.Level.CompareTo(a.region.Level)
             : a.distSq.CompareTo(b.distSq));

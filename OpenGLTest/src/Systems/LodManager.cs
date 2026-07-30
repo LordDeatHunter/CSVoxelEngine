@@ -209,5 +209,41 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
             Regions[key] = region;
             uploaded++;
         }
+
+        UpdateBuriedFlags();
+    }
+
+    /// <summary>
+    /// Flags every region whose whole footprint is already covered by loaded finer-level
+    /// regions so the renderer draws a single LOD level per area. The levels are nested
+    /// shells stacked below one another: drawing all of them is invisible from above the
+    /// terrain (the depth buffer sorts it out) but shows up as layered surfaces once the
+    /// camera goes underground.
+    ///
+    /// Coverage is tested against the regions that actually exist rather than each level's
+    /// radius, so a finer region that has not been built yet can never open a hole in the
+    /// horizon — the coarser mesh keeps drawing until its replacement is loaded.
+    /// </summary>
+    private void UpdateBuriedFlags()
+    {
+        foreach (var (key, region) in Regions)
+            region.IsBuried = key.Level > 0 && IsCoveredByFinerLevel(key.Level, key.X, key.Z);
+    }
+
+    private bool IsCoveredByFinerLevel(int level, int x, int z)
+    {
+        var finer = level - 1;
+        // Region grids are aligned at the origin and sizes are power-of-two multiples,
+        // so one region maps onto exactly ratio x ratio regions of the finer level
+        var ratio = LodRegion.Levels[level].RegionBlocks / LodRegion.Levels[finer].RegionBlocks;
+
+        for (var dx = 0; dx < ratio; dx++)
+        for (var dz = 0; dz < ratio; dz++)
+        {
+            if (!Regions.ContainsKey((finer, x * ratio + dx, z * ratio + dz)))
+                return false;
+        }
+
+        return true;
     }
 }

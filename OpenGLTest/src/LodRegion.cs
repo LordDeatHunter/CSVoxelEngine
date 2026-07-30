@@ -23,7 +23,10 @@ public readonly record struct LodLevelSpec(int CellSize, int RegionBlocks, int R
 /// and are lowered by HeightBias, so each level's mesh lies strictly inside the real
 /// terrain AND strictly below the next finer LOD level. Wherever finer geometry is
 /// rendered the depth buffer buries the coarser mesh completely; no masking or
-/// camera-dependent remeshing is needed.
+/// camera-dependent remeshing is needed. Regions whose footprint is fully covered by
+/// loaded finer regions are skipped entirely (<see cref="IsBuried"/>) so only one level
+/// is drawn per area — the stacked shells are invisible from outside the terrain but
+/// show through once the camera goes underground.
 /// </summary>
 public class LodRegion : IDisposable
 {
@@ -39,6 +42,12 @@ public class LodRegion : IDisposable
 
     public const float MAX_LIFETIME = 0.5f;
     public double Lifetime;
+
+    /// <summary>
+    /// Set by <see cref="LodManager.Update"/>: every finer-level region overlapping this
+    /// one is loaded, so this mesh contributes nothing and is skipped at render time.
+    /// </summary>
+    public bool IsBuried;
 
     public readonly int Level;
     public readonly int X, Z;          // region grid coordinates (in this level's grid)
