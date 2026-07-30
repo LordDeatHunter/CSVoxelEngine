@@ -14,16 +14,22 @@ public class BlockType
     // Array-indexed view of Types for the meshing hot path (no dictionary hashing per block)
     public static readonly BlockType?[] ById = BuildById();
 
+    // Hits a block takes before it breaks; one hit lands per World.BlockHitSeconds of mining
+    public const int DefaultMaxHealth = 5;
+
     public Point Top, Bottom, Side;
 
     // Tile per face, indexed in Chunk.CubeFaces order: -Z, +Z, -X, +X, +Y, -Y
     public readonly Point[] FaceTiles;
 
-    public BlockType(Point top, Point bottom, Point side)
+    public readonly int MaxHealth;
+
+    public BlockType(Point top, Point bottom, Point side, int maxHealth = DefaultMaxHealth)
     {
         Top = top;
         Bottom = bottom;
         Side = side;
+        MaxHealth = maxHealth;
         FaceTiles = [side, side, side, side, top, bottom];
     }
 

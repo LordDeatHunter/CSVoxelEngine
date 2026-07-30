@@ -14,8 +14,9 @@ public class World
     // How far the player can target blocks (10 m)
     public const float InteractionReach = 10f * WorldScale.BlocksPerMeter;
 
-    // Seconds of holding left-click to break a block (noclip breaks instantly)
-    public const float BlockBreakSeconds = 1f;
+    // Seconds of holding left-click per mining hit. Each hit removes 1 HP from the
+    // targeted block; time short of a full interval deals nothing (noclip breaks instantly).
+    public const float BlockHitSeconds = 0.2f;
 
     private readonly ChunkManager _chunkManager;
     private readonly ChunkGenerationWorker _generationWorker;
@@ -26,8 +27,14 @@ public class World
     private Vector3 _selectedFaceNormal;
     private bool _isBreaking;
     private Vector3 _breakingBlockPosition;
-    private float _breakProgress;
+    private int _breakDamage;
+    private int _breakMaxHealth;
+    private float _hitTimer;
     public Camera Camera { get; }
+
+    // Break overlay strength. Quantized to whole hits, so it steps with the damage dealt
+    // instead of sweeping continuously.
+    private float BreakProgress => _breakMaxHealth > 0 ? _breakDamage / (float)_breakMaxHealth : 0f;
 
     public World(GL gl, IWindow window, IInputContext input)
     {
@@ -59,7 +66,7 @@ public class World
         renderManager.RenderBlockSelection(Camera, _selectedBlockPosition, _selectedFaceNormal);
 
         if (_isBreaking)
-            renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, _breakProgress);
+            renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress);
     }
 
     public void RenderUI(RenderManager renderManager)
@@ -68,24 +75,23 @@ public class World
     }
     
     /// <summary>
-    /// Drives hold-to-break: progress accumulates while left-click is held on the same
-    /// block, resets when the target changes or the button is released, and completes
-    /// after BlockBreakSeconds. Noclip instamines (one block per frame, as before).
-    /// Call after Update so the block selection is current.
+    /// Drives hit-based mining: holding left-click on a block lands one hit per
+    /// BlockHitSeconds, each removing 1 HP, and the block breaks when its HP runs out
+    /// (see BlockType.MaxHealth). A partial interval deals no damage, and damage is
+    /// discarded when the target changes or the button is released. Noclip instamines
+    /// (one block per frame, as before). Call after Update so the selection is current.
     /// </summary>
     public void UpdateBlockBreaking(double deltaTime, bool isHolding)
     {
         if (!isHolding || !_hasSelectedBlock)
         {
-            _isBreaking = false;
-            _breakProgress = 0f;
+            StopBreaking();
             return;
         }
 
         if (Camera.IsNoclip)
         {
-            _isBreaking = false;
-            _breakProgress = 0f;
+            StopBreaking();
             RemoveBlock(_selectedBlockPosition);
             return;
         }
@@ -94,15 +100,50 @@ public class World
         {
             _isBreaking = true;
             _breakingBlockPosition = _selectedBlockPosition;
-            _breakProgress = 0f;
+            _breakMaxHealth = BlockHealthAt(_selectedBlockPosition);
+            _breakDamage = 0;
+            _hitTimer = 0f;
         }
 
-        _breakProgress += (float)deltaTime / BlockBreakSeconds;
-        if (_breakProgress < 1f) return;
+        // Air or an unloaded chunk: nothing to mine
+        if (_breakMaxHealth <= 0)
+        {
+            StopBreaking();
+            return;
+        }
 
-        RemoveBlock(_breakingBlockPosition);
+        _hitTimer += (float)deltaTime;
+
+        // A long frame can carry more than one hit; the leftover time rolls into the next
+        while (_hitTimer >= BlockHitSeconds)
+        {
+            _hitTimer -= BlockHitSeconds;
+            _breakDamage++;
+
+            if (_breakDamage < _breakMaxHealth) continue;
+
+            RemoveBlock(_breakingBlockPosition);
+            StopBreaking();
+            return;
+        }
+    }
+
+    private void StopBreaking()
+    {
         _isBreaking = false;
-        _breakProgress = 0f;
+        _breakDamage = 0;
+        _breakMaxHealth = 0;
+        _hitTimer = 0f;
+    }
+
+    /// <summary>
+    /// HP of the block at a world position, or 0 for air and unloaded chunks.
+    /// </summary>
+    private int BlockHealthAt(Vector3 blockPos)
+    {
+        // blockPos components are floored floats, so the int casts are exact
+        var id = _chunkManager.GetBlockGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
+        return BlockType.ById[id]?.MaxHealth ?? 0;
     }
 
     private void RemoveBlock(Vector3 blockPos)

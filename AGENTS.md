@@ -18,7 +18,7 @@ dotnet build OpenGLTest.sln
 dotnet run --project OpenGLTest/silkgltriangle.csproj
 ```
 
-The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, double-tap Space to toggle flight (Space/Left Ctrl for up/down while flying), `C` to toggle noclip, Left Shift for 10x speed, hold left-click ~1s to break a block (instant while noclip; progress overlay via `break-*.glsl`), right-click to place stone, `X` to toggle debug logging (FPS/position to console), Escape to quit.
+The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, double-tap Space to toggle flight (Space/Left Ctrl for up/down while flying), `C` to toggle noclip, Left Shift for 10x speed, hold left-click to mine a block (hit-based: one hit per `World.BlockHitSeconds` = 200 ms removes 1 HP of the block's `BlockType.MaxHealth` = 5, so ~1s; damage resets if you release or switch target; instant while noclip; stepped progress overlay via `break-*.glsl`), right-click to place stone, `X` to toggle debug logging (FPS/position to console), Escape to quit.
 
 Shaders (`assets/shaders/**/*.glsl`) and textures (`assets/textures/**/*.png`) are copied to the output directory via `CopyToOutputDirectory` rules in the csproj — **new asset types/extensions need a matching `<None Update>` entry** or they won't be found at runtime.
 
@@ -33,7 +33,7 @@ OpenGLTest/
     ChunkGenerationWorker.cs   # background threads creating chunks around the camera
     Camera.cs                  # FPS camera, physics (gravity/jump/collision), DDA raycast
     LodRegion.cs               # far-terrain LOD: 4x4-chunk columns meshed at half res from heightmaps
-    BlockType.cs               # block ID -> atlas tile mapping (1=grass, 2=dirt, 3=stone; 0=air)
+    BlockType.cs               # block ID -> atlas tiles + mining HP (1=grass, 2=dirt, 3=stone; 0=air)
     WorldGenerationConfig.cs   # all tuning constants (view radius, per-frame budgets, thread counts)
     Mesh.cs, Shader.cs, TextureLoader.cs, FileUtils.cs, FastNoiseLite.cs (vendored, don't reformat)
     Data/                      # Vertex struct, cube geometry, frustum/plane math, direction tables
@@ -66,7 +66,7 @@ Other invariants:
 
 - World/chunk coordinates: `Chunk.Position` is in chunk units; world pos = chunk pos × `Chunk.Size` (16). Chunks are cubic and stacked vertically too (3D chunk grid, not 2D columns).
 - One block is **0.5 m** (1 world unit = 1 block). Quantities defined in physical units — player size, speeds, gravity, interaction reach — are written as `<meters> * WorldScale.BlocksPerMeter` (see `WorldScale.cs`); keep new physical constants in that form.
-- Blocks are `byte` IDs; `0` is air. New block types are registered in `BlockType.Types` with atlas tile coordinates into `assets/textures/atlas.png`.
+- Blocks are `byte` IDs; `0` is air. New block types are registered in `BlockType.Types` with atlas tile coordinates into `assets/textures/atlas.png` and an optional `maxHealth` (defaults to `BlockType.DefaultMaxHealth`, currently 5 for every block).
 - Terrain noise is seeded statically in `Chunk`'s static constructor (seed 1337) — worldgen must stay deterministic and thread-safe (`FastNoiseLite.GetNoise` is read-only after setup). Terrain (before player edits) is exactly "solid iff worldY <= height(x,z)" where heights come from `Chunk.GetColumnHeights`; the LOD system depends on this invariant.
 - **Far-terrain LOD**: full-detail chunks load to `ChunkRadius` (16 chunks = 256 blocks); a cascade of LOD rings defined in `LodRegion.Levels` extends the render distance (level 1: 2-block cells to 512, level 2: 4-block cells to 1024, level 3: 8-block cells to 2048 blocks). Regions are columns meshed at reduced resolution straight from the heightmap cache (no block data). Each level's heights are eroded (min over a widened fine-column window) and biased downward so its mesh sits strictly inside real terrain *and* strictly below the next finer level — finer geometry always buries coarser via the depth buffer, so no masking or camera-driven remeshing exists. Because those shells are stacked, only one level may actually be drawn per area — otherwise they are all visible once the camera is inside the terrain — so `LodManager.UpdateBuriedFlags` marks each region whose footprint is fully covered by *loaded* finer-level regions (region grids nest exactly: one region = ratio×ratio regions of the finer level) and `RenderLod` skips those. Testing loaded regions rather than each level's radius means an unbuilt finer region can never open a hole in the horizon. The nesting invariants (`SampleMargin(L+1) >= SampleMargin(L) + CellSize(L) - 1`, `HeightBias(L+1) >= HeightBias(L) + CellSize(L)`) must hold when adding levels, and `Camera.NearPlane`/`FarPlane` are tuned to keep those separations from z-fighting at the outermost ring. LOD draws before chunks, coarsest level first (`RenderManager.RenderLod`). Destroying a block would expose the buried LOD, so removals cap that column's LOD height below the removed block (`LodRegion.LowerColumnBelow`) and affected regions on every level rebuild (`LodManager.MarkEditedColumn`); placements need nothing.
 
