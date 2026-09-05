@@ -20,19 +20,18 @@ public class Camera
     private const float DefaultFov = 70f;
     // Near plane sets depth precision at distance (error ~ z^2 / (near * 2^24)); it must be
     // large enough that stacked LOD levels ~4 blocks apart don't z-fight at 2048 blocks.
-    // Collision keeps geometry at least PlayerRadius (0.6) away, so 0.2 never clips.
+    // Collision keeps geometry at least PlayerRadius (0.3) away, so 0.2 never clips.
     private const float NearPlane = 0.2f;
     private const float FarPlane = 4096f; // past the outermost LOD ring (2048 blocks + terrain height)
     private const float MouseSensitivity = 0.2f;
 
-    // Physical quantities in meters (or m/s, m/s^2), converted to block units
-    private const float BaseSpeed = 8f * WorldScale.BlocksPerMeter;
-    private const float Gravity = 34f * WorldScale.BlocksPerMeter;
-    private const float JumpSpeed = 11f * WorldScale.BlocksPerMeter;
-    private const float PlayerHeight = 1.8f * WorldScale.BlocksPerMeter;
-    private const float EyeHeight = 1.62f * WorldScale.BlocksPerMeter;
-    private const float PlayerRadius = 0.30f * WorldScale.BlocksPerMeter;
-    private const float CollisionStepSize = 0.05f * WorldScale.BlocksPerMeter;
+    private const float BaseSpeed = 8f;
+    private const float Gravity = 34f;
+    private const float JumpSpeed = 11f;
+    private const float PlayerHeight = 1.8f;
+    private const float EyeHeight = 1.62f;
+    private const float PlayerRadius = 0.30f;
+    private const float CollisionStepSize = 0.05f;
 
     // Two Space presses within this window toggle flight
     private const float DoubleTapWindow = 0.3f;

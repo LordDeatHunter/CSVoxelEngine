@@ -18,14 +18,14 @@ public class ItemDrop
     private const float PulseAmount = 0.08f;
     private const float PulsePeriod = 1.4f;
 
-    // Speeds in m/s converted to block units. The drop eases from a drift into a fast whip, so
+    // Speeds in blocks/s. The drop eases from a drift into a fast whip, so
     // being pulled in reads as deliberate rather than instant.
-    private const float DriftSpeed = 1f * WorldScale.BlocksPerMeter;
-    private const float SuckSpeed = 9f * WorldScale.BlocksPerMeter;
+    private const float DriftSpeed = 1f;
+    private const float SuckSpeed = 9f;
     private const float RampSeconds = 0.35f;
 
     // Close enough to count as collected, so a drop never hovers just short of the target
-    private const float CollectDistance = 0.2f * WorldScale.BlocksPerMeter;
+    private const float CollectDistance = 0.2f;
 
     // A drop chasing a player faster than SuckSpeed is collected anyway rather than trailing
     // them forever

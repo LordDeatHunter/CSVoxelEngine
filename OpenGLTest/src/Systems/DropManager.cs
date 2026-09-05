@@ -11,11 +11,11 @@ namespace silkgltriangle;
 /// </summary>
 public class DropManager
 {
-    /// <summary>How close the player must get before a drop starts flying towards them (1.5 m).</summary>
-    public const float PickupRange = 1.5f * WorldScale.BlocksPerMeter;
+    /// <summary>How close the player must get before a drop starts flying towards them (1.5 blocks).</summary>
+    public const float PickupRange = 1.5f;
 
     // Drops aim below the eye so they fly to the player's chest rather than into the camera
-    private const float CollectHeightOffset = 0.35f * WorldScale.BlocksPerMeter;
+    private const float CollectHeightOffset = 0.35f;
 
     private readonly List<ItemDrop> _drops = [];
     private readonly List<byte> _collected = [];

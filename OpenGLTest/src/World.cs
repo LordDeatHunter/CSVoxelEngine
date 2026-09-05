@@ -11,8 +11,8 @@ namespace silkgltriangle;
 /// </summary>
 public class World
 {
-    // How far the player can target blocks (10 m)
-    public const float InteractionReach = 10f * WorldScale.BlocksPerMeter;
+    // How far the player can target blocks (10 blocks)
+    public const float InteractionReach = 10f;
 
     // Seconds of holding left-click per mining hit. Each hit removes 1 HP from the
     // targeted block; time short of a full interval deals nothing (noclip breaks instantly).

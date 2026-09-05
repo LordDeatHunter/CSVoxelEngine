@@ -78,7 +78,6 @@ Rules that follow from this:
 Other invariants:
 
 - World/chunk coordinates: `Chunk.Position` is in chunk units; world pos = chunk pos × `Chunk.Size` (16). Chunks are cubic and stacked vertically too (3D chunk grid, not 2D columns).
-- One block is **0.5 m** (1 world unit = 1 block). Quantities defined in physical units — player size, speeds, gravity, interaction reach — are written as `<meters> * WorldScale.BlocksPerMeter` (see `WorldScale.cs`); keep new physical constants in that form.
 - Blocks are `byte` IDs; `0` is air. New block types are registered in `BlockType.Types` with atlas tile coordinates into `assets/textures/atlas.png` and an optional `maxHealth` (defaults to `BlockType.DefaultMaxHealth`, currently 5 for every block).
 - Worldgen must stay deterministic and thread-safe (`FastNoiseLite.GetNoise` is read-only after setup; noise instances are configured once in static constructors and never re-tuned per call). All noise seeds derive from `WorldGenerationConfig.Seed` plus fixed per-channel offsets (`TerrainGenerator.MakeNoise`). Before player edits, terrain obeys:
   - **Nothing generated is ever solid above `height(x,z)`** — heights come from `Chunk.GetColumnData(...).Heights` (or the `GetColumnHeights` wrapper) and already include ravines, which are cut into the heightmap so the far LOD sees them too. The block at `height` is solid unless a cave or entrance carved it.
