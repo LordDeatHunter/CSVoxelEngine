@@ -36,6 +36,9 @@ float SampleShadow(vec3 wp) {
 
 void main() {
     vec4 texColor = texture(uTextureAtlas, fTexCoord);
+    // Leaf tiles have transparent holes; cut them out so the canopy sees through instead of
+    // blending ghosts. Every other tile is fully opaque, so this changes nothing for them.
+    if (texColor.a < 0.5) discard;
     vec3 albedo = texColor.rgb * fColor.rgb;
     vec3 N = normalize(fNormal);
     float ndl = max(dot(N, uSunDir), 0.0);

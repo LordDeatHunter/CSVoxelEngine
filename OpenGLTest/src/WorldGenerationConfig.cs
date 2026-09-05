@@ -165,4 +165,34 @@ public static class WorldGenerationConfig
     public const int WormStartDepthMax = 60;
     public const float WormSurfaceMargin = 6f;              // stay this far under the surface outside entrances
     public const float WormBranchChance = 0.1f;             // per 20 nodes
+
+    // --- Trees (TreeGenerator) ---
+    public const bool TreesEnabled = true;
+    // A ground column grows a tree candidate with this probability; spacing (below) thins it
+    public const float TreeDensity = 0.02f;
+    // A candidate is kept only when its hash is the lowest within this Chebyshev radius,
+    // which spaces trunks apart without any cross-chunk state
+    public const int TreeSpacingRadius = 2;
+    // Trunk height in blocks, from the ground up; the bottom TreeLogHeight blocks are full
+    // cubes (1 size), everything above tapers through branch and twig boxes
+    public const int TreeMinHeight = 6;
+    public const int TreeMaxHeight = 10;
+    public const int TreeLogHeight = 3;                     // full-cube log blocks at the trunk base
+    public const int TreeBranchCount = 4;                   // limbs per tree (plus the crown spike)
+    public const int TreeBranchMinLength = 2;
+    public const int TreeBranchMaxLength = 4;
+    public const float TreeBranchRiseChance = 0.45f;        // per limb step: rise instead of extend
+    public const int TreeRootDepth = 4;                     // trunk extension into post-carve air below the base
+    public const int TreeCrownRadius = 2;                   // leaf blob radius at branch tips + top
+    // Ground rules: needs soil (not ravine rock), gentle slope, and modest altitude
+    public const int TreeMinSoil = 2;
+    public const int TreeMaxSlope = 2;
+    public const int TreeMinGroundHeight = 4;
+    public const int TreeMaxGroundHeight = 90;
+    // Chunk border margin: how far a trunk outside this chunk can still reach into it
+    public const int TreeReachBlocks = 8;
+    public const int TreeMaxHeightBlocks = 16;              // tallest a tree (plus crown) can stand
+    // No trunk roots this close (Chebyshev) to the origin column, so the surface spawn the
+    // camera picks there is always in the open
+    public const int TreeSpawnClearRadius = 3;
 }

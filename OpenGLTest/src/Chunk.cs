@@ -282,16 +282,33 @@ public class Chunk : IDisposable
     }
 
     /// <summary>
-    /// Fills the terrain columns (grass / dirt / stone by depth), then lets the cave carvers
-    /// clear their air out of the result. Runs on a generation worker thread.
+    /// Fills the terrain columns (grass / dirt / stone by depth), lets the cave carvers clear
+    /// their air out of the result, then stamps trees onto the surface. Runs on a generation
+    /// worker thread.
     /// </summary>
     public void GenerateBlockData()
     {
         var column = GetColumnData((int)Position.X, (int)Position.Z);
         var lowerBoundY = LowerBoundY;
 
-        // Entirely above the terrain: nothing to fill, nothing to carve
-        if (lowerBoundY > column.MaxHeight)
+        // Entirely above the terrain: nothing to fill, nothing to carve, nothing to stamp.
+        // With trees enabled the band above the surface still needs generation (crowns and
+        // limbs reach TreeMaxHeightBlocks past it), and overhanging limbs near cliffs can
+        // cross from higher neighbouring columns, so the test uses the tallest neighbour.
+        var maxHeight = column.MaxHeight;
+        if (WorldGenerationConfig.TreesEnabled)
+        {
+            var cx = (int)Position.X;
+            var cz = (int)Position.Z;
+            for (var dx = -1; dx <= 1; dx++)
+            for (var dz = -1; dz <= 1; dz++)
+            {
+                var neighbourMax = GetColumnData(cx + dx, cz + dz).MaxHeight;
+                if (neighbourMax > maxHeight) maxHeight = neighbourMax;
+            }
+            maxHeight += WorldGenerationConfig.TreeMaxHeightBlocks;
+        }
+        if (lowerBoundY > maxHeight)
         {
             IsBlockDataReady = true;
             return;
@@ -314,6 +331,9 @@ public class Chunk : IDisposable
 
         if (WorldGenerationConfig.WormCavesEnabled)
             WormCarver.Carve(_blocks, column, worldX0, lowerBoundY, worldZ0);
+
+        if (WorldGenerationConfig.TreesEnabled)
+            TreeGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
 
         // Carving removed an unknown number of blocks; a recount is cheaper than bookkeeping
         var solid = 0;
@@ -560,10 +580,22 @@ public class Chunk : IDisposable
             var basePos = new Vector3(x, y, z);
             var pIdx = (x + 1) * PaddedSq + (y + 1) * Padded + (z + 1);
 
+            // Tapered wood renders as a centred box (plus arms reaching wood neighbours)
+            // instead of a full cube; see EmitBranchBox
+            if (BlockType.IsPartialCube(blockId))
+            {
+                EmitBranchBox(vertices, indices, ref indexOffset, padded, pIdx, sunLight, blockLight,
+                    x, y, z, blockId, type, basePos);
+                continue;
+            }
+
             for (var i = 0; i < 6; i++)
             {
                 var faceCell = pIdx + FaceNeighborDelta[i];
-                if (padded[faceCell] != 0) continue;
+                var neighbour = padded[faceCell];
+                // Partial neighbours (branch/twig boxes) never hide a face: the ground still
+                // draws under a trunk, and a box sits on a drawn face instead of a gap ring
+                if (neighbour != 0 && !BlockType.IsPartialCube(neighbour)) continue;
 
                 // Light of the air cell in front of the face, from the wide light volume
                 // (so lamps across the chunk border still reach); AO still varies corners
@@ -607,6 +639,229 @@ public class Chunk : IDisposable
         }
 
         return new ChunkMeshData(vertices, indices);
+    }
+
+    /// <summary>Half-width of wood for joint comparisons; logs count as full width.</summary>
+    private static float WoodHalfWidth(byte blockId)
+    {
+        if (blockId == BlockType.Log) return 0.5f;
+        if (BlockType.IsPartialCube(blockId)) return BlockType.PartialHalfWidth(blockId);
+        return -1f; // not wood
+    }
+
+    private static bool IsWood(byte blockId) => WoodHalfWidth(blockId) >= 0f;
+
+    /// <summary>
+    /// Emits a tapered wood segment as a centred node cube with square tubes reaching every
+    /// wood neighbour (plus a foot onto full cubes, so a segment sitting on terrain or a log
+    /// never floats). A vertical stack of segments reads as one continuous tapering pipe, but
+    /// a limb cell with only horizontal neighbours is just a node with arms — never a
+    /// full-height vertical core, so limbs read as limbs instead of second trunks. Tube mouths
+    /// press against the node faces behind them and cap only into narrower wood; wider wood
+    /// and full cubes already close the joint. No face culling is enabled, so only normals
+    /// matter — but coplanar opposite quads would still z-fight, and these rules emit none.
+    /// </summary>
+    private static void EmitBranchBox(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        byte[] padded, int pIdx, byte[] sunLight, byte[] blockLight,
+        int x, int y, int z, byte blockId, BlockType type, Vector3 basePos)
+    {
+        var w = BlockType.PartialHalfWidth(blockId);
+        var c = 0.5f;
+
+        Span<byte> nb = stackalloc byte[6];
+        Span<float> sunF = stackalloc float[6];
+        Span<float> blockF = stackalloc float[6];
+        var lightBase = LightIdx(x, y, z);
+        for (var i = 0; i < 6; i++)
+        {
+            nb[i] = padded[pIdx + FaceNeighborDelta[i]];
+            var lightCell = lightBase + LightFaceDelta[i];
+            sunF[i] = sunLight[lightCell] / 15f;
+            blockF[i] = blockLight[lightCell] / 15f;
+        }
+
+        // Central node: every face draws, closing the tube mouths pressed against it
+        var nodeMin = new Vector3(c - w, c - w, c - w);
+        var nodeMax = new Vector3(c + w, c + w, c + w);
+        for (var i = 0; i < 6; i++)
+        {
+            var tile = i == 4 ? type.Top : i == 5 ? type.Bottom : type.Side;
+            EmitBoxFace(vertices, indices, ref indexOffset, basePos, nodeMin, nodeMax, i,
+                tile, ShadeLut[(i << 2) | 3], sunF[i], blockF[i]);
+        }
+
+        // Up-tube continues the taper into wood stacked above
+        var aboveWidth = WoodHalfWidth(nb[4]);
+        if (aboveWidth >= 0f)
+        {
+            EmitTubeSides(vertices, indices, ref indexOffset, basePos, sunF, blockF,
+                type.Side, c - w, c + w, c + w, 1f);
+            if (aboveWidth < w)
+                EmitTubeCap(vertices, indices, ref indexOffset, padded, pIdx,
+                    sunF[4], blockF[4], type.Top, basePos, c, w, top: true);
+        }
+
+        // Down-tube continues into wood below, or feet onto a full cube; air below means the
+        // node floats free (a limb in open air) and its bottom face already closes it
+        var belowWidth = WoodHalfWidth(nb[5]);
+        if (nb[5] != BlockType.Air)
+        {
+            EmitTubeSides(vertices, indices, ref indexOffset, basePos, sunF, blockF,
+                type.Side, c - w, c + w, 0f, c - w);
+            if (belowWidth >= 0f && belowWidth < w)
+                EmitTubeCap(vertices, indices, ref indexOffset, padded, pIdx,
+                    sunF[5], blockF[5], type.Bottom, basePos, c, w, top: false);
+        }
+
+        // Horizontal arms weld this segment to wood neighbours
+        for (var i = 0; i < 4; i++)
+        {
+            if (!IsWood(nb[i])) continue;
+            EmitArm(vertices, indices, ref indexOffset, sunF, blockF, type, basePos, c, w, i, nb[i]);
+        }
+    }
+
+    /// <summary>The four vertical walls of a tapered tube with a square [lo, hi] cross-section
+    /// running from <paramref name="y0"/> to <paramref name="y1"/> (cell-local).</summary>
+    private static void EmitTubeSides(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        Vector3 basePos, Span<float> sunF, Span<float> blockF, BlockType.Point tile,
+        float lo, float hi, float y0, float y1)
+    {
+        var min = new Vector3(lo, y0, lo);
+        var max = new Vector3(hi, y1, hi);
+        for (var i = 0; i < 4; i++)
+            EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, i,
+                tile, ShadeLut[(i << 2) | 3], sunF[i], blockF[i]);
+    }
+
+    /// <summary>Mouth cap of a vertical tube where it meets air or narrower wood; wider wood
+    /// and full cubes already cover the joint, so capping there would z-fight them.</summary>
+    private static void EmitTubeCap(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        byte[] padded, int pIdx, float sun, float block, BlockType.Point tile,
+        Vector3 basePos, float c, float w, bool top)
+    {
+        var i = top ? 4 : 5;
+        var face = CubeFaces[i].face;
+        var aoDeltas = AODeltas[i];
+
+        Span<Vector2> uv = stackalloc Vector2[4];
+        SetTileUv(tile, uv);
+
+        for (var j = 0; j < 4; j++)
+        {
+            var corner = face[j];
+            var side1 = padded[pIdx + aoDeltas[j * 3 + 0]] != 0;
+            var side2 = padded[pIdx + aoDeltas[j * 3 + 1]] != 0;
+            var occluder = padded[pIdx + aoDeltas[j * 3 + 2]] != 0;
+
+            var ao = VertexAO(side1, side2, occluder);
+            var shade = ShadeLut[(i << 2) | ao];
+
+            var pos = basePos + new Vector3(
+                corner.X == 0 ? c - w : c + w,
+                top ? 1f : 0f,
+                corner.Z == 0 ? c - w : c + w);
+            vertices.Add(new Vertex(pos, shade, shade, shade, 255, uv[j], sun, block, CubeFaces[i].normal));
+        }
+
+        indices.Add((ushort)(indexOffset + 0));
+        indices.Add((ushort)(indexOffset + 1));
+        indices.Add((ushort)(indexOffset + 2));
+        indices.Add((ushort)(indexOffset + 0));
+        indices.Add((ushort)(indexOffset + 2));
+        indices.Add((ushort)(indexOffset + 3));
+        indexOffset += 4;
+    }
+
+    /// <summary>
+    /// One horizontal limb from the core surface (never from the centre, so arm walls meet core
+    /// walls edge-on with no coplanar overlap) to the cell face toward a wood neighbour.
+    /// The end cap draws only into a narrower neighbour's mouth; equal or wider wood and full
+    /// cubes already close the joint.
+    /// </summary>
+    private static void EmitArm(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        Span<float> sunF, Span<float> blockF, BlockType type,
+        Vector3 basePos, float c, float w, int dir, byte neighbourId)
+    {
+        var n = CubeFaces[dir].normal;
+        var lo = c - w;
+        var hi = c + w;
+        // Box from the core wall out to the neighbour-side cell face
+        var min = new Vector3(
+            n.X > 0 ? hi : n.X < 0 ? 0f : lo,
+            lo,
+            n.Z > 0 ? hi : n.Z < 0 ? 0f : lo);
+        var max = new Vector3(
+            n.X > 0 ? 1f : n.X < 0 ? c - w : hi,
+            hi,
+            n.Z > 0 ? 1f : n.Z < 0 ? c - w : hi);
+
+        // Top, bottom and the two flanks always draw; the mouth cap only into narrower wood
+        EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, 4,
+            type.Side, ShadeLut[(4 << 2) | 3], sunF[4], blockF[4]);
+        EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, 5,
+            type.Side, ShadeLut[(5 << 2) | 3], sunF[5], blockF[5]);
+
+        var flankA = dir is 0 or 1 ? 2 : 0;
+        var flankB = dir is 0 or 1 ? 3 : 1;
+        EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, flankA,
+            type.Side, ShadeLut[(flankA << 2) | 3], sunF[flankA], blockF[flankA]);
+        EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, flankB,
+            type.Side, ShadeLut[(flankB << 2) | 3], sunF[flankB], blockF[flankB]);
+
+        if (IsWood(neighbourId) && WoodHalfWidth(neighbourId) < w)
+            EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, dir,
+                type.Top, ShadeLut[(dir << 2) | 3], sunF[dir], blockF[dir]);
+    }
+
+    /// <summary>One axis-aligned face of the [min, max] box (cell-local), with flat shading.</summary>
+    private static void EmitBoxFace(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        Vector3 basePos, Vector3 min, Vector3 max, int face,
+        BlockType.Point tile, byte shade, float sun, float block)
+    {
+        Span<Vector2> uv = stackalloc Vector2[4];
+        SetTileUv(tile, uv);
+
+        var (a, b, c, d) = face switch
+        {
+            0 => (new Vector3(min.X, min.Y, min.Z), new Vector3(min.X, max.Y, min.Z),
+                  new Vector3(max.X, max.Y, min.Z), new Vector3(max.X, min.Y, min.Z)),
+            1 => (new Vector3(max.X, min.Y, max.Z), new Vector3(max.X, max.Y, max.Z),
+                  new Vector3(min.X, max.Y, max.Z), new Vector3(min.X, min.Y, max.Z)),
+            2 => (new Vector3(min.X, min.Y, max.Z), new Vector3(min.X, max.Y, max.Z),
+                  new Vector3(min.X, max.Y, min.Z), new Vector3(min.X, min.Y, min.Z)),
+            3 => (new Vector3(max.X, min.Y, min.Z), new Vector3(max.X, max.Y, min.Z),
+                  new Vector3(max.X, max.Y, max.Z), new Vector3(max.X, min.Y, max.Z)),
+            4 => (new Vector3(min.X, max.Y, min.Z), new Vector3(min.X, max.Y, max.Z),
+                  new Vector3(max.X, max.Y, max.Z), new Vector3(max.X, max.Y, min.Z)),
+            _ => (new Vector3(min.X, min.Y, max.Z), new Vector3(min.X, min.Y, min.Z),
+                  new Vector3(max.X, min.Y, min.Z), new Vector3(max.X, min.Y, max.Z)),
+        };
+
+        var normal = CubeFaces[face].normal;
+        vertices.Add(new Vertex(basePos + a, shade, shade, shade, 255, uv[0], sun, block, normal));
+        vertices.Add(new Vertex(basePos + b, shade, shade, shade, 255, uv[1], sun, block, normal));
+        vertices.Add(new Vertex(basePos + c, shade, shade, shade, 255, uv[2], sun, block, normal));
+        vertices.Add(new Vertex(basePos + d, shade, shade, shade, 255, uv[3], sun, block, normal));
+
+        indices.Add((ushort)(indexOffset + 0));
+        indices.Add((ushort)(indexOffset + 1));
+        indices.Add((ushort)(indexOffset + 2));
+        indices.Add((ushort)(indexOffset + 0));
+        indices.Add((ushort)(indexOffset + 2));
+        indices.Add((ushort)(indexOffset + 3));
+        indexOffset += 4;
+    }
+
+    /// <summary>Atlas UVs for a tile in quad-corner order, matching the cube-face emission.</summary>
+    private static void SetTileUv(BlockType.Point tile, Span<Vector2> uv)
+    {
+        var u0 = tile.X * TileUVSize;
+        var v0 = tile.Y * TileUVSize;
+        uv[0] = new Vector2(u0, v0 + TileUVSize);
+        uv[1] = new Vector2(u0, v0);
+        uv[2] = new Vector2(u0 + TileUVSize, v0);
+        uv[3] = new Vector2(u0 + TileUVSize, v0 + TileUVSize);
     }
 
     public void UpdateMesh(ChunkMeshData meshData)

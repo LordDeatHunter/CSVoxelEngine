@@ -14,7 +14,7 @@ namespace silkgltriangle;
 /// </summary>
 public class Inventory
 {
-    public const int SlotCount = 6;
+    public const int SlotCount = 13;
 
     /// <summary>How much TNT the player starts with.</summary>
     public const int StartingTnt = 50;
