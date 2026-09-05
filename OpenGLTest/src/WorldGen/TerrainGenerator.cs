@@ -11,7 +11,10 @@ namespace silkgltriangle;
 /// </summary>
 public static class TerrainGenerator
 {
-    private static readonly FastNoiseLite HeightNoise;
+    private static readonly FastNoiseLite BaseNoise;
+    private static readonly FastNoiseLite FlatMask;
+    private static readonly FastNoiseLite MeadowNoise;
+    private static readonly FastNoiseLite SwellNoise;
     private static readonly FastNoiseLite DirtNoise;
     private static readonly FastNoiseLite RavineRidge;
     private static readonly FastNoiseLite RavineWarp;
@@ -21,9 +24,14 @@ public static class TerrainGenerator
 
     static TerrainGenerator()
     {
-        // Base terrain keeps the original seed and settings exactly, so existing terrain
-        // is unchanged wherever no ravine touches it
-        HeightNoise = MakeNoise(0, 0.001f, octaves: 6);
+        // The rolling base keeps the original seed and settings exactly, so natural terrain
+        // is unchanged wherever the flat mask stays at zero. The mask is rare and
+        // low-frequency on purpose: most of the world keeps its old look, and only large
+        // patches go flat, with a wide soft blend between.
+        BaseNoise = MakeNoise(0, WorldGenerationConfig.BaseFrequency, octaves: 6);
+        FlatMask = MakeNoise(50, WorldGenerationConfig.FlatMaskFrequency);
+        MeadowNoise = MakeNoise(51, WorldGenerationConfig.MeadowFrequency, octaves: 3);
+        SwellNoise = MakeNoise(52, WorldGenerationConfig.SwellFrequency, octaves: 2);
 
         DirtNoise = MakeNoise(11, WorldGenerationConfig.DirtDepthFrequency);
         RavineRidge = MakeNoise(21, WorldGenerationConfig.RavineRidgeFrequency);
@@ -74,8 +82,24 @@ public static class TerrainGenerator
                 var worldZ = z + baseZ;
                 var i = (x << Chunk.SizeShift) | z;
 
-                var heightNoise = HeightNoise.GetNoise(worldX, worldZ) * HeightNoise.GetNoise(worldZ, worldX);
-                var height = (int)(heightNoise * 256f);
+                // Natural rolling base (the old terrain character), eased toward gentle meadow
+                // rolling only where the rare flat mask rises. Both sides sit around the same
+                // mean level, so the wide partial-mask band between them is just softer hills
+                // instead of a cliff or a second biome.
+                var baseHeight = BaseNoise.GetNoise(worldX, worldZ) * BaseNoise.GetNoise(worldZ, worldX)
+                    * WorldGenerationConfig.BaseAmplitude;
+                var flat = MathUtils.SmoothStep(
+                    WorldGenerationConfig.FlatStart,
+                    WorldGenerationConfig.FlatEnd,
+                    FlatMask.GetNoise(worldX, worldZ));
+                var heightF = baseHeight;
+                if (flat > 0f)
+                {
+                    var plains = MeadowNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.MeadowAmplitude
+                        + SwellNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.SwellAmplitude;
+                    heightF = baseHeight + flat * (plains - baseHeight);
+                }
+                var height = (int)heightF;
 
                 // Sampled once and reused: the same value cuts the ravine into the heightmap and
                 // decides how much soil is left on the column

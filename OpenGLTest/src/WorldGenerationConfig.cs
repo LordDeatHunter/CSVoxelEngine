@@ -43,6 +43,22 @@ public static class WorldGenerationConfig
     // Far LOD side faces switch from dirt to stone below this depth
     public const int NominalDirtDepth = 4;
 
+    // --- Terrain shape (natural rolling base with large flat patches) ---
+    // The base is the original rolling terrain (BaseFrequency, 6-octave product noise times
+    // BaseAmplitude). A rare low-frequency mask flattens large patches toward gentle meadow
+    // rolling on a broad swell, so most of the world keeps its natural look and only some
+    // 200-400 block regions go flat. Mask values between the smoothstep edges are partial,
+    // which gives soft natural transitions rather than a hard second biome.
+    public const float BaseFrequency = 0.001f;
+    public const float BaseAmplitude = 256f;
+    public const float FlatMaskFrequency = 1f / 600f;   // wavelength ~600 blocks: flat-patch scale
+    public const float FlatStart = 0.2f;                // fully natural below this...
+    public const float FlatEnd = 0.6f;                  // ...fully flat above this (soft blend between)
+    public const float MeadowFrequency = 1f / 160f;     // gentle rolling inside the flats
+    public const float MeadowAmplitude = 9f;            // blocks, +- around the local base level
+    public const float SwellFrequency = 1f / 900f;      // continent-scale undulation the flats ride on
+    public const float SwellAmplitude = 22f;            // blocks; neighboring meadows sit at different levels
+
     // --- Ravines (2D, cut into the heightmap so the far LOD shows them too) ---
     public const bool RavinesEnabled = true;
     public const float RavineRidgeFrequency = 1f / 300f;   // spacing of candidate canyon lines
