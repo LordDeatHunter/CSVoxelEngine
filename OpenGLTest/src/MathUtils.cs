@@ -30,6 +30,9 @@ public static class MathUtils
         return t * t * (3f - 2f * t);
     }
 
+    /// <summary>GLSL-style smoothstep: 0 at or below edge0, 1 at or above edge1, Hermite between.</summary>
+    public static float SmoothStep(float edge0, float edge1, float x) => SmoothStep(InverseLerp(edge0, edge1, x));
+
     /// <summary>Slow start, fast finish.</summary>
     public static float EaseInCubic(float t)
     {

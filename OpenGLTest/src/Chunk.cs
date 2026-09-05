@@ -31,7 +31,6 @@ public class Chunk : IDisposable
     private readonly byte[] _blocks = new byte[BlockCount];
     private int _solidCount;
 
-    private static readonly FastNoiseLite Noise;
     private static readonly Vector3[] NeighborOffsets = Vector3Directions.CardinalDirections;
     public double lifetime = 0.0f;
     public const float MAX_LIFETIME = 0.5f;
@@ -50,12 +49,19 @@ public class Chunk : IDisposable
     /// </summary>
     public bool HasMesh => _mesh != null;
 
-    // Column heights only depend on (x, z), so vertical chunk stacks share one heightmap.
+    /// <summary>
+    /// Whether a mesh has been applied at least once, even an empty one (all air, or solid with
+    /// no exposed face). Main-thread only. The LOD uses it to tell "chunk is drawn" apart from
+    /// "chunk has nothing to draw", which <see cref="HasMesh"/> cannot.
+    /// </summary>
+    public bool IsMeshed { get; private set; }
+
+    // Column data only depends on (x, z), so vertical chunk stacks share one entry.
     // The outermost LOD ring touches more columns than this (they're computed once per region
     // build and rarely revisited), so occasional Clear + recompute is cheaper than a bigger
-    // cache. 16k entries is ~16 MB.
-    private static readonly ConcurrentDictionary<(int X, int Z), int[]> HeightmapCache = new();
-    private const int HeightmapCacheLimit = 16384;
+    // cache. 16k entries is ~40 MB.
+    private static readonly ConcurrentDictionary<(int X, int Z), ColumnData> ColumnCache = new();
+    private const int ColumnCacheLimit = 16384;
 
     // Meshing lookup tables, flattened from CubeFaces/AONeighbors into padded-snapshot index deltas
     private static readonly int[] FaceNeighborDelta = new int[6];
@@ -65,13 +71,6 @@ public class Chunk : IDisposable
 
     static Chunk()
     {
-        Noise = new FastNoiseLite();
-        Noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-        Noise.SetFrequency(0.001f);
-        Noise.SetSeed(1337);
-        Noise.SetFractalType(FastNoiseLite.FractalType.FBm);
-        Noise.SetFractalOctaves(6);
-
         for (var i = 0; i < 6; i++)
         {
             FaceNeighborDelta[i] = PaddedDelta(CubeFaces[i].normal);
@@ -93,8 +92,9 @@ public class Chunk : IDisposable
     private static int PaddedDelta(Vector3 offset) =>
         (int)offset.X * PaddedSq + (int)offset.Y * Padded + (int)offset.Z;
 
+    /// <summary>Flat index of a chunk-local block; shared with the WorldGen carvers.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int Idx(int x, int y, int z) => (x << (2 * SizeShift)) | (y << SizeShift) | z;
+    internal static int Idx(int x, int y, int z) => (x << (2 * SizeShift)) | (y << SizeShift) | z;
 
     public Chunk(GL gl, Vector3 position, bool generateBlockData = true)
     {
@@ -107,77 +107,91 @@ public class Chunk : IDisposable
         }
     }
 
+    /// <summary>
+    /// Fills the terrain columns (grass / dirt / stone by depth), then lets the cave carvers
+    /// clear their air out of the result. Runs on a generation worker thread.
+    /// </summary>
     public void GenerateBlockData()
     {
-        var heights = GetColumnHeights((int)Position.X, (int)Position.Z);
+        var column = GetColumnData((int)Position.X, (int)Position.Z);
         var lowerBoundY = LowerBoundY;
-        var upperBoundY = UpperBoundY;
+
+        // Entirely above the terrain: nothing to fill, nothing to carve
+        if (lowerBoundY > column.MaxHeight)
+        {
+            IsBlockDataReady = true;
+            return;
+        }
 
         for (var x = 0; x < Size; x++)
         {
             for (var z = 0; z < Size; z++)
             {
-                GenerateColumn(x, z, heights[(x << SizeShift) | z], lowerBoundY, upperBoundY);
+                var i = (x << SizeShift) | z;
+                GenerateColumn(x, z, column.Heights[i], column.DirtDepth[i], lowerBoundY);
             }
         }
+
+        var worldX0 = (int)Position.X * Size;
+        var worldZ0 = (int)Position.Z * Size;
+
+        if (WorldGenerationConfig.NoiseCavesEnabled)
+            NoiseCaves.Carve(_blocks, column, worldX0, lowerBoundY, worldZ0);
+
+        if (WorldGenerationConfig.WormCavesEnabled)
+            WormCarver.Carve(_blocks, column, worldX0, lowerBoundY, worldZ0);
+
+        // Carving removed an unknown number of blocks; a recount is cheaper than bookkeeping
+        var solid = 0;
+        foreach (var block in _blocks)
+            if (block != BlockType.Air) solid++;
+        _solidCount = solid;
 
         IsBlockDataReady = true;
     }
 
     /// <summary>
-    /// Returns the terrain heightmap for a chunk column, indexed by (x &lt;&lt; SizeShift) | z.
-    /// Terrain (before player edits) is exactly "solid iff worldY &lt;= height"; the far-LOD
-    /// mesher relies on this. Cached, deterministic, and safe to call from any thread.
+    /// Returns the 2D generation inputs for a chunk column. Nothing generated is ever solid
+    /// above Heights[x, z]; the block at that height is solid unless a cave or entrance carved
+    /// it. Cached, deterministic, and safe to call from any thread.
     /// </summary>
-    public static int[] GetColumnHeights(int chunkX, int chunkZ)
+    public static ColumnData GetColumnData(int chunkX, int chunkZ)
     {
         var key = (chunkX, chunkZ);
-        if (HeightmapCache.TryGetValue(key, out var cached))
+        if (ColumnCache.TryGetValue(key, out var cached))
             return cached;
 
-        var heights = new int[Size * Size];
-        var baseX = (float)chunkX * Size;
-        var baseZ = (float)chunkZ * Size;
-
-        for (var x = 0; x < Size; x++)
-        {
-            var worldX = x + baseX;
-            for (var z = 0; z < Size; z++)
-            {
-                var worldZ = z + baseZ;
-                var heightNoise = Noise.GetNoise(worldX, worldZ) * Noise.GetNoise(worldZ, worldX);
-                heights[(x << SizeShift) | z] = (int)(heightNoise * 256f);
-            }
-        }
+        var column = TerrainGenerator.Compute(chunkX, chunkZ);
 
         // Crude growth cap; entries are deterministic so a full reset is harmless
-        if (HeightmapCache.Count >= HeightmapCacheLimit)
-            HeightmapCache.Clear();
+        if (ColumnCache.Count >= ColumnCacheLimit)
+            ColumnCache.Clear();
 
-        HeightmapCache[key] = heights;
-        return heights;
+        ColumnCache[key] = column;
+        return column;
     }
 
-    private void GenerateColumn(int x, int z, int terrainHeight, int lowerBoundY, int upperBoundY)
+    /// <summary>
+    /// The terrain heightmap for a chunk column, indexed by (x &lt;&lt; SizeShift) | z. Ravines
+    /// are already cut in; caves are not (they are 3D). See <see cref="GetColumnData"/>.
+    /// </summary>
+    public static int[] GetColumnHeights(int chunkX, int chunkZ) => GetColumnData(chunkX, chunkZ).Heights;
+
+    // Solid from the chunk floor up to the terrain height: grass on top, dirt for dirtDepth
+    // blocks under it, stone below that. dirtDepth == 0 marks a bare stone column
+    // (see ColumnData.DirtDepth) - deep ravine walls, where the top block is stone as well
+    private void GenerateColumn(int x, int z, int terrainHeight, int dirtDepth, int lowerBoundY)
     {
-        if (terrainHeight < lowerBoundY) return;
-
-        if (terrainHeight >= upperBoundY)
+        for (var y = 0; y < Size; y++)
         {
-            for (var y = 0; y < Size; y++)
-                _blocks[Idx(x, y, z)] = 2;
-            _solidCount += Size;
-            return;
+            var depth = terrainHeight - (lowerBoundY + y);
+            if (depth < 0) break;
+
+            _blocks[Idx(x, y, z)] = dirtDepth == 0 ? BlockType.Stone
+                : depth == 0 ? BlockType.Grass
+                : depth <= dirtDepth ? BlockType.Dirt
+                : BlockType.Stone;
         }
-
-        if (terrainHeight < 0)
-            terrainHeight = Size - (int)MathF.Abs(terrainHeight) % Size;
-
-        var localHeight = terrainHeight % Size;
-
-        for (var y = 0; y <= localHeight; y++)
-            _blocks[Idx(x, y, z)] = (byte)(y == localHeight ? 1 : 2);
-        _solidCount += localHeight + 1;
     }
 
     public int LowerBoundY => (int)Position.Y * Size;
@@ -379,6 +393,7 @@ public class Chunk : IDisposable
 
     public void UpdateMesh(ChunkMeshData meshData)
     {
+        IsMeshed = true;
         _mesh?.Dispose();
         _mesh = meshData.Vertices.Count == 0
             ? null

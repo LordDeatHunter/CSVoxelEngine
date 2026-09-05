@@ -163,7 +163,7 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
         return ((int)MathF.Floor(pos.X / size), (int)MathF.Floor(pos.Z / size));
     }
 
-    public void Update()
+    public void Update(ChunkManager chunkManager)
     {
         if (_camera == null) return;
 
@@ -210,7 +210,7 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
             uploaded++;
         }
 
-        UpdateBuriedFlags();
+        UpdateBuriedFlags(chunkManager);
     }
 
     /// <summary>
@@ -218,16 +218,57 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
     /// regions so the renderer draws a single LOD level per area. The levels are nested
     /// shells stacked below one another: drawing all of them is invisible from above the
     /// terrain (the depth buffer sorts it out) but shows up as layered surfaces once the
-    /// camera goes underground.
+    /// camera goes underground. The finest level is likewise flagged where the full-detail
+    /// chunks are drawn, because caves cut into the band its shell occupies and would show it.
     ///
-    /// Coverage is tested against the regions that actually exist rather than each level's
-    /// radius, so a finer region that has not been built yet can never open a hole in the
-    /// horizon — the coarser mesh keeps drawing until its replacement is loaded.
+    /// Coverage is tested against the regions and chunks that actually exist rather than each
+    /// level's radius, so a finer region or chunk that has not been built yet can never open a
+    /// hole in the horizon — the coarser mesh keeps drawing until its replacement is loaded.
     /// </summary>
-    private void UpdateBuriedFlags()
+    private void UpdateBuriedFlags(ChunkManager chunkManager)
     {
+        var camChunk = (_camera!.Position / Chunk.Size).Floor();
+
         foreach (var (key, region) in Regions)
-            region.IsBuried = key.Level > 0 && IsCoveredByFinerLevel(key.Level, key.X, key.Z);
+        {
+            region.IsBuried = key.Level > 0
+                ? IsCoveredByFinerLevel(key.Level, key.X, key.Z)
+                : IsCoveredByChunks(region, chunkManager, camChunk);
+        }
+    }
+
+    /// <summary>
+    /// Whether every chunk this region's shell could show through is loaded and drawn. The
+    /// chunk ranges come from the region build (<see cref="LodRegion.ColumnCyMin"/>); presence
+    /// is tested per chunk rather than by distance because the load volume is a sphere, so
+    /// terrain far below the camera near its horizontal edge is not loaded.
+    /// </summary>
+    private static bool IsCoveredByChunks(LodRegion region, ChunkManager chunkManager, Vector3 camChunk)
+    {
+        var span = region.SizeBlocks / Chunk.Size;
+        var baseCx = region.X * span;
+        var baseCz = region.Z * span;
+
+        // Chunks only exist within ChunkRadius of the camera, so a region whose nearest chunk
+        // column is farther than that cannot be covered; skips the lookups for most of the ring
+        var dx = Math.Max(0, Math.Max(baseCx - (int)camChunk.X, (int)camChunk.X - (baseCx + span - 1)));
+        var dz = Math.Max(0, Math.Max(baseCz - (int)camChunk.Z, (int)camChunk.Z - (baseCz + span - 1)));
+        if (dx * dx + dz * dz > WorldGenerationConfig.ChunkRadiusSq)
+            return false;
+
+        for (var ci = 0; ci < span; ci++)
+        for (var cj = 0; cj < span; cj++)
+        {
+            var c = ci * span + cj;
+            for (var cy = region.ColumnCyMin[c]; cy <= region.ColumnCyMax[c]; cy++)
+            {
+                if (!chunkManager.Chunks.TryGetValue(new Vector3(baseCx + ci, cy, baseCz + cj), out var chunk)
+                    || !chunk.IsMeshed)
+                    return false;
+            }
+        }
+
+        return true;
     }
 
     private bool IsCoveredByFinerLevel(int level, int x, int z)

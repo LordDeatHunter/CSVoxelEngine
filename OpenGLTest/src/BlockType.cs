@@ -4,6 +4,12 @@ namespace silkgltriangle;
 
 public class BlockType
 {
+    // Ids of the built-in blocks, for code that decides what to generate
+    public const byte Air = 0;
+    public const byte Grass = 1;
+    public const byte Dirt = 2;
+    public const byte Stone = 3;
+
     public static readonly Dictionary<byte, BlockType> Types = new()
     {
         { 1, new BlockType(new Point(0, 0), new Point(2, 0), new Point(1, 0)) }, // grass

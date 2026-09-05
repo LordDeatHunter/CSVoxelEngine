@@ -26,7 +26,9 @@ public readonly record struct LodLevelSpec(int CellSize, int RegionBlocks, int R
 /// camera-dependent remeshing is needed. Regions whose footprint is fully covered by
 /// loaded finer regions are skipped entirely (<see cref="IsBuried"/>) so only one level
 /// is drawn per area — the stacked shells are invisible from outside the terrain but
-/// show through once the camera goes underground.
+/// show through once the camera goes underground. For the same reason the finest level is
+/// skipped wherever the full-detail chunks are drawn: caves reach into the shell band under
+/// the surface, so the shell would otherwise appear inside them.
 /// </summary>
 public class LodRegion : IDisposable
 {
@@ -53,6 +55,13 @@ public class LodRegion : IDisposable
     public readonly int X, Z;          // region grid coordinates (in this level's grid)
     public readonly int SizeBlocks;
     public readonly float YMin, YMax;
+
+    /// <summary>
+    /// Per chunk column of the region (index ci * span + cj, span = SizeBlocks / Chunk.Size):
+    /// the inclusive chunk-Y range that must be loaded and drawn for this shell to be hidden
+    /// under full-detail chunks. See <see cref="LodManager"/>.
+    /// </summary>
+    public readonly int[] ColumnCyMin, ColumnCyMax;
 
     private Mesh? _mesh;
 
@@ -92,6 +101,8 @@ public class LodRegion : IDisposable
         SizeBlocks = Levels[data.Level].RegionBlocks;
         YMin = data.YMin;
         YMax = data.YMax;
+        ColumnCyMin = data.ColumnCyMin;
+        ColumnCyMax = data.ColumnCyMax;
         _mesh = data.Vertices.Count == 0
             ? null
             : new Mesh(gl, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.Vertices),
@@ -170,8 +181,40 @@ public class LodRegion : IDisposable
             }
         }
 
-        var grass = BlockType.Types[1];
-        var dirt = BlockType.Types[2];
+        // Which chunks must be drawn for a full-detail column to hide this shell: everything
+        // from the lowest side face (set by the neighbouring cells' tops, hence the 1-cell ring)
+        // up to the top face and the real terrain surface above it.
+        var cellsPerChunk = Chunk.Size / cellSize;
+        var columnCyMin = new int[regionChunkSpan * regionChunkSpan];
+        var columnCyMax = new int[regionChunkSpan * regionChunkSpan];
+        for (var ci = 0; ci < regionChunkSpan; ci++)
+        {
+            for (var cj = 0; cj < regionChunkSpan; cj++)
+            {
+                var minTop = int.MaxValue;
+                var maxTop = int.MinValue;
+                for (var i = ci * cellsPerChunk - 1; i <= (ci + 1) * cellsPerChunk; i++)
+                for (var j = cj * cellsPerChunk - 1; j <= (cj + 1) * cellsPerChunk; j++)
+                {
+                    var t = topCell[(i + 1) * heightGrid + (j + 1)];
+                    if (t < minTop) minTop = t;
+                    if (t > maxTop) maxTop = t;
+                }
+
+                var maxHeight = int.MinValue;
+                foreach (var h in heightmaps[(ci + 1) * chunkSpan + (cj + 1)])
+                    if (h > maxHeight) maxHeight = h;
+
+                var yLo = cellSize * (minTop + 1);
+                var yHi = Math.Max(cellSize * (maxTop + 1), maxHeight + 1);
+                columnCyMin[ci * regionChunkSpan + cj] = yLo >> Chunk.SizeShift;
+                columnCyMax[ci * regionChunkSpan + cj] = (yHi - 1) >> Chunk.SizeShift;
+            }
+        }
+
+        var grass = BlockType.Types[BlockType.Grass];
+        var dirt = BlockType.Types[BlockType.Dirt];
+        var stone = BlockType.Types[BlockType.Stone];
 
         var vertices = new List<Vertex>(8192);
         var indices = new List<ushort>(12288);
@@ -270,15 +313,19 @@ public class LodRegion : IDisposable
                             shades[c] = Chunk.ShadeLut[(f << 2) | Chunk.VertexAO(side1, side2, diagonal)];
                         }
 
-                        var tile = cy == top ? grass.FaceTiles[f] : dirt.FaceTiles[f];
+                        // Grass at the top, dirt for the first few blocks, stone below (matches Chunk.GenerateColumn)
+                        var tile = cy == top ? grass.FaceTiles[f]
+                            : (top - cy) * cellSize <= WorldGenerationConfig.NominalDirtDepth ? dirt.FaceTiles[f]
+                            : stone.FaceTiles[f];
                         AddQuad(f, new Vector3(i * cellSize, cy * cellSize, j * cellSize), tile, shades);
                     }
                 }
             }
         }
 
-        return new LodMeshData(level, rx, rz, vertices, indices, yMin, yMax);
+        return new LodMeshData(level, rx, rz, vertices, indices, yMin, yMax, columnCyMin, columnCyMax);
     }
 }
 
-public record LodMeshData(int Level, int X, int Z, List<Vertex> Vertices, List<ushort> Indices, float YMin, float YMax);
+public record LodMeshData(int Level, int X, int Z, List<Vertex> Vertices, List<ushort> Indices, float YMin, float YMax,
+    int[] ColumnCyMin, int[] ColumnCyMax);

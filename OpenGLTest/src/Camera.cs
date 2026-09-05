@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using Silk.NET.Input;
@@ -8,7 +9,7 @@ namespace silkgltriangle;
 
 public class Camera
 {
-    public Vector3 Position { get; private set; } = new(0, 0, 3);
+    public Vector3 Position { get; private set; } = SpawnPosition();
     public float Yaw { get; private set; } = -90f;
     public float Pitch { get; private set; } = 0f;
     public bool IsGrounded { get; private set; }
@@ -36,6 +37,9 @@ public class Camera
     // Two Space presses within this window toggle flight
     private const float DoubleTapWindow = 0.3f;
 
+    // Set to "x,y,z" to start the eye at an exact spot instead of the surface spawn
+    private const string SpawnOverrideVariable = "VOXEL_SPAWN";
+
     private float _aspectRatio = 16f / 10f;
     private float _verticalVelocity;
     private Vector2 _lastMousePosition;
@@ -46,6 +50,44 @@ public class Camera
 
     private readonly IWindow window;
     private readonly IMouse? mouse;
+
+    // Eye position standing on the terrain at the origin, so the player never starts buried
+    private static Vector3 SpawnPosition()
+    {
+        // Dev override: VOXEL_SPAWN="x,y,z" drops the eye exactly there, so a spot worth
+        // inspecting (a cave, a ravine) can be looked at without flying out to it first.
+        var spawnOverride = Environment.GetEnvironmentVariable(SpawnOverrideVariable);
+        if (!string.IsNullOrWhiteSpace(spawnOverride))
+        {
+            if (TryParseSpawnOverride(spawnOverride, out var overridePosition))
+                return overridePosition;
+
+            Console.WriteLine(
+                $"Ignoring {SpawnOverrideVariable}=\"{spawnOverride}\": expected three comma-separated numbers, e.g. -40,-107,-75");
+        }
+
+        var surface = Chunk.GetColumnHeights(0, 0)[0] + 1;
+        return new Vector3(0.5f, surface + EyeHeight, 0.5f);
+    }
+
+    private static bool TryParseSpawnOverride(string value, out Vector3 position)
+    {
+        position = Vector3.Zero;
+
+        var parts = value.Split(',');
+        if (parts.Length != 3)
+            return false;
+
+        Span<float> components = stackalloc float[3];
+        for (var i = 0; i < 3; i++)
+        {
+            if (!float.TryParse(parts[i].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out components[i]))
+                return false;
+        }
+
+        position = new Vector3(components[0], components[1], components[2]);
+        return true;
+    }
 
     public Camera(IWindow window, IInputContext input)
     {

@@ -70,7 +70,7 @@ public class World
     {
         Camera.Update((float)deltaTime, keyboard, _chunkManager);
         _chunkManager.Update(Camera);
-        _lodManager.Update();
+        _lodManager.Update(_chunkManager);
 
         // Drops collected this tick land in the hotbar, which pops the matching icon. A block
         // with no slot is simply discarded.

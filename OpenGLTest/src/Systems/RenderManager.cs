@@ -138,8 +138,8 @@ public class RenderManager : IDisposable
 
         foreach (var region in regions)
         {
-            // Buried regions are fully covered by a finer level; drawing them too would
-            // stack shells that are visible from inside the terrain
+            // Buried regions are fully covered by a finer level (or, for the finest level, by
+            // drawn chunks); drawing them too would stack shells visible from inside caves
             if (!region.HasMesh || region.IsBuried)
                 continue;
 
