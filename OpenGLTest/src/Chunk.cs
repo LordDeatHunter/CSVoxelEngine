@@ -175,13 +175,14 @@ public class Chunk : IDisposable
     /// <summary>
     /// Flood-fills skylight and lamp light over the wide light snapshot (see
     /// FillLightSnapshot), so lamps and skylight changes up to LightPropagationRadius
-    /// blocks away still light this chunk's faces. Sun seeds are air cells at or above
-    /// the terrain height (nothing generated is ever solid above it); lamp seeds are
-    /// emissive cells. Both spread through air losing one level per block, so caves and
-    /// overhangs fall off into darkness. All inputs are local (snapshot + height cache),
-    /// so this is thread-safe and needs no cross-chunk state. Seeds all enter at the same
-    /// max level, so a FIFO queue visits every cell at its final level first, each cell is
-    /// enqueued at most once, and the caller-sized queue never overflows.
+    /// blocks away still light this chunk's faces. Sun seeds are air or leaf cells at or
+    /// above the terrain height (nothing generated is ever solid above it, and canopies
+    /// pass light); lamp seeds are emissive cells. Both spread through air and leaves
+    /// losing one level per block, so caves and overhangs fall off into darkness. All
+    /// inputs are local (snapshot + height cache), so this is thread-safe and needs no
+    /// cross-chunk state. Seeds all enter at the same max level, so a FIFO queue visits
+    /// every cell at its final level first, each cell is enqueued at most once, and the
+    /// caller-sized queue never overflows.
     /// <paramref name="sun"/> and <paramref name="block"/> must be zeroed and hold at
     /// least LightCount entries each, as must <paramref name="queue"/>.
     /// </summary>
@@ -195,6 +196,8 @@ public class Chunk : IDisposable
         var tail = 0;
 
         // Sunlight seeds: air cells at or above the terrain height see the sky directly.
+        // Leaves seed too: canopies pass light, so the sky reaches straight through them
+        // (branch tops under leaves stay lit; only depth falloff dims deep cover).
         for (var lx = 0; lx < LightSize; lx++)
         {
             var worldX = worldX0 + lx;
@@ -205,7 +208,7 @@ public class Chunk : IDisposable
                 for (var ly = 0; ly < LightSize; ly++)
                 {
                     var i = columnBase + ly * LightSize;
-                    if (light[i] != BlockType.Air) continue;
+                    if (!PassesLight(light[i])) continue;
                     if (worldY0 + ly >= height)
                     {
                         sun[i] = 15;
@@ -231,8 +234,17 @@ public class Chunk : IDisposable
         SpreadLight(light, block, queue, ref head, ref tail);
     }
 
-    /// <summary>One BFS pass: spreads <paramref name="levels"/> through air cells of the
-    /// light snapshot, losing one level per block. Shared by the sun and lamp passes.</summary>
+    /// <summary>Whether voxel light travels through a block: air, plus leaves, whose canopy
+    /// stays lit through instead of casting solid shade. Everything else (rock, wood, TNT)
+    /// still blocks. Geometry culling and AO keep treating leaves as solid.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool PassesLight(byte blockId) =>
+        blockId == BlockType.Air || blockId == BlockType.Leaves;
+
+    /// <summary>One BFS pass: spreads <paramref name="levels"/> through light-passing cells
+    /// (see <see cref="PassesLight"/>) of the light snapshot, losing one level per block.
+    /// Shared by the sun and lamp passes. Every cell is still enqueued at most once, since
+    /// every traversal costs exactly one level.</summary>
     private static void SpreadLight(byte[] light, byte[] levels, int[] queue, ref int head, ref int tail)
     {
         while (head < tail)
@@ -247,17 +259,17 @@ public class Chunk : IDisposable
             var ly = rem / LightSize;
             var lz = rem - ly * LightSize;
 
-            if (lx > 0 && light[c - LightSq] == BlockType.Air && levels[c - LightSq] < next)
+            if (lx > 0 && PassesLight(light[c - LightSq]) && levels[c - LightSq] < next)
                 { levels[c - LightSq] = next; queue[tail++] = c - LightSq; }
-            if (lx < LightSize - 1 && light[c + LightSq] == BlockType.Air && levels[c + LightSq] < next)
+            if (lx < LightSize - 1 && PassesLight(light[c + LightSq]) && levels[c + LightSq] < next)
                 { levels[c + LightSq] = next; queue[tail++] = c + LightSq; }
-            if (ly > 0 && light[c - LightSize] == BlockType.Air && levels[c - LightSize] < next)
+            if (ly > 0 && PassesLight(light[c - LightSize]) && levels[c - LightSize] < next)
                 { levels[c - LightSize] = next; queue[tail++] = c - LightSize; }
-            if (ly < LightSize - 1 && light[c + LightSize] == BlockType.Air && levels[c + LightSize] < next)
+            if (ly < LightSize - 1 && PassesLight(light[c + LightSize]) && levels[c + LightSize] < next)
                 { levels[c + LightSize] = next; queue[tail++] = c + LightSize; }
-            if (lz > 0 && light[c - 1] == BlockType.Air && levels[c - 1] < next)
+            if (lz > 0 && PassesLight(light[c - 1]) && levels[c - 1] < next)
                 { levels[c - 1] = next; queue[tail++] = c - 1; }
-            if (lz < LightSize - 1 && light[c + 1] == BlockType.Air && levels[c + 1] < next)
+            if (lz < LightSize - 1 && PassesLight(light[c + 1]) && levels[c + 1] < next)
                 { levels[c + 1] = next; queue[tail++] = c + 1; }
         }
     }
