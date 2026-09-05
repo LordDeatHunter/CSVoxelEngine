@@ -592,6 +592,9 @@ public class Chunk : IDisposable
             var basePos = new Vector3(x, y, z);
             var pIdx = (x + 1) * PaddedSq + (y + 1) * Padded + (z + 1);
 
+            // Canopy leaves ride the wind in the vertex shader; everything else stays planted
+            var sway = blockId == BlockType.Leaves ? 1f : 0f;
+
             // Tapered wood renders as a centred box (plus arms reaching wood neighbours)
             // instead of a full cube; see EmitBranchBox
             if (BlockType.IsPartialCube(blockId))
@@ -636,7 +639,7 @@ public class Chunk : IDisposable
                     var ao = VertexAO(side1, side2, corner);
                     var shade = ShadeLut[(i << 2) | ao];
 
-                    vertices.Add(new Vertex(basePos + face[j], shade, shade, shade, 255, uv[j], sun, block, normal));
+                    vertices.Add(new Vertex(basePos + face[j], shade, shade, shade, 255, uv[j], sun, block, normal, sway));
                 }
 
                 indices.Add((ushort)(indexOffset + 0));

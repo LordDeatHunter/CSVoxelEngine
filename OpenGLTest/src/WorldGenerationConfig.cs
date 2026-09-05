@@ -195,4 +195,9 @@ public static class WorldGenerationConfig
     // No trunk roots this close (Chebyshev) to the origin column, so the surface spawn the
     // camera picks there is always in the open
     public const int TreeSpawnClearRadius = 3;
+
+    // --- Canopy wind (leaf-wave vertex shader) ---
+    // Master strength of the leaf sway, 0 disables it; wavelengths and gusts live in
+    // test-vertex.glsl next to the wave itself
+    public const float LeafSwayStrength = 1f;
 }

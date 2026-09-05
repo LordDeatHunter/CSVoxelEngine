@@ -183,6 +183,7 @@ public class RenderManager : IDisposable
         worldShader.SetUniform("uNumPointLights", _pointCount);
         worldShader.SetUniformArray3("uPointPos", _pointPos);
         worldShader.SetUniformArray3("uPointColor", _pointColors);
+        worldShader.SetUniform("uSwayStrength", WorldGenerationConfig.LeafSwayStrength);
         worldShader.SetUniform("uFlash", 0f);
     }
 

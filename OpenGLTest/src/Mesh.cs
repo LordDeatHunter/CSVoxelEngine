@@ -50,6 +50,9 @@ public class Mesh : IDisposable
 
             _gl.VertexAttribPointer(5, 3, VertexAttribPointerType.Float, false, Vertex.Size, (void*)32);
             _gl.EnableVertexAttribArray(5);
+
+            _gl.VertexAttribPointer(6, 1, VertexAttribPointerType.Float, false, Vertex.Size, (void*)44);
+            _gl.EnableVertexAttribArray(6);
         }
 
         _gl.BindVertexArray(0);
