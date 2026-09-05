@@ -74,7 +74,7 @@ public class World
 
         // Drops collected this tick land in the hotbar, which pops the matching icon. A block
         // with no slot is simply discarded.
-        _dropManager.Update((float)deltaTime, Camera.Position);
+        _dropManager.Update((float)deltaTime, Camera.Position, _chunkManager);
         foreach (var blockId in _dropManager.Collected)
             Inventory.Add(blockId);
 

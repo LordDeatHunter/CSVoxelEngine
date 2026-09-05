@@ -37,7 +37,7 @@ public class DropManager
         _drops.Add(new ItemDrop(blockId, blockPosition + new Vector3(0.5f)));
     }
 
-    public void Update(float deltaTime, Vector3 playerPosition)
+    public void Update(float deltaTime, Vector3 playerPosition, ChunkManager chunks)
     {
         _collected.Clear();
         if (_drops.Count == 0) return;
@@ -51,7 +51,7 @@ public class DropManager
             var drop = _drops[i];
             var inRange = Vector3.DistanceSquared(drop.Position, target) <= rangeSquared;
 
-            if (!drop.Update(deltaTime, target, inRange)) continue;
+            if (!drop.Update(deltaTime, target, inRange, chunks)) continue;
 
             _collected.Add(drop.BlockId);
             _drops.RemoveAt(i);

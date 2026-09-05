@@ -1,16 +1,21 @@
+using System;
 using System.Numerics;
 
 namespace silkgltriangle;
 
 /// <summary>
-/// A collectable block left behind by mining. A drop hovers where the block was, spinning and
-/// breathing in scale, until the player comes close enough — then it accelerates towards them
-/// and is collected on contact. Drops ignore terrain; they only ever move towards the player.
+/// A collectable block left behind by mining. A drop pops out where the block was, falls under
+/// gravity and rests on the terrain, spinning and breathing in scale, until the player comes
+/// close enough — then it accelerates towards them and is collected on contact. Once latched
+/// onto the player it flies straight and ignores terrain.
 /// </summary>
 public class ItemDrop
 {
     /// <summary>Edge length of the floating cube, in blocks.</summary>
-    public const float Size = 0.35f;
+    public const float Size = 0.35f / 1.5f;
+
+    /// <summary>Half the edge length; the drop collides as a cube this far from its centre.</summary>
+    private const float HalfExtent = Size * 0.5f;
 
     private const float SpinRadiansPerSecond = 1.5f;
 
@@ -27,6 +32,15 @@ public class ItemDrop
     // Close enough to count as collected, so a drop never hovers just short of the target
     private const float CollectDistance = 0.2f;
 
+    // Idle physics (before the drop latches onto the player): gravity, ground friction and a
+    // small bounce so drops settle onto the terrain instead of hovering where the block was
+    private const float Gravity = 28f;
+    private const float TerminalVelocity = -30f;
+    private const float GroundFriction = 8f;
+    private const float BounceDamping = 0.35f;
+    private const float BounceThreshold = 4f;
+    private const float CollisionStepSize = 0.05f;
+
     // A drop chasing a player faster than SuckSpeed is collected anyway rather than trailing
     // them forever
     private const float MaxAttractSeconds = 3f;
@@ -38,9 +52,13 @@ public class ItemDrop
     public byte BlockId { get; }
     public Vector3 Position { get; private set; }
 
+    private Vector3 _velocity;
     private float _age;
     private float _attractElapsed;
     private bool _attracted;
+
+    /// <summary>Whether the drop has landed and is resting on the terrain.</summary>
+    public bool IsGrounded { get; private set; }
 
     /// <summary>Whether the drop has committed to flying at the player.</summary>
     public bool IsAttracted => _attracted;
@@ -55,19 +73,30 @@ public class ItemDrop
     {
         BlockId = blockId;
         Position = position;
+
+        // Small random pop so the drop visibly ejects instead of appearing dead still, with an
+        // upward bias so a surface-mined block lands back on top rather than inside the floor
+        var angle = Random.Shared.NextSingle() * MathF.Tau;
+        var horizontalSpeed = 0.5f + Random.Shared.NextSingle();
+        _velocity = new Vector3(
+            MathF.Cos(angle) * horizontalSpeed,
+            2f + Random.Shared.NextSingle() * 1.5f,
+            MathF.Sin(angle) * horizontalSpeed);
     }
 
     /// <summary>
     /// Advances the drop, returning true once it reaches <paramref name="target"/> and should be
-    /// collected. <paramref name="inRange"/> latches attraction on, so a drop already being
+    /// collected. While idle the drop falls under gravity and collides with blocks;
+    /// <paramref name="inRange"/> latches attraction on, so a drop already being
     /// pulled keeps coming even if the player backs away.
     /// </summary>
-    public bool Update(float deltaTime, Vector3 target, bool inRange)
+    public bool Update(float deltaTime, Vector3 target, bool inRange, ChunkManager chunks)
     {
         _age += deltaTime;
 
         if (!_attracted)
         {
+            ApplyPhysics(deltaTime, chunks);
             if (!inRange || _age < PickupDelaySeconds) return false;
             _attracted = true;
         }
@@ -87,6 +116,113 @@ public class ItemDrop
         if (step >= distance) return true;
 
         Position += toTarget / distance * step;
+        return false;
+    }
+
+    /// <summary>
+    /// Falls under gravity and slides along blocks, axis by axis like the player, so drops land
+    /// on top of the terrain instead of sinking through it.
+    /// </summary>
+    private void ApplyPhysics(float deltaTime, ChunkManager chunks)
+    {
+        if (deltaTime <= 0f || chunks == null) return;
+
+        _velocity.Y = MathF.Max(_velocity.Y - Gravity * deltaTime, TerminalVelocity);
+
+        var movement = _velocity * deltaTime;
+
+        Position = MoveOnAxis(Position, movement.X, 0, chunks, out var hitX);
+        Position = MoveOnAxis(Position, movement.Z, 2, chunks, out var hitZ);
+        Position = MoveOnAxis(Position, movement.Y, 1, chunks, out var hitY);
+
+        // Walls just stop that axis; the floor bounces light impacts and rests on hard ones
+        if (hitX) _velocity.X = 0f;
+        if (hitZ) _velocity.Z = 0f;
+
+        if (hitY)
+        {
+            if (_velocity.Y < 0f)
+            {
+                var impact = -_velocity.Y;
+                _velocity.Y = impact >= BounceThreshold ? impact * BounceDamping : 0f;
+                IsGrounded = _velocity.Y == 0f;
+            }
+            else
+            {
+                _velocity.Y = 0f;
+            }
+        }
+        else
+        {
+            IsGrounded = false;
+        }
+
+        // Scrub horizontal speed once settled so drops don't slide forever on flat ground
+        if (IsGrounded)
+        {
+            var damp = MathF.Max(0f, 1f - GroundFriction * deltaTime);
+            _velocity.X *= damp;
+            _velocity.Z *= damp;
+            if (MathF.Abs(_velocity.X) < 0.01f) _velocity.X = 0f;
+            if (MathF.Abs(_velocity.Z) < 0.01f) _velocity.Z = 0f;
+        }
+    }
+
+    private Vector3 MoveOnAxis(Vector3 start, float delta, int axis, ChunkManager chunks, out bool collided)
+    {
+        collided = false;
+        if (MathF.Abs(delta) < float.Epsilon)
+            return start;
+
+        var position = start;
+        var remaining = delta;
+
+        while (MathF.Abs(remaining) > float.Epsilon)
+        {
+            var step = Math.Clamp(remaining, -CollisionStepSize, CollisionStepSize);
+            var candidate = OffsetAxis(position, axis, step);
+
+            if (IsColliding(candidate, chunks))
+            {
+                collided = true;
+                break;
+            }
+
+            position = candidate;
+            remaining -= step;
+        }
+
+        return position;
+    }
+
+    private static Vector3 OffsetAxis(Vector3 value, int axis, float delta)
+    {
+        return axis switch
+        {
+            0 => new Vector3(value.X + delta, value.Y, value.Z),
+            1 => new Vector3(value.X, value.Y + delta, value.Z),
+            2 => new Vector3(value.X, value.Y, value.Z + delta),
+            _ => value
+        };
+    }
+
+    private static bool IsColliding(Vector3 center, ChunkManager chunks)
+    {
+        var minX = (int)MathF.Floor(center.X - HalfExtent);
+        var minY = (int)MathF.Floor(center.Y - HalfExtent);
+        var minZ = (int)MathF.Floor(center.Z - HalfExtent);
+        var maxX = (int)MathF.Floor(center.X + HalfExtent);
+        var maxY = (int)MathF.Floor(center.Y + HalfExtent);
+        var maxZ = (int)MathF.Floor(center.Z + HalfExtent);
+
+        for (var x = minX; x <= maxX; x++)
+        for (var y = minY; y <= maxY; y++)
+        for (var z = minZ; z <= maxZ; z++)
+        {
+            if (chunks.GetBlockGlobal(x, y, z) != 0)
+                return true;
+        }
+
         return false;
     }
 }
