@@ -241,6 +241,41 @@ public class Chunk : IDisposable
         return true;
     }
 
+    /// <summary>
+    /// Clears a block without remeshing and returns the removed id (0 if the cell was outside
+    /// this chunk or already air). The caller must remesh every touched chunk afterwards —
+    /// explosions clear hundreds of blocks, where per-block remeshing would hitch.
+    /// Main thread only, like the other block edits.
+    /// </summary>
+    public byte ClearBlockAt(Vector3 worldPos)
+    {
+        var localX = (int)(worldPos.X - Position.X * Size);
+        var localY = (int)(worldPos.Y - Position.Y * Size);
+        var localZ = (int)(worldPos.Z - Position.Z * Size);
+
+        if (!InBounds(localX, localY, localZ)) return 0;
+        var removed = _blocks[Idx(localX, localY, localZ)];
+        if (removed == 0) return 0;
+        _blocks[Idx(localX, localY, localZ)] = 0;
+        _solidCount--;
+        return removed;
+    }
+
+    /// <summary>
+    /// Remeshes this chunk right away and schedules its 6 neighbours for remeshing, so a batch
+    /// edit that already cleared the blocks (see <see cref="ClearBlockAt"/>) becomes visible.
+    /// </summary>
+    public void RemeshAfterBatchEdit(ChunkManager chunkManager)
+    {
+        chunkManager.ImmediateRemesh(Position);
+        foreach (var offset in NeighborOffsets)
+        {
+            var neighborPos = Position + offset;
+            if (chunkManager.Chunks.ContainsKey(neighborPos))
+                chunkManager.MarkDirty(neighborPos);
+        }
+    }
+
     private void MarkNeighborsDirty(Vector3 worldPos, ChunkManager chunkManager)
     {
         HashSet<Vector3> chunksForUpdate = [];

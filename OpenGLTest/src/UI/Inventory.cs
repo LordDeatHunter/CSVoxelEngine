@@ -9,11 +9,15 @@ namespace silkgltriangle;
 /// leftover slots stay empty (block id 0).
 ///
 /// Each slot tracks how many blocks it holds. Counts start at zero and are filled by mining, so
-/// a slot renders its block whether or not it holds any — only placing checks the count.
+/// a slot renders its block whether or not it holds any — only placing checks the count. The
+/// player spawns with a starter stock of TNT.
 /// </summary>
 public class Inventory
 {
-    public const int SlotCount = 4;
+    public const int SlotCount = 5;
+
+    /// <summary>How much TNT the player starts with.</summary>
+    public const int StartingTnt = 50;
 
     // A pickup makes the slot's icon jump and settle back, so a count change is visible even
     // though the count itself isn't drawn yet
@@ -21,7 +25,7 @@ public class Inventory
     public const float PopScale = 1.3f;
 
     private readonly byte[] _slots = BuildSlots();
-    private readonly int[] _counts = new int[SlotCount];
+    private readonly int[] _counts = BuildCounts();
 
     // Seconds since each slot's last pickup, parked at PopSeconds once the pop has finished
     private readonly float[] _popElapsed = FinishedPops();
@@ -106,6 +110,17 @@ public class Inventory
         var ids = BlockType.Types.Keys.OrderBy(id => id).Take(SlotCount).ToArray();
         ids.CopyTo(slots, 0);
         return slots;
+    }
+
+    // The player spawns holding TNT; everything else is earned by mining
+    private static int[] BuildCounts()
+    {
+        var counts = new int[SlotCount];
+        var ids = BlockType.Types.Keys.OrderBy(id => id).Take(SlotCount).ToArray();
+        for (var i = 0; i < ids.Length; i++)
+            if (ids[i] == BlockType.Tnt)
+                counts[i] = StartingTnt;
+        return counts;
     }
 
     private static float[] FinishedPops()

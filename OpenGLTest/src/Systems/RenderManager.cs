@@ -226,6 +226,38 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
+    /// Draws the primed TNT cubes at full block size, strobing white through uFlash as their
+    /// fuses burn down. Leaves uFlash at 0 so the other world draws stay textured.
+    /// </summary>
+    public void RenderPrimedTnt(Camera camera, IReadOnlyList<PrimedTnt> primed)
+    {
+        if (camera == null || primed.Count == 0) return;
+
+        worldShader.Use();
+        worldShader.SetUniform("uAlpha", 1f);
+        gl.ActiveTexture(TextureUnit.Texture0);
+        gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
+
+        var viewProj = camera.GetViewProjection();
+
+        foreach (var tnt in primed)
+        {
+            var mesh = blockCubes.Get(BlockType.Tnt);
+            if (mesh == null) continue;
+
+            // The cube is centred on its own origin, so it scales about its centre
+            var model = Matrix4x4.CreateScale(tnt.Scale)
+                        * Matrix4x4.CreateTranslation(tnt.Position);
+
+            worldShader.SetUniform("uMVP", model * viewProj);
+            worldShader.SetUniform("uFlash", tnt.WhiteFlash);
+            mesh.Render();
+        }
+
+        worldShader.SetUniform("uFlash", 0f);
+    }
+
+    /// <summary>
     /// Draws the targeted block's outline and face highlight. <paramref name="scale"/> is the
     /// block's current pop scale so the highlight tracks it while mining.
     /// </summary>

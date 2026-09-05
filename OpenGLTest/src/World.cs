@@ -29,6 +29,7 @@ public class World
     private readonly ChunkGenerationWorker _generationWorker;
     private readonly LodManager _lodManager;
     private readonly DropManager _dropManager = new();
+    private readonly TntManager _tntManager = new();
     private readonly IWindow _window;
     private bool _hasSelectedBlock;
     private Vector3 _selectedBlockPosition;
@@ -78,6 +79,8 @@ public class World
         foreach (var blockId in _dropManager.Collected)
             Inventory.Add(blockId);
 
+        _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager);
+
         Inventory.Update((float)deltaTime);
 
         _hasSelectedBlock = Camera.Raycast(InteractionReach, _chunkManager, out _selectedBlockPosition, out _selectedFaceNormal);
@@ -88,6 +91,7 @@ public class World
         renderManager.RenderLod(Camera, _lodManager.Regions.Values);
         renderManager.RenderWorld(Camera, _chunkManager.Chunks.Values, _window.Time);
         renderManager.RenderItemDrops(Camera, _dropManager.Drops);
+        renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
 
         if (!_hasSelectedBlock) return;
 
@@ -202,8 +206,14 @@ public class World
         // Read the id before the block goes away, so the drop knows what it is
         var brokenId = BlockIdAt(blockPos);
 
+        // Mined TNT never drops — once its HP runs out it primes on the spot instead
+        if (brokenId == BlockType.Tnt)
+        {
+            if (chunk.RemoveBlockAt(blockPos, _chunkManager))
+                _tntManager.Spawn(blockPos);
+        }
         // Only drop something if a block was actually cleared
-        if (chunk.RemoveBlockAt(blockPos, _chunkManager))
+        else if (chunk.RemoveBlockAt(blockPos, _chunkManager))
             _dropManager.Spawn(BlockType.DropFor(brokenId), blockPos);
 
         // Keep the buried LOD mesh below the newly exposed hole
