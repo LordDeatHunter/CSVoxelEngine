@@ -303,6 +303,9 @@ public class Camera
 
     public Matrix4x4 GetViewProjection() => GetViewMatrix() * GetProjectionMatrix();
 
+    /// <summary>View direction, for aiming the shadow camera ahead of the player.</summary>
+    public Vector3 Forward => GetForwardVector();
+
     private Vector3 GetForwardVector()
     {
         var yawRad = MathF.PI * Yaw / 180f;

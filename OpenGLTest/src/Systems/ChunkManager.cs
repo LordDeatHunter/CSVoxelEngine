@@ -195,6 +195,34 @@ public class ChunkManager(GL gl)
     }
 
     /// <summary>
+    /// Marks every loaded chunk within <paramref name="radiusBlocks"/> of the world-space
+    /// box [<paramref name="min"/>, <paramref name="max"/>] dirty. Voxel light travels up
+    /// to <see cref="WorldGenerationConfig.LightPropagationRadius"/> blocks from an edit,
+    /// so all of these chunks need their light recomputed — not just face-adjacent ones.
+    /// Async and budgeted like any other dirty chunk; the edited chunk itself is usually
+    /// remeshed synchronously by the caller already, so it is skipped here.
+    /// </summary>
+    public void MarkAreaDirty(Vector3 min, Vector3 max, int radiusBlocks, Vector3? skip = null)
+    {
+        var x0 = (int)MathF.Floor((min.X - radiusBlocks) / Chunk.Size);
+        var y0 = (int)MathF.Floor((min.Y - radiusBlocks) / Chunk.Size);
+        var z0 = (int)MathF.Floor((min.Z - radiusBlocks) / Chunk.Size);
+        var x1 = (int)MathF.Floor((max.X + radiusBlocks) / Chunk.Size);
+        var y1 = (int)MathF.Floor((max.Y + radiusBlocks) / Chunk.Size);
+        var z1 = (int)MathF.Floor((max.Z + radiusBlocks) / Chunk.Size);
+
+        for (var x = x0; x <= x1; x++)
+        for (var y = y0; y <= y1; y++)
+        for (var z = z0; z <= z1; z++)
+        {
+            var pos = new Vector3(x, y, z);
+            if (skip.HasValue && pos == skip.Value) continue;
+            if (Chunks.ContainsKey(pos))
+                _dirtyChunks.TryAdd(pos, 0);
+        }
+    }
+
+    /// <summary>
     /// Immediately regenerates the mesh for a chunk (used for block breaking).
     /// </summary>
     public void ImmediateRemesh(Vector3 pos)

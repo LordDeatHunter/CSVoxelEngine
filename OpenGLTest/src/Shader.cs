@@ -100,6 +100,16 @@ public class Shader : IDisposable
         _gl.Uniform3(loc, value.X, value.Y, value.Z);
     }
 
+    /// <summary>Sets a fixed-size vec3 array uniform (point light positions/colors).</summary>
+    public void SetUniformArray3(string name, Vector3[] values)
+    {
+        for (var i = 0; i < values.Length; i++)
+        {
+            var loc = GetUniformLocation($"{name}[{i}]");
+            _gl.Uniform3(loc, values[i].X, values[i].Y, values[i].Z);
+        }
+    }
+
     public void SetUniform(string name, Vector4 value)
     {
         var loc = GetUniformLocation(name);

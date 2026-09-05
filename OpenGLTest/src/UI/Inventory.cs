@@ -14,10 +14,13 @@ namespace silkgltriangle;
 /// </summary>
 public class Inventory
 {
-    public const int SlotCount = 5;
+    public const int SlotCount = 6;
 
     /// <summary>How much TNT the player starts with.</summary>
     public const int StartingTnt = 50;
+
+    /// <summary>How many lamps the player starts with (lamps are not generated in terrain).</summary>
+    public const int StartingLamps = 64;
 
     // A pickup makes the slot's icon jump and settle back, so a count change is visible even
     // though the count itself isn't drawn yet
@@ -112,7 +115,7 @@ public class Inventory
         return slots;
     }
 
-    // The player spawns holding TNT; everything else is earned by mining
+    // The player spawns holding TNT and lamps; everything else is earned by mining
     private static int[] BuildCounts()
     {
         var counts = new int[SlotCount];
@@ -120,6 +123,8 @@ public class Inventory
         for (var i = 0; i < ids.Length; i++)
             if (ids[i] == BlockType.Tnt)
                 counts[i] = StartingTnt;
+            else if (ids[i] == BlockType.Lamp)
+                counts[i] = StartingLamps;
         return counts;
     }
 

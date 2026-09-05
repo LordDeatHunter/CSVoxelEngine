@@ -83,6 +83,7 @@ public static class Program
 
     private static void OnRender(double deltaTime)
     {
+        renderManager.SetLighting(windowManager.Window.Time, world.Camera, world.PrimedTnt);
         renderManager.BeginFrame();
         world.Render(renderManager);
         world.RenderUI(renderManager);

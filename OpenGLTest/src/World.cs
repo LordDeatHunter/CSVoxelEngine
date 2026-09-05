@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
 using Silk.NET.Input;
@@ -45,6 +46,9 @@ public class World
 
     /// <summary>The player's hotbar; its selected slot decides what block placing puts down.</summary>
     public Inventory Inventory { get; } = new();
+
+    /// <summary>Live primed TNT, feeding the renderer's dynamic point lights.</summary>
+    public IReadOnlyList<PrimedTnt> PrimedTnt => _tntManager.Primed;
 
     // Break overlay strength. Quantized to whole hits, so it steps with the damage dealt
     // instead of sweeping continuously.

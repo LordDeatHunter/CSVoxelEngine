@@ -11,6 +11,7 @@ public class BlockType
     public const byte Stone = 3;
     public const byte Cobblestone = 4;
     public const byte Tnt = 5;
+    public const byte Lamp = 6;
 
     public static readonly Dictionary<byte, BlockType> Types = new()
     {
@@ -19,10 +20,17 @@ public class BlockType
         { 3, new BlockType(new Point(0, 1), new Point(0, 1), new Point(0, 1)) }, // stone
         { 4, new BlockType(new Point(3, 0), new Point(3, 0), new Point(3, 0)) }, // cobblestone
         { 5, new BlockType(new Point(2, 1), new Point(2, 1), new Point(1, 1)) }, // tnt
+        { 6, new BlockType(new Point(3, 1), new Point(3, 1), new Point(3, 1)) }, // lamp
     };
 
     // Array-indexed view of Types for the meshing hot path (no dictionary hashing per block)
     public static readonly BlockType?[] ById = BuildById();
+
+    /// <summary>
+    /// Light emitted by each block id (0-15), indexed like <see cref="ById"/>. Only the lamp
+    /// glows; everything else is lit by the sun or by flood-filled lamp light.
+    /// </summary>
+    public static readonly byte[] Emission = BuildEmission();
 
     // Hits a block takes before it breaks; one hit lands per World.BlockHitSeconds of mining
     public const int DefaultMaxHealth = 5;
@@ -49,6 +57,13 @@ public class BlockType
         foreach (var (id, type) in Types)
             byId[id] = type;
         return byId;
+    }
+
+    private static byte[] BuildEmission()
+    {
+        var emission = new byte[256];
+        emission[Lamp] = 15;
+        return emission;
     }
 
     /// <summary>Block id dropped when a block is mined; stone drops cobblestone, TNT drops

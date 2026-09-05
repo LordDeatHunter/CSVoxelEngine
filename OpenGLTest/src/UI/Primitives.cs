@@ -82,11 +82,12 @@ public static class Primitives
             var shaded = faceShades.IsEmpty ? tint : Shade(tint, faceShades[face]);
             // CubeFaces positions span the 0..1 unit cube, so recentre before scaling
             var positions = Chunk.CubeFaces[face].face;
+            var normal = Chunk.CubeFaces[face].normal;
 
             for (var corner = 0; corner < CornersPerFace; corner++)
             {
                 var position = (positions[corner] - new Vector3(0.5f)) * size;
-                vertices[face * CornersPerFace + corner] = Vert(position, shaded, corners[corner]);
+                vertices[face * CornersPerFace + corner] = Vert(position, shaded, corners[corner], normal);
             }
 
             var offset = (ushort)(face * CornersPerFace);
@@ -121,8 +122,8 @@ public static class Primitives
         return CreateCube(gl, size, Rgba.White, faceUvs, faceShades);
     }
 
-    private static Vertex Vert(Vector3 position, Rgba color, Vector2 uv) =>
-        new(position, color.R, color.G, color.B, color.A, uv);
+    private static Vertex Vert(Vector3 position, Rgba color, Vector2 uv, Vector3? normal = null) =>
+        new(position, color.R, color.G, color.B, color.A, uv, 1f, 0f, normal);
 
     private static Rgba Shade(Rgba color, float factor) =>
         Rgba.FromFloat(color.R / 255f * factor, color.G / 255f * factor, color.B / 255f * factor,

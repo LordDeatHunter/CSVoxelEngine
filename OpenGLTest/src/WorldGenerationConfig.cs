@@ -25,6 +25,31 @@ public static class WorldGenerationConfig
     // Delay when no chunks need generating (ms)
     public const int GenerationDelayIdleMs = 200;
 
+    // --- Lighting ---
+    // Full day/night cycle length in seconds (sun orbit + sky + light modulation)
+    public const float DayLengthSeconds = 600f;
+
+    // Directional shadow map resolution (depth texture is Size x Size)
+    public const int ShadowMapSize = 2048;
+
+    // Half-extent in blocks of the shadow camera's ortho box around the view target
+    public const float ShadowRadiusBlocks = 90f;
+
+    // Farthest chunk-center distance (blocks) that still casts into the shadow map
+    public const float ShadowCasterRadiusBlocks = 110f;
+
+    // Dynamic point lights in the world shader (primed TNT strobes); lamp glow is baked
+    public const int MaxPointLights = 8;
+
+    // Distance fog that blends far terrain into the sky (also hides the LOD edge at night)
+    public const float FogNearBlocks = 200f;
+    public const float FogFarBlocks = 1800f;
+
+    // Sunlight and lamp light spread through air losing one level per block from a max
+    // of 15, so one edited block can change light up to this far away. Block edits must
+    // remesh every chunk in this radius, not just face-adjacent ones.
+    public const int LightPropagationRadius = 15;
+
     // --- Far-terrain LOD ---
     // Level definitions (cell sizes, per-level radii) live in LodRegion.Levels.
 

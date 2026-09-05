@@ -243,6 +243,7 @@ public class LodRegion : IDisposable
             ];
 
             var face = Chunk.CubeFaces[faceIndex].face;
+            var normal = Chunk.CubeFaces[faceIndex].normal;
             var indexOffset = (ushort)vertices.Count;
             for (var c = 0; c < 4; c++)
             {
@@ -250,7 +251,8 @@ public class LodRegion : IDisposable
                 if (pos.Y < yMin) yMin = pos.Y;
                 if (pos.Y > yMax) yMax = pos.Y;
                 var shade = shades[c];
-                vertices.Add(new Vertex(pos, shade, shade, shade, 255, uv[c]));
+                // Far shells sit in open sky: full sun, no lamp light, real face normal
+                vertices.Add(new Vertex(pos, shade, shade, shade, 255, uv[c], 1f, 0f, normal));
             }
 
             indices.Add((ushort)(indexOffset + 0));

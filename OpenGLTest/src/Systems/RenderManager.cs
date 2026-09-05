@@ -22,11 +22,32 @@ public class RenderManager : IDisposable
     private uint faceVao;
     private uint faceVbo;
 
+    // Directional shadow mapping is parked (see SampleShadow in test-fragment.glsl);
+    // when it comes back, the shadow FBO / light-space matrix live here again.
+    private Vector2D<int> _viewportSize;
+
+    // Per-frame lighting state, pushed once per frame via SetLighting and applied
+    // to the world shader by every world draw through ApplyLightingUniforms
+    private Vector3 _sunDir = Vector3.UnitY;
+    private Vector3 _sunColor = Vector3.One;
+    private float _sunIntensity = 1f;
+    private Vector3 _ambient = new(0.42f, 0.45f, 0.52f);
+    private readonly Vector3 _torchColor = new(1f, 0.62f, 0.25f);
+    private const float TorchIntensity = 1.2f;
+    private Vector3 _fogColor = new(0.3f, 0.6f, 0.9f);
+    private Vector3 _skyColor = new(0.3f, 0.6f, 0.9f);
+    private Vector3 _cameraPos;
+    private float _time;
+    private readonly Vector3[] _pointPos = new Vector3[WorldGenerationConfig.MaxPointLights];
+    private readonly Vector3[] _pointColors = new Vector3[WorldGenerationConfig.MaxPointLights];
+    private int _pointCount;
+
     public RenderManager(IWindow window)
     {
         gl = window.CreateOpenGL();
         gl.Enable(GLEnum.DepthTest);
         gl.DepthFunc(GLEnum.Lequal);
+        _viewportSize = window.Size;
 
         LoadResources();
     }
@@ -43,6 +64,9 @@ public class RenderManager : IDisposable
         textureAtlas = TextureLoader.LoadFromFile(gl, "assets/textures/atlas.png");
 
         worldShader = new Shader(gl, vs, fs);
+        // SetUniform writes to the currently bound program, so bind first — otherwise
+        // the sampler unit silently stays at its default.
+        worldShader.Use();
         worldShader.SetUniform("uTextureAtlas", 0);
 
         selectionShader = new Shader(gl, selectionVs, selectionFs);
@@ -55,15 +79,111 @@ public class RenderManager : IDisposable
 
     public void SetViewport(Vector2D<int> size)
     {
+        _viewportSize = size;
         gl.Viewport(size);
     }
+
+    /// <summary>
+    /// Advances the day/night cycle and pushes the resulting sun, sky and point-light
+    /// state into the per-frame fields. Called once per frame before <see cref="BeginFrame"/>;
+    /// every world draw applies the state through <see cref="ApplyLightingUniforms"/>.
+    /// </summary>
+    public void SetLighting(double time, Camera? camera, IReadOnlyList<PrimedTnt>? primed)
+    {
+        _time = (float)time;
+        if (camera != null)
+            _cameraPos = camera.Position;
+
+        // The sun orbits once per DayLengthSeconds; the phase starts it mid-morning
+        var angle = (float)(time / WorldGenerationConfig.DayLengthSeconds) * MathF.Tau + 0.8f;
+        _sunDir = Vector3.Normalize(new Vector3(MathF.Cos(angle), MathF.Sin(angle), 0.35f));
+        var elevation = _sunDir.Y;
+
+        // Parked: the shadow camera (ortho box + light-space matrix) used the elevation
+        // to disable itself at night; it will again when shadows come back.
+        var dayness = Smooth01((elevation + 0.08f) / 0.33f);
+        var duskAmount = elevation > -0.1f ? Math.Clamp(1f - MathF.Abs(elevation) * 5f, 0f, 1f) : 0f;
+
+        _sunColor = Mix(new Vector3(0.3f, 0.4f, 0.7f), new Vector3(1f, 0.96f, 0.88f), dayness);
+        _sunColor = Mix(_sunColor, new Vector3(1f, 0.5f, 0.25f), duskAmount * 0.55f);
+        _sunIntensity = 0.05f + 1.2f * dayness;
+
+        _ambient = Mix(new Vector3(0.06f, 0.07f, 0.11f), new Vector3(0.42f, 0.45f, 0.52f), dayness);
+
+        _skyColor = Mix(new Vector3(0.012f, 0.018f, 0.045f), new Vector3(0.3f, 0.6f, 0.9f), dayness);
+        _skyColor = Mix(_skyColor, new Vector3(0.98f, 0.45f, 0.2f), duskAmount * 0.5f);
+        // Fog melts the far terrain (and the LOD edge) into the sky, day and night
+        _fogColor = _skyColor;
+
+        // Primed TNT strobes feed the dynamic point lights; lamp glow is baked voxel light
+        _pointCount = 0;
+        if (primed != null)
+        {
+            foreach (var tnt in primed)
+            {
+                if (_pointCount >= WorldGenerationConfig.MaxPointLights) break;
+                _pointPos[_pointCount] = tnt.Position;
+                var flash = tnt.WhiteFlash;
+                _pointColors[_pointCount] = new Vector3(1f, 0.45f, 0.15f) * 1.2f
+                    + new Vector3(1f, 0.9f, 0.8f) * (flash * 2f);
+                _pointCount++;
+            }
+        }
+        for (var i = _pointCount; i < WorldGenerationConfig.MaxPointLights; i++)
+        {
+            _pointPos[i] = Vector3.Zero;
+            _pointColors[i] = Vector3.Zero;
+        }
+
+    }
+
+    private static float Smooth01(float t)
+    {
+        t = Math.Clamp(t, 0f, 1f);
+        return t * t * (3f - 2f * t);
+    }
+
+    private static Vector3 Mix(Vector3 a, Vector3 b, float t) => a + (b - a) * Math.Clamp(t, 0f, 1f);
 
     public void BeginFrame()
     {
         worldShader.Use();
-        gl.ClearColor(0.3f, 0.6f, 0.9f, 1f);
+        gl.ClearColor(_skyColor.X, _skyColor.Y, _skyColor.Z, 1f);
         gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         gl.Enable(EnableCap.Blend);
+    }
+
+    /// <summary>
+    /// Binds the world texture (atlas on unit 0) for a world draw.
+    /// </summary>
+    private void BindWorldTextures()
+    {
+        gl.ActiveTexture(TextureUnit.Texture0);
+        gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
+    }
+
+    /// <summary>
+    /// Pushes the per-frame lighting state plus this draw's model matrix to the world
+    /// shader. The vertex shader needs uModel for world positions and normals.
+    /// </summary>
+    private void ApplyLightingUniforms(Matrix4x4 model)
+    {
+        worldShader.SetUniform("uModel", model);
+        worldShader.SetUniform("uTime", _time);
+        worldShader.SetUniform("uSunDir", _sunDir);
+        worldShader.SetUniform("uSunColor", _sunColor);
+        worldShader.SetUniform("uSunIntensity", _sunIntensity);
+        worldShader.SetUniform("uAmbient", _ambient);
+        worldShader.SetUniform("uTorchColor", _torchColor);
+        worldShader.SetUniform("uTorchIntensity", TorchIntensity);
+        worldShader.SetUniform("uFogColor", _fogColor);
+        worldShader.SetUniform("uFogNear", WorldGenerationConfig.FogNearBlocks);
+        worldShader.SetUniform("uFogFar", WorldGenerationConfig.FogFarBlocks);
+        worldShader.SetUniform("uCameraPos", _cameraPos);
+        worldShader.SetUniform("uNumPointLights", _pointCount);
+        worldShader.SetUniformArray3("uPointPos", _pointPos);
+        worldShader.SetUniformArray3("uPointColor", _pointColors);
+        worldShader.SetUniform("uFlash", 0f);
     }
 
     // Reused across frames to avoid a per-frame allocation
@@ -74,9 +194,7 @@ public class RenderManager : IDisposable
         if (camera == null) return;
 
         worldShader.Use();
-        worldShader.SetUniform("uTime", (float)time);
-        gl.ActiveTexture(TextureUnit.Texture0);
-        gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
+        BindWorldTextures();
 
         var viewProj = camera.GetViewProjection();
         var frustum = new Frustum(viewProj);
@@ -107,9 +225,10 @@ public class RenderManager : IDisposable
         foreach (var (chunk, _) in _visibleChunks)
         {
             chunk.lifetime += 1.0 / 60.0; // TODO: Pass delta time eventually
-            
-            var mvp = Matrix4x4.CreateTranslation(chunk.Position * Chunk.Size) * viewProj;
-            worldShader.SetUniform("uMVP", mvp);
+
+            var model = Matrix4x4.CreateTranslation(chunk.Position * Chunk.Size);
+            ApplyLightingUniforms(model);
+            worldShader.SetUniform("uMVP", model * viewProj);
             worldShader.SetUniform("uAlpha", MathF.Min(1F, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
 
             chunk.Render();
@@ -127,8 +246,7 @@ public class RenderManager : IDisposable
         if (camera == null) return;
 
         worldShader.Use();
-        gl.ActiveTexture(TextureUnit.Texture0);
-        gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
+        BindWorldTextures();
 
         var viewProj = camera.GetViewProjection();
         var frustum = new Frustum(viewProj);
@@ -165,6 +283,7 @@ public class RenderManager : IDisposable
             region.Lifetime += 1.0 / 60.0;
 
             var model = Matrix4x4.CreateTranslation(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks);
+            ApplyLightingUniforms(model);
             worldShader.SetUniform("uMVP", model * viewProj);
             worldShader.SetUniform("uAlpha", MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)));
 
@@ -183,13 +302,13 @@ public class RenderManager : IDisposable
         if (mesh == null) return;
 
         worldShader.Use();
-        gl.ActiveTexture(TextureUnit.Texture0);
-        gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
+        BindWorldTextures();
 
         // The cube is centred on its own origin, so scaling happens about the block's centre
         var model = Matrix4x4.CreateScale(scale)
                     * Matrix4x4.CreateTranslation(blockPosition + new Vector3(0.5f));
 
+        ApplyLightingUniforms(model);
         worldShader.SetUniform("uMVP", model * camera.GetViewProjection());
         worldShader.SetUniform("uAlpha", 1f);
 
@@ -204,9 +323,7 @@ public class RenderManager : IDisposable
         if (camera == null || drops.Count == 0) return;
 
         worldShader.Use();
-        worldShader.SetUniform("uAlpha", 1f);
-        gl.ActiveTexture(TextureUnit.Texture0);
-        gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
+        BindWorldTextures();
 
         var viewProj = camera.GetViewProjection();
 
@@ -220,7 +337,9 @@ public class RenderManager : IDisposable
                         * Matrix4x4.CreateRotationY(drop.Spin)
                         * Matrix4x4.CreateTranslation(drop.Position);
 
+            ApplyLightingUniforms(model);
             worldShader.SetUniform("uMVP", model * viewProj);
+            worldShader.SetUniform("uAlpha", 1f);
             mesh.Render();
         }
     }
@@ -234,9 +353,7 @@ public class RenderManager : IDisposable
         if (camera == null || primed.Count == 0) return;
 
         worldShader.Use();
-        worldShader.SetUniform("uAlpha", 1f);
-        gl.ActiveTexture(TextureUnit.Texture0);
-        gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
+        BindWorldTextures();
 
         var viewProj = camera.GetViewProjection();
 
@@ -249,12 +366,12 @@ public class RenderManager : IDisposable
             var model = Matrix4x4.CreateScale(tnt.Scale)
                         * Matrix4x4.CreateTranslation(tnt.Position);
 
+            ApplyLightingUniforms(model);
             worldShader.SetUniform("uMVP", model * viewProj);
+            worldShader.SetUniform("uAlpha", 1f);
             worldShader.SetUniform("uFlash", tnt.WhiteFlash);
             mesh.Render();
         }
-
-        worldShader.SetUniform("uFlash", 0f);
     }
 
     /// <summary>

@@ -24,6 +24,17 @@ public class Chunk : IDisposable
     private const int PaddedSq = Padded * Padded;
     private const int PaddedCount = Padded * PaddedSq;
 
+    // Voxel light travels up to LightPropagationRadius blocks through air, so it is
+    // computed over a wider volume centered on this chunk: a lamp just across the
+    // border must still light this chunk's faces. The 3x3x3 neighbor chunks cover it
+    // (LightBorder < Size). A padded-snapshot index (px,py,pz) maps to light index
+    // (px+LightOffset, py+LightOffset, pz+LightOffset).
+    private const int LightBorder = WorldGenerationConfig.LightPropagationRadius;
+    private const int LightSize = Size + LightBorder * 2;
+    private const int LightSq = LightSize * LightSize;
+    private const int LightCount = LightSize * LightSq;
+    private const int LightOffset = LightBorder - 1;
+
     internal const int AtlasTilesPerSide = 4;
     internal const float TileUVSize = 1f / AtlasTilesPerSide;
 
@@ -65,6 +76,8 @@ public class Chunk : IDisposable
 
     // Meshing lookup tables, flattened from CubeFaces/AONeighbors into padded-snapshot index deltas
     private static readonly int[] FaceNeighborDelta = new int[6];
+    // Same face normals as light-volume index deltas, for the air cell in front of a face
+    private static readonly int[] LightFaceDelta = new int[6];
     private static readonly int[][] AODeltas = new int[6][]; // 12 per face: (side1, side2, corner) x 4 corners
     internal static readonly float[] FaceBrightness = [0.85f, 0.95f, 0.8f, 0.9f, 1.0f, 0.75f]; // matches CubeFaces order
     internal static readonly byte[] ShadeLut = new byte[6 * 4]; // [face * 4 + ao]
@@ -74,6 +87,8 @@ public class Chunk : IDisposable
         for (var i = 0; i < 6; i++)
         {
             FaceNeighborDelta[i] = PaddedDelta(CubeFaces[i].normal);
+            var n = CubeFaces[i].normal;
+            LightFaceDelta[i] = (int)n.X * LightSq + (int)n.Y * LightSize + (int)n.Z;
 
             var deltas = new int[12];
             for (var j = 0; j < 4; j++)
@@ -91,6 +106,165 @@ public class Chunk : IDisposable
 
     private static int PaddedDelta(Vector3 offset) =>
         (int)offset.X * PaddedSq + (int)offset.Y * Padded + (int)offset.Z;
+
+    private static int FloorDiv(int a, int b) => a >= 0 ? a / b : -((-a + b - 1) / b);
+
+    /// <summary>Terrain height at a world (x, z) column, via the cached heightmaps.</summary>
+    private static int ColumnHeight(int worldX, int worldZ)
+    {
+        var cx = FloorDiv(worldX, Size);
+        var cz = FloorDiv(worldZ, Size);
+        var lx = worldX - cx * Size;
+        var lz = worldZ - cz * Size;
+        return GetColumnHeights(cx, cz)[(lx << SizeShift) | lz];
+    }
+
+    /// <summary>
+    /// Copies the LightSize^3 block volume centered on this chunk straight from the 3x3x3
+    /// neighboring chunks' block arrays, so the fill loop does zero dictionary lookups.
+    /// Missing or not-yet-ready neighbors read as air; meshing already requires the 6 face
+    /// neighbors, and QueueChunk dirties neighbors when later chunks stream in, so any
+    /// transient leak heals as the world loads. Same thread-safety convention as
+    /// FillPaddedSnapshot (block edits race the read; the edit's own remesh wins after).
+    /// </summary>
+    private void FillLightSnapshot(byte[] light, ChunkManager chunkManager)
+    {
+        var neighbors = new Chunk?[27];
+        for (var cx = 0; cx < 3; cx++)
+        for (var cy = 0; cy < 3; cy++)
+        for (var cz = 0; cz < 3; cz++)
+        {
+            var ni = (cx * 3 + cy) * 3 + cz;
+            if (ni == 13)
+            {
+                neighbors[ni] = this;
+                continue;
+            }
+
+            var pos = Position + new Vector3(cx - 1, cy - 1, cz - 1);
+            if (chunkManager.Chunks.TryGetValue(pos, out var neighbor) && neighbor.IsBlockDataReady)
+                neighbors[ni] = neighbor;
+        }
+
+        // Per-axis map from volume coordinate to (chunk 0..2, local block 0..15). The volume
+        // spans LightBorder cells into each neighbor: [1, LightBorder) of the previous
+        // chunk, the full own chunk, then [0, LightBorder) of the next one.
+        Span<int> mapChunk = stackalloc int[LightSize];
+        Span<int> mapLocal = stackalloc int[LightSize];
+        for (var l = 0; l < LightSize; l++)
+        {
+            if (l < LightBorder) { mapChunk[l] = 0; mapLocal[l] = l + 1; }
+            else if (l < LightBorder + Size) { mapChunk[l] = 1; mapLocal[l] = l - LightBorder; }
+            else { mapChunk[l] = 2; mapLocal[l] = l - LightBorder - Size; }
+        }
+
+        for (var lx = 0; lx < LightSize; lx++)
+        for (var ly = 0; ly < LightSize; ly++)
+        {
+            var rowBase = (lx * LightSize + ly) * LightSize;
+            var neighborRow = (mapChunk[lx] * 3 + mapChunk[ly]) * 3;
+            var blockRow = (mapLocal[lx] << (2 * SizeShift)) | (mapLocal[ly] << SizeShift);
+            for (var lz = 0; lz < LightSize; lz++)
+            {
+                var neighbor = neighbors[neighborRow + mapChunk[lz]];
+                light[rowBase + lz] = neighbor?._blocks[blockRow | mapLocal[lz]] ?? 0;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Flood-fills skylight and lamp light over the wide light snapshot (see
+    /// FillLightSnapshot), so lamps and skylight changes up to LightPropagationRadius
+    /// blocks away still light this chunk's faces. Sun seeds are air cells at or above
+    /// the terrain height (nothing generated is ever solid above it); lamp seeds are
+    /// emissive cells. Both spread through air losing one level per block, so caves and
+    /// overhangs fall off into darkness. All inputs are local (snapshot + height cache),
+    /// so this is thread-safe and needs no cross-chunk state. Seeds all enter at the same
+    /// max level, so a FIFO queue visits every cell at its final level first, each cell is
+    /// enqueued at most once, and the caller-sized queue never overflows.
+    /// <paramref name="sun"/> and <paramref name="block"/> must be zeroed and hold at
+    /// least LightCount entries each, as must <paramref name="queue"/>.
+    /// </summary>
+    private void ComputeLight(byte[] light, byte[] sun, byte[] block, int[] queue)
+    {
+        var worldX0 = (int)Position.X * Size - LightBorder;
+        var worldY0 = LowerBoundY - LightBorder;
+        var worldZ0 = (int)Position.Z * Size - LightBorder;
+
+        var head = 0;
+        var tail = 0;
+
+        // Sunlight seeds: air cells at or above the terrain height see the sky directly.
+        for (var lx = 0; lx < LightSize; lx++)
+        {
+            var worldX = worldX0 + lx;
+            for (var lz = 0; lz < LightSize; lz++)
+            {
+                var height = ColumnHeight(worldX, worldZ0 + lz);
+                var columnBase = (lx * LightSize) * LightSize + lz;
+                for (var ly = 0; ly < LightSize; ly++)
+                {
+                    var i = columnBase + ly * LightSize;
+                    if (light[i] != BlockType.Air) continue;
+                    if (worldY0 + ly >= height)
+                    {
+                        sun[i] = 15;
+                        queue[tail++] = i;
+                    }
+                }
+            }
+        }
+
+        SpreadLight(light, sun, queue, ref head, ref tail);
+
+        // Lamp seeds: emissive cells glow at full strength, then spread like sunlight.
+        head = 0;
+        tail = 0;
+        for (var i = 0; i < LightCount; i++)
+        {
+            var emission = BlockType.Emission[light[i]];
+            if (emission == 0) continue;
+            block[i] = emission;
+            queue[tail++] = i;
+        }
+
+        SpreadLight(light, block, queue, ref head, ref tail);
+    }
+
+    /// <summary>One BFS pass: spreads <paramref name="levels"/> through air cells of the
+    /// light snapshot, losing one level per block. Shared by the sun and lamp passes.</summary>
+    private static void SpreadLight(byte[] light, byte[] levels, int[] queue, ref int head, ref int tail)
+    {
+        while (head < tail)
+        {
+            var c = queue[head++];
+            var level = levels[c];
+            if (level <= 1) continue;
+            var next = (byte)(level - 1);
+
+            var lx = c / LightSq;
+            var rem = c - lx * LightSq;
+            var ly = rem / LightSize;
+            var lz = rem - ly * LightSize;
+
+            if (lx > 0 && light[c - LightSq] == BlockType.Air && levels[c - LightSq] < next)
+                { levels[c - LightSq] = next; queue[tail++] = c - LightSq; }
+            if (lx < LightSize - 1 && light[c + LightSq] == BlockType.Air && levels[c + LightSq] < next)
+                { levels[c + LightSq] = next; queue[tail++] = c + LightSq; }
+            if (ly > 0 && light[c - LightSize] == BlockType.Air && levels[c - LightSize] < next)
+                { levels[c - LightSize] = next; queue[tail++] = c - LightSize; }
+            if (ly < LightSize - 1 && light[c + LightSize] == BlockType.Air && levels[c + LightSize] < next)
+                { levels[c + LightSize] = next; queue[tail++] = c + LightSize; }
+            if (lz > 0 && light[c - 1] == BlockType.Air && levels[c - 1] < next)
+                { levels[c - 1] = next; queue[tail++] = c - 1; }
+            if (lz < LightSize - 1 && light[c + 1] == BlockType.Air && levels[c + 1] < next)
+                { levels[c + 1] = next; queue[tail++] = c + 1; }
+        }
+    }
+
+    /// <summary>Light-volume index of a chunk-local block.</summary>
+    private static int LightIdx(int x, int y, int z) =>
+        ((x + LightBorder) * LightSize + (y + LightBorder)) * LightSize + (z + LightBorder);
 
     /// <summary>Flat index of a chunk-local block; shared with the WorldGen carvers.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -262,42 +436,28 @@ public class Chunk : IDisposable
     }
 
     /// <summary>
-    /// Remeshes this chunk right away and schedules its 6 neighbours for remeshing, so a batch
-    /// edit that already cleared the blocks (see <see cref="ClearBlockAt"/>) becomes visible.
+    /// Remeshes this chunk right away and schedules everything in light radius for
+    /// remeshing, so a batch edit that already cleared the blocks (see
+    /// <see cref="ClearBlockAt"/>) becomes visible with correct light.
     /// </summary>
     public void RemeshAfterBatchEdit(ChunkManager chunkManager)
     {
         chunkManager.ImmediateRemesh(Position);
-        foreach (var offset in NeighborOffsets)
-        {
-            var neighborPos = Position + offset;
-            if (chunkManager.Chunks.ContainsKey(neighborPos))
-                chunkManager.MarkDirty(neighborPos);
-        }
+        var min = Position * Size;
+        chunkManager.MarkAreaDirty(min, min + new Vector3(Size),
+            WorldGenerationConfig.LightPropagationRadius, skip: Position);
     }
 
+    /// <summary>
+    /// Schedules every chunk in voxel-light radius of an edited block for remeshing, so
+    /// lamp glow and skylight changes propagate their full 15 blocks instead of stopping
+    /// at the edited chunk's border. The edited chunk itself was already remeshed
+    /// synchronously by the caller and is skipped.
+    /// </summary>
     private void MarkNeighborsDirty(Vector3 worldPos, ChunkManager chunkManager)
     {
-        HashSet<Vector3> chunksForUpdate = [];
-        foreach (var neighborOffset in NeighborOffsets)
-        {
-            var neighborPos = worldPos + neighborOffset;
-            var chunkPos = new Vector3(
-                MathF.Floor(neighborPos.X / Size),
-                MathF.Floor(neighborPos.Y / Size),
-                MathF.Floor(neighborPos.Z / Size)
-            );
-
-            if (chunkManager.Chunks.TryGetValue(chunkPos, out var neighbor))
-            {
-                chunksForUpdate.Add(neighbor.Position);
-            }
-        }
-
-        foreach (var chunkPos in chunksForUpdate)
-        {
-            chunkManager.MarkDirty(chunkPos);
-        }
+        chunkManager.MarkAreaDirty(worldPos, worldPos + Vector3.One,
+            WorldGenerationConfig.LightPropagationRadius, skip: Position);
     }
 
     private static bool InBounds(int x, int y, int z)
@@ -309,14 +469,29 @@ public class Chunk : IDisposable
             return new ChunkMeshData([], []);
 
         var padded = ArrayPool<byte>.Shared.Rent(PaddedCount);
+        // Rented arrays arrive dirty: the light snapshot is fully overwritten by the fill,
+        // but the outputs must start at zero. Oversized rents are fine — everything below
+        // only touches the first LightCount entries.
+        var lightBlocks = ArrayPool<byte>.Shared.Rent(LightCount);
+        var sunLight = ArrayPool<byte>.Shared.Rent(LightCount);
+        var blockLight = ArrayPool<byte>.Shared.Rent(LightCount);
+        var queue = ArrayPool<int>.Shared.Rent(LightCount);
         try
         {
             FillPaddedSnapshot(padded, chunkManager);
-            return GenerateMeshDataFromSnapshot(padded);
+            FillLightSnapshot(lightBlocks, chunkManager);
+            Array.Clear(sunLight, 0, LightCount);
+            Array.Clear(blockLight, 0, LightCount);
+            ComputeLight(lightBlocks, sunLight, blockLight, queue);
+            return GenerateMeshDataFromSnapshot(padded, sunLight, blockLight);
         }
         finally
         {
             ArrayPool<byte>.Shared.Return(padded);
+            ArrayPool<byte>.Shared.Return(lightBlocks);
+            ArrayPool<byte>.Shared.Return(sunLight);
+            ArrayPool<byte>.Shared.Return(blockLight);
+            ArrayPool<int>.Shared.Return(queue);
         }
     }
 
@@ -365,7 +540,7 @@ public class Chunk : IDisposable
         }
     }
 
-    private ChunkMeshData GenerateMeshDataFromSnapshot(byte[] padded)
+    private ChunkMeshData GenerateMeshDataFromSnapshot(byte[] padded, byte[] sunLight, byte[] blockLight)
     {
         var vertices = new List<Vertex>(4096);
         var indices = new List<ushort>(6144);
@@ -387,7 +562,15 @@ public class Chunk : IDisposable
 
             for (var i = 0; i < 6; i++)
             {
-                if (padded[pIdx + FaceNeighborDelta[i]] != 0) continue;
+                var faceCell = pIdx + FaceNeighborDelta[i];
+                if (padded[faceCell] != 0) continue;
+
+                // Light of the air cell in front of the face, from the wide light volume
+                // (so lamps across the chunk border still reach); AO still varies corners
+                var lightCell = LightIdx(x, y, z) + LightFaceDelta[i];
+                var sun = sunLight[lightCell] / 15f;
+                var block = blockLight[lightCell] / 15f;
+                var normal = CubeFaces[i].normal;
 
                 var tile = type.FaceTiles[i];
                 var u0 = tile.X * TileUVSize;
@@ -409,7 +592,7 @@ public class Chunk : IDisposable
                     var ao = VertexAO(side1, side2, corner);
                     var shade = ShadeLut[(i << 2) | ao];
 
-                    vertices.Add(new Vertex(basePos + face[j], shade, shade, shade, 255, uv[j]));
+                    vertices.Add(new Vertex(basePos + face[j], shade, shade, shade, 255, uv[j], sun, block, normal));
                 }
 
                 indices.Add((ushort)(indexOffset + 0));
