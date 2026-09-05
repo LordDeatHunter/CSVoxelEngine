@@ -744,9 +744,6 @@ public class Chunk : IDisposable
         var face = CubeFaces[i].face;
         var aoDeltas = AODeltas[i];
 
-        Span<Vector2> uv = stackalloc Vector2[4];
-        SetTileUv(tile, uv);
-
         for (var j = 0; j < 4; j++)
         {
             var corner = face[j];
@@ -757,11 +754,13 @@ public class Chunk : IDisposable
             var ao = VertexAO(side1, side2, occluder);
             var shade = ShadeLut[(i << 2) | ao];
 
-            var pos = basePos + new Vector3(
+            var local = new Vector3(
                 corner.X == 0 ? c - w : c + w,
                 top ? 1f : 0f,
                 corner.Z == 0 ? c - w : c + w);
-            vertices.Add(new Vertex(pos, shade, shade, shade, 255, uv[j], sun, block, CubeFaces[i].normal));
+            var pos = basePos + local;
+            vertices.Add(new Vertex(pos, shade, shade, shade, 255,
+                CropUv(tile, i, local), sun, block, CubeFaces[i].normal));
         }
 
         indices.Add((ushort)(indexOffset + 0));
@@ -774,8 +773,8 @@ public class Chunk : IDisposable
     }
 
     /// <summary>
-    /// One horizontal limb from the core surface (never from the centre, so arm walls meet core
-    /// walls edge-on with no coplanar overlap) to the cell face toward a wood neighbour.
+    /// One horizontal limb from the node wall (so arm walls meet node walls edge-on with no
+    /// coplanar overlap) to the cell face toward a wood neighbour.
     /// The end cap draws only into a narrower neighbour's mouth; equal or wider wood and full
     /// cubes already close the joint.
     /// </summary>
@@ -814,14 +813,12 @@ public class Chunk : IDisposable
                 type.Top, ShadeLut[(dir << 2) | 3], sunF[dir], blockF[dir]);
     }
 
-    /// <summary>One axis-aligned face of the [min, max] box (cell-local), with flat shading.</summary>
+    /// <summary>One axis-aligned face of the [min, max] box (cell-local), with flat shading
+    /// and cropped UVs (see <see cref="CropUv"/>).</summary>
     private static void EmitBoxFace(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         Vector3 basePos, Vector3 min, Vector3 max, int face,
         BlockType.Point tile, byte shade, float sun, float block)
     {
-        Span<Vector2> uv = stackalloc Vector2[4];
-        SetTileUv(tile, uv);
-
         var (a, b, c, d) = face switch
         {
             0 => (new Vector3(min.X, min.Y, min.Z), new Vector3(min.X, max.Y, min.Z),
@@ -839,10 +836,10 @@ public class Chunk : IDisposable
         };
 
         var normal = CubeFaces[face].normal;
-        vertices.Add(new Vertex(basePos + a, shade, shade, shade, 255, uv[0], sun, block, normal));
-        vertices.Add(new Vertex(basePos + b, shade, shade, shade, 255, uv[1], sun, block, normal));
-        vertices.Add(new Vertex(basePos + c, shade, shade, shade, 255, uv[2], sun, block, normal));
-        vertices.Add(new Vertex(basePos + d, shade, shade, shade, 255, uv[3], sun, block, normal));
+        vertices.Add(new Vertex(basePos + a, shade, shade, shade, 255, CropUv(tile, face, a), sun, block, normal));
+        vertices.Add(new Vertex(basePos + b, shade, shade, shade, 255, CropUv(tile, face, b), sun, block, normal));
+        vertices.Add(new Vertex(basePos + c, shade, shade, shade, 255, CropUv(tile, face, c), sun, block, normal));
+        vertices.Add(new Vertex(basePos + d, shade, shade, shade, 255, CropUv(tile, face, d), sun, block, normal));
 
         indices.Add((ushort)(indexOffset + 0));
         indices.Add((ushort)(indexOffset + 1));
@@ -853,15 +850,29 @@ public class Chunk : IDisposable
         indexOffset += 4;
     }
 
-    /// <summary>Atlas UVs for a tile in quad-corner order, matching the cube-face emission.</summary>
-    private static void SetTileUv(BlockType.Point tile, Span<Vector2> uv)
+    /// <summary>
+    /// Atlas UVs sampling the tile sub-region under a cell-local point, so a small box shows a
+    /// crop of the texture at exactly the texel density of full cubes instead of a squashed
+    /// whole tile. The mapping matches the full-cube face emission corner-for-corner (same
+    /// mirroring per face), so bark features continue across log/branch joints at one scale.
+    /// </summary>
+    private static Vector2 CropUv(BlockType.Point tile, int face, Vector3 local)
     {
-        var u0 = tile.X * TileUVSize;
-        var v0 = tile.Y * TileUVSize;
-        uv[0] = new Vector2(u0, v0 + TileUVSize);
-        uv[1] = new Vector2(u0, v0);
-        uv[2] = new Vector2(u0 + TileUVSize, v0);
-        uv[3] = new Vector2(u0 + TileUVSize, v0 + TileUVSize);
+        float u = face switch
+        {
+            0 => local.X,
+            1 => 1f - local.X,
+            2 => 1f - local.Z,
+            3 => local.Z,
+            _ => local.X, // top and bottom run along X
+        };
+        float v = face switch
+        {
+            4 => 1f - local.Z, // top runs along Z
+            5 => local.Z,      // bottom runs along Z
+            _ => 1f - local.Y, // sides run bottom-to-top
+        };
+        return new Vector2((tile.X + u) * TileUVSize, (tile.Y + v) * TileUVSize);
     }
 
     public void UpdateMesh(ChunkMeshData meshData)
