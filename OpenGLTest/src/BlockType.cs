@@ -9,12 +9,14 @@ public class BlockType
     public const byte Grass = 1;
     public const byte Dirt = 2;
     public const byte Stone = 3;
+    public const byte Cobblestone = 4;
 
     public static readonly Dictionary<byte, BlockType> Types = new()
     {
         { 1, new BlockType(new Point(0, 0), new Point(2, 0), new Point(1, 0)) }, // grass
         { 2, new BlockType(new Point(2, 0), new Point(2, 0), new Point(2, 0)) }, // dirt
-        { 3, new BlockType(new Point(3, 0), new Point(3, 0), new Point(3, 0)) }, // stone
+        { 3, new BlockType(new Point(0, 1), new Point(0, 1), new Point(0, 1)) }, // stone
+        { 4, new BlockType(new Point(3, 0), new Point(3, 0), new Point(3, 0)) }, // cobblestone
     };
 
     // Array-indexed view of Types for the meshing hot path (no dictionary hashing per block)
@@ -46,6 +48,9 @@ public class BlockType
             byId[id] = type;
         return byId;
     }
+
+    /// <summary>Block id dropped when a block is mined; stone drops cobblestone, everything else drops itself.</summary>
+    public static byte DropFor(byte blockId) => blockId == Stone ? Cobblestone : blockId;
 
     public record struct Point(int X, int Y);
 }

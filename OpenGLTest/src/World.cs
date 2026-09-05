@@ -204,7 +204,7 @@ public class World
 
         // Only drop something if a block was actually cleared
         if (chunk.RemoveBlockAt(blockPos, _chunkManager))
-            _dropManager.Spawn(brokenId, blockPos);
+            _dropManager.Spawn(BlockType.DropFor(brokenId), blockPos);
 
         // Keep the buried LOD mesh below the newly exposed hole
         // (blockPos components are floored floats, so the int casts are exact)
