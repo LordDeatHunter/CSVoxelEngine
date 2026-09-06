@@ -157,6 +157,14 @@ public class World
             _popElapsed = BlockPopSeconds;
         }
 
+        // Pebbles pop on first contact: one punch breaks them, no hold-to-mine
+        if (_breakingBlockId == BlockType.Pebble)
+        {
+            RemoveBlock(_selectedBlockPosition);
+            StopBreaking();
+            return;
+        }
+
         // Air or an unloaded chunk: nothing to mine
         if (_breakMaxHealth <= 0)
         {
@@ -230,6 +238,13 @@ public class World
         // destruction path; see DropManager.SpawnLeafDrops)
         else if (brokenId == BlockType.Leaves && chunk.RemoveBlockAt(blockPos, _chunkManager))
             _dropManager.SpawnLeafDrops(blockPos);
+        // Pebbles drop one flint per visible stone (see PebbleGenerator.CountAt)
+        else if (brokenId == BlockType.Pebble && chunk.RemoveBlockAt(blockPos, _chunkManager))
+        {
+            var flints = PebbleGenerator.CountAt((int)blockPos.X, (int)blockPos.Z);
+            for (var i = 0; i < flints; i++)
+                _dropManager.Spawn(ItemType.Flint, blockPos);
+        }
         // Only drop something if a block was actually cleared
         else if (chunk.RemoveBlockAt(blockPos, _chunkManager))
             _dropManager.Spawn(BlockType.DropFor(brokenId), blockPos);

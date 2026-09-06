@@ -230,7 +230,7 @@ public class ItemDrop
         for (var y = minY; y <= maxY; y++)
         for (var z = minZ; z <= maxZ; z++)
         {
-            if (chunks.GetBlockGlobal(x, y, z) != 0)
+            if (BlockType.IsSolid(chunks.GetBlockGlobal(x, y, z)))
                 return true;
         }
 

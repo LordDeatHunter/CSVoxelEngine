@@ -237,12 +237,13 @@ public class Chunk : IDisposable
 
     /// <summary>Whether voxel light travels through a block: air, plus leaves, whose canopy
     /// stays lit through instead of casting solid shade, plus the tapered wood boxes, which
-    /// are far thinner than a full cube and should dapple rather than block. Everything else
+    /// are far thinner than a full cube and should dapple rather than block, plus the
+    /// ankle-high pebbles, which are too small to shade. Everything else
     /// (rock, full-cube logs, TNT) still blocks. AO keeps treating leaves as solid; geometry
     /// culling does not (see <see cref="BlockType.Occludes"/>).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool PassesLight(byte blockId) =>
-        blockId == BlockType.Air || blockId == BlockType.Leaves || BlockType.IsPartialCube(blockId);
+        blockId == BlockType.Air || blockId == BlockType.Leaves || blockId == BlockType.Pebble || BlockType.IsPartialCube(blockId);
 
     /// <summary>One BFS pass: spreads <paramref name="levels"/> through light-passing cells
     /// (see <see cref="PassesLight"/>) of the light snapshot, losing one level per block.
@@ -323,7 +324,7 @@ public class Chunk : IDisposable
             }
             maxHeight += WorldGenerationConfig.TreeMaxHeightBlocks;
         }
-        if (lowerBoundY > maxHeight)
+        if (lowerBoundY > maxHeight + 1)
         {
             IsBlockDataReady = true;
             return;
@@ -349,6 +350,9 @@ public class Chunk : IDisposable
 
         if (WorldGenerationConfig.TreesEnabled)
             TreeGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
+
+        if (WorldGenerationConfig.PebblesEnabled)
+            PebbleGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
         // Carving removed an unknown number of blocks; a recount is cheaper than bookkeeping
         var solid = 0;
@@ -609,6 +613,14 @@ public class Chunk : IDisposable
                 continue;
             }
 
+            // Pebbles render as 1-3 ankle-high boxes sharing the cell; see EmitPebbles
+            if (blockId == BlockType.Pebble)
+            {
+                EmitPebbles(vertices, indices, ref indexOffset, sunLight, blockLight,
+                    x, y, z, type, basePos);
+                continue;
+            }
+
             for (var i = 0; i < 6; i++)
             {
                 var faceCell = pIdx + FaceNeighborDelta[i];
@@ -642,9 +654,9 @@ public class Chunk : IDisposable
 
                 for (var j = 0; j < 4; j++)
                 {
-                    var side1 = padded[pIdx + aoDeltas[j * 3 + 0]] != 0;
-                    var side2 = padded[pIdx + aoDeltas[j * 3 + 1]] != 0;
-                    var corner = padded[pIdx + aoDeltas[j * 3 + 2]] != 0;
+                    var side1 = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 0]]);
+                    var side2 = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 1]]);
+                    var corner = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 2]]);
 
                     var ao = VertexAO(side1, side2, corner);
                     var shade = ShadeLut[(i << 2) | ao];
@@ -746,6 +758,67 @@ public class Chunk : IDisposable
         }
     }
 
+    /// <summary>
+    /// Emits the 1-3 ankle-high stones sharing a pebble cell: floor-sitting cubes sized and
+    /// spun per stone (see PebbleGenerator), with the stone tile cropped to their size so
+    /// texel density matches full cubes. UVs come from the unrotated corners, so the texture
+    /// stays put while the geometry spins. The bottom face is skipped: it sits coplanar on
+    /// the ground's top face, which still draws because pebbles never occlude.
+    /// </summary>
+    private void EmitPebbles(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        byte[] sunLight, byte[] blockLight,
+        int x, int y, int z, BlockType type, Vector3 basePos)
+    {
+        var worldX = (int)Position.X * Size + x;
+        var worldZ = (int)Position.Z * Size + z;
+        var count = PebbleGenerator.CountAt(worldX, worldZ);
+        var variant = PebbleGenerator.VariantAt(worldX, worldZ);
+
+        Span<float> sunF = stackalloc float[6];
+        Span<float> blockF = stackalloc float[6];
+        var lightBase = LightIdx(x, y, z);
+        for (var i = 0; i < 6; i++)
+        {
+            var lightCell = lightBase + LightFaceDelta[i];
+            sunF[i] = sunLight[lightCell] / 15f;
+            blockF[i] = blockLight[lightCell] / 15f;
+        }
+
+        for (var b = 0; b < count; b++)
+        {
+            PebbleGenerator.GetCenter(count, variant, b, out var cx, out var cz);
+            var s = PebbleGenerator.SizeAt(worldX, worldZ, b);
+            var angle = PebbleGenerator.AngleAt(worldX, worldZ, b);
+            var cos = MathF.Cos(angle);
+            var sin = MathF.Sin(angle);
+            var half = s * 0.5f;
+            var min = new Vector3(cx - half, 0f, cz - half);
+            var max = new Vector3(cx + half, s, cz + half);
+            for (var face = 0; face < 6; face++)
+            {
+                if (face == 5) continue;
+                var tile = face == 4 ? type.Top : type.Side;
+                BoxFaceCorners(min, max, face, out var p0, out var p1, out var p2, out var p3);
+                var normal = CubeFaces[face].normal;
+                EmitQuad(vertices, indices, ref indexOffset, basePos,
+                    SpinY(p0, cx, cz, cos, sin), SpinY(p1, cx, cz, cos, sin),
+                    SpinY(p2, cx, cz, cos, sin), SpinY(p3, cx, cz, cos, sin),
+                    SpinY(normal, 0f, 0f, cos, sin),
+                    CropUv(tile, face, p0), CropUv(tile, face, p1),
+                    CropUv(tile, face, p2), CropUv(tile, face, p3),
+                    ShadeLut[(face << 2) | 3], sunF[face], blockF[face]);
+            }
+        }
+    }
+
+    /// <summary>Rotates a point about (cx, cz) by a Y spin; normals pass through with cx = cz = 0.</summary>
+    private static Vector3 SpinY(Vector3 p, float cx, float cz, float cos, float sin)
+    {
+        var dx = p.X - cx;
+        var dz = p.Z - cz;
+        return new Vector3(cx + dx * cos + dz * sin, p.Y, cz - dx * sin + dz * cos);
+    }
+
     /// <summary>The four vertical walls of a tapered tube with a square [lo, hi] cross-section
     /// running from <paramref name="y0"/> to <paramref name="y1"/> (cell-local).</summary>
     private static void EmitTubeSides(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
@@ -772,9 +845,9 @@ public class Chunk : IDisposable
         for (var j = 0; j < 4; j++)
         {
             var corner = face[j];
-            var side1 = padded[pIdx + aoDeltas[j * 3 + 0]] != 0;
-            var side2 = padded[pIdx + aoDeltas[j * 3 + 1]] != 0;
-            var occluder = padded[pIdx + aoDeltas[j * 3 + 2]] != 0;
+            var side1 = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 0]]);
+            var side2 = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 1]]);
+            var occluder = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 2]]);
 
             var ao = VertexAO(side1, side2, occluder);
             var shade = ShadeLut[(i << 2) | ao];
@@ -844,7 +917,37 @@ public class Chunk : IDisposable
         Vector3 basePos, Vector3 min, Vector3 max, int face,
         BlockType.Point tile, byte shade, float sun, float block)
     {
-        var (a, b, c, d) = face switch
+        BoxFaceCorners(min, max, face, out var a, out var b, out var c, out var d);
+        EmitQuad(vertices, indices, ref indexOffset, basePos, a, b, c, d, CubeFaces[face].normal,
+            CropUv(tile, face, a), CropUv(tile, face, b), CropUv(tile, face, c), CropUv(tile, face, d),
+            shade, sun, block);
+    }
+
+    /// <summary>One arbitrary quad: four cell-local corners, one normal, one UV per corner.</summary>
+    private static void EmitQuad(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        Vector3 basePos, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 normal,
+        Vector2 uva, Vector2 uvb, Vector2 uvc, Vector2 uvd,
+        byte shade, float sun, float block)
+    {
+        vertices.Add(new Vertex(basePos + a, shade, shade, shade, 255, uva, sun, block, normal));
+        vertices.Add(new Vertex(basePos + b, shade, shade, shade, 255, uvb, sun, block, normal));
+        vertices.Add(new Vertex(basePos + c, shade, shade, shade, 255, uvc, sun, block, normal));
+        vertices.Add(new Vertex(basePos + d, shade, shade, shade, 255, uvd, sun, block, normal));
+
+        indices.Add((ushort)(indexOffset + 0));
+        indices.Add((ushort)(indexOffset + 1));
+        indices.Add((ushort)(indexOffset + 2));
+        indices.Add((ushort)(indexOffset + 0));
+        indices.Add((ushort)(indexOffset + 2));
+        indices.Add((ushort)(indexOffset + 3));
+        indexOffset += 4;
+    }
+
+    /// <summary>Corners of one axis-aligned face of the [min, max] box (cell-local).</summary>
+    private static void BoxFaceCorners(Vector3 min, Vector3 max, int face,
+        out Vector3 a, out Vector3 b, out Vector3 c, out Vector3 d)
+    {
+        (a, b, c, d) = face switch
         {
             0 => (new Vector3(min.X, min.Y, min.Z), new Vector3(min.X, max.Y, min.Z),
                   new Vector3(max.X, max.Y, min.Z), new Vector3(max.X, min.Y, min.Z)),
@@ -859,20 +962,6 @@ public class Chunk : IDisposable
             _ => (new Vector3(min.X, min.Y, max.Z), new Vector3(min.X, min.Y, min.Z),
                   new Vector3(max.X, min.Y, min.Z), new Vector3(max.X, min.Y, max.Z)),
         };
-
-        var normal = CubeFaces[face].normal;
-        vertices.Add(new Vertex(basePos + a, shade, shade, shade, 255, CropUv(tile, face, a), sun, block, normal));
-        vertices.Add(new Vertex(basePos + b, shade, shade, shade, 255, CropUv(tile, face, b), sun, block, normal));
-        vertices.Add(new Vertex(basePos + c, shade, shade, shade, 255, CropUv(tile, face, c), sun, block, normal));
-        vertices.Add(new Vertex(basePos + d, shade, shade, shade, 255, CropUv(tile, face, d), sun, block, normal));
-
-        indices.Add((ushort)(indexOffset + 0));
-        indices.Add((ushort)(indexOffset + 1));
-        indices.Add((ushort)(indexOffset + 2));
-        indices.Add((ushort)(indexOffset + 0));
-        indices.Add((ushort)(indexOffset + 2));
-        indices.Add((ushort)(indexOffset + 3));
-        indexOffset += 4;
     }
 
     /// <summary>

@@ -210,6 +210,16 @@ public static class WorldGenerationConfig
     public const float LeafVineDropChance = 0.15f;
     public const float LeafBranchDropChance = 0.15f;
 
+    // --- Pebbles (PebbleGenerator) ---
+    // Ankle-high stones in rare low-frequency patches; a density roll thins inside them
+    public const bool PebblesEnabled = true;
+    public const float PebblePatchFrequency = 1f / 96f;
+    public const float PebblePatchThreshold = 0.25f;
+    public const float PebbleDensity = 0.08f;
+    // Edge length of one stone, in whole texels (footprint and height alike)
+    public const int PebbleMinSizeTexels = 4;
+    public const int PebbleMaxSizeTexels = 8;
+
     // --- Tree felling (TopplingTree) ---
     // Seconds for a felled tree to swing from upright to flat (cubic ease-in: slow tip,
     // accelerating slam), then rest before its wood pops out as item drops

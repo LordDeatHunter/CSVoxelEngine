@@ -294,7 +294,7 @@ public class Camera
     }
 
     private static bool IsSolidBlock(int worldX, int worldY, int worldZ, ChunkManager chunkManager)
-        => chunkManager.GetBlockGlobal(worldX, worldY, worldZ) != 0;
+        => BlockType.IsSolid(chunkManager.GetBlockGlobal(worldX, worldY, worldZ));
 
     public Matrix4x4 GetViewMatrix() => Matrix4x4.CreateLookAt(Position, Position + GetForwardVector(), Vector3.UnitY);
 

@@ -16,7 +16,7 @@ namespace silkgltriangle;
 /// </summary>
 public class Inventory
 {
-    public const int SlotCount = 10;
+    public const int SlotCount = 11;
 
     /// <summary>How much TNT the player starts with.</summary>
     public const int StartingTnt = 50;
@@ -116,9 +116,10 @@ public class Inventory
     {
         var slots = new byte[SlotCount];
         // Taper variants (branch/limb/sprig/...) are visual states of wood, not items: mining
-        // any of them drops the default log, so only the log itself takes a slot. Pure items
-        // (vine, branch pickups) take the trailing slots.
-        var blockIds = BlockType.Types.Keys.Where(id => !BlockType.IsPartialCube(id)).OrderBy(id => id);
+        // any of them drops the default log, so only the log itself takes a slot. Pebbles
+        // likewise drop flint, never themselves. Pure items (vine, branch pickups) take the
+        // trailing slots.
+        var blockIds = BlockType.Types.Keys.Where(id => !BlockType.IsPartialCube(id) && id != BlockType.Pebble).OrderBy(id => id);
         var ids = blockIds.Concat(ItemType.Types.Keys.OrderBy(id => id)).Take(SlotCount).ToArray();
         ids.CopyTo(slots, 0);
         return slots;
@@ -128,7 +129,7 @@ public class Inventory
     private static int[] BuildCounts()
     {
         var counts = new int[SlotCount];
-        var blockIds = BlockType.Types.Keys.Where(id => !BlockType.IsPartialCube(id)).OrderBy(id => id);
+        var blockIds = BlockType.Types.Keys.Where(id => !BlockType.IsPartialCube(id) && id != BlockType.Pebble).OrderBy(id => id);
         var ids = blockIds.Concat(ItemType.Types.Keys.OrderBy(id => id)).Take(SlotCount).ToArray();
         for (var i = 0; i < ids.Length; i++)
             if (ids[i] == BlockType.Tnt)

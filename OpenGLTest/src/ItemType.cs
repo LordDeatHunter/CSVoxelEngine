@@ -13,11 +13,13 @@ public class ItemType
 {
     public const byte Vine = 100;
     public const byte Branch = 101;
+    public const byte Flint = 102;
 
     public static readonly Dictionary<byte, ItemType> Types = new()
     {
         { Vine, new ItemType("vine", "assets/textures/items/vine.png") },
         { Branch, new ItemType("branch", "assets/textures/items/branch.png") },
+        { Flint, new ItemType("flint", "assets/textures/items/flint.png") },
     };
 
     /// <summary>Display name for future tooltips/crafting UI.</summary>

@@ -19,6 +19,7 @@ public class BlockType
     public const byte Limb = 11;
     public const byte Sprig = 12;
     public const byte Switch = 13;
+    public const byte Pebble = 14;
 
     public static readonly Dictionary<byte, BlockType> Types = new()
     {
@@ -35,6 +36,7 @@ public class BlockType
         { 11, new BlockType("log_top", "log_top", "log_side") }, // limb (taper level 2)
         { 12, new BlockType("log_top", "log_top", "log_side") }, // sprig (taper level 3)
         { 13, new BlockType("log_top", "log_top", "log_side") }, // switch (taper level 4)
+        { 14, new BlockType("stone", "stone", "stone", maxHealth: 1) }, // pebble (ankle-high stones, insta-break)
     };
 
     // Array-indexed view of Types for the meshing hot path (no dictionary hashing per block)
@@ -107,13 +109,24 @@ public class BlockType
     public static bool IsPartialCube(byte blockId) =>
         blockId == Branch || blockId == Limb || blockId == Sprig || blockId == Switch || blockId == Twig;
 
+    /// <summary>Whether a block is solid to bodies: everything except air and the
+    /// walk-through pebbles. The raycast still targets pebbles (it hits any non-air cell),
+    /// so this only gates movement and drop physics.</summary>
+    public static bool IsSolid(byte blockId) => blockId != Air && blockId != Pebble;
+
     /// <summary>Whether a block fully hides a neighbouring full cube's face. Leaves are
     /// cutout (their tile discards ~13% of fragments in test-fragment.glsl), so they must
     /// never hide a neighbour: a face culled behind one becomes an X-ray window through
     /// its texture holes into the ground behind. Partial wood boxes never hide either
-    /// (see <see cref="IsPartialCube"/>).</summary>
+    /// (see <see cref="IsPartialCube"/>), and neither do the ankle-high pebbles, so the
+    /// ground still draws under both.</summary>
     public static bool Occludes(byte blockId) =>
-        blockId != Air && blockId != Leaves && !IsPartialCube(blockId);
+        IsSolid(blockId) && blockId != Leaves && !IsPartialCube(blockId);
+
+    /// <summary>Whether a block darkens neighbouring faces via ambient occlusion. Leaves count
+    /// as solid here (unlike <see cref="Occludes"/>); only air and the ankle-high pebbles,
+    /// too small to block any light, do not.</summary>
+    public static bool CastsAO(byte blockId) => blockId != Air && blockId != Pebble;
 
     /// <summary>Half-width of a partial block's tapered box, in blocks. Full cubes are 0.5.
     /// Levels run Branch (0.75) down to Twig (0.25); see TreeGenerator for how limbs step
@@ -129,7 +142,8 @@ public class BlockType
     };
     /// <summary>Block id dropped when a block is mined; stone drops cobblestone, every tapered
     /// wood id drops logs, TNT drops nothing (mining it primes it instead), leaves drop
-    /// nothing, everything else drops itself.</summary>
+    /// nothing, pebbles drop nothing here (World spawns their flint directly, one per stone),
+    /// everything else drops itself.</summary>
     public static byte DropFor(byte blockId) => blockId switch
     {
         Stone => Cobblestone,
@@ -140,6 +154,7 @@ public class BlockType
         Twig => Log,
         Tnt => Air,
         Leaves => Air,
+        Pebble => Air,
         _ => blockId,
     };
 
