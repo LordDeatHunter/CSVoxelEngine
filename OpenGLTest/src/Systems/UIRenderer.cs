@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Numerics;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
@@ -33,6 +34,14 @@ public class UIRenderer : IDisposable
     // Fraction of a slot the icon's footprint fills, leaving a margin inside the border
     private const float IconFill = 0.72f;
 
+    // Hotbar count text, in pixels. Counts sit in the slot's bottom-right corner, sized
+    // by digit cap-height so the size survives swapping the font file.
+    private const string CountFontPath = "assets/fonts/kongtext.ttf";
+    private const float CountCapHeight = 14f;
+    private const float CountPadRight = 5f;
+    private const float CountPadBottom = 4f;
+    private static readonly Rgba CountShadow = new(0, 0, 0, 180);
+
     // Three-quarter view: yaw swings a side face towards the viewer, pitch tilts the top down
     private const float IconYaw = 45f * MathF.PI / 180f;
     private const float IconPitch = 30f * MathF.PI / 180f;
@@ -58,6 +67,15 @@ public class UIRenderer : IDisposable
     // Unit shapes, scaled per draw so a colour or size change costs no buffer work
     private readonly Mesh _unitSquare;
 
+    // Count font, baked once from the TTF. Null when the file is missing or broken, in
+    // which case the hotbar simply draws no counts.
+    private readonly BitmapFont? _font;
+    private readonly float _countScale;
+
+    // Scratch for one DrawText call; reused so text layout allocates nothing per frame.
+    // Safe to share: all UI drawing happens on the main thread.
+    private readonly GlyphInstance[] _glyphScratch = new GlyphInstance[32];
+
     private Matrix4x4 _projection;
     private Vector2 _screenSize;
     private bool _depthCleared;
@@ -75,6 +93,16 @@ public class UIRenderer : IDisposable
 
         _crosshairTexture = TextureLoader.LoadFromFile(gl, "assets/textures/crosshair.png");
         _unitSquare = Primitives.CreateSquare(gl, 1f);
+
+        try
+        {
+            _font = new BitmapFont(gl, CountFontPath);
+            _countScale = _font.ScaleForCapHeight(CountCapHeight);
+        }
+        catch (Exception e) when (e is IOException or InvalidOperationException)
+        {
+            Console.WriteLine($"Warning: count font '{CountFontPath}' not loaded ({e.Message}); hotbar counts hidden.");
+        }
     }
 
     /// <summary>Starts a UI pass sized to the window. Must be paired with <see cref="End"/>.</summary>
@@ -164,6 +192,31 @@ public class UIRenderer : IDisposable
     public void DrawCrosshair() =>
         DrawTexture(ScreenCentre, new Vector2(CrosshairSize), _crosshairTexture);
 
+    /// <summary>
+    /// Screen-space text with its top-left corner at <paramref name="topLeft"/> (pixels, Y
+    /// down). A one-pixel dark shadow is drawn under each glyph so the text reads over
+    /// bright icons. Strings longer than 32 characters are truncated.
+    /// </summary>
+    public void DrawText(string text, Vector2 topLeft, float scale, Rgba color)
+    {
+        if (_font == null || string.IsNullOrEmpty(text))
+            return;
+
+        var instances = _glyphScratch.AsSpan();
+        var n = _font.Layout(text.AsSpan(), topLeft, scale, instances);
+
+        // Every shadow first, so each glyph's face draws over every shadow
+        for (var i = 0; i < n; i++)
+            DrawMesh(instances[i].Mesh,
+                RectTransform(instances[i].Centre + new Vector2(1f, 1f), instances[i].Size),
+                CountShadow, _font.Texture);
+
+        for (var i = 0; i < n; i++)
+            DrawMesh(instances[i].Mesh,
+                RectTransform(instances[i].Centre, instances[i].Size),
+                color, _font.Texture);
+    }
+
     /// <summary>Draws the hotbar centred along the bottom edge, highlighting the selected slot.</summary>
     public void DrawHotbar(Inventory inventory)
     {
@@ -191,6 +244,21 @@ public class UIRenderer : IDisposable
             var centre = new Vector2(firstCentreX + i * stride, centreY);
             // The pop marks a pickup; IconFill leaves enough margin for it to stay in the slot
             DrawBlockIcon(centre, SlotSize * IconFill * inventory.PopScaleAt(i), slots[i]);
+        }
+
+        // Counts overlay the slot's bottom-right corner, after the icons so text is on top
+        if (_font != null)
+        {
+            for (var i = 0; i < slots.Length; i++)
+            {
+                var text = inventory.CountAt(i).ToString();
+                var size = _font.MeasureSize(text.AsSpan(), _countScale);
+                var slotRight = firstCentreX + i * stride + SlotSize * 0.5f;
+                var slotBottom = centreY + SlotSize * 0.5f;
+                DrawText(text,
+                    new Vector2(slotRight - CountPadRight - size.X, slotBottom - CountPadBottom - size.Y),
+                    _countScale, Rgba.White);
+            }
         }
     }
 
@@ -238,6 +306,7 @@ public class UIRenderer : IDisposable
     public void Dispose()
     {
         // _blockCubes is owned by RenderManager and shared with the world passes
+        _font?.Dispose();
         _unitSquare.Dispose();
         _shader.Dispose();
         _gl.DeleteTexture(_crosshairTexture);

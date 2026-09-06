@@ -23,8 +23,8 @@ public class Inventory
     /// <summary>How many lamps the player starts with (lamps are not generated in terrain).</summary>
     public const int StartingLamps = 64;
 
-    // A pickup makes the slot's icon jump and settle back, so a count change is visible even
-    // though the count itself isn't drawn yet
+    // A pickup makes the slot's icon jump and settle back, echoing the count change
+    // drawn in the slot's corner
     public const float PopSeconds = 0.25f;
     public const float PopScale = 1.3f;
 
