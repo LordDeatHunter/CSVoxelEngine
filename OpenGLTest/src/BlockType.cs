@@ -107,6 +107,14 @@ public class BlockType
     public static bool IsPartialCube(byte blockId) =>
         blockId == Branch || blockId == Limb || blockId == Sprig || blockId == Switch || blockId == Twig;
 
+    /// <summary>Whether a block fully hides a neighbouring full cube's face. Leaves are
+    /// cutout (their tile discards ~13% of fragments in test-fragment.glsl), so they must
+    /// never hide a neighbour: a face culled behind one becomes an X-ray window through
+    /// its texture holes into the ground behind. Partial wood boxes never hide either
+    /// (see <see cref="IsPartialCube"/>).</summary>
+    public static bool Occludes(byte blockId) =>
+        blockId != Air && blockId != Leaves && !IsPartialCube(blockId);
+
     /// <summary>Half-width of a partial block's tapered box, in blocks. Full cubes are 0.5.
     /// Levels run Branch (0.75) down to Twig (0.25); see TreeGenerator for how limbs step
     /// through them.</summary>

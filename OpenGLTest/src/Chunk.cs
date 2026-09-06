@@ -197,7 +197,8 @@ public class Chunk : IDisposable
 
         // Sunlight seeds: air cells at or above the terrain height see the sky directly.
         // Leaves seed too: canopies pass light, so the sky reaches straight through them
-        // (branch tops under leaves stay lit; only depth falloff dims deep cover).
+        // (branch tops under leaves stay lit; only depth falloff dims deep cover). Tapered
+        // wood boxes seed as well (see PassesLight): a thin limb never casts a full shadow.
         for (var lx = 0; lx < LightSize; lx++)
         {
             var worldX = worldX0 + lx;
@@ -235,11 +236,13 @@ public class Chunk : IDisposable
     }
 
     /// <summary>Whether voxel light travels through a block: air, plus leaves, whose canopy
-    /// stays lit through instead of casting solid shade. Everything else (rock, wood, TNT)
-    /// still blocks. Geometry culling and AO keep treating leaves as solid.</summary>
+    /// stays lit through instead of casting solid shade, plus the tapered wood boxes, which
+    /// are far thinner than a full cube and should dapple rather than block. Everything else
+    /// (rock, full-cube logs, TNT) still blocks. AO keeps treating leaves as solid; geometry
+    /// culling does not (see <see cref="BlockType.Occludes"/>).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool PassesLight(byte blockId) =>
-        blockId == BlockType.Air || blockId == BlockType.Leaves;
+        blockId == BlockType.Air || blockId == BlockType.Leaves || BlockType.IsPartialCube(blockId);
 
     /// <summary>One BFS pass: spreads <paramref name="levels"/> through light-passing cells
     /// (see <see cref="PassesLight"/>) of the light snapshot, losing one level per block.
@@ -608,9 +611,13 @@ public class Chunk : IDisposable
             {
                 var faceCell = pIdx + FaceNeighborDelta[i];
                 var neighbour = padded[faceCell];
-                // Partial neighbours (branch/twig boxes) never hide a face: the ground still
-                // draws under a trunk, and a box sits on a drawn face instead of a gap ring
-                if (neighbour != 0 && !BlockType.IsPartialCube(neighbour)) continue;
+                // Only opaque neighbours hide a face. Leaves are cutout, so they never
+                // hide: a face culled behind one shows through its texture holes as an
+                // X-ray into the ground. Leaf-vs-leaf keeps both sides (Minecraft
+                // fancy-style) so the canopy still reads solid through the holes, while
+                // leaf-vs-rock draws the rock side only (the leaf side culls as before,
+                // so no coplanar double quad z-fights).
+                if (BlockType.Occludes(neighbour)) continue;
 
                 // Light of the air cell in front of the face, from the wide light volume
                 // (so lamps across the chunk border still reach); AO still varies corners
