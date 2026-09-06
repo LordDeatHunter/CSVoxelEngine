@@ -192,6 +192,9 @@ public static class WorldGenerationConfig
     // Chunk border margin: how far a trunk outside this chunk can still reach into it
     public const int TreeReachBlocks = 8;
     public const int TreeMaxHeightBlocks = 16;              // tallest a tree (plus crown) can stand
+    // Canopy columns poisoned around a wood/leaf edit (limb reach + blob radius + margin),
+    // so the far LOD never resurrects an edited crown
+    public const int TreeCanopyPoisonRadius = 8;
     // No trunk roots this close (Chebyshev) to the origin column, so the surface spawn the
     // camera picks there is always in the open
     public const int TreeSpawnClearRadius = 3;

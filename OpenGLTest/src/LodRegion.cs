@@ -162,7 +162,11 @@ public class LodRegion : IDisposable
             return height;
         }
 
-        // Top solid cell per LOD column (with 1-cell border), from the eroded heights
+        // Top solid cell per LOD column (with 1-cell border): the eroded terrain below, the
+        // canopy above it, and their max — the shell actually drawn. Canopy is sampled over
+        // each cell's own footprint only (no erosion margin), so a tree lifts just its own
+        // column into a leaf-textured bump instead of a plateau.
+        var groundTop = new int[heightGrid * heightGrid];
         var topCell = new int[heightGrid * heightGrid];
         for (var i = -1; i <= cells; i++)
         {
@@ -177,13 +181,33 @@ public class LodRegion : IDisposable
                 }
 
                 // Cell cy is solid iff cellSize * (cy + 1) <= eroded height
-                topCell[(i + 1) * heightGrid + (j + 1)] = ((minHeight - spec.HeightBias) >> cellShift) - 1;
+                var ground = ((minHeight - spec.HeightBias) >> cellShift) - 1;
+                groundTop[(i + 1) * heightGrid + (j + 1)] = ground;
+
+                // Canopy tops are always positive where present (trees need ground above the
+                // minimum height), so 0 unambiguously means open sky. It must not reach the
+                // cell formula: "no canopy" computes to cell -1, which would outrank deeply
+                // negative terrain and pave lowlands with phantom leaf pillars.
+                var top = ground;
+                var canopyMax = 0;
+                for (var dx = 0; dx < cellSize; dx++)
+                for (var dz = 0; dz < cellSize; dz++)
+                {
+                    var t = TreeGenerator.CanopyTop(baseFineX + i * cellSize + dx, baseFineZ + j * cellSize + dz);
+                    if (t > canopyMax) canopyMax = t;
+                }
+
+                if (canopyMax > 0)
+                    top = Math.Max(top, ((canopyMax - spec.HeightBias) >> cellShift) - 1);
+                topCell[(i + 1) * heightGrid + (j + 1)] = top;
             }
         }
 
         // Which chunks must be drawn for a full-detail column to hide this shell: everything
         // from the lowest side face (set by the neighbouring cells' tops, hence the 1-cell ring)
-        // up to the top face and the real terrain surface above it.
+        // up to the top face and the real terrain surface above it. The low end reads the
+        // ground grid (canopy bumps must not lift it, or shell sides would show with no chunk
+        // behind them); the high end reads the bumped grid so the canopy is covered too.
         var cellsPerChunk = Chunk.Size / cellSize;
         var columnCyMin = new int[regionChunkSpan * regionChunkSpan];
         var columnCyMax = new int[regionChunkSpan * regionChunkSpan];
@@ -196,8 +220,9 @@ public class LodRegion : IDisposable
                 for (var i = ci * cellsPerChunk - 1; i <= (ci + 1) * cellsPerChunk; i++)
                 for (var j = cj * cellsPerChunk - 1; j <= (cj + 1) * cellsPerChunk; j++)
                 {
+                    var g = groundTop[(i + 1) * heightGrid + (j + 1)];
+                    if (g < minTop) minTop = g;
                     var t = topCell[(i + 1) * heightGrid + (j + 1)];
-                    if (t < minTop) minTop = t;
                     if (t > maxTop) maxTop = t;
                 }
 
@@ -215,6 +240,7 @@ public class LodRegion : IDisposable
         var grass = BlockType.Types[BlockType.Grass];
         var dirt = BlockType.Types[BlockType.Dirt];
         var stone = BlockType.Types[BlockType.Stone];
+        var leaves = BlockType.Types[BlockType.Leaves];
 
         var vertices = new List<Vertex>(8192);
         var indices = new List<ushort>(12288);
@@ -275,6 +301,7 @@ public class LodRegion : IDisposable
                 var gi = i + 1;
                 var gj = j + 1;
                 var top = topCell[gi * heightGrid + gj];
+                var ground = groundTop[gi * heightGrid + gj];
 
                 var topCorners = Chunk.CubeFaces[topFace].face;
                 for (var c = 0; c < 4; c++)
@@ -287,7 +314,8 @@ public class LodRegion : IDisposable
                     shades[c] = Chunk.ShadeLut[(topFace << 2) | Chunk.VertexAO(side1, side2, diagonal)];
                 }
 
-                AddQuad(topFace, new Vector3(i * cellSize, top * cellSize, j * cellSize), grass.FaceTiles[topFace], shades);
+                AddQuad(topFace, new Vector3(i * cellSize, top * cellSize, j * cellSize),
+                    top > ground ? leaves.FaceTiles[topFace] : grass.FaceTiles[topFace], shades);
 
                 foreach (var f in sideFaces)
                 {
@@ -315,9 +343,11 @@ public class LodRegion : IDisposable
                             shades[c] = Chunk.ShadeLut[(f << 2) | Chunk.VertexAO(side1, side2, diagonal)];
                         }
 
-                        // Grass at the top, dirt for the first few blocks, stone below (matches Chunk.GenerateColumn)
-                        var tile = cy == top ? grass.FaceTiles[f]
-                            : (top - cy) * cellSize <= WorldGenerationConfig.NominalDirtDepth ? dirt.FaceTiles[f]
+                        // Canopy airspace wears leaves; at and below the eroded surface the
+                        // grass/dirt/stone rule applies, measured from the ground (not the bump)
+                        var tile = cy > ground ? leaves.FaceTiles[f]
+                            : cy == top ? grass.FaceTiles[f]
+                            : (ground - cy) * cellSize <= WorldGenerationConfig.NominalDirtDepth ? dirt.FaceTiles[f]
                             : stone.FaceTiles[f];
                         AddQuad(f, new Vector3(i * cellSize, cy * cellSize, j * cellSize), tile, shades);
                     }

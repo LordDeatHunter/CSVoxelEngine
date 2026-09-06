@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 
 namespace silkgltriangle;
@@ -242,6 +243,27 @@ public static class TreeGenerator
 
     private static void StampLeaves(byte[] blocks, int worldX0, int worldY0, int worldZ0, TreeShape shape)
     {
+        foreach (var (x, y, z) in CanopyCells(shape))
+        {
+            var lx = x - worldX0;
+            var ly = y - worldY0;
+            var lz = z - worldZ0;
+            if ((uint)lx >= Chunk.Size || (uint)ly >= Chunk.Size || (uint)lz >= Chunk.Size)
+                continue;
+
+            var i = Chunk.Idx(lx, ly, lz);
+            if (blocks[i] == BlockType.Air)
+                blocks[i] = BlockType.Leaves;
+        }
+    }
+
+    /// <summary>
+    /// Every world cell a trunk's canopy can place leaves into: the crown blob plus one blob
+    /// per limb tip, with the ragged shell edge. Chunk bounds and air checks are the caller's
+    /// job; shared by the stamper and the canopy-top cache so they can never disagree.
+    /// </summary>
+    internal static IEnumerable<(int X, int Y, int Z)> CanopyCells(TreeShape shape)
+    {
         var r = WorldGenerationConfig.TreeCrownRadius;
         foreach (var (cx, cy, cz) in shape.LeafBlobs)
         {
@@ -256,11 +278,6 @@ public static class TreeGenerator
                 var x = cx + dx;
                 var y = cy + dy;
                 var z = cz + dz;
-                var lx = x - worldX0;
-                var ly = y - worldY0;
-                var lz = z - worldZ0;
-                if ((uint)lx >= Chunk.Size || (uint)ly >= Chunk.Size || (uint)lz >= Chunk.Size)
-                    continue;
                 if (y <= HeightAt(x, z))
                     continue;
                 // Thin the outer shell into a ragged edge; parity on world coords keeps it
@@ -268,10 +285,99 @@ public static class TreeGenerator
                 if (d2 > r * r && ((x + y + z) & 1) == 0)
                     continue;
 
-                var i = Chunk.Idx(lx, ly, lz);
-                if (blocks[i] == BlockType.Air)
-                    blocks[i] = BlockType.Leaves;
+                yield return (x, y, z);
             }
         }
+    }
+
+    // Canopy tops per chunk column (index (x & mask) << shift | (z & mask)): the highest leaf
+    // cell over each ground column, 0 where the sky is clear. The far LOD reads this instead
+    // of block data so distant forests show. Same growth cap + wholesale clear as the other
+    // worldgen caches; entries are deterministic so a reset is harmless.
+    private static readonly ConcurrentDictionary<(int X, int Z), int[]> CanopyCache = new();
+    private const int CanopyCacheLimit = 4096;
+
+    // Fine columns whose canopy was edited by the player (mined wood/leaves, blasts, fells).
+    // The static canopy above knows nothing of edits, so lookups here read 0 (no bump) rather
+    // than resurrecting a chopped crown at long range. Entries are gameplay truth, so the cap
+    // only bounds memory; clearing it can briefly show a stale bump far away, never a hole.
+    private static readonly ConcurrentDictionary<(int X, int Z), byte> CanopyDisturbed = new();
+    private const int CanopyDisturbedLimit = 16384;
+
+    /// <summary>
+    /// Highest canopy cell over the ground column (x, z), or 0 under open sky. Disturbed
+    /// columns (see <see cref="PoisonCanopy"/>) read 0. Safe to call from any thread.
+    /// </summary>
+    public static int CanopyTop(int x, int z)
+    {
+        if (CanopyDisturbed.ContainsKey((x, z)))
+            return 0;
+
+        return GetCanopyTops(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
+            [((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
+    }
+
+    /// <summary>
+    /// Marks canopy columns around a player edit as disturbed (see <see cref="CanopyTop"/>).
+    /// Call for every mined/placed/blasted wood or leaf block; felling covers its whole
+    /// canopy with one call at the break.
+    /// </summary>
+    public static void PoisonCanopy(int x, int z)
+    {
+        var r = WorldGenerationConfig.TreeCanopyPoisonRadius;
+        for (var dx = -r; dx <= r; dx++)
+        for (var dz = -r; dz <= r; dz++)
+        {
+            if (CanopyDisturbed.Count >= CanopyDisturbedLimit)
+                CanopyDisturbed.Clear();
+
+            CanopyDisturbed[(x + dx, z + dz)] = 0;
+        }
+    }
+
+    internal static int[] GetCanopyTops(int chunkX, int chunkZ)
+    {
+        var key = (chunkX, chunkZ);
+        if (CanopyCache.TryGetValue(key, out var cached))
+            return cached;
+
+        var tops = BuildCanopyTops(chunkX, chunkZ);
+
+        if (CanopyCache.Count >= CanopyCacheLimit)
+            CanopyCache.Clear();
+
+        CanopyCache[key] = tops;
+        return tops;
+    }
+
+    // Raises each ground column under a nearby trunk's canopy cells to the highest leaf cell
+    // above it. Trunks up to TreeReachBlocks outside the chunk still overhang it.
+    private static int[] BuildCanopyTops(int chunkX, int chunkZ)
+    {
+        const int R = WorldGenerationConfig.TreeReachBlocks;
+        var x0 = chunkX * Chunk.Size;
+        var z0 = chunkZ * Chunk.Size;
+        var tops = new int[Chunk.Size * Chunk.Size];
+
+        for (var tx = x0 - R; tx < x0 + Chunk.Size + R; tx++)
+        for (var tz = z0 - R; tz < z0 + Chunk.Size + R; tz++)
+        {
+            if (!TryGetTrunk(tx, tz, out _, out var shape))
+                continue;
+
+            foreach (var (x, y, z) in CanopyCells(shape))
+            {
+                var lx = x - x0;
+                var lz = z - z0;
+                if ((uint)lx >= Chunk.Size || (uint)lz >= Chunk.Size)
+                    continue;
+
+                var i = (lx << Chunk.SizeShift) | lz;
+                if (y > tops[i])
+                    tops[i] = y;
+            }
+        }
+
+        return tops;
     }
 }

@@ -5,8 +5,9 @@ namespace silkgltriangle;
 
 /// <summary>
 /// The player's hotbar: a fixed row of slots, one of which is selected. Slots are seeded from
-/// the registered block types so a newly added type shows up without touching this class;
-/// leftover slots stay empty (block id 0).
+/// the registered full-cube block types (taper variants are wood states, not items, so they
+/// are skipped) so a newly added type shows up without touching this class; leftover slots
+/// stay empty (block id 0).
 ///
 /// Each slot tracks how many blocks it holds. Counts start at zero and are filled by mining, so
 /// a slot renders its block whether or not it holds any — only placing checks the count. The
@@ -14,7 +15,7 @@ namespace silkgltriangle;
 /// </summary>
 public class Inventory
 {
-    public const int SlotCount = 13;
+    public const int SlotCount = 8;
 
     /// <summary>How much TNT the player starts with.</summary>
     public const int StartingTnt = 50;
@@ -110,7 +111,9 @@ public class Inventory
     private static byte[] BuildSlots()
     {
         var slots = new byte[SlotCount];
-        var ids = BlockType.Types.Keys.OrderBy(id => id).Take(SlotCount).ToArray();
+        // Taper variants (branch/limb/sprig/...) are visual states of wood, not items: mining
+        // any of them drops the default log, so only the log itself takes a slot
+        var ids = BlockType.Types.Keys.Where(id => !BlockType.IsPartialCube(id)).OrderBy(id => id).Take(SlotCount).ToArray();
         ids.CopyTo(slots, 0);
         return slots;
     }
@@ -119,7 +122,7 @@ public class Inventory
     private static int[] BuildCounts()
     {
         var counts = new int[SlotCount];
-        var ids = BlockType.Types.Keys.OrderBy(id => id).Take(SlotCount).ToArray();
+        var ids = BlockType.Types.Keys.Where(id => !BlockType.IsPartialCube(id)).OrderBy(id => id).Take(SlotCount).ToArray();
         for (var i = 0; i < ids.Length; i++)
             if (ids[i] == BlockType.Tnt)
                 counts[i] = StartingTnt;

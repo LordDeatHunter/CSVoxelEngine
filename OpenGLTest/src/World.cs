@@ -233,6 +233,14 @@ public class World
         // (blockPos components are floored floats, so the int casts are exact)
         if (LodRegion.LowerColumnBelow((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z))
             _lodManager.MarkEditedColumn((int)blockPos.X, (int)blockPos.Z);
+
+        // Wood and leaves live above the heightmap caps, so the gate above never fires for
+        // them — yet the far LOD draws their canopy. Disturb it and rebuild regardless.
+        if (TreeGenerator.WoodLevel(brokenId) >= 0 || brokenId == BlockType.Leaves)
+        {
+            TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z);
+            _lodManager.MarkEditedColumn((int)blockPos.X, (int)blockPos.Z);
+        }
     }
 
     /// <summary>
@@ -280,6 +288,12 @@ public class World
             if (LodRegion.LowerColumnBelow(x, y, z))
                 _lodManager.MarkEditedColumn(x, z);
         }
+
+        // The whole canopy came down above the caps: disturb it once at the break (its reach
+        // covers the crown) and rebuild every touched column so no ghost lingers at range
+        TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z);
+        foreach (var ((x, z), _) in lowestY)
+            _lodManager.MarkEditedColumn(x, z);
 
         // The tree tips away from whoever felled it, pivoting on the mined cell's base
         var away = new Vector3(

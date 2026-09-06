@@ -80,6 +80,11 @@ public class TntManager
 
             touchedChunks.Add(chunkPos);
 
+            // A blasted canopy must not linger in the far LOD (its rebuild is already
+            // triggered per blasted column below, which then reads the poison)
+            if (TreeGenerator.WoodLevel(removed) >= 0 || removed == BlockType.Leaves)
+                TreeGenerator.PoisonCanopy(x, z);
+
             if (removed == BlockType.Tnt)
             {
                 // Deferred: the live list is being iterated further up the call stack
