@@ -424,6 +424,7 @@ public class Chunk : IDisposable
         _blocks[Idx(localX, localY, localZ)] = 0;
         _solidCount--;
 
+        chunkManager.UnmarkPlayerPlaced((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
         chunkManager.ImmediateRemesh(Position);
         MarkNeighborsDirty(worldPos, chunkManager);
         return true;
@@ -445,6 +446,7 @@ public class Chunk : IDisposable
         _blocks[Idx(localX, localY, localZ)] = blockId;
         _solidCount++;
 
+        chunkManager.MarkPlayerPlaced((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
         chunkManager.ImmediateRemesh(Position);
         MarkNeighborsDirty(worldPos, chunkManager);
         return true;

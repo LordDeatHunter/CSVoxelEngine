@@ -50,32 +50,30 @@ public class TopplingTree : IDisposable
     }
 
     /// <summary>
-    /// Collects the tree above a mined log: the broken block itself plus every connected wood
-    /// block at or above its height (the stump below stays), plus canopy leaves within two
-    /// blocks of that wood. Bounded by the fell caps; anything past them stays standing.
-    /// Pure CPU over live chunk data — safe to call from the main thread on break.
+    /// Collects the severed part of a tree above a mined wood block: the broken block itself
+    /// plus every connected wood block at or above its height that lost its support through
+    /// the break. The stump below stays standing, and so does any limb still rooted through
+    /// standing wood — cutting one branch no longer fells the crown. Canopy leaves within
+    /// two blocks of the falling wood come along. Bounded by the fell caps; anything past
+    /// them stays standing. Pure CPU over live chunk data — safe to call from the main
+    /// thread on break, whether or not the broken cell itself was already cleared.
     /// </summary>
     public static List<FellBlock> Collect(ChunkManager chunks, Vector3 breakCell, byte brokenId)
     {
-        var collected = new List<FellBlock>(64);
-        var seen = new HashSet<Vector3>();
-        var taken = new HashSet<Vector3>();
-        var wood = new List<Vector3>(64);
         var baseY = (int)breakCell.Y;
 
-        collected.Add(new FellBlock(breakCell, brokenId));
-        seen.Add(breakCell);
-        taken.Add(breakCell);
+        // Flood first: every wood block connected to the break at or above its height, as if
+        // the break cell were still there (it is seeded either way, so a cleared cell reads
+        // the passed id instead of air).
+        var woodIds = new Dictionary<Vector3, byte>();
+        var seen = new HashSet<Vector3> { breakCell };
         if (TreeGenerator.WoodLevel(brokenId) >= 0)
-        {
-            wood.Add(breakCell);
-        }
+            woodIds[breakCell] = brokenId;
 
         var queue = new Queue<Vector3>();
         queue.Enqueue(breakCell);
         while (queue.Count > 0
-               && wood.Count < WorldGenerationConfig.TreeFellWoodCap
-               && collected.Count < WorldGenerationConfig.TreeFellTotalCap)
+               && woodIds.Count < WorldGenerationConfig.TreeFellWoodCap)
         {
             var cell = queue.Dequeue();
             foreach (var offset in Vector3Directions.CardinalDirections)
@@ -87,18 +85,70 @@ public class TopplingTree : IDisposable
                 if (TreeGenerator.WoodLevel(id) < 0)
                     continue;
 
-                wood.Add(next);
-                taken.Add(next);
-                collected.Add(new FellBlock(next, id));
+                woodIds[next] = id;
                 queue.Enqueue(next);
             }
         }
 
-        // The canopy comes along without chain-felling neighbours: leaves near felled wood
-        // join (the stamper keeps every blob cell within Chebyshev 2 of wood), but the flood
-        // never walks leaf-to-leaf into the next tree.
-        foreach (var cell in wood)
+        // Support split: with the break cell gone, whatever is still connected through wood
+        // down to live wood below the break stays up; the rest (the break plus its children)
+        // falls. A floating remnant with no live wood underneath has no seeds, so it all falls.
+        var standing = new HashSet<Vector3>();
+        var supportQueue = new Queue<Vector3>();
+        foreach (var cell in woodIds.Keys)
         {
+            if (cell == breakCell)
+                continue;
+            foreach (var offset in Vector3Directions.CardinalDirections)
+            {
+                var next = cell + offset;
+                if ((int)next.Y >= baseY)
+                    continue;
+                if (TreeGenerator.WoodLevel(chunks.GetBlockGlobal((int)next.X, (int)next.Y, (int)next.Z)) < 0)
+                    continue;
+
+                standing.Add(cell);
+                supportQueue.Enqueue(cell);
+                break;
+            }
+        }
+
+        while (supportQueue.Count > 0)
+        {
+            var cell = supportQueue.Dequeue();
+            foreach (var offset in Vector3Directions.CardinalDirections)
+            {
+                var next = cell + offset;
+                if (next == breakCell || !woodIds.ContainsKey(next) || !standing.Add(next))
+                    continue;
+                supportQueue.Enqueue(next);
+            }
+        }
+
+        // The canopy comes along without chain-felling neighbours: leaves near falling wood
+        // join (the stamper keeps every blob cell within Chebyshev 2 of wood), but the flood
+        // never walks leaf-to-leaf into the next tree. The falling wood is snapshotted first:
+        // leaves append to collected, which must not be enumerated while it grows.
+        var fallingWood = new List<Vector3>(woodIds.Count);
+        foreach (var cell in woodIds.Keys)
+        {
+            if (cell != breakCell && standing.Contains(cell))
+                continue;
+            fallingWood.Add(cell);
+        }
+
+        var collected = new List<FellBlock>(fallingWood.Count + 16);
+        var taken = new HashSet<Vector3>();
+        foreach (var cell in fallingWood)
+        {
+            if (collected.Count >= WorldGenerationConfig.TreeFellTotalCap)
+                return collected;
+
+            collected.Add(new FellBlock(cell, woodIds[cell]));
+            taken.Add(cell);
+        }
+
+        foreach (var cell in fallingWood)
             for (var dx = -2; dx <= 2; dx++)
             for (var dy = -2; dy <= 2; dy++)
             for (var dz = -2; dz <= 2; dz++)
@@ -114,7 +164,6 @@ public class TopplingTree : IDisposable
 
                 collected.Add(new FellBlock(leaf, BlockType.Leaves));
             }
-        }
 
         return collected;
     }

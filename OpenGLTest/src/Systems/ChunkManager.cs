@@ -24,6 +24,21 @@ public class ChunkManager(GL gl)
     private readonly ConcurrentDictionary<Vector3, byte> _generatingMeshes = new();
     private readonly SemaphoreSlim _meshSemaphore = new(WorldGenerationConfig.MaxConcurrentMeshGenerations);
 
+    // World cells the player built (integer coords): breaking one never fells a tree, it just
+    // drops as-is with no toppling entity. Main thread only, like every other block edit.
+    // Unloaded chunks regenerate from worldgen (edits don't persist), so their entries are
+    // purged on unload to keep the set — and the felling decision — truthful.
+    private readonly HashSet<(int X, int Y, int Z)> _playerPlaced = new();
+
+    /// <summary>Whether the world cell was built by the player rather than generated.</summary>
+    public bool IsPlayerPlaced(int x, int y, int z) => _playerPlaced.Contains((x, y, z));
+
+    /// <summary>Records a player placement (called by <see cref="Chunk.PlaceBlockAt"/>).</summary>
+    public void MarkPlayerPlaced(int x, int y, int z) => _playerPlaced.Add((x, y, z));
+
+    /// <summary>Forgets a placement once its block is gone (mined, felled or blasted).</summary>
+    public void UnmarkPlayerPlaced(int x, int y, int z) => _playerPlaced.Remove((x, y, z));
+
     public void Update(Camera camera)
     {
         if (camera == null) return;
@@ -48,6 +63,16 @@ public class ChunkManager(GL gl)
             _queuedChunkPositions.TryRemove(pos, out _);
             _generatingMeshes.TryRemove(pos, out _);
             _dirtyChunks.TryRemove(pos, out _);
+
+            // Edits don't survive an unload (the chunk regenerates from worldgen), so
+            // placements inside it stop being player-placed too
+            var x0 = (int)pos.X * Chunk.Size;
+            var y0 = (int)pos.Y * Chunk.Size;
+            var z0 = (int)pos.Z * Chunk.Size;
+            _playerPlaced.RemoveWhere(cell =>
+                cell.X >= x0 && cell.X < x0 + Chunk.Size &&
+                cell.Y >= y0 && cell.Y < y0 + Chunk.Size &&
+                cell.Z >= z0 && cell.Z < z0 + Chunk.Size);
         }
     }
 

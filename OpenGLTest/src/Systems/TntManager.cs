@@ -78,6 +78,8 @@ public class TntManager
             var removed = chunk.ClearBlockAt(new Vector3(x, y, z));
             if (removed == 0) continue;
 
+            // A blasted player build stops counting as placed with the block gone
+            chunks.UnmarkPlayerPlaced(x, y, z);
             touchedChunks.Add(chunkPos);
 
             // A blasted canopy must not linger in the far LOD (its rebuild is already

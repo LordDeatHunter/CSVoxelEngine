@@ -222,9 +222,10 @@ public class World
             if (chunk.RemoveBlockAt(blockPos, _chunkManager))
                 _tntManager.Spawn(blockPos);
         }
-        // A mined base log fells the tree above it instead of dropping one block
-        else if (brokenId == BlockType.Log && chunk.ClearBlockAt(blockPos) != 0)
-            FellTree(blockPos);
+        // A mined wood block fells whatever it was holding up instead of dropping one
+        // block (see FellWood): a trunk cut drops the crown, a branch cut only its children
+        else if (TreeGenerator.WoodLevel(brokenId) >= 0)
+            FellWood(blockPos, brokenId, chunk);
         // Mined leaves roll item drops instead of a block drop (same odds as every other
         // destruction path; see DropManager.SpawnLeafDrops)
         else if (brokenId == BlockType.Leaves && chunk.RemoveBlockAt(blockPos, _chunkManager))
@@ -248,17 +249,37 @@ public class World
     }
 
     /// <summary>
-    /// Fells the tree above a mined base log: collects the connected wood and canopy, clears
-    /// it in one batch (same pattern as a TNT blast), and launches a toppling entity that
-    /// drops its blocks once it has lain still. A lone remnant too small to topple just drops
-    /// its single log instead.
+    /// Fells the wood a mined wood block was holding up: collects the severed part (the break
+    /// plus its children — a branch cut leaves the trunk standing), clears it in one batch
+    /// (same pattern as a TNT blast), and launches a toppling entity that drops its blocks
+    /// once it has lain still. Player-placed logs are not trees: they pop out as a plain
+    /// drop with no entity and no animation. A lone block with no children just drops as-is.
     /// </summary>
-    private void FellTree(Vector3 blockPos)
+    private void FellWood(Vector3 blockPos, byte brokenId, Chunk chunk)
     {
-        var collected = TopplingTree.Collect(_chunkManager, blockPos, BlockType.Log);
+        var x = (int)blockPos.X;
+        var y = (int)blockPos.Y;
+        var z = (int)blockPos.Z;
+
+        // Player-built logs never topple: no entity, no animation, just a drop.
+        // RemoveBlockAt remeshes, so unlike the batch paths below nothing lingers.
+        if (_chunkManager.IsPlayerPlaced(x, y, z))
+        {
+            if (chunk.RemoveBlockAt(blockPos, _chunkManager))
+                _dropManager.Spawn(BlockType.DropFor(brokenId), blockPos);
+            return;
+        }
+
+        var collected = TopplingTree.Collect(_chunkManager, blockPos, brokenId);
         if (collected.Count < 2)
         {
-            _dropManager.Spawn(BlockType.Log, blockPos);
+            // Nothing was held up by this block: drop it as-is. ClearBlockAt skips the
+            // remesh, so remesh the batch of one — otherwise the mined log visibly lingers.
+            if (chunk.ClearBlockAt(blockPos) != 0)
+            {
+                chunk.RemeshAfterBatchEdit(_chunkManager);
+                _dropManager.Spawn(BlockType.DropFor(brokenId), blockPos);
+            }
             return;
         }
 
@@ -271,9 +292,11 @@ public class World
                 MathF.Floor(block.Cell.Y / Chunk.Size),
                 MathF.Floor(block.Cell.Z / Chunk.Size)
             );
-            if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk)) continue;
-            if (chunk.ClearBlockAt(block.Cell) == 0) continue;
+            if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var target)) continue;
+            if (target.ClearBlockAt(block.Cell) == 0) continue;
 
+            // A player-built extension felled with the tree stops counting as placed
+            _chunkManager.UnmarkPlayerPlaced((int)block.Cell.X, (int)block.Cell.Y, (int)block.Cell.Z);
             touchedChunks.Add(chunkPos);
 
             var key = ((int)block.Cell.X, (int)block.Cell.Z);
@@ -283,21 +306,21 @@ public class World
 
         foreach (var chunkPos in touchedChunks)
         {
-            if (_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk))
-                chunk.RemeshAfterBatchEdit(_chunkManager);
+            if (_chunkManager.Chunks.TryGetValue(chunkPos, out var touched))
+                touched.RemeshAfterBatchEdit(_chunkManager);
         }
 
-        foreach (var ((x, z), y) in lowestY)
+        foreach (var ((lx, lz), ly) in lowestY)
         {
-            if (LodRegion.LowerColumnBelow(x, y, z))
-                _lodManager.MarkEditedColumn(x, z);
+            if (LodRegion.LowerColumnBelow(lx, ly, lz))
+                _lodManager.MarkEditedColumn(lx, lz);
         }
 
         // The whole canopy came down above the caps: disturb it once at the break (its reach
         // covers the crown) and rebuild every touched column so no ghost lingers at range
         TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z);
-        foreach (var ((x, z), _) in lowestY)
-            _lodManager.MarkEditedColumn(x, z);
+        foreach (var ((lx, lz), _) in lowestY)
+            _lodManager.MarkEditedColumn(lx, lz);
 
         // The tree tips away from whoever felled it, pivoting on the mined cell's base
         var away = new Vector3(
