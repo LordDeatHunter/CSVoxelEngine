@@ -325,6 +325,28 @@ public class World
     }
 
     /// <summary>
+    /// Throws the selected slot onto the ground in front of the player: one unit, or the whole
+    /// stack when <paramref name="wholeStack"/> is set. Works for blocks and pure items alike;
+    /// does nothing when the slot is empty. Each unit spawns its own drop, so a thrown stack
+    /// scatters (every drop rolls its own random pop) and picks back up one unit at a time.
+    /// </summary>
+    public void ThrowSelected(bool wholeStack = false)
+    {
+        var id = Inventory.SelectedBlockId;
+        if (id == 0 || Inventory.SelectedCount <= 0) return;
+
+        var units = wholeStack ? Inventory.SelectedCount : 1;
+        var forward = Camera.Forward;
+        for (var i = 0; i < units; i++)
+        {
+            // Spend first so a failed spend never duplicates the drop
+            if (!Inventory.ConsumeSelected()) break;
+
+            _dropManager.SpawnAt(id, Camera.Position + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f);
+        }
+    }
+
+    /// <summary>
     /// Places the hotbar's selected block against the face the player is looking at and spends
     /// one from that slot. Does nothing when the slot is empty or holds no blocks.
     /// </summary>

@@ -77,19 +77,22 @@ public class ItemDrop
     // Collision stays at the shared Size: the item boost is visual only
     private float VisualSize => Size * (ItemType.IsItem(BlockId) ? ItemSizeMultiplier : 1f);
 
-    public ItemDrop(byte blockId, Vector3 position)
+    public ItemDrop(byte blockId, Vector3 position, Vector3? toss = null)
     {
         BlockId = blockId;
         Position = position;
 
         // Small random pop so the drop visibly ejects instead of appearing dead still, with an
-        // upward bias so a surface-mined block lands back on top rather than inside the floor
+        // upward bias so a surface-mined block lands back on top rather than inside the floor.
+        // A throw adds its own velocity on top.
         var angle = Random.Shared.NextSingle() * MathF.Tau;
         var horizontalSpeed = 0.5f + Random.Shared.NextSingle();
         _velocity = new Vector3(
             MathF.Cos(angle) * horizontalSpeed,
             2f + Random.Shared.NextSingle() * 1.5f,
             MathF.Sin(angle) * horizontalSpeed);
+        if (toss.HasValue)
+            _velocity += toss.Value;
     }
 
     /// <summary>

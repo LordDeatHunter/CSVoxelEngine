@@ -39,6 +39,17 @@ public class DropManager
     }
 
     /// <summary>
+    /// Drops a block or item at an exact world position (no cell-centre snap), for throws.
+    /// Air and unknown ids drop nothing.
+    /// </summary>
+    public void SpawnAt(byte blockId, Vector3 position, Vector3? toss = null)
+    {
+        if (BlockType.ById[blockId] == null && !ItemType.IsItem(blockId)) return;
+
+        _drops.Add(new ItemDrop(blockId, position, toss));
+    }
+
+    /// <summary>
     /// Rolls a destroyed leaves block's item drops. Each chance (see
     /// <see cref="WorldGenerationConfig"/>) is independent, so one block can yield nothing, a
     /// vine, a branch, or both. Every destruction path — mining, TNT, felling — routes through

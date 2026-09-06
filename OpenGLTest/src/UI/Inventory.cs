@@ -86,10 +86,10 @@ public class Inventory
         return true;
     }
 
-    /// <summary>Spends one block from the selected slot. Returns false when it is empty.</summary>
+    /// <summary>Spends one unit from the selected slot. Returns false when it is empty.</summary>
     public bool ConsumeSelected()
     {
-        if (!CanPlaceSelected) return false;
+        if (SelectedBlockId == 0 || SelectedCount <= 0) return false;
 
         _counts[SelectedIndex]--;
         return true;

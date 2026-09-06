@@ -12,6 +12,7 @@ public static class Program
     private static World world;
     private static bool debugEnabled;
     private static bool xWasPressed;
+    private static bool qWasPressed;
     private static double debugLogTimer;
     // TODO: move this to player class
     private static double placeTimer = MAX_PLACE_TIMER;
@@ -54,6 +55,16 @@ public static class Program
             Console.WriteLine($"Debug {(debugEnabled ? "ON" : "OFF")}");
         }
         xWasPressed = xPressed;
+
+        // One throw per press, so holding Q doesn't empty the slot; Ctrl+Q throws the stack
+        var qPressed = inputManager.Keyboard?.IsKeyPressed(Key.Q) == true;
+        if (qPressed && !qWasPressed)
+        {
+            var wholeStack = inputManager.Keyboard?.IsKeyPressed(Key.ControlLeft) == true
+                || inputManager.Keyboard?.IsKeyPressed(Key.ControlRight) == true;
+            world.ThrowSelected(wholeStack);
+        }
+        qWasPressed = qPressed;
 
         if (inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true && placeTimer >= MAX_PLACE_TIMER)
         {
