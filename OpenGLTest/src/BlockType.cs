@@ -28,7 +28,7 @@ public class BlockType
         { 4, new BlockType(new Point(3, 0), new Point(3, 0), new Point(3, 0)) }, // cobblestone
         { 5, new BlockType(new Point(2, 1), new Point(2, 1), new Point(1, 1)) }, // tnt
         { 6, new BlockType(new Point(3, 1), new Point(3, 1), new Point(3, 1)) }, // lamp
-        { 7, new BlockType(new Point(1, 2), new Point(1, 2), new Point(0, 2)) }, // log (full-cube trunk base)
+        { 7, new BlockType(new Point(1, 2), new Point(1, 2), new Point(0, 2), maxHealth: 8) }, // log (full-cube trunk base)
         { 8, new BlockType(new Point(1, 2), new Point(1, 2), new Point(0, 2)) }, // branch (taper level 1)
         { 9, new BlockType(new Point(1, 2), new Point(1, 2), new Point(0, 2)) }, // twig (taper level 5, tips)
         { 10, new BlockType(new Point(2, 2), new Point(2, 2), new Point(2, 2), maxHealth: 2) }, // leaves (cutout)

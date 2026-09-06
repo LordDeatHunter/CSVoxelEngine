@@ -376,6 +376,29 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
+    /// Draws a felled tree swinging around its base. The mesh uploads on first sight (GL is
+    /// only legal on this thread); an empty mesh means nothing visible was collected.
+    /// </summary>
+    public void RenderTopplingTree(Camera camera, TopplingTree tree)
+    {
+        if (camera == null || tree == null) return;
+
+        tree.EnsureMesh(gl);
+        var mesh = tree.Mesh;
+        if (mesh == null) return;
+
+        worldShader.Use();
+        BindWorldTextures();
+
+        var model = tree.Model;
+        ApplyLightingUniforms(model);
+        worldShader.SetUniform("uMVP", model * camera.GetViewProjection());
+        worldShader.SetUniform("uAlpha", 1f);
+
+        mesh.Render();
+    }
+
+    /// <summary>
     /// Draws the targeted block's outline and face highlight. <paramref name="scale"/> is the
     /// block's current pop scale so the highlight tracks it while mining.
     /// </summary>

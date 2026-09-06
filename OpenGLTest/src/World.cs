@@ -31,6 +31,8 @@ public class World
     private readonly LodManager _lodManager;
     private readonly DropManager _dropManager = new();
     private readonly TntManager _tntManager = new();
+    // Trees currently toppling over after their base log was mined
+    private readonly List<TopplingTree> _toppling = new();
     private readonly IWindow _window;
     private bool _hasSelectedBlock;
     private Vector3 _selectedBlockPosition;
@@ -85,6 +87,8 @@ public class World
 
         _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager);
 
+        UpdateToppling((float)deltaTime);
+
         Inventory.Update((float)deltaTime);
 
         _hasSelectedBlock = Camera.Raycast(InteractionReach, _chunkManager, out _selectedBlockPosition, out _selectedFaceNormal);
@@ -96,6 +100,8 @@ public class World
         renderManager.RenderWorld(Camera, _chunkManager.Chunks.Values, _window.Time);
         renderManager.RenderItemDrops(Camera, _dropManager.Drops);
         renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
+        foreach (var tree in _toppling)
+            renderManager.RenderTopplingTree(Camera, tree);
 
         if (!_hasSelectedBlock) return;
 
@@ -216,6 +222,9 @@ public class World
             if (chunk.RemoveBlockAt(blockPos, _chunkManager))
                 _tntManager.Spawn(blockPos);
         }
+        // A mined base log fells the tree above it instead of dropping one block
+        else if (brokenId == BlockType.Log && chunk.ClearBlockAt(blockPos) != 0)
+            FellTree(blockPos);
         // Only drop something if a block was actually cleared
         else if (chunk.RemoveBlockAt(blockPos, _chunkManager))
             _dropManager.Spawn(BlockType.DropFor(brokenId), blockPos);
@@ -224,6 +233,77 @@ public class World
         // (blockPos components are floored floats, so the int casts are exact)
         if (LodRegion.LowerColumnBelow((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z))
             _lodManager.MarkEditedColumn((int)blockPos.X, (int)blockPos.Z);
+    }
+
+    /// <summary>
+    /// Fells the tree above a mined base log: collects the connected wood and canopy, clears
+    /// it in one batch (same pattern as a TNT blast), and launches a toppling entity that
+    /// drops its blocks once it has lain still. A lone remnant too small to topple just drops
+    /// its single log instead.
+    /// </summary>
+    private void FellTree(Vector3 blockPos)
+    {
+        var collected = TopplingTree.Collect(_chunkManager, blockPos, BlockType.Log);
+        if (collected.Count < 2)
+        {
+            _dropManager.Spawn(BlockType.Log, blockPos);
+            return;
+        }
+
+        var touchedChunks = new HashSet<Vector3>();
+        var lowestY = new Dictionary<(int X, int Z), int>();
+        foreach (var block in collected)
+        {
+            var chunkPos = new Vector3(
+                MathF.Floor(block.Cell.X / Chunk.Size),
+                MathF.Floor(block.Cell.Y / Chunk.Size),
+                MathF.Floor(block.Cell.Z / Chunk.Size)
+            );
+            if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk)) continue;
+            if (chunk.ClearBlockAt(block.Cell) == 0) continue;
+
+            touchedChunks.Add(chunkPos);
+
+            var key = ((int)block.Cell.X, (int)block.Cell.Z);
+            if (!lowestY.TryGetValue(key, out var lowest) || (int)block.Cell.Y < lowest)
+                lowestY[key] = (int)block.Cell.Y;
+        }
+
+        foreach (var chunkPos in touchedChunks)
+        {
+            if (_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk))
+                chunk.RemeshAfterBatchEdit(_chunkManager);
+        }
+
+        foreach (var ((x, z), y) in lowestY)
+        {
+            if (LodRegion.LowerColumnBelow(x, y, z))
+                _lodManager.MarkEditedColumn(x, z);
+        }
+
+        // The tree tips away from whoever felled it, pivoting on the mined cell's base
+        var away = new Vector3(
+            blockPos.X + 0.5f - Camera.Position.X, 0f,
+            blockPos.Z + 0.5f - Camera.Position.Z);
+        _toppling.Add(new TopplingTree(collected,
+            new Vector3(blockPos.X + 0.5f, blockPos.Y, blockPos.Z + 0.5f), away));
+    }
+
+    /// <summary>Swings falling trees, then pops their wood out as item drops once rested.</summary>
+    private void UpdateToppling(float deltaTime)
+    {
+        for (var i = _toppling.Count - 1; i >= 0; i--)
+        {
+            var tree = _toppling[i];
+            tree.Update(deltaTime);
+            if (!tree.IsDone) continue;
+
+            foreach (var (id, cell) in tree.TakeDrops())
+                _dropManager.Spawn(id, cell);
+
+            tree.Dispose();
+            _toppling.RemoveAt(i);
+        }
     }
 
     /// <summary>

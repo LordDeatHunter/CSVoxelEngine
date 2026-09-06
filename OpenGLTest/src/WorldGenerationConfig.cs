@@ -200,4 +200,14 @@ public static class WorldGenerationConfig
     // Master strength of the leaf sway, 0 disables it; wavelengths and gusts live in
     // test-vertex.glsl next to the wave itself
     public const float LeafSwayStrength = 1f;
+
+    // --- Tree felling (TopplingTree) ---
+    // Seconds for a felled tree to swing from upright to flat (cubic ease-in: slow tip,
+    // accelerating slam), then rest before its wood pops out as item drops
+    public const float TreeToppleSeconds = 1.2f;
+    public const float TreeFellRestSeconds = 2f;
+    // Collection bounds: wood flood cap, then overall cap including the canopy. Anything
+    // past the caps stays standing (and still drops normally when mined).
+    public const int TreeFellWoodCap = 256;
+    public const int TreeFellTotalCap = 512;
 }
