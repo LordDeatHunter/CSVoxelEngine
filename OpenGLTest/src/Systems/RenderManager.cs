@@ -15,6 +15,7 @@ public class RenderManager : IDisposable
     private Shader breakShader;
     private UIRenderer ui;
     private BlockCubeCache blockCubes;
+    private ItemMeshCache itemMeshes;
     private uint textureAtlas;
     private uint outlineVao;
     private uint outlineVbo;
@@ -74,6 +75,7 @@ public class RenderManager : IDisposable
         breakShader = new Shader(gl, breakVs, breakFs);
 
         blockCubes = new BlockCubeCache(gl);
+        itemMeshes = new ItemMeshCache(gl);
         ui = new UIRenderer(gl, textureAtlas, blockCubes);
         CreateSelectionGeometry();
     }
@@ -319,22 +321,34 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// Draws the floating item drops, each spinning about its own centre and pulsing in scale.
+    /// Block drops draw their atlas cube; pure items (see <see cref="ItemType"/>) draw their
+    /// extruded sprite with its own texture bound (the shader's sampler just reads unit 0).
     /// </summary>
     public void RenderItemDrops(Camera camera, IReadOnlyList<ItemDrop> drops)
     {
         if (camera == null || drops.Count == 0) return;
 
         worldShader.Use();
-        BindWorldTextures();
 
         var viewProj = camera.GetViewProjection();
 
         foreach (var drop in drops)
         {
-            var mesh = blockCubes.Get(drop.BlockId);
-            if (mesh == null) continue;
+            Mesh? mesh;
+            if (ItemType.IsItem(drop.BlockId))
+            {
+                if (!itemMeshes.TryGet(drop.BlockId, out mesh, out var itemTexture)) continue;
+                gl.ActiveTexture(TextureUnit.Texture0);
+                gl.BindTexture(TextureTarget.Texture2D, itemTexture);
+            }
+            else
+            {
+                BindWorldTextures();
+                mesh = blockCubes.Get(drop.BlockId);
+                if (mesh == null) continue;
+            }
 
-            // The cube is centred on its own origin, so it spins in place
+            // The shape is centred on its own origin, so it spins in place
             var model = Matrix4x4.CreateScale(drop.Scale)
                         * Matrix4x4.CreateRotationY(drop.Spin)
                         * Matrix4x4.CreateTranslation(drop.Position);
@@ -555,6 +569,7 @@ public class RenderManager : IDisposable
     {
         ui.Dispose();
         blockCubes.Dispose();
+        itemMeshes.Dispose();
         worldShader.Dispose();
         selectionShader.Dispose();
         breakShader.Dispose();

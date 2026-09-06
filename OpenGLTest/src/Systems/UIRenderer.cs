@@ -64,6 +64,9 @@ public class UIRenderer : IDisposable
     private readonly uint _crosshairTexture;
     private readonly BlockCubeCache _blockCubes;
 
+    // Flat sprite icons for the pure item slots (see ItemType); block slots keep their 3D cubes
+    private readonly Dictionary<byte, uint> _itemIcons = new();
+
     // Unit shapes, scaled per draw so a colour or size change costs no buffer work
     private readonly Mesh _unitSquare;
 
@@ -92,6 +95,8 @@ public class UIRenderer : IDisposable
         _shader.SetUniform("uTex", 0);
 
         _crosshairTexture = TextureLoader.LoadFromFile(gl, "assets/textures/crosshair.png");
+        foreach (var (id, type) in ItemType.Types)
+            _itemIcons[id] = TextureLoader.LoadFromFile(gl, type.TexturePath);
         _unitSquare = Primitives.CreateSquare(gl, 1f);
 
         try
@@ -243,7 +248,12 @@ public class UIRenderer : IDisposable
         {
             var centre = new Vector2(firstCentreX + i * stride, centreY);
             // The pop marks a pickup; IconFill leaves enough margin for it to stay in the slot
-            DrawBlockIcon(centre, SlotSize * IconFill * inventory.PopScaleAt(i), slots[i]);
+            var iconSize = SlotSize * IconFill * inventory.PopScaleAt(i);
+            // Items are flat sprites; blocks keep their 3D cubes
+            if (ItemType.IsItem(slots[i]) && _itemIcons.TryGetValue(slots[i], out var icon))
+                DrawTexture(centre, new Vector2(iconSize), icon);
+            else
+                DrawBlockIcon(centre, iconSize, slots[i]);
         }
 
         // Counts overlay the slot's bottom-right corner, after the icons so text is on top
@@ -310,6 +320,8 @@ public class UIRenderer : IDisposable
         _unitSquare.Dispose();
         _shader.Dispose();
         _gl.DeleteTexture(_crosshairTexture);
+        foreach (var icon in _itemIcons.Values)
+            _gl.DeleteTexture(icon);
 
         GC.SuppressFinalize(this);
     }

@@ -4,7 +4,8 @@ using System.Numerics;
 namespace silkgltriangle;
 
 /// <summary>
-/// A collectable block left behind by mining. A drop pops out where the block was, falls under
+/// A collectable left behind by mining: usually a block, sometimes a pure item (see
+/// <see cref="ItemType"/>). A drop pops out where the block was, falls under
 /// gravity and rests on the terrain, spinning and breathing in scale, until the player comes
 /// close enough — then it accelerates towards them and is collected on contact. Once latched
 /// onto the player it flies straight and ignores terrain.
@@ -13,6 +14,9 @@ public class ItemDrop
 {
     /// <summary>Edge length of the floating cube, in blocks.</summary>
     public const float Size = 0.35f / 1.5f;
+
+    /// <summary>Item sprites render larger than block cubes so they read at a distance.</summary>
+    private const float ItemSizeMultiplier = 1.5f;
 
     /// <summary>Half the edge length; the drop collides as a cube this far from its centre.</summary>
     private const float HalfExtent = Size * 0.5f;
@@ -49,6 +53,7 @@ public class ItemDrop
     // length is collected the same instant it appears and its spin is never seen.
     private const float PickupDelaySeconds = 0.4f;
 
+    /// <summary>Block or item id this drop collects as (see <see cref="ItemType"/>).</summary>
     public byte BlockId { get; }
     public Vector3 Position { get; private set; }
 
@@ -66,8 +71,11 @@ public class ItemDrop
     /// <summary>Continuous spin about the Y axis, in radians.</summary>
     public float Spin => _age * SpinRadiansPerSecond;
 
-    /// <summary>Current edge length, including the idle pulse.</summary>
-    public float Scale => Size * (1f + PulseAmount * MathUtils.Oscillate(_age, PulsePeriod));
+    /// <summary>Current edge length, including the idle pulse; items render 1.5x.</summary>
+    public float Scale => VisualSize * (1f + PulseAmount * MathUtils.Oscillate(_age, PulsePeriod));
+
+    // Collision stays at the shared Size: the item boost is visual only
+    private float VisualSize => Size * (ItemType.IsItem(BlockId) ? ItemSizeMultiplier : 1f);
 
     public ItemDrop(byte blockId, Vector3 position)
     {

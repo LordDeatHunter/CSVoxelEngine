@@ -190,7 +190,8 @@ public class TopplingTree : IDisposable
 
     /// <summary>
     /// Item drops for the landed tree, each at the floored cell its block came to rest in.
-    /// Leaves drop nothing (see <see cref="BlockType.DropFor"/>). Single-use: the second call
+    /// Canopy leaves roll the same vine/branch odds as mined leaves (see
+    /// <see cref="DropManager.SpawnLeafDrops"/>). Single-use: the second call
     /// returns nothing.
     /// </summary>
     public List<(byte Id, Vector3 Cell)> TakeDrops()
@@ -203,12 +204,24 @@ public class TopplingTree : IDisposable
         var landed = Matrix4x4.CreateFromAxisAngle(_axis, MathF.PI * 0.5f);
         foreach (var block in _blocks)
         {
+            var rest = _pivot + Vector3.Transform(block.Cell + new Vector3(0.5f) - _pivot, landed);
+            var cell = new Vector3(MathF.Floor(rest.X), MathF.Floor(rest.Y), MathF.Floor(rest.Z));
+
+            // Felled canopy leaves roll the same item odds as mined ones
+            if (block.Id == BlockType.Leaves)
+            {
+                if (Random.Shared.NextSingle() < WorldGenerationConfig.LeafVineDropChance)
+                    drops.Add((ItemType.Vine, cell));
+                if (Random.Shared.NextSingle() < WorldGenerationConfig.LeafBranchDropChance)
+                    drops.Add((ItemType.Branch, cell));
+                continue;
+            }
+
             var dropId = BlockType.DropFor(block.Id);
             if (dropId == BlockType.Air)
                 continue;
 
-            var rest = _pivot + Vector3.Transform(block.Cell + new Vector3(0.5f) - _pivot, landed);
-            drops.Add((dropId, new Vector3(MathF.Floor(rest.X), MathF.Floor(rest.Y), MathF.Floor(rest.Z))));
+            drops.Add((dropId, cell));
         }
 
         return drops;

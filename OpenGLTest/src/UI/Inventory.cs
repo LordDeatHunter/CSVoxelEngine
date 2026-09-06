@@ -6,16 +6,17 @@ namespace silkgltriangle;
 /// <summary>
 /// The player's hotbar: a fixed row of slots, one of which is selected. Slots are seeded from
 /// the registered full-cube block types (taper variants are wood states, not items, so they
-/// are skipped) so a newly added type shows up without touching this class; leftover slots
-/// stay empty (block id 0).
+/// are skipped) followed by the pure item types (see <see cref="ItemType"/>), so a newly added
+/// type shows up without touching this class; leftover slots stay empty (id 0).
 ///
-/// Each slot tracks how many blocks it holds. Counts start at zero and are filled by mining, so
-/// a slot renders its block whether or not it holds any — only placing checks the count. The
-/// player spawns with a starter stock of TNT.
+/// Each slot tracks how many blocks or items it holds. Counts start at zero and are filled by
+/// mining, so a slot renders its icon whether or not it holds any — only placing checks the
+/// count. Items can be collected but never placed. The player spawns with a starter stock
+/// of TNT.
 /// </summary>
 public class Inventory
 {
-    public const int SlotCount = 8;
+    public const int SlotCount = 10;
 
     /// <summary>How much TNT the player starts with.</summary>
     public const int StartingTnt = 50;
@@ -44,8 +45,11 @@ public class Inventory
 
     public ReadOnlySpan<byte> Slots => _slots;
 
-    /// <summary>Whether the selected slot holds a block that can actually be placed.</summary>
-    public bool CanPlaceSelected => SelectedBlockId != 0 && SelectedCount > 0;
+    /// <summary>
+    /// Whether the selected slot holds a block that can actually be placed. Pure items
+    /// (see <see cref="ItemType"/>) are collected but never placed.
+    /// </summary>
+    public bool CanPlaceSelected => SelectedBlockId != 0 && SelectedCount > 0 && !ItemType.IsItem(SelectedBlockId);
 
     public int CountAt(int index) => _counts[index];
 
@@ -69,8 +73,8 @@ public class Inventory
     }
 
     /// <summary>
-    /// Credits picked-up blocks to the slot holding that type and pops its icon. Returns false
-    /// for a block with no slot, whose drop the caller should discard.
+    /// Credits picked-up blocks or items to the slot holding that type and pops its icon.
+    /// Returns false for an id with no slot, whose drop the caller should discard.
     /// </summary>
     public bool Add(byte blockId, int amount = 1)
     {
@@ -112,8 +116,10 @@ public class Inventory
     {
         var slots = new byte[SlotCount];
         // Taper variants (branch/limb/sprig/...) are visual states of wood, not items: mining
-        // any of them drops the default log, so only the log itself takes a slot
-        var ids = BlockType.Types.Keys.Where(id => !BlockType.IsPartialCube(id)).OrderBy(id => id).Take(SlotCount).ToArray();
+        // any of them drops the default log, so only the log itself takes a slot. Pure items
+        // (vine, branch pickups) take the trailing slots.
+        var blockIds = BlockType.Types.Keys.Where(id => !BlockType.IsPartialCube(id)).OrderBy(id => id);
+        var ids = blockIds.Concat(ItemType.Types.Keys.OrderBy(id => id)).Take(SlotCount).ToArray();
         ids.CopyTo(slots, 0);
         return slots;
     }
@@ -122,7 +128,8 @@ public class Inventory
     private static int[] BuildCounts()
     {
         var counts = new int[SlotCount];
-        var ids = BlockType.Types.Keys.Where(id => !BlockType.IsPartialCube(id)).OrderBy(id => id).Take(SlotCount).ToArray();
+        var blockIds = BlockType.Types.Keys.Where(id => !BlockType.IsPartialCube(id)).OrderBy(id => id);
+        var ids = blockIds.Concat(ItemType.Types.Keys.OrderBy(id => id)).Take(SlotCount).ToArray();
         for (var i = 0; i < ids.Length; i++)
             if (ids[i] == BlockType.Tnt)
                 counts[i] = StartingTnt;

@@ -225,6 +225,10 @@ public class World
         // A mined base log fells the tree above it instead of dropping one block
         else if (brokenId == BlockType.Log && chunk.ClearBlockAt(blockPos) != 0)
             FellTree(blockPos);
+        // Mined leaves roll item drops instead of a block drop (same odds as every other
+        // destruction path; see DropManager.SpawnLeafDrops)
+        else if (brokenId == BlockType.Leaves && chunk.RemoveBlockAt(blockPos, _chunkManager))
+            _dropManager.SpawnLeafDrops(blockPos);
         // Only drop something if a block was actually cleared
         else if (chunk.RemoveBlockAt(blockPos, _chunkManager))
             _dropManager.Spawn(BlockType.DropFor(brokenId), blockPos);

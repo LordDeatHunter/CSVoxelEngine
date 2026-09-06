@@ -204,6 +204,12 @@ public static class WorldGenerationConfig
     // test-vertex.glsl next to the wave itself
     public const float LeafSwayStrength = 1f;
 
+    // --- Leaf item drops ---
+    // Mining a leaves block rolls each chance independently, so one block can drop
+    // nothing, a vine, a branch, or (rarely) both.
+    public const float LeafVineDropChance = 0.15f;
+    public const float LeafBranchDropChance = 0.15f;
+
     // --- Tree felling (TopplingTree) ---
     // Seconds for a felled tree to swing from upright to flat (cubic ease-in: slow tip,
     // accelerating slam), then rest before its wood pops out as item drops

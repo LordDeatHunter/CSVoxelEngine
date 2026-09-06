@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
 
@@ -120,6 +121,91 @@ public static class Primitives
         }
 
         return CreateCube(gl, size, Rgba.White, faceUvs, faceShades);
+    }
+
+    /// <summary>
+    /// A 2D sprite extruded by two texels: full-texture front and back faces plus side walls
+    /// around every opaque pixel's exposed edges, so the sprite reads as a thin slab with the
+    /// texture's own silhouette. Transparent fragments are cut out by the world shader's
+    /// alpha discard, exactly like leaf holes. <paramref name="rgba"/> holds top-first rows
+    /// (StbImageSharp order); a pixel is solid when its alpha is at least 128.
+    /// </summary>
+    public static Mesh CreateExtrudedSprite(GL gl, byte[] rgba, int width, int height, float size = 1f)
+    {
+        var half = size * 0.5f;
+        var depth = size / width * 2f;
+        var zFront = depth * 0.5f;
+        var zBack = -zFront;
+
+        bool Solid(int x, int y)
+        {
+            if (x < 0 || y < 0 || x >= width || y >= height) return false;
+            return rgba[(y * width + x) * 4 + 3] >= 128;
+        }
+
+        var vertices = new List<Vertex>(64);
+        var indices = new List<ushort>(96);
+
+        // Front (+Z) and back (-Z) faces: the whole sprite, upright (image top maps to +Y).
+        // UV v = 0 is the image's top row: TextureLoader uploads rows top-first with no flip,
+        // so the first memory row lands on v = 0.
+        Span<Vector2> corners = stackalloc Vector2[CornersPerFace];
+        UvRect.Full.CornersTo(corners);
+        Span<Vector3> facePositions =
+        [
+            new Vector3(-half, -half, zFront),
+            new Vector3(-half, half, zFront),
+            new Vector3(half, half, zFront),
+            new Vector3(half, -half, zFront),
+        ];
+        for (var i = 0; i < CornersPerFace; i++)
+            vertices.Add(Vert(facePositions[i], Rgba.White, corners[i], Vector3.UnitZ));
+        indices.AddRange([0, 1, 2, 0, 2, 3]);
+
+        var backBase = (ushort)vertices.Count;
+        for (var i = 0; i < CornersPerFace; i++)
+            vertices.Add(Vert(facePositions[i] with { Z = zBack }, Rgba.White, corners[i], -Vector3.UnitZ));
+        indices.AddRange([(ushort)(backBase + 0), (ushort)(backBase + 2), (ushort)(backBase + 1),
+            (ushort)(backBase + 0), (ushort)(backBase + 3), (ushort)(backBase + 2)]);
+
+        // Side walls, one quad per exposed pixel edge, UV'd to the edge texel's centre so
+        // nearest filtering paints the wall the texel's own colour.
+        for (var y = 0; y < height; y++)
+        for (var x = 0; x < width; x++)
+        {
+            if (!Solid(x, y)) continue;
+
+            var x0 = x / (float)width * size - half;
+            var x1 = (x + 1) / (float)width * size - half;
+            var y1 = half - y / (float)height * size;
+            var y0 = half - (y + 1) / (float)height * size;
+            var uv = new Vector2((x + 0.5f) / width, (y + 0.5f) / height);
+
+            if (!Solid(x, y - 1)) AddWall(new Vector3(x0, y1, zFront), new Vector3(x1, y1, zFront),
+                new Vector3(x1, y1, zBack), new Vector3(x0, y1, zBack), Vector3.UnitY, uv);
+            if (!Solid(x, y + 1)) AddWall(new Vector3(x0, y0, zFront), new Vector3(x0, y0, zBack),
+                new Vector3(x1, y0, zBack), new Vector3(x1, y0, zFront), -Vector3.UnitY, uv);
+            if (!Solid(x - 1, y)) AddWall(new Vector3(x0, y0, zFront), new Vector3(x0, y1, zFront),
+                new Vector3(x0, y1, zBack), new Vector3(x0, y0, zBack), -Vector3.UnitX, uv);
+            if (!Solid(x + 1, y)) AddWall(new Vector3(x1, y0, zFront), new Vector3(x1, y0, zBack),
+                new Vector3(x1, y1, zBack), new Vector3(x1, y1, zFront), Vector3.UnitX, uv);
+        }
+
+        void AddWall(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 normal, Vector2 wallUv)
+        {
+            var quadBase = (ushort)vertices.Count;
+            vertices.Add(Vert(a, Rgba.White, wallUv, normal));
+            vertices.Add(Vert(b, Rgba.White, wallUv, normal));
+            vertices.Add(Vert(c, Rgba.White, wallUv, normal));
+            vertices.Add(Vert(d, Rgba.White, wallUv, normal));
+            indices.AddRange([(ushort)(quadBase + 0), (ushort)(quadBase + 1), (ushort)(quadBase + 2),
+                (ushort)(quadBase + 0), (ushort)(quadBase + 2), (ushort)(quadBase + 3)]);
+        }
+
+        return new Mesh(gl,
+            System.Runtime.InteropServices.CollectionsMarshal.AsSpan(vertices),
+            System.Runtime.InteropServices.CollectionsMarshal.AsSpan(indices));
+
     }
 
     private static Vertex Vert(Vector3 position, Rgba color, Vector2 uv, Vector3? normal = null) =>

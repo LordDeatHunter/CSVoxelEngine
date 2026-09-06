@@ -90,6 +90,11 @@ public class TntManager
                 // Deferred: the live list is being iterated further up the call stack
                 _pendingSpawns.Add(new Vector3(x + 0.5f, y + 0.5f, z + 0.5f));
             }
+            else if (removed == BlockType.Leaves)
+            {
+                // Same odds as a mined leaves block (see DropManager.SpawnLeafDrops)
+                drops.SpawnLeafDrops(new Vector3(x, y, z));
+            }
             else
             {
                 // Same drop a mined block would leave (stone drops cobblestone)

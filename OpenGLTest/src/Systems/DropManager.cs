@@ -28,13 +28,28 @@ public class DropManager
     public ReadOnlySpan<byte> Collected => CollectionsMarshal.AsSpan(_collected);
 
     /// <summary>
-    /// Drops a block at the centre of the cell it occupied. Air and unknown ids drop nothing.
+    /// Drops a block or item at the centre of the cell it occupied. Air and unknown ids drop
+    /// nothing.
     /// </summary>
     public void Spawn(byte blockId, Vector3 blockPosition)
     {
-        if (BlockType.ById[blockId] == null) return;
+        if (BlockType.ById[blockId] == null && !ItemType.IsItem(blockId)) return;
 
         _drops.Add(new ItemDrop(blockId, blockPosition + new Vector3(0.5f)));
+    }
+
+    /// <summary>
+    /// Rolls a destroyed leaves block's item drops. Each chance (see
+    /// <see cref="WorldGenerationConfig"/>) is independent, so one block can yield nothing, a
+    /// vine, a branch, or both. Every destruction path — mining, TNT, felling — routes through
+    /// here so the odds never depend on how the leaves came down.
+    /// </summary>
+    public void SpawnLeafDrops(Vector3 blockPosition)
+    {
+        if (Random.Shared.NextSingle() < WorldGenerationConfig.LeafVineDropChance)
+            Spawn(ItemType.Vine, blockPosition);
+        if (Random.Shared.NextSingle() < WorldGenerationConfig.LeafBranchDropChance)
+            Spawn(ItemType.Branch, blockPosition);
     }
 
     public void Update(float deltaTime, Vector3 playerPosition, ChunkManager chunks)
