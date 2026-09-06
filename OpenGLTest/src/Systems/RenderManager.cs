@@ -61,7 +61,8 @@ public class RenderManager : IDisposable
         var breakVs = FileUtils.ReadFile("assets/shaders/break-vertex.glsl");
         var breakFs = FileUtils.ReadFile("assets/shaders/break-fragment.glsl");
 
-        textureAtlas = TextureLoader.LoadFromFile(gl, "assets/textures/atlas.png");
+        textureAtlas = TextureAtlas.Build(gl, "assets/textures/blocks");
+        BlockType.ResolveAtlasTiles();
 
         worldShader = new Shader(gl, vs, fs);
         // SetUniform writes to the currently bound program, so bind first — otherwise

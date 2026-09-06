@@ -35,8 +35,8 @@ public class Chunk : IDisposable
     private const int LightCount = LightSize * LightSq;
     private const int LightOffset = LightBorder - 1;
 
-    internal const int AtlasTilesPerSide = 4;
-    internal const float TileUVSize = 1f / AtlasTilesPerSide;
+    // Tile layout lives on TextureAtlas (set once when the atlas is stitched at startup);
+    // meshing only reads it, so background mesh threads need no synchronization.
 
     // Flat block storage; index = (x << 8) | (y << 4) | z
     private readonly byte[] _blocks = new byte[BlockCount];
@@ -620,12 +620,13 @@ public class Chunk : IDisposable
                 var normal = CubeFaces[i].normal;
 
                 var tile = type.FaceTiles[i];
-                var u0 = tile.X * TileUVSize;
-                var v0 = tile.Y * TileUVSize;
-                uv[0] = new Vector2(u0, v0 + TileUVSize);
+                var tileUv = TextureAtlas.TileUVSize;
+                var u0 = tile.X * tileUv;
+                var v0 = tile.Y * tileUv;
+                uv[0] = new Vector2(u0, v0 + tileUv);
                 uv[1] = new Vector2(u0, v0);
-                uv[2] = new Vector2(u0 + TileUVSize, v0);
-                uv[3] = new Vector2(u0 + TileUVSize, v0 + TileUVSize);
+                uv[2] = new Vector2(u0 + tileUv, v0);
+                uv[3] = new Vector2(u0 + tileUv, v0 + tileUv);
 
                 var face = CubeFaces[i].face;
                 var aoDeltas = AODeltas[i];
@@ -887,7 +888,7 @@ public class Chunk : IDisposable
             5 => local.Z,      // bottom runs along Z
             _ => 1f - local.Y, // sides run bottom-to-top
         };
-        return new Vector2((tile.X + u) * TileUVSize, (tile.Y + v) * TileUVSize);
+        return new Vector2((tile.X + u) * TextureAtlas.TileUVSize, (tile.Y + v) * TextureAtlas.TileUVSize);
     }
 
     public void UpdateMesh(ChunkMeshData meshData)

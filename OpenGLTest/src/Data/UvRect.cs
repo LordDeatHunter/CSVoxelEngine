@@ -20,9 +20,9 @@ public readonly record struct UvRect(Vector2 Min, Vector2 Max)
         return new UvRect(min, min + new Vector2(size));
     }
 
-    /// <summary>One tile of the block atlas.</summary>
+    /// <summary>One tile of the stitched block atlas.</summary>
     public static UvRect Tile(BlockType.Point tile) =>
-        Tile(tile.X, tile.Y, Chunk.AtlasTilesPerSide);
+        Tile(tile.X, tile.Y, TextureAtlas.TilesPerSide);
 
     /// <summary>
     /// The four corners in the winding the primitive builders and chunk mesher share:

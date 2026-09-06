@@ -22,19 +22,19 @@ public class BlockType
 
     public static readonly Dictionary<byte, BlockType> Types = new()
     {
-        { 1, new BlockType(new Point(0, 0), new Point(2, 0), new Point(1, 0)) }, // grass
-        { 2, new BlockType(new Point(2, 0), new Point(2, 0), new Point(2, 0)) }, // dirt
-        { 3, new BlockType(new Point(0, 1), new Point(0, 1), new Point(0, 1)) }, // stone
-        { 4, new BlockType(new Point(3, 0), new Point(3, 0), new Point(3, 0)) }, // cobblestone
-        { 5, new BlockType(new Point(2, 1), new Point(2, 1), new Point(1, 1)) }, // tnt
-        { 6, new BlockType(new Point(3, 1), new Point(3, 1), new Point(3, 1)) }, // lamp
-        { 7, new BlockType(new Point(1, 2), new Point(1, 2), new Point(0, 2), maxHealth: 8) }, // log (full-cube trunk base)
-        { 8, new BlockType(new Point(1, 2), new Point(1, 2), new Point(0, 2)) }, // branch (taper level 1)
-        { 9, new BlockType(new Point(1, 2), new Point(1, 2), new Point(0, 2)) }, // twig (taper level 5, tips)
-        { 10, new BlockType(new Point(2, 2), new Point(2, 2), new Point(2, 2), maxHealth: 2) }, // leaves (cutout)
-        { 11, new BlockType(new Point(1, 2), new Point(1, 2), new Point(0, 2)) }, // limb (taper level 2)
-        { 12, new BlockType(new Point(1, 2), new Point(1, 2), new Point(0, 2)) }, // sprig (taper level 3)
-        { 13, new BlockType(new Point(1, 2), new Point(1, 2), new Point(0, 2)) }, // switch (taper level 4)
+        { 1, new BlockType("grass_top", "dirt", "grass_side") }, // grass
+        { 2, new BlockType("dirt", "dirt", "dirt") }, // dirt
+        { 3, new BlockType("stone", "stone", "stone") }, // stone
+        { 4, new BlockType("cobblestone", "cobblestone", "cobblestone") }, // cobblestone
+        { 5, new BlockType("tnt_top", "tnt_top", "tnt_side") }, // tnt
+        { 6, new BlockType("lantern_lit", "lantern_lit", "lantern_lit") }, // lamp
+        { 7, new BlockType("log_top", "log_top", "log_side", maxHealth: 8) }, // log (full-cube trunk base)
+        { 8, new BlockType("log_top", "log_top", "log_side") }, // branch (taper level 1)
+        { 9, new BlockType("log_top", "log_top", "log_side") }, // twig (taper level 5, tips)
+        { 10, new BlockType("leaves", "leaves", "leaves", maxHealth: 2) }, // leaves (cutout)
+        { 11, new BlockType("log_top", "log_top", "log_side") }, // limb (taper level 2)
+        { 12, new BlockType("log_top", "log_top", "log_side") }, // sprig (taper level 3)
+        { 13, new BlockType("log_top", "log_top", "log_side") }, // switch (taper level 4)
     };
 
     // Array-indexed view of Types for the meshing hot path (no dictionary hashing per block)
@@ -51,18 +51,38 @@ public class BlockType
 
     public Point Top, Bottom, Side;
 
-    // Tile per face, indexed in Chunk.CubeFaces order: -Z, +Z, -X, +X, +Y, -Y
-    public readonly Point[] FaceTiles;
+    // Tile per face, indexed in Chunk.CubeFaces order: -Z, +Z, -X, +X, +Y, -Y.
+    // Empty until ResolveAtlasTiles runs at startup; the meshing hot path reads plain
+    // tile coordinates exactly as before, so stitching costs nothing per block.
+    public Point[] FaceTiles = [];
 
     public readonly int MaxHealth;
 
-    public BlockType(Point top, Point bottom, Point side, int maxHealth = DefaultMaxHealth)
+    // Texture names without extension, resolved against the stitched atlas at startup.
+    private readonly string _topName, _bottomName, _sideName;
+
+    public BlockType(string top, string bottom, string side, int maxHealth = DefaultMaxHealth)
     {
-        Top = top;
-        Bottom = bottom;
-        Side = side;
+        _topName = top;
+        _bottomName = bottom;
+        _sideName = side;
         MaxHealth = maxHealth;
-        FaceTiles = [side, side, side, side, top, bottom];
+    }
+
+    /// <summary>
+    /// Resolves every type's texture names to stitched atlas tiles. Called once at startup
+    /// by <see cref="RenderManager"/> right after <see cref="TextureAtlas.Build"/>, before
+    /// the <see cref="World"/> and its meshing threads exist.
+    /// </summary>
+    public static void ResolveAtlasTiles()
+    {
+        foreach (var type in Types.Values)
+        {
+            type.Top = TextureAtlas.TileOf(type._topName);
+            type.Bottom = TextureAtlas.TileOf(type._bottomName);
+            type.Side = TextureAtlas.TileOf(type._sideName);
+            type.FaceTiles = [type.Side, type.Side, type.Side, type.Side, type.Top, type.Bottom];
+        }
     }
 
     private static BlockType?[] BuildById()

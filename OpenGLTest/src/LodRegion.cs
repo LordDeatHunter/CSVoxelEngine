@@ -258,14 +258,15 @@ public class LodRegion : IDisposable
             if (vertices.Count > ushort.MaxValue - 3)
                 return;
 
-            var u0 = tile.X * Chunk.TileUVSize;
-            var v0 = tile.Y * Chunk.TileUVSize;
+            var tileUv = TextureAtlas.TileUVSize;
+            var u0 = tile.X * tileUv;
+            var v0 = tile.Y * tileUv;
             Span<Vector2> uv =
             [
-                new Vector2(u0, v0 + Chunk.TileUVSize),
+                new Vector2(u0, v0 + tileUv),
                 new Vector2(u0, v0),
-                new Vector2(u0 + Chunk.TileUVSize, v0),
-                new Vector2(u0 + Chunk.TileUVSize, v0 + Chunk.TileUVSize)
+                new Vector2(u0 + tileUv, v0),
+                new Vector2(u0 + tileUv, v0 + tileUv)
             ];
 
             var face = Chunk.CubeFaces[faceIndex].face;
