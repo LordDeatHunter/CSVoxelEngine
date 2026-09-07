@@ -297,11 +297,9 @@ public class World
         {
             // Nothing was held up by this block: drop it as-is. ClearBlockAt skips the
             // remesh, so remesh the batch of one — otherwise the mined log visibly lingers.
-            if (chunk.ClearBlockAt(blockPos) != 0)
-            {
-                chunk.RemeshAfterBatchEdit(_chunkManager);
-                _dropManager.Spawn(BlockType.DropFor(brokenId), blockPos);
-            }
+            if (chunk.ClearBlockAt(blockPos) == 0) return;
+            chunk.RemeshAfterBatchEdit(_chunkManager);
+            _dropManager.Spawn(BlockType.DropFor(brokenId), blockPos);
             return;
         }
 
