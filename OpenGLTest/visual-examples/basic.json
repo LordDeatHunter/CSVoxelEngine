@@ -1,0 +1,17 @@
+{
+  // Scripted visual test: run with VOXEL_SCRIPT=visual-examples/basic.json
+  // (working directory OpenGLTest/, e.g. via dotnet run). Shots land in visual/basic/.
+  // Ops: teleport {pos, yaw?, pitch?}, look {yaw?, pitch?}, wait {seconds},
+  // walk {keys?, seconds}, mine {seconds}, place, screenshot {name?, hideHud?}.
+  // Walk keys are Silk Key names: W A S D Space ShiftLeft ControlLeft C ...
+  "steps": [
+    { "op": "wait", "seconds": 5 },
+    { "op": "screenshot", "name": "spawn" },
+    { "op": "walk", "keys": ["W"], "seconds": 5 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "walked", "hideHud": true },
+    { "op": "teleport", "pos": [0.5, 60.5, 0.5], "yaw": -90, "pitch": -30 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "overlook" }
+  ]
+}

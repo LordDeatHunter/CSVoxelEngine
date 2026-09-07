@@ -13,6 +13,8 @@ public static class Program
     private static InputManager inputManager;
     private static RenderManager renderManager;
     private static World world;
+    private static VisualDirector? visualDirector;
+    private static bool visualScriptFailed;
     private static bool debugEnabled;
     private static bool xWasPressed;
     private static bool qWasPressed;
@@ -26,6 +28,11 @@ public static class Program
 
     // Set to a number of seconds to jump the day/night cycle at startup
     private const string TimeOffsetVariable = "VOXEL_TIME";
+
+    // Set to a scenario JSON path to run a scripted visual test instead of playing:
+    // teleport/walk/mine/screenshot steps drive the real update functions, then the
+    // window closes. A bad path or bad script fails fast instead of trapping anyone.
+    private const string VisualScriptVariable = "VOXEL_SCRIPT";
 
     // Added to the window clock before the lighting pass sees it, so a screenshot can be taken
     // at any point of the day without waiting for the sun to get there
@@ -59,6 +66,20 @@ public static class Program
         };
 
         inputManager.Mouse?.Scroll += (_, wheel) => world.Inventory.Scroll(wheel.Y);
+
+        var script = Environment.GetEnvironmentVariable(VisualScriptVariable);
+        if (!string.IsNullOrWhiteSpace(script))
+        {
+            try
+            {
+                visualDirector = new VisualDirector(VisualScenario.Load(script.Trim()), world);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Ignoring {VisualScriptVariable}=\"{script}\": {e.Message}");
+                visualScriptFailed = true;
+            }
+        }
     }
 
     /// <summary>
@@ -101,6 +122,20 @@ public static class Program
 
     private static void OnUpdate(double deltaTime)
     {
+        if (visualScriptFailed)
+        {
+            windowManager.Window.Close();
+            return;
+        }
+
+        if (visualDirector != null)
+        {
+            visualDirector.Drive(deltaTime);
+            if (visualDirector.IsDone)
+                windowManager.Window.Close();
+            return;
+        }
+
         placeTimer = Math.Min(MAX_PLACE_TIMER, placeTimer + deltaTime);
         var xPressed = inputManager.Keyboard?.IsKeyPressed(Key.X) == true;
         if (xPressed && !xWasPressed)
@@ -176,8 +211,17 @@ public static class Program
         }
 
         FrameProfiler.Begin(ProfileSection.UiPass);
-        world.RenderUI(renderManager, shownFps, debugEnabled);
+        var hideHud = visualDirector?.TakeScreenshot == true && visualDirector.ScreenshotHideHud;
+        if (!hideHud)
+            world.RenderUI(renderManager, shownFps, debugEnabled);
         FrameProfiler.End(ProfileSection.UiPass);
+
+        if (visualDirector?.TakeScreenshot == true)
+        {
+            visualDirector.TakeScreenshot = false;
+            var size = windowManager.Window.FramebufferSize;
+            VisualCapture.SaveScreenshot(renderManager.gl, size.X, size.Y, visualDirector.ScreenshotPath);
+        }
 
         renderManager.EndGpuFrame();
         FrameProfiler.EndFrame();
