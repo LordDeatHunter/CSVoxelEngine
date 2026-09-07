@@ -261,6 +261,13 @@ public class World
             TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z);
             _lodManager.MarkEditedColumn((int)blockPos.X, (int)blockPos.Z);
         }
+
+        // Pebbles need the block under them: pop whatever sits right above the break. This
+        // routes through the normal pebble path, so it drops its flint; its own check above
+        // then no-ops on air, so the recursion always terminates.
+        var above = blockPos + Vector3.UnitY;
+        if (BlockIdAt(above) == BlockType.Pebble)
+            RemoveBlock(above);
     }
 
     /// <summary>
