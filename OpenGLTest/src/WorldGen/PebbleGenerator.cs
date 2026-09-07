@@ -22,9 +22,13 @@ public static class PebbleGenerator
 
     private static readonly FastNoiseLite PatchNoise;
 
+    /// <summary>Block this generator stamps; resolved once, like the noise.</summary>
+    public static readonly byte PebbleBlock;
+
     static PebbleGenerator()
     {
         PatchNoise = TerrainGenerator.MakeNoise(61, WorldGenerationConfig.PebblePatchFrequency);
+        PebbleBlock = ContentRegistry.RequireBlock("pebble").Id;
     }
 
     /// <summary>
@@ -66,7 +70,7 @@ public static class PebbleGenerator
             var i = Chunk.Idx(x, ly, z);
             if (blocks[i] != BlockType.Air) continue;
             if (ly > 0 && blocks[Chunk.Idx(x, ly - 1, z)] == BlockType.Air) continue;
-            blocks[i] = BlockType.Pebble;
+            blocks[i] = PebbleBlock;
         }
     }
 

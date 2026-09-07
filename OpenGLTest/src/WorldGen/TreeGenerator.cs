@@ -18,6 +18,16 @@ public static class TreeGenerator
     private const int PlacementSalt = 0x7E5715;
     private const int ShapeSalt = 0x7EE51F;
 
+    /// <summary>Block the canopy is made of; the wood ids come from <see cref="WoodId"/>.</summary>
+    public static readonly byte LeavesBlock;
+
+    // Explicit so the lookup happens the first time anything touches this class (after
+    // ContentRegistry.Load), not at whatever point beforefieldinit would allow
+    static TreeGenerator()
+    {
+        LeavesBlock = ContentRegistry.RequireBlock("leaves").Id;
+    }
+
     /// <summary>
     /// Stamps every tree whose volume can intersect this chunk into <paramref name="blocks"/>.
     /// Runs on a generation worker thread, after the cave carvers, before the solid recount.
@@ -126,6 +136,9 @@ public static class TreeGenerator
     /// <summary>Level of a wood block id, inverse of <see cref="WoodId"/> (leaves: -1).</summary>
     public static int WoodLevel(byte blockId) => BlockType.ById[blockId]?.WoodTaperLevel ?? -1;
 
+    /// <summary>Wood of any taper or leaves: the blocks whose removal disturbs the far-LOD canopy.</summary>
+    public static bool IsTreeBlock(byte blockId) => WoodLevel(blockId) >= 0 || blockId == LeavesBlock;
+
     /// <summary>A trunk's wood cells plus the leaf-blob centres; world coordinates.</summary>
     public record struct TreeShape(
         int TrunkX,
@@ -207,7 +220,7 @@ public static class TreeGenerator
 
             var i = Chunk.Idx(lx, ly, lz);
             var current = blocks[i];
-            if (current == BlockType.Air || current == BlockType.Leaves)
+            if (current == BlockType.Air || current == LeavesBlock)
                 blocks[i] = id;
         }
 
@@ -226,7 +239,7 @@ public static class TreeGenerator
 
             var i = Chunk.Idx(rootX, ly, rootZ);
             if (blocks[i] != BlockType.Air) break;
-            blocks[i] = BlockType.Log;
+            blocks[i] = WoodId(0);
         }
     }
 
@@ -242,7 +255,7 @@ public static class TreeGenerator
 
             var i = Chunk.Idx(lx, ly, lz);
             if (blocks[i] == BlockType.Air)
-                blocks[i] = BlockType.Leaves;
+                blocks[i] = LeavesBlock;
         }
     }
 

@@ -511,7 +511,7 @@ public class RenderManager : IDisposable
 
         foreach (var tnt in primed)
         {
-            var mesh = blockCubes.Get(BlockType.Tnt);
+            var mesh = blockCubes.Get(tnt.BlockId);
             if (mesh == null) continue;
 
             // The cube is centred on its own origin, so it scales about its centre

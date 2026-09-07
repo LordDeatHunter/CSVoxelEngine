@@ -30,6 +30,10 @@ public class PrimedTnt
 
     public Vector3 Position { get; private set; }
 
+    /// <summary>The block that primed, so the cube renders as whatever declared
+    /// <c>onBreak: prime_tnt</c> instead of one hardcoded type.</summary>
+    public byte BlockId { get; }
+
     private Vector3 _velocity;
     private float _age;
 
@@ -61,9 +65,10 @@ public class PrimedTnt
         }
     }
 
-    public PrimedTnt(Vector3 position)
+    public PrimedTnt(Vector3 position, byte blockId)
     {
         Position = position;
+        BlockId = blockId;
 
         // Small random pop so the cube visibly ejects instead of appearing dead still, with an
         // upward bias so surface-primed TNT lands back on top rather than inside the floor

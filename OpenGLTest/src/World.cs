@@ -251,7 +251,7 @@ public class World
         if (BlockType.ById[brokenId]?.OnBreak == BlockBreakAction.PrimeTnt)
         {
             if (chunk.RemoveBlockAt(blockPos, _chunkManager))
-                _tntManager.Spawn(blockPos);
+                _tntManager.Spawn(blockPos, brokenId);
         }
         // A mined wood block fells whatever it was holding up instead of dropping one
         // block (see FellWood): a trunk cut drops the crown, a branch cut only its children
@@ -271,7 +271,7 @@ public class World
 
         // Wood and leaves live above the heightmap caps, so the gate above never fires for
         // them — yet the far LOD draws their canopy. Disturb it and rebuild regardless.
-        if (TreeGenerator.WoodLevel(brokenId) >= 0 || brokenId == BlockType.Leaves)
+        if (TreeGenerator.IsTreeBlock(brokenId))
         {
             TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z);
             _lodManager.MarkEditedColumn((int)blockPos.X, (int)blockPos.Z);

@@ -88,15 +88,19 @@ the engine indexes by id. **Adding a block means adding JSON, not editing C#.**
 Ids are `byte` and chunk storage is a `byte[]`: id 0 is air (it has no definition file, and a
 block may not be named `air`), then blocks sorted by file name, then items sorted by file name.
 Blocks and items therefore share 255 ids and the registry throws if they overflow. Code that has
-to name a specific block does it through a well-known handle (`BlockType.Stone`,
-`ItemType.Flint`) resolved by name in `ContentRegistry.ResolveHandles`, so a renamed or deleted
-JSON file fails loudly at startup instead of silently mis-indexing. Every content error names the
-file it came from.
+to name a specific block or item asks for it by file name — `ContentRegistry.RequireBlock("stone")`,
+`ContentRegistry.RequireItem("bucket")` — which throws naming the missing content at startup
+instead of silently mis-indexing. Hot paths must not do that per voxel: worldgen and the LOD
+mesher resolve their palette once in the owning feature's static constructor
+(`TerrainGenerator.SurfaceBlock/SoilBlock/RockBlock/SeaBlock`, `TreeGenerator.LeavesBlock`,
+`PebbleGenerator.PebbleBlock`) and everything else reads those bytes. Best of all is not naming
+a block: when the question is "what does this block do", add a data flag and read it (see the
+convention below). Every content error names the file it came from.
 
 ### Startup order (`RenderManager.LoadResources`)
 
 1. `ContentRegistry.Load("assets")` - parses items, loot tables, blocks and every model they
-   reference, assigns ids and resolves handles. No GL, no atlas.
+   reference, and assigns ids. No GL, no atlas.
 2. `TextureAtlas.Build(gl, "assets/textures/blocks")` - stitches the tiles.
 3. `ContentRegistry.BakeModels()` - bakes each block's model into atlas-ready quads and settles
    the defaults that need to know whether the result is a full cube (`occludes`, `light.passes`).

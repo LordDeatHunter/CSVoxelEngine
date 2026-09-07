@@ -16,14 +16,17 @@ public class TntManager
 
     private readonly List<PrimedTnt> _primed = [];
     // Spawned while iterating _primed (chained TNT); drained after the tick
-    private readonly List<Vector3> _pendingSpawns = [];
+    private readonly List<(Vector3 Position, byte BlockId)> _pendingSpawns = [];
 
     public IReadOnlyList<PrimedTnt> Primed => _primed;
 
-    /// <summary>Primes a cube at the centre of the cell the block occupied.</summary>
-    public void Spawn(Vector3 blockPosition)
+    /// <summary>
+    /// Primes a cube at the centre of the cell the block occupied. The cube carries
+    /// <paramref name="blockId"/> so it renders as the block that primed.
+    /// </summary>
+    public void Spawn(Vector3 blockPosition, byte blockId)
     {
-        _primed.Add(new PrimedTnt(blockPosition + new Vector3(0.5f)));
+        _primed.Add(new PrimedTnt(blockPosition + new Vector3(0.5f), blockId));
     }
 
     public void Update(float deltaTime, ChunkManager chunks, LodManager lod, DropManager drops,
@@ -41,8 +44,8 @@ public class TntManager
             Detonate(at, chunks, lod, drops, fluids);
         }
 
-        foreach (var spawn in _pendingSpawns)
-            _primed.Add(new PrimedTnt(spawn));
+        foreach (var (position, blockId) in _pendingSpawns)
+            _primed.Add(new PrimedTnt(position, blockId));
         _pendingSpawns.Clear();
     }
 
@@ -93,13 +96,13 @@ public class TntManager
 
             // A blasted canopy must not linger in the far LOD (its rebuild is already
             // triggered per blasted column below, which then reads the poison)
-            if (TreeGenerator.WoodLevel(removed) >= 0 || removed == BlockType.Leaves)
+            if (TreeGenerator.IsTreeBlock(removed))
                 TreeGenerator.PoisonCanopy(x, z);
 
             if (BlockType.ById[removed]?.OnBreak == BlockBreakAction.PrimeTnt)
             {
                 // Deferred: the live list is being iterated further up the call stack
-                _pendingSpawns.Add(new Vector3(x + 0.5f, y + 0.5f, z + 0.5f));
+                _pendingSpawns.Add((new Vector3(x + 0.5f, y + 0.5f, z + 0.5f), removed));
             }
             else
             {

@@ -169,12 +169,18 @@ public class Inventory
     {
         var counts = new int[SlotCount];
         var ids = HotbarIds();
+
+        // Resolved once per inventory rather than per slot; this runs when the UI is built
+        var tnt = ContentRegistry.RequireBlock("tnt").Id;
+        var lamp = ContentRegistry.RequireBlock("lamp").Id;
+        var bucket = ContentRegistry.RequireItem("bucket").Id;
+
         for (var i = 0; i < ids.Length && i < SlotCount; i++)
-            if (ids[i] == BlockType.Tnt)
+            if (ids[i] == tnt)
                 counts[i] = StartingTnt;
-            else if (ids[i] == BlockType.Lamp)
+            else if (ids[i] == lamp)
                 counts[i] = StartingLamps;
-            else if (ids[i] == ItemType.Bucket)
+            else if (ids[i] == bucket)
                 counts[i] = StartingBuckets;
         return counts;
     }

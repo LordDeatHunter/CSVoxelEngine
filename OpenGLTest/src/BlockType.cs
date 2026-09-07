@@ -11,8 +11,7 @@ namespace silkgltriangle;
 /// threads can read them freely.
 ///
 /// The static side is the hot-path view: plain arrays indexed by block id, so face culling and
-/// AO cost an array read instead of a dictionary lookup, plus the well-known handles worldgen
-/// and gameplay code names blocks by.
+/// AO cost an array read instead of a dictionary lookup.
 /// </summary>
 public sealed record BlockType
 {
@@ -21,18 +20,6 @@ public sealed record BlockType
 
     /// <summary>Hits a block takes before it breaks; one hit lands per World.BlockHitSeconds.</summary>
     public const int DefaultMaxHealth = 5;
-
-    // Well-known handles, resolved by name after the registry has assigned ids. Code that
-    // decides what to generate or how to react to a break names blocks through these.
-    public static byte Grass { get; internal set; }
-    public static byte Dirt { get; internal set; }
-    public static byte Stone { get; internal set; }
-    public static byte Tnt { get; internal set; }
-    public static byte Lamp { get; internal set; }
-    public static byte Log { get; internal set; }
-    public static byte Leaves { get; internal set; }
-    public static byte Pebble { get; internal set; }
-    public static byte Water { get; internal set; }
 
     /// <summary>Every registered block by id; null where no block owns that id.</summary>
     public static readonly BlockType?[] ById = new BlockType?[256];

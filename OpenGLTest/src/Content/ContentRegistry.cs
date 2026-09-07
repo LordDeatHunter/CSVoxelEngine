@@ -19,6 +19,10 @@ namespace silkgltriangle;
 /// parsed models into atlas-ready quads, which is also when the defaults that depend on a
 /// model being a full cube (occlusion, light passing) are settled.</item>
 /// </list>
+/// Code that has to name one specific piece of content asks for it by file name afterwards
+/// through <see cref="RequireBlock"/> / <see cref="RequireItem"/>, which throw rather than
+/// return a wrong id.
+///
 /// Every failure names the file it came from: content errors are authoring mistakes, and a
 /// startup crash pointing at the offending JSON beats a block that silently renders wrong.
 /// </summary>
@@ -81,8 +85,6 @@ public static class ContentRegistry
         LoadLootTables(Path.Combine(assetsRoot, "data", "loot"));
         LoadBlocks(blockFiles);
         ValidateItemUses(itemFiles);
-
-        ResolveHandles();
     }
 
     /// <summary>
@@ -141,6 +143,25 @@ public static class ContentRegistry
     {
         if (TryResolve(name, out var id)) return id;
         throw new InvalidOperationException($"No block or item named '{name}' is registered.");
+    }
+
+    /// <summary>
+    /// The block registered under <paramref name="name"/> (its JSON file name), for the few
+    /// features that have to name one specific block. Blocks only, so an item sharing the name
+    /// can never be picked up by mistake.
+    /// </summary>
+    public static BlockType RequireBlock(string name)
+    {
+        if (BlockIds.TryGetValue(name, out var id)) return BlockType.ById[id]!;
+        throw new InvalidOperationException($"No block named '{name}' is registered.");
+    }
+
+    /// <summary>The item registered under that JSON file name; items only, like
+    /// <see cref="RequireBlock"/>.</summary>
+    public static ItemType RequireItem(string name)
+    {
+        if (ItemIds.TryGetValue(name, out var id)) return ItemType.Types[id];
+        throw new InvalidOperationException($"No item named '{name}' is registered.");
     }
 
     /// <summary>The compiled loot table of that name, or null when there is none.</summary>
@@ -339,25 +360,6 @@ public static class ContentRegistry
                 throw new InvalidOperationException($"No block declares wood.taperLevel {level}.");
 
         return byLevel;
-    }
-
-    private static void ResolveHandles()
-    {
-        BlockType.Grass = Require("block/grass");
-        BlockType.Dirt = Require("block/dirt");
-        BlockType.Stone = Require("block/stone");
-        BlockType.Tnt = Require("block/tnt");
-        BlockType.Lamp = Require("block/lamp");
-        BlockType.Log = Require("block/log");
-        BlockType.Leaves = Require("block/leaves");
-        BlockType.Pebble = Require("block/pebble");
-        BlockType.Water = Require("block/water");
-
-        ItemType.Vine = Require("item/vine");
-        ItemType.Branch = Require("item/branch");
-        ItemType.Flint = Require("item/flint");
-        ItemType.Bucket = Require("item/bucket");
-        ItemType.WaterBucket = Require("item/water_bucket");
     }
 
     private static LootTable? ResolveLoot(string blockName, string? loot, string path)

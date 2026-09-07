@@ -22,8 +22,29 @@ public static class TerrainGenerator
     private static readonly FastNoiseLite EntranceNoise;
     private static readonly FastNoiseLite IntensityNoise;
 
+    // The terrain palette: the generator owns the choice of which blocks natural ground is made
+    // of, and Chunk only fills its columns with them. Resolved once here so the per-voxel fill
+    // and the far LOD both read a byte instead of hitting the registry.
+
+    /// <summary>Block the top of a dry column is made of.</summary>
+    public static readonly byte SurfaceBlock;
+
+    /// <summary>Block filling the soil band under the surface (and the top of a sea floor).</summary>
+    public static readonly byte SoilBlock;
+
+    /// <summary>Block everything below the soil band is made of.</summary>
+    public static readonly byte RockBlock;
+
+    /// <summary>Fluid the sea is filled with, up to and including sea level.</summary>
+    public static readonly byte SeaBlock;
+
     static TerrainGenerator()
     {
+        SurfaceBlock = ContentRegistry.RequireBlock("grass").Id;
+        SoilBlock = ContentRegistry.RequireBlock("dirt").Id;
+        RockBlock = ContentRegistry.RequireBlock("stone").Id;
+        SeaBlock = ContentRegistry.RequireBlock("water").Id;
+
         // The rolling base keeps the original seed and settings exactly, so natural terrain
         // is unchanged wherever the flat mask stays at zero. The mask is rare and
         // low-frequency on purpose: most of the world keeps its old look, and only large

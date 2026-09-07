@@ -273,10 +273,10 @@ public class LodRegion : IDisposable
             }
         }
 
-        var grass = BlockType.ById[BlockType.Grass]!;
-        var dirt = BlockType.ById[BlockType.Dirt]!;
-        var stone = BlockType.ById[BlockType.Stone]!;
-        var leaves = BlockType.ById[BlockType.Leaves]!;
+        var grass = BlockType.ById[TerrainGenerator.SurfaceBlock]!;
+        var dirt = BlockType.ById[TerrainGenerator.SoilBlock]!;
+        var stone = BlockType.ById[TerrainGenerator.RockBlock]!;
+        var leaves = BlockType.ById[TreeGenerator.LeavesBlock]!;
 
         var vertices = new List<Vertex>(8192);
         var indices = new List<ushort>(12288);
@@ -335,7 +335,7 @@ public class LodRegion : IDisposable
         // the chunk water surface minus this level's height bias (the terrain shells are
         // lowered the same way) and a further LodWaterSink, which keeps level 0 just under the
         // real chunk water it meets at the full-detail ring instead of z-fighting it.
-        var water = BlockType.ById[BlockType.Water]!;
+        var water = BlockType.ById[TerrainGenerator.SeaBlock]!;
         var waterTile = water.FaceTiles[topFace];
         var sheetY = WorldGenerationConfig.SeaLevel + FluidState.SourceHeight
                      - spec.HeightBias - WorldGenerationConfig.LodWaterSink;

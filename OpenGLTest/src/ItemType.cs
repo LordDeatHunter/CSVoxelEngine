@@ -12,13 +12,6 @@ namespace silkgltriangle;
 /// </summary>
 public sealed class ItemType
 {
-    // Well-known handles, resolved by name once the registry has assigned ids
-    public static byte Vine { get; internal set; }
-    public static byte Branch { get; internal set; }
-    public static byte Flint { get; internal set; }
-    public static byte Bucket { get; internal set; }
-    public static byte WaterBucket { get; internal set; }
-
     /// <summary>Every registered item by id.</summary>
     public static IReadOnlyDictionary<byte, ItemType> Types { get; internal set; } =
         new Dictionary<byte, ItemType>();

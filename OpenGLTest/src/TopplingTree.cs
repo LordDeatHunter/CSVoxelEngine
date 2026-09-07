@@ -159,10 +159,10 @@ public class TopplingTree : IDisposable
                 var leaf = cell + new Vector3(dx, dy, dz);
                 if ((int)leaf.Y < baseY || !taken.Add(leaf))
                     continue;
-                if (chunks.GetBlockGlobal((int)leaf.X, (int)leaf.Y, (int)leaf.Z) != BlockType.Leaves)
+                if (chunks.GetBlockGlobal((int)leaf.X, (int)leaf.Y, (int)leaf.Z) != TreeGenerator.LeavesBlock)
                     continue;
 
-                collected.Add(new FellBlock(leaf, BlockType.Leaves));
+                collected.Add(new FellBlock(leaf, TreeGenerator.LeavesBlock));
             }
 
         return collected;

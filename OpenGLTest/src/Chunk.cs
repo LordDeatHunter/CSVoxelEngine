@@ -413,7 +413,7 @@ public class Chunk : IDisposable
             for (var y = 0; y <= top; y++)
             {
                 var i = Idx(x, y, z);
-                if (_blocks[i] == BlockType.Air) _blocks[i] = BlockType.Water;
+                if (_blocks[i] == BlockType.Air) _blocks[i] = TerrainGenerator.SeaBlock;
             }
         }
     }
@@ -451,17 +451,19 @@ public class Chunk : IDisposable
     // A submerged column tops out in dirt instead: grass does not grow on a sea floor.
     private void GenerateColumn(int x, int z, int terrainHeight, int dirtDepth, int lowerBoundY)
     {
-        var topBlock = TerrainGenerator.IsSubmerged(terrainHeight) ? BlockType.Dirt : BlockType.Grass;
+        var topBlock = TerrainGenerator.IsSubmerged(terrainHeight)
+            ? TerrainGenerator.SoilBlock
+            : TerrainGenerator.SurfaceBlock;
 
         for (var y = 0; y < Size; y++)
         {
             var depth = terrainHeight - (lowerBoundY + y);
             if (depth < 0) break;
 
-            _blocks[Idx(x, y, z)] = dirtDepth == 0 ? BlockType.Stone
+            _blocks[Idx(x, y, z)] = dirtDepth == 0 ? TerrainGenerator.RockBlock
                 : depth == 0 ? topBlock
-                : depth <= dirtDepth ? BlockType.Dirt
-                : BlockType.Stone;
+                : depth <= dirtDepth ? TerrainGenerator.SoilBlock
+                : TerrainGenerator.RockBlock;
         }
     }
 
