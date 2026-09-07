@@ -16,6 +16,15 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
 {
     public readonly ConcurrentDictionary<(int Level, int X, int Z), LodRegion> Regions = new();
 
+    /// <summary>
+    /// The same regions as <see cref="Regions"/>, flat, so the main thread can walk them
+    /// without the locked full-table copy <c>Regions.Values</c> makes every frame. Order is
+    /// irrelevant (the render passes sort what they draw), so entries are swap-removed.
+    /// Main thread only — <see cref="Update"/> maintains it and the render passes read it.
+    /// <see cref="Regions"/> stays concurrent because the background builder probes it by key.
+    /// </summary>
+    public readonly List<LodRegion> RegionList = new(512);
+
     private readonly ConcurrentDictionary<(int Level, int X, int Z), byte> _queued = new();
     private readonly ConcurrentDictionary<(int Level, int X, int Z), byte> _dirtyRegions = new();
     private readonly ConcurrentQueue<LodMeshData> _completedMeshes = new();
@@ -171,15 +180,20 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
         for (var level = 0; level < LodRegion.Levels.Length; level++)
             camRegions[level] = CameraRegion(level);
 
-        foreach (var (key, region) in Regions)
+        // Backwards by index because this loop removes as it goes: a swap-remove drops the
+        // last entry into the hole, and a descending walk has already visited that entry.
+        for (var i = RegionList.Count - 1; i >= 0; i--)
         {
-            var radius = LodRegion.Levels[key.Level].RegionRadius + 1;
-            var dx = key.X - camRegions[key.Level].camX;
-            var dz = key.Z - camRegions[key.Level].camZ;
+            var region = RegionList[i];
+            var radius = LodRegion.Levels[region.Level].RegionRadius + 1;
+            var dx = region.X - camRegions[region.Level].camX;
+            var dz = region.Z - camRegions[region.Level].camZ;
             if (dx * dx + dz * dz <= radius * radius)
                 continue;
 
+            var key = (region.Level, region.X, region.Z);
             if (!Regions.TryRemove(key, out var removed)) continue;
+            RemoveRegion(removed);
             removed.Dispose();
             _queued.TryRemove(key, out _);
         }
@@ -203,14 +217,48 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
             if (Regions.TryRemove(key, out var replaced))
             {
                 region.Lifetime = replaced.Lifetime; // rebuilt region keeps its fade state
+                RemoveRegion(replaced);
                 replaced.Dispose();
             }
 
-            Regions[key] = region;
+            AddRegion(key, region);
             uploaded++;
         }
 
         UpdateBuriedFlags(chunkManager);
+    }
+
+    /// <summary>
+    /// Registers a region in both the lookup table and <see cref="RegionList"/>.
+    /// Main thread only.
+    /// </summary>
+    private void AddRegion((int Level, int X, int Z) key, LodRegion region)
+    {
+        Regions[key] = region;
+        region.ListIndex = RegionList.Count;
+        RegionList.Add(region);
+    }
+
+    /// <summary>
+    /// Swap-removes a region from <see cref="RegionList"/>; a no-op for one that is not in it.
+    /// The caller removes it from <see cref="Regions"/> itself, which is where the key lives.
+    /// Main thread only.
+    /// </summary>
+    private void RemoveRegion(LodRegion region)
+    {
+        var index = region.ListIndex;
+        if (index < 0) return;
+
+        var last = RegionList.Count - 1;
+        if (index != last)
+        {
+            var moved = RegionList[last];
+            RegionList[index] = moved;
+            moved.ListIndex = index;
+        }
+
+        RegionList.RemoveAt(last);
+        region.ListIndex = -1;
     }
 
     /// <summary>
@@ -229,10 +277,11 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
     {
         var camChunk = (_camera!.Position / Chunk.Size).Floor();
 
-        foreach (var (key, region) in Regions)
+        for (var i = 0; i < RegionList.Count; i++)
         {
-            region.IsBuried = key.Level > 0
-                ? IsCoveredByFinerLevel(key.Level, key.X, key.Z)
+            var region = RegionList[i];
+            region.IsBuried = region.Level > 0
+                ? IsCoveredByFinerLevel(region.Level, region.X, region.Z)
                 : IsCoveredByChunks(region, chunkManager, camChunk);
         }
     }

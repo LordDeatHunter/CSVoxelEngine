@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,7 +14,43 @@ namespace silkgltriangle;
 public class ChunkManager(GL gl)
 {
     public readonly ConcurrentDictionary<Vector3, Chunk> Chunks = new();
-    
+
+    /// <summary>
+    /// Every loaded chunk that currently has an opaque or a translucent mesh. The render
+    /// passes walk this flat list instead of <see cref="Chunks"/>: enumerating the dictionary
+    /// by <c>Values</c> takes a locked full-table copy and then hands the passes every loaded
+    /// chunk, the large majority of which have nothing to draw. Order is irrelevant — each
+    /// pass sorts what it draws — so entries are swap-removed.
+    /// Main thread only: it is maintained by <see cref="Update"/> and
+    /// <see cref="ImmediateRemesh"/>, the only places a chunk's mesh appears or disappears.
+    /// </summary>
+    public readonly List<Chunk> Renderable = new(4096);
+
+    /// <summary>
+    /// Bumped every time <see cref="Renderable"/> changes, so a consumer that derives
+    /// something from the set of drawn chunks can tell "nothing moved since last frame" and
+    /// skip the recompute. Main thread only.
+    /// </summary>
+    public int MeshVersion { get; private set; }
+
+    /// <summary>
+    /// How many chunks are loaded. A maintained counter rather than <c>Chunks.Count</c>,
+    /// which locks every segment of the dictionary to add the per-segment counts up.
+    /// </summary>
+    public int LoadedChunkCount => _loadedChunkCount;
+
+    private int _loadedChunkCount;
+
+    // The camera chunk the last unload scan ran for, and how many frames ago that was. See
+    // Update: chunks only leave the load sphere when the camera crosses a chunk border.
+    private Vector3? _lastUnloadCamChunk;
+    private int _framesSinceUnloadScan;
+
+    // Frames after which the unload scan runs even though the camera has not changed chunk.
+    // Covers a chunk a generation worker registered just after the camera moved, which the
+    // scan for that move could have missed.
+    private const int UnloadScanFallbackFrames = 120;
+
     // The sequence number stamps each result with the order it finished in. ApplyCompletedMeshes
     // sorts by distance, and two results for the same chunk (an older one re-queued by the
     // upload budget, plus a newer rebuild) tie there, so without it the unstable sort could
@@ -56,8 +91,16 @@ public class ChunkManager(GL gl)
 
         var camChunk = (camera.Position / Chunk.Size).Floor();
 
+        // A loaded chunk can only fall out of range when the camera crosses a chunk border,
+        // so scanning every loaded chunk on the frames in between finds nothing. The periodic
+        // fallback covers a chunk registered by a generation worker just after a move.
         FrameProfiler.Begin(ProfileSection.ChunkUnload);
-        UnloadDistantChunks(camChunk);
+        if (camChunk != _lastUnloadCamChunk || ++_framesSinceUnloadScan >= UnloadScanFallbackFrames)
+        {
+            _lastUnloadCamChunk = camChunk;
+            _framesSinceUnloadScan = 0;
+            UnloadDistantChunks(camChunk);
+        }
         FrameProfiler.End(ProfileSection.ChunkUnload);
 
         FrameProfiler.Begin(ProfileSection.ChunkApply);
@@ -71,14 +114,20 @@ public class ChunkManager(GL gl)
 
     private void UnloadDistantChunks(Vector3 camChunk)
     {
-        foreach (var pos in Chunks.Keys)
+        // The ConcurrentDictionary enumerator is lock-free and copies nothing (unlike Keys),
+        // and removing entries through it while enumerating is explicitly supported.
+        foreach (var kvp in Chunks)
         {
+            var pos = kvp.Key;
             if (Vector3.DistanceSquared(pos, camChunk) <= WorldGenerationConfig.ChunkRadiusSq)
                 continue;
-                
+
             if (!Chunks.TryRemove(pos, out var chunk)) continue;
-            
+
+            // Dispose nulls both meshes, so the Renderable bookkeeping has to happen first
+            RemoveRenderable(chunk);
             chunk.Dispose();
+            Interlocked.Decrement(ref _loadedChunkCount);
             _queuedChunkPositions.TryRemove(pos, out _);
             _generatingMeshes.TryRemove(pos, out _);
             _dirtyChunks.TryRemove(pos, out _);
@@ -120,14 +169,16 @@ public class ChunkManager(GL gl)
 
         foreach (var (pos, chunk, meshData, seq) in pending)
         {
-            // Skip chunks that moved out of range or were unloaded
+            // Skip chunks that moved out of range, were unloaded, or were replaced by a
+            // freshly generated chunk at the same position while this build ran: uploading
+            // into the dead one would leave a mesh in Renderable that no unload ever removes
             if (Vector3.DistanceSquared(pos, camChunk) > WorldGenerationConfig.ChunkRadiusSq ||
-                !Chunks.ContainsKey(pos))
+                !Chunks.TryGetValue(pos, out var live) || !ReferenceEquals(live, chunk))
                 continue;
-            
+
             if (appliedCount < WorldGenerationConfig.MaxMeshUploadsPerFrame)
             {
-                chunk.UpdateMesh(meshData);
+                ApplyMesh(chunk, meshData);
                 appliedCount++;
             }
             else
@@ -139,51 +190,132 @@ public class ChunkManager(GL gl)
         }
     }
 
+    // Reused across frames: the dirty entries eligible to mesh this frame, with the distance
+    // the per-frame budget sorts on. Cleared after every pass so it holds no chunk references
+    // at rest.
+    private readonly List<(Vector3 pos, Chunk chunk, float distSq)> _dirtyCandidates = new(256);
+
     private void ProcessDirtyChunks(Vector3 camChunk)
     {
         if (_dirtyChunks.IsEmpty) return;
 
-        // Snapshot and sort dirty chunks by distance
-        var dirtyPositions = _dirtyChunks.Keys.ToArray();
-        
-        Array.Sort(dirtyPositions, (a, b) =>
-            Vector3.DistanceSquared(a, camChunk)
-                .CompareTo(Vector3.DistanceSquared(b, camChunk)));
+        _dirtyCandidates.Clear();
 
-        var processedCount = 0;
-
-        foreach (var pos in dirtyPositions)
+        // Lock-free enumeration, no snapshot; removing through it while enumerating is safe
+        foreach (var kvp in _dirtyChunks)
         {
-            if (processedCount >= WorldGenerationConfig.MaxDirtyChunksPerFrame)
-                break;
+            var pos = kvp.Key;
+            var distSq = Vector3.DistanceSquared(pos, camChunk);
 
-            // Out of range - just remove
-            if (Vector3.DistanceSquared(pos, camChunk) > WorldGenerationConfig.ChunkRadiusSq)
+            // Out of range, or unloaded — just drop the entry
+            if (distSq > WorldGenerationConfig.ChunkRadiusSq || !Chunks.TryGetValue(pos, out var chunk))
             {
                 _dirtyChunks.TryRemove(pos, out _);
                 continue;
             }
 
-            if (!Chunks.TryGetValue(pos, out var chunk))
-            {
-                _dirtyChunks.TryRemove(pos, out _);
+            // A build is already in flight for this chunk. The entry stays: it was added after
+            // that build took its snapshot, so the chunk has to mesh again once it finishes.
+            if (_generatingMeshes.ContainsKey(pos))
                 continue;
-            }
 
-            // Not ready yet or already meshing - skip, will retry next frame
-            if (!chunk.IsBlockDataReady || _generatingMeshes.ContainsKey(pos))
+            // Block data is always ready for a chunk in Chunks (QueueChunk generates before
+            // inserting), but the check is cheap and keeps the contract honest
+            if (!chunk.IsBlockDataReady)
+                continue;
+
+            // Claim the entry BEFORE the neighbour test, and drop a chunk that is still
+            // missing a face neighbour instead of retrying it every frame. QueueChunk
+            // re-dirties all six neighbours of a chunk when it arrives (with its block data
+            // already generated), so the missing neighbour's arrival is what wakes this chunk
+            // back up. Removing first closes the race where that TryAdd would be a no-op
+            // because this entry still existed. This is what lets _dirtyChunks reach empty at
+            // rest: the rim chunks of the load sphere never get their outer neighbour until
+            // the camera moves, and used to be rescanned every single frame.
+            if (!_dirtyChunks.TryRemove(pos, out _))
                 continue;
 
             if (!HasAllNeighbors(pos))
                 continue;
 
-            // Ready to mesh
-            if (!_dirtyChunks.TryRemove(pos, out _))
-                continue;
-
-            StartMeshGeneration(pos, chunk);
-            processedCount++;
+            _dirtyCandidates.Add((pos, chunk, distSq));
         }
+
+        if (_dirtyCandidates.Count > WorldGenerationConfig.MaxDirtyChunksPerFrame)
+        {
+            // Only sorted when the budget actually has to choose between candidates
+            _dirtyCandidates.Sort((a, b) => a.distSq.CompareTo(b.distSq));
+
+            for (var i = 0; i < WorldGenerationConfig.MaxDirtyChunksPerFrame; i++)
+                StartMeshGeneration(_dirtyCandidates[i].pos, _dirtyCandidates[i].chunk);
+
+            // Everything past the budget goes back in the dirty set for next frame
+            for (var i = WorldGenerationConfig.MaxDirtyChunksPerFrame; i < _dirtyCandidates.Count; i++)
+                _dirtyChunks.TryAdd(_dirtyCandidates[i].pos, 0);
+        }
+        else
+        {
+            for (var i = 0; i < _dirtyCandidates.Count; i++)
+                StartMeshGeneration(_dirtyCandidates[i].pos, _dirtyCandidates[i].chunk);
+        }
+
+        // Don't keep the chunk references alive between frames
+        _dirtyCandidates.Clear();
+    }
+
+    /// <summary>
+    /// Uploads a finished mesh to the chunk and keeps <see cref="Renderable"/> in step with it.
+    /// Main thread only, like every GL call.
+    /// </summary>
+    private void ApplyMesh(Chunk chunk, ChunkMeshData meshData)
+    {
+        chunk.UpdateMesh(meshData);
+        SyncRenderable(chunk);
+    }
+
+    /// <summary>
+    /// Adds <paramref name="chunk"/> to <see cref="Renderable"/> or drops it, to match whether
+    /// it currently has anything to draw — a rebuild can also empty a chunk that had a mesh
+    /// (the last block mined out of it). Main thread only.
+    /// </summary>
+    private void SyncRenderable(Chunk chunk)
+    {
+        var wants = chunk.HasMesh || chunk.HasTranslucentMesh;
+
+        if (!wants)
+        {
+            RemoveRenderable(chunk);
+            return;
+        }
+
+        if (chunk.RenderIndex >= 0) return;
+
+        chunk.RenderIndex = Renderable.Count;
+        Renderable.Add(chunk);
+        MeshVersion++;
+    }
+
+    /// <summary>
+    /// Swap-removes a chunk from <see cref="Renderable"/>; a no-op for a chunk that is not in
+    /// the list. Must run before <see cref="Chunk.Dispose"/>, which nulls the meshes this
+    /// bookkeeping is keyed on. Main thread only.
+    /// </summary>
+    private void RemoveRenderable(Chunk chunk)
+    {
+        var index = chunk.RenderIndex;
+        if (index < 0) return;
+
+        var last = Renderable.Count - 1;
+        if (index != last)
+        {
+            var moved = Renderable[last];
+            Renderable[index] = moved;
+            moved.RenderIndex = index;
+        }
+
+        Renderable.RemoveAt(last);
+        chunk.RenderIndex = -1;
+        MeshVersion++;
     }
 
     private void StartMeshGeneration(Vector3 pos, Chunk chunk)
@@ -233,6 +365,7 @@ public class ChunkManager(GL gl)
         // which already processes closest chunks first.
         var chunk = new Chunk(gl, pos, generateBlockData: true);
         Chunks[pos] = chunk;
+        Interlocked.Increment(ref _loadedChunkCount);
         _loadedChunks.Enqueue(chunk);
 
         // Mark this chunk and neighbors dirty for meshing
@@ -306,7 +439,7 @@ public class ChunkManager(GL gl)
             return;
         }
 
-        chunk.UpdateMesh(meshData);
+        ApplyMesh(chunk, meshData);
     }
 
     /// <summary>

@@ -87,6 +87,13 @@ public class Chunk : IDisposable
     public bool IsMeshed { get; private set; }
 
     /// <summary>
+    /// This chunk's index in <see cref="ChunkManager.Renderable"/>, or -1 while it is not in
+    /// that list (no mesh at all, or unloaded). Maintained by <see cref="ChunkManager"/> on
+    /// the main thread only.
+    /// </summary>
+    public int RenderIndex = -1;
+
+    /// <summary>
     /// The lowest terrain-surface height (<see cref="ColumnData.MinHeight"/>: ravines already
     /// cut in, caves not — carvers only remove blocks) anywhere in this chunk's 16x16 column.
     /// Nothing in a chunk whose top is below this can be lit by the sun, which is what the

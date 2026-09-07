@@ -1,0 +1,7 @@
+<Project>
+  <!-- Plain `dotnet build` / `dotnet run` build Release. Debug is several times slower in the
+       voxel loops and only worth it for breakpoints; pass -c Debug explicitly for that. -->
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)'==''">Release</Configuration>
+  </PropertyGroup>
+</Project>

@@ -82,55 +82,77 @@ public class Shader : IDisposable
         return location;
     }
 
-    public void SetUniform(string name, float value)
+    // Locations of the elements of a fixed-size array uniform, so a caller that sets one
+    // every frame never rebuilds the "name[i]" strings the lookup would need
+    private readonly Dictionary<string, int[]> _uniformArrayLocations = new();
+
+    /// <summary>
+    /// Resolves and caches the locations of <paramref name="count"/> elements of the array
+    /// uniform <paramref name="name"/>. Hot draw loops should hold on to the returned array
+    /// and pass it to <see cref="SetUniformArray3(int[], ReadOnlySpan{Vector3})"/> rather than
+    /// going through the name each time, which allocates one string per element.
+    /// </summary>
+    public int[] GetUniformArrayLocations(string name, int count)
     {
-        var loc = GetUniformLocation(name);
-        _gl.Uniform1(loc, value);
+        if (_uniformArrayLocations.TryGetValue(name, out var locations) && locations.Length == count)
+            return locations;
+
+        locations = new int[count];
+        for (var i = 0; i < count; i++)
+            locations[i] = GetUniformLocation($"{name}[{i}]");
+
+        _uniformArrayLocations[name] = locations;
+        return locations;
     }
 
-    public void SetUniform(string name, int value)
-    {
-        var loc = GetUniformLocation(name);
-        _gl.Uniform1(loc, value);
-    }
+    public void SetUniform(string name, float value) => SetUniform(GetUniformLocation(name), value);
 
-    public void SetUniform(string name, Vector3 value)
-    {
-        var loc = GetUniformLocation(name);
-        _gl.Uniform3(loc, value.X, value.Y, value.Z);
-    }
+    public void SetUniform(int location, float value) => _gl.Uniform1(location, value);
+
+    public void SetUniform(string name, int value) => SetUniform(GetUniformLocation(name), value);
+
+    public void SetUniform(int location, int value) => _gl.Uniform1(location, value);
+
+    public void SetUniform(string name, Vector3 value) => SetUniform(GetUniformLocation(name), value);
+
+    public void SetUniform(int location, Vector3 value) => _gl.Uniform3(location, value.X, value.Y, value.Z);
 
     /// <summary>Sets a fixed-size vec3 array uniform (point light positions/colors).</summary>
-    public void SetUniformArray3(string name, Vector3[] values)
+    public void SetUniformArray3(string name, Vector3[] values) =>
+        SetUniformArray3(GetUniformArrayLocations(name, values.Length), values);
+
+    /// <summary>
+    /// Sets a fixed-size vec3 array uniform through locations already resolved by
+    /// <see cref="GetUniformArrayLocations"/>, so no strings are built per call.
+    /// </summary>
+    public void SetUniformArray3(int[] locations, ReadOnlySpan<Vector3> values)
     {
-        for (var i = 0; i < values.Length; i++)
-        {
-            var loc = GetUniformLocation($"{name}[{i}]");
-            _gl.Uniform3(loc, values[i].X, values[i].Y, values[i].Z);
-        }
+        var count = Math.Min(locations.Length, values.Length);
+        for (var i = 0; i < count; i++)
+            _gl.Uniform3(locations[i], values[i].X, values[i].Y, values[i].Z);
     }
 
-    public void SetUniform(string name, Vector4 value)
-    {
-        var loc = GetUniformLocation(name);
-        _gl.Uniform4(loc, value.X, value.Y, value.Z, value.W);
-    }
+    public void SetUniform(string name, Vector4 value) => SetUniform(GetUniformLocation(name), value);
+
+    public void SetUniform(int location, Vector4 value) =>
+        _gl.Uniform4(location, value.X, value.Y, value.Z, value.W);
 
     /// <summary>Sets a GLSL bool uniform, which the API takes as an int.</summary>
-    public void SetUniform(string name, bool value)
-    {
-        var loc = GetUniformLocation(name);
-        _gl.Uniform1(loc, value ? 1 : 0);
-    }
+    public void SetUniform(string name, bool value) => SetUniform(GetUniformLocation(name), value);
 
-    public void SetUniform(string name, Matrix4x4 value, bool transpose = false)
+    /// <summary>Sets a GLSL bool uniform, which the API takes as an int.</summary>
+    public void SetUniform(int location, bool value) => _gl.Uniform1(location, value ? 1 : 0);
+
+    public void SetUniform(string name, Matrix4x4 value, bool transpose = false) =>
+        SetUniform(GetUniformLocation(name), value, transpose);
+
+    public void SetUniform(int location, Matrix4x4 value, bool transpose = false)
     {
-        var loc = GetUniformLocation(name);
         unsafe
         {
             fixed (float* ptr = &MemoryMarshal.GetReference(MemoryMarshal.CreateSpan(ref value.M11, 16)))
             {
-                _gl.UniformMatrix4(loc, 1, transpose, ptr);
+                _gl.UniformMatrix4(location, 1, transpose, ptr);
             }
         }
     }

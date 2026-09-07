@@ -129,19 +129,19 @@ public class World
     {
         // Depth-only sun pass first: every world draw below samples the shadow map it fills
         FrameProfiler.Begin(ProfileSection.Shadows);
-        renderManager.RenderShadows(Camera, _chunkManager.Chunks.Values, _tntManager.Primed, _toppling);
+        renderManager.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _toppling);
         FrameProfiler.End(ProfileSection.Shadows);
 
         FrameProfiler.Begin(ProfileSection.LodPass);
-        renderManager.RenderLod(Camera, _lodManager.Regions.Values);
+        renderManager.RenderLod(Camera, _lodManager.RegionList);
         FrameProfiler.End(ProfileSection.LodPass);
 
         FrameProfiler.Begin(ProfileSection.WorldPass);
-        renderManager.RenderWorld(Camera, _chunkManager.Chunks.Values, _window.Time);
+        renderManager.RenderWorld(Camera, _chunkManager.Renderable, _window.Time);
         FrameProfiler.End(ProfileSection.WorldPass);
 
         // The frustum test inside RenderWorld has just counted what is on screen
-        FrameProfiler.SetCounts(_chunkManager.Chunks.Count, renderManager.LastVisibleChunkCount);
+        FrameProfiler.SetCounts(_chunkManager.LoadedChunkCount, renderManager.LastVisibleChunkCount);
 
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.RenderItemDrops(Camera, _dropManager.Drops);
@@ -153,8 +153,8 @@ public class World
         // Water last of the world passes: it blends, so everything it can cover has to be in
         // the depth buffer already
         FrameProfiler.Begin(ProfileSection.WaterPass);
-        renderManager.RenderWorldTranslucent(Camera, _chunkManager.Chunks.Values,
-            _lodManager.Regions.Values);
+        renderManager.RenderWorldTranslucent(Camera, _chunkManager.Renderable,
+            _lodManager.RegionList);
         FrameProfiler.End(ProfileSection.WaterPass);
 
         // With no target there is nothing left to draw, so SelectPass only opens past here and

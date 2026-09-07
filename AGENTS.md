@@ -14,9 +14,17 @@ There is a single executable project. Historical naming quirks to be aware of:
 ## Build and run
 
 ```powershell
-dotnet build OpenGLTest.sln
-dotnet run --project OpenGLTest/silkgltriangle.csproj
+dotnet build OpenGLTest.sln -c Release
+dotnet run --project OpenGLTest/silkgltriangle.csproj -c Release
 ```
+
+Always build and run **Release**. Debug is several times slower in the voxel loops (mesh
+builds, light propagation, the per-frame chunk walks), so a framerate or hitch observed in Debug
+says little about the game. `Directory.Build.props` at the repo root makes Release the default
+when no `-c` is given to a project build or `dotnet run`; a solution build still needs the
+explicit `-c Release`, and Rider's run configuration follows the solution configuration
+dropdown, which must be set to `Release | Any CPU`. Use `-c Debug` only when you need
+breakpoints. The startup line `Build: Release | debugger ...` confirms which one is running.
 
 Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit. All three parse once at startup and ignore garbage with a console warning.
 

@@ -51,6 +51,12 @@ public class LodRegion : IDisposable
     /// </summary>
     public bool IsBuried;
 
+    /// <summary>
+    /// This region's index in <see cref="LodManager.RegionList"/>, or -1 while it is not in
+    /// that list. Maintained by <see cref="LodManager"/> on the main thread only.
+    /// </summary>
+    public int ListIndex = -1;
+
     public readonly int Level;
     public readonly int X, Z;          // region grid coordinates (in this level's grid)
     public readonly int SizeBlocks;

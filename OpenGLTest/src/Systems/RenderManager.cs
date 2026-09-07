@@ -38,8 +38,8 @@ public class RenderManager : IDisposable
     private uint _shadowDepthTex;
     private Vector2D<int> _viewportSize;
 
-    // Per-frame lighting state, pushed once per frame via SetLighting and applied
-    // to the world shader by every world draw through ApplyLightingUniforms
+    // Per-frame lighting state, pushed once per frame via SetLighting and uploaded to the
+    // world shader once per frame by ApplyFrameUniforms
     private Vector3 _sunDir = Vector3.UnitY;
     private Vector3 _sunColor = Vector3.One;
     private float _sunIntensity = 1f;
@@ -79,6 +79,16 @@ public class RenderManager : IDisposable
     private readonly Vector3[] _pointPos = new Vector3[WorldGenerationConfig.MaxPointLights];
     private readonly Vector3[] _pointColors = new Vector3[WorldGenerationConfig.MaxPointLights];
     private int _pointCount;
+
+    // World-shader uniform locations, resolved once in LoadResources. The first four are the
+    // only uniforms a world draw still touches, so the per-draw cost is three (four for TNT)
+    // glUniform calls with no dictionary lookup in between; the arrays feed ApplyFrameUniforms.
+    private int _locModel;
+    private int _locMvp;
+    private int _locAlpha;
+    private int _locFlash;
+    private int[] _locPointPos = [];
+    private int[] _locPointColor = [];
 
     public RenderManager(IWindow window)
     {
@@ -162,6 +172,14 @@ public class RenderManager : IDisposable
         worldShader.SetUniform("uTextureAtlas", 0);
         worldShader.SetUniform("uShadowMap", 1);
 
+        // Everything a world draw sets per draw, resolved once here (see SetDrawUniforms)
+        _locModel = worldShader.GetUniformLocation("uModel");
+        _locMvp = worldShader.GetUniformLocation("uMVP");
+        _locAlpha = worldShader.GetUniformLocation("uAlpha");
+        _locFlash = worldShader.GetUniformLocation("uFlash");
+        _locPointPos = worldShader.GetUniformArrayLocations("uPointPos", WorldGenerationConfig.MaxPointLights);
+        _locPointColor = worldShader.GetUniformArrayLocations("uPointColor", WorldGenerationConfig.MaxPointLights);
+
         selectionShader = new Shader(gl, selectionVs, selectionFs);
         breakShader = new Shader(gl, breakVs, breakFs);
 
@@ -241,8 +259,8 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// Advances the day/night cycle and pushes the resulting sun, sky and point-light
-    /// state into the per-frame fields. Called once per frame before <see cref="BeginFrame"/>;
-    /// every world draw applies the state through <see cref="ApplyLightingUniforms"/>.
+    /// state into the per-frame fields. Called once per frame before <see cref="BeginFrame"/>,
+    /// which uploads the result to the world shader through <see cref="ApplyFrameUniforms"/>.
     /// <paramref name="underwater"/> is whether the camera's eye sits below a fluid surface;
     /// it fades the underwater tint in and out.
     /// </summary>
@@ -373,8 +391,10 @@ public class RenderManager : IDisposable
     /// box: opaque chunk meshes, primed TNT and toppling trees. Runs first each frame, before
     /// anything draws to the default framebuffer; water never casts. Culling uses the light
     /// frustum, so the caster set is exactly what the box can hold.
+    /// <paramref name="chunks"/> is <see cref="ChunkManager.Renderable"/>, a superset of the
+    /// casters: water-only chunks are in it and are skipped here.
     /// </summary>
-    public void RenderShadows(Camera camera, IEnumerable<Chunk> chunks,
+    public void RenderShadows(Camera camera, IReadOnlyList<Chunk> chunks,
         IReadOnlyList<PrimedTnt> primed, IEnumerable<TopplingTree> trees)
     {
         if (camera == null || _shadowStrength <= 0f) return;
@@ -400,8 +420,10 @@ public class RenderManager : IDisposable
 
         var frustum = new Frustum(_lightViewProj);
 
-        foreach (var chunk in chunks)
+        for (var i = 0; i < chunks.Count; i++)
         {
+            var chunk = chunks[i];
+
             // HasMesh is the opaque mesh only, so a water-only chunk (translucent mesh and
             // nothing else) never enters the depth pass — fluids are not casters anyway.
             if (!chunk.HasMesh) continue;
@@ -481,6 +503,7 @@ public class RenderManager : IDisposable
         RenderSun(camera);
 
         worldShader.Use();
+        ApplyFrameUniforms();
         gl.Enable(EnableCap.Blend);
         // The world passes rely on straight alpha blending for the fluid mesh and the chunk
         // fade-in. Set it here rather than inheriting whatever the last UI pass (or the sun's
@@ -546,12 +569,17 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Pushes the per-frame lighting state plus this draw's model matrix to the world
-    /// shader. The vertex shader needs uModel for world positions and normals.
+    /// Pushes every world-shader uniform that is constant for the whole frame: the sun, sky,
+    /// fog, camera, point lights and shadow parameters. Called once per frame from
+    /// <see cref="BeginFrame"/>, right after the world program is bound — uniform values live
+    /// in the program object and survive any number of <c>UseProgram</c> switches, so the
+    /// selection, break, sun and UI shaders running in between do not disturb these and every
+    /// later world pass in the frame inherits them. Everything it reads is final by then:
+    /// <see cref="SetLighting"/> (including <c>_lightViewProj</c>) runs before
+    /// <see cref="BeginFrame"/>, and nothing in a world pass writes these fields.
     /// </summary>
-    private void ApplyLightingUniforms(Matrix4x4 model)
+    private void ApplyFrameUniforms()
     {
-        worldShader.SetUniform("uModel", model);
         worldShader.SetUniform("uTime", _time);
         worldShader.SetUniform("uSunDir", _sunDir);
         worldShader.SetUniform("uSunColor", _sunColor);
@@ -564,10 +592,10 @@ public class RenderManager : IDisposable
         worldShader.SetUniform("uFogFar", _fogFar);
         worldShader.SetUniform("uCameraPos", _cameraPos);
         worldShader.SetUniform("uNumPointLights", _pointCount);
-        worldShader.SetUniformArray3("uPointPos", _pointPos);
-        worldShader.SetUniformArray3("uPointColor", _pointColors);
+        worldShader.SetUniformArray3(_locPointPos, _pointPos);
+        worldShader.SetUniformArray3(_locPointColor, _pointColors);
         worldShader.SetUniform("uSwayStrength", WorldGenerationConfig.LeafSwayStrength);
-        worldShader.SetUniform("uFlash", 0f);
+        worldShader.SetUniform(_locFlash, 0f);
         worldShader.SetUniform("uLightViewProj", _lightViewProj);
         worldShader.SetUniform("uShadowStrength", _shadowStrength);
         worldShader.SetUniform("uShadowTexel", 1f / WorldGenerationConfig.ShadowMapSize);
@@ -577,10 +605,28 @@ public class RenderManager : IDisposable
         worldShader.SetUniform("uShadowNormalOffset", WorldGenerationConfig.ShadowNormalOffsetTexels);
     }
 
+    /// <summary>
+    /// Everything a single world draw has to say: its model matrix (the vertex shader needs it
+    /// for world positions and normals), its full MVP and its fade alpha. Exactly three
+    /// <c>glUniform</c> calls through cached locations — the rest of the world shader's state
+    /// was uploaded once by <see cref="ApplyFrameUniforms"/>.
+    /// </summary>
+    private void SetDrawUniforms(in Matrix4x4 model, in Matrix4x4 mvp, float alpha)
+    {
+        worldShader.SetUniform(_locModel, model);
+        worldShader.SetUniform(_locMvp, mvp);
+        worldShader.SetUniform(_locAlpha, alpha);
+    }
+
     // Reused across frames to avoid a per-frame allocation
     private readonly List<(Chunk chunk, float distSq)> _visibleChunks = new(1024);
 
-    public void RenderWorld(Camera camera, IEnumerable<Chunk> chunks, double time)
+    /// <summary>
+    /// Draws the opaque world. <paramref name="chunks"/> is
+    /// <see cref="ChunkManager.Renderable"/>: every chunk with something to draw, opaque or
+    /// translucent — the water-only ones still need their fade lifetime advanced here.
+    /// </summary>
+    public void RenderWorld(Camera camera, IReadOnlyList<Chunk> chunks, double time)
     {
         if (camera == null) return;
 
@@ -594,11 +640,13 @@ public class RenderManager : IDisposable
         // Sort chunks by distance for better cache coherency and early z-rejection
         _visibleChunks.Clear();
 
-        foreach (var chunk in chunks)
+        for (var i = 0; i < chunks.Count; i++)
         {
-            // Air-only chunks (the majority) have nothing at all — skip before the frustum
-            // test. A water-only ocean chunk has no opaque mesh but still needs its lifetime
-            // advanced here, or its fluid mesh would stay at alpha 0 forever.
+            var chunk = chunks[i];
+
+            // Renderable holds only chunks with something to draw, but a water-only ocean
+            // chunk has no opaque mesh — it is here to have its lifetime advanced, or its
+            // fluid mesh would stay at alpha 0 forever.
             if (!chunk.HasMesh && !chunk.HasTranslucentMesh)
                 continue;
 
@@ -623,9 +671,8 @@ public class RenderManager : IDisposable
             if (!chunk.HasMesh) continue;
 
             var model = Matrix4x4.CreateTranslation(chunk.Position * Chunk.Size);
-            ApplyLightingUniforms(model);
-            worldShader.SetUniform("uMVP", model * viewProj);
-            worldShader.SetUniform("uAlpha", MathF.Min(1F, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
+            SetDrawUniforms(model, model * viewProj,
+                MathF.Min(1F, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
 
             chunk.Render();
         }
@@ -641,8 +688,12 @@ public class RenderManager : IDisposable
     /// show through it. Depth writing stays on: water bodies are at most a couple of layers
     /// deep from any viewpoint, and writing depth is what makes the chunk-vs-LOD overlap at
     /// the full-detail ring resolve by distance instead of by draw order.
+    /// <paramref name="chunks"/> is <see cref="ChunkManager.Renderable"/> and
+    /// <paramref name="regions"/> is <see cref="LodManager.RegionList"/>; both are supersets
+    /// of what this pass draws, so the skips below still do the selecting.
     /// </summary>
-    public void RenderWorldTranslucent(Camera camera, IEnumerable<Chunk> chunks, IEnumerable<LodRegion> regions)
+    public void RenderWorldTranslucent(Camera camera, IReadOnlyList<Chunk> chunks,
+        IReadOnlyList<LodRegion> regions)
     {
         if (camera == null) return;
 
@@ -659,8 +710,9 @@ public class RenderManager : IDisposable
 
         _translucentChunks.Clear();
 
-        foreach (var chunk in chunks)
+        for (var i = 0; i < chunks.Count; i++)
         {
+            var chunk = chunks[i];
             if (!chunk.HasTranslucentMesh)
                 continue;
 
@@ -680,17 +732,17 @@ public class RenderManager : IDisposable
         foreach (var (chunk, _) in _translucentChunks)
         {
             var model = Matrix4x4.CreateTranslation(chunk.Position * Chunk.Size);
-            ApplyLightingUniforms(model);
-            worldShader.SetUniform("uMVP", model * viewProj);
-            worldShader.SetUniform("uAlpha", MathF.Min(1f, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
+            SetDrawUniforms(model, model * viewProj,
+                MathF.Min(1f, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
 
             chunk.RenderTranslucent();
         }
 
         _translucentRegions.Clear();
 
-        foreach (var region in regions)
+        for (var i = 0; i < regions.Count; i++)
         {
+            var region = regions[i];
             if (!region.HasWaterMesh || region.IsBuried)
                 continue;
 
@@ -714,9 +766,8 @@ public class RenderManager : IDisposable
         foreach (var (region, _) in _translucentRegions)
         {
             var model = Matrix4x4.CreateTranslation(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks);
-            ApplyLightingUniforms(model);
-            worldShader.SetUniform("uMVP", model * viewProj);
-            worldShader.SetUniform("uAlpha", MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)));
+            SetDrawUniforms(model, model * viewProj,
+                MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)));
 
             region.RenderWater();
         }
@@ -727,8 +778,10 @@ public class RenderManager : IDisposable
     /// <summary>
     /// Draws far-terrain LOD regions. Called before RenderWorld so full-detail chunks
     /// draw over the LOD wherever both exist (the LOD sits strictly below the real surface).
+    /// <paramref name="regions"/> is <see cref="LodManager.RegionList"/>, every loaded region;
+    /// the buried and mesh-less ones are skipped below.
     /// </summary>
-    public void RenderLod(Camera camera, IEnumerable<LodRegion> regions)
+    public void RenderLod(Camera camera, IReadOnlyList<LodRegion> regions)
     {
         if (camera == null) return;
 
@@ -741,8 +794,10 @@ public class RenderManager : IDisposable
 
         _visibleRegions.Clear();
 
-        foreach (var region in regions)
+        for (var i = 0; i < regions.Count; i++)
         {
+            var region = regions[i];
+
             // Buried regions are fully covered by a finer level (or, for the finest level, by
             // drawn chunks); drawing them too would stack shells visible from inside caves
             if (!region.HasMesh || region.IsBuried)
@@ -770,9 +825,8 @@ public class RenderManager : IDisposable
             region.Lifetime += 1.0 / 60.0;
 
             var model = Matrix4x4.CreateTranslation(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks);
-            ApplyLightingUniforms(model);
-            worldShader.SetUniform("uMVP", model * viewProj);
-            worldShader.SetUniform("uAlpha", MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)));
+            SetDrawUniforms(model, model * viewProj,
+                MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)));
 
             region.Render();
         }
@@ -795,9 +849,7 @@ public class RenderManager : IDisposable
         var model = Matrix4x4.CreateScale(scale)
                     * Matrix4x4.CreateTranslation(blockPosition + new Vector3(0.5f));
 
-        ApplyLightingUniforms(model);
-        worldShader.SetUniform("uMVP", model * camera.GetViewProjection());
-        worldShader.SetUniform("uAlpha", 1f);
+        SetDrawUniforms(model, model * camera.GetViewProjection(), 1f);
 
         mesh.Render();
     }
@@ -812,8 +864,13 @@ public class RenderManager : IDisposable
         if (camera == null || drops.Count == 0) return;
 
         worldShader.Use();
+        BindWorldTextures();
 
         var viewProj = camera.GetViewProjection();
+        // Only an item sprite ever takes unit 0 away from the atlas, so the atlas is rebound
+        // when one actually did rather than once per drop. Unit 1 (the shadow map) never
+        // changes in here.
+        var atlasBound = true;
 
         foreach (var drop in drops)
         {
@@ -823,10 +880,16 @@ public class RenderManager : IDisposable
                 if (!itemMeshes.TryGet(drop.BlockId, out mesh, out var itemTexture)) continue;
                 gl.ActiveTexture(TextureUnit.Texture0);
                 gl.BindTexture(TextureTarget.Texture2D, itemTexture);
+                atlasBound = false;
             }
             else
             {
-                BindWorldTextures();
+                if (!atlasBound)
+                {
+                    BindWorldTextures();
+                    atlasBound = true;
+                }
+
                 mesh = blockCubes.Get(drop.BlockId);
                 if (mesh == null) continue;
             }
@@ -836,9 +899,7 @@ public class RenderManager : IDisposable
                         * Matrix4x4.CreateRotationY(drop.Spin)
                         * Matrix4x4.CreateTranslation(drop.Position);
 
-            ApplyLightingUniforms(model);
-            worldShader.SetUniform("uMVP", model * viewProj);
-            worldShader.SetUniform("uAlpha", 1f);
+            SetDrawUniforms(model, model * viewProj, 1f);
             mesh.Render();
         }
     }
@@ -855,6 +916,7 @@ public class RenderManager : IDisposable
         BindWorldTextures();
 
         var viewProj = camera.GetViewProjection();
+        var drewFlash = false;
 
         foreach (var tnt in primed)
         {
@@ -865,12 +927,16 @@ public class RenderManager : IDisposable
             var model = Matrix4x4.CreateScale(tnt.Scale)
                         * Matrix4x4.CreateTranslation(tnt.Position);
 
-            ApplyLightingUniforms(model);
-            worldShader.SetUniform("uMVP", model * viewProj);
-            worldShader.SetUniform("uAlpha", 1f);
-            worldShader.SetUniform("uFlash", tnt.WhiteFlash);
+            SetDrawUniforms(model, model * viewProj, 1f);
+            worldShader.SetUniform(_locFlash, tnt.WhiteFlash);
             mesh.Render();
+            drewFlash = true;
         }
+
+        // uFlash is a frame constant for every other pass, and the translucent water pass runs
+        // after the entities, so put it back rather than tinting whatever draws next.
+        if (drewFlash)
+            worldShader.SetUniform(_locFlash, 0f);
     }
 
     /// <summary>
@@ -889,9 +955,7 @@ public class RenderManager : IDisposable
         BindWorldTextures();
 
         var model = tree.Model;
-        ApplyLightingUniforms(model);
-        worldShader.SetUniform("uMVP", model * camera.GetViewProjection());
-        worldShader.SetUniform("uAlpha", 1f);
+        SetDrawUniforms(model, model * camera.GetViewProjection(), 1f);
 
         mesh.Render();
     }
