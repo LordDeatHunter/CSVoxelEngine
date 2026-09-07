@@ -105,6 +105,9 @@ public class World
 
     public void Render(RenderManager renderManager)
     {
+        // Depth-only sun pass first: every world draw below samples the shadow map it fills
+        renderManager.RenderShadows(Camera, _chunkManager.Chunks.Values, _tntManager.Primed, _toppling);
+
         renderManager.RenderLod(Camera, _lodManager.Regions.Values);
         renderManager.RenderWorld(Camera, _chunkManager.Chunks.Values, _window.Time);
         renderManager.RenderItemDrops(Camera, _dropManager.Drops);

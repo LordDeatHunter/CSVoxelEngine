@@ -35,8 +35,18 @@ public static class WorldGenerationConfig
     // Half-extent in blocks of the shadow camera's ortho box around the view target
     public const float ShadowRadiusBlocks = 90f;
 
-    // Farthest chunk-center distance (blocks) that still casts into the shadow map
-    public const float ShadowCasterRadiusBlocks = 110f;
+    // Whether the depth-only shadow pass runs at all (false leaves the world fully lit)
+    public const bool ShadowsEnabled = true;
+
+    // Spread of the 4-tap PCF kernel in shadow-map texels. The four taps sit half a texel
+    // times this value from the lookup on each diagonal, and the shadow sampler filters
+    // linearly, so every tap is itself a hardware 2x2 comparison: at 1 the four overlap into
+    // a smooth ~3x3 tent for 4 fetches instead of 9. 0 or less means a single tap.
+    public const float ShadowSoftnessTexels = 1f;
+
+    // How far along its normal a fragment is pushed before the depth lookup, in shadow
+    // texels — kills the self-shadowing acne on grazing-lit voxel faces
+    public const float ShadowNormalOffsetTexels = 1.5f;
 
     // Dynamic point lights in the world shader (primed TNT strobes); lamp glow is baked
     public const int MaxPointLights = 8;
@@ -49,6 +59,21 @@ public static class WorldGenerationConfig
     // of 15, so one edited block can change light up to this far away. Block edits must
     // remesh every chunk in this radius, not just face-adjacent ones.
     public const int LightPropagationRadius = 15;
+
+    // --- Sky ---
+    // Angular radius of the visible sun disc in degrees. The real sun is 0.27 degrees across
+    // its radius, but at that size it reads as a pinprick, so games exaggerate it.
+    public const float SunAngularRadiusDeg = 3.5f;
+
+    // Radius of the glow quad as a multiple of the disc radius: the quad is drawn this much
+    // bigger than the disc and the extra ring is pure falloff around it.
+    public const float SunGlowScale = 4f;
+
+    // Peak brightness the glow adds at the disc's edge, before the sun colour tints it
+    public const float SunGlowIntensity = 0.55f;
+
+    // Falloff exponent of the glow from the disc outwards; higher means a tighter halo
+    public const float SunGlowExponent = 2.5f;
 
     // --- Far-terrain LOD ---
     // Level definitions (cell sizes, per-level radii) live in LodRegion.Levels.

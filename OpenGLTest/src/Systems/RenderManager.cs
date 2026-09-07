@@ -13,6 +13,8 @@ public class RenderManager : IDisposable
     private Shader worldShader;
     private Shader selectionShader;
     private Shader breakShader;
+    private Shader shadowShader;
+    private Shader sunShader;
     private UIRenderer ui;
     private BlockCubeCache blockCubes;
     private ItemMeshCache itemMeshes;
@@ -23,8 +25,17 @@ public class RenderManager : IDisposable
     private uint faceVao;
     private uint faceVbo;
 
-    // Directional shadow mapping is parked (see SampleShadow in test-fragment.glsl);
-    // when it comes back, the shadow FBO / light-space matrix live here again.
+    // The sun disc: one shared unit quad plus its sprite, oriented around _sunDir every frame
+    // by RenderSun. _sunVisibility fades it out below the horizon and underwater.
+    private uint _sunTexture;
+    private Mesh _sunQuad;
+    private float _sunVisibility;
+
+    // Directional sun shadows: RenderShadows fills _shadowDepthTex (a depth-only FBO
+    // attachment, sampled as a comparison sampler on unit 1) through _lightViewProj, and
+    // every world draw hands both to test-fragment.glsl's SampleShadow.
+    private uint _shadowFbo;
+    private uint _shadowDepthTex;
     private Vector2D<int> _viewportSize;
 
     // Per-frame lighting state, pushed once per frame via SetLighting and applied
@@ -41,6 +52,11 @@ public class RenderManager : IDisposable
     private float _fogFar = WorldGenerationConfig.FogFarBlocks;
     private Vector3 _cameraPos;
     private float _time;
+
+    // 0 at night (and fully underwater), 1 with the sun well up: how much of the direct
+    // sun term the shadow lookup is allowed to take away
+    private float _shadowStrength;
+    private Matrix4x4 _lightViewProj = Matrix4x4.Identity;
 
     // Underwater tint: the eye state is a hard flag, so it is eased into _underwaterT
     // (0 = above water, 1 = fully submerged) over UnderwaterFadeSeconds
@@ -74,6 +90,10 @@ public class RenderManager : IDisposable
         var selectionFs = FileUtils.ReadFile("assets/shaders/selection-fragment.glsl");
         var breakVs = FileUtils.ReadFile("assets/shaders/break-vertex.glsl");
         var breakFs = FileUtils.ReadFile("assets/shaders/break-fragment.glsl");
+        var shadowVs = FileUtils.ReadFile("assets/shaders/shadow-vertex.glsl");
+        var shadowFs = FileUtils.ReadFile("assets/shaders/shadow-fragment.glsl");
+        var sunVs = FileUtils.ReadFile("assets/shaders/sun-vertex.glsl");
+        var sunFs = FileUtils.ReadFile("assets/shaders/sun-fragment.glsl");
 
         textureAtlas = TextureAtlas.Build(gl, "assets/textures/blocks");
         ContentRegistry.BakeModels();
@@ -83,14 +103,77 @@ public class RenderManager : IDisposable
         // the sampler unit silently stays at its default.
         worldShader.Use();
         worldShader.SetUniform("uTextureAtlas", 0);
+        worldShader.SetUniform("uShadowMap", 1);
 
         selectionShader = new Shader(gl, selectionVs, selectionFs);
         breakShader = new Shader(gl, breakVs, breakFs);
+
+        shadowShader = new Shader(gl, shadowVs, shadowFs);
+        // The depth pass still samples the atlas, to punch the cutout tiles' holes
+        shadowShader.Use();
+        shadowShader.SetUniform("uTextureAtlas", 0);
+        CreateShadowMap();
+
+        sunShader = new Shader(gl, sunVs, sunFs);
+        sunShader.Use();
+        sunShader.SetUniform("uSunTexture", 0);
+
+        _sunTexture = TextureLoader.LoadFromFile(gl, "assets/textures/environment/sun.png");
+        // The loader hard-codes Nearest for the block tiles; the 64px disc is scaled up a lot
+        // on screen, so it needs Linear or its edge turns into a staircase.
+        gl.BindTexture(TextureTarget.Texture2D, _sunTexture);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        gl.BindTexture(TextureTarget.Texture2D, 0);
+        _sunQuad = Primitives.CreateSquare(gl, 1f);
 
         blockCubes = new BlockCubeCache(gl);
         itemMeshes = new ItemMeshCache(gl);
         ui = new UIRenderer(gl, textureAtlas, blockCubes);
         CreateSelectionGeometry();
+    }
+
+    /// <summary>
+    /// Allocates the shadow map: one depth texture, no colour attachment. It is sampled as a
+    /// <c>sampler2DShadow</c>, so the compare mode does the depth test in hardware and Linear
+    /// filtering gives free 2x2 bilinear PCF on top of the shader's own kernel. Outside the
+    /// ortho box the border colour reads as depth 1 (farthest), i.e. fully lit.
+    /// </summary>
+    private void CreateShadowMap()
+    {
+        const uint size = WorldGenerationConfig.ShadowMapSize;
+
+        _shadowDepthTex = gl.GenTexture();
+        gl.BindTexture(TextureTarget.Texture2D, _shadowDepthTex);
+        unsafe
+        {
+            gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.DepthComponent24,
+                size, size, 0, PixelFormat.DepthComponent, PixelType.Float, null);
+        }
+
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToBorder);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToBorder);
+        Span<float> border = [1f, 1f, 1f, 1f];
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureBorderColor, border);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureCompareMode,
+            (int)GLEnum.CompareRefToTexture);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureCompareFunc, (int)GLEnum.Lequal);
+
+        _shadowFbo = gl.GenFramebuffer();
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, _shadowFbo);
+        gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
+            TextureTarget.Texture2D, _shadowDepthTex, 0);
+        gl.DrawBuffer(DrawBufferMode.None);
+        gl.ReadBuffer(ReadBufferMode.None);
+
+        var status = gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
+        if (status != GLEnum.FramebufferComplete)
+            throw new Exception($"Shadow framebuffer incomplete: {status}");
+
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        gl.BindTexture(TextureTarget.Texture2D, 0);
     }
 
     public void SetViewport(Vector2D<int> size)
@@ -122,8 +205,17 @@ public class RenderManager : IDisposable
         _sunDir = Vector3.Normalize(new Vector3(MathF.Cos(angle), MathF.Sin(angle), 0.35f));
         var elevation = _sunDir.Y;
 
-        // Parked: the shadow camera (ortho box + light-space matrix) used the elevation
-        // to disable itself at night; it will again when shadows come back.
+        // The shadow camera fades itself out as the sun sets: at a grazing elevation the
+        // shadows stretch to the horizon and the ortho box cannot hold them, and at night
+        // there is no direct sun left to remove anyway.
+        _shadowStrength = WorldGenerationConfig.ShadowsEnabled
+            ? Smooth01((elevation - 0.02f) / 0.12f)
+            : 0f;
+
+        // The disc itself fades over a much narrower band than the light does, so it sinks
+        // out of sight shortly after the horizon instead of hanging in the night sky
+        _sunVisibility = Smooth01((elevation + 0.08f) / 0.14f);
+
         var dayness = Smooth01((elevation + 0.08f) / 0.33f);
         var duskAmount = elevation > -0.1f ? Math.Clamp(1f - MathF.Abs(elevation) * 5f, 0f, 1f) : 0f;
 
@@ -165,6 +257,13 @@ public class RenderManager : IDisposable
             _underwaterT + (underwater ? dt : -dt) / WorldGenerationConfig.UnderwaterFadeSeconds);
         var wet = MathUtils.SmoothStep(_underwaterT);
 
+        // Underwater the sun is a diffuse glow, so the crisp shadow edges go with the tint.
+        // This has to run before the early return below, or a submerged view would keep them.
+        _shadowStrength *= 1f - wet;
+        // Same reason the disc goes with them: from under the surface there is no sun to see
+        _sunVisibility *= 1f - wet;
+        UpdateShadowCamera(camera);
+
         _fogNear = MathUtils.Lerp(WorldGenerationConfig.FogNearBlocks,
             WorldGenerationConfig.UnderwaterFogNearBlocks, wet);
         _fogFar = MathUtils.Lerp(WorldGenerationConfig.FogFarBlocks,
@@ -179,6 +278,130 @@ public class RenderManager : IDisposable
         _sunIntensity = MathUtils.Lerp(_sunIntensity, _sunIntensity * 0.5f, wet);
     }
 
+    /// <summary>
+    /// Builds the light-space matrix for this frame: an orthographic box of half-extent
+    /// <see cref="WorldGenerationConfig.ShadowRadiusBlocks"/> centred a little ahead of the
+    /// camera (most of what the player looks at is in front of them) and looking down the sun
+    /// direction. The box centre is snapped to whole shadow texels in light space, or the
+    /// sub-texel drift as the player walks makes every shadow edge crawl and shimmer.
+    /// </summary>
+    private void UpdateShadowCamera(Camera? camera)
+    {
+        if (camera == null || _shadowStrength <= 0f) return;
+
+        const float r = WorldGenerationConfig.ShadowRadiusBlocks;
+        const float d = 2.5f * r;
+        var target = camera.Position + camera.Forward * (r * 0.35f);
+
+        // Snap in the provisional light space, then bring the snapped point back to world
+        // space and rebuild the view around it
+        var lightView = Matrix4x4.CreateLookAt(target + _sunDir * d, target, Vector3.UnitY);
+        var texel = 2f * r / WorldGenerationConfig.ShadowMapSize;
+        var inLight = Vector3.Transform(target, lightView);
+        inLight.X = MathF.Round(inLight.X / texel) * texel;
+        inLight.Y = MathF.Round(inLight.Y / texel) * texel;
+        var snappedTarget = Matrix4x4.Invert(lightView, out var inverseView)
+            ? Vector3.Transform(inLight, inverseView)
+            : target;
+
+        lightView = Matrix4x4.CreateLookAt(snappedTarget + _sunDir * d, snappedTarget, Vector3.UnitY);
+        // The sun's 0.35 Z tilt keeps it more than 19 degrees off vertical, so UnitY is
+        // never parallel to the view direction and the look-at stays well defined
+        var lightProj = Matrix4x4.CreateOrthographic(2f * r, 2f * r, d - 2f * r, d + 2f * r);
+        _lightViewProj = lightView * lightProj;
+    }
+
+    /// <summary>
+    /// Depth-only pass that fills the shadow map with every caster inside the light's ortho
+    /// box: opaque chunk meshes, primed TNT and toppling trees. Runs first each frame, before
+    /// anything draws to the default framebuffer; water never casts. Culling uses the light
+    /// frustum, so the caster set is exactly what the box can hold.
+    /// </summary>
+    public void RenderShadows(Camera camera, IEnumerable<Chunk> chunks,
+        IReadOnlyList<PrimedTnt> primed, IEnumerable<TopplingTree> trees)
+    {
+        if (camera == null || _shadowStrength <= 0f) return;
+
+        const uint size = WorldGenerationConfig.ShadowMapSize;
+
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, _shadowFbo);
+        gl.Viewport(0, 0, size, size);
+        gl.Clear(ClearBufferMask.DepthBufferBit);
+        // No colour is written, so blending would only cost fill rate
+        gl.Disable(EnableCap.Blend);
+
+        shadowShader.Use();
+        // The depth texture is this pass's render target, so it must not stay bound to unit 1
+        // while it draws: sampling and rendering the same texture is a feedback loop, and
+        // drivers are free to return garbage for it. BindWorldTextures rebinds it afterwards.
+        gl.ActiveTexture(TextureUnit.Texture1);
+        gl.BindTexture(TextureTarget.Texture2D, 0);
+        gl.ActiveTexture(TextureUnit.Texture0);
+        gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
+        shadowShader.SetUniform("uTime", _time);
+        shadowShader.SetUniform("uSwayStrength", WorldGenerationConfig.LeafSwayStrength);
+
+        var frustum = new Frustum(_lightViewProj);
+
+        foreach (var chunk in chunks)
+        {
+            // HasMesh is the opaque mesh only, so a water-only chunk (translucent mesh and
+            // nothing else) never enters the depth pass — fluids are not casters anyway.
+            if (!chunk.HasMesh) continue;
+
+            // Cull buried casters. The light's ortho box is 180 blocks wide and 360 deep, so
+            // its frustum admits every chunk of a column right down to bedrock, and a chunk
+            // whose top sits below the lowest surface height in its own 16x16 column is
+            // completely under the terrain: no sunlight reaches it, so it can occlude nothing.
+            // A 1-block margin keeps the surface block itself (and the face under it) in.
+            // Trees do poke above the surface, but only into the chunk ABOVE, whose own top is
+            // then above that column's surface height and so is never skipped by this test.
+            // (Written as top + 1 < min rather than top < min - 1 so the int.MinValue
+            // sentinel on a chunk with no block data cannot wrap and cull everything.)
+            if (chunk.UpperBoundY + 1 < chunk.SurfaceMinY) continue;
+
+            var min = chunk.Position * Chunk.Size;
+            var max = min + new Vector3(Chunk.Size);
+
+            if (!frustum.IntersectsAABB(min, max)) continue;
+
+            var model = Matrix4x4.CreateTranslation(min);
+            shadowShader.SetUniform("uModel", model);
+            shadowShader.SetUniform("uLightMVP", model * _lightViewProj);
+            chunk.Render();
+        }
+
+        foreach (var tnt in primed)
+        {
+            var mesh = blockCubes.Get(tnt.BlockId);
+            if (mesh == null) continue;
+
+            var model = Matrix4x4.CreateScale(tnt.Scale)
+                        * Matrix4x4.CreateTranslation(tnt.Position);
+            shadowShader.SetUniform("uModel", model);
+            shadowShader.SetUniform("uLightMVP", model * _lightViewProj);
+            mesh.Render();
+        }
+
+        foreach (var tree in trees)
+        {
+            tree.EnsureMesh(gl);
+            var mesh = tree.Mesh;
+            if (mesh == null) continue;
+
+            var model = tree.Model;
+            shadowShader.SetUniform("uModel", model);
+            shadowShader.SetUniform("uLightMVP", model * _lightViewProj);
+            mesh.Render();
+        }
+
+        // Back to the default framebuffer and the blend state the world passes expect
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        gl.Viewport(_viewportSize);
+        gl.Enable(EnableCap.Blend);
+        gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+    }
+
     private static float Smooth01(float t)
     {
         t = Math.Clamp(t, 0f, 1f);
@@ -187,22 +410,80 @@ public class RenderManager : IDisposable
 
     private static Vector3 Mix(Vector3 a, Vector3 b, float t) => a + (b - a) * Math.Clamp(t, 0f, 1f);
 
-    public void BeginFrame()
+    /// <summary>
+    /// Clears to the sky colour, paints the sun into it, and leaves the GL state the world
+    /// passes expect. <paramref name="camera"/> only orients the sun quad; a null camera just
+    /// skips it.
+    /// </summary>
+    public void BeginFrame(Camera? camera)
     {
-        worldShader.Use();
         gl.ClearColor(_skyColor.X, _skyColor.Y, _skyColor.Z, 1f);
         gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+        // Straight onto the fresh sky, before any terrain: see RenderSun
+        RenderSun(camera);
+
+        worldShader.Use();
         gl.Enable(EnableCap.Blend);
         // The world passes rely on straight alpha blending for the fluid mesh and the chunk
-        // fade-in. Set it here rather than inheriting whatever the last UI pass left behind.
+        // fade-in. Set it here rather than inheriting whatever the last UI pass (or the sun's
+        // additive blend above) left behind.
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
     }
 
     /// <summary>
-    /// Binds the world texture (atlas on unit 0) for a world draw.
+    /// Draws the sun: a textured disc surrounded by a radial glow, on one screen-facing quad.
+    /// Three things make it cheap. It is drawn first, with the depth test and depth writes
+    /// off, so everything drawn afterwards occludes it for free and the sky needs no skybox.
+    /// The quad is placed 100 blocks along <see cref="_sunDir"/> under a view matrix with the
+    /// translation removed, so it effectively sits at infinity and never parallaxes as the
+    /// player walks. And it blends additively (One, One), so the shader's black background
+    /// contributes nothing and the glow brightens the sky rather than greying it.
+    /// </summary>
+    private void RenderSun(Camera? camera)
+    {
+        if (camera == null || _sunVisibility <= 0f) return;
+
+        gl.Disable(EnableCap.DepthTest);
+        gl.DepthMask(false);
+        gl.Enable(EnableCap.Blend);
+        gl.BlendFunc(BlendingFactor.One, BlendingFactor.One);
+
+        sunShader.Use();
+        gl.ActiveTexture(TextureUnit.Texture0);
+        gl.BindTexture(TextureTarget.Texture2D, _sunTexture);
+
+        // Rotation only: dropping the camera position is what pins the quad at infinity
+        var viewRot = Matrix4x4.CreateLookAt(Vector3.Zero, camera.Forward, Vector3.UnitY);
+        sunShader.SetUniform("uViewProj", viewRot * camera.GetProjectionMatrix());
+        sunShader.SetUniform("uSunDir", _sunDir);
+        // The quad has to hold the whole glow, so it is sized to the glow's angular radius and
+        // the shader keeps the textured disc inside the inner uDiscFraction of it. The unit
+        // square's corners sit at +-0.5, hence the factor 2 to make uHalfSize the true radius.
+        sunShader.SetUniform("uHalfSize", 2f * 100f * MathF.Tan(WorldGenerationConfig.SunAngularRadiusDeg
+            * WorldGenerationConfig.SunGlowScale * MathF.PI / 180f));
+        sunShader.SetUniform("uDiscFraction", 1f / WorldGenerationConfig.SunGlowScale);
+        sunShader.SetUniform("uGlowIntensity", WorldGenerationConfig.SunGlowIntensity);
+        sunShader.SetUniform("uGlowExponent", WorldGenerationConfig.SunGlowExponent);
+        sunShader.SetUniform("uSunColor", _sunColor);
+        sunShader.SetUniform("uVisibility", _sunVisibility);
+
+        _sunQuad.Render();
+
+        gl.BindVertexArray(0);
+        gl.DepthMask(true);
+        gl.Enable(EnableCap.DepthTest);
+    }
+
+    /// <summary>
+    /// Binds the world textures for a world draw: the atlas on unit 0 and the shadow map on
+    /// unit 1. Unit 0 is left active on the way out, because <see cref="RenderItemDrops"/>
+    /// binds an item's own texture assuming that.
     /// </summary>
     private void BindWorldTextures()
     {
+        gl.ActiveTexture(TextureUnit.Texture1);
+        gl.BindTexture(TextureTarget.Texture2D, _shadowDepthTex);
         gl.ActiveTexture(TextureUnit.Texture0);
         gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
     }
@@ -230,6 +511,13 @@ public class RenderManager : IDisposable
         worldShader.SetUniformArray3("uPointColor", _pointColors);
         worldShader.SetUniform("uSwayStrength", WorldGenerationConfig.LeafSwayStrength);
         worldShader.SetUniform("uFlash", 0f);
+        worldShader.SetUniform("uLightViewProj", _lightViewProj);
+        worldShader.SetUniform("uShadowStrength", _shadowStrength);
+        worldShader.SetUniform("uShadowTexel", 1f / WorldGenerationConfig.ShadowMapSize);
+        worldShader.SetUniform("uShadowWorldTexel",
+            2f * WorldGenerationConfig.ShadowRadiusBlocks / WorldGenerationConfig.ShadowMapSize);
+        worldShader.SetUniform("uShadowSoftness", WorldGenerationConfig.ShadowSoftnessTexels);
+        worldShader.SetUniform("uShadowNormalOffset", WorldGenerationConfig.ShadowNormalOffsetTexels);
     }
 
     // Reused across frames to avoid a per-frame allocation
@@ -719,6 +1007,12 @@ public class RenderManager : IDisposable
         worldShader.Dispose();
         selectionShader.Dispose();
         breakShader.Dispose();
+        shadowShader.Dispose();
+        sunShader.Dispose();
+        _sunQuad.Dispose();
+        gl.DeleteTexture(_sunTexture);
+        gl.DeleteFramebuffer(_shadowFbo);
+        gl.DeleteTexture(_shadowDepthTex);
         gl.DeleteBuffer(outlineVbo);
         gl.DeleteBuffer(outlineEbo);
         gl.DeleteVertexArray(outlineVao);

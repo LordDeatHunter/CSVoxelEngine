@@ -86,6 +86,16 @@ public class Chunk : IDisposable
     /// </summary>
     public bool IsMeshed { get; private set; }
 
+    /// <summary>
+    /// The lowest terrain-surface height (<see cref="ColumnData.MinHeight"/>: ravines already
+    /// cut in, caves not — carvers only remove blocks) anywhere in this chunk's 16x16 column.
+    /// Nothing in a chunk whose top is below this can be lit by the sun, which is what the
+    /// shadow pass uses it for. Recorded while the block data is generated, where the column
+    /// data is already in hand, so no per-frame cache lookup is needed;
+    /// <c>int.MinValue</c> on a chunk built without block data (never rendered).
+    /// </summary>
+    public int SurfaceMinY { get; private set; } = int.MinValue;
+
     // Column data only depends on (x, z), so vertical chunk stacks share one entry.
     // The outermost LOD ring touches more columns than this (they're computed once per region
     // build and rarely revisited), so occasional Clear + recompute is cheaper than a bigger
@@ -325,6 +335,7 @@ public class Chunk : IDisposable
     {
         var column = GetColumnData((int)Position.X, (int)Position.Z);
         var lowerBoundY = LowerBoundY;
+        SurfaceMinY = column.MinHeight;
 
         // Entirely above the terrain: nothing to fill, nothing to carve, nothing to stamp.
         // With trees enabled the band above the surface still needs generation (crowns and

@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 
@@ -18,6 +19,13 @@ public static class Program
     private static double placeTimer = MAX_PLACE_TIMER;
     private static readonly double MAX_PLACE_TIMER = 0.2;
 
+    // Set to a number of seconds to jump the day/night cycle at startup
+    private const string TimeOffsetVariable = "VOXEL_TIME";
+
+    // Added to the window clock before the lighting pass sees it, so a screenshot can be taken
+    // at any point of the day without waiting for the sun to get there
+    private static double timeOffset;
+
     public static void Main()
     {
         windowManager = new WindowManager();
@@ -33,6 +41,8 @@ public static class Program
 
     private static void OnLoad()
     {
+        timeOffset = ReadTimeOffset();
+
         inputManager = new InputManager(windowManager.Window);
         renderManager = new RenderManager(windowManager.Window);
         world = new World(renderManager.gl, windowManager.Window, inputManager.InputContext);
@@ -44,7 +54,28 @@ public static class Program
 
         inputManager.Mouse?.Scroll += (_, wheel) => world.Inventory.Scroll(wheel.Y);
     }
-    
+
+    /// <summary>
+    /// Dev override: VOXEL_TIME="seconds" offsets the clock the lighting pass reads, so noon,
+    /// dusk or night can be photographed straight away instead of after minutes of orbit.
+    /// Parsed once here; an unparseable value is ignored with a warning, like VOXEL_SPAWN.
+    /// </summary>
+    private static double ReadTimeOffset()
+    {
+        var timeOverride = Environment.GetEnvironmentVariable(TimeOffsetVariable);
+        if (string.IsNullOrWhiteSpace(timeOverride))
+            return 0.0;
+
+        if (double.TryParse(timeOverride.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture,
+                out var offset))
+            return offset;
+
+        Console.WriteLine(
+            $"Ignoring {TimeOffsetVariable}=\"{timeOverride}\": expected a number of seconds, e.g. 150");
+        return 0.0;
+    }
+
+
     private static void OnUpdate(double deltaTime)
     {
         placeTimer = Math.Min(MAX_PLACE_TIMER, placeTimer + deltaTime);
@@ -95,9 +126,9 @@ public static class Program
 
     private static void OnRender(double deltaTime)
     {
-        renderManager.SetLighting(windowManager.Window.Time, world.Camera, world.PrimedTnt,
+        renderManager.SetLighting(windowManager.Window.Time + timeOffset, world.Camera, world.PrimedTnt,
             world.Camera.IsEyeInWater);
-        renderManager.BeginFrame();
+        renderManager.BeginFrame(world.Camera);
         world.Render(renderManager);
         world.RenderUI(renderManager);
     }

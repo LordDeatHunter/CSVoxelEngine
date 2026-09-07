@@ -18,7 +18,7 @@ dotnet build OpenGLTest.sln
 dotnet run --project OpenGLTest/silkgltriangle.csproj
 ```
 
-Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning.
+Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit. All three parse once at startup and ignore garbage with a console warning.
 
 The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, double-tap Space to toggle flight (Space/Left Ctrl for up/down while flying), `C` to toggle noclip, Left Shift for 10x speed, hold left-click to mine a block (hit-based: one hit per `World.BlockHitSeconds` = 200 ms removes 1 HP of the block's `hardness`, declared in its JSON - 5 for most blocks, so ~1s, 8 for logs, 2 for leaves, and `0` means it pops on first contact like a pebble; damage resets if you release or switch target; instant while noclip; stepped progress overlay via `break-*.glsl`; each hit pops the block out and back via `RenderManager.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), `X` to toggle debug logging (FPS/position/water state to console), Escape to quit.
 
@@ -59,6 +59,12 @@ OpenGLTest/
       WindowManager.cs         # Silk.NET window setup
       InputManager.cs          # keyboard/mouse context
       RenderManager.cs         # GL state, world/selection/UI passes, viewport
+                               #   a depth-only directional shadow pass (RenderShadows) into its
+                               #   own FBO runs first each frame, and SampleShadow in
+                               #   test-fragment.glsl consumes that depth texture on unit 1
+                               #   the sun disc (assets/textures/environment/sun.png) is drawn
+                               #   additively right after the clear (RenderSun), depth off, so
+                               #   the terrain that follows occludes it
       ChunkManager.cs          # chunk lifecycle: load/unload, dirty tracking, mesh scheduling
       LodManager.cs            # LOD region lifecycle: worker thread builds, main thread uploads/unloads, burial flags
       FluidManager.cs          # the fluid tick: scheduled cells, level recompute + spread, batched remeshes

@@ -23,15 +23,42 @@ uniform vec3 uCameraPos;
 uniform int uNumPointLights;
 uniform vec3 uPointPos[8];
 uniform vec3 uPointColor[8];
+uniform sampler2DShadow uShadowMap;
+uniform mat4 uLightViewProj;
+uniform float uShadowStrength;
+uniform float uShadowTexel;
+uniform float uShadowWorldTexel;
+uniform float uShadowSoftness;
+uniform float uShadowNormalOffset;
 
 out vec4 FragColor;
 
-// Directional shadow mapping is parked for now (it shaded inverted/wonky) — everything
-// stays fully lit until it comes back. The depth-pass shaders are still on disk at
-// assets/shaders/shadow-vertex.glsl + shadow-fragment.glsl; re-enabling means restoring
-// the depth FBO + light-space matrix in RenderManager and the real lookup here.
-float SampleShadow(vec3 wp) {
-    return 1.0;
+// Directional sun shadows. RenderManager renders the casters depth-only through
+// uLightViewProj into uShadowMap, so a fragment's own light-space depth compared against
+// what is stored there says whether something else got the sunlight first. The ortho
+// projection puts clip z in 0..1 exactly like GL's depth write, so all three components
+// map with *0.5+0.5 and the comparison is apples to apples.
+float SampleShadow(vec3 wp, vec3 N, float ndl) {
+    if (uShadowStrength <= 0.0) return 1.0;
+    // Normal offset: axis-aligned voxel faces at grazing angles otherwise show acne
+    vec3 p = wp + N * (uShadowWorldTexel * uShadowNormalOffset * (1.0 - ndl));
+    vec4 lp = uLightViewProj * vec4(p, 1.0);
+    vec3 ndc = lp.xyz / lp.w;
+    vec3 uvz = ndc * 0.5 + 0.5;                 // all three components -> [0,1]
+    float edge = max(abs(ndc.x), abs(ndc.y));
+    float fade = 1.0 - smoothstep(0.85, 1.0, edge);   // soften the ortho-box boundary
+    if (fade <= 0.0 || uvz.z > 1.0) return 1.0;
+    uvz.z -= 0.0008;
+    if (uShadowSoftness <= 0.0) return mix(1.0, texture(uShadowMap, uvz), fade * uShadowStrength);
+    // Four taps on the diagonals, half a texel out. The sampler filters linearly, so each
+    // fetch is already a hardware 2x2 comparison and the four overlap into a smooth ~3x3
+    // tent — the same softness as the old (2s+1)^2 loop for 4 fetches instead of 9.
+    float o = 0.5 * uShadowTexel * uShadowSoftness;
+    float lit = texture(uShadowMap, vec3(uvz.x - o, uvz.y - o, uvz.z))
+              + texture(uShadowMap, vec3(uvz.x + o, uvz.y - o, uvz.z))
+              + texture(uShadowMap, vec3(uvz.x - o, uvz.y + o, uvz.z))
+              + texture(uShadowMap, vec3(uvz.x + o, uvz.y + o, uvz.z));
+    return mix(1.0, lit * 0.25, fade * uShadowStrength);
 }
 
 void main() {
@@ -42,8 +69,9 @@ void main() {
     vec3 albedo = texColor.rgb * fColor.rgb;
     vec3 N = normalize(fNormal);
     float ndl = max(dot(N, uSunDir), 0.0);
-    // Blend between flat and directional so sides stay readable while the sun orbits
-    float shadow = SampleShadow(fWorldPos);
+    float shadow = SampleShadow(fWorldPos, N, ndl);
+    // Blend between flat and directional so sides stay readable while the sun orbits;
+    // the shadow term only ever dims the direct sun, never the ambient below
     vec3 sun = uSunColor * (fSun * uSunIntensity * (0.35 + 0.65 * ndl) * shadow);
     float flick = 0.9 + 0.1 * sin(uTime * 9.0) * sin(uTime * 7.3 + 1.7);
     vec3 torch = uTorchColor * (fBlock * uTorchIntensity * flick);

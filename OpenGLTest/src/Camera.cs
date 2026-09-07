@@ -10,8 +10,8 @@ namespace silkgltriangle;
 public class Camera
 {
     public Vector3 Position { get; private set; } = SpawnPosition();
-    public float Yaw { get; private set; } = -90f;
-    public float Pitch { get; private set; } = 0f;
+    public float Yaw { get; private set; } = SpawnLook.X;
+    public float Pitch { get; private set; } = SpawnLook.Y;
     public bool IsGrounded { get; private set; }
     public bool IsFlying { get; private set; }
     public bool IsNoclip { get; private set; }
@@ -64,6 +64,15 @@ public class Camera
     // Set to "x,y,z" to start the eye at an exact spot instead of the surface spawn
     private const string SpawnOverrideVariable = "VOXEL_SPAWN";
 
+    // Set to "yaw,pitch" in degrees to start facing an exact direction
+    private const string LookOverrideVariable = "VOXEL_LOOK";
+
+    // Yaw 0 looks down +X, so the default -90 faces -Z, level with the horizon
+    private static readonly Vector2 DefaultLook = new(-90f, 0f);
+
+    // Parsed once for the whole process, and read by the Yaw/Pitch initializers above
+    private static readonly Vector2 SpawnLook = SpawnOrientation();
+
     private float _aspectRatio = 16f / 10f;
     private float _verticalVelocity;
     private Vector2 _lastMousePosition;
@@ -114,6 +123,42 @@ public class Camera
         }
 
         position = new Vector3(components[0], components[1], components[2]);
+        return true;
+    }
+
+    // Facing at startup, as (yaw, pitch) in degrees
+    private static Vector2 SpawnOrientation()
+    {
+        // Dev override: VOXEL_LOOK="yaw,pitch" pins the view direction, so a scripted
+        // verification run frames the same thing every time instead of whatever the mouse
+        // happened to be doing.
+        var lookOverride = Environment.GetEnvironmentVariable(LookOverrideVariable);
+        if (!string.IsNullOrWhiteSpace(lookOverride))
+        {
+            if (TryParseLookOverride(lookOverride, out var look))
+                return look;
+
+            Console.WriteLine(
+                $"Ignoring {LookOverrideVariable}=\"{lookOverride}\": expected two comma-separated numbers, e.g. -90,-20");
+        }
+
+        return DefaultLook;
+    }
+
+    private static bool TryParseLookOverride(string value, out Vector2 look)
+    {
+        look = DefaultLook;
+
+        var parts = value.Split(',');
+        if (parts.Length != 2)
+            return false;
+
+        if (!float.TryParse(parts[0].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var yaw)
+            || !float.TryParse(parts[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var pitch))
+            return false;
+
+        // Same clamp the mouse look uses, so an override can never start the view past vertical
+        look = new Vector2(yaw, Math.Clamp(pitch, -89f, 89f));
         return true;
     }
 
