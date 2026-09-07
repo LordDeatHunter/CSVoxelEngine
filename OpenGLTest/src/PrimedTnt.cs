@@ -174,7 +174,9 @@ public class PrimedTnt
         for (var y = minY; y <= maxY; y++)
         for (var z = minZ; z <= maxZ; z++)
         {
-            if (chunks.GetBlockGlobal(x, y, z) != 0)
+            // Solid, not merely non-air: a primed cube falls through pebbles like the
+            // player and the item drops do
+            if (BlockType.IsSolid(chunks.GetBlockGlobal(x, y, z)))
                 return true;
         }
 

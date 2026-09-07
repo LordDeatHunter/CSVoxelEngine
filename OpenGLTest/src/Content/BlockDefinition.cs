@@ -1,0 +1,60 @@
+using System.Text.Json;
+
+namespace silkgltriangle;
+
+/// <summary>
+/// JSON shape of <c>assets/data/blocks/&lt;name&gt;.json</c>. Every field is optional except
+/// <see cref="Model"/>; nullable value types mark "not written by the author" so
+/// <see cref="ContentRegistry"/> can apply defaults that depend on the baked model (a block
+/// occludes by default only if its model turned out to be a full cube).
+/// </summary>
+public sealed class BlockDefinition
+{
+    /// <summary>Model file name (<c>"block/cube_all"</c>) or an inline model object.</summary>
+    public JsonElement Model { get; set; }
+
+    /// <summary>Hits to break; see <see cref="BlockType.MaxHealth"/>.</summary>
+    public int? Hardness { get; set; }
+
+    public bool? Solid { get; set; }
+    public bool? Occludes { get; set; }
+    public bool? CullSelf { get; set; }
+    public bool? CastsAO { get; set; }
+    public bool? Cutout { get; set; }
+    public bool? Sway { get; set; }
+    public bool? HasItem { get; set; }
+    public bool? NeedsSupport { get; set; }
+
+    public LightDefinition? Light { get; set; }
+    public WoodDefinition? Wood { get; set; }
+
+    /// <summary>"model" | "tapered_wood" | "pebbles".</summary>
+    public string? Renderer { get; set; }
+
+    /// <summary>"drop" | "prime_tnt".</summary>
+    public string? OnBreak { get; set; }
+
+    /// <summary>Loot table name, or "none" for nothing. Omitted: the table sharing this
+    /// block's name if one exists, otherwise the block drops itself.</summary>
+    public string? Loot { get; set; }
+
+    /// <summary>Voxel light behaviour of a block.</summary>
+    public sealed class LightDefinition
+    {
+        /// <summary>Light this block emits, 0-15.</summary>
+        public byte? Emission { get; set; }
+
+        /// <summary>Whether voxel light travels through it; defaults to "not a full cube".</summary>
+        public bool? Passes { get; set; }
+    }
+
+    /// <summary>Wood-family membership: taper step and the half-width its box is drawn at.</summary>
+    public sealed class WoodDefinition
+    {
+        /// <summary>0 is the full-cube log, 1..5 step branch down to twig.</summary>
+        public int? TaperLevel { get; set; }
+
+        /// <summary>Half edge length of the tapered box, in blocks.</summary>
+        public float? HalfWidth { get; set; }
+    }
+}

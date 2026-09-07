@@ -1,0 +1,8 @@
+{
+  "model": {
+    "parent": "block/cube_column",
+    "textures": { "end": "log_top", "side": "log_side" }
+  },
+  "hardness": 8,
+  "wood": { "taperLevel": 0, "halfWidth": 0.5 }
+}

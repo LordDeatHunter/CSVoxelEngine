@@ -87,27 +87,15 @@ public class TntManager
             if (TreeGenerator.WoodLevel(removed) >= 0 || removed == BlockType.Leaves)
                 TreeGenerator.PoisonCanopy(x, z);
 
-            if (removed == BlockType.Tnt)
+            if (BlockType.ById[removed]?.OnBreak == BlockBreakAction.PrimeTnt)
             {
                 // Deferred: the live list is being iterated further up the call stack
                 _pendingSpawns.Add(new Vector3(x + 0.5f, y + 0.5f, z + 0.5f));
             }
-            else if (removed == BlockType.Pebble)
-            {
-                // Same yield as a mined pebble: one flint per visible stone.
-                var flints = PebbleGenerator.CountAt(x, z);
-                for (var i = 0; i < flints; i++)
-                    drops.Spawn(ItemType.Flint, new Vector3(x, y, z));
-            }
-            else if (removed == BlockType.Leaves)
-            {
-                // Same odds as a mined leaves block (see DropManager.SpawnLeafDrops)
-                drops.SpawnLeafDrops(new Vector3(x, y, z));
-            }
             else
             {
-                // Same drop a mined block would leave (stone drops cobblestone)
-                drops.Spawn(BlockType.DropFor(removed), new Vector3(x, y, z));
+                // Same loot a mined block would leave (stone drops cobblestone)
+                drops.SpawnLoot(removed, new Vector3(x, y, z));
             }
 
             // The cell is air now either way, so the buried LOD must duck below it
@@ -117,14 +105,15 @@ public class TntManager
             }
         }
 
-        // Pebbles need support: pop survivors left floating where the blast took the
-        // ground from under them. The scan runs after all clearing, so a pebble found
+        // Pebbles and their kind need support: pop survivors left floating where the blast
+        // took the ground from under them. The scan runs after all clearing, so a block found
         // over air genuinely lost its support (or was already floating).
         foreach (var ((x, z), lowestY) in blastedColumns)
         {
             for (var y = lowestY; y <= (int)max.Y + 1; y++)
             {
-                if (chunks.GetBlockGlobal(x, y, z) != BlockType.Pebble) continue;
+                var standing = chunks.GetBlockGlobal(x, y, z);
+                if (BlockType.ById[standing]?.NeedsSupport != true) continue;
 
                 // Support in an unloaded chunk reads as air: leave those alone.
                 var belowChunkPos = new Vector3(
@@ -142,9 +131,7 @@ public class TntManager
                 if (pebbleChunk.ClearBlockAt(new Vector3(x, y, z)) == 0) continue;
                 touchedChunks.Add(pebbleChunkPos);
 
-                var flints = PebbleGenerator.CountAt(x, z);
-                for (var i = 0; i < flints; i++)
-                    drops.Spawn(ItemType.Flint, new Vector3(x, y, z));
+                drops.SpawnLoot(standing, new Vector3(x, y, z));
             }
         }
 

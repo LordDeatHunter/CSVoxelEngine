@@ -127,9 +127,10 @@ public class World
     /// <summary>
     /// Drives hit-based mining: holding left-click on a block lands one hit per
     /// BlockHitSeconds, each removing 1 HP, and the block breaks when its HP runs out
-    /// (see BlockType.MaxHealth). A partial interval deals no damage, and damage is
-    /// discarded when the target changes or the button is released. Noclip instamines
-    /// (one block per frame, as before). Call after Update so the selection is current.
+    /// (see BlockType.MaxHealth, the block's JSON hardness). A block of hardness 0 breaks on
+    /// first contact. A partial interval deals no damage, and damage is discarded when the
+    /// target changes or the button is released. Noclip instamines (one block per frame, as
+    /// before). Call after Update so the selection is current.
     /// </summary>
     public void UpdateBlockBreaking(double deltaTime, bool isHolding)
     {
@@ -157,17 +158,13 @@ public class World
             _popElapsed = BlockPopSeconds;
         }
 
-        // Pebbles pop on first contact: one punch breaks them, no hold-to-mine
-        if (_breakingBlockId == BlockType.Pebble)
-        {
-            RemoveBlock(_selectedBlockPosition);
-            StopBreaking();
-            return;
-        }
-
-        // Air or an unloaded chunk: nothing to mine
+        // Zero health covers two cases: a real block of hardness 0 (pebbles) pops on first
+        // contact with no hold-to-mine, while air or an unloaded chunk has nothing to mine
+        // at all — the id being a registered block is what tells them apart.
         if (_breakMaxHealth <= 0)
         {
+            if (BlockType.ById[_breakingBlockId] != null)
+                RemoveBlock(_selectedBlockPosition);
             StopBreaking();
             return;
         }
@@ -224,8 +221,8 @@ public class World
         // Read the id before the block goes away, so the drop knows what it is
         var brokenId = BlockIdAt(blockPos);
 
-        // Mined TNT never drops — once its HP runs out it primes on the spot instead
-        if (brokenId == BlockType.Tnt)
+        // TNT never drops — once its HP runs out it primes on the spot instead
+        if (BlockType.ById[brokenId]?.OnBreak == BlockBreakAction.PrimeTnt)
         {
             if (chunk.RemoveBlockAt(blockPos, _chunkManager))
                 _tntManager.Spawn(blockPos);
@@ -234,20 +231,9 @@ public class World
         // block (see FellWood): a trunk cut drops the crown, a branch cut only its children
         else if (TreeGenerator.WoodLevel(brokenId) >= 0)
             FellWood(blockPos, brokenId, chunk);
-        // Mined leaves roll item drops instead of a block drop (same odds as every other
-        // destruction path; see DropManager.SpawnLeafDrops)
-        else if (brokenId == BlockType.Leaves && chunk.RemoveBlockAt(blockPos, _chunkManager))
-            _dropManager.SpawnLeafDrops(blockPos);
-        // Pebbles drop one flint per visible stone (see PebbleGenerator.CountAt)
-        else if (brokenId == BlockType.Pebble && chunk.RemoveBlockAt(blockPos, _chunkManager))
-        {
-            var flints = PebbleGenerator.CountAt((int)blockPos.X, (int)blockPos.Z);
-            for (var i = 0; i < flints; i++)
-                _dropManager.Spawn(ItemType.Flint, blockPos);
-        }
-        // Only drop something if a block was actually cleared
+        // Everything else rolls its loot table, but only once a block was actually cleared
         else if (chunk.RemoveBlockAt(blockPos, _chunkManager))
-            _dropManager.Spawn(BlockType.DropFor(brokenId), blockPos);
+            _dropManager.SpawnLoot(brokenId, blockPos);
 
         // Keep the buried LOD mesh below the newly exposed hole
         // (blockPos components are floored floats, so the int casts are exact)
@@ -262,11 +248,11 @@ public class World
             _lodManager.MarkEditedColumn((int)blockPos.X, (int)blockPos.Z);
         }
 
-        // Pebbles need the block under them: pop whatever sits right above the break. This
-        // routes through the normal pebble path, so it drops its flint; its own check above
-        // then no-ops on air, so the recursion always terminates.
+        // Pebbles and their kind need the block under them: pop whatever sits right above the
+        // break. This routes through the normal break path, so it rolls its loot; its own
+        // check then no-ops on air, so the recursion always terminates.
         var above = blockPos + Vector3.UnitY;
-        if (BlockIdAt(above) == BlockType.Pebble)
+        if (BlockType.ById[BlockIdAt(above)]?.NeedsSupport == true)
             RemoveBlock(above);
     }
 
@@ -288,7 +274,7 @@ public class World
         if (_chunkManager.IsPlayerPlaced(x, y, z))
         {
             if (chunk.RemoveBlockAt(blockPos, _chunkManager))
-                _dropManager.Spawn(BlockType.DropFor(brokenId), blockPos);
+                _dropManager.SpawnLoot(brokenId, blockPos);
             return;
         }
 
@@ -299,7 +285,7 @@ public class World
             // remesh, so remesh the batch of one — otherwise the mined log visibly lingers.
             if (chunk.ClearBlockAt(blockPos) == 0) return;
             chunk.RemeshAfterBatchEdit(_chunkManager);
-            _dropManager.Spawn(BlockType.DropFor(brokenId), blockPos);
+            _dropManager.SpawnLoot(brokenId, blockPos);
             return;
         }
 

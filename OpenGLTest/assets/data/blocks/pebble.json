@@ -1,0 +1,12 @@
+{
+  "model": { "parent": "block/cube_all", "textures": { "all": "stone" } },
+  "hardness": 0,
+  "renderer": "pebbles",
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "light": { "passes": true },
+  "hasItem": false,
+  "needsSupport": true,
+  "loot": "pebble"
+}

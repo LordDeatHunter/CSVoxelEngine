@@ -104,23 +104,42 @@ public static class Primitives
     }
 
     /// <summary>
-    /// A cube for one block type, centred on the origin, wearing that type's atlas tiles and
-    /// per-face brightness. Faces are shaded as fully unoccluded (AO 3) — used both for the
-    /// mining pop, where the block has nothing beside it, and for inventory icons.
+    /// A block's baked model as a standalone mesh, centred on the origin, so drops, the mining
+    /// pop, primed TNT and inventory icons all show the same shape the world does. Faces are
+    /// shaded as fully unoccluded (AO 3) — nothing stands beside a floating copy of a block.
     /// </summary>
-    public static Mesh CreateBlockCube(GL gl, BlockType type, float size = 1f)
+    public static Mesh CreateBlockModel(GL gl, BakedModel model, float size = 1f)
     {
-        Span<UvRect> faceUvs = stackalloc UvRect[FaceCount];
-        Span<float> faceShades = stackalloc float[FaceCount];
+        var quads = model.Quads;
+        var vertices = new Vertex[quads.Length * CornersPerFace];
+        var indices = new ushort[quads.Length * 6];
 
-        for (var face = 0; face < FaceCount; face++)
+        for (var q = 0; q < quads.Length; q++)
         {
-            faceUvs[face] = UvRect.Tile(type.FaceTiles[face]);
-            // ShadeLut already folds brightness and AO into a 0..255 byte
-            faceShades[face] = Chunk.ShadeLut[(face << 2) | 3] / 255f;
+            var quad = quads[q];
+            // ShadeLut already folds face brightness and AO into a 0..255 byte; an element
+            // with shade off keeps full brightness, exactly like the chunk mesher
+            var shade = quad.Shade ? Chunk.ShadeLut[(quad.Face << 2) | 3] / 255f : 1f;
+            var tint = Shade(Rgba.White, shade);
+
+            for (var corner = 0; corner < CornersPerFace; corner++)
+            {
+                // Baked positions span the 0..1 cell, so recentre before scaling
+                var position = (quad.Positions[corner] - new Vector3(0.5f)) * size;
+                vertices[q * CornersPerFace + corner] =
+                    Vert(position, tint, quad.Uvs[corner], quad.Normal);
+            }
+
+            var offset = (ushort)(q * CornersPerFace);
+            indices[q * 6 + 0] = offset;
+            indices[q * 6 + 1] = (ushort)(offset + 1);
+            indices[q * 6 + 2] = (ushort)(offset + 2);
+            indices[q * 6 + 3] = offset;
+            indices[q * 6 + 4] = (ushort)(offset + 2);
+            indices[q * 6 + 5] = (ushort)(offset + 3);
         }
 
-        return CreateCube(gl, size, Rgba.White, faceUvs, faceShades);
+        return new Mesh(gl, vertices, indices);
     }
 
     /// <summary>

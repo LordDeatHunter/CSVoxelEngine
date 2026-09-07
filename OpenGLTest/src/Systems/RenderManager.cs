@@ -55,6 +55,10 @@ public class RenderManager : IDisposable
 
     private void LoadResources()
     {
+        // Blocks, items, loot and models first: everything below (and the World that follows)
+        // reads the tables this fills, and nothing in it touches GL or the atlas.
+        ContentRegistry.Load("assets");
+
         var vs = FileUtils.ReadFile("assets/shaders/test-vertex.glsl");
         var fs = FileUtils.ReadFile("assets/shaders/test-fragment.glsl");
         var selectionVs = FileUtils.ReadFile("assets/shaders/selection-vertex.glsl");
@@ -63,7 +67,7 @@ public class RenderManager : IDisposable
         var breakFs = FileUtils.ReadFile("assets/shaders/break-fragment.glsl");
 
         textureAtlas = TextureAtlas.Build(gl, "assets/textures/blocks");
-        BlockType.ResolveAtlasTiles();
+        ContentRegistry.BakeModels();
 
         worldShader = new Shader(gl, vs, fs);
         // SetUniform writes to the currently bound program, so bind first — otherwise

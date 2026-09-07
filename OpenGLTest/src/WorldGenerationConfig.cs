@@ -204,12 +204,6 @@ public static class WorldGenerationConfig
     // test-vertex.glsl next to the wave itself
     public const float LeafSwayStrength = 1f;
 
-    // --- Leaf item drops ---
-    // Mining a leaves block rolls each chance independently, so one block can drop
-    // nothing, a vine, a branch, or (rarely) both.
-    public const float LeafVineDropChance = 0.15f;
-    public const float LeafBranchDropChance = 0.15f;
-
     // --- Pebbles (PebbleGenerator) ---
     // Ankle-high stones in rare low-frequency patches; a density roll thins inside them
     public const bool PebblesEnabled = true;

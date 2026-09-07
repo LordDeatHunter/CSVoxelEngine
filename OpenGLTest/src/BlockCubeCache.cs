@@ -24,9 +24,27 @@ public class BlockCubeCache : IDisposable
         var type = BlockType.ById[blockId];
         if (type == null) return null;
 
-        mesh = Primitives.CreateBlockCube(_gl, type);
+        // Every registered block is baked at startup; the plain cube is only a safety net so a
+        // half-initialised registry still draws something instead of throwing
+        mesh = type.BakedModel != null
+            ? Primitives.CreateBlockModel(_gl, type.BakedModel)
+            : CreateFallbackCube(type);
         _meshes[blockId] = mesh;
         return mesh;
+    }
+
+    /// <summary>Face tiles on a plain unit cube, shaded as fully unoccluded.</summary>
+    private Mesh CreateFallbackCube(BlockType type)
+    {
+        Span<UvRect> faceUvs = stackalloc UvRect[6];
+        Span<float> faceShades = stackalloc float[6];
+        for (var face = 0; face < 6; face++)
+        {
+            faceUvs[face] = UvRect.Tile(type.FaceTiles[face]);
+            faceShades[face] = Chunk.ShadeLut[(face << 2) | 3] / 255f;
+        }
+
+        return Primitives.CreateCube(_gl, 1f, Rgba.White, faceUvs, faceShades);
     }
 
     public void Dispose()

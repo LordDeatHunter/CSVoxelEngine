@@ -239,9 +239,9 @@ public class TopplingTree : IDisposable
 
     /// <summary>
     /// Item drops for the landed tree, each at the floored cell its block came to rest in.
-    /// Canopy leaves roll the same vine/branch odds as mined leaves (see
-    /// <see cref="DropManager.SpawnLeafDrops"/>). Single-use: the second call
-    /// returns nothing.
+    /// Every block rolls its own loot table through <see cref="DropManager.RollLoot"/>, so a
+    /// felled canopy yields exactly what mining or blasting it would. Single-use: the second
+    /// call returns nothing.
     /// </summary>
     public List<(byte Id, Vector3 Cell)> TakeDrops()
     {
@@ -251,26 +251,19 @@ public class TopplingTree : IDisposable
         _dropsTaken = true;
 
         var landed = Matrix4x4.CreateFromAxisAngle(_axis, MathF.PI * 0.5f);
+        var rolled = new List<byte>();
         foreach (var block in _blocks)
         {
             var rest = _pivot + Vector3.Transform(block.Cell + new Vector3(0.5f) - _pivot, landed);
             var cell = new Vector3(MathF.Floor(rest.X), MathF.Floor(rest.Y), MathF.Floor(rest.Z));
 
-            // Felled canopy leaves roll the same item odds as mined ones
-            if (block.Id == BlockType.Leaves)
-            {
-                if (Random.Shared.NextSingle() < WorldGenerationConfig.LeafVineDropChance)
-                    drops.Add((ItemType.Vine, cell));
-                if (Random.Shared.NextSingle() < WorldGenerationConfig.LeafBranchDropChance)
-                    drops.Add((ItemType.Branch, cell));
-                continue;
-            }
+            // The resting cell is the loot context too, so position-dependent rolls see where
+            // the block landed rather than where it grew
+            rolled.Clear();
+            DropManager.RollLoot(block.Id, new LootContext((int)cell.X, (int)cell.Y, (int)cell.Z), rolled);
 
-            var dropId = BlockType.DropFor(block.Id);
-            if (dropId == BlockType.Air)
-                continue;
-
-            drops.Add((dropId, cell));
+            foreach (var id in rolled)
+                drops.Add((id, cell));
         }
 
         return drops;

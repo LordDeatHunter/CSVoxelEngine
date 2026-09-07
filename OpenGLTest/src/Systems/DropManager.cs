@@ -19,6 +19,8 @@ public class DropManager
 
     private readonly List<ItemDrop> _drops = [];
     private readonly List<byte> _collected = [];
+    // Reused by SpawnLoot so a break does not allocate; main thread only, like the rest
+    private readonly List<byte> _loot = [];
 
     public IReadOnlyList<ItemDrop> Drops => _drops;
 
@@ -50,17 +52,39 @@ public class DropManager
     }
 
     /// <summary>
-    /// Rolls a destroyed leaves block's item drops. Each chance (see
-    /// <see cref="WorldGenerationConfig"/>) is independent, so one block can yield nothing, a
-    /// vine, a branch, or both. Every destruction path — mining, TNT, felling — routes through
-    /// here so the odds never depend on how the leaves came down.
+    /// Rolls what a destroyed block leaves behind into <paramref name="into"/>: its loot table,
+    /// or the block itself when it declares none (<see cref="LootTable.None"/> yields nothing).
+    /// Every destruction path — mining, TNT, felling — rolls through here, so the yield never
+    /// depends on how the block came down. Unknown ids (air, items) roll nothing.
     /// </summary>
-    public void SpawnLeafDrops(Vector3 blockPosition)
+    public static void RollLoot(byte blockId, LootContext context, List<byte> into)
     {
-        if (Random.Shared.NextSingle() < WorldGenerationConfig.LeafVineDropChance)
-            Spawn(ItemType.Vine, blockPosition);
-        if (Random.Shared.NextSingle() < WorldGenerationConfig.LeafBranchDropChance)
-            Spawn(ItemType.Branch, blockPosition);
+        var type = BlockType.ById[blockId];
+        if (type == null) return;
+
+        if (type.LootTable == null)
+        {
+            into.Add(blockId);
+            return;
+        }
+
+        type.LootTable.Roll(context, into);
+    }
+
+    /// <summary>
+    /// Rolls a destroyed block's loot and drops every rolled id at the centre of the cell the
+    /// block occupied. The cell doubles as the loot context, so position-dependent rolls (the
+    /// pebble's flint count) see where the block stood.
+    /// </summary>
+    public void SpawnLoot(byte blockId, Vector3 blockPosition)
+    {
+        _loot.Clear();
+        RollLoot(blockId,
+            new LootContext((int)blockPosition.X, (int)blockPosition.Y, (int)blockPosition.Z),
+            _loot);
+
+        foreach (var id in _loot)
+            Spawn(id, blockPosition);
     }
 
     public void Update(float deltaTime, Vector3 playerPosition, ChunkManager chunks)

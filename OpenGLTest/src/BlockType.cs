@@ -1,162 +1,151 @@
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace silkgltriangle;
 
-public class BlockType
+/// <summary>
+/// Everything the engine knows about one block, loaded from
+/// <c>assets/data/blocks/&lt;name&gt;.json</c> by <see cref="ContentRegistry"/>. Instances are
+/// created once at startup and never mutated afterwards (the few <c>internal set</c> members
+/// are filled during the load/bake sequence, before any world thread exists), so meshing
+/// threads can read them freely.
+///
+/// The static side is the hot-path view: plain arrays indexed by block id, so face culling and
+/// AO cost an array read instead of a dictionary lookup, plus the well-known handles worldgen
+/// and gameplay code names blocks by.
+/// </summary>
+public sealed record BlockType
 {
-    // Ids of the built-in blocks, for code that decides what to generate
+    /// <summary>Air is not a registered block; id 0 always means "nothing here".</summary>
     public const byte Air = 0;
-    public const byte Grass = 1;
-    public const byte Dirt = 2;
-    public const byte Stone = 3;
-    public const byte Cobblestone = 4;
-    public const byte Tnt = 5;
-    public const byte Lamp = 6;
-    public const byte Log = 7;
-    public const byte Branch = 8;
-    public const byte Twig = 9;
-    public const byte Leaves = 10;
-    public const byte Limb = 11;
-    public const byte Sprig = 12;
-    public const byte Switch = 13;
-    public const byte Pebble = 14;
 
-    public static readonly Dictionary<byte, BlockType> Types = new()
-    {
-        { 1, new BlockType("grass_top", "dirt", "grass_side") }, // grass
-        { 2, new BlockType("dirt", "dirt", "dirt") }, // dirt
-        { 3, new BlockType("stone", "stone", "stone") }, // stone
-        { 4, new BlockType("cobblestone", "cobblestone", "cobblestone") }, // cobblestone
-        { 5, new BlockType("tnt_top", "tnt_top", "tnt_side") }, // tnt
-        { 6, new BlockType("lantern_lit", "lantern_lit", "lantern_lit") }, // lamp
-        { 7, new BlockType("log_top", "log_top", "log_side", maxHealth: 8) }, // log (full-cube trunk base)
-        { 8, new BlockType("log_top", "log_top", "log_side") }, // branch (taper level 1)
-        { 9, new BlockType("log_top", "log_top", "log_side") }, // twig (taper level 5, tips)
-        { 10, new BlockType("leaves", "leaves", "leaves", maxHealth: 2) }, // leaves (cutout)
-        { 11, new BlockType("log_top", "log_top", "log_side") }, // limb (taper level 2)
-        { 12, new BlockType("log_top", "log_top", "log_side") }, // sprig (taper level 3)
-        { 13, new BlockType("log_top", "log_top", "log_side") }, // switch (taper level 4)
-        { 14, new BlockType("stone", "stone", "stone", maxHealth: 1) }, // pebble (ankle-high stones, insta-break)
-    };
-
-    // Array-indexed view of Types for the meshing hot path (no dictionary hashing per block)
-    public static readonly BlockType?[] ById = BuildById();
-
-    /// <summary>
-    /// Light emitted by each block id (0-15), indexed like <see cref="ById"/>. Only the lamp
-    /// glows; everything else is lit by the sun or by flood-filled lamp light.
-    /// </summary>
-    public static readonly byte[] Emission = BuildEmission();
-
-    // Hits a block takes before it breaks; one hit lands per World.BlockHitSeconds of mining
+    /// <summary>Hits a block takes before it breaks; one hit lands per World.BlockHitSeconds.</summary>
     public const int DefaultMaxHealth = 5;
 
-    public Point Top, Bottom, Side;
+    // Well-known handles, resolved by name after the registry has assigned ids. Code that
+    // decides what to generate or how to react to a break names blocks through these.
+    public static byte Grass { get; internal set; }
+    public static byte Dirt { get; internal set; }
+    public static byte Stone { get; internal set; }
+    public static byte Tnt { get; internal set; }
+    public static byte Lamp { get; internal set; }
+    public static byte Log { get; internal set; }
+    public static byte Leaves { get; internal set; }
+    public static byte Pebble { get; internal set; }
 
-    // Tile per face, indexed in Chunk.CubeFaces order: -Z, +Z, -X, +X, +Y, -Y.
-    // Empty until ResolveAtlasTiles runs at startup; the meshing hot path reads plain
-    // tile coordinates exactly as before, so stitching costs nothing per block.
-    public Point[] FaceTiles = [];
+    /// <summary>Every registered block by id; null where no block owns that id.</summary>
+    public static readonly BlockType?[] ById = new BlockType?[256];
 
-    public readonly int MaxHealth;
+    /// <summary>Light emitted by each block id (0-15), indexed like <see cref="ById"/>.</summary>
+    public static readonly byte[] Emission = new byte[256];
 
-    // Texture names without extension, resolved against the stitched atlas at startup.
-    private readonly string _topName, _bottomName, _sideName;
+    /// <summary>Whether voxel light travels through each block id; see Chunk's light passes.</summary>
+    public static readonly bool[] PassesLightById = new bool[256];
 
-    public BlockType(string top, string bottom, string side, int maxHealth = DefaultMaxHealth)
-    {
-        _topName = top;
-        _bottomName = bottom;
-        _sideName = side;
-        MaxHealth = maxHealth;
-    }
+    /// <summary>Wood block per taper level: index 0 is the full-cube log, 1..5 step branch down
+    /// to twig. Built and validated by the registry from each block's <c>wood.taperLevel</c>.</summary>
+    public static byte[] WoodByLevel { get; internal set; } = [];
 
-    /// <summary>
-    /// Resolves every type's texture names to stitched atlas tiles. Called once at startup
-    /// by <see cref="RenderManager"/> right after <see cref="TextureAtlas.Build"/>, before
-    /// the <see cref="World"/> and its meshing threads exist.
-    /// </summary>
-    public static void ResolveAtlasTiles()
-    {
-        foreach (var type in Types.Values)
-        {
-            type.Top = TextureAtlas.TileOf(type._topName);
-            type.Bottom = TextureAtlas.TileOf(type._bottomName);
-            type.Side = TextureAtlas.TileOf(type._sideName);
-            type.FaceTiles = [type.Side, type.Side, type.Side, type.Side, type.Top, type.Bottom];
-        }
-    }
+    /// <summary>Every registered block keyed by id, for code that enumerates types.</summary>
+    public static IReadOnlyDictionary<byte, BlockType> Types { get; internal set; } =
+        new Dictionary<byte, BlockType>();
 
-    private static BlockType?[] BuildById()
-    {
-        var byId = new BlockType?[256];
-        foreach (var (id, type) in Types)
-            byId[id] = type;
-        return byId;
-    }
+    // bool[256] mirrors of the per-block flags the mesher asks about by neighbour id
+    internal static readonly bool[] SolidById = new bool[256];
+    internal static readonly bool[] OccludesById = new bool[256];
+    internal static readonly bool[] CastsAoById = new bool[256];
 
-    private static byte[] BuildEmission()
-    {
-        var emission = new byte[256];
-        emission[Lamp] = 15;
-        return emission;
-    }
+    /// <summary>String id: the block's file name under <c>assets/data/blocks</c>.</summary>
+    public required string Name { get; init; }
 
-    /// <summary>Whether a block renders as a sub-cell tapered box instead of a full cube:
-    /// every wood id except the full-cube log. Partial neighbours never hide a full cube's
-    /// faces, so the ground still draws under a trunk and a box sitting on terrain never
-    /// leaves a gap ring.</summary>
-    public static bool IsPartialCube(byte blockId) =>
-        blockId == Branch || blockId == Limb || blockId == Sprig || blockId == Switch || blockId == Twig;
+    /// <summary>Byte id assigned at load; what chunk storage holds.</summary>
+    public required byte Id { get; init; }
 
-    /// <summary>Whether a block is solid to bodies: everything except air and the
-    /// walk-through pebbles. The raycast still targets pebbles (it hits any non-air cell),
-    /// so this only gates movement and drop physics.</summary>
-    public static bool IsSolid(byte blockId) => blockId != Air && blockId != Pebble;
+    public int MaxHealth { get; init; } = DefaultMaxHealth;
 
-    /// <summary>Whether a block fully hides a neighbouring full cube's face. Leaves are
-    /// cutout (their tile discards ~13% of fragments in test-fragment.glsl), so they must
-    /// never hide a neighbour: a face culled behind one becomes an X-ray window through
-    /// its texture holes into the ground behind. Partial wood boxes never hide either
-    /// (see <see cref="IsPartialCube"/>), and neither do the ankle-high pebbles, so the
-    /// ground still draws under both.</summary>
-    public static bool Occludes(byte blockId) =>
-        IsSolid(blockId) && blockId != Leaves && !IsPartialCube(blockId);
+    /// <summary>Whether the block collides with bodies.</summary>
+    public bool Solid { get; init; } = true;
+
+    /// <summary>Whether the block hides a neighbouring full cube's face. Defaults to "the baked
+    /// model is a full cube and it is not cutout", so it is only known after baking.</summary>
+    public bool OccludesNeighbours { get; internal set; }
+
+    /// <summary>Whether faces are also culled against a neighbour of the same block (glass).</summary>
+    public bool CullSelf { get; init; }
+
+    /// <summary>Whether the block darkens neighbouring faces via ambient occlusion. Defaults to
+    /// <see cref="Solid"/>.</summary>
+    public bool CastsAmbientOcclusion { get; internal set; }
+
+    /// <summary>Alpha-tested texture (leaves); forces <see cref="OccludesNeighbours"/> off, or a
+    /// face culled behind it becomes an X-ray window through the texture's holes.</summary>
+    public bool Cutout { get; init; }
+
+    /// <summary>Whether the vertex shader gives this block the leaf-wind sway.</summary>
+    public bool Sway { get; init; }
+
+    /// <summary>Light this block emits, 0-15.</summary>
+    public byte LightEmission { get; init; }
+
+    /// <summary>Whether voxel light travels through it; defaults to "not a full cube".</summary>
+    public bool PassesLight { get; internal set; }
+
+    /// <summary>Which geometry emitter turns this block into chunk vertices.</summary>
+    public BlockRenderer Renderer { get; init; } = BlockRenderer.Model;
+
+    /// <summary>Wood taper step, or -1 for anything that is not wood.</summary>
+    public int WoodTaperLevel { get; init; } = -1;
+
+    /// <summary>Half edge length of the tapered wood box in blocks, or -1 for non-wood.</summary>
+    public float HalfWidth { get; init; } = -1f;
+
+    /// <summary>Whether the block gets an inventory slot and can be held.</summary>
+    public bool HasItem { get; init; } = true;
+
+    /// <summary>Whether the block pops (with its loot) when the block below is removed.</summary>
+    public bool NeedsSupport { get; init; }
+
+    /// <summary>What happens when the block is destroyed.</summary>
+    public BlockBreakAction OnBreak { get; init; } = BlockBreakAction.Drop;
+
+    /// <summary>Loot rolled on break. Null means "drop yourself";
+    /// <see cref="silkgltriangle.LootTable.None"/> means "drop nothing".</summary>
+    public LootTable? LootTable { get; init; }
+
+    /// <summary>The block's model, baked to atlas-ready quads at startup.</summary>
+    public BakedModel? BakedModel { get; internal set; }
+
+    /// <summary>Tile per face in <see cref="Chunk.CubeFaces"/> order: -Z, +Z, -X, +X, +Y, -Y.
+    /// Empty until the models are baked.</summary>
+    public Point[] FaceTiles { get; internal set; } = [];
+
+    /// <summary>Tile of the +Y face; shorthand the procedural emitters read.</summary>
+    public Point Top { get; internal set; }
+
+    /// <summary>Tile of the -Y face.</summary>
+    public Point Bottom { get; internal set; }
+
+    /// <summary>Tile of the side faces (-Z is representative).</summary>
+    public Point Side { get; internal set; }
+
+    /// <summary>Whether a block is solid to bodies. The raycast still targets non-solid blocks
+    /// (it hits any non-air cell), so this only gates movement and drop physics.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsSolid(byte blockId) => SolidById[blockId];
+
+    /// <summary>Whether a block fully hides a neighbouring full cube's face.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool Occludes(byte blockId) => OccludesById[blockId];
 
     /// <summary>Whether a block darkens neighbouring faces via ambient occlusion. Leaves count
-    /// as solid here (unlike <see cref="Occludes"/>); only air and the ankle-high pebbles,
-    /// too small to block any light, do not.</summary>
-    public static bool CastsAO(byte blockId) => blockId != Air && blockId != Pebble;
+    /// as solid here (unlike <see cref="Occludes"/>).</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool CastsAO(byte blockId) => CastsAoById[blockId];
 
-    /// <summary>Half-width of a partial block's tapered box, in blocks. Full cubes are 0.5.
-    /// Levels run Branch (0.75) down to Twig (0.25); see TreeGenerator for how limbs step
-    /// through them.</summary>
-    public static float PartialHalfWidth(byte blockId) => blockId switch
-    {
-        Branch => 6f / 16f,
-        Limb => 5f / 16f,
-        Sprig => 4f / 16f,
-        Switch => 3f / 16f,
-        Twig => 2f / 16f,
-        _ => 0.5f,
-    };
-    /// <summary>Block id dropped when a block is mined; stone drops cobblestone, every tapered
-    /// wood id drops logs, TNT drops nothing (mining it primes it instead), leaves drop
-    /// nothing, pebbles drop nothing here (World spawns their flint directly, one per stone),
-    /// everything else drops itself.</summary>
-    public static byte DropFor(byte blockId) => blockId switch
-    {
-        Stone => Cobblestone,
-        Branch => Log,
-        Limb => Log,
-        Sprig => Log,
-        Switch => Log,
-        Twig => Log,
-        Tnt => Air,
-        Leaves => Air,
-        Pebble => Air,
-        _ => blockId,
-    };
+    /// <summary>Half-width of a wood block's box in blocks (the log is 0.5), or -1 when the id
+    /// is not wood at all.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float WoodHalfWidth(byte blockId) => ById[blockId]?.HalfWidth ?? -1f;
 
     public record struct Point(int X, int Y);
 }

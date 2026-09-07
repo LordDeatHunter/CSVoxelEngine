@@ -1,0 +1,8 @@
+{
+  "pools": [
+    {
+      "rolls": { "provider": "pebble_count" },
+      "entries": [ { "item": "item/flint" } ]
+    }
+  ]
+}

@@ -112,16 +112,24 @@ public class Inventory
 
     private static int Wrap(int index) => ((index % SlotCount) + SlotCount) % SlotCount;
 
+    /// <summary>
+    /// Ids the hotbar shows, in order: every block that declares <c>hasItem</c>, then every pure
+    /// item. Blocks without an item form (the taper variants, which are visual states of wood,
+    /// and pebbles, which drop flint) never enter the inventory, so they get no slot.
+    /// </summary>
+    private static byte[] HotbarIds() =>
+        BlockType.Types.Values
+            .Where(type => type.HasItem)
+            .Select(type => type.Id)
+            .OrderBy(id => id)
+            .Concat(ItemType.Types.Keys.OrderBy(id => id))
+            .Take(SlotCount)
+            .ToArray();
+
     private static byte[] BuildSlots()
     {
         var slots = new byte[SlotCount];
-        // Taper variants (branch/limb/sprig/...) are visual states of wood, not items: mining
-        // any of them drops the default log, so only the log itself takes a slot. Pebbles
-        // likewise drop flint, never themselves. Pure items (vine, branch pickups) take the
-        // trailing slots.
-        var blockIds = BlockType.Types.Keys.Where(id => !BlockType.IsPartialCube(id) && id != BlockType.Pebble).OrderBy(id => id);
-        var ids = blockIds.Concat(ItemType.Types.Keys.OrderBy(id => id)).Take(SlotCount).ToArray();
-        ids.CopyTo(slots, 0);
+        HotbarIds().CopyTo(slots, 0);
         return slots;
     }
 
@@ -129,8 +137,7 @@ public class Inventory
     private static int[] BuildCounts()
     {
         var counts = new int[SlotCount];
-        var blockIds = BlockType.Types.Keys.Where(id => !BlockType.IsPartialCube(id) && id != BlockType.Pebble).OrderBy(id => id);
-        var ids = blockIds.Concat(ItemType.Types.Keys.OrderBy(id => id)).Take(SlotCount).ToArray();
+        var ids = HotbarIds();
         for (var i = 0; i < ids.Length; i++)
             if (ids[i] == BlockType.Tnt)
                 counts[i] = StartingTnt;

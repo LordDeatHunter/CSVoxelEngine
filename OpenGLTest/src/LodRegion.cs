@@ -237,10 +237,10 @@ public class LodRegion : IDisposable
             }
         }
 
-        var grass = BlockType.Types[BlockType.Grass];
-        var dirt = BlockType.Types[BlockType.Dirt];
-        var stone = BlockType.Types[BlockType.Stone];
-        var leaves = BlockType.Types[BlockType.Leaves];
+        var grass = BlockType.ById[BlockType.Grass]!;
+        var dirt = BlockType.ById[BlockType.Dirt]!;
+        var stone = BlockType.ById[BlockType.Stone]!;
+        var leaves = BlockType.ById[BlockType.Leaves]!;
 
         var vertices = new List<Vertex>(8192);
         var indices = new List<ushort>(12288);

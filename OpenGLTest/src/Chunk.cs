@@ -240,10 +240,10 @@ public class Chunk : IDisposable
     /// are far thinner than a full cube and should dapple rather than block, plus the
     /// ankle-high pebbles, which are too small to shade. Everything else
     /// (rock, full-cube logs, TNT) still blocks. AO keeps treating leaves as solid; geometry
-    /// culling does not (see <see cref="BlockType.Occludes"/>).</summary>
+    /// culling does not (see <see cref="BlockType.Occludes"/>). Which blocks pass is data now:
+    /// <c>light.passes</c> in each block's JSON, defaulting to "not a full cube".</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool PassesLight(byte blockId) =>
-        blockId == BlockType.Air || blockId == BlockType.Leaves || blockId == BlockType.Pebble || BlockType.IsPartialCube(blockId);
+    private static bool PassesLight(byte blockId) => BlockType.PassesLightById[blockId];
 
     /// <summary>One BFS pass: spreads <paramref name="levels"/> through light-passing cells
     /// (see <see cref="PassesLight"/>) of the light snapshot, losing one level per block.
@@ -581,12 +581,16 @@ public class Chunk : IDisposable
         }
     }
 
+    /// <summary>
+    /// Turns the padded block snapshot into vertices. Each block picks an emitter from its
+    /// <see cref="BlockType.Renderer"/>: the two procedural ones (tapered wood, pebbles) build
+    /// their geometry from tiles, everything else replays its baked model's quads.
+    /// </summary>
     private ChunkMeshData GenerateMeshDataFromSnapshot(byte[] padded, byte[] sunLight, byte[] blockLight)
     {
         var vertices = new List<Vertex>(4096);
         var indices = new List<ushort>(6144);
         ushort indexOffset = 0;
-        Span<Vector2> uv = stackalloc Vector2[4];
 
         for (var x = 0; x < Size; x++)
         for (var y = 0; y < Size; y++)
@@ -601,67 +605,104 @@ public class Chunk : IDisposable
             var basePos = new Vector3(x, y, z);
             var pIdx = (x + 1) * PaddedSq + (y + 1) * Padded + (z + 1);
 
-            // Canopy leaves ride the wind in the vertex shader; everything else stays planted
-            var sway = blockId == BlockType.Leaves ? 1f : 0f;
-
             // Tapered wood renders as a centred box (plus arms reaching wood neighbours)
             // instead of a full cube; see EmitBranchBox
-            if (BlockType.IsPartialCube(blockId))
+            if (type.Renderer == BlockRenderer.TaperedWood)
             {
                 EmitBranchBox(vertices, indices, ref indexOffset, padded, pIdx, sunLight, blockLight,
-                    x, y, z, blockId, type, basePos);
+                    x, y, z, type, basePos);
                 continue;
             }
 
             // Pebbles render as 1-3 ankle-high boxes sharing the cell; see EmitPebbles
-            if (blockId == BlockType.Pebble)
+            if (type.Renderer == BlockRenderer.Pebbles)
             {
                 EmitPebbles(vertices, indices, ref indexOffset, padded, pIdx, sunLight, blockLight,
                     x, y, z, type, basePos);
                 continue;
             }
 
-            for (var i = 0; i < 6; i++)
-            {
-                var faceCell = pIdx + FaceNeighborDelta[i];
-                var neighbour = padded[faceCell];
-                // Only opaque neighbours hide a face. Leaves are cutout, so they never
-                // hide: a face culled behind one shows through its texture holes as an
-                // X-ray into the ground. Leaf-vs-leaf keeps both sides (Minecraft
-                // fancy-style) so the canopy still reads solid through the holes, while
-                // leaf-vs-rock draws the rock side only (the leaf side culls as before,
-                // so no coplanar double quad z-fights).
-                if (BlockType.Occludes(neighbour)) continue;
+            var model = type.BakedModel;
+            if (model == null) continue;
 
-                // Light of the air cell in front of the face, from the wide light volume
-                // (so lamps across the chunk border still reach); AO still varies corners
-                var lightCell = LightIdx(x, y, z) + LightFaceDelta[i];
+            // Canopy leaves ride the wind in the vertex shader; everything else stays planted
+            var sway = type.Sway ? 1f : 0f;
+            var lightBase = LightIdx(x, y, z);
+            var quads = model.Quads;
+
+            for (var q = 0; q < quads.Length; q++)
+            {
+                var quad = quads[q];
+                var cullFace = quad.CullFace;
+                int lightCell;
+
+                if (cullFace >= 0)
+                {
+                    var neighbour = padded[pIdx + FaceNeighborDelta[cullFace]];
+                    // Only opaque neighbours hide a face. Leaves are cutout, so they never
+                    // hide: a face culled behind one shows through its texture holes as an
+                    // X-ray into the ground. Leaf-vs-leaf keeps both sides (Minecraft
+                    // fancy-style) so the canopy still reads solid through the holes, while
+                    // leaf-vs-rock draws the rock side only (the leaf side culls as before,
+                    // so no coplanar double quad z-fights). CullSelf additionally hides a
+                    // face against the same block, the way glass panes fuse.
+                    if (BlockType.Occludes(neighbour) || (type.CullSelf && neighbour == blockId)) continue;
+
+                    // Light of the air cell in front of the face, from the wide light volume
+                    // (so lamps across the chunk border still reach); AO still varies corners.
+                    // A neighbour that would read as black light is exactly one that occludes,
+                    // and that face is already gone, so no fallback is needed here.
+                    lightCell = lightBase + LightFaceDelta[cullFace];
+                }
+                else
+                {
+                    // An interior quad of a sub-cell model has no neighbour to read: light it
+                    // from its own cell, which passes light precisely because the model is not
+                    // a full cube (the generalised form of the pebble trick).
+                    lightCell = lightBase;
+                }
+
                 var sun = sunLight[lightCell] / 15f;
                 var block = blockLight[lightCell] / 15f;
-                var normal = CubeFaces[i].normal;
+                var face = quad.Face;
+                var positions = quad.Positions;
+                var uvs = quad.Uvs;
+                var normal = quad.Normal;
 
-                var tile = type.FaceTiles[i];
-                var tileUv = TextureAtlas.TileUVSize;
-                var u0 = tile.X * tileUv;
-                var v0 = tile.Y * tileUv;
-                uv[0] = new Vector2(u0, v0 + tileUv);
-                uv[1] = new Vector2(u0, v0);
-                uv[2] = new Vector2(u0 + tileUv, v0);
-                uv[3] = new Vector2(u0 + tileUv, v0 + tileUv);
-
-                var face = CubeFaces[i].face;
-                var aoDeltas = AODeltas[i];
-
-                for (var j = 0; j < 4; j++)
+                if (!quad.Shade)
                 {
-                    var side1 = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 0]]);
-                    var side2 = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 1]]);
-                    var corner = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 2]]);
+                    // Minecraft's per-element "shade": false — full brightness, no face
+                    // brightness and no ambient occlusion
+                    for (var j = 0; j < 4; j++)
+                        vertices.Add(new Vertex(basePos + positions[j], 255, 255, 255, 255, uvs[j],
+                            sun, block, normal, sway));
+                }
+                else if (quad.IsFullFace)
+                {
+                    // Only a quad that fills its cube face has meaningful corner neighbours,
+                    // so per-corner AO applies exactly as it did for hand-written cubes
+                    var aoDeltas = AODeltas[face];
+                    for (var j = 0; j < 4; j++)
+                    {
+                        var side1 = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 0]]);
+                        var side2 = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 1]]);
+                        var corner = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 2]]);
 
-                    var ao = VertexAO(side1, side2, corner);
-                    var shade = ShadeLut[(i << 2) | ao];
+                        var ao = VertexAO(side1, side2, corner);
+                        var shade = ShadeLut[(face << 2) | ao];
 
-                    vertices.Add(new Vertex(basePos + face[j], shade, shade, shade, 255, uv[j], sun, block, normal, sway));
+                        vertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j],
+                            sun, block, normal, sway));
+                    }
+                }
+                else
+                {
+                    // A sub-cell quad floats inside the cell, where corner sampling would
+                    // darken it by neighbours it does not touch: shade it flat and unoccluded
+                    var shade = ShadeLut[(face << 2) | 3];
+                    for (var j = 0; j < 4; j++)
+                        vertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j],
+                            sun, block, normal, sway));
                 }
 
                 indices.Add((ushort)(indexOffset + 0));
@@ -679,12 +720,7 @@ public class Chunk : IDisposable
     }
 
     /// <summary>Half-width of wood for joint comparisons; logs count as full width.</summary>
-    private static float WoodHalfWidth(byte blockId)
-    {
-        if (blockId == BlockType.Log) return 0.5f;
-        if (BlockType.IsPartialCube(blockId)) return BlockType.PartialHalfWidth(blockId);
-        return -1f; // not wood
-    }
+    private static float WoodHalfWidth(byte blockId) => BlockType.WoodHalfWidth(blockId);
 
     private static bool IsWood(byte blockId) => WoodHalfWidth(blockId) >= 0f;
 
@@ -700,9 +736,9 @@ public class Chunk : IDisposable
     /// </summary>
     private static void EmitBranchBox(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         byte[] padded, int pIdx, byte[] sunLight, byte[] blockLight,
-        int x, int y, int z, byte blockId, BlockType type, Vector3 basePos)
+        int x, int y, int z, BlockType type, Vector3 basePos)
     {
-        var w = BlockType.PartialHalfWidth(blockId);
+        var w = type.HalfWidth;
         var c = 0.5f;
 
         Span<byte> nb = stackalloc byte[6];

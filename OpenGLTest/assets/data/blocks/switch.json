@@ -1,0 +1,13 @@
+{
+  "model": {
+    "parent": "block/cube_column",
+    "textures": { "end": "log_top", "side": "log_side" }
+  },
+  "renderer": "tapered_wood",
+  "wood": { "taperLevel": 4, "halfWidth": 0.1875 },
+  "hasItem": false,
+  "occludes": false,
+  "castsAO": true,
+  "light": { "passes": true },
+  "loot": "wood"
+}

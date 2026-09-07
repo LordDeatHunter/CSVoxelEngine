@@ -114,28 +114,13 @@ public static class TreeGenerator
         [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
     /// <summary>Taper level to wood block: 0 is the full-cube log, 1..5 step Branch down to
-    /// Twig. Limbs stop before exceeding level 5, so this never clamps two cells in a row.</summary>
-    public static byte WoodId(int level) => level switch
-    {
-        0 => BlockType.Log,
-        1 => BlockType.Branch,
-        2 => BlockType.Limb,
-        3 => BlockType.Sprig,
-        4 => BlockType.Switch,
-        _ => BlockType.Twig,
-    };
+    /// Twig. Limbs stop before exceeding level 5, so this never clamps two cells in a row.
+    /// The mapping itself comes from each block's <c>wood.taperLevel</c>, so adding a taper
+    /// step is a JSON change (see <see cref="BlockType.WoodByLevel"/>).</summary>
+    public static byte WoodId(int level) => BlockType.WoodByLevel[(uint)level < 6u ? level : 5];
 
     /// <summary>Level of a wood block id, inverse of <see cref="WoodId"/> (leaves: -1).</summary>
-    public static int WoodLevel(byte blockId) => blockId switch
-    {
-        BlockType.Log => 0,
-        BlockType.Branch => 1,
-        BlockType.Limb => 2,
-        BlockType.Sprig => 3,
-        BlockType.Switch => 4,
-        BlockType.Twig => 5,
-        _ => -1,
-    };
+    public static int WoodLevel(byte blockId) => BlockType.ById[blockId]?.WoodTaperLevel ?? -1;
 
     /// <summary>A trunk's wood cells plus the leaf-blob centres; world coordinates.</summary>
     public record struct TreeShape(
