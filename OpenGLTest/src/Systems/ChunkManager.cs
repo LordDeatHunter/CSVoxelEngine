@@ -27,9 +27,11 @@ public class ChunkManager(GL gl)
     public readonly List<Chunk> Renderable = new(4096);
 
     /// <summary>
-    /// Bumped every time <see cref="Renderable"/> changes, so a consumer that derives
-    /// something from the set of drawn chunks can tell "nothing moved since last frame" and
-    /// skip the recompute. Main thread only.
+    /// Bumped whenever the set of loaded, meshed chunks changes: a chunk enters or leaves
+    /// <see cref="Renderable"/>, a chunk is meshed for the first time (even with an empty mesh,
+    /// which never enters <see cref="Renderable"/>), or a chunk is unloaded. A consumer that
+    /// derives something from which chunks are loaded and drawn (the LOD buried flags) compares
+    /// it to skip the recompute when nothing moved. Main thread only.
     /// </summary>
     public int MeshVersion { get; private set; }
 
@@ -126,6 +128,8 @@ public class ChunkManager(GL gl)
 
             // Dispose nulls both meshes, so the Renderable bookkeeping has to happen first
             RemoveRenderable(chunk);
+            // A chunk leaving the world changes the LOD cover even when it had nothing to draw.
+            MeshVersion++;
             chunk.Dispose();
             Interlocked.Decrement(ref _loadedChunkCount);
             _queuedChunkPositions.TryRemove(pos, out _);
@@ -269,8 +273,12 @@ public class ChunkManager(GL gl)
     /// </summary>
     private void ApplyMesh(Chunk chunk, ChunkMeshData meshData)
     {
+        var wasMeshed = chunk.IsMeshed;
         chunk.UpdateMesh(meshData);
         SyncRenderable(chunk);
+        // The first mesh makes the chunk count as "drawn" for the LOD cover test even when it is
+        // empty (all air, or enclosed) and therefore never enters Renderable
+        if (!wasMeshed) MeshVersion++;
     }
 
     /// <summary>

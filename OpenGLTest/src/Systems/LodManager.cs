@@ -31,6 +31,12 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
     private volatile bool _isRunning;
     private Camera? _camera;
 
+    // Inputs of the last buried-flag pass; see Update. -1 / null force the first pass.
+    private int _regionSetVersion;
+    private int _lastBuriedMeshVersion = -1;
+    private int _lastBuriedRegionSetVersion = -1;
+    private Vector3? _lastBuriedCamChunk;
+
     // Per level: 2D region offsets within that level's radius, sorted closest-first
     private static readonly (int dx, int dz)[][] SortedOffsets = BuildSortedOffsets();
 
@@ -176,6 +182,7 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
     {
         if (_camera == null) return;
 
+        var camChunk = (_camera.Position / Chunk.Size).Floor();
         Span<(int camX, int camZ)> camRegions = stackalloc (int, int)[LodRegion.Levels.Length];
         for (var level = 0; level < LodRegion.Levels.Length; level++)
             camRegions[level] = CameraRegion(level);
@@ -225,7 +232,20 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
             uploaded++;
         }
 
-        UpdateBuriedFlags(chunkManager);
+        // The flags depend only on which chunks are loaded and meshed (MeshVersion), which regions
+        // exist (_regionSetVersion) and the camera chunk (the distance early-out in
+        // IsCoveredByChunks), so the pass is skipped while none of them moved. A region added above
+        // starts with IsBuried == false; the add bumps the region-set version, so the pass always runs
+        // in the frame a region appears and never draws a shell for a frame it should not.
+        if (chunkManager.MeshVersion != _lastBuriedMeshVersion
+            || _regionSetVersion != _lastBuriedRegionSetVersion
+            || camChunk != _lastBuriedCamChunk)
+        {
+            _lastBuriedMeshVersion = chunkManager.MeshVersion;
+            _lastBuriedRegionSetVersion = _regionSetVersion;
+            _lastBuriedCamChunk = camChunk;
+            UpdateBuriedFlags(chunkManager, camChunk);
+        }
     }
 
     /// <summary>
@@ -237,6 +257,7 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
         Regions[key] = region;
         region.ListIndex = RegionList.Count;
         RegionList.Add(region);
+        _regionSetVersion++;
     }
 
     /// <summary>
@@ -259,6 +280,7 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
 
         RegionList.RemoveAt(last);
         region.ListIndex = -1;
+        _regionSetVersion++;
     }
 
     /// <summary>
@@ -272,11 +294,11 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
     /// Coverage is tested against the regions and chunks that actually exist rather than each
     /// level's radius, so a finer region or chunk that has not been built yet can never open a
     /// hole in the horizon — the coarser mesh keeps drawing until its replacement is loaded.
+    /// Runs only when a chunk was meshed or unloaded, a region was added or removed, or the
+    /// camera changed chunk; see <see cref="Update"/>.
     /// </summary>
-    private void UpdateBuriedFlags(ChunkManager chunkManager)
+    private void UpdateBuriedFlags(ChunkManager chunkManager, Vector3 camChunk)
     {
-        var camChunk = (_camera!.Position / Chunk.Size).Floor();
-
         for (var i = 0; i < RegionList.Count; i++)
         {
             var region = RegionList[i];
