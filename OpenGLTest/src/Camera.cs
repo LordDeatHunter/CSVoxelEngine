@@ -83,7 +83,7 @@ public class Camera
     // Averaged flow of the fluid cells the body is in, refreshed by UpdateWaterState
     private Vector3 _waterFlow;
 
-    private readonly IWindow window;
+    private readonly IWindow? window;
     private readonly IMouse? mouse;
 
     // Eye position standing on the terrain at the origin, so the player never starts buried
@@ -162,16 +162,31 @@ public class Camera
         return true;
     }
 
-    public Camera(IWindow window, IInputContext input)
+    // Headless tests pass nulls: no window to resize with and no mouse to capture.
+    // The game always passes both, so its behaviour is unchanged.
+    public Camera(IWindow? window, IInputContext? input)
     {
         this.window = window;
-        mouse = input.Mice.FirstOrDefault();
+        mouse = input?.Mice.FirstOrDefault();
 
-        window.FramebufferResize += size => { _aspectRatio = size.X / (float)size.Y; };
+        if (window != null)
+            window.FramebufferResize += size => { _aspectRatio = size.X / (float)size.Y; };
 
         if (mouse == null) return;
         mouse.Cursor.CursorMode = CursorMode.Disabled;
         mouse.MouseMove += OnMouseMove;
+    }
+
+    /// <summary>
+    /// Test seam: drops the eye at an exact spot facing an exact direction, so headless tests
+    /// can aim the raycast and place the body without a window or input. Pitch is clamped
+    /// exactly like the mouse look.
+    /// </summary>
+    public void TestTeleport(Vector3 position, float yaw, float pitch)
+    {
+        Position = position;
+        Yaw = yaw;
+        Pitch = Math.Clamp(pitch, -89f, 89f);
     }
 
     private void OnMouseMove(IMouse mouse, Vector2 position)

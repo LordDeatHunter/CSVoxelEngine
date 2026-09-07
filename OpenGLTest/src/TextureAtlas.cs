@@ -40,6 +40,18 @@ public static class TextureAtlas
     /// <returns>The uploaded GL texture handle.</returns>
     public static uint Build(GL gl, string folder)
     {
+        var stitched = Stitch(folder);
+        return TextureLoader.Upload(gl, stitched.Atlas, stitched.Width, stitched.Height);
+    }
+
+    /// <summary>
+    /// Test seam: stitches the atlas and records the tile layout without uploading, so
+    /// headless tests bake models against the exact layout the game uses.
+    /// </summary>
+    public static void RegisterTilesWithoutUpload(string folder) => Stitch(folder);
+
+    private static (byte[] Atlas, int Width, int Height) Stitch(string folder)
+    {
         var files = Directory.GetFiles(folder, "*.png").OrderBy(Path.GetFileName).ToArray();
         if (files.Length == 0)
             throw new InvalidOperationException($"No block textures found in '{folder}'.");
@@ -75,7 +87,7 @@ public static class TextureAtlas
         }
 
         TilesPerSide = tilesPerSide;
-        return TextureLoader.Upload(gl, atlas, atlasWidth, atlasHeight);
+        return (atlas, atlasWidth, atlasHeight);
     }
 
     /// <summary>Tile coordinate of a stitched texture, by file name without extension.</summary>
