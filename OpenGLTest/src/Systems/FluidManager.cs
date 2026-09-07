@@ -94,15 +94,18 @@ public class FluidManager
     /// call, so a sea breached by a cave or an entrance starts pouring in the moment it loads
     /// instead of standing there as a wall. Interior frontiers were found on the generation
     /// worker (<see cref="Chunk.FluidFrontier"/>); the borders need both chunks loaded, so they
-    /// are scanned here.
+    /// are scanned here. At most <see cref="WorldGenerationConfig.MaxWakeChunksPerFrame"/>
+    /// chunks are woken per call; the rest wait in the queue for the next frame.
     ///
     /// Main thread, called once a frame right before <see cref="Update"/> so the cells it
     /// schedules ride the same tick as this frame's block edits.
     /// </summary>
     public void WakeLoadedChunks(ChunkManager chunks)
     {
-        while (chunks.TryDequeueLoaded(out var chunk))
+        var woken = 0;
+        while (woken < WorldGenerationConfig.MaxWakeChunksPerFrame && chunks.TryDequeueLoaded(out var chunk))
         {
+            woken++;
             // An unload can race the queue: only the chunk still registered at its position
             // owns those cells, and a stale one's blocks are nobody's business
             if (!chunks.Chunks.TryGetValue(chunk.Position, out var live) || live != chunk) continue;

@@ -690,7 +690,10 @@ public class Chunk : IDisposable
         if (!TryResolveNeighbors(chunkManager, neighbors, neighborStates))
             return null;
 
-        if (_solidCount == 0)
+        // Nothing to draw: either all air, or a solid block of occluders whose six neighbours
+        // seal every boundary face. The second case is most of the deep terrain in the load
+        // sphere, and skipping it saves the light flood and the per-voxel walk below.
+        if (_solidCount == 0 || IsFullyEnclosed(neighbors))
             return new ChunkMeshData([], [], [], []);
 
         var padded = ArrayPool<byte>.Shared.Rent(PaddedCount);
@@ -709,7 +712,7 @@ public class Chunk : IDisposable
             Array.Clear(sunLight, 0, LightCount);
             Array.Clear(blockLight, 0, LightCount);
             ComputeLight(lightBlocks, sunLight, blockLight, queue);
-            return GenerateMeshDataFromSnapshot(padded, paddedState, sunLight, blockLight);
+            return GenerateMeshDataFromSnapshot(padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers);
         }
         finally
         {
@@ -769,6 +772,42 @@ public class Chunk : IDisposable
     }
 
     /// <summary>
+    /// True when every cell of this chunk occludes and the 16x16 plane of each face
+    /// neighbour that touches this chunk occludes too, so no face of any block can be seen.
+    /// An air pocket anywhere inside (<c>_solidCount &lt; BlockCount</c>) has real faces around
+    /// it and fails the test. Reads neighbour block arrays directly, the same tolerated race as
+    /// the snapshot fills: an edit's own remesh of both chunks wins afterwards.
+    /// </summary>
+    private bool IsFullyEnclosed(Chunk?[] neighbors)
+    {
+        if (_solidCount != BlockCount) return false;
+
+        var occludes = BlockType.OccludesById;
+        for (var i = 0; i < BlockCount; i++)
+        {
+            if (!occludes[_blocks[i]]) return false;
+        }
+
+        // Face neighbours (slot = (cx*3+cy)*3+cz): the plane that faces this chunk is the
+        // neighbour's far plane along that axis.
+        var negX = neighbors[4]!._blocks;
+        var posX = neighbors[22]!._blocks;
+        var negY = neighbors[10]!._blocks;
+        var posY = neighbors[16]!._blocks;
+        var negZ = neighbors[12]!._blocks;
+        var posZ = neighbors[14]!._blocks;
+        for (var a = 0; a < Size; a++)
+        for (var b = 0; b < Size; b++)
+        {
+            if (!occludes[negX[Idx(Size - 1, a, b)]] || !occludes[posX[Idx(0, a, b)]]) return false;
+            if (!occludes[negY[Idx(a, Size - 1, b)]] || !occludes[posY[Idx(a, 0, b)]]) return false;
+            if (!occludes[negZ[Idx(a, b, Size - 1)]] || !occludes[posZ[Idx(a, b, 0)]]) return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Copies this chunk plus a 1-block border from the 26 surrounding chunks into a flat
     /// snapshot, so meshing does zero dictionary lookups. <paramref name="paddedState"/> is
     /// filled the same way with the per-block state bytes the fluid emitter needs (0 where the
@@ -809,10 +848,11 @@ public class Chunk : IDisposable
     /// their geometry from tiles, everything else replays its baked model's quads.
     /// </summary>
     private ChunkMeshData GenerateMeshDataFromSnapshot(byte[] padded, byte[] paddedState,
-        byte[] sunLight, byte[] blockLight)
+        byte[] sunLight, byte[] blockLight, MeshBufferPool pool)
     {
-        var vertices = new List<Vertex>(4096);
-        var indices = new List<ushort>(6144);
+        // Rented, not allocated: ChunkManager returns them once the mesh is on the GPU
+        var vertices = pool.RentVertices();
+        var indices = pool.RentIndices();
         ushort indexOffset = 0;
 
         // Fluids build a second, blended mesh drawn after the opaque world, so whatever sits

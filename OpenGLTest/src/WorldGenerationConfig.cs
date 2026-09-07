@@ -107,6 +107,11 @@ public static class WorldGenerationConfig
     public const float FluidTickSeconds = 0.25f;
     public const int MaxFluidTicksPerFrame = 4;
 
+    // Chunks whose worldgen water is woken per frame (FluidManager.WakeLoadedChunks). Each wake
+    // schedules the chunk's fluid frontier and scans its six borders, so a streaming burst is
+    // spread over frames; leftovers simply stay queued for the next one.
+    public const int MaxWakeChunksPerFrame = 16;
+
     // How far a spreading fluid looks for a hole to fall into before spreading evenly
     public const int FluidSlopeSearchDistance = 4;
 

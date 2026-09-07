@@ -22,6 +22,19 @@ public sealed class MeshingTests
         return (manager, center);
     }
 
+    private static void FillAll(Chunk chunk, byte id)
+    {
+        for (var x = 0; x < Chunk.Size; x++)
+        for (var y = 0; y < Chunk.Size; y++)
+        for (var z = 0; z < Chunk.Size; z++)
+            chunk.SetBlockRaw(x, y, z, id, 0);
+    }
+
+    private static void FillWalledArea(ChunkManager manager, byte id)
+    {
+        foreach (var chunk in manager.Chunks.Values) FillAll(chunk, id);
+    }
+
     [Fact]
     public void SingleCubeEmitsSixFaces()
     {
@@ -119,5 +132,85 @@ public sealed class MeshingTests
         Assert.NotNull(mesh);
         Assert.Empty(mesh.Vertices);
         Assert.NotEmpty(mesh.TranslucentVertices);
+    }
+
+    [Fact]
+    public void EnclosedChunkBuildsEmpty()
+    {
+        var (manager, center) = WalledArea();
+        FillWalledArea(manager, ContentRegistry.RequireBlock("stone").Id);
+
+        var mesh = center.GenerateMeshData(manager);
+        Assert.NotNull(mesh);
+        Assert.Empty(mesh.Vertices);
+        Assert.Empty(mesh.TranslucentVertices);
+    }
+
+    // One air cell in the neighbour plane that touches the centre exposes exactly one face,
+    // which also pins the orientation of each boundary plane the fast path inspects.
+    [Theory]
+    [InlineData(1, 0, 0, 0, 8, 8)]
+    [InlineData(-1, 0, 0, 15, 8, 8)]
+    [InlineData(0, 1, 0, 8, 0, 8)]
+    [InlineData(0, -1, 0, 8, 15, 8)]
+    [InlineData(0, 0, 1, 8, 8, 0)]
+    [InlineData(0, 0, -1, 8, 8, 15)]
+    public void HoleInNeighbourPlaneEmitsOneFace(int ox, int oy, int oz, int hx, int hy, int hz)
+    {
+        var (manager, center) = WalledArea();
+        FillWalledArea(manager, ContentRegistry.RequireBlock("stone").Id);
+        manager.Chunks[new Vector3(ox, oy, oz)].SetBlockRaw(hx, hy, hz, 0, 0);
+
+        var mesh = center.GenerateMeshData(manager);
+        Assert.NotNull(mesh);
+        Assert.Equal(4, mesh.Vertices.Count);
+        Assert.Equal(6, mesh.Indices.Count);
+    }
+
+    [Fact]
+    public void AirPocketInsideSolidChunkStillMeshes()
+    {
+        var (manager, center) = WalledArea();
+        FillWalledArea(manager, ContentRegistry.RequireBlock("stone").Id);
+        center.SetBlockRaw(8, 8, 8, 0, 0);
+
+        var mesh = center.GenerateMeshData(manager);
+        Assert.NotNull(mesh);
+        Assert.Equal(24, mesh.Vertices.Count);
+    }
+
+    [Fact]
+    public void ReturnedBuffersAreRentedAgain()
+    {
+        var (manager, center) = WalledArea();
+        center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
+
+        var first = center.GenerateMeshData(manager);
+        Assert.NotNull(first);
+        Assert.Equal(0, manager.MeshBuffers.PooledVertexLists);
+
+        manager.MeshBuffers.Return(first);
+        Assert.Equal(1, manager.MeshBuffers.PooledVertexLists);
+
+        var second = center.GenerateMeshData(manager);
+        Assert.NotNull(second);
+        Assert.Same(first.Vertices, second.Vertices);
+        Assert.Same(first.Indices, second.Indices);
+        Assert.Equal(24, second.Vertices.Count);
+        Assert.Equal(0, manager.MeshBuffers.PooledVertexLists);
+    }
+
+    [Fact]
+    public void OversizedBuffersAreNotRetained()
+    {
+        var (manager, center) = WalledArea();
+        center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
+
+        var mesh = center.GenerateMeshData(manager);
+        Assert.NotNull(mesh);
+        mesh.Vertices.Capacity = MeshBufferPool.VertexCapacity * 8;
+
+        manager.MeshBuffers.Return(mesh);
+        Assert.Equal(0, manager.MeshBuffers.PooledVertexLists);
     }
 }

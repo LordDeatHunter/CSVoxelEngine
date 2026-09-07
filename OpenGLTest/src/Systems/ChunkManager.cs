@@ -26,6 +26,9 @@ public class ChunkManager(GL gl)
     /// </summary>
     public readonly List<Chunk> Renderable = new(4096);
 
+    /// <summary>Recycled opaque mesh buffers; see <see cref="MeshBufferPool"/>.</summary>
+    public MeshBufferPool MeshBuffers { get; } = new();
+
     /// <summary>
     /// Bumped whenever the set of loaded, meshed chunks changes: a chunk enters or leaves
     /// <see cref="Renderable"/>, a chunk is meshed for the first time (even with an empty mesh,
@@ -178,7 +181,10 @@ public class ChunkManager(GL gl)
             // into the dead one would leave a mesh in Renderable that no unload ever removes
             if (Vector3.DistanceSquared(pos, camChunk) > WorldGenerationConfig.ChunkRadiusSq ||
                 !Chunks.TryGetValue(pos, out var live) || !ReferenceEquals(live, chunk))
+            {
+                MeshBuffers.Return(meshData);
                 continue;
+            }
 
             if (appliedCount < WorldGenerationConfig.MaxMeshUploadsPerFrame)
             {
@@ -275,6 +281,8 @@ public class ChunkManager(GL gl)
     {
         var wasMeshed = chunk.IsMeshed;
         chunk.UpdateMesh(meshData);
+        // The GPU copy is complete when UpdateMesh returns; Mesh keeps no reference to the lists.
+        MeshBuffers.Return(meshData);
         SyncRenderable(chunk);
         // The first mesh makes the chunk count as "drawn" for the LOD cover test even when it is
         // empty (all air, or enclosed) and therefore never enters Renderable
