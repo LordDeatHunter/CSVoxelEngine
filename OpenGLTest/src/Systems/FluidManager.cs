@@ -11,9 +11,14 @@ namespace silkgltriangle;
 ///
 /// Only scheduled cells do any work, and a cell reschedules its neighbourhood exactly when it
 /// changes or writes into a neighbour, so a settled body of water costs nothing. Every block
-/// edit path in the game therefore has to call <see cref="ScheduleAround(Vector3)"/> — water
-/// next to untouched worldgen air stays static until something adjacent is disturbed, the same
-/// way Minecraft's does.
+/// edit path in the game therefore has to call <see cref="ScheduleAround(Vector3)"/>, or the
+/// water beside the edit will not notice it.
+///
+/// Worldgen water gets the same treatment from <see cref="WakeLoadedChunks"/>: when a chunk
+/// streams in, its whole water/air frontier is scheduled — the interior found by the generation
+/// worker (<see cref="Chunk.FluidFrontier"/>), the borders scanned here once both chunks are
+/// loaded — so a sea that a cave or an entrance breached pours into it instead of standing
+/// there as a wall. Once that has settled it costs nothing again.
 ///
 /// Cells are read through <see cref="ChunkManager.TryGetCell"/> and never through
 /// <c>GetBlockGlobal</c>: the latter reports unloaded chunks as air, which would let water
@@ -83,6 +88,124 @@ public class FluidManager
         for (var z = (int)min.Z; z <= (int)max.Z; z++)
             _next.Add(Pack(x, y, z));
     }
+
+    /// <summary>
+    /// Schedules the water/air frontier of every chunk that finished generating since the last
+    /// call, so a sea breached by a cave or an entrance starts pouring in the moment it loads
+    /// instead of standing there as a wall. Interior frontiers were found on the generation
+    /// worker (<see cref="Chunk.FluidFrontier"/>); the borders need both chunks loaded, so they
+    /// are scanned here.
+    ///
+    /// Main thread, called once a frame right before <see cref="Update"/> so the cells it
+    /// schedules ride the same tick as this frame's block edits.
+    /// </summary>
+    public void WakeLoadedChunks(ChunkManager chunks)
+    {
+        while (chunks.TryDequeueLoaded(out var chunk))
+        {
+            // An unload can race the queue: only the chunk still registered at its position
+            // owns those cells, and a stale one's blocks are nobody's business
+            if (!chunks.Chunks.TryGetValue(chunk.Position, out var live) || live != chunk) continue;
+
+            var frontier = chunk.FluidFrontier;
+            if (frontier != null)
+            {
+                foreach (var index in frontier)
+                {
+                    // Scheduling the fluid cell alone is enough: its tick runs Spread, and Flow
+                    // reschedules the neighbourhood of everything it writes into
+                    ScheduleLocal(chunk,
+                        index >> (2 * Chunk.SizeShift),
+                        (index >> Chunk.SizeShift) & Chunk.SizeMask,
+                        index & Chunk.SizeMask);
+                }
+            }
+
+            // Generated water never sits above sea level, and a chunk that just streamed in
+            // holds nothing but generated blocks, so a chunk entirely above it can neither hold
+            // water nor border any — the block edit paths cover player-placed water up there.
+            // Note this is not the same test as an empty frontier: a chunk can be solid water
+            // inside and still face air across a border.
+            if (chunk.LowerBoundY > WorldGenerationConfig.SeaLevel) continue;
+
+            WakeBorders(chunk, chunks);
+        }
+    }
+
+    /// <summary>
+    /// Schedules the fluid side of every fluid/flowable pair across the faces this chunk shares
+    /// with its loaded neighbours, in whichever chunk the fluid actually lives. Blocks are read
+    /// straight off both chunks (they are loaded, so their arrays are there) rather than through
+    /// <c>GetBlockGlobal</c>, which would call an unloaded chunk air.
+    /// </summary>
+    private void WakeBorders(Chunk chunk, ChunkManager chunks)
+    {
+        var pos = chunk.Position;
+
+        foreach (var (dx, _, dz) in Horizontals)
+        {
+            if (!TryGetLoadedNeighbour(chunks, pos, dx, 0, dz, out var neighbour)) continue;
+
+            // The two 16x16 planes that touch: this chunk's face cells sit at `near` on the
+            // axis the face cuts, the neighbour's directly across at `far`
+            var near = dx + dz > 0 ? Chunk.SizeMask : 0;
+            var far = Chunk.SizeMask - near;
+
+            for (var ly = 0; ly < Chunk.Size; ly++)
+            for (var t = 0; t < Chunk.Size; t++)
+            {
+                // t sweeps the horizontal axis the face does not cut
+                var hx = dx != 0 ? near : t;
+                var hz = dx != 0 ? t : near;
+                var nx = dx != 0 ? far : t;
+                var nz = dx != 0 ? t : far;
+
+                var here = chunk.GetLocalBlock(hx, ly, hz);
+                var there = neighbour.GetLocalBlock(nx, ly, nz);
+
+                if (BlockType.IsFluid(here) && IsFlowTarget(there)) ScheduleLocal(chunk, hx, ly, hz);
+                else if (BlockType.IsFluid(there) && IsFlowTarget(here)) ScheduleLocal(neighbour, nx, ly, nz);
+            }
+        }
+
+        // Water only ever falls through a vertical face, so each of these schedules one side:
+        // the fluid sitting over the hole, never the air sitting over the fluid.
+        if (TryGetLoadedNeighbour(chunks, pos, 0, -1, 0, out var below))
+        {
+            for (var lx = 0; lx < Chunk.Size; lx++)
+            for (var lz = 0; lz < Chunk.Size; lz++)
+            {
+                if (BlockType.IsFluid(chunk.GetLocalBlock(lx, 0, lz))
+                    && IsFlowTarget(below.GetLocalBlock(lx, Chunk.SizeMask, lz)))
+                    ScheduleLocal(chunk, lx, 0, lz);
+            }
+        }
+
+        if (TryGetLoadedNeighbour(chunks, pos, 0, 1, 0, out var above))
+        {
+            for (var lx = 0; lx < Chunk.Size; lx++)
+            for (var lz = 0; lz < Chunk.Size; lz++)
+            {
+                if (BlockType.IsFluid(above.GetLocalBlock(lx, 0, lz))
+                    && IsFlowTarget(chunk.GetLocalBlock(lx, Chunk.SizeMask, lz)))
+                    ScheduleLocal(above, lx, 0, lz);
+            }
+        }
+    }
+
+    /// <summary>The face neighbour at the offset, when it exists and its blocks are generated.</summary>
+    private static bool TryGetLoadedNeighbour(ChunkManager chunks, Vector3 pos, int dx, int dy, int dz,
+        out Chunk neighbour)
+    {
+        return chunks.Chunks.TryGetValue(pos + new Vector3(dx, dy, dz), out neighbour)
+               && neighbour.IsBlockDataReady;
+    }
+
+    /// <summary>Schedules a chunk-local cell for the next tick.</summary>
+    private void ScheduleLocal(Chunk chunk, int lx, int ly, int lz) =>
+        _next.Add(Pack((int)chunk.Position.X * Chunk.Size + lx,
+            (int)chunk.Position.Y * Chunk.Size + ly,
+            (int)chunk.Position.Z * Chunk.Size + lz));
 
     /// <summary>
     /// Runs whole fluid ticks at a fixed rate, at most
@@ -373,10 +496,16 @@ public class FluidManager
     /// either air or a fragile block the flow washes away.</summary>
     private static bool CanFlowInto(int x, int y, int z, ChunkManager chunks)
     {
-        return chunks.TryGetCell(x, y, z, out var id, out _)
-               && !BlockType.IsFluid(id)
-               && BlockType.IsReplaceable(id);
+        return chunks.TryGetCell(x, y, z, out var id, out _) && IsFlowTarget(id);
     }
+
+    /// <summary>
+    /// Whether a block a fluid already knows is loaded is somewhere it may flow: not fluid
+    /// itself, and either air or a fragile block the flow washes away. Shared with
+    /// <see cref="Chunk.FluidFrontier"/>'s worker-thread scan so both halves of the wake-up
+    /// agree with <see cref="CanFlowInto"/> on what counts as somewhere to go.
+    /// </summary>
+    internal static bool IsFlowTarget(byte id) => !BlockType.IsFluid(id) && BlockType.IsReplaceable(id);
 
     /// <summary>Whether a cell would let fluid drain into it: replaceable, or already the same
     /// fluid. What the slope search calls a "hole".</summary>

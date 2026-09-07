@@ -172,8 +172,9 @@ public class TopplingTree : IDisposable
     /// Meshes collected blocks with the real chunk mesher (taper boxes, joint caps, AO, crop
     /// UVs) inside one scratch chunk, then rebases positions to pivot-relative and bakes
     /// full daylight (a falling tree is out in the open; sampling its old nook's light would
-    /// freeze stale cave shade onto it). The scratch chunk is never registered anywhere, so
-    /// its missing neighbours read as air and severed ends cap themselves.
+    /// freeze stale cave shade onto it). The scratch chunk sits in a throwaway manager holding
+    /// nothing but empty neighbours, so everything around it reads as air and severed ends cap
+    /// themselves.
     /// </summary>
     public static ChunkMeshData BuildMeshData(List<FellBlock> blocks, Vector3 pivot)
     {
@@ -195,7 +196,20 @@ public class TopplingTree : IDisposable
             scratch.PlaceBlockAt(worldPos, block.Id, scratchManager);
         }
 
-        var meshData = scratch.GenerateMeshData(scratchManager);
+        // GenerateMeshData refuses to build without its six face neighbours (a real chunk
+        // meshed across an unloaded one bakes border artifacts), so the scratch chunk gets six
+        // empty ones. All air, which is exactly the "missing neighbours" the severed ends want
+        // to cap themselves against.
+        foreach (var offset in Vector3Directions.CardinalDirections)
+        {
+            var emptyNeighbour = new Chunk(null!, scratch.Position + offset, generateBlockData: false)
+            {
+                IsBlockDataReady = true
+            };
+            scratchManager.Chunks[emptyNeighbour.Position] = emptyNeighbour;
+        }
+
+        var meshData = scratch.GenerateMeshData(scratchManager) ?? new ChunkMeshData([], [], [], []);
 
         var rebase = min - pivot;
         for (var i = 0; i < meshData.Vertices.Count; i++)

@@ -33,7 +33,7 @@ public class World
     private readonly TntManager _tntManager = new();
     private readonly FluidManager _fluidManager = new();
     // Trees currently toppling over after their base log was mined
-    private readonly List<TopplingTree> _toppling = new();
+    private readonly List<TopplingTree> _toppling = [];
     private readonly IWindow _window;
     private bool _hasSelectedBlock;
     private Vector3 _selectedBlockPosition;
@@ -89,6 +89,11 @@ public class World
         _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager);
 
         UpdateToppling((float)deltaTime);
+
+        // Chunks that streamed in this frame hand over their water/air frontier, so a sea a
+        // cave broke into starts flowing as soon as it is loaded rather than waiting for the
+        // player to disturb something next to it
+        _fluidManager.WakeLoadedChunks(_chunkManager);
 
         // Runs after every path that can edit a block this frame, so the cells they scheduled
         // are all in the same tick

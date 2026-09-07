@@ -96,6 +96,17 @@ public class Chunk : IDisposable
     /// </summary>
     public int SurfaceMinY { get; private set; } = int.MinValue;
 
+    /// <summary>
+    /// The fluid cells inside this chunk that already sit against somewhere they could flow
+    /// (local block indices as <see cref="Idx"/> produces them), or <c>null</c> when there are
+    /// none. Generated sea water is static source blocks, so a cave carved into the sea floor
+    /// leaves water standing against worldgen air that nothing would ever schedule; this is the
+    /// list <see cref="FluidManager.WakeLoadedChunks"/> uses to make it pour in the moment the
+    /// chunk loads. Written once by the generation worker before <see cref="IsBlockDataReady"/>
+    /// goes true and read once on the main thread afterwards, so it needs no locking.
+    /// </summary>
+    internal ushort[]? FluidFrontier { get; private set; }
+
     // Column data only depends on (x, z), so vertical chunk stacks share one entry.
     // The outermost LOD ring touches more columns than this (they're computed once per region
     // build and rarely revisited), so occasional Clear + recompute is cheaper than a bigger
@@ -151,30 +162,14 @@ public class Chunk : IDisposable
     /// <summary>
     /// Copies the LightSize^3 block volume centered on this chunk straight from the 3x3x3
     /// neighboring chunks' block arrays, so the fill loop does zero dictionary lookups.
-    /// Missing or not-yet-ready neighbors read as air; meshing already requires the 6 face
-    /// neighbors, and QueueChunk dirties neighbors when later chunks stream in, so any
-    /// transient leak heals as the world loads. Same thread-safety convention as
-    /// FillPaddedSnapshot (block edits race the read; the edit's own remesh wins after).
+    /// <paramref name="neighbors"/> comes pre-resolved from <see cref="TryResolveNeighbors"/>,
+    /// which guarantees the 6 face neighbors are present; the corner and edge slots may still
+    /// be null and read as air, which only costs a little light accuracy in the diagonal
+    /// corners of the wide light volume. Same thread-safety convention as FillPaddedSnapshot
+    /// (block edits race the read; the edit's own remesh wins after).
     /// </summary>
-    private void FillLightSnapshot(byte[] light, ChunkManager chunkManager)
+    private void FillLightSnapshot(byte[] light, Chunk?[] neighbors)
     {
-        var neighbors = new Chunk?[27];
-        for (var cx = 0; cx < 3; cx++)
-        for (var cy = 0; cy < 3; cy++)
-        for (var cz = 0; cz < 3; cz++)
-        {
-            var ni = (cx * 3 + cy) * 3 + cz;
-            if (ni == 13)
-            {
-                neighbors[ni] = this;
-                continue;
-            }
-
-            var pos = Position + new Vector3(cx - 1, cy - 1, cz - 1);
-            if (chunkManager.Chunks.TryGetValue(pos, out var neighbor) && neighbor.IsBlockDataReady)
-                neighbors[ni] = neighbor;
-        }
-
         // Per-axis map from volume coordinate to (chunk 0..2, local block 0..15). The volume
         // spans LightBorder cells into each neighbor: [1, LightBorder) of the previous
         // chunk, the full own chunk, then [0, LightBorder) of the next one.
@@ -401,7 +396,47 @@ public class Chunk : IDisposable
             if (block != BlockType.Air) solid++;
         _solidCount = solid;
 
+        // Only a chunk that actually got flooded can have a frontier to report
+        if (needsWater) ScanFluidFrontier();
+
         IsBlockDataReady = true;
+    }
+
+    /// <summary>
+    /// Collects the cells where this chunk's water already touches space it could flow into,
+    /// into <see cref="FluidFrontier"/>. The sea is generated as static sources, so without
+    /// this a cave or entrance that breached it would leave a wall of water standing beside
+    /// worldgen air forever — nothing schedules those cells, since only block edits do.
+    ///
+    /// +Y is deliberately not tested: every sea-surface cell has air above it and water never
+    /// flows upward, so including it would report a useless 256 cells per surface chunk.
+    /// Neighbours across a chunk border are left to the main-thread pass, which can wait until
+    /// both chunks are loaded, so this only ever reads this chunk's own blocks and stays as
+    /// thread-safe as the rest of worldgen.
+    /// </summary>
+    private void ScanFluidFrontier()
+    {
+        List<ushort>? frontier = null;
+
+        for (var x = 0; x < Size; x++)
+        for (var y = 0; y < Size; y++)
+        for (var z = 0; z < Size; z++)
+        {
+            var i = Idx(x, y, z);
+            if (!BlockType.IsFluid(_blocks[i])) continue;
+
+            var exposed = (x > 0 && FluidManager.IsFlowTarget(_blocks[Idx(x - 1, y, z)]))
+                          || (x < SizeMask && FluidManager.IsFlowTarget(_blocks[Idx(x + 1, y, z)]))
+                          || (z > 0 && FluidManager.IsFlowTarget(_blocks[Idx(x, y, z - 1)]))
+                          || (z < SizeMask && FluidManager.IsFlowTarget(_blocks[Idx(x, y, z + 1)]))
+                          || (y > 0 && FluidManager.IsFlowTarget(_blocks[Idx(x, y - 1, z)]));
+            if (!exposed) continue;
+
+            frontier ??= [];
+            frontier.Add((ushort)i);
+        }
+
+        FluidFrontier = frontier?.ToArray();
     }
 
     /// <summary>
@@ -631,8 +666,23 @@ public class Chunk : IDisposable
     private static bool InBounds(int x, int y, int z)
         => x >= 0 && y >= 0 && z >= 0 && x < Size && y < Size && z < Size;
 
-    public ChunkMeshData GenerateMeshData(ChunkManager chunkManager)
+    /// <summary>
+    /// Builds this chunk's mesh, or returns null when a face neighbour is missing.
+    /// The whole 3x3x3 neighbourhood is resolved once, up front: the caller checked for face
+    /// neighbours before scheduling, but this runs on a pool thread behind a semaphore and can
+    /// start seconds later, by which time an unload may have taken one away. Meshing against
+    /// that hole reads solid ground as air and bakes bogus side faces, sunk fluid corners and
+    /// sunlight leaks along the border, which then stay until something re-dirties the chunk —
+    /// so the build is abandoned instead and the caller puts the chunk back on the dirty list.
+    /// </summary>
+    public ChunkMeshData? GenerateMeshData(ChunkManager chunkManager)
     {
+        // Resolve before renting or touching anything: an abandoned build should cost nothing
+        var neighbors = new Chunk?[27];
+        byte[]?[] neighborStates = new byte[27][];
+        if (!TryResolveNeighbors(chunkManager, neighbors, neighborStates))
+            return null;
+
         if (_solidCount == 0)
             return new ChunkMeshData([], [], [], []);
 
@@ -647,8 +697,8 @@ public class Chunk : IDisposable
         var queue = ArrayPool<int>.Shared.Rent(LightCount);
         try
         {
-            FillPaddedSnapshot(padded, paddedState, chunkManager);
-            FillLightSnapshot(lightBlocks, chunkManager);
+            FillPaddedSnapshot(padded, paddedState, neighbors, neighborStates);
+            FillLightSnapshot(lightBlocks, neighbors);
             Array.Clear(sunLight, 0, LightCount);
             Array.Clear(blockLight, 0, LightCount);
             ComputeLight(lightBlocks, sunLight, blockLight, queue);
@@ -665,18 +715,21 @@ public class Chunk : IDisposable
         }
     }
 
+    // Slots of the six face-adjacent chunks in the 3x3x3 (cx*3+cy)*3+cz neighbourhood
+    // (slot 13 is this chunk itself). Meshing cannot proceed without these; the twenty
+    // edge and corner slots only feed light and fluid corner heights, so they may be null.
+    private static readonly int[] FaceNeighborSlots = [4, 10, 12, 14, 16, 22];
+
     /// <summary>
-    /// Copies this chunk plus a 1-block border from the 26 surrounding chunks into a flat
-    /// snapshot, so meshing does zero dictionary lookups. <paramref name="paddedState"/> is
-    /// filled the same way with the per-block state bytes the fluid emitter needs (0 where the
-    /// neighbour chunk is missing or has no state array yet). Missing neighbors read as air.
+    /// Resolves the 3x3x3 chunk neighbourhood once per mesh build, so both snapshot fills work
+    /// from the same picture of the world instead of each racing the loader on its own. A
+    /// neighbour that exists but has no block data yet counts as absent, exactly like one that
+    /// was never loaded. Returns false when any of the six FACE neighbours is missing, which
+    /// makes the mesh unbuildable (see <see cref="GenerateMeshData"/>); edge and corner
+    /// neighbours are allowed to stay null and read as air.
     /// </summary>
-    private void FillPaddedSnapshot(byte[] padded, byte[] paddedState, ChunkManager chunkManager)
+    private bool TryResolveNeighbors(ChunkManager chunkManager, Chunk?[] neighbors, byte[]?[] neighborStates)
     {
-        var neighbors = new Chunk?[27];
-        // Each neighbour's state array is read once into a local: the field is volatile and may
-        // be allocated by a main-thread fluid edit while this snapshot is being filled
-        byte[]?[] neighborStates = new byte[27][];
         for (var cx = 0; cx < 3; cx++)
         for (var cy = 0; cy < 3; cy++)
         for (var cz = 0; cz < 3; cz++)
@@ -690,13 +743,34 @@ public class Chunk : IDisposable
             }
 
             var pos = Position + new Vector3(cx - 1, cy - 1, cz - 1);
-            if (chunkManager.Chunks.TryGetValue(pos, out var neighbor))
+            // Each neighbour's state array is read once into the array: the field is volatile
+            // and may be allocated by a main-thread fluid edit while the snapshot is filled
+            if (chunkManager.Chunks.TryGetValue(pos, out var neighbor) && neighbor.IsBlockDataReady)
             {
                 neighbors[ni] = neighbor;
                 neighborStates[ni] = neighbor._state;
             }
         }
 
+        foreach (var slot in FaceNeighborSlots)
+        {
+            if (neighbors[slot] == null)
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Copies this chunk plus a 1-block border from the 26 surrounding chunks into a flat
+    /// snapshot, so meshing does zero dictionary lookups. <paramref name="paddedState"/> is
+    /// filled the same way with the per-block state bytes the fluid emitter needs (0 where the
+    /// neighbour chunk is missing or has no state array yet). The arrays come pre-resolved from
+    /// <see cref="TryResolveNeighbors"/>, so the 6 face neighbours are always present; a null
+    /// edge or corner slot reads as air, which only affects fluid corner heights.
+    /// </summary>
+    private void FillPaddedSnapshot(byte[] padded, byte[] paddedState, Chunk?[] neighbors, byte[]?[] neighborStates)
+    {
         for (var px = 0; px < Padded; px++)
         {
             var cx = px == 0 ? 0 : px == Padded - 1 ? 2 : 1;

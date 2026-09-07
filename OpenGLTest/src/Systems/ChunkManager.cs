@@ -16,9 +16,20 @@ public class ChunkManager(GL gl)
 {
     public readonly ConcurrentDictionary<Vector3, Chunk> Chunks = new();
     
-    private readonly ConcurrentQueue<(Vector3 pos, Chunk chunk, ChunkMeshData meshData)> _completedMeshQueue = new();
+    // The sequence number stamps each result with the order it finished in. ApplyCompletedMeshes
+    // sorts by distance, and two results for the same chunk (an older one re-queued by the
+    // upload budget, plus a newer rebuild) tie there, so without it the unstable sort could
+    // apply them newest-first and leave the stale mesh on screen.
+    private readonly ConcurrentQueue<(Vector3 pos, Chunk chunk, ChunkMeshData meshData, long seq)> _completedMeshQueue = new();
+    private long _meshSequence;
     private readonly ConcurrentDictionary<Vector3, byte> _dirtyChunks = new();
     private readonly ConcurrentDictionary<Vector3, byte> _queuedChunkPositions = new();
+
+    // Chunks whose block data was just generated, handed to the main thread so the fluid tick
+    // can wake the water they brought in (FluidManager.WakeLoadedChunks). Filled by the
+    // generation workers, drained on the main thread; entries can outlive an unload, so the
+    // consumer re-checks that the chunk is still the live one at its position.
+    private readonly ConcurrentQueue<Chunk> _loadedChunks = new();
 
     // Track active mesh generation to avoid duplicates
     private readonly ConcurrentDictionary<Vector3, byte> _generatingMeshes = new();
@@ -79,22 +90,27 @@ public class ChunkManager(GL gl)
     private void ApplyCompletedMeshes(Vector3 camChunk)
     {
         // Drain into a temporary list to sort by distance
-        var pending = new List<(Vector3 pos, Chunk chunk, ChunkMeshData meshData)>();
+        var pending = new List<(Vector3 pos, Chunk chunk, ChunkMeshData meshData, long seq)>();
         while (_completedMeshQueue.TryDequeue(out var item))
         {
             pending.Add(item);
         }
-        
+
         if (pending.Count == 0) return;
-        
-        // Sort closest first
+
+        // Sort closest first, then oldest first. List.Sort is unstable, so the sequence
+        // tiebreak is what guarantees a newer mesh for a chunk is applied after an older one
+        // rather than being overwritten by it.
         pending.Sort((a, b) =>
-            Vector3.DistanceSquared(a.pos, camChunk)
-                .CompareTo(Vector3.DistanceSquared(b.pos, camChunk)));
+        {
+            var byDistance = Vector3.DistanceSquared(a.pos, camChunk)
+                .CompareTo(Vector3.DistanceSquared(b.pos, camChunk));
+            return byDistance != 0 ? byDistance : a.seq.CompareTo(b.seq);
+        });
 
         var appliedCount = 0;
-        
-        foreach (var (pos, chunk, meshData) in pending)
+
+        foreach (var (pos, chunk, meshData, seq) in pending)
         {
             // Skip chunks that moved out of range or were unloaded
             if (Vector3.DistanceSquared(pos, camChunk) > WorldGenerationConfig.ChunkRadiusSq ||
@@ -108,8 +124,9 @@ public class ChunkManager(GL gl)
             }
             else
             {
-                // Re-queue for next frame
-                _completedMeshQueue.Enqueue((pos, chunk, meshData));
+                // Re-queue for next frame, keeping the original sequence so a rebuild that
+                // finishes in the meantime still sorts after it
+                _completedMeshQueue.Enqueue((pos, chunk, meshData, seq));
             }
         }
     }
@@ -173,9 +190,18 @@ public class ChunkManager(GL gl)
             {
                 if (!Chunks.ContainsKey(pos))
                     return;
-                    
+
                 var meshData = chunk.GenerateMeshData(this);
-                _completedMeshQueue.Enqueue((pos, chunk, meshData));
+                if (meshData == null)
+                {
+                    // A face neighbour was unloaded between the scheduling check and this
+                    // snapshot; meshing across that hole would bake border artifacts, so the
+                    // build is dropped and the chunk retried once the world settles
+                    _dirtyChunks.TryAdd(pos, 0);
+                    return;
+                }
+
+                _completedMeshQueue.Enqueue((pos, chunk, meshData, Interlocked.Increment(ref _meshSequence)));
             }
             finally
             {
@@ -199,6 +225,7 @@ public class ChunkManager(GL gl)
         // which already processes closest chunks first.
         var chunk = new Chunk(gl, pos, generateBlockData: true);
         Chunks[pos] = chunk;
+        _loadedChunks.Enqueue(chunk);
 
         // Mark this chunk and neighbors dirty for meshing
         _dirtyChunks.TryAdd(pos, 0);
@@ -210,6 +237,13 @@ public class ChunkManager(GL gl)
                 _dirtyChunks.TryAdd(neighborPos, 0);
         }
     }
+
+    /// <summary>
+    /// Pops one chunk that finished generating since the last call, oldest first. The caller
+    /// must confirm it is still the chunk registered at its position, because an unload can
+    /// happen between the enqueue and the drain.
+    /// </summary>
+    public bool TryDequeueLoaded(out Chunk chunk) => _loadedChunks.TryDequeue(out chunk);
 
     /// <summary>
     /// Marks a chunk as dirty (needs remeshing).
@@ -255,8 +289,15 @@ public class ChunkManager(GL gl)
         if (!Chunks.TryGetValue(pos, out var chunk)) return;
         if (!chunk.IsBlockDataReady) return;
         if (!HasAllNeighbors(pos)) return;
-        
+
         var meshData = chunk.GenerateMeshData(this);
+        if (meshData == null)
+        {
+            // Lost a face neighbour to an unload mid-call: retry rather than bake a hole in
+            _dirtyChunks.TryAdd(pos, 0);
+            return;
+        }
+
         chunk.UpdateMesh(meshData);
     }
 
