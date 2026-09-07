@@ -64,6 +64,18 @@ public class RenderManager : IDisposable
     private static readonly Vector3 UnderwaterAmbientTint = new(0.55f, 0.75f, 1f);
     private double _prevTime;
     private float _underwaterT;
+
+    // Whole-frame GPU time, measured with a ring of TIME_ELAPSED queries so a result is only
+    // ever read once the driver has it (see BeginGpuFrame). Three slots is enough for the
+    // usual one-to-two frame latency.
+    private readonly uint[] _gpuQueries = new uint[3];
+    private readonly bool[] _gpuQueryPending = new bool[3];
+    private int _gpuQueryIndex;
+    private bool _gpuQueryActive;
+
+    /// <summary>Chunks the last <see cref="RenderWorld"/> call passed the frustum test.</summary>
+    public int LastVisibleChunkCount { get; private set; }
+
     private readonly Vector3[] _pointPos = new Vector3[WorldGenerationConfig.MaxPointLights];
     private readonly Vector3[] _pointColors = new Vector3[WorldGenerationConfig.MaxPointLights];
     private int _pointCount;
@@ -75,7 +87,52 @@ public class RenderManager : IDisposable
         gl.DepthFunc(GLEnum.Lequal);
         _viewportSize = window.Size;
 
+        // Which GPU actually ran matters for every timing: a hybrid laptop happily renders
+        // this on the iGPU unless told otherwise, and the numbers then mean nothing.
+        Console.WriteLine($"GPU: {gl.GetStringS(StringName.Renderer)} | {gl.GetStringS(StringName.Vendor)} | GL {gl.GetStringS(StringName.Version)}");
+
+        for (var i = 0; i < _gpuQueries.Length; i++)
+            _gpuQueries[i] = gl.GenQuery();
+
         LoadResources();
+    }
+
+    /// <summary>
+    /// Opens this frame's GPU timer and, before reusing the slot, drains whatever result is
+    /// already sitting in it. The query is only read when the driver says it is available, so
+    /// this never stalls the pipeline; a result that is still missing after a full lap of the
+    /// ring is simply dropped. Only one TIME_ELAPSED query may be active at a time, which is
+    /// why this wraps the whole frame instead of individual passes.
+    /// </summary>
+    public void BeginGpuFrame()
+    {
+        var id = _gpuQueries[_gpuQueryIndex];
+
+        if (_gpuQueryPending[_gpuQueryIndex])
+        {
+            gl.GetQueryObject(id, QueryObjectParameterName.ResultAvailable, out int available);
+            if (available != 0)
+            {
+                gl.GetQueryObject(id, QueryObjectParameterName.Result, out long nanoseconds);
+                FrameProfiler.ReportGpuNanoseconds(nanoseconds);
+            }
+
+            _gpuQueryPending[_gpuQueryIndex] = false;
+        }
+
+        gl.BeginQuery(QueryTarget.TimeElapsed, id);
+        _gpuQueryActive = true;
+    }
+
+    /// <summary>Closes the frame's GPU timer and moves the ring on.</summary>
+    public void EndGpuFrame()
+    {
+        if (!_gpuQueryActive) return;
+
+        gl.EndQuery(QueryTarget.TimeElapsed);
+        _gpuQueryActive = false;
+        _gpuQueryPending[_gpuQueryIndex] = true;
+        _gpuQueryIndex = (_gpuQueryIndex + 1) % _gpuQueries.Length;
     }
 
     private void LoadResources()
@@ -558,6 +615,8 @@ public class RenderManager : IDisposable
         // Sort by distance (front to back for better z-buffer performance)
         _visibleChunks.Sort((a, b) => a.distSq.CompareTo(b.distSq));
 
+        LastVisibleChunkCount = _visibleChunks.Count;
+
         foreach (var (chunk, _) in _visibleChunks)
         {
             chunk.lifetime += 1.0 / 60.0; // TODO: Pass delta time eventually
@@ -981,7 +1040,7 @@ public class RenderManager : IDisposable
         return -1;
     }
 
-    public void RenderUI(IWindow window, Inventory inventory, int fps)
+    public void RenderUI(IWindow window, Inventory inventory, int fps, bool showProfiler)
     {
         ui.Begin(window.Size);
 
@@ -996,6 +1055,8 @@ public class RenderManager : IDisposable
 
         ui.DrawCrosshair();
         ui.DrawFps(fps);
+        if (showProfiler)
+            ui.DrawProfiler(FrameProfiler.Lines);
         ui.DrawHotbar(inventory);
         ui.End();
     }
@@ -1019,6 +1080,8 @@ public class RenderManager : IDisposable
         gl.DeleteVertexArray(outlineVao);
         gl.DeleteBuffer(faceVbo);
         gl.DeleteVertexArray(faceVao);
+        foreach (var query in _gpuQueries)
+            gl.DeleteQuery(query);
         gl.Dispose();
     }
 }

@@ -42,6 +42,14 @@ public class UIRenderer : IDisposable
     private const float CountPadBottom = 4f;
     private static readonly Rgba CountShadow = new(0, 0, 0, 180);
 
+    // The FPS counter's top-left corner, in pixels; the profiler table starts one line below it
+    private const float FpsTop = 10f;
+
+    // Frame-timing overlay (DrawProfiler), in pixels
+    private const float ProfilerLeft = 10f;
+    private const float ProfilerPadding = 6f;
+    private static readonly Rgba ProfilerBackground = Rgba.Grey(0.04f, 0.6f);
+
     // Three-quarter view: yaw swings a side face towards the viewer, pitch tilts the top down
     private const float IconYaw = 45f * MathF.PI / 180f;
     private const float IconPitch = 30f * MathF.PI / 180f;
@@ -198,7 +206,39 @@ public class UIRenderer : IDisposable
         DrawTexture(ScreenCentre, new Vector2(CrosshairSize), _crosshairTexture);
 
     public void DrawFps(int fps) =>
-        DrawText($"FPS {fps}", new Vector2(10f, 10f), _countScale, Rgba.White);
+        DrawText($"FPS {fps}", new Vector2(ProfilerLeft, FpsTop), _countScale, Rgba.White);
+
+    /// <summary>
+    /// Draws the frame-timing table under the FPS text: a translucent panel sized to the block
+    /// so it reads over bright terrain, then one <see cref="DrawText"/> line per row. The lines
+    /// are already formatted by <see cref="FrameProfiler"/> (rebuilt once a second), so this
+    /// allocates nothing per frame.
+    /// </summary>
+    public void DrawProfiler(IReadOnlyList<string> lines)
+    {
+        if (_font == null || lines.Count == 0) return;
+
+        // Cap height of a glyph, so the spacing follows the font rather than a magic number
+        var lineStep = _font.MeasureSize("X".AsSpan(), _countScale).Y * 1.5f;
+        var top = FpsTop + lineStep;
+
+        // Only the longest line is measured — the count font is monospaced, so character
+        // count orders the rows by width, and measuring all of them every frame would cost
+        // as much again as drawing them
+        var longest = 0;
+        for (var i = 1; i < lines.Count; i++)
+            if (lines[i].Length > lines[longest].Length)
+                longest = i;
+
+        var size = new Vector2(
+            _font.MeasureSize(lines[longest].AsSpan(), _countScale).X + ProfilerPadding * 2f,
+            lines.Count * lineStep + ProfilerPadding * 2f);
+        DrawRect(new Vector2(ProfilerLeft - ProfilerPadding + size.X * 0.5f,
+            top - ProfilerPadding + size.Y * 0.5f), size, ProfilerBackground);
+
+        for (var i = 0; i < lines.Count; i++)
+            DrawText(lines[i], new Vector2(ProfilerLeft, top + i * lineStep), _countScale, Rgba.White);
+    }
 
     /// <summary>
     /// Screen-space text with its top-left corner at <paramref name="topLeft"/> (pixels, Y

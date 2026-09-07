@@ -76,9 +76,18 @@ public class World
 
     public void Update(double deltaTime, IKeyboard? keyboard)
     {
+        FrameProfiler.Begin(ProfileSection.Camera);
         Camera.Update((float)deltaTime, keyboard, _chunkManager);
+        FrameProfiler.End(ProfileSection.Camera);
+
+        // Times itself, as ChunkUnload / ChunkApply / ChunkDirty
         _chunkManager.Update(Camera);
+
+        FrameProfiler.Begin(ProfileSection.Lod);
         _lodManager.Update(_chunkManager);
+        FrameProfiler.End(ProfileSection.Lod);
+
+        FrameProfiler.Begin(ProfileSection.Entities);
 
         // Drops collected this tick land in the hotbar, which pops the matching icon. A block
         // with no slot is simply discarded.
@@ -89,43 +98,70 @@ public class World
         _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager);
 
         UpdateToppling((float)deltaTime);
+        FrameProfiler.End(ProfileSection.Entities);
 
         // Chunks that streamed in this frame hand over their water/air frontier, so a sea a
         // cave broke into starts flowing as soon as it is loaded rather than waiting for the
         // player to disturb something next to it
+        FrameProfiler.Begin(ProfileSection.FluidWake);
         _fluidManager.WakeLoadedChunks(_chunkManager);
+        FrameProfiler.End(ProfileSection.FluidWake);
+
+        FrameProfiler.Begin(ProfileSection.FluidTick);
 
         // Runs after every path that can edit a block this frame, so the cells they scheduled
         // are all in the same tick
         _fluidManager.Update((float)deltaTime, _chunkManager, _dropManager);
 
         Inventory.Update((float)deltaTime);
+        FrameProfiler.End(ProfileSection.FluidTick);
 
         // Water is aimed through unless the held item is out to scoop it, so a pond never
         // stops the player targeting the block under it
+        FrameProfiler.Begin(ProfileSection.Raycast);
         _hasSelectedBlock = Camera.Raycast(InteractionReach, _chunkManager,
             out _selectedBlockPosition, out _selectedFaceNormal,
             includeFluids: ItemType.TargetsFluids(Inventory.SelectedBlockId));
+        FrameProfiler.End(ProfileSection.Raycast);
     }
 
     public void Render(RenderManager renderManager)
     {
         // Depth-only sun pass first: every world draw below samples the shadow map it fills
+        FrameProfiler.Begin(ProfileSection.Shadows);
         renderManager.RenderShadows(Camera, _chunkManager.Chunks.Values, _tntManager.Primed, _toppling);
+        FrameProfiler.End(ProfileSection.Shadows);
 
+        FrameProfiler.Begin(ProfileSection.LodPass);
         renderManager.RenderLod(Camera, _lodManager.Regions.Values);
+        FrameProfiler.End(ProfileSection.LodPass);
+
+        FrameProfiler.Begin(ProfileSection.WorldPass);
         renderManager.RenderWorld(Camera, _chunkManager.Chunks.Values, _window.Time);
+        FrameProfiler.End(ProfileSection.WorldPass);
+
+        // The frustum test inside RenderWorld has just counted what is on screen
+        FrameProfiler.SetCounts(_chunkManager.Chunks.Count, renderManager.LastVisibleChunkCount);
+
+        FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.RenderItemDrops(Camera, _dropManager.Drops);
         renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
         foreach (var tree in _toppling)
             renderManager.RenderTopplingTree(Camera, tree);
+        FrameProfiler.End(ProfileSection.EntityPass);
 
         // Water last of the world passes: it blends, so everything it can cover has to be in
         // the depth buffer already
+        FrameProfiler.Begin(ProfileSection.WaterPass);
         renderManager.RenderWorldTranslucent(Camera, _chunkManager.Chunks.Values,
             _lodManager.Regions.Values);
+        FrameProfiler.End(ProfileSection.WaterPass);
 
+        // With no target there is nothing left to draw, so SelectPass only opens past here and
+        // its Begin/End stay balanced across the early return
         if (!_hasSelectedBlock) return;
+
+        FrameProfiler.Begin(ProfileSection.SelectPass);
 
         // While mining, the outline and the break overlay ride along with the popping block
         var popScale = _isBreaking ? BlockPopScaleNow : 1f;
@@ -139,11 +175,17 @@ public class World
 
         if (_isBreaking)
             renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress, popScale);
+
+        FrameProfiler.End(ProfileSection.SelectPass);
     }
 
-    public void RenderUI(RenderManager renderManager, int fps)
+    /// <summary>
+    /// Draws the HUD. <paramref name="showProfiler"/> adds the frame-timing table under the FPS
+    /// counter (the same flag that turns the debug console logging on).
+    /// </summary>
+    public void RenderUI(RenderManager renderManager, int fps, bool showProfiler)
     {
-        renderManager.RenderUI(_window, Inventory, fps);
+        renderManager.RenderUI(_window, Inventory, fps, showProfiler);
     }
     
     /// <summary>

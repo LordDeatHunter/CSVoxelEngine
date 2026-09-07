@@ -1,5 +1,7 @@
 using System;
+using System.Diagnostics;
 using System.Globalization;
+using System.Runtime;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 
@@ -44,6 +46,7 @@ public static class Program
 
     private static void OnLoad()
     {
+        PrintBuildDiagnostics();
         timeOffset = ReadTimeOffset();
 
         inputManager = new InputManager(windowManager.Window);
@@ -56,6 +59,23 @@ public static class Program
         };
 
         inputManager.Mouse?.Scroll += (_, wheel) => world.Inventory.Scroll(wheel.Y);
+    }
+
+    /// <summary>
+    /// One line naming the build the timings were taken on. A Debug build, an attached
+    /// debugger and workstation GC each cost enough that a measurement without them recorded
+    /// cannot be compared against anything.
+    /// </summary>
+    private static void PrintBuildDiagnostics()
+    {
+#if DEBUG
+        const string configuration = "Debug";
+#else
+        const string configuration = "Release";
+#endif
+        Console.WriteLine(
+            $"Build: {configuration} | debugger {Debugger.IsAttached} | serverGC {GCSettings.IsServerGC}"
+            + $" | latency {GCSettings.LatencyMode} | cpus {Environment.ProcessorCount}");
     }
 
     /// <summary>
@@ -107,10 +127,17 @@ public static class Program
         }
 
         world.Update((float)deltaTime, inputManager.Keyboard);
+
+        FrameProfiler.Begin(ProfileSection.Breaking);
         world.UpdateBlockBreaking(deltaTime, inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true);
+        FrameProfiler.End(ProfileSection.Breaking);
 
         if (debugEnabled)
         {
+            // One profiler snapshot a second, so a headless run's log carries the breakdown
+            if (FrameProfiler.TryTakeSnapshotForConsole(out var profilerLine))
+                Console.WriteLine(profilerLine);
+
             debugLogTimer += deltaTime;
             if (debugLogTimer >= 0.2)
             {
@@ -129,9 +156,15 @@ public static class Program
 
     private static void OnRender(double deltaTime)
     {
+        // One TIME_ELAPSED query wraps the whole frame, so it has to open before any draw
+        renderManager.BeginGpuFrame();
+
+        FrameProfiler.Begin(ProfileSection.Lighting);
         renderManager.SetLighting(windowManager.Window.Time + timeOffset, world.Camera, world.PrimedTnt,
             world.Camera.IsEyeInWater);
         renderManager.BeginFrame(world.Camera);
+        FrameProfiler.End(ProfileSection.Lighting);
+
         world.Render(renderManager);
         fpsTimer += deltaTime;
         fpsFrames++;
@@ -141,7 +174,13 @@ public static class Program
             fpsTimer = 0.0;
             fpsFrames = 0;
         }
-        world.RenderUI(renderManager, shownFps);
+
+        FrameProfiler.Begin(ProfileSection.UiPass);
+        world.RenderUI(renderManager, shownFps, debugEnabled);
+        FrameProfiler.End(ProfileSection.UiPass);
+
+        renderManager.EndGpuFrame();
+        FrameProfiler.EndFrame();
     }
 
     private static void OnFramebufferResize(Vector2D<int> size)

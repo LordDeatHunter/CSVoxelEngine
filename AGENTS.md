@@ -22,6 +22,23 @@ Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated
 
 The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, double-tap Space to toggle flight (Space/Left Ctrl for up/down while flying), `C` to toggle noclip, Left Shift for 10x speed, hold left-click to mine a block (hit-based: one hit per `World.BlockHitSeconds` = 200 ms removes 1 HP of the block's `hardness`, declared in its JSON - 5 for most blocks, so ~1s, 8 for logs, 2 for leaves, and `0` means it pops on first contact like a pebble; damage resets if you release or switch target; instant while noclip; stepped progress overlay via `break-*.glsl`; each hit pops the block out and back via `RenderManager.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), `X` to toggle debug logging (FPS/position/water state to console), Escape to quit.
 
+`X` also raises the **frame profiler overlay** under the FPS counter, and prints the same
+snapshot to the console once a second so a headless run's log carries it. Each row is a section
+of the frame — `camera`, the three `chunk*` rows from `ChunkManager.Update`, `lod`, `entities`,
+`fluidWake`, `fluidTick`, `raycast`, `breaking` on the update side, then `lighting`, `shadows`,
+`lodPass`, `worldPass`, `entityPass`, `waterPass`, `selectPass`, `uiPass` on the render side —
+with its average and worst millisecond cost over the last second; `other` is the wall time no
+section claimed (mostly the buffer swap). The header carries the frame time and FPS, the CPU
+sum against the GPU's own `TIME_ELAPSED` measurement of the whole frame (`--` until the first
+query comes back), GC collections per second and the loaded/visible chunk counts. Timings are
+collected every frame whether or not the overlay is up, so the first second after pressing `X`
+already has data; the overlay's own glyph draws land in `uiPass`, so compare that row with `X`
+on and off before reading it as a baseline. `Program.OnLoad` and the `RenderManager` constructor
+each print one startup line — build configuration, debugger, GC mode and CPU count, then the GL
+renderer, vendor and version — so a measurement always records which build and which GPU
+produced it. Timing lives in `OpenGLTest/src/FrameProfiler.cs`; wrap new work in
+`FrameProfiler.Begin`/`End` (main thread only) rather than adding another ad-hoc stopwatch.
+
 Standing in water switches the player to **swimming** (`Camera.IsInWater`, recomputed every frame by `Camera.UpdateWaterState` from the real fluid surface heights under the body): horizontal speed halves, gravity is replaced by an eased sink toward `SinkSpeed` (Space eases up toward `SwimUpSpeed` instead, both through `MathUtils.Damp`), and swimming into a bank while holding Space adds `SwimExitBoost` so the player can climb out without a ramp. Flight and noclip ignore water entirely, and a player standing on the bottom of a shallow puddle still jumps normally. Flowing water also pushes the player and floating item drops along its flow direction (`ChunkManager.GetFluidFlowGlobal`, Minecraft's `FlowingFluid.getFlow`: a horizontal vector summed from how much lower each neighbouring cell's surface sits, zero in a still pool). `Camera.IsEyeInWater` is the separate eye-only test and is the source of truth for the underwater tint.
 
 Shaders (`assets/shaders/**/*.glsl`), textures (`assets/textures/**/*.png`), fonts (`assets/fonts/**/*.ttf`) and all content JSON (`assets/**/*.json` — blocks, items, loot tables, models) are copied to the output directory via `CopyToOutputDirectory` rules in the csproj — **new asset types/extensions need a matching `<None Update>` entry** or they won't be found at runtime. The JSON rule is a wildcard over the whole `assets` tree, so adding a block, item, loot table or model needs no csproj edit.

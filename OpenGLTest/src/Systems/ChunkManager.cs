@@ -56,9 +56,17 @@ public class ChunkManager(GL gl)
 
         var camChunk = (camera.Position / Chunk.Size).Floor();
 
+        FrameProfiler.Begin(ProfileSection.ChunkUnload);
         UnloadDistantChunks(camChunk);
+        FrameProfiler.End(ProfileSection.ChunkUnload);
+
+        FrameProfiler.Begin(ProfileSection.ChunkApply);
         ApplyCompletedMeshes(camChunk);
+        FrameProfiler.End(ProfileSection.ChunkApply);
+
+        FrameProfiler.Begin(ProfileSection.ChunkDirty);
         ProcessDirtyChunks(camChunk);
+        FrameProfiler.End(ProfileSection.ChunkDirty);
     }
 
     private void UnloadDistantChunks(Vector3 camChunk)
