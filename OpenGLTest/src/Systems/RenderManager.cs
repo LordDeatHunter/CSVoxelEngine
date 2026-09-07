@@ -981,7 +981,7 @@ public class RenderManager : IDisposable
         return -1;
     }
 
-    public void RenderUI(IWindow window, Inventory inventory)
+    public void RenderUI(IWindow window, Inventory inventory, int fps)
     {
         ui.Begin(window.Size);
 
@@ -995,6 +995,7 @@ public class RenderManager : IDisposable
         }
 
         ui.DrawCrosshair();
+        ui.DrawFps(fps);
         ui.DrawHotbar(inventory);
         ui.End();
     }

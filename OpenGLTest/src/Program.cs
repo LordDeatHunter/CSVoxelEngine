@@ -15,6 +15,9 @@ public static class Program
     private static bool xWasPressed;
     private static bool qWasPressed;
     private static double debugLogTimer;
+    private static double fpsTimer;
+    private static int fpsFrames;
+    private static int shownFps;
     // TODO: move this to player class
     private static double placeTimer = MAX_PLACE_TIMER;
     private static readonly double MAX_PLACE_TIMER = 0.2;
@@ -130,7 +133,15 @@ public static class Program
             world.Camera.IsEyeInWater);
         renderManager.BeginFrame(world.Camera);
         world.Render(renderManager);
-        world.RenderUI(renderManager);
+        fpsTimer += deltaTime;
+        fpsFrames++;
+        if (fpsTimer >= 1.0)
+        {
+            shownFps = (int)(fpsFrames / fpsTimer);
+            fpsTimer = 0.0;
+            fpsFrames = 0;
+        }
+        world.RenderUI(renderManager, shownFps);
     }
 
     private static void OnFramebufferResize(Vector2D<int> size)

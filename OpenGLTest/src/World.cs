@@ -141,9 +141,9 @@ public class World
             renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress, popScale);
     }
 
-    public void RenderUI(RenderManager renderManager)
+    public void RenderUI(RenderManager renderManager, int fps)
     {
-        renderManager.RenderUI(_window, Inventory);
+        renderManager.RenderUI(_window, Inventory, fps);
     }
     
     /// <summary>

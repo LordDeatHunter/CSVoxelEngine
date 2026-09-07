@@ -197,6 +197,9 @@ public class UIRenderer : IDisposable
     public void DrawCrosshair() =>
         DrawTexture(ScreenCentre, new Vector2(CrosshairSize), _crosshairTexture);
 
+    public void DrawFps(int fps) =>
+        DrawText($"FPS {fps}", new Vector2(10f, 10f), _countScale, Rgba.White);
+
     /// <summary>
     /// Screen-space text with its top-left corner at <paramref name="topLeft"/> (pixels, Y
     /// down). A one-pixel dark shadow is drawn under each glyph so the text reads over
