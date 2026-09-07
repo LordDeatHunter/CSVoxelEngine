@@ -37,8 +37,17 @@ public class RenderManager : IDisposable
     private const float TorchIntensity = 1.2f;
     private Vector3 _fogColor = new(0.3f, 0.6f, 0.9f);
     private Vector3 _skyColor = new(0.3f, 0.6f, 0.9f);
+    private float _fogNear = WorldGenerationConfig.FogNearBlocks;
+    private float _fogFar = WorldGenerationConfig.FogFarBlocks;
     private Vector3 _cameraPos;
     private float _time;
+
+    // Underwater tint: the eye state is a hard flag, so it is eased into _underwaterT
+    // (0 = above water, 1 = fully submerged) over UnderwaterFadeSeconds
+    private static readonly Vector3 UnderwaterFogColor = new(0.05f, 0.22f, 0.42f);
+    private static readonly Vector3 UnderwaterAmbientTint = new(0.55f, 0.75f, 1f);
+    private double _prevTime;
+    private float _underwaterT;
     private readonly Vector3[] _pointPos = new Vector3[WorldGenerationConfig.MaxPointLights];
     private readonly Vector3[] _pointColors = new Vector3[WorldGenerationConfig.MaxPointLights];
     private int _pointCount;
@@ -94,9 +103,16 @@ public class RenderManager : IDisposable
     /// Advances the day/night cycle and pushes the resulting sun, sky and point-light
     /// state into the per-frame fields. Called once per frame before <see cref="BeginFrame"/>;
     /// every world draw applies the state through <see cref="ApplyLightingUniforms"/>.
+    /// <paramref name="underwater"/> is whether the camera's eye sits below a fluid surface;
+    /// it fades the underwater tint in and out.
     /// </summary>
-    public void SetLighting(double time, Camera? camera, IReadOnlyList<PrimedTnt>? primed)
+    public void SetLighting(double time, Camera? camera, IReadOnlyList<PrimedTnt>? primed, bool underwater)
     {
+        // The window clock is the only time source this pass has; clamp the step so a hitch
+        // (or the very first frame) cannot jump the fade
+        var dt = (float)Math.Clamp(time - _prevTime, 0.0, 0.25);
+        _prevTime = time;
+
         _time = (float)time;
         if (camera != null)
             _cameraPos = camera.Position;
@@ -142,6 +158,25 @@ public class RenderManager : IDisposable
             _pointColors[i] = Vector3.Zero;
         }
 
+        // Underwater the fog closes in to a few blocks, the sky and fog go blue-green and the
+        // light dims and cools, so a submerged view reads as being inside the water rather
+        // than looking at a blue filter. Scaled by dayness so night water stays dark.
+        _underwaterT = MathUtils.Clamp01(
+            _underwaterT + (underwater ? dt : -dt) / WorldGenerationConfig.UnderwaterFadeSeconds);
+        var wet = MathUtils.SmoothStep(_underwaterT);
+
+        _fogNear = MathUtils.Lerp(WorldGenerationConfig.FogNearBlocks,
+            WorldGenerationConfig.UnderwaterFogNearBlocks, wet);
+        _fogFar = MathUtils.Lerp(WorldGenerationConfig.FogFarBlocks,
+            WorldGenerationConfig.UnderwaterFogFarBlocks, wet);
+
+        if (wet <= 0f) return;
+
+        var underwaterColor = UnderwaterFogColor * (0.15f + 0.85f * dayness);
+        _fogColor = Mix(_fogColor, underwaterColor, wet);
+        _skyColor = Mix(_skyColor, underwaterColor, wet);
+        _ambient = Mix(_ambient, _ambient * UnderwaterAmbientTint, wet);
+        _sunIntensity = MathUtils.Lerp(_sunIntensity, _sunIntensity * 0.5f, wet);
     }
 
     private static float Smooth01(float t)
@@ -158,6 +193,9 @@ public class RenderManager : IDisposable
         gl.ClearColor(_skyColor.X, _skyColor.Y, _skyColor.Z, 1f);
         gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         gl.Enable(EnableCap.Blend);
+        // The world passes rely on straight alpha blending for the fluid mesh and the chunk
+        // fade-in. Set it here rather than inheriting whatever the last UI pass left behind.
+        gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
     }
 
     /// <summary>
@@ -184,8 +222,8 @@ public class RenderManager : IDisposable
         worldShader.SetUniform("uTorchColor", _torchColor);
         worldShader.SetUniform("uTorchIntensity", TorchIntensity);
         worldShader.SetUniform("uFogColor", _fogColor);
-        worldShader.SetUniform("uFogNear", WorldGenerationConfig.FogNearBlocks);
-        worldShader.SetUniform("uFogFar", WorldGenerationConfig.FogFarBlocks);
+        worldShader.SetUniform("uFogNear", _fogNear);
+        worldShader.SetUniform("uFogFar", _fogFar);
         worldShader.SetUniform("uCameraPos", _cameraPos);
         worldShader.SetUniform("uNumPointLights", _pointCount);
         worldShader.SetUniformArray3("uPointPos", _pointPos);
@@ -213,8 +251,10 @@ public class RenderManager : IDisposable
 
         foreach (var chunk in chunks)
         {
-            // Air-only chunks (the majority) have no mesh — skip before the frustum test
-            if (!chunk.HasMesh)
+            // Air-only chunks (the majority) have nothing at all — skip before the frustum
+            // test. A water-only ocean chunk has no opaque mesh but still needs its lifetime
+            // advanced here, or its fluid mesh would stay at alpha 0 forever.
+            if (!chunk.HasMesh && !chunk.HasTranslucentMesh)
                 continue;
 
             var min = chunk.Position * Chunk.Size;
@@ -233,6 +273,7 @@ public class RenderManager : IDisposable
         foreach (var (chunk, _) in _visibleChunks)
         {
             chunk.lifetime += 1.0 / 60.0; // TODO: Pass delta time eventually
+            if (!chunk.HasMesh) continue;
 
             var model = Matrix4x4.CreateTranslation(chunk.Position * Chunk.Size);
             ApplyLightingUniforms(model);
@@ -240,6 +281,97 @@ public class RenderManager : IDisposable
             worldShader.SetUniform("uAlpha", MathF.Min(1F, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
 
             chunk.Render();
+        }
+    }
+
+    // Reused across frames, like _visibleChunks / _visibleRegions
+    private readonly List<(Chunk chunk, float distSq)> _translucentChunks = new(256);
+    private readonly List<(LodRegion region, float distSq)> _translucentRegions = new(256);
+
+    /// <summary>
+    /// Draws every fluid surface — chunk water first, then the far LOD's water sheets — in one
+    /// blended pass after the whole opaque world, so terrain, drops and TNT behind the water
+    /// show through it. Depth writing stays on: water bodies are at most a couple of layers
+    /// deep from any viewpoint, and writing depth is what makes the chunk-vs-LOD overlap at
+    /// the full-detail ring resolve by distance instead of by draw order.
+    /// </summary>
+    public void RenderWorldTranslucent(Camera camera, IEnumerable<Chunk> chunks, IEnumerable<LodRegion> regions)
+    {
+        if (camera == null) return;
+
+        worldShader.Use();
+        BindWorldTextures();
+        gl.Enable(EnableCap.Blend);
+        gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+        gl.DepthMask(true);
+
+        var viewProj = camera.GetViewProjection();
+        var frustum = new Frustum(viewProj);
+        var camChunkPos = (camera.Position / Chunk.Size).Floor();
+        var camPos = camera.Position;
+
+        _translucentChunks.Clear();
+
+        foreach (var chunk in chunks)
+        {
+            if (!chunk.HasTranslucentMesh)
+                continue;
+
+            var min = chunk.Position * Chunk.Size;
+            var max = min + new Vector3(Chunk.Size);
+
+            if (!frustum.IntersectsAABB(min, max))
+                continue;
+
+            _translucentChunks.Add((chunk, Vector3.DistanceSquared(chunk.Position, camChunkPos)));
+        }
+
+        // Back to front, so overlapping surfaces (a pond seen across a sea) blend in the
+        // order the eye sees them
+        _translucentChunks.Sort((a, b) => b.distSq.CompareTo(a.distSq));
+
+        foreach (var (chunk, _) in _translucentChunks)
+        {
+            var model = Matrix4x4.CreateTranslation(chunk.Position * Chunk.Size);
+            ApplyLightingUniforms(model);
+            worldShader.SetUniform("uMVP", model * viewProj);
+            worldShader.SetUniform("uAlpha", MathF.Min(1f, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
+
+            chunk.RenderTranslucent();
+        }
+
+        _translucentRegions.Clear();
+
+        foreach (var region in regions)
+        {
+            if (!region.HasWaterMesh || region.IsBuried)
+                continue;
+
+            var min = new Vector3(region.X * region.SizeBlocks, region.YMin, region.Z * region.SizeBlocks);
+            var max = new Vector3(min.X + region.SizeBlocks, region.YMax, min.Z + region.SizeBlocks);
+
+            if (!frustum.IntersectsAABB(min, max))
+                continue;
+
+            var center = (min + max) * 0.5f;
+            _translucentRegions.Add((region, Vector3.DistanceSquared(center, camPos)));
+        }
+
+        // Finest level first: its sheet sits highest (each coarser level sinks by its own
+        // height bias), so the duplicates underneath it fail the depth test instead of
+        // double-blending the same stretch of sea
+        _translucentRegions.Sort((a, b) => a.region.Level != b.region.Level
+            ? a.region.Level.CompareTo(b.region.Level)
+            : b.distSq.CompareTo(a.distSq));
+
+        foreach (var (region, _) in _translucentRegions)
+        {
+            var model = Matrix4x4.CreateTranslation(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks);
+            ApplyLightingUniforms(model);
+            worldShader.SetUniform("uMVP", model * viewProj);
+            worldShader.SetUniform("uAlpha", MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)));
+
+            region.RenderWater();
         }
     }
 
@@ -564,6 +696,16 @@ public class RenderManager : IDisposable
     public void RenderUI(IWindow window, Inventory inventory)
     {
         ui.Begin(window.Size);
+
+        // Cheap underwater wash over the whole view: the world fog alone leaves nearby
+        // geometry untinted, and this is what sells "the camera is in the water"
+        if (_underwaterT > 0.001f)
+        {
+            var wet = MathUtils.SmoothStep(_underwaterT);
+            ui.DrawRect(ui.ScreenCentre, new Vector2(window.Size.X, window.Size.Y),
+                Rgba.FromFloat(UnderwaterFogColor.X, UnderwaterFogColor.Y, UnderwaterFogColor.Z, 0.18f * wet));
+        }
+
         ui.DrawCrosshair();
         ui.DrawHotbar(inventory);
         ui.End();

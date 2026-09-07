@@ -69,7 +69,7 @@ public static class Program
         if (inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true && placeTimer >= MAX_PLACE_TIMER)
         {
             placeTimer = 0;
-            world.TryPlaceSelectedBlock(World.InteractionReach);
+            world.TryUseSelected(World.InteractionReach);
         }
 
         world.Update((float)deltaTime, inputManager.Keyboard);
@@ -81,9 +81,10 @@ public static class Program
             if (debugLogTimer >= 0.2)
             {
                 var fps = deltaTime > 0 ? (int)(1 / deltaTime) : 0;
-                var position = world.Camera.Position;
+                var camera = world.Camera;
+                var position = camera.Position;
                 Console.WriteLine(
-                    $"FPS {fps} | Pos ({position.X:F2}, {position.Y:F2}, {position.Z:F2}) | Grounded {world.Camera.IsGrounded} | Vy {world.Camera.VerticalVelocity:F2}");
+                    $"FPS {fps} | Pos ({position.X:F2}, {position.Y:F2}, {position.Z:F2}) | Grounded {camera.IsGrounded} | Vy {camera.VerticalVelocity:F2} | Water {camera.IsInWater}/{camera.IsEyeInWater}");
                 debugLogTimer = 0;
             }
         }
@@ -94,7 +95,8 @@ public static class Program
 
     private static void OnRender(double deltaTime)
     {
-        renderManager.SetLighting(windowManager.Window.Time, world.Camera, world.PrimedTnt);
+        renderManager.SetLighting(windowManager.Window.Time, world.Camera, world.PrimedTnt,
+            world.Camera.IsEyeInWater);
         renderManager.BeginFrame();
         world.Render(renderManager);
         world.RenderUI(renderManager);

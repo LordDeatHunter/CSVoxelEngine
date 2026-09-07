@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -269,6 +269,117 @@ public class ChunkManager(GL gl)
         return Chunks.TryGetValue(chunkPos, out var chunk)
             ? chunk.GetLocalBlock(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask)
             : (byte)0;
+    }
+
+    /// <summary>
+    /// The loaded chunk owning a world cell, or null when it is not loaded. A chunk present in
+    /// <see cref="Chunks"/> always has ready block data (<see cref="QueueChunk"/> generates
+    /// before inserting), but the flag is checked anyway so the contract holds if that changes.
+    /// </summary>
+    public Chunk? ChunkAt(int x, int y, int z)
+    {
+        var chunkPos = new Vector3(x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift);
+        return Chunks.TryGetValue(chunkPos, out var chunk) && chunk.IsBlockDataReady ? chunk : null;
+    }
+
+    /// <summary>
+    /// Reads a world cell's block id and state byte, returning false when its chunk is not
+    /// loaded. The fluid simulation must use this rather than <see cref="GetBlockGlobal"/>:
+    /// "unloaded" reads as air there, which would make water pour into unloaded space.
+    /// </summary>
+    public bool TryGetCell(int x, int y, int z, out byte id, out byte state)
+    {
+        var chunk = ChunkAt(x, y, z);
+        if (chunk == null)
+        {
+            id = 0;
+            state = 0;
+            return false;
+        }
+
+        var lx = x & Chunk.SizeMask;
+        var ly = y & Chunk.SizeMask;
+        var lz = z & Chunk.SizeMask;
+        id = chunk.GetLocalBlock(lx, ly, lz);
+        state = chunk.GetLocalState(lx, ly, lz);
+        return true;
+    }
+
+    /// <summary>Reads a world cell's state byte; 0 when its chunk is not loaded (which is also
+    /// what a source reads as, so pair it with a loaded check when that matters).</summary>
+    public byte GetStateGlobal(int x, int y, int z)
+    {
+        var chunk = ChunkAt(x, y, z);
+        return chunk?.GetLocalState(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask) ?? 0;
+    }
+
+    /// <summary>
+    /// World Y of the fluid surface in the cell (x, y, z): <c>y + 1</c> when another fluid cell
+    /// sits directly above (stacked water has no seam), otherwise <c>y</c> plus the cell's own
+    /// <see cref="FluidState.SurfaceHeight"/>. Returns <see cref="float.NegativeInfinity"/>
+    /// when the cell holds no fluid, so callers can compare against it unconditionally.
+    /// </summary>
+    public float GetFluidSurfaceGlobal(int x, int y, int z)
+    {
+        if (!TryGetCell(x, y, z, out var id, out var state) || !BlockType.IsFluid(id))
+            return float.NegativeInfinity;
+
+        if (TryGetCell(x, y + 1, z, out var above, out _) && BlockType.IsFluid(above))
+            return y + 1f;
+
+        return y + FluidState.SurfaceHeight(state);
+    }
+
+    // The four horizontal neighbours a flow can be pulled toward, as (dx, dz)
+    private static readonly (int X, int Z)[] FlowNeighbours = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+
+    /// <summary>
+    /// Unit-length horizontal direction the fluid in the cell (x, y, z) flows, or
+    /// <see cref="Vector3.Zero"/> when the cell holds no fluid or the fluid is still. Mirrors
+    /// Minecraft's <c>FlowingFluid.getFlow</c>: every horizontal neighbour pulls the flow toward
+    /// itself in proportion to how much lower its own surface sits, a replaceable cell the fluid
+    /// can drop off into counting as a whole source lower still, and a solid neighbour
+    /// contributing nothing. A pool of sources therefore cancels out to zero, while a skirt
+    /// points away from its source and toward the edge it pours over.
+    /// </summary>
+    public Vector3 GetFluidFlowGlobal(int x, int y, int z)
+    {
+        if (!TryGetCell(x, y, z, out var id, out var state) || !BlockType.IsFluid(id))
+            return Vector3.Zero;
+
+        // The cell's own level, deliberately not GetFluidSurfaceGlobal: pinning a cell with
+        // fluid above it to a full block would flatten a falling column's gradient to nothing
+        var ownHeight = FluidState.SurfaceHeight(state);
+        var flow = Vector3.Zero;
+
+        foreach (var (dx, dz) in FlowNeighbours)
+        {
+            if (!TryGetCell(x + dx, y, z + dz, out var neighbourId, out var neighbourState))
+                continue;
+
+            float neighbourHeight;
+            if (neighbourId == id)
+            {
+                neighbourHeight = FluidState.SurfaceHeight(neighbourState);
+            }
+            else if (BlockType.IsReplaceable(neighbourId))
+            {
+                // Air or a fragile block: the fluid only gets pulled that way if it would drop
+                // off there, and a drop counts as a full source lower than any level could be
+                if (TryGetCell(x + dx, y - 1, z + dz, out var belowId, out var belowState) && belowId == id)
+                    neighbourHeight = FluidState.SurfaceHeight(belowState) - FluidState.SourceHeight;
+                else
+                    continue;
+            }
+            else
+            {
+                continue; // a solid neighbour dams the flow instead of steering it
+            }
+
+            flow += new Vector3(dx, 0f, dz) * (ownHeight - neighbourHeight);
+        }
+
+        return flow.LengthSquared() > 1e-6f ? Vector3.Normalize(flow) : Vector3.Zero;
     }
 
     /// <summary>

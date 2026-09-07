@@ -40,6 +40,15 @@ public class Chunk : IDisposable
 
     // Flat block storage; index = (x << 8) | (y << 4) | z
     private readonly byte[] _blocks = new byte[BlockCount];
+
+    // Per-block state byte, parallel to _blocks and lazily allocated: null means "all zero",
+    // which is what every non-fluid cell and every generated sea cell reads as (see
+    // FluidState). Written on the main thread only; mesh threads copy the field to a local and
+    // treat null as zeros, the same tolerated race as _blocks (an edit's own remesh wins after).
+    private volatile byte[]? _state;
+
+    // Counts non-air cells, water included: its only consumer is the all-air mesh fast path,
+    // and a chunk holding nothing but sea water still has a surface to draw.
     private int _solidCount;
 
     private static readonly Vector3[] NeighborOffsets = Vector3Directions.CardinalDirections;
@@ -48,6 +57,10 @@ public class Chunk : IDisposable
 
     public Vector3 Position { get; }
     private Mesh? _mesh;
+
+    // Fluid surfaces live in their own mesh so RenderManager can draw them blended, after
+    // everything opaque (see RenderManager.RenderWorldTranslucent)
+    private Mesh? _translucentMesh;
     private readonly GL _gl;
 
     /// <summary>
@@ -59,6 +72,12 @@ public class Chunk : IDisposable
     /// Whether this chunk has an uploaded, non-empty mesh worth drawing.
     /// </summary>
     public bool HasMesh => _mesh != null;
+
+    /// <summary>
+    /// Whether this chunk has an uploaded fluid mesh for the blended pass. An ocean chunk
+    /// holding nothing but water has one of these and no opaque mesh at all.
+    /// </summary>
+    public bool HasTranslucentMesh => _translucentMesh != null;
 
     /// <summary>
     /// Whether a mesh has been applied at least once, even an empty one (all air, or solid with
@@ -299,8 +318,8 @@ public class Chunk : IDisposable
 
     /// <summary>
     /// Fills the terrain columns (grass / dirt / stone by depth), lets the cave carvers clear
-    /// their air out of the result, then stamps trees onto the surface. Runs on a generation
-    /// worker thread.
+    /// their air out of the result, floods everything below sea level, then stamps trees onto
+    /// the surface. Runs on a generation worker thread.
     /// </summary>
     public void GenerateBlockData()
     {
@@ -324,7 +343,13 @@ public class Chunk : IDisposable
             }
             maxHeight += WorldGenerationConfig.TreeMaxHeightBlocks;
         }
-        if (lowerBoundY > maxHeight + 1)
+
+        // A chunk above the terrain still has water to fill when it holds part of the sea:
+        // it must reach sea level or below, and some column under it must be flooded
+        var needsWater = WorldGenerationConfig.WaterEnabled
+                         && lowerBoundY <= WorldGenerationConfig.SeaLevel
+                         && column.MinHeight < WorldGenerationConfig.SeaLevel;
+        if (lowerBoundY > maxHeight + 1 && !needsWater)
         {
             IsBlockDataReady = true;
             return;
@@ -348,6 +373,11 @@ public class Chunk : IDisposable
         if (WorldGenerationConfig.WormCavesEnabled)
             WormCarver.Carve(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
+        // After the carvers (so caves under the sea floor flood) and before the trees and
+        // pebbles, which skip submerged columns rather than growing underwater
+        if (WorldGenerationConfig.WaterEnabled)
+            FillWater(column, lowerBoundY);
+
         if (WorldGenerationConfig.TreesEnabled)
             TreeGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
 
@@ -361,6 +391,31 @@ public class Chunk : IDisposable
         _solidCount = solid;
 
         IsBlockDataReady = true;
+    }
+
+    /// <summary>
+    /// Floods every air cell up to and including sea level in columns whose terrain sits below
+    /// it, so oceans, flooded ravines and sea-floor caves all fill. Generated water is always a
+    /// source (state 0), which is what an untouched state byte reads as, so nothing is written
+    /// to <c>_state</c> here. A pure per-column function of world position like the rest of
+    /// worldgen: neighbours agree at their borders with no shared state.
+    /// </summary>
+    private void FillWater(ColumnData column, int lowerBoundY)
+    {
+        var top = Math.Min(WorldGenerationConfig.SeaLevel - lowerBoundY, Size - 1);
+        if (top < 0) return;
+
+        for (var x = 0; x < Size; x++)
+        for (var z = 0; z < Size; z++)
+        {
+            if (column.Heights[(x << SizeShift) | z] >= WorldGenerationConfig.SeaLevel) continue;
+
+            for (var y = 0; y <= top; y++)
+            {
+                var i = Idx(x, y, z);
+                if (_blocks[i] == BlockType.Air) _blocks[i] = BlockType.Water;
+            }
+        }
     }
 
     /// <summary>
@@ -392,16 +447,19 @@ public class Chunk : IDisposable
 
     // Solid from the chunk floor up to the terrain height: grass on top, dirt for dirtDepth
     // blocks under it, stone below that. dirtDepth == 0 marks a bare stone column
-    // (see ColumnData.DirtDepth) - deep ravine walls, where the top block is stone as well
+    // (see ColumnData.DirtDepth) - deep ravine walls, where the top block is stone as well.
+    // A submerged column tops out in dirt instead: grass does not grow on a sea floor.
     private void GenerateColumn(int x, int z, int terrainHeight, int dirtDepth, int lowerBoundY)
     {
+        var topBlock = TerrainGenerator.IsSubmerged(terrainHeight) ? BlockType.Dirt : BlockType.Grass;
+
         for (var y = 0; y < Size; y++)
         {
             var depth = terrainHeight - (lowerBoundY + y);
             if (depth < 0) break;
 
             _blocks[Idx(x, y, z)] = dirtDepth == 0 ? BlockType.Stone
-                : depth == 0 ? BlockType.Grass
+                : depth == 0 ? topBlock
                 : depth <= dirtDepth ? BlockType.Dirt
                 : BlockType.Stone;
         }
@@ -416,6 +474,49 @@ public class Chunk : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public byte GetLocalBlock(int x, int y, int z) => _blocks[Idx(x, y, z)];
 
+    /// <summary>
+    /// Reads a cell's state byte using chunk-local coordinates; 0 when no state array exists
+    /// yet. Coordinates must be in [0, Size). See <see cref="FluidState"/> for the encoding.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public byte GetLocalState(int x, int y, int z) => _state?[Idx(x, y, z)] ?? 0;
+
+    /// <summary>
+    /// Writes a block and its state with no remeshing, no player-placed bookkeeping and no
+    /// scheduling, returning the previous id. The fluid simulation edits hundreds of cells per
+    /// tick and batches the remeshes itself (<see cref="ChunkManager.MarkDirty"/>), so the
+    /// per-edit work of <see cref="PlaceBlockAt"/> would hitch. Main thread only, like every
+    /// other block edit. Allocates the state array on the first non-zero state.
+    /// </summary>
+    public byte SetBlockRaw(int x, int y, int z, byte id, byte state)
+    {
+        var i = Idx(x, y, z);
+        var previous = _blocks[i];
+
+        // _solidCount tracks non-air cells, so only an air <-> non-air transition moves it
+        if (previous == 0 && id != 0) _solidCount++;
+        else if (previous != 0 && id == 0) _solidCount--;
+
+        _blocks[i] = id;
+
+        if (state != 0)
+        {
+            var states = _state;
+            if (states == null)
+            {
+                states = new byte[BlockCount];
+                _state = states;
+            }
+            states[i] = state;
+        }
+        else if (_state != null)
+        {
+            _state[i] = 0;
+        }
+
+        return previous;
+    }
+
     /// <summary>Clears a block. Returns false if the cell is outside this chunk or already air.</summary>
     public bool RemoveBlockAt(Vector3 worldPos, ChunkManager chunkManager)
     {
@@ -427,6 +528,7 @@ public class Chunk : IDisposable
         if (_blocks[Idx(localX, localY, localZ)] == 0) return false;
         _blocks[Idx(localX, localY, localZ)] = 0;
         _solidCount--;
+        ClearState(Idx(localX, localY, localZ));
 
         chunkManager.UnmarkPlayerPlaced((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
         chunkManager.ImmediateRemesh(Position);
@@ -445,10 +547,14 @@ public class Chunk : IDisposable
         var localZ = (int)(worldPos.Z - Position.Z * Size);
 
         if (!InBounds(localX, localY, localZ)) return false;
-        if (_blocks[Idx(localX, localY, localZ)] != 0) return false;
+        // Water is displaced by a placement instead of blocking it; anything else occupies
+        // the cell and the placement fails, so the caller keeps its item
+        var existing = _blocks[Idx(localX, localY, localZ)];
+        if (existing != 0 && !BlockType.IsFluid(existing)) return false;
 
         _blocks[Idx(localX, localY, localZ)] = blockId;
-        _solidCount++;
+        if (existing == 0) _solidCount++;
+        ClearState(Idx(localX, localY, localZ));
 
         chunkManager.MarkPlayerPlaced((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
         chunkManager.ImmediateRemesh(Position);
@@ -473,7 +579,15 @@ public class Chunk : IDisposable
         if (removed == 0) return 0;
         _blocks[Idx(localX, localY, localZ)] = 0;
         _solidCount--;
+        ClearState(Idx(localX, localY, localZ));
         return removed;
+    }
+
+    /// <summary>Zeroes one cell's state byte. Every write that is not a fluid write goes
+    /// through here, so a stale level can never outlive the water that owned it.</summary>
+    private void ClearState(int index)
+    {
+        if (_state != null) _state[index] = 0;
     }
 
     /// <summary>
@@ -507,9 +621,10 @@ public class Chunk : IDisposable
     public ChunkMeshData GenerateMeshData(ChunkManager chunkManager)
     {
         if (_solidCount == 0)
-            return new ChunkMeshData([], []);
+            return new ChunkMeshData([], [], [], []);
 
         var padded = ArrayPool<byte>.Shared.Rent(PaddedCount);
+        var paddedState = ArrayPool<byte>.Shared.Rent(PaddedCount);
         // Rented arrays arrive dirty: the light snapshot is fully overwritten by the fill,
         // but the outputs must start at zero. Oversized rents are fine — everything below
         // only touches the first LightCount entries.
@@ -519,16 +634,17 @@ public class Chunk : IDisposable
         var queue = ArrayPool<int>.Shared.Rent(LightCount);
         try
         {
-            FillPaddedSnapshot(padded, chunkManager);
+            FillPaddedSnapshot(padded, paddedState, chunkManager);
             FillLightSnapshot(lightBlocks, chunkManager);
             Array.Clear(sunLight, 0, LightCount);
             Array.Clear(blockLight, 0, LightCount);
             ComputeLight(lightBlocks, sunLight, blockLight, queue);
-            return GenerateMeshDataFromSnapshot(padded, sunLight, blockLight);
+            return GenerateMeshDataFromSnapshot(padded, paddedState, sunLight, blockLight);
         }
         finally
         {
             ArrayPool<byte>.Shared.Return(padded);
+            ArrayPool<byte>.Shared.Return(paddedState);
             ArrayPool<byte>.Shared.Return(lightBlocks);
             ArrayPool<byte>.Shared.Return(sunLight);
             ArrayPool<byte>.Shared.Return(blockLight);
@@ -538,11 +654,16 @@ public class Chunk : IDisposable
 
     /// <summary>
     /// Copies this chunk plus a 1-block border from the 26 surrounding chunks into a flat
-    /// snapshot, so meshing does zero dictionary lookups. Missing neighbors read as air.
+    /// snapshot, so meshing does zero dictionary lookups. <paramref name="paddedState"/> is
+    /// filled the same way with the per-block state bytes the fluid emitter needs (0 where the
+    /// neighbour chunk is missing or has no state array yet). Missing neighbors read as air.
     /// </summary>
-    private void FillPaddedSnapshot(byte[] padded, ChunkManager chunkManager)
+    private void FillPaddedSnapshot(byte[] padded, byte[] paddedState, ChunkManager chunkManager)
     {
         var neighbors = new Chunk?[27];
+        // Each neighbour's state array is read once into a local: the field is volatile and may
+        // be allocated by a main-thread fluid edit while this snapshot is being filled
+        byte[]?[] neighborStates = new byte[27][];
         for (var cx = 0; cx < 3; cx++)
         for (var cy = 0; cy < 3; cy++)
         for (var cz = 0; cz < 3; cz++)
@@ -551,12 +672,16 @@ public class Chunk : IDisposable
             if (ni == 13)
             {
                 neighbors[ni] = this;
+                neighborStates[ni] = _state;
                 continue;
             }
 
             var pos = Position + new Vector3(cx - 1, cy - 1, cz - 1);
             if (chunkManager.Chunks.TryGetValue(pos, out var neighbor))
+            {
                 neighbors[ni] = neighbor;
+                neighborStates[ni] = neighbor._state;
+            }
         }
 
         for (var px = 0; px < Padded; px++)
@@ -574,8 +699,11 @@ public class Chunk : IDisposable
                 for (var pz = 0; pz < Padded; pz++)
                 {
                     var cz = pz == 0 ? 0 : pz == Padded - 1 ? 2 : 1;
-                    var neighbor = neighbors[neighborRow + cz];
-                    padded[rowBase + pz] = neighbor?._blocks[Idx(lx, ly, (pz - 1) & SizeMask)] ?? 0;
+                    var ni = neighborRow + cz;
+                    var neighbor = neighbors[ni];
+                    var blockIndex = Idx(lx, ly, (pz - 1) & SizeMask);
+                    padded[rowBase + pz] = neighbor?._blocks[blockIndex] ?? 0;
+                    paddedState[rowBase + pz] = neighborStates[ni]?[blockIndex] ?? 0;
                 }
             }
         }
@@ -586,11 +714,18 @@ public class Chunk : IDisposable
     /// <see cref="BlockType.Renderer"/>: the two procedural ones (tapered wood, pebbles) build
     /// their geometry from tiles, everything else replays its baked model's quads.
     /// </summary>
-    private ChunkMeshData GenerateMeshDataFromSnapshot(byte[] padded, byte[] sunLight, byte[] blockLight)
+    private ChunkMeshData GenerateMeshDataFromSnapshot(byte[] padded, byte[] paddedState,
+        byte[] sunLight, byte[] blockLight)
     {
         var vertices = new List<Vertex>(4096);
         var indices = new List<ushort>(6144);
         ushort indexOffset = 0;
+
+        // Fluids build a second, blended mesh drawn after the opaque world, so whatever sits
+        // behind the water shows through it. Most chunks hold none, hence the tiny capacity.
+        var tVertices = new List<Vertex>();
+        var tIndices = new List<ushort>();
+        ushort tIndexOffset = 0;
 
         for (var x = 0; x < Size; x++)
         for (var y = 0; y < Size; y++)
@@ -619,6 +754,15 @@ public class Chunk : IDisposable
             {
                 EmitPebbles(vertices, indices, ref indexOffset, padded, pIdx, sunLight, blockLight,
                     x, y, z, type, basePos);
+                continue;
+            }
+
+            // A fluid's sloped surface is read out of paddedState and goes into the
+            // translucent lists; see EmitFluid
+            if (type.Renderer == BlockRenderer.Fluid)
+            {
+                EmitFluid(tVertices, tIndices, ref tIndexOffset, padded, paddedState, pIdx,
+                    sunLight, blockLight, x, y, z, type, basePos);
                 continue;
             }
 
@@ -716,7 +860,141 @@ public class Chunk : IDisposable
             }
         }
 
-        return new ChunkMeshData(vertices, indices);
+        return new ChunkMeshData(vertices, indices, tVertices, tIndices);
+    }
+
+    /// <summary>
+    /// Emits one fluid cell's surface into the translucent lists. The top face is a quad whose
+    /// four corners sit at <see cref="CornerHeight"/>, so a flow slopes away from its source
+    /// and - the average being symmetric between neighbours - adjacent tops meet exactly with
+    /// no crack. No face is ever emitted between two fluid cells, so a body of water reads as
+    /// a single skin instead of a stack of blended cubes.
+    /// </summary>
+    private void EmitFluid(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+        int x, int y, int z, BlockType type, Vector3 basePos)
+    {
+        // Water passes light and casts no AO, so its own cell carries the light for every
+        // face and there is no per-corner shading to compute
+        var lightBase = LightIdx(x, y, z);
+        var sun = sunLight[lightBase] / 15f;
+        var block = blockLight[lightBase] / 15f;
+
+        // Corner heights indexed by the corner's own (X, Z) inside the cell: cornerX * 2 + cornerZ
+        Span<float> corners = stackalloc float[4];
+        var minCorner = float.MaxValue;
+        for (var cx = 0; cx < 2; cx++)
+        for (var cz = 0; cz < 2; cz++)
+        {
+            var h = CornerHeight(padded, paddedState, pIdx,
+                cx == 0 ? -PaddedSq : PaddedSq, cz == 0 ? -1 : 1);
+            corners[cx * 2 + cz] = h;
+            if (h < minCorner) minCorner = h;
+        }
+
+        // A fluid's model only supplies its tile (see the block schema), so every face uses it
+        var tile = type.Top;
+
+        for (var face = 0; face < 6; face++)
+        {
+            var neighbour = padded[pIdx + FaceNeighborDelta[face]];
+
+            // Two fluid cells share no face: their sloped tops already meet at the corners
+            if (BlockType.IsFluid(neighbour)) continue;
+            if (face != 4 && BlockType.Occludes(neighbour)) continue;
+            // A full column pressed against a ceiling has a coplanar top face - drop it
+            // instead of z-fighting the block above
+            if (face == 4 && BlockType.Occludes(neighbour) && minCorner >= 0.999f) continue;
+
+            // Meshes are indexed with ushort (mirrors LodRegion.AddQuad): stop emitting
+            // instead of wrapping the offset if a chunk somehow runs past the limit
+            if (vertices.Count > ushort.MaxValue - 3) return;
+
+            var faceCorners = CubeFaces[face].face;
+            var a = LowerCorner(faceCorners[0], corners);
+            var b = LowerCorner(faceCorners[1], corners);
+            var c = LowerCorner(faceCorners[2], corners);
+            var d = LowerCorner(faceCorners[3], corners);
+
+            // A sloped top needs the normal of the quad it actually became, or the sun
+            // diffuse ignores the slope; the other five faces stay axis-aligned
+            var normal = face == 4
+                ? Vector3.Normalize(Vector3.Cross(c - a, d - b))
+                : CubeFaces[face].normal;
+
+            EmitQuad(vertices, indices, ref indexOffset, basePos, a, b, c, d, normal,
+                CropUv(tile, face, a), CropUv(tile, face, b), CropUv(tile, face, c), CropUv(tile, face, d),
+                ShadeLut[(face << 2) | 3], sun, block);
+        }
+    }
+
+    /// <summary>Drops a cube corner's top vertex to the fluid surface, so side faces crop to
+    /// the real height and the top face slopes. Bottom corners pass through unchanged.</summary>
+    private static Vector3 LowerCorner(Vector3 corner, Span<float> cornerHeights) =>
+        corner.Y == 0f
+            ? corner
+            : new Vector3(corner.X, cornerHeights[(int)corner.X * 2 + (int)corner.Z], corner.Z);
+
+    /// <summary>Surface height inside one fluid cell of the padded snapshot, 0..1. Fluid
+    /// directly above fills the cell completely, so stacked water shows no seam.</summary>
+    private static float FluidHeight(byte[] padded, byte[] paddedState, int p) =>
+        BlockType.IsFluid(padded[p + FaceNeighborDelta[4]])
+            ? 1f
+            : FluidState.SurfaceHeight(paddedState[p]);
+
+    /// <summary>
+    /// Height of the fluid surface at one corner of a cell, averaged over the cells that meet
+    /// there (<paramref name="dx"/> and <paramref name="dz"/> are the padded index deltas
+    /// toward the corner). Nearly full cells outweigh thin ones ten to one, so a source next
+    /// to a skirt keeps its own level; air and cutouts pull the corner down toward 0; an
+    /// occluding solid is skipped, because a wall must not lower the water beside it. The
+    /// diagonal cell counts only when at least one of the two orthogonal neighbours is fluid
+    /// (Minecraft's rule), so two bodies of water touching across a corner with solids in both
+    /// orthogonal cells stay separate instead of visually joining. The cell itself is fluid, so
+    /// the weight is never zero.
+    /// </summary>
+    private static float CornerHeight(byte[] padded, byte[] paddedState, int p, int dx, int dz)
+    {
+        var total = 0f;
+        var weight = 0f;
+        // The diagonal is only reachable through a fluid orthogonal neighbour; with neither of
+        // them fluid it is ignored outright - no height, no full-column pin, no weight
+        var orthogonalFluid = false;
+
+        for (var i = 0; i < 4; i++)
+        {
+            // i: 0 = own cell, 1 = the dx neighbour, 2 = the dz neighbour, 3 = the diagonal
+            if (i == 3 && !orthogonalFluid) break;
+
+            var q = p + ((i & 1) != 0 ? dx : 0) + ((i & 2) != 0 ? dz : 0);
+            var id = padded[q];
+
+            if (BlockType.IsFluid(id))
+            {
+                if (i is 1 or 2) orthogonalFluid = true;
+
+                // A full column touching this corner pins it to the cell top
+                if (BlockType.IsFluid(padded[q + FaceNeighborDelta[4]])) return 1f;
+
+                var h = FluidHeight(padded, paddedState, q);
+                if (h >= 0.8f)
+                {
+                    total += h * 10f;
+                    weight += 10f;
+                }
+                else
+                {
+                    total += h;
+                    weight += 1f;
+                }
+            }
+            else if (!BlockType.Occludes(id))
+            {
+                weight += 1f;
+            }
+        }
+
+        return total / weight;
     }
 
     /// <summary>Half-width of wood for joint comparisons; logs count as full width.</summary>
@@ -1037,6 +1315,12 @@ public class Chunk : IDisposable
         _mesh = meshData.Vertices.Count == 0
             ? null
             : new Mesh(_gl, CollectionsMarshal.AsSpan(meshData.Vertices), CollectionsMarshal.AsSpan(meshData.Indices));
+
+        _translucentMesh?.Dispose();
+        _translucentMesh = meshData.TranslucentVertices.Count == 0
+            ? null
+            : new Mesh(_gl, CollectionsMarshal.AsSpan(meshData.TranslucentVertices),
+                CollectionsMarshal.AsSpan(meshData.TranslucentIndices));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1051,10 +1335,18 @@ public class Chunk : IDisposable
         _mesh?.Render();
     }
 
+    /// <summary>Draws only this chunk's fluid surfaces; called from the blended pass.</summary>
+    public void RenderTranslucent()
+    {
+        _translucentMesh?.Render();
+    }
+
     public void Dispose()
     {
         _mesh?.Dispose();
         _mesh = null;
+        _translucentMesh?.Dispose();
+        _translucentMesh = null;
         GC.SuppressFinalize(this);
     }
 
@@ -1109,4 +1401,10 @@ public class Chunk : IDisposable
     ];
 }
 
-public record ChunkMeshData(List<Vertex> Vertices, List<ushort> Indices);
+/// <summary>
+/// CPU-side mesh of one chunk, produced off the main thread. The opaque lists become the
+/// chunk's normal mesh; the translucent ones its fluid mesh, drawn blended after everything
+/// opaque so the sea floor shows through the water.
+/// </summary>
+public record ChunkMeshData(List<Vertex> Vertices, List<ushort> Indices,
+    List<Vertex> TranslucentVertices, List<ushort> TranslucentIndices);

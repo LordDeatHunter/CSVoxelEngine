@@ -57,6 +57,8 @@ public static class PebbleGenerator
         for (var z = 0; z < Chunk.Size; z++)
         {
             var height = column.Heights[(x << Chunk.SizeShift) | z];
+            // Submerged columns stay bare: the cell above a sea floor is water, not air
+            if (TerrainGenerator.IsSubmerged(height)) continue;
             var ly = height + 1 - worldY0;
             if ((uint)ly >= Chunk.Size) continue;
             if (!TryGetPebble(worldX0 + x, worldZ0 + z, out _)) continue;

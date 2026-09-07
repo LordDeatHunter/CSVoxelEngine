@@ -1,0 +1,5 @@
+{
+  "name": "Bucket",
+  "texture": "assets/textures/items/bucket.png",
+  "use": { "action": "pickup_fluid", "fluid": "block/water", "result": "item/water_bucket" }
+}

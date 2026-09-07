@@ -25,10 +25,14 @@ public sealed class BlockDefinition
     public bool? HasItem { get; set; }
     public bool? NeedsSupport { get; set; }
 
+    /// <summary>Marks the block as a fluid: flows, is replaceable, never collides or drops.
+    /// The registry forces the flags that follow from it rather than trusting the file.</summary>
+    public bool? Fluid { get; set; }
+
     public LightDefinition? Light { get; set; }
     public WoodDefinition? Wood { get; set; }
 
-    /// <summary>"model" | "tapered_wood" | "pebbles".</summary>
+    /// <summary>"model" | "tapered_wood" | "pebbles" | "fluid".</summary>
     public string? Renderer { get; set; }
 
     /// <summary>"drop" | "prime_tnt".</summary>

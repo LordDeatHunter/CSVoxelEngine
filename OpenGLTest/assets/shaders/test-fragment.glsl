@@ -62,5 +62,7 @@ void main() {
     float dist = distance(fWorldPos, uCameraPos);
     float f = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
     col = mix(col, uFogColor, f * f);
-    FragColor = vec4(mix(col, vec3(1.0), uFlash), uAlpha);
+    // Tile alpha carries the fluid's translucency; uAlpha is the chunk fade-in. The
+    // discard above still removes the leaf tiles' fully transparent holes.
+    FragColor = vec4(mix(col, vec3(1.0), uFlash), texColor.a * uAlpha);
 }

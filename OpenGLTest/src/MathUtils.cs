@@ -16,6 +16,14 @@ public static class MathUtils
     /// <summary>Linear interpolation with t clamped to 0..1.</summary>
     public static float Lerp(float a, float b, float t) => a + (b - a) * Clamp01(t);
 
+    /// <summary>
+    /// Frame-rate independent easing toward a target: the remaining distance decays
+    /// exponentially at <paramref name="rate"/> per second, so the result of two half-steps
+    /// equals one full step and a frame hitch never overshoots.
+    /// </summary>
+    public static float Damp(float current, float target, float rate, float deltaTime) =>
+        target + (current - target) * MathF.Exp(-rate * MathF.Max(0f, deltaTime));
+
     /// <summary>Linear interpolation without clamping, for deliberate overshoot.</summary>
     public static float LerpUnclamped(float a, float b, float t) => a + (b - a) * t;
 

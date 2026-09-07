@@ -32,6 +32,7 @@ public sealed record BlockType
     public static byte Log { get; internal set; }
     public static byte Leaves { get; internal set; }
     public static byte Pebble { get; internal set; }
+    public static byte Water { get; internal set; }
 
     /// <summary>Every registered block by id; null where no block owns that id.</summary>
     public static readonly BlockType?[] ById = new BlockType?[256];
@@ -54,6 +55,11 @@ public sealed record BlockType
     internal static readonly bool[] SolidById = new bool[256];
     internal static readonly bool[] OccludesById = new bool[256];
     internal static readonly bool[] CastsAoById = new bool[256];
+
+    // The fluid simulation asks these of every neighbour cell it looks at, so they get the
+    // same flat-array treatment as the mesher's flags
+    internal static readonly bool[] FluidById = new bool[256];
+    internal static readonly bool[] ReplaceableById = new bool[256];
 
     /// <summary>String id: the block's file name under <c>assets/data/blocks</c>.</summary>
     public required string Name { get; init; }
@@ -105,6 +111,12 @@ public sealed record BlockType
     /// <summary>Whether the block pops (with its loot) when the block below is removed.</summary>
     public bool NeedsSupport { get; init; }
 
+    /// <summary>Whether the block is a flowing fluid. Fluid cells carry a level in the chunk's
+    /// state byte (see <see cref="FluidState"/>), are replaceable by placements and flows, and
+    /// never collide, cast AO, drop loot or take an inventory slot. Named like
+    /// <see cref="Solid"/> rather than "IsFluid", which the per-id predicate below owns.</summary>
+    public bool Fluid { get; init; }
+
     /// <summary>What happens when the block is destroyed.</summary>
     public BlockBreakAction OnBreak { get; init; } = BlockBreakAction.Drop;
 
@@ -141,6 +153,18 @@ public sealed record BlockType
     /// as solid here (unlike <see cref="Occludes"/>).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool CastsAO(byte blockId) => CastsAoById[blockId];
+
+    /// <summary>Whether a block id is a flowing fluid; see <see cref="IsFluid"/>.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsFluid(byte blockId) => FluidById[blockId];
+
+    /// <summary>Whether a fluid or a placement may overwrite the cell without destroying
+    /// anything worth keeping: air, plus the fragile <see cref="NeedsSupport"/> blocks, which
+    /// pop (rolling their loot) when water washes over them. Fluids themselves are not
+    /// replaceable here — a flow into an existing fluid cell is a level recompute, not a
+    /// write — but every caller that displaces water tests <see cref="IsFluid(byte)"/> too.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsReplaceable(byte blockId) => ReplaceableById[blockId];
 
     /// <summary>Half-width of a wood block's box in blocks (the log is 0.5), or -1 when the id
     /// is not wood at all.</summary>

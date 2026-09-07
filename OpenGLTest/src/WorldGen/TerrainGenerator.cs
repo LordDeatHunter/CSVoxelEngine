@@ -46,6 +46,14 @@ public static class TerrainGenerator
         RavineWarp.SetDomainWarpAmp(WorldGenerationConfig.RavineWarpAmplitude);
     }
 
+    /// <summary>
+    /// Whether a column's terrain sits below sea level and is therefore flooded. A column
+    /// whose height equals <see cref="WorldGenerationConfig.SeaLevel"/> stays dry: the water
+    /// fills up to and including sea level, so its top block would be the shoreline itself.
+    /// </summary>
+    public static bool IsSubmerged(int height) =>
+        WorldGenerationConfig.WaterEnabled && height < WorldGenerationConfig.SeaLevel;
+
     /// <summary>OpenSimplex2 noise seeded from the world seed; more than one octave turns on FBm.</summary>
     internal static FastNoiseLite MakeNoise(int seedOffset, float frequency, int octaves = 1)
     {

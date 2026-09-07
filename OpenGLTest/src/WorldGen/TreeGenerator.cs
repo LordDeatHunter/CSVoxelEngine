@@ -81,6 +81,10 @@ public static class TreeGenerator
         var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
         var li = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
         var height = column.Heights[li];
+        // Nothing grows on a sea floor; the stamps only write into air anyway, but a submerged
+        // trunk would still poke its crown out of the water
+        if (TerrainGenerator.IsSubmerged(height))
+            return false;
         if (column.DirtDepth[li] < WorldGenerationConfig.TreeMinSoil)
             return false;
         if (height < WorldGenerationConfig.TreeMinGroundHeight || height > WorldGenerationConfig.TreeMaxGroundHeight)

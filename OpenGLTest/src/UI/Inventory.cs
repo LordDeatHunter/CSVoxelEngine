@@ -16,13 +16,18 @@ namespace silkgltriangle;
 /// </summary>
 public class Inventory
 {
-    public const int SlotCount = 11;
+    // Room to spare: every block with an item form plus every pure item needs a slot, and a
+    // truncated list would make the last types unreachable (BuildSlots warns if it happens).
+    public const int SlotCount = 13;
 
     /// <summary>How much TNT the player starts with.</summary>
     public const int StartingTnt = 50;
 
     /// <summary>How many lamps the player starts with (lamps are not generated in terrain).</summary>
     public const int StartingLamps = 64;
+
+    /// <summary>How many (empty) buckets the player starts with; water is only reachable with one.</summary>
+    public const int StartingBuckets = 1;
 
     // A pickup makes the slot's icon jump and settle back, echoing the count change
     // drawn in the slot's corner
@@ -86,6 +91,24 @@ public class Inventory
         return true;
     }
 
+    /// <summary>
+    /// Spends one unit of <paramref name="fromId"/> and credits one of <paramref name="toId"/>,
+    /// then selects the slot that received it — so using a bucket leaves the water bucket in
+    /// hand and scooping and pouring alternate on the same button. Returns false when the source
+    /// slot is empty or either id has no slot.
+    /// </summary>
+    public bool Exchange(byte fromId, byte toId)
+    {
+        var from = IndexOf(fromId);
+        var to = IndexOf(toId);
+        if (from < 0 || to < 0 || _counts[from] <= 0) return false;
+
+        _counts[from]--;
+        Add(toId);
+        SelectedIndex = to;
+        return true;
+    }
+
     /// <summary>Spends one unit from the selected slot. Returns false when it is empty.</summary>
     public bool ConsumeSelected()
     {
@@ -123,26 +146,36 @@ public class Inventory
             .Select(type => type.Id)
             .OrderBy(id => id)
             .Concat(ItemType.Types.Keys.OrderBy(id => id))
-            .Take(SlotCount)
             .ToArray();
 
     private static byte[] BuildSlots()
     {
+        var ids = HotbarIds();
+
+        // The hotbar is the only way to reach a type, so overflowing it is a content bug the
+        // author has to see rather than a silently dropped tail
+        if (ids.Length > SlotCount)
+            Console.WriteLine(
+                $"Hotbar has {SlotCount} slots but {ids.Length} block and item types want one: " +
+                $"the last {ids.Length - SlotCount} are unreachable. Raise Inventory.SlotCount.");
+
         var slots = new byte[SlotCount];
-        HotbarIds().CopyTo(slots, 0);
+        ids.AsSpan(0, Math.Min(ids.Length, SlotCount)).CopyTo(slots);
         return slots;
     }
 
-    // The player spawns holding TNT and lamps; everything else is earned by mining
+    // The player spawns holding TNT, lamps and a bucket; everything else is earned by mining
     private static int[] BuildCounts()
     {
         var counts = new int[SlotCount];
         var ids = HotbarIds();
-        for (var i = 0; i < ids.Length; i++)
+        for (var i = 0; i < ids.Length && i < SlotCount; i++)
             if (ids[i] == BlockType.Tnt)
                 counts[i] = StartingTnt;
             else if (ids[i] == BlockType.Lamp)
                 counts[i] = StartingLamps;
+            else if (ids[i] == ItemType.Bucket)
+                counts[i] = StartingBuckets;
         return counts;
     }
 

@@ -65,7 +65,14 @@ public class LodRegion : IDisposable
 
     private Mesh? _mesh;
 
+    // The sea sheet is a separate mesh so the renderer can draw it blended, after everything
+    // opaque (see RenderManager.RenderWorldTranslucent)
+    private Mesh? _waterMesh;
+
     public bool HasMesh => _mesh != null;
+
+    /// <summary>Whether any cell of this region is below sea level, i.e. it has a water sheet.</summary>
+    public bool HasWaterMesh => _waterMesh != null;
 
     // Destroying blocks exposes the LOD buried beneath the surface. These per-column caps
     // force the LOD height below every removed block so the LOD always stays hidden.
@@ -107,6 +114,10 @@ public class LodRegion : IDisposable
             ? null
             : new Mesh(gl, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.Vertices),
                 System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.Indices));
+        _waterMesh = data.WaterVertices.Count == 0
+            ? null
+            : new Mesh(gl, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.WaterVertices),
+                System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.WaterIndices));
     }
 
     public void Render()
@@ -114,10 +125,18 @@ public class LodRegion : IDisposable
         _mesh?.Render();
     }
 
+    /// <summary>Draws only this region's sea sheet; called from the blended pass.</summary>
+    public void RenderWater()
+    {
+        _waterMesh?.Render();
+    }
+
     public void Dispose()
     {
         _mesh?.Dispose();
         _mesh = null;
+        _waterMesh?.Dispose();
+        _waterMesh = null;
         GC.SuppressFinalize(this);
     }
 
@@ -168,17 +187,26 @@ public class LodRegion : IDisposable
         // column into a leaf-textured bump instead of a plateau.
         var groundTop = new int[heightGrid * heightGrid];
         var topCell = new int[heightGrid * heightGrid];
+        // Which cells the sea covers. Measured as the max over the cell's OWN footprint, with
+        // no erosion margin: the eroded minimum would paint water across every beach whose
+        // neighbourhood dips below sea level.
+        var isSea = new bool[heightGrid * heightGrid];
         for (var i = -1; i <= cells; i++)
         {
             for (var j = -1; j <= cells; j++)
             {
                 var minHeight = int.MaxValue;
+                var maxOwn = int.MinValue;
                 for (var dx = -margin; dx < cellSize + margin; dx++)
                 for (var dz = -margin; dz < cellSize + margin; dz++)
                 {
                     var h = FineHeight(baseFineX + i * cellSize + dx, baseFineZ + j * cellSize + dz);
                     if (h < minHeight) minHeight = h;
+                    if (h > maxOwn && dx >= 0 && dx < cellSize && dz >= 0 && dz < cellSize) maxOwn = h;
                 }
+
+                isSea[(i + 1) * heightGrid + (j + 1)] =
+                    WorldGenerationConfig.WaterEnabled && maxOwn < WorldGenerationConfig.SeaLevel;
 
                 // Cell cy is solid iff cellSize * (cy + 1) <= eroded height
                 var ground = ((minHeight - spec.HeightBias) >> cellShift) - 1;
@@ -230,8 +258,16 @@ public class LodRegion : IDisposable
                 foreach (var h in heightmaps[(ci + 1) * chunkSpan + (cj + 1)])
                     if (h > maxHeight) maxHeight = h;
 
+                // A sea cell hides this shell only once the chunk holding the water surface
+                // is meshed too, or the sheet would vanish before the chunk water appears
+                var hasSea = false;
+                for (var i = ci * cellsPerChunk; i < (ci + 1) * cellsPerChunk && !hasSea; i++)
+                for (var j = cj * cellsPerChunk; j < (cj + 1) * cellsPerChunk && !hasSea; j++)
+                    hasSea = isSea[(i + 1) * heightGrid + (j + 1)];
+
                 var yLo = cellSize * (minTop + 1);
                 var yHi = Math.Max(cellSize * (maxTop + 1), maxHeight + 1);
+                if (hasSea) yHi = Math.Max(yHi, WorldGenerationConfig.SeaLevel + 1);
                 columnCyMin[ci * regionChunkSpan + cj] = yLo >> Chunk.SizeShift;
                 columnCyMax[ci * regionChunkSpan + cj] = (yHi - 1) >> Chunk.SizeShift;
             }
@@ -244,6 +280,8 @@ public class LodRegion : IDisposable
 
         var vertices = new List<Vertex>(8192);
         var indices = new List<ushort>(12288);
+        var waterVertices = new List<Vertex>();
+        var waterIndices = new List<ushort>();
         var yMin = float.MaxValue;
         var yMax = float.MinValue;
 
@@ -251,11 +289,12 @@ public class LodRegion : IDisposable
         Span<int> sideFaces = [0, 1, 2, 3];
         const int topFace = 4;
 
-        void AddQuad(int faceIndex, Vector3 cellOrigin, BlockType.Point tile, Span<byte> shades)
+        void AddQuad(List<Vertex> targetVertices, List<ushort> targetIndices,
+            int faceIndex, Vector3 cellOrigin, BlockType.Point tile, Span<byte> shades)
         {
             // Meshes are indexed with ushort; a region can't realistically exceed this,
             // but degrade gracefully instead of overflowing if terrain is extreme
-            if (vertices.Count > ushort.MaxValue - 3)
+            if (targetVertices.Count > ushort.MaxValue - 3)
                 return;
 
             var tileUv = TextureAtlas.TileUVSize;
@@ -271,24 +310,39 @@ public class LodRegion : IDisposable
 
             var face = Chunk.CubeFaces[faceIndex].face;
             var normal = Chunk.CubeFaces[faceIndex].normal;
-            var indexOffset = (ushort)vertices.Count;
+            var indexOffset = (ushort)targetVertices.Count;
             for (var c = 0; c < 4; c++)
             {
                 var pos = cellOrigin + face[c] * cellSize;
+                // The region AABB is what the frustum and the burial test use, so the sea
+                // sheet has to widen it too
                 if (pos.Y < yMin) yMin = pos.Y;
                 if (pos.Y > yMax) yMax = pos.Y;
                 var shade = shades[c];
                 // Far shells sit in open sky: full sun, no lamp light, real face normal
-                vertices.Add(new Vertex(pos, shade, shade, shade, 255, uv[c], 1f, 0f, normal));
+                targetVertices.Add(new Vertex(pos, shade, shade, shade, 255, uv[c], 1f, 0f, normal));
             }
 
-            indices.Add((ushort)(indexOffset + 0));
-            indices.Add((ushort)(indexOffset + 1));
-            indices.Add((ushort)(indexOffset + 2));
-            indices.Add((ushort)(indexOffset + 0));
-            indices.Add((ushort)(indexOffset + 2));
-            indices.Add((ushort)(indexOffset + 3));
+            targetIndices.Add((ushort)(indexOffset + 0));
+            targetIndices.Add((ushort)(indexOffset + 1));
+            targetIndices.Add((ushort)(indexOffset + 2));
+            targetIndices.Add((ushort)(indexOffset + 0));
+            targetIndices.Add((ushort)(indexOffset + 2));
+            targetIndices.Add((ushort)(indexOffset + 3));
         }
+
+        // The sea reads as one flat sheet at range, so it is a single +Y quad per sea cell at
+        // the chunk water surface minus this level's height bias (the terrain shells are
+        // lowered the same way) and a further LodWaterSink, which keeps level 0 just under the
+        // real chunk water it meets at the full-detail ring instead of z-fighting it.
+        var water = BlockType.ById[BlockType.Water]!;
+        var waterTile = water.FaceTiles[topFace];
+        var sheetY = WorldGenerationConfig.SeaLevel + FluidState.SourceHeight
+                     - spec.HeightBias - WorldGenerationConfig.LodWaterSink;
+        Span<byte> waterShades = [
+            Chunk.ShadeLut[(topFace << 2) | 3], Chunk.ShadeLut[(topFace << 2) | 3],
+            Chunk.ShadeLut[(topFace << 2) | 3], Chunk.ShadeLut[(topFace << 2) | 3]
+        ];
 
         // Per-vertex ambient occlusion derived from the column-top grid (same formula and
         // shade table as chunk meshing): a neighboring column rising above a face corner
@@ -315,8 +369,16 @@ public class LodRegion : IDisposable
                     shades[c] = Chunk.ShadeLut[(topFace << 2) | Chunk.VertexAO(side1, side2, diagonal)];
                 }
 
-                AddQuad(topFace, new Vector3(i * cellSize, top * cellSize, j * cellSize),
-                    top > ground ? leaves.FaceTiles[topFace] : grass.FaceTiles[topFace], shades);
+                AddQuad(vertices, indices, topFace, new Vector3(i * cellSize, top * cellSize, j * cellSize),
+                    top > ground ? leaves.FaceTiles[topFace]
+                    : isSea[gi * heightGrid + gj] ? dirt.FaceTiles[topFace]   // sea floors are dirt, like the chunks
+                    : grass.FaceTiles[topFace], shades);
+
+                // AddQuad places a +Y face one cell above its origin, so the origin sits a
+                // cell below the sheet
+                if (isSea[gi * heightGrid + gj])
+                    AddQuad(waterVertices, waterIndices, topFace,
+                        new Vector3(i * cellSize, sheetY - cellSize, j * cellSize), waterTile, waterShades);
 
                 foreach (var f in sideFaces)
                 {
@@ -347,18 +409,20 @@ public class LodRegion : IDisposable
                         // Canopy airspace wears leaves; at and below the eroded surface the
                         // grass/dirt/stone rule applies, measured from the ground (not the bump)
                         var tile = cy > ground ? leaves.FaceTiles[f]
-                            : cy == top ? grass.FaceTiles[f]
+                            : cy == top ? (isSea[gi * heightGrid + gj] ? dirt : grass).FaceTiles[f]
                             : (ground - cy) * cellSize <= WorldGenerationConfig.NominalDirtDepth ? dirt.FaceTiles[f]
                             : stone.FaceTiles[f];
-                        AddQuad(f, new Vector3(i * cellSize, cy * cellSize, j * cellSize), tile, shades);
+                        AddQuad(vertices, indices, f, new Vector3(i * cellSize, cy * cellSize, j * cellSize), tile, shades);
                     }
                 }
             }
         }
 
-        return new LodMeshData(level, rx, rz, vertices, indices, yMin, yMax, columnCyMin, columnCyMax);
+        return new LodMeshData(level, rx, rz, vertices, indices, waterVertices, waterIndices,
+            yMin, yMax, columnCyMin, columnCyMax);
     }
 }
 
-public record LodMeshData(int Level, int X, int Z, List<Vertex> Vertices, List<ushort> Indices, float YMin, float YMax,
+public record LodMeshData(int Level, int X, int Z, List<Vertex> Vertices, List<ushort> Indices,
+    List<Vertex> WaterVertices, List<ushort> WaterIndices, float YMin, float YMax,
     int[] ColumnCyMin, int[] ColumnCyMax);

@@ -1,0 +1,12 @@
+{
+  "model": { "parent": "block/cube_all", "textures": { "all": "water_still" } },
+  "fluid": true,
+  "renderer": "fluid",
+  "hardness": 0,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "light": { "passes": true },
+  "hasItem": false,
+  "loot": "none"
+}

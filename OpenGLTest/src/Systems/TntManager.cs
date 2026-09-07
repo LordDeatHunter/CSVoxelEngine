@@ -26,7 +26,8 @@ public class TntManager
         _primed.Add(new PrimedTnt(blockPosition + new Vector3(0.5f)));
     }
 
-    public void Update(float deltaTime, ChunkManager chunks, LodManager lod, DropManager drops)
+    public void Update(float deltaTime, ChunkManager chunks, LodManager lod, DropManager drops,
+        FluidManager fluids)
     {
         foreach (var tnt in _primed)
             tnt.Update(deltaTime, chunks);
@@ -37,7 +38,7 @@ public class TntManager
             if (!_primed[i].IsDue) continue;
             var at = _primed[i].Position;
             _primed.RemoveAt(i);
-            Detonate(at, chunks, lod, drops);
+            Detonate(at, chunks, lod, drops, fluids);
         }
 
         foreach (var spawn in _pendingSpawns)
@@ -48,9 +49,12 @@ public class TntManager
     /// <summary>
     /// Clears a sphere of blocks around <paramref name="center"/> (TNT blocks are primed instead
     /// of destroyed, so blasts chain; everything else drops like a mined block), remeshing each
-    /// touched chunk once, then lowers the buried LOD under every blasted column.
+    /// touched chunk once, then lowers the buried LOD under every blasted column. Fluid cells
+    /// are left standing — clearing them would only be undone by the hundreds of sources around
+    /// the crater — and the water around the blast is scheduled so it floods the hole instead.
     /// </summary>
-    private void Detonate(Vector3 center, ChunkManager chunks, LodManager lod, DropManager drops)
+    private void Detonate(Vector3 center, ChunkManager chunks, LodManager lod, DropManager drops,
+        FluidManager fluids)
     {
         var radius = BlastRadius;
         var radiusSq = radius * radius;
@@ -67,7 +71,12 @@ public class TntManager
         {
             var cellCenter = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
             if (Vector3.DistanceSquared(cellCenter, center) > radiusSq) continue;
-            if (chunks.GetBlockGlobal(x, y, z) == 0) continue;
+            var existing = chunks.GetBlockGlobal(x, y, z);
+            if (existing == 0) continue;
+
+            // A blast cannot clear water: it would refill within a tick or two anyway, and a
+            // dry crater under the sea would flood from every side at once
+            if (BlockType.IsFluid(existing)) continue;
 
             var chunkPos = new Vector3(
                 MathF.Floor(x / (float)Chunk.Size),
@@ -146,5 +155,8 @@ public class TntManager
             if (LodRegion.LowerColumnBelow(x, lowestY, z))
                 lod.MarkEditedColumn(x, z);
         }
+
+        // One box for the whole blast, grown by a block so the water just outside it notices
+        fluids.ScheduleBox(min - Vector3.One, max + Vector3.One);
     }
 }

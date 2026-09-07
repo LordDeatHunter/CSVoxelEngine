@@ -20,7 +20,9 @@ dotnet run --project OpenGLTest/silkgltriangle.csproj
 
 Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning.
 
-The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, double-tap Space to toggle flight (Space/Left Ctrl for up/down while flying), `C` to toggle noclip, Left Shift for 10x speed, hold left-click to mine a block (hit-based: one hit per `World.BlockHitSeconds` = 200 ms removes 1 HP of the block's `hardness`, declared in its JSON - 5 for most blocks, so ~1s, 8 for logs, 2 for leaves, and `0` means it pops on first contact like a pebble; damage resets if you release or switch target; instant while noclip; stepped progress overlay via `break-*.glsl`; each hit pops the block out and back via `RenderManager.RenderBlockPop`), right-click to place stone, `X` to toggle debug logging (FPS/position to console), Escape to quit.
+The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, double-tap Space to toggle flight (Space/Left Ctrl for up/down while flying), `C` to toggle noclip, Left Shift for 10x speed, hold left-click to mine a block (hit-based: one hit per `World.BlockHitSeconds` = 200 ms removes 1 HP of the block's `hardness`, declared in its JSON - 5 for most blocks, so ~1s, 8 for logs, 2 for leaves, and `0` means it pops on first contact like a pebble; damage resets if you release or switch target; instant while noclip; stepped progress overlay via `break-*.glsl`; each hit pops the block out and back via `RenderManager.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), `X` to toggle debug logging (FPS/position/water state to console), Escape to quit.
+
+Standing in water switches the player to **swimming** (`Camera.IsInWater`, recomputed every frame by `Camera.UpdateWaterState` from the real fluid surface heights under the body): horizontal speed halves, gravity is replaced by an eased sink toward `SinkSpeed` (Space eases up toward `SwimUpSpeed` instead, both through `MathUtils.Damp`), and swimming into a bank while holding Space adds `SwimExitBoost` so the player can climb out without a ramp. Flight and noclip ignore water entirely, and a player standing on the bottom of a shallow puddle still jumps normally. Flowing water also pushes the player and floating item drops along its flow direction (`ChunkManager.GetFluidFlowGlobal`, Minecraft's `FlowingFluid.getFlow`: a horizontal vector summed from how much lower each neighbouring cell's surface sits, zero in a still pool). `Camera.IsEyeInWater` is the separate eye-only test and is the source of truth for the underwater tint.
 
 Shaders (`assets/shaders/**/*.glsl`), textures (`assets/textures/**/*.png`), fonts (`assets/fonts/**/*.ttf`) and all content JSON (`assets/**/*.json` — blocks, items, loot tables, models) are copied to the output directory via `CopyToOutputDirectory` rules in the csproj — **new asset types/extensions need a matching `<None Update>` entry** or they won't be found at runtime. The JSON rule is a wildcard over the whole `assets` tree, so adding a block, item, loot table or model needs no csproj edit.
 
@@ -37,6 +39,7 @@ OpenGLTest/
     ChunkGenerationWorker.cs   # background threads creating chunks around the camera
     Camera.cs                  # FPS camera, physics (gravity/jump/collision), DDA raycast
     LodRegion.cs               # far-terrain LOD: region columns meshed at reduced resolution from heightmaps; per-column chunk-Y ranges for burial
+    FluidState.cs              # encoding of the per-block state byte for fluid cells (source / falling / level 1-7)
     BlockType.cs               # runtime block record built from JSON, plus the per-id lookup tables
                                #   the mesher and gameplay read (ById, Emission, IsSolid/Occludes/...)
     ItemType.cs                # pure items (vine, branch, flint): ids handed out after the blocks;
@@ -58,6 +61,7 @@ OpenGLTest/
       RenderManager.cs         # GL state, world/selection/UI passes, viewport
       ChunkManager.cs          # chunk lifecycle: load/unload, dirty tracking, mesh scheduling
       LodManager.cs            # LOD region lifecycle: worker thread builds, main thread uploads/unloads, burial flags
+      FluidManager.cs          # the fluid tick: scheduled cells, level recompute + spread, batched remeshes
     WorldGen/
       TerrainGenerator.cs      # the 2D half: owns every 2D noise channel; Compute(chunkX, chunkZ) -> ColumnData
       ColumnData.cs            # per-chunk-column arrays: Heights (ravines included), DirtDepth, EntranceWeight, CaveIntensity
@@ -69,7 +73,7 @@ OpenGLTest/
                                       #   startup), item sprites, crosshair
   assets/fonts/                       # TTF for the UI text
   assets/data/blocks/<name>.json      # one file per block; the file name is its string id
-  assets/data/items/<name>.json       # vine, branch, flint
+  assets/data/items/<name>.json       # vine, branch, flint, bucket, water_bucket
   assets/data/loot/<name>.json        # stone, wood, leaves, pebble
   assets/models/block/<name>.json     # Minecraft Java block models, incl. the built-in parents
                                       #   cube, cube_all, cube_column, cube_bottom_top
@@ -118,11 +122,12 @@ trailing commas.
 | `sway` | false | leaf-wind sway in the vertex shader |
 | `light.emission` | 0 | 0..15 (`LightEmission`) |
 | `light.passes` | `!fullCube` | whether voxel light travels through the cell (`PassesLight`) |
-| `renderer` | `"model"` | `model` (baked quads), `tapered_wood` or `pebbles` (procedural emitters) |
+| `renderer` | `"model"` | `model` (baked quads), `tapered_wood`, `pebbles` or `fluid` (procedural emitters); a fluid's model only supplies its tile |
 | `wood.taperLevel` | none | 0 = full-cube log, 1..5 taper steps; across all blocks 0..5 must be covered exactly once |
 | `wood.halfWidth` | 0.5 | half edge length of the tapered box, in blocks (`HalfWidth`) |
 | `hasItem` | true | gets an inventory slot and can be held; false for taper wood and pebbles |
-| `needsSupport` | false | pops, rolling its loot, when the block below is removed |
+| `needsSupport` | false | pops, rolling its loot, when the block below is removed; also makes the block replaceable, so a flow washes it away |
+| `fluid` | false | the block is a flowing fluid (water): forces `solid`, `castsAO`, `hasItem`, `needsSupport` off, `occludes` off and `light.passes` on, and drops nothing whatever the file says |
 | `onBreak` | `"drop"` | `drop` (roll loot) or `prime_tnt` (no drop, spawns a `PrimedTnt`) |
 | `loot` | the table sharing this block's name, else drop self | loot table name; `"none"` drops nothing |
 
@@ -135,6 +140,28 @@ block must not occlude**, which the registry enforces rather than trusting the f
 ```json
 { "name": "Flint", "texture": "assets/textures/items/flint.png" }
 ```
+
+`name` and `texture` are all a plain pickup needs. An optional `use` object gives the item a
+right-click behaviour (`World.TryUseSelected` -> `TryUseItem`):
+
+```json
+{ "name": "Bucket", "texture": "assets/textures/items/bucket.png",
+  "use": { "action": "pickup_fluid", "fluid": "block/water", "result": "item/water_bucket" } }
+```
+
+| field | meaning |
+|---|---|
+| `use.action` | `pickup_fluid` (scoop the targeted fluid source into the item) or `place_fluid` (pour one into the targeted cell) |
+| `use.fluid` | the fluid block the action works on; must be a block with `fluid: true` |
+| `use.result` | the item this one becomes on success; must be an item, and the two normally point at each other |
+
+Both names resolve like a loot entry (`block/` / `item/` prefixes pin the namespace).
+`ContentRegistry.ValidateItemUses` runs after the blocks are loaded and throws, naming the file,
+if the fluid is not a fluid block or the result is not an item. A successful use goes through
+`Inventory.Exchange`, which spends the item, credits the result and selects its slot, so
+scooping and pouring alternate on the same button. `ItemType.TargetsFluids` makes the selection
+raycast include fluid sources only while a `pickup_fluid` item is held — otherwise water is
+aimed straight through, and mining refuses fluid cells regardless.
 
 ### Loot schema (`assets/data/loot/<name>.json`)
 
@@ -203,9 +230,13 @@ Other invariants:
 
 - World/chunk coordinates: `Chunk.Position` is in chunk units; world pos = chunk pos × `Chunk.Size` (16). Chunks are cubic and stacked vertically too (3D chunk grid, not 2D columns).
 - Blocks are `byte` IDs; `0` is air. Everything else about a block comes from `assets/data/blocks/<name>.json` through `ContentRegistry` (see "Content" above), never from a new `switch` on the id. Hot paths read the flat mirrors (`BlockType.IsSolid/Occludes/CastsAO`, `BlockType.Emission`, `BlockType.PassesLightById`) rather than `BlockType.ById[...]`, so keep new per-id flags in that shape.
+- **Per-block state byte**: alongside `Chunk._blocks` each chunk has a lazily allocated `volatile byte[]? _state` (null = all zero), read through `Chunk.GetLocalState` / `ChunkManager.GetStateGlobal` / `TryGetCell` and written only by `Chunk.SetBlockRaw` (no remesh, no scheduling — the fluid tick batches those). Today only fluids use it: `FluidState` decodes it as source (`0`), falling (`8`) or flowing level `1..7`. **Every write that is not a fluid write zeroes it** (`RemoveBlockAt`, `PlaceBlockAt` — which also treats a fluid cell as replaceable — and `ClearBlockAt`), so a stale level can never outlive the water that owned it. Meshing gets it as a second padded snapshot from `FillPaddedSnapshot(padded, paddedState, chunkManager)`; the fluid simulation must read cells through `TryGetCell`/`ChunkAt`, never `GetBlockGlobal`, which reports unloaded chunks as air.
+- **Fluid tick**: `Systems/FluidManager.cs` (owned by `World`, main thread only) is a *scheduled-cell* simulation, not a scan. `World.Update` calls it once per frame after `UpdateToppling`; it runs whole ticks every `WorldGenerationConfig.FluidTickSeconds` (0.25 s), at most `MaxFluidTicksPerFrame` of them per frame, and drops the leftover time so a hitch never leaves it spiralling. Each tick takes the set of cells scheduled by the previous one (packed as `long`, 21 bits per axis), recomputes every **non-source** fluid cell from its neighbours (Minecraft's `getNewLiquid`: two adjacent sources over ground that cannot drain become a source themselves, fluid directly above means falling, otherwise one level thinner than the fullest neighbour, and nothing left means the cell drains to air), then spreads it downwards, or sideways toward the nearest hole within `FluidSlopeSearchDistance` (ties spread evenly). Spreading only ever writes into non-fluid `IsReplaceable` cells, popping the fragile block it washes away through `DropManager.SpawnLoot`; a cell that already holds fluid recomputes itself on its own tick. Writes go through `Chunk.SetBlockRaw` and dirty only the cell's own chunk plus the face-adjacent chunk on each axis where the cell sits on a border, batched into `MarkDirty` at the end of the tick — not `ImmediateRemesh`, and never `MarkAreaDirty`, because a fluid passes light and casts no AO. A cell reschedules itself and its neighbourhood exactly when it changed or wrote into a neighbour, so settled water costs nothing and worldgen water beside worldgen air stays static until something adjacent is disturbed (same as Minecraft).
+- **Every block edit path must call `FluidManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the water beside the edit will never notice it: `World.RemoveBlock`, `World.FellWood` (per cleared cell, and in both single-block branches), `World.TryPlaceBlockFromRaycast`, `TntManager.Detonate` (`ScheduleBox` over the blast box grown by one; the blast also **skips fluid cells**, since a dry crater under water would just refill from every side) and bucket edits through `FluidManager.SetCellImmediate`, which is the only fluid write that remeshes synchronously. Mining never takes a fluid out: `RemoveBlock` returns early on `BlockType.IsFluid`, so only a bucket removes water.
 - Worldgen must stay deterministic and thread-safe (`FastNoiseLite.GetNoise` is read-only after setup; noise instances are configured once in static constructors and never re-tuned per call). All noise seeds derive from `WorldGenerationConfig.Seed` plus fixed per-channel offsets (`TerrainGenerator.MakeNoise`). Before player edits, terrain obeys:
   - **Nothing generated is ever solid above `height(x,z)`** — heights come from `Chunk.GetColumnData(...).Heights` (or the `GetColumnHeights` wrapper) and already include ravines, which are cut into the heightmap so the far LOD sees them too. The block at `height` is solid unless a cave or entrance carved it.
   - Both carvers only ever **remove** blocks: `Chunk.GenerateBlockData` fills the columns (grass at depth 0, dirt down to `DirtDepth`, stone below), then `NoiseCaves.Carve` and `WormCarver.Carve` clear air out of the result and `_solidCount` is recounted.
+  - **Sea water** fills every air cell at `y <= SeaLevel` in columns whose `height < SeaLevel`, in `Chunk.FillWater` after both carvers and before trees and pebbles, so sea-floor caves flood while land caves stay dry and nothing grows underwater (`TerrainGenerator.IsSubmerged`; submerged columns also top out in dirt instead of grass). Generated water is always a **source** (state `0`), so the sea needs no state array at all. Set `WaterEnabled = false` to turn the whole thing off.
   - Caves fade out within ~`CaveSurfaceFadeEnd` blocks of the surface (`WormSurfaceMargin` for worms), except inside entrance zones — sparse patches where `ColumnData.EntranceWeight` lifts the fade and caves reach the sky.
   - Worldgen is a **pure function of world position**: each chunk generates its own blocks with no cross-chunk writes, so neighbours agree at their borders without shared state. Worm paths are cached per 64-block XZ cell in `WormCarver` exactly the way column data is cached per chunk column in `Chunk.GetColumnData` (compute-then-overwrite, wholesale `Clear` at the size limit — entries are deterministic, so a race yields identical values).
   - 3D cave noise is sampled on a `CaveNoiseStride` lattice (aligned to world coordinates so adjacent chunks share boundary samples) and trilinearly interpolated per block before thresholding.

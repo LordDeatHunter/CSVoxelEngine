@@ -31,6 +31,7 @@ public class World
     private readonly LodManager _lodManager;
     private readonly DropManager _dropManager = new();
     private readonly TntManager _tntManager = new();
+    private readonly FluidManager _fluidManager = new();
     // Trees currently toppling over after their base log was mined
     private readonly List<TopplingTree> _toppling = new();
     private readonly IWindow _window;
@@ -85,13 +86,21 @@ public class World
         foreach (var blockId in _dropManager.Collected)
             Inventory.Add(blockId);
 
-        _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager);
+        _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager);
 
         UpdateToppling((float)deltaTime);
 
+        // Runs after every path that can edit a block this frame, so the cells they scheduled
+        // are all in the same tick
+        _fluidManager.Update((float)deltaTime, _chunkManager, _dropManager);
+
         Inventory.Update((float)deltaTime);
 
-        _hasSelectedBlock = Camera.Raycast(InteractionReach, _chunkManager, out _selectedBlockPosition, out _selectedFaceNormal);
+        // Water is aimed through unless the held item is out to scoop it, so a pond never
+        // stops the player targeting the block under it
+        _hasSelectedBlock = Camera.Raycast(InteractionReach, _chunkManager,
+            out _selectedBlockPosition, out _selectedFaceNormal,
+            includeFluids: ItemType.TargetsFluids(Inventory.SelectedBlockId));
     }
 
     public void Render(RenderManager renderManager)
@@ -102,6 +111,11 @@ public class World
         renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
         foreach (var tree in _toppling)
             renderManager.RenderTopplingTree(Camera, tree);
+
+        // Water last of the world passes: it blends, so everything it can cover has to be in
+        // the depth buffer already
+        renderManager.RenderWorldTranslucent(Camera, _chunkManager.Chunks.Values,
+            _lodManager.Regions.Values);
 
         if (!_hasSelectedBlock) return;
 
@@ -135,6 +149,14 @@ public class World
     public void UpdateBlockBreaking(double deltaTime, bool isHolding)
     {
         if (!isHolding || !_hasSelectedBlock)
+        {
+            StopBreaking();
+            return;
+        }
+
+        // A bucket makes water selectable; left-clicking it must still do nothing, since
+        // RemoveBlock refuses fluids anyway (and water's hardness of 0 would pop instantly)
+        if (BlockType.IsFluid(BlockIdAt(_selectedBlockPosition)))
         {
             StopBreaking();
             return;
@@ -221,6 +243,10 @@ public class World
         // Read the id before the block goes away, so the drop knows what it is
         var brokenId = BlockIdAt(blockPos);
 
+        // Water is not mineable: only a bucket takes it out (and its hardness of 0 would
+        // otherwise pop it on first contact)
+        if (BlockType.IsFluid(brokenId)) return;
+
         // TNT never drops — once its HP runs out it primes on the spot instead
         if (BlockType.ById[brokenId]?.OnBreak == BlockBreakAction.PrimeTnt)
         {
@@ -234,6 +260,9 @@ public class World
         // Everything else rolls its loot table, but only once a block was actually cleared
         else if (chunk.RemoveBlockAt(blockPos, _chunkManager))
             _dropManager.SpawnLoot(brokenId, blockPos);
+
+        // Water beside or above the hole pours into it on the next fluid tick
+        _fluidManager.ScheduleAround(blockPos);
 
         // Keep the buried LOD mesh below the newly exposed hole
         // (blockPos components are floored floats, so the int casts are exact)
@@ -275,6 +304,7 @@ public class World
         {
             if (chunk.RemoveBlockAt(blockPos, _chunkManager))
                 _dropManager.SpawnLoot(brokenId, blockPos);
+            _fluidManager.ScheduleAround(blockPos);
             return;
         }
 
@@ -286,6 +316,7 @@ public class World
             if (chunk.ClearBlockAt(blockPos) == 0) return;
             chunk.RemeshAfterBatchEdit(_chunkManager);
             _dropManager.SpawnLoot(brokenId, blockPos);
+            _fluidManager.ScheduleAround(blockPos);
             return;
         }
 
@@ -304,6 +335,7 @@ public class World
             // A player-built extension felled with the tree stops counting as placed
             _chunkManager.UnmarkPlayerPlaced((int)block.Cell.X, (int)block.Cell.Y, (int)block.Cell.Z);
             touchedChunks.Add(chunkPos);
+            _fluidManager.ScheduleAround(block.Cell);
 
             var key = ((int)block.Cell.X, (int)block.Cell.Z);
             if (!lowestY.TryGetValue(key, out var lowest) || (int)block.Cell.Y < lowest)
@@ -376,6 +408,75 @@ public class World
     }
 
     /// <summary>
+    /// Right-click: uses the selected slot's item when it declares a use action (a bucket
+    /// scoops or pours water), otherwise places the selected block. A successful use swaps the
+    /// item for its result and selects that slot, so scooping and pouring alternate on the
+    /// same button.
+    /// </summary>
+    public void TryUseSelected(float maxDistance)
+    {
+        var id = Inventory.SelectedBlockId;
+        if (id != 0 && Inventory.SelectedCount > 0
+            && ItemType.Types.TryGetValue(id, out var item) && item.UseAction != ItemUseAction.None)
+        {
+            // Only spend the item if the action actually took effect
+            if (TryUseItem(maxDistance, item))
+                Inventory.Exchange(id, item.UseResultId);
+            return;
+        }
+
+        TryPlaceSelectedBlock(maxDistance);
+    }
+
+    /// <summary>
+    /// Runs one item use action against whatever the player is aiming at. Returns whether it
+    /// took effect, which is what decides if the item is spent. Bucket edits go through
+    /// <see cref="FluidManager.SetCellImmediate"/>, the only fluid write that remeshes on the
+    /// spot, so the water appears or vanishes on the click rather than on the next tick.
+    /// </summary>
+    private bool TryUseItem(float maxDistance, ItemType item)
+    {
+        switch (item.UseAction)
+        {
+            case ItemUseAction.PickupFluid:
+            {
+                // The raycast already limits fluid hits to sources, so a bucket can never
+                // scoop a flowing skirt out from under the source feeding it
+                if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out _, includeFluids: true))
+                    return false;
+
+                if (!_chunkManager.TryGetCell((int)hit.X, (int)hit.Y, (int)hit.Z, out var id, out var state))
+                    return false;
+                if (id != item.UseFluidId || !FluidState.IsSource(state)) return false;
+
+                return _fluidManager.SetCellImmediate(hit, 0, 0, _chunkManager);
+            }
+            case ItemUseAction.PlaceFluid:
+            {
+                // Fluids are excluded from this cast, so aiming at a pond hits its floor and
+                // the face offset lands the source inside the water instead of in front of it
+                if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out var hitNormal))
+                    return false;
+
+                var target = hit + hitNormal;
+                var existing = BlockIdAt(target);
+                if (!BlockType.IsReplaceable(existing) && !BlockType.IsFluid(existing)) return false;
+
+                // A fragile block in the way pops exactly as a flow washing over it would
+                if (existing != 0 && !BlockType.IsFluid(existing))
+                {
+                    _dropManager.SpawnLoot(existing, target);
+                    _chunkManager.UnmarkPlayerPlaced((int)target.X, (int)target.Y, (int)target.Z);
+                }
+
+                return _fluidManager.SetCellImmediate(target, item.UseFluidId, FluidState.Source, _chunkManager);
+            }
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
     /// Places the hotbar's selected block against the face the player is looking at and spends
     /// one from that slot. Does nothing when the slot is empty or holds no blocks.
     /// </summary>
@@ -403,8 +504,12 @@ public class World
             MathF.Floor(placePos.Z / Chunk.Size)
         );
 
-        return _chunkManager.Chunks.TryGetValue(chunkPos, out var chunk)
-               && chunk.PlaceBlockAt(placePos, blockId, _chunkManager);
+        if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk)) return false;
+        if (!chunk.PlaceBlockAt(placePos, blockId, _chunkManager)) return false;
+
+        // A block placed into water displaces it, so the neighbours recompute their levels
+        _fluidManager.ScheduleAround(placePos);
+        return true;
     }
     
     public ChunkManager GetChunkManager() => _chunkManager;

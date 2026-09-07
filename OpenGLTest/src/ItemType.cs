@@ -16,6 +16,8 @@ public sealed class ItemType
     public static byte Vine { get; internal set; }
     public static byte Branch { get; internal set; }
     public static byte Flint { get; internal set; }
+    public static byte Bucket { get; internal set; }
+    public static byte WaterBucket { get; internal set; }
 
     /// <summary>Every registered item by id.</summary>
     public static IReadOnlyDictionary<byte, ItemType> Types { get; internal set; } =
@@ -37,6 +39,25 @@ public sealed class ItemType
     /// <summary>Sprite source, relative to the working directory like every other asset.</summary>
     public string TexturePath { get; }
 
+    /// <summary>What right-clicking with this item does; <see cref="ItemUseAction.None"/> for a
+    /// plain pickup.</summary>
+    public ItemUseAction UseAction { get; internal init; }
+
+    /// <summary>Item id this one becomes after a successful use (a bucket becomes a water
+    /// bucket); 0 when the item declares no use.</summary>
+    public byte UseResultId { get; internal init; }
+
+    /// <summary>Fluid block id the use picks up or places; 0 when the item declares no use.</summary>
+    public byte UseFluidId { get; internal init; }
+
     /// <summary>Whether an id is a pure item rather than a block (or air/unknown).</summary>
     public static bool IsItem(byte id) => Types.ContainsKey(id);
+
+    /// <summary>
+    /// Whether holding this id should make the block selection raycast see fluids. Only an item
+    /// that scoops one needs to aim at water; for everything else the water is aimed through,
+    /// so a pond never blocks placing a block on its floor.
+    /// </summary>
+    public static bool TargetsFluids(byte id) =>
+        Types.TryGetValue(id, out var type) && type.UseAction == ItemUseAction.PickupFluid;
 }

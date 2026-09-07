@@ -17,6 +17,17 @@ public class Camera
     public bool IsNoclip { get; private set; }
     public float VerticalVelocity => _verticalVelocity;
 
+    /// <summary>
+    /// Whether the player is deep enough in a fluid to swim: some cell of the body's footprint
+    /// in the feet..feet+<see cref="SwimDepth"/> band has a fluid surface above the feet. A thin
+    /// flowing skirt underfoot is waded through, not swum in.
+    /// </summary>
+    public bool IsInWater { get; private set; }
+
+    /// <summary>Whether the eye itself sits below a fluid surface — the source of truth for the
+    /// underwater tint, which must not fade in while only the legs are wet.</summary>
+    public bool IsEyeInWater { get; private set; }
+
     private const float DefaultFov = 70f;
     // Near plane sets depth precision at distance (error ~ z^2 / (near * 2^24)); it must be
     // large enough that stacked LOD levels ~4 blocks apart don't z-fight at 2048 blocks.
@@ -33,6 +44,20 @@ public class Camera
     private const float PlayerRadius = 0.30f;
     private const float CollisionStepSize = 0.05f;
 
+    // Swimming. Water has no gravity term: vertical speed eases toward a target instead, so it
+    // stays capped by SwimUpSpeed/SinkSpeed however long the player stays under.
+    private const float SwimSpeedFactor = 0.5f;
+    private const float SwimUpSpeed = 4f;
+    private const float SinkSpeed = -2f;
+    private const float WaterDrag = 6f;
+    // Pushing into a bank while holding Space lifts the player over it, so getting out of
+    // water never needs a ramp
+    private const float SwimExitBoost = 6f;
+    // How far above the feet a fluid surface has to reach before it counts as swimmable
+    private const float SwimDepth = 0.9f;
+    // How hard a flow carries a swimmer along it, in blocks/s
+    private const float FlowPushSpeed = 2f;
+
     // Two Space presses within this window toggle flight
     private const float DoubleTapWindow = 0.3f;
 
@@ -46,6 +71,8 @@ public class Camera
     private bool _spaceWasPressed;
     private bool _noclipWasPressed;
     private float _timeSinceSpacePress = float.MaxValue;
+    // Averaged flow of the fluid cells the body is in, refreshed by UpdateWaterState
+    private Vector3 _waterFlow;
 
     private readonly IWindow window;
     private readonly IMouse? mouse;
@@ -65,7 +92,9 @@ public class Camera
                 $"Ignoring {SpawnOverrideVariable}=\"{spawnOverride}\": expected three comma-separated numbers, e.g. -40,-107,-75");
         }
 
-        var surface = Chunk.GetColumnHeights(0, 0)[0] + 1;
+        // On the water surface where the origin column is flooded, so the player never starts
+        // submerged (or, once swimming exists, sinking)
+        var surface = Math.Max(Chunk.GetColumnHeights(0, 0)[0], WorldGenerationConfig.SeaLevel) + 1;
         return new Vector3(0.5f, surface + EyeHeight, 0.5f);
     }
 
@@ -139,8 +168,21 @@ public class Camera
 
         UpdateFlightToggle(deltaTime, keyboard);
         UpdateNoclipToggle(keyboard);
+        UpdateWaterState(chunkManager);
+
+        // Flight and noclip ignore the water entirely, so a submerged player can still fly out
+        var swimming = IsInWater && !IsFlying && !IsNoclip;
+        if (swimming) moveSpeed *= SwimSpeedFactor;
 
         var frameMovement = moveInput * moveSpeed * deltaTime;
+
+        // Flowing water carries the player with it. Added before the horizontal moves below, so
+        // the push is still stopped by a wall rather than shoving the player through it.
+        if (swimming)
+        {
+            frameMovement.X += _waterFlow.X * FlowPushSpeed * deltaTime;
+            frameMovement.Z += _waterFlow.Z * FlowPushSpeed * deltaTime;
+        }
 
         if (IsFlying || IsNoclip)
         {
@@ -148,6 +190,22 @@ public class Camera
             if (keyboard.IsKeyPressed(Key.Space)) verticalInput += 1f;
             if (keyboard.IsKeyPressed(Key.ControlLeft)) verticalInput -= 1f;
             frameMovement.Y = verticalInput * moveSpeed * deltaTime;
+        }
+        else if (swimming)
+        {
+            // Standing on the bottom of a shallow puddle still jumps, so wading out of one works
+            if (IsGrounded && keyboard.IsKeyPressed(Key.Space))
+            {
+                _verticalVelocity = JumpSpeed;
+                IsGrounded = false;
+            }
+            else
+            {
+                _verticalVelocity = MathUtils.Damp(_verticalVelocity,
+                    keyboard.IsKeyPressed(Key.Space) ? SwimUpSpeed : SinkSpeed, WaterDrag, deltaTime);
+            }
+
+            frameMovement.Y = _verticalVelocity * deltaTime;
         }
         else
         {
@@ -168,8 +226,16 @@ public class Camera
             return;
         }
 
-        Position = MoveOnAxis(Position, frameMovement.X, 0, chunkManager, out _);
-        Position = MoveOnAxis(Position, frameMovement.Z, 2, chunkManager, out _);
+        Position = MoveOnAxis(Position, frameMovement.X, 0, chunkManager, out var collidedX);
+        Position = MoveOnAxis(Position, frameMovement.Z, 2, chunkManager, out var collidedZ);
+
+        // Swimming into a wall while holding Space climbs it. The boost is applied before the
+        // vertical move so the lift lands in the same frame as the collision.
+        if (swimming && (collidedX || collidedZ) && keyboard.IsKeyPressed(Key.Space))
+        {
+            _verticalVelocity = MathF.Max(_verticalVelocity, SwimExitBoost);
+            frameMovement.Y = _verticalVelocity * deltaTime;
+        }
 
         Position = MoveOnAxis(Position, frameMovement.Y, 1, chunkManager, out var collidedY);
 
@@ -188,6 +254,50 @@ public class Camera
         {
             IsGrounded = false;
         }
+    }
+
+    /// <summary>
+    /// Recomputes <see cref="IsInWater"/> and <see cref="IsEyeInWater"/> from the fluid cells the
+    /// body overlaps, and averages those cells' flow directions into the push applied while
+    /// swimming. A fluid surface sits below its cell top (8/9 of a block for a source, less
+    /// for a flowing skirt), so both tests compare real surface heights instead of merely asking
+    /// whether the cell holds water.
+    /// </summary>
+    private void UpdateWaterState(ChunkManager chunkManager)
+    {
+        var feetY = Position.Y - EyeHeight;
+
+        var minX = (int)MathF.Floor(Position.X - PlayerRadius);
+        var maxX = (int)MathF.Floor(Position.X + PlayerRadius);
+        var minZ = (int)MathF.Floor(Position.Z - PlayerRadius);
+        var maxZ = (int)MathF.Floor(Position.Z + PlayerRadius);
+        var minY = (int)MathF.Floor(feetY);
+        var maxY = (int)MathF.Floor(feetY + SwimDepth);
+
+        // One pass over the footprint answers both questions: whether any cell is deep enough
+        // to swim in, and which way the ones that are actually flow
+        var inWater = false;
+        var flowSum = Vector3.Zero;
+        var flowCells = 0;
+        for (var x = minX; x <= maxX; x++)
+        for (var y = minY; y <= maxY; y++)
+        for (var z = minZ; z <= maxZ; z++)
+        {
+            if (chunkManager.GetFluidSurfaceGlobal(x, y, z) <= feetY) continue;
+
+            inWater = true;
+
+            var cellFlow = chunkManager.GetFluidFlowGlobal(x, y, z);
+            if (cellFlow == Vector3.Zero) continue; // a still cell must not dilute the average
+
+            flowSum += cellFlow;
+            flowCells++;
+        }
+
+        _waterFlow = flowCells > 0 ? flowSum / flowCells : Vector3.Zero;
+        IsInWater = inWater;
+        IsEyeInWater = Position.Y < chunkManager.GetFluidSurfaceGlobal(
+            (int)MathF.Floor(Position.X), (int)MathF.Floor(Position.Y), (int)MathF.Floor(Position.Z));
     }
 
     private void UpdateNoclipToggle(IKeyboard keyboard)
@@ -318,7 +428,13 @@ public class Camera
         ));
     }
 
-    public bool Raycast(float maxDistance, ChunkManager chunkManager, out Vector3 hitPosition, out Vector3 hitNormal)
+    /// <summary>
+    /// Walks the view ray cell by cell (DDA) and reports the first cell it can target. Fluids are
+    /// transparent to targeting unless <paramref name="includeFluids"/> is set, which only an item
+    /// that works on them (the bucket) asks for.
+    /// </summary>
+    public bool Raycast(float maxDistance, ChunkManager chunkManager, out Vector3 hitPosition, out Vector3 hitNormal,
+        bool includeFluids = false)
     {
         var direction = GetForwardVector();
         var currentPosition = Position.Floor();
@@ -339,7 +455,18 @@ public class Camera
         for (var i = 0; i < maxDistance * dist; i++)
         {
             // currentPosition components are floored floats, so the int casts are exact
-            if (chunkManager.GetBlockGlobal((int)currentPosition.X, (int)currentPosition.Y, (int)currentPosition.Z) != 0)
+            var cellX = (int)currentPosition.X;
+            var cellY = (int)currentPosition.Y;
+            var cellZ = (int)currentPosition.Z;
+            var cellId = chunkManager.GetBlockGlobal(cellX, cellY, cellZ);
+
+            // A fluid is hit only for a caller that asked for it, and then only as a source: a
+            // flowing skirt is aimed through (Minecraft's SOURCE_ONLY), and the cell the eye is
+            // already inside is skipped so swimming never targets the water on the player's face.
+            var isHit = cellId != 0 && (!BlockType.IsFluid(cellId)
+                || (includeFluids && i > 0 && FluidState.IsSource(chunkManager.GetStateGlobal(cellX, cellY, cellZ))));
+
+            if (isHit)
             {
                 hitPosition = currentPosition;
 

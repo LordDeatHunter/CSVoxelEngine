@@ -68,6 +68,35 @@ public static class WorldGenerationConfig
     // Far LOD side faces switch from dirt to stone below this depth
     public const int NominalDirtDepth = 4;
 
+    // --- Water ---
+    // Sea level: every column whose terrain height is below it is flooded with water up to
+    // SeaLevel, after the carvers and before trees (see Chunk.FillWater). Measured over a
+    // 1024x1024 area around the origin, terrain heights run -65..112 with a mean near +15, so
+    // 0 floods about a quarter of the map (basins up to ~65 deep) while the origin column
+    // (height 0) stays dry as a shoreline. Coverage: -8 -> 8%, 0 -> 26%, 4 -> 45%, 8 -> 53%.
+    public const bool WaterEnabled = true;
+    public const int SeaLevel = 0;
+
+    // Fluid simulation: one tick every FluidTickSeconds, at most MaxFluidTicksPerFrame of them
+    // in a frame so a hitch never turns into a spiral of catch-up ticks
+    public const float FluidTickSeconds = 0.25f;
+    public const int MaxFluidTicksPerFrame = 4;
+
+    // How far a spreading fluid looks for a hole to fall into before spreading evenly
+    public const int FluidSlopeSearchDistance = 4;
+
+    // Blocks the far LOD water sheet sits below the chunk water surface, so the two never
+    // z-fight where they meet at the full-detail ring. Depth resolution there is ~0.02 blocks;
+    // the step is also visible edge-on as a thin line at the ring, so keep it as small as safe
+    public const float LodWaterSink = 0.05f;
+
+    // Underwater view: the fog closes in to a few blocks and everything turns blue-green.
+    // The fade is deliberately short, so breaking the surface reads as a hard boundary
+    // rather than a slow filter, but is still eased instead of snapped.
+    public const float UnderwaterFadeSeconds = 0.15f;
+    public const float UnderwaterFogNearBlocks = 1f;
+    public const float UnderwaterFogFarBlocks = 48f;
+
     // --- Terrain shape (natural rolling base with large flat patches) ---
     // The base is the original rolling terrain (BaseFrequency, 6-octave product noise times
     // BaseAmplitude). A rare low-frequency mask flattens large patches toward gentle meadow

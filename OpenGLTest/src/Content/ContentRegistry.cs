@@ -80,6 +80,7 @@ public static class ContentRegistry
         LoadItems(itemFiles);
         LoadLootTables(Path.Combine(assetsRoot, "data", "loot"));
         LoadBlocks(blockFiles);
+        ValidateItemUses(itemFiles);
 
         ResolveHandles();
     }
@@ -117,6 +118,14 @@ public static class ContentRegistry
             type.OccludesNeighbours = !type.Cutout && (definition.Occludes ?? baked.IsFullCube);
             type.PassesLight = definition.Light?.Passes ?? !baked.IsFullCube;
 
+            // A fluid's model is a full cube (it only supplies the tile), but its surface sits
+            // below the cell top and it must never hide a neighbour or shade its own cell dark
+            if (type.Fluid)
+            {
+                type.OccludesNeighbours = false;
+                type.PassesLight = true;
+            }
+
             BlockType.OccludesById[id] = type.OccludesNeighbours;
             BlockType.PassesLightById[id] = type.PassesLight;
         }
@@ -152,9 +161,12 @@ public static class ContentRegistry
         Array.Clear(BlockType.SolidById);
         Array.Clear(BlockType.OccludesById);
         Array.Clear(BlockType.CastsAoById);
+        Array.Clear(BlockType.FluidById);
+        Array.Clear(BlockType.ReplaceableById);
 
         // Air owns no definition but still has to let light through and stop nothing
         BlockType.PassesLightById[BlockType.Air] = true;
+        BlockType.ReplaceableById[BlockType.Air] = true;
     }
 
     private static void LoadItems(List<(string Name, string Path)> files)
@@ -166,11 +178,59 @@ public static class ContentRegistry
             if (string.IsNullOrWhiteSpace(definition.Texture))
                 throw new InvalidOperationException($"Item '{path}' has no texture.");
 
+            var use = definition.Use;
+            var action = use?.Action switch
+            {
+                null => ItemUseAction.None,
+                "pickup_fluid" => ItemUseAction.PickupFluid,
+                "place_fluid" => ItemUseAction.PlaceFluid,
+                _ => throw new InvalidOperationException(
+                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid or place_fluid."),
+            };
+
             var id = ItemIds[name];
-            types[id] = new ItemType(id, definition.Name ?? name, definition.Texture);
+            types[id] = new ItemType(id, definition.Name ?? name, definition.Texture)
+            {
+                UseAction = action,
+                UseResultId = ResolveUseTarget(use?.Result, "use.result", path),
+                UseFluidId = ResolveUseTarget(use?.Fluid, "use.fluid", path),
+            };
         }
 
         ItemType.Types = types;
+    }
+
+    // Items are parsed before blocks, so only the id maps exist here; what those ids turn out
+    // to be is checked in ValidateItemUses once the runtime tables are filled.
+    private static byte ResolveUseTarget(string? name, string field, string path)
+    {
+        if (name == null) return 0;
+
+        if (TryResolve(name, out var id)) return id;
+        throw new InvalidOperationException(
+            $"Item '{path}' names '{name}' in {field}, which is not a registered block or item.");
+    }
+
+    /// <summary>
+    /// Checks each item's declared use against the finished tables: a fluid action needs a real
+    /// fluid block to work on and an item to turn into (the hotbar swaps one for the other).
+    /// Runs after <see cref="LoadBlocks"/>, which is when the fluid flags first exist.
+    /// </summary>
+    private static void ValidateItemUses(List<(string Name, string Path)> files)
+    {
+        foreach (var (name, path) in files)
+        {
+            var item = ItemType.Types[ItemIds[name]];
+            if (item.UseAction == ItemUseAction.None) continue;
+
+            if (!BlockType.IsFluid(item.UseFluidId))
+                throw new InvalidOperationException(
+                    $"Item '{path}' has use.action '{item.UseAction}' but its use.fluid is not a fluid block.");
+
+            if (!ItemType.IsItem(item.UseResultId))
+                throw new InvalidOperationException(
+                    $"Item '{path}' has use.action '{item.UseAction}' but its use.result is not an item.");
+        }
     }
 
     private static void LoadLootTables(string folder)
@@ -193,8 +253,9 @@ public static class ContentRegistry
                 null or "model" => BlockRenderer.Model,
                 "tapered_wood" => BlockRenderer.TaperedWood,
                 "pebbles" => BlockRenderer.Pebbles,
+                "fluid" => BlockRenderer.Fluid,
                 _ => throw new InvalidOperationException(
-                    $"Block '{path}' has unknown renderer '{definition.Renderer}'; expected model, tapered_wood or pebbles."),
+                    $"Block '{path}' has unknown renderer '{definition.Renderer}'; expected model, tapered_wood, pebbles or fluid."),
             };
 
             var onBreak = definition.OnBreak switch
@@ -214,7 +275,12 @@ public static class ContentRegistry
             if (emission > 15)
                 throw new InvalidOperationException($"Block '{path}' has light.emission {emission}; expected 0..15.");
 
-            var solid = definition.Solid ?? true;
+            // A fluid's behaviour follows from being a fluid, so the registry forces it rather
+            // than trusting the file: nothing collides with water, it darkens no face, it has
+            // no inventory slot or loot, and it is never support-fragile (it is what pops
+            // those blocks). It stays replaceable, which is set below for every block.
+            var fluid = definition.Fluid ?? false;
+            var solid = !fluid && (definition.Solid ?? true);
             var type = new BlockType
             {
                 Name = name,
@@ -222,17 +288,18 @@ public static class ContentRegistry
                 MaxHealth = definition.Hardness ?? BlockType.DefaultMaxHealth,
                 Solid = solid,
                 CullSelf = definition.CullSelf ?? false,
-                CastsAmbientOcclusion = definition.CastsAO ?? solid,
+                CastsAmbientOcclusion = !fluid && (definition.CastsAO ?? solid),
                 Cutout = definition.Cutout ?? false,
                 Sway = definition.Sway ?? false,
                 LightEmission = emission,
                 Renderer = renderer,
                 WoodTaperLevel = taperLevel,
                 HalfWidth = definition.Wood == null ? -1f : definition.Wood.HalfWidth ?? 0.5f,
-                HasItem = definition.HasItem ?? true,
-                NeedsSupport = definition.NeedsSupport ?? false,
+                HasItem = !fluid && (definition.HasItem ?? true),
+                NeedsSupport = !fluid && (definition.NeedsSupport ?? false),
+                Fluid = fluid,
                 OnBreak = onBreak,
-                LootTable = ResolveLoot(name, definition.Loot, path),
+                LootTable = fluid ? LootTable.None : ResolveLoot(name, definition.Loot, path),
             };
 
             BlockModels[id] = ResolveModel(definition.Model, path);
@@ -243,6 +310,9 @@ public static class ContentRegistry
             BlockType.Emission[id] = type.LightEmission;
             BlockType.SolidById[id] = type.Solid;
             BlockType.CastsAoById[id] = type.CastsAmbientOcclusion;
+            BlockType.FluidById[id] = type.Fluid;
+            // Fragile blocks are washed away by a flow instead of stopping it
+            BlockType.ReplaceableById[id] = type.NeedsSupport;
         }
 
         BlockType.Types = types;
@@ -281,10 +351,13 @@ public static class ContentRegistry
         BlockType.Log = Require("block/log");
         BlockType.Leaves = Require("block/leaves");
         BlockType.Pebble = Require("block/pebble");
+        BlockType.Water = Require("block/water");
 
         ItemType.Vine = Require("item/vine");
         ItemType.Branch = Require("item/branch");
         ItemType.Flint = Require("item/flint");
+        ItemType.Bucket = Require("item/bucket");
+        ItemType.WaterBucket = Require("item/water_bucket");
     }
 
     private static LootTable? ResolveLoot(string blockName, string? loot, string path)

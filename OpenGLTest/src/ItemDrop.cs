@@ -45,6 +45,16 @@ public class ItemDrop
     private const float BounceThreshold = 4f;
     private const float CollisionStepSize = 0.05f;
 
+    // Buoyancy: instead of gravity, a submerged drop eases toward a rise proportional to how
+    // far under the surface it is, so it climbs, barely overshoots and bobs at the top
+    private const float FloatSpeed = 1.5f;
+    private const float BuoyancyStiffness = 3f;
+    private const float WaterDrag = 4f;
+    private const float WaterFriction = 3f;
+    // How hard a flow accelerates a floating drop, in blocks/s^2; against WaterFriction the
+    // drift settles at roughly FlowPushAccel / WaterFriction blocks/s
+    private const float FlowPushAccel = 4f;
+
     // A drop chasing a player faster than SuckSpeed is collected anyway rather than trailing
     // them forever
     private const float MaxAttractSeconds = 3f;
@@ -138,7 +148,34 @@ public class ItemDrop
     {
         if (deltaTime <= 0f || chunks == null) return;
 
-        _velocity.Y = MathF.Max(_velocity.Y - Gravity * deltaTime, TerminalVelocity);
+        // The bottom of the cube decides: a drop resting on the sea floor with its top out of
+        // the water should not still be pushed up
+        var bottomY = Position.Y - HalfExtent;
+        var surfaceY = chunks.GetFluidSurfaceGlobal(
+            (int)MathF.Floor(Position.X), (int)MathF.Floor(bottomY), (int)MathF.Floor(Position.Z));
+        var floating = bottomY < surfaceY;
+
+        if (floating)
+        {
+            var targetY = Math.Clamp((surfaceY - bottomY) * BuoyancyStiffness, -FloatSpeed, FloatSpeed);
+            _velocity.Y = MathUtils.Damp(_velocity.Y, targetY, WaterDrag, deltaTime);
+
+            // Flowing water carries the drop downstream. Applied before the damping below, which
+            // then caps the drift instead of letting it build up indefinitely.
+            var flow = chunks.GetFluidFlowGlobal(
+                (int)MathF.Floor(Position.X), (int)MathF.Floor(bottomY), (int)MathF.Floor(Position.Z));
+            _velocity.X += flow.X * FlowPushAccel * deltaTime;
+            _velocity.Z += flow.Z * FlowPushAccel * deltaTime;
+
+            // Water also kills the sideways pop, so a drop thrown into a pond stops drifting
+            var drag = MathF.Exp(-WaterFriction * deltaTime);
+            _velocity.X *= drag;
+            _velocity.Z *= drag;
+        }
+        else
+        {
+            _velocity.Y = MathF.Max(_velocity.Y - Gravity * deltaTime, TerminalVelocity);
+        }
 
         var movement = _velocity * deltaTime;
 
@@ -154,8 +191,10 @@ public class ItemDrop
         {
             if (_velocity.Y < 0f)
             {
+                // Water absorbs the impact: a sinking drop settles on the bottom rather than
+                // bouncing back up through the surface
                 var impact = -_velocity.Y;
-                _velocity.Y = impact >= BounceThreshold ? impact * BounceDamping : 0f;
+                _velocity.Y = !floating && impact >= BounceThreshold ? impact * BounceDamping : 0f;
                 IsGrounded = _velocity.Y == 0f;
             }
             else

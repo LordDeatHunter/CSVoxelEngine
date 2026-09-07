@@ -24,6 +24,10 @@ public class PrimedTnt
     private const float BounceThreshold = 4f;
     private const float CollisionStepSize = 0.05f;
 
+    // A primed cube is heavier than an item drop: it does not float, it just sinks slowly
+    private const float WaterSinkSpeed = -3f;
+    private const float WaterDrag = 5f;
+
     public Vector3 Position { get; private set; }
 
     private Vector3 _velocity;
@@ -87,7 +91,13 @@ public class PrimedTnt
     {
         if (deltaTime <= 0f || chunks == null) return;
 
-        _velocity.Y = MathF.Max(_velocity.Y - Gravity * deltaTime, TerminalVelocity);
+        var submerged = Position.Y < chunks.GetFluidSurfaceGlobal(
+            (int)MathF.Floor(Position.X), (int)MathF.Floor(Position.Y), (int)MathF.Floor(Position.Z));
+
+        if (submerged)
+            _velocity.Y = MathUtils.Damp(_velocity.Y, WaterSinkSpeed, WaterDrag, deltaTime);
+        else
+            _velocity.Y = MathF.Max(_velocity.Y - Gravity * deltaTime, TerminalVelocity);
 
         var movement = _velocity * deltaTime;
 
@@ -103,8 +113,9 @@ public class PrimedTnt
         {
             if (_velocity.Y < 0f)
             {
+                // Underwater the impact is absorbed instead of bouncing
                 var impact = -_velocity.Y;
-                _velocity.Y = impact >= BounceThreshold ? impact * BounceDamping : 0f;
+                _velocity.Y = !submerged && impact >= BounceThreshold ? impact * BounceDamping : 0f;
             }
             else
             {
