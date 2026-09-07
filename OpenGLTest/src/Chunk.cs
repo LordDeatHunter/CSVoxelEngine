@@ -616,7 +616,7 @@ public class Chunk : IDisposable
             // Pebbles render as 1-3 ankle-high boxes sharing the cell; see EmitPebbles
             if (blockId == BlockType.Pebble)
             {
-                EmitPebbles(vertices, indices, ref indexOffset, sunLight, blockLight,
+                EmitPebbles(vertices, indices, ref indexOffset, padded, pIdx, sunLight, blockLight,
                     x, y, z, type, basePos);
                 continue;
             }
@@ -766,7 +766,7 @@ public class Chunk : IDisposable
     /// the ground's top face, which still draws because pebbles never occlude.
     /// </summary>
     private void EmitPebbles(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        byte[] sunLight, byte[] blockLight,
+        byte[] padded, int pIdx, byte[] sunLight, byte[] blockLight,
         int x, int y, int z, BlockType type, Vector3 basePos)
     {
         var worldX = (int)Position.X * Size + x;
@@ -779,7 +779,12 @@ public class Chunk : IDisposable
         var lightBase = LightIdx(x, y, z);
         for (var i = 0; i < 6; i++)
         {
-            var lightCell = lightBase + LightFaceDelta[i];
+            // A face backed against rock or wood (a slope, a trunk) must not sample the
+            // neighbour's zero light, or it renders black: light it from the pebble's own
+            // cell instead, which sits open to the sky above the ground it rests on.
+            var lightCell = BlockType.Occludes(padded[pIdx + FaceNeighborDelta[i]])
+                ? lightBase
+                : lightBase + LightFaceDelta[i];
             sunF[i] = sunLight[lightCell] / 15f;
             blockF[i] = blockLight[lightCell] / 15f;
         }
