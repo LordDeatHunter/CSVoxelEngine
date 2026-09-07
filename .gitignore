@@ -487,3 +487,6 @@ version.txt
 
 # AI sloppa
 .omo
+
+# Tests
+OpenGLTest/visual

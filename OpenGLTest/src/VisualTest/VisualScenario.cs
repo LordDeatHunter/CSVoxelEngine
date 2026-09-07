@@ -21,6 +21,8 @@ public sealed class VisualStep
     public Key[] Keys { get; init; } = [];
     public string ShotName { get; init; } = "shot";
     public bool HideHud { get; init; }
+    public string? Block { get; init; }
+    public int Count { get; init; } = 1;
 }
 
 /// <summary>
@@ -127,6 +129,12 @@ public sealed class VisualScenario
             },
             "mine" => new VisualStep { Op = "mine", Seconds = ReadSeconds(element, index) },
             "place" => new VisualStep { Op = "place" },
+            "give" => new VisualStep
+            {
+                Op = "give",
+                Block = ReadGiveBlock(element, index),
+                Count = ReadGiveCount(element, index),
+            },
             "screenshot" => new VisualStep
             {
                 Op = "screenshot",
@@ -134,7 +142,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, give or screenshot."),
         };
     }
 
@@ -155,6 +163,21 @@ public sealed class VisualScenario
 
     private static float? ReadOptionalFloat(JsonElement element, string field) =>
         element.TryGetProperty(field, out var value) ? (float)value.GetDouble() : null;
+
+    private static string ReadGiveBlock(JsonElement element, int index)
+    {
+        if (!element.TryGetProperty("block", out var block) || string.IsNullOrWhiteSpace(block.GetString()))
+            throw new InvalidOperationException($"Step {index} (give) needs 'block'.");
+        return block.GetString()!;
+    }
+
+    private static int ReadGiveCount(JsonElement element, int index)
+    {
+        var count = element.TryGetProperty("count", out var value) ? value.GetInt32() : 1;
+        if (count <= 0)
+            throw new InvalidOperationException($"Step {index} (give) needs 'count' above 0.");
+        return count;
+    }
 
     private static float ReadSeconds(JsonElement element, int index)
     {

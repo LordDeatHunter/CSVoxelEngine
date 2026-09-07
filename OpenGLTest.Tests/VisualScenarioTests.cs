@@ -22,13 +22,15 @@ public sealed class VisualScenarioTests
                 { "op": "place" },
                 { "op": "screenshot", "name": "arrival", "hideHud": true },
                 { "op": "screenshot" },
+                { "op": "give", "block": "glass", "count": 16 },
+                { "op": "give", "block": "stone" },
               ],
             }
             """, "tour");
 
         Assert.Equal("tour", scenario.Name);
         Assert.Equal(Path.Combine("visual", "tour"), scenario.OutputDir);
-        Assert.Equal(8, scenario.Steps.Count);
+        Assert.Equal(10, scenario.Steps.Count);
 
         var teleport = scenario.Steps[0];
         Assert.Equal(new System.Numerics.Vector3(8.5f, 30f, 8.5f), teleport.Pos);
@@ -42,6 +44,14 @@ public sealed class VisualScenarioTests
         var plain = scenario.Steps[7];
         Assert.Equal("shot", plain.ShotName);
         Assert.False(plain.HideHud);
+
+        var give = scenario.Steps[8];
+        Assert.Equal("glass", give.Block);
+        Assert.Equal(16, give.Count);
+
+        var giveDefault = scenario.Steps[9];
+        Assert.Equal("stone", giveDefault.Block);
+        Assert.Equal(1, giveDefault.Count);
     }
 
     [Fact]
@@ -73,6 +83,7 @@ public sealed class VisualScenarioTests
     [InlineData("""{ "steps": [{ "op": "wait", "seconds": 0 }] }""", "'seconds'")]
     [InlineData("""{ "steps": [{ "op": "walk", "seconds": 1, "keys": ["Ww"] }] }""", "Ww")]
     [InlineData("""{ "steps": [{ }] }""", "'op'")]
+    [InlineData("""{ "steps": [{ "op": "give" }] }""", "block")]
     public void BadStepsThrowNamingTheProblem(string json, string fragment)
     {
         var ex = Assert.Throws<InvalidOperationException>(() => VisualScenario.Parse(json, "bad"));

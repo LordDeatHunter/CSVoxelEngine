@@ -74,6 +74,10 @@ public sealed record BlockType
     /// face culled behind it becomes an X-ray window through the texture's holes.</summary>
     public bool Cutout { get; init; }
 
+    /// <summary>Drawn blended in the sorted translucent pass together with the fluids;
+    /// forces <see cref="OccludesNeighbours"/> off.</summary>
+    public bool Translucent { get; init; }
+
     /// <summary>Whether the vertex shader gives this block the leaf-wind sway.</summary>
     public bool Sway { get; init; }
 

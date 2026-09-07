@@ -38,6 +38,18 @@ public sealed class ContentTests
     }
 
     [Fact]
+    public void GlassIsTranslucentAndSelfCulling()
+    {
+        var glass = ContentRegistry.RequireBlock("glass");
+        Assert.True(glass.Translucent);
+        Assert.True(glass.CullSelf);
+        Assert.False(glass.OccludesNeighbours);
+        Assert.True(glass.PassesLight);
+        Assert.False(glass.CastsAmbientOcclusion);
+        Assert.False(BlockType.Occludes(glass.Id));
+    }
+
+    [Fact]
     public void StoneAlwaysDropsOneCobblestone()
     {
         var table = ContentRegistry.LootTableFor("stone");

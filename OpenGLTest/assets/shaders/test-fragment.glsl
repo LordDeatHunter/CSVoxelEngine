@@ -9,6 +9,7 @@ in vec3 fWorldPos;
 uniform sampler2D uTextureAtlas;
 uniform float uAlpha;
 uniform float uFlash;
+uniform float uAlphaCutoff;
 uniform float uTime;
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
@@ -64,8 +65,9 @@ float SampleShadow(vec3 wp, vec3 N, float ndl) {
 void main() {
     vec4 texColor = texture(uTextureAtlas, fTexCoord);
     // Leaf tiles have transparent holes; cut them out so the canopy sees through instead of
-    // blending ghosts. Every other tile is fully opaque, so this changes nothing for them.
-    if (texColor.a < 0.5) discard;
+    // blending ghosts. The cutoff is a uniform: the opaque pass uses 0.5 for the leaf holes,
+    // the translucent pass uses 0 so glass's faint interior blends instead of vanishing.
+    if (texColor.a < uAlphaCutoff) discard;
     vec3 albedo = texColor.rgb * fColor.rgb;
     vec3 N = normalize(fNormal);
     float ndl = max(dot(N, uSunDir), 0.0);
@@ -90,7 +92,8 @@ void main() {
     float dist = distance(fWorldPos, uCameraPos);
     float f = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
     col = mix(col, uFogColor, f * f);
-    // Tile alpha carries the fluid's translucency; uAlpha is the chunk fade-in. The
-    // discard above still removes the leaf tiles' fully transparent holes.
+    // Tile alpha carries the translucent mesh's translucency; uAlpha is the chunk fade-in.
+    // The discard above still removes the leaf tiles' fully transparent holes in the
+    // opaque pass, while the translucent pass keeps every faint texel.
     FragColor = vec4(mix(col, vec3(1.0), uFlash), texColor.a * uAlpha);
 }

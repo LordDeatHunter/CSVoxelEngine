@@ -87,6 +87,7 @@ public class RenderManager : IDisposable
     private int _locMvp;
     private int _locAlpha;
     private int _locFlash;
+    private int _locAlphaCutoff;
     private int[] _locPointPos = [];
     private int[] _locPointColor = [];
 
@@ -177,6 +178,7 @@ public class RenderManager : IDisposable
         _locMvp = worldShader.GetUniformLocation("uMVP");
         _locAlpha = worldShader.GetUniformLocation("uAlpha");
         _locFlash = worldShader.GetUniformLocation("uFlash");
+        _locAlphaCutoff = worldShader.GetUniformLocation("uAlphaCutoff");
         _locPointPos = worldShader.GetUniformArrayLocations("uPointPos", WorldGenerationConfig.MaxPointLights);
         _locPointColor = worldShader.GetUniformArrayLocations("uPointColor", WorldGenerationConfig.MaxPointLights);
 
@@ -503,6 +505,8 @@ public class RenderManager : IDisposable
         RenderSun(camera);
 
         worldShader.Use();
+        // Opaque default: punch the leaf tiles' holes; the translucent pass lowers it.
+        worldShader.SetUniform(_locAlphaCutoff, 0.5f);
         ApplyFrameUniforms();
         gl.Enable(EnableCap.Blend);
         // The world passes rely on straight alpha blending for the fluid mesh and the chunk
@@ -698,6 +702,8 @@ public class RenderManager : IDisposable
         if (camera == null) return;
 
         worldShader.Use();
+        // No cutout here: glass's faint interior must blend instead of discarding away.
+        worldShader.SetUniform(_locAlphaCutoff, 0f);
         BindWorldTextures();
         gl.Enable(EnableCap.Blend);
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
@@ -771,6 +777,9 @@ public class RenderManager : IDisposable
 
             region.RenderWater();
         }
+
+        // Later passes reuse this program and need the cutout behaviour back.
+        worldShader.SetUniform(_locAlphaCutoff, 0.5f);
     }
 
     private readonly List<(LodRegion region, float distSq)> _visibleRegions = new(256);

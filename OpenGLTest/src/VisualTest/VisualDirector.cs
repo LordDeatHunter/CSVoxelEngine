@@ -72,6 +72,14 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 Advance();
                 break;
 
+            case "give":
+                var id = ContentRegistry.RequireBlock(step.Block!).Id;
+                world.Inventory.Add(id, step.Count);
+                world.Inventory.Select(world.Inventory.Slots.IndexOf(id));
+                Console.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} give {step.Count} {step.Block}");
+                Advance();
+                break;
+
             case "screenshot":
                 ScreenshotPath = Path.Combine(scenario.OutputDir, $"{_step + 1:D2}-{step.ShotName}.png");
                 ScreenshotHideHud = step.HideHud;

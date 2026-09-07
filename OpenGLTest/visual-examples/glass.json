@@ -1,0 +1,35 @@
+{
+  // Scripted visual test: run with VOXEL_SCRIPT=visual-examples/glass.json
+  // (working directory OpenGLTest/, e.g. via dotnet run). Shots land in visual/glass/.
+  // Ops: teleport {pos, yaw?, pitch?}, look {yaw?, pitch?}, wait {seconds},
+  // walk {keys?, seconds}, mine {seconds}, place, give {block, count?},
+  // screenshot {name?, hideHud?}.
+  // Walk keys are Silk Key names: W A S D Space ShiftLeft ControlLeft C ...
+  //
+  // Waits for the spawn chunks, then drops the player onto the ground at the origin: at 5 s the
+  // default spawn is still inside unloaded terrain and every place would miss.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [0.5, 5.0, 0.5], "yaw": -90, "pitch": 0 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "give", "block": "glass", "count": 16 },
+    { "op": "look", "yaw": -90, "pitch": -40 },
+    { "op": "place" },
+    { "op": "look", "yaw": -70, "pitch": -40 },
+    { "op": "place" },
+    { "op": "look", "yaw": -110, "pitch": -40 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 1 },
+    { "op": "look", "yaw": -90, "pitch": -25 },
+    { "op": "screenshot", "name": "panes" },
+    { "op": "teleport", "pos": [0.5, 7.5, 5.5], "yaw": -90, "pitch": -40 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "panes-high", "hideHud": true },
+    { "op": "teleport", "pos": [-6.5, 4.5, -2.5], "yaw": 0, "pitch": -15 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "panes-side", "hideHud": true },
+    { "op": "teleport", "pos": [0.5, 4.0, -8.5], "yaw": 90, "pitch": -10 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "panes-back", "hideHud": true }
+  ]
+}

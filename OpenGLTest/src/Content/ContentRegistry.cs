@@ -117,7 +117,9 @@ public static class ContentRegistry
 
             // A cutout block must never hide a neighbour's face, whatever the author wrote:
             // a face culled behind one shows through the texture's holes as an X-ray.
-            type.OccludesNeighbours = !type.Cutout && (definition.Occludes ?? baked.IsFullCube);
+            // A translucent block must never hide a neighbour's face either, or the
+            // neighbour shows a hole through the glass.
+            type.OccludesNeighbours = !type.Cutout && !type.Translucent && (definition.Occludes ?? baked.IsFullCube);
             type.PassesLight = definition.Light?.Passes ?? !baked.IsFullCube;
 
             // A fluid's model is a full cube (it only supplies the tile), but its surface sits
@@ -311,6 +313,7 @@ public static class ContentRegistry
                 CullSelf = definition.CullSelf ?? false,
                 CastsAmbientOcclusion = !fluid && (definition.CastsAO ?? solid),
                 Cutout = definition.Cutout ?? false,
+                Translucent = definition.Translucent ?? false,
                 Sway = definition.Sway ?? false,
                 LightEmission = emission,
                 Renderer = renderer,

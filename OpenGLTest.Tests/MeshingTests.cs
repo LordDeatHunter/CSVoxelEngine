@@ -70,6 +70,46 @@ public sealed class MeshingTests
     }
 
     [Fact]
+    public void GlassQuadsGoToTheTranslucentMesh()
+    {
+        var (manager, center) = WalledArea();
+        center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("glass").Id, 0);
+
+        var mesh = center.GenerateMeshData(manager);
+        Assert.NotNull(mesh);
+        Assert.Empty(mesh.Vertices);
+        Assert.Equal(24, mesh.TranslucentVertices.Count);
+        Assert.Equal(36, mesh.TranslucentIndices.Count);
+    }
+
+    [Fact]
+    public void TouchingGlassCullsTheSharedFaces()
+    {
+        var (manager, center) = WalledArea();
+        var glass = ContentRegistry.RequireBlock("glass").Id;
+        center.SetBlockRaw(8, 8, 8, glass, 0);
+        center.SetBlockRaw(9, 8, 8, glass, 0);
+
+        var mesh = center.GenerateMeshData(manager);
+        Assert.NotNull(mesh);
+        Assert.Equal(40, mesh.TranslucentVertices.Count);
+        Assert.Equal(60, mesh.TranslucentIndices.Count);
+    }
+
+    [Fact]
+    public void GlassNeverHidesAStoneFace()
+    {
+        var (manager, center) = WalledArea();
+        center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
+        center.SetBlockRaw(9, 8, 8, ContentRegistry.RequireBlock("glass").Id, 0);
+
+        var mesh = center.GenerateMeshData(manager);
+        Assert.NotNull(mesh);
+        Assert.Equal(24, mesh.Vertices.Count);
+        Assert.Equal(20, mesh.TranslucentVertices.Count);
+    }
+
+    [Fact]
     public void WaterSurfaceGoesToTheTranslucentMesh()
     {
         var (manager, center) = WalledArea();

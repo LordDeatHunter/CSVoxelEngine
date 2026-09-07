@@ -868,6 +868,12 @@ public class Chunk : IDisposable
             var lightBase = LightIdx(x, y, z);
             var quads = model.Quads;
 
+            // Translucent blocks (glass) replay the same baked quads into the blended
+            // lists drawn after the opaque world; culling, AO and lighting below are shared.
+            var dstVertices = type.Translucent ? tVertices : vertices;
+            var dstIndices = type.Translucent ? tIndices : indices;
+            ref var dstOffset = ref (type.Translucent ? ref tIndexOffset : ref indexOffset);
+
             for (var q = 0; q < quads.Length; q++)
             {
                 var quad = quads[q];
@@ -912,7 +918,7 @@ public class Chunk : IDisposable
                     // Minecraft's per-element "shade": false — full brightness, no face
                     // brightness and no ambient occlusion
                     for (var j = 0; j < 4; j++)
-                        vertices.Add(new Vertex(basePos + positions[j], 255, 255, 255, 255, uvs[j],
+                        dstVertices.Add(new Vertex(basePos + positions[j], 255, 255, 255, 255, uvs[j],
                             sun, block, normal, sway));
                 }
                 else if (quad.IsFullFace)
@@ -929,7 +935,7 @@ public class Chunk : IDisposable
                         var ao = VertexAO(side1, side2, corner);
                         var shade = ShadeLut[(face << 2) | ao];
 
-                        vertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j],
+                        dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j],
                             sun, block, normal, sway));
                     }
                 }
@@ -939,18 +945,18 @@ public class Chunk : IDisposable
                     // darken it by neighbours it does not touch: shade it flat and unoccluded
                     var shade = ShadeLut[(face << 2) | 3];
                     for (var j = 0; j < 4; j++)
-                        vertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j],
+                        dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j],
                             sun, block, normal, sway));
                 }
 
-                indices.Add((ushort)(indexOffset + 0));
-                indices.Add((ushort)(indexOffset + 1));
-                indices.Add((ushort)(indexOffset + 2));
-                indices.Add((ushort)(indexOffset + 0));
-                indices.Add((ushort)(indexOffset + 2));
-                indices.Add((ushort)(indexOffset + 3));
+                dstIndices.Add((ushort)(dstOffset + 0));
+                dstIndices.Add((ushort)(dstOffset + 1));
+                dstIndices.Add((ushort)(dstOffset + 2));
+                dstIndices.Add((ushort)(dstOffset + 0));
+                dstIndices.Add((ushort)(dstOffset + 2));
+                dstIndices.Add((ushort)(dstOffset + 3));
 
-                indexOffset += 4;
+                dstOffset += 4;
             }
         }
 

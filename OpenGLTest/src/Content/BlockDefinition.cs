@@ -21,6 +21,7 @@ public sealed class BlockDefinition
     public bool? CullSelf { get; set; }
     public bool? CastsAO { get; set; }
     public bool? Cutout { get; set; }
+    public bool? Translucent { get; set; }
     public bool? Sway { get; set; }
     public bool? HasItem { get; set; }
     public bool? NeedsSupport { get; set; }
