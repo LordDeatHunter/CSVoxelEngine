@@ -646,16 +646,19 @@ public class Chunk : IDisposable
     }
 
     /// <summary>
-    /// Remeshes this chunk right away and schedules everything in light radius for
-    /// remeshing, so a batch edit that already cleared the blocks (see
-    /// <see cref="ClearBlockAt"/>) becomes visible with correct light.
+    /// Schedules this chunk and everything in light radius for remeshing, so a batch edit
+    /// that already cleared the blocks (see <see cref="ClearBlockAt"/>) becomes visible
+    /// with correct light. Fully async through the dirty queue: a blast or a felling touches
+    /// several chunks and building them all synchronously hitched the frame, while the dirty
+    /// budget sorts closest-first and edited chunks sit at the camera, so they still rebuild
+    /// within a frame or two. Single-block edits (<see cref="RemoveBlockAt"/>,
+    /// <see cref="PlaceBlockAt"/>) stay synchronous: one build is cheap and instant.
     /// </summary>
     public void RemeshAfterBatchEdit(ChunkManager chunkManager)
     {
-        chunkManager.ImmediateRemesh(Position);
         var min = Position * Size;
         chunkManager.MarkAreaDirty(min, min + new Vector3(Size),
-            WorldGenerationConfig.LightPropagationRadius, skip: Position);
+            WorldGenerationConfig.LightPropagationRadius);
     }
 
     /// <summary>

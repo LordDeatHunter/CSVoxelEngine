@@ -361,11 +361,10 @@ public class World
         var collected = TopplingTree.Collect(_chunkManager, blockPos, brokenId);
         if (collected.Count < 2)
         {
-            // Nothing was held up by this block: drop it as-is. ClearBlockAt skips the
-            // remesh, so remesh the batch of one — otherwise the mined log visibly lingers.
-            if (chunk.ClearBlockAt(blockPos) == 0) return;
-            chunk.RemeshAfterBatchEdit(_chunkManager);
-            _dropManager.SpawnLoot(brokenId, blockPos);
+            // Nothing was held up by this block: drop it as-is through the normal
+            // single-block path, which remeshes synchronously.
+            if (chunk.RemoveBlockAt(blockPos, _chunkManager))
+                _dropManager.SpawnLoot(brokenId, blockPos);
             _fluidManager.ScheduleAround(blockPos);
             return;
         }
