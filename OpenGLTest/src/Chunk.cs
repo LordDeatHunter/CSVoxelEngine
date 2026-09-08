@@ -20,8 +20,8 @@ public class Chunk : IDisposable
     private const int BlockCount = Size * Size * Size;
 
     // Meshing reads a snapshot of this chunk plus a 1-block border from neighbors
-    private const int Padded = Size + 2;
-    private const int PaddedSq = Padded * Padded;
+    internal const int Padded = Size + 2;
+    internal const int PaddedSq = Padded * Padded;
     private const int PaddedCount = Padded * PaddedSq;
 
     // Voxel light travels up to LightPropagationRadius blocks through air, so it is
@@ -705,7 +705,14 @@ public class Chunk : IDisposable
     /// sunlight leaks along the border, which then stay until something re-dirties the chunk —
     /// so the build is abandoned instead and the caller puts the chunk back on the dirty list.
     /// </summary>
-    public ChunkMeshData? GenerateMeshData(ChunkManager chunkManager)
+    public ChunkMeshData? GenerateMeshData(ChunkManager chunkManager) => GenerateMeshData(chunkManager, greedy: true);
+
+    /// <summary>
+    /// <see cref="GenerateMeshData(ChunkManager)"/> with the binary greedy pass switchable: the
+    /// differential test meshes the same chunk both ways and compares. A parameter rather than
+    /// a static flag because test classes run in parallel and pool threads read it.
+    /// </summary>
+    internal ChunkMeshData? GenerateMeshData(ChunkManager chunkManager, bool greedy)
     {
         // Resolve before renting or touching anything: an abandoned build should cost nothing
         var neighbors = new Chunk?[27];
@@ -735,7 +742,7 @@ public class Chunk : IDisposable
             Array.Clear(sunLight, 0, LightCount);
             Array.Clear(blockLight, 0, LightCount);
             ComputeLight(lightBlocks, sunLight, blockLight, queue);
-            return GenerateMeshDataFromSnapshot(padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers);
+            return GenerateMeshDataFromSnapshot(padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy);
         }
         finally
         {
@@ -866,12 +873,15 @@ public class Chunk : IDisposable
     }
 
     /// <summary>
-    /// Turns the padded block snapshot into vertices. Each block picks an emitter from its
-    /// <see cref="BlockType.Renderer"/>: the two procedural ones (tapered wood, pebbles) build
-    /// their geometry from tiles, everything else replays its baked model's quads.
+    /// Turns the padded block snapshot into vertices. Plain full cubes (<see cref="BlockType.IsGreedy"/>)
+    /// go through the binary greedy pass first (<see cref="EmitGreedyFaces"/>), which merges
+    /// identical neighbouring faces into one quad. The per-voxel loop then handles the rest: each
+    /// block picks an emitter from its <see cref="BlockType.Renderer"/> — the two procedural ones
+    /// (tapered wood, pebbles) build their geometry from tiles, everything else replays its baked
+    /// model's quads.
     /// </summary>
     private ChunkMeshData GenerateMeshDataFromSnapshot(byte[] padded, byte[] paddedState,
-        byte[] sunLight, byte[] blockLight, MeshBufferPool pool)
+        byte[] sunLight, byte[] blockLight, MeshBufferPool pool, bool greedy)
     {
         // Rented, not allocated: ChunkManager returns them once the mesh is on the GPU
         var vertices = pool.RentVertices();
@@ -888,12 +898,18 @@ public class Chunk : IDisposable
         // the reflection and scene-copy passes need the narrower answer.
         var hasWater = false;
 
+        if (greedy)
+            EmitGreedyFaces(MeshScratch.Current, padded, sunLight, blockLight,
+                vertices, indices, ref indexOffset, tVertices, tIndices, ref tIndexOffset);
+
         for (var x = 0; x < Size; x++)
         for (var y = 0; y < Size; y++)
         for (var z = 0; z < Size; z++)
         {
             var blockId = _blocks[Idx(x, y, z)];
             if (blockId == 0) continue;
+            // Already emitted (merged) by the greedy pass above
+            if (greedy && BlockType.IsGreedy(blockId)) continue;
 
             var type = BlockType.ById[blockId];
             if (type == null) continue;
@@ -979,6 +995,10 @@ public class Chunk : IDisposable
                     lightCell = lightBase;
                 }
 
+                // Meshes are indexed with ushort (mirrors EmitFluid): stop emitting into a
+                // list that is full instead of wrapping the offset
+                if (dstVertices.Count > ushort.MaxValue - 3) continue;
+
                 var sun = sunLight[lightCell] / 15f;
                 var block = blockLight[lightCell] / 15f;
                 var face = quad.Face;
@@ -1034,6 +1054,279 @@ public class Chunk : IDisposable
         }
 
         return new ChunkMeshData(vertices, indices, tVertices, tIndices, hasWater);
+    }
+
+    // Axis each face's plane is perpendicular to (0 = X, 1 = Y, 2 = Z), in CubeFaces order,
+    // and whether the face looks along +axis. Rows and columns of a face's bit plane are the two
+    // other axes: X faces row = y, col = z; Y faces row = x, col = z; Z faces row = y, col = x.
+    private static readonly int[] FaceAxis = [2, 2, 0, 0, 1, 1];
+    private static readonly bool[] FacePositive = [false, true, false, true, true, false];
+
+    // Bits 1..16 of an 18-bit padded column: the chunk's own cells (0 and 17 are the halo)
+    private const uint ChunkBits = 0x1FFFE;
+
+    /// <summary>
+    /// Binary greedy pass over every <see cref="BlockType.IsGreedy"/> cell. Faces are found with
+    /// bit columns (a cell shows a face when its greedy bit is set and the occluder bit one
+    /// step along the face normal is not — the halo bits cull border faces exactly as the
+    /// per-voxel neighbour read does), keyed by everything that would make two cells' quads
+    /// differ (block, the four corner AO values, sun and lamp light, the submerged flag),
+    /// gathered per depth slice into one bit plane per key, and merged per plane into the widest,
+    /// then tallest, rectangles. The output is pixel-identical
+    /// to emitting each face on its own: a merge only happens along an axis where the key's AO
+    /// is constant, so the big quad's interpolated shade equals the per-cell quads' (see
+    /// <see cref="EmitGreedyRun"/>), and the UVs run 0..W / 0..H in tile units so the sampler's
+    /// REPEAT tiles the texture per cell.
+    /// </summary>
+    private static void EmitGreedyFaces(MeshScratch scratch, byte[] padded, byte[] sunLight, byte[] blockLight,
+        List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        List<Vertex> tVertices, List<ushort> tIndices, ref ushort tIndexOffset)
+    {
+        var greedyCols = scratch.GreedyColumns;
+        var occCols = scratch.OccluderColumns;
+        for (var a = 0; a < 3; a++)
+        {
+            Array.Clear(greedyCols[a]);
+            Array.Clear(occCols[a]);
+        }
+
+        // A. One pass over the padded snapshot fills the three column sets. Column index is
+        // (row + 1) * Padded + (col + 1) in the face's row/col convention; the bit is the padded
+        // coordinate along the axis.
+        var greedyById = BlockType.GreedyById;
+        var occludesById = BlockType.OccludesById;
+        var gX = greedyCols[0]; var gY = greedyCols[1]; var gZ = greedyCols[2];
+        var oX = occCols[0]; var oY = occCols[1]; var oZ = occCols[2];
+        var anyGreedy = false;
+        for (var px = 0; px < Padded; px++)
+        for (var py = 0; py < Padded; py++)
+        {
+            var rowBase = px * PaddedSq + py * Padded;
+            for (var pz = 0; pz < Padded; pz++)
+            {
+                var id = padded[rowBase + pz];
+                if (id == 0) continue;
+                if (greedyById[id])
+                {
+                    gX[py * Padded + pz] |= 1u << px;
+                    gY[px * Padded + pz] |= 1u << py;
+                    gZ[py * Padded + px] |= 1u << pz;
+                    anyGreedy = true;
+                }
+                if (occludesById[id])
+                {
+                    oX[py * Padded + pz] |= 1u << px;
+                    oY[px * Padded + pz] |= 1u << py;
+                    oZ[py * Padded + px] |= 1u << pz;
+                }
+            }
+        }
+        if (!anyGreedy) return;
+
+        var visible = scratch.Visible;
+        var table = scratch.PlaneTable;
+        var planeKeys = scratch.PlaneKeys;
+        var planeRows = scratch.PlaneRows;
+
+        for (var f = 0; f < 6; f++)
+        {
+            var axis = FaceAxis[f];
+            var positive = FacePositive[f];
+            var g = greedyCols[axis];
+            var o = occCols[axis];
+            var faceDelta = FaceNeighborDelta[f];
+            var lightDelta = LightFaceDelta[f];
+            var aoDeltas = AODeltas[f];
+
+            // B. Face mask per column: a face shows where the cell is greedy and the cell one
+            // step along the normal does not occlude
+            var anyVisible = 0u;
+            for (var row = 0; row < Size; row++)
+            for (var col = 0; col < Size; col++)
+            {
+                var column = (row + 1) * Padded + (col + 1);
+                var occ = o[column];
+                var mask = g[column] & ~(positive ? occ >> 1 : occ << 1) & ChunkBits;
+                visible[row * Size + col] = mask;
+                anyVisible |= mask;
+            }
+            if (anyVisible == 0) continue;
+
+            // C. Per depth slice: key every visible face and gather the faces of each key into
+            // one 16x16 bit plane. Keys go through a small open-addressed table (at most 256
+            // distinct keys per slice, 512 slots), which is cheaper than sorting the entries.
+            for (var depth = 0; depth < Size; depth++)
+            {
+                var bit = 1u << (depth + 1);
+                if ((anyVisible & bit) == 0) continue;
+                var planeCount = 0;
+                Array.Clear(table);
+
+                for (var row = 0; row < Size; row++)
+                for (var col = 0; col < Size; col++)
+                {
+                    if ((visible[row * Size + col] & bit) == 0) continue;
+
+                    int x, y, z;
+                    switch (axis)
+                    {
+                        case 0: x = depth; y = row; z = col; break;
+                        case 1: x = row; y = depth; z = col; break;
+                        default: x = col; y = row; z = depth; break;
+                    }
+
+                    var pIdx = (x + 1) * PaddedSq + (y + 1) * Padded + (z + 1);
+                    var id = padded[pIdx];
+                    var neighbour = padded[pIdx + faceDelta];
+                    // Glass panes fuse: a face against the same block is hidden (the occluder
+                    // mask already handled opaque neighbours)
+                    if (neighbour == id && BlockType.ById[id]!.CullSelf) continue;
+
+                    var ao = 0;
+                    for (var j = 0; j < 4; j++)
+                    {
+                        var side1 = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 0]]);
+                        var side2 = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 1]]);
+                        var corner = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 2]]);
+                        ao |= VertexAO(side1, side2, corner) << (2 * j);
+                    }
+
+                    var lightCell = LightIdx(x, y, z) + lightDelta;
+                    var key = id | ao << 8 | sunLight[lightCell] << 16 | blockLight[lightCell] << 20
+                              | (BlockType.IsFluid(neighbour) ? 1 << 24 : 0);
+
+                    // Find or open the key's plane
+                    var slot = (int)((uint)key * 0x9E3779B1u >> 23);
+                    int plane;
+                    while (true)
+                    {
+                        var entry = table[slot];
+                        if (entry == 0)
+                        {
+                            plane = planeCount++;
+                            table[slot] = plane + 1;
+                            planeKeys[plane] = key;
+                            Array.Clear(planeRows, plane * Size, Size);
+                            break;
+                        }
+                        if (planeKeys[entry - 1] == key)
+                        {
+                            plane = entry - 1;
+                            break;
+                        }
+                        slot = (slot + 1) & (MeshScratch.PlaneTableSize - 1);
+                    }
+                    planeRows[plane * Size + row] |= (ushort)(1 << col);
+                }
+
+                // D + E. Merge and emit each key's plane
+                for (var plane = 0; plane < planeCount; plane++)
+                {
+                    var key = planeKeys[plane];
+                    var type = BlockType.ById[key & 0xFF]!;
+                    var rows = planeRows.AsSpan(plane * Size, Size);
+                    if (type.Translucent)
+                        EmitGreedyRun(f, axis, depth, key, type, rows, tVertices, tIndices, ref tIndexOffset);
+                    else
+                        EmitGreedyRun(f, axis, depth, key, type, rows, vertices, indices, ref indexOffset);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Merges one key's bit plane into rectangles and emits them. Every cell in the plane has the
+    /// same four corner AO values, but that alone does not make the shade continuous across two
+    /// cells: for ordinary occluders the shared-vertex geometry makes it so, while a neighbour
+    /// that casts AO without occluding (leaves, tapered wood) can leave a step at a shared edge.
+    /// So a run only grows along an axis where the key's AO is the same at both ends of that
+    /// axis — then the two cells' shared corners carry the same value, the shade inside every cell
+    /// is affine, and the merged quad interpolates to exactly the per-cell result. Uniform-AO
+    /// terrain merges both ways; a strip beside a wall merges along the wall.
+    /// </summary>
+    private static void EmitGreedyRun(int f, int axis, int depth, int key, BlockType type, Span<ushort> rows,
+        List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset)
+    {
+        var ao = (key >> 8) & 0xFF;
+        var a0 = ao & 3;
+        var a1 = (ao >> 2) & 3;
+        var a2 = (ao >> 4) & 3;
+        var a3 = (ao >> 6) & 3;
+        // Corner pairs that differ along the col axis: (c0,c1),(c3,c2) on Y faces (c0-c1 runs
+        // along z there), (c0,c3),(c1,c2) on X and Z faces; the row axis takes the other pair.
+        var yFace = axis == 1;
+        var alongCol = yFace ? a0 == a1 && a3 == a2 : a0 == a3 && a1 == a2;
+        var alongRow = yFace ? a0 == a3 && a1 == a2 : a0 == a1 && a3 == a2;
+
+        var sun = ((key >> 16) & 15) / 15f;
+        var block = ((key >> 20) & 15) / 15f;
+        var submerged = ((key >> 24) & 1) != 0;
+        var layer = type.FaceTiles[f];
+        var sway = type.Sway ? 1f : 0f;
+        var normal = CubeFaces[f].normal;
+        var corners = CubeFaces[f].face;
+
+        for (var row = 0; row < Size; row++)
+        {
+            var bits = (int)rows[row];
+            while (bits != 0)
+            {
+                var start = BitOperations.TrailingZeroCount(bits);
+                // Run of set bits from start; ~(bits >> start) has a zero above bit 15 at the
+                // latest, so width never passes the plane's edge
+                var width = alongCol ? BitOperations.TrailingZeroCount(~(bits >> start)) : 1;
+                var mask = ((1 << width) - 1) << start;
+                var height = 1;
+                if (alongRow)
+                {
+                    while (row + height < Size && (rows[row + height] & mask) == mask)
+                    {
+                        rows[row + height] &= (ushort)~mask;
+                        height++;
+                    }
+                }
+                bits &= ~mask;
+
+                // Meshes are indexed with ushort (mirrors EmitFluid): stop emitting into a full
+                // list instead of wrapping the offset
+                if (vertices.Count > ushort.MaxValue - 3) return;
+
+                Vector3 origin, extent;
+                switch (axis)
+                {
+                    case 0:
+                        origin = new Vector3(depth, row, start);
+                        extent = new Vector3(1f, height, width);
+                        break;
+                    case 1:
+                        origin = new Vector3(row, depth, start);
+                        extent = new Vector3(height, 1f, width);
+                        break;
+                    default:
+                        origin = new Vector3(start, row, depth);
+                        extent = new Vector3(width, height, 1f);
+                        break;
+                }
+
+                // Corner j of the merged quad sits where corner j of a cell quad would, scaled
+                // by the extent, so key AO corner j lands on the matching corner
+                for (var j = 0; j < 4; j++)
+                {
+                    var local = corners[j] * extent;
+                    var shade = ShadeLut[(f << 2) | ((ao >> (2 * j)) & 3)];
+                    vertices.Add(new Vertex(origin + local, shade, shade, shade, 255,
+                        TiledUv(f, local, extent), layer, sun, block, normal, sway, submerged));
+                }
+
+                indices.Add((ushort)(indexOffset + 0));
+                indices.Add((ushort)(indexOffset + 1));
+                indices.Add((ushort)(indexOffset + 2));
+                indices.Add((ushort)(indexOffset + 0));
+                indices.Add((ushort)(indexOffset + 2));
+                indices.Add((ushort)(indexOffset + 3));
+                indexOffset += 4;
+            }
+        }
     }
 
     /// <summary>

@@ -43,6 +43,11 @@ public sealed record BlockType
     internal static readonly bool[] OccludesById = new bool[256];
     internal static readonly bool[] CastsAoById = new bool[256];
 
+    // Whether the binary greedy mesher may merge this block's faces: a plain full cube whose
+    // six faces are the untransformed cube faces (see ContentRegistry.BakesGreedy). Anything
+    // else goes through the per-quad scalar path.
+    internal static readonly bool[] GreedyById = new bool[256];
+
     // The fluid simulation asks these of every neighbour cell it looks at, so they get the
     // same flat-array treatment as the mesher's flags
     internal static readonly bool[] FluidById = new bool[256];
@@ -152,6 +157,11 @@ public sealed record BlockType
     /// as solid here (unlike <see cref="Occludes"/>).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool CastsAO(byte blockId) => CastsAoById[blockId];
+
+    /// <summary>Whether the greedy mesher handles this block (a plain full cube in the
+    /// <see cref="BlockRenderer.Model"/> renderer); false sends it down the per-quad path.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsGreedy(byte blockId) => GreedyById[blockId];
 
     /// <summary>Whether a block id is a flowing fluid; see <see cref="IsFluid"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

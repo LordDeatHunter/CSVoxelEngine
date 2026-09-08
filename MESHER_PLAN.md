@@ -386,10 +386,39 @@ targets net9.0).
   "spawn" shot is unusable in both runs (spawn chunks not loaded yet). AGENTS.md and
   PERF_TODO.md (item 11) updated. Not measured for FPS (no geometry change; item 9 showed
   vertex fetch is not the bottleneck).
-- [ ] **Phase 2 — binary greedy mesher.** Next. Start from the "Phase 2" section above; the
-  `TiledUv` helper and `BakedQuad.Tile` it needs already exist. Remember: no static on/off
-  switch (xUnit parallelism) — add the `GenerateMeshData(ChunkManager, bool greedy)` overload;
-  merged-count tests must sit at chunk Y = 8 so sunlight is uniform.
-- [ ] **Phase 3 — GL 4.6 context.**
+- [x] **Phase 2 — binary greedy mesher** (done 2026-09-08, uncommitted on `worldgen`).
+  `BlockType.GreedyById`/`IsGreedy` set in `BakeModels` via `ContentRegistry.BakesGreedy`
+  (six full shaded quads culled against their own face, on the `CubeFaces` corners, with plain
+  `TiledUv` UVs; `SelfCheckBuiltInParents` asserts all four parents qualify). `Chunk.EmitGreedyFaces`
+  runs before the per-voxel loop, which skips greedy cells; `GenerateMeshData(manager, greedy)`
+  is the internal test seam (`InternalsVisibleTo` added for the test project). Scratch lives in
+  `MeshScratch.Current` (`[ThreadStatic]`, ~20 KB). Steps A/B/D/E are as planned; step C
+  deviates: instead of bucketing entries per slice and sorting, each slice's visible faces go
+  through a 512-slot open-addressed key table that maps straight to one 16×16 bit plane per
+  key (cheaper than sorting up to 256 longs per slice, and no `faceEntries` buffer). The
+  `alongCol`/`alongRow` rule is exactly the necessary condition: two same-key cells share a
+  corner value iff the key's AO is constant along their axis, so no separate "leaf beside a
+  strip" test exists — the differential test (random soup of stone/dirt/grass/log/glass/
+  leaves/lamp/pebble/branch/water in the centre and all six neighbours, four seeds, chunk Y
+  0/1/2/8) rasterises both paths into unit cell faces with bilinear shade and UV-mod-1 at every
+  cell corner and compares them, plus verbatim comparison of all non-grid quads (random soup
+  merges only a few quads in ten thousand, so it asserts "no more vertices", not "fewer"). Other new
+  tests: eligibility of every shipped block and of hand-built models (cropped UV, rotation,
+  missing cullface, shade=false), tiled UV extents on a 3×2 slab and a 1×2×3 wall, a bare
+  16×16 floor = 24 vertices, a pillar splitting the floor top, a strip beside a wall merging
+  along it (3 top quads), full-leaf chunk within ushort indices on both paths. Both
+  merged-count tests moved to `MeshTestWorld.HighAbove` (chunk Y = 8). 141 tests pass.
+  Measured (headless, generated chunks, per-quad -> greedy vertices): spawn forest -16 %,
+  sea/beach -20 %, deep caves -14 %; build per non-empty chunk +12 % in the forest, within
+  2 % elsewhere. The small gain is the terrain's: around spawn only ~95 of 3258 grass-top
+  cells have an adjacent same-key neighbour (AO differs almost everywhere on the noise
+  surface, canopies fragment the same way; sunlight is uniform there). Visual check: `basic`,
+  `glass`, `water` from a `HEAD` worktree and the branch, diffed pixel-by-pixel — remaining
+  differences are wave/sway phase, HUD numbers and streaming progress; the overlook, panes
+  and walked shots were eyeballed and match (sand noise continues seamlessly across merged
+  quads). At-rest frame identical (PERF_TODO Measurements, item 11 phase 2).
+- [ ] **Phase 3 — GL 4.6 context.** Next. Start from the "Phase 3" section above: `WindowManager`
+  `APIVersion(4, 6)`, `#version 460 core` in every shader, verify the startup GL version line and
+  the three scenarios, note the macOS drop in `AGENTS.md`.
 - [ ] **Phase 4 — geometry pool + multi-draw indirect.**
 - [ ] **Phase 5 (optional) — compute frustum cull.**

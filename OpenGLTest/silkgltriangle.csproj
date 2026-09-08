@@ -12,6 +12,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <!-- The test project drives internal seams (GenerateMeshData(greedy), BakesGreedy, TiledUv) -->
+        <InternalsVisibleTo Include="silkgltriangle.Tests" />
+    </ItemGroup>
+    <ItemGroup>
         <PackageReference Include="Silk.NET.Input" Version="2.22.0" />
         <PackageReference Include="Silk.NET.Windowing" Version="2.*" />
         <PackageReference Include="Silk.NET.OpenGL" Version="2.*" />

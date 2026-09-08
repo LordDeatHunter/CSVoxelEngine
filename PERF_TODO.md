@@ -167,6 +167,21 @@ fragments; the mesher/renderer change is preserved in the stash named in item 5.
   re-measured — the vertex grew 8 bytes, and item 9 showed vertex fetch is not the bottleneck).
   128 tests pass; the three visual scenarios were diffed pixel-by-pixel against the pre-change
   build (result recorded in `MESHER_PLAN.md`).
+  Phase 2 done 2026-09-08: binary greedy mesher (`Chunk.EmitGreedyFaces`, `MeshScratch`),
+  pixel-identical by construction — it merges only within identical block/AO/light/submerged
+  keys and only along axes where the key's AO is constant; `GreedyMeshingTests` rasterises both
+  paths into unit cell faces and compares every one. Headless geometry over generated chunks
+  (per-quad -> greedy, opaque + translucent vertices): spawn forest 5x5x6 chunks 308.6k ->
+  258.3k (-16 %, 9.4 -> 7.9 MB), sea/beach 5x5x5 194.8k -> 156.1k (-20 %), deep caves 5x5x4
+  146.7k -> 126.1k (-14 %). Why so little: of 3258 grass-top cells around spawn only ~95
+  adjacent pairs share a key — the noise terrain is rough enough that corner AO differs between
+  almost every pair of neighbouring surface cells, and canopy faces (leaf-vs-leaf, both sides
+  kept) fragment on AO the same way; sunlight was 15 on every grass top, so light is not the
+  limiter. Merging across AO/light steps would change the picture, so this is the ceiling for
+  an exact mesher on this terrain. Build time per non-empty chunk (pool thread, includes the
+  light flood): forest 1.27 -> 1.41 ms, sea 0.78 -> 0.79, deep 0.39 -> 0.40. Frame at rest
+  unchanged (see Measurements); screenshots identical apart from wave/sway phase and
+  streaming progress. 141 tests pass.
 
 - [ ] **10. GC and runtime settings.** `GCSettings.LatencyMode = SustainedLowLatency` in
   `Program.Main`; explicit `<ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>`
@@ -231,3 +246,4 @@ What it says:
 | 7 | Release | sea flight (spawn 45,30,-45, look 0,-35) | - | - | alloc 1060 -> 534 MB, GC 57/29/9 -> 52/22/3, `fluidWake` avg 0.001 / max 0.01 ms in both builds, `fluidTick` avg 0.013 -> 0.020; ~7000 builds per window. Shoreline and canopy identical |
 | 5 | Release | forest (look -130,8), still | 297-313 | 280-283 | REVERTED. before: frame 3.21-3.37, CPU 2.95-3.09, GPU 1.81-1.87, worldPass 1.05-1.12; after: frame 3.55, CPU 3.27, GPU 2.13, worldPass 1.32. Cutout-first: frame 3.47, GPU 1.98, worldPass 1.26. 1313 visible chunks |
 | 9 | Release | spawn, still | 329 avg | 312 avg | FPS is the on-screen counter averaged over 3 settled still shots (15 s settle + 2 s apart) from a scripted run — no X overlay in a headless session, so no per-section ms. Intra-run swing is 280-345 either way, so the frame is unchanged within noise, as expected: vertex fetch was never the bottleneck (GPU ~1.7 ms vs CPU ~3.8 ms) and a rest frame builds no meshes. What moved is memory: vertex lists 48 -> 24 B/vertex (~96 KB per pooled 4096-list), asserted by `VertexPackingRoundTrips`. Leaf holes, water blending, lighting/fog, HUD icons identical before/after; clean log, no shader or chunk-gen errors |
+| 11 (phase 2) | Release | spawn (0,30,0), look -90,-10, VOXEL_TIME=60, still, scripted 20 s, debug overlay on | 54-57 / 40-42 | 51-60 / 38-39 | two interleaved pairs (HEAD worktree vs branch), same 1769 visible chunks. The session was GPU-bound with low clocks (gpu ~= frame): frame 17.5-18.4 / 24.0-24.8 ms head vs 16.7-19.5 / 25.4-25.7 ms branch, worldPass 4.1-5.4 both. No mesh builds happen at rest, so no change was expected; what moved is resident geometry (-14..-20 % vertices, see item 11). The CPU section that absorbs the GPU wait differs: `lighting` 2.8-3.9 ms on head, `shadows` 4.7-7.5 ms on the branch, with the sum and the frame equal - a redistribution of the stall, not a cost |

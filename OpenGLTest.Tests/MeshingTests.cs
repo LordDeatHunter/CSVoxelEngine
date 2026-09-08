@@ -7,38 +7,10 @@ public sealed class MeshingTests
 {
     public MeshingTests() => TestContent.EnsureLoaded();
 
-    private static (ChunkManager Manager, Chunk Center) WalledArea()
-    {
-        var manager = new ChunkManager(null!);
-        var center = new Chunk(null!, Vector3.Zero, generateBlockData: false);
-        center.IsBlockDataReady = true;
-        manager.Chunks[Vector3.Zero] = center;
-        foreach (var offset in Vector3Directions.CardinalDirections)
-        {
-            var neighbour = new Chunk(null!, offset, generateBlockData: false);
-            neighbour.IsBlockDataReady = true;
-            manager.Chunks[offset] = neighbour;
-        }
-        return (manager, center);
-    }
-
-    private static void FillAll(Chunk chunk, byte id)
-    {
-        for (var x = 0; x < Chunk.Size; x++)
-        for (var y = 0; y < Chunk.Size; y++)
-        for (var z = 0; z < Chunk.Size; z++)
-            chunk.SetBlockRaw(x, y, z, id, 0);
-    }
-
-    private static void FillWalledArea(ChunkManager manager, byte id)
-    {
-        foreach (var chunk in manager.Chunks.Values) FillAll(chunk, id);
-    }
-
     [Fact]
     public void SingleCubeEmitsSixFaces()
     {
-        var (manager, center) = WalledArea();
+        var (manager, center) = MeshTestWorld.WalledArea();
         center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
 
         var mesh = center.GenerateMeshData(manager);
@@ -51,21 +23,29 @@ public sealed class MeshingTests
     [Fact]
     public void SharedFaceIsCulledBetweenCubes()
     {
-        var (manager, center) = WalledArea();
+        // High above the terrain so sunlight is uniform: the two cubes' shared face is culled
+        // and the greedy pass merges the remaining coplanar pairs (+-Y, +-Z) into six quads
+        var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
         var stone = ContentRegistry.RequireBlock("stone").Id;
         center.SetBlockRaw(8, 8, 8, stone, 0);
         center.SetBlockRaw(9, 8, 8, stone, 0);
 
         var mesh = center.GenerateMeshData(manager);
         Assert.NotNull(mesh);
-        Assert.Equal(40, mesh.Vertices.Count);
-        Assert.Equal(60, mesh.Indices.Count);
+        Assert.Equal(24, mesh.Vertices.Count);
+        Assert.Equal(36, mesh.Indices.Count);
+
+        // The per-quad path keeps the ten faces apart
+        var scalar = center.GenerateMeshData(manager, greedy: false);
+        Assert.NotNull(scalar);
+        Assert.Equal(40, scalar.Vertices.Count);
+        Assert.Equal(60, scalar.Indices.Count);
     }
 
     [Fact]
     public void MissingFaceNeighbourAbandonsTheBuild()
     {
-        var (manager, center) = WalledArea();
+        var (manager, center) = MeshTestWorld.WalledArea();
         manager.Chunks.TryRemove(Vector3.UnitX, out _);
 
         Assert.Null(center.GenerateMeshData(manager));
@@ -74,7 +54,7 @@ public sealed class MeshingTests
     [Fact]
     public void AllAirChunkBuildsEmpty()
     {
-        var (manager, center) = WalledArea();
+        var (manager, center) = MeshTestWorld.WalledArea();
 
         var mesh = center.GenerateMeshData(manager);
         Assert.NotNull(mesh);
@@ -85,7 +65,7 @@ public sealed class MeshingTests
     [Fact]
     public void GlassQuadsGoToTheTranslucentMesh()
     {
-        var (manager, center) = WalledArea();
+        var (manager, center) = MeshTestWorld.WalledArea();
         center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("glass").Id, 0);
 
         var mesh = center.GenerateMeshData(manager);
@@ -98,21 +78,27 @@ public sealed class MeshingTests
     [Fact]
     public void TouchingGlassCullsTheSharedFaces()
     {
-        var (manager, center) = WalledArea();
+        // Glass casts no AO, so like the stone pair above it merges to six quads
+        var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
         var glass = ContentRegistry.RequireBlock("glass").Id;
         center.SetBlockRaw(8, 8, 8, glass, 0);
         center.SetBlockRaw(9, 8, 8, glass, 0);
 
         var mesh = center.GenerateMeshData(manager);
         Assert.NotNull(mesh);
-        Assert.Equal(40, mesh.TranslucentVertices.Count);
-        Assert.Equal(60, mesh.TranslucentIndices.Count);
+        Assert.Equal(24, mesh.TranslucentVertices.Count);
+        Assert.Equal(36, mesh.TranslucentIndices.Count);
+
+        var scalar = center.GenerateMeshData(manager, greedy: false);
+        Assert.NotNull(scalar);
+        Assert.Equal(40, scalar.TranslucentVertices.Count);
+        Assert.Equal(60, scalar.TranslucentIndices.Count);
     }
 
     [Fact]
     public void GlassNeverHidesAStoneFace()
     {
-        var (manager, center) = WalledArea();
+        var (manager, center) = MeshTestWorld.WalledArea();
         center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
         center.SetBlockRaw(9, 8, 8, ContentRegistry.RequireBlock("glass").Id, 0);
 
@@ -125,7 +111,7 @@ public sealed class MeshingTests
     [Fact]
     public void WaterSurfaceGoesToTheTranslucentMesh()
     {
-        var (manager, center) = WalledArea();
+        var (manager, center) = MeshTestWorld.WalledArea();
         center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("water").Id, FluidState.Source);
 
         var mesh = center.GenerateMeshData(manager);
@@ -137,8 +123,8 @@ public sealed class MeshingTests
     [Fact]
     public void EnclosedChunkBuildsEmpty()
     {
-        var (manager, center) = WalledArea();
-        FillWalledArea(manager, ContentRegistry.RequireBlock("stone").Id);
+        var (manager, center) = MeshTestWorld.WalledArea();
+        MeshTestWorld.FillWalledArea(manager, ContentRegistry.RequireBlock("stone").Id);
 
         var mesh = center.GenerateMeshData(manager);
         Assert.NotNull(mesh);
@@ -157,8 +143,8 @@ public sealed class MeshingTests
     [InlineData(0, 0, -1, 8, 8, 15)]
     public void HoleInNeighbourPlaneEmitsOneFace(int ox, int oy, int oz, int hx, int hy, int hz)
     {
-        var (manager, center) = WalledArea();
-        FillWalledArea(manager, ContentRegistry.RequireBlock("stone").Id);
+        var (manager, center) = MeshTestWorld.WalledArea();
+        MeshTestWorld.FillWalledArea(manager, ContentRegistry.RequireBlock("stone").Id);
         manager.Chunks[new Vector3(ox, oy, oz)].SetBlockRaw(hx, hy, hz, 0, 0);
 
         var mesh = center.GenerateMeshData(manager);
@@ -170,8 +156,8 @@ public sealed class MeshingTests
     [Fact]
     public void AirPocketInsideSolidChunkStillMeshes()
     {
-        var (manager, center) = WalledArea();
-        FillWalledArea(manager, ContentRegistry.RequireBlock("stone").Id);
+        var (manager, center) = MeshTestWorld.WalledArea();
+        MeshTestWorld.FillWalledArea(manager, ContentRegistry.RequireBlock("stone").Id);
         center.SetBlockRaw(8, 8, 8, 0, 0);
 
         var mesh = center.GenerateMeshData(manager);
@@ -182,7 +168,7 @@ public sealed class MeshingTests
     [Fact]
     public void ReturnedBuffersAreRentedAgain()
     {
-        var (manager, center) = WalledArea();
+        var (manager, center) = MeshTestWorld.WalledArea();
         center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
 
         var first = center.GenerateMeshData(manager);
@@ -203,7 +189,7 @@ public sealed class MeshingTests
     [Fact]
     public void OversizedBuffersAreNotRetained()
     {
-        var (manager, center) = WalledArea();
+        var (manager, center) = MeshTestWorld.WalledArea();
         center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
 
         var mesh = center.GenerateMeshData(manager);
@@ -253,7 +239,7 @@ public sealed class MeshingTests
     [Fact]
     public void SubmergedFacesAreFlagged()
     {
-        var (manager, center) = WalledArea();
+        var (manager, center) = MeshTestWorld.WalledArea();
         center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
         center.SetBlockRaw(8, 9, 8, ContentRegistry.RequireBlock("water").Id, FluidState.Source);
 
@@ -284,7 +270,7 @@ public sealed class MeshingTests
     [Fact]
     public void WaterChunkReportsHasWater()
     {
-        var (waterManager, waterChunk) = WalledArea();
+        var (waterManager, waterChunk) = MeshTestWorld.WalledArea();
         waterChunk.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("water").Id, FluidState.Source);
         var waterMesh = waterChunk.GenerateMeshData(waterManager);
         Assert.NotNull(waterMesh);
@@ -292,14 +278,14 @@ public sealed class MeshingTests
         Assert.NotEmpty(waterMesh.TranslucentVertices);
 
         // Glass lands in the same translucent lists, so a translucent mesh is not proof of water
-        var (glassManager, glassChunk) = WalledArea();
+        var (glassManager, glassChunk) = MeshTestWorld.WalledArea();
         glassChunk.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("glass").Id, 0);
         var glassMesh = glassChunk.GenerateMeshData(glassManager);
         Assert.NotNull(glassMesh);
         Assert.False(glassMesh.HasWater);
         Assert.NotEmpty(glassMesh.TranslucentVertices);
 
-        var (stoneManager, stoneChunk) = WalledArea();
+        var (stoneManager, stoneChunk) = MeshTestWorld.WalledArea();
         stoneChunk.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
         var stoneMesh = stoneChunk.GenerateMeshData(stoneManager);
         Assert.NotNull(stoneMesh);

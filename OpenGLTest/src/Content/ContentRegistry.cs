@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Text.Json;
 
 namespace silkgltriangle;
@@ -134,9 +135,42 @@ public static class ContentRegistry
 
             BlockType.OccludesById[id] = type.OccludesNeighbours;
             BlockType.PassesLightById[id] = type.PassesLight;
+            BlockType.GreedyById[id] = type.Renderer == BlockRenderer.Model && !type.Fluid && BakesGreedy(baked);
         }
 
         SelfCheckBuiltInParents();
+    }
+
+    /// <summary>
+    /// Whether a baked model is exactly the six untransformed cube faces, so the greedy mesher
+    /// can rebuild any of its faces from (face, extent) alone: one full, shaded quad per cube
+    /// face, culled against its own side, positioned on the <see cref="Chunk.CubeFaces"/>
+    /// corners and textured with the plain <see cref="Chunk.TiledUv"/> orientation. A rotated
+    /// or cropped face UV, a sub-cell element or an unshaded face keeps the per-quad path.
+    /// Cutout (leaves) and translucent (glass) cubes qualify: their culling rule is the same
+    /// one, and the mesher picks the destination list per block type.
+    /// </summary>
+    internal static bool BakesGreedy(BakedModel baked)
+    {
+        if (!baked.IsFullCube || baked.Quads.Length != 6) return false;
+
+        var seen = 0;
+        foreach (var quad in baked.Quads)
+        {
+            if (!quad.IsFullFace || !quad.Shade || quad.CullFace != quad.Face) return false;
+            if ((seen & (1 << quad.Face)) != 0) return false;
+            seen |= 1 << quad.Face;
+            if (quad.Tile != baked.FaceTiles[quad.Face]) return false;
+
+            var corners = Chunk.CubeFaces[quad.Face].face;
+            for (var j = 0; j < 4; j++)
+            {
+                if (quad.Positions[j] != corners[j]) return false;
+                if (quad.Uvs[j] != Chunk.TiledUv(quad.Face, corners[j], Vector3.One)) return false;
+            }
+        }
+
+        return seen == 0x3F;
     }
 
     /// <summary>
@@ -561,6 +595,12 @@ public static class ContentRegistry
                 if (!quad.IsFullFace || quad.CullFace != quad.Face)
                     throw new InvalidOperationException(
                         $"Built-in model '{parent}' baked a quad on face {quad.Face} with cullface {quad.CullFace} (full face: {quad.IsFullFace}).");
+
+            // Every full-cube block derives from one of these, so the greedy mesher must be
+            // able to take all of them or most of the world falls back to the per-quad path
+            if (!BakesGreedy(baked))
+                throw new InvalidOperationException(
+                    $"Built-in model '{parent}' does not bake to plain cube faces the greedy mesher can merge.");
         }
     }
 

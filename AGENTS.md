@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## Project overview
 
-A Minecraft-style voxel engine written in C# on .NET 9, using **Silk.NET** (windowing, input, OpenGL bindings) and StbImageSharp for texture loading. It renders an infinite, procedurally generated world (FastNoiseLite OpenSimplex2 noise) with chunk streaming, an underground of 3D-noise caves, worm-carved tunnels and heightmap ravines, per-face chunk meshing with ambient occlusion (a binary greedy mesher is in progress, see `MESHER_PLAN.md`), frustum culling, block breaking/placement via raycast, and simple player physics (gravity, jumping, collision). The player spawns standing on the terrain at the origin (`Camera.SpawnPosition`).
+A Minecraft-style voxel engine written in C# on .NET 9, using **Silk.NET** (windowing, input, OpenGL bindings) and StbImageSharp for texture loading. It renders an infinite, procedurally generated world (FastNoiseLite OpenSimplex2 noise) with chunk streaming, an underground of 3D-noise caves, worm-carved tunnels and heightmap ravines, binary greedy chunk meshing with ambient occlusion (plain cubes are culled by bitmask and merged into larger quads wherever the result is pixel-identical; procedural blocks and fluids keep per-quad emitters — see `MESHER_PLAN.md`), frustum culling, block breaking/placement via raycast, and simple player physics (gravity, jumping, collision). The player spawns standing on the terrain at the origin (`Camera.SpawnPosition`).
 
 There is a single executable project. Historical naming quirks to be aware of:
 
@@ -69,6 +69,24 @@ quads (`BakedQuad.Uvs` + `.Tile`) and every procedural emitter go through `Chunk
 local, extent)`, the single definition of per-face texture orientation; `CropUv` is its
 extent-1 case. Bind these textures with `TextureTarget.Texture2DArray`.
 
+**Chunk meshing.** `Chunk.GenerateMeshDataFromSnapshot` runs two passes over the padded 18³
+block snapshot. The binary greedy pass (`EmitGreedyFaces`, scratch in the `[ThreadStatic]`
+`MeshScratch`) takes every block flagged `BlockType.IsGreedy`: a `Model`-renderer block whose
+baked model is exactly the six untransformed cube faces (`ContentRegistry.BakesGreedy`; all four
+built-in parents qualify, so stone, dirt, grass, logs, TNT, lamps, leaves and glass all do). It
+builds per-axis bit columns of greedy and occluding cells, finds visible faces with one
+shift-and-mask per column (the halo bits cull border faces exactly like the neighbour read),
+keys each face by block id, the four corner AO values, sun and lamp light and the submerged
+flag, gathers each key's faces per depth slice into a 16×16 bit plane and merges rectangles —
+but only along an axis where the key's AO is constant, so the merged quad's interpolated shade
+equals the per-cell shade exactly. Merged quads carry UVs 0..W / 0..H in tile units (`TiledUv`)
+and the sampler's REPEAT tiles them. The per-voxel loop then skips greedy cells and emits
+everything else as before (tapered wood, pebbles, fluids, any model with cropped or rotated
+UVs). `GenerateMeshData(manager, greedy: false)` is the test seam; `GreedyMeshingTests`
+rasterises both outputs into unit cell faces and requires them to be equal. Because a merge
+never crosses a lighting or AO difference, this world's rough noise terrain and leaf canopies
+only give ~15-20 % fewer vertices (`PERF_TODO.md` item 11), not the 5-10× of flat worlds.
+
 ## Layout
 
 ```
@@ -76,7 +94,8 @@ OpenGLTest/
   src/
     Program.cs                 # entry point, wires window callbacks, input polling
     World.cs                   # owns Camera, ChunkManager, ChunkGenerationWorker, LodManager; raycast block edit API
-    Chunk.cs                   # 16^3 block storage (byte IDs), block/column fill + cave carving via WorldGen/, mesh data generation + AO
+    Chunk.cs                   # 16^3 block storage (byte IDs), block/column fill + cave carving via WorldGen/, mesh data generation (greedy pass + per-quad emitters) + AO
+    MeshScratch.cs             # per-thread scratch buffers of the binary greedy mesh pass
     ChunkGenerationWorker.cs   # background threads creating chunks around the camera
     Camera.cs                  # FPS camera, physics (gravity/jump/collision), DDA raycast
     LodRegion.cs               # far-terrain LOD: region columns meshed at reduced resolution from heightmaps; per-column chunk-Y ranges for burial
