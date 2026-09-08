@@ -61,7 +61,9 @@ public sealed class CraftingTests
         var pickaxe = ContentRegistry.RequireItem("primitive_pickaxe").Id;
         var recipe = ContentRegistry.RecipeForResult(pickaxe)!;
 
-        Assert.True(inventory.Add(flint, Inventory.MiscCapacity - 3));
+        // Fill the pool to exactly full whatever the starting stock holds, so the
+        // craft below only fits because its ingredients free the room first.
+        Assert.True(inventory.Add(flint, Inventory.MiscCapacity - inventory.UsedOf(InventoryCategory.Misc) - 3));
         Assert.True(inventory.Add(branch));
         Assert.True(inventory.Add(vine, 2));
         Assert.Equal(Inventory.MiscCapacity, inventory.UsedOf(InventoryCategory.Misc));

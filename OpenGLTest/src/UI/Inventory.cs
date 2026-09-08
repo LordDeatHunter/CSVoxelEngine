@@ -51,6 +51,10 @@ public class Inventory
     /// <summary>Empty buckets the player spawns with; water is only reachable with one.</summary>
     public const int StartingBuckets = 1;
 
+    /// <summary>Compasses in the misc pool at spawn; the player equips one to a hotbar
+    /// slot through the [E] panel to turn the HUD compass on.</summary>
+    public const int StartingCompasses = 1;
+
     // A pickup makes the slot's icon jump and settle back, echoing the count change
     // drawn in the slot's corner
     public const float PopSeconds = 0.25f;
@@ -276,6 +280,19 @@ public class Inventory
         return _tools.Any(t => t.InstanceId == slot.ToolInstance) ? slot.ToolInstance : 0;
     }
 
+    /// <summary>
+    /// Whether any hotbar slot shows this id — equipped, whether selected or not. Used by
+    /// the HUD compass, which is visible while its item sits anywhere on the hotbar.
+    /// </summary>
+    public bool ContainsInHotbar(byte id)
+    {
+        if (id == 0) return false;
+        for (var i = 0; i < SlotCount; i++)
+            if (IdAt(i) == id)
+                return true;
+        return false;
+    }
+
     /// <summary>Pool total for a stackable id, or the live-instance count for a tool id.</summary>
     public int CountFor(byte id)
     {
@@ -419,6 +436,11 @@ public class Inventory
         for (var i = 0; i < StartingBuckets; i++)
             if (ItemType.Types.Values.FirstOrDefault(t => t.UseAction == ItemUseAction.PickupFluid) is { } bucket)
                 _tools.Add(new ToolEntry(_nextToolInstance++, bucket.Id));
+        // A plain pickup like flint, found by display name the way the bucket is found
+        // by behaviour. No use action: it only ever sits on the hotbar for the compass.
+        if (ItemType.Types.Values.FirstOrDefault(t =>
+                t.Name.Equals("Compass", StringComparison.OrdinalIgnoreCase)) is { } compass)
+            _misc[compass.Id] = _misc.GetValueOrDefault(compass.Id) + StartingCompasses;
     }
 
     private sealed record ToolEntry(int InstanceId, byte ItemId);

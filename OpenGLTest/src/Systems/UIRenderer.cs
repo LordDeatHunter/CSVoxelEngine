@@ -64,6 +64,24 @@ public class UIRenderer : IDisposable
     private const float ProfilerPadding = 6f;
     private static readonly Rgba ProfilerBackground = Rgba.Grey(0.04f, 0.6f);
 
+    // Top-center compass bar (DrawCompass), in pixels: a scrolling 120-degree window
+    // of the horizon with cardinals every 45 degrees and minor ticks every 15
+    private const float CompassTop = 10f;
+    private const float CompassWidth = 440f;
+    private const float CompassHeight = 42f;
+    private const float CompassSidePad = 14f;
+    private const float CompassHalfSpan = 60f;
+    private const float CompassTickStep = 15f;
+    private const float CompassCardinalStep = 45f;
+    private const float CompassReadoutTop = 2f;
+    private const float CompassTickTop = 20f;
+    private const float CompassCoordsGap = 4f;
+    private const float CompassSpawnDot = 8f;
+    private const float CompassHideSpawnWithin = 1f;
+    private static readonly Rgba CompassNorth = new(255, 92, 92);
+    private static readonly Rgba CompassSpawn = new(140, 210, 255);
+    private static readonly Rgba CompassTick = Rgba.Grey(0.75f, 0.9f);
+
     // Three-quarter view: yaw swings a side face towards the viewer, pitch tilts the top down
     private const float IconYaw = 45f * MathF.PI / 180f;
     private const float IconPitch = 30f * MathF.PI / 180f;
@@ -259,6 +277,69 @@ public class UIRenderer : IDisposable
 
         for (var i = 0; i < lines.Count; i++)
             DrawText(lines[i], new Vector2(ProfilerLeft, top + i * lineStep), _countScale, Rgba.White);
+    }
+
+    /// <summary>
+    /// RPG-style compass: a translucent bar across the top centre showing a 120-degree
+    /// window of the horizon around the camera heading, with cardinal labels every 45
+    /// degrees (N in red), minor ticks every 15, a centre caret, the numeric heading on
+    /// top and a light-blue dot at the bearing toward the world spawn. The font only
+    /// covers printable ASCII, so the readout is "N 005" rather than using a degree sign.
+    /// <paramref name="yaw"/> is the camera yaw in degrees (0 looks down +X);
+    /// <paramref name="position"/> is the eye position, also feeding the optional
+    /// coordinates line under the bar.
+    /// </summary>
+    public void DrawCompass(float yaw, Vector3 position, bool showCoordinates = true)
+    {
+        var heading = Compass.HeadingFromYaw(yaw);
+        var cx = _screenSize.X * 0.5f;
+        var halfInner = CompassWidth * 0.5f - CompassSidePad;
+
+        DrawRect(new Vector2(cx, CompassTop + CompassHeight * 0.5f),
+            new Vector2(CompassWidth, CompassHeight), PanelBackground);
+
+        var readout = $"{Compass.CardinalName(heading)} {(int)MathF.Round(heading) % 360:D3}";
+        DrawTextCentred(readout, cx, CompassTop + CompassReadoutTop, _countScale, Rgba.White);
+
+        var tickTop = CompassTop + CompassTickTop;
+        var start = MathF.Floor((heading - CompassHalfSpan) / CompassTickStep) * CompassTickStep;
+        for (var d = start; d <= heading + CompassHalfSpan + 0.01f; d += CompassTickStep)
+        {
+            var rel = Compass.WrapDelta(d - heading);
+            if (MathF.Abs(rel) > CompassHalfSpan) continue;
+            var x = cx + rel / CompassHalfSpan * halfInner;
+            var norm = ((d % 360f) + 360f) % 360f;
+            if (MathF.Abs(norm % CompassCardinalStep) < 0.01f)
+            {
+                var name = Compass.CardinalName(norm);
+                DrawTextCentred(name, x, tickTop, _countScale,
+                    name == "N" ? CompassNorth : Rgba.White);
+            }
+            else
+            {
+                DrawRect(new Vector2(x, tickTop + 7f), new Vector2(2f, 10f), CompassTick);
+            }
+        }
+
+        var spawnDx = Compass.SpawnX - position.X;
+        var spawnDz = Compass.SpawnZ - position.Z;
+        if (MathF.Sqrt(spawnDx * spawnDx + spawnDz * spawnDz) > CompassHideSpawnWithin)
+        {
+            var spawnRel = Compass.WrapDelta(
+                Compass.BearingTo(position.X, position.Z, Compass.SpawnX, Compass.SpawnZ) - heading);
+            if (MathF.Abs(spawnRel) <= CompassHalfSpan)
+                DrawSquare(new Vector2(cx + spawnRel / CompassHalfSpan * halfInner, tickTop + 16f),
+                    CompassSpawnDot, CompassSpawn);
+        }
+
+        DrawRect(new Vector2(cx, tickTop + 8f), new Vector2(2f, 22f), Rgba.White);
+
+        if (showCoordinates && _font != null)
+        {
+            var coords = $"XYZ {position.X:0.0} / {position.Y:0.0} / {position.Z:0.0}";
+            DrawTextCentred(coords, cx, CompassTop + CompassHeight + CompassCoordsGap,
+                _countScale, Rgba.White);
+        }
     }
 
     /// <summary>

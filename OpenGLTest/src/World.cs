@@ -212,9 +212,9 @@ public class World
     /// counter (the same flag that turns the debug console logging on).
     /// </summary>
     public void RenderUI(RenderManager renderManager, InventoryView view, float time,
-        int fps, bool showProfiler)
+        int fps, bool showProfiler, bool showCoordinates = true)
     {
-        renderManager.RenderUI(_window, Inventory, view, time, fps, showProfiler);
+        renderManager.RenderUI(_window, Inventory, view, time, fps, showProfiler, Camera, showCoordinates);
     }
     
     /// <summary>

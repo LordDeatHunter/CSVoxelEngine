@@ -1573,7 +1573,7 @@ public class RenderManager : IDisposable
     }
 
     public void RenderUI(IWindow window, Inventory inventory, InventoryView view, float time,
-        int fps, bool showProfiler)
+        int fps, bool showProfiler, Camera? camera = null, bool showCoordinates = true)
     {
         ui.Begin(window.Size);
 
@@ -1588,6 +1588,8 @@ public class RenderManager : IDisposable
 
         if (!view.IsOpen)
             ui.DrawCrosshair();
+        if (camera != null && HasCompassEquipped(inventory))
+            ui.DrawCompass(camera.Yaw, camera.Position, showCoordinates);
         ui.DrawFps(fps);
         if (showProfiler)
             ui.DrawProfiler(FrameProfiler.Lines);
@@ -1602,6 +1604,27 @@ public class RenderManager : IDisposable
     public InventoryCategory? UiPanelTabAt(Vector2 point) => ui.PanelTabAt(point);
     public int? UiPanelRowAt(Vector2 point, int rowCount) => ui.PanelRowAt(point, rowCount);
 
+    // The compass item id, resolved once: null when no item named "compass" is registered,
+    // in which case the HUD compass never shows rather than throwing every frame.
+    private byte? _compassId;
+    private bool _compassResolved;
+
+    private bool HasCompassEquipped(Inventory inventory)
+    {
+        if (!_compassResolved)
+        {
+            _compassResolved = true;
+            try
+            {
+                _compassId = ContentRegistry.RequireItem("compass").Id;
+            }
+            catch (InvalidOperationException)
+            {
+                _compassId = null;
+            }
+        }
+        return _compassId.HasValue && inventory.ContainsInHotbar(_compassId.Value);
+    }
     public void Dispose()
     {
         ui.Dispose();

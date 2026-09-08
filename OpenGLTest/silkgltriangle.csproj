@@ -6,6 +6,9 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>default</LangVersion>
         <Nullable>annotations</Nullable>
+        <!-- Lets the net9.0 app run on a newer major runtime (e.g. a 10.x-only
+             user-local install in ~/.dotnet) without installing 9.x everywhere. -->
+        <RollForward>LatestMajor</RollForward>
     </PropertyGroup>
 
     <ItemGroup>
