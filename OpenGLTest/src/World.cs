@@ -142,6 +142,10 @@ public class World
         renderManager.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling);
         FrameProfiler.End(ProfileSection.Shadows);
 
+        FrameProfiler.Begin(ProfileSection.Reflection);
+        renderManager.RenderReflection(Camera, _chunkManager.Renderable, _lodManager.RegionList);
+        FrameProfiler.End(ProfileSection.Reflection);
+
         FrameProfiler.Begin(ProfileSection.LodPass);
         renderManager.RenderLod(Camera, _lodManager.RegionList);
         FrameProfiler.End(ProfileSection.LodPass);

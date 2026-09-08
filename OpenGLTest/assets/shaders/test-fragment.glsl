@@ -26,6 +26,11 @@ uniform vec3 uPointPos[8];
 uniform vec3 uPointColor[8];
 uniform sampler2DShadow uShadowMap;
 uniform mat4 uLightViewProj;
+uniform sampler2D uReflectionMap;
+uniform mat4 uReflViewProj;
+uniform float uWaterPlaneY;
+uniform float uReflValid;
+uniform float uClipY;
 uniform float uShadowStrength;
 uniform float uShadowTexel;
 uniform float uShadowWorldTexel;
@@ -63,6 +68,18 @@ float SampleShadow(vec3 wp, vec3 N, float ndl) {
 }
 
 void main() {
+    // The reflection pass clips everything below the sea surface out of the mirror.
+    if (fWorldPos.y < uClipY) discard;
+    // ponytail: water flag rides in fColor.a (254 = water); vertex alpha is otherwise unused.
+    bool isWater = fColor.a < 0.998;
+    float wob1 = 0.0;
+    float wob2 = 0.0;
+    if (isWater) {
+        // Animated ripple phases; they wobble the lighting normal below, never the UVs
+        // (shifting UVs would bleed across atlas tile borders).
+        wob1 = sin(fWorldPos.x * 2.1 + uTime * 1.6 + sin(fWorldPos.z * 1.7 + uTime * 1.1));
+        wob2 = sin(fWorldPos.z * 2.7 - uTime * 1.9 + sin(fWorldPos.x * 1.3 - uTime * 0.8));
+    }
     vec4 texColor = texture(uTextureAtlas, fTexCoord);
     // Leaf tiles have transparent holes; cut them out so the canopy sees through instead of
     // blending ghosts. The cutoff is a uniform: the opaque pass uses 0.5 for the leaf holes,
@@ -89,11 +106,35 @@ void main() {
     // Without this every sealed cave renders at full ambient brightness in daytime.
     vec3 light = uAmbient * (0.12 + 0.88 * fSun) + sun + torch + pl;
     vec3 col = albedo * light;
+    float waterFres = 0.0;
+    float waterSpec = 0.0;
+    if (isWater) {
+        // Reflection fake: wobbled normal, fresnel toward sky colour, Blinn-Phong sun glint.
+        vec3 nW = normalize(N + vec3(wob1 * 0.12, 0.0, wob2 * 0.12));
+        vec3 V = normalize(uCameraPos - fWorldPos);
+        waterFres = pow(1.0 - max(dot(V, nW), 0.0), 3.0);
+        waterFres = mix(0.15, 1.0, waterFres);
+        if (uReflValid > 0.5 && uCameraPos.y > uWaterPlaneY) {
+            // True planar reflection: project into the mirrored render, distorted by the
+            // same ripple so the mirror shimmers instead of sitting perfectly still.
+            vec4 rp = uReflViewProj * vec4(fWorldPos, 1.0);
+            vec2 ruv = rp.xy / rp.w * 0.5 + 0.5 + vec2(wob1, wob2) * 0.03;
+            vec3 reflection = texture(uReflectionMap, clamp(ruv, 0.001, 0.999)).rgb;
+            col = mix(col, reflection, waterFres * 0.75);
+        } else {
+            col = mix(col, uFogColor, waterFres * 0.6);
+        }
+        vec3 H = normalize(V + uSunDir);
+        waterSpec = pow(max(dot(nW, H), 0.0), 128.0) * shadow;
+        col += uSunColor * (waterSpec * uSunIntensity);
+    }
     float dist = distance(fWorldPos, uCameraPos);
     float f = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
     col = mix(col, uFogColor, f * f);
     // Tile alpha carries the translucent mesh's translucency; uAlpha is the chunk fade-in.
     // The discard above still removes the leaf tiles' fully transparent holes in the
     // opaque pass, while the translucent pass keeps every faint texel.
-    FragColor = vec4(mix(col, vec3(1.0), uFlash), texColor.a * uAlpha);
+    float alpha = texColor.a * uAlpha;
+    if (isWater) alpha = clamp(alpha + waterFres * 0.25 + waterSpec * 0.5, 0.0, 1.0);
+    FragColor = vec4(mix(col, vec3(1.0), uFlash), alpha);
 }

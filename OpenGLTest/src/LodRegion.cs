@@ -307,7 +307,7 @@ public class LodRegion : IDisposable
         const int topFace = 4;
 
         void AddQuad(List<Vertex> targetVertices, List<ushort> targetIndices,
-            int faceIndex, Vector3 cellOrigin, BlockType.Point tile, Span<byte> shades)
+            int faceIndex, Vector3 cellOrigin, BlockType.Point tile, Span<byte> shades, bool isWater = false)
         {
             // Meshes are indexed with ushort; a region can't realistically exceed this,
             // but degrade gracefully instead of overflowing if terrain is extreme
@@ -336,8 +336,11 @@ public class LodRegion : IDisposable
                 if (pos.Y < yMin) yMin = pos.Y;
                 if (pos.Y > yMax) yMax = pos.Y;
                 var shade = shades[c];
-                // Far shells sit in open sky: full sun, no lamp light, real face normal
-                targetVertices.Add(new Vertex(pos, shade, shade, shade, 255, uv[c], 1f, 0f, normal));
+                // Far shells sit in open sky: full sun, no lamp light, real face normal.
+                // ponytail: vertex alpha 254 flags water for the shader (glass/terrain stay 255);
+                // fColor.a is otherwise unused by the world shader, so the flag is invisible.
+                var alpha = (byte)(isWater ? 254 : 255);
+                targetVertices.Add(new Vertex(pos, shade, shade, shade, alpha, uv[c], 1f, 0f, normal));
             }
 
             targetIndices.Add((ushort)(indexOffset + 0));
@@ -403,7 +406,7 @@ public class LodRegion : IDisposable
                 // cell below the sheet
                 if (isSea[gi * heightGrid + gj])
                     AddQuad(waterVertices, waterIndices, topFace,
-                        new Vector3(i * cellSize, sheetY - cellSize, j * cellSize), waterTile, waterShades);
+                        new Vector3(i * cellSize, sheetY - cellSize, j * cellSize), waterTile, waterShades, true);
 
                 foreach (var f in sideFaces)
                 {

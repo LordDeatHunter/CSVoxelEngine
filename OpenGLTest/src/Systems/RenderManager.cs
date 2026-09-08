@@ -38,6 +38,21 @@ public class RenderManager : IDisposable
     private uint _shadowDepthTex;
     private Vector2D<int> _viewportSize;
 
+    // Planar water reflections: the opaque world mirrored across the sea surface, drawn
+    // once per frame at WaterReflectionScale resolution. Sampled projectively by water
+    // fragments; the depth texture is a render target only, never sampled.
+    private uint _reflFbo;
+    private uint _reflTex;
+    private uint _reflDepthTex;
+    private Vector2D<int> _reflSize;
+    private Matrix4x4 _reflViewProj = Matrix4x4.Identity;
+
+    // The sea surface the reflection mirrors across (a source cell's top), and the
+    // per-frame clip that keeps below-plane geometry out of the reflection texture.
+    // _clipY rides ApplyFrameUniforms into uClipY; -1e9 disables the discard.
+    private const float WaterPlaneY = WorldGenerationConfig.SeaLevel + FluidState.SourceHeight;
+    private float _clipY = -1e9f;
+
     // Per-frame lighting state, pushed once per frame via SetLighting and uploaded to the
     // world shader once per frame by ApplyFrameUniforms
     private Vector3 _sunDir = Vector3.UnitY;
@@ -172,6 +187,10 @@ public class RenderManager : IDisposable
         worldShader.Use();
         worldShader.SetUniform("uTextureAtlas", 0);
         worldShader.SetUniform("uShadowMap", 1);
+        worldShader.SetUniform("uReflectionMap", 2);
+        worldShader.SetUniform("uWaterPlaneY", WaterPlaneY);
+        worldShader.SetUniform("uReflValid", 0f);
+        CreateReflectionTarget();
 
         // Everything a world draw sets per draw, resolved once here (see SetDrawUniforms)
         _locModel = worldShader.GetUniformLocation("uModel");
@@ -257,6 +276,7 @@ public class RenderManager : IDisposable
     {
         _viewportSize = size;
         gl.Viewport(size);
+        CreateReflectionTarget();
     }
 
     /// <summary>
@@ -494,6 +514,177 @@ public class RenderManager : IDisposable
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
     }
 
+    /// <summary>
+    /// Builds the half-res reflection texture: a colour target plus a depth texture, sized
+    /// from the viewport. Called from <see cref="LoadResources"/> and
+    /// <see cref="SetViewport"/>; recreating only when the size actually changed.
+    /// </summary>
+    private void CreateReflectionTarget()
+    {
+        var w = Math.Max(2, (int)(_viewportSize.X * WorldGenerationConfig.WaterReflectionScale));
+        var h = Math.Max(2, (int)(_viewportSize.Y * WorldGenerationConfig.WaterReflectionScale));
+        if (_reflFbo != 0 && _reflSize.X == w && _reflSize.Y == h) return;
+
+        DeleteReflectionTarget();
+        _reflSize = new Vector2D<int>(w, h);
+
+        _reflTex = gl.GenTexture();
+        gl.BindTexture(TextureTarget.Texture2D, _reflTex);
+        unsafe
+        {
+            gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.Rgba8,
+                (uint)w, (uint)h, 0, PixelFormat.Rgba, PixelType.UnsignedByte, null);
+        }
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
+
+        _reflDepthTex = gl.GenTexture();
+        gl.BindTexture(TextureTarget.Texture2D, _reflDepthTex);
+        unsafe
+        {
+            gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.DepthComponent24,
+                (uint)w, (uint)h, 0, PixelFormat.DepthComponent, PixelType.Float, null);
+        }
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
+
+        _reflFbo = gl.GenFramebuffer();
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, _reflFbo);
+        gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+            TextureTarget.Texture2D, _reflTex, 0);
+        gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
+            TextureTarget.Texture2D, _reflDepthTex, 0);
+
+        var status = gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
+        if (status != GLEnum.FramebufferComplete)
+            throw new Exception($"Reflection framebuffer incomplete: {status}");
+
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        gl.BindTexture(TextureTarget.Texture2D, 0);
+    }
+
+    private void DeleteReflectionTarget()
+    {
+        if (_reflFbo == 0) return;
+        gl.DeleteFramebuffer(_reflFbo);
+        gl.DeleteTexture(_reflTex);
+        gl.DeleteTexture(_reflDepthTex);
+        _reflFbo = 0;
+    }
+
+    /// <summary>
+    /// Renders the opaque world (chunks + LOD, no water, no entities) from a camera
+    /// mirrored across the sea surface into the reflection texture, which the water in
+    /// <see cref="RenderWorldTranslucent"/> then samples projectively. Below-plane
+    /// geometry is clipped via <c>uClipY</c> so the seabed never shows up in the mirror.
+    /// Skipped (leaving <c>uReflValid</c> at 0) when there is no water to reflect in or
+    /// the eye itself is below the surface. Runs after <see cref="RenderShadows"/> so the
+    /// shadow map it samples is already filled.
+    /// </summary>
+    public void RenderReflection(Camera camera, IReadOnlyList<Chunk> chunks,
+        IReadOnlyList<LodRegion> regions)
+    {
+        worldShader.Use();
+        if (!WorldGenerationConfig.WaterEnabled || camera == null
+            || camera.Position.Y < WaterPlaneY || _reflFbo == 0)
+        {
+            worldShader.SetUniform("uReflValid", 0f);
+            return;
+        }
+
+        // The reflection texture is this pass's render target, so it must not stay bound
+        // to unit 2 while it draws: sampling and rendering the same texture is a
+        // feedback loop (see RenderShadows for unit 1). Later passes rebind it.
+        gl.ActiveTexture(TextureUnit.Texture2);
+        gl.BindTexture(TextureTarget.Texture2D, 0);
+        gl.ActiveTexture(TextureUnit.Texture0);
+
+        // Mirror position and facing across the horizontal plane; pitch stays within
+        // ±89° through the mirror, so UnitY never parallels the view direction.
+        var fwd = camera.Forward;
+        var mirroredPos = new Vector3(camera.Position.X, 2f * WaterPlaneY - camera.Position.Y,
+            camera.Position.Z);
+        var mirroredFwd = new Vector3(fwd.X, -fwd.Y, fwd.Z);
+        var view = Matrix4x4.CreateLookAt(mirroredPos, mirroredPos + mirroredFwd, Vector3.UnitY);
+        _reflViewProj = view * camera.GetProjectionMatrix();
+
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, _reflFbo);
+        gl.Viewport(_reflSize);
+        gl.ClearColor(_skyColor.X, _skyColor.Y, _skyColor.Z, 1f);
+        gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+        gl.Disable(EnableCap.Blend);
+
+        // Fog and specular inside the texture want the mirrored eye; the clip drops
+        // everything below the surface. Both are restored below.
+        var savedCamPos = _cameraPos;
+        var savedClip = _clipY;
+        _cameraPos = mirroredPos;
+        _clipY = WaterPlaneY;
+        ApplyFrameUniforms();
+        worldShader.SetUniform("uReflViewProj", _reflViewProj);
+
+        var frustum = new Frustum(_reflViewProj);
+
+        _visibleChunks.Clear();
+        for (var i = 0; i < chunks.Count; i++)
+        {
+            var chunk = chunks[i];
+            if (!chunk.HasMesh) continue;
+
+            var min = chunk.Position * Chunk.Size;
+            var max = min + new Vector3(Chunk.Size);
+
+            if (!frustum.IntersectsAABB(min, max)) continue;
+
+            _visibleChunks.Add((chunk, Vector3.DistanceSquared(min, mirroredPos)));
+        }
+
+        _visibleChunks.Sort((a, b) => a.distSq.CompareTo(b.distSq));
+
+        foreach (var (chunk, _) in _visibleChunks)
+        {
+            var model = Matrix4x4.CreateTranslation(chunk.Position * Chunk.Size);
+            SetDrawUniforms(model, model * _reflViewProj,
+                MathF.Min(1f, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
+            chunk.Render();
+        }
+
+        _visibleRegions.Clear();
+        for (var i = 0; i < regions.Count; i++)
+        {
+            var region = regions[i];
+            if (!region.HasMesh || region.IsBuried) continue;
+
+            var min = new Vector3(region.X * region.SizeBlocks, region.YMin, region.Z * region.SizeBlocks);
+            var max = new Vector3(min.X + region.SizeBlocks, region.YMax, min.Z + region.SizeBlocks);
+
+            if (!frustum.IntersectsAABB(min, max)) continue;
+
+            _visibleRegions.Add((region, 0f));
+        }
+
+        foreach (var (region, _) in _visibleRegions)
+        {
+            var model = Matrix4x4.CreateTranslation(region.X * region.SizeBlocks, 0f,
+                region.Z * region.SizeBlocks);
+            SetDrawUniforms(model, model * _reflViewProj,
+                MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)));
+            region.Render();
+        }
+
+        _cameraPos = savedCamPos;
+        _clipY = savedClip;
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        gl.Viewport(_viewportSize);
+        gl.Enable(EnableCap.Blend);
+        gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+        // Restores the real eye's fog/camera uniforms; uReflViewProj survives in the program.
+        ApplyFrameUniforms();
+        worldShader.SetUniform("uReflValid", 1f);
+    }
+
     private static float Smooth01(float t)
     {
         t = Math.Clamp(t, 0f, 1f);
@@ -571,14 +762,16 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Binds the world textures for a world draw: the atlas on unit 0 and the shadow map on
-    /// unit 1. Unit 0 is left active on the way out, because <see cref="RenderItemDrops"/>
+    /// Binds the world textures for a world draw: the atlas on unit 0, the shadow map on
+    /// unit 1 and the reflection texture on unit 2. Unit 0 is left active on the way out, because <see cref="RenderItemDrops"/>
     /// binds an item's own texture assuming that.
     /// </summary>
     private void BindWorldTextures()
     {
         gl.ActiveTexture(TextureUnit.Texture1);
         gl.BindTexture(TextureTarget.Texture2D, _shadowDepthTex);
+        gl.ActiveTexture(TextureUnit.Texture2);
+        gl.BindTexture(TextureTarget.Texture2D, _reflTex);
         gl.ActiveTexture(TextureUnit.Texture0);
         gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
     }
@@ -618,6 +811,7 @@ public class RenderManager : IDisposable
             2f * WorldGenerationConfig.ShadowRadiusBlocks / WorldGenerationConfig.ShadowMapSize);
         worldShader.SetUniform("uShadowSoftness", WorldGenerationConfig.ShadowSoftnessTexels);
         worldShader.SetUniform("uShadowNormalOffset", WorldGenerationConfig.ShadowNormalOffsetTexels);
+        worldShader.SetUniform("uClipY", _clipY);
     }
 
     /// <summary>
@@ -1185,6 +1379,7 @@ public class RenderManager : IDisposable
         gl.DeleteTexture(_sunTexture);
         gl.DeleteFramebuffer(_shadowFbo);
         gl.DeleteTexture(_shadowDepthTex);
+        DeleteReflectionTarget();
         gl.DeleteBuffer(outlineVbo);
         gl.DeleteBuffer(outlineEbo);
         gl.DeleteVertexArray(outlineVao);

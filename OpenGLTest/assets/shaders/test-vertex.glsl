@@ -11,6 +11,7 @@ uniform mat4 uMVP;
 uniform mat4 uModel;
 uniform float uTime;
 uniform float uSwayStrength;
+uniform vec3 uCameraPos;
 
 out vec4 fColor;
 out vec2 fTexCoord;
@@ -25,6 +26,18 @@ void main() {
     // voxel seams). Wavelengths span many blocks, so neighbouring verts shear by ~a texel
     // while the canopy visibly sways; amplitude peaks under a tenth of a block.
     vec3 displaced = vPosition;
+    // ponytail: water flag rides in vColor.a (254 = water, 255 = everything else); fColor.a is unused otherwise.
+    bool isWater = vColor.a < 0.998;
+    if (isWater) {
+        // Y-only waves as a pure function of world XZ, so verts sharing an XZ (sloped-top
+        // corners, side-face top edges) displace identically and the skin never cracks.
+        // Faded out by ~160 blocks: the far LOD sheets sample different XZs, so any
+        // displacement there would seam against the chunk water and between LOD levels.
+        vec4 anchorW = uModel * vec4(vPosition, 1.0);
+        float wFade = 1.0 - smoothstep(64.0, 160.0, distance(anchorW.xyz, uCameraPos));
+        displaced.y += (sin(uTime * 1.8 + anchorW.x * 1.2 + anchorW.z * 0.9) * 0.03
+                      + sin(uTime * 3.1 + anchorW.z * 2.2 - anchorW.x * 0.7) * 0.015) * wFade;
+    }
     if (vSway > 0.001 && uSwayStrength > 0.001) {
         vec4 anchor = uModel * vec4(vPosition, 1.0);
         float gust = 0.6 + 0.4 * sin(uTime * 0.5 + anchor.x * 0.08 + anchor.z * 0.06);

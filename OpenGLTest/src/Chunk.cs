@@ -1078,9 +1078,10 @@ public class Chunk : IDisposable
                 ? Vector3.Normalize(Vector3.Cross(c - a, d - b))
                 : CubeFaces[face].normal;
 
+            // ponytail: alpha 254 flags water for the shader (glass stays 255); fColor.a is unused otherwise.
             EmitQuad(vertices, indices, ref indexOffset, basePos, a, b, c, d, normal,
                 CropUv(tile, face, a), CropUv(tile, face, b), CropUv(tile, face, c), CropUv(tile, face, d),
-                ShadeLut[(face << 2) | 3], sun, block);
+                ShadeLut[(face << 2) | 3], sun, block, 254);
         }
     }
 
@@ -1402,12 +1403,12 @@ public class Chunk : IDisposable
     private static void EmitQuad(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         Vector3 basePos, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 normal,
         Vector2 uva, Vector2 uvb, Vector2 uvc, Vector2 uvd,
-        byte shade, float sun, float block)
+        byte shade, float sun, float block, byte alpha = 255)
     {
-        vertices.Add(new Vertex(basePos + a, shade, shade, shade, 255, uva, sun, block, normal));
-        vertices.Add(new Vertex(basePos + b, shade, shade, shade, 255, uvb, sun, block, normal));
-        vertices.Add(new Vertex(basePos + c, shade, shade, shade, 255, uvc, sun, block, normal));
-        vertices.Add(new Vertex(basePos + d, shade, shade, shade, 255, uvd, sun, block, normal));
+        vertices.Add(new Vertex(basePos + a, shade, shade, shade, alpha, uva, sun, block, normal));
+        vertices.Add(new Vertex(basePos + b, shade, shade, shade, alpha, uvb, sun, block, normal));
+        vertices.Add(new Vertex(basePos + c, shade, shade, shade, alpha, uvc, sun, block, normal));
+        vertices.Add(new Vertex(basePos + d, shade, shade, shade, alpha, uvd, sun, block, normal));
 
         indices.Add((ushort)(indexOffset + 0));
         indices.Add((ushort)(indexOffset + 1));

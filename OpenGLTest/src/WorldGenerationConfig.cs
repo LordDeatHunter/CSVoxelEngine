@@ -102,6 +102,10 @@ public static class WorldGenerationConfig
     public const bool WaterEnabled = true;
     public const int SeaLevel = 0;
 
+    // Planar water reflections render the opaque world mirrored across the sea surface
+    // into a texture this fraction of the viewport (half res ≈ quarter cost).
+    public const float WaterReflectionScale = 0.5f;
+
     // Beaches ring the sea: dry columns up to BeachAboveSeaLevel over the waterline and
     // submerged columns down to BeachBelowSeaLevel under it build their top and soil band
     // from sand instead of grass/dirt. Ravine bare-stone walls still win over the beach.
