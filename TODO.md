@@ -22,3 +22,8 @@
 # XL — engine bets
 14. Redstone-ish wiring / pistons / minecarts. Scheduled-tick logic on top of FluidManager's pattern, plus moving collision.
 15. Second dimension (Nether-like) + portals. Separate seed/noise set, same chunk pipeline, new LOD palette.
+
+# Other
+- Fix falling blocks not sliding when dropping on a single block
+- Add leaf particles dropping
+
