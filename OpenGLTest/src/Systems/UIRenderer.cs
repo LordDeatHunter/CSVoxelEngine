@@ -352,7 +352,7 @@ public class UIRenderer : IDisposable
         var panel = new Vector2(PanelLeft + PanelWidth * 0.5f, top + height * 0.5f);
         DrawRect(panel, new Vector2(PanelWidth, height), PanelBackground);
 
-        var tabs = new[] { InventoryCategory.Blocks, InventoryCategory.Tools, InventoryCategory.Misc };
+        var tabs = new[] { InventoryCategory.Blocks, InventoryCategory.Tools, InventoryCategory.Misc, InventoryCategory.Crafting };
         var tabWidth = (PanelWidth - PanelPad * 2f) / tabs.Length;
         for (var t = 0; t < tabs.Length; t++)
         {
@@ -365,7 +365,7 @@ public class UIRenderer : IDisposable
                 DrawBorder(centre, new Vector2(tabWidth - 4f, TabHeight), SlotBorder, SelectedBorderColor);
             DrawTextCentred(TabTitle(tabs[t]),
                 centre.X, top + PanelPad + 6f, _countScale, Rgba.White);
-            DrawTextCentred($"{inventory.UsedOf(tabs[t])}/{Inventory.CapacityOf(tabs[t])}",
+            DrawTextCentred(TabSubtitle(inventory, tabs[t]),
                 centre.X, top + PanelPad + 30f, _countScale, Rgba.White);
         }
 
@@ -378,6 +378,15 @@ public class UIRenderer : IDisposable
                 var selected = view.SelectedToolInstance == tools[i].InstanceId;
                 DrawEntryRow(i, listTop, tools[i].ItemId, tools[i].Name, "1", selected);
             }
+        }
+        else if (view.Tab == InventoryCategory.Crafting)
+        {
+            var craftable = inventory.Craftable();
+            for (var i = 0; i < craftable.Count; i++)
+                DrawEntryRow(i, listTop, craftable[i].ResultId,
+                    Inventory.DisplayName(craftable[i].ResultId),
+                    craftable[i].ResultCount.ToString(),
+                    view.SelectedId == craftable[i].ResultId);
         }
         else
         {
@@ -411,7 +420,7 @@ public class UIRenderer : IDisposable
     /// <summary>Panel tab under a screen point, if any.</summary>
     public InventoryCategory? PanelTabAt(Vector2 point)
     {
-        var tabs = new[] { InventoryCategory.Blocks, InventoryCategory.Tools, InventoryCategory.Misc };
+        var tabs = new[] { InventoryCategory.Blocks, InventoryCategory.Tools, InventoryCategory.Misc, InventoryCategory.Crafting };
         var tabWidth = (PanelWidth - PanelPad * 2f) / tabs.Length;
 
         if (point.X < PanelLeft || point.X > PanelLeft + PanelWidth) return null;
@@ -438,8 +447,14 @@ public class UIRenderer : IDisposable
     {
         InventoryCategory.Blocks => "Blocks",
         InventoryCategory.Tools => "Tools",
+        InventoryCategory.Crafting => "Craft",
         _ => "Misc",
     };
+
+    private static string TabSubtitle(Inventory inventory, InventoryCategory tab) =>
+        tab == InventoryCategory.Crafting
+            ? $"{inventory.Craftable().Count}/{ContentRegistry.CraftingRecipes.Count}"
+            : $"{inventory.UsedOf(tab)}/{Inventory.CapacityOf(tab)}";
 
     private void DrawEntryRow(int row, float listTop, byte id, string name, string count, bool selected)
     {
@@ -468,6 +483,12 @@ public class UIRenderer : IDisposable
 
     private void DrawPreview(Inventory inventory, InventoryView view, float time)
     {
+        if (view.Tab == InventoryCategory.Crafting)
+        {
+            DrawRecipePreview(inventory, view, time);
+            return;
+        }
+
         byte id = 0;
         string name = "";
         if (view.Tab == InventoryCategory.Tools)
@@ -495,6 +516,38 @@ public class UIRenderer : IDisposable
             DrawBlockIconSpinning(centre, PreviewSize * 0.7f, id, spin);
 
         DrawTextCentred(name, centre.X, centre.Y + PreviewSize * 0.5f + 22f, _headScale, Rgba.White);
+    }
+
+    private void DrawRecipePreview(Inventory inventory, InventoryView view, float time)
+    {
+        if (view.SelectedId == 0) return;
+        var recipe = ContentRegistry.RecipeForResult(view.SelectedId);
+        if (recipe == null) return;
+
+        var id = recipe.ResultId;
+        var centre = new Vector2(_screenSize.X - PreviewRight, _screenSize.Y * 0.38f);
+        var lineStep = _font != null ? _font.MeasureSize("X".AsSpan(), _countScale).Y * 1.5f : 20f;
+        var extra = (recipe.Ingredients.Length + 1) * lineStep;
+        DrawRect(centre with { Y = centre.Y + extra * 0.5f },
+            new Vector2(PreviewSize + 40f, PreviewSize + 70f + extra), PanelBackground);
+
+        var spin = time * 0.9f;
+        if (ItemType.IsItem(id))
+            DrawItemIcon(centre, PreviewSize * 0.7f, id, spin);
+        else
+            DrawBlockIconSpinning(centre, PreviewSize * 0.7f, id, spin);
+
+        var nameTop = centre.Y + PreviewSize * 0.5f + 22f;
+        DrawTextCentred(Inventory.DisplayName(id), centre.X, nameTop, _headScale, Rgba.White);
+        var y = nameTop + lineStep * 2f;
+        foreach (var ingredient in recipe.Ingredients)
+        {
+            DrawTextCentred(
+                $"{inventory.CountFor(ingredient.Id)}/{ingredient.Count} {Inventory.DisplayName(ingredient.Id)}",
+                centre.X, y, _countScale, Rgba.White);
+            y += lineStep;
+        }
+        DrawTextCentred("Click again to craft", centre.X, y, _countScale, Rgba.White);
     }
 
     /// <summary>

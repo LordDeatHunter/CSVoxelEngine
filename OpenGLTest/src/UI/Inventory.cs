@@ -10,6 +10,7 @@ public enum InventoryCategory
     Blocks,
     Tools,
     Misc,
+    Crafting,
 }
 
 /// <summary>
@@ -288,6 +289,35 @@ public class Inventory
         };
     }
 
+    /// <summary>Recipes the pools can currently afford, including room for the result.</summary>
+    public IReadOnlyList<CraftingRecipe> Craftable() =>
+        ContentRegistry.CraftingRecipes.Where(CanCraft).ToArray();
+
+    /// <summary>Whether one craft of this recipe would succeed: ingredients on hand plus
+    /// room for the result (consumption frees room first, so a full pool still crafts
+    /// when the ingredients come out of it).</summary>
+    public bool CanCraft(CraftingRecipe recipe)
+    {
+        foreach (var ingredient in recipe.Ingredients)
+            if (CountFor(ingredient.Id) < ingredient.Count)
+                return false;
+
+        var category = CategoryOf(recipe.ResultId);
+        if (!category.HasValue) return false;
+        return UsedOf(category.Value) - FreedBy(recipe, category.Value) + recipe.ResultCount
+            <= CapacityOf(category.Value);
+    }
+
+    /// <summary>Consumes one craft's ingredients and adds its result. Returns false when
+    /// the recipe is not currently craftable, consuming nothing.</summary>
+    public bool TryCraft(CraftingRecipe recipe)
+    {
+        if (!CanCraft(recipe)) return false;
+        foreach (var ingredient in recipe.Ingredients)
+            RemoveUnits(ingredient.Id, ingredient.Count);
+        return Add(recipe.ResultId, recipe.ResultCount);
+    }
+
     /// <summary>Display name for a list row or preview heading.</summary>
     public static string DisplayName(byte id)
     {
@@ -299,6 +329,8 @@ public class Inventory
     /// <summary>Stackable rows for a tab, holding something only (name-sorted).</summary>
     public IReadOnlyList<StackRow> StackEntries(InventoryCategory category)
     {
+        if (category == InventoryCategory.Crafting || category == InventoryCategory.Tools)
+            return [];
         var store = category == InventoryCategory.Blocks ? _blocks : _misc;
         return store
             .Where(kv => kv.Value > 0)
@@ -336,6 +368,30 @@ public class Inventory
         InventoryCategory.Misc => _misc,
         _ => null,
     };
+
+    private int FreedBy(CraftingRecipe recipe, InventoryCategory category)
+    {
+        var freed = 0;
+        foreach (var ingredient in recipe.Ingredients)
+            if (CategoryOf(ingredient.Id) == category)
+                freed += ingredient.Count;
+        return freed;
+    }
+
+    private void RemoveUnits(byte id, int count)
+    {
+        if (CategoryOf(id) == InventoryCategory.Tools)
+        {
+            foreach (var instance in _tools.Where(t => t.ItemId == id).Take(count).ToArray())
+                RemoveTool(instance.InstanceId);
+            return;
+        }
+        var store = StoreOf(id);
+        if (store == null) return;
+        var left = store.GetValueOrDefault(id) - count;
+        if (left <= 0) store.Remove(id);
+        else store[id] = left;
+    }
 
     private void PopSlotsShowing(byte id)
     {

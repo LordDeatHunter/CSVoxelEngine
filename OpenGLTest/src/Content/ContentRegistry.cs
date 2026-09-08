@@ -45,6 +45,7 @@ public static class ContentRegistry
     private static readonly Dictionary<string, LootTable> LootTables = new(StringComparer.Ordinal);
     private static readonly Dictionary<byte, BlockModel> BlockModels = new();
     private static readonly Dictionary<byte, BlockDefinition> BlockDefinitions = new();
+    private static readonly List<CraftingRecipe> Recipes = new();
 
     private static string _assetsRoot = "assets";
     private static ModelLoader? _models;
@@ -84,6 +85,7 @@ public static class ContentRegistry
         LoadItems(itemFiles);
         LoadLootTables(Path.Combine(assetsRoot, "data", "loot"));
         LoadBlocks(blockFiles);
+        LoadRecipes(Path.Combine(assetsRoot, "data", "recipes"));
         ValidateItemUses(itemFiles);
     }
 
@@ -170,11 +172,19 @@ public static class ContentRegistry
     public static LootTable? LootTableFor(string name) =>
         LootTables.GetValueOrDefault(name);
 
+    /// <summary>Every compiled crafting recipe, in file-name order.</summary>
+    public static IReadOnlyList<CraftingRecipe> CraftingRecipes => Recipes;
+
+    /// <summary>First recipe making this id, or null when nothing crafts it.</summary>
+    public static CraftingRecipe? RecipeForResult(byte id) =>
+        Recipes.FirstOrDefault(r => r.ResultId == id);
+
     private static void Reset()
     {
         BlockIds.Clear();
         ItemIds.Clear();
         LootTables.Clear();
+        Recipes.Clear();
         BlockModels.Clear();
         BlockDefinitions.Clear();
 
@@ -261,6 +271,39 @@ public static class ContentRegistry
     {
         foreach (var (name, path) in JsonFilesIn(folder))
             LootTables[name] = CompileLootTable(name, ReadJson<LootTableDefinition>(path), path);
+    }
+
+    private static void LoadRecipes(string folder)
+    {
+        if (!Directory.Exists(folder)) return;
+        foreach (var (name, path) in JsonFilesIn(folder))
+            Recipes.Add(CompileRecipe(name, ReadJson<RecipeDefinition>(path), path));
+    }
+
+    private static CraftingRecipe CompileRecipe(string name, RecipeDefinition definition, string path)
+    {
+        if (definition.Result == null || !TryResolve(definition.Result, out var resultId))
+            throw new InvalidOperationException(
+                $"Recipe '{path}' names result '{definition.Result}', which is not a registered block or item.");
+        var resultCount = definition.Count ?? 1;
+        if (resultCount <= 0)
+            throw new InvalidOperationException($"Recipe '{path}' has count {resultCount}; expected 1 or more.");
+
+        var ingredients = new List<CraftingRecipe.Ingredient>();
+        foreach (var ingredient in definition.Ingredients ?? [])
+        {
+            if (ingredient.Item == null || !TryResolve(ingredient.Item, out var id))
+                throw new InvalidOperationException(
+                    $"Recipe '{path}' names ingredient '{ingredient.Item}', which is not a registered block or item.");
+            var count = ingredient.Count ?? 1;
+            if (count <= 0)
+                throw new InvalidOperationException($"Recipe '{path}' has an ingredient with count {count}; expected 1 or more.");
+            ingredients.Add(new CraftingRecipe.Ingredient(id, count));
+        }
+        if (ingredients.Count == 0)
+            throw new InvalidOperationException($"Recipe '{path}' has no ingredients.");
+
+        return new CraftingRecipe(name, resultId, resultCount, ingredients.ToArray());
     }
 
     private static void LoadBlocks(List<(string Name, string Path)> files)

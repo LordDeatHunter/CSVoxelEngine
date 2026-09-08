@@ -1,0 +1,10 @@
+// ponytail: one recipe only. Tags (e.g. ANY log) are future work, see CraftingRecipe.cs TODO.
+{
+  "result": "item/primitive_pickaxe",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/flint", "count": 1 },
+    { "item": "item/branch", "count": 1 },
+    { "item": "item/vine", "count": 2 }
+  ]
+}

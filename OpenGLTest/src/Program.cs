@@ -262,9 +262,12 @@ public static class Program
             return;
         }
 
-        var rowCount = inventoryView.Tab == InventoryCategory.Tools
-            ? inventory.ToolEntries().Count
-            : inventory.StackEntries(inventoryView.Tab).Count;
+        var rowCount = inventoryView.Tab switch
+        {
+            InventoryCategory.Tools => inventory.ToolEntries().Count,
+            InventoryCategory.Crafting => inventory.Craftable().Count,
+            _ => inventory.StackEntries(inventoryView.Tab).Count,
+        };
         var row = renderManager.UiPanelRowAt(position, rowCount);
         if (row.HasValue)
         {
@@ -272,6 +275,17 @@ public static class Program
             {
                 inventoryView.SelectedToolInstance = inventory.ToolEntries()[row.Value].InstanceId;
                 inventoryView.SelectedId = 0;
+            }
+            else if (inventoryView.Tab == InventoryCategory.Crafting)
+            {
+                var recipe = inventory.Craftable()[row.Value];
+                if (inventoryView.SelectedId == recipe.ResultId)
+                    inventory.TryCraft(recipe);
+                else
+                {
+                    inventoryView.SelectedId = recipe.ResultId;
+                    inventoryView.SelectedToolInstance = 0;
+                }
             }
             else
             {
