@@ -4,7 +4,7 @@ layout (location = 1) in vec4 vColor;
 layout (location = 2) in vec2 vTexCoord;
 layout (location = 3) in float vSun;
 layout (location = 4) in float vBlock;
-layout (location = 5) in vec3 vNormal;
+layout (location = 5) in float vNormalIdx;
 layout (location = 6) in float vSway;
 
 uniform mat4 uMVP;
@@ -41,6 +41,13 @@ void main() {
     fTexCoord = vTexCoord;
     fSun = vSun;
     fBlock = vBlock;
-    // uModel is a pure translation for chunks/LOD, so the normal is unchanged
+    // uModel is a pure translation for chunks/LOD, so the normal is unchanged.
+    // The mesher packs the face as a 0..5 index (Chunk.CubeFaces order); a nested ternary
+    // keeps it branchless without relying on dynamic array indexing.
+    vec3 vNormal = vNormalIdx < 0.5 ? vec3(0.0, 0.0, -1.0)
+        : vNormalIdx < 1.5 ? vec3(0.0, 0.0, 1.0)
+        : vNormalIdx < 2.5 ? vec3(-1.0, 0.0, 0.0)
+        : vNormalIdx < 3.5 ? vec3(1.0, 0.0, 0.0)
+        : vNormalIdx < 4.5 ? vec3(0.0, 1.0, 0.0) : vec3(0.0, -1.0, 0.0);
     fNormal = mat3(uModel) * vNormal;
 }

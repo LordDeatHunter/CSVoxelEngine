@@ -216,8 +216,8 @@ public class TopplingTree : IDisposable
         {
             var vertex = meshData.Vertices[i];
             vertex.Position += rebase;
-            vertex.Sun = 1f;
-            vertex.Block = 0f;
+            vertex.Sun = 255;
+            vertex.Block = 0;
             meshData.Vertices[i] = vertex;
         }
 

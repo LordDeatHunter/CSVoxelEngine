@@ -213,4 +213,26 @@ public sealed class MeshingTests
         manager.MeshBuffers.Return(mesh);
         Assert.Equal(0, manager.MeshBuffers.PooledVertexLists);
     }
+
+    [Fact]
+    public void VertexPackingRoundTrips()
+    {
+        Assert.Equal(24u, Vertex.Size);
+        var v = new Vertex(new Vector3(1f, 2f, 3f), 10, 20, 30, 255,
+            new Vector2(0.25f, 0.75f), 7f / 15f, 3f / 15f, new Vector3(0f, 0f, 1f), 1f);
+        Assert.Equal(0.25f, v.UV.X, 3);
+        Assert.Equal(0.75f, v.UV.Y, 3);
+        Assert.Equal(7f / 15f, v.Sun / 255f, 3);
+        Assert.Equal(3f / 15f, v.Block / 255f, 3);
+        Assert.Equal(1, v.Normal);
+        Assert.Equal(255, v.Sway);
+        foreach (var (normal, index) in new[]
+                 {
+                     (new Vector3(0, 0, -1), 0), (new Vector3(0, 0, 1), 1),
+                     (new Vector3(-1, 0, 0), 2), (new Vector3(1, 0, 0), 3),
+                     (new Vector3(0, 1, 0), 4), (new Vector3(0, -1, 0), 5),
+                 })
+            Assert.Equal(index, new Vertex(Vector3.Zero, 255, 255, 255, 255,
+                Vector2.Zero, 1f, 0f, normal, 0f).Normal);
+    }
 }

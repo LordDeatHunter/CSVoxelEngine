@@ -4,7 +4,7 @@ namespace silkgltriangle;
 
 /// <summary>
 /// Recycles the opaque vertex and index lists a chunk mesh build fills. Each build otherwise
-/// allocates a ~200 KB <c>List&lt;Vertex&gt;(4096)</c> on the large object heap, which is what
+/// allocates a ~96 KB <c>List&lt;Vertex&gt;(4096)</c> on the large object heap, which is what
 /// turns a streaming burst into gen2 collections. Builds rent on the mesh workers and the
 /// main thread (<see cref="ChunkManager.ImmediateRemesh"/>); lists come back only on the main
 /// thread once <see cref="Chunk.UpdateMesh"/> has copied them to the GPU, or when a finished

@@ -39,19 +39,19 @@ public class Mesh : IDisposable
             _gl.VertexAttribPointer(1, 4, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)12);
             _gl.EnableVertexAttribArray(1);
 
-            _gl.VertexAttribPointer(2, 2, VertexAttribPointerType.Float, false, Vertex.Size, (void*)16);
+            _gl.VertexAttribPointer(2, 2, VertexAttribPointerType.UnsignedShort, true, Vertex.Size, (void*)16);
             _gl.EnableVertexAttribArray(2);
 
-            _gl.VertexAttribPointer(3, 1, VertexAttribPointerType.Float, false, Vertex.Size, (void*)24);
+            _gl.VertexAttribPointer(3, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)20);
             _gl.EnableVertexAttribArray(3);
 
-            _gl.VertexAttribPointer(4, 1, VertexAttribPointerType.Float, false, Vertex.Size, (void*)28);
+            _gl.VertexAttribPointer(4, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)21);
             _gl.EnableVertexAttribArray(4);
 
-            _gl.VertexAttribPointer(5, 3, VertexAttribPointerType.Float, false, Vertex.Size, (void*)32);
+            _gl.VertexAttribPointer(5, 1, VertexAttribPointerType.UnsignedByte, false, Vertex.Size, (void*)22);
             _gl.EnableVertexAttribArray(5);
 
-            _gl.VertexAttribPointer(6, 1, VertexAttribPointerType.Float, false, Vertex.Size, (void*)44);
+            _gl.VertexAttribPointer(6, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)23);
             _gl.EnableVertexAttribArray(6);
         }
 
