@@ -706,7 +706,7 @@ public class UIRenderer : IDisposable
         if (texture != 0)
         {
             _gl.ActiveTexture(TextureUnit.Texture0);
-            _gl.BindTexture(TextureTarget.Texture2D, texture);
+            _gl.BindTexture(TextureTarget.Texture2DArray, texture);
         }
 
         mesh.Render();

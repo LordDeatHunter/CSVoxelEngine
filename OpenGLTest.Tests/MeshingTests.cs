@@ -217,11 +217,19 @@ public sealed class MeshingTests
     [Fact]
     public void VertexPackingRoundTrips()
     {
-        Assert.Equal(24u, Vertex.Size);
+        Assert.Equal(32u, Vertex.Size);
+        // Tile-local UVs are floats: a merged quad spans whole tiles, a font glyph a sub-texel
+        // rectangle, and both have to come back exactly
         var v = new Vertex(new Vector3(1f, 2f, 3f), 10, 20, 30, 255,
-            new Vector2(0.25f, 0.75f), 7f / 15f, 3f / 15f, new Vector3(0f, 0f, 1f), 1f);
-        Assert.Equal(0.25f, v.UV.X, 3);
-        Assert.Equal(0.75f, v.UV.Y, 3);
+            new Vector2(13.5f, 0.25f), 300, 7f / 15f, 3f / 15f, new Vector3(0f, 0f, 1f), 1f);
+        Assert.Equal(13.5f, v.UV.X);
+        Assert.Equal(0.25f, v.UV.Y);
+        Assert.Equal(300, v.Layer);
+        Assert.Equal(0, v.Reserved);
+        // The single-slice overload lands on layer 0 with the UV untouched
+        var sprite = new Vertex(Vector3.Zero, 255, 255, 255, 255, new Vector2(0.125f, 0.875f));
+        Assert.Equal(0, sprite.Layer);
+        Assert.Equal(0.125f, sprite.UV.X);
         Assert.Equal(7f / 15f, v.Sun / 255f, 3);
         Assert.Equal(3f / 15f, v.Block / 255f, 3);
         Assert.Equal(1, v.Normal);

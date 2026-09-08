@@ -4,12 +4,14 @@
 // quad sits at infinity and never parallaxes as the player moves.
 layout (location = 0) in vec3 vPosition;
 layout (location = 2) in vec2 vTexCoord;
+layout (location = 7) in uint vLayer; // array-texture slice (Vertex.Layer)
 
 uniform mat4 uViewProj;
 uniform vec3 uSunDir;
 uniform float uHalfSize;
 
 out vec2 fTexCoord;
+flat out uint fLayer;
 
 void main()
 {
@@ -22,4 +24,5 @@ void main()
 
     gl_Position = uViewProj * vec4(world, 1.0);
     fTexCoord = vTexCoord;
+    fLayer = vLayer;
 }

@@ -14,13 +14,15 @@
 // caustic net on top, projected back up the sun direction to the sea plane.
 in vec4 fColor;
 in vec2 fTexCoord;
+flat in uint fLayer;
 in float fSun;
 in float fBlock;
 in vec3 fNormal;
 in vec3 fWorldPos;
 in float fSubmerged;
 
-uniform sampler2D uTextureAtlas;
+// One slice per block tile; UVs are tile-local and REPEAT across merged quads.
+uniform sampler2DArray uTextureAtlas;
 uniform float uAlpha;
 uniform float uFlash;
 uniform float uAlphaCutoff;
@@ -154,7 +156,7 @@ void main() {
         wob1 = sin(fWorldPos.x * 2.1 + uTime * 1.6 + sin(fWorldPos.z * 1.7 + uTime * 1.1));
         wob2 = sin(fWorldPos.z * 2.7 - uTime * 1.9 + sin(fWorldPos.x * 1.3 - uTime * 0.8));
     }
-    vec4 texColor = texture(uTextureAtlas, fTexCoord);
+    vec4 texColor = texture(uTextureAtlas, vec3(fTexCoord, float(fLayer)));
     // Leaf tiles have transparent holes; cut them out so the canopy sees through instead of
     // blending ghosts. The cutoff is a uniform: the opaque pass uses 0.5 for the leaf holes,
     // the translucent pass uses 0 so glass's faint interior blends instead of vanishing.

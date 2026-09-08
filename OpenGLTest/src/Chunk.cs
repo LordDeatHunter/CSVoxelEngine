@@ -991,7 +991,7 @@ public class Chunk : IDisposable
                     // Minecraft's per-element "shade": false — full brightness, no face
                     // brightness and no ambient occlusion
                     for (var j = 0; j < 4; j++)
-                        dstVertices.Add(new Vertex(basePos + positions[j], 255, 255, 255, 255, uvs[j],
+                        dstVertices.Add(new Vertex(basePos + positions[j], 255, 255, 255, 255, uvs[j], quad.Tile,
                             sun, block, normal, sway, submerged));
                 }
                 else if (quad.IsFullFace)
@@ -1008,7 +1008,7 @@ public class Chunk : IDisposable
                         var ao = VertexAO(side1, side2, corner);
                         var shade = ShadeLut[(face << 2) | ao];
 
-                        dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j],
+                        dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j], quad.Tile,
                             sun, block, normal, sway, submerged));
                     }
                 }
@@ -1018,7 +1018,7 @@ public class Chunk : IDisposable
                     // darken it by neighbours it does not touch: shade it flat and unoccluded
                     var shade = ShadeLut[(face << 2) | 3];
                     for (var j = 0; j < 4; j++)
-                        dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j],
+                        dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j], quad.Tile,
                             sun, block, normal, sway, submerged));
                 }
 
@@ -1097,7 +1097,7 @@ public class Chunk : IDisposable
 
             // ponytail: alpha 254 flags water for the shader (glass stays 255); fColor.a is unused otherwise.
             EmitQuad(vertices, indices, ref indexOffset, basePos, a, b, c, d, normal,
-                CropUv(tile, face, a), CropUv(tile, face, b), CropUv(tile, face, c), CropUv(tile, face, d),
+                CropUv(face, a), CropUv(face, b), CropUv(face, c), CropUv(face, d), tile,
                 ShadeLut[(face << 2) | 3], sun, block, 254);
         }
     }
@@ -1297,8 +1297,7 @@ public class Chunk : IDisposable
                     SpinY(p0, cx, cz, cos, sin), SpinY(p1, cx, cz, cos, sin),
                     SpinY(p2, cx, cz, cos, sin), SpinY(p3, cx, cz, cos, sin),
                     SpinY(normal, 0f, 0f, cos, sin),
-                    CropUv(tile, face, p0), CropUv(tile, face, p1),
-                    CropUv(tile, face, p2), CropUv(tile, face, p3),
+                    CropUv(face, p0), CropUv(face, p1), CropUv(face, p2), CropUv(face, p3), tile,
                     ShadeLut[(face << 2) | 3], sunF[face], blockF[face]);
             }
         }
@@ -1315,7 +1314,7 @@ public class Chunk : IDisposable
     /// <summary>The four vertical walls of a tapered tube with a square [lo, hi] cross-section
     /// running from <paramref name="y0"/> to <paramref name="y1"/> (cell-local).</summary>
     private static void EmitTubeSides(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        Vector3 basePos, Span<float> sunF, Span<float> blockF, BlockType.Point tile,
+        Vector3 basePos, Span<float> sunF, Span<float> blockF, ushort tile,
         float lo, float hi, float y0, float y1)
     {
         var min = new Vector3(lo, y0, lo);
@@ -1328,7 +1327,7 @@ public class Chunk : IDisposable
     /// <summary>Mouth cap of a vertical tube where it meets air or narrower wood; wider wood
     /// and full cubes already cover the joint, so capping there would z-fight them.</summary>
     private static void EmitTubeCap(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        byte[] padded, int pIdx, float sun, float block, BlockType.Point tile,
+        byte[] padded, int pIdx, float sun, float block, ushort tile,
         Vector3 basePos, float c, float w, bool top)
     {
         var i = top ? 4 : 5;
@@ -1351,7 +1350,7 @@ public class Chunk : IDisposable
                 corner.Z == 0 ? c - w : c + w);
             var pos = basePos + local;
             vertices.Add(new Vertex(pos, shade, shade, shade, 255,
-                CropUv(tile, i, local), sun, block, CubeFaces[i].normal));
+                CropUv(i, local), tile, sun, block, CubeFaces[i].normal));
         }
 
         indices.Add((ushort)(indexOffset + 0));
@@ -1408,24 +1407,25 @@ public class Chunk : IDisposable
     /// and cropped UVs (see <see cref="CropUv"/>).</summary>
     private static void EmitBoxFace(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         Vector3 basePos, Vector3 min, Vector3 max, int face,
-        BlockType.Point tile, byte shade, float sun, float block)
+        ushort tile, byte shade, float sun, float block)
     {
         BoxFaceCorners(min, max, face, out var a, out var b, out var c, out var d);
         EmitQuad(vertices, indices, ref indexOffset, basePos, a, b, c, d, CubeFaces[face].normal,
-            CropUv(tile, face, a), CropUv(tile, face, b), CropUv(tile, face, c), CropUv(tile, face, d),
+            CropUv(face, a), CropUv(face, b), CropUv(face, c), CropUv(face, d), tile,
             shade, sun, block);
     }
 
-    /// <summary>One arbitrary quad: four cell-local corners, one normal, one UV per corner.</summary>
+    /// <summary>One arbitrary quad: four cell-local corners, one normal, one tile-local UV per
+    /// corner, all on atlas slice <paramref name="tile"/>.</summary>
     private static void EmitQuad(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         Vector3 basePos, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 normal,
-        Vector2 uva, Vector2 uvb, Vector2 uvc, Vector2 uvd,
+        Vector2 uva, Vector2 uvb, Vector2 uvc, Vector2 uvd, ushort tile,
         byte shade, float sun, float block, byte alpha = 255)
     {
-        vertices.Add(new Vertex(basePos + a, shade, shade, shade, alpha, uva, sun, block, normal));
-        vertices.Add(new Vertex(basePos + b, shade, shade, shade, alpha, uvb, sun, block, normal));
-        vertices.Add(new Vertex(basePos + c, shade, shade, shade, alpha, uvc, sun, block, normal));
-        vertices.Add(new Vertex(basePos + d, shade, shade, shade, alpha, uvd, sun, block, normal));
+        vertices.Add(new Vertex(basePos + a, shade, shade, shade, alpha, uva, tile, sun, block, normal));
+        vertices.Add(new Vertex(basePos + b, shade, shade, shade, alpha, uvb, tile, sun, block, normal));
+        vertices.Add(new Vertex(basePos + c, shade, shade, shade, alpha, uvc, tile, sun, block, normal));
+        vertices.Add(new Vertex(basePos + d, shade, shade, shade, alpha, uvd, tile, sun, block, normal));
 
         indices.Add((ushort)(indexOffset + 0));
         indices.Add((ushort)(indexOffset + 1));
@@ -1458,29 +1458,38 @@ public class Chunk : IDisposable
     }
 
     /// <summary>
-    /// Atlas UVs sampling the tile sub-region under a cell-local point, so a small box shows a
-    /// crop of the texture at exactly the texel density of full cubes instead of a squashed
-    /// whole tile. The mapping matches the full-cube face emission corner-for-corner (same
-    /// mirroring per face), so bark features continue across log/branch joints at one scale.
+    /// Tile-local UV of a point on an axis-aligned quad, in tile units. This is the one
+    /// definition of how each face orients its texture: a full cube face maps its 0..1 cell to
+    /// 0..1 on the tile, a sub-cell box (<see cref="CropUv"/>) samples the matching crop at the
+    /// same texel density, and a quad merged over <paramref name="extent"/> cells runs 0..W and
+    /// 0..H so the sampler's REPEAT tiles it. Per face, U runs along X or Z and V along Y (Z on
+    /// top and bottom), mirrored where Minecraft's convention runs the other way — the same
+    /// mirror <see cref="ModelBaker"/> applies, so baked cubes, procedural boxes and merged quads
+    /// all sample identically and bark continues across log/branch joints at one scale.
     /// </summary>
-    private static Vector2 CropUv(BlockType.Point tile, int face, Vector3 local)
+    /// <param name="local">Point on the quad, relative to the quad's minimum corner.</param>
+    /// <param name="extent">Size of the quad along each axis (1 on its plane axis).</param>
+    internal static Vector2 TiledUv(int face, Vector3 local, Vector3 extent)
     {
         float u = face switch
         {
             0 => local.X,
-            1 => 1f - local.X,
-            2 => 1f - local.Z,
+            1 => extent.X - local.X,
+            2 => extent.Z - local.Z,
             3 => local.Z,
             _ => local.X, // top and bottom run along X
         };
         float v = face switch
         {
-            4 => 1f - local.Z, // top runs along Z
-            5 => local.Z,      // bottom runs along Z
-            _ => 1f - local.Y, // sides run bottom-to-top
+            4 => extent.Z - local.Z, // top runs along Z
+            5 => local.Z,            // bottom runs along Z
+            _ => extent.Y - local.Y, // sides run bottom-to-top
         };
-        return new Vector2((tile.X + u) * TextureAtlas.TileUVSize, (tile.Y + v) * TextureAtlas.TileUVSize);
+        return new Vector2(u, v);
     }
+
+    /// <summary>Tile-local UV under a cell-local point of a sub-cell box (see <see cref="TiledUv"/>).</summary>
+    private static Vector2 CropUv(int face, Vector3 local) => TiledUv(face, local, Vector3.One);
 
     public void UpdateMesh(ChunkMeshData meshData)
     {

@@ -38,6 +38,38 @@ public sealed class ContentTests
     }
 
     [Fact]
+    public void AtlasIsOneSlicePerTextureInFileNameOrder()
+    {
+        var root = TestContent.FindAssetsRoot();
+        var files = System.IO.Directory.GetFiles(System.IO.Path.Combine(root, "textures", "blocks"), "*.png")
+            .Select(System.IO.Path.GetFileNameWithoutExtension)
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(files.Length, TextureAtlas.LayerCount);
+        Assert.Equal(Array.IndexOf(files, "stone"), TextureAtlas.TileOf("stone"));
+        Assert.Equal(TextureAtlas.TileOf("grass_top"), ContentRegistry.RequireBlock("grass").FaceTiles[4]);
+        Assert.Equal(TextureAtlas.TileOf("grass_side"), ContentRegistry.RequireBlock("grass").FaceTiles[0]);
+    }
+
+    [Fact]
+    public void BakedQuadsCarryTileLocalUvs()
+    {
+        // Every face of a full cube spans its whole tile: local UVs sit at 0 or 1 and the quad
+        // names the slice it samples, so a merged quad can later run the same UV past 1.
+        var stone = ContentRegistry.RequireBlock("stone").BakedModel!;
+        Assert.Equal(6, stone.Quads.Length);
+        foreach (var quad in stone.Quads)
+        {
+            Assert.Equal(TextureAtlas.TileOf("stone"), quad.Tile);
+            foreach (var uv in quad.Uvs)
+            {
+                Assert.True(uv.X is 0f or 1f, $"u = {uv.X}");
+                Assert.True(uv.Y is 0f or 1f, $"v = {uv.Y}");
+            }
+        }
+    }
+
+    [Fact]
     public void GlassIsTranslucentAndSelfCulling()
     {
         var glass = ContentRegistry.RequireBlock("glass");

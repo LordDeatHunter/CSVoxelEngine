@@ -13,7 +13,7 @@ namespace silkgltriangle;
 ///
 /// Shapes carry a vertex colour with alpha. A solid-colour shape is just an untextured draw
 /// (see uUseTexture in ui-fragment.glsl); a textured one takes a <see cref="UvRect"/>, either
-/// the full image or one tile of the block atlas.
+/// the full image (layer 0 of a single-slice texture) or one tile of the block atlas.
 /// </summary>
 public static class Primitives
 {
@@ -34,15 +34,16 @@ public static class Primitives
         var halfWidth = width * 0.5f;
         var halfHeight = height * 0.5f;
 
+        var rect = uv ?? UvRect.Full;
         Span<Vector2> corners = stackalloc Vector2[CornersPerFace];
-        (uv ?? UvRect.Full).CornersTo(corners);
+        rect.CornersTo(corners);
 
         Span<Vertex> vertices =
         [
-            Vert(new Vector3(-halfWidth, -halfHeight, 0f), tint, corners[0]),
-            Vert(new Vector3(-halfWidth, halfHeight, 0f), tint, corners[1]),
-            Vert(new Vector3(halfWidth, halfHeight, 0f), tint, corners[2]),
-            Vert(new Vector3(halfWidth, -halfHeight, 0f), tint, corners[3])
+            Vert(new Vector3(-halfWidth, -halfHeight, 0f), tint, corners[0], rect.Layer),
+            Vert(new Vector3(-halfWidth, halfHeight, 0f), tint, corners[1], rect.Layer),
+            Vert(new Vector3(halfWidth, halfHeight, 0f), tint, corners[2], rect.Layer),
+            Vert(new Vector3(halfWidth, -halfHeight, 0f), tint, corners[3], rect.Layer)
         ];
 
         Span<ushort> indices = [0, 1, 2, 0, 2, 3];
@@ -88,7 +89,8 @@ public static class Primitives
             for (var corner = 0; corner < CornersPerFace; corner++)
             {
                 var position = (positions[corner] - new Vector3(0.5f)) * size;
-                vertices[face * CornersPerFace + corner] = Vert(position, shaded, corners[corner], normal);
+                vertices[face * CornersPerFace + corner] =
+                    Vert(position, shaded, corners[corner], faceUvs[face].Layer, normal);
             }
 
             var offset = (ushort)(face * CornersPerFace);
@@ -127,7 +129,7 @@ public static class Primitives
                 // Baked positions span the 0..1 cell, so recentre before scaling
                 var position = (quad.Positions[corner] - new Vector3(0.5f)) * size;
                 vertices[q * CornersPerFace + corner] =
-                    Vert(position, tint, quad.Uvs[corner], quad.Normal);
+                    Vert(position, tint, quad.Uvs[corner], quad.Tile, quad.Normal);
             }
 
             var offset = (ushort)(q * CornersPerFace);
@@ -227,8 +229,12 @@ public static class Primitives
 
     }
 
+    private static Vertex Vert(Vector3 position, Rgba color, Vector2 uv, ushort layer, Vector3? normal = null) =>
+        new(position, color.R, color.G, color.B, color.A, uv, layer, 1f, 0f, normal);
+
+    // Single-slice textures (sprites): plain 0..1 UVs on layer 0
     private static Vertex Vert(Vector3 position, Rgba color, Vector2 uv, Vector3? normal = null) =>
-        new(position, color.R, color.G, color.B, color.A, uv, 1f, 0f, normal);
+        Vert(position, color, uv, 0, normal);
 
     private static Rgba Shade(Rgba color, float factor) =>
         Rgba.FromFloat(color.R / 255f * factor, color.G / 255f * factor, color.B / 255f * factor,

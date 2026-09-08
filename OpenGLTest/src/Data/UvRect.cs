@@ -4,25 +4,17 @@ using System.Numerics;
 namespace silkgltriangle;
 
 /// <summary>
-/// An axis-aligned region of a texture in 0..1 UV space. <see cref="Min"/> is the top-left
-/// corner as the atlas is authored (V grows downwards), matching the chunk mesher.
+/// An axis-aligned region of one slice of an array texture, in 0..1 UV space. <see cref="Min"/>
+/// is the top-left corner as the image is authored (V grows downwards), matching the chunk
+/// mesher. <see cref="Layer"/> is 0 for single-slice textures and the tile for the block atlas.
 /// </summary>
-public readonly record struct UvRect(Vector2 Min, Vector2 Max)
+public readonly record struct UvRect(Vector2 Min, Vector2 Max, ushort Layer = 0)
 {
     /// <summary>The whole texture — what a standalone (non-atlas) image wants.</summary>
     public static readonly UvRect Full = new(Vector2.Zero, Vector2.One);
 
-    /// <summary>One tile of a square atlas, addressed in tile coordinates.</summary>
-    public static UvRect Tile(int tileX, int tileY, int tilesPerSide)
-    {
-        var size = 1f / tilesPerSide;
-        var min = new Vector2(tileX * size, tileY * size);
-        return new UvRect(min, min + new Vector2(size));
-    }
-
-    /// <summary>One tile of the stitched block atlas.</summary>
-    public static UvRect Tile(BlockType.Point tile) =>
-        Tile(tile.X, tile.Y, TextureAtlas.TilesPerSide);
+    /// <summary>One whole tile of the block atlas.</summary>
+    public static UvRect Tile(ushort tile) => new(Vector2.Zero, Vector2.One, tile);
 
     /// <summary>
     /// The four corners in the winding the primitive builders and chunk mesher share:

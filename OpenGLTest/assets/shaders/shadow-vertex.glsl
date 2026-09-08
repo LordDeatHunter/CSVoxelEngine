@@ -2,6 +2,7 @@
 layout (location = 0) in vec3 vPosition;
 layout (location = 2) in vec2 vTexCoord;
 layout (location = 6) in float vSway;
+layout (location = 7) in uint vLayer; // array-texture slice (Vertex.Layer)
 
 uniform mat4 uLightMVP;
 uniform mat4 uModel;
@@ -9,6 +10,7 @@ uniform float uTime;
 uniform float uSwayStrength;
 
 out vec2 fTexCoord;
+flat out uint fLayer;
 
 void main() {
     // Canopy wind, shaderpack-style: broad sine waves rolling over world XZ breathe whole
@@ -29,4 +31,5 @@ void main() {
     }
     gl_Position = uLightMVP * vec4(displaced, 1.0);
     fTexCoord = vTexCoord;
+    fLayer = vLayer;
 }

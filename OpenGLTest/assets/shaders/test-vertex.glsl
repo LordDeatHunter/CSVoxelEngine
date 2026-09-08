@@ -6,6 +6,7 @@ layout (location = 3) in float vSun;
 layout (location = 4) in float vBlock;
 layout (location = 5) in float vNormalIdx;
 layout (location = 6) in float vSway;
+layout (location = 7) in uint vLayer; // array-texture slice (Vertex.Layer)
 
 uniform mat4 uMVP;
 uniform mat4 uModel;
@@ -15,6 +16,7 @@ uniform vec3 uCameraPos;
 
 out vec4 fColor;
 out vec2 fTexCoord;
+flat out uint fLayer;
 out float fSun;
 out float fBlock;
 out vec3 fNormal;
@@ -64,6 +66,7 @@ void main() {
     gl_Position = uMVP * vec4(displaced, 1.0);
     fColor = vColor;
     fTexCoord = vTexCoord;
+    fLayer = vLayer;
     fSun = vSun;
     fBlock = vBlock;
     // uModel is a pure translation for chunks/LOD, so the normal is unchanged.

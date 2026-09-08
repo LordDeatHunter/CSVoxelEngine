@@ -158,6 +158,16 @@ fragments; the mesher/renderer change is preserved in the stash named in item 5.
   bytes). Touches `Vertex.cs`, `Mesh.cs`, `Chunk.cs`, `LodRegion.cs`, `test-vertex.glsl`,
   `shadow-vertex.glsl`. Do last.
 
+- [ ] **11. Binary greedy mesher + GPU draw path** (tracked phase by phase in `MESHER_PLAN.md`;
+  see its Status section). Phase 1 done 2026-09-08: every mesh texture is a `TEXTURE_2D_ARRAY`
+  (block atlas one slice per tile, sprites/font/crosshair/sun single-slice), `Vertex` 24 -> 32
+  bytes with float tile-local UVs and a `ushort Layer` at attribute location 7, all eight
+  world/shadow/UI/sun shaders sample `sampler2DArray`. This is the prerequisite for merged quads
+  to tile their texture; it changes no geometry, so the frame is expected unchanged (not
+  re-measured — the vertex grew 8 bytes, and item 9 showed vertex fetch is not the bottleneck).
+  128 tests pass; the three visual scenarios were diffed pixel-by-pixel against the pre-change
+  build (result recorded in `MESHER_PLAN.md`).
+
 - [ ] **10. GC and runtime settings.** `GCSettings.LatencyMode = SustainedLowLatency` in
   `Program.Main`; explicit `<ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>`
   and `<TieredPGO>true</TieredPGO>` in the csproj. Do not enable Server GC without measuring.

@@ -33,26 +33,32 @@ public class Mesh : IDisposable
 
         unsafe
         {
+            // Offsets follow the Vertex field order: position 0, colour 12, uv 16, sun 24,
+            // block 25, normal 26, sway 27, layer 28 (see Vertex for the semantics)
             _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, Vertex.Size, (void*)0);
             _gl.EnableVertexAttribArray(0);
 
             _gl.VertexAttribPointer(1, 4, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)12);
             _gl.EnableVertexAttribArray(1);
 
-            _gl.VertexAttribPointer(2, 2, VertexAttribPointerType.UnsignedShort, true, Vertex.Size, (void*)16);
+            _gl.VertexAttribPointer(2, 2, VertexAttribPointerType.Float, false, Vertex.Size, (void*)16);
             _gl.EnableVertexAttribArray(2);
 
-            _gl.VertexAttribPointer(3, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)20);
+            _gl.VertexAttribPointer(3, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)24);
             _gl.EnableVertexAttribArray(3);
 
-            _gl.VertexAttribPointer(4, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)21);
+            _gl.VertexAttribPointer(4, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)25);
             _gl.EnableVertexAttribArray(4);
 
-            _gl.VertexAttribPointer(5, 1, VertexAttribPointerType.UnsignedByte, false, Vertex.Size, (void*)22);
+            _gl.VertexAttribPointer(5, 1, VertexAttribPointerType.UnsignedByte, false, Vertex.Size, (void*)26);
             _gl.EnableVertexAttribArray(5);
 
-            _gl.VertexAttribPointer(6, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)23);
+            _gl.VertexAttribPointer(6, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)27);
             _gl.EnableVertexAttribArray(6);
+
+            // The array-texture layer is an integer attribute: no float conversion, read as uint
+            _gl.VertexAttribIPointer(7, 1, VertexAttribIType.UnsignedShort, Vertex.Size, (void*)28);
+            _gl.EnableVertexAttribArray(7);
         }
 
         _gl.BindVertexArray(0);

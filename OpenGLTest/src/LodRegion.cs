@@ -307,22 +307,20 @@ public class LodRegion : IDisposable
         const int topFace = 4;
 
         void AddQuad(List<Vertex> targetVertices, List<ushort> targetIndices,
-            int faceIndex, Vector3 cellOrigin, BlockType.Point tile, Span<byte> shades, bool isWater = false)
+            int faceIndex, Vector3 cellOrigin, ushort tile, Span<byte> shades, bool isWater = false)
         {
             // Meshes are indexed with ushort; a region can't realistically exceed this,
             // but degrade gracefully instead of overflowing if terrain is extreme
             if (targetVertices.Count > ushort.MaxValue - 3)
                 return;
 
-            var tileUv = TextureAtlas.TileUVSize;
-            var u0 = tile.X * tileUv;
-            var v0 = tile.Y * tileUv;
+            // One whole tile per LOD cell: tile-local UVs on the tile's atlas slice
             Span<Vector2> uv =
             [
-                new Vector2(u0, v0 + tileUv),
-                new Vector2(u0, v0),
-                new Vector2(u0 + tileUv, v0),
-                new Vector2(u0 + tileUv, v0 + tileUv)
+                new Vector2(0f, 1f),
+                new Vector2(0f, 0f),
+                new Vector2(1f, 0f),
+                new Vector2(1f, 1f)
             ];
 
             var face = Chunk.CubeFaces[faceIndex].face;
@@ -340,7 +338,7 @@ public class LodRegion : IDisposable
                 // ponytail: vertex alpha 254 flags water for the shader (glass/terrain stay 255);
                 // fColor.a is otherwise unused by the world shader, so the flag is invisible.
                 var alpha = (byte)(isWater ? 254 : 255);
-                targetVertices.Add(new Vertex(pos, shade, shade, shade, alpha, uv[c], 1f, 0f, normal));
+                targetVertices.Add(new Vertex(pos, shade, shade, shade, alpha, uv[c], tile, 1f, 0f, normal));
             }
 
             targetIndices.Add((ushort)(indexOffset + 0));

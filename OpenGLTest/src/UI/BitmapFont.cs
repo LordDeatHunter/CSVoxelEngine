@@ -140,22 +140,15 @@ public sealed class BitmapFont : IDisposable
             rgba[o + 3] = bitmap[i];
         }
 
-        var texture = gl.GenTexture();
-        gl.BindTexture(TextureTarget.Texture2D, texture);
-        unsafe
-        {
-            fixed (byte* ptr = rgba)
-            {
-                gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.Rgba,
-                    (uint)side, (uint)side, 0, PixelFormat.Rgba, PixelType.UnsignedByte, ptr);
-            }
-        }
-
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
-        gl.BindTexture(TextureTarget.Texture2D, 0);
+        // Every texture the shared Vertex layout samples is an array texture (see
+        // TextureLoader); the glyph atlas is a single slice with its own smooth, clamped sampling
+        var texture = TextureLoader.Upload(gl, rgba, side, side);
+        gl.BindTexture(TextureTarget.Texture2DArray, texture);
+        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
+        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
+        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
+        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        gl.BindTexture(TextureTarget.Texture2DArray, 0);
 
         return texture;
     }

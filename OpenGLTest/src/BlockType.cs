@@ -126,18 +126,18 @@ public sealed record BlockType
     /// <summary>The block's model, baked to atlas-ready quads at startup.</summary>
     public BakedModel? BakedModel { get; internal set; }
 
-    /// <summary>Tile per face in <see cref="Chunk.CubeFaces"/> order: -Z, +Z, -X, +X, +Y, -Y.
+    /// <summary>Atlas slice per face in <see cref="Chunk.CubeFaces"/> order: -Z, +Z, -X, +X, +Y, -Y.
     /// Empty until the models are baked.</summary>
-    public Point[] FaceTiles { get; internal set; } = [];
+    public ushort[] FaceTiles { get; internal set; } = [];
 
     /// <summary>Tile of the +Y face; shorthand the procedural emitters read.</summary>
-    public Point Top { get; internal set; }
+    public ushort Top { get; internal set; }
 
     /// <summary>Tile of the -Y face.</summary>
-    public Point Bottom { get; internal set; }
+    public ushort Bottom { get; internal set; }
 
     /// <summary>Tile of the side faces (-Z is representative).</summary>
-    public Point Side { get; internal set; }
+    public ushort Side { get; internal set; }
 
     /// <summary>Whether a block is solid to bodies. The raycast still targets non-solid blocks
     /// (it hits any non-air cell), so this only gates movement and drop physics.</summary>
@@ -174,5 +174,4 @@ public sealed record BlockType
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float WoodHalfWidth(byte blockId) => ById[blockId]?.HalfWidth ?? -1f;
 
-    public record struct Point(int X, int Y);
 }

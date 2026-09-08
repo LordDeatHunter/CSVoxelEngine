@@ -252,10 +252,10 @@ public class RenderManager : IDisposable
         _sunTexture = TextureLoader.LoadFromFile(gl, "assets/textures/environment/sun.png");
         // The loader hard-codes Nearest for the block tiles; the 64px disc is scaled up a lot
         // on screen, so it needs Linear or its edge turns into a staircase.
-        gl.BindTexture(TextureTarget.Texture2D, _sunTexture);
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
-        gl.BindTexture(TextureTarget.Texture2D, 0);
+        gl.BindTexture(TextureTarget.Texture2DArray, _sunTexture);
+        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
+        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        gl.BindTexture(TextureTarget.Texture2DArray, 0);
         _sunQuad = Primitives.CreateSquare(gl, 1f);
         _clouds = new CloudRenderer(gl);
         _rays = new UnderwaterRaysRenderer(gl);
@@ -487,7 +487,7 @@ public class RenderManager : IDisposable
         gl.ActiveTexture(TextureUnit.Texture1);
         gl.BindTexture(TextureTarget.Texture2D, 0);
         gl.ActiveTexture(TextureUnit.Texture0);
-        gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
+        gl.BindTexture(TextureTarget.Texture2DArray, textureAtlas);
         shadowShader.SetUniform("uTime", _time);
         shadowShader.SetUniform("uSwayStrength", WorldGenerationConfig.LeafSwayStrength);
 
@@ -746,7 +746,7 @@ public class RenderManager : IDisposable
         // below want ours and the atlas back.
         worldShader.Use();
         gl.ActiveTexture(TextureUnit.Texture0);
-        gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
+        gl.BindTexture(TextureTarget.Texture2DArray, textureAtlas);
         gl.Disable(EnableCap.Blend);
 
         // Fog and specular inside the texture want the mirrored eye; the clip drops
@@ -892,7 +892,7 @@ public class RenderManager : IDisposable
 
         sunShader.Use();
         gl.ActiveTexture(TextureUnit.Texture0);
-        gl.BindTexture(TextureTarget.Texture2D, _sunTexture);
+        gl.BindTexture(TextureTarget.Texture2DArray, _sunTexture);
 
         // Rotation only: dropping the camera position is what pins the quad at infinity
         var viewRot = Matrix4x4.CreateLookAt(Vector3.Zero, forward, Vector3.UnitY);
@@ -933,7 +933,7 @@ public class RenderManager : IDisposable
         gl.ActiveTexture(TextureUnit.Texture4);
         gl.BindTexture(TextureTarget.Texture2D, _sceneDepthTex);
         gl.ActiveTexture(TextureUnit.Texture0);
-        gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
+        gl.BindTexture(TextureTarget.Texture2DArray, textureAtlas);
     }
 
     /// <summary>
@@ -1321,7 +1321,7 @@ public class RenderManager : IDisposable
             {
                 if (!itemMeshes.TryGet(drop.BlockId, out mesh, out var itemTexture)) continue;
                 gl.ActiveTexture(TextureUnit.Texture0);
-                gl.BindTexture(TextureTarget.Texture2D, itemTexture);
+                gl.BindTexture(TextureTarget.Texture2DArray, itemTexture);
                 atlasBound = false;
             }
             else

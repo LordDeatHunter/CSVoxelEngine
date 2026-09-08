@@ -6,7 +6,7 @@ namespace silkgltriangle;
 
 /// <summary>
 /// Turns a flattened <see cref="BlockModel"/> into a <see cref="BakedModel"/>: model-space
-/// boxes become cell-local quads, texture variables become atlas tiles, and Minecraft's UV
+/// boxes become cell-local quads, texture variables become atlas slices, and Minecraft's UV
 /// conventions are converted to this engine's.
 ///
 /// The two conventions differ only by a mirror, and consistently so: for the four side faces
@@ -79,7 +79,7 @@ public static class ModelBaker
         }
 
         var hasFullFace = new bool[6];
-        var faceTiles = new BlockType.Point[6];
+        var faceTiles = new ushort[6];
         var fallback = quads.Count > 0 ? quads[0].Tile : default;
         for (var f = 0; f < 6; f++) faceTiles[f] = fallback;
 
@@ -113,7 +113,6 @@ public static class ModelBaker
                 $"Model '{model.Source}' face '{FaceNames[faceIndex]}' has uv rotation {rotation}; expected 0, 90, 180 or 270.");
         var uvShift = rotation / 90;
 
-        var tileUv = TextureAtlas.TileUVSize;
         var positions = new Vector3[4];
         var uvs = new Vector2[4];
         var corners = Corners[faceIndex];
@@ -134,7 +133,8 @@ public static class ModelBaker
             if (FlipU[faceIndex]) u = 1f - u;
             if (FlipV[faceIndex]) v = 1f - v;
 
-            uvs[j] = new Vector2((tile.X + u) * tileUv, (tile.Y + v) * tileUv);
+            // Tile-local: the quad's Tile picks the atlas slice, so the UV stays 0..1 on it
+            uvs[j] = new Vector2(u, v);
         }
 
         if (element.Rotation != null)

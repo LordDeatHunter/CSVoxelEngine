@@ -1,8 +1,11 @@
 #version 330 core
 in vec4 fColor;
 in vec2 fTexCoord;
+flat in uint fLayer;
 
-uniform sampler2D uTex;
+// Every UI texture is an array: the block atlas (icons pick their tile through fLayer),
+// and single-slice sprites, font and crosshair on layer 0.
+uniform sampler2DArray uTex;
 uniform vec4 uColor;
 uniform bool uUseTexture;
 // Alpha discard threshold for cutout draws (extruded item sprites). 0 disables: without it
@@ -20,7 +23,7 @@ void main()
 
     if (uUseTexture)
     {
-        texel = texture(uTex, fTexCoord);
+        texel = texture(uTex, vec3(fTexCoord, float(fLayer)));
         if (uAlphaCutoff > 0.0 && texel.a < uAlphaCutoff)
             discard;
     }

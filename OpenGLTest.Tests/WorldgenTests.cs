@@ -129,11 +129,8 @@ public sealed class WorldgenTests
 
         var mesh = LodRegion.BuildMeshData(1, fx / 64, fz / 64);
         var tile = ContentRegistry.RequireBlock("sand").FaceTiles[4];
-        var tileUv = TextureAtlas.TileUVSize;
-        var u0 = tile.X * tileUv;
-        var v0 = tile.Y * tileUv;
         Assert.Contains(mesh.Vertices, v =>
-            v.UV.X >= u0 && v.UV.X <= u0 + tileUv && v.UV.Y >= v0 && v.UV.Y <= v0 + tileUv);
+            v.Layer == tile && v.UV.X >= 0f && v.UV.X <= 1f && v.UV.Y >= 0f && v.UV.Y <= 1f);
     }
 
     [Fact]
@@ -180,10 +177,7 @@ public sealed class WorldgenTests
 
         var mesh = LodRegion.BuildMeshData(1, rx, rz);
         var tile = ContentRegistry.RequireBlock("gravel").FaceTiles[4];
-        var tileUv = TextureAtlas.TileUVSize;
-        var u0 = tile.X * tileUv;
-        var v0 = tile.Y * tileUv;
         Assert.Contains(mesh.Vertices, v =>
-            v.UV.X >= u0 && v.UV.X <= u0 + tileUv && v.UV.Y >= v0 && v.UV.Y <= v0 + tileUv);
+            v.Layer == tile && v.UV.X >= 0f && v.UV.X <= 1f && v.UV.Y >= 0f && v.UV.Y <= 1f);
     }
 }

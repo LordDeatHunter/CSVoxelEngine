@@ -1,7 +1,7 @@
 namespace silkgltriangle;
 
 /// <summary>
-/// A model turned into chunk-ready geometry: atlas UVs resolved, element rotations applied and
+/// A model turned into chunk-ready geometry: atlas slices resolved, UVs tile-local, element rotations applied and
 /// full-face coverage worked out. Built once at startup by <see cref="ModelBaker"/> and then
 /// read-only, so meshing threads can share it.
 /// </summary>
@@ -16,4 +16,4 @@ public sealed record BakedModel(
     BakedQuad[] Quads,
     bool IsFullCube,
     bool[] HasFullFace,
-    BlockType.Point[] FaceTiles);
+    ushort[] FaceTiles);

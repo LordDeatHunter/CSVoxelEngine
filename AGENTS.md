@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## Project overview
 
-A Minecraft-style voxel engine written in C# on .NET 9, using **Silk.NET** (windowing, input, OpenGL bindings) and StbImageSharp for texture loading. It renders an infinite, procedurally generated world (FastNoiseLite OpenSimplex2 noise) with chunk streaming, an underground of 3D-noise caves, worm-carved tunnels and heightmap ravines, greedy per-face meshing with ambient occlusion, frustum culling, block breaking/placement via raycast, and simple player physics (gravity, jumping, collision). The player spawns standing on the terrain at the origin (`Camera.SpawnPosition`).
+A Minecraft-style voxel engine written in C# on .NET 9, using **Silk.NET** (windowing, input, OpenGL bindings) and StbImageSharp for texture loading. It renders an infinite, procedurally generated world (FastNoiseLite OpenSimplex2 noise) with chunk streaming, an underground of 3D-noise caves, worm-carved tunnels and heightmap ravines, per-face chunk meshing with ambient occlusion (a binary greedy mesher is in progress, see `MESHER_PLAN.md`), frustum culling, block breaking/placement via raycast, and simple player physics (gravity, jumping, collision). The player spawns standing on the terrain at the origin (`Camera.SpawnPosition`).
 
 There is a single executable project. Historical naming quirks to be aware of:
 
@@ -53,7 +53,21 @@ Standing in water switches the player to **swimming** (`Camera.IsInWater`, recom
 
 Shaders (`assets/shaders/**/*.glsl`), textures (`assets/textures/**/*.png`), fonts (`assets/fonts/**/*.ttf`) and all content JSON (`assets/**/*.json` — blocks, items, loot tables, models) are copied to the output directory via `CopyToOutputDirectory` rules in the csproj — **new asset types/extensions need a matching `<None Update>` entry** or they won't be found at runtime. The JSON rule is a wildcard over the whole `assets` tree, so adding a block, item, loot table or model needs no csproj edit.
 
-Assets are opened by **relative** path (`FileUtils.ReadFile("assets/shaders/...")`, `TextureLoader.LoadFromFile(gl, "assets/textures/atlas.png")` in `RenderManager.LoadResources`), so the app must be launched with a working directory that contains `assets/` — either the build output directory or `OpenGLTest/`. `dotnet run --project OpenGLTest/silkgltriangle.csproj` satisfies this (it runs from the project folder); launching the built executable from an arbitrary directory does not.
+Assets are opened by **relative** path (`FileUtils.ReadFile("assets/shaders/...")`, `TextureAtlas.Build(gl, "assets/textures/blocks")` in `RenderManager.LoadResources`), so the app must be launched with a working directory that contains `assets/` — either the build output directory or `OpenGLTest/`. `dotnet run --project OpenGLTest/silkgltriangle.csproj` satisfies this (it runs from the project folder); launching the built executable from an arbitrary directory does not.
+
+**Textures and the vertex layout.** Every texture a `Vertex`-layout mesh samples is a
+`TEXTURE_2D_ARRAY` (`TextureLoader.Upload`/`UploadArray`): the block atlas has one slice per
+`assets/textures/blocks/*.png` in sorted file-name order (`TextureAtlas.TileOf(name)` returns the
+slice as a `ushort`, `BlockType.FaceTiles/Top/Bottom/Side` hold it), and item sprites, the font,
+the crosshair and the sun are single-slice arrays on layer 0. All eight world/shadow/UI/sun
+shaders therefore declare `sampler2DArray` and read `vec3(fTexCoord, float(fLayer))`; there is
+no 2D-texture path for meshes. `Vertex` is 32 bytes: position (3 floats), packed rgba, **UV as
+two floats in tile units** (0..1 across one tile, 0..W across a quad merged over W cells — the
+sampler's REPEAT tiles it, so UVs are never atlas-absolute), sun/block/normal/sway bytes at
+24-27 and the `ushort Layer` at 28 (attribute location 7, an integer attribute). Baked model
+quads (`BakedQuad.Uvs` + `.Tile`) and every procedural emitter go through `Chunk.TiledUv(face,
+local, extent)`, the single definition of per-face texture orientation; `CropUv` is its
+extent-1 case. Bind these textures with `TextureTarget.Texture2DArray`.
 
 ## Layout
 
@@ -74,7 +88,8 @@ OpenGLTest/
     WorldGenerationConfig.cs   # all tuning constants (view radius, per-frame budgets, thread counts) and every worldgen knob (seed, ravine, cave, carver)
     MathUtils.cs               # lerp/easing/pulse helpers for animation curves + shared constants
     Mesh.cs, Shader.cs, TextureLoader.cs, FileUtils.cs, FastNoiseLite.cs (vendored, don't reformat)
-    Data/                      # Vertex struct, cube geometry, frustum/plane math, direction tables
+    Data/                      # Vertex struct (32 B: float pos, rgba, float tile-local UV, sun/block/normal/sway bytes,
+                               #   ushort array-texture layer), cube geometry, frustum/plane math, direction tables
     Content/                   # the data-driven content pipeline (see "Content" below)
       ContentRegistry.cs       # loads assets/data + assets/models, assigns byte ids, fills the tables
       BlockDefinition.cs, ItemDefinition.cs, LootTableDefinition.cs, ModelDefinition.cs  # JSON DTOs
@@ -105,8 +120,8 @@ OpenGLTest/
       WormCarver.cs            # worm-carved tunnels: per-XZ-cell deterministic paths, cached, carved sphere by sphere
       CaveNode.cs, Worm.cs     # one tunnel sphere (center + radius); a worm's node array plus its AABB
       SplitMix64.cs            # deterministic integer-hash PRNG so worms don't depend on System.Random internals
-  assets/shaders/, assets/textures/   # GLSL shaders; block tiles (stitched into an atlas at
-                                      #   startup), item sprites, crosshair
+  assets/shaders/, assets/textures/   # GLSL shaders; block tiles (loaded into a TEXTURE_2D_ARRAY,
+                                      #   one slice per file, at startup), item sprites, crosshair
   assets/fonts/                       # TTF for the UI text
   assets/data/blocks/<name>.json      # one file per block; the file name is its string id
   assets/data/items/<name>.json       # vine, branch, flint, bucket, water_bucket
@@ -137,7 +152,7 @@ convention below). Every content error names the file it came from.
 
 1. `ContentRegistry.Load("assets")` - parses items, loot tables, blocks and every model they
    reference, and assigns ids. No GL, no atlas.
-2. `TextureAtlas.Build(gl, "assets/textures/blocks")` - stitches the tiles.
+2. `TextureAtlas.Build(gl, "assets/textures/blocks")` - loads the tiles into the array texture.
 3. `ContentRegistry.BakeModels()` - bakes each block's model into atlas-ready quads and settles
    the defaults that need to know whether the result is a full cube (`occludes`, `light.passes`).
 4. Shaders, `BlockCubeCache`, `ItemMeshCache`, `UIRenderer`, then the `World`.

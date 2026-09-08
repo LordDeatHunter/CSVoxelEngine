@@ -8,53 +8,50 @@ using StbImageSharp;
 namespace silkgltriangle;
 
 /// <summary>
-/// Stitches the individual block textures in <c>assets/textures/blocks/*.png</c> into a
-/// single grid atlas at startup and uploads it as the world texture. Block types reference
-/// textures by file name (see <see cref="BlockType"/>) and resolve to tile coordinates
-/// through <see cref="TileOf"/> once the atlas is built.
-///
-/// Files are packed row-major in sorted file-name order; the grid grows to
-/// <c>ceil(sqrt(count))</c> tiles per side, so adding a texture never requires touching
-/// coordinates by hand. All source textures must share one size (currently 32x32).
-/// Rows are blitted top-first exactly as decoded, so the stitched atlas samples identically
-/// to a pre-combined PNG laid out the same way.
+/// Loads the individual block textures in <c>assets/textures/blocks/*.png</c> into one
+/// <c>TEXTURE_2D_ARRAY</c> at startup — one slice per file, in sorted file-name order — and
+/// uploads it as the world texture. Block types reference textures by file name (see
+/// <see cref="BlockType"/>) and resolve to a slice through <see cref="TileOf"/> once the atlas
+/// is built. Because every tile is its own slice, UVs are plain 0..1 (or 0..N for a quad that
+/// tiles) and the sampler's REPEAT wraps them; nothing ever bleeds across tiles, at any mip
+/// level. All source textures must share one size (currently 32x32). Rows are uploaded
+/// top-first exactly as decoded.
 ///
 /// Startup-owned: <see cref="Build"/> runs once on the main thread (GL upload) before the
 /// <see cref="World"/> and its generation workers exist; afterwards the layout is read-only
-/// and safe to sample from meshing threads.
+/// and safe to read from meshing threads.
 /// </summary>
 public static class TextureAtlas
 {
-    /// <summary>Tiles per atlas side from the last <see cref="Build"/>; mesh UV math reads this.</summary>
-    public static int TilesPerSide { get; private set; } = 4;
+    /// <summary>Number of slices in the last built atlas (tests, diagnostics).</summary>
+    public static int LayerCount { get; private set; }
 
-    /// <summary>UV span of one tile; kept as a property so it tracks <see cref="TilesPerSide"/>.</summary>
-    public static float TileUVSize => 1f / TilesPerSide;
-
-    private static readonly Dictionary<string, BlockType.Point> Tiles = new();
+    private static readonly Dictionary<string, ushort> Tiles = new();
 
     /// <summary>
     /// Builds the atlas from every <c>*.png</c> in <paramref name="folder"/>, uploads it,
-    /// and records each file's tile coordinate under its name without extension.
+    /// and records each file's slice under its name without extension.
     /// </summary>
     /// <returns>The uploaded GL texture handle.</returns>
     public static uint Build(GL gl, string folder)
     {
-        var stitched = Stitch(folder);
-        return TextureLoader.Upload(gl, stitched.Atlas, stitched.Width, stitched.Height);
+        var (layers, width, height) = Load(folder);
+        return TextureLoader.UploadArray(gl, layers, width, height);
     }
 
     /// <summary>
-    /// Test seam: stitches the atlas and records the tile layout without uploading, so
+    /// Test seam: decodes the tiles and records the slice layout without uploading, so
     /// headless tests bake models against the exact layout the game uses.
     /// </summary>
-    public static void RegisterTilesWithoutUpload(string folder) => Stitch(folder);
+    public static void RegisterTilesWithoutUpload(string folder) => Load(folder);
 
-    private static (byte[] Atlas, int Width, int Height) Stitch(string folder)
+    private static (List<byte[]> Layers, int Width, int Height) Load(string folder)
     {
-        var files = Directory.GetFiles(folder, "*.png").OrderBy(Path.GetFileName).ToArray();
+        var files = Directory.GetFiles(folder, "*.png").OrderBy(Path.GetFileName, StringComparer.Ordinal).ToArray();
         if (files.Length == 0)
             throw new InvalidOperationException($"No block textures found in '{folder}'.");
+        if (files.Length > ushort.MaxValue)
+            throw new InvalidOperationException($"{files.Length} block textures exceed the {ushort.MaxValue} slices a Vertex.Layer can address.");
 
         var images = new List<(string Name, ImageResult Image)>(files.Length);
         foreach (var file in files)
@@ -71,41 +68,25 @@ public static class TextureAtlas
                 throw new InvalidOperationException(
                     $"Block texture '{name}.png' is {image.Width}x{image.Height}, expected {tileWidth}x{tileHeight}: all atlas tiles must share one size.");
 
-        var tilesPerSide = (int)Math.Ceiling(Math.Sqrt(images.Count));
-        var atlasWidth = tilesPerSide * tileWidth;
-        var atlasHeight = tilesPerSide * tileHeight;
-        var atlas = new byte[atlasWidth * atlasHeight * 4];
-
         Tiles.Clear();
+        var layers = new List<byte[]>(images.Count);
         for (var i = 0; i < images.Count; i++)
         {
             var (name, image) = images[i];
-            var tx = i % tilesPerSide;
-            var ty = i / tilesPerSide;
-            Blit(image.Data, tileWidth, tileHeight, atlas, atlasWidth, tx, ty);
-            Tiles[name] = new BlockType.Point(tx, ty);
+            layers.Add(image.Data);
+            Tiles[name] = (ushort)i;
         }
 
-        TilesPerSide = tilesPerSide;
-        return (atlas, atlasWidth, atlasHeight);
+        LayerCount = layers.Count;
+        return (layers, tileWidth, tileHeight);
     }
 
-    /// <summary>Tile coordinate of a stitched texture, by file name without extension.</summary>
-    public static BlockType.Point TileOf(string name)
+    /// <summary>Slice of a block texture, by file name without extension.</summary>
+    public static ushort TileOf(string name)
     {
         if (!Tiles.TryGetValue(name, out var tile))
             throw new KeyNotFoundException(
-                $"Block texture '{name}.png' is not in the stitched atlas. Add the file to assets/textures/blocks/.");
+                $"Block texture '{name}.png' is not in the atlas. Add the file to assets/textures/blocks/.");
         return tile;
-    }
-
-    // Copies one tile's rows into the atlas at grid cell (tx, ty). Both buffers hold
-    // top-first RGBA rows, so row r of the source lands on the matching atlas row.
-    private static void Blit(byte[] src, int tileWidth, int tileHeight,
-        byte[] dst, int atlasWidth, int tx, int ty)
-    {
-        var rowBytes = tileWidth * 4;
-        for (var r = 0; r < tileHeight; r++)
-            System.Buffer.BlockCopy(src, r * rowBytes, dst, ((ty * tileHeight + r) * atlasWidth + tx * tileWidth) * 4, rowBytes);
     }
 }
