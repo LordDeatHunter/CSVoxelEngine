@@ -30,6 +30,7 @@ public enum ProfileSection
     WorldPass,
     EntityPass,
     WaterPass,
+    CloudPass,
     SelectPass,
     UiPass
 }
@@ -50,7 +51,7 @@ public static class FrameProfiler
     [
         "camera", "chunkUnld", "chunkApply", "chunkDirty", "lod", "entities",
         "fluidWake", "fluidTick", "raycast", "breaking",
-        "lighting", "shadows", "reflect", "lodPass", "worldPass", "entityPass", "waterPass",
+        "lighting", "shadows", "reflect", "lodPass", "worldPass", "entityPass", "waterPass", "cloudPass",
         "selectPass", "uiPass"
     ];
 

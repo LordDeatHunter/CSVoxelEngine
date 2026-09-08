@@ -172,6 +172,11 @@ public class World
             _lodManager.RegionList);
         FrameProfiler.End(ProfileSection.WaterPass);
 
+        // Clouds blend too, so they go after water has written its depth
+        FrameProfiler.Begin(ProfileSection.CloudPass);
+        renderManager.RenderClouds(Camera, Camera.IsEyeInWater);
+        FrameProfiler.End(ProfileSection.CloudPass);
+
         // With no target there is nothing left to draw, so SelectPass only opens past here and
         // its Begin/End stay balanced across the early return
         if (!_hasSelectedBlock) return;

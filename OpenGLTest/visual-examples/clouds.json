@@ -1,0 +1,23 @@
+{
+  // Cloud check: run with VOXEL_SCRIPT=visual-examples/clouds.json
+  // (working directory OpenGLTest/). Shots land in visual/clouds/.
+  // Frames the sky from open air below the layer, level with it, from high above, then inside it.
+  "steps": [
+    { "op": "wait", "seconds": 5 },
+    { "op": "teleport", "pos": [0.5, 30.5, 0.5], "yaw": -90, "pitch": 40 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "clouds_up", "hideHud": true },
+    { "op": "teleport", "pos": [0.5, 200.5, 0.5], "yaw": -90, "pitch": -8 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "clouds_level", "hideHud": true },
+    { "op": "teleport", "pos": [0.5, 320.5, 0.5], "yaw": -90, "pitch": -50 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "clouds_above", "hideHud": true },
+    { "op": "teleport", "pos": [0.5, 162.5, 0.5], "yaw": -90, "pitch": 0 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "clouds_inside", "hideHud": true },
+    { "op": "teleport", "pos": [0.5, 150.5, 0.5], "yaw": -90, "pitch": 35 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "clouds_closeup", "hideHud": true }
+  ]
+}

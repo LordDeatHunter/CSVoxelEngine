@@ -75,6 +75,30 @@ public static class WorldGenerationConfig
     // Falloff exponent of the glow from the disc outwards; higher means a tighter halo
     public const float SunGlowExponent = 2.5f;
 
+    // --- Clouds ---
+    // One static field of 8x8-block cells (CloudField) drawn 3x3 around the camera by
+    // CloudRenderer. Cell levels come from periodic value noise, so the field tiles with no seam.
+    // Heights clear the tallest terrain (~112) plus trees.
+    public const float CloudHeight = 160f;
+    // Drawn as whole copies 3x3 around the camera, so this must be >= FogFarBlocks for the
+    // field edge to stay hidden in fog. Must be a power-of-two multiple of CloudCellSize.
+    public const float CloudFieldSize = 2048f;
+    public const float CloudCellSize = 8f;
+    public const float CloudLayerThickness = 4f;
+    public const int CloudMaxLevels = 3;
+    // Density above which a cell holds a cloud (tuned for 30-45 % coverage; CloudTests asserts it),
+    // and how much more density each extra stacked layer needs.
+    public const float CloudThreshold = 0.54f;
+    public const float CloudLevelStep = 0.09f;
+    public const float CloudOpacity = 0.8f;
+    // Fillet radius on every convex cloud edge, in blocks. Must stay below half the layer thickness
+    // and half the cell size so the flat parts of a one-layer cell keep a positive size.
+    public const float CloudCornerRadius = 1.5f;
+    // Quads per quarter turn of a fillet; 3 is plenty with smooth per-vertex normals.
+    public const int CloudFilletSegments = 3;
+    public const int CloudSeed = 9241;
+    public const float CloudDriftBlocksPerSecond = 1.5f;
+
     // --- Far-terrain LOD ---
     // Level definitions (cell sizes, per-level radii) live in LodRegion.Levels.
 

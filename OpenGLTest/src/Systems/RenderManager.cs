@@ -31,6 +31,10 @@ public class RenderManager : IDisposable
     private Mesh _sunQuad;
     private float _sunVisibility;
 
+    // The cloud layer as one static, stitched mesh (see CloudRenderer), drawn translucent
+    // after the water pass. Null until LoadResources builds it.
+    private CloudRenderer? _clouds;
+
     // Directional sun shadows: RenderShadows fills _shadowDepthTex (a depth-only FBO
     // attachment, sampled as a comparison sampler on unit 1) through _lightViewProj, and
     // every world draw hands both to test-fragment.glsl's SampleShadow.
@@ -222,6 +226,7 @@ public class RenderManager : IDisposable
         gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
         gl.BindTexture(TextureTarget.Texture2D, 0);
         _sunQuad = Primitives.CreateSquare(gl, 1f);
+        _clouds = new CloudRenderer(gl);
 
         blockCubes = new BlockCubeCache(gl);
         itemMeshes = new ItemMeshCache(gl);
@@ -827,6 +832,31 @@ public class RenderManager : IDisposable
         worldShader.SetUniform(_locAlpha, alpha);
     }
 
+    /// <summary>
+    /// Draws the cloud field once, translucent, after every opaque pass and the water pass so the
+    /// terrain and the sea surface both occlude it properly. Skipped with the eye underwater, where
+    /// the water fog already hides the sky. Only the cull state has to be restored afterwards:
+    /// blending is the state the later passes expect anyway.
+    /// </summary>
+    public void RenderClouds(Camera? camera, bool eyeInWater)
+    {
+        if (camera == null || eyeInWater || _clouds == null) return;
+
+        // Translucent and depth-tested: terrain and water (already drawn) occlude the clouds, and a
+        // depth pre-pass inside CloudRenderer picks the nearest surface so overlapping rounded pieces
+        // blend exactly once whatever their draw order. Back-face culling keeps bottoms from bleeding
+        // through tops; DepthMask goes back on below because the pre-pass leaves it off.
+        gl.Enable(EnableCap.Blend);
+        gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+        gl.DepthMask(false);
+        gl.Enable(EnableCap.CullFace);
+        gl.CullFace(TriangleFace.Back);
+        _clouds.Render(camera.GetViewProjection(), _cameraPos, _time,
+            _sunDir, _sunColor, _sunIntensity, _ambient, _fogColor, _fogNear, _fogFar);
+        gl.Disable(EnableCap.CullFace);
+        gl.DepthMask(true);
+    }
+
     // Reused across frames to avoid a per-frame allocation
     private readonly List<(Chunk chunk, float distSq)> _visibleChunks = new(1024);
 
@@ -1375,6 +1405,7 @@ public class RenderManager : IDisposable
         breakShader.Dispose();
         shadowShader.Dispose();
         sunShader.Dispose();
+        _clouds?.Dispose();
         _sunQuad.Dispose();
         gl.DeleteTexture(_sunTexture);
         gl.DeleteFramebuffer(_shadowFbo);

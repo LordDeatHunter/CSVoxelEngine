@@ -113,6 +113,10 @@ public class Shader : IDisposable
 
     public void SetUniform(int location, int value) => _gl.Uniform1(location, value);
 
+    public void SetUniform(string name, Vector2 value) => SetUniform(GetUniformLocation(name), value);
+
+    public void SetUniform(int location, Vector2 value) => _gl.Uniform2(location, value.X, value.Y);
+
     public void SetUniform(string name, Vector3 value) => SetUniform(GetUniformLocation(name), value);
 
     public void SetUniform(int location, Vector3 value) => _gl.Uniform3(location, value.X, value.Y, value.Z);

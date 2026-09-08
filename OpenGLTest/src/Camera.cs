@@ -187,6 +187,9 @@ public class Camera
         Position = position;
         Yaw = yaw;
         Pitch = Math.Clamp(pitch, -89f, 89f);
+        // A teleport is not a fall: without this a scenario dropped at altitude keeps the
+        // speed it built up before the jump and plummets through the frame it wanted
+        _verticalVelocity = 0f;
     }
 
     private void OnMouseMove(IMouse mouse, Vector2 position)

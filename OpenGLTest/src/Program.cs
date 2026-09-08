@@ -34,6 +34,10 @@ public static class Program
     // window closes. A bad path or bad script fails fast instead of trapping anyone.
     private const string VisualScriptVariable = "VOXEL_SCRIPT";
 
+    // Set to 1 to start with the X debug line on, so a scripted run logs FPS and the profiler
+    // breakdown once a second without anyone pressing a key
+    private const string DebugVariable = "VOXEL_DEBUG";
+
     // Added to the window clock before the lighting pass sees it, so a screenshot can be taken
     // at any point of the day without waiting for the sun to get there
     private static double timeOffset;
@@ -66,6 +70,8 @@ public static class Program
         };
 
         inputManager.Mouse?.Scroll += (_, wheel) => world.Inventory.Scroll(wheel.Y);
+
+        debugEnabled = Environment.GetEnvironmentVariable(DebugVariable)?.Trim() is "1" or "true";
 
         var script = Environment.GetEnvironmentVariable(VisualScriptVariable);
         if (!string.IsNullOrWhiteSpace(script))
@@ -120,6 +126,29 @@ public static class Program
     }
 
 
+    /// <summary>
+    /// The X debug line: FPS and camera state five times a second plus one profiler snapshot a
+    /// second. Shared by the interactive and the scripted update paths, so a VOXEL_DEBUG run logs
+    /// the same numbers a player would see.
+    /// </summary>
+    private static void LogDebugLine(double deltaTime)
+    {
+        if (!debugEnabled) return;
+
+        if (FrameProfiler.TryTakeSnapshotForConsole(out var profilerLine))
+            Console.WriteLine(profilerLine);
+
+        debugLogTimer += deltaTime;
+        if (debugLogTimer < 0.2) return;
+
+        var fps = deltaTime > 0 ? (int)(1 / deltaTime) : 0;
+        var camera = world.Camera;
+        var position = camera.Position;
+        Console.WriteLine(
+            $"FPS {fps} | Pos ({position.X:F2}, {position.Y:F2}, {position.Z:F2}) | Grounded {camera.IsGrounded} | Vy {camera.VerticalVelocity:F2} | Water {camera.IsInWater}/{camera.IsEyeInWater}");
+        debugLogTimer = 0;
+    }
+
     private static void OnUpdate(double deltaTime)
     {
         if (visualScriptFailed)
@@ -131,6 +160,7 @@ public static class Program
         if (visualDirector != null)
         {
             visualDirector.Drive(deltaTime);
+            LogDebugLine(deltaTime);
             if (visualDirector.IsDone)
                 windowManager.Window.Close();
             return;
@@ -167,23 +197,7 @@ public static class Program
         world.UpdateBlockBreaking(deltaTime, inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true);
         FrameProfiler.End(ProfileSection.Breaking);
 
-        if (debugEnabled)
-        {
-            // One profiler snapshot a second, so a headless run's log carries the breakdown
-            if (FrameProfiler.TryTakeSnapshotForConsole(out var profilerLine))
-                Console.WriteLine(profilerLine);
-
-            debugLogTimer += deltaTime;
-            if (debugLogTimer >= 0.2)
-            {
-                var fps = deltaTime > 0 ? (int)(1 / deltaTime) : 0;
-                var camera = world.Camera;
-                var position = camera.Position;
-                Console.WriteLine(
-                    $"FPS {fps} | Pos ({position.X:F2}, {position.Y:F2}, {position.Z:F2}) | Grounded {camera.IsGrounded} | Vy {camera.VerticalVelocity:F2} | Water {camera.IsInWater}/{camera.IsEyeInWater}");
-                debugLogTimer = 0;
-            }
-        }
+        LogDebugLine(deltaTime);
 
         if (inputManager.Keyboard?.IsKeyPressed(Key.Escape) == true)
             windowManager.Window.Close();
