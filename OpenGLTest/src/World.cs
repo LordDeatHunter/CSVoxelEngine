@@ -143,6 +143,9 @@ public class World
         FrameProfiler.End(ProfileSection.Shadows);
 
         FrameProfiler.Begin(ProfileSection.Reflection);
+        // One frustum pass over the translucent draws feeds both this and the water pass, and
+        // tells the reflection whether there is any water on screen to be worth rendering
+        renderManager.CullWater(Camera, _chunkManager.Renderable, _lodManager.RegionList);
         renderManager.RenderReflection(Camera, _chunkManager.Renderable, _lodManager.RegionList);
         FrameProfiler.End(ProfileSection.Reflection);
 
@@ -168,14 +171,19 @@ public class World
         // Water last of the world passes: it blends, so everything it can cover has to be in
         // the depth buffer already
         FrameProfiler.Begin(ProfileSection.WaterPass);
-        renderManager.RenderWorldTranslucent(Camera, _chunkManager.Renderable,
-            _lodManager.RegionList);
+        renderManager.RenderWorldTranslucent(Camera);
         FrameProfiler.End(ProfileSection.WaterPass);
 
         // Clouds blend too, so they go after water has written its depth
         FrameProfiler.Begin(ProfileSection.CloudPass);
         renderManager.RenderClouds(Camera, Camera.IsEyeInWater);
         FrameProfiler.End(ProfileSection.CloudPass);
+
+        // Additive sun shafts on top of the finished underwater view; it re-reads the depth
+        // buffer, so it has to follow everything that writes depth
+        FrameProfiler.Begin(ProfileSection.RaysPass);
+        renderManager.RenderUnderwaterRays(Camera);
+        FrameProfiler.End(ProfileSection.RaysPass);
 
         // With no target there is nothing left to draw, so SelectPass only opens past here and
         // its Begin/End stay balanced across the early return

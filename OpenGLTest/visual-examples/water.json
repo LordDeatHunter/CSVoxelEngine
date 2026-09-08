@@ -1,0 +1,37 @@
+{
+  // Water check: run with VOXEL_TIME=70 VOXEL_SCRIPT=visual-examples/water.json
+  // (working directory OpenGLTest/). Shots land in visual/water/.
+  // Double-taps Space for flight first so the camera holds each framing instead of falling.
+  // The bay at x~230, z~-140 has a beach, trees and water deep enough to swim in at x~250.
+  "steps": [
+    { "op": "wait", "seconds": 5 },
+    { "op": "walk", "keys": ["Space"], "seconds": 0.05 },
+    { "op": "wait", "seconds": 0.12 },
+    { "op": "walk", "keys": ["Space"], "seconds": 0.05 },
+    { "op": "teleport", "pos": [228.5, 10.5, -138.5], "yaw": 0, "pitch": -22 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "water_bay", "hideHud": true },
+    { "op": "teleport", "pos": [236.5, 4.5, -134.5], "yaw": 35, "pitch": -50 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "water_shore", "hideHud": true },
+    { "op": "teleport", "pos": [228.5, 2.5, -138.5], "yaw": 0, "pitch": -5 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "water_grazing", "hideHud": true },
+    { "op": "teleport", "pos": [228.5, 40.5, -138.5], "yaw": 0, "pitch": -60 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "water_high", "hideHud": true },
+    { "op": "teleport", "pos": [250.5, -3.5, -150.5], "yaw": 90, "pitch": 40 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "water_under_sun", "hideHud": true },
+    { "op": "teleport", "pos": [250.5, -3.5, -150.5], "yaw": 0, "pitch": -35 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "water_under_floor", "hideHud": true },
+    { "op": "teleport", "pos": [243.5, -2.5, -143.5], "yaw": 20, "pitch": 5 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "water_under_shore", "hideHud": true },
+    // Shafts want shadow in the water: at VOXEL_TIME=180 the low sun sits behind this shore
+    { "op": "teleport", "pos": [212.5, -1.5, -140.5], "yaw": 180, "pitch": 25 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "water_under_shafts", "hideHud": true }
+  ]
+}

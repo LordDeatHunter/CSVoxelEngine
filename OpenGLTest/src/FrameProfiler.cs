@@ -31,6 +31,7 @@ public enum ProfileSection
     EntityPass,
     WaterPass,
     CloudPass,
+    RaysPass,
     SelectPass,
     UiPass
 }
@@ -52,7 +53,7 @@ public static class FrameProfiler
         "camera", "chunkUnld", "chunkApply", "chunkDirty", "lod", "entities",
         "fluidWake", "fluidTick", "raycast", "breaking",
         "lighting", "shadows", "reflect", "lodPass", "worldPass", "entityPass", "waterPass", "cloudPass",
-        "selectPass", "uiPass"
+        "raysPass", "selectPass", "uiPass"
     ];
 
     private const string OtherLabel = "other";

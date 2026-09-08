@@ -19,6 +19,16 @@ out float fSun;
 out float fBlock;
 out vec3 fNormal;
 out vec3 fWorldPos;
+out float fSubmerged;
+
+// Four directional sines: the sum stays under 0.09 blocks so a full cell's surface (8/9) never
+// pokes out of its block. Duplicated verbatim in test-fragment.glsl for the analytic normal.
+float WaveHeight(vec2 p, float t) {
+    return 0.035 * sin(dot(p, vec2(0.9, 0.4)) * 0.9 + t * 1.6)
+         + 0.025 * sin(dot(p, vec2(-0.5, 0.85)) * 1.4 + t * 2.1)
+         + 0.015 * sin(dot(p, vec2(0.3, -0.95)) * 2.6 + t * 2.9)
+         + 0.010 * sin(dot(p, vec2(-0.8, -0.6)) * 4.1 + t * 3.7);
+}
 
 void main() {
     // Canopy wind, shaderpack-style: broad sine waves rolling over world XZ breathe whole
@@ -28,15 +38,17 @@ void main() {
     vec3 displaced = vPosition;
     // ponytail: water flag rides in vColor.a (254 = water, 255 = everything else); fColor.a is unused otherwise.
     bool isWater = vColor.a < 0.998;
-    if (isWater) {
+    // Only true surface vertices move: skirt bottoms, the tops of stacked columns and the
+    // integer-height tops of falling water all sit at whole numbers, and displacing those
+    // would crack the skin against the floor and against the cell above.
+    if (isWater && fract(vPosition.y) > 0.01) {
         // Y-only waves as a pure function of world XZ, so verts sharing an XZ (sloped-top
         // corners, side-face top edges) displace identically and the skin never cracks.
         // Faded out by ~160 blocks: the far LOD sheets sample different XZs, so any
         // displacement there would seam against the chunk water and between LOD levels.
         vec4 anchorW = uModel * vec4(vPosition, 1.0);
         float wFade = 1.0 - smoothstep(64.0, 160.0, distance(anchorW.xyz, uCameraPos));
-        displaced.y += (sin(uTime * 1.8 + anchorW.x * 1.2 + anchorW.z * 0.9) * 0.03
-                      + sin(uTime * 3.1 + anchorW.z * 2.2 - anchorW.x * 0.7) * 0.015) * wFade;
+        displaced.y += WaveHeight(anchorW.xz, uTime) * wFade;
     }
     if (vSway > 0.001 && uSwayStrength > 0.001) {
         vec4 anchor = uModel * vec4(vPosition, 1.0);
@@ -55,12 +67,16 @@ void main() {
     fSun = vSun;
     fBlock = vBlock;
     // uModel is a pure translation for chunks/LOD, so the normal is unchanged.
-    // The mesher packs the face as a 0..5 index (Chunk.CubeFaces order); a nested ternary
-    // keeps it branchless without relying on dynamic array indexing.
-    vec3 vNormal = vNormalIdx < 0.5 ? vec3(0.0, 0.0, -1.0)
-        : vNormalIdx < 1.5 ? vec3(0.0, 0.0, 1.0)
-        : vNormalIdx < 2.5 ? vec3(-1.0, 0.0, 0.0)
-        : vNormalIdx < 3.5 ? vec3(1.0, 0.0, 0.0)
-        : vNormalIdx < 4.5 ? vec3(0.0, 1.0, 0.0) : vec3(0.0, -1.0, 0.0);
+    // The mesher packs the face as a 0..5 index (Chunk.CubeFaces order) in bits 0-2 and
+    // "this face looks into water" in bit 3; a nested ternary keeps the decode branchless
+    // without relying on dynamic array indexing.
+    int nIdx = int(vNormalIdx + 0.5);
+    int face = nIdx & 7;
+    fSubmerged = (nIdx & 8) != 0 ? 1.0 : 0.0;
+    vec3 vNormal = face == 0 ? vec3(0.0, 0.0, -1.0)
+        : face == 1 ? vec3(0.0, 0.0, 1.0)
+        : face == 2 ? vec3(-1.0, 0.0, 0.0)
+        : face == 3 ? vec3(1.0, 0.0, 0.0)
+        : face == 4 ? vec3(0.0, 1.0, 0.0) : vec3(0.0, -1.0, 0.0);
     fNormal = mat3(uModel) * vNormal;
 }

@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 namespace silkgltriangle;
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
-public struct Vertex(Vector3 position, byte r, byte g, byte b, byte a, Vector2 uv, float sun = 1f, float block = 0f, Vector3? normal = null, float sway = 0f)
+public struct Vertex(Vector3 position, byte r, byte g, byte b, byte a, Vector2 uv, float sun = 1f, float block = 0f, Vector3? normal = null, float sway = 0f, bool submerged = false)
 {
     public Vector3 Position = position;
     public uint PackedColor = (uint)(r | (g << 8) | (b << 16) | (a << 24));
@@ -20,10 +20,11 @@ public struct Vertex(Vector3 position, byte r, byte g, byte b, byte a, Vector2 u
     /// <summary>Lamp light level 0..1, flood-filled from emissive blocks at mesh time.</summary>
     public byte Block = EncodeLight(block);
 
-    /// <summary>Face index in <see cref="Chunk.CubeFaces"/> order, reconstructed in the vertex
-    /// shader. Sloped fluid tops and spun pebbles snap to their dominant axis; both sit within
-    /// a few degrees of one, so the sun diffuse barely moves.</summary>
-    public byte Normal = EncodeNormal(normal ?? Vector3.UnitY);
+    /// <summary>Bits 0-2: face index in <see cref="Chunk.CubeFaces"/> order, reconstructed in
+    /// the vertex shader. Sloped fluid tops and spun pebbles snap to their dominant axis; both
+    /// sit within a few degrees of one, so the sun diffuse barely moves. Bit 3: the face looks
+    /// into water, which is what the fragment shader paints the caustic net onto.</summary>
+    public byte Normal = (byte)(EncodeNormal(normal ?? Vector3.UnitY) | (submerged ? 8 : 0));
 
     /// <summary>Wind weight for the leaf-wave shader (1 on canopy leaves, 0 elsewhere).
     /// Chunk meshes set it; standalone cubes (drops, icons, mining pops) stay planted at 0.</summary>

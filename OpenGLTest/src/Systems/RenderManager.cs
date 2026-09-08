@@ -35,6 +35,9 @@ public class RenderManager : IDisposable
     // after the water pass. Null until LoadResources builds it.
     private CloudRenderer? _clouds;
 
+    // Underwater sun shafts, one additive full-screen pass. Null until LoadResources builds it.
+    private UnderwaterRaysRenderer? _rays;
+
     // Directional sun shadows: RenderShadows fills _shadowDepthTex (a depth-only FBO
     // attachment, sampled as a comparison sampler on unit 1) through _lightViewProj, and
     // every world draw hands both to test-fragment.glsl's SampleShadow.
@@ -50,6 +53,12 @@ public class RenderManager : IDisposable
     private uint _reflDepthTex;
     private Vector2D<int> _reflSize;
     private Matrix4x4 _reflViewProj = Matrix4x4.Identity;
+
+    // The scene copies the water pass refracts through: the default framebuffer's colour on
+    // unit 3 and its depth on unit 4, snapshotted by CopyScene just before the water draws.
+    private uint _sceneColorTex;
+    private uint _sceneDepthTex;
+    private Vector2D<int> _sceneSize;
 
     // The sea surface the reflection mirrors across (a source cell's top), and the
     // per-frame clip that keeps below-plane geometry out of the reflection texture.
@@ -75,7 +84,19 @@ public class RenderManager : IDisposable
     // 0 at night (and fully underwater), 1 with the sun well up: how much of the direct
     // sun term the shadow lookup is allowed to take away
     private float _shadowStrength;
+
+    // The same value before the underwater fade. Caustics and the sun shafts are exactly the
+    // effects a submerged eye is supposed to see, so they (and the shadow map itself) keep
+    // using this while the world diffuse fades with _shadowStrength.
+    private float _shadowStrengthDry;
+
+    // How high the sun is, 0 at night and 1 well into the day; the ray pass scales with it
+    private float _dayness;
     private Matrix4x4 _lightViewProj = Matrix4x4.Identity;
+
+    // Inverse of the current view-projection, for the shaders that reconstruct a world
+    // position out of the depth texture (see the depth-convention note in test-fragment.glsl)
+    private Matrix4x4 _invViewProj = Matrix4x4.Identity;
 
     // Underwater tint: the eye state is a hard flag, so it is eased into _underwaterT
     // (0 = above water, 1 = fully submerged) over UnderwaterFadeSeconds
@@ -192,9 +213,19 @@ public class RenderManager : IDisposable
         worldShader.SetUniform("uTextureAtlas", 0);
         worldShader.SetUniform("uShadowMap", 1);
         worldShader.SetUniform("uReflectionMap", 2);
+        worldShader.SetUniform("uSceneColor", 3);
+        worldShader.SetUniform("uSceneDepth", 4);
         worldShader.SetUniform("uWaterPlaneY", WaterPlaneY);
         worldShader.SetUniform("uReflValid", 0f);
+        // The water model's tuning constants never change at runtime, so they go up once here
+        // instead of riding ApplyFrameUniforms every frame.
+        worldShader.SetUniform("uWaterNormalScale", WorldGenerationConfig.WaterNormalScale);
+        worldShader.SetUniform("uWaterRefractStrength", WorldGenerationConfig.WaterRefractStrength);
+        worldShader.SetUniform("uWaterAbsorb", WorldGenerationConfig.WaterAbsorb);
+        worldShader.SetUniform("uWaterScatter", WorldGenerationConfig.WaterScatter);
+        worldShader.SetUniform("uWaterCausticStrength", WorldGenerationConfig.WaterCausticStrength);
         CreateReflectionTarget();
+        CreateSceneCopy();
 
         // Everything a world draw sets per draw, resolved once here (see SetDrawUniforms)
         _locModel = worldShader.GetUniformLocation("uModel");
@@ -227,6 +258,7 @@ public class RenderManager : IDisposable
         gl.BindTexture(TextureTarget.Texture2D, 0);
         _sunQuad = Primitives.CreateSquare(gl, 1f);
         _clouds = new CloudRenderer(gl);
+        _rays = new UnderwaterRaysRenderer(gl);
 
         blockCubes = new BlockCubeCache(gl);
         itemMeshes = new ItemMeshCache(gl);
@@ -282,6 +314,7 @@ public class RenderManager : IDisposable
         _viewportSize = size;
         gl.Viewport(size);
         CreateReflectionTarget();
+        CreateSceneCopy();
     }
 
     /// <summary>
@@ -300,7 +333,13 @@ public class RenderManager : IDisposable
 
         _time = (float)time;
         if (camera != null)
+        {
             _cameraPos = camera.Position;
+            // Inverting the exact matrix the depth was written with is what makes the shaders'
+            // position reconstruction independent of the clip-depth convention.
+            if (!Matrix4x4.Invert(camera.GetViewProjection(), out _invViewProj))
+                _invViewProj = Matrix4x4.Identity;
+        }
 
         // The sun orbits once per DayLengthSeconds; the phase starts it mid-morning
         var angle = (float)(time / WorldGenerationConfig.DayLengthSeconds) * MathF.Tau + 0.8f;
@@ -319,6 +358,7 @@ public class RenderManager : IDisposable
         _sunVisibility = Smooth01((elevation + 0.08f) / 0.14f);
 
         var dayness = Smooth01((elevation + 0.08f) / 0.33f);
+        _dayness = dayness;
         var duskAmount = elevation > -0.1f ? Math.Clamp(1f - MathF.Abs(elevation) * 5f, 0f, 1f) : 0f;
 
         _sunColor = Mix(new Vector3(0.3f, 0.4f, 0.7f), new Vector3(1f, 0.96f, 0.88f), dayness);
@@ -361,6 +401,10 @@ public class RenderManager : IDisposable
 
         // Underwater the sun is a diffuse glow, so the crisp shadow edges go with the tint.
         // This has to run before the early return below, or a submerged view would keep them.
+        // _shadowStrengthDry keeps the unfaded value: the caustics and the underwater sun
+        // shafts are exactly what a submerged eye should see, and both need the shadow map
+        // to still be rendered and sampled while the world diffuse fades.
+        _shadowStrengthDry = _shadowStrength;
         _shadowStrength *= 1f - wet;
         // Same reason the disc goes with them: from under the surface there is no sun to see
         _sunVisibility *= 1f - wet;
@@ -389,7 +433,7 @@ public class RenderManager : IDisposable
     /// </summary>
     private void UpdateShadowCamera(Camera? camera)
     {
-        if (camera == null || _shadowStrength <= 0f) return;
+        if (camera == null || _shadowStrengthDry <= 0f) return;
 
         const float r = WorldGenerationConfig.ShadowRadiusBlocks;
         const float d = 2.5f * r;
@@ -424,7 +468,9 @@ public class RenderManager : IDisposable
     public void RenderShadows(Camera camera, IReadOnlyList<Chunk> chunks,
         IReadOnlyList<PrimedTnt> primed, IReadOnlyList<FallingBlock> falling, IEnumerable<TopplingTree> trees)
     {
-        if (camera == null || _shadowStrength <= 0f) return;
+        // The dry strength, not the wet-faded one: submerged, the caustics and the sun shafts
+        // still sample this map even though the world diffuse has stopped using it.
+        if (camera == null || _shadowStrengthDry <= 0f) return;
 
         const uint size = WorldGenerationConfig.ShadowMapSize;
 
@@ -580,6 +626,78 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
+    /// Allocates the two full-resolution textures <see cref="CopyScene"/> snapshots the default
+    /// framebuffer into. No FBO and no depth attachment: these are copy destinations only, read
+    /// back by the water fragment shader on units 3 and 4. Called from
+    /// <see cref="LoadResources"/> and <see cref="SetViewport"/>, recreating only on a resize.
+    /// </summary>
+    private void CreateSceneCopy()
+    {
+        var w = Math.Max(2, _viewportSize.X);
+        var h = Math.Max(2, _viewportSize.Y);
+        if (_sceneColorTex != 0 && _sceneSize.X == w && _sceneSize.Y == h) return;
+
+        DeleteSceneCopy();
+        _sceneSize = new Vector2D<int>(w, h);
+
+        _sceneColorTex = gl.GenTexture();
+        gl.BindTexture(TextureTarget.Texture2D, _sceneColorTex);
+        unsafe
+        {
+            gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.Rgba8,
+                (uint)w, (uint)h, 0, PixelFormat.Rgba, PixelType.UnsignedByte, null);
+        }
+        // Linear: the refraction offset lands between texels, and a nearest fetch there
+        // turns the ripple into a staircase.
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
+
+        _sceneDepthTex = gl.GenTexture();
+        gl.BindTexture(TextureTarget.Texture2D, _sceneDepthTex);
+        unsafe
+        {
+            gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.DepthComponent24,
+                (uint)w, (uint)h, 0, PixelFormat.DepthComponent, PixelType.Float, null);
+        }
+        // Nearest, and deliberately no compare mode: unlike the shadow map this one is read
+        // as a plain sampler2D for its raw depth value, not as a hardware depth test.
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
+
+        gl.BindTexture(TextureTarget.Texture2D, 0);
+    }
+
+    private void DeleteSceneCopy()
+    {
+        if (_sceneColorTex == 0) return;
+        gl.DeleteTexture(_sceneColorTex);
+        gl.DeleteTexture(_sceneDepthTex);
+        _sceneColorTex = 0;
+        _sceneDepthTex = 0;
+    }
+
+    /// <summary>Snapshots the default framebuffer's colour and depth into the scene textures so the
+    /// water pass can refract what is behind the surface and measure how thick the water is. Two
+    /// texture copies, no FBO: the window has no MSAA, so CopyTexSubImage2D reads it directly.</summary>
+    private void CopyScene(bool colour)
+    {
+        if (colour)
+        {
+            gl.ActiveTexture(TextureUnit.Texture3);
+            gl.BindTexture(TextureTarget.Texture2D, _sceneColorTex);
+            gl.CopyTexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, 0, 0, (uint)_sceneSize.X, (uint)_sceneSize.Y);
+        }
+        gl.ActiveTexture(TextureUnit.Texture4);
+        gl.BindTexture(TextureTarget.Texture2D, _sceneDepthTex);
+        gl.CopyTexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, 0, 0, (uint)_sceneSize.X, (uint)_sceneSize.Y);
+        gl.ActiveTexture(TextureUnit.Texture0);
+    }
+
+    /// <summary>
     /// Renders the opaque world (chunks + LOD, no water, no entities) from a camera
     /// mirrored across the sea surface into the reflection texture, which the water in
     /// <see cref="RenderWorldTranslucent"/> then samples projectively. Below-plane
@@ -592,7 +710,9 @@ public class RenderManager : IDisposable
         IReadOnlyList<LodRegion> regions)
     {
         worldShader.Use();
-        if (!WorldGenerationConfig.WaterEnabled || camera == null
+        // CullWater ran a moment ago, so a frame with no water on screen skips the whole
+        // mirrored render rather than filling a texture nothing will sample.
+        if (!WorldGenerationConfig.WaterEnabled || camera == null || !_waterVisible
             || camera.Position.Y < WaterPlaneY || _reflFbo == 0)
         {
             worldShader.SetUniform("uReflValid", 0f);
@@ -619,6 +739,14 @@ public class RenderManager : IDisposable
         gl.Viewport(_reflSize);
         gl.ClearColor(_skyColor.X, _skyColor.Y, _skyColor.Z, 1f);
         gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+        // The sun belongs in the mirror for the same reason it does in the real frame: it is
+        // painted onto the bare sky before any terrain, and everything after occludes it.
+        RenderSun(mirroredFwd, camera.GetProjectionMatrix());
+        // RenderSun leaves its own program and its disc on unit 0; the mirrored world draws
+        // below want ours and the atlas back.
+        worldShader.Use();
+        gl.ActiveTexture(TextureUnit.Texture0);
+        gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
         gl.Disable(EnableCap.Blend);
 
         // Fog and specular inside the texture want the mirrored eye; the clip drops
@@ -679,6 +807,25 @@ public class RenderManager : IDisposable
             region.Render();
         }
 
+        // Clouds in the mirror are what makes the reflection readable on open water (the sky
+        // itself is a flat colour). The mirror flips triangle winding, so cull front faces
+        // here to keep the same "nearest exterior surface wins" behaviour RenderClouds relies on.
+        if (_clouds != null && savedCamPos.Y >= WaterPlaneY)
+        {
+            gl.Enable(EnableCap.Blend);
+            gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+            gl.DepthMask(false);
+            gl.Enable(EnableCap.CullFace);
+            gl.CullFace(TriangleFace.Front);
+            _clouds.Render(_reflViewProj, mirroredPos, _time, _sunDir, _sunColor, _sunIntensity, _ambient,
+                _fogColor, _fogNear, _fogFar);
+            gl.CullFace(TriangleFace.Back);
+            gl.Disable(EnableCap.CullFace);
+            gl.DepthMask(true);
+            // _clouds.Render bound its own program; ApplyFrameUniforms below needs ours.
+            worldShader.Use();
+        }
+
         _cameraPos = savedCamPos;
         _clipY = savedClip;
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
@@ -709,7 +856,8 @@ public class RenderManager : IDisposable
         gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
         // Straight onto the fresh sky, before any terrain: see RenderSun
-        RenderSun(camera);
+        if (camera != null)
+            RenderSun(camera.Forward, camera.GetProjectionMatrix());
 
         worldShader.Use();
         // Opaque default: punch the leaf tiles' holes; the translucent pass lowers it.
@@ -730,10 +878,12 @@ public class RenderManager : IDisposable
     /// translation removed, so it effectively sits at infinity and never parallaxes as the
     /// player walks. And it blends additively (One, One), so the shader's black background
     /// contributes nothing and the glow brightens the sky rather than greying it.
+    /// Takes the facing and projection rather than a camera, so the reflection pass can draw
+    /// the same disc through its mirrored forward vector.
     /// </summary>
-    private void RenderSun(Camera? camera)
+    private void RenderSun(Vector3 forward, Matrix4x4 projection)
     {
-        if (camera == null || _sunVisibility <= 0f) return;
+        if (_sunVisibility <= 0f) return;
 
         gl.Disable(EnableCap.DepthTest);
         gl.DepthMask(false);
@@ -745,8 +895,8 @@ public class RenderManager : IDisposable
         gl.BindTexture(TextureTarget.Texture2D, _sunTexture);
 
         // Rotation only: dropping the camera position is what pins the quad at infinity
-        var viewRot = Matrix4x4.CreateLookAt(Vector3.Zero, camera.Forward, Vector3.UnitY);
-        sunShader.SetUniform("uViewProj", viewRot * camera.GetProjectionMatrix());
+        var viewRot = Matrix4x4.CreateLookAt(Vector3.Zero, forward, Vector3.UnitY);
+        sunShader.SetUniform("uViewProj", viewRot * projection);
         sunShader.SetUniform("uSunDir", _sunDir);
         // The quad has to hold the whole glow, so it is sized to the glow's angular radius and
         // the shader keeps the textured disc inside the inner uDiscFraction of it. The unit
@@ -768,7 +918,8 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// Binds the world textures for a world draw: the atlas on unit 0, the shadow map on
-    /// unit 1 and the reflection texture on unit 2. Unit 0 is left active on the way out, because <see cref="RenderItemDrops"/>
+    /// unit 1, the reflection texture on unit 2 and the scene colour/depth copies on units 3
+    /// and 4. Unit 0 is left active on the way out, because <see cref="RenderItemDrops"/>
     /// binds an item's own texture assuming that.
     /// </summary>
     private void BindWorldTextures()
@@ -777,6 +928,10 @@ public class RenderManager : IDisposable
         gl.BindTexture(TextureTarget.Texture2D, _shadowDepthTex);
         gl.ActiveTexture(TextureUnit.Texture2);
         gl.BindTexture(TextureTarget.Texture2D, _reflTex);
+        gl.ActiveTexture(TextureUnit.Texture3);
+        gl.BindTexture(TextureTarget.Texture2D, _sceneColorTex);
+        gl.ActiveTexture(TextureUnit.Texture4);
+        gl.BindTexture(TextureTarget.Texture2D, _sceneDepthTex);
         gl.ActiveTexture(TextureUnit.Texture0);
         gl.BindTexture(TextureTarget.Texture2D, textureAtlas);
     }
@@ -817,6 +972,13 @@ public class RenderManager : IDisposable
         worldShader.SetUniform("uShadowSoftness", WorldGenerationConfig.ShadowSoftnessTexels);
         worldShader.SetUniform("uShadowNormalOffset", WorldGenerationConfig.ShadowNormalOffsetTexels);
         worldShader.SetUniform("uClipY", _clipY);
+        // The water pass reads the scene copies by screen uv and unprojects their depth; both
+        // describe the real eye, so the reflection pass (which draws no water) can ignore them.
+        worldShader.SetUniform("uInvViewport",
+            new Vector2(1f / Math.Max(1, _viewportSize.X), 1f / Math.Max(1, _viewportSize.Y)));
+        worldShader.SetUniform("uInvViewProj", _invViewProj);
+        worldShader.SetUniform("uShadowStrengthDry", _shadowStrengthDry);
+        worldShader.SetUniform("uUnderwater", MathUtils.SmoothStep(_underwaterT));
     }
 
     /// <summary>
@@ -855,6 +1017,24 @@ public class RenderManager : IDisposable
             _sunDir, _sunColor, _sunIntensity, _ambient, _fogColor, _fogNear, _fogFar);
         gl.Disable(EnableCap.CullFace);
         gl.DepthMask(true);
+    }
+
+    /// <summary>Sun shafts through the water, drawn as one additive full-screen pass while the eye
+    /// is submerged. Needs the depth of everything drawn so far (water surface included), so the
+    /// depth texture is re-copied here before the march.</summary>
+    public void RenderUnderwaterRays(Camera? camera)
+    {
+        if (camera == null || _rays == null) return;
+        var wet = MathUtils.SmoothStep(_underwaterT);
+        var strength = wet * _shadowStrengthDry * _dayness * WorldGenerationConfig.WaterRayStrength;
+        if (strength <= 0.0005f) return;
+        CopyScene(colour: false);
+        gl.ActiveTexture(TextureUnit.Texture1);
+        gl.BindTexture(TextureTarget.Texture2D, _shadowDepthTex);
+        gl.ActiveTexture(TextureUnit.Texture4);
+        gl.BindTexture(TextureTarget.Texture2D, _sceneDepthTex);
+        gl.ActiveTexture(TextureUnit.Texture0);
+        _rays.Render(_invViewProj, _cameraPos, _sunDir, _sunColor, strength, WaterPlaneY, _lightViewProj, _time);
     }
 
     // Reused across frames to avoid a per-frame allocation
@@ -921,35 +1101,24 @@ public class RenderManager : IDisposable
     private readonly List<(Chunk chunk, float distSq)> _translucentChunks = new(256);
     private readonly List<(LodRegion region, float distSq)> _translucentRegions = new(256);
 
-    /// <summary>
-    /// Draws every fluid surface — chunk water first, then the far LOD's water sheets — in one
-    /// blended pass after the whole opaque world, so terrain, drops and TNT behind the water
-    /// show through it. Depth writing stays on: water bodies are at most a couple of layers
-    /// deep from any viewpoint, and writing depth is what makes the chunk-vs-LOD overlap at
-    /// the full-detail ring resolve by distance instead of by draw order.
-    /// <paramref name="chunks"/> is <see cref="ChunkManager.Renderable"/> and
-    /// <paramref name="regions"/> is <see cref="LodManager.RegionList"/>; both are supersets
-    /// of what this pass draws, so the skips below still do the selecting.
-    /// </summary>
-    public void RenderWorldTranslucent(Camera camera, IReadOnlyList<Chunk> chunks,
-        IReadOnlyList<LodRegion> regions)
+    // Whether anything the translucent pass will draw is actually water, recomputed by
+    // CullWater once a frame. Glass alone does not turn the water-only passes back on.
+    private bool _waterVisible;
+
+    /// <summary>Frustum-culls the translucent draws once per frame and records whether any water
+    /// (chunk or LOD sheet) is on screen. Reflection and the scene copies only run when it is,
+    /// and RenderWorldTranslucent draws from the lists filled here. Glass-only chunks are listed
+    /// for drawing but never trigger the water-only passes.</summary>
+    public void CullWater(Camera camera, IReadOnlyList<Chunk> chunks, IReadOnlyList<LodRegion> regions)
     {
+        _translucentChunks.Clear();
+        _translucentRegions.Clear();
+        _waterVisible = false;
         if (camera == null) return;
 
-        worldShader.Use();
-        // No cutout here: glass's faint interior must blend instead of discarding away.
-        worldShader.SetUniform(_locAlphaCutoff, 0f);
-        BindWorldTextures();
-        gl.Enable(EnableCap.Blend);
-        gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-        gl.DepthMask(true);
-
-        var viewProj = camera.GetViewProjection();
-        var frustum = new Frustum(viewProj);
+        var frustum = new Frustum(camera.GetViewProjection());
         var camChunkPos = (camera.Position / Chunk.Size).Floor();
         var camPos = camera.Position;
-
-        _translucentChunks.Clear();
 
         for (var i = 0; i < chunks.Count; i++)
         {
@@ -964,22 +1133,12 @@ public class RenderManager : IDisposable
                 continue;
 
             _translucentChunks.Add((chunk, Vector3.DistanceSquared(chunk.Position, camChunkPos)));
+            if (chunk.HasWaterMesh) _waterVisible = true;
         }
 
         // Back to front, so overlapping surfaces (a pond seen across a sea) blend in the
         // order the eye sees them
         _translucentChunks.Sort((a, b) => b.distSq.CompareTo(a.distSq));
-
-        foreach (var (chunk, _) in _translucentChunks)
-        {
-            var model = Matrix4x4.CreateTranslation(chunk.Position * Chunk.Size);
-            SetDrawUniforms(model, model * viewProj,
-                MathF.Min(1f, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
-
-            chunk.RenderTranslucent();
-        }
-
-        _translucentRegions.Clear();
 
         for (var i = 0; i < regions.Count; i++)
         {
@@ -995,6 +1154,8 @@ public class RenderManager : IDisposable
 
             var center = (min + max) * 0.5f;
             _translucentRegions.Add((region, Vector3.DistanceSquared(center, camPos)));
+            // A LOD region's translucent mesh is only ever the water sheet
+            _waterVisible = true;
         }
 
         // Finest level first: its sheet sits highest (each coarser level sinks by its own
@@ -1003,6 +1164,43 @@ public class RenderManager : IDisposable
         _translucentRegions.Sort((a, b) => a.region.Level != b.region.Level
             ? a.region.Level.CompareTo(b.region.Level)
             : b.distSq.CompareTo(a.distSq));
+    }
+
+    /// <summary>
+    /// Draws every fluid surface — chunk water first, then the far LOD's water sheets — in one
+    /// blended pass after the whole opaque world, so terrain, drops and TNT behind the water
+    /// show through it. Depth writing stays on: water bodies are at most a couple of layers
+    /// deep from any viewpoint, and writing depth is what makes the chunk-vs-LOD overlap at
+    /// the full-detail ring resolve by distance instead of by draw order.
+    /// The lists it walks were filled by <see cref="CullWater"/> earlier in the frame, which
+    /// also decided whether the scene copy below is worth taking.
+    /// </summary>
+    public void RenderWorldTranslucent(Camera camera)
+    {
+        if (camera == null) return;
+
+        // The refraction reads the frame as it stands right now: everything opaque plus the
+        // entities, and nothing translucent yet. Depth comes along for the thickness measure.
+        if (_waterVisible) CopyScene(colour: true);
+
+        worldShader.Use();
+        // No cutout here: glass's faint interior must blend instead of discarding away.
+        worldShader.SetUniform(_locAlphaCutoff, 0f);
+        BindWorldTextures();
+        gl.Enable(EnableCap.Blend);
+        gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+        gl.DepthMask(true);
+
+        var viewProj = camera.GetViewProjection();
+
+        foreach (var (chunk, _) in _translucentChunks)
+        {
+            var model = Matrix4x4.CreateTranslation(chunk.Position * Chunk.Size);
+            SetDrawUniforms(model, model * viewProj,
+                MathF.Min(1f, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
+
+            chunk.RenderTranslucent();
+        }
 
         foreach (var (region, _) in _translucentRegions)
         {
@@ -1406,11 +1604,13 @@ public class RenderManager : IDisposable
         shadowShader.Dispose();
         sunShader.Dispose();
         _clouds?.Dispose();
+        _rays?.Dispose();
         _sunQuad.Dispose();
         gl.DeleteTexture(_sunTexture);
         gl.DeleteFramebuffer(_shadowFbo);
         gl.DeleteTexture(_shadowDepthTex);
         DeleteReflectionTarget();
+        DeleteSceneCopy();
         gl.DeleteBuffer(outlineVbo);
         gl.DeleteBuffer(outlineEbo);
         gl.DeleteVertexArray(outlineVao);

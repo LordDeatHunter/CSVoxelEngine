@@ -234,5 +234,67 @@ public sealed class MeshingTests
                  })
             Assert.Equal(index, new Vertex(Vector3.Zero, 255, 255, 255, 255,
                 Vector2.Zero, 1f, 0f, normal, 0f).Normal);
+
+        // Bit 3 rides alongside the face index rather than replacing it
+        var submerged = new Vertex(Vector3.Zero, 255, 255, 255, 255,
+            Vector2.Zero, 1f, 0f, Vector3.UnitY, 0f, submerged: true);
+        Assert.Equal(4 | 8, submerged.Normal);
+        Assert.Equal(4, submerged.Normal & 7);
+    }
+
+    [Fact]
+    public void SubmergedFacesAreFlagged()
+    {
+        var (manager, center) = WalledArea();
+        center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
+        center.SetBlockRaw(8, 9, 8, ContentRegistry.RequireBlock("water").Id, FluidState.Source);
+
+        var mesh = center.GenerateMeshData(manager);
+        Assert.NotNull(mesh);
+
+        var topVertices = 0;
+        foreach (var vertex in mesh.Vertices)
+        {
+            var face = vertex.Normal & 7;
+            var submerged = (vertex.Normal & 8) != 0;
+            if (face == 4)
+            {
+                // The stone's top face is the only one looking into the water above it
+                Assert.Equal(9f, vertex.Position.Y);
+                Assert.True(submerged);
+                topVertices++;
+            }
+            else
+            {
+                Assert.False(submerged);
+            }
+        }
+
+        Assert.Equal(4, topVertices);
+    }
+
+    [Fact]
+    public void WaterChunkReportsHasWater()
+    {
+        var (waterManager, waterChunk) = WalledArea();
+        waterChunk.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("water").Id, FluidState.Source);
+        var waterMesh = waterChunk.GenerateMeshData(waterManager);
+        Assert.NotNull(waterMesh);
+        Assert.True(waterMesh.HasWater);
+        Assert.NotEmpty(waterMesh.TranslucentVertices);
+
+        // Glass lands in the same translucent lists, so a translucent mesh is not proof of water
+        var (glassManager, glassChunk) = WalledArea();
+        glassChunk.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("glass").Id, 0);
+        var glassMesh = glassChunk.GenerateMeshData(glassManager);
+        Assert.NotNull(glassMesh);
+        Assert.False(glassMesh.HasWater);
+        Assert.NotEmpty(glassMesh.TranslucentVertices);
+
+        var (stoneManager, stoneChunk) = WalledArea();
+        stoneChunk.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
+        var stoneMesh = stoneChunk.GenerateMeshData(stoneManager);
+        Assert.NotNull(stoneMesh);
+        Assert.False(stoneMesh.HasWater);
     }
 }

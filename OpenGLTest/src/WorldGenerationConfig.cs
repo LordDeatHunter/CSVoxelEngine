@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace silkgltriangle;
 
 /// <summary>
@@ -129,6 +131,21 @@ public static class WorldGenerationConfig
     // Planar water reflections render the opaque world mirrored across the sea surface
     // into a texture this fraction of the viewport (half res ≈ quarter cost).
     public const float WaterReflectionScale = 0.5f;
+
+    // Wave normal steepness multiplier for the water shading (geometry moves less than it looks)
+    public const float WaterNormalScale = 2.0f;
+    // Screen-space refraction offset at the camera, in uv units; shrinks with distance in the shader
+    public const float WaterRefractStrength = 0.06f;
+    // Beer-Lambert absorption per block of water, per channel (red dies first, so depth reads teal)
+    public static readonly Vector3 WaterAbsorb = new(0.20f, 0.07f, 0.04f);
+    // In-scattered water colour that replaces the seabed as the water thickens
+    public static readonly Vector3 WaterScatter = new(0.05f, 0.30f, 0.40f);
+    // Brightness of the sunlight caustics on submerged faces
+    public const float WaterCausticStrength = 0.6f;
+    // Underwater sun shafts: brightness, how far the ray marches and how many samples it takes
+    public const float WaterRayStrength = 0.08f;
+    public const float WaterRayMaxDistance = 40f;
+    public const int WaterRaySteps = 20;
 
     // Beaches ring the sea: dry columns up to BeachAboveSeaLevel over the waterline and
     // submerged columns down to BeachBelowSeaLevel under it build their top and soil band

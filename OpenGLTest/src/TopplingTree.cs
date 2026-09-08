@@ -209,7 +209,7 @@ public class TopplingTree : IDisposable
             scratchManager.Chunks[emptyNeighbour.Position] = emptyNeighbour;
         }
 
-        var meshData = scratch.GenerateMeshData(scratchManager) ?? new ChunkMeshData([], [], [], []);
+        var meshData = scratch.GenerateMeshData(scratchManager) ?? new ChunkMeshData([], [], [], [], false);
 
         var rebase = min - pivot;
         for (var i = 0; i < meshData.Vertices.Count; i++)

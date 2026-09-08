@@ -80,6 +80,13 @@ public class Chunk : IDisposable
     public bool HasTranslucentMesh => _translucentMesh != null;
 
     /// <summary>
+    /// Whether this chunk's translucent mesh actually holds fluid. Glass shares that mesh, so
+    /// <see cref="HasTranslucentMesh"/> cannot answer this, and the water-only work — the
+    /// planar reflection and the scene colour/depth copies — keys on this instead.
+    /// </summary>
+    public bool HasWaterMesh { get; private set; }
+
+    /// <summary>
     /// Whether a mesh has been applied at least once, even an empty one (all air, or solid with
     /// no exposed face). Main-thread only. The LOD uses it to tell "chunk is drawn" apart from
     /// "chunk has nothing to draw", which <see cref="HasMesh"/> cannot.
@@ -710,7 +717,7 @@ public class Chunk : IDisposable
         // seal every boundary face. The second case is most of the deep terrain in the load
         // sphere, and skipping it saves the light flood and the per-voxel walk below.
         if (_solidCount == 0 || IsFullyEnclosed(neighbors))
-            return new ChunkMeshData([], [], [], []);
+            return new ChunkMeshData([], [], [], [], false);
 
         var padded = ArrayPool<byte>.Shared.Rent(PaddedCount);
         var paddedState = ArrayPool<byte>.Shared.Rent(PaddedCount);
@@ -877,6 +884,10 @@ public class Chunk : IDisposable
         var tIndices = new List<ushort>();
         ushort tIndexOffset = 0;
 
+        // Glass shares the translucent lists, so "has a translucent mesh" is not "has water";
+        // the reflection and scene-copy passes need the narrower answer.
+        var hasWater = false;
+
         for (var x = 0; x < Size; x++)
         for (var y = 0; y < Size; y++)
         for (var z = 0; z < Size; z++)
@@ -913,6 +924,7 @@ public class Chunk : IDisposable
             {
                 EmitFluid(tVertices, tIndices, ref tIndexOffset, padded, paddedState, pIdx,
                     sunLight, blockLight, x, y, z, type, basePos);
+                hasWater = true;
                 continue;
             }
 
@@ -935,6 +947,10 @@ public class Chunk : IDisposable
                 var quad = quads[q];
                 var cullFace = quad.CullFace;
                 int lightCell;
+                // Bit 3 of the packed normal: this face looks into water, so the fragment
+                // shader paints caustics on it. Interior sub-cell quads have no neighbour to
+                // look into and stay false.
+                var submerged = false;
 
                 if (cullFace >= 0)
                 {
@@ -953,6 +969,7 @@ public class Chunk : IDisposable
                     // A neighbour that would read as black light is exactly one that occludes,
                     // and that face is already gone, so no fallback is needed here.
                     lightCell = lightBase + LightFaceDelta[cullFace];
+                    submerged = BlockType.IsFluid(neighbour);
                 }
                 else
                 {
@@ -975,7 +992,7 @@ public class Chunk : IDisposable
                     // brightness and no ambient occlusion
                     for (var j = 0; j < 4; j++)
                         dstVertices.Add(new Vertex(basePos + positions[j], 255, 255, 255, 255, uvs[j],
-                            sun, block, normal, sway));
+                            sun, block, normal, sway, submerged));
                 }
                 else if (quad.IsFullFace)
                 {
@@ -992,7 +1009,7 @@ public class Chunk : IDisposable
                         var shade = ShadeLut[(face << 2) | ao];
 
                         dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j],
-                            sun, block, normal, sway));
+                            sun, block, normal, sway, submerged));
                     }
                 }
                 else
@@ -1002,7 +1019,7 @@ public class Chunk : IDisposable
                     var shade = ShadeLut[(face << 2) | 3];
                     for (var j = 0; j < 4; j++)
                         dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j],
-                            sun, block, normal, sway));
+                            sun, block, normal, sway, submerged));
                 }
 
                 dstIndices.Add((ushort)(dstOffset + 0));
@@ -1016,7 +1033,7 @@ public class Chunk : IDisposable
             }
         }
 
-        return new ChunkMeshData(vertices, indices, tVertices, tIndices);
+        return new ChunkMeshData(vertices, indices, tVertices, tIndices, hasWater);
     }
 
     /// <summary>
@@ -1478,6 +1495,8 @@ public class Chunk : IDisposable
             ? null
             : new Mesh(_gl, CollectionsMarshal.AsSpan(meshData.TranslucentVertices),
                 CollectionsMarshal.AsSpan(meshData.TranslucentIndices));
+
+        HasWaterMesh = meshData.HasWater && meshData.TranslucentVertices.Count > 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1504,6 +1523,7 @@ public class Chunk : IDisposable
         _mesh = null;
         _translucentMesh?.Dispose();
         _translucentMesh = null;
+        HasWaterMesh = false;
         GC.SuppressFinalize(this);
     }
 
@@ -1561,7 +1581,8 @@ public class Chunk : IDisposable
 /// <summary>
 /// CPU-side mesh of one chunk, produced off the main thread. The opaque lists become the
 /// chunk's normal mesh; the translucent ones its fluid mesh, drawn blended after everything
-/// opaque so the sea floor shows through the water.
+/// opaque so the sea floor shows through the water. <paramref name="HasWater"/> says whether
+/// any of those translucent quads are fluid — glass lands in the same lists.
 /// </summary>
 public record ChunkMeshData(List<Vertex> Vertices, List<ushort> Indices,
-    List<Vertex> TranslucentVertices, List<ushort> TranslucentIndices);
+    List<Vertex> TranslucentVertices, List<ushort> TranslucentIndices, bool HasWater);
