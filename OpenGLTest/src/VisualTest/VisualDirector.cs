@@ -75,7 +75,8 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
             case "give":
                 var id = ContentRegistry.RequireBlock(step.Block!).Id;
                 world.Inventory.Add(id, step.Count);
-                world.Inventory.Select(world.Inventory.Slots.IndexOf(id));
+                if (world.Inventory.IdAt(world.Inventory.SelectedIndex) != id)
+                    world.Inventory.EquipStackable(world.Inventory.SelectedIndex, id);
                 Console.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} give {step.Count} {step.Block}");
                 Advance();
                 break;

@@ -87,7 +87,13 @@ public class DropManager
             Spawn(id, blockPosition);
     }
 
-    public void Update(float deltaTime, Vector3 playerPosition, ChunkManager chunks)
+    /// <summary>
+    /// Advances the drops, collecting what reaches the player. A drop whose id
+    /// <paramref name="canCollect"/> refuses is never attracted and stays on the ground,
+    /// so a full inventory pool ignores pickups instead of sucking them up.
+    /// </summary>
+    public void Update(float deltaTime, Vector3 playerPosition, ChunkManager chunks,
+        Func<byte, bool>? canCollect = null)
     {
         _collected.Clear();
         if (_drops.Count == 0) return;
@@ -99,9 +105,13 @@ public class DropManager
         for (var i = _drops.Count - 1; i >= 0; i--)
         {
             var drop = _drops[i];
-            var inRange = Vector3.DistanceSquared(drop.Position, target) <= rangeSquared;
+            var wanted = canCollect?.Invoke(drop.BlockId) ?? true;
+            var inRange = wanted && Vector3.DistanceSquared(drop.Position, target) <= rangeSquared;
 
             if (!drop.Update(deltaTime, target, inRange, chunks)) continue;
+
+            // Belt and braces: a drop that latched before its pool filled still needs room
+            if (!wanted && !(canCollect?.Invoke(drop.BlockId) ?? true)) continue;
 
             _collected.Add(drop.BlockId);
             _drops.RemoveAt(i);

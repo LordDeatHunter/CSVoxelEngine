@@ -93,9 +93,9 @@ public class World
 
         FrameProfiler.Begin(ProfileSection.Entities);
 
-        // Drops collected this tick land in the hotbar, which pops the matching icon. A block
-        // with no slot is simply discarded.
-        _dropManager.Update((float)deltaTime, Camera.Position, _chunkManager);
+        // Drops collected this tick land in the inventory pools. A full pool ignores the
+        // drop (it is never attracted), and an id with no pool is discarded.
+        _dropManager.Update((float)deltaTime, Camera.Position, _chunkManager, Inventory.CanAccept);
         foreach (var blockId in _dropManager.Collected)
             Inventory.Add(blockId);
 
@@ -211,9 +211,10 @@ public class World
     /// Draws the HUD. <paramref name="showProfiler"/> adds the frame-timing table under the FPS
     /// counter (the same flag that turns the debug console logging on).
     /// </summary>
-    public void RenderUI(RenderManager renderManager, int fps, bool showProfiler)
+    public void RenderUI(RenderManager renderManager, InventoryView view, float time,
+        int fps, bool showProfiler)
     {
-        renderManager.RenderUI(_window, Inventory, fps, showProfiler);
+        renderManager.RenderUI(_window, Inventory, view, time, fps, showProfiler);
     }
     
     /// <summary>
@@ -481,25 +482,36 @@ public class World
     /// </summary>
     public void ThrowSelected(bool wholeStack = false)
     {
-        var id = Inventory.SelectedBlockId;
-        if (id == 0 || Inventory.SelectedCount <= 0) return;
+        var forward = Camera.Forward;
+
+        // A held tool is one instance: it leaves the pool and every hotbar slot holding it
+        if (Inventory.SelectedToolInstance is var instance and > 0)
+        {
+            var id = Inventory.SelectedBlockId;
+            if (id == 0) return;
+            if (!Inventory.RemoveTool(instance)) return;
+            _dropManager.SpawnAt(id, Camera.Position + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f);
+            return;
+        }
+
+        var stackId = Inventory.SelectedBlockId;
+        if (stackId == 0 || Inventory.SelectedCount <= 0) return;
 
         var units = wholeStack ? Inventory.SelectedCount : 1;
-        var forward = Camera.Forward;
         for (var i = 0; i < units; i++)
         {
             // Spend first so a failed spend never duplicates the drop
             if (!Inventory.ConsumeSelected()) break;
 
-            _dropManager.SpawnAt(id, Camera.Position + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f);
+            _dropManager.SpawnAt(stackId, Camera.Position + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f);
         }
     }
 
     /// <summary>
     /// Right-click: uses the selected slot's item when it declares a use action (a bucket
-    /// scoops or pours water), otherwise places the selected block. A successful use swaps the
-    /// item for its result and selects that slot, so scooping and pouring alternate on the
-    /// same button.
+    /// scoops or pours water), otherwise places the selected block. A successful use morphs
+    /// the tool instance in place, so every hotbar slot holding that bucket flips with it
+    /// and scooping and pouring alternate on the same button.
     /// </summary>
     public void TryUseSelected(float maxDistance)
     {
@@ -507,9 +519,9 @@ public class World
         if (id != 0 && Inventory.SelectedCount > 0
             && ItemType.Types.TryGetValue(id, out var item) && item.UseAction != ItemUseAction.None)
         {
-            // Only spend the item if the action actually took effect
-            if (TryUseItem(maxDistance, item))
-                Inventory.Exchange(id, item.UseResultId);
+            // Only morph the tool if the action actually took effect
+            if (TryUseItem(maxDistance, item) && Inventory.SelectedToolInstance is var instance and > 0)
+                Inventory.MorphTool(instance, item.UseResultId);
             return;
         }
 

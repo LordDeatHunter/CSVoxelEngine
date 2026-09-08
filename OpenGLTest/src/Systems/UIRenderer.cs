@@ -45,6 +45,20 @@ public class UIRenderer : IDisposable
     // The FPS counter's top-left corner, in pixels; the profiler table starts one line below it
     private const float FpsTop = 10f;
 
+    // [E] inventory panel, in pixels: a Skyrim-style list on the left, preview on the right
+    private const float PanelLeft = 40f;
+    private const float PanelTop = 80f;
+    private const float PanelWidth = 560f;
+    private const float PanelPad = 10f;
+    private const float TabHeight = 60f;
+    private const float RowHeight = 42f;
+    private const float RowIcon = 30f;
+    private const float PreviewSize = 190f;
+    private const float PreviewRight = 300f;
+    private const float HeadCapHeight = 22f;
+    private static readonly Rgba PanelBackground = Rgba.Grey(0.03f, 0.72f);
+    private static readonly Rgba RowSelected = Rgba.Grey(0.22f, 0.8f);
+
     // Frame-timing overlay (DrawProfiler), in pixels
     private const float ProfilerLeft = 10f;
     private const float ProfilerPadding = 6f;
@@ -71,9 +85,12 @@ public class UIRenderer : IDisposable
     private readonly uint _atlasTexture;
     private readonly uint _crosshairTexture;
     private readonly BlockCubeCache _blockCubes;
+    private readonly ItemMeshCache _itemMeshes;
 
-    // Flat sprite icons for the pure item slots (see ItemType); block slots keep their 3D cubes
+    // Flat sprite textures for the list rows; the hotbar and the preview draw the same ids
+    // as extruded 3D meshes through DrawItemIcon instead
     private readonly Dictionary<byte, uint> _itemIcons = new();
+    private readonly int _locAlphaCutoff;
 
     // Unit shapes, scaled per draw so a colour or size change costs no buffer work
     private readonly Mesh _unitSquare;
@@ -82,6 +99,7 @@ public class UIRenderer : IDisposable
     // which case the hotbar simply draws no counts.
     private readonly BitmapFont? _font;
     private readonly float _countScale;
+    private readonly float _headScale;
 
     // Scratch for one DrawText call; reused so text layout allocates nothing per frame.
     // Safe to share: all UI drawing happens on the main thread.
@@ -91,11 +109,12 @@ public class UIRenderer : IDisposable
     private Vector2 _screenSize;
     private bool _depthCleared;
 
-    public UIRenderer(GL gl, uint atlasTexture, BlockCubeCache blockCubes)
+    public UIRenderer(GL gl, uint atlasTexture, BlockCubeCache blockCubes, ItemMeshCache itemMeshes)
     {
         _gl = gl;
         _atlasTexture = atlasTexture;
         _blockCubes = blockCubes;
+        _itemMeshes = itemMeshes;
 
         var vertexSource = FileUtils.ReadFile("assets/shaders/ui-vertex.glsl");
         var fragmentSource = FileUtils.ReadFile("assets/shaders/ui-fragment.glsl");
@@ -105,12 +124,14 @@ public class UIRenderer : IDisposable
         _crosshairTexture = TextureLoader.LoadFromFile(gl, "assets/textures/crosshair.png");
         foreach (var (id, type) in ItemType.Types)
             _itemIcons[id] = TextureLoader.LoadFromFile(gl, type.TexturePath);
+        _locAlphaCutoff = _shader.GetUniformLocation("uAlphaCutoff");
         _unitSquare = Primitives.CreateSquare(gl, 1f);
 
         try
         {
             _font = new BitmapFont(gl, CountFontPath);
             _countScale = _font.ScaleForCapHeight(CountCapHeight);
+            _headScale = _font.ScaleForCapHeight(HeadCapHeight);
         }
         catch (Exception e) when (e is IOException or InvalidOperationException)
         {
@@ -268,14 +289,13 @@ public class UIRenderer : IDisposable
     /// <summary>Draws the hotbar centred along the bottom edge, highlighting the selected slot.</summary>
     public void DrawHotbar(Inventory inventory)
     {
-        var slots = inventory.Slots;
         var stride = SlotSize + SlotGap;
-        var rowWidth = slots.Length * SlotSize + (slots.Length - 1) * SlotGap;
+        var rowWidth = Inventory.SlotCount * SlotSize + (Inventory.SlotCount - 1) * SlotGap;
         var firstCentreX = (_screenSize.X - rowWidth) * 0.5f + SlotSize * 0.5f;
         var centreY = _screenSize.Y - BottomMargin - SlotSize * 0.5f;
         var slotSize = new Vector2(SlotSize);
 
-        for (var i = 0; i < slots.Length; i++)
+        for (var i = 0; i < Inventory.SlotCount; i++)
         {
             var centre = new Vector2(firstCentreX + i * stride, centreY);
             var selected = i == inventory.SelectedIndex;
@@ -287,23 +307,27 @@ public class UIRenderer : IDisposable
         }
 
         // Icons come after every background so the depth clear can't erase a later slot's panel
-        for (var i = 0; i < slots.Length; i++)
+        for (var i = 0; i < Inventory.SlotCount; i++)
         {
+            var id = inventory.IdAt(i);
+            if (id == 0) continue;
             var centre = new Vector2(firstCentreX + i * stride, centreY);
             // The pop marks a pickup; IconFill leaves enough margin for it to stay in the slot
             var iconSize = SlotSize * IconFill * inventory.PopScaleAt(i);
-            // Items are flat sprites; blocks keep their 3D cubes
-            if (ItemType.IsItem(slots[i]) && _itemIcons.TryGetValue(slots[i], out var icon))
+            // Items show their flat sprites here like the list rows; blocks keep 3D cubes
+            if (ItemType.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
                 DrawTexture(centre, new Vector2(iconSize), icon);
             else
-                DrawBlockIcon(centre, iconSize, slots[i]);
+                DrawBlockIcon(centre, iconSize, id);
         }
 
-        // Counts overlay the slot's bottom-right corner, after the icons so text is on top
+        // Counts overlay the slot's bottom-right corner, after the icons so text is on top.
+        // Slots share pool totals, so two slots showing one block show the same number.
         if (_font != null)
         {
-            for (var i = 0; i < slots.Length; i++)
+            for (var i = 0; i < Inventory.SlotCount; i++)
             {
+                if (inventory.IdAt(i) == 0) continue;
                 var text = inventory.CountAt(i).ToString();
                 var size = _font.MeasureSize(text.AsSpan(), _countScale);
                 var slotRight = firstCentreX + i * stride + SlotSize * 0.5f;
@@ -313,6 +337,225 @@ public class UIRenderer : IDisposable
                     _countScale, Rgba.White);
             }
         }
+    }
+
+    /// <summary>
+    /// The [E] panel: tabs and a name-sorted list on the left, a rotating preview with the
+    /// picked name on the right. The hotbar stays visible underneath so picks can be aimed
+    /// at slots. <paramref name="time"/> spins the preview.
+    /// </summary>
+    public void DrawInventoryPanel(Inventory inventory, InventoryView view, float time)
+    {
+        var top = PanelTop;
+        var bottom = _screenSize.Y - BottomMargin - (SlotSize + 14f);
+        var height = Math.Max(RowHeight * 2f, bottom - top);
+        var panel = new Vector2(PanelLeft + PanelWidth * 0.5f, top + height * 0.5f);
+        DrawRect(panel, new Vector2(PanelWidth, height), PanelBackground);
+
+        var tabs = new[] { InventoryCategory.Blocks, InventoryCategory.Tools, InventoryCategory.Misc };
+        var tabWidth = (PanelWidth - PanelPad * 2f) / tabs.Length;
+        for (var t = 0; t < tabs.Length; t++)
+        {
+            var centre = new Vector2(
+                PanelLeft + PanelPad + tabWidth * (t + 0.5f), top + PanelPad + TabHeight * 0.5f);
+            var active = view.Tab == tabs[t];
+            DrawRect(centre, new Vector2(tabWidth - 4f, TabHeight),
+                active ? SelectedBackground : SlotBackground);
+            if (active)
+                DrawBorder(centre, new Vector2(tabWidth - 4f, TabHeight), SlotBorder, SelectedBorderColor);
+            DrawTextCentred(TabTitle(tabs[t]),
+                centre.X, top + PanelPad + 6f, _countScale, Rgba.White);
+            DrawTextCentred($"{inventory.UsedOf(tabs[t])}/{Inventory.CapacityOf(tabs[t])}",
+                centre.X, top + PanelPad + 30f, _countScale, Rgba.White);
+        }
+
+        var listTop = top + PanelPad * 2f + TabHeight;
+        if (view.Tab == InventoryCategory.Tools)
+        {
+            var tools = inventory.ToolEntries();
+            for (var i = 0; i < tools.Count; i++)
+            {
+                var selected = view.SelectedToolInstance == tools[i].InstanceId;
+                DrawEntryRow(i, listTop, tools[i].ItemId, tools[i].Name, "1", selected);
+            }
+        }
+        else
+        {
+            var rows = inventory.StackEntries(view.Tab);
+            for (var i = 0; i < rows.Count; i++)
+                DrawEntryRow(i, listTop, rows[i].Id, rows[i].Name, rows[i].Count.ToString(),
+                    view.SelectedId == rows[i].Id);
+        }
+
+        DrawPreview(inventory, view, time);
+    }
+
+    /// <summary>Hotbar slot under a screen point (pixels, top-left origin), if any.</summary>
+    public int? HotbarSlotAt(Vector2 point)
+    {
+        var stride = SlotSize + SlotGap;
+        var rowWidth = Inventory.SlotCount * SlotSize + (Inventory.SlotCount - 1) * SlotGap;
+        var firstCentreX = (_screenSize.X - rowWidth) * 0.5f + SlotSize * 0.5f;
+        var centreY = _screenSize.Y - BottomMargin - SlotSize * 0.5f;
+
+        for (var i = 0; i < Inventory.SlotCount; i++)
+        {
+            var centre = new Vector2(firstCentreX + i * stride, centreY);
+            if (MathF.Abs(point.X - centre.X) <= SlotSize * 0.5f
+                && MathF.Abs(point.Y - centre.Y) <= SlotSize * 0.5f)
+                return i;
+        }
+        return null;
+    }
+
+    /// <summary>Panel tab under a screen point, if any.</summary>
+    public InventoryCategory? PanelTabAt(Vector2 point)
+    {
+        var tabs = new[] { InventoryCategory.Blocks, InventoryCategory.Tools, InventoryCategory.Misc };
+        var tabWidth = (PanelWidth - PanelPad * 2f) / tabs.Length;
+
+        if (point.X < PanelLeft || point.X > PanelLeft + PanelWidth) return null;
+        if (point.Y < PanelTop + PanelPad || point.Y > PanelTop + PanelPad + TabHeight) return null;
+
+        var t = (int)((point.X - PanelLeft - PanelPad) / tabWidth);
+        return t >= 0 && t < tabs.Length ? tabs[t] : null;
+    }
+
+    /// <summary>List row index under a screen point for a tab holding this many rows, if any.</summary>
+    public int? PanelRowAt(Vector2 point, int rowCount)
+    {
+        if (point.X < PanelLeft || point.X > PanelLeft + PanelWidth) return null;
+
+        var listTop = PanelTop + PanelPad * 2f + TabHeight;
+        var y = point.Y - listTop;
+        if (y < 0) return null;
+
+        var row = (int)(y / RowHeight);
+        return row >= 0 && row < rowCount ? row : null;
+    }
+
+    private static string TabTitle(InventoryCategory tab) => tab switch
+    {
+        InventoryCategory.Blocks => "Blocks",
+        InventoryCategory.Tools => "Tools",
+        _ => "Misc",
+    };
+
+    private void DrawEntryRow(int row, float listTop, byte id, string name, string count, bool selected)
+    {
+        var centreY = listTop + row * RowHeight + RowHeight * 0.5f;
+        var centre = new Vector2(PanelLeft + PanelWidth * 0.5f, centreY);
+        DrawRect(centre, new Vector2(PanelWidth - PanelPad * 2f, RowHeight - 4f),
+            selected ? RowSelected : SlotBackground);
+
+        var iconCentre = new Vector2(PanelLeft + PanelPad + RowIcon * 0.5f + 4f, centreY);
+        if (ItemType.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
+            DrawTexture(iconCentre, new Vector2(RowIcon), icon);
+        else
+            DrawBlockIcon(iconCentre, RowIcon, id);
+
+        DrawText(name, new Vector2(iconCentre.X + RowIcon * 0.5f + 8f, centreY - 9f),
+            _countScale, Rgba.White);
+
+        if (_font != null)
+        {
+            var size = _font.MeasureSize(count.AsSpan(), _countScale);
+            DrawText(count,
+                new Vector2(PanelLeft + PanelWidth - PanelPad - 8f - size.X, centreY - 9f),
+                _countScale, Rgba.White);
+        }
+    }
+
+    private void DrawPreview(Inventory inventory, InventoryView view, float time)
+    {
+        byte id = 0;
+        string name = "";
+        if (view.Tab == InventoryCategory.Tools)
+        {
+            if (view.SelectedToolInstance != 0)
+            {
+                id = inventory.ToolItemId(view.SelectedToolInstance);
+                if (id != 0) name = Inventory.DisplayName(id);
+            }
+        }
+        else if (view.SelectedId != 0 && inventory.CountFor(view.SelectedId) > 0)
+        {
+            id = view.SelectedId;
+            name = Inventory.DisplayName(id);
+        }
+        if (id == 0) return;
+
+        var centre = new Vector2(_screenSize.X - PreviewRight, _screenSize.Y * 0.38f);
+        DrawRect(centre, new Vector2(PreviewSize + 40f, PreviewSize + 70f), PanelBackground);
+
+        var spin = time * 0.9f;
+        if (ItemType.IsItem(id))
+            DrawItemIcon(centre, PreviewSize * 0.7f, id, spin);
+        else
+            DrawBlockIconSpinning(centre, PreviewSize * 0.7f, id, spin);
+
+        DrawTextCentred(name, centre.X, centre.Y + PreviewSize * 0.5f + 22f, _headScale, Rgba.White);
+    }
+
+    /// <summary>
+    /// A pure item as its extruded world-drop sprite, yawed like the block icons. Only the
+    /// preview uses this; rows and hotbar draw the flat sprite.
+    /// </summary>
+    public void DrawItemIcon(Vector2 centre, float size, byte itemId, float yaw)
+    {
+        if (!_itemMeshes.TryGet(itemId, out var mesh, out var texture)) return;
+
+        _gl.Enable(EnableCap.DepthTest);
+        if (!_depthCleared)
+        {
+            _gl.Clear(ClearBufferMask.DepthBufferBit);
+            _depthCleared = true;
+        }
+
+        var rotation = Matrix4x4.CreateRotationY(yaw) * Matrix4x4.CreateRotationX(IconPitch);
+        var model = Matrix4x4.CreateScale(size)
+                    * rotation
+                    * FlipToScreen(centre);
+
+        // Cut out the sprite's transparent texels so they write neither colour nor depth:
+        // without this the front face's invisible pixels depth-swallow the extrusion walls
+        // behind them for half of every turn
+        _shader.Use();
+        _shader.SetUniform(_locAlphaCutoff, 0.5f);
+        DrawMesh(mesh, model, Rgba.White, texture);
+        _shader.SetUniform(_locAlphaCutoff, 0f);
+
+        _gl.Disable(EnableCap.DepthTest);
+    }
+
+    /// <summary>A block cube yawed by <paramref name="yaw"/> instead of the fixed icon angle.</summary>
+    public void DrawBlockIconSpinning(Vector2 centre, float size, byte blockId, float yaw)
+    {
+        var mesh = _blockCubes.Get(blockId);
+        if (mesh == null) return;
+
+        _gl.Enable(EnableCap.DepthTest);
+        if (!_depthCleared)
+        {
+            _gl.Clear(ClearBufferMask.DepthBufferBit);
+            _depthCleared = true;
+        }
+
+        var rotation = Matrix4x4.CreateRotationY(yaw) * Matrix4x4.CreateRotationX(IconPitch);
+        var model = Matrix4x4.CreateScale(size / IconExtent)
+                    * rotation
+                    * FlipToScreen(centre);
+
+        DrawMesh(mesh, model, Rgba.White, _atlasTexture);
+
+        _gl.Disable(EnableCap.DepthTest);
+    }
+
+    private void DrawTextCentred(string text, float centreX, float topY, float scale, Rgba color)
+    {
+        if (_font == null || string.IsNullOrEmpty(text)) return;
+        var width = _font.MeasureSize(text.AsSpan(), scale).X;
+        DrawText(text, new Vector2(centreX - width * 0.5f, topY), scale, color);
     }
 
     /// <summary>

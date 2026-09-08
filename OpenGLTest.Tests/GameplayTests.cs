@@ -61,27 +61,28 @@ public sealed class GameplayTests
     {
         var inventory = new Inventory();
         var stone = ContentRegistry.RequireBlock("stone").Id;
-        var slot = -1;
-        for (var i = 0; i < Inventory.SlotCount; i++)
-            if (inventory.Slots[i] == stone) slot = i;
-        Assert.True(slot >= 0);
-        inventory.Select(slot);
+        inventory.Select(0);
+        inventory.EquipStackable(0, stone);
 
+        var before = inventory.SelectedCount;
         Assert.True(inventory.Add(stone));
-        Assert.Equal(1, inventory.SelectedCount);
+        Assert.Equal(before + 1, inventory.SelectedCount);
         Assert.True(inventory.ConsumeSelected());
-        Assert.Equal(0, inventory.SelectedCount);
+        Assert.Equal(before, inventory.SelectedCount);
+
+        inventory.Select(1);
         Assert.False(inventory.ConsumeSelected());
     }
 
     [Fact]
-    public void InventoryExchangeSwapsBucketForWaterBucket()
+    public void InventoryMorphSwapsBucketForWaterBucketInPlace()
     {
         var inventory = new Inventory();
-        var bucket = ContentRegistry.RequireItem("bucket").Id;
         var filled = ContentRegistry.RequireItem("water_bucket").Id;
+        var instance = Assert.Single(inventory.ToolEntries()).InstanceId;
+        inventory.EquipTool(0, instance);
 
-        Assert.True(inventory.Exchange(bucket, filled));
+        Assert.True(inventory.MorphTool(instance, filled));
         Assert.Equal(filled, inventory.SelectedBlockId);
     }
 

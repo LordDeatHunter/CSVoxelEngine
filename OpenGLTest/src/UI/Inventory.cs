@@ -1,32 +1,53 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace silkgltriangle;
 
+/// <summary>Which storage pool an id belongs to. Each pool has its own shared cap.</summary>
+public enum InventoryCategory
+{
+    Blocks,
+    Tools,
+    Misc,
+}
+
 /// <summary>
-/// The player's hotbar: a fixed row of slots, one of which is selected. Slots are seeded from
-/// the registered full-cube block types (taper variants are wood states, not items, so they
-/// are skipped) followed by the pure item types (see <see cref="ItemType"/>), so a newly added
-/// type shows up without touching this class; leftover slots stay empty (id 0).
+/// One hotbar slot: either a reference to a stackable id (blocks/misc, whose count is the
+/// pool total, so several slots can show the same id and stay in sync) or to a single tool
+/// instance (tools are never stacked, so slots sharing an instance morph together while
+/// slots holding different instances stay independent). The default value is empty.
+/// </summary>
+public readonly record struct HotbarSlot(bool IsTool, byte Id, int ToolInstance)
+{
+    public static HotbarSlot Empty => default;
+    public bool IsEmpty => !IsTool && Id == 0;
+}
+
+/// <summary>
+/// The player's belongings: three category pools plus a 10-slot hotbar of references into
+/// them. Blocks and misc items stack per id against a shared per-category cap; tools are
+/// individual instances (at most <see cref="ToolCapacity"/>) that morph in place, so a
+/// bucket scooped in one slot becomes a water bucket in every slot holding that instance.
 ///
-/// Each slot tracks how many blocks or items it holds. Counts start at zero and are filled by
-/// mining, so a slot renders its icon whether or not it holds any — only placing checks the
-/// count. Items can be collected but never placed. The player spawns with a starter stock
-/// of TNT.
+/// Pickups go through <see cref="Add"/>, which refuses what does not fit — the caller must
+/// leave a refused drop on the ground (see <see cref="CanAccept"/>). The player spawns with
+/// a test stock of 50 of every block plus one bucket.
 /// </summary>
 public class Inventory
 {
-    // Room to spare: every block with an item form plus every pure item needs a slot, and a
-    // truncated list would make the last types unreachable (BuildSlots warns if it happens).
-    public const int SlotCount = 16;
+    /// <summary>Hotbar slots along the bottom, switched with 1-10 / scroll.</summary>
+    public const int SlotCount = 10;
 
-    /// <summary>How much TNT the player starts with.</summary>
-    public const int StartingTnt = 50;
+    /// <summary>Shared pool caps: blocks and misc count every stacked unit, tools every instance.</summary>
+    public const int BlockCapacity = 2048;
+    public const int ToolCapacity = 8;
+    public const int MiscCapacity = 2048;
 
-    /// <summary>How many lamps the player starts with (lamps are not generated in terrain).</summary>
-    public const int StartingLamps = 64;
+    /// <summary>Test stock of every placeable block the player spawns with.</summary>
+    public const int StartingStock = 50;
 
-    /// <summary>How many (empty) buckets the player starts with; water is only reachable with one.</summary>
+    /// <summary>Empty buckets the player spawns with; water is only reachable with one.</summary>
     public const int StartingBuckets = 1;
 
     // A pickup makes the slot's icon jump and settle back, echoing the count change
@@ -34,21 +55,31 @@ public class Inventory
     public const float PopSeconds = 0.25f;
     public const float PopScale = 1.3f;
 
-    private readonly byte[] _slots = BuildSlots();
-    private readonly int[] _counts = BuildCounts();
+    private readonly Dictionary<byte, int> _blocks = new();
+    private readonly Dictionary<byte, int> _misc = new();
 
-    // Seconds since each slot's last pickup, parked at PopSeconds once the pop has finished
+    // One entry per tool; InstanceId is handed out increasing and never reused, so a
+    // hotbar slot can name its instance and dead references are detectable
+    private readonly List<ToolEntry> _tools = [];
+    private int _nextToolInstance = 1;
+
+    private readonly HotbarSlot[] _hotbar = new HotbarSlot[SlotCount];
+
+    // Seconds since each hotbar slot's last change, parked at PopSeconds once the pop finished
     private readonly float[] _popElapsed = FinishedPops();
 
-    /// <summary>Which slot the player has selected; always a valid index.</summary>
+    /// <summary>Which hotbar slot is in hand; always a valid index.</summary>
     public int SelectedIndex { get; private set; }
 
-    /// <summary>Block id in the selected slot, or 0 when that slot is empty.</summary>
-    public byte SelectedBlockId => _slots[SelectedIndex];
+    /// <summary>Block or item id in the selected hotbar slot, or 0 when it is empty.</summary>
+    public byte SelectedBlockId => IdAt(SelectedIndex);
 
-    public int SelectedCount => _counts[SelectedIndex];
+    public int SelectedCount => CountAt(SelectedIndex);
 
-    public ReadOnlySpan<byte> Slots => _slots;
+    /// <summary>Tool instance in the selected slot, or 0 when it holds no live tool.</summary>
+    public int SelectedToolInstance => ToolInstanceAt(SelectedIndex);
+
+    public HotbarSlot SlotAt(int index) => _hotbar[Wrap(index)];
 
     /// <summary>
     /// Whether the selected slot holds a block that can actually be placed. Pure items
@@ -56,7 +87,119 @@ public class Inventory
     /// </summary>
     public bool CanPlaceSelected => SelectedBlockId != 0 && SelectedCount > 0 && !ItemType.IsItem(SelectedBlockId);
 
-    public int CountAt(int index) => _counts[index];
+    /// <summary>Pool an id stores into, or null when it is not collectable (air, fluids,
+    /// blocks without an item form, unknown ids).</summary>
+    public static InventoryCategory? CategoryOf(byte id)
+    {
+        if (id == 0) return null;
+        if (BlockType.ById[id] is { } block)
+            return block is { HasItem: true, Fluid: false } ? InventoryCategory.Blocks : null;
+        if (ItemType.IsItem(id))
+            return ItemType.Types[id].UseAction != ItemUseAction.None
+                ? InventoryCategory.Tools
+                : InventoryCategory.Misc;
+        return null;
+    }
+
+    public static int CapacityOf(InventoryCategory category) => category switch
+    {
+        InventoryCategory.Blocks => BlockCapacity,
+        InventoryCategory.Tools => ToolCapacity,
+        InventoryCategory.Misc => MiscCapacity,
+        _ => 0,
+    };
+
+    public int UsedOf(InventoryCategory category) => category switch
+    {
+        InventoryCategory.Blocks => _blocks.Values.Sum(),
+        InventoryCategory.Tools => _tools.Count,
+        InventoryCategory.Misc => _misc.Values.Sum(),
+        _ => 0,
+    };
+
+    /// <summary>Whether a pickup of this id would fit (one unit, or one instance for tools).</summary>
+    public bool CanAccept(byte id)
+    {
+        var category = CategoryOf(id);
+        return category.HasValue && UsedOf(category.Value) < CapacityOf(category.Value);
+    }
+
+    /// <summary>
+    /// Credits picked-up blocks or items to their pool and pops every hotbar slot showing
+    /// them. Tools arrive as new instances. Returns false for an id with no pool, or when
+    /// its pool is full — the caller must leave the drop on the ground.
+    /// </summary>
+    public bool Add(byte id, int amount = 1)
+    {
+        var category = CategoryOf(id);
+        if (!category.HasValue || amount <= 0) return false;
+
+        switch (category.Value)
+        {
+            case InventoryCategory.Tools:
+                var room = ToolCapacity - _tools.Count;
+                if (room <= 0) return false;
+                for (var i = 0; i < Math.Min(room, amount); i++)
+                    _tools.Add(new ToolEntry(_nextToolInstance++, id));
+                return true;
+            default:
+            {
+                var store = category.Value == InventoryCategory.Blocks ? _blocks : _misc;
+                var capacity = CapacityOf(category.Value);
+                var used = store.Values.Sum();
+                if (used >= capacity) return false;
+                var n = Math.Min(capacity - used, amount);
+                store[id] = CountFor(id) + n;
+                PopSlotsShowing(id);
+                return true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Morphs a tool instance into another item (a bucket scooped full, a water bucket
+    /// poured out) and pops every hotbar slot holding it, so shared slots flip together.
+    /// </summary>
+    public bool MorphTool(int instanceId, byte toId)
+    {
+        var index = _tools.FindIndex(t => t.InstanceId == instanceId);
+        if (index < 0) return false;
+        _tools[index] = _tools[index] with { ItemId = toId };
+        for (var i = 0; i < _hotbar.Length; i++)
+            if (_hotbar[i] is { IsTool: true } slot && slot.ToolInstance == instanceId)
+                _popElapsed[i] = 0f;
+        return true;
+    }
+
+    /// <summary>
+    /// Drops a tool instance from the pool and empties every hotbar slot holding it
+    /// (thrown tools leave no ghost behind).
+    /// </summary>
+    public bool RemoveTool(int instanceId)
+    {
+        var index = _tools.FindIndex(t => t.InstanceId == instanceId);
+        if (index < 0) return false;
+        _tools.RemoveAt(index);
+        for (var i = 0; i < _hotbar.Length; i++)
+            if (_hotbar[i] is { IsTool: true } slot && slot.ToolInstance == instanceId)
+                _hotbar[i] = HotbarSlot.Empty;
+        return true;
+    }
+
+    /// <summary>Spends one unit from the selected slot. Tools are never spent — they morph.</summary>
+    public bool ConsumeSelected()
+    {
+        var slot = _hotbar[SelectedIndex];
+        if (slot.IsTool) return false;
+        if (slot.Id == 0 || CountFor(slot.Id) <= 0) return false;
+
+        var store = StoreOf(slot.Id);
+        if (store == null) return false;
+        var left = store[slot.Id] - 1;
+        if (left <= 0) store.Remove(slot.Id);
+        else store[slot.Id] = left;
+        return true;
+    }
 
     public void Select(int index) => SelectedIndex = Wrap(index);
 
@@ -70,6 +213,112 @@ public class Inventory
         Select(SelectedIndex - Math.Sign(delta));
     }
 
+    /// <summary>
+    /// Points a hotbar slot at a stackable id. Clicking the id the slot already shows
+    /// clears it (toggle off); anything else overwrites.
+    /// </summary>
+    public void EquipStackable(int hotbarIndex, byte id)
+    {
+        var i = Wrap(hotbarIndex);
+        _hotbar[i] = _hotbar[i] is { IsTool: false } slot && slot.Id == id && id != 0
+            ? HotbarSlot.Empty
+            : new HotbarSlot(false, id, 0);
+        _popElapsed[i] = 0f;
+    }
+
+    /// <summary>
+    /// Points a hotbar slot at one tool instance. Clicking the instance the slot already
+    /// holds clears it. Returns false when the instance is gone (the slot is cleared).
+    /// </summary>
+    public bool EquipTool(int hotbarIndex, int instanceId)
+    {
+        var i = Wrap(hotbarIndex);
+        if (_hotbar[i] is { IsTool: true } slot && slot.ToolInstance == instanceId)
+        {
+            _hotbar[i] = HotbarSlot.Empty;
+            _popElapsed[i] = 0f;
+            return true;
+        }
+        var alive = _tools.Any(t => t.InstanceId == instanceId);
+        _hotbar[i] = alive ? new HotbarSlot(true, 0, instanceId) : HotbarSlot.Empty;
+        _popElapsed[i] = 0f;
+        return alive;
+    }
+
+    public void ClearSlot(int hotbarIndex) => _hotbar[Wrap(hotbarIndex)] = HotbarSlot.Empty;
+
+    /// <summary>Id shown in a hotbar slot, or 0 when it is empty or its tool is gone.</summary>
+    public byte IdAt(int index)
+    {
+        var slot = _hotbar[Wrap(index)];
+        if (slot.IsTool)
+            return _tools.FirstOrDefault(t => t.InstanceId == slot.ToolInstance).ItemId;
+        return slot.Id;
+    }
+
+    /// <summary>
+    /// Count shown in a hotbar slot: the pool total for stackables (shared across slots),
+    /// 1 for a live tool, 0 for empty or orphaned slots.
+    /// </summary>
+    public int CountAt(int index)
+    {
+        var slot = _hotbar[Wrap(index)];
+        if (slot.IsTool)
+            return _tools.Any(t => t.InstanceId == slot.ToolInstance) ? 1 : 0;
+        return CountFor(slot.Id);
+    }
+
+    public int ToolInstanceAt(int index)
+    {
+        var slot = _hotbar[Wrap(index)];
+        if (!slot.IsTool) return 0;
+        return _tools.Any(t => t.InstanceId == slot.ToolInstance) ? slot.ToolInstance : 0;
+    }
+
+    /// <summary>Pool total for a stackable id, or the live-instance count for a tool id.</summary>
+    public int CountFor(byte id)
+    {
+        var category = CategoryOf(id);
+        return category switch
+        {
+            InventoryCategory.Blocks => _blocks.GetValueOrDefault(id),
+            InventoryCategory.Misc => _misc.GetValueOrDefault(id),
+            InventoryCategory.Tools => _tools.Count(t => t.ItemId == id),
+            _ => 0,
+        };
+    }
+
+    /// <summary>Display name for a list row or preview heading.</summary>
+    public static string DisplayName(byte id)
+    {
+        if (BlockType.ById[id] != null) return BlockType.ById[id]!.Name;
+        if (ItemType.Types.TryGetValue(id, out var item)) return item.Name;
+        return $"unknown {id}";
+    }
+
+    /// <summary>Stackable rows for a tab, holding something only (name-sorted).</summary>
+    public IReadOnlyList<StackRow> StackEntries(InventoryCategory category)
+    {
+        var store = category == InventoryCategory.Blocks ? _blocks : _misc;
+        return store
+            .Where(kv => kv.Value > 0)
+            .OrderBy(kv => DisplayName(kv.Key), StringComparer.OrdinalIgnoreCase)
+            .Select(kv => new StackRow(kv.Key, DisplayName(kv.Key), kv.Value))
+            .ToArray();
+    }
+
+    /// <summary>One row per tool instance (name-sorted, oldest first within a name).</summary>
+    public IReadOnlyList<ToolRow> ToolEntries() =>
+        _tools
+            .OrderBy(t => DisplayName(t.ItemId), StringComparer.OrdinalIgnoreCase)
+            .ThenBy(t => t.InstanceId)
+            .Select(t => new ToolRow(t.InstanceId, t.ItemId, DisplayName(t.ItemId)))
+            .ToArray();
+
+    /// <summary>Item id a tool instance currently is, or 0 when it is gone.</summary>
+    public byte ToolItemId(int instanceId) =>
+        _tools.FirstOrDefault(t => t.InstanceId == instanceId).ItemId;
+
     /// <summary>Advances the slot pop animations.</summary>
     public void Update(float deltaTime)
     {
@@ -77,118 +326,25 @@ public class Inventory
             _popElapsed[i] = MathF.Min(PopSeconds, _popElapsed[i] + deltaTime);
     }
 
-    /// <summary>
-    /// Credits picked-up blocks or items to the slot holding that type and pops its icon.
-    /// Returns false for an id with no slot, whose drop the caller should discard.
-    /// </summary>
-    public bool Add(byte blockId, int amount = 1)
-    {
-        var index = IndexOf(blockId);
-        if (index < 0) return false;
-
-        _counts[index] += amount;
-        _popElapsed[index] = 0f;
-        return true;
-    }
-
-    /// <summary>
-    /// Spends one unit of <paramref name="fromId"/> and credits one of <paramref name="toId"/>,
-    /// then selects the slot that received it — so using a bucket leaves the water bucket in
-    /// hand and scooping and pouring alternate on the same button. Returns false when the source
-    /// slot is empty or either id has no slot.
-    /// </summary>
-    public bool Exchange(byte fromId, byte toId)
-    {
-        var from = IndexOf(fromId);
-        var to = IndexOf(toId);
-        if (from < 0 || to < 0 || _counts[from] <= 0) return false;
-
-        _counts[from]--;
-        Add(toId);
-        SelectedIndex = to;
-        return true;
-    }
-
-    /// <summary>Spends one unit from the selected slot. Returns false when it is empty.</summary>
-    public bool ConsumeSelected()
-    {
-        if (SelectedBlockId == 0 || SelectedCount <= 0) return false;
-
-        _counts[SelectedIndex]--;
-        return true;
-    }
-
-    /// <summary>Icon scale for a slot: 1 at rest, briefly larger just after a pickup.</summary>
+    /// <summary>Icon scale for a hotbar slot: 1 at rest, briefly larger just after a change.</summary>
     public float PopScaleAt(int index) =>
-        MathUtils.Lerp(1f, PopScale, MathUtils.Pulse(_popElapsed[index] / PopSeconds));
+        MathUtils.Lerp(1f, PopScale, MathUtils.Pulse(_popElapsed[Wrap(index)] / PopSeconds));
 
-    private int IndexOf(byte blockId)
+    private Dictionary<byte, int>? StoreOf(byte id) => CategoryOf(id) switch
     {
-        if (blockId == 0) return -1;
+        InventoryCategory.Blocks => _blocks,
+        InventoryCategory.Misc => _misc,
+        _ => null,
+    };
 
-        for (var i = 0; i < _slots.Length; i++)
-            if (_slots[i] == blockId)
-                return i;
-
-        return -1;
+    private void PopSlotsShowing(byte id)
+    {
+        for (var i = 0; i < _hotbar.Length; i++)
+            if (IdAt(i) == id)
+                _popElapsed[i] = 0f;
     }
 
     private static int Wrap(int index) => ((index % SlotCount) + SlotCount) % SlotCount;
-
-    /// <summary>
-    /// Ids the hotbar shows, in order: every block that declares <c>hasItem</c>, then every pure
-    /// item. Blocks without an item form (the taper variants, which are visual states of wood,
-    /// and pebbles, which drop flint) never enter the inventory, so they get no slot.
-    /// </summary>
-    private static byte[] HotbarIds() =>
-        BlockType.Types.Values
-            .Where(type => type.HasItem)
-            .Select(type => type.Id)
-            .OrderBy(id => id)
-            .Concat(ItemType.Types.Keys.OrderBy(id => id))
-            .ToArray();
-
-    private static byte[] BuildSlots()
-    {
-        var ids = HotbarIds();
-
-        // The hotbar is the only way to reach a type, so overflowing it is a content bug the
-        // author has to see rather than a silently dropped tail
-        if (ids.Length > SlotCount)
-            Console.WriteLine(
-                $"Hotbar has {SlotCount} slots but {ids.Length} block and item types want one: " +
-                $"the last {ids.Length - SlotCount} are unreachable. Raise Inventory.SlotCount.");
-
-        var slots = new byte[SlotCount];
-        ids.AsSpan(0, Math.Min(ids.Length, SlotCount)).CopyTo(slots);
-        return slots;
-    }
-
-    // The player spawns holding TNT, lamps and a bucket; everything else is earned by mining
-    private static int[] BuildCounts()
-    {
-        var counts = new int[SlotCount];
-        var ids = HotbarIds();
-
-        // Resolved once per inventory rather than per slot; this runs when the UI is built
-        var tnt = ContentRegistry.RequireBlock("tnt").Id;
-        var lamp = ContentRegistry.RequireBlock("lamp").Id;
-        var glass = ContentRegistry.RequireBlock("glass").Id;
-        var sand = ContentRegistry.RequireBlock("sand").Id;
-        var gravel = ContentRegistry.RequireBlock("gravel").Id;
-        var bucket = ContentRegistry.RequireItem("bucket").Id;
-
-        for (var i = 0; i < ids.Length && i < SlotCount; i++)
-            if (ids[i] == tnt)
-                counts[i] = StartingTnt;
-            else if (ids[i] == lamp)
-                counts[i] = StartingLamps;
-            else if (ids[i] == bucket)
-                counts[i] = StartingBuckets;
-            else if (ids[i] == glass || ids[i] == sand || ids[i] == gravel)
-                counts[i] = 50;
-        return counts;
-    }
 
     private static float[] FinishedPops()
     {
@@ -196,4 +352,24 @@ public class Inventory
         Array.Fill(pops, PopSeconds);
         return pops;
     }
+
+    public Inventory()
+    {
+        // Test stock: 50 of every placeable block, so placing and the category caps can
+        // be tried without mining first; one bucket, since water needs one to reach
+        foreach (var type in BlockType.Types.Values)
+            if (type.HasItem && !type.Fluid)
+                _blocks[type.Id] = StartingStock;
+        for (var i = 0; i < StartingBuckets; i++)
+            if (ItemType.Types.Values.FirstOrDefault(t => t.UseAction == ItemUseAction.PickupFluid) is { } bucket)
+                _tools.Add(new ToolEntry(_nextToolInstance++, bucket.Id));
+    }
+
+    private sealed record ToolEntry(int InstanceId, byte ItemId);
+
+    /// <summary>One stackable list row: icon, name and the pool count for that id.</summary>
+    public readonly record struct StackRow(byte Id, string Name, int Count);
+
+    /// <summary>One tool list row: icon, name and the instance it equips.</summary>
+    public readonly record struct ToolRow(int InstanceId, byte ItemId, string Name);
 }

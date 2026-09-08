@@ -192,8 +192,20 @@ public class Camera
         _verticalVelocity = 0f;
     }
 
+    /// <summary>
+    /// While set, mouse movement no longer turns the view (the [E] panel owns the cursor).
+    /// Position still updates so reopening the game never jumps the look.
+    /// </summary>
+    public bool SuppressLook { get; set; }
+
     private void OnMouseMove(IMouse mouse, Vector2 position)
     {
+        if (SuppressLook)
+        {
+            _lastMousePosition = position;
+            _firstMouseMovement = false;
+            return;
+        }
         if (_firstMouseMovement)
         {
             _lastMousePosition = position;

@@ -1,0 +1,152 @@
+using Xunit;
+
+namespace silkgltriangle.Tests;
+
+public sealed class InventoryTests
+{
+    public InventoryTests() => TestContent.EnsureLoaded();
+
+    [Fact]
+    public void BlocksShareOnePoolAcrossIds()
+    {
+        var inventory = new Inventory();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var dirt = ContentRegistry.RequireBlock("dirt").Id;
+
+        Assert.True(inventory.Add(stone, Inventory.BlockCapacity - inventory.UsedOf(InventoryCategory.Blocks)));
+        Assert.Equal(Inventory.BlockCapacity, inventory.UsedOf(InventoryCategory.Blocks));
+        Assert.False(inventory.CanAccept(dirt));
+        Assert.False(inventory.Add(dirt));
+    }
+
+    [Fact]
+    public void PlacingFreesPoolRoomForAnyBlock()
+    {
+        var inventory = new Inventory();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var dirt = ContentRegistry.RequireBlock("dirt").Id;
+        inventory.Add(stone, Inventory.BlockCapacity - inventory.UsedOf(InventoryCategory.Blocks));
+
+        inventory.Select(0);
+        inventory.EquipStackable(0, stone);
+        for (var i = 0; i < 4; i++)
+            Assert.True(inventory.ConsumeSelected());
+
+        Assert.True(inventory.CanAccept(dirt));
+        Assert.True(inventory.Add(dirt, 4));
+        Assert.Equal(Inventory.BlockCapacity, inventory.UsedOf(InventoryCategory.Blocks));
+    }
+
+    [Fact]
+    public void HotbarSlotsSharePoolCounts()
+    {
+        var inventory = new Inventory();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        inventory.EquipStackable(0, stone);
+        inventory.EquipStackable(3, stone);
+
+        var before = inventory.CountAt(0);
+        Assert.Equal(before, inventory.CountAt(3));
+
+        inventory.Select(0);
+        Assert.True(inventory.ConsumeSelected());
+        Assert.Equal(before - 1, inventory.CountAt(0));
+        Assert.Equal(before - 1, inventory.CountAt(3));
+    }
+
+    [Fact]
+    public void EquippingTheShownIdClearsTheSlot()
+    {
+        var inventory = new Inventory();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var dirt = ContentRegistry.RequireBlock("dirt").Id;
+
+        inventory.EquipStackable(0, stone);
+        Assert.Equal(stone, inventory.IdAt(0));
+        inventory.EquipStackable(0, stone);
+        Assert.Equal(0, inventory.IdAt(0));
+
+        inventory.EquipStackable(0, stone);
+        inventory.EquipStackable(0, dirt);
+        Assert.Equal(dirt, inventory.IdAt(0));
+    }
+
+    [Fact]
+    public void ToolsAreCappedInstancesThatMorphTogether()
+    {
+        var inventory = new Inventory();
+        var bucket = ContentRegistry.RequireItem("bucket").Id;
+        var filled = ContentRegistry.RequireItem("water_bucket").Id;
+
+        for (var i = inventory.UsedOf(InventoryCategory.Tools); i < Inventory.ToolCapacity; i++)
+            Assert.True(inventory.Add(bucket));
+        Assert.False(inventory.Add(bucket));
+
+        var first = inventory.ToolEntries()[0].InstanceId;
+        inventory.EquipTool(0, first);
+        inventory.EquipTool(3, first);
+        Assert.True(inventory.MorphTool(first, filled));
+        Assert.Equal(filled, inventory.IdAt(0));
+        Assert.Equal(filled, inventory.IdAt(3));
+    }
+
+    [Fact]
+    public void DifferentToolInstancesMorphIndependently()
+    {
+        var inventory = new Inventory();
+        var bucket = ContentRegistry.RequireItem("bucket").Id;
+        var filled = ContentRegistry.RequireItem("water_bucket").Id;
+        Assert.True(inventory.Add(bucket));
+
+        var tools = inventory.ToolEntries();
+        Assert.Equal(2, tools.Count);
+        inventory.EquipTool(0, tools[0].InstanceId);
+        inventory.EquipTool(3, tools[1].InstanceId);
+
+        Assert.True(inventory.MorphTool(tools[0].InstanceId, filled));
+        Assert.Equal(filled, inventory.IdAt(0));
+        Assert.Equal(bucket, inventory.IdAt(3));
+    }
+
+    [Fact]
+    public void RemovingAToolEmptiesItsSlots()
+    {
+        var inventory = new Inventory();
+        var instance = Assert.Single(inventory.ToolEntries()).InstanceId;
+        inventory.EquipTool(0, instance);
+        inventory.EquipTool(3, instance);
+
+        Assert.True(inventory.RemoveTool(instance));
+        Assert.Equal(0, inventory.IdAt(0));
+        Assert.Equal(0, inventory.IdAt(3));
+        Assert.False(inventory.ConsumeSelected());
+    }
+
+    [Fact]
+    public void MiscSharesItsOwnPool()
+    {
+        var inventory = new Inventory();
+        var flint = ContentRegistry.RequireItem("flint").Id;
+        var vine = ContentRegistry.RequireItem("vine").Id;
+
+        Assert.True(inventory.Add(flint, Inventory.MiscCapacity));
+        Assert.False(inventory.Add(vine));
+        Assert.Equal(InventoryCategory.Misc, Inventory.CategoryOf(flint));
+    }
+
+    [Fact]
+    public void UncollectableIdsHaveNoPool()
+    {
+        var water = ContentRegistry.RequireBlock("water").Id;
+        var log = ContentRegistry.RequireBlock("log").Id;
+        var bucket = ContentRegistry.RequireItem("bucket").Id;
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+
+        Assert.Null(Inventory.CategoryOf(0));
+        Assert.Null(Inventory.CategoryOf(water));
+        Assert.Equal(InventoryCategory.Blocks, Inventory.CategoryOf(log));
+        Assert.Equal(InventoryCategory.Tools, Inventory.CategoryOf(bucket));
+        Assert.Equal(InventoryCategory.Blocks, Inventory.CategoryOf(stone));
+        Assert.False(new Inventory().CanAccept(water));
+    }
+}

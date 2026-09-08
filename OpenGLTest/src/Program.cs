@@ -18,6 +18,8 @@ public static class Program
     private static bool debugEnabled;
     private static bool xWasPressed;
     private static bool qWasPressed;
+    private static bool eWasPressed;
+    private static readonly InventoryView inventoryView = new();
     private static double debugLogTimer;
     private static double fpsTimer;
     private static int fpsFrames;
@@ -67,9 +69,14 @@ public static class Program
         inputManager.Mouse?.MouseUp += (_, button) =>
         {
             if (button == MouseButton.Right) placeTimer = MAX_PLACE_TIMER;
+            if (button == MouseButton.Left && inventoryView.IsOpen && inputManager.Mouse != null)
+                HandleInventoryClick(inputManager.Mouse.Position);
         };
 
-        inputManager.Mouse?.Scroll += (_, wheel) => world.Inventory.Scroll(wheel.Y);
+        inputManager.Mouse?.Scroll += (_, wheel) =>
+        {
+            if (!inventoryView.IsOpen) world.Inventory.Scroll(wheel.Y);
+        };
 
         debugEnabled = Environment.GetEnvironmentVariable(DebugVariable)?.Trim() is "1" or "true";
 
@@ -175,32 +182,113 @@ public static class Program
         }
         xWasPressed = xPressed;
 
-        // One throw per press, so holding Q doesn't empty the slot; Ctrl+Q throws the stack
-        var qPressed = inputManager.Keyboard?.IsKeyPressed(Key.Q) == true;
-        if (qPressed && !qWasPressed)
-        {
-            var wholeStack = inputManager.Keyboard?.IsKeyPressed(Key.ControlLeft) == true
-                || inputManager.Keyboard?.IsKeyPressed(Key.ControlRight) == true;
-            world.ThrowSelected(wholeStack);
-        }
-        qWasPressed = qPressed;
+        // The [E] panel owns the mouse: clicks equip, hotbar keys rest, and the world runs on
+        var ePressed = inputManager.Keyboard?.IsKeyPressed(Key.E) == true;
+        if (ePressed && !eWasPressed)
+            SetInventoryOpen(!inventoryView.IsOpen);
+        eWasPressed = ePressed;
 
-        if (inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true && placeTimer >= MAX_PLACE_TIMER)
+        if (!inventoryView.IsOpen)
         {
-            placeTimer = 0;
-            world.TryUseSelected(World.InteractionReach);
+            // 1-10 grabs the hotbar slot directly; scroll still walks it one step at a time
+            var numberKeys = new[] { Key.Number1, Key.Number2, Key.Number3, Key.Number4, Key.Number5,
+                Key.Number6, Key.Number7, Key.Number8, Key.Number9, Key.Number0 };
+            for (var i = 0; i < numberKeys.Length; i++)
+                if (inputManager.Keyboard?.IsKeyPressed(numberKeys[i]) == true)
+                    world.Inventory.Select(i);
+
+            // One throw per press, so holding Q doesn't empty the slot; Ctrl+Q throws the stack
+            var qPressed = inputManager.Keyboard?.IsKeyPressed(Key.Q) == true;
+            if (qPressed && !qWasPressed)
+            {
+                var wholeStack = inputManager.Keyboard?.IsKeyPressed(Key.ControlLeft) == true
+                    || inputManager.Keyboard?.IsKeyPressed(Key.ControlRight) == true;
+                world.ThrowSelected(wholeStack);
+            }
+            qWasPressed = qPressed;
+
+            if (inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true && placeTimer >= MAX_PLACE_TIMER)
+            {
+                placeTimer = 0;
+                world.TryUseSelected(World.InteractionReach);
+            }
         }
 
         world.Update((float)deltaTime, inputManager.Keyboard);
 
         FrameProfiler.Begin(ProfileSection.Breaking);
-        world.UpdateBlockBreaking(deltaTime, inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true);
+        world.UpdateBlockBreaking(deltaTime,
+            !inventoryView.IsOpen && inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true);
         FrameProfiler.End(ProfileSection.Breaking);
 
         LogDebugLine(deltaTime);
 
         if (inputManager.Keyboard?.IsKeyPressed(Key.Escape) == true)
-            windowManager.Window.Close();
+        {
+            if (inventoryView.IsOpen)
+                SetInventoryOpen(false);
+            else
+                windowManager.Window.Close();
+        }
+    }
+
+    /// <summary>
+    /// Opens or closes the [E] panel: the mouse is freed for clicking (and the look frozen)
+    /// while it is open, then captured again. Closing also drops any list pick.
+    /// </summary>
+    private static void SetInventoryOpen(bool open)
+    {
+        inventoryView.IsOpen = open;
+        if (!open)
+            inventoryView.ClearSelection();
+        world.Camera.SuppressLook = open;
+        if (inputManager.Mouse != null)
+            inputManager.Mouse.Cursor.CursorMode = open ? CursorMode.Normal : CursorMode.Disabled;
+    }
+
+    /// <summary>
+    /// Routes one left-click inside the open panel: tabs switch, rows pick for preview,
+    /// and hotbar slots equip the pick (clicking what the slot already shows clears it).
+    /// </summary>
+    private static void HandleInventoryClick(System.Numerics.Vector2 position)
+    {
+        var inventory = world.Inventory;
+
+        var tab = renderManager.UiPanelTabAt(position);
+        if (tab.HasValue)
+        {
+            inventoryView.Tab = tab.Value;
+            inventoryView.ClearSelection();
+            return;
+        }
+
+        var rowCount = inventoryView.Tab == InventoryCategory.Tools
+            ? inventory.ToolEntries().Count
+            : inventory.StackEntries(inventoryView.Tab).Count;
+        var row = renderManager.UiPanelRowAt(position, rowCount);
+        if (row.HasValue)
+        {
+            if (inventoryView.Tab == InventoryCategory.Tools)
+            {
+                inventoryView.SelectedToolInstance = inventory.ToolEntries()[row.Value].InstanceId;
+                inventoryView.SelectedId = 0;
+            }
+            else
+            {
+                inventoryView.SelectedId = inventory.StackEntries(inventoryView.Tab)[row.Value].Id;
+                inventoryView.SelectedToolInstance = 0;
+            }
+            return;
+        }
+
+        var hotbar = renderManager.UiHotbarSlotAt(position);
+        if (hotbar.HasValue)
+        {
+            if (inventoryView.Tab == InventoryCategory.Tools && inventoryView.SelectedToolInstance != 0)
+                inventory.EquipTool(hotbar.Value, inventoryView.SelectedToolInstance);
+            else if (inventoryView.SelectedId != 0)
+                inventory.EquipStackable(hotbar.Value, inventoryView.SelectedId);
+        }
     }
 
     private static void OnRender(double deltaTime)
@@ -227,7 +315,8 @@ public static class Program
         FrameProfiler.Begin(ProfileSection.UiPass);
         var hideHud = visualDirector?.TakeScreenshot == true && visualDirector.ScreenshotHideHud;
         if (!hideHud)
-            world.RenderUI(renderManager, shownFps, debugEnabled);
+            world.RenderUI(renderManager, inventoryView,
+                (float)(windowManager.Window.Time + timeOffset), shownFps, debugEnabled);
         FrameProfiler.End(ProfileSection.UiPass);
 
         if (visualDirector?.TakeScreenshot == true)

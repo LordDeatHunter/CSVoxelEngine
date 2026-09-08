@@ -262,7 +262,7 @@ public class RenderManager : IDisposable
 
         blockCubes = new BlockCubeCache(gl);
         itemMeshes = new ItemMeshCache(gl);
-        ui = new UIRenderer(gl, textureAtlas, blockCubes);
+        ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes);
         CreateSelectionGeometry();
     }
 
@@ -1572,7 +1572,8 @@ public class RenderManager : IDisposable
         return -1;
     }
 
-    public void RenderUI(IWindow window, Inventory inventory, int fps, bool showProfiler)
+    public void RenderUI(IWindow window, Inventory inventory, InventoryView view, float time,
+        int fps, bool showProfiler)
     {
         ui.Begin(window.Size);
 
@@ -1585,13 +1586,21 @@ public class RenderManager : IDisposable
                 Rgba.FromFloat(UnderwaterFogColor.X, UnderwaterFogColor.Y, UnderwaterFogColor.Z, 0.18f * wet));
         }
 
-        ui.DrawCrosshair();
+        if (!view.IsOpen)
+            ui.DrawCrosshair();
         ui.DrawFps(fps);
         if (showProfiler)
             ui.DrawProfiler(FrameProfiler.Lines);
         ui.DrawHotbar(inventory);
+        if (view.IsOpen)
+            ui.DrawInventoryPanel(inventory, view, time);
         ui.End();
     }
+
+    /// <summary>Delegates click hit-testing to the UI pass (valid after a frame has begun).</summary>
+    public int? UiHotbarSlotAt(Vector2 point) => ui.HotbarSlotAt(point);
+    public InventoryCategory? UiPanelTabAt(Vector2 point) => ui.PanelTabAt(point);
+    public int? UiPanelRowAt(Vector2 point, int rowCount) => ui.PanelRowAt(point, rowCount);
 
     public void Dispose()
     {
