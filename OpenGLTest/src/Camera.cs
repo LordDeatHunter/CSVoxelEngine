@@ -466,6 +466,63 @@ public class Camera
     private static bool IsSolidBlock(int worldX, int worldY, int worldZ, ChunkManager chunkManager)
         => BlockType.IsSolid(chunkManager.GetBlockGlobal(worldX, worldY, worldZ));
 
+    /// <summary>
+    /// Shoves the player out of a falling cube, along the smallest-penetration axis. Strictly
+    /// one-way: cubes push the player, the player never pushes cubes. Axes that would park
+    /// the eye inside a solid block are skipped, so a cube cannot shove the player through a
+    /// wall; noclip ignores shoves entirely.
+    /// </summary>
+    public void PushOutOf(Vector3 center, float halfExtent, ChunkManager chunkManager)
+    {
+        if (IsNoclip) return;
+
+        var min = new Vector3(
+            Position.X - PlayerRadius,
+            Position.Y - EyeHeight,
+            Position.Z - PlayerRadius);
+        var max = new Vector3(
+            Position.X + PlayerRadius,
+            Position.Y - EyeHeight + PlayerHeight,
+            Position.Z + PlayerRadius);
+        var eMin = center - new Vector3(halfExtent);
+        var eMax = center + new Vector3(halfExtent);
+
+        var ox = Math.Min(max.X, eMax.X) - Math.Max(min.X, eMin.X);
+        var oy = Math.Min(max.Y, eMax.Y) - Math.Max(min.Y, eMin.Y);
+        var oz = Math.Min(max.Z, eMax.Z) - Math.Max(min.Z, eMin.Z);
+        if (ox <= 0f || oy <= 0f || oz <= 0f) return;
+
+        // Signed shove per axis that moves the body fully clear of the cube; ties go negative.
+        // Shallowest first, so the shove moves the player the least.
+        var bodyCenterY = Position.Y - EyeHeight + PlayerHeight * 0.5f;
+        Span<float> pushes = [
+            Position.X <= center.X ? eMin.X - max.X : eMax.X - min.X,
+            bodyCenterY <= center.Y ? eMin.Y - max.Y : eMax.Y - min.Y,
+            Position.Z <= center.Z ? eMin.Z - max.Z : eMax.Z - min.Z,
+        ];
+        Span<int> order = [0, 1, 2];
+        for (var a = 0; a < 2; a++)
+        for (var b = a + 1; b < 3; b++)
+            if (Math.Abs(pushes[order[b]]) < Math.Abs(pushes[order[a]]))
+                (order[a], order[b]) = (order[b], order[a]);
+
+        foreach (var axis in order)
+        {
+            var candidate = axis switch
+            {
+                0 => Position + new Vector3(pushes[0], 0f, 0f),
+                1 => Position + new Vector3(0f, pushes[1], 0f),
+                _ => Position + new Vector3(0f, 0f, pushes[2]),
+            };
+
+            if (!IsColliding(candidate, chunkManager))
+            {
+                Position = candidate;
+                return;
+            }
+        }
+    }
+
     public Matrix4x4 GetViewMatrix() => Matrix4x4.CreateLookAt(Position, Position + GetForwardVector(), Vector3.UnitY);
 
     public Matrix4x4 GetProjectionMatrix() =>

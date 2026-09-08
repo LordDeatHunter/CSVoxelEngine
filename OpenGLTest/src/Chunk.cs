@@ -502,11 +502,24 @@ public class Chunk : IDisposable
     // blocks under it, stone below that. dirtDepth == 0 marks a bare stone column
     // (see ColumnData.DirtDepth) - deep ravine walls, where the top block is stone as well.
     // A submerged column tops out in dirt instead: grass does not grow on a sea floor.
+    // Shoreline columns (see TerrainGenerator.IsBeachHeight) build from sand instead, capped
+    // with gravel where TerrainGenerator.IsGravelPatch holds.
     private void GenerateColumn(int x, int z, int terrainHeight, int dirtDepth, int lowerBoundY)
     {
         var topBlock = TerrainGenerator.IsSubmerged(terrainHeight)
             ? TerrainGenerator.SoilBlock
             : TerrainGenerator.SurfaceBlock;
+        var soilBlock = TerrainGenerator.SoilBlock;
+
+        if (dirtDepth != 0 && TerrainGenerator.IsBeachHeight(terrainHeight))
+        {
+            var worldX = (int)Position.X * Size + x;
+            var worldZ = (int)Position.Z * Size + z;
+            topBlock = TerrainGenerator.IsGravelPatch(worldX, worldZ)
+                ? TerrainGenerator.GravelBlock
+                : TerrainGenerator.SandBlock;
+            soilBlock = TerrainGenerator.SandBlock;
+        }
 
         for (var y = 0; y < Size; y++)
         {
@@ -515,7 +528,7 @@ public class Chunk : IDisposable
 
             _blocks[Idx(x, y, z)] = dirtDepth == 0 ? TerrainGenerator.RockBlock
                 : depth == 0 ? topBlock
-                : depth <= dirtDepth ? TerrainGenerator.SoilBlock
+                : depth <= dirtDepth ? soilBlock
                 : TerrainGenerator.RockBlock;
         }
     }

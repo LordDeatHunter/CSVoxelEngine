@@ -26,6 +26,11 @@ public sealed class BlockDefinition
     public bool? HasItem { get; set; }
     public bool? NeedsSupport { get; set; }
 
+    /// <summary>Marks the block as gravity-affected (sand, gravel): it topples into a falling
+    /// entity when the cell below it stops being solid. Never combines with
+    /// <see cref="Fluid"/> or <see cref="NeedsSupport"/>.</summary>
+    public bool? Falls { get; set; }
+
     /// <summary>Marks the block as a fluid: flows, is replaceable, never collides or drops.
     /// The registry forces the flags that follow from it rather than trusting the file.</summary>
     public bool? Fluid { get; set; }

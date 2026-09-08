@@ -102,6 +102,16 @@ public static class WorldGenerationConfig
     public const bool WaterEnabled = true;
     public const int SeaLevel = 0;
 
+    // Beaches ring the sea: dry columns up to BeachAboveSeaLevel over the waterline and
+    // submerged columns down to BeachBelowSeaLevel under it build their top and soil band
+    // from sand instead of grass/dirt. Ravine bare-stone walls still win over the beach.
+    public const int BeachAboveSeaLevel = 2;
+    public const int BeachBelowSeaLevel = 3;
+
+    // Gravel patches cap some beach columns: where the gravel noise passes its threshold
+    public const float GravelFrequency = 1f / 48f;
+    public const float GravelThreshold = 0.45f;
+
     // Fluid simulation: one tick every FluidTickSeconds, at most MaxFluidTicksPerFrame of them
     // in a frame so a hitch never turns into a spiral of catch-up ticks
     public const float FluidTickSeconds = 0.25f;

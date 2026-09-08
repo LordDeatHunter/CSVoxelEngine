@@ -186,6 +186,7 @@ public static class ContentRegistry
         Array.Clear(BlockType.CastsAoById);
         Array.Clear(BlockType.FluidById);
         Array.Clear(BlockType.ReplaceableById);
+        Array.Clear(BlockType.FallsById);
 
         // Air owns no definition but still has to let light through and stop nothing
         BlockType.PassesLightById[BlockType.Air] = true;
@@ -303,6 +304,14 @@ public static class ContentRegistry
             // no inventory slot or loot, and it is never support-fragile (it is what pops
             // those blocks). It stays replaceable, which is set below for every block.
             var fluid = definition.Fluid ?? false;
+            var falls = definition.Falls ?? false;
+            if (fluid && falls)
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets both fluid and falls: a fluid cell has no block to topple.");
+            var needsSupport = !fluid && (definition.NeedsSupport ?? false);
+            if (falls && needsSupport)
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets both falls and needsSupport: a falling block topples instead of popping.");
             var solid = !fluid && (definition.Solid ?? true);
             var type = new BlockType
             {
@@ -320,7 +329,8 @@ public static class ContentRegistry
                 WoodTaperLevel = taperLevel,
                 HalfWidth = definition.Wood == null ? -1f : definition.Wood.HalfWidth ?? 0.5f,
                 HasItem = !fluid && (definition.HasItem ?? true),
-                NeedsSupport = !fluid && (definition.NeedsSupport ?? false),
+                NeedsSupport = needsSupport,
+                Falls = falls,
                 Fluid = fluid,
                 OnBreak = onBreak,
                 LootTable = fluid ? LootTable.None : ResolveLoot(name, definition.Loot, path),
@@ -335,6 +345,7 @@ public static class ContentRegistry
             BlockType.SolidById[id] = type.Solid;
             BlockType.CastsAoById[id] = type.CastsAmbientOcclusion;
             BlockType.FluidById[id] = type.Fluid;
+            BlockType.FallsById[id] = type.Falls;
             // Fragile blocks are washed away by a flow instead of stopping it
             BlockType.ReplaceableById[id] = type.NeedsSupport;
         }

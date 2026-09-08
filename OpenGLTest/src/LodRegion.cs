@@ -197,6 +197,10 @@ public class LodRegion : IDisposable
         // no erosion margin: the eroded minimum would paint water across every beach whose
         // neighbourhood dips below sea level.
         var isSea = new bool[heightGrid * heightGrid];
+        // Beaches and gravel caps read from the same uneroded max for the same reason, the
+        // gravel with one noise eval at the cell centre per cell.
+        var beachTop = new bool[heightGrid * heightGrid];
+        var gravelTop = new bool[heightGrid * heightGrid];
         for (var i = -1; i <= cells; i++)
         {
             for (var j = -1; j <= cells; j++)
@@ -213,6 +217,11 @@ public class LodRegion : IDisposable
 
                 isSea[(i + 1) * heightGrid + (j + 1)] =
                     WorldGenerationConfig.WaterEnabled && maxOwn < WorldGenerationConfig.SeaLevel;
+
+                beachTop[(i + 1) * heightGrid + (j + 1)] = TerrainGenerator.IsBeachHeight(maxOwn);
+                gravelTop[(i + 1) * heightGrid + (j + 1)] =
+                    beachTop[(i + 1) * heightGrid + (j + 1)] && TerrainGenerator.IsGravelPatch(
+                        baseFineX + i * cellSize + cellSize / 2, baseFineZ + j * cellSize + cellSize / 2);
 
                 // Cell cy is solid iff cellSize * (cy + 1) <= eroded height
                 var ground = ((minHeight - spec.HeightBias) >> cellShift) - 1;
@@ -282,6 +291,8 @@ public class LodRegion : IDisposable
         var grass = BlockType.ById[TerrainGenerator.SurfaceBlock]!;
         var dirt = BlockType.ById[TerrainGenerator.SoilBlock]!;
         var stone = BlockType.ById[TerrainGenerator.RockBlock]!;
+        var sand = BlockType.ById[TerrainGenerator.SandBlock]!;
+        var gravel = BlockType.ById[TerrainGenerator.GravelBlock]!;
         var leaves = BlockType.ById[TreeGenerator.LeavesBlock]!;
 
         var vertices = new List<Vertex>(8192);
@@ -375,9 +386,17 @@ public class LodRegion : IDisposable
                     shades[c] = Chunk.ShadeLut[(topFace << 2) | Chunk.VertexAO(side1, side2, diagonal)];
                 }
 
+                // Shoreline columns wear sand (gravel where the cell is patched) like the
+                // chunks; beach-ness comes from the uneroded cell max, since the eroded ground
+                // top can sit a whole band below the real shoreline
+                var beach = beachTop[gi * heightGrid + gj];
+                var cap = beach && gravelTop[gi * heightGrid + gj] ? gravel : sand;
+                var soil = beach ? sand : dirt;
+
                 AddQuad(vertices, indices, topFace, new Vector3(i * cellSize, top * cellSize, j * cellSize),
                     top > ground ? leaves.FaceTiles[topFace]
-                    : isSea[gi * heightGrid + gj] ? dirt.FaceTiles[topFace]   // sea floors are dirt, like the chunks
+                    : isSea[gi * heightGrid + gj] ? soil.FaceTiles[topFace]   // sea floors are dirt, sandy ones sand
+                    : beach ? cap.FaceTiles[topFace]
                     : grass.FaceTiles[topFace], shades);
 
                 // AddQuad places a +Y face one cell above its origin, so the origin sits a
@@ -415,8 +434,8 @@ public class LodRegion : IDisposable
                         // Canopy airspace wears leaves; at and below the eroded surface the
                         // grass/dirt/stone rule applies, measured from the ground (not the bump)
                         var tile = cy > ground ? leaves.FaceTiles[f]
-                            : cy == top ? (isSea[gi * heightGrid + gj] ? dirt : grass).FaceTiles[f]
-                            : (ground - cy) * cellSize <= WorldGenerationConfig.NominalDirtDepth ? dirt.FaceTiles[f]
+                            : cy == top ? (isSea[gi * heightGrid + gj] ? soil : beach ? cap : grass).FaceTiles[f]
+                            : (ground - cy) * cellSize <= WorldGenerationConfig.NominalDirtDepth ? soil.FaceTiles[f]
                             : stone.FaceTiles[f];
                         AddQuad(vertices, indices, f, new Vector3(i * cellSize, cy * cellSize, j * cellSize), tile, shades);
                     }

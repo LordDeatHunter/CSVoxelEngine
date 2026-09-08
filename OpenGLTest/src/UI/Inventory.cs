@@ -18,7 +18,7 @@ public class Inventory
 {
     // Room to spare: every block with an item form plus every pure item needs a slot, and a
     // truncated list would make the last types unreachable (BuildSlots warns if it happens).
-    public const int SlotCount = 14;
+    public const int SlotCount = 16;
 
     /// <summary>How much TNT the player starts with.</summary>
     public const int StartingTnt = 50;
@@ -174,6 +174,8 @@ public class Inventory
         var tnt = ContentRegistry.RequireBlock("tnt").Id;
         var lamp = ContentRegistry.RequireBlock("lamp").Id;
         var glass = ContentRegistry.RequireBlock("glass").Id;
+        var sand = ContentRegistry.RequireBlock("sand").Id;
+        var gravel = ContentRegistry.RequireBlock("gravel").Id;
         var bucket = ContentRegistry.RequireItem("bucket").Id;
 
         for (var i = 0; i < ids.Length && i < SlotCount; i++)
@@ -183,7 +185,7 @@ public class Inventory
                 counts[i] = StartingLamps;
             else if (ids[i] == bucket)
                 counts[i] = StartingBuckets;
-            else if (ids[i] == glass)
+            else if (ids[i] == glass || ids[i] == sand || ids[i] == gravel)
                 counts[i] = 50;
         return counts;
     }

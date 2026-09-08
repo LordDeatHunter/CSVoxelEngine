@@ -30,7 +30,7 @@ public class TntManager
     }
 
     public void Update(float deltaTime, ChunkManager chunks, LodManager lod, DropManager drops,
-        FluidManager fluids)
+        FluidManager fluids, FallingBlockManager falling)
     {
         foreach (var tnt in _primed)
             tnt.Update(deltaTime, chunks);
@@ -41,7 +41,7 @@ public class TntManager
             if (!_primed[i].IsDue) continue;
             var at = _primed[i].Position;
             _primed.RemoveAt(i);
-            Detonate(at, chunks, lod, drops, fluids);
+            Detonate(at, chunks, lod, drops, fluids, falling);
         }
 
         foreach (var (position, blockId) in _pendingSpawns)
@@ -57,7 +57,7 @@ public class TntManager
     /// the crater — and the water around the blast is scheduled so it floods the hole instead.
     /// </summary>
     private void Detonate(Vector3 center, ChunkManager chunks, LodManager lod, DropManager drops,
-        FluidManager fluids)
+        FluidManager fluids, FallingBlockManager falling)
     {
         var radius = BlastRadius;
         var radiusSq = radius * radius;
@@ -158,6 +158,12 @@ public class TntManager
             if (LodRegion.LowerColumnBelow(x, lowestY, z))
                 lod.MarkEditedColumn(x, z);
         }
+
+        // Sand above the crater loses its support with it: sweep bottom-up over the blast box
+        // plus one layer, so stacked columns come down in order
+        for (var x = (int)min.X; x <= (int)max.X; x++)
+        for (var z = (int)min.Z; z <= (int)max.Z; z++)
+            falling.CheckColumn(chunks, lod, fluids, x, z, (int)min.Y, (int)max.Y + 1);
 
         // One box for the whole blast, grown by a block so the water just outside it notices
         fluids.ScheduleBox(min - Vector3.One, max + Vector3.One);

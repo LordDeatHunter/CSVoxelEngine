@@ -21,6 +21,7 @@ public static class TerrainGenerator
     private static readonly FastNoiseLite RavineMask;
     private static readonly FastNoiseLite EntranceNoise;
     private static readonly FastNoiseLite IntensityNoise;
+    private static readonly FastNoiseLite GravelNoise;
 
     // The terrain palette: the generator owns the choice of which blocks natural ground is made
     // of, and Chunk only fills its columns with them. Resolved once here so the per-voxel fill
@@ -38,12 +39,20 @@ public static class TerrainGenerator
     /// <summary>Fluid the sea is filled with, up to and including sea level.</summary>
     public static readonly byte SeaBlock;
 
+    /// <summary>Block beach columns (see <see cref="IsBeachHeight"/>) are built from.</summary>
+    public static readonly byte SandBlock;
+
+    /// <summary>Block capping beach columns where <see cref="IsGravelPatch"/> holds.</summary>
+    public static readonly byte GravelBlock;
+
     static TerrainGenerator()
     {
         SurfaceBlock = ContentRegistry.RequireBlock("grass").Id;
         SoilBlock = ContentRegistry.RequireBlock("dirt").Id;
         RockBlock = ContentRegistry.RequireBlock("stone").Id;
         SeaBlock = ContentRegistry.RequireBlock("water").Id;
+        SandBlock = ContentRegistry.RequireBlock("sand").Id;
+        GravelBlock = ContentRegistry.RequireBlock("gravel").Id;
 
         // The rolling base keeps the original seed and settings exactly, so natural terrain
         // is unchanged wherever the flat mask stays at zero. The mask is rare and
@@ -59,6 +68,7 @@ public static class TerrainGenerator
         RavineMask = MakeNoise(23, WorldGenerationConfig.RavineMaskFrequency);
         EntranceNoise = MakeNoise(31, WorldGenerationConfig.EntranceFrequency);
         IntensityNoise = MakeNoise(41, WorldGenerationConfig.CaveIntensityFrequency);
+        GravelNoise = MakeNoise(61, WorldGenerationConfig.GravelFrequency);
 
         // Displaces the ridge lookup so ravines wind instead of following straight noise contours
         RavineWarp = new FastNoiseLite(WorldGenerationConfig.Seed + 22);
@@ -74,6 +84,16 @@ public static class TerrainGenerator
     /// </summary>
     public static bool IsSubmerged(int height) =>
         WorldGenerationConfig.WaterEnabled && height < WorldGenerationConfig.SeaLevel;
+
+    /// <summary>Whether a column height sits in the shoreline band that builds from sand.</summary>
+    public static bool IsBeachHeight(int height) =>
+        height >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.BeachBelowSeaLevel
+        && height <= WorldGenerationConfig.SeaLevel + WorldGenerationConfig.BeachAboveSeaLevel;
+
+    /// <summary>Whether the beach column at (x, z) is capped with gravel. Pure function of
+    /// world position like everything else here, so neighbours agree without shared state.</summary>
+    public static bool IsGravelPatch(float x, float z) =>
+        GravelNoise.GetNoise(x, z) > WorldGenerationConfig.GravelThreshold;
 
     /// <summary>OpenSimplex2 noise seeded from the world seed; more than one octave turns on FBm.</summary>
     internal static FastNoiseLite MakeNoise(int seedOffset, float frequency, int octaves = 1)

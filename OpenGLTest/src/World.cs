@@ -31,6 +31,7 @@ public class World
     private readonly LodManager _lodManager;
     private readonly DropManager _dropManager = new();
     private readonly TntManager _tntManager = new();
+    private readonly FallingBlockManager _falling = new();
     private readonly FluidManager _fluidManager = new();
     // Trees currently toppling over after their base log was mined
     private readonly List<TopplingTree> _toppling = [];
@@ -52,6 +53,9 @@ public class World
 
     /// <summary>Live primed TNT, feeding the renderer's dynamic point lights.</summary>
     public IReadOnlyList<PrimedTnt> PrimedTnt => _tntManager.Primed;
+
+    /// <summary>Live falling sand/gravel cubes.</summary>
+    public IReadOnlyList<FallingBlock> Falling => _falling.Falling;
 
     // Break overlay strength. Quantized to whole hits, so it steps with the damage dealt
     // instead of sweeping continuously.
@@ -95,7 +99,13 @@ public class World
         foreach (var blockId in _dropManager.Collected)
             Inventory.Add(blockId);
 
-        _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager);
+        _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager, _falling);
+        _falling.Update((float)deltaTime, _chunkManager, _dropManager, _fluidManager);
+
+        // Falling cubes shove the player aside instead of landing inside them; strictly
+        // one-way, the player never deflects a cube
+        foreach (var block in _falling.Falling)
+            Camera.PushOutOf(block.Position, FallingBlock.HalfExtent, _chunkManager);
 
         UpdateToppling((float)deltaTime);
         FrameProfiler.End(ProfileSection.Entities);
@@ -129,7 +139,7 @@ public class World
     {
         // Depth-only sun pass first: every world draw below samples the shadow map it fills
         FrameProfiler.Begin(ProfileSection.Shadows);
-        renderManager.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _toppling);
+        renderManager.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling);
         FrameProfiler.End(ProfileSection.Shadows);
 
         FrameProfiler.Begin(ProfileSection.LodPass);
@@ -146,6 +156,7 @@ public class World
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.RenderItemDrops(Camera, _dropManager.Drops);
         renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
+        renderManager.RenderFallingBlocks(Camera, _falling.Falling);
         foreach (var tree in _toppling)
             renderManager.RenderTopplingTree(Camera, tree);
         FrameProfiler.End(ProfileSection.EntityPass);
@@ -333,6 +344,12 @@ public class World
         var above = blockPos + Vector3.UnitY;
         if (BlockType.ById[BlockIdAt(above)]?.NeedsSupport == true)
             RemoveBlock(above);
+
+        // Sand and its kind need the block under them too, but they topple into a falling
+        // cube instead of popping: a no-op unless a falls block sits right above the break,
+        // and its own check chains the rest of the column
+        _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
+            (int)above.X, (int)above.Y, (int)above.Z);
     }
 
     /// <summary>
@@ -396,6 +413,11 @@ public class World
             if (_chunkManager.Chunks.TryGetValue(chunkPos, out var touched))
                 touched.RemeshAfterBatchEdit(_chunkManager);
         }
+
+        // Sand stacked on the felled wood loses its support with it
+        foreach (var block in collected)
+            _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
+                (int)block.Cell.X, (int)block.Cell.Y + 1, (int)block.Cell.Z);
 
         foreach (var ((lx, lz), ly) in lowestY)
         {
@@ -554,10 +576,20 @@ public class World
         );
 
         if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk)) return false;
+
+        // A live cube owns its cell until it lands: placing into one would cement the cube
+        // inside the new block, so the placement fails and the caller keeps its item
+        if (_falling.OverlapsAny((int)placePos.X, (int)placePos.Y, (int)placePos.Z))
+            return false;
+
         if (!chunk.PlaceBlockAt(placePos, blockId, _chunkManager)) return false;
 
         // A block placed into water displaces it, so the neighbours recompute their levels
         _fluidManager.ScheduleAround(placePos);
+
+        // Sand placed into thin air falls at once instead of hovering
+        _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
+            (int)placePos.X, (int)placePos.Y, (int)placePos.Z);
         return true;
     }
     

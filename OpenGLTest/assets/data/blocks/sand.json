@@ -1,0 +1,5 @@
+{
+  "model": { "parent": "block/cube_all", "textures": { "all": "sand" } },
+  "hardness": 3,
+  "falls": true
+}

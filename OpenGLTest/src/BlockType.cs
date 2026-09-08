@@ -48,6 +48,10 @@ public sealed record BlockType
     internal static readonly bool[] FluidById = new bool[256];
     internal static readonly bool[] ReplaceableById = new bool[256];
 
+    // Gravity checks run per block edit (not per voxel), but the flat shape keeps the
+    // support test a single array read like the other per-id questions
+    internal static readonly bool[] FallsById = new bool[256];
+
     /// <summary>String id: the block's file name under <c>assets/data/blocks</c>.</summary>
     public required string Name { get; init; }
 
@@ -101,6 +105,10 @@ public sealed record BlockType
 
     /// <summary>Whether the block pops (with its loot) when the block below is removed.</summary>
     public bool NeedsSupport { get; init; }
+
+    /// <summary>Whether the block is gravity-affected: it topples into a falling entity when
+    /// the cell below it stops being solid, and a placed one falls immediately.</summary>
+    public bool Falls { get; init; }
 
     /// <summary>Whether the block is a flowing fluid. Fluid cells carry a level in the chunk's
     /// state byte (see <see cref="FluidState"/>), are replaceable by placements and flows, and
@@ -156,6 +164,10 @@ public sealed record BlockType
     /// write — but every caller that displaces water tests <see cref="IsFluid(byte)"/> too.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsReplaceable(byte blockId) => ReplaceableById[blockId];
+
+    /// <summary>Whether a block id is gravity-affected; see <see cref="Falls"/>.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsFalling(byte blockId) => FallsById[blockId];
 
     /// <summary>Half-width of a wood block's box in blocks (the log is 0.5), or -1 when the id
     /// is not wood at all.</summary>

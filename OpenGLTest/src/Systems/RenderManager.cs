@@ -397,7 +397,7 @@ public class RenderManager : IDisposable
     /// casters: water-only chunks are in it and are skipped here.
     /// </summary>
     public void RenderShadows(Camera camera, IReadOnlyList<Chunk> chunks,
-        IReadOnlyList<PrimedTnt> primed, IEnumerable<TopplingTree> trees)
+        IReadOnlyList<PrimedTnt> primed, IReadOnlyList<FallingBlock> falling, IEnumerable<TopplingTree> trees)
     {
         if (camera == null || _shadowStrength <= 0f) return;
 
@@ -459,6 +459,17 @@ public class RenderManager : IDisposable
 
             var model = Matrix4x4.CreateScale(tnt.Scale)
                         * Matrix4x4.CreateTranslation(tnt.Position);
+            shadowShader.SetUniform("uModel", model);
+            shadowShader.SetUniform("uLightMVP", model * _lightViewProj);
+            mesh.Render();
+        }
+
+        foreach (var block in falling)
+        {
+            var mesh = blockCubes.Get(block.BlockId);
+            if (mesh == null) continue;
+
+            var model = Matrix4x4.CreateTranslation(block.Position);
             shadowShader.SetUniform("uModel", model);
             shadowShader.SetUniform("uLightMVP", model * _lightViewProj);
             mesh.Render();
@@ -946,6 +957,32 @@ public class RenderManager : IDisposable
         // after the entities, so put it back rather than tinting whatever draws next.
         if (drewFlash)
             worldShader.SetUniform(_locFlash, 0f);
+    }
+
+    /// <summary>
+    /// Draws falling sand/gravel cubes at full block size. Unlike primed TNT there is no
+    /// flash or swell, so every cube shares one textured draw.
+    /// </summary>
+    public void RenderFallingBlocks(Camera camera, IReadOnlyList<FallingBlock> falling)
+    {
+        if (camera == null || falling.Count == 0) return;
+
+        worldShader.Use();
+        BindWorldTextures();
+
+        var viewProj = camera.GetViewProjection();
+
+        foreach (var block in falling)
+        {
+            var mesh = blockCubes.Get(block.BlockId);
+            if (mesh == null) continue;
+
+            // The cube is centred on its own origin, like the primed TNT above
+            var model = Matrix4x4.CreateTranslation(block.Position);
+
+            SetDrawUniforms(model, model * viewProj, 1f);
+            mesh.Render();
+        }
     }
 
     /// <summary>
