@@ -17,7 +17,7 @@ public class WindowManager : IDisposable
             PreferredStencilBufferBits = 8,
             Size = new Vector2D<int>(1920, 1080),
             // Debug contexts add driver-side validation overhead; switch back to ContextFlags.Debug when debugging GL issues
-            API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.Default, new APIVersion(3, 3)),
+            API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.Default, new APIVersion(4, 6)),
             VSync = false,
             UpdatesPerSecond = 0,
             FramesPerSecond = 0,

@@ -6,6 +6,13 @@ Guidance for AI coding agents working in this repository.
 
 A Minecraft-style voxel engine written in C# on .NET 9, using **Silk.NET** (windowing, input, OpenGL bindings) and StbImageSharp for texture loading. It renders an infinite, procedurally generated world (FastNoiseLite OpenSimplex2 noise) with chunk streaming, an underground of 3D-noise caves, worm-carved tunnels and heightmap ravines, binary greedy chunk meshing with ambient occlusion (plain cubes are culled by bitmask and merged into larger quads wherever the result is pixel-identical; procedural blocks and fluids keep per-quad emitters — see `MESHER_PLAN.md`), frustum culling, block breaking/placement via raycast, and simple player physics (gravity, jumping, collision). The player spawns standing on the terrain at the origin (`Camera.SpawnPosition`).
 
+The renderer requires an **OpenGL 4.6 core** context: `WindowManager` requests `APIVersion(4, 6)`
+with `ContextProfile.Core`, and every shader under `assets/shaders/` declares `#version 460 core`.
+The GPU draw path planned in `MESHER_PLAN.md` (Phases 4-5) relies on 4.6 core features
+(`gl_DrawID`, `glMultiDrawElementsIndirectCount`, `BufferStorage`), so this is a hard requirement
+rather than a preference; any 2015+ desktop driver on Windows or Linux provides it, but
+**macOS (stuck at GL 4.1) is no longer supported**.
+
 There is a single executable project. Historical naming quirks to be aware of:
 
 - The solution is `OpenGLTest.sln`, the project folder is `OpenGLTest/`, the csproj is `OpenGLTest/silkgltriangle.csproj`, and **all code lives in the `silkgltriangle` namespace**. Keep new files in that namespace unless deliberately renaming everything.
@@ -43,9 +50,10 @@ collected every frame whether or not the overlay is up, so the first second afte
 already has data; the overlay's own glyph draws land in `uiPass`, so compare that row with `X`
 on and off before reading it as a baseline. `Program.OnLoad` and the `RenderManager` constructor
 each print one startup line — build configuration, debugger, GC mode and CPU count, then the GL
-renderer, vendor and version — so a measurement always records which build and which GPU
-produced it. Timing lives in `OpenGLTest/src/FrameProfiler.cs`; wrap new work in
-`FrameProfiler.Begin`/`End` (main thread only) rather than adding another ad-hoc stopwatch.
+renderer, vendor and version (which must report a 4.6 core context) — so a measurement always
+records which build and which GPU produced it. Timing lives in `OpenGLTest/src/FrameProfiler.cs`;
+wrap new work in `FrameProfiler.Begin`/`End` (main thread only) rather than adding another ad-hoc
+stopwatch.
 
 Standing in water switches the player to **swimming** (`Camera.IsInWater`, recomputed every frame by `Camera.UpdateWaterState` from the real fluid surface heights under the body): horizontal speed halves, gravity is replaced by an eased sink toward `SinkSpeed` (Space eases up toward `SwimUpSpeed` instead, both through `MathUtils.Damp`), and swimming into a bank while holding Space adds `SwimExitBoost` so the player can climb out without a ramp. Flight and noclip ignore water entirely, and a player standing on the bottom of a shallow puddle still jumps normally. Flowing water also pushes the player and floating item drops along its flow direction (`ChunkManager.GetFluidFlowGlobal`, Minecraft's `FlowingFluid.getFlow`: a horizontal vector summed from how much lower each neighbouring cell's surface sits, zero in a still pool). `Camera.IsEyeInWater` is the separate eye-only test and is the source of truth for the underwater tint.
 

@@ -1,4 +1,4 @@
-#version 330 core
+#version 460 core
 // The cloud field is one static mesh in field-local coordinates. The CPU draws it 3x3 around
 // the camera with a rigid per-copy offset (field multiples plus drift), so a copy never tears.
 layout (location = 0) in vec3 vPosition;

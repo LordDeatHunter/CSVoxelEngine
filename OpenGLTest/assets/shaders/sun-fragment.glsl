@@ -1,4 +1,4 @@
-#version 330 core
+#version 460 core
 // Drawn with additive blending (One, One): black contributes nothing, so the quad's corners
 // disappear and the glow brightens the sky instead of greying it. Never write anything but
 // light here - there is no alpha to hide behind.

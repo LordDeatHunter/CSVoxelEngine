@@ -1,4 +1,4 @@
-#version 330 core
+#version 460 core
 
 uniform vec3 uColor;
 uniform float uOpacity;

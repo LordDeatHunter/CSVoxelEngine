@@ -1,4 +1,4 @@
-#version 330 core
+#version 460 core
 // Underwater sun shafts (god rays). One additive full-screen triangle: for every pixel the
 // scene depth says how far the eye can see through the water, and the shader marches that
 // segment in uSteps jittered samples, adding the sunlight that actually reaches each point

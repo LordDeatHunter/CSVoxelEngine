@@ -1,4 +1,4 @@
-#version 330 core
+#version 460 core
 // World surface shading. Opaque terrain gets atlas colour, baked voxel light, a directional
 // sun with shadow-map lookup, torch light and point lights, then fog.
 //

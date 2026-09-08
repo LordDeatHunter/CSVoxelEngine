@@ -417,8 +417,19 @@ targets net9.0).
   differences are wave/sway phase, HUD numbers and streaming progress; the overlook, panes
   and walked shots were eyeballed and match (sand noise continues seamlessly across merged
   quads). At-rest frame identical (PERF_TODO Measurements, item 11 phase 2).
-- [ ] **Phase 3 — GL 4.6 context.** Next. Start from the "Phase 3" section above: `WindowManager`
-  `APIVersion(4, 6)`, `#version 460 core` in every shader, verify the startup GL version line and
-  the three scenarios, note the macOS drop in `AGENTS.md`.
-- [ ] **Phase 4 — geometry pool + multi-draw indirect.**
+- [x] **Phase 3 — GL 4.6 core context** (done 2026-09-08, uncommitted on `worldgen`; implemented
+  via the plan-and-implement workflow). `WindowManager` requests `APIVersion(4, 6)` with
+  `ContextProfile.Core`; all 16 shaders that carry a directive declare `#version 460 core` (BOM on
+  `selection-vertex.glsl` and the mixed CRLF/LF endings preserved byte for byte;
+  `selection-frag.glsl` is a 3-byte BOM-only orphan nobody loads, left alone as a cleanup
+  candidate). No other shader or C# change. New headless
+  `ShaderVersionTests.EveryShaderDeclaresVersion460Core` guards the directive for the shaders
+  Phase 4 adds. 140 tests pass (baseline was 139, not the 141 recorded above). Startup line on
+  this machine: `GPU: Quadro T1000 with Max-Q Design/PCIe/SSE2 | NVIDIA Corporation | GL 4.6.0
+  NVIDIA 597.06` — note the NVIDIA driver already handed a 3.3 core request its highest core
+  version, so the line is confirmatory; the diff is the evidence. `basic`, `glass`, `water`
+  (VOXEL_TIME=70) scenarios ran clean (no compile/link errors, 15 PNGs, shore shot eyeballed).
+  AGENTS.md (new requirements paragraph, macOS drop) and PERF_TODO.md item 11 updated. Leftover
+  noticed: AGENTS.md still says "There are no test projects and no CI", which is stale.
+- [ ] **Phase 4 — geometry pool + multi-draw indirect.** Next. Start from the "Phase 4" section above.
 - [ ] **Phase 5 (optional) — compute frustum cull.**

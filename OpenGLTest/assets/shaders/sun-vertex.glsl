@@ -1,4 +1,4 @@
-#version 330 core
+#version 460 core
 // The sun quad is built in world space around the sun direction, not around the camera:
 // uViewProj is the view matrix with its translation removed times the projection, so the
 // quad sits at infinity and never parallaxes as the player moves.

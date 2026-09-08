@@ -182,6 +182,10 @@ fragments; the mesher/renderer change is preserved in the stash named in item 5.
   light flood): forest 1.27 -> 1.41 ms, sea 0.78 -> 0.79, deep 0.39 -> 0.40. Frame at rest
   unchanged (see Measurements); screenshots identical apart from wave/sway phase and
   streaming progress. 141 tests pass.
+  Phase 3 done 2026-09-08: the window requests a GL 4.6 core context (`WindowManager`,
+  `APIVersion(4, 6)`) and every shader declares `#version 460 core`; no behaviour change — the
+  startup line reports `GL 4.6...`, all shaders compile, screenshots unchanged. macOS (GL 4.1) is
+  no longer supported. 140 tests pass (`ShaderVersionTests` added).
 
 - [ ] **10. GC and runtime settings.** `GCSettings.LatencyMode = SustainedLowLatency` in
   `Program.Main`; explicit `<ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>`
