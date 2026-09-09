@@ -14,7 +14,14 @@ public class Camera
     public float Pitch { get; private set; } = SpawnLook.Y;
     public bool IsGrounded { get; private set; }
     public bool IsFlying { get; private set; }
-    public bool IsNoclip { get; private set; }
+    /// <summary>
+    /// Creative mode (toggled with [C]): walking behaves like survival, but block placing
+    /// costs nothing, breaking drops nothing, and double-tapping Space toggles flight.
+    /// Flight itself is noclip — it passes through walls.
+    /// </summary>
+    public bool IsCreative { get; private set; }
+    [Obsolete("Renamed to IsCreative.")]
+    public bool IsNoclip => IsCreative;
     public float VerticalVelocity => _verticalVelocity;
 
     /// <summary>
@@ -42,6 +49,9 @@ public class Camera
     private const float MouseSensitivity = 0.2f;
 
     private const float BaseSpeed = 8f;
+    // Shift while walking is a regular sprint; the giga boost is flight-only.
+    private const float SprintMultiplier = 1.5f;
+    private const float FlyBoostMultiplier = 10f;
     private const float Gravity = 34f;
     private const float JumpSpeed = 11f;
     private const float PlayerHeight = 1.8f;
@@ -83,7 +93,7 @@ public class Camera
     private Vector2 _lastMousePosition;
     private bool _firstMouseMovement = true;
     private bool _spaceWasPressed;
-    private bool _noclipWasPressed;
+    private bool _creativeWasPressed;
     private float _timeSinceSpacePress = float.MaxValue;
     // Averaged flow of the fluid cells the body is in, refreshed by UpdateWaterState
     private Vector3 _waterFlow;
@@ -232,7 +242,12 @@ public class Camera
         if (keyboard == null || chunkManager == null)
             return;
 
-        var moveSpeed = keyboard.IsKeyPressed(Key.ShiftLeft) ? BaseSpeed * 10f : BaseSpeed;
+        UpdateCreativeToggle(keyboard);
+        UpdateFlightToggle(deltaTime, keyboard);
+        UpdateWaterState(chunkManager);
+
+        var sprinting = keyboard.IsKeyPressed(Key.ShiftLeft);
+        var moveSpeed = BaseSpeed * (sprinting ? (IsFlying ? FlyBoostMultiplier : SprintMultiplier) : 1f);
         var direction = GetForwardVector();
         var right = Vector3.Normalize(Vector3.Cross(direction, Vector3.UnitY));
         var forward = Vector3.Normalize(new Vector3(direction.X, 0f, direction.Z));
@@ -246,12 +261,9 @@ public class Camera
         if (moveInput.LengthSquared() > 1f)
             moveInput = Vector3.Normalize(moveInput);
 
-        UpdateFlightToggle(deltaTime, keyboard);
-        UpdateNoclipToggle(keyboard);
-        UpdateWaterState(chunkManager);
-
-        // Flight and noclip ignore the water entirely, so a submerged player can still fly out
-        var swimming = IsInWater && !IsFlying && !IsNoclip;
+        // Flight ignores the water entirely, so a submerged player can still fly out.
+        // Creative mode on foot swims like survival.
+        var swimming = IsInWater && !IsFlying;
         if (swimming) moveSpeed *= SwimSpeedFactor;
 
         var frameMovement = moveInput * moveSpeed * deltaTime;
@@ -264,7 +276,7 @@ public class Camera
             frameMovement.Z += _waterFlow.Z * FlowPushSpeed * deltaTime;
         }
 
-        if (IsFlying || IsNoclip)
+        if (IsFlying)
         {
             var verticalInput = 0f;
             if (keyboard.IsKeyPressed(Key.Space)) verticalInput += 1f;
@@ -299,7 +311,8 @@ public class Camera
             frameMovement.Y = _verticalVelocity * deltaTime;
         }
 
-        if (IsNoclip)
+        // Flight is noclip: it moves straight through walls, so no axis stepping.
+        if (IsFlying)
         {
             Position += frameMovement;
             IsGrounded = false;
@@ -319,11 +332,7 @@ public class Camera
 
         Position = MoveOnAxis(Position, frameMovement.Y, 1, chunkManager, out var collidedY);
 
-        if (IsFlying)
-        {
-            IsGrounded = false; // blocked vertical movement just stops while flying
-        }
-        else if (collidedY)
+        if (collidedY)
         {
             if (frameMovement.Y < 0f)
                 IsGrounded = true;
@@ -388,17 +397,19 @@ public class Camera
         }
     }
 
-    private void UpdateNoclipToggle(IKeyboard keyboard)
+    private void UpdateCreativeToggle(IKeyboard keyboard)
     {
-        var noclipPressed = keyboard.IsKeyPressed(Key.C);
-        if (noclipPressed && !_noclipWasPressed)
+        var creativePressed = keyboard.IsKeyPressed(Key.C);
+        if (creativePressed && !_creativeWasPressed)
         {
-            IsNoclip = !IsNoclip;
+            IsCreative = !IsCreative;
+            if (!IsCreative)
+                IsFlying = false;
             _verticalVelocity = 0f;
-            Console.WriteLine($"Noclip {(IsNoclip ? "ON" : "OFF")}");
+            Console.WriteLine($"Creative {(IsCreative ? "ON" : "OFF")}");
         }
 
-        _noclipWasPressed = noclipPressed;
+        _creativeWasPressed = creativePressed;
     }
 
     private void UpdateFlightToggle(float deltaTime, IKeyboard keyboard)
@@ -410,10 +421,14 @@ public class Camera
         {
             if (_timeSinceSpacePress <= DoubleTapWindow)
             {
-                IsFlying = !IsFlying;
-                _verticalVelocity = 0f;
+                // Flight is a creative-only move: on foot the second tap is just a jump.
+                if (IsCreative)
+                {
+                    IsFlying = !IsFlying;
+                    _verticalVelocity = 0f;
+                    Console.WriteLine($"Flight {(IsFlying ? "ON" : "OFF")}");
+                }
                 _timeSinceSpacePress = float.MaxValue; // a toggle requires a fresh double tap
-                Console.WriteLine($"Flight {(IsFlying ? "ON" : "OFF")}");
             }
             else
             {
@@ -498,11 +513,11 @@ public class Camera
     /// Shoves the player out of a falling cube, along the smallest-penetration axis. Strictly
     /// one-way: cubes push the player, the player never pushes cubes. Axes that would park
     /// the eye inside a solid block are skipped, so a cube cannot shove the player through a
-    /// wall; noclip ignores shoves entirely.
+    /// wall; flight ignores shoves entirely.
     /// </summary>
     public void PushOutOf(Vector3 center, float halfExtent, ChunkManager chunkManager)
     {
-        if (IsNoclip) return;
+        if (IsFlying) return;
 
         var min = new Vector3(
             Position.X - PlayerRadius,

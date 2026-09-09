@@ -16,7 +16,7 @@ public class World
     public const float InteractionReach = 10f;
 
     // Seconds of holding left-click per mining hit. Each hit removes 1 HP from the
-    // targeted block; time short of a full interval deals nothing (noclip breaks instantly).
+    // targeted block; time short of a full interval deals nothing (creative breaks instantly).
     public const float BlockHitSeconds = 0.2f;
 
     // A hit makes the block jump out and settle back. Kept below BlockHitSeconds so the
@@ -229,7 +229,7 @@ public class World
     /// BlockHitSeconds, each removing 1 HP, and the block breaks when its HP runs out
     /// (see BlockType.MaxHealth, the block's JSON hardness). A block of hardness 0 breaks on
     /// first contact. A partial interval deals no damage, and damage is discarded when the
-    /// target changes or the button is released. Noclip instamines (one block per frame, as
+    /// target changes or the button is released. Creative instamines (one block per frame, as
     /// before). Call after Update so the selection is current.
     /// </summary>
     public void UpdateBlockBreaking(double deltaTime, bool isHolding)
@@ -248,7 +248,7 @@ public class World
             return;
         }
 
-        if (Camera.IsNoclip)
+        if (Camera.IsCreative)
         {
             StopBreaking();
             RemoveBlock(_selectedBlockPosition);
@@ -333,6 +333,9 @@ public class World
         // otherwise pop it on first contact)
         if (BlockType.IsFluid(brokenId)) return;
 
+        // Creative breaks drop nothing, but the effects still play: TNT primes, trees fall.
+        var creative = Camera.IsCreative;
+
         // TNT never drops — once its HP runs out it primes on the spot instead
         if (BlockType.ById[brokenId]?.OnBreak == BlockBreakAction.PrimeTnt)
         {
@@ -342,10 +345,13 @@ public class World
         // A mined wood block fells whatever it was holding up instead of dropping one
         // block (see FellWood): a trunk cut drops the crown, a branch cut only its children
         else if (TreeGenerator.WoodLevel(brokenId) >= 0)
-            FellWood(blockPos, brokenId, chunk);
+            FellWood(blockPos, brokenId, chunk, creative);
         // Everything else rolls its loot table, but only once a block was actually cleared
         else if (chunk.RemoveBlockAt(blockPos, _chunkManager))
-            _dropManager.SpawnLoot(brokenId, blockPos);
+        {
+            if (!creative)
+                _dropManager.SpawnLoot(brokenId, blockPos);
+        }
 
         // Water beside or above the hole pours into it on the next fluid tick
         _fluidManager.ScheduleAround(blockPos);
@@ -384,8 +390,9 @@ public class World
     /// (same pattern as a TNT blast), and launches a toppling entity that drops its blocks
     /// once it has lain still. Player-placed logs are not trees: they pop out as a plain
     /// drop with no entity and no animation. A lone block with no children just drops as-is.
+    /// A creative break (<paramref name="creative"/>) still topples, but drops nothing.
     /// </summary>
-    private void FellWood(Vector3 blockPos, byte brokenId, Chunk chunk)
+    private void FellWood(Vector3 blockPos, byte brokenId, Chunk chunk, bool creative)
     {
         var x = (int)blockPos.X;
         var y = (int)blockPos.Y;
@@ -395,7 +402,7 @@ public class World
         // RemoveBlockAt remeshes, so unlike the batch paths below nothing lingers.
         if (_chunkManager.IsPlayerPlaced(x, y, z))
         {
-            if (chunk.RemoveBlockAt(blockPos, _chunkManager))
+            if (chunk.RemoveBlockAt(blockPos, _chunkManager) && !creative)
                 _dropManager.SpawnLoot(brokenId, blockPos);
             _fluidManager.ScheduleAround(blockPos);
             return;
@@ -406,7 +413,7 @@ public class World
         {
             // Nothing was held up by this block: drop it as-is through the normal
             // single-block path, which remeshes synchronously.
-            if (chunk.RemoveBlockAt(blockPos, _chunkManager))
+            if (chunk.RemoveBlockAt(blockPos, _chunkManager) && !creative)
                 _dropManager.SpawnLoot(brokenId, blockPos);
             _fluidManager.ScheduleAround(blockPos);
             return;
@@ -472,7 +479,7 @@ public class World
             blockPos.X + 0.5f - Camera.Position.X, 0f,
             blockPos.Z + 0.5f - Camera.Position.Z);
         _toppling.Add(new TopplingTree(collected,
-            new Vector3(blockPos.X + 0.5f, blockPos.Y, blockPos.Z + 0.5f), away));
+            new Vector3(blockPos.X + 0.5f, blockPos.Y, blockPos.Z + 0.5f), away, drops: !creative));
     }
 
     /// <summary>Swings falling trees, then pops their wood out as item drops once rested.</summary>
@@ -599,9 +606,11 @@ public class World
                 if (!BlockType.IsReplaceable(existing) && !BlockType.IsFluid(existing)) return false;
 
                 // A fragile block in the way pops exactly as a flow washing over it would
+                // (but a creative pour drops nothing)
                 if (existing != 0 && !BlockType.IsFluid(existing))
                 {
-                    _dropManager.SpawnLoot(existing, target);
+                    if (!Camera.IsCreative)
+                        _dropManager.SpawnLoot(existing, target);
                     _chunkManager.UnmarkPlayerPlaced((int)target.X, (int)target.Y, (int)target.Z);
                 }
 
@@ -614,14 +623,15 @@ public class World
 
     /// <summary>
     /// Places the hotbar's selected block against the face the player is looking at and spends
-    /// one from that slot. Does nothing when the slot is empty or holds no blocks.
+    /// one from that slot — except in creative mode, where placing is free. Does nothing
+    /// when the slot is empty or holds no blocks.
     /// </summary>
     public void TryPlaceSelectedBlock(float maxDistance)
     {
         if (!Inventory.CanPlaceSelected) return;
 
-        // Only spend a block if one actually went down
-        if (TryPlaceBlockFromRaycast(maxDistance, Inventory.SelectedBlockId))
+        // Only spend a block if one actually went down (and never in creative)
+        if (TryPlaceBlockFromRaycast(maxDistance, Inventory.SelectedBlockId) && !Camera.IsCreative)
             Inventory.ConsumeSelected();
     }
 

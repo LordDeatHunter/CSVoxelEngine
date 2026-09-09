@@ -22,6 +22,7 @@ public class TopplingTree : IDisposable
     private readonly List<FellBlock> _blocks;
     private readonly Vector3 _pivot;
     private readonly Vector3 _axis;
+    private readonly bool _drops;
     private float _elapsed;
     private bool _dropsTaken;
 
@@ -34,10 +35,11 @@ public class TopplingTree : IDisposable
     /// <summary>True once the tree has lain still for <see cref="WorldGenerationConfig.TreeFellRestSeconds"/>.</summary>
     public bool IsDone { get; private set; }
 
-    public TopplingTree(List<FellBlock> blocks, Vector3 pivot, Vector3 fallDirection)
+    public TopplingTree(List<FellBlock> blocks, Vector3 pivot, Vector3 fallDirection, bool drops = true)
     {
         _blocks = blocks;
         _pivot = pivot;
+        _drops = drops;
 
         var flat = new Vector3(fallDirection.X, 0f, fallDirection.Z);
         if (flat.LengthSquared() < 1e-6f)
@@ -255,7 +257,7 @@ public class TopplingTree : IDisposable
     /// Item drops for the landed tree, each at the floored cell its block came to rest in.
     /// Every block rolls its own loot table through <see cref="DropManager.RollLoot"/>, so a
     /// felled canopy yields exactly what mining or blasting it would. Single-use: the second
-    /// call returns nothing.
+    /// call returns nothing. A tree felled in creative mode yields nothing.
     /// </summary>
     public List<(byte Id, Vector3 Cell)> TakeDrops()
     {
@@ -263,6 +265,9 @@ public class TopplingTree : IDisposable
         if (_dropsTaken)
             return drops;
         _dropsTaken = true;
+
+        if (!_drops)
+            return drops;
 
         var landed = Matrix4x4.CreateFromAxisAngle(_axis, MathF.PI * 0.5f);
         var rolled = new List<byte>();
