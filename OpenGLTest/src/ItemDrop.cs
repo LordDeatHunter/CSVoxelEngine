@@ -29,9 +29,9 @@ public class ItemDrop
 
     // Speeds in blocks/s. The drop eases from a drift into a fast whip, so
     // being pulled in reads as deliberate rather than instant.
-    private const float DriftSpeed = 1f;
-    private const float SuckSpeed = 9f;
-    private const float RampSeconds = 0.35f;
+    private const float DriftSpeed = 2f;
+    private const float SuckSpeed = 18f;
+    private const float RampSeconds = 0.175f;
 
     // Close enough to count as collected, so a drop never hovers just short of the target
     private const float CollectDistance = 0.2f;
@@ -57,7 +57,7 @@ public class ItemDrop
 
     // A drop chasing a player faster than SuckSpeed is collected anyway rather than trailing
     // them forever
-    private const float MaxAttractSeconds = 3f;
+    private const float MaxAttractSeconds = 1.5f;
 
     // Grace period before a fresh drop can be pulled in. Without it a block mined at arm's
     // length is collected the same instant it appears and its spin is never seen.
