@@ -499,15 +499,18 @@ public class Camera
         for (var y = minY; y <= maxY; y++)
         for (var z = minZ; z <= maxZ; z++)
         {
-            if (IsSolidBlock(x, y, z, chunkManager))
+            var blockId = chunkManager.GetBlockGlobal(x, y, z);
+            if (!BlockType.IsSolid(blockId)) continue;
+            // Tapered wood collides with its drawn node-and-arms shape instead of the
+            // whole cell, so the body slips past thin limbs and under high arms; every
+            // other solid block keeps the full-cube test it always had.
+            if (!WoodShape.IsTapered(blockId)) return true;
+            if (WoodShape.OverlapsShape(blockId, chunkManager.GetBlockGlobal, x, y, z, min, max))
                 return true;
         }
 
         return false;
     }
-
-    private static bool IsSolidBlock(int worldX, int worldY, int worldZ, ChunkManager chunkManager)
-        => BlockType.IsSolid(chunkManager.GetBlockGlobal(worldX, worldY, worldZ));
 
     /// <summary>
     /// Whether a block cell at <paramref name="blockPos"/> overlaps the player's body. The cell

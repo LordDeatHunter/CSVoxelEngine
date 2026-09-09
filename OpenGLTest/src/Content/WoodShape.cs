@@ -131,6 +131,31 @@ public static class WoodShape
         return GetBoxes(blockId, nb);
     }
 
+    /// <summary>
+    /// Whether a world-space body box touches the block's drawn shape: the
+    /// shape-accurate boxes for tapered wood, the registered hitboxes otherwise.
+    /// Touching a face exactly counts, matching the cell-granular collision test this
+    /// replaces for full cubes (a floored body bound always includes the touched cell).
+    /// </summary>
+    public static bool OverlapsShape(byte blockId, Func<int, int, int, byte> getBlock,
+        int x, int y, int z, Vector3 min, Vector3 max)
+    {
+        var boxes = IsTapered(blockId)
+            ? GetBoxesAt(blockId, getBlock, x, y, z)
+            : BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
+        var cell = new Vector3(x, y, z);
+        foreach (var box in boxes)
+        {
+            var bMin = cell + box.Min;
+            var bMax = cell + box.Max;
+            if (bMin.X <= max.X && bMax.X >= min.X
+                && bMin.Y <= max.Y && bMax.Y >= min.Y
+                && bMin.Z <= max.Z && bMax.Z >= min.Z)
+                return true;
+        }
+        return false;
+    }
+
     /// <summary>Cell-local extents of one horizontal arm: from the node wall out to
     /// the cell face, riding the node's [lo, hi] band in Y (mirrors EmitArm).</summary>
     internal static void GetArmBox(int dir, float lo, float hi, out Vector3 min, out Vector3 max)

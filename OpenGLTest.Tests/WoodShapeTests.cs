@@ -1,4 +1,5 @@
 using System.Numerics;
+using Silk.NET.Input;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -8,6 +9,15 @@ public sealed class WoodShapeTests
     public WoodShapeTests() => TestContent.EnsureLoaded();
 
     private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+
+    private static ChunkManager SingleChunk()
+    {
+        var manager = new ChunkManager(null!);
+        var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);
+        chunk.IsBlockDataReady = true;
+        manager.Chunks[Vector3.Zero] = chunk;
+        return manager;
+    }
 
     private static byte[] Neighbours(byte fill = 0, byte? negZ = null, byte? posZ = null,
         byte? negX = null, byte? posX = null, byte? posY = null, byte? negY = null) =>
@@ -117,5 +127,69 @@ public sealed class WoodShapeTests
         var single = Assert.Single(boxes);
         Assert.Equal(Vector3.Zero, single.Min);
         Assert.Equal(Vector3.One, single.Max);
+    }
+
+    [Fact]
+    public void BodyMissingTheNodeDoesNotCollide()
+    {
+        var manager = SingleChunk();
+        manager.Chunks[Vector3.Zero].SetBlockRaw(5, 1, 2, Block("twig"), 0);
+        // Isolated twig node: [5.375..5.625] x [1.375..1.625] x [2.375..2.625].
+        // The body overlaps the cell but stops short of the node in Z.
+        Assert.False(WoodShape.OverlapsShape(Block("twig"), manager.GetBlockGlobal, 5, 1, 2,
+            new Vector3(4.9f, 1f, 1.9f), new Vector3(5.5f, 2f, 2.3f)));
+        Assert.True(WoodShape.OverlapsShape(Block("twig"), manager.GetBlockGlobal, 5, 1, 2,
+            new Vector3(5f, 1f, 2f), new Vector3(5.5f, 2f, 2.7f)));
+    }
+
+    [Fact]
+    public void BodyHittingOnlyASideArmCollides()
+    {
+        var manager = SingleChunk();
+        var branch = Block("branch");
+        manager.Chunks[Vector3.Zero].SetBlockRaw(4, 1, 2, Block("log"), 0);
+        manager.Chunks[Vector3.Zero].SetBlockRaw(5, 1, 2, branch, 0);
+        // The -X arm spans x [5.0..5.125] while the core starts at 5.125.
+        Assert.True(WoodShape.OverlapsShape(branch, manager.GetBlockGlobal, 5, 1, 2,
+            new Vector3(4.7f, 1.2f, 2.4f), new Vector3(5.05f, 1.8f, 2.6f)));
+        Assert.False(WoodShape.OverlapsShape(branch, manager.GetBlockGlobal, 5, 1, 2,
+            new Vector3(4.7f, 1.2f, 2.4f), new Vector3(4.95f, 1.8f, 2.6f)));
+    }
+
+    [Fact]
+    public void SolidCubeCollisionStaysFullCell()
+    {
+        var manager = SingleChunk();
+        var stone = Block("stone");
+        manager.Chunks[Vector3.Zero].SetBlockRaw(5, 1, 2, stone, 0);
+        Assert.True(WoodShape.OverlapsShape(stone, manager.GetBlockGlobal, 5, 1, 2,
+            new Vector3(5.9f, 1.9f, 2.9f), new Vector3(6.5f, 2.5f, 3.5f)));
+        Assert.False(WoodShape.OverlapsShape(stone, manager.GetBlockGlobal, 5, 1, 2,
+            new Vector3(6.1f, 1.9f, 2.9f), new Vector3(6.5f, 2.5f, 3.5f)));
+    }
+
+    [Fact]
+    public void PlayerWalksPastLimbCornerButIsStoppedByNode()
+    {
+        var manager = SingleChunk();
+        var stone = Block("stone");
+        for (var x = 0; x < Chunk.Size; x++)
+        for (var z = 0; z < Chunk.Size; z++)
+            manager.Chunks[Vector3.Zero].SetBlockRaw(x, 0, z, stone, 0);
+        manager.Chunks[Vector3.Zero].SetBlockRaw(5, 1, 2, Block("twig"), 0);
+        var keyboard = new ScriptedKeyboard();
+        keyboard.Press([Key.W]);
+
+        // Lane through the node: the walk ends against it.
+        var camera = new Camera(null, null);
+        camera.TestTeleport(new Vector3(3f, 2.62f, 2.5f), yaw: 0f, pitch: 0f);
+        for (var i = 0; i < 60; i++) camera.Update(1f / 60f, keyboard, manager);
+        Assert.True(camera.Position.X > 4.5f);
+        Assert.True(camera.Position.X < 5.3f);
+
+        // Lane through the cell corner missing the node: the walk passes through.
+        camera.TestTeleport(new Vector3(3f, 2.62f, 2f), yaw: 0f, pitch: 0f);
+        for (var i = 0; i < 60; i++) camera.Update(1f / 60f, keyboard, manager);
+        Assert.True(camera.Position.X > 6f);
     }
 }
