@@ -1,0 +1,14 @@
+{
+  "model": {
+    "parent": "block/cross",
+    "textures": { "cross": "flower" }
+  },
+  "hardness": 0,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "cutout": true,
+  "sway": true,
+  "light": { "passes": true },
+  "needsSupport": true
+}

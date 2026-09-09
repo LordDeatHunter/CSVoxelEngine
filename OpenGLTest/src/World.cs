@@ -647,6 +647,14 @@ public class World
         if (_falling.OverlapsAny((int)placePos.X, (int)placePos.Y, (int)placePos.Z))
             return false;
 
+        // Fragile blocks need solid ground: a flower planted into mid-air would hover
+        // until anything remeshed it, so the placement fails and the caller keeps its item
+        if (BlockType.ById[blockId]?.NeedsSupport == true)
+        {
+            var below = placePos - Vector3.UnitY;
+            if (!BlockType.IsSolid(BlockIdAt(below))) return false;
+        }
+
         if (!chunk.PlaceBlockAt(placePos, blockId, _chunkManager)) return false;
 
         // A block placed into water displaces it, so the neighbours recompute their levels

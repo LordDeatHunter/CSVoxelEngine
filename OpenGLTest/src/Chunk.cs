@@ -425,6 +425,9 @@ public class Chunk : IDisposable
         if (WorldGenerationConfig.PebblesEnabled)
             PebbleGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
+        if (WorldGenerationConfig.FlowersEnabled)
+            FlowerGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
+
         // Carving removed an unknown number of blocks; a recount is cheaper than bookkeeping
         var solid = 0;
         foreach (var block in _blocks)

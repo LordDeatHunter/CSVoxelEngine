@@ -22,11 +22,13 @@ public sealed class GreedyMeshingTests
     [Fact]
     public void EveryModelRenderedBlockIsGreedyAndNothingElseIs()
     {
-        // Every shipped Model-renderer block is a plain full cube (all derive from the four
-        // built-in parents); the procedural renderers and water keep the per-quad path
+        // Every shipped full-cube Model-renderer block is greedy (all derive from the four
+        // built-in parents); cross blocks like the flower are Model-rendered but not full
+        // cubes, so they keep the per-quad path with the procedural renderers and water
         foreach (var type in BlockType.Types.Values)
         {
-            var expected = type.Renderer == BlockRenderer.Model && !type.Fluid;
+            var expected = type.Renderer == BlockRenderer.Model && !type.Fluid
+                && type.BakedModel?.IsFullCube == true;
             Assert.True(expected == BlockType.IsGreedy(type.Id), $"{type.Name}: greedy should be {expected}");
         }
 
@@ -35,6 +37,7 @@ public sealed class GreedyMeshingTests
         Assert.False(BlockType.IsGreedy(Block("water")));
         Assert.False(BlockType.IsGreedy(Block("pebble")));
         Assert.False(BlockType.IsGreedy(Block("branch")));
+        Assert.False(BlockType.IsGreedy(Block("flower")));
         Assert.False(BlockType.IsGreedy(BlockType.Air));
     }
 

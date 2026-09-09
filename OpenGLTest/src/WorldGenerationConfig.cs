@@ -359,6 +359,13 @@ public static class WorldGenerationConfig
     public const int PebbleMinSizeTexels = 4;
     public const int PebbleMaxSizeTexels = 8;
 
+    // --- Flowers (FlowerGenerator) ---
+    // Meadow cross-blocks in low-frequency patches on dry grass; a density roll thins inside them
+    public const bool FlowersEnabled = true;
+    public const float FlowerPatchFrequency = 1f / 64f;
+    public const float FlowerPatchThreshold = 0.2f;
+    public const float FlowerDensity = 0.06f;
+
     // --- Tree felling (TopplingTree) ---
     // Seconds for a felled tree to swing from upright to flat (cubic ease-in: slow tip,
     // accelerating slam), then rest before its wood pops out as item drops
