@@ -133,6 +133,8 @@ public class Inventory
     /// Credits picked-up blocks or items to their pool and pops every hotbar slot showing
     /// them. Tools arrive as new instances. Returns false for an id with no pool, or when
     /// its pool is full — the caller must leave the drop on the ground.
+    /// A pickup of an id the pools hold none of yet auto-equips into the first empty
+    /// hotbar slot, when there is one, so a new find is immediately in hand.
     /// </summary>
     public bool Add(byte id, int amount = 1)
     {
@@ -144,8 +146,12 @@ public class Inventory
             case InventoryCategory.Tools:
                 var room = ToolCapacity - _tools.Count;
                 if (room <= 0) return false;
+                var newTool = CountFor(id) == 0;
+                var firstNewIndex = _tools.Count;
                 for (var i = 0; i < Math.Min(room, amount); i++)
                     _tools.Add(new ToolEntry(_nextToolInstance++, id));
+                if (newTool)
+                    EquipNewTool(_tools[firstNewIndex].InstanceId);
                 return true;
             default:
             {
@@ -153,9 +159,12 @@ public class Inventory
                 var capacity = CapacityOf(category.Value);
                 var used = store.Values.Sum();
                 if (used >= capacity) return false;
+                var fresh = store.GetValueOrDefault(id) <= 0;
                 var n = Math.Min(capacity - used, amount);
                 store[id] = CountFor(id) + n;
                 PopSlotsShowing(id);
+                if (fresh)
+                    EquipNewStackable(id);
                 return true;
             }
         }
@@ -191,18 +200,25 @@ public class Inventory
         return true;
     }
 
-    /// <summary>Spends one unit from the selected slot. Tools are never spent — they morph.</summary>
+    /// <summary>Spends one unit from the selected slot. Tools are never spent — they morph.
+    /// When the last unit goes, every hotbar slot showing it is cleared rather than left
+    /// displaying a zero count.</summary>
     public bool ConsumeSelected()
     {
         var slot = _hotbar[SelectedIndex];
         if (slot.IsTool) return false;
         if (slot.Id == 0 || CountFor(slot.Id) <= 0) return false;
 
-        var store = StoreOf(slot.Id);
+        var id = slot.Id;
+        var store = StoreOf(id);
         if (store == null) return false;
-        var left = store[slot.Id] - 1;
-        if (left <= 0) store.Remove(slot.Id);
-        else store[slot.Id] = left;
+        var left = store[id] - 1;
+        if (left <= 0)
+        {
+            store.Remove(id);
+            ClearSlotsShowing(id);
+        }
+        else store[id] = left;
         return true;
     }
 
@@ -406,7 +422,11 @@ public class Inventory
         var store = StoreOf(id);
         if (store == null) return;
         var left = store.GetValueOrDefault(id) - count;
-        if (left <= 0) store.Remove(id);
+        if (left <= 0)
+        {
+            store.Remove(id);
+            ClearSlotsShowing(id);
+        }
         else store[id] = left;
     }
 
@@ -415,6 +435,39 @@ public class Inventory
         for (var i = 0; i < _hotbar.Length; i++)
             if (IdAt(i) == id)
                 _popElapsed[i] = 0f;
+    }
+
+    private void ClearSlotsShowing(byte id)
+    {
+        for (var i = 0; i < _hotbar.Length; i++)
+            if (_hotbar[i] is { IsTool: false } slot && slot.Id == id)
+                _hotbar[i] = HotbarSlot.Empty;
+    }
+
+    /// <summary>
+    /// First hotbar slot showing nothing (empty or holding a long-gone tool), or -1 when
+    /// the hotbar is full. New pickups equip there; the equip itself pops the slot.
+    /// </summary>
+    private int FirstEmptySlot()
+    {
+        for (var i = 0; i < _hotbar.Length; i++)
+            if (IdAt(i) == 0)
+                return i;
+        return -1;
+    }
+
+    private void EquipNewStackable(byte id)
+    {
+        var slot = FirstEmptySlot();
+        if (slot >= 0)
+            EquipStackable(slot, id);
+    }
+
+    private void EquipNewTool(int instanceId)
+    {
+        var slot = FirstEmptySlot();
+        if (slot >= 0)
+            EquipTool(slot, instanceId);
     }
 
     private static int Wrap(int index) => ((index % SlotCount) + SlotCount) % SlotCount;
