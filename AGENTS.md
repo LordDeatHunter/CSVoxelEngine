@@ -8,15 +8,17 @@ A Minecraft-style voxel engine written in C# on .NET 9, using **Silk.NET** (wind
 
 The renderer requires an **OpenGL 4.6 core** context: `WindowManager` requests `APIVersion(4, 6)`
 with `ContextProfile.Core`, and every shader under `assets/shaders/` declares `#version 460 core`.
-The GPU draw path planned in `MESHER_PLAN.md` (Phases 4-5) relies on 4.6 core features
-(`gl_DrawID`, `glMultiDrawElementsIndirectCount`, `BufferStorage`), so this is a hard requirement
-rather than a preference; any 2015+ desktop driver on Windows or Linux provides it, but
-**macOS (stuck at GL 4.1) is no longer supported**.
+The chunk draw path uses those 4.6 core features directly — `gl_DrawID`, `BufferStorage`,
+persistent buffer mapping and `glMultiDrawElementsIndirect` (see "Chunk drawing" below) — so this
+is a hard requirement rather than a preference; any 2015+ desktop driver on Windows or Linux
+provides it, but **macOS (stuck at GL 4.1) is no longer supported**. The optional Phase 5 in
+`MESHER_PLAN.md` (a compute cull writing the indirect buffer) would add
+`glMultiDrawElementsIndirectCount`.
 
 There is a single executable project. Historical naming quirks to be aware of:
 
 - The solution is `OpenGLTest.sln`, the project folder is `OpenGLTest/`, the csproj is `OpenGLTest/silkgltriangle.csproj`, and **all code lives in the `silkgltriangle` namespace**. Keep new files in that namespace unless deliberately renaming everything.
-- There are no test projects and no CI. Verification is done by building and running the game.
+- Verification is by building and running the game **and** by the xUnit tests in `OpenGLTest.Tests/` (headless, no window: `dotnet test OpenGLTest.Tests/silkgltriangle.Tests.csproj -c Release`) plus the scripted visual scenarios under `OpenGLTest/visual-examples/` (see `VOXEL_SCRIPT` below). There is no CI.
 
 ## Build and run
 
@@ -95,6 +97,26 @@ rasterises both outputs into unit cell faces and requires them to be equal. Beca
 never crosses a lighting or AO difference, this world's rough noise terrain and leaf canopies
 only give ~15-20 % fewer vertices (`PERF_TODO.md` item 11), not the 5-10× of flat worlds.
 
+**Chunk drawing.** Chunks do not own `Mesh` objects. `Chunk.UpdateMesh` uploads its vertex and
+index lists into the two `ChunkGeometryPool`s owned by `RenderManager` (opaque and translucent:
+one `BufferStorage` VBO + EBO + VAO each, allocated by `GeometryAllocator`, a first-fit free list
+with coalescing in units of 64 vertices / 96 indices — one unit covers both buffers at the same
+offset, since quads are exactly 4:6 — growing by doubling plus `CopyBufferSubData`), and keeps a
+`GeometrySlice` per list (`OpaqueSlice`/`TranslucentSlice`; `HasMesh`/`HasTranslucentMesh` are
+just those being non-null). Every frame each chunk pass — shadow, reflection, opaque
+front-to-back, translucent back-to-front — frustum-culls and sorts on the CPU exactly as before,
+but instead of a draw call per chunk it appends a `DrawElementsIndirectCommand` plus a
+`vec4(origin, fade alpha)` per draw into `ChunkDrawBatch`'s persistent-mapped 3-slot ring (fenced
+with `FenceSync`/`ClientWaitSync`, since VSync is off) and issues one
+`MultiDrawElementsIndirect`. The chunk vertex shaders are compiled twice from the same source
+(`Shader`'s `defines` prefix): the `#define CHUNK_DRAW` variant reads the `ChunkInfo` SSBO at
+binding 0 at `uDrawBase + gl_DrawID` and transforms with `uViewProj`, while the plain variant
+keeps `uModel`/`uMVP`/`uAlpha` for LOD, drops, TNT, falling blocks, trees and block pops
+(`SetDrawUniforms`). Per-draw fade alpha reaches the fragment stage as the `flat` varying
+`fAlpha`, because a uniform cannot vary between the sub-draws of one multi-draw. The wave and
+sway blocks of `test-vertex.glsl` and `shadow-vertex.glsl` must stay byte-identical — a
+`TO_WORLD(p)` macro is what lets them be, and `ChunkDrawShaderTests` guards it.
+
 ## Layout
 
 ```
@@ -136,7 +158,16 @@ OpenGLTest/
                                #   the terrain that follows occludes it
                                #   CopyScene snapshots the frame's colour/depth to units 3/4
                                #   for the water pass's refraction (see Water rendering above)
+                               #   owns the two ChunkGeometryPools, the ChunkDrawBatch and the
+                               #   CHUNK_DRAW variants of the world/shadow programs; the four
+                               #   chunk passes are one MultiDrawElementsIndirect each
       UnderwaterRaysRenderer.cs # additive full-screen sun shafts while the eye is submerged
+      ChunkGeometryPool.cs     # the two shared chunk vertex/index buffers (opaque, translucent):
+                               #   BufferStorage VBO+EBO+VAO, BufferSubData uploads, grow by copy
+      GeometryAllocator.cs     # GL-free first-fit free list with coalescing, in units of
+                               #   64 vertices / 96 indices; hands out the pools' GeometrySlices
+      ChunkDrawBatch.cs        # persistent-mapped 3-slot ring of DrawElementsIndirectCommands +
+                               #   the vec4(origin, alpha) ChunkInfo SSBO read via gl_DrawID
       ChunkManager.cs          # chunk lifecycle: load/unload, dirty tracking, mesh scheduling
       LodManager.cs            # LOD region lifecycle: worker thread builds, main thread uploads/unloads, burial flags
       FluidManager.cs          # the fluid tick: scheduled cells, level recompute + spread, batched remeshes
@@ -304,7 +335,7 @@ Chunk work is split across threads, and OpenGL calls are only legal on the main 
 
 Rules that follow from this:
 
-- **Never call GL functions (buffer uploads, `Mesh` creation/disposal, shader use) off the main thread.** Background work must only produce plain data handed over via the concurrent queues.
+- **Never call GL functions (buffer uploads, `Mesh` creation/disposal, pool uploads/frees through `ChunkGeometryPool`, shader use) off the main thread.** Background work must only produce plain data handed over via the concurrent queues.
 - A chunk is only meshed when its block data is ready **and all 6 cardinal neighbors exist with ready data** (`HasAllNeighbors`) — meshing reads neighbor blocks for face culling and cross-chunk AO. Breaking this reintroduces holes/seams at chunk borders (see git history). That scheduling check can go stale (the mesh task waits on the semaphore and an unload may take a neighbor away meanwhile), so `Chunk.GenerateMeshData` re-resolves the whole 3x3x3 neighbourhood once up front and returns `null` when a face neighbor is gone; callers must then re-mark the chunk dirty rather than apply anything. Only the edge/corner neighbors may be absent, and those read as air (they feed light and fluid corner heights only).
 - Shared state uses `ConcurrentDictionary`/`ConcurrentQueue`; `Chunk.IsBlockDataReady` is `volatile`. Keep new shared state lock-free in the same style.
 - Editing a block on a chunk border must also remesh the affected neighbor chunk(s) — block edits use `ChunkManager.ImmediateRemesh` / `MarkDirty`.

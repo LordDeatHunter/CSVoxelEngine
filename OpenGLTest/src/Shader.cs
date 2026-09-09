@@ -13,12 +13,19 @@ public class Shader : IDisposable
 
     private bool _disposed;
 
-    public Shader(GL gl, string vertexSource, string fragmentSource)
+    /// <param name="defines">
+    /// Optional preprocessor prefix injected right after the <c>#version</c> line of both
+    /// sources, so one GLSL file can be compiled as two program variants out of the same text:
+    /// <c>#define CHUNK_DRAW</c> builds the pooled chunk-draw variant, which reads its per-draw
+    /// origin and alpha from the ChunkInfo SSBO (see <c>ChunkDrawBatch</c>), while the plain
+    /// program keeps the <c>uModel</c>/<c>uMVP</c> uniform path that entities and LOD use.
+    /// </param>
+    public Shader(GL gl, string vertexSource, string fragmentSource, string? defines = null)
     {
         _gl = gl;
 
-        var vertexShader = CompileShader(ShaderType.VertexShader, vertexSource);
-        var fragmentShader = CompileShader(ShaderType.FragmentShader, fragmentSource);
+        var vertexShader = CompileShader(ShaderType.VertexShader, InjectDefines(vertexSource, defines));
+        var fragmentShader = CompileShader(ShaderType.FragmentShader, InjectDefines(fragmentSource, defines));
 
         Handle = _gl.CreateProgram();
         _gl.AttachShader(Handle, vertexShader);
@@ -36,6 +43,24 @@ public class Shader : IDisposable
         _gl.DetachShader(Handle, fragmentShader);
         _gl.DeleteShader(vertexShader);
         _gl.DeleteShader(fragmentShader);
+    }
+
+    /// <summary>
+    /// Returns <paramref name="source"/> with <paramref name="defines"/> spliced in right after
+    /// its first line. <c>#version</c> must stay the first line of a GLSL source, so the prefix
+    /// cannot simply be prepended; the trailing <c>#line 2</c> makes the compiler report the
+    /// original line numbers for everything after the injected block, so an error in a variant
+    /// build still points at the right line of the file on disk. A null or empty prefix returns
+    /// the source unchanged, which is what every plain (non-variant) compile does.
+    /// </summary>
+    internal static string InjectDefines(string source, string? defines)
+    {
+        if (string.IsNullOrEmpty(defines)) return source;
+
+        // IndexOf('\n') + 1 keeps a CRLF first line intact: the \r stays on the #version line
+        var newline = source.IndexOf('\n');
+        var end = newline < 0 ? source.Length : newline + 1;
+        return source[..end] + defines + "\n#line 2\n" + source[end..];
     }
 
     private uint CompileShader(ShaderType type, string source)

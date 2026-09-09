@@ -186,11 +186,44 @@ fragments; the mesher/renderer change is preserved in the stash named in item 5.
   `APIVersion(4, 6)`) and every shader declares `#version 460 core`; no behaviour change — the
   startup line reports `GL 4.6...`, all shaders compile, screenshots unchanged. macOS (GL 4.1) is
   no longer supported. 140 tests pass (`ShaderVersionTests` added).
+  Phase 4 done 2026-09-09: chunks no longer own `Mesh` objects. `Chunk.UpdateMesh` uploads into
+  two shared `ChunkGeometryPool`s (opaque, translucent — one `BufferStorage` VBO + EBO + VAO
+  each, a first-fit `GeometryAllocator` free list in units of 64 vertices / 96 indices, growth by
+  doubling with `CopyBufferSubData`) and keeps a `GeometrySlice`; each of the four chunk passes
+  (shadow, reflection, opaque front-to-back, translucent back-to-front) still culls and sorts on
+  the CPU but now fills a persistent-mapped 3-slot ring of `DrawElementsIndirectCommand`s plus a
+  `vec4(origin, alpha)` ChunkInfo SSBO and issues one `glMultiDrawElementsIndirect`, with the
+  chunk vertex shaders compiled a second time under `#define CHUNK_DRAW` (SSBO at
+  `uDrawBase + gl_DrawID`, `uViewProj`) while entities and LOD keep `SetDrawUniforms`. Measured
+  interleaved against a HEAD worktree on a Quadro T1000 (two pairs, scripted 40 s at the spawn
+  view, 2148 visible chunks both trees): `worldPass` 4.74 / 3.67 -> 0.50 / 0.51 ms, `shadows`
+  1.31 / 1.23 -> 0.26 / 0.27, `waterPass` 1.83 / 1.19 -> 0.09 / 0.09, `reflect` 3.63 / 3.59 ->
+  0.83 / 0.85 — the four chunk passes together 11.5 -> 1.7 ms — and frame 28.20 / 32.12 -> 26.56
+  / 30.73 ms (35 / 31 -> 38 / 33 FPS). Read it the way the phase-2 row reads: the session was
+  GPU-bound (CPU sum == frame, and `gpu` == frame on the lines where the timer query resolved),
+  so much of the collapse is the stall relocating into `lighting`, the frame's first GL call
+  (15.0 -> 24.2 ms) — the *unconverted* `lodPass` (0.28 -> 0.10) and `uiPass` (1.15 -> 0.25)
+  shrank ~3x as well. What exceeds that redistribution is the part MDI actually bought:
+  `worldPass` 9.5x and `waterPass` 20x. Pools grow only during the first stream-in (opaque
+  65536 -> 131072 -> 262144 units, translucent 8192 -> 16384) and settle at 244801 / 262144
+  units opaque (478 of 512 MB, 93 % occupancy) and 12732 / 16384 translucent; raising
+  `ChunkGeometryPool.OpaqueInitialUnits` to 262144 would trade 512 MB allocated up front for the
+  two mid-stream growth copies. 153 tests pass (new: `ShaderDefinesTests`,
+  `GeometryAllocatorTests`, `ChunkDrawShaderTests`); `basic`, `glass` and `water` diffed against
+  the HEAD worktree with a same-build control run as the noise floor — every difference is wave
+  phase, cloud drift, sub-block camera position or streaming progress. Details in
+  `MESHER_PLAN.md`; see the `11 (phase 4)` Measurements row.
 
-- [ ] **10. GC and runtime settings.** `GCSettings.LatencyMode = SustainedLowLatency` in
+- [ ] **10. GC and runtime settings.** (the `chunk.lifetime` half is **done** 2026-09-09 as part of
+  `MESHER_PLAN.md` Phase 4; the GC and runtime settings below are still open.)
+  `GCSettings.LatencyMode = SustainedLowLatency` in
   `Program.Main`; explicit `<ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>`
   and `<TieredPGO>true</TieredPGO>` in the csproj. Do not enable Server GC without measuring.
-  Replace `chunk.lifetime += 1.0 / 60.0` in `RenderManager.RenderWorld` with real delta time.
+  ~~Replace `chunk.lifetime += 1.0 / 60.0` in `RenderManager.RenderWorld` with real delta
+  time.~~ Done: `RenderWorld` takes the delta from the `time` it already received
+  (`_window.Time`), clamped to 0.1 s so a hitch cannot snap every streaming chunk to full alpha,
+  so the 0.5 s fade is 0.5 s of wall clock at any frame rate. `LodRegion.Lifetime` still steps
+  at 1/60.
 
 ## Measuring
 
@@ -251,3 +284,4 @@ What it says:
 | 5 | Release | forest (look -130,8), still | 297-313 | 280-283 | REVERTED. before: frame 3.21-3.37, CPU 2.95-3.09, GPU 1.81-1.87, worldPass 1.05-1.12; after: frame 3.55, CPU 3.27, GPU 2.13, worldPass 1.32. Cutout-first: frame 3.47, GPU 1.98, worldPass 1.26. 1313 visible chunks |
 | 9 | Release | spawn, still | 329 avg | 312 avg | FPS is the on-screen counter averaged over 3 settled still shots (15 s settle + 2 s apart) from a scripted run — no X overlay in a headless session, so no per-section ms. Intra-run swing is 280-345 either way, so the frame is unchanged within noise, as expected: vertex fetch was never the bottleneck (GPU ~1.7 ms vs CPU ~3.8 ms) and a rest frame builds no meshes. What moved is memory: vertex lists 48 -> 24 B/vertex (~96 KB per pooled 4096-list), asserted by `VertexPackingRoundTrips`. Leaf holes, water blending, lighting/fog, HUD icons identical before/after; clean log, no shader or chunk-gen errors |
 | 11 (phase 2) | Release | spawn (0,30,0), look -90,-10, VOXEL_TIME=60, still, scripted 20 s, debug overlay on | 54-57 / 40-42 | 51-60 / 38-39 | two interleaved pairs (HEAD worktree vs branch), same 1769 visible chunks. The session was GPU-bound with low clocks (gpu ~= frame): frame 17.5-18.4 / 24.0-24.8 ms head vs 16.7-19.5 / 25.4-25.7 ms branch, worldPass 4.1-5.4 both. No mesh builds happen at rest, so no change was expected; what moved is resident geometry (-14..-20 % vertices, see item 11). The CPU section that absorbs the GPU wait differs: `lighting` 2.8-3.9 ms on head, `shadows` 4.7-7.5 ms on the branch, with the sum and the frame equal - a redistribution of the stall, not a cost |
+| 11 (phase 4) | Release | spawn (0,30,0), look -90,-10, VOXEL_TIME=60, still, scripted 40 s, debug overlay on | 35 / 31 | 38 / 33 | two interleaved pairs (HEAD worktree vs branch), 2148 visible chunks in three of the four runs (head run 2 settled at 1769, a count the head tree also produced in the 20 s runs, so the cull is unchanged). Medians over the settled window (chunkApply 0.00, gc 0/0/0): frame 28.20 / 32.12 -> 26.56 / 30.73 ms, worldPass 4.74 / 3.67 -> 0.50 / 0.51, shadows 1.31 / 1.23 -> 0.26 / 0.27, waterPass 1.83 / 1.19 -> 0.09 / 0.09, reflect 3.63 / 3.59 -> 0.83 / 0.85; the four chunk passes together 11.5 -> 1.7 ms. The session was GPU-bound (CPU sum == frame; `gpu` == frame on the lines where the timer query resolved, `--` on the rest), so most of that is the stall relocating rather than a saving: the unconverted `lodPass` 0.28 -> 0.10 and `uiPass` 1.15 -> 0.25 shrank too, and `lighting`, the frame's first GL call, absorbed it (15.0 -> 24.2 ms). Pools grow during the first stream-in only (opaque 65536 -> 131072 -> 262144 units, translucent 8192 -> 16384); steady state 244801/262144 units opaque (478 of 512 MB) and 12732/16384 translucent, no growth after settle. 153 tests |

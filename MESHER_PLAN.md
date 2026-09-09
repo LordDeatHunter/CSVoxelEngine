@@ -431,5 +431,87 @@ targets net9.0).
   (VOXEL_TIME=70) scenarios ran clean (no compile/link errors, 15 PNGs, shore shot eyeballed).
   AGENTS.md (new requirements paragraph, macOS drop) and PERF_TODO.md item 11 updated. Leftover
   noticed: AGENTS.md still says "There are no test projects and no CI", which is stale.
-- [ ] **Phase 4 — geometry pool + multi-draw indirect.** Next. Start from the "Phase 4" section above.
+- [x] **Phase 4 — geometry pool + multi-draw indirect** (done 2026-09-09 on `worldgen`;
+  implemented via the plan-and-implement workflow). Chunks no longer own `Mesh` objects: all
+  chunk geometry lives in two shared pools and each chunk pass issues exactly one
+  `glMultiDrawElementsIndirect`.
+  **Pools and allocator.** New `Systems/ChunkGeometryPool.cs` keeps one `BufferStorage`
+  (`DynamicStorageBit`) vertex buffer, one index buffer and one VAO per pool (opaque,
+  translucent), and hands out a `GeometrySlice { UnitOffset, UnitCount, VertexCount,
+  IndexCount }` whose `VertexOffset`/`IndexOffset` are computed from the unit offset. Behind it,
+  new `Systems/GeometryAllocator.cs` is a GL-free first-fit free list with coalescing over a
+  *single* unit space: one unit is 64 vertices **and** 96 indices, so one allocation covers both
+  buffers at the same offset and nothing is wasted (quads are exactly 4:6). Fixed units bound
+  fragmentation, and keeping the allocator free of GL makes its offsets deterministic and unit
+  testable. Uploads go through the `CopyWriteBuffer` target on purpose — binding
+  `ElementArrayBuffer` would rewrite whichever VAO a `Mesh` left bound — and `BufferSubData`
+  copies synchronously, so `ChunkManager.ApplyMesh` still recycles its pooled lists immediately.
+  Growth doubles the buffers, `CopyBufferSubData`s the old contents across, re-points the VAO
+  and logs one line. `Vertex.Size`/`sizeof(ushort)` arithmetic widens to `long` before the cast
+  at the GL boundary, so a doubling past 131072 units cannot overflow.
+  **Draw batch.** New `Systems/ChunkDrawBatch.cs` owns a persistent-mapped
+  (`MapWriteBit|MapPersistentBit|MapCoherentBit`) 3-slot ring of `DrawElementsIndirectCommand`
+  (the 20-byte GL 4.6 §10.4 layout, asserted at type load) plus a parallel `vec4 originAndAlpha`
+  ChunkInfo SSBO at binding 0, bound once with `BindBufferBase`. Passes call
+  `BeginFrame`/`BeginPass`/`Add`/`Draw`; each pass draws its own contiguous run.
+  *Deviation from the plan:* a `FenceSync`/`ClientWaitSync` per slot was added — VSync is off, so
+  a GPU more than two frames behind would otherwise read a slot the CPU is rewriting — and the
+  pass's SSBO base is passed as a `uDrawBase` int uniform (`draws[uDrawBase + gl_DrawID]`)
+  instead of `BindBufferRange`, which would have needed
+  `SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT` padding.
+  **Shaders.** `Shader` gained the `defines` prefix that PERF item 5 had prototyped (the stash it
+  named no longer existed, so it was written fresh): `InjectDefines` splices the defines plus a
+  `#line 2` after the `#version` line, so error line numbers still point at the file on disk.
+  `test-vertex.glsl` and `shadow-vertex.glsl` now carry a `#ifdef CHUNK_DRAW` variant that reads
+  `ChunkInfo` at `uDrawBase + gl_DrawID` and transforms with `uViewProj`; a `TO_WORLD(p)` macro
+  (translation by the chunk origin in the chunk variant, `uModel * p` in the plain one) keeps the
+  wave and sway blocks byte-identical across both files and both variants, which
+  `ChunkDrawShaderTests` now guards. *Deviation:* `test-fragment.glsl` was touched too (3 lines,
+  not in the plan's file list) — `uniform float uAlpha` became the `flat in float fAlpha`
+  varying, because a uniform cannot vary between the sub-draws of one multi-draw and the plan
+  itself moves alpha into the SSBO's `.w`. `Mesh.ConfigureVertexAttribs` was extracted so the
+  pool VAO cannot drift from the `Mesh` layout.
+  **Wiring.** `RenderManager` compiles `chunkShader`/`chunkShadowShader` as second instances of
+  the same sources with `#define CHUNK_DRAW`, mirrors every frame and one-time world uniform onto
+  both programs (`InitWorldProgram`, `ApplyFrameUniformsTo`, `SetWorldUniform` for the three
+  reflection sets), owns both pools and the batch, and converts the four chunk loops — shadow,
+  reflection, opaque front-to-back, translucent back-to-front — to command fills followed by one
+  MDI each. Every cull, sort and `LastVisibleChunkCount` assignment is exactly where it was.
+  The pools are threaded `Program -> World -> ChunkManager -> Chunk.UpdateMesh` (both parameters
+  default to null so the headless tests keep constructing `new ChunkManager(null!)`);
+  `Chunk` keeps `OpaqueSlice?`/`TranslucentSlice?` plus the pool each came from, `HasMesh`/
+  `HasTranslucentMesh`/`HasWaterMesh` keep their meaning, and `Chunk.Render()`/
+  `RenderTranslucent()` are gone. `SetDrawUniforms` stays for LOD, drops, TNT, falling blocks,
+  trees and block pops. `chunk.lifetime` finally advances by real delta time (PERF item 10),
+  clamped to 0.1 s per frame; `LodRegion.Lifetime` keeps its 1/60 step.
+  **Tests.** 153 pass (140 baseline + 13): `ShaderDefinesTests` (3, the injection and CRLF/null
+  cases), `GeometryAllocatorTests` (7, first-fit determinism, hole reuse, coalescing in both
+  directions, failure leaving state untouched, `Grow` extending the tail, double free) and
+  `ChunkDrawShaderTests` (3, the byte-identical sway blocks, the CHUNK_DRAW declarations, the
+  `fAlpha` varying).
+  **Visual check.** `basic`, `glass` and `water` (all with `VOXEL_TIME=70`) run from a `HEAD`
+  worktree and from the branch: 15 PNGs each, every log free of exceptions and compile/link
+  errors, and a TEMP-DIAG `gl.GetError()` probe after all four MDI calls reported `NoError` in
+  every scenario. Pixel diffs on the animated shots are large in absolute terms (up to 29.6 %),
+  so a same-build control run was taken as a noise floor and lands at the same magnitude
+  (30.4 % on the same shot); the differences are wave phase, cloud drift, sub-block camera
+  position and streaming progress. Reflection, refraction, caustics, leaf holes, glass, LOD
+  horizon and the HUD were eyeballed and match.
+  **Perf** (this machine is a Quadro T1000 and far slower than the RTX 3070 of items 1-9, so only
+  the interleaved pairs are comparable): `worldPass` 4.74 / 3.67 -> 0.50 / 0.51 ms, `shadows`
+  1.31 / 1.23 -> 0.26 / 0.27, `waterPass` 1.83 / 1.19 -> 0.09 / 0.09, `reflect` 3.63 / 3.59 ->
+  0.83 / 0.85 — the four chunk passes together 11.5 -> 1.7 ms, frame 28.20 / 32.12 -> 26.56 /
+  30.73 ms. The session was GPU-bound, so much of that is the stall relocating into `lighting`
+  (15.0 -> 24.2 ms, the frame's first GL call) rather than a pure saving — the unconverted
+  `lodPass` and `uiPass` shrank 3x too — but `worldPass` (9.5x) and `waterPass` (20x) fell far
+  beyond that redistribution. Visible-chunk count unchanged (2148 on both trees). Details in
+  `PERF_TODO.md` item 11 and the `11 (phase 4)` Measurements row.
+  **Leftovers noticed:** the opaque pool grows twice during the first stream-in (65536 ->
+  131072 -> 262144 units) and the translucent one once (8192 -> 16384), settling at 244801 /
+  262144 units (478 of 512 MB) and 12732 / 16384 — raising `OpaqueInitialUnits` to 262144 would
+  trade 512 MB allocated up front for two fewer growth copies. Slices are never compacted, so a
+  long session could fragment the pools (occupancy was 93 % here, so nothing to act on yet).
+  `LodRegion.Lifetime` still steps at 1/60, so a chunk and the LOD under it fade at slightly
+  different rates for half a second. AGENTS.md's stale "no test projects and no CI" line, flagged
+  by the Phase 3 entry, was fixed here.
 - [ ] **Phase 5 (optional) — compute frustum cull.**

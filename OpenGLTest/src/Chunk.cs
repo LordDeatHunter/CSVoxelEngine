@@ -56,12 +56,26 @@ public class Chunk : IDisposable
     public const float MAX_LIFETIME = 0.5f;
 
     public Vector3 Position { get; }
-    private Mesh? _mesh;
 
-    // Fluid surfaces live in their own mesh so RenderManager can draw them blended, after
-    // everything opaque (see RenderManager.RenderWorldTranslucent)
-    private Mesh? _translucentMesh;
-    private readonly GL _gl;
+    /// <summary>
+    /// Where this chunk's opaque geometry lives in the render manager's opaque
+    /// <see cref="ChunkGeometryPool"/>, or <c>null</c> when there is nothing to draw.
+    /// The chunk passes turn these into <c>glMultiDrawElementsIndirect</c> commands.
+    /// </summary>
+    public GeometrySlice? OpaqueSlice { get; private set; }
+
+    /// <summary>
+    /// Where this chunk's fluid and glass geometry lives in the render manager's translucent
+    /// <see cref="ChunkGeometryPool"/>, or <c>null</c> when there is nothing to draw. Fluid
+    /// surfaces live apart from the opaque geometry so RenderManager can draw them blended,
+    /// after everything opaque (see RenderManager.RenderWorldTranslucent).
+    /// </summary>
+    public GeometrySlice? TranslucentSlice { get; private set; }
+
+    // The pools the two slices came from, so Dispose can hand the space back without an
+    // unload having to thread a pool reference in.
+    private ChunkGeometryPool? _opaquePool;
+    private ChunkGeometryPool? _translucentPool;
 
     /// <summary>
     /// Whether block data has been fully generated and is ready for meshing.
@@ -71,13 +85,13 @@ public class Chunk : IDisposable
     /// <summary>
     /// Whether this chunk has an uploaded, non-empty mesh worth drawing.
     /// </summary>
-    public bool HasMesh => _mesh != null;
+    public bool HasMesh => OpaqueSlice != null;
 
     /// <summary>
     /// Whether this chunk has an uploaded fluid mesh for the blended pass. An ocean chunk
     /// holding nothing but water has one of these and no opaque mesh at all.
     /// </summary>
-    public bool HasTranslucentMesh => _translucentMesh != null;
+    public bool HasTranslucentMesh => TranslucentSlice != null;
 
     /// <summary>
     /// Whether this chunk's translucent mesh actually holds fluid. Glass shares that mesh, so
@@ -324,9 +338,12 @@ public class Chunk : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static int Idx(int x, int y, int z) => (x << (2 * SizeShift)) | (y << SizeShift) | z;
 
+    // gl is retained for signature stability only: every call site (and the headless tests)
+    // still constructs a chunk with the context, but a chunk owns no GL object any more —
+    // its geometry lives in the render manager's ChunkGeometryPools.
     public Chunk(GL gl, Vector3 position, bool generateBlockData = true)
     {
-        _gl = gl;
+        _ = gl;
         Position = position;
 
         if (generateBlockData)
@@ -1784,21 +1801,57 @@ public class Chunk : IDisposable
     /// <summary>Tile-local UV under a cell-local point of a sub-cell box (see <see cref="TiledUv"/>).</summary>
     private static Vector2 CropUv(int face, Vector3 local) => TiledUv(face, local, Vector3.One);
 
-    public void UpdateMesh(ChunkMeshData meshData)
+    /// <summary>
+    /// Uploads a finished mesh into the shared chunk geometry pools, releasing whatever this
+    /// chunk held before. The upload is a synchronous <c>glBufferSubData</c>, so the caller may
+    /// recycle <paramref name="meshData"/>'s lists the moment this returns. An empty list never
+    /// touches a pool at all, which is what lets the headless tests pass <c>null</c> for both.
+    /// Main thread only, like every other GL call.
+    /// </summary>
+    public void UpdateMesh(ChunkMeshData meshData, ChunkGeometryPool? opaquePool,
+        ChunkGeometryPool? translucentPool)
     {
         IsMeshed = true;
-        _mesh?.Dispose();
-        _mesh = meshData.Vertices.Count == 0
-            ? null
-            : new Mesh(_gl, CollectionsMarshal.AsSpan(meshData.Vertices), CollectionsMarshal.AsSpan(meshData.Indices));
+        ReleaseSlices();
 
-        _translucentMesh?.Dispose();
-        _translucentMesh = meshData.TranslucentVertices.Count == 0
-            ? null
-            : new Mesh(_gl, CollectionsMarshal.AsSpan(meshData.TranslucentVertices),
+        if (meshData.Vertices.Count > 0)
+        {
+            _opaquePool = opaquePool
+                ?? throw new InvalidOperationException("non-empty chunk mesh without a geometry pool");
+            OpaqueSlice = _opaquePool.Upload(CollectionsMarshal.AsSpan(meshData.Vertices),
+                CollectionsMarshal.AsSpan(meshData.Indices));
+        }
+
+        if (meshData.TranslucentVertices.Count > 0)
+        {
+            _translucentPool = translucentPool
+                ?? throw new InvalidOperationException("non-empty chunk mesh without a geometry pool");
+            TranslucentSlice = _translucentPool.Upload(CollectionsMarshal.AsSpan(meshData.TranslucentVertices),
                 CollectionsMarshal.AsSpan(meshData.TranslucentIndices));
+        }
 
         HasWaterMesh = meshData.HasWater && meshData.TranslucentVertices.Count > 0;
+    }
+
+    /// <summary>
+    /// Hands both slices back to the pools they came from and forgets them. Freeing twice
+    /// throws inside the allocator, so each slice is nulled the moment it is released.
+    /// </summary>
+    private void ReleaseSlices()
+    {
+        if (OpaqueSlice is { } opaque)
+        {
+            _opaquePool?.Free(opaque);
+            OpaqueSlice = null;
+        }
+        _opaquePool = null;
+
+        if (TranslucentSlice is { } translucent)
+        {
+            _translucentPool?.Free(translucent);
+            TranslucentSlice = null;
+        }
+        _translucentPool = null;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1808,23 +1861,9 @@ public class Chunk : IDisposable
         return 3 - ((side1 ? 1 : 0) + (side2 ? 1 : 0) + (corner ? 1 : 0));
     }
 
-    public void Render()
-    {
-        _mesh?.Render();
-    }
-
-    /// <summary>Draws only this chunk's fluid surfaces; called from the blended pass.</summary>
-    public void RenderTranslucent()
-    {
-        _translucentMesh?.Render();
-    }
-
     public void Dispose()
     {
-        _mesh?.Dispose();
-        _mesh = null;
-        _translucentMesh?.Dispose();
-        _translucentMesh = null;
+        ReleaseSlices();
         HasWaterMesh = false;
         GC.SuppressFinalize(this);
     }

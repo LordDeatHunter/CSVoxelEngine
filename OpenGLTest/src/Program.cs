@@ -64,7 +64,8 @@ public static class Program
 
         inputManager = new InputManager(windowManager.Window);
         renderManager = new RenderManager(windowManager.Window);
-        world = new World(renderManager.gl, windowManager.Window, inputManager.InputContext);
+        world = new World(renderManager.gl, renderManager.OpaqueChunkGeometry,
+            renderManager.TranslucentChunkGeometry, windowManager.Window, inputManager.InputContext);
 
         inputManager.Mouse?.MouseUp += (_, button) =>
         {

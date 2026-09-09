@@ -11,7 +11,14 @@ namespace silkgltriangle;
 /// <summary>
 /// Manages chunk loading, unloading, and mesh generation.
 /// </summary>
-public class ChunkManager(GL gl)
+/// <param name="gl">The GL context new chunks are constructed with.</param>
+/// <param name="opaqueGeometry">The shared opaque chunk geometry pool finished meshes upload
+/// into, owned by <see cref="RenderManager"/>. Null in the headless tests, which only ever
+/// apply empty meshes.</param>
+/// <param name="translucentGeometry">The shared translucent (water and glass) pool; see
+/// <paramref name="opaqueGeometry"/>.</param>
+public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
+    ChunkGeometryPool? translucentGeometry = null)
 {
     public readonly ConcurrentDictionary<Vector3, Chunk> Chunks = new();
 
@@ -129,7 +136,7 @@ public class ChunkManager(GL gl)
 
             if (!Chunks.TryRemove(pos, out var chunk)) continue;
 
-            // Dispose nulls both meshes, so the Renderable bookkeeping has to happen first
+            // Dispose nulls both slices, so the Renderable bookkeeping has to happen first
             RemoveRenderable(chunk);
             // A chunk leaving the world changes the LOD cover even when it had nothing to draw.
             MeshVersion++;
@@ -280,8 +287,8 @@ public class ChunkManager(GL gl)
     private void ApplyMesh(Chunk chunk, ChunkMeshData meshData)
     {
         var wasMeshed = chunk.IsMeshed;
-        chunk.UpdateMesh(meshData);
-        // The GPU copy is complete when UpdateMesh returns; Mesh keeps no reference to the lists.
+        chunk.UpdateMesh(meshData, opaqueGeometry, translucentGeometry);
+        // BufferSubData copies synchronously, so the lists can be recycled at once.
         MeshBuffers.Return(meshData);
         SyncRenderable(chunk);
         // The first mesh makes the chunk count as "drawn" for the LOD cover test even when it is
@@ -313,7 +320,7 @@ public class ChunkManager(GL gl)
 
     /// <summary>
     /// Swap-removes a chunk from <see cref="Renderable"/>; a no-op for a chunk that is not in
-    /// the list. Must run before <see cref="Chunk.Dispose"/>, which nulls the meshes this
+    /// the list. Must run before <see cref="Chunk.Dispose"/>, which nulls the slices this
     /// bookkeeping is keyed on. Main thread only.
     /// </summary>
     private void RemoveRenderable(Chunk chunk)

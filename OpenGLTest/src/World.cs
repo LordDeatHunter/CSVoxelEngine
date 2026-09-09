@@ -66,11 +66,12 @@ public class World
     private float BlockPopScaleNow =>
         MathUtils.Lerp(1f, BlockPopScale, MathUtils.Pulse(_popElapsed / BlockPopSeconds));
 
-    public World(GL gl, IWindow window, IInputContext input)
+    public World(GL gl, ChunkGeometryPool opaqueGeometry, ChunkGeometryPool translucentGeometry,
+        IWindow window, IInputContext input)
     {
         _window = window;
         Camera = new Camera(window, input);
-        _chunkManager = new ChunkManager(gl);
+        _chunkManager = new ChunkManager(gl, opaqueGeometry, translucentGeometry);
         _generationWorker = new ChunkGenerationWorker(_chunkManager, Camera);
         _lodManager = new LodManager(gl);
 

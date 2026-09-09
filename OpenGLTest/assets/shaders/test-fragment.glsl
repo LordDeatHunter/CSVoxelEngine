@@ -20,10 +20,10 @@ in float fBlock;
 in vec3 fNormal;
 in vec3 fWorldPos;
 in float fSubmerged;
+flat in float fAlpha; // per-draw fade from the vertex stage: a uniform cannot vary inside one multi-draw
 
 // One slice per block tile; UVs are tile-local and REPEAT across merged quads.
 uniform sampler2DArray uTextureAtlas;
-uniform float uAlpha;
 uniform float uFlash;
 uniform float uAlphaCutoff;
 uniform float uTime;
@@ -246,12 +246,12 @@ void main() {
 
     float f = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
     col = mix(col, uFogColor, f * f);
-    // Tile alpha carries the translucent mesh's translucency; uAlpha is the chunk fade-in.
+    // Tile alpha carries the translucent mesh's translucency; fAlpha is the chunk fade-in.
     // The discard above still removes the leaf tiles' fully transparent holes in the
     // opaque pass, while the translucent pass keeps every faint texel.
     // Water composited the refracted scene itself, so nothing is left for the blender to
     // show through: its only alpha is the chunk's stream-in fade.
-    float alpha = texColor.a * uAlpha;
-    if (isWater) alpha = uAlpha;
+    float alpha = texColor.a * fAlpha;
+    if (isWater) alpha = fAlpha;
     FragColor = vec4(mix(col, vec3(1.0), uFlash), alpha);
 }

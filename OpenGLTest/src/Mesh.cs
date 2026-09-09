@@ -31,37 +31,45 @@ public class Mesh : IDisposable
         _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _ebo);
         _gl.BufferData<ushort>(BufferTargetARB.ElementArrayBuffer, indexDataSize, indices, BufferUsageARB.StaticDraw);
 
-        unsafe
-        {
-            // Offsets follow the Vertex field order: position 0, colour 12, uv 16, sun 24,
-            // block 25, normal 26, sway 27, layer 28 (see Vertex for the semantics)
-            _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, Vertex.Size, (void*)0);
-            _gl.EnableVertexAttribArray(0);
-
-            _gl.VertexAttribPointer(1, 4, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)12);
-            _gl.EnableVertexAttribArray(1);
-
-            _gl.VertexAttribPointer(2, 2, VertexAttribPointerType.Float, false, Vertex.Size, (void*)16);
-            _gl.EnableVertexAttribArray(2);
-
-            _gl.VertexAttribPointer(3, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)24);
-            _gl.EnableVertexAttribArray(3);
-
-            _gl.VertexAttribPointer(4, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)25);
-            _gl.EnableVertexAttribArray(4);
-
-            _gl.VertexAttribPointer(5, 1, VertexAttribPointerType.UnsignedByte, false, Vertex.Size, (void*)26);
-            _gl.EnableVertexAttribArray(5);
-
-            _gl.VertexAttribPointer(6, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)27);
-            _gl.EnableVertexAttribArray(6);
-
-            // The array-texture layer is an integer attribute: no float conversion, read as uint
-            _gl.VertexAttribIPointer(7, 1, VertexAttribIType.UnsignedShort, Vertex.Size, (void*)28);
-            _gl.EnableVertexAttribArray(7);
-        }
+        ConfigureVertexAttribs(_gl);
 
         _gl.BindVertexArray(0);
+    }
+
+    /// <summary>
+    /// Points the currently bound vertex array at the currently bound array buffer using the
+    /// shared <see cref="Vertex"/> layout. Both the VAO and its VBO must already be bound.
+    /// <c>ChunkGeometryPool</c> configures its pooled VAO through this same helper, so
+    /// the pool layout can never drift from the one meshes use.
+    /// </summary>
+    internal static unsafe void ConfigureVertexAttribs(GL gl)
+    {
+        // Offsets follow the Vertex field order: position 0, colour 12, uv 16, sun 24,
+        // block 25, normal 26, sway 27, layer 28 (see Vertex for the semantics)
+        gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, Vertex.Size, (void*)0);
+        gl.EnableVertexAttribArray(0);
+
+        gl.VertexAttribPointer(1, 4, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)12);
+        gl.EnableVertexAttribArray(1);
+
+        gl.VertexAttribPointer(2, 2, VertexAttribPointerType.Float, false, Vertex.Size, (void*)16);
+        gl.EnableVertexAttribArray(2);
+
+        gl.VertexAttribPointer(3, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)24);
+        gl.EnableVertexAttribArray(3);
+
+        gl.VertexAttribPointer(4, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)25);
+        gl.EnableVertexAttribArray(4);
+
+        gl.VertexAttribPointer(5, 1, VertexAttribPointerType.UnsignedByte, false, Vertex.Size, (void*)26);
+        gl.EnableVertexAttribArray(5);
+
+        gl.VertexAttribPointer(6, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)27);
+        gl.EnableVertexAttribArray(6);
+
+        // The array-texture layer is an integer attribute: no float conversion, read as uint
+        gl.VertexAttribIPointer(7, 1, VertexAttribIType.UnsignedShort, Vertex.Size, (void*)28);
+        gl.EnableVertexAttribArray(7);
     }
 
     public void Render()
