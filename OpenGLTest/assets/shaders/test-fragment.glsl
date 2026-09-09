@@ -68,6 +68,8 @@ uniform float uWaterRefractStrength;
 uniform vec3 uWaterAbsorb;
 uniform vec3 uWaterScatter;
 uniform float uWaterCausticStrength;
+// Atlas slice of the lava tile: fluid fragments on this layer glow instead of refracting.
+uniform float uLavaLayer;
 
 out vec4 FragColor;
 
@@ -202,7 +204,13 @@ void main() {
     }
 
     float waterSpec = 0.0;
-    if (isWater) {
+    bool isLava = isWater && abs(float(fLayer) - uLavaLayer) < 0.5;
+    if (isLava) {
+        // Molten rock glows on its own instead of refracting: albedo-tinted emission with
+        // a slow pulse, flat in shadow and at night. Fog still closes in below.
+        float pulse = 0.9 + 0.1 * sin(uTime * 2.0 + fWorldPos.x * 1.3 + fWorldPos.z * 1.7);
+        col = (albedo * 2.0 + vec3(0.55, 0.13, 0.01)) * pulse;
+    } else if (isWater) {
         vec3 nW = WaveNormal(fWorldPos.xz, uTime, uWaterNormalScale);
         nW = normalize(nW + vec3(wob1 * 0.09, 0.0, wob2 * 0.09));   // fine glitter on top of the swell
         vec3 V = normalize(uCameraPos - fWorldPos);

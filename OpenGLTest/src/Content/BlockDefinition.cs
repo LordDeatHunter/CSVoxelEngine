@@ -38,6 +38,10 @@ public sealed class BlockDefinition
     public LightDefinition? Light { get; set; }
     public WoodDefinition? Wood { get; set; }
 
+    /// <summary>Fluid tuning; only legal on a block with <see cref="Fluid"/>. Omitted means
+    /// water behaviour: every tick, full 7-block range, infinite sources, never hardens.</summary>
+    public FlowDefinition? Flow { get; set; }
+
     /// <summary>"model" | "tapered_wood" | "pebbles" | "fluid".</summary>
     public string? Renderer { get; set; }
 
@@ -66,5 +70,25 @@ public sealed class BlockDefinition
 
         /// <summary>Half edge length of the tapered box, in blocks.</summary>
         public float? HalfWidth { get; set; }
+    }
+
+    /// <summary>Per-fluid simulation tuning, mirroring how water and lava differ.</summary>
+    public sealed class FlowDefinition
+    {
+        /// <summary>Ticks between this fluid's updates; 2 means half water speed. Default 1.</summary>
+        public int? TickDivisor { get; set; }
+
+        /// <summary>Sideways spread in blocks before the skirt dries up, 1..7. Default 7.</summary>
+        public int? Range { get; set; }
+
+        /// <summary>Whether two adjacent sources birth a new source. Default true.</summary>
+        public bool? Infinite { get; set; }
+
+        /// <summary>Block this fluid becomes on touching <see cref="HardensTouching"/>,
+        /// e.g. lava's <c>"cobblestone"</c>. Omitted: never hardens.</summary>
+        public string? HardensTo { get; set; }
+
+        /// <summary>Fluid whose contact hardens this one, e.g. lava's <c>"block/water"</c>.</summary>
+        public string? HardensTouching { get; set; }
     }
 }

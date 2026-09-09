@@ -46,6 +46,10 @@ public class FluidManager
 
     private float _accumulator;
 
+    // How many ticks have run. Fluids with a tick divisor above 1 (lava: 2) only process
+    // when the index divides evenly, so they flow slower while sharing the one schedule.
+    private int _tickIndex;
+
     // Cells ticking now and cells scheduled for the next tick; swapped every tick so a cell
     // scheduled while ticking is handled on the following one (no unbounded cascade per tick).
     private HashSet<long> _pending = [];
@@ -271,6 +275,7 @@ public class FluidManager
         (_pending, _next) = (_next, _pending);
         _next.Clear();
         _dirtyChunks.Clear();
+        _tickIndex++;
 
         foreach (var key in _pending)
         {
@@ -280,6 +285,24 @@ public class FluidManager
             // chunk unloading needs no hook here
             if (!chunks.TryGetCell(x, y, z, out var id, out var state)) continue;
             if (!BlockType.IsFluid(id)) continue;
+
+            // Slow fluids sit this tick out and ride the next one instead of losing their turn
+            var divisor = BlockType.FluidTickDivisorById[id];
+            if (divisor > 1 && _tickIndex % divisor != 0)
+            {
+                _next.Add(key);
+                continue;
+            }
+
+            // Contact hardening runs before the level rules: lava beside water becomes
+            // cobblestone instead of flowing or lingering for another tick
+            var hardensTo = BlockType.HardensToById[id];
+            if (hardensTo != 0 && TouchesFluid(x, y, z, BlockType.HardensTouchingById[id], chunks))
+            {
+                Write(x, y, z, hardensTo, 0, chunks);
+                ScheduleAround(x, y, z);
+                continue;
+            }
 
             // Sources are infinite: they never thin out and never dry up
             if (!FluidState.IsSource(state))
@@ -332,7 +355,7 @@ public class FluidManager
             if (amount > maxAmount) maxAmount = amount;
         }
 
-        if (sources >= 2)
+        if (sources >= 2 && BlockType.FluidInfiniteById[fluid])
         {
             // Two sources side by side become a source themselves, but only where the water
             // cannot simply drain away underneath
@@ -346,8 +369,9 @@ public class FluidManager
         if (chunks.TryGetCell(x, y + 1, z, out var above, out _) && above == fluid)
             return FluidState.Falling;
 
+        var range = BlockType.FluidRangeById[fluid];
         var newAmount = maxAmount - 1;
-        if (newAmount <= 0) return StateNone;
+        if (newAmount <= 0 || newAmount < 8 - range) return StateNone;
 
         return FluidState.Flowing(8 - newAmount);
     }
@@ -468,6 +492,29 @@ public class FluidManager
         // rather than washing a block away for a drop of water that never arrives
         if (state == StateNone) return;
 
+        // A flow that would land touching the fluid that hardens it arrives hardened:
+        // lava reaching water comes out as cobblestone, not as a one-tick lava cell
+        byte writeId = fluid;
+        byte writeState = (byte)state;
+        var hardensTo = BlockType.HardensToById[fluid];
+        if (hardensTo != 0 && TouchesFluid(x, y, z, BlockType.HardensTouchingById[fluid], chunks))
+        {
+            writeId = hardensTo;
+            writeState = 0;
+        }
+        else
+        {
+            // ...and so does a flow settling against a fluid that hardens on its touch:
+            // water reaching lava crusts to cobblestone too, whichever side ticks first,
+            // so the outcome never depends on the schedule's iteration order
+            var crust = HardenedByNeighbour(x, y, z, fluid, chunks);
+            if (crust != 0)
+            {
+                writeId = crust;
+                writeState = 0;
+            }
+        }
+
         if (!chunks.TryGetCell(x, y, z, out var previous, out _)) return;
 
         if (previous != 0)
@@ -476,7 +523,7 @@ public class FluidManager
             chunks.UnmarkPlayerPlaced(x, y, z);
         }
 
-        Write(x, y, z, fluid, (byte)state, chunks);
+        Write(x, y, z, writeId, writeState, chunks);
         ScheduleAround(x, y, z);
     }
 
@@ -524,6 +571,50 @@ public class FluidManager
     {
         if (!chunks.TryGetCell(x, y, z, out var id, out var state)) return false;
         return BlockType.IsReplaceable(id) || (id == fluid && !FluidState.IsSource(state));
+    }
+
+    /// <summary>Whether any of the six face neighbours of a cell holds the given fluid.
+    /// Unloaded neighbours read as absent, never as contact.</summary>
+    private static bool TouchesFluid(int x, int y, int z, byte fluidId, ChunkManager chunks)    {
+        foreach (var (dx, dy, dz) in Horizontals)
+        {
+            if (chunks.TryGetCell(x + dx, y + dy, z + dz, out var id, out _) && id == fluidId)
+                return true;
+        }
+
+        return (chunks.TryGetCell(x, y + 1, z, out var above, out _) && above == fluidId)
+               || (chunks.TryGetCell(x, y - 1, z, out var below, out _) && below == fluidId);
+    }
+
+    /// <summary>
+    /// Block id a flow of <paramref name="fluid"/> settling at a cell hardens into when a
+    /// neighbouring fluid hardens on its touch (water reaching lava crusts to the lava's
+    /// cobblestone), or 0 when no neighbour does. Unloaded neighbours harden nothing.
+    /// </summary>
+    private static byte HardenedByNeighbour(int x, int y, int z, byte fluid, ChunkManager chunks)
+    {
+        foreach (var (dx, dy, dz) in Horizontals)
+        {
+            if (chunks.TryGetCell(x + dx, y + dy, z + dz, out var id, out _)
+                && BlockType.IsFluid(id)
+                && BlockType.HardensTouchingById[id] == fluid
+                && BlockType.HardensToById[id] != 0)
+                return BlockType.HardensToById[id];
+        }
+
+        if (chunks.TryGetCell(x, y + 1, z, out var above, out _)
+            && BlockType.IsFluid(above)
+            && BlockType.HardensTouchingById[above] == fluid
+            && BlockType.HardensToById[above] != 0)
+            return BlockType.HardensToById[above];
+
+        if (chunks.TryGetCell(x, y - 1, z, out var below, out _)
+            && BlockType.IsFluid(below)
+            && BlockType.HardensTouchingById[below] == fluid
+            && BlockType.HardensToById[below] != 0)
+            return BlockType.HardensToById[below];
+
+        return 0;
     }
 
     /// <summary>Horizontally adjacent source cells of the same fluid.</summary>

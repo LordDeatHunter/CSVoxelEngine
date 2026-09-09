@@ -342,6 +342,7 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterAbsorb", WorldGenerationConfig.WaterAbsorb);
         program.SetUniform("uWaterScatter", WorldGenerationConfig.WaterScatter);
         program.SetUniform("uWaterCausticStrength", WorldGenerationConfig.WaterCausticStrength);
+        program.SetUniform("uLavaLayer", (float)ContentRegistry.RequireBlock("lava").Top);
     }
 
     /// <summary>

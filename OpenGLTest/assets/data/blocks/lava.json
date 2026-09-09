@@ -1,0 +1,19 @@
+{
+  "model": { "parent": "block/cube_all", "textures": { "all": "lava_still" } },
+  "fluid": true,
+  "renderer": "fluid",
+  "hardness": 0,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "light": { "emission": 15, "passes": true },
+  "hasItem": false,
+  "loot": "none",
+  "flow": {
+    "tickDivisor": 2,
+    "range": 3,
+    "infinite": false,
+    "hardensTo": "cobblestone",
+    "hardensTouching": "block/water"
+  }
+}

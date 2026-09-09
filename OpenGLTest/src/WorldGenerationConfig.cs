@@ -175,12 +175,22 @@ public static class WorldGenerationConfig
     // the step is also visible edge-on as a thin line at the ring, so keep it as small as safe
     public const float LodWaterSink = 0.05f;
 
-    // Underwater view: the fog closes in to a few blocks and everything turns blue-green.
-    // The fade is deliberately short, so breaking the surface reads as a hard boundary
+    // Underwater view: the fog closes in to a few blocks and everything turns blue-green.    // The fade is deliberately short, so breaking the surface reads as a hard boundary
     // rather than a slow filter, but is still eased instead of snapped.
     public const float UnderwaterFadeSeconds = 0.15f;
     public const float UnderwaterFogNearBlocks = 1f;
     public const float UnderwaterFogFarBlocks = 48f;
+
+    // --- Lava ---
+    // Deep cave floors pond over with lava sources where a patch mask and a per-cell roll
+    // agree (see LavaGenerator). Pockets sit at or below LavaMaxY and buried under the
+    // terrain, so the surface, ravines and entrances stay dry and sea caves stay water.
+    public const bool LavaEnabled = true;
+    public const int LavaMaxY = -24;
+    public const int LavaBurial = 2;
+    public const float LavaPatchFrequency = 1f / 128f;
+    public const float LavaPatchThreshold = 0.2f;
+    public const float LavaPoolChance = 0.3f;
 
     // --- Terrain shape (natural rolling base with large flat patches) ---
     // The base is the original rolling terrain (BaseFrequency, 6-octave product noise times

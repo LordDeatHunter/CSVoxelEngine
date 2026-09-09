@@ -229,12 +229,20 @@ public static class ContentRegistry
         Array.Clear(BlockType.OccludesById);
         Array.Clear(BlockType.CastsAoById);
         Array.Clear(BlockType.FluidById);
+        Array.Clear(BlockType.FluidTickDivisorById);
+        Array.Clear(BlockType.FluidRangeById);
+        Array.Clear(BlockType.FluidInfiniteById);
+        Array.Clear(BlockType.HardensToById);
+        Array.Clear(BlockType.HardensTouchingById);
         Array.Clear(BlockType.ReplaceableById);
         Array.Clear(BlockType.FallsById);
 
         // Air owns no definition but still has to let light through and stop nothing
         BlockType.PassesLightById[BlockType.Air] = true;
         BlockType.ReplaceableById[BlockType.Air] = true;
+        BlockType.FluidTickDivisorById[BlockType.Air] = 1;
+        BlockType.FluidRangeById[BlockType.Air] = 7;
+        BlockType.FluidInfiniteById[BlockType.Air] = true;
     }
 
     private static void LoadItems(List<(string Name, string Path)> files)
@@ -277,6 +285,22 @@ public static class ContentRegistry
         if (TryResolve(name, out var id)) return id;
         throw new InvalidOperationException(
             $"Item '{path}' names '{name}' in {field}, which is not a registered block or item.");
+    }
+
+    private static byte ResolveHardenTarget(string? name, string field, string path, bool requireFluid, byte ownerId)
+    {
+        if (name == null) return 0;
+
+        if (!TryResolve(name, out var id) || id == BlockType.Air || ItemType.Types.ContainsKey(id))
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in {field}, which is not a registered block.");
+        if (requireFluid && (!BlockType.FluidById[id] || id == ownerId))
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in {field}, which is not a different fluid block.");
+        if (!requireFluid && BlockType.FluidById[id])
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in {field}, which is a fluid; hardening must produce a solid block.");
+        return id;
     }
 
     /// <summary>
@@ -343,6 +367,7 @@ public static class ContentRegistry
     private static void LoadBlocks(List<(string Name, string Path)> files)
     {
         var types = new Dictionary<byte, BlockType>();
+        var hardenPending = new List<(byte Id, string? To, string? Touching, string Path)>();
 
         foreach (var (name, path) in files)
         {
@@ -375,6 +400,19 @@ public static class ContentRegistry
             var emission = definition.Light?.Emission ?? 0;
             if (emission > 15)
                 throw new InvalidOperationException($"Block '{path}' has light.emission {emission}; expected 0..15.");
+
+            var flow = definition.Flow;
+            if (flow != null && !(definition.Fluid ?? false))
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets flow.* without fluid: true; flow tuning only applies to fluids.");
+            var tickDivisor = flow?.TickDivisor ?? 1;
+            if (tickDivisor < 1 || tickDivisor > 8)
+                throw new InvalidOperationException(
+                    $"Block '{path}' has flow.tickDivisor {tickDivisor}; expected 1..8.");
+            var range = flow?.Range ?? 7;
+            if (range < 1 || range > 7)
+                throw new InvalidOperationException(
+                    $"Block '{path}' has flow.range {range}; expected 1..7 (the state byte holds levels 1..7).");
 
             // A fluid's behaviour follows from being a fluid, so the registry forces it rather
             // than trusting the file: nothing collides with water, it darkens no face, it has
@@ -409,9 +447,18 @@ public static class ContentRegistry
                 NeedsSupport = needsSupport,
                 Falls = falls,
                 Fluid = fluid,
+                FluidTickDivisor = (byte)tickDivisor,
+                FluidRange = (byte)range,
+                FluidInfinite = flow?.Infinite ?? true,
                 OnBreak = onBreak,
                 LootTable = fluid ? LootTable.None : ResolveLoot(name, definition.Loot, path),
             };
+            type.HardensToId = 0;
+            type.HardensTouchingId = 0;
+            if ((flow?.HardensTo == null) != (flow?.HardensTouching == null))
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets only one of flow.hardensTo / flow.hardensTouching; hardening needs both.");
+            hardenPending.Add((id, flow?.HardensTo, flow?.HardensTouching, path));
 
             BlockModels[id] = ResolveModel(definition.Model, path);
             BlockDefinitions[id] = definition;
@@ -422,9 +469,26 @@ public static class ContentRegistry
             BlockType.SolidById[id] = type.Solid;
             BlockType.CastsAoById[id] = type.CastsAmbientOcclusion;
             BlockType.FluidById[id] = type.Fluid;
+            BlockType.FluidTickDivisorById[id] = type.FluidTickDivisor;
+            BlockType.FluidRangeById[id] = type.FluidRange;
+            BlockType.FluidInfiniteById[id] = type.FluidInfinite;
+            BlockType.HardensToById[id] = type.HardensToId;
+            BlockType.HardensTouchingById[id] = type.HardensTouchingId;
             BlockType.FallsById[id] = type.Falls;
             // Fragile blocks are washed away by a flow instead of stopping it
             BlockType.ReplaceableById[id] = type.NeedsSupport;
+        }
+
+        // Contact targets resolve here, not inline: files load alphabetically, so lava's
+        // flow.hardensTouching (water) may not have its fluid flag yet when lava is read.
+        foreach (var (pendingId, to, touching, pendingPath) in hardenPending)
+        {
+            if (to == null) continue;
+            var type = types[pendingId];
+            type.HardensToId = ResolveHardenTarget(to, "flow.hardensTo", pendingPath, requireFluid: false, ownerId: pendingId);
+            type.HardensTouchingId = ResolveHardenTarget(touching, "flow.hardensTouching", pendingPath, requireFluid: true, ownerId: pendingId);
+            BlockType.HardensToById[pendingId] = type.HardensToId;
+            BlockType.HardensTouchingById[pendingId] = type.HardensTouchingId;
         }
 
         BlockType.Types = types;

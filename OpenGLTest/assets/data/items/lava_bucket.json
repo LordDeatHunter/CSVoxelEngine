@@ -1,0 +1,5 @@
+{
+  "name": "Lava Bucket",
+  "texture": "assets/textures/items/lava_bucket.png",
+  "use": { "action": "place_fluid", "fluid": "block/lava", "result": "item/bucket" }
+}

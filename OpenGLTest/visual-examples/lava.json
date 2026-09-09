@@ -1,0 +1,13 @@
+{
+  // Lava pockets: run with VOXEL_SCRIPT=visual-examples/lava.json
+  // (working directory OpenGLTest/, e.g. via dotnet run). Shots land in visual/lava/.
+  // Teleports into a cave above a generated lava pool at (-42,-54,79) and frames it.
+  "steps": [
+    { "op": "teleport", "pos": [-41.5, -51.5, 79.5], "yaw": -90, "pitch": -60 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "screenshot", "name": "pocket" },
+    { "op": "look", "yaw": -45, "pitch": -45 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "pocket-wide", "hideHud": true }
+  ]
+}

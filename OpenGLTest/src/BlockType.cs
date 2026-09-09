@@ -53,6 +53,17 @@ public sealed record BlockType
     internal static readonly bool[] FluidById = new bool[256];
     internal static readonly bool[] ReplaceableById = new bool[256];
 
+    // Per-fluid simulation tuning (see BlockDefinition.FlowDefinition): ticks between updates,
+    // sideways spread range, and whether adjacent sources multiply. Water's defaults.
+    internal static readonly byte[] FluidTickDivisorById = new byte[256];
+    internal static readonly byte[] FluidRangeById = new byte[256];
+    internal static readonly bool[] FluidInfiniteById = new bool[256];
+
+    // Contact hardening: a fluid cell holding HardensTouchingId next to it becomes HardensToId
+    // (lava beside water becomes cobblestone). Zero means the fluid never hardens.
+    internal static readonly byte[] HardensToById = new byte[256];
+    internal static readonly byte[] HardensTouchingById = new byte[256];
+
     // Gravity checks run per block edit (not per voxel), but the flat shape keeps the
     // support test a single array read like the other per-id questions
     internal static readonly bool[] FallsById = new bool[256];
@@ -120,6 +131,22 @@ public sealed record BlockType
     /// never collide, cast AO, drop loot or take an inventory slot. Named like
     /// <see cref="Solid"/> rather than "IsFluid", which the per-id predicate below owns.</summary>
     public bool Fluid { get; init; }
+
+    /// <summary>Ticks between this fluid's simulation updates; 1 is water speed, 2 half of it.</summary>
+    public byte FluidTickDivisor { get; init; } = 1;
+
+    /// <summary>Sideways spread in blocks before the skirt dries up; water flows 7.</summary>
+    public byte FluidRange { get; init; } = 7;
+
+    /// <summary>Whether adjacent sources of this fluid birth a new source.</summary>
+    public bool FluidInfinite { get; init; } = true;
+
+    /// <summary>Block id this fluid becomes on touching <see cref="HardensTouchingId"/>;
+    /// 0 when the fluid never hardens.</summary>
+    public byte HardensToId { get; internal set; }
+
+    /// <summary>Fluid block id whose contact hardens this one; 0 when it never hardens.</summary>
+    public byte HardensTouchingId { get; internal set; }
 
     /// <summary>What happens when the block is destroyed.</summary>
     public BlockBreakAction OnBreak { get; init; } = BlockBreakAction.Drop;

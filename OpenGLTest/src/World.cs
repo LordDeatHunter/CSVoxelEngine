@@ -538,8 +538,8 @@ public class World
             && ItemType.Types.TryGetValue(id, out var item) && item.UseAction != ItemUseAction.None)
         {
             // Only morph the tool if the action actually took effect
-            if (TryUseItem(maxDistance, item) && Inventory.SelectedToolInstance is var instance and > 0)
-                Inventory.MorphTool(instance, item.UseResultId);
+            if (TryUseItem(maxDistance, item, out var resultId) && Inventory.SelectedToolInstance is var instance and > 0)
+                Inventory.MorphTool(instance, resultId);
             return;
         }
 
@@ -552,8 +552,9 @@ public class World
     /// <see cref="FluidManager.SetCellImmediate"/>, the only fluid write that remeshes on the
     /// spot, so the water appears or vanishes on the click rather than on the next tick.
     /// </summary>
-    private bool TryUseItem(float maxDistance, ItemType item)
+    private bool TryUseItem(float maxDistance, ItemType item, out byte resultId)
     {
+        resultId = item.UseResultId;
         switch (item.UseAction)
         {
             case ItemUseAction.PickupFluid:
@@ -565,7 +566,24 @@ public class World
 
                 if (!_chunkManager.TryGetCell((int)hit.X, (int)hit.Y, (int)hit.Z, out var id, out var state))
                     return false;
-                if (id != item.UseFluidId || !FluidState.IsSource(state)) return false;
+                if (!BlockType.IsFluid(id) || !FluidState.IsSource(state)) return false;
+
+                // An empty bucket scoops whatever fluid it hit, becoming the full bucket
+                // whose pour targets that fluid; a fluid with no full bucket cannot be taken
+                if (id != item.UseFluidId)
+                {
+                    resultId = 0;
+                    foreach (var (candidateId, candidate) in ItemType.Types)
+                    {
+                        if (candidate.UseAction == ItemUseAction.PlaceFluid && candidate.UseFluidId == id)
+                        {
+                            resultId = candidateId;
+                            break;
+                        }
+                    }
+
+                    if (resultId == 0) return false;
+                }
 
                 return _fluidManager.SetCellImmediate(hit, 0, 0, _chunkManager);
             }

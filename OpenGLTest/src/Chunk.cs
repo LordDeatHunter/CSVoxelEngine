@@ -415,6 +415,10 @@ public class Chunk : IDisposable
         if (WorldGenerationConfig.WaterEnabled)
             FillWater(column, lowerBoundY);
 
+        // After the sea: flooded cells are water, not air, so only dry cave floors pond lava
+        if (WorldGenerationConfig.LavaEnabled)
+            LavaGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
+
         if (WorldGenerationConfig.TreesEnabled)
             TreeGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
 
@@ -427,8 +431,10 @@ public class Chunk : IDisposable
             if (block != BlockType.Air) solid++;
         _solidCount = solid;
 
-        // Only a chunk that actually got flooded can have a frontier to report
-        if (needsWater) ScanFluidFrontier();
+        // Only a chunk that actually got flooded can have a frontier to report, plus any
+        // chunk low enough to hold lava pockets (the scan itself is fluid-generic)
+        if (needsWater || (WorldGenerationConfig.LavaEnabled && lowerBoundY <= WorldGenerationConfig.LavaMaxY))
+            ScanFluidFrontier();
 
         IsBlockDataReady = true;
     }
