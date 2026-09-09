@@ -28,6 +28,11 @@ public class Camera
     /// underwater tint, which must not fade in while only the legs are wet.</summary>
     public bool IsEyeInWater { get; private set; }
 
+    /// <summary>Whether the eye sits inside a glowing fluid (lava): the underwater tint
+    /// turns red instead of blue. A fluid's glow is what tells them apart, so a new
+    /// emissive fluid gets the lava treatment without naming it here.</summary>
+    public bool IsEyeInLava { get; private set; }
+
     private const float DefaultFov = 70f;
     // Near plane sets depth precision at distance (error ~ z^2 / (near * 2^24)); it must be
     // large enough that stacked LOD levels ~4 blocks apart don't z-fight at 2048 blocks.
@@ -371,8 +376,16 @@ public class Camera
 
         _waterFlow = flowCells > 0 ? flowSum / flowCells : Vector3.Zero;
         IsInWater = inWater;
-        IsEyeInWater = Position.Y < chunkManager.GetFluidSurfaceGlobal(
-            (int)MathF.Floor(Position.X), (int)MathF.Floor(Position.Y), (int)MathF.Floor(Position.Z));
+        var eyeX = (int)MathF.Floor(Position.X);
+        var eyeY = (int)MathF.Floor(Position.Y);
+        var eyeZ = (int)MathF.Floor(Position.Z);
+        IsEyeInWater = Position.Y < chunkManager.GetFluidSurfaceGlobal(eyeX, eyeY, eyeZ);
+        IsEyeInLava = false;
+        if (IsEyeInWater && chunkManager.TryGetCell(eyeX, eyeY, eyeZ, out var eyeId, out _)
+            && BlockType.IsFluid(eyeId))
+        {
+            IsEyeInLava = BlockType.Emission[eyeId] > 0;
+        }
     }
 
     private void UpdateNoclipToggle(IKeyboard keyboard)

@@ -125,8 +125,11 @@ public class RenderManager : IDisposable
     // (0 = above water, 1 = fully submerged) over UnderwaterFadeSeconds
     private static readonly Vector3 UnderwaterFogColor = new(0.05f, 0.22f, 0.42f);
     private static readonly Vector3 UnderwaterAmbientTint = new(0.55f, 0.75f, 1f);
+    private static readonly Vector3 LavaFogColor = new(0.55f, 0.12f, 0.02f);
+    private static readonly Vector3 LavaAmbientTint = new(1.2f, 0.6f, 0.4f);
     private double _prevTime;
     private float _underwaterT;
+    private bool _eyeInLava;
 
     // Whole-frame GPU time, measured with a ring of TIME_ELAPSED queries so a result is only
     // ever read once the driver has it (see BeginGpuFrame). Three slots is enough for the
@@ -425,9 +428,10 @@ public class RenderManager : IDisposable
     /// state into the per-frame fields. Called once per frame before <see cref="BeginFrame"/>,
     /// which uploads the result to the world shader through <see cref="ApplyFrameUniforms"/>.
     /// <paramref name="underwater"/> is whether the camera's eye sits below a fluid surface;
-    /// it fades the underwater tint in and out.
+    /// it fades the underwater tint in and out. <paramref name="eyeInLava"/> picks the lava
+    /// variant of that tint, so a submerged view reads red instead of blue.
     /// </summary>
-    public void SetLighting(double time, Camera? camera, IReadOnlyList<PrimedTnt>? primed, bool underwater)
+    public void SetLighting(double time, Camera? camera, IReadOnlyList<PrimedTnt>? primed, bool underwater, bool eyeInLava)
     {
         // The window clock is the only time source this pass has; clamp the step so a hitch
         // (or the very first frame) cannot jump the fade
@@ -498,6 +502,8 @@ public class RenderManager : IDisposable
         // Underwater the fog closes in to a few blocks, the sky and fog go blue-green and the
         // light dims and cools, so a submerged view reads as being inside the water rather
         // than looking at a blue filter. Scaled by dayness so night water stays dark.
+        // Lava keeps the same fade but glows red instead, staying bright at night.
+        _eyeInLava = eyeInLava && underwater;
         _underwaterT = MathUtils.Clamp01(
             _underwaterT + (underwater ? dt : -dt) / WorldGenerationConfig.UnderwaterFadeSeconds);
         var wet = MathUtils.SmoothStep(_underwaterT);
@@ -520,10 +526,12 @@ public class RenderManager : IDisposable
 
         if (wet <= 0f) return;
 
-        var underwaterColor = UnderwaterFogColor * (0.15f + 0.85f * dayness);
+        var underwaterColor = _eyeInLava
+            ? LavaFogColor * (0.6f + 0.4f * dayness)
+            : UnderwaterFogColor * (0.15f + 0.85f * dayness);
         _fogColor = Mix(_fogColor, underwaterColor, wet);
         _skyColor = Mix(_skyColor, underwaterColor, wet);
-        _ambient = Mix(_ambient, _ambient * UnderwaterAmbientTint, wet);
+        _ambient = Mix(_ambient, _ambient * (_eyeInLava ? LavaAmbientTint : UnderwaterAmbientTint), wet);
         _sunIntensity = MathUtils.Lerp(_sunIntensity, _sunIntensity * 0.5f, wet);
     }
 
@@ -1113,7 +1121,7 @@ public class RenderManager : IDisposable
             new Vector2(1f / Math.Max(1, _viewportSize.X), 1f / Math.Max(1, _viewportSize.Y)));
         program.SetUniform("uInvViewProj", _invViewProj);
         program.SetUniform("uShadowStrengthDry", _shadowStrengthDry);
-        program.SetUniform("uUnderwater", MathUtils.SmoothStep(_underwaterT));
+        program.SetUniform("uUnderwater", _eyeInLava ? 0f : MathUtils.SmoothStep(_underwaterT));
     }
 
     /// <summary>
@@ -1161,7 +1169,7 @@ public class RenderManager : IDisposable
     /// depth texture is re-copied here before the march.</summary>
     public void RenderUnderwaterRays(Camera? camera)
     {
-        if (camera == null || _rays == null) return;
+        if (camera == null || _rays == null || _eyeInLava) return;
         var wet = MathUtils.SmoothStep(_underwaterT);
         var strength = wet * _shadowStrengthDry * _dayness * WorldGenerationConfig.WaterRayStrength;
         if (strength <= 0.0005f) return;
@@ -1757,8 +1765,10 @@ public class RenderManager : IDisposable
         if (_underwaterT > 0.001f)
         {
             var wet = MathUtils.SmoothStep(_underwaterT);
+            var tint = _eyeInLava ? LavaFogColor : UnderwaterFogColor;
+            var alpha = (_eyeInLava ? 0.35f : 0.18f) * wet;
             ui.DrawRect(ui.ScreenCentre, new Vector2(window.Size.X, window.Size.Y),
-                Rgba.FromFloat(UnderwaterFogColor.X, UnderwaterFogColor.Y, UnderwaterFogColor.Z, 0.18f * wet));
+                Rgba.FromFloat(tint.X, tint.Y, tint.Z, alpha));
         }
 
         if (!view.IsOpen)
