@@ -57,6 +57,10 @@ public class RenderManager : IDisposable
     // Underwater sun shafts, one additive full-screen pass. Null until LoadResources builds it.
     private UnderwaterRaysRenderer? _rays;
 
+    // Falling leaves: one dynamic billboard batch drawn in the entity pass, after the
+    // cubes. Null until LoadResources builds it.
+    private LeafParticleRenderer? _leaves;
+
     // Directional sun shadows: RenderShadows fills _shadowDepthTex (a depth-only FBO
     // attachment, sampled as a comparison sampler on unit 1) through _lightViewProj, and
     // every world draw hands both to test-fragment.glsl's SampleShadow.
@@ -305,6 +309,7 @@ public class RenderManager : IDisposable
         _sunQuad = Primitives.CreateSquare(gl, 1f);
         _clouds = new CloudRenderer(gl);
         _rays = new UnderwaterRaysRenderer(gl);
+        _leaves = new LeafParticleRenderer(gl);
 
         blockCubes = new BlockCubeCache(gl);
         itemMeshes = new ItemMeshCache(gl);
@@ -1563,6 +1568,20 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
+    /// Draws every live falling leaf in one batched billboard draw. Leaves are too small to
+    /// cast shadows, so they skip the shadow pass; their own shader carries the frame light
+    /// and fog, which is final by the time the entity pass runs.
+    /// </summary>
+    public void RenderLeafParticles(Camera camera, IReadOnlyList<LeafParticle> leaves)
+    {
+        if (camera == null || leaves.Count == 0 || _leaves == null) return;
+
+        _leaves.Render(leaves, camera.GetViewProjection(), camera.Position, camera.Forward,
+            textureAtlas, TextureAtlas.TileWidth, _sunDir, _sunColor, _sunIntensity,
+            _ambient, _fogColor, _fogNear, _fogFar);
+    }
+
+    /// <summary>
     /// Draws a felled tree swinging around its base. The mesh uploads on first sight (GL is
     /// only legal on this thread); an empty mesh means nothing visible was collected.
     /// </summary>
@@ -1794,6 +1813,7 @@ public class RenderManager : IDisposable
         sunShader.Dispose();
         _clouds?.Dispose();
         _rays?.Dispose();
+        _leaves?.Dispose();
         _sunQuad.Dispose();
         gl.DeleteTexture(_sunTexture);
         gl.DeleteFramebuffer(_shadowFbo);

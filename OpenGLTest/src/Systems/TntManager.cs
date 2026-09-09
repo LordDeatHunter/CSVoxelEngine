@@ -30,7 +30,7 @@ public class TntManager
     }
 
     public void Update(float deltaTime, ChunkManager chunks, LodManager lod, DropManager drops,
-        FluidManager fluids, FallingBlockManager falling)
+        FluidManager fluids, FallingBlockManager falling, LeafParticleSystem? leaves = null)
     {
         foreach (var tnt in _primed)
             tnt.Update(deltaTime, chunks);
@@ -41,7 +41,7 @@ public class TntManager
             if (!_primed[i].IsDue) continue;
             var at = _primed[i].Position;
             _primed.RemoveAt(i);
-            Detonate(at, chunks, lod, drops, fluids, falling);
+            Detonate(at, chunks, lod, drops, fluids, falling, leaves);
         }
 
         foreach (var (position, blockId) in _pendingSpawns)
@@ -57,13 +57,14 @@ public class TntManager
     /// the crater — and the water around the blast is scheduled so it floods the hole instead.
     /// </summary>
     private void Detonate(Vector3 center, ChunkManager chunks, LodManager lod, DropManager drops,
-        FluidManager fluids, FallingBlockManager falling)
+        FluidManager fluids, FallingBlockManager falling, LeafParticleSystem? leaves = null)
     {
         var radius = BlastRadius;
         var radiusSq = radius * radius;
         var touchedChunks = new HashSet<Vector3>();
         // Lowest destroyed y per (x, z), so each blasted column lowers the LOD cap once
         var blastedColumns = new Dictionary<(int X, int Z), int>();
+        List<Vector3>? blastedLeaves = null;
 
         var min = (center - new Vector3(radius)).Floor();
         var max = (center + new Vector3(radius)).Floor();
@@ -98,6 +99,12 @@ public class TntManager
             // triggered per blasted column below, which then reads the poison)
             if (TreeGenerator.IsTreeBlock(removed))
                 TreeGenerator.PoisonCanopy(x, z);
+
+            if (leaves != null && removed == TreeGenerator.LeavesBlock)
+            {
+                blastedLeaves ??= new List<Vector3>();
+                blastedLeaves.Add(new Vector3(x, y, z));
+            }
 
             if (BlockType.ById[removed]?.OnBreak == BlockBreakAction.PrimeTnt)
             {
@@ -167,5 +174,8 @@ public class TntManager
 
         // One box for the whole blast, grown by a block so the water just outside it notices
         fluids.ScheduleBox(min - Vector3.One, max + Vector3.One);
+
+        if (blastedLeaves != null)
+            leaves?.BurstCells(blastedLeaves, WorldGenerationConfig.LeafParticleBurstBlast);
     }
 }

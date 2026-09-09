@@ -33,6 +33,7 @@ public class World
     private readonly TntManager _tntManager = new();
     private readonly FallingBlockManager _falling = new();
     private readonly FluidManager _fluidManager = new();
+    private readonly LeafParticleSystem _leaves = new();
     // Trees currently toppling over after their base log was mined
     private readonly List<TopplingTree> _toppling = [];
     private readonly IWindow _window;
@@ -56,6 +57,9 @@ public class World
 
     /// <summary>Live falling sand/gravel cubes.</summary>
     public IReadOnlyList<FallingBlock> Falling => _falling.Falling;
+
+    /// <summary>Live falling leaves, feeding the batched billboard pass.</summary>
+    public IReadOnlyList<LeafParticle> LeafParticles => _leaves.Particles;
 
     // Break overlay strength. Quantized to whole hits, so it steps with the damage dealt
     // instead of sweeping continuously.
@@ -100,8 +104,9 @@ public class World
         foreach (var blockId in _dropManager.Collected)
             Inventory.Add(blockId);
 
-        _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager, _falling);
+        _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager, _falling, _leaves);
         _falling.Update((float)deltaTime, _chunkManager, _dropManager, _fluidManager);
+        _leaves.Update((float)deltaTime, Camera.Position, _chunkManager);
 
         // Falling cubes shove the player aside instead of landing inside them; strictly
         // one-way, the player never deflects a cube
@@ -165,6 +170,7 @@ public class World
         renderManager.RenderItemDrops(Camera, _dropManager.Drops);
         renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
         renderManager.RenderFallingBlocks(Camera, _falling.Falling);
+        renderManager.RenderLeafParticles(Camera, _leaves.Particles);
         foreach (var tree in _toppling)
             renderManager.RenderTopplingTree(Camera, tree);
         FrameProfiler.End(ProfileSection.EntityPass);
@@ -355,6 +361,7 @@ public class World
         {
             TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z);
             _lodManager.MarkEditedColumn((int)blockPos.X, (int)blockPos.Z);
+            _leaves.Burst(blockPos, WorldGenerationConfig.LeafParticleBurstMined);
         }
 
         // Pebbles and their kind need the block under them: pop whatever sits right above the
@@ -449,6 +456,16 @@ public class World
         TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z);
         foreach (var ((lx, lz), _) in lowestY)
             _lodManager.MarkEditedColumn(lx, lz);
+
+        List<Vector3>? felledLeaves = null;
+        foreach (var block in collected)
+        {
+            if (block.Id != TreeGenerator.LeavesBlock) continue;
+            felledLeaves ??= new List<Vector3>();
+            felledLeaves.Add(block.Cell);
+        }
+        if (felledLeaves != null)
+            _leaves.BurstCells(felledLeaves, WorldGenerationConfig.LeafParticleBurstFell);
 
         // The tree tips away from whoever felled it, pivoting on the mined cell's base
         var away = new Vector3(

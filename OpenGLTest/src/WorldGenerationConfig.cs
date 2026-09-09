@@ -318,6 +318,27 @@ public static class WorldGenerationConfig
     // test-vertex.glsl next to the wave itself
     public const float LeafSwayStrength = 1f;
 
+    // --- Falling leaves (LeafParticleSystem + LeafParticleRenderer) ---
+    // Ambient leaf fall around the camera plus a burst whenever canopy is disturbed
+    // (mined, felled, blasted). One batched billboard draw covers all of them.
+    public const int LeafParticleMax = 512;
+    public const float LeafParticleSpawnPerSecond = 30f;
+    public const float LeafParticleSpawnRadius = 24f;
+    public const int LeafParticleSpawnTries = 6;
+    public const float LeafParticleLifetime = 9f;
+    // Leaves flutter down at a near-constant sink instead of accelerating like drops
+    public const float LeafParticleFallSpeed = 0.9f;
+    public const float LeafParticleFallDrag = 2.5f;
+    // A 6x6-texel crop of a 32px tile spans 6/32 of a block, rounded up a touch
+    public const float LeafParticleSize = 0.2f;
+    // Seconds a landed leaf takes to fade out before it is removed
+    public const float LeafParticleFadeSeconds = 1.2f;
+    // Texels of the centred square cropped out of the leaves tile for the sprite
+    public const int LeafParticleCropPixels = 6;
+    public const int LeafParticleBurstMined = 6;
+    public const int LeafParticleBurstFell = 24;
+    public const int LeafParticleBurstBlast = 16;
+
     // --- Pebbles (PebbleGenerator) ---
     // Ankle-high stones in rare low-frequency patches; a density roll thins inside them
     public const bool PebblesEnabled = true;

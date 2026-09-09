@@ -26,6 +26,10 @@ public static class TextureAtlas
     /// <summary>Number of slices in the last built atlas (tests, diagnostics).</summary>
     public static int LayerCount { get; private set; }
 
+    /// <summary>Pixel size of one tile; every tile shares it (tests, particle UV crops).</summary>
+    public static int TileWidth { get; private set; }
+    public static int TileHeight { get; private set; }
+
     private static readonly Dictionary<string, ushort> Tiles = new();
 
     /// <summary>
@@ -78,6 +82,8 @@ public static class TextureAtlas
         }
 
         LayerCount = layers.Count;
+        TileWidth = tileWidth;
+        TileHeight = tileHeight;
         return (layers, tileWidth, tileHeight);
     }
 
