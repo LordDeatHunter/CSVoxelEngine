@@ -48,6 +48,13 @@ public sealed class BlockDefinition
     /// <summary>"drop" | "prime_tnt".</summary>
     public string? OnBreak { get; set; }
 
+    /// <summary>
+    /// Custom selection boxes in cell-local 0..1 space: either a single
+    /// <c>{"min": [x,y,z], "max": [x,y,z]}</c> object or an array of them.
+    /// Omitted means the full cube. Undefined when the author wrote nothing.
+    /// </summary>
+    public JsonElement Hitbox { get; set; }
+
     /// <summary>Loot table name, or "none" for nothing. Omitted: the table sharing this
     /// block's name if one exists, otherwise the block drops itself.</summary>
     public string? Loot { get; set; }

@@ -151,6 +151,13 @@ public sealed record BlockType
     /// <summary>What happens when the block is destroyed.</summary>
     public BlockBreakAction OnBreak { get; init; } = BlockBreakAction.Drop;
 
+    /// <summary>
+    /// Selection boxes in cell-local 0..1 space, from the block's <c>"hitbox"</c> JSON.
+    /// A single full-cube entry when the author wrote nothing. The hover outline draws
+    /// all of them; the raycast targets the cell only through one of them.
+    /// </summary>
+    public BlockHitbox[] Hitboxes { get; init; } = [BlockHitbox.FullCube];
+
     /// <summary>Loot rolled on break. Null means "drop yourself";
     /// <see cref="silkgltriangle.LootTable.None"/> means "drop nothing".</summary>
     public LootTable? LootTable { get; init; }

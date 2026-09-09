@@ -247,6 +247,7 @@ trailing commas.
 | `flow` | water behaviour | per-fluid tuning, only legal with `fluid: true`: `tickDivisor` (ticks between updates, lava `2` = half water speed), `range` (sideways spread 1..7, lava `3`), `infinite` (adjacent sources birth new ones, lava `false`), and the `hardensTo` + `hardensTouching` pair (lava hardens to `cobblestone` on touching `block/water`) |
 | `onBreak` | `"drop"` | `drop` (roll loot) or `prime_tnt` (no drop, spawns a `PrimedTnt`) |
 | `loot` | the table sharing this block's name, else drop self | loot table name; `"none"` drops nothing |
+| `hitbox` | full cube | selection boxes in cell-local 0..1 space: one `{"min": [x,y,z], "max": [x,y,z]}` object or an array of them; the outline draws all, the raycast only targets through one |
 
 Two traps worth repeating: a **model that is not a full cube needs `light.passes: true`** (which
 is its default) or its own cell stays dark and the interior quads render black; and a **cutout

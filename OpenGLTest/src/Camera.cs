@@ -617,10 +617,21 @@ public class Camera
     /// <summary>
     /// Walks the view ray cell by cell (DDA) and reports the first cell it can target. Fluids are
     /// transparent to targeting unless <paramref name="includeFluids"/> is set, which only an item
-    /// that works on them (the bucket) asks for.
+    /// that works on them (the bucket) asks for. A cell only counts when the ray enters one of
+    /// the block's hitboxes (see <see cref="BlockHitbox"/>), so small blocks like flowers are
+    /// aimed through everywhere outside their shape.
     /// </summary>
     public bool Raycast(float maxDistance, ChunkManager chunkManager, out Vector3 hitPosition, out Vector3 hitNormal,
-        bool includeFluids = false)
+        bool includeFluids = false) =>
+        Raycast(maxDistance, chunkManager, out hitPosition, out hitNormal, out _, includeFluids);
+
+    /// <summary>
+    /// Box-aware raycast: like <see cref="Raycast(float, ChunkManager, out Vector3, out Vector3, bool)"/>,
+    /// but also reports which of the hit block's hitboxes was entered, so the selection outline
+    /// can highlight that box's face.
+    /// </summary>
+    public bool Raycast(float maxDistance, ChunkManager chunkManager, out Vector3 hitPosition, out Vector3 hitNormal,
+        out int hitBoxIndex, bool includeFluids = false)
     {
         var direction = GetForwardVector();
         var currentPosition = Position.Floor();
@@ -637,6 +648,7 @@ public class Camera
 
         hitPosition = Vector3.Zero;
         hitNormal = Vector3.Zero;
+        hitBoxIndex = 0;
 
         for (var i = 0; i < maxDistance * dist; i++)
         {
@@ -649,17 +661,47 @@ public class Camera
             // A fluid is hit only for a caller that asked for it, and then only as a source: a
             // flowing skirt is aimed through (Minecraft's SOURCE_ONLY), and the cell the eye is
             // already inside is skipped so swimming never targets the water on the player's face.
-            var isHit = cellId != 0 && (!BlockType.IsFluid(cellId)
+            var targetsCell = cellId != 0 && (!BlockType.IsFluid(cellId)
                 || (includeFluids && i > 0 && FluidState.IsSource(chunkManager.GetStateGlobal(cellX, cellY, cellZ))));
 
-            if (isHit)
+            if (targetsCell)
             {
-                hitPosition = currentPosition;
+                var boxes = BlockType.ById[cellId]?.Hitboxes;
+                if (boxes == null || boxes.Length == 0)
+                {
+                    hitPosition = currentPosition;
+                    hitNormal = lastStepNormal == Vector3.Zero ? -direction.Sign() : lastStepNormal;
+                    hitBoxIndex = 0;
+                    return true;
+                }
 
-                // If we start inside a solid voxel, approximate with opposite view direction.
-                hitNormal = lastStepNormal == Vector3.Zero ? -direction.Sign() : lastStepNormal;
+                var bestT = float.PositiveInfinity;
+                var bestBox = -1;
+                var bestNormal = Vector3.Zero;
+                for (var b = 0; b < boxes.Length; b++)
+                {
+                    var boxMin = currentPosition + boxes[b].Min;
+                    var boxMax = currentPosition + boxes[b].Max;
+                    if (!RayIntersectsBox(Position, direction, boxMin, boxMax, maxDistance, out var t, out var normal))
+                        continue;
+                    if (t < bestT)
+                    {
+                        bestT = t;
+                        bestBox = b;
+                        bestNormal = normal;
+                    }
+                }
 
-                return true;
+                if (bestBox >= 0)
+                {
+                    hitPosition = currentPosition;
+                    hitBoxIndex = bestBox;
+                    // The eye inside the box has no entry face: fall back to the cell entry.
+                    hitNormal = bestNormal == Vector3.Zero
+                        ? (lastStepNormal == Vector3.Zero ? -direction.Sign() : lastStepNormal)
+                        : bestNormal;
+                    return true;
+                }
             }
 
             if (tMax.X < tMax.Y && tMax.X < tMax.Z)
@@ -683,5 +725,57 @@ public class Camera
         }
 
         return false;
+    }
+
+    internal static bool RayIntersectsBox(Vector3 origin, Vector3 direction, Vector3 min, Vector3 max,
+        float maxDistance, out float tEnter, out Vector3 normal)
+    {
+        tEnter = 0f;
+        normal = Vector3.Zero;
+        var tExit = float.PositiveInfinity;
+        var hitAxis = -1;
+
+        for (var axis = 0; axis < 3; axis++)
+        {
+            var o = axis == 0 ? origin.X : axis == 1 ? origin.Y : origin.Z;
+            var d = axis == 0 ? direction.X : axis == 1 ? direction.Y : direction.Z;
+            var lo = axis == 0 ? min.X : axis == 1 ? min.Y : min.Z;
+            var hi = axis == 0 ? max.X : axis == 1 ? max.Y : max.Z;
+
+            if (MathF.Abs(d) < 1e-8f)
+            {
+                if (o < lo || o > hi) return false;
+                continue;
+            }
+
+            var t1 = (lo - o) / d;
+            var t2 = (hi - o) / d;
+            var tNear = MathF.Min(t1, t2);
+            var tFar = MathF.Max(t1, t2);
+            if (tNear > tEnter || (tNear == tEnter && hitAxis < 0))
+            {
+                tEnter = tNear;
+                hitAxis = axis;
+            }
+            tExit = MathF.Min(tExit, tFar);
+            if (tEnter > tExit) return false;
+        }
+
+        if (tExit < 0f || tEnter > maxDistance) return false;
+        if (tEnter < 0f)
+        {
+            tEnter = 0f;
+            normal = Vector3.Zero;
+            return true;
+        }
+
+        var sign = (hitAxis == 0 ? direction.X : hitAxis == 1 ? direction.Y : direction.Z) > 0f ? -1f : 1f;
+        normal = hitAxis switch
+        {
+            0 => new Vector3(sign, 0f, 0f),
+            1 => new Vector3(0f, sign, 0f),
+            _ => new Vector3(0f, 0f, sign),
+        };
+        return true;
     }
 }

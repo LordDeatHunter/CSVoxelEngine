@@ -452,6 +452,7 @@ public static class ContentRegistry
                 FluidInfinite = flow?.Infinite ?? true,
                 OnBreak = onBreak,
                 LootTable = fluid ? LootTable.None : ResolveLoot(name, definition.Loot, path),
+                Hitboxes = ParseHitboxes(definition.Hitbox, path),
             };
             type.HardensToId = 0;
             type.HardensTouchingId = 0;
@@ -515,6 +516,59 @@ public static class ContentRegistry
                 throw new InvalidOperationException($"No block declares wood.taperLevel {level}.");
 
         return byLevel;
+    }
+
+    private static BlockHitbox[] ParseHitboxes(JsonElement hitbox, string path)
+    {
+        if (hitbox.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
+            return [BlockHitbox.FullCube];
+
+        if (hitbox.ValueKind == JsonValueKind.Array)
+        {
+            if (hitbox.GetArrayLength() == 0)
+                throw new InvalidOperationException($"Block '{path}' has an empty hitbox array; omit hitbox for a full cube.");
+            var boxes = new BlockHitbox[hitbox.GetArrayLength()];
+            var i = 0;
+            foreach (var element in hitbox.EnumerateArray())
+                boxes[i++] = ParseOneBox(element, path);
+            return boxes;
+        }
+
+        if (hitbox.ValueKind == JsonValueKind.Object)
+            return [ParseOneBox(hitbox, path)];
+
+        throw new InvalidOperationException($"Block '{path}' has a hitbox that is neither an object nor an array.");
+    }
+
+    private static BlockHitbox ParseOneBox(JsonElement element, string path)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+            throw new InvalidOperationException($"Block '{path}' has a hitbox entry that is not an object.");
+        if (!element.TryGetProperty("min", out var minElement) || !element.TryGetProperty("max", out var maxElement))
+            throw new InvalidOperationException($"Block '{path}' has a hitbox entry without min and max.");
+        var min = ReadBoxCorner(minElement, "min", path);
+        var max = ReadBoxCorner(maxElement, "max", path);
+        if (min.X >= max.X || min.Y >= max.Y || min.Z >= max.Z)
+            throw new InvalidOperationException($"Block '{path}' has a hitbox whose min {min} is not below its max {max}.");
+        return new BlockHitbox(min, max);
+    }
+
+    private static Vector3 ReadBoxCorner(JsonElement element, string field, string path)
+    {
+        if (element.ValueKind != JsonValueKind.Array || element.GetArrayLength() != 3)
+            throw new InvalidOperationException($"Block '{path}' has a hitbox.{field} that is not a 3-number array.");
+        var values = new float[3];
+        var i = 0;
+        foreach (var number in element.EnumerateArray())
+        {
+            if (number.ValueKind != JsonValueKind.Number)
+                throw new InvalidOperationException($"Block '{path}' has a hitbox.{field} that is not a 3-number array.");
+            var value = number.GetSingle();
+            if (!float.IsFinite(value) || value < 0f || value > 1f)
+                throw new InvalidOperationException($"Block '{path}' has a hitbox.{field} value {value}; expected 0..1.");
+            values[i++] = value;
+        }
+        return new Vector3(values[0], values[1], values[2]);
     }
 
     private static LootTable? ResolveLoot(string blockName, string? loot, string path)

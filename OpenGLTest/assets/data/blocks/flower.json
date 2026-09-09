@@ -10,5 +10,6 @@
   "cutout": true,
   "sway": true,
   "light": { "passes": true },
-  "needsSupport": true
+  "needsSupport": true,
+  "hitbox": { "min": [0.25, 0, 0.25], "max": [0.75, 1, 0.75] }
 }

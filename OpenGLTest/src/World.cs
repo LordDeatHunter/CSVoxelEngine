@@ -40,6 +40,7 @@ public class World
     private bool _hasSelectedBlock;
     private Vector3 _selectedBlockPosition;
     private Vector3 _selectedFaceNormal;
+    private int _selectedBoxIndex;
     private bool _isBreaking;
     private Vector3 _breakingBlockPosition;
     private byte _breakingBlockId;
@@ -136,7 +137,7 @@ public class World
         // stops the player targeting the block under it
         FrameProfiler.Begin(ProfileSection.Raycast);
         _hasSelectedBlock = Camera.Raycast(InteractionReach, _chunkManager,
-            out _selectedBlockPosition, out _selectedFaceNormal,
+            out _selectedBlockPosition, out _selectedFaceNormal, out _selectedBoxIndex,
             includeFluids: ItemType.TargetsFluids(Inventory.SelectedBlockId));
         FrameProfiler.End(ProfileSection.Raycast);
     }
@@ -206,10 +207,11 @@ public class World
         if (popScale > 1f)
             renderManager.RenderBlockPop(Camera, _breakingBlockPosition, _breakingBlockId, popScale);
 
-        renderManager.RenderBlockSelection(Camera, _selectedBlockPosition, _selectedFaceNormal, popScale);
+        renderManager.RenderBlockSelection(Camera, _selectedBlockPosition, _selectedFaceNormal, popScale,
+            BlockIdAt(_selectedBlockPosition), _selectedBoxIndex);
 
         if (_isBreaking)
-            renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress, popScale);
+            renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress, popScale, _breakingBlockId);
 
         FrameProfiler.End(ProfileSection.SelectPass);
     }

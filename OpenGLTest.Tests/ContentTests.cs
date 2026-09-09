@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -109,5 +110,45 @@ public sealed class ContentTests
     {
         var ex = Assert.Throws<InvalidOperationException>(() => ContentRegistry.RequireBlock("nope"));
         Assert.Contains("nope", ex.Message);
+    }
+
+    [Fact]
+    public void DefaultHitboxIsFullCube()
+    {
+        var boxes = ContentRegistry.RequireBlock("stone").Hitboxes;
+        var single = Assert.Single(boxes);
+        Assert.Equal(Vector3.Zero, single.Min);
+        Assert.Equal(Vector3.One, single.Max);
+    }
+
+    [Fact]
+    public void FlowerHitboxIsNarrowColumnFullHeight()
+    {
+        var box = Assert.Single(ContentRegistry.RequireBlock("flower").Hitboxes);
+        Assert.Equal(new Vector3(0.25f, 0f, 0.25f), box.Min);
+        Assert.Equal(new Vector3(0.75f, 1f, 0.75f), box.Max);
+    }
+
+    [Fact]
+    public void PebbleHitboxCoversMaxStoneHeight()
+    {
+        var box = Assert.Single(ContentRegistry.RequireBlock("pebble").Hitboxes);
+        Assert.Equal(Vector3.Zero, box.Min);
+        var maxHeight = WorldGenerationConfig.PebbleMaxSizeTexels / 32f;
+        Assert.Equal(new Vector3(1f, maxHeight, 1f), box.Max);
+    }
+
+    [Fact]
+    public void RayIntersectsFlowerBoxButMissesItsEmptyRim()
+    {
+        var min = new Vector3(1.25f, 0f, 1.25f);
+        var max = new Vector3(1.75f, 1f, 1.75f);
+        var origin = new Vector3(1.5f, 2f, 1.5f);
+        Assert.True(Camera.RayIntersectsBox(origin, -Vector3.UnitY, min, max, 10f, out var t, out var normal));
+        Assert.Equal(1f, t, precision: 4);
+        Assert.Equal(Vector3.UnitY, normal);
+
+        var rimOrigin = new Vector3(1.1f, 2f, 1.5f);
+        Assert.False(Camera.RayIntersectsBox(rimOrigin, -Vector3.UnitY, min, max, 10f, out _, out _));
     }
 }

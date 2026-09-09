@@ -1612,10 +1612,12 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Draws the targeted block's outline and face highlight. <paramref name="scale"/> is the
+    /// Draws the targeted block's outline and face highlight. Each of the block's hitboxes gets
+    /// its own outline; the highlight lands on the hit box's face. <paramref name="scale"/> is the
     /// block's current pop scale so the highlight tracks it while mining.
     /// </summary>
-    public void RenderBlockSelection(Camera camera, Vector3 blockPosition, Vector3 hitNormal, float scale = 1f)
+    public void RenderBlockSelection(Camera camera, Vector3 blockPosition, Vector3 hitNormal, float scale = 1f,
+        byte blockId = 0, int hitBoxIndex = 0)
     {
         selectionShader.Use();
 
@@ -1624,24 +1626,28 @@ public class RenderManager : IDisposable
         gl.Enable(EnableCap.Blend);
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
-        var center = blockPosition + new Vector3(0.5f);
-        var outlineModel = Matrix4x4.CreateScale(1.01f * scale) * Matrix4x4.CreateTranslation(center);
-        selectionShader.SetUniform("uMVP", outlineModel * viewProj);
+        var boxes = BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
         selectionShader.SetUniform("uColor", new Vector3(1.0f, 0.95f, 0.35f));
         selectionShader.SetUniform("uOpacity", 0.95f);
 
         gl.LineWidth(2f);
         gl.BindVertexArray(outlineVao);
-        unsafe { gl.DrawElements(PrimitiveType.Lines, 24, DrawElementsType.UnsignedInt, null); }
+        foreach (var box in boxes)
+        {
+            var boxCenter = blockPosition + box.Center;
+            var outlineModel = Matrix4x4.CreateScale(box.Size * (1.01f * scale)) * Matrix4x4.CreateTranslation(boxCenter);
+            selectionShader.SetUniform("uMVP", outlineModel * viewProj);
+            unsafe { gl.DrawElements(PrimitiveType.Lines, 24, DrawElementsType.UnsignedInt, null); }
+        }
 
+        var hitBox = boxes[Math.Clamp(hitBoxIndex, 0, boxes.Length - 1)];
         var faceIndex = FaceIndexFromNormal(hitNormal);
         if (faceIndex >= 0)
         {
-            // Face geometry is local 0..1, so scale about the block center, then nudge the
-            // quad off the (now possibly moved) face so it never z-fights the block
+            var hitCenter = blockPosition + hitBox.Center;
             var faceModel = Matrix4x4.CreateTranslation(new Vector3(-0.5f))
-                            * Matrix4x4.CreateScale(scale)
-                            * Matrix4x4.CreateTranslation(center + hitNormal * 0.003f);
+                            * Matrix4x4.CreateScale(hitBox.Size * scale)
+                            * Matrix4x4.CreateTranslation(hitCenter + hitNormal * 0.003f);
             selectionShader.SetUniform("uMVP", faceModel * viewProj);
             selectionShader.SetUniform("uColor", new Vector3(1.0f, 1.0f, 0.5f));
             selectionShader.SetUniform("uOpacity", 0.3f);
@@ -1655,12 +1661,13 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Draws the block-breaking progress overlay on all faces of the targeted block:
+    /// Draws the block-breaking progress overlay on every face of each of the block's hitboxes:
     /// a dark fill with a bright leading edge grows from the face centers as progress
     /// goes 0 -> 1 (see break-fragment.glsl). <paramref name="scale"/> is the block's
     /// current pop scale so the overlay tracks it while mining.
     /// </summary>
-    public void RenderBlockBreaking(Camera camera, Vector3 blockPosition, float progress, float scale = 1f)
+    public void RenderBlockBreaking(Camera camera, Vector3 blockPosition, float progress, float scale = 1f,
+        byte blockId = 0)
     {
         if (progress <= 0f) return;
 
@@ -1669,17 +1676,19 @@ public class RenderManager : IDisposable
         gl.Enable(EnableCap.Blend);
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
-        // Inflate slightly around the block center so the overlay never z-fights the block
-        var center = new Vector3(0.5f);
-        var model = Matrix4x4.CreateTranslation(-center)
-                    * Matrix4x4.CreateScale(1.004f * scale)
-                    * Matrix4x4.CreateTranslation(blockPosition + center);
-        breakShader.SetUniform("uMVP", model * camera.GetViewProjection());
+        var boxes = BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
         breakShader.SetUniform("uProgress", progress);
 
         gl.BindVertexArray(faceVao);
-        for (var face = 0; face < 6; face++)
-            gl.DrawArrays(GLEnum.TriangleFan, face * 4, 4);
+        foreach (var box in boxes)
+        {
+            var model = Matrix4x4.CreateTranslation(new Vector3(-0.5f))
+                        * Matrix4x4.CreateScale(box.Size * (1.004f * scale))
+                        * Matrix4x4.CreateTranslation(blockPosition + box.Center);
+            breakShader.SetUniform("uMVP", model * camera.GetViewProjection());
+            for (var face = 0; face < 6; face++)
+                gl.DrawArrays(GLEnum.TriangleFan, face * 4, 4);
+        }
 
         gl.BindVertexArray(0);
         gl.DepthMask(true);
