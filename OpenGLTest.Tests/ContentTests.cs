@@ -139,6 +139,18 @@ public sealed class ContentTests
     }
 
     [Fact]
+    public void TaperedWoodHitboxFollowsHalfWidth()
+    {
+        var twig = Assert.Single(ContentRegistry.RequireBlock("twig").Hitboxes);
+        Assert.Equal(new Vector3(0.375f, 0f, 0.375f), twig.Min);
+        Assert.Equal(new Vector3(0.625f, 1f, 0.625f), twig.Max);
+
+        var log = Assert.Single(ContentRegistry.RequireBlock("log").Hitboxes);
+        Assert.Equal(Vector3.Zero, log.Min);
+        Assert.Equal(Vector3.One, log.Max);
+    }
+
+    [Fact]
     public void RayIntersectsFlowerBoxButMissesItsEmptyRim()
     {
         var min = new Vector3(1.25f, 0f, 1.25f);

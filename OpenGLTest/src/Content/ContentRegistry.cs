@@ -452,7 +452,8 @@ public static class ContentRegistry
                 FluidInfinite = flow?.Infinite ?? true,
                 OnBreak = onBreak,
                 LootTable = fluid ? LootTable.None : ResolveLoot(name, definition.Loot, path),
-                Hitboxes = ParseHitboxes(definition.Hitbox, path),
+                Hitboxes = ParseHitboxes(definition.Hitbox, path)
+                    ?? DefaultWoodHitbox(taperLevel, definition.Wood?.HalfWidth ?? 0.5f),
             };
             type.HardensToId = 0;
             type.HardensTouchingId = 0;
@@ -518,10 +519,21 @@ public static class ContentRegistry
         return byLevel;
     }
 
-    private static BlockHitbox[] ParseHitboxes(JsonElement hitbox, string path)
+    private static BlockHitbox[] DefaultWoodHitbox(int taperLevel, float halfWidth)
+    {
+        // Tapered wood renders as a thin column, not the full cube its model bakes to, so the
+        // outline, raycast and mining pop would all float around empty air on the default. The
+        // column spans the full height (node plus the up/down tubes); side arms welding to
+        // neighbours poke out of it, which the single-box shape accepts.
+        if (taperLevel < 0) return [BlockHitbox.FullCube];
+        var hw = Math.Clamp(halfWidth, 0f, 0.5f);
+        return [new BlockHitbox(new Vector3(0.5f - hw, 0f, 0.5f - hw), new Vector3(0.5f + hw, 1f, 0.5f + hw))];
+    }
+
+    private static BlockHitbox[]? ParseHitboxes(JsonElement hitbox, string path)
     {
         if (hitbox.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
-            return [BlockHitbox.FullCube];
+            return null;
 
         if (hitbox.ValueKind == JsonValueKind.Array)
         {

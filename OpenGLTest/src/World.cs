@@ -23,8 +23,10 @@ public class World
     // pop always finishes before the next hit restarts it.
     public const float BlockPopSeconds = 0.15f;
 
-    // Uniform scale the block reaches at the peak of a hit
-    public const float BlockPopScale = 1.3f;
+    // Absolute growth in blocks the mined block gains at the peak of a hit, added to the
+    // block's hitbox on every axis rather than multiplied, so tiny blocks pop by the same
+    // amount as full cubes instead of barely moving
+    public const float BlockPopGrow = 0.12f;
 
     private readonly ChunkManager _chunkManager;
     private readonly ChunkGenerationWorker _generationWorker;
@@ -66,10 +68,10 @@ public class World
     // instead of sweeping continuously.
     private float BreakProgress => _breakMaxHealth > 0 ? _breakDamage / (float)_breakMaxHealth : 0f;
 
-    // Scale of the block being mined: 1 at rest, eased up to BlockPopScale and back down
+    // Growth of the block being mined: 0 at rest, eased up to BlockPopGrow and back down
     // over BlockPopSeconds after each hit lands
-    private float BlockPopScaleNow =>
-        MathUtils.Lerp(1f, BlockPopScale, MathUtils.Pulse(_popElapsed / BlockPopSeconds));
+    private float BlockPopGrowNow =>
+        BlockPopGrow * MathUtils.Pulse(_popElapsed / BlockPopSeconds);
 
     public World(GL gl, ChunkGeometryPool opaqueGeometry, ChunkGeometryPool translucentGeometry,
         IWindow window, IInputContext input)
@@ -200,18 +202,18 @@ public class World
         FrameProfiler.Begin(ProfileSection.SelectPass);
 
         // While mining, the outline and the break overlay ride along with the popping block
-        var popScale = _isBreaking ? BlockPopScaleNow : 1f;
+        var popGrow = _isBreaking ? BlockPopGrowNow : 0f;
 
         // The chunk mesh still holds the block at rest size, so the popped cube is only
-        // needed (and only hides it) while it is scaled up
-        if (popScale > 1f)
-            renderManager.RenderBlockPop(Camera, _breakingBlockPosition, _breakingBlockId, popScale);
+        // needed (and only hides it) while it is grown
+        if (popGrow > 0f)
+            renderManager.RenderBlockPop(Camera, _breakingBlockPosition, _breakingBlockId, popGrow);
 
-        renderManager.RenderBlockSelection(Camera, _selectedBlockPosition, _selectedFaceNormal, popScale,
+        renderManager.RenderBlockSelection(Camera, _selectedBlockPosition, _selectedFaceNormal, popGrow,
             BlockIdAt(_selectedBlockPosition), _selectedBoxIndex);
 
         if (_isBreaking)
-            renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress, popScale, _breakingBlockId);
+            renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress, popGrow, _breakingBlockId);
 
         FrameProfiler.End(ProfileSection.SelectPass);
     }

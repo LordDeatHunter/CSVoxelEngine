@@ -1444,11 +1444,13 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Draws a single block as a standalone cube scaled about its center. Used for the
-    /// mining pop: at scale > 1 the cube encloses the block baked into the chunk mesh, so
-    /// the block appears to jump out of the terrain.
+    /// Draws the block's own mesh once per hitbox, fitted into the grown box so the mining pop
+    /// starts from the block's real size: at grow 0 the cube sits exactly inside its outline, and
+    /// a hit grows every axis by the same absolute amount, so tiny blocks jump as visibly as full
+    /// cubes. Used for the mining pop: grown, the mesh encloses the block baked into the chunk
+    /// mesh, so the block appears to jump out of the terrain.
     /// </summary>
-    public void RenderBlockPop(Camera camera, Vector3 blockPosition, byte blockId, float scale)
+    public void RenderBlockPop(Camera camera, Vector3 blockPosition, byte blockId, float grow)
     {
         var mesh = blockCubes.Get(blockId);
         if (mesh == null) return;
@@ -1456,13 +1458,16 @@ public class RenderManager : IDisposable
         worldShader.Use();
         BindWorldTextures();
 
-        // The cube is centred on its own origin, so scaling happens about the block's centre
-        var model = Matrix4x4.CreateScale(scale)
-                    * Matrix4x4.CreateTranslation(blockPosition + new Vector3(0.5f));
-
-        SetDrawUniforms(model, model * camera.GetViewProjection(), 1f);
-
-        mesh.Render();
+        // The mesh is centred on its own origin, so scaling happens about each box's centre
+        var boxes = BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
+        var grown = new Vector3(grow);
+        foreach (var box in boxes)
+        {
+            var model = Matrix4x4.CreateScale(box.Size + grown)
+                        * Matrix4x4.CreateTranslation(blockPosition + box.Center);
+            SetDrawUniforms(model, model * camera.GetViewProjection(), 1f);
+            mesh.Render();
+        }
     }
 
     /// <summary>
@@ -1613,10 +1618,10 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// Draws the targeted block's outline and face highlight. Each of the block's hitboxes gets
-    /// its own outline; the highlight lands on the hit box's face. <paramref name="scale"/> is the
-    /// block's current pop scale so the highlight tracks it while mining.
+    /// its own outline; the highlight lands on the hit box's face. <paramref name="grow"/> is the
+    /// block's current pop growth so the highlight tracks it while mining.
     /// </summary>
-    public void RenderBlockSelection(Camera camera, Vector3 blockPosition, Vector3 hitNormal, float scale = 1f,
+    public void RenderBlockSelection(Camera camera, Vector3 blockPosition, Vector3 hitNormal, float grow = 0f,
         byte blockId = 0, int hitBoxIndex = 0)
     {
         selectionShader.Use();
@@ -1627,15 +1632,17 @@ public class RenderManager : IDisposable
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
         var boxes = BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
-        selectionShader.SetUniform("uColor", new Vector3(1.0f, 0.95f, 0.35f));
+        selectionShader.SetUniform("uColor", new Vector3(0.8f, 0.8f, 0.85f));
         selectionShader.SetUniform("uOpacity", 0.95f);
 
         gl.LineWidth(2f);
         gl.BindVertexArray(outlineVao);
+        // The outline inflates a hair past the grown box so it never z-fights the block
+        var outlinePad = new Vector3(0.01f + grow);
         foreach (var box in boxes)
         {
             var boxCenter = blockPosition + box.Center;
-            var outlineModel = Matrix4x4.CreateScale(box.Size * (1.01f * scale)) * Matrix4x4.CreateTranslation(boxCenter);
+            var outlineModel = Matrix4x4.CreateScale(box.Size + outlinePad) * Matrix4x4.CreateTranslation(boxCenter);
             selectionShader.SetUniform("uMVP", outlineModel * viewProj);
             unsafe { gl.DrawElements(PrimitiveType.Lines, 24, DrawElementsType.UnsignedInt, null); }
         }
@@ -1646,11 +1653,11 @@ public class RenderManager : IDisposable
         {
             var hitCenter = blockPosition + hitBox.Center;
             var faceModel = Matrix4x4.CreateTranslation(new Vector3(-0.5f))
-                            * Matrix4x4.CreateScale(hitBox.Size * scale)
+                            * Matrix4x4.CreateScale(hitBox.Size + new Vector3(grow))
                             * Matrix4x4.CreateTranslation(hitCenter + hitNormal * 0.003f);
             selectionShader.SetUniform("uMVP", faceModel * viewProj);
-            selectionShader.SetUniform("uColor", new Vector3(1.0f, 1.0f, 0.5f));
-            selectionShader.SetUniform("uOpacity", 0.3f);
+            selectionShader.SetUniform("uColor", new Vector3(0.7f, 0.7f, 0.75f));
+            selectionShader.SetUniform("uOpacity", 0.15f);
 
             gl.BindVertexArray(faceVao);
             gl.DrawArrays(GLEnum.TriangleFan, faceIndex * 4, 4);
@@ -1663,10 +1670,10 @@ public class RenderManager : IDisposable
     /// <summary>
     /// Draws the block-breaking progress overlay on every face of each of the block's hitboxes:
     /// a dark fill with a bright leading edge grows from the face centers as progress
-    /// goes 0 -> 1 (see break-fragment.glsl). <paramref name="scale"/> is the block's
-    /// current pop scale so the overlay tracks it while mining.
+    /// goes 0 -> 1 (see break-fragment.glsl). <paramref name="grow"/> is the block's
+    /// current pop growth so the overlay tracks it while mining.
     /// </summary>
-    public void RenderBlockBreaking(Camera camera, Vector3 blockPosition, float progress, float scale = 1f,
+    public void RenderBlockBreaking(Camera camera, Vector3 blockPosition, float progress, float grow = 0f,
         byte blockId = 0)
     {
         if (progress <= 0f) return;
@@ -1680,10 +1687,12 @@ public class RenderManager : IDisposable
         breakShader.SetUniform("uProgress", progress);
 
         gl.BindVertexArray(faceVao);
+        // Inflated slightly past the grown box so the overlay never z-fights the block
+        var pad = new Vector3(0.004f + grow);
         foreach (var box in boxes)
         {
             var model = Matrix4x4.CreateTranslation(new Vector3(-0.5f))
-                        * Matrix4x4.CreateScale(box.Size * (1.004f * scale))
+                        * Matrix4x4.CreateScale(box.Size + pad)
                         * Matrix4x4.CreateTranslation(blockPosition + box.Center);
             breakShader.SetUniform("uMVP", model * camera.GetViewProjection());
             for (var face = 0; face < 6; face++)
