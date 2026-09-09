@@ -413,7 +413,10 @@ public class Chunk : IDisposable
         // After the carvers (so caves under the sea floor flood) and before the trees and
         // pebbles, which skip submerged columns rather than growing underwater
         if (WorldGenerationConfig.WaterEnabled)
+        {
             FillWater(column, lowerBoundY);
+            StampMud(worldX0, lowerBoundY, worldZ0);
+        }
 
         // After the sea: flooded cells are water, not air, so only dry cave floors pond lava
         if (WorldGenerationConfig.LavaEnabled)
@@ -502,6 +505,68 @@ public class Chunk : IDisposable
                 if (_blocks[i] == BlockType.Air) _blocks[i] = TerrainGenerator.SeaBlock;
             }
         }
+    }
+
+    /// <summary>
+    /// Rots dirt touching the fresh sea to mud on the spot, so worldgen ground spawns muddy
+    /// instead of waiting for the fluid tick's watch to convert it. In-chunk neighbours read
+    /// straight off this chunk's blocks; across a chunk border the sea is a pure function of
+    /// the neighbour column's height, so that is tested analytically. A cave flood breaching
+    /// across a border is left to the fluid tick, the same split <see cref="ScanFluidFrontier"/>
+    /// uses: worldgen stays a pure per-chunk function with no cross-chunk block reads.
+    /// </summary>
+    private void StampMud(int worldX0, int lowerBoundY, int worldZ0)
+    {
+        // Water only ever sits at or below sea level, so a chunk starting above it can
+        // neither hold water nor touch any within one cell
+        if (lowerBoundY > WorldGenerationConfig.SeaLevel + 1) return;
+
+        var dirt = TerrainGenerator.SoilBlock;
+        var water = TerrainGenerator.SeaBlock;
+        var mud = TerrainGenerator.MudBlock;
+
+        for (var x = 0; x < Size; x++)
+        for (var y = 0; y < Size; y++)
+        for (var z = 0; z < Size; z++)
+        {
+            if (_blocks[Idx(x, y, z)] != dirt) continue;
+            if (TouchesSeaWater(x, y, z, worldX0, lowerBoundY, worldZ0, water))
+                _blocks[Idx(x, y, z)] = mud;
+        }
+    }
+
+    /// <summary>
+    /// Whether any of the 26 cells around a chunk-local cell holds sea water: a direct block
+    /// read inside this chunk, or the height test <see cref="FillWater"/> itself is built on
+    /// (a below-sea-level column holds water in every air cell up to sea level) outside it.
+    /// </summary>
+    private bool TouchesSeaWater(int x, int y, int z, int worldX0, int lowerBoundY, int worldZ0, byte water)
+    {
+        for (var dx = -1; dx <= 1; dx++)
+        for (var dy = -1; dy <= 1; dy++)
+        for (var dz = -1; dz <= 1; dz++)
+        {
+            if (dx == 0 && dy == 0 && dz == 0) continue;
+
+            var nx = x + dx;
+            var ny = y + dy;
+            var nz = z + dz;
+            if (nx >= 0 && ny >= 0 && nz >= 0 && nx < Size && ny < Size && nz < Size)
+            {
+                if (_blocks[Idx(nx, ny, nz)] == water) return true;
+                continue;
+            }
+
+            var wx = worldX0 + x + dx;
+            var wy = lowerBoundY + y + dy;
+            var wz = worldZ0 + z + dz;
+            if (wy > WorldGenerationConfig.SeaLevel) continue;
+            var height = GetColumnHeights(wx >> SizeShift, wz >> SizeShift)
+                [(wx & SizeMask) << SizeShift | (wz & SizeMask)];
+            if (height < WorldGenerationConfig.SeaLevel && wy > height) return true;
+        }
+
+        return false;
     }
 
     /// <summary>

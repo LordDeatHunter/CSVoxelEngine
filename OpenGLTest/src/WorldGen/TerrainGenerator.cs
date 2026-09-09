@@ -39,6 +39,9 @@ public static class TerrainGenerator
     /// <summary>Fluid the sea is filled with, up to and including sea level.</summary>
     public static readonly byte SeaBlock;
 
+    /// <summary>Block dirt touching fresh sea water rots into on the spot.</summary>
+    public static readonly byte MudBlock;
+
     /// <summary>Block beach columns (see <see cref="IsBeachHeight"/>) are built from.</summary>
     public static readonly byte SandBlock;
 
@@ -51,6 +54,7 @@ public static class TerrainGenerator
         SoilBlock = ContentRegistry.RequireBlock("dirt").Id;
         RockBlock = ContentRegistry.RequireBlock("stone").Id;
         SeaBlock = ContentRegistry.RequireBlock("water").Id;
+        MudBlock = ContentRegistry.RequireBlock("mud").Id;
         SandBlock = ContentRegistry.RequireBlock("sand").Id;
         GravelBlock = ContentRegistry.RequireBlock("gravel").Id;
 

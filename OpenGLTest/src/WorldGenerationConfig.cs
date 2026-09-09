@@ -170,6 +170,12 @@ public static class WorldGenerationConfig
     // How far a spreading fluid looks for a hole to fall into before spreading evenly
     public const int FluidSlopeSearchDistance = 4;
 
+    // --- Mud ---
+    // Dirt with water directly above it and at least this many water cells in its
+    // 26-neighbourhood (faces, edges and corners alike) rots to mud the moment a
+    // neighbouring fluid ticks and notices it.
+    public const int MudWaterNeighbours = 2;
+
     // Blocks the far LOD water sheet sits below the chunk water surface, so the two never
     // z-fight where they meet at the full-detail ring. Depth resolution there is ~0.02 blocks;
     // the step is also visible edge-on as a thin line at the ring, so keep it as small as safe
