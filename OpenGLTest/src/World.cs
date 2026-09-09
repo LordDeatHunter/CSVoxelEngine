@@ -657,6 +657,12 @@ public class World
         if (_falling.OverlapsAny((int)placePos.X, (int)placePos.Y, (int)placePos.Z))
             return false;
 
+        // A solid block inside the player's body would trap them (or force the physics to
+        // shove them out); non-solid blocks are fine to stand in. Flying is noclip but the
+        // placement is still refused, so dropping out of flight never leaves the player buried.
+        if (BlockType.IsSolid(blockId) && Camera.OverlapsPlayer(placePos))
+            return false;
+
         // Fragile blocks need solid ground: a flower planted into mid-air would hover
         // until anything remeshed it, so the placement fails and the caller keeps its item
         if (BlockType.ById[blockId]?.NeedsSupport == true)

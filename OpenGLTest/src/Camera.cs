@@ -510,6 +510,32 @@ public class Camera
         => BlockType.IsSolid(chunkManager.GetBlockGlobal(worldX, worldY, worldZ));
 
     /// <summary>
+    /// Whether a block cell at <paramref name="blockPos"/> overlaps the player's body. The cell
+    /// spans one full cube from its floored corner; touching a face exactly does not count, so
+    /// placing a block under the feet or beside the body stays legal.
+    /// </summary>
+    public bool OverlapsPlayer(Vector3 blockPos)
+    {
+        var min = new Vector3(
+            Position.X - PlayerRadius,
+            Position.Y - EyeHeight,
+            Position.Z - PlayerRadius);
+        var max = new Vector3(
+            Position.X + PlayerRadius,
+            Position.Y - EyeHeight + PlayerHeight,
+            Position.Z + PlayerRadius);
+        var cellMin = new Vector3(
+            MathF.Floor(blockPos.X),
+            MathF.Floor(blockPos.Y),
+            MathF.Floor(blockPos.Z));
+        var cellMax = cellMin + Vector3.One;
+
+        return cellMin.X < max.X && cellMax.X > min.X
+            && cellMin.Y < max.Y && cellMax.Y > min.Y
+            && cellMin.Z < max.Z && cellMax.Z > min.Z;
+    }
+
+    /// <summary>
     /// Shoves the player out of a falling cube, along the smallest-penetration axis. Strictly
     /// one-way: cubes push the player, the player never pushes cubes. Axes that would park
     /// the eye inside a solid block are skipped, so a cube cannot shove the player through a
