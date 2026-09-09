@@ -44,6 +44,12 @@ public class FallingBlock
     /// <summary>The block that toppled, so the cube renders as itself.</summary>
     public byte BlockId { get; }
 
+    /// <summary>Set when the cube toppled as part of a multi-cube column collapse (see
+    /// <see cref="FallingBlockManager.TryTopple"/>): chain cubes stack on sand instead of
+    /// sliding, so the column rebuilds bottom-up with nothing lost. A lone grain keeps the
+    /// default and slumps off sand like stone.</summary>
+    public bool ChainCollapse { get; set; }
+
     /// <summary>Whether the cube has rested long enough to be written back as a block.</summary>
     public bool IsSettled => _restTime >= SettleSeconds;
 
@@ -213,9 +219,9 @@ public class FallingBlock
             return;
         }
 
-        // Sand stacks on sand: a falls-block support never triggers the slide, so a mined
-        // tower rebuilds instead of avalanching. Only foreign supports slump.
-        if (BlockType.IsFalling(support))
+        // Chain cubes stack on sand so the column rebuilds; a lone grain slumps instead
+        // of growing a tower wherever it lands.
+        if (ChainCollapse && BlockType.IsFalling(support))
         {
             _slideDir = null;
             return;

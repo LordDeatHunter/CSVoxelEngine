@@ -104,8 +104,8 @@ public sealed class FallingBlockTests
 
         SettleAll(falling, chunks, drops, fluids);
 
-        // Both cubes land as blocks and the tower rebuilds exactly: sand stacks on sand
-        // instead of avalanching, so nothing is lost to drops and nothing floats
+        // Two cubes toppled together: the batch is flagged a chain collapse, so the upper
+        // stacks on the sand base and the tower rebuilds exactly with nothing lost
         Assert.Empty(falling.Falling);
         Assert.Empty(drops.Drops);
         Assert.Equal(sand, chunks.GetBlockGlobal(3, 1, 3));
@@ -124,7 +124,34 @@ public sealed class FallingBlockTests
     }
 
     [Fact]
-    public void SandStacksOnSandInsteadOfSliding()
+    public void SevenTowerChainRebuildsFullyWithNoDrops()
+    {
+        var (chunks, lod, fluids, drops, falling, stone, sand) = Setup();
+        var chunk = chunks.Chunks[Vector3.Zero];
+        for (var x = 0; x < 9; x++)
+        for (var z = 0; z < 9; z++)
+            chunk.SetBlockRaw(x, 0, z, stone, 0);
+        for (var y = 1; y <= 7; y++)
+            chunk.SetBlockRaw(4, y, 4, sand, 0);
+
+        // Mine the base: the six cubes above come down as one flagged batch, so every one
+        // stacks and the column rebuilds at y 1..6 with nothing avalanching or popping out
+        Assert.True(chunk.RemoveBlockAt(new Vector3(4, 1, 4), chunks));
+        Assert.True(falling.TryTopple(chunks, lod, fluids, 4, 2, 4));
+        Assert.Equal(6, falling.Falling.Count);
+        Assert.All(falling.Falling, cube => Assert.True(cube.ChainCollapse));
+
+        SettleAll(falling, chunks, drops, fluids);
+
+        Assert.Empty(falling.Falling);
+        Assert.Empty(drops.Drops);
+        for (var y = 1; y <= 6; y++)
+            Assert.Equal(sand, chunks.GetBlockGlobal(4, y, 4));
+        Assert.Equal(BlockType.Air, chunks.GetBlockGlobal(4, 7, 4));
+    }
+
+    [Fact]
+    public void SandSlidesOffSandPillarLikeStone()
     {
         var (chunks, lod, fluids, drops, falling, stone, sand) = Setup();
         var chunk = chunks.Chunks[Vector3.Zero];
@@ -135,16 +162,30 @@ public sealed class FallingBlockTests
         chunk.SetBlockRaw(2, 2, 2, sand, 0);
         chunk.SetBlockRaw(2, 3, 2, sand, 0);
 
-        // Mine the middle out: the top cube drops two cells onto a sand support ringed by
-        // air, which would always slide on stone — on sand it must stack instead
+        // Mine the middle out: the top cube drops onto a lone sand support ringed by
+        // air, which always slides — sand slumps like stone instead of stacking
         Assert.True(chunk.RemoveBlockAt(new Vector3(2, 2, 2), chunks));
         Assert.True(falling.TryTopple(chunks, lod, fluids, 2, 3, 2));
+
+        // A lone grain is not a chain collapse, so it must slide rather than stack
+        var lone = Assert.Single(falling.Falling);
+        Assert.False(lone.ChainCollapse);
 
         SettleAll(falling, chunks, drops, fluids);
 
         Assert.Empty(falling.Falling);
         Assert.Empty(drops.Drops);
-        Assert.Equal(sand, chunks.GetBlockGlobal(2, 2, 2));
+        Assert.Equal(sand, chunks.GetBlockGlobal(2, 1, 2));
+        Assert.Equal(BlockType.Air, chunks.GetBlockGlobal(2, 2, 2));
+        var landed = chunks.GetBlockGlobal(1, 1, 2) == sand ? (1, 1, 2)
+            : chunks.GetBlockGlobal(3, 1, 2) == sand ? (3, 1, 2)
+            : chunks.GetBlockGlobal(2, 1, 1) == sand ? (2, 1, 1)
+            : chunks.GetBlockGlobal(2, 1, 3) == sand ? (2, 1, 3)
+            : chunks.GetBlockGlobal(1, 1, 1) == sand ? (1, 1, 1)
+            : chunks.GetBlockGlobal(3, 1, 1) == sand ? (3, 1, 1)
+            : chunks.GetBlockGlobal(1, 1, 3) == sand ? (1, 1, 3)
+            : (3, 1, 3);
+        Assert.Equal(sand, chunks.GetBlockGlobal(landed.Item1, landed.Item2, landed.Item3));
     }
 
     [Fact]

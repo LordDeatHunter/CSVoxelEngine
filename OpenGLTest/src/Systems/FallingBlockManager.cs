@@ -26,11 +26,14 @@ public class FallingBlockManager
 
     /// <summary>
     /// Starts a cube at the centre of the cell the block occupied. The cube carries
-    /// <paramref name="blockId"/> so it renders as the block that toppled.
+    /// <paramref name="blockId"/> so it renders as the block that toppled. Returns the cube
+    /// so <see cref="TryTopple"/> can flag chain collapses.
     /// </summary>
-    public void Spawn(Vector3 blockPosition, byte blockId)
+    public FallingBlock Spawn(Vector3 blockPosition, byte blockId)
     {
-        _falling.Add(new FallingBlock(blockPosition + new Vector3(0.5f), blockId));
+        var block = new FallingBlock(blockPosition + new Vector3(0.5f), blockId);
+        _falling.Add(block);
+        return block;
     }
 
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, FluidManager fluids)
@@ -64,8 +67,11 @@ public class FallingBlockManager
     /// Topples the <c>falls</c> block at (x, y, z) when the cell below it is loaded and not
     /// solid — fluids never support, so sand sinks through water. Unloaded cells read as air,
     /// so anything touching unloaded space is left alone rather than poured into the void.
-    /// Returns whether a cube was spawned. The cell above is checked recursively, so a whole
-    /// column comes down one cube at a time.
+    /// Returns whether a cube was spawned. The cells above are toppled bottom-up in the same
+    /// batch, so a whole column comes down one cube at a time; when the batch holds more than
+    /// one cube every member is flagged <see cref="FallingBlock.ChainCollapse"/>, so the
+    /// column stacks on sand and rebuilds instead of avalanching. A lone grain keeps the
+    /// default and slides.
     /// </summary>
     public bool TryTopple(ChunkManager chunks, LodManager lod, FluidManager fluids, int x, int y, int z)
     {
@@ -74,21 +80,40 @@ public class FallingBlockManager
         if (!chunks.TryGetCell(x, y - 1, z, out var below, out _) || BlockType.IsSolid(below))
             return false;
 
-        var cell = new Vector3(x, y, z);
-        var chunkPos = new Vector3(x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift);
-        if (!chunks.Chunks.TryGetValue(chunkPos, out var chunk)) return false;
-        if (!chunk.RemoveBlockAt(cell, chunks)) return false;
+        List<FallingBlock>? batch = null;
+        var cy = y;
+        while (true)
+        {
+            if (!chunks.TryGetCell(x, cy, z, out var curId, out _) || !BlockType.IsFalling(curId))
+                break;
+            // Below the base this repeats the entry check; above it the cell was just freed
+            // by the iteration below, which is what lets the column come down together.
+            // A level that is still supported stays put and caps the batch.
+            if (!chunks.TryGetCell(x, cy - 1, z, out var curBelow, out _) || BlockType.IsSolid(curBelow))
+                break;
 
-        Spawn(cell, id);
+            var cell = new Vector3(x, cy, z);
+            var chunkPos = new Vector3(x >> Chunk.SizeShift, cy >> Chunk.SizeShift, z >> Chunk.SizeShift);
+            if (!chunks.Chunks.TryGetValue(chunkPos, out var chunk)) break;
+            if (!chunk.RemoveBlockAt(cell, chunks)) break;
 
-        // Water beside or above the freed cell pours into it on the next fluid tick
-        fluids.ScheduleAround(cell);
+            batch ??= [];
+            batch.Add(Spawn(cell, curId));
 
-        // The removal exposes a hole like any mined block
-        if (LodRegion.LowerColumnBelow(x, y, z))
-            lod.MarkEditedColumn(x, z);
+            // Water beside or above the freed cell pours into it on the next fluid tick
+            fluids.ScheduleAround(cell);
 
-        TryTopple(chunks, lod, fluids, x, y + 1, z);
+            // The removal exposes a hole like any mined block
+            if (LodRegion.LowerColumnBelow(x, cy, z))
+                lod.MarkEditedColumn(x, z);
+
+            cy++;
+        }
+
+        if (batch == null) return false;
+        if (batch.Count > 1)
+            foreach (var block in batch)
+                block.ChainCollapse = true;
         return true;
     }
 
