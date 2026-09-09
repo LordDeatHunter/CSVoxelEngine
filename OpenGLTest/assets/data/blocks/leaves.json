@@ -4,7 +4,7 @@
   "cutout": true,
   "sway": true,
   "occludes": false,
-  "castsAO": true,
+  "castsAO": false,
   "light": { "passes": true },
   "loot": "leaves"
 }

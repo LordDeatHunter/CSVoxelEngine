@@ -187,10 +187,19 @@ public sealed record BlockType
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool Occludes(byte blockId) => OccludesById[blockId];
 
-    /// <summary>Whether a block darkens neighbouring faces via ambient occlusion. Leaves count
-    /// as solid here (unlike <see cref="Occludes"/>).</summary>
+    /// <summary>Whether a block darkens neighbouring faces via ambient occlusion. This is the
+    /// raw JSON flag (<c>castsAO</c>, defaulting to <see cref="Solid"/>); meshing must read
+    /// <see cref="OccludesAO"/> instead, so a thin shape can never darken a face it does not
+    /// fully block.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool CastsAO(byte blockId) => CastsAoById[blockId];
+
+    /// <summary>Whether a block actually blocks a neighbouring face's corner/edge for ambient
+    /// occlusion: only a fully occupying block (see <see cref="Occludes"/>) counts. Leaves pass
+    /// light and thin shapes (tapered wood, pebbles, flowers) never fill the corner voxel, so
+    /// they leave AO at full brightness even when their JSON flag is set.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool OccludesAO(byte blockId) => OccludesById[blockId] && CastsAoById[blockId];
 
     /// <summary>Whether the greedy mesher handles this block (a plain full cube in the
     /// <see cref="BlockRenderer.Model"/> renderer); false sends it down the per-quad path.</summary>

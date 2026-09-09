@@ -291,4 +291,66 @@ public sealed class MeshingTests
         Assert.NotNull(stoneMesh);
         Assert.False(stoneMesh.HasWater);
     }
+
+    [Fact]
+    public void LeavesAndThinWoodPassLightAndCastNoAO()
+    {
+        var leaves = ContentRegistry.RequireBlock("leaves");
+        Assert.True(leaves.PassesLight);
+        Assert.False(leaves.CastsAmbientOcclusion);
+        Assert.False(BlockType.Occludes(leaves.Id));
+        Assert.False(BlockType.OccludesAO(leaves.Id));
+
+        foreach (var name in new[] { "branch", "limb", "sprig", "switch", "twig" })
+        {
+            var wood = ContentRegistry.RequireBlock(name);
+            Assert.True(wood.PassesLight);
+            Assert.False(wood.CastsAmbientOcclusion);
+            Assert.False(BlockType.Occludes(wood.Id));
+            Assert.False(BlockType.OccludesAO(wood.Id));
+        }
+
+        // Full cubes still darken: the gate must not flatten real occlusion.
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        Assert.True(BlockType.OccludesAO(stone));
+    }
+
+    [Fact]
+    public void ThinWoodAndLeavesDoNotDarkenNeighbourTopFace()
+    {
+        // High above the terrain so sunlight is uniform: only AO can vary the shade.
+        var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var leaves = ContentRegistry.RequireBlock("leaves").Id;
+        var branch = ContentRegistry.RequireBlock("branch").Id;
+        center.SetBlockRaw(8, 8, 8, stone, 0);
+
+        // Ring the top-face AO neighbourhood with canopy and thin wood: every side/corner
+        // sample around the +Y face sits on leaves or a branch. A full-cube neighbour here
+        // would drag corners to AO 0 (black); these must leave it at full brightness.
+        var ring = new (int x, int z, byte id)[]
+        {
+            (7, 7, leaves), (7, 8, branch), (7, 9, leaves),
+            (8, 7, branch), (8, 9, leaves),
+            (9, 7, leaves), (9, 8, branch), (9, 9, leaves),
+        };
+        foreach (var (x, z, id) in ring)
+            center.SetBlockRaw(x, 9, z, id, 0);
+
+        var mesh = center.GenerateMeshData(manager, greedy: false);
+        Assert.NotNull(mesh);
+
+        var expected = Chunk.ShadeLut[(4 << 2) | 3];
+        var topVertices = 0;
+        foreach (var vertex in mesh.Vertices)
+        {
+            if ((vertex.Normal & 7) != 4) continue;
+            if (vertex.Position.Y != 9f) continue;
+            topVertices++;
+            var shade = (byte)(vertex.PackedColor & 0xFF);
+            Assert.Equal(expected, shade);
+        }
+
+        Assert.Equal(4, topVertices);
+    }
 }

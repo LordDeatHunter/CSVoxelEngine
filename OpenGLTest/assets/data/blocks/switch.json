@@ -7,7 +7,7 @@
   "wood": { "taperLevel": 4, "halfWidth": 0.1875 },
   "hasItem": false,
   "occludes": false,
-  "castsAO": true,
+  "castsAO": false,
   "light": { "passes": true },
   "loot": "wood"
 }

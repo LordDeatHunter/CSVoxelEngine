@@ -291,8 +291,9 @@ public class Chunk : IDisposable
     /// stays lit through instead of casting solid shade, plus the tapered wood boxes, which
     /// are far thinner than a full cube and should dapple rather than block, plus the
     /// ankle-high pebbles, which are too small to shade. Everything else
-    /// (rock, full-cube logs, TNT) still blocks. AO keeps treating leaves as solid; geometry
-    /// culling does not (see <see cref="BlockType.Occludes"/>). Which blocks pass is data now:
+    /// (rock, full-cube logs, TNT) still blocks. AO likewise ignores leaves and thin shapes
+    /// (see <see cref="BlockType.OccludesAO"/>); geometry culling does not
+    /// (see <see cref="BlockType.Occludes"/>). Which blocks pass is data now:
     /// <c>light.passes</c> in each block's JSON, defaulting to "not a full cube".</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool PassesLight(byte blockId) => BlockType.PassesLightById[blockId];
@@ -1112,9 +1113,9 @@ public class Chunk : IDisposable
                     var aoDeltas = AODeltas[face];
                     for (var j = 0; j < 4; j++)
                     {
-                        var side1 = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 0]]);
-                        var side2 = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 1]]);
-                        var corner = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 2]]);
+                        var side1 = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 0]]);
+                        var side2 = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 1]]);
+                        var corner = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 2]]);
 
                         var ao = VertexAO(side1, side2, corner);
                         var shade = ShadeLut[(face << 2) | ao];
@@ -1276,9 +1277,9 @@ public class Chunk : IDisposable
                     var ao = 0;
                     for (var j = 0; j < 4; j++)
                     {
-                        var side1 = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 0]]);
-                        var side2 = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 1]]);
-                        var corner = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 2]]);
+                        var side1 = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 0]]);
+                        var side2 = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 1]]);
+                        var corner = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 2]]);
                         ao |= VertexAO(side1, side2, corner) << (2 * j);
                     }
 
@@ -1725,9 +1726,9 @@ public class Chunk : IDisposable
         for (var j = 0; j < 4; j++)
         {
             var corner = face[j];
-            var side1 = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 0]]);
-            var side2 = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 1]]);
-            var occluder = BlockType.CastsAO(padded[pIdx + aoDeltas[j * 3 + 2]]);
+            var side1 = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 0]]);
+            var side2 = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 1]]);
+            var occluder = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 2]]);
 
             var ao = VertexAO(side1, side2, occluder);
             var shade = ShadeLut[(i << 2) | ao];
