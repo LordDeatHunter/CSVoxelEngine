@@ -104,6 +104,10 @@ public class RenderManager : IDisposable
     private Vector3 _cameraPos;
     private float _time;
 
+    // Average opaque colour of the leaves tile, uploaded as uLodLeafColor: far LOD crowns
+    // sample the cutout leaf texture stretched over whole cells, so their transparent texels
+    // fall back to this instead of discarding to sky.
+    private Vector3 _lodLeafColor = new(0.17f, 0.29f, 0.07f);
     // 0 at night (and fully underwater), 1 with the sun well up: how much of the direct
     // sun term the shadow lookup is allowed to take away
     private float _shadowStrength;
@@ -243,6 +247,7 @@ public class RenderManager : IDisposable
         var sunFs = FileUtils.ReadFile("assets/shaders/sun-fragment.glsl");
 
         textureAtlas = TextureAtlas.Build(gl, "assets/textures/blocks");
+        _lodLeafColor = LoadOpaqueAverage("assets/textures/blocks/leaves.png", _lodLeafColor);
         ContentRegistry.BakeModels();
 
         worldShader = new Shader(gl, vs, fs);
@@ -346,6 +351,28 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterScatter", WorldGenerationConfig.WaterScatter);
         program.SetUniform("uWaterCausticStrength", WorldGenerationConfig.WaterCausticStrength);
         program.SetUniform("uLavaLayer", (float)ContentRegistry.RequireBlock("lava").Top);
+        program.SetUniform("uLodLeafColor", _lodLeafColor);
+    }
+
+    /// <summary>
+    /// Averages a tile's opaque texels to 0..1, falling back to
+    /// <paramref name="fallback"/> when none qualify.
+    /// </summary>
+    private static Vector3 LoadOpaqueAverage(string path, Vector3 fallback)
+    {
+        using var stream = System.IO.File.OpenRead(path);
+        var image = StbImageSharp.ImageResult.FromStream(stream, StbImageSharp.ColorComponents.RedGreenBlueAlpha);
+        long r = 0, g = 0, b = 0;
+        var n = 0;
+        for (var i = 0; i + 3 < image.Data.Length; i += 4)
+        {
+            if (image.Data[i + 3] < 128) continue;
+            r += image.Data[i];
+            g += image.Data[i + 1];
+            b += image.Data[i + 2];
+            n++;
+        }
+        return n == 0 ? fallback : new Vector3(r / (n * 255f), g / (n * 255f), b / (n * 255f));
     }
 
     /// <summary>

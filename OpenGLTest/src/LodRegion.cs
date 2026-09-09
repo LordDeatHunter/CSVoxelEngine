@@ -307,7 +307,7 @@ public class LodRegion : IDisposable
         const int topFace = 4;
 
         void AddQuad(List<Vertex> targetVertices, List<ushort> targetIndices,
-            int faceIndex, Vector3 cellOrigin, ushort tile, Span<byte> shades, bool isWater = false)
+            int faceIndex, Vector3 cellOrigin, ushort tile, Span<byte> shades, bool isWater = false, bool lodLeaves = false)
         {
             // Meshes are indexed with ushort; a region can't realistically exceed this,
             // but degrade gracefully instead of overflowing if terrain is extreme
@@ -335,9 +335,10 @@ public class LodRegion : IDisposable
                 if (pos.Y > yMax) yMax = pos.Y;
                 var shade = shades[c];
                 // Far shells sit in open sky: full sun, no lamp light, real face normal.
-                // ponytail: vertex alpha 254 flags water for the shader (glass/terrain stay 255);
-                // fColor.a is otherwise unused by the world shader, so the flag is invisible.
-                var alpha = (byte)(isWater ? 254 : 255);
+                // ponytail: vertex alpha flags the fragment path (254 = water, 253 = opaque
+                // LOD foliage, 255 = everything else); fColor.a is otherwise unused by the
+                // world shader, so the flags are invisible.
+                var alpha = (byte)(isWater ? 254 : lodLeaves ? 253 : 255);
                 targetVertices.Add(new Vertex(pos, shade, shade, shade, alpha, uv[c], tile, 1f, 0f, normal));
             }
 
@@ -398,7 +399,7 @@ public class LodRegion : IDisposable
                     top > ground ? leaves.FaceTiles[topFace]
                     : isSea[gi * heightGrid + gj] ? soil.FaceTiles[topFace]   // sea floors are dirt, sandy ones sand
                     : beach ? cap.FaceTiles[topFace]
-                    : grass.FaceTiles[topFace], shades);
+                    : grass.FaceTiles[topFace], shades, lodLeaves: top > ground);
 
                 // AddQuad places a +Y face one cell above its origin, so the origin sits a
                 // cell below the sheet
@@ -438,7 +439,7 @@ public class LodRegion : IDisposable
                             : cy == top ? (isSea[gi * heightGrid + gj] ? soil : beach ? cap : grass).FaceTiles[f]
                             : (ground - cy) * cellSize <= WorldGenerationConfig.NominalDirtDepth ? soil.FaceTiles[f]
                             : stone.FaceTiles[f];
-                        AddQuad(vertices, indices, f, new Vector3(i * cellSize, cy * cellSize, j * cellSize), tile, shades);
+                        AddQuad(vertices, indices, f, new Vector3(i * cellSize, cy * cellSize, j * cellSize), tile, shades, lodLeaves: cy > ground);
                     }
                 }
             }

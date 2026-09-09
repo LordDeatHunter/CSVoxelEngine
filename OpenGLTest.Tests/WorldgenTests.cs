@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Numerics;
 using Xunit;
 
@@ -131,6 +132,36 @@ public sealed class WorldgenTests
         var tile = ContentRegistry.RequireBlock("sand").FaceTiles[4];
         Assert.Contains(mesh.Vertices, v =>
             v.Layer == tile && v.UV.X >= 0f && v.UV.X <= 1f && v.UV.Y >= 0f && v.UV.Y <= 1f);
+    }
+
+    [Fact]
+    public void LodLeavesAreOpaque()
+    {
+        // A canopy column's LOD cell must wear leaves flagged opaque (alpha 253), so
+        // magnified cutout texels fall back to solid leaf colour instead of
+        // discarding to sky.
+        var found = false;
+        var tx = 0;
+        var tz = 0;
+        for (var x = 8; x < 256 && !found; x++)
+        for (var z = 8; z < 256 && !found; z++)
+        {
+            if (TreeGenerator.CanopyTop(x, z) > 0)
+            {
+                tx = x;
+                tz = z;
+                found = true;
+            }
+        }
+        Assert.True(found);
+
+        const int level = 0;
+        var spec = LodRegion.Levels[level];
+        var mesh = LodRegion.BuildMeshData(level, tx / spec.RegionBlocks, tz / spec.RegionBlocks);
+        var leaves = BlockType.ById[TreeGenerator.LeavesBlock]!;
+        var leafTiles = new HashSet<ushort>(leaves.FaceTiles);
+        Assert.Contains(mesh.Vertices,
+            v => (v.PackedColor >> 24) == 253u && leafTiles.Contains(v.Layer));
     }
 
     [Fact]

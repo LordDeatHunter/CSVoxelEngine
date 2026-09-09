@@ -68,6 +68,9 @@ uniform float uWaterRefractStrength;
 uniform vec3 uWaterAbsorb;
 uniform vec3 uWaterScatter;
 uniform float uWaterCausticStrength;
+// Average opaque colour of the leaves tile, for LOD foliage below: far crowns are
+// drawn opaque (no cutout holes) and transparent texels fall back to this.
+uniform vec3 uLodLeafColor;
 // Atlas slice of the lava tile: fluid fragments on this layer glow instead of refracting.
 uniform float uLavaLayer;
 
@@ -148,8 +151,12 @@ float Caustics(vec2 p, float t) {
 void main() {
     // The reflection pass clips everything below the sea surface out of the mirror.
     if (fWorldPos.y < uClipY) discard;
-    // ponytail: water flag rides in fColor.a (254 = water); vertex alpha is otherwise unused.
-    bool isWater = fColor.a < 0.998;
+    // ponytail: the water flag (254) and the opaque-LOD-foliage flag (253) ride in
+    // fColor.a (255 = everything else); vertex alpha is otherwise unused. Decode the
+    // exact byte so the foliage flag is never mistaken for water.
+    int alphaByte = int(fColor.a * 255.0 + 0.5);
+    bool isWater = (alphaByte == 254);
+    bool lodLeaves = (alphaByte == 253);
     float wob1 = 0.0;
     float wob2 = 0.0;
     if (isWater) {
@@ -162,7 +169,12 @@ void main() {
     // Leaf tiles have transparent holes; cut them out so the canopy sees through instead of
     // blending ghosts. The cutoff is a uniform: the opaque pass uses 0.5 for the leaf holes,
     // the translucent pass uses 0 so glass's faint interior blends instead of vanishing.
-    if (texColor.a < uAlphaCutoff) discard;
+    // Far LOD crowns are opaque instead: holes fall back to the average leaf colour so no
+    // sky shows through the magnified texels.
+    if (lodLeaves) {
+        vec3 leafRgb = texColor.a < 0.5 ? uLodLeafColor : texColor.rgb;
+        texColor = vec4(leafRgb, 1.0);
+    } else if (texColor.a < uAlphaCutoff) discard;
     vec3 albedo = texColor.rgb * fColor.rgb;
     vec3 N = normalize(fNormal);
     float ndl = max(dot(N, uSunDir), 0.0);
