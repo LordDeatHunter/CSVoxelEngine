@@ -8,7 +8,7 @@ using System.Text.Json;
 namespace silkgltriangle;
 
 /// <summary>
-/// Loads every block, item, loot table and model from <c>assets/data</c> and
+/// Loads every block, item, loot table, tag and model from <c>assets/data</c> and
 /// <c>assets/models</c>, hands out byte ids and fills the static tables on
 /// <see cref="BlockType"/> and <see cref="ItemType"/>.
 ///
@@ -44,6 +44,7 @@ public static class ContentRegistry
     private static readonly Dictionary<string, byte> BlockIds = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, byte> ItemIds = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, LootTable> LootTables = new(StringComparer.Ordinal);
+    private static readonly Dictionary<string, HashSet<byte>> Tags = new(StringComparer.Ordinal);
     private static readonly Dictionary<byte, BlockModel> BlockModels = new();
     private static readonly Dictionary<byte, BlockDefinition> BlockDefinitions = new();
     private static readonly List<CraftingRecipe> Recipes = new();
@@ -86,6 +87,7 @@ public static class ContentRegistry
         LoadItems(itemFiles);
         LoadLootTables(Path.Combine(assetsRoot, "data", "loot"));
         LoadBlocks(blockFiles);
+        LoadTags(Path.Combine(assetsRoot, "data", "tags"));
         LoadRecipes(Path.Combine(assetsRoot, "data", "recipes"));
         ValidateItemUses(itemFiles);
     }
@@ -218,6 +220,7 @@ public static class ContentRegistry
         BlockIds.Clear();
         ItemIds.Clear();
         LootTables.Clear();
+        Tags.Clear();
         Recipes.Clear();
         BlockModels.Clear();
         BlockDefinitions.Clear();
@@ -225,6 +228,7 @@ public static class ContentRegistry
         Array.Clear(BlockType.ById);
         Array.Clear(BlockType.Emission);
         Array.Clear(BlockType.PassesLightById);
+        Array.Clear(BlockType.BranchConnectableById);
         Array.Clear(BlockType.SolidById);
         Array.Clear(BlockType.OccludesById);
         Array.Clear(BlockType.CastsAoById);
@@ -517,6 +521,47 @@ public static class ContentRegistry
                 throw new InvalidOperationException($"No block declares wood.taperLevel {level}.");
 
         return byLevel;
+    }
+
+    /// <summary>Tag tapered wood may grow tubes and arms into, beyond parent/child wood.</summary>
+    public const string BranchConnectableTag = "tree_branch_connectable";
+
+    /// <summary>Whether a block id belongs to a loaded tag.</summary>
+    public static bool IsInTag(string tag, byte id) =>
+        Tags.TryGetValue(tag, out var members) && members.Contains(id);
+
+    // Block tags: named sets of blocks from data/tags/<name>.json ({"blocks": [...]}),
+    // resolved here so gameplay and meshing share them. Tapered wood reads its tag through
+    // the flat BranchConnectableById mirror (see BlockType); the dictionary stays for
+    // error messages and tests.
+    private static void LoadTags(string folder)
+    {
+        foreach (var (name, path) in JsonFilesIn(folder))
+        {
+            var definition = ReadJson<TagDefinition>(path);
+            var members = new HashSet<byte>();
+            foreach (var entry in definition.Blocks ?? [])
+            {
+                var id = ResolveTagMember(entry, path);
+                if (!members.Add(id))
+                    throw new InvalidOperationException($"Tag '{path}' lists '{entry}' twice.");
+            }
+            Tags[name] = members;
+        }
+
+        if (!Tags.TryGetValue(BranchConnectableTag, out var connectable))
+            throw new InvalidOperationException(
+                $"Missing required block tag '{BranchConnectableTag}': expected '{Path.Combine(folder, BranchConnectableTag)}.json'.");
+        foreach (var id in connectable)
+            BlockType.BranchConnectableById[id] = true;
+    }
+
+    private static byte ResolveTagMember(string name, string path)
+    {
+        var bare = name.StartsWith("block/", StringComparison.Ordinal) ? name["block/".Length..] : name;
+        if (name.StartsWith("item/", StringComparison.Ordinal) || !BlockIds.TryGetValue(bare, out var id))
+            throw new InvalidOperationException($"Tag '{path}' names '{name}', which is not a registered block.");
+        return id;
     }
 
     private static BlockHitbox[] DefaultWoodHitbox(int taperLevel, float halfWidth)

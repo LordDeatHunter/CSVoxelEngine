@@ -37,8 +37,9 @@ public sealed class WoodShapeTests
         Assert.True(WoodShape.ConnectsVertical(limb, branch));
         Assert.False(WoodShape.ConnectsVertical(limb, log));
         Assert.False(WoodShape.ConnectsVertical(twig, log));
-        Assert.False(WoodShape.ConnectsVertical(branch, Block("leaves")));
+        Assert.True(WoodShape.ConnectsVertical(branch, Block("leaves")));
         Assert.False(WoodShape.ConnectsVertical(branch, Block("stone")));
+        Assert.False(WoodShape.ConnectsVertical(branch, Block("grass")));
     }
 
     [Fact]
@@ -54,7 +55,9 @@ public sealed class WoodShapeTests
         Assert.False(WoodShape.ConnectsHorizontal(branch, branch));
         Assert.False(WoodShape.ConnectsHorizontal(log, log));
         Assert.False(WoodShape.ConnectsHorizontal(sprig, branch));
-        Assert.False(WoodShape.ConnectsHorizontal(branch, Block("leaves")));
+        Assert.True(WoodShape.ConnectsHorizontal(branch, Block("leaves")));
+        Assert.False(WoodShape.ConnectsHorizontal(branch, Block("grass")));
+        Assert.False(WoodShape.ConnectsHorizontal(branch, Block("stone")));
     }
 
     [Fact]
@@ -107,16 +110,60 @@ public sealed class WoodShapeTests
     }
 
     [Fact]
-    public void FootGrowsDownOntoGroundButNotOntoForeignWood()
+    public void FootGrowsDownOntoLeavesButNotOntoGroundOrForeignWood()
     {
         var branch = Block("branch");
         var sprig = Block("sprig");
 
+        var onLeaves = WoodShape.GetBoxes(branch, Neighbours(negY: Block("leaves")));
+        Assert.Equal(0f, Assert.Single(onLeaves).Min.Y);
+
+        // Grass and rock are not tag members: the node floats instead of welding down.
         var onGround = WoodShape.GetBoxes(branch, Neighbours(negY: Block("grass")));
-        Assert.Equal(0f, Assert.Single(onGround).Min.Y);
+        Assert.Equal(0.125f, Assert.Single(onGround).Min.Y);
 
         var onForeignWood = WoodShape.GetBoxes(branch, Neighbours(negY: sprig));
         Assert.Equal(0.125f, Assert.Single(onForeignWood).Min.Y);
+    }
+
+    [Fact]
+    public void BranchConnectableTagHoldsLeavesAndNothingElse()
+    {
+        var leaves = Block("leaves");
+        Assert.True(ContentRegistry.IsInTag(ContentRegistry.BranchConnectableTag, leaves));
+        Assert.True(BlockType.IsBranchConnectable(leaves));
+
+        foreach (var name in new[] { "grass", "stone", "log", "branch", "glass", "water" })
+            Assert.False(BlockType.IsBranchConnectable(Block(name)), name);
+    }
+
+    [Fact]
+    public void ArmGrowsIntoLeavesButNotIntoGrass()
+    {
+        // Branch half-width is 0.375, so the node spans 0.125..0.875 and an arm runs
+        // from the node wall out to the cell face.
+        var branch = Block("branch");
+
+        var intoLeaves = WoodShape.GetBoxes(branch, Neighbours(posX: Block("leaves")));
+        Assert.Equal(2, intoLeaves.Length);
+        var arm = intoLeaves[1];
+        Assert.Equal(new Vector3(0.875f, 0.125f, 0.125f), arm.Min);
+        Assert.Equal(new Vector3(1f, 0.875f, 0.875f), arm.Max);
+
+        var intoGrass = WoodShape.GetBoxes(branch, Neighbours(posX: Block("grass")));
+        var single = Assert.Single(intoGrass);
+        Assert.Equal(new Vector3(0.125f, 0.125f, 0.125f), single.Min);
+        Assert.Equal(new Vector3(0.875f, 0.875f, 0.875f), single.Max);
+    }
+
+    [Fact]
+    public void VerticalTubeGrowsIntoLeavesAbove()
+    {
+        var branch = Block("branch");
+        var boxes = WoodShape.GetBoxes(branch, Neighbours(posY: Block("leaves")));
+        var single = Assert.Single(boxes);
+        Assert.Equal(new Vector3(0.125f, 0.125f, 0.125f), single.Min);
+        Assert.Equal(new Vector3(0.875f, 1f, 0.875f), single.Max);
     }
 
     [Fact]

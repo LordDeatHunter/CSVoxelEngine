@@ -35,34 +35,45 @@ public static class WoodShape
         return type != null && type.WoodTaperLevel >= 1 && type.Renderer == BlockRenderer.TaperedWood;
     }
 
+    /// <summary>Whether tapered wood may grow into this block without a parent/child edge:
+    /// a member of the <c>tree_branch_connectable</c> tag (leaves), never terrain or rock.</summary>
+    public static bool IsBranchConnectable(byte blockId) => BlockType.IsBranchConnectable(blockId);
+
     /// <summary>
-    /// Whether two vertically adjacent wood cells belong to the same parent/child run:
-    /// stacked trunk cells share a level, every other vertical step thins by one.
+    /// Whether two vertically adjacent cells belong to the same wood run or a branch grows
+    /// into the tag: stacked trunk cells share a level, every other vertical wood step
+    /// thins by one, and any wood joined to a <see cref="IsBranchConnectable"/> block above
+    /// or below extends a tube into it.
     /// </summary>
     public static bool ConnectsVertical(byte a, byte b)
     {
-        if (!IsWood(a) || !IsWood(b)) return false;
+        if (!IsWood(a)) return false;
+        if (IsBranchConnectable(b)) return true;
+        if (!IsWood(b)) return false;
         return Math.Abs(WoodLevel(a) - WoodLevel(b)) <= 1;
     }
 
     /// <summary>
-    /// Whether two horizontally adjacent wood cells are parent and child: a limb step
-    /// always thins by exactly one, so same-level or wider-apart touches are foreign
-    /// wood (a sibling limb, another tree) and must not weld.
+    /// Whether two horizontally adjacent cells join: a limb step always thins by exactly
+    /// one, so same-level or wider-apart touches are foreign wood (a sibling limb, another
+    /// tree) and must not weld — unless the neighbour is <see cref="IsBranchConnectable"/>,
+    /// which always takes an arm.
     /// </summary>
     public static bool ConnectsHorizontal(byte a, byte b)
     {
-        if (!IsWood(a) || !IsWood(b)) return false;
+        if (!IsWood(a)) return false;
+        if (IsBranchConnectable(b)) return true;
+        if (!IsWood(b)) return false;
         return Math.Abs(WoodLevel(a) - WoodLevel(b)) == 1;
     }
 
     /// <summary>
-    /// Whether a tapered segment grows a foot tube down onto the cell below: any
-    /// non-air that is not wood (terrain, a log pile, leaves). Wood below either joins
-    /// as parent/child (<see cref="ConnectsVertical"/>) or is foreign and gets nothing.
+    /// Whether a tapered segment grows a foot tube down onto the cell below: only onto
+    /// <see cref="IsBranchConnectable"/> blocks (leaves). Terrain, rock and foreign wood
+    /// get nothing — a branch over grass floats on its node instead of welding to it.
     /// Mirrors the down-tube condition in the mesher.
     /// </summary>
-    public static bool HasFoot(byte belowId) => belowId != BlockType.Air && !IsWood(belowId);
+    public static bool HasFoot(byte belowId) => IsBranchConnectable(belowId);
 
     /// <summary>
     /// Hitboxes matching the emitted mesh: one central column spanning only the drawn

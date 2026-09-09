@@ -1601,21 +1601,23 @@ public class Chunk : IDisposable
                 tile, ShadeLut[(i << 2) | 3], sunF[i], blockF[i]);
         }
 
-        // Up-tube continues the taper into the parent/child wood stacked above; foreign
-        // wood that merely touches (same level side contact from another limb, a wider-apart
-        // level from another tree) gets no tube, so crowns cannot weld into loops
+        // Up-tube continues the taper into the parent/child wood stacked above or into a
+        // tag block (leaves); foreign wood that merely touches (same level side contact
+        // from another limb, a wider-apart level from another tree) gets no tube, so crowns
+        // cannot weld into loops. The mouth cap only closes into narrower wood: a tag
+        // neighbour's own full-cube face already closes the joint, like terrain does.
         var aboveWidth = WoodHalfWidth(nb[4]);
         if (WoodShape.ConnectsVertical(type.Id, nb[4]))
         {
             EmitTubeSides(vertices, indices, ref indexOffset, basePos, sunF, blockF,
                 type.Side, c - w, c + w, c + w, 1f);
-            if (aboveWidth < w)
+            if (aboveWidth >= 0f && aboveWidth < w)
                 EmitTubeCap(vertices, indices, ref indexOffset, padded, pIdx,
                     sunF[4], blockF[4], type.Top, basePos, c, w, top: true);
         }
 
-        // Down-tube continues into parent/child wood below, or feet onto non-wood ground;
-        // foreign wood below is treated like air (the node bottom face already closes it)
+        // Down-tube continues into parent/child wood or a tag block below, or feet onto a
+        // tag block; foreign wood below is treated like air (the node bottom face closes it)
         var belowWidth = WoodHalfWidth(nb[5]);
         var connectsDown = WoodShape.ConnectsVertical(type.Id, nb[5]);
         if (connectsDown || WoodShape.HasFoot(nb[5]))
@@ -1627,7 +1629,8 @@ public class Chunk : IDisposable
                     sunF[5], blockF[5], type.Bottom, basePos, c, w, top: false);
         }
 
-        // Horizontal arms weld this segment to its parent/child wood neighbours only
+        // Horizontal arms weld this segment to its parent/child wood neighbours and to tag
+        // blocks (leaves); anything else gets no arm
         for (var i = 0; i < 4; i++)
         {
             if (!WoodShape.ConnectsHorizontal(type.Id, nb[i])) continue;
@@ -1753,9 +1756,9 @@ public class Chunk : IDisposable
 
     /// <summary>
     /// One horizontal limb from the node wall (so arm walls meet node walls edge-on with no
-    /// coplanar overlap) to the cell face toward a wood neighbour.
-    /// The end cap draws only into a narrower neighbour's mouth; equal or wider wood and full
-    /// cubes already close the joint.
+    /// coplanar overlap) to the cell face toward a connected neighbour (parent/child wood
+    /// or a tag block). The end cap draws only into a narrower wood neighbour's mouth;
+    /// equal or wider wood, tag blocks and full cubes already close the joint.
     /// </summary>
     private static void EmitArm(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         Span<float> sunF, Span<float> blockF, BlockType type,
@@ -1787,7 +1790,8 @@ public class Chunk : IDisposable
         EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, flankB,
             type.Side, ShadeLut[(flankB << 2) | 3], sunF[flankB], blockF[flankB]);
 
-        if (WoodShape.ConnectsHorizontal(type.Id, neighbourId) && WoodHalfWidth(neighbourId) < w)
+        if (WoodShape.ConnectsHorizontal(type.Id, neighbourId)
+            && WoodShape.IsWood(neighbourId) && WoodHalfWidth(neighbourId) < w)
             EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, dir,
                 type.Top, ShadeLut[(dir << 2) | 3], sunF[dir], blockF[dir]);
     }

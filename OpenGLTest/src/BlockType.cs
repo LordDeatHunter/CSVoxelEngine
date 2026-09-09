@@ -43,6 +43,10 @@ public sealed record BlockType
     internal static readonly bool[] OccludesById = new bool[256];
     internal static readonly bool[] CastsAoById = new bool[256];
 
+    // Whether tapered wood may grow a tube or arm into each block id (members of the
+    // tree_branch_connectable tag: leaves, never terrain). Flat like the other mesher flags.
+    internal static readonly bool[] BranchConnectableById = new bool[256];
+
     // Whether the binary greedy mesher may merge this block's faces: a plain full cube whose
     // six faces are the untransformed cube faces (see ContentRegistry.BakesGreedy). Anything
     // else goes through the per-quad scalar path.
@@ -200,6 +204,11 @@ public sealed record BlockType
     /// they leave AO at full brightness even when their JSON flag is set.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool OccludesAO(byte blockId) => OccludesById[blockId] && CastsAoById[blockId];
+
+    /// <summary>Whether tapered wood may grow a tube or arm into this block: a member of
+    /// the <c>tree_branch_connectable</c> tag (leaves), never terrain or rock.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsBranchConnectable(byte blockId) => BranchConnectableById[blockId];
 
     /// <summary>Whether the greedy mesher handles this block (a plain full cube in the
     /// <see cref="BlockRenderer.Model"/> renderer); false sends it down the per-quad path.</summary>
