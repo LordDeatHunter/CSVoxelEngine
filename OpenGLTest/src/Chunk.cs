@@ -1008,8 +1008,8 @@ public class Chunk : IDisposable
             var basePos = new Vector3(x, y, z);
             var pIdx = (x + 1) * PaddedSq + (y + 1) * Padded + (z + 1);
 
-            // Tapered wood renders as a centred box (plus arms reaching wood neighbours)
-            // instead of a full cube; see EmitBranchBox
+            // Tapered wood renders as a centred box (plus arms reaching parent/child
+            // wood neighbours) instead of a full cube; see EmitBranchBox
             if (type.Renderer == BlockRenderer.TaperedWood)
             {
                 EmitBranchBox(vertices, indices, ref indexOffset, padded, pIdx, sunLight, blockLight,
@@ -1558,14 +1558,15 @@ public class Chunk : IDisposable
     /// <summary>Half-width of wood for joint comparisons; logs count as full width.</summary>
     private static float WoodHalfWidth(byte blockId) => BlockType.WoodHalfWidth(blockId);
 
-    private static bool IsWood(byte blockId) => WoodHalfWidth(blockId) >= 0f;
-
     /// <summary>
-    /// Emits a tapered wood segment as a centred node cube with square tubes reaching every
-    /// wood neighbour (plus a foot onto full cubes, so a segment sitting on terrain or a log
-    /// never floats). A vertical stack of segments reads as one continuous tapering pipe, but
-    /// a limb cell with only horizontal neighbours is just a node with arms — never a
-    /// full-height vertical core, so limbs read as limbs instead of second trunks. Tube mouths
+    /// Emits a tapered wood segment as a centred node cube with square tubes reaching its
+    /// parent/child wood neighbours only (see <see cref="WoodShape"/>), plus a foot onto
+    /// non-wood full cubes, so a segment sitting on terrain or a log never floats.
+    /// Wood that merely touches at the same level or two apart (a sibling limb, another
+    /// tree) gets no tube, which is what used to weld crowns into circular loops. A
+    /// vertical stack of segments reads as one continuous tapering pipe, but a limb cell
+    /// with only horizontal neighbours is just a node with arms — never a full-height
+    /// vertical core, so limbs read as limbs instead of second trunks. Tube mouths
     /// press against the node faces behind them and cap only into narrower wood; wider wood
     /// and full cubes already close the joint. No face culling is enabled, so only normals
     /// matter — but coplanar opposite quads would still z-fight, and these rules emit none.
@@ -1599,9 +1600,11 @@ public class Chunk : IDisposable
                 tile, ShadeLut[(i << 2) | 3], sunF[i], blockF[i]);
         }
 
-        // Up-tube continues the taper into wood stacked above
+        // Up-tube continues the taper into the parent/child wood stacked above; foreign
+        // wood that merely touches (same level side contact from another limb, a wider-apart
+        // level from another tree) gets no tube, so crowns cannot weld into loops
         var aboveWidth = WoodHalfWidth(nb[4]);
-        if (aboveWidth >= 0f)
+        if (WoodShape.ConnectsVertical(type.Id, nb[4]))
         {
             EmitTubeSides(vertices, indices, ref indexOffset, basePos, sunF, blockF,
                 type.Side, c - w, c + w, c + w, 1f);
@@ -1610,22 +1613,23 @@ public class Chunk : IDisposable
                     sunF[4], blockF[4], type.Top, basePos, c, w, top: true);
         }
 
-        // Down-tube continues into wood below, or feet onto a full cube; air below means the
-        // node floats free (a limb in open air) and its bottom face already closes it
+        // Down-tube continues into parent/child wood below, or feet onto non-wood ground;
+        // foreign wood below is treated like air (the node bottom face already closes it)
         var belowWidth = WoodHalfWidth(nb[5]);
-        if (nb[5] != BlockType.Air)
+        var connectsDown = WoodShape.ConnectsVertical(type.Id, nb[5]);
+        if (connectsDown || WoodShape.HasFoot(nb[5]))
         {
             EmitTubeSides(vertices, indices, ref indexOffset, basePos, sunF, blockF,
                 type.Side, c - w, c + w, 0f, c - w);
-            if (belowWidth >= 0f && belowWidth < w)
+            if (connectsDown && belowWidth >= 0f && belowWidth < w)
                 EmitTubeCap(vertices, indices, ref indexOffset, padded, pIdx,
                     sunF[5], blockF[5], type.Bottom, basePos, c, w, top: false);
         }
 
-        // Horizontal arms weld this segment to wood neighbours
+        // Horizontal arms weld this segment to its parent/child wood neighbours only
         for (var i = 0; i < 4; i++)
         {
-            if (!IsWood(nb[i])) continue;
+            if (!WoodShape.ConnectsHorizontal(type.Id, nb[i])) continue;
             EmitArm(vertices, indices, ref indexOffset, sunF, blockF, type, basePos, c, w, i, nb[i]);
         }
     }
@@ -1782,7 +1786,7 @@ public class Chunk : IDisposable
         EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, flankB,
             type.Side, ShadeLut[(flankB << 2) | 3], sunF[flankB], blockF[flankB]);
 
-        if (IsWood(neighbourId) && WoodHalfWidth(neighbourId) < w)
+        if (WoodShape.ConnectsHorizontal(type.Id, neighbourId) && WoodHalfWidth(neighbourId) < w)
             EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, dir,
                 type.Top, ShadeLut[(dir << 2) | 3], sunF[dir], blockF[dir]);
     }

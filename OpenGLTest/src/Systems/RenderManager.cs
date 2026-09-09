@@ -1450,7 +1450,8 @@ public class RenderManager : IDisposable
     /// cubes. Used for the mining pop: grown, the mesh encloses the block baked into the chunk
     /// mesh, so the block appears to jump out of the terrain.
     /// </summary>
-    public void RenderBlockPop(Camera camera, Vector3 blockPosition, byte blockId, float grow)
+    public void RenderBlockPop(Camera camera, Vector3 blockPosition, byte blockId, float grow,
+        BlockHitbox[]? boxes = null)
     {
         var mesh = blockCubes.Get(blockId);
         if (mesh == null) return;
@@ -1459,7 +1460,7 @@ public class RenderManager : IDisposable
         BindWorldTextures();
 
         // The mesh is centred on its own origin, so scaling happens about each box's centre
-        var boxes = BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
+        boxes ??= BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
         var grown = new Vector3(grow);
         foreach (var box in boxes)
         {
@@ -1622,7 +1623,7 @@ public class RenderManager : IDisposable
     /// block's current pop growth so the highlight tracks it while mining.
     /// </summary>
     public void RenderBlockSelection(Camera camera, Vector3 blockPosition, Vector3 hitNormal, float grow = 0f,
-        byte blockId = 0, int hitBoxIndex = 0)
+        byte blockId = 0, int hitBoxIndex = 0, BlockHitbox[]? boxes = null)
     {
         selectionShader.Use();
 
@@ -1631,7 +1632,7 @@ public class RenderManager : IDisposable
         gl.Enable(EnableCap.Blend);
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
-        var boxes = BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
+        boxes ??= BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
         selectionShader.SetUniform("uColor", new Vector3(0.8f, 0.8f, 0.85f));
         selectionShader.SetUniform("uOpacity", 0.95f);
 
@@ -1674,7 +1675,7 @@ public class RenderManager : IDisposable
     /// current pop growth so the overlay tracks it while mining.
     /// </summary>
     public void RenderBlockBreaking(Camera camera, Vector3 blockPosition, float progress, float grow = 0f,
-        byte blockId = 0)
+        byte blockId = 0, BlockHitbox[]? boxes = null)
     {
         if (progress <= 0f) return;
 
@@ -1683,7 +1684,7 @@ public class RenderManager : IDisposable
         gl.Enable(EnableCap.Blend);
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
-        var boxes = BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
+        boxes ??= BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
         breakShader.SetUniform("uProgress", progress);
 
         gl.BindVertexArray(faceVao);

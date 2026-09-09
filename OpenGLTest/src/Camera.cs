@@ -666,7 +666,12 @@ public class Camera
 
             if (targetsCell)
             {
-                var boxes = BlockType.ById[cellId]?.Hitboxes;
+                // Tapered wood aims at its drawn shape, not the static full-height column:
+                // the node's vertical extent and side arms follow the parent/child
+                // neighbours, so the boxes are resolved from the live neighbourhood.
+                var boxes = WoodShape.IsTapered(cellId)
+                    ? WoodShape.GetBoxesAt(cellId, chunkManager.GetBlockGlobal, cellX, cellY, cellZ)
+                    : BlockType.ById[cellId]?.Hitboxes;
                 if (boxes == null || boxes.Length == 0)
                 {
                     hitPosition = currentPosition;

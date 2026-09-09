@@ -207,13 +207,16 @@ public class World
         // The chunk mesh still holds the block at rest size, so the popped cube is only
         // needed (and only hides it) while it is grown
         if (popGrow > 0f)
-            renderManager.RenderBlockPop(Camera, _breakingBlockPosition, _breakingBlockId, popGrow);
+            renderManager.RenderBlockPop(Camera, _breakingBlockPosition, _breakingBlockId, popGrow,
+                HitboxesAt(_breakingBlockPosition, _breakingBlockId));
 
+        var selectedId = BlockIdAt(_selectedBlockPosition);
         renderManager.RenderBlockSelection(Camera, _selectedBlockPosition, _selectedFaceNormal, popGrow,
-            BlockIdAt(_selectedBlockPosition), _selectedBoxIndex);
+            selectedId, _selectedBoxIndex, HitboxesAt(_selectedBlockPosition, selectedId));
 
         if (_isBreaking)
-            renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress, popGrow, _breakingBlockId);
+            renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress, popGrow, _breakingBlockId,
+                HitboxesAt(_breakingBlockPosition, _breakingBlockId));
 
         FrameProfiler.End(ProfileSection.SelectPass);
     }
@@ -318,6 +321,19 @@ public class World
     {
         // blockPos components are floored floats, so the int casts are exact
         return _chunkManager.GetBlockGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
+    }
+
+    /// <summary>
+    /// Hitboxes for the outline, break overlay and mining pop. Tapered wood resolves
+    /// its drawn shape from the live neighbourhood (see <see cref="WoodShape"/>);
+    /// everything else uses its registered boxes.
+    /// </summary>
+    private BlockHitbox[] HitboxesAt(Vector3 blockPos, byte blockId)
+    {
+        if (!WoodShape.IsTapered(blockId))
+            return BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
+        return WoodShape.GetBoxesAt(blockId, _chunkManager.GetBlockGlobal,
+            (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
     }
 
     private void RemoveBlock(Vector3 blockPos)
