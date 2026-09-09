@@ -1,0 +1,7 @@
+{
+  "result": "block/mud_bricks",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/mud_brick", "count": 4 }
+  ]
+}
