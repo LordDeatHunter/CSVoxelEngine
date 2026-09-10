@@ -194,7 +194,10 @@ void main() {
     }
     // Ambient is skylight bounce, so it only reaches fragments the sky reaches (fSun).
     // Without this every sealed cave renders at full ambient brightness in daytime.
-    vec3 light = uAmbient * (0.12 + 0.88 * fSun) + sun + torch + pl;
+    // Block and point lights fill in where the sun doesn't reach but never stack on top of
+    // it: the direct term is the stronger of the two, so a lamp can't push sunlit ground
+    // past white at noon yet still lights caves and the night.
+    vec3 light = uAmbient * (0.12 + 0.88 * fSun) + max(sun, torch + pl);
     vec3 col = albedo * light;
     // Wanted by the caustics and the refraction below as well as by the fog at the end
     float dist = distance(fWorldPos, uCameraPos);
