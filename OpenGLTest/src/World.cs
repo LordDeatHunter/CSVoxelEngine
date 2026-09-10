@@ -64,6 +64,14 @@ public class World
     private byte _heldId;
     private bool _hasHeld;
 
+    // True once the player rests exactly on real ground at the origin spawn. The camera's
+    // initial position is only a heightmap guess (pre-carve, see Camera.SpawnPosition), and
+    // physics starts before the spawn chunks stream in (unloaded cells read as air), so
+    // without this the player falls through and ends up buried once the terrain loads.
+    private bool _spawnSettled;
+    private readonly float _spawnX;
+    private readonly float _spawnZ;
+
     /// <summary>The player's hotbar; its selected slot decides what block placing puts down.</summary>
     public Inventory Inventory { get; } = new();
 
@@ -102,6 +110,10 @@ public class World
     {
         _window = window;
         Camera = new Camera(window, input);
+        _spawnX = Camera.Position.X;
+        _spawnZ = Camera.Position.Z;
+        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("VOXEL_SPAWN")))
+            _spawnSettled = true;
         _chunkManager = new ChunkManager(gl, opaqueGeometry, translucentGeometry);
         _generationWorker = new ChunkGenerationWorker(_chunkManager, Camera);
         _lodManager = new LodManager(gl);
@@ -110,8 +122,85 @@ public class World
         _lodManager.Start(Camera);
     }
 
+    private void EnsureSpawnSettled()
+    {
+        if (_spawnSettled)
+            return;
+
+        var dx = Camera.Position.X - _spawnX;
+        var dz = Camera.Position.Z - _spawnZ;
+        if (dx * dx + dz * dz > 64f)
+        {
+            _spawnSettled = true;
+            return;
+        }
+
+        var sx = (int)MathF.Floor(_spawnX);
+        var sz = (int)MathF.Floor(_spawnZ);
+        var cx = (int)MathF.Floor(sx / (float)Chunk.Size);
+        var cz = (int)MathF.Floor(sz / (float)Chunk.Size);
+        var lx = sx - cx * Chunk.Size;
+        var lz = sz - cz * Chunk.Size;
+        var heightmap = Chunk.GetColumnHeights(cx, cz)[(lx << Chunk.SizeShift) | lz];
+        var estimate = Math.Max(heightmap, WorldGenerationConfig.SeaLevel);
+        const float spawnLift = 0.02f;
+        var holdEye = estimate + 1 + Camera.EyeHeight + spawnLift;
+
+        if (WorldGenerationConfig.WaterEnabled && heightmap < WorldGenerationConfig.SeaLevel)
+        {
+            if (!_chunkManager.TryGetCell(sx, WorldGenerationConfig.SeaLevel, sz, out _, out _))
+            {
+                Camera.TestTeleport(new Vector3(_spawnX, holdEye, _spawnZ), Camera.Yaw, Camera.Pitch);
+                return;
+            }
+
+            Camera.TestTeleport(new Vector3(_spawnX, WorldGenerationConfig.SeaLevel + 1 + Camera.EyeHeight + spawnLift, _spawnZ),
+                Camera.Yaw, Camera.Pitch);
+            _spawnSettled = true;
+            return;
+        }
+
+        var top = estimate + WorldGenerationConfig.TreeMaxHeightBlocks + 2;
+        if (!_chunkManager.TryGetCell(sx, top, sz, out _, out _))
+        {
+            Camera.TestTeleport(new Vector3(_spawnX, holdEye, _spawnZ), Camera.Yaw, Camera.Pitch);
+            return;
+        }
+
+        for (var y = top; y > estimate - 64; y--)
+        {
+            if (!_chunkManager.TryGetCell(sx, y, sz, out var id, out _))
+            {
+                Camera.TestTeleport(new Vector3(_spawnX, holdEye, _spawnZ), Camera.Yaw, Camera.Pitch);
+                return;
+            }
+
+            if (!BlockType.IsSolid(id))
+                continue;
+
+            if (!_chunkManager.TryGetCell(sx, y + 1, sz, out var above1, out _)
+                || !_chunkManager.TryGetCell(sx, y + 2, sz, out var above2, out _))
+            {
+                Camera.TestTeleport(new Vector3(_spawnX, holdEye, _spawnZ), Camera.Yaw, Camera.Pitch);
+                return;
+            }
+
+            if (BlockType.IsSolid(above1) || BlockType.IsSolid(above2))
+                continue;
+
+            Camera.TestTeleport(new Vector3(_spawnX, y + 1 + Camera.EyeHeight + spawnLift, _spawnZ),
+                Camera.Yaw, Camera.Pitch);
+            _spawnSettled = true;
+            return;
+        }
+
+        Camera.TestTeleport(new Vector3(_spawnX, holdEye, _spawnZ), Camera.Yaw, Camera.Pitch);
+    }
+
     public void Update(double deltaTime, IKeyboard? keyboard)
     {
+        EnsureSpawnSettled();
+
         FrameProfiler.Begin(ProfileSection.Camera);
         Camera.Update((float)deltaTime, keyboard, _chunkManager);
         FrameProfiler.End(ProfileSection.Camera);
