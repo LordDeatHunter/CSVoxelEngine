@@ -63,7 +63,18 @@ public class UIRenderer : IDisposable
     // [E] inventory panel, in pixels: a Skyrim-style list on the left, preview on the right
     private const float PanelLeft = 40f;
     private const float PanelTop = 80f;
-    private const float PanelWidth = 560f;
+    private const float PanelGap = 16f;
+    private const float PanelRightMargin = 24f;
+    private const float PanelWidthMin = 480f;
+    private const float PanelWidthMax = 660f;
+    private const float DetailWidthMin = 300f;
+    private const float DetailWidthMax = 480f;
+    private float PanelWidth =>
+        Math.Clamp((_screenSize.X - PanelLeft - PanelGap - PanelRightMargin) * 0.58f,
+            PanelWidthMin, PanelWidthMax);
+    private float DetailWidth =>
+        Math.Clamp(_screenSize.X - PanelLeft - PanelWidth - PanelGap - PanelRightMargin,
+            DetailWidthMin, DetailWidthMax);
     private const float PanelPad = 10f;
     private const float TabHeight = 60f;
     private const float RowHeight = 42f;
@@ -88,11 +99,11 @@ public class UIRenderer : IDisposable
     private static readonly Rgba ButtonTextDisabled = Rgba.Grey(0.45f, 1f);
 
     // Crafting detail card, in pixels: floats right where the preview sits
-    private const float DetailWidth = 380f;
     private const float DetailPad = 14f;
     private const float DetailHeaderH = 84f;
-    private const float DetailBatchH = 32f;
     private const float StepBox = 24f;
+    private const float BatchCountW = 34f;
+    private const float BatchGap = 8f;
     private const float IngPad = 10f;
     private const float IngTitleH = 20f;
     private const float IngBarH = 6f;
@@ -175,7 +186,7 @@ public class UIRenderer : IDisposable
 
     // Scratch for one DrawText call; reused so text layout allocates nothing per frame.
     // Safe to share: all UI drawing happens on the main thread.
-    private readonly GlyphInstance[] _glyphScratch = new GlyphInstance[32];
+    private readonly GlyphInstance[] _glyphScratch = new GlyphInstance[64];
 
     private Matrix4x4 _projection;
     private Vector2 _screenSize;
@@ -430,7 +441,7 @@ public class UIRenderer : IDisposable
     /// <summary>
     /// Screen-space text with its top-left corner at <paramref name="topLeft"/> (pixels, Y
     /// down). A one-pixel dark shadow is drawn under each glyph so the text reads over
-    /// bright icons. Strings longer than 32 characters are truncated.
+    /// bright icons. Strings longer than 64 characters are truncated.
     /// </summary>
     public void DrawText(string text, Vector2 topLeft, float scale, Rgba color)
     {
@@ -544,10 +555,10 @@ public class UIRenderer : IDisposable
                 active ? SelectedBackground : SlotBackground);
             if (active)
                 DrawBorder(centre, new Vector2(tabWidth - 4f, TabHeight), SlotBorder, SelectedBorderColor);
-            DrawTextCentred(TabTitle(tabs[t]),
-                centre.X, top + PanelPad + 6f, _countScale, Rgba.White);
-            DrawTextCentred(TabSubtitle(inventory, tabs[t]),
-                centre.X, top + PanelPad + 30f, _countScale, Rgba.White);
+            DrawTextCentredFitted(TabTitle(tabs[t]),
+                centre.X, top + PanelPad + 6f, _countScale, Rgba.White, tabWidth - 8f);
+            DrawTextCentredFitted(TabSubtitle(inventory, tabs[t]),
+                centre.X, top + PanelPad + 30f, _countScale, Rgba.White, tabWidth - 8f);
         }
 
         var listTop = top + PanelPad * 2f + TabHeight;
@@ -661,7 +672,7 @@ public class UIRenderer : IDisposable
         else
             DrawBlockIcon(iconCentre, RowIcon, id);
 
-        DrawText(name, new Vector2(iconCentre.X + RowIcon * 0.5f + 8f, centreY - 9f),
+        DrawText(FitText(name, _countScale, RowNameAvail(count)), new Vector2(iconCentre.X + RowIcon * 0.5f + 8f, centreY - 9f),
             _countScale, dim && !selected ? TextDim : Rgba.White);
 
         if (_font != null)
@@ -725,7 +736,8 @@ public class UIRenderer : IDisposable
         else
             DrawBlockIconSpinning(centre with { Y = centre.Y - 12f }, PreviewSize * 0.7f, id, spin);
 
-        DrawTextCentred(name, centre.X, centre.Y + PreviewSize * 0.5f + 12f, _headScale, Rgba.White);
+        DrawTextCentredFitted(name, centre.X, centre.Y + PreviewSize * 0.5f + 12f, _headScale, Rgba.White,
+            cardSize.X - 16f);
         DrawTextCentred(stock, centre.X, centre.Y + PreviewSize * 0.5f + 40f, _countScale, TextDim);
         DrawTextCentred("Click a hotbar slot to equip", centre.X,
             centre.Y + PreviewSize * 0.5f + 58f, _countScale, TextDim);
@@ -759,14 +771,27 @@ public class UIRenderer : IDisposable
     private Vector2 CraftBatchMinusCentre(InventoryView view)
     {
         var cardLeft = _screenSize.X - PreviewRight - DetailWidth * 0.5f;
-        return new Vector2(cardLeft + DetailPad + 78f, CraftBatchCentreY(view));
+        var x = cardLeft + DetailPad + 76f + CraftBatchLabelW() + BatchGap + StepBox * 0.5f;
+        return new Vector2(x, CraftBatchCentreY(view));
+    }
+
+    private float CraftBatchLabelW() =>
+        _font?.MeasureSize("Batch".AsSpan(), _countScale).X ?? 44f;
+
+    private Vector2 CraftBatchCountCentre(InventoryView view)
+    {
+        var minus = CraftBatchMinusCentre(view);
+        return new Vector2(minus.X + StepBox * 0.5f + BatchGap + BatchCountW * 0.5f, minus.Y);
     }
 
     private Vector2 CraftBatchPlusCentre(InventoryView view)
     {
-        var minus = CraftBatchMinusCentre(view);
-        return minus with { X = minus.X + 62f };
+        var count = CraftBatchCountCentre(view);
+        return new Vector2(count.X + BatchCountW * 0.5f + BatchGap + StepBox * 0.5f, count.Y);
     }
+
+    private float CraftBatchMaxX(InventoryView view) =>
+        CraftBatchPlusCentre(view).X + StepBox * 0.5f + BatchGap;
 
     private float CraftBatchCentreY(InventoryView view)
     {
@@ -829,7 +854,8 @@ public class UIRenderer : IDisposable
     {
         if (view.Craft.Recipe == null) return new CraftHit(CraftHitKind.None);
         if (InBox(point, CraftButtonCentre(view), new Vector2(CraftInnerWidth, CraftButtonH)))
-            return new CraftHit(CraftHitKind.CraftButton);        if (InBox(point, CraftBatchMinusCentre(view), new Vector2(StepBox)))
+            return new CraftHit(CraftHitKind.CraftButton);
+        if (InBox(point, CraftBatchMinusCentre(view), new Vector2(StepBox)))
             return new CraftHit(CraftHitKind.BatchMinus);
         if (InBox(point, CraftBatchPlusCentre(view), new Vector2(StepBox)))
             return new CraftHit(CraftHitKind.BatchPlus);
@@ -877,11 +903,12 @@ public class UIRenderer : IDisposable
 
         if (session.Recipe == null)
         {
-            DrawTextCentred("Crafting", cardCentre.X, PanelTop + DetailPad, _headScale, Rgba.White);
-            DrawTextCentred("Pick a recipe on the left", cardCentre.X,
-                PanelTop + DetailPad + 34f, _countScale, TextDim);
-            DrawTextCentred("then feed it items and hit CRAFT", cardCentre.X,
-                PanelTop + DetailPad + 54f, _countScale, TextDim);
+            DrawTextCentredFitted("Crafting", cardCentre.X, PanelTop + DetailPad, _headScale, Rgba.White,
+                CraftInnerWidth - 8f);
+            DrawTextCentredFitted("Pick a recipe on the left", cardCentre.X,
+                PanelTop + DetailPad + 34f, _countScale, TextDim, CraftInnerWidth - 8f);
+            DrawTextCentredFitted("then feed it items and hit CRAFT", cardCentre.X,
+                PanelTop + DetailPad + 54f, _countScale, TextDim, CraftInnerWidth - 8f);
             return;
         }
 
@@ -897,18 +924,25 @@ public class UIRenderer : IDisposable
             DrawBlockIconSpinning(iconCentre, 60f, recipe.ResultId, spin);
 
         var textX = cardLeft + DetailPad + 76f;
-        DrawText(Inventory.DisplayName(recipe.ResultId), new Vector2(textX, y + 4f), _headScale, Rgba.White);
-        DrawText($"Makes {recipe.ResultCount} per craft", new Vector2(textX, y + 32f), _countScale, TextDim);
+        var headAvail = DetailWidth - DetailPad * 2f - 76f;
+        var title = Inventory.DisplayName(recipe.ResultId);
+        var titleScale = FitScale(title, _headScale, headAvail);
+        DrawText(FitText(title, titleScale, headAvail), new Vector2(textX, y + 4f), titleScale, Rgba.White);
+        DrawText(FitText($"Makes {recipe.ResultCount} per craft", _countScale, headAvail),
+            new Vector2(textX, y + 32f), _countScale, TextDim);
 
         DrawText("Batch", new Vector2(textX, y + 56f), _countScale, TextDim);
         var batchMinus = CraftBatchMinusCentre(view);
         var batchPlus = CraftBatchPlusCentre(view);
         DrawBoxButton(batchMinus, StepBox, "-", ChipBackground, SlotBorderColor, Rgba.White);
-        DrawTextCentred(session.Batch.ToString(), (batchMinus.X + batchPlus.X) * 0.5f,
+        DrawTextCentred(session.Batch.ToString(), CraftBatchCountCentre(view).X,
             batchMinus.Y - 8f, _countScale, Rgba.White);
         DrawBoxButton(batchPlus, StepBox, "+", ChipBackground, SlotBorderColor, Rgba.White);
         var maxBatch = session.MaxAffordable(inventory);
-        DrawText($"max {maxBatch}", new Vector2(batchPlus.X + StepBox * 0.5f + 8f, y + 56f),
+        var maxX = CraftBatchMaxX(view);
+        var maxRight = cardLeft + DetailWidth - DetailPad;
+        DrawText(FitText($"max {maxBatch}", _countScale, Math.Max(20f, maxRight - maxX)),
+            new Vector2(maxX, y + 56f),
             _countScale, maxBatch >= session.Batch ? ReadyGreen : DangerRed);
 
         y += DetailHeaderH + 10f;
@@ -925,7 +959,8 @@ public class UIRenderer : IDisposable
             var need = session.NeedAt(i);
             var fed = session.FedAt(i);
             var label = ingredient.IsTag ? $"Any {ingredient.Tag}" : Inventory.DisplayName(ingredient.Id);
-            DrawText($"{i + 1}. {label}  x{ingredient.Count}/craft",
+            var ingTitleAvail = CraftInnerWidth - IngPad * 2f;
+            DrawText(FitText($"{i + 1}. {label}  x{ingredient.Count}/craft", _countScale, ingTitleAvail),
                 new Vector2(cardLeft + DetailPad + IngPad, cardTop + IngPad), _countScale, Rgba.White);
 
             var barY = cardTop + IngPad + IngTitleH;
@@ -944,12 +979,14 @@ public class UIRenderer : IDisposable
                 DrawIdIcon(new Vector2(fedCx, fedCy), 30f, fed.MemberId, headingDegrees, time);
             else
                 DrawTextCentred("?", fedCx, fedCy - 8f, _countScale, TextDim);
-            DrawText($"{fed.Count} / {need} fed",
-                new Vector2(fedCx + 24f, fedCy - 8f), _countScale,
-                fed.Count >= need ? ReadyGreen : Rgba.White);
 
             var minus = CraftIngMinusCentre(view, i);
             var plus = CraftIngPlusCentre(view, i);
+            var fedText = $"{fed.Count} / {need} fed";
+            var fedAvail = minus.X - IngStepBox * 0.5f - (fedCx + 24f) - 8f;
+            DrawText(FitText(fedText, _countScale, Math.Max(20f, fedAvail)),
+                new Vector2(fedCx + 24f, fedCy - 8f), _countScale,
+                fed.Count >= need ? ReadyGreen : Rgba.White);
             DrawBoxButton(minus, IngStepBox, "-", ChipBackground, SlotBorderColor, Rgba.White);
             DrawBoxButton(plus, IngStepBox, "+", ChipBackground, SlotBorderColor, Rgba.White);
 
@@ -977,8 +1014,8 @@ public class UIRenderer : IDisposable
         }
 
         var statusY = PanelTop + CraftCardHeight(view) - DetailPad - CraftButtonH - 8f - StatusH;
-        DrawTextCentred(session.StatusLine(inventory), cardCentre.X, statusY,
-            _countScale, ready ? ReadyGreen : AccentGold);
+        DrawTextCentredFitted(session.StatusLine(inventory), cardCentre.X, statusY,
+            _countScale, ready ? ReadyGreen : AccentGold, CraftInnerWidth - 8f);
 
         var buttonC = CraftButtonCentre(view);
         var buttonS = new Vector2(CraftInnerWidth, CraftButtonH);
@@ -1077,6 +1114,50 @@ public class UIRenderer : IDisposable
         if (_font == null || string.IsNullOrEmpty(text)) return;
         var width = _font.MeasureSize(text.AsSpan(), scale).X;
         DrawText(text, new Vector2(centreX - width * 0.5f, topY), scale, color);
+    }
+
+    private float TextWidth(string text, float scale) =>
+        _font == null || string.IsNullOrEmpty(text)
+            ? 0f
+            : _font.MeasureSize(text.AsSpan(), scale).X;
+
+    // Truncates text with "..." to fit maxWidth at scale. ASCII dots because the font
+    // only covers printable ASCII (U+2026 would vanish).
+    private string FitText(string text, float scale, float maxWidth)
+    {
+        if (_font == null || string.IsNullOrEmpty(text)) return text;
+        if (maxWidth <= 0f) return "";
+        if (_font.MeasureSize(text.AsSpan(), scale).X <= maxWidth) return text;
+        const string dots = "...";
+        for (var len = text.Length - 1; len > 0; len--)
+        {
+            var sub = text.Substring(0, len) + dots;
+            if (_font.MeasureSize(sub.AsSpan(), scale).X <= maxWidth) return sub;
+        }
+        return dots;
+    }
+
+    private float FitScale(string text, float scale, float maxWidth)
+    {
+        if (_font == null || string.IsNullOrEmpty(text) || maxWidth <= 0f) return scale;
+        var w = _font.MeasureSize(text.AsSpan(), scale).X;
+        if (w <= maxWidth || w <= 0f) return scale;
+        return Math.Max(scale * 0.7f, scale * maxWidth / w);
+    }
+
+    private void DrawTextCentredFitted(string text, float centreX, float topY, float scale,
+        Rgba color, float maxWidth)
+    {
+        if (_font == null || string.IsNullOrEmpty(text)) return;
+        var s = FitScale(text, scale, maxWidth);
+        DrawTextCentred(FitText(text, s, maxWidth), centreX, topY, s, color);
+    }
+
+    private float RowNameAvail(string count)
+    {
+        var nameX = PanelLeft + PanelPad + RowIcon + 16f;
+        var countW = TextWidth(count, _countScale);
+        return PanelLeft + PanelWidth - PanelPad - 8f - countW - nameX - 8f;
     }
 
     /// <summary>
