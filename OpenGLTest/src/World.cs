@@ -100,8 +100,9 @@ public class World
         Camera.Update((float)deltaTime, keyboard, _chunkManager);
         FrameProfiler.End(ProfileSection.Camera);
 
-        // The walk cycle runs off real horizontal speed, so the limbs keep up with sprint,
-        // swim and flight instead of playing a fixed-rate loop.
+        // The walk cycle runs off real horizontal speed, so the limbs keep up with sprint
+        // and swim instead of playing a fixed-rate loop. Flying poses no stride, so it
+        // feeds zero speed and the limbs ease back to rest.
         var camPos = Camera.Position;
         var horizontalSpeed = 0f;
         if (_hasPrevCamPos && deltaTime > 0.0)
@@ -114,7 +115,8 @@ public class World
         _heldId = Inventory.SelectedBlockId;
         _hasHeld = _heldId != 0 && (Inventory.SelectedCount > 0 || Inventory.SelectedToolInstance > 0);
         Player.HoldingItem = _hasHeld;
-        Player.Update((float)deltaTime, horizontalSpeed);
+        var animSpeed = Camera.IsFlying ? 0f : horizontalSpeed;
+        Player.Update((float)deltaTime, animSpeed, Camera.IsSprinting, Camera.IsGrounded);
 
         // Times itself, as ChunkUnload / ChunkApply / ChunkDirty
         _chunkManager.Update(Camera);

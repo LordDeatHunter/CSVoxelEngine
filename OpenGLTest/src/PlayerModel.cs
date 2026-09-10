@@ -49,8 +49,21 @@ public class PlayerModel
     // Gait tuning. WalkSpeedRef matches the camera's base move speed, so Blend hits 1
     // exactly when walking normally and stays capped while sprinting or flying.
     private const float WalkSpeedRef = 8f;
-    private const float SwingAmp = 0.65f;
+    private const float WalkSwingAmp = 0.65f;
+    private const float RunSwingAmp = 1.05f;
+    private const float WalkKneeAmp = 0.9f;
+    private const float RunKneeAmp = 1.5f;
+    private const float WalkElbowAmp = 0.45f;
+    private const float RunElbowAmp = 0.85f;
+    private const float WalkBobAmp = 0.04f;
+    private const float RunBobAmp = 0.075f;
+    private const float WalkTorsoPitch = 0.06f;
+    private const float RunTorsoPitch = 0.20f;
+    // Extra stride rate on top of the speed-scaled walk cadence, so running reads as a
+    // faster cadence and not just a sped-up walk loop.
+    private const float RunStrideBoost = 2.5f;
     private const float MoveBlendRate = 8f;
+    private const float RunBlendRate = 6f;
     public const float MineDuration = 0.25f;
 
     // First-person framing: straight-hanging arms sit ~66 degrees below the view centre,
@@ -69,6 +82,7 @@ public class PlayerModel
 
     private float _walkPhase;
     private float _moveBlend;
+    private float _runBlend;
     private float _mineT = 1f;
     private float _time;
     private float _holdBlend;
@@ -88,22 +102,29 @@ public class PlayerModel
     /// <summary>Smoothed 0..1 movement amount driving the swing amplitude.</summary>
     public float MoveBlend => _moveBlend;
 
+    /// <summary>Smoothed 0..1 running amount driving the larger run-cycle amplitudes.</summary>
+    public float RunBlend => _runBlend;
+
     /// <summary>
     /// Advances the walk cycle and the mine swing. <paramref name="horizontalSpeed"/> is in
     /// blocks/s (the camera's XZ displacement per second); standing still eases the limbs
-    /// back to rest instead of snapping.
+    /// back to rest instead of snapping. <paramref name="sprinting"/> selects the larger
+    /// run cycle, and <paramref name="grounded"/> gates it so airtime stays a walk pose.
     /// </summary>
-    public void Update(float deltaTime, float horizontalSpeed)
+    public void Update(float deltaTime, float horizontalSpeed, bool sprinting = false, bool grounded = true)
     {
         if (deltaTime <= 0f) return;
         _time += deltaTime;
 
         var target = MathUtils.Clamp01(horizontalSpeed / WalkSpeedRef);
         _moveBlend = MathUtils.Damp(_moveBlend, target, MoveBlendRate, deltaTime);
+        var runTarget = sprinting && grounded && horizontalSpeed > 0.5f ? 1f : 0f;
+        _runBlend = MathUtils.Damp(_runBlend, runTarget, RunBlendRate, deltaTime);
         _holdBlend = MathUtils.Damp(_holdBlend, HoldingItem ? 1f : 0f, MoveBlendRate, deltaTime);
 
-        // Stride rate grows with speed so feet roughly keep up with the ground.
-        _walkPhase += deltaTime * (4f + horizontalSpeed * 0.9f);
+        // Stride rate grows with speed so feet roughly keep up with the ground, plus an
+        // extra kick while running so the cadence lifts beyond a sped-up walk.
+        _walkPhase += deltaTime * (4f + horizontalSpeed * 0.9f + _runBlend * RunStrideBoost);
 
         if (_mineT < 1f)
             _mineT = Math.Min(1f, _mineT + deltaTime / MineDuration);
@@ -145,18 +166,21 @@ public class PlayerModel
 
     public Pose GetPose()
     {
-        var swing = MathF.Sin(_walkPhase) * SwingAmp * _moveBlend;
+        var swingAmp = MathUtils.Lerp(WalkSwingAmp, RunSwingAmp, _runBlend);
+        var kneeAmp = MathUtils.Lerp(WalkKneeAmp, RunKneeAmp, _runBlend);
+        var elbowAmp = MathUtils.Lerp(WalkElbowAmp, RunElbowAmp, _runBlend);
+        var swing = MathF.Sin(_walkPhase) * swingAmp * _moveBlend;
 
         // Hips and shoulders swing opposite; knees flex (backward, hence negative) with a
         // phase lag so the joint reads instead of the leg swinging like a plank. Elbows
         // stay slightly bent at rest and flex forward as the arm swings.
-        var leftKnee = -(Math.Max(0f, MathF.Sin(_walkPhase - 0.7f)) * 0.9f * _moveBlend + 0.03f);
-        var rightKnee = -(Math.Max(0f, MathF.Sin(_walkPhase + MathF.PI - 0.7f)) * 0.9f * _moveBlend + 0.03f);
+        var leftKnee = -(Math.Max(0f, MathF.Sin(_walkPhase - 0.7f)) * kneeAmp * _moveBlend + 0.03f);
+        var rightKnee = -(Math.Max(0f, MathF.Sin(_walkPhase + MathF.PI - 0.7f)) * kneeAmp * _moveBlend + 0.03f);
         var leftShoulder = RestShoulderForward - swing + MathF.Sin(_time * 1.7f) * 0.02f;
         var rightShoulder = RestShoulderForward + swing - MathF.Sin(_time * 1.7f) * 0.02f
             + _holdBlend * HoldShoulder;
-        var leftElbow = (Math.Max(0f, MathF.Sin(_walkPhase)) * 0.45f * _moveBlend) + RestElbow;
-        var rightElbow = (Math.Max(0f, -MathF.Sin(_walkPhase)) * 0.45f * _moveBlend) + RestElbow
+        var leftElbow = (Math.Max(0f, MathF.Sin(_walkPhase)) * elbowAmp * _moveBlend) + RestElbow;
+        var rightElbow = (Math.Max(0f, -MathF.Sin(_walkPhase)) * elbowAmp * _moveBlend) + RestElbow
             + _holdBlend * HoldElbow;
 
         // Mining raises the right hand up-forward into view, peaking mid-swing, on top of
@@ -169,8 +193,10 @@ public class PlayerModel
             rightElbow += pump * 0.4f;
         }
 
-        var bob = MathF.Abs(MathF.Cos(_walkPhase)) * 0.04f * _moveBlend;
-        var torsoPitch = -_moveBlend * 0.06f - (_mineT < 1f ? MathF.Sin(MathF.PI * _mineT) * 0.03f : 0f);
+        var bobAmp = MathUtils.Lerp(WalkBobAmp, RunBobAmp, _runBlend);
+        var bob = MathF.Abs(MathF.Cos(_walkPhase)) * bobAmp * _moveBlend;
+        var torsoPitch = -_moveBlend * MathUtils.Lerp(WalkTorsoPitch, RunTorsoPitch, _runBlend)
+            - (_mineT < 1f ? MathF.Sin(MathF.PI * _mineT) * 0.03f : 0f);
         return new Pose(swing, -swing, leftKnee, rightKnee,
             leftShoulder, rightShoulder, leftElbow, rightElbow, torsoPitch, bob);
     }

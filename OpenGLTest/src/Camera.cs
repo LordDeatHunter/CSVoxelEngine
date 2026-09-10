@@ -14,6 +14,10 @@ public class Camera
     public float Pitch { get; private set; } = SpawnLook.Y;
     public bool IsGrounded { get; private set; }
     public bool IsFlying { get; private set; }
+    /// <summary>True while sprinting on foot with movement input; drives the run cycle, roll and FOV.</summary>
+    public bool IsSprinting { get; private set; }
+    /// <summary>Current vertical FOV in degrees; eases toward sprint boost with speed.</summary>
+    public float CurrentFov => _currentFov;
     /// <summary>
     /// Creative mode (toggled with [C]): walking behaves like survival, but block placing
     /// costs nothing, breaking drops nothing, and double-tapping Space toggles flight.
@@ -41,6 +45,15 @@ public class Camera
     public bool IsEyeInLava { get; private set; }
 
     private const float DefaultFov = 70f;
+    private const float SprintFovBoost = 5f;
+    private const float FovDampRate = 6f;
+    private const float BobDampRate = 8f;
+    private const float RunBlendRate = 6f;
+    private const float WalkBobHeight = 0.035f;
+    private const float RunBobHeight = 0.06f;
+    private const float WalkBobStrafe = 0.02f;
+    private const float RunBobStrafe = 0.035f;
+    private const float RunRoll = 0.02f;
     // Near plane sets depth precision at distance (error ~ z^2 / (near * 2^24)); it must be
     // large enough that stacked LOD levels ~4 blocks apart don't z-fight at 2048 blocks.
     // Collision keeps geometry at least PlayerRadius (0.3) away, so 0.2 never clips.
@@ -90,6 +103,13 @@ public class Camera
     private static readonly Vector2 SpawnLook = SpawnOrientation();
 
     private float _aspectRatio = 16f / 10f;
+    private float _currentFov = DefaultFov;
+    private float _bobPhase;
+    private float _bobBlend;
+    private float _runBlend;
+    private float _bobHeight;
+    private float _bobStrafe;
+    private float _roll;
     private float _verticalVelocity;
     private Vector2 _lastMousePosition;
     private bool _firstMouseMovement = true;
@@ -265,7 +285,11 @@ public class Camera
         // Flight ignores the water entirely, so a submerged player can still fly out.
         // Creative mode on foot swims like survival.
         var swimming = IsInWater && !IsFlying;
+        var moving = moveInput.LengthSquared() > 0.01f;
+        IsSprinting = sprinting && moving && !IsFlying && !swimming && IsGrounded;
         if (swimming) moveSpeed *= SwimSpeedFactor;
+        var intendedSpeed = moving ? moveSpeed * moveInput.Length() : 0f;
+        UpdateHeadMotion(deltaTime, intendedSpeed, moving, swimming);
 
         var frameMovement = moveInput * moveSpeed * deltaTime;
 
@@ -396,6 +420,25 @@ public class Camera
         {
             IsEyeInLava = BlockType.Emission[eyeId] > 0;
         }
+    }
+
+    private void UpdateHeadMotion(float deltaTime, float intendedSpeed, bool moving, bool swimming)
+    {
+        var fovTarget = DefaultFov + SprintFovBoost *
+            MathUtils.Clamp01((intendedSpeed - BaseSpeed) / (BaseSpeed * (SprintMultiplier - 1f)));
+        _currentFov = MathUtils.Damp(_currentFov, fovTarget, FovDampRate, deltaTime);
+
+        _runBlend = MathUtils.Damp(_runBlend, IsSprinting ? 1f : 0f, RunBlendRate, deltaTime);
+        var bobTarget = moving && !IsFlying && (IsGrounded || swimming) ? 1f : 0f;
+        _bobBlend = MathUtils.Damp(_bobBlend, bobTarget, BobDampRate, deltaTime);
+        if (moving && !IsFlying)
+            _bobPhase += deltaTime * (4f + intendedSpeed * 0.9f + _runBlend * 2.5f);
+
+        var height = MathUtils.Lerp(WalkBobHeight, RunBobHeight, _runBlend);
+        var strafe = MathUtils.Lerp(WalkBobStrafe, RunBobStrafe, _runBlend);
+        _bobHeight = MathF.Sin(_bobPhase * 2f) * height * _bobBlend;
+        _bobStrafe = MathF.Cos(_bobPhase) * strafe * _bobBlend;
+        _roll = MathF.Sin(_bobPhase) * RunRoll * _runBlend * _bobBlend;
     }
 
     private void UpdateCreativeToggle(IKeyboard keyboard)
@@ -596,10 +639,18 @@ public class Camera
         }
     }
 
-    public Matrix4x4 GetViewMatrix() => Matrix4x4.CreateLookAt(Position, Position + GetForwardVector(), Vector3.UnitY);
+    public Matrix4x4 GetViewMatrix()
+    {
+        var forward = GetForwardVector();
+        var right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
+        var up = Vector3.Transform(Vector3.UnitY,
+            Matrix4x4.CreateFromAxisAngle(forward, _roll));
+        var eye = Position + Vector3.UnitY * _bobHeight + right * _bobStrafe;
+        return Matrix4x4.CreateLookAt(eye, eye + forward, up);
+    }
 
     public Matrix4x4 GetProjectionMatrix() =>
-        Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI * DefaultFov / 180f, _aspectRatio, NearPlane, FarPlane);
+        Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI * _currentFov / 180f, _aspectRatio, NearPlane, FarPlane);
 
     public Matrix4x4 GetViewProjection() => GetViewMatrix() * GetProjectionMatrix();
 

@@ -42,6 +42,40 @@ public sealed class PlayerModelTests
     }
 
     [Fact]
+    public void SprintUsesALargerCycleThanWalking()
+    {
+        var walk = new PlayerModel();
+        var walkPeak = 0f;
+        for (var i = 0; i < 180; i++)
+        {
+            walk.Update(1f / 60f, 8f, sprinting: false, grounded: true);
+            walkPeak = MathF.Max(walkPeak, MathF.Abs(walk.GetPose().LeftHip));
+        }
+
+        var run = new PlayerModel();
+        var runPeak = 0f;
+        for (var i = 0; i < 180; i++)
+        {
+            run.Update(1f / 60f, 12f, sprinting: true, grounded: true);
+            runPeak = MathF.Max(runPeak, MathF.Abs(run.GetPose().LeftHip));
+        }
+
+        Assert.True(walk.RunBlend < 0.1f);
+        Assert.True(run.RunBlend > 0.9f);
+        Assert.True(runPeak > walkPeak + 0.15f);
+        Assert.True(run.GetPose().TorsoPitch < walk.GetPose().TorsoPitch - 0.05f);
+    }
+
+    [Fact]
+    public void AirtimeStaysAWalkPoseEvenWhenSprinting()
+    {
+        var player = new PlayerModel();
+        for (var i = 0; i < 180; i++)
+            player.Update(1f / 60f, 12f, sprinting: true, grounded: false);
+        Assert.True(player.RunBlend < 0.1f);
+    }
+
+    [Fact]
     public void PunchSwingsTheRightArmAndDecays()
     {
         var player = new PlayerModel();
