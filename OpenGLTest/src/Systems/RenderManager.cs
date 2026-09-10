@@ -1835,6 +1835,7 @@ public class RenderManager : IDisposable
     public int? UiHotbarSlotAt(Vector2 point) => ui.HotbarSlotAt(point);
     public InventoryCategory? UiPanelTabAt(Vector2 point) => ui.PanelTabAt(point);
     public int? UiPanelRowAt(Vector2 point, int rowCount) => ui.PanelRowAt(point, rowCount);
+    public CraftHit UiCraftHitAt(Vector2 point, InventoryView view) => ui.CraftHitAt(point, view);
 
     // The compass item id, resolved once: null when no item named "compass" is registered,
     // in which case the HUD compass never shows rather than throwing every frame.

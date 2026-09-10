@@ -7,6 +7,21 @@ using Silk.NET.OpenGL;
 
 namespace silkgltriangle;
 
+/// <summary>What part of the crafting detail card a click landed on.</summary>
+public enum CraftHitKind
+{
+    None,
+    BatchMinus,
+    BatchPlus,
+    CraftButton,
+    IngMinus,
+    IngPlus,
+    MemberChip,
+}
+
+/// <summary>One hit-test result inside the crafting detail card.</summary>
+public readonly record struct CraftHit(CraftHitKind Kind, int IngredientIndex = -1, byte MemberId = 0);
+
 /// <summary>
 /// Draws screen-space UI through an orthographic projection measured in pixels, with the origin
 /// at the top-left corner. Shapes come from <see cref="Primitives"/> in their own Y-up space and
@@ -58,6 +73,35 @@ public class UIRenderer : IDisposable
     private const float HeadCapHeight = 22f;
     private static readonly Rgba PanelBackground = Rgba.Grey(0.03f, 0.72f);
     private static readonly Rgba RowSelected = Rgba.Grey(0.22f, 0.8f);
+
+    // Inventory prettify palette: warm gold accents, green ready states, muted dims
+    private static readonly Rgba AccentGold = new(232, 184, 72);
+    private static readonly Rgba AccentDim = new(150, 120, 60);
+    private static readonly Rgba ReadyGreen = new(126, 217, 87);
+    private static readonly Rgba DangerRed = new(230, 110, 110);
+    private static readonly Rgba TextDim = Rgba.Grey(0.55f, 1f);
+    private static readonly Rgba CardBackground = Rgba.Grey(0.07f, 0.85f);
+    private static readonly Rgba ChipBackground = Rgba.Grey(0.12f, 0.9f);
+    private static readonly Rgba ButtonReady = new(232, 184, 72);
+    private static readonly Rgba ButtonDisabled = Rgba.Grey(0.12f, 0.9f);
+    private static readonly Rgba ButtonTextReady = new(30, 26, 20);
+    private static readonly Rgba ButtonTextDisabled = Rgba.Grey(0.45f, 1f);
+
+    // Crafting detail card, in pixels: floats right where the preview sits
+    private const float DetailWidth = 380f;
+    private const float DetailPad = 14f;
+    private const float DetailHeaderH = 84f;
+    private const float DetailBatchH = 32f;
+    private const float StepBox = 24f;
+    private const float IngPad = 10f;
+    private const float IngTitleH = 20f;
+    private const float IngBarH = 6f;
+    private const float IngFedH = 40f;
+    private const float IngStepBox = 26f;
+    private const float ChipSize = 36f;
+    private const float ChipGap = 6f;
+    private const float CraftButtonH = 46f;
+    private const float StatusH = 22f;
 
     // Frame-timing overlay (DrawProfiler), in pixels
     private const float ProfilerLeft = 10f;
@@ -485,27 +529,32 @@ public class UIRenderer : IDisposable
             for (var i = 0; i < tools.Count; i++)
             {
                 var selected = view.SelectedToolInstance == tools[i].InstanceId;
-                DrawEntryRow(i, listTop, tools[i].ItemId, tools[i].Name, "1", selected, headingDegrees, time);
+                DrawEntryRow(i, listTop, tools[i].ItemId, tools[i].Name, "1", selected, false, headingDegrees, time);
             }
         }
         else if (view.Tab == InventoryCategory.Crafting)
         {
-            var craftable = inventory.Craftable();
-            for (var i = 0; i < craftable.Count; i++)
-                DrawEntryRow(i, listTop, craftable[i].ResultId,
-                    Inventory.DisplayName(craftable[i].ResultId),
-                    craftable[i].ResultCount.ToString(),
-                    view.SelectedId == craftable[i].ResultId, headingDegrees, time);
+            var recipes = ContentRegistry.CraftingRecipes;
+            for (var i = 0; i < recipes.Count; i++)
+            {
+                var ready = inventory.CanCraft(recipes[i]);
+                DrawEntryRow(i, listTop, recipes[i].ResultId,
+                    Inventory.DisplayName(recipes[i].ResultId),
+                    $"x{recipes[i].ResultCount}",
+                    view.Craft.Recipe != null && view.Craft.Recipe.Name == recipes[i].Name,
+                    !ready, headingDegrees, time,
+                    ready ? ReadyGreen : null);
+            }
         }
         else
         {
             var rows = inventory.StackEntries(view.Tab);
             for (var i = 0; i < rows.Count; i++)
                 DrawEntryRow(i, listTop, rows[i].Id, rows[i].Name, rows[i].Count.ToString(),
-                    view.SelectedId == rows[i].Id, headingDegrees, time);
+                    view.SelectedId == rows[i].Id, false, headingDegrees, time);
         }
 
-        DrawPreview(inventory, view, time);
+        DrawPreview(inventory, view, time, headingDegrees);
     }
 
     /// <summary>Hotbar slot under a screen point (pixels, top-left origin), if any.</summary>
@@ -566,98 +615,342 @@ public class UIRenderer : IDisposable
             : $"{inventory.UsedOf(tab)}/{Inventory.CapacityOf(tab)}";
 
     private void DrawEntryRow(int row, float listTop, byte id, string name, string count, bool selected,
-        float headingDegrees, float timeSeconds)
+        bool dim, float headingDegrees, float timeSeconds, Rgba? accent = null)
     {
         var centreY = listTop + row * RowHeight + RowHeight * 0.5f;
         var centre = new Vector2(PanelLeft + PanelWidth * 0.5f, centreY);
         DrawRect(centre, new Vector2(PanelWidth - PanelPad * 2f, RowHeight - 4f),
             selected ? RowSelected : SlotBackground);
 
-        var iconCentre = new Vector2(PanelLeft + PanelPad + RowIcon * 0.5f + 4f, centreY);
+        var barColor = accent ?? (selected ? SelectedBorderColor : SlotBorderColor);
+        DrawRect(new Vector2(PanelLeft + PanelPad + 2f, centreY),
+            new Vector2(4f, RowHeight - 4f), dim ? TextDim : barColor);
+
+        var iconCentre = new Vector2(PanelLeft + PanelPad + RowIcon * 0.5f + 8f, centreY);
         if (ItemType.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
             DrawItemSprite(iconCentre, new Vector2(RowIcon), id, icon, headingDegrees, timeSeconds);
         else
             DrawBlockIcon(iconCentre, RowIcon, id);
 
         DrawText(name, new Vector2(iconCentre.X + RowIcon * 0.5f + 8f, centreY - 9f),
-            _countScale, Rgba.White);
+            _countScale, dim && !selected ? TextDim : Rgba.White);
 
         if (_font != null)
         {
             var size = _font.MeasureSize(count.AsSpan(), _countScale);
             DrawText(count,
                 new Vector2(PanelLeft + PanelWidth - PanelPad - 8f - size.X, centreY - 9f),
-                _countScale, Rgba.White);
+                _countScale, dim && !selected ? TextDim : Rgba.White);
         }
     }
 
-    private void DrawPreview(Inventory inventory, InventoryView view, float time)
+    private void DrawPreview(Inventory inventory, InventoryView view, float time, float headingDegrees)
     {
         if (view.Tab == InventoryCategory.Crafting)
         {
-            DrawRecipePreview(inventory, view, time);
+            DrawCraftDetail(inventory, view, time, headingDegrees);
             return;
         }
 
         byte id = 0;
         string name = "";
+        string stock = "";
         if (view.Tab == InventoryCategory.Tools)
         {
             if (view.SelectedToolInstance != 0)
             {
                 id = inventory.ToolItemId(view.SelectedToolInstance);
-                if (id != 0) name = Inventory.DisplayName(id);
+                if (id != 0)
+                {
+                    name = Inventory.DisplayName(id);
+                    stock = "tool in hand";
+                }
             }
         }
         else if (view.SelectedId != 0 && inventory.CountFor(view.SelectedId) > 0)
         {
             id = view.SelectedId;
             name = Inventory.DisplayName(id);
+            stock = $"x{inventory.CountFor(id)} in stock";
         }
         if (id == 0) return;
 
         var centre = new Vector2(_screenSize.X - PreviewRight, _screenSize.Y * 0.38f);
-        DrawRect(centre, new Vector2(PreviewSize + 40f, PreviewSize + 70f), PanelBackground);
+        var cardSize = new Vector2(PreviewSize + 40f, PreviewSize + 96f);
+        DrawRect(centre, cardSize, PanelBackground);
+        DrawBorder(centre, cardSize, SlotBorder, SlotBorderColor);
+        DrawRect(new Vector2(centre.X, centre.Y - cardSize.Y * 0.5f + 3f),
+            new Vector2(cardSize.X - 4f, 2f), AccentGold);
 
         var spin = time * 0.9f;
         if (ItemType.IsItem(id))
-            DrawItemIcon(centre, PreviewSize * 0.7f, id, spin);
+            DrawItemIcon(centre with { Y = centre.Y - 12f }, PreviewSize * 0.7f, id, spin);
         else
-            DrawBlockIconSpinning(centre, PreviewSize * 0.7f, id, spin);
+            DrawBlockIconSpinning(centre with { Y = centre.Y - 12f }, PreviewSize * 0.7f, id, spin);
 
-        DrawTextCentred(name, centre.X, centre.Y + PreviewSize * 0.5f + 22f, _headScale, Rgba.White);
+        DrawTextCentred(name, centre.X, centre.Y + PreviewSize * 0.5f + 12f, _headScale, Rgba.White);
+        DrawTextCentred(stock, centre.X, centre.Y + PreviewSize * 0.5f + 40f, _countScale, TextDim);
+        DrawTextCentred("Click a hotbar slot to equip", centre.X,
+            centre.Y + PreviewSize * 0.5f + 58f, _countScale, TextDim);
     }
 
-    private void DrawRecipePreview(Inventory inventory, InventoryView view, float time)
+    private float CraftInnerWidth => DetailWidth - DetailPad * 2f;
+
+    private int CraftChipsPerRow =>
+        Math.Max(1, (int)((CraftInnerWidth - IngPad * 2f + ChipGap) / (ChipSize + ChipGap)));
+
+    private static float CraftIngCardHeight(int memberCount, int chipsPerRow)
     {
-        if (view.SelectedId == 0) return;
-        var recipe = ContentRegistry.RecipeForResult(view.SelectedId);
-        if (recipe == null) return;
+        var rows = Math.Max(1, (memberCount + chipsPerRow - 1) / chipsPerRow);
+        return IngPad + IngTitleH + IngBarH + 6f + IngFedH + 6f
+            + rows * (ChipSize + ChipGap) - ChipGap + IngPad;
+    }
 
-        var id = recipe.ResultId;
-        var centre = new Vector2(_screenSize.X - PreviewRight, _screenSize.Y * 0.38f);
-        var lineStep = _font != null ? _font.MeasureSize("X".AsSpan(), _countScale).Y * 1.5f : 20f;
-        var extra = (recipe.Ingredients.Length + 1) * lineStep;
-        DrawRect(centre with { Y = centre.Y + extra * 0.5f },
-            new Vector2(PreviewSize + 40f, PreviewSize + 70f + extra), PanelBackground);
+    private float CraftCardHeight(InventoryView view)
+    {
+        if (view.Craft.Recipe == null) return DetailPad * 2f + 90f;
+        var height = DetailPad + DetailHeaderH + 10f;
+        var chipsPerRow = CraftChipsPerRow;
+        foreach (var ingredient in view.Craft.Recipe.Ingredients)
+            height += CraftIngCardHeight(ingredient.AcceptedIds.Length, chipsPerRow) + 8f;
+        return height + StatusH + 8f + CraftButtonH + DetailPad;
+    }
 
-        var spin = time * 0.9f;
-        if (ItemType.IsItem(id))
-            DrawItemIcon(centre, PreviewSize * 0.7f, id, spin);
-        else
-            DrawBlockIconSpinning(centre, PreviewSize * 0.7f, id, spin);
+    private Vector2 CraftCardCentre(InventoryView view) =>
+        new(_screenSize.X - PreviewRight, PanelTop + CraftCardHeight(view) * 0.5f);
 
-        var nameTop = centre.Y + PreviewSize * 0.5f + 22f;
-        DrawTextCentred(Inventory.DisplayName(id), centre.X, nameTop, _headScale, Rgba.White);
-        var y = nameTop + lineStep * 2f;
-        foreach (var ingredient in recipe.Ingredients)
+    private Vector2 CraftBatchMinusCentre(InventoryView view)
+    {
+        var cardLeft = _screenSize.X - PreviewRight - DetailWidth * 0.5f;
+        return new Vector2(cardLeft + DetailPad + 78f, CraftBatchCentreY(view));
+    }
+
+    private Vector2 CraftBatchPlusCentre(InventoryView view)
+    {
+        var minus = CraftBatchMinusCentre(view);
+        return minus with { X = minus.X + 62f };
+    }
+
+    private float CraftBatchCentreY(InventoryView view)
+    {
+        _ = view;
+        return PanelTop + DetailPad + 56f + 8f;
+    }
+
+    private float CraftIngCardTop(InventoryView view, int index)
+    {
+        var y = PanelTop + DetailPad + DetailHeaderH + 10f;
+        var chipsPerRow = CraftChipsPerRow;
+        var ingredients = view.Craft.Recipe!.Ingredients;
+        for (var i = 0; i < index; i++)
+            y += CraftIngCardHeight(ingredients[i].AcceptedIds.Length, chipsPerRow) + 8f;
+        return y;
+    }
+
+    private Vector2 CraftIngMinusCentre(InventoryView view, int index)
+    {
+        var cardLeft = _screenSize.X - PreviewRight - DetailWidth * 0.5f;
+        var cardRight = cardLeft + DetailWidth - DetailPad;
+        var top = CraftIngCardTop(view, index);
+        var fedY = top + IngPad + IngTitleH + IngBarH + 6f;
+        var plusX = cardRight - IngPad - IngStepBox * 0.5f;
+        return new Vector2(plusX - IngStepBox - 8f, fedY + IngFedH * 0.5f);
+    }
+
+    private Vector2 CraftIngPlusCentre(InventoryView view, int index)
+    {
+        var minus = CraftIngMinusCentre(view, index);
+        return minus with { X = minus.X + IngStepBox + 8f };
+    }
+
+    private Vector2 CraftChipCentre(InventoryView view, int ingredientIndex, int chipPos)
+    {
+        var cardLeft = _screenSize.X - PreviewRight - DetailWidth * 0.5f;
+        var top = CraftIngCardTop(view, ingredientIndex);
+        var chipsY = top + IngPad + IngTitleH + IngBarH + 6f + IngFedH + 6f;
+        var chipsPerRow = CraftChipsPerRow;
+        var row = chipPos / chipsPerRow;
+        var col = chipPos % chipsPerRow;
+        return new Vector2(
+            cardLeft + DetailPad + IngPad + ChipSize * 0.5f + col * (ChipSize + ChipGap),
+            chipsY + ChipSize * 0.5f + row * (ChipSize + ChipGap));
+    }
+
+    private Vector2 CraftButtonCentre(InventoryView view)
+    {
+        var height = CraftCardHeight(view);
+        return new Vector2(_screenSize.X - PreviewRight,
+            PanelTop + height - DetailPad - CraftButtonH * 0.5f);
+    }
+
+    private static bool InBox(Vector2 point, Vector2 centre, Vector2 size) =>
+        MathF.Abs(point.X - centre.X) <= size.X * 0.5f
+        && MathF.Abs(point.Y - centre.Y) <= size.Y * 0.5f;
+
+    /// <summary>Which crafting control sits under a screen point, if any.</summary>
+    public CraftHit CraftHitAt(Vector2 point, InventoryView view)
+    {
+        if (view.Craft.Recipe == null) return new CraftHit(CraftHitKind.None);
+        if (InBox(point, CraftButtonCentre(view), new Vector2(CraftInnerWidth, CraftButtonH)))
+            return new CraftHit(CraftHitKind.CraftButton);        if (InBox(point, CraftBatchMinusCentre(view), new Vector2(StepBox)))
+            return new CraftHit(CraftHitKind.BatchMinus);
+        if (InBox(point, CraftBatchPlusCentre(view), new Vector2(StepBox)))
+            return new CraftHit(CraftHitKind.BatchPlus);
+
+        var ingredients = view.Craft.Recipe.Ingredients;
+        for (var i = 0; i < ingredients.Length; i++)
         {
-            DrawTextCentred(
-                $"{inventory.CountFor(ingredient.Id)}/{ingredient.Count} {Inventory.DisplayName(ingredient.Id)}",
-                centre.X, y, _countScale, Rgba.White);
-            y += lineStep;
+            if (InBox(point, CraftIngMinusCentre(view, i), new Vector2(IngStepBox)))
+                return new CraftHit(CraftHitKind.IngMinus, i);
+            if (InBox(point, CraftIngPlusCentre(view, i), new Vector2(IngStepBox)))
+                return new CraftHit(CraftHitKind.IngPlus, i);
+            var members = ingredients[i].AcceptedIds;
+            for (var c = 0; c < members.Length; c++)
+                if (InBox(point, CraftChipCentre(view, i, c), new Vector2(ChipSize)))
+                    return new CraftHit(CraftHitKind.MemberChip, i, members[c]);
         }
-        DrawTextCentred("Click again to craft", centre.X, y, _countScale, Rgba.White);
+        return new CraftHit(CraftHitKind.None);
+    }
+
+    private void DrawBoxButton(Vector2 centre, float size, string label, Rgba bg, Rgba border, Rgba text)
+    {
+        DrawRect(centre, new Vector2(size), bg);
+        DrawBorder(centre, new Vector2(size), 1.5f, border);
+        DrawTextCentred(label, centre.X, centre.Y - 8f, _countScale, text);
+    }
+
+    private void DrawIdIcon(Vector2 centre, float size, byte id, float headingDegrees, float timeSeconds)
+    {
+        if (ItemType.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
+            DrawItemSprite(centre, new Vector2(size), id, icon, headingDegrees, timeSeconds);
+        else
+            DrawBlockIcon(centre, size, id);
+    }
+
+    private void DrawCraftDetail(Inventory inventory, InventoryView view, float time, float headingDegrees)
+    {
+        var session = view.Craft;
+        var cardCentre = CraftCardCentre(view);
+        var cardSize = new Vector2(DetailWidth, CraftCardHeight(view));
+        DrawRect(cardCentre, cardSize, PanelBackground);
+        DrawBorder(cardCentre, cardSize, SlotBorder, SlotBorderColor);
+        var cardLeft = cardCentre.X - DetailWidth * 0.5f;
+        DrawRect(new Vector2(cardCentre.X, PanelTop + 3f),
+            new Vector2(DetailWidth - 4f, 2f), AccentGold);
+
+        if (session.Recipe == null)
+        {
+            DrawTextCentred("Crafting", cardCentre.X, PanelTop + DetailPad, _headScale, Rgba.White);
+            DrawTextCentred("Pick a recipe on the left", cardCentre.X,
+                PanelTop + DetailPad + 34f, _countScale, TextDim);
+            DrawTextCentred("then feed it items and hit CRAFT", cardCentre.X,
+                PanelTop + DetailPad + 54f, _countScale, TextDim);
+            return;
+        }
+
+        var recipe = session.Recipe;
+        var ready = session.IsReady(inventory);
+        var y = PanelTop + DetailPad;
+
+        var iconCentre = new Vector2(cardLeft + DetailPad + 32f, y + 38f);
+        var spin = time * 0.9f;
+        if (ItemType.IsItem(recipe.ResultId))
+            DrawItemIcon(iconCentre, 56f, recipe.ResultId, spin);
+        else
+            DrawBlockIconSpinning(iconCentre, 60f, recipe.ResultId, spin);
+
+        var textX = cardLeft + DetailPad + 76f;
+        DrawText(Inventory.DisplayName(recipe.ResultId), new Vector2(textX, y + 4f), _headScale, Rgba.White);
+        DrawText($"Makes {recipe.ResultCount} per craft", new Vector2(textX, y + 32f), _countScale, TextDim);
+
+        DrawText("Batch", new Vector2(textX, y + 56f), _countScale, TextDim);
+        var batchMinus = CraftBatchMinusCentre(view);
+        var batchPlus = CraftBatchPlusCentre(view);
+        DrawBoxButton(batchMinus, StepBox, "-", ChipBackground, SlotBorderColor, Rgba.White);
+        DrawTextCentred(session.Batch.ToString(), (batchMinus.X + batchPlus.X) * 0.5f,
+            batchMinus.Y - 8f, _countScale, Rgba.White);
+        DrawBoxButton(batchPlus, StepBox, "+", ChipBackground, SlotBorderColor, Rgba.White);
+        var maxBatch = session.MaxAffordable(inventory);
+        DrawText($"max {maxBatch}", new Vector2(batchPlus.X + StepBox * 0.5f + 8f, y + 56f),
+            _countScale, maxBatch >= session.Batch ? ReadyGreen : DangerRed);
+
+        y += DetailHeaderH + 10f;
+        DrawRect(new Vector2(cardCentre.X, y - 5f), new Vector2(CraftInnerWidth, 1.5f), SlotBorderColor);
+
+        for (var i = 0; i < recipe.Ingredients.Length; i++)
+        {
+            var ingredient = recipe.Ingredients[i];
+            var cardTop = CraftIngCardTop(view, i);
+            var cardH = CraftIngCardHeight(ingredient.AcceptedIds.Length, CraftChipsPerRow);
+            var ingCentre = new Vector2(cardCentre.X, cardTop + cardH * 0.5f);
+            DrawRect(ingCentre, new Vector2(CraftInnerWidth, cardH), CardBackground);
+
+            var need = session.NeedAt(i);
+            var fed = session.FedAt(i);
+            var label = ingredient.IsTag ? $"Any {ingredient.Tag}" : Inventory.DisplayName(ingredient.Id);
+            DrawText($"{i + 1}. {label}  x{ingredient.Count}/craft",
+                new Vector2(cardLeft + DetailPad + IngPad, cardTop + IngPad), _countScale, Rgba.White);
+
+            var barY = cardTop + IngPad + IngTitleH;
+            var barW = CraftInnerWidth - IngPad * 2f;
+            DrawRect(new Vector2(cardLeft + DetailPad + IngPad + barW * 0.5f, barY + IngBarH * 0.5f),
+                new Vector2(barW, IngBarH), SlotBackground);
+            var fill = Math.Clamp(need > 0 ? fed.Count / (float)need : 1f, 0f, 1f);
+            if (fill > 0f)
+                DrawRect(new Vector2(cardLeft + DetailPad + IngPad + barW * fill * 0.5f, barY + IngBarH * 0.5f),
+                    new Vector2(barW * fill, IngBarH), fill >= 1f ? ReadyGreen : AccentGold);
+
+            var fedY = barY + IngBarH + 6f;
+            var fedCx = cardLeft + DetailPad + IngPad + 16f;
+            var fedCy = fedY + IngFedH * 0.5f;
+            if (fed.MemberId != 0)
+                DrawIdIcon(new Vector2(fedCx, fedCy), 30f, fed.MemberId, headingDegrees, time);
+            else
+                DrawTextCentred("?", fedCx, fedCy - 8f, _countScale, TextDim);
+            DrawText($"{fed.Count} / {need} fed",
+                new Vector2(fedCx + 24f, fedCy - 8f), _countScale,
+                fed.Count >= need ? ReadyGreen : Rgba.White);
+
+            var minus = CraftIngMinusCentre(view, i);
+            var plus = CraftIngPlusCentre(view, i);
+            DrawBoxButton(minus, IngStepBox, "-", ChipBackground, SlotBorderColor, Rgba.White);
+            DrawBoxButton(plus, IngStepBox, "+", ChipBackground, SlotBorderColor, Rgba.White);
+
+            var members = ingredient.AcceptedIds;
+            var picked = fed.MemberId;
+            for (var c = 0; c < members.Length; c++)
+            {
+                var chipC = CraftChipCentre(view, i, c);
+                var owned = inventory.CountFor(members[c]);
+                var isPicked = picked != 0 && picked == members[c];
+                DrawRect(chipC, new Vector2(ChipSize), owned > 0 ? ChipBackground : SlotBackground);
+                DrawBorder(chipC, new Vector2(ChipSize), isPicked ? 2.5f : 1.5f,
+                    isPicked ? AccentGold : SlotBorderColor);
+                DrawIdIcon(chipC with { Y = chipC.Y - 3f }, 26f, members[c], headingDegrees, time);
+                var ownedText = owned.ToString();
+                if (_font != null)
+                {
+                    var size = _font.MeasureSize(ownedText.AsSpan(), _countScale);
+                    DrawText(ownedText,
+                        new Vector2(chipC.X + ChipSize * 0.5f - 3f - size.X,
+                            chipC.Y + ChipSize * 0.5f - 3f - size.Y),
+                        _countScale, owned > 0 ? Rgba.White : TextDim);
+                }
+            }
+        }
+
+        var statusY = PanelTop + CraftCardHeight(view) - DetailPad - CraftButtonH - 8f - StatusH;
+        DrawTextCentred(session.StatusLine(inventory), cardCentre.X, statusY,
+            _countScale, ready ? ReadyGreen : AccentGold);
+
+        var buttonC = CraftButtonCentre(view);
+        var buttonS = new Vector2(CraftInnerWidth, CraftButtonH);
+        var total = recipe.ResultCount * session.Batch;
+        DrawRect(buttonC, buttonS, ready ? ButtonReady : ButtonDisabled);
+        DrawBorder(buttonC, buttonS, 2f, ready ? Rgba.White : SlotBorderColor);
+        DrawTextCentred(session.Batch > 1 ? $"CRAFT  x{total}" : "CRAFT",
+            buttonC.X, buttonC.Y - 9f, _headScale,
+            ready ? ButtonTextReady : ButtonTextDisabled);
     }
 
     /// <summary>

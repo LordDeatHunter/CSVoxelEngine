@@ -328,27 +328,72 @@ public class Inventory
 
     /// <summary>Whether one craft of this recipe would succeed: ingredients on hand plus
     /// room for the result (consumption frees room first, so a full pool still crafts
-    /// when the ingredients come out of it).</summary>
-    public bool CanCraft(CraftingRecipe recipe)
+    /// when the ingredients come out of it). Tag ingredients pool every member's stock.</summary>
+    public bool CanCraft(CraftingRecipe recipe) => CanCraftBatch(recipe, 1, null);
+
+    /// <summary>
+    /// Whether <paramref name="batch"/> crafts would succeed. A null
+    /// <paramref name="pickMember"/> pools every accepted id per ingredient; otherwise the
+    /// picked member alone must cover its ingredient's share.
+    /// </summary>
+    public bool CanCraftBatch(CraftingRecipe recipe, int batch,
+        Func<int, CraftingRecipe.Ingredient, byte>? pickMember)
     {
-        foreach (var ingredient in recipe.Ingredients)
-            if (CountFor(ingredient.Id) < ingredient.Count)
-                return false;
+        if (batch < 1) return false;
+        for (var i = 0; i < recipe.Ingredients.Length; i++)
+        {
+            var ingredient = recipe.Ingredients[i];
+            var need = ingredient.Count * batch;
+            if (pickMember != null)
+            {
+                var picked = pickMember(i, ingredient);
+                if (!ingredient.Accepts(picked) || CountFor(picked) < need) return false;
+            }
+            else if (AvailableFor(ingredient) < need) return false;
+        }
 
         var category = CategoryOf(recipe.ResultId);
         if (!category.HasValue) return false;
-        return UsedOf(category.Value) - FreedBy(recipe, category.Value) + recipe.ResultCount
-            <= CapacityOf(category.Value);
+        return UsedOf(category.Value) - FreedBy(recipe, category.Value) * batch
+            + recipe.ResultCount * batch <= CapacityOf(category.Value);
     }
 
     /// <summary>Consumes one craft's ingredients and adds its result. Returns false when
     /// the recipe is not currently craftable, consuming nothing.</summary>
-    public bool TryCraft(CraftingRecipe recipe)
+    public bool TryCraft(CraftingRecipe recipe) => TryCraft(recipe, 1, null);
+
+    /// <summary>
+    /// Consumes <paramref name="batch"/> crafts and adds their results. A null
+    /// <paramref name="pickMember"/> spends tag ingredients greedily across members;
+    /// otherwise each ingredient comes out of its picked member only. Returns false when
+    /// the batch is not currently craftable, consuming nothing.
+    /// </summary>
+    public bool TryCraft(CraftingRecipe recipe, int batch,
+        Func<int, CraftingRecipe.Ingredient, byte>? pickMember)
     {
-        if (!CanCraft(recipe)) return false;
-        foreach (var ingredient in recipe.Ingredients)
-            RemoveUnits(ingredient.Id, ingredient.Count);
-        return Add(recipe.ResultId, recipe.ResultCount);
+        if (!CanCraftBatch(recipe, batch, pickMember)) return false;
+        for (var i = 0; i < recipe.Ingredients.Length; i++)
+        {
+            var ingredient = recipe.Ingredients[i];
+            var need = ingredient.Count * batch;
+            if (pickMember != null)
+                RemoveUnits(pickMember(i, ingredient), need);
+            else if (ingredient.IsTag)
+            {
+                foreach (var member in ingredient.AcceptedIds)
+                {
+                    if (need <= 0) break;
+                    var take = Math.Min(need, CountFor(member));
+                    if (take > 0)
+                    {
+                        RemoveUnits(member, take);
+                        need -= take;
+                    }
+                }
+            }
+            else RemoveUnits(ingredient.Id, need);
+        }
+        return Add(recipe.ResultId, recipe.ResultCount * batch);
     }
 
     /// <summary>Display name for a list row or preview heading.</summary>
@@ -402,12 +447,26 @@ public class Inventory
         _ => null,
     };
 
+    private int AvailableFor(CraftingRecipe.Ingredient ingredient)
+    {
+        var total = 0;
+        foreach (var id in ingredient.AcceptedIds)
+            total += CountFor(id);
+        return total;
+    }
+
     private int FreedBy(CraftingRecipe recipe, InventoryCategory category)
     {
         var freed = 0;
         foreach (var ingredient in recipe.Ingredients)
-            if (CategoryOf(ingredient.Id) == category)
-                freed += ingredient.Count;
+        {
+            if (ingredient.IsTag)
+            {
+                if (ingredient.AcceptedIds.All(id => CategoryOf(id) == category))
+                    freed += ingredient.Count;
+            }
+            else if (CategoryOf(ingredient.Id) == category) freed += ingredient.Count;
+        }
         return freed;
     }
 

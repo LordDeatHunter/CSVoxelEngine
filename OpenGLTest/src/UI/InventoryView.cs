@@ -16,6 +16,13 @@ public sealed class InventoryView
     /// <summary>Picked tool instance for the tools tab, or 0 for none.</summary>
     public int SelectedToolInstance { get; set; }
 
+    /// <summary>
+    /// The crafting tab's working state: open recipe, batch size and fed reservations.
+    /// Survives tab switches (so counts can be checked mid-craft) but is cleared when the
+    /// panel closes or another recipe is opened.
+    /// </summary>
+    public CraftingSession Craft { get; } = new();
+
     public void ClearSelection()
     {
         SelectedId = 0;

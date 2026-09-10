@@ -241,7 +241,10 @@ public static class Program
     {
         inventoryView.IsOpen = open;
         if (!open)
+        {
             inventoryView.ClearSelection();
+            inventoryView.Craft.Clear();
+        }
         world.Camera.SuppressLook = open;
         if (inputManager.Mouse != null)
             inputManager.Mouse.Cursor.CursorMode = open ? CursorMode.Normal : CursorMode.Disabled;
@@ -249,7 +252,8 @@ public static class Program
 
     /// <summary>
     /// Routes one left-click inside the open panel: tabs switch, rows pick for preview,
-    /// and hotbar slots equip the pick (clicking what the slot already shows clears it).
+    /// crafting controls feed the open recipe, and hotbar slots equip the pick (clicking
+    /// what the slot already shows clears it).
     /// </summary>
     private static void HandleInventoryClick(System.Numerics.Vector2 position)
     {
@@ -266,7 +270,7 @@ public static class Program
         var rowCount = inventoryView.Tab switch
         {
             InventoryCategory.Tools => inventory.ToolEntries().Count,
-            InventoryCategory.Crafting => inventory.Craftable().Count,
+            InventoryCategory.Crafting => ContentRegistry.CraftingRecipes.Count,
             _ => inventory.StackEntries(inventoryView.Tab).Count,
         };
         var row = renderManager.UiPanelRowAt(position, rowCount);
@@ -279,21 +283,47 @@ public static class Program
             }
             else if (inventoryView.Tab == InventoryCategory.Crafting)
             {
-                var recipe = inventory.Craftable()[row.Value];
-                if (inventoryView.SelectedId == recipe.ResultId)
-                    inventory.TryCraft(recipe);
-                else
-                {
-                    inventoryView.SelectedId = recipe.ResultId;
-                    inventoryView.SelectedToolInstance = 0;
-                }
+                inventoryView.Craft.Select(ContentRegistry.CraftingRecipes[row.Value]);
             }
             else
             {
-                inventoryView.SelectedId = inventory.StackEntries(inventoryView.Tab)[row.Value].Id;
+                var picked = inventory.StackEntries(inventoryView.Tab)[row.Value].Id;
+                inventoryView.SelectedId = picked;
                 inventoryView.SelectedToolInstance = 0;
+                if (inventoryView.Craft.Recipe != null)
+                    inventoryView.Craft.FeedFromInventory(picked, inventory);
             }
             return;
+        }
+
+        if (inventoryView.Tab == InventoryCategory.Crafting)
+        {
+            var hit = renderManager.UiCraftHitAt(position, inventoryView);
+            var craft = inventoryView.Craft;
+            switch (hit.Kind)
+            {
+                case CraftHitKind.BatchMinus:
+                    craft.SetBatch(craft.Batch - 1);
+                    return;
+                case CraftHitKind.BatchPlus:
+                    craft.SetBatch(craft.Batch + 1);
+                    return;
+                case CraftHitKind.IngMinus:
+                    craft.FeedLess(hit.IngredientIndex);
+                    return;
+                case CraftHitKind.IngPlus:
+                    craft.FeedMore(hit.IngredientIndex, inventory);
+                    return;
+                case CraftHitKind.MemberChip:
+                    craft.SetMember(hit.IngredientIndex, hit.MemberId, inventory);
+                    craft.FeedMore(hit.IngredientIndex, inventory);
+                    return;
+                case CraftHitKind.CraftButton:
+                    craft.Craft(inventory);
+                    return;
+                case CraftHitKind.None:
+                    break;
+            }
         }
 
         var hotbar = renderManager.UiHotbarSlotAt(position);

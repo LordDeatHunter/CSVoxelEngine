@@ -215,6 +215,16 @@ public static class ContentRegistry
     public static CraftingRecipe? RecipeForResult(byte id) =>
         Recipes.FirstOrDefault(r => r.ResultId == id);
 
+    /// <summary>Recipe by file name, or null when there is none.</summary>
+    public static CraftingRecipe? RecipeByName(string name) =>
+        Recipes.FirstOrDefault(r => r.Name.Equals(name, StringComparison.Ordinal));
+
+    /// <summary>Member ids of a loaded tag, sorted ascending, or null when there is no such tag.</summary>
+    public static byte[]? TagMembers(string tag) =>
+        Tags.TryGetValue(tag, out var members)
+            ? members.OrderBy(id => id).ToArray()
+            : null;
+
     private static void Reset()
     {
         BlockIds.Clear();
@@ -391,12 +401,24 @@ public static class ContentRegistry
         var ingredients = new List<CraftingRecipe.Ingredient>();
         foreach (var ingredient in definition.Ingredients ?? [])
         {
-            if (ingredient.Item == null || !TryResolve(ingredient.Item, out var id))
-                throw new InvalidOperationException(
-                    $"Recipe '{path}' names ingredient '{ingredient.Item}', which is not a registered block or item.");
             var count = ingredient.Count ?? 1;
             if (count <= 0)
                 throw new InvalidOperationException($"Recipe '{path}' has an ingredient with count {count}; expected 1 or more.");
+            if (ingredient.Tag != null && ingredient.Item != null)
+                throw new InvalidOperationException(
+                    $"Recipe '{path}' names both item '{ingredient.Item}' and tag '{ingredient.Tag}'; an ingredient takes one or the other.");
+            if (ingredient.Tag != null)
+            {
+                if (!Tags.TryGetValue(ingredient.Tag, out var members) || members.Count == 0)
+                    throw new InvalidOperationException(
+                        $"Recipe '{path}' names tag '{ingredient.Tag}', which has no loaded members.");
+                ingredients.Add(new CraftingRecipe.Ingredient(0, count, ingredient.Tag,
+                    members.OrderBy(id => id).ToArray()));
+                continue;
+            }
+            if (ingredient.Item == null || !TryResolve(ingredient.Item, out var id))
+                throw new InvalidOperationException(
+                    $"Recipe '{path}' names ingredient '{ingredient.Item}', which is not a registered block or item.");
             ingredients.Add(new CraftingRecipe.Ingredient(id, count));
         }
         if (ingredients.Count == 0)
@@ -567,10 +589,10 @@ public static class ContentRegistry
     public static bool IsInTag(string tag, byte id) =>
         Tags.TryGetValue(tag, out var members) && members.Contains(id);
 
-    // Block tags: named sets of blocks from data/tags/<name>.json ({"blocks": [...]}),
-    // resolved here so gameplay and meshing share them. Tapered wood reads its tag through
-    // the flat BranchConnectableById mirror (see BlockType); the dictionary stays for
-    // error messages and tests.
+    // Block and item tags: named sets from data/tags/<name>.json ({"blocks": [...],
+    // "items": [...]}), resolved here so gameplay and crafting share them. Tapered wood reads
+    // its tag through the flat BranchConnectableById mirror (see BlockType); the dictionary
+    // stays for error messages, tests and recipe ingredients.
     private static void LoadTags(string folder)
     {
         foreach (var (name, path) in JsonFilesIn(folder))
@@ -583,6 +605,12 @@ public static class ContentRegistry
                 if (!members.Add(id))
                     throw new InvalidOperationException($"Tag '{path}' lists '{entry}' twice.");
             }
+            foreach (var entry in definition.Items ?? [])
+            {
+                var id = ResolveTagMember(entry, path);
+                if (!members.Add(id))
+                    throw new InvalidOperationException($"Tag '{path}' lists '{entry}' twice.");
+            }
             Tags[name] = members;
         }
 
@@ -590,15 +618,31 @@ public static class ContentRegistry
             throw new InvalidOperationException(
                 $"Missing required block tag '{BranchConnectableTag}': expected '{Path.Combine(folder, BranchConnectableTag)}.json'.");
         foreach (var id in connectable)
+        {
+            if (BlockType.ById[id] == null || ItemType.IsItem(id))
+                throw new InvalidOperationException(
+                    $"Tag '{BranchConnectableTag}' names id {id}: tapered wood only grows into blocks.");
             BlockType.BranchConnectableById[id] = true;
+        }
     }
 
     private static byte ResolveTagMember(string name, string path)
     {
-        var bare = name.StartsWith("block/", StringComparison.Ordinal) ? name["block/".Length..] : name;
-        if (name.StartsWith("item/", StringComparison.Ordinal) || !BlockIds.TryGetValue(bare, out var id))
+        var bare = name.StartsWith("block/", StringComparison.Ordinal) ? name["block/".Length..]
+            : name.StartsWith("item/", StringComparison.Ordinal) ? name["item/".Length..]
+            : name;
+        if (name.StartsWith("block/", StringComparison.Ordinal))
+        {
+            if (BlockIds.TryGetValue(bare, out var blockId)) return blockId;
             throw new InvalidOperationException($"Tag '{path}' names '{name}', which is not a registered block.");
-        return id;
+        }
+        if (name.StartsWith("item/", StringComparison.Ordinal))
+        {
+            if (ItemIds.TryGetValue(bare, out var itemId)) return itemId;
+            throw new InvalidOperationException($"Tag '{path}' names '{name}', which is not a registered item.");
+        }
+        if (TryResolve(name, out var id)) return id;
+        throw new InvalidOperationException($"Tag '{path}' names '{name}', which is not a registered block or item.");
     }
 
     private static BlockHitbox[] DefaultWoodHitbox(int taperLevel, float halfWidth)

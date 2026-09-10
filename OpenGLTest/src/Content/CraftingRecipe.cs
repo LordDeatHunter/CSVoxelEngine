@@ -1,14 +1,6 @@
-namespace silkgltriangle;
+using System;
 
-// TODO(tags): let an ingredient name a tag (item group) instead of one id, e.g.
-// { "tag": "log", "count": 1 }, with tags defined in assets/data/tags/<name>.json
-// listing member ids. The crafting tab then needs per-ingredient member choice:
-// the player picks 1 of N log types per slot and each craft consumes the picked
-// member, so the same recipe can be crafted repeatedly with different members.
-// Keep it data-driven: no per-id branches, resolve members through ContentRegistry
-// like loot entries do.
-//
-// For now every ingredient names exactly one block/item id with a count.
+namespace silkgltriangle;
 
 /// <summary>One compiled crafting recipe: what it makes and what one craft consumes.</summary>
 public sealed class CraftingRecipe
@@ -33,6 +25,21 @@ public sealed class CraftingRecipe
     /// <summary>What one craft consumes.</summary>
     public Ingredient[] Ingredients { get; }
 
-    /// <summary>One consumed ingredient: an id plus units per craft.</summary>
-    public readonly record struct Ingredient(byte Id, int Count);
+    /// <summary>
+    /// One consumed ingredient: either a single id (<see cref="IsTag"/> false) or a named tag
+    /// whose <see cref="MemberIds"/> the player picks from at craft time (e.g. "any log").
+    /// Tags resolve through <see cref="ContentRegistry"/> like loot entries do — no per-id
+    /// branches at the call sites.
+    /// </summary>
+    public readonly record struct Ingredient(byte Id, int Count, string? Tag = null, byte[]? MemberIds = null)
+    {
+        /// <summary>Whether this ingredient accepts any member of <see cref="Tag"/>.</summary>
+        public bool IsTag => Tag != null;
+
+        /// <summary>Every id this ingredient accepts: the tag members, or just <see cref="Id"/>.</summary>
+        public byte[] AcceptedIds => MemberIds ?? [Id];
+
+        /// <summary>Whether this id satisfies the ingredient (single id or tag member).</summary>
+        public bool Accepts(byte id) => !IsTag ? id == Id : MemberIds != null && Array.IndexOf(MemberIds, id) >= 0;
+    }
 }
