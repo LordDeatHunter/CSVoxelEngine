@@ -380,6 +380,19 @@ public static class WorldGenerationConfig
     public const float FireSmokePerSecond = 8f;
     public const float FireParticleRadius = 48f;
 
+    // --- Exhaled bubbles (BubbleParticleSystem + BubbleParticleRenderer) ---
+    // Small billboards rising off the player's mouth while the eye is submerged, popping
+    // at the water surface. One batched billboard draw covers all of them.
+    public const int BubbleParticleMax = 128;
+    public const float BubblePerSecond = 1f;
+    public const float BubbleLifetime = 4f;
+    public const float BubbleRise = 0.1f;
+    public const float BubbleDrag = 3f;
+    public const float BubbleSize = 0.09f;
+    public const float BubbleGrow = 0.02f;
+    // Seconds a bubble takes to fade in at spawn and out at the end of its life
+    public const float BubbleFadeSeconds = 0.4f;
+
     // --- Pebbles (PebbleGenerator) ---
     // Ankle-high stones in rare low-frequency patches; a density roll thins inside them
     public const bool PebblesEnabled = true;

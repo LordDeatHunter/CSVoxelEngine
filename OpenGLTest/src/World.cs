@@ -39,6 +39,7 @@ public class World
     private readonly BlockDebrisSystem _debris = new();
     private readonly CampfireManager _campfires = new();
     private readonly FireParticleSystem _fire = new();
+    private readonly BubbleParticleSystem _bubbles = new();
     // Trees currently toppling over after their base log was mined
     private readonly List<TopplingTree> _toppling = [];
     private readonly IWindow _window;
@@ -83,6 +84,9 @@ public class World
 
     /// <summary>Live campfire embers and smoke, feeding the fire billboard pass.</summary>
     public IReadOnlyList<FireParticle> FireParticles => _fire.Particles;
+
+    /// <summary>Live exhaled bubbles, feeding the bubble billboard pass.</summary>
+    public IReadOnlyList<BubbleParticle> Bubbles => _bubbles.Particles;
 
     // Break overlay strength. Quantized to whole hits, so it steps with the damage dealt
     // instead of sweeping continuously.
@@ -153,6 +157,7 @@ public class World
         _debris.Update((float)deltaTime, _chunkManager);
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
         _fire.Update((float)deltaTime, _campfires.LitCells, Camera.Position);
+        _bubbles.Update((float)deltaTime, Camera.Position, Camera.Forward, Camera.IsEyeInWater, _chunkManager);
 
         // Falling cubes shove the player aside instead of landing inside them; strictly
         // one-way, the player never deflects a cube
@@ -231,6 +236,14 @@ public class World
         FrameProfiler.Begin(ProfileSection.WaterPass);
         renderManager.RenderWorldTranslucent(Camera);
         FrameProfiler.End(ProfileSection.WaterPass);
+
+        // Bubbles ride behind the water pass, not with the other entities: the water writes
+        // depth, so a depth-tested bubble draws over the surface when the eye is submerged
+        // and stays hidden behind it when the eye is out of the water. Drawing them earlier
+        // would let the blended surface cover bubbles floating in front of it.
+        FrameProfiler.Begin(ProfileSection.EntityPass);
+        renderManager.RenderBubbleParticles(Camera, _bubbles.Particles);
+        FrameProfiler.End(ProfileSection.EntityPass);
 
         // Clouds blend too, so they go after water has written its depth
         FrameProfiler.Begin(ProfileSection.CloudPass);

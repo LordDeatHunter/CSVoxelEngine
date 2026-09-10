@@ -69,6 +69,7 @@ public class RenderManager : IDisposable
     // cubes. Null until LoadResources builds it.
     private LeafParticleRenderer? _leaves;
     private FireParticleRenderer? _fire;
+    private BubbleParticleRenderer? _bubbles;
 
     // Directional sun shadows: RenderShadows fills _shadowDepthTex (a depth-only FBO
     // attachment, sampled as a comparison sampler on unit 1) through _lightViewProj, and
@@ -328,6 +329,7 @@ public class RenderManager : IDisposable
         _rays = new UnderwaterRaysRenderer(gl);
         _leaves = new LeafParticleRenderer(gl);
         _fire = new FireParticleRenderer(gl);
+        _bubbles = new BubbleParticleRenderer(gl);
 
         blockCubes = new BlockCubeCache(gl);
         itemMeshes = new ItemMeshCache(gl);
@@ -1677,6 +1679,14 @@ public class RenderManager : IDisposable
             _fogColor, _fogNear, _fogFar);
     }
 
+    public void RenderBubbleParticles(Camera camera, IReadOnlyList<BubbleParticle> bubbles)
+    {
+        if (camera == null || bubbles.Count == 0 || _bubbles == null) return;
+
+        _bubbles.Render(bubbles, camera.GetViewProjection(), camera.Position, camera.Forward,
+            _fogColor, _fogNear, _fogFar);
+    }
+
     /// <summary>
     /// Draws the live mining debris as small cubes textured as the block they broke off
     /// from. Each cube spins and tumbles about its centre and fades through the world
@@ -2054,6 +2064,7 @@ public class RenderManager : IDisposable
         _rays?.Dispose();
         _leaves?.Dispose();
         _fire?.Dispose();
+        _bubbles?.Dispose();
         _sunQuad.Dispose();
         gl.DeleteTexture(_sunTexture);
         gl.DeleteFramebuffer(_shadowFbo);
