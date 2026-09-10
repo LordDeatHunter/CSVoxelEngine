@@ -659,9 +659,10 @@ public class World
     }
 
     /// <summary>
-    /// Strikes the selected firestarter at the aimed firepit: a full branch pile has a
-    /// per-use chance to light, every attempt spends one durability and starts the item's
-    /// use delay, and aiming anywhere else does nothing. Returns whether the fire lit.
+    /// Strikes the selected firestarter at the aimed block: a full branch pile has a
+    /// per-use chance to light, and a TNT block has the same per-use chance to prime,
+    /// every attempt spends one durability and starts the item's use delay, and aiming
+    /// anywhere else does nothing. Returns whether the fire lit or the TNT primed.
     /// </summary>
     private bool TryIgniteCampfire(float maxDistance, ItemType item, int instanceId)
     {
@@ -673,13 +674,36 @@ public class World
         var hy = (int)hit.Y;
         var hz = (int)hit.Z;
         if (!_chunkManager.TryGetCell(hx, hy, hz, out var hitId, out var hitState)) return false;
+        if (BlockType.ById[hitId]?.OnBreak == BlockBreakAction.PrimeTnt)
+        {
+            var delay = item.UseDelaySeconds > 0f ? item.UseDelaySeconds : 0f;
+            Inventory.MarkToolUsed(instanceId, now, delay);
+            var primed = Random.Shared.NextSingle() < item.UseChance;
+            if (primed)
+            {
+                var cell = new Vector3(hx, hy, hz);
+                if (_chunkManager.ChunkAt(hx, hy, hz)?.RemoveBlockAt(cell, _chunkManager) == true)
+                {
+                    _tntManager.Spawn(cell, hitId);
+                    _fluidManager.ScheduleAround(cell);
+                    if (LodRegion.LowerColumnBelow(hx, hy, hz))
+                        _lodManager.MarkEditedColumn(hx, hz);
+                }
+                else
+                {
+                    primed = false;
+                }
+            }
+            Inventory.DamageTool(instanceId);
+            return primed;
+        }
         var pile = BlockType.ById[item.UseBlockId];
         if (pile == null || hitId != item.UseBlockId) return false;
         if (BranchPileGenerator.CountWithState(hitState, pile.StackMax) < pile.StackMax) return false;
         if (_campfires.IsLit(hx, hy, hz)) return false;
 
-        var delay = item.UseDelaySeconds > 0f ? item.UseDelaySeconds : 0f;
-        Inventory.MarkToolUsed(instanceId, now, delay);
+        var campfireDelay = item.UseDelaySeconds > 0f ? item.UseDelaySeconds : 0f;
+        Inventory.MarkToolUsed(instanceId, now, campfireDelay);
         var lit = Random.Shared.NextSingle() < item.UseChance && _campfires.Ignite(hx, hy, hz);
         Inventory.DamageTool(instanceId);
         return lit;
