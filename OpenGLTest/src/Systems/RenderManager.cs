@@ -1684,6 +1684,61 @@ public class RenderManager : IDisposable
         BindWorldTextures();
     }
 
+    // Held-item sizing, in blocks. The sprite is unit-sized and the cube is full-block;
+    // both are shrunk to sit in the palm. The grips lift the shape just clear of the
+    // forearm with a nudge outward (+X, away from the body) and forward (-Z).
+    private const float HeldItemScale = 0.5f;
+    private static readonly Vector3 HeldItemGrip = new(0.03f, 0.10f, -0.04f);
+    private const float HeldBlockScale = 0.38f;
+    private static readonly Vector3 HeldBlockGrip = new(0.08f, 0.10f, -0.02f);
+
+    /// <summary>
+    /// Draws the selected hotbar slot in the right hand: a block as its 3D cube, a pure
+    /// item as its sprite posed by the item's display transform (canted tools by default,
+    /// the compass facing back up at the holder). Positioned at the fist through the hand
+    /// anchor, so it rides the carrying pose, the walk swing and the mine pump.
+    /// </summary>
+    public void RenderHeldItem(Camera camera, PlayerModel player, byte selectedId, bool hasHeld,
+        float timeSeconds, float headingDegrees)
+    {
+        if (camera == null || player == null || selectedId == 0 || !hasHeld) return;
+
+        var hand = player.GetHandAnchorMatrix(camera.Position, camera.Yaw,
+            PlayerModel.FirstPersonBodyBack);
+        var viewProj = camera.GetViewProjection();
+
+        worldShader.Use();
+        BindWorldTextures();
+
+        if (ItemType.IsItem(selectedId))
+        {
+            if (!ItemType.Types.TryGetValue(selectedId, out var type)) return;
+            var frame = Math.Clamp(type.FrameAt(timeSeconds, headingDegrees), 0,
+                Math.Max(0, type.FrameCount - 1));
+            if (!itemMeshes.TryGetFrame(selectedId, frame, out var mesh, out var texture)) return;
+
+            var model = Matrix4x4.CreateScale(HeldItemScale)
+                        * type.DisplayMatrix()
+                        * Matrix4x4.CreateTranslation(HeldItemGrip)
+                        * hand;
+            SetDrawUniforms(model, model * viewProj, 1f);
+
+            gl.ActiveTexture(TextureUnit.Texture0);
+            gl.BindTexture(TextureTarget.Texture2DArray, texture);
+            mesh.Render();
+            BindWorldTextures();
+            return;
+        }
+
+        var cube = blockCubes.Get(selectedId);
+        if (cube == null) return;
+        var blockModel = Matrix4x4.CreateScale(HeldBlockScale)
+                         * Matrix4x4.CreateTranslation(HeldBlockGrip)
+                         * hand;
+        SetDrawUniforms(blockModel, blockModel * viewProj, 1f);
+        cube.Render();
+    }
+
     private void DrawPlayerPartShadow(PlayerModel player, string part, Camera camera)
     {
         var model = player.GetPartMatrix(part, camera.Position, camera.Yaw, camera.Pitch);

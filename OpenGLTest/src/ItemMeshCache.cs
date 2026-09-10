@@ -15,63 +15,80 @@ namespace silkgltriangle;
 public class ItemMeshCache : IDisposable
 {
     private readonly GL _gl;
-    private readonly Dictionary<byte, (Mesh Mesh, uint Texture)> _entries = new();
+    private readonly Dictionary<byte, (Mesh Mesh, Dictionary<int, uint> Textures)> _entries = new();
 
     public ItemMeshCache(GL gl) => _gl = gl;
 
     /// <summary>The mesh and texture for an item id, or false for non-item ids.</summary>
-    public bool TryGet(byte itemId, out Mesh mesh, out uint texture)
+    public bool TryGet(byte itemId, out Mesh mesh, out uint texture) =>
+        TryGetFrame(itemId, 0, out mesh, out texture);
+
+    /// <summary>
+    /// The extruded mesh plus the texture of one spritesheet frame, for items whose look
+    /// changes over time (the held compass tracks its heading). Geometry is identical for
+    /// every frame, so one mesh is shared and only the per-frame texture is cached.
+    /// </summary>
+    public bool TryGetFrame(byte itemId, int frame, out Mesh mesh, out uint texture)
     {
-        if (_entries.TryGetValue(itemId, out var entry))
-        {
-            (mesh, texture) = entry;
-            return true;
-        }
-
+        mesh = null!;
+        texture = 0;
         if (!ItemType.Types.TryGetValue(itemId, out var type))
-        {
-            (mesh, texture) = (null!, 0);
             return false;
+
+        frame = Math.Clamp(frame, 0, Math.Max(0, type.FrameCount - 1));
+        if (!_entries.TryGetValue(itemId, out var entry))
+        {
+            entry = (BuildMesh(type, frame), new Dictionary<int, uint>());
+            _entries[itemId] = entry;
         }
 
-        entry = Build(type);
-        _entries[itemId] = entry;
-        (mesh, texture) = entry;
+        mesh = entry.Mesh;
+        if (!entry.Textures.TryGetValue(frame, out texture))
+        {
+            texture = BuildTexture(type, frame);
+            entry.Textures[frame] = texture;
+        }
         return true;
     }
 
-    private (Mesh Mesh, uint Texture) Build(ItemType type)
+    private Mesh BuildMesh(ItemType type, int frame)
+    {
+        var (pixels, width, height) = FramePixels(type, frame);
+        return Primitives.CreateExtrudedSprite(_gl, pixels, width, height);
+    }
+
+    private uint BuildTexture(ItemType type, int frame)
+    {
+        var (pixels, width, height) = FramePixels(type, frame);
+        return TextureLoader.Upload(_gl, pixels, width, height);
+    }
+
+    // One cell of a spritesheet, or the whole texture for a plain sprite. The mesh it
+    // extrudes is identical for every frame, so callers share it and vary only the texture.
+    private static (byte[] Pixels, int Width, int Height) FramePixels(ItemType type, int frame)
     {
         using var stream = File.OpenRead(type.TexturePath);
         var image = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
 
-        // The flat UI icons animate through the sheet's slices; the extruded drop keeps showing
-        // one face, so a sheet is cropped to its first frame instead of stretching all of them.
-        if (type.Animation != ItemAnimationMode.None)
-        {
-            if (image.Width % type.SpriteCols != 0 || image.Height % type.SpriteRows != 0)
-                throw new InvalidOperationException(
-                    $"Item '{type.TexturePath}' is {image.Width}x{image.Height} but its spritesheet is {type.SpriteCols}x{type.SpriteRows}: cells must divide the texture evenly.");
-            var cell = TextureLoader.CropFrame(image.Data, image.Width, image.Height,
-                type.SpriteCols, type.SpriteRows, 0);
-            var cellWidth = image.Width / type.SpriteCols;
-            var cellHeight = image.Height / type.SpriteRows;
-            var texture = TextureLoader.Upload(_gl, cell, cellWidth, cellHeight);
-            var mesh = Primitives.CreateExtrudedSprite(_gl, cell, cellWidth, cellHeight);
-            return (mesh, texture);
-        }
+        if (type.Animation == ItemAnimationMode.None)
+            return (image.Data, image.Width, image.Height);
 
-        var singleTexture = TextureLoader.Upload(_gl, image.Data, image.Width, image.Height);
-        var singleMesh = Primitives.CreateExtrudedSprite(_gl, image.Data, image.Width, image.Height);
-        return (singleMesh, singleTexture);
+        if (image.Width % type.SpriteCols != 0 || image.Height % type.SpriteRows != 0)
+            throw new InvalidOperationException(
+                $"Item '{type.TexturePath}' is {image.Width}x{image.Height} but its spritesheet is {type.SpriteCols}x{type.SpriteRows}: cells must divide the texture evenly.");
+        var cellWidth = image.Width / type.SpriteCols;
+        var cellHeight = image.Height / type.SpriteRows;
+        return (TextureLoader.CropFrame(image.Data, image.Width, image.Height,
+            type.SpriteCols, type.SpriteRows, frame), cellWidth, cellHeight);
     }
 
     public void Dispose()
     {
-        foreach (var (mesh, texture) in _entries.Values)
+        foreach (var (mesh, textures) in _entries.Values)
         {
             mesh.Dispose();
-            _gl.DeleteTexture(texture);
+            foreach (var texture in textures.Values)
+                _gl.DeleteTexture(texture);
         }
         _entries.Clear();
 

@@ -151,6 +151,43 @@ public sealed class ContentTests
     }
 
     [Fact]
+    public void ItemDisplayDefaultsToSideCantedTool()
+    {
+        var type = ContentRegistry.RequireItem("bucket");
+        Assert.Equal(new Vector3(-30f, 10f, 0f), type.DisplayRotation);
+        Assert.Equal(Vector3.Zero, type.DisplayTranslation);
+        Assert.Equal(1f, type.DisplayScale);
+    }
+
+    [Fact]
+    public void CompassDisplayFacesTheHolder()
+    {
+        var type = ContentRegistry.RequireItem("compass");
+        Assert.Equal(new Vector3(-60f, 0f, 0f), type.DisplayRotation);
+        Assert.Equal(new Vector3(-0.01f, 0.06f, -0.02f), type.DisplayTranslation);
+        Assert.Equal(0.67f, type.DisplayScale);
+    }
+
+    [Fact]
+    public void DisplayMatrixPosesSpritesAsConfigured()
+    {
+        // Default: the sprite normal (+Z) tips up and slightly right toward the viewer.
+        var normal = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitZ,
+            ContentRegistry.RequireItem("bucket").DisplayMatrix()));
+        Assert.True(normal.X > 0.1f && normal.Y > 0.3f && normal.Z > 0.7f);
+
+        // Pickaxe: yawed so the head axis (+X) runs fore-aft with a tip facing forward (-Z).
+        var tip = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitX,
+            ContentRegistry.RequireItem("primitive_pickaxe").DisplayMatrix()));
+        Assert.True(tip.Z < -0.6f);
+
+        // Compass: pitched up-back at the holder's face (normalized: its scale shrinks normals).
+        var face = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitZ,
+            ContentRegistry.RequireItem("compass").DisplayMatrix()));
+        Assert.True(face.Y > 0.8f && face.Z > 0.4f && MathF.Abs(face.X) < 0.01f);
+    }
+
+    [Fact]
     public void RayIntersectsFlowerBoxButMissesItsEmptyRim()
     {
         var min = new Vector3(1.25f, 0f, 1.25f);

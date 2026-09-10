@@ -62,10 +62,22 @@ public class PlayerModel
     public const float RestElbow = 0.30f;
     public const float ArmInwardYaw = 0.12f;
 
+    // Carrying pose: with something held, the right arm rises so the hand (and the item)
+    // sits up in view instead of hanging hidden inside the arm's silhouette.
+    public const float HoldShoulder = 0.5f;
+    public const float HoldElbow = 1.0f;
+
     private float _walkPhase;
     private float _moveBlend;
     private float _mineT = 1f;
     private float _time;
+    private float _holdBlend;
+
+    /// <summary>Whether the right hand currently holds something; eases the carrying pose in and out.</summary>
+    public bool HoldingItem { get; set; }
+
+    /// <summary>Smoothed 0..1 carrying amount.</summary>
+    public float HoldBlend => _holdBlend;
 
     /// <summary>The shape being posed: pivots, cubes and skin. Swapped for the file rig at startup.</summary>
     public PlayerRig Rig { get; set; } = PlayerRig.BuiltIn();
@@ -88,6 +100,7 @@ public class PlayerModel
 
         var target = MathUtils.Clamp01(horizontalSpeed / WalkSpeedRef);
         _moveBlend = MathUtils.Damp(_moveBlend, target, MoveBlendRate, deltaTime);
+        _holdBlend = MathUtils.Damp(_holdBlend, HoldingItem ? 1f : 0f, MoveBlendRate, deltaTime);
 
         // Stride rate grows with speed so feet roughly keep up with the ground.
         _walkPhase += deltaTime * (4f + horizontalSpeed * 0.9f);
@@ -140,17 +153,20 @@ public class PlayerModel
         var leftKnee = -(Math.Max(0f, MathF.Sin(_walkPhase - 0.7f)) * 0.9f * _moveBlend + 0.03f);
         var rightKnee = -(Math.Max(0f, MathF.Sin(_walkPhase + MathF.PI - 0.7f)) * 0.9f * _moveBlend + 0.03f);
         var leftShoulder = RestShoulderForward - swing + MathF.Sin(_time * 1.7f) * 0.02f;
-        var rightShoulder = RestShoulderForward + swing - MathF.Sin(_time * 1.7f) * 0.02f;
+        var rightShoulder = RestShoulderForward + swing - MathF.Sin(_time * 1.7f) * 0.02f
+            + _holdBlend * HoldShoulder;
         var leftElbow = (Math.Max(0f, MathF.Sin(_walkPhase)) * 0.45f * _moveBlend) + RestElbow;
-        var rightElbow = (Math.Max(0f, -MathF.Sin(_walkPhase)) * 0.45f * _moveBlend) + RestElbow;
+        var rightElbow = (Math.Max(0f, -MathF.Sin(_walkPhase)) * 0.45f * _moveBlend) + RestElbow
+            + _holdBlend * HoldElbow;
 
         // Mining raises the right hand up-forward into view, peaking mid-swing, on top of
         // whatever the walk cycle is doing. sin(pi*t) is 0 at both ends, 1 in the middle.
+        // Kept below the carrying pose's range so the two never stack past the vertical.
         if (_mineT < 1f)
         {
             var pump = MathF.Sin(MathF.PI * _mineT);
-            rightShoulder += pump * 1.3f;
-            rightElbow += pump * 0.5f;
+            rightShoulder += pump * 1.0f;
+            rightElbow += pump * 0.4f;
         }
 
         var bob = MathF.Abs(MathF.Cos(_walkPhase)) * 0.04f * _moveBlend;
@@ -230,6 +246,32 @@ public class PlayerModel
                 * Thigh(Pivot("ThighR"), pose.RightHip),
             _ => Matrix4x4.Identity,
         };
+    }
+
+    /// <summary>
+    /// How far below the right forearm's pivot the hand sits: the lowest cuboid bottom, so
+    /// reshaped forearms carry the grip with them. Negative, in blocks.
+    /// </summary>
+    public float HandDepth()
+    {
+        var depth = 0f;
+        foreach (var cube in Rig.Parts["ForearmR"].Cubes)
+            depth = Math.Min(depth, cube.Min.Y);
+        return depth;
+    }
+
+    /// <summary>
+    /// Anchor for a held item: positioned at the right fist so it follows the walk swing
+    /// and the mine pump, but oriented in body space. Parenting the orientation to the
+    /// forearm would force absurd display angles the moment the carrying pose raises the
+    /// arm (a level tool would need -130 degrees of pitch), so the JSON numbers stay human.
+    /// </summary>
+    public Matrix4x4 GetHandAnchorMatrix(Vector3 eyePos, float yawDeg, float backOffset = 0f)
+    {
+        var fist = Vector3.Transform(new Vector3(0f, HandDepth(), 0f),
+            GetPartMatrix("ForearmR", eyePos, yawDeg, 0f, backOffset));
+        var yawRad = -(yawDeg + 90f) * MathF.PI / 180f;
+        return Matrix4x4.CreateRotationY(yawRad) * Matrix4x4.CreateTranslation(fist);
     }
 
     /// <summary>Mesh name per draw; arms/legs draw one mesh twice (left + right matrices).</summary>

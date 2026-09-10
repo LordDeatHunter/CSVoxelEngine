@@ -13,6 +13,28 @@ public sealed class ItemDefinition
     public UseDefinition? Use { get; set; }
 
     /// <summary>
+    /// How the item sits in the hand when held, Minecraft-style: rotation as
+    /// [pitch, yaw, roll] degrees composed yaw, then pitch, then roll; translation in
+    /// blocks of hand space applied after rotation and never scaled; scale multiplies the
+    /// whole sprite. Omitted for the tool default: upright, sideways like a pickaxe and
+    /// canted toward the viewer so it never goes edge-on.
+    /// </summary>
+    public DisplayDefinition? Display { get; set; }
+
+    /// <summary>The <c>display</c> object: held-item rotation, translation and scale.</summary>
+    public sealed class DisplayDefinition
+    {
+        /// <summary>[pitch, yaw, roll] degrees; default [-30, 10, 0].</summary>
+        public float[]? Rotation { get; set; }
+
+        /// <summary>Blocks in hand space; default [0, 0, 0].</summary>
+        public float[]? Translation { get; set; }
+
+        /// <summary>Uniform multiplier; default 1.</summary>
+        public float? Scale { get; set; }
+    }
+
+    /// <summary>
     /// Optional spritesheet: the texture holds a grid of frames instead of one sprite.
     /// Frames are row-major (frame 0 is the top-left cell) and picked per draw by
     /// <c>mode</c>: <c>heading</c> selects from the player's compass heading (north = 0),

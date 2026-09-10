@@ -280,6 +280,7 @@ public static class ContentRegistry
 
             var id = ItemIds[name];
             var sheet = ParseSpritesheet(definition.Spritesheet, path);
+            var display = ParseDisplay(definition.Display, path);
             types[id] = new ItemType(id, definition.Name ?? name, definition.Texture)
             {
                 UseAction = action,
@@ -290,6 +291,9 @@ public static class ContentRegistry
                 FrameCount = sheet.Frames,
                 Animation = sheet.Mode,
                 AnimationFps = sheet.Fps,
+                DisplayRotation = display.Rotation,
+                DisplayTranslation = display.Translation,
+                DisplayScale = display.Scale,
             };
         }
 
@@ -325,6 +329,35 @@ public static class ContentRegistry
                 $"Item '{path}' has spritesheet.fps {sheet.Fps}; expected a positive number.");
 
         return new ParsedSheet(cols, rows, frames, mode, fps);
+    }
+
+    private readonly record struct ParsedDisplay(Vector3 Rotation, Vector3 Translation, float Scale);
+
+    /// <summary>
+    /// Reads an item's held-in-hand transform, defaulting to the upright side-facing tool
+    /// pose when the file says nothing.
+    /// </summary>
+    private static ParsedDisplay ParseDisplay(ItemDefinition.DisplayDefinition? display, string path)
+    {
+        if (display == null)
+            return new ParsedDisplay(new Vector3(-30f, 10f, 0f), Vector3.Zero, 1f);
+
+        Vector3 ReadTriple(float[]? values, string field)
+        {
+            if (values == null) return field == "rotation" ? new Vector3(-30f, 10f, 0f) : Vector3.Zero;
+            if (values.Length != 3 || values.Any(v => !float.IsFinite(v)))
+                throw new InvalidOperationException(
+                    $"Item '{path}' has display.{field} with {values?.Length ?? 0} entries; expected 3 finite numbers.");
+            return new Vector3(values[0], values[1], values[2]);
+        }
+
+        var scale = display.Scale ?? 1f;
+        if (!float.IsFinite(scale) || scale <= 0f)
+            throw new InvalidOperationException(
+                $"Item '{path}' has display.scale {display.Scale}; expected a positive number.");
+
+        return new ParsedDisplay(ReadTriple(display.Rotation, "rotation"),
+            ReadTriple(display.Translation, "translation"), scale);
     }
 
     // Items are parsed before blocks, so only the id maps exist here; what those ids turn out

@@ -57,6 +57,8 @@ public class World
 
     private Vector3 _prevCamPos;
     private bool _hasPrevCamPos;
+    private byte _heldId;
+    private bool _hasHeld;
 
     /// <summary>The player's hotbar; its selected slot decides what block placing puts down.</summary>
     public Inventory Inventory { get; } = new();
@@ -109,6 +111,9 @@ public class World
         }
         _prevCamPos = camPos;
         _hasPrevCamPos = true;
+        _heldId = Inventory.SelectedBlockId;
+        _hasHeld = _heldId != 0 && (Inventory.SelectedCount > 0 || Inventory.SelectedToolInstance > 0);
+        Player.HoldingItem = _hasHeld;
         Player.Update((float)deltaTime, horizontalSpeed);
 
         // Times itself, as ChunkUnload / ChunkApply / ChunkDirty
@@ -196,6 +201,8 @@ public class World
         foreach (var tree in _toppling)
             renderManager.RenderTopplingTree(Camera, tree);
         renderManager.RenderPlayer(Camera, Player);
+        renderManager.RenderHeldItem(Camera, Player, _heldId, _hasHeld,
+            (float)_window.Time, Compass.HeadingFromYaw(Camera.Yaw));
         FrameProfiler.End(ProfileSection.EntityPass);
 
         // Water last of the world passes: it blends, so everything it can cover has to be in

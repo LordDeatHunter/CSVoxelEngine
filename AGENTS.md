@@ -271,6 +271,7 @@ right-click behaviour (`World.TryUseSelected` -> `TryUseItem`):
 |---|---|
 | `use.action` | `pickup_fluid` (scoop the targeted fluid source into the item) or `place_fluid` (pour one into the targeted cell) |
 | `use.fluid` | the fluid block the action works on; must be a block with `fluid: true` || `use.result` | the item this one becomes on success; must be an item, and the two normally point at each other |
+| `display` | how the item sits in the right hand: `rotation` as `[pitch, yaw, roll]` degrees (composed yaw, then pitch, then roll), `translation` in blocks of hand space, `scale` as a multiplier; omitted means `{"rotation": [-30, 10, 0]}`, i.e. upright over the hand with a slight sideways cant — the pickaxe yaws to 60 so a tip faces forward, the compass uses rotation `[-60, 0, 0]`, scale `0.67` and a lift to face back up at the holder |
 
 Both names resolve like a loot entry (`block/` / `item/` prefixes pin the namespace).
 `ContentRegistry.ValidateItemUses` runs after the blocks are loaded and throws, naming the file,

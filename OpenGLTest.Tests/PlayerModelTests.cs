@@ -97,6 +97,43 @@ public sealed class PlayerModelTests
     }
 
     [Fact]
+    public void HandHangsBelowTheEyeOnTheRightSide()
+    {
+        var player = new PlayerModel();
+        Assert.Equal(-PlayerModel.ForearmLength, player.HandDepth());
+
+        // Yaw -90 faces -Z, so the right hand sits at +X and forward at -Z.
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+        var hand = Vector3.Transform(Vector3.Zero, player.GetHandAnchorMatrix(eye, -90f));
+        Assert.True(hand.Y < eye.Y - 0.5f);
+        Assert.True(hand.X > eye.X);
+        Assert.True(hand.Z < eye.Z);
+    }
+
+    [Fact]
+    public void HoldingRaisesTheRightHandAndReleasesIt()
+    {
+        var player = new PlayerModel();
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+        var rest = Vector3.Transform(Vector3.Zero, player.GetHandAnchorMatrix(eye, -90f));
+
+        player.HoldingItem = true;
+        for (var i = 0; i < 120; i++)
+            player.Update(1f / 60f, 0f);
+        Assert.Equal(1f, player.HoldBlend, 3);
+        var raised = Vector3.Transform(Vector3.Zero, player.GetHandAnchorMatrix(eye, -90f));
+        Assert.True(raised.Y > rest.Y + 0.2f);
+        Assert.True(raised.Z < rest.Z - 0.1f);
+
+        player.HoldingItem = false;
+        for (var i = 0; i < 120; i++)
+            player.Update(1f / 60f, 0f);
+        Assert.Equal(0f, player.HoldBlend, 3);
+        var lowered = Vector3.Transform(Vector3.Zero, player.GetHandAnchorMatrix(eye, -90f));
+        Assert.True(Vector3.Distance(rest, lowered) < 0.05f);
+    }
+
+    [Fact]
     public void PaletteHasOneOpaqueSwatchPerSlot()
     {
         var pixels = PlayerModel.PalettePixels();

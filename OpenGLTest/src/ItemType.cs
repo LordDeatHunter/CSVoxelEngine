@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 
 namespace silkgltriangle;
 
@@ -69,6 +70,30 @@ public sealed class ItemType
 
     /// <summary>Frames per second for <see cref="ItemAnimationMode.Loop"/>; ignored otherwise.</summary>
     public float AnimationFps { get; internal init; } = 8f;
+
+    /// <summary>Held-item rotation as [pitch, yaw, roll] degrees; the default [-30, 10, 0]
+    /// stands the sprite nearly upright over the hand with a slight sideways cant, like a
+    /// pickaxe, without ever going edge-on.</summary>
+    public Vector3 DisplayRotation { get; internal init; } = new(-30f, 10f, 0f);
+
+    /// <summary>Held-item offset in blocks of hand space, applied after the rotation.</summary>
+    public Vector3 DisplayTranslation { get; internal init; } = Vector3.Zero;
+
+    /// <summary>Held-item uniform scale multiplier.</summary>
+    public float DisplayScale { get; internal init; } = 1f;
+
+    /// <summary>
+    /// Held-item transform in hand space: scaled, rotated (yaw, then pitch, then roll),
+    /// then translated. The renderer composes it under the hand matrix, so the item rides
+    /// the arm swing and the mine pump.
+    /// </summary>
+    public Matrix4x4 DisplayMatrix()
+    {
+        var radians = DisplayRotation * (MathF.PI / 180f);
+        return Matrix4x4.CreateScale(DisplayScale)
+            * Matrix4x4.CreateFromYawPitchRoll(radians.Y, radians.X, radians.Z)
+            * Matrix4x4.CreateTranslation(DisplayTranslation);
+    }
 
     /// <summary>Frame to draw for this item at this moment.</summary>
     /// <param name="timeSeconds">Scene clock, driving <see cref="ItemAnimationMode.Loop"/>.</param>
