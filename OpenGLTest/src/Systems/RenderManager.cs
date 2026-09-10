@@ -1736,11 +1736,12 @@ public class RenderManager : IDisposable
 
         var blend = camera.ShoulderBlend;
         var viewProj = camera.GetViewProjection();
+        var bodyYaw = camera.PlayerYaw;
         if (blend <= 0f)
         {
             foreach (var part in PlayerModel.FirstPersonParts)
             {
-                var model = player.GetPartMatrix(part, camera.Position, camera.Yaw, camera.Pitch,
+                var model = player.GetPartMatrix(part, camera.Position, bodyYaw, camera.Pitch,
                     PlayerModel.FirstPersonBodyBack);
                 SetDrawUniforms(model, model * viewProj, 1f);
                 _playerMeshes[part].Render();
@@ -1750,11 +1751,11 @@ public class RenderManager : IDisposable
         {
             foreach (var part in PlayerModel.BodyParts)
             {
-                var model = player.GetPartMatrix(part, camera.Position, camera.Yaw, camera.Pitch);
+                var model = player.GetPartMatrix(part, camera.Position, bodyYaw, camera.Pitch);
                 SetDrawUniforms(model, model * viewProj, 1f);
                 _playerMeshes[part].Render();
             }
-            var head = player.GetPartMatrix("Head", camera.Position, camera.Yaw, camera.Pitch);
+            var head = player.GetPartMatrix("Head", camera.Position, bodyYaw, camera.Pitch);
             SetDrawUniforms(head, head * viewProj, 1f);
             _playerMeshes["Head"].Render();
         }
@@ -1763,12 +1764,12 @@ public class RenderManager : IDisposable
             var back = PlayerModel.FirstPersonBodyBack * (1f - blend);
             foreach (var part in PlayerModel.BodyParts)
             {
-                var model = player.GetPartMatrix(part, camera.Position, camera.Yaw, camera.Pitch, back);
+                var model = player.GetPartMatrix(part, camera.Position, bodyYaw, camera.Pitch, back);
                 SetDrawUniforms(model, model * viewProj, 1f);
                 _playerMeshes[part].Render();
             }
             gl.DepthMask(false);
-            var head = player.GetPartMatrix("Head", camera.Position, camera.Yaw, camera.Pitch);
+            var head = player.GetPartMatrix("Head", camera.Position, bodyYaw, camera.Pitch);
             SetDrawUniforms(head, head * viewProj, blend);
             _playerMeshes["Head"].Render();
             gl.DepthMask(true);
@@ -1797,7 +1798,7 @@ public class RenderManager : IDisposable
         if (camera == null || player == null || selectedId == 0 || !hasHeld) return;
 
         var backOffset = PlayerModel.FirstPersonBodyBack * (1f - camera.ShoulderBlend);
-        var hand = player.GetHandAnchorMatrix(camera.Position, camera.Yaw, backOffset);
+        var hand = player.GetHandAnchorMatrix(camera.Position, camera.PlayerYaw, backOffset);
         var viewProj = camera.GetViewProjection();
 
         worldShader.Use();
@@ -1834,7 +1835,7 @@ public class RenderManager : IDisposable
 
     private void DrawPlayerPartShadow(PlayerModel player, string part, Camera camera)
     {
-        var model = player.GetPartMatrix(part, camera.Position, camera.Yaw, camera.Pitch);
+        var model = player.GetPartMatrix(part, camera.Position, camera.PlayerYaw, camera.Pitch);
         shadowShader.SetUniform("uModel", model);
         shadowShader.SetUniform("uLightMVP", model * _lightViewProj);
         _playerMeshes[part].Render();

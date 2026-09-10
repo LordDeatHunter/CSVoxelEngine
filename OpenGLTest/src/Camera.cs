@@ -7,6 +7,14 @@ using Silk.NET.Windowing;
 
 namespace silkgltriangle;
 
+/// <summary>F5 camera modes, cycled FirstPerson -> Shoulder -> Orbit -> FirstPerson.</summary>
+public enum CameraMode
+{
+    FirstPerson,
+    Shoulder,
+    Orbit,
+}
+
 public class Camera
 {
     public Vector3 Position { get; private set; } = SpawnPosition();
@@ -25,14 +33,29 @@ public class Camera
     /// </summary>
     public bool IsCreative { get; private set; }
     /// <summary>
-    /// Over-shoulder third-person view toggled with F5. The player body stays where the
+    /// Over-shoulder third-person view (F5 mode 2). The player body stays where the
     /// physics put it (<see cref="Position"/> is still the head); the view eye moves behind
     /// + to the side (<see cref="RenderEye"/>) and tilts back onto the aim point
     /// (<see cref="ViewDirection"/>), which <see cref="Raycast"/> also fires along, so the
     /// highlight lands under the crosshair. Movement, collision and swimming keep reading
     /// <see cref="Position"/>.
     /// </summary>
-    public bool IsShoulderSurf { get; private set; }
+    public bool IsShoulderSurf => Mode != CameraMode.FirstPerson;
+    /// <summary>Active F5 camera mode.</summary>
+    public CameraMode Mode { get; private set; } = CameraMode.FirstPerson;
+    /// <summary>
+    /// Centered orbit view (F5 mode 3): same rig as shoulder-surf but centered, with the
+    /// camera orbiting freely while the player body keeps its own facing
+    /// (<see cref="PlayerYaw"/>). Moving or interacting turns the player toward the motion
+    /// or the aim, fast-lerped rather than snapped.
+    /// </summary>
+    public bool IsOrbit => Mode == CameraMode.Orbit;
+    /// <summary>
+    /// Yaw the player body faces, in degrees. Tracks the camera in first person and
+    /// shoulder-surf; in orbit mode it lerps toward the movement direction or, after a
+    /// click, toward the camera aim (see <see cref="NotifyPlayerAction"/>).
+    /// </summary>
+    public float PlayerYaw => IsOrbit ? _orbitPlayerYaw : Yaw;
     /// <summary>View eye: the head in first person, the pulled-in shoulder camera in third.</summary>
     public Vector3 RenderEye => Position + _shoulderOffset;
     /// <summary>
@@ -130,12 +153,21 @@ public class Camera
 
     // F5 transition: the camera glides and the head fades over this long, eased.
     private const float ShoulderTransitionSeconds = 0.5f;
+    // Orbit player turn speed, in exponential-damp units per second: fast but visibly lerped.
+    private const float OrbitTurnRate = 10f;
+    // Lateral glide rate for the shoulder<->orbit side offset, same ballpark as the F5 glide.
+    private const float OrbitSideRate = 8f;
 
     private bool _f5WasPressed;
     private Vector3 _shoulderOffset = Vector3.Zero;
     private Vector3 _shoulderViewDir = Vector3.Zero;
     // Linear 0..1 timer behind ShoulderBlend; toggling mid-glide reverses smoothly.
     private float _shoulderBlendT;
+    // Orbit body facing (degrees) plus its smoothed lateral rig offset, both glided.
+    private float _orbitPlayerYaw;
+    private float _shoulderSide = ShoulderSideOffset;
+    private bool _hasActionTarget;
+    private float _actionYaw;
 
     // Set to "x,y,z" to start the eye at an exact spot instead of the surface spawn
     private const string SpawnOverrideVariable = "VOXEL_SPAWN";
@@ -276,6 +308,38 @@ public class Camera
         _shoulderOffset = Vector3.Zero;
         _shoulderViewDir = Vector3.Zero;
         _shoulderBlendT = IsShoulderSurf ? 1f : 0f;
+        _orbitPlayerYaw = yaw;
+        _shoulderSide = Mode == CameraMode.Shoulder ? ShoulderSideOffset : 0f;
+        _hasActionTarget = false;
+    }
+
+    /// <summary>
+    /// Test seam: orbits the camera without touching the player body, simulating a mouse
+    /// drag in orbit mode headlessly. Pitch is clamped exactly like the mouse look.
+    /// </summary>
+    public void TestSetCameraLook(float yaw, float pitch)
+    {
+        Yaw = yaw;
+        Pitch = Math.Clamp(pitch, -89f, 89f);
+    }
+
+    /// <summary>
+    /// Tells orbit mode the player just interacted (mine/place/use click): the body turns
+    /// toward the camera aim over the next frames while the action itself fires at once.
+    /// No-op outside orbit mode, where the body already faces the camera.
+    /// </summary>
+    public void NotifyPlayerAction()
+    {
+        if (!IsOrbit) return;
+        _actionYaw = Yaw;
+        _hasActionTarget = true;
+    }
+
+    private static float DampAngle(float current, float target, float rate, float deltaTime)
+    {
+        var delta = target - current;
+        delta -= MathF.Round(delta / 360f) * 360f;
+        return current + delta * (1f - MathF.Exp(-rate * Math.Max(0f, deltaTime)));
     }
 
     /// <summary>
@@ -322,7 +386,7 @@ public class Camera
 
         var sprinting = keyboard.IsKeyPressed(Key.ShiftLeft);
         var moveSpeed = BaseSpeed * (sprinting ? (IsFlying ? FlyBoostMultiplier : SprintMultiplier) : 1f);
-        var direction = GetForwardVector();
+        var direction = IsOrbit ? ViewDirection : GetForwardVector();
         var right = Vector3.Normalize(Vector3.Cross(direction, Vector3.UnitY));
         var forward = Vector3.Normalize(new Vector3(direction.X, 0f, direction.Z));
 
@@ -335,14 +399,37 @@ public class Camera
         if (moveInput.LengthSquared() > 1f)
             moveInput = Vector3.Normalize(moveInput);
 
-        // Walking backwards is slower; flight keeps full speed in every direction.
-        var backing = keyboard.IsKeyPressed(Key.S) && !keyboard.IsKeyPressed(Key.W);
+        // Orbit faces its motion, so it is always walking forward, never backing up.
+        var backing = !IsOrbit && keyboard.IsKeyPressed(Key.S) && !keyboard.IsKeyPressed(Key.W);
         if (backing && !IsFlying) moveSpeed *= 0.3f;
+
+        // In orbit the body turns toward the motion (or, after a click, toward the aim)
+        // while the camera orbits freely; everywhere else it already faces the camera.
+        var moving = moveInput.LengthSquared() > 0.01f;
+        if (IsOrbit)
+        {
+            if (moving)
+            {
+                var motionYaw = MathF.Atan2(moveInput.Z, moveInput.X) * 180f / MathF.PI;
+                _orbitPlayerYaw = DampAngle(_orbitPlayerYaw, motionYaw, OrbitTurnRate, deltaTime);
+            }
+            else if (_hasActionTarget)
+            {
+                _orbitPlayerYaw = DampAngle(_orbitPlayerYaw, _actionYaw, OrbitTurnRate, deltaTime);
+                var remaining = _actionYaw - _orbitPlayerYaw;
+                remaining -= MathF.Round(remaining / 360f) * 360f;
+                if (Math.Abs(remaining) < 0.5f)
+                    _hasActionTarget = false;
+            }
+        }
+        else
+        {
+            _orbitPlayerYaw = Yaw;
+        }
 
         // Flight ignores the water entirely, so a submerged player can still fly out.
         // Creative mode on foot swims like survival.
         var swimming = IsInWater && !IsFlying;
-        var moving = moveInput.LengthSquared() > 0.01f;
         IsSprinting = sprinting && moving && !IsFlying && !swimming && IsGrounded;
         if (swimming) moveSpeed *= SwimSpeedFactor;
         var intendedSpeed = moving ? moveSpeed * moveInput.Length() : 0f;
@@ -398,7 +485,7 @@ public class Camera
         {
             Position += frameMovement;
             IsGrounded = false;
-            UpdateShoulderOffset(chunkManager);
+            UpdateShoulderOffset(chunkManager, deltaTime);
             RefreshEyeWaterState(chunkManager);
             return;
         }
@@ -428,7 +515,7 @@ public class Camera
             IsGrounded = false;
         }
 
-        UpdateShoulderOffset(chunkManager);
+        UpdateShoulderOffset(chunkManager, deltaTime);
         RefreshEyeWaterState(chunkManager);
     }
 
@@ -550,29 +637,33 @@ public class Camera
         var pressed = keyboard.IsKeyPressed(Key.F5);
         if (pressed && !_f5WasPressed)
         {
-            IsShoulderSurf = !IsShoulderSurf;
-        // Past halfway through the F5 glide the camera owns the crosshair; before that
-        // the head still aims, so the rules switch mid-glide where the two nearly agree.
-        if (ShoulderBlend <= 0.5f)
-                _shoulderOffset = Vector3.Zero;
-            Console.WriteLine($"Shoulder {(IsShoulderSurf ? "ON" : "OFF")}");
+            Mode = (CameraMode)(((int)Mode + 1) % 3);
+            if (Mode == CameraMode.Orbit)
+            {
+                _orbitPlayerYaw = Yaw;
+                _hasActionTarget = false;
+            }
+            Console.WriteLine($"Camera {Mode}");
         }
 
         _f5WasPressed = pressed;
     }
 
-    private void UpdateShoulderOffset(ChunkManager chunkManager)
+    private void UpdateShoulderOffset(ChunkManager chunkManager, float deltaTime)
     {
         var forward = GetForwardVector();
         if (!IsShoulderSurf && _shoulderBlendT <= 0f)
         {
             _shoulderOffset = Vector3.Zero;
             _shoulderViewDir = forward;
+            _shoulderSide = Mode == CameraMode.Shoulder ? ShoulderSideOffset : 0f;
             return;
         }
 
+        _shoulderSide = MathUtils.Damp(_shoulderSide,
+            Mode == CameraMode.Shoulder ? ShoulderSideOffset : 0f, OrbitSideRate, deltaTime);
         var right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
-        var desired = -forward * ShoulderBackDist + Vector3.UnitY * ShoulderHeightOffset + right * ShoulderSideOffset;
+        var desired = -forward * ShoulderBackDist + Vector3.UnitY * ShoulderHeightOffset + right * _shoulderSide;
         var length = desired.Length();
         if (length < float.Epsilon)
         {

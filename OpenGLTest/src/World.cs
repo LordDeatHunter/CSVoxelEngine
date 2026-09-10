@@ -308,6 +308,9 @@ public class World
             return;
         }
 
+        // Orbit mode turns the body toward the aim while the action fires at once.
+        Camera.NotifyPlayerAction();
+
         // A bucket makes water selectable; left-clicking it must still do nothing, since
         // RemoveBlock refuses fluids anyway (and water's hardness of 0 would pop instantly)
         if (BlockType.IsFluid(BlockIdAt(_selectedBlockPosition)))
@@ -635,6 +638,7 @@ public class World
     /// </summary>
     public void TryUseSelected(float maxDistance)
     {
+        Camera.NotifyPlayerAction();
         var id = Inventory.SelectedBlockId;
         if (id != 0 && Inventory.SelectedCount > 0
             && ItemType.Types.TryGetValue(id, out var item) && item.UseAction != ItemUseAction.None)

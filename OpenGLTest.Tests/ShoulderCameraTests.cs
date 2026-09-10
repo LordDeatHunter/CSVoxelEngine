@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using Silk.NET.Input;
 using Xunit;
@@ -55,6 +56,29 @@ public sealed class ShoulderCameraTests
     }
 
     [Fact]
+    public void F5CyclesFirstPersonShoulderOrbitAndBack()
+    {
+        var (camera, keys, manager, _) = Setup(HeadStart);
+
+        Assert.Equal(CameraMode.FirstPerson, camera.Mode);
+        Assert.False(camera.IsShoulderSurf);
+
+        Tap(camera, keys, manager, Key.F5);
+        Assert.Equal(CameraMode.Shoulder, camera.Mode);
+        Assert.True(camera.IsShoulderSurf);
+        Assert.False(camera.IsOrbit);
+
+        Tap(camera, keys, manager, Key.F5);
+        Assert.Equal(CameraMode.Orbit, camera.Mode);
+        Assert.True(camera.IsShoulderSurf);
+        Assert.True(camera.IsOrbit);
+
+        Tap(camera, keys, manager, Key.F5);
+        Assert.Equal(CameraMode.FirstPerson, camera.Mode);
+        Assert.False(camera.IsShoulderSurf);
+    }
+
+    [Fact]
     public void F5GlidesCameraAndHeadOverHalfASecond()
     {
         var (camera, keys, manager, _) = Setup(HeadStart);
@@ -65,16 +89,17 @@ public sealed class ShoulderCameraTests
 
         // 0.1 s into the 0.5 s glide: SmoothStep(0.2) is about 0.104, camera partway out.
         Tap(camera, keys, manager, Key.F5);
-        Assert.True(camera.IsShoulderSurf);
+        Assert.Equal(CameraMode.Shoulder, camera.Mode);
         Assert.InRange(camera.ShoulderBlend, 0.09f, 0.12f);
         Assert.InRange((camera.RenderEye - camera.Position).Length(), 0.3f, 0.5f);
 
         Settle(camera, keys, manager);
         Assert.Equal(1f, camera.ShoulderBlend);
 
-        // Toggling back out glides the same way in reverse.
         Tap(camera, keys, manager, Key.F5);
-        Assert.False(camera.IsShoulderSurf);
+        Assert.Equal(CameraMode.Orbit, camera.Mode);
+        Tap(camera, keys, manager, Key.F5);
+        Assert.Equal(CameraMode.FirstPerson, camera.Mode);
         Assert.InRange(camera.ShoulderBlend, 0.88f, 0.91f);
 
         Settle(camera, keys, manager);
@@ -210,12 +235,110 @@ public sealed class ShoulderCameraTests
 
         // ...while first person honestly reports the pillar itself.
         Tap(camera, keys, manager, Key.F5);
+        Tap(camera, keys, manager, Key.F5);
         Settle(camera, keys, manager);
         camera.TestTeleport(HeadStart, yaw: 0f, pitch: 0f);
         Update(camera, keys, manager);
         Assert.Equal(0f, camera.ShoulderBlend);
         Assert.True(camera.Raycast(10f, manager, out var fpHit, out _));
         Assert.Equal(new Vector3(2f, 5f, 0f), fpHit);
+    }
+
+    [Fact]
+    public void OrbitCameraIsCenteredBehindAndAbove()
+    {
+        var (camera, keys, manager, _) = Setup(HeadStart);
+
+        Tap(camera, keys, manager, Key.F5);
+        Tap(camera, keys, manager, Key.F5);
+        Assert.Equal(CameraMode.Orbit, camera.Mode);
+        Settle(camera, keys, manager);
+        camera.TestTeleport(HeadStart, yaw: 0f, pitch: 0f);
+        Update(camera, keys, manager);
+
+        var offset = camera.RenderEye - camera.Position;
+        Assert.True(offset.X < -2f, $"offset.X {offset.X} should reach behind (+X facing)");
+        Assert.True(offset.Y > 0.3f, $"offset.Y {offset.Y} should sit above the head");
+        var side = Vector3.Dot(offset, new Vector3(0f, 0f, 1f));
+        Assert.True(Math.Abs(side) < 0.05f, $"side {side} should be centered");
+    }
+
+    [Fact]
+    public void OrbitKeepsPlayerFacingWhileCameraOrbits()
+    {
+        var (camera, keys, manager, _) = Setup(HeadStart);
+
+        Tap(camera, keys, manager, Key.F5);
+        Tap(camera, keys, manager, Key.F5);
+        Settle(camera, keys, manager);
+        camera.TestTeleport(HeadStart, yaw: 0f, pitch: 0f);
+        Update(camera, keys, manager);
+        Assert.Equal(0f, camera.PlayerYaw);
+
+        camera.TestSetCameraLook(60f, 0f);
+        Update(camera, keys, manager);
+
+        Assert.Equal(60f, camera.Yaw);
+        Assert.Equal(0f, camera.PlayerYaw);
+    }
+
+    [Fact]
+    public void OrbitMovementTurnsPlayerTowardMotion()
+    {
+        var (camera, keys, manager, _) = Setup(HeadStart);
+
+        Tap(camera, keys, manager, Key.F5);
+        Tap(camera, keys, manager, Key.F5);
+        Settle(camera, keys, manager);
+        camera.TestTeleport(HeadStart, yaw: 0f, pitch: 0f);
+        Update(camera, keys, manager);
+
+        camera.TestSetCameraLook(90f, 0f);
+        keys.Press([Key.W]);
+        for (var i = 0; i < 12; i++)
+            Update(camera, keys, manager);
+        keys.ReleaseAll();
+
+        Assert.True(camera.PlayerYaw > 80f, $"player yaw {camera.PlayerYaw} should face the motion");
+        Assert.True(camera.Position.Z > HeadStart.Z + 1f, "player should walk along the camera forward");
+    }
+
+    [Fact]
+    public void OrbitClickTurnsPlayerTowardAim()
+    {
+        var (camera, keys, manager, _) = Setup(HeadStart);
+
+        Tap(camera, keys, manager, Key.F5);
+        Tap(camera, keys, manager, Key.F5);
+        Settle(camera, keys, manager);
+        camera.TestTeleport(HeadStart, yaw: 0f, pitch: 0f);
+        Update(camera, keys, manager);
+
+        camera.TestSetCameraLook(90f, 0f);
+        camera.NotifyPlayerAction();
+        for (var i = 0; i < 12; i++)
+            Update(camera, keys, manager);
+
+        Assert.True(camera.PlayerYaw > 80f, $"player yaw {camera.PlayerYaw} should face the aim");
+    }
+
+    [Fact]
+    public void OrbitRaycastHitsTheSameBlockAsFirstPerson()
+    {
+        var (camera, keys, manager, center) = Setup(HeadStart);
+        BuildWall(center, x: 7);
+
+        Assert.True(camera.Raycast(10f, manager, out var fpHit, out _));
+        Assert.Equal(new Vector3(7f, 5f, 0f), fpHit);
+
+        Tap(camera, keys, manager, Key.F5);
+        Tap(camera, keys, manager, Key.F5);
+        Settle(camera, keys, manager);
+        camera.TestTeleport(HeadStart, yaw: 0f, pitch: 0f);
+        Update(camera, keys, manager);
+
+        Assert.True(camera.Raycast(10f, manager, out var orbitHit, out _));
+        Assert.Equal(fpHit, orbitHit);
     }
 
     [Fact]
