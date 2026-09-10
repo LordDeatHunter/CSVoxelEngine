@@ -116,7 +116,9 @@ public class World
         _hasHeld = _heldId != 0 && (Inventory.SelectedCount > 0 || Inventory.SelectedToolInstance > 0);
         Player.HoldingItem = _hasHeld;
         var animSpeed = Camera.IsFlying ? 0f : horizontalSpeed;
-        Player.Update((float)deltaTime, animSpeed, Camera.IsSprinting, Camera.IsGrounded);
+        var supported = Camera.IsGrounded || Camera.IsFlying || Camera.IsInWater;
+        Player.Update((float)deltaTime, animSpeed, Camera.IsSprinting, supported,
+            Camera.VerticalVelocity);
 
         // Times itself, as ChunkUnload / ChunkApply / ChunkDirty
         _chunkManager.Update(Camera);

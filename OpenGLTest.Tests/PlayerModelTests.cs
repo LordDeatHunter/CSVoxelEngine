@@ -67,12 +67,47 @@ public sealed class PlayerModelTests
     }
 
     [Fact]
-    public void AirtimeStaysAWalkPoseEvenWhenSprinting()
+    public void AirtimeUsesAJumpPoseInsteadOfTheRunCycle()
     {
         var player = new PlayerModel();
         for (var i = 0; i < 180; i++)
-            player.Update(1f / 60f, 12f, sprinting: true, grounded: false);
+            player.Update(1f / 60f, 12f, sprinting: true, grounded: false, verticalVelocity: 5f);
         Assert.True(player.RunBlend < 0.1f);
+        Assert.True(player.AirBlend > 0.9f);
+        var pose = player.GetPose();
+        Assert.True(pose.LeftHip > 0.3f);
+        Assert.True(pose.RightHip < -0.2f);
+        Assert.True(pose.LeftKnee < -0.2f && pose.RightKnee < -0.2f);
+        Assert.Equal(0f, pose.Bob, 3);
+    }
+
+    [Fact]
+    public void SprintJumpSplitsWiderThanAStandingJump()
+    {
+        var hop = new PlayerModel();
+        for (var i = 0; i < 180; i++)
+            hop.Update(1f / 60f, 0f, sprinting: false, grounded: false, verticalVelocity: 5f);
+        var leap = new PlayerModel();
+        for (var i = 0; i < 180; i++)
+            leap.Update(1f / 60f, 12f, sprinting: true, grounded: false, verticalVelocity: 5f);
+
+        var hopPose = hop.GetPose();
+        var leapPose = leap.GetPose();
+        Assert.True(leapPose.LeftHip - leapPose.RightHip > hopPose.LeftHip - hopPose.RightHip + 0.3f);
+        Assert.True(leapPose.TorsoPitch < hopPose.TorsoPitch - 0.1f);
+    }
+
+    [Fact]
+    public void FallingExtendsTheLegsTowardLanding()
+    {
+        var rising = new PlayerModel();
+        for (var i = 0; i < 180; i++)
+            rising.Update(1f / 60f, 0f, sprinting: false, grounded: false, verticalVelocity: 10f);
+        var falling = new PlayerModel();
+        for (var i = 0; i < 180; i++)
+            falling.Update(1f / 60f, 0f, sprinting: false, grounded: false, verticalVelocity: -12f);
+
+        Assert.True(rising.GetPose().LeftKnee < falling.GetPose().LeftKnee - 0.15f);
     }
 
     [Fact]

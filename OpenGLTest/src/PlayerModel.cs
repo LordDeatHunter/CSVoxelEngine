@@ -64,6 +64,25 @@ public class PlayerModel
     private const float RunStrideBoost = 2.5f;
     private const float MoveBlendRate = 8f;
     private const float RunBlendRate = 6f;
+    private const float AirBlendRate = 10f;
+    // Airborne leg targets. A standing jump tucks both knees under; a sprint jump splits
+    // into a reaching front leg and a tucked trailing leg. Rise tucks harder, fall extends
+    // toward landing (all knees stay bent backward, hence negative with a floor).
+    private const float JumpHipFront = 0.45f;
+    private const float JumpHipBack = -0.30f;
+    private const float SprintJumpHipFront = 0.75f;
+    private const float SprintJumpHipBack = -0.65f;
+    private const float JumpKneeFront = -1.1f;
+    private const float JumpKneeBack = -0.6f;
+    private const float SprintJumpKneeFront = -0.45f;
+    private const float SprintJumpKneeBack = -1.4f;
+    private const float MinKneeBend = -0.08f;
+    private const float JumpShoulder = 0.5f;
+    private const float JumpElbow = 0.7f;
+    private const float SprintJumpShoulderFront = -0.3f;
+    private const float SprintJumpShoulderBack = 0.4f;
+    private const float JumpTorso = 0.02f;
+    private const float SprintJumpTorso = 0.30f;
     public const float MineDuration = 0.25f;
 
     // First-person framing: straight-hanging arms sit ~66 degrees below the view centre,
@@ -83,6 +102,9 @@ public class PlayerModel
     private float _walkPhase;
     private float _moveBlend;
     private float _runBlend;
+    private float _airBlend;
+    private float _airRun;
+    private float _airVelocity;
     private float _mineT = 1f;
     private float _time;
     private float _holdBlend;
@@ -105,13 +127,20 @@ public class PlayerModel
     /// <summary>Smoothed 0..1 running amount driving the larger run-cycle amplitudes.</summary>
     public float RunBlend => _runBlend;
 
+    /// <summary>Smoothed 0..1 airborne amount blending the ground cycle into the jump pose.</summary>
+    public float AirBlend => _airBlend;
+
     /// <summary>
     /// Advances the walk cycle and the mine swing. <paramref name="horizontalSpeed"/> is in
     /// blocks/s (the camera's XZ displacement per second); standing still eases the limbs
     /// back to rest instead of snapping. <paramref name="sprinting"/> selects the larger
-    /// run cycle, and <paramref name="grounded"/> gates it so airtime stays a walk pose.
+    /// run cycle, and <paramref name="grounded"/> gates both it and the jump pose — callers
+    /// pass true while swimming or flying so those stay out of the air pose.
+    /// <paramref name="verticalVelocity"/> in blocks/s shapes the jump: rising tucks the
+    /// knees, falling extends toward landing.
     /// </summary>
-    public void Update(float deltaTime, float horizontalSpeed, bool sprinting = false, bool grounded = true)
+    public void Update(float deltaTime, float horizontalSpeed, bool sprinting = false, bool grounded = true,
+        float verticalVelocity = 0f)
     {
         if (deltaTime <= 0f) return;
         _time += deltaTime;
@@ -120,6 +149,10 @@ public class PlayerModel
         _moveBlend = MathUtils.Damp(_moveBlend, target, MoveBlendRate, deltaTime);
         var runTarget = sprinting && grounded && horizontalSpeed > 0.5f ? 1f : 0f;
         _runBlend = MathUtils.Damp(_runBlend, runTarget, RunBlendRate, deltaTime);
+        _airBlend = MathUtils.Damp(_airBlend, grounded ? 0f : 1f, AirBlendRate, deltaTime);
+        _airRun = MathUtils.Damp(_airRun, sprinting && horizontalSpeed > 0.5f ? 1f : 0f,
+            RunBlendRate, deltaTime);
+        _airVelocity = verticalVelocity;
         _holdBlend = MathUtils.Damp(_holdBlend, HoldingItem ? 1f : 0f, MoveBlendRate, deltaTime);
 
         // Stride rate grows with speed so feet roughly keep up with the ground, plus an
@@ -197,8 +230,43 @@ public class PlayerModel
         var bob = MathF.Abs(MathF.Cos(_walkPhase)) * bobAmp * _moveBlend;
         var torsoPitch = -_moveBlend * MathUtils.Lerp(WalkTorsoPitch, RunTorsoPitch, _runBlend)
             - (_mineT < 1f ? MathF.Sin(MathF.PI * _mineT) * 0.03f : 0f);
-        return new Pose(swing, -swing, leftKnee, rightKnee,
+        var ground = new Pose(swing, -swing, leftKnee, rightKnee,
             leftShoulder, rightShoulder, leftElbow, rightElbow, torsoPitch, bob);
+
+        if (_airBlend <= 0.001f)
+            return ground;
+
+        var rise = MathUtils.Clamp01(_airVelocity / 11f);
+        var fall = MathUtils.Clamp01(-_airVelocity / 12f);
+        var airLeftHip = MathUtils.Lerp(JumpHipFront, SprintJumpHipFront, _airRun)
+            + rise * 0.15f - fall * 0.35f;
+        var airRightHip = MathUtils.Lerp(JumpHipBack, SprintJumpHipBack, _airRun)
+            - rise * 0.1f + fall * 0.35f;
+        var airLeftKnee = Math.Min(MinKneeBend,
+            MathUtils.Lerp(JumpKneeFront, SprintJumpKneeFront, _airRun) - rise * 0.25f + fall * 0.7f);
+        var airRightKnee = Math.Min(MinKneeBend,
+            MathUtils.Lerp(JumpKneeBack, SprintJumpKneeBack, _airRun) - rise * 0.2f + fall * 0.9f);
+        var airLeftShoulder = MathUtils.Lerp(JumpShoulder, SprintJumpShoulderFront, _airRun);
+        var airRightShoulder = MathUtils.Lerp(JumpShoulder, SprintJumpShoulderBack, _airRun)
+            + _holdBlend * HoldShoulder;
+        var airLeftElbow = JumpElbow;
+        var airRightElbow = JumpElbow + _holdBlend * HoldElbow;
+        var airTorso = -MathUtils.Lerp(JumpTorso, SprintJumpTorso, _airRun);
+        var air = new Pose(airLeftHip, airRightHip, airLeftKnee, airRightKnee,
+            airLeftShoulder, airRightShoulder, airLeftElbow, airRightElbow, airTorso, 0f);
+
+        var t = _airBlend;
+        return new Pose(
+            MathUtils.Lerp(ground.LeftHip, air.LeftHip, t),
+            MathUtils.Lerp(ground.RightHip, air.RightHip, t),
+            MathUtils.Lerp(ground.LeftKnee, air.LeftKnee, t),
+            MathUtils.Lerp(ground.RightKnee, air.RightKnee, t),
+            MathUtils.Lerp(ground.LeftShoulder, air.LeftShoulder, t),
+            MathUtils.Lerp(ground.RightShoulder, air.RightShoulder, t),
+            MathUtils.Lerp(ground.LeftElbow, air.LeftElbow, t),
+            MathUtils.Lerp(ground.RightElbow, air.RightElbow, t),
+            MathUtils.Lerp(ground.TorsoPitch, air.TorsoPitch, t),
+            MathUtils.Lerp(ground.Bob, 0f, t));
     }
 
     /// <summary>
