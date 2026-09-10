@@ -114,6 +114,14 @@ public sealed record BlockType
     /// <summary>Which geometry emitter turns this block into chunk vertices.</summary>
     public BlockRenderer Renderer { get; init; } = BlockRenderer.Model;
 
+    /// <summary>
+    /// How many units of this block stack in one cell, candle-style (pebbles hold up to 3);
+    /// 0 for an ordinary single-state block. The count lives in the chunk's state byte, where
+    /// 0 means "untouched worldgen" (the generator's own default) and 1..StackMax is an
+    /// explicit player-built pile. Never set on fluids (their state holds levels instead).
+    /// </summary>
+    public byte StackMax { get; init; }
+
     /// <summary>Wood taper step, or -1 for anything that is not wood.</summary>
     public int WoodTaperLevel { get; init; } = -1;
 

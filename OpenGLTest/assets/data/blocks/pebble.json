@@ -8,6 +8,7 @@
   "light": { "passes": true },
   "hasItem": false,
   "needsSupport": true,
+  "stackMax": 3,
   "loot": "pebble",
   "hitbox": { "min": [0, 0, 0], "max": [1, 0.25, 1] }
 }

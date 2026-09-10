@@ -56,6 +56,12 @@ public sealed class ItemType
     /// <summary>Fluid block id the use picks up or places; 0 when the item declares no use.</summary>
     public byte UseFluidId { get; internal init; }
 
+    /// <summary>
+    /// Stackable block id a <see cref="ItemUseAction.PlaceStack"/> use builds up (flint grows
+    /// pebble piles); 0 for every other action.
+    /// </summary>
+    public byte UseBlockId { get; internal init; }
+
     /// <summary>Cells across the spritesheet texture; 1 for a plain sprite.</summary>
     public int SpriteCols { get; internal init; } = 1;
 

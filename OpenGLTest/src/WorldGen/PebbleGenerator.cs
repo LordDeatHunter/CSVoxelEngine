@@ -47,6 +47,14 @@ public static class PebbleGenerator
     /// <summary>Visible stones in the cell at (x, z): 1-3. Also the flint yield on mining.</summary>
     public static int CountAt(int x, int z) => 1 + (int)(UnitHash(x, z, CountSalt) * 3f);
 
+    /// <summary>
+    /// Stones rendered (and flints dropped) for a pebble cell carrying this state byte: an
+    /// explicit player-built pile (1..<paramref name="max"/>) reads back directly, while 0 —
+    /// untouched worldgen, which never writes state — keeps the position-hash default above.
+    /// </summary>
+    public static int CountWithState(int x, int z, byte state, int max) =>
+        state >= 1 && state <= max ? state : CountAt(x, z);
+
     /// <summary>Layout rotation (0-3 quarter turns) so same-count neighbours don't look identical.</summary>
     public static int VariantAt(int x, int z) => (int)(UnitHash(x, z, VariantSalt) * 4f);
 

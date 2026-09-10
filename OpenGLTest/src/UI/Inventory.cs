@@ -100,7 +100,10 @@ public class Inventory
         if (BlockType.ById[id] is { } block)
             return block is { HasItem: true, Fluid: false } ? InventoryCategory.Blocks : null;
         if (ItemType.IsItem(id))
-            return ItemType.Types[id].UseAction != ItemUseAction.None
+            // Tools are the items that morph on use (a bucket becomes its full form, and back):
+            // each instance is tracked on its own. A use with no result spends from its stack
+            // instead (flint grounds rock piles), so those stay plain Misc pickups.
+            return ItemType.Types[id].UseResultId != 0
                 ? InventoryCategory.Tools
                 : InventoryCategory.Misc;
         return null;

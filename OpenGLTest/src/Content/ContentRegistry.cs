@@ -274,8 +274,9 @@ public static class ContentRegistry
                 null => ItemUseAction.None,
                 "pickup_fluid" => ItemUseAction.PickupFluid,
                 "place_fluid" => ItemUseAction.PlaceFluid,
+                "place_stack" => ItemUseAction.PlaceStack,
                 _ => throw new InvalidOperationException(
-                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid or place_fluid."),
+                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid or place_stack."),
             };
 
             var id = ItemIds[name];
@@ -286,6 +287,7 @@ public static class ContentRegistry
                 UseAction = action,
                 UseResultId = ResolveUseTarget(use?.Result, "use.result", path),
                 UseFluidId = ResolveUseTarget(use?.Fluid, "use.fluid", path),
+                UseBlockId = ResolveUseTarget(use?.Block, "use.block", path),
                 SpriteCols = sheet.Cols,
                 SpriteRows = sheet.Rows,
                 FrameCount = sheet.Frames,
@@ -389,8 +391,10 @@ public static class ContentRegistry
 
     /// <summary>
     /// Checks each item's declared use against the finished tables: a fluid action needs a real
-    /// fluid block to work on and an item to turn into (the hotbar swaps one for the other).
-    /// Runs after <see cref="LoadBlocks"/>, which is when the fluid flags first exist.
+    /// fluid block to work on and an item to turn into (the hotbar swaps one for the other),
+    /// while a stack action needs a real stackable block and no result (it spends from its
+    /// own stack instead of morphing, so it stays a plain pickup).
+    /// Runs after <see cref="LoadBlocks"/>, which is when the fluid and stack flags first exist.
     /// </summary>
     private static void ValidateItemUses(List<(string Name, string Path)> files)
     {
@@ -398,6 +402,31 @@ public static class ContentRegistry
         {
             var item = ItemType.Types[ItemIds[name]];
             if (item.UseAction == ItemUseAction.None) continue;
+
+            if (item.UseAction == ItemUseAction.PlaceStack)
+            {
+                var target = BlockType.ById[item.UseBlockId];
+                if (target == null)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'place_stack' but its use.block is not a block.");
+                if (target.Fluid)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'place_stack' but '{target.Name}' is a fluid, whose state byte holds levels.");
+                if (target.StackMax < 2)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'place_stack' but block '{target.Name}' sets no stackMax.");
+                if (item.UseResultId != 0)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'place_stack' with a use.result: a stack action spends from its stack, it never morphs.");
+                if (item.UseFluidId != 0)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'place_stack' with a use.fluid: that field belongs to the bucket actions.");
+                continue;
+            }
+
+            if (item.UseBlockId != 0)
+                throw new InvalidOperationException(
+                    $"Item '{path}' has use.action '{item.UseAction}' with a use.block: that field belongs to place_stack.");
 
             if (!BlockType.IsFluid(item.UseFluidId))
                 throw new InvalidOperationException(
@@ -519,6 +548,16 @@ public static class ContentRegistry
             if (fluid && falls)
                 throw new InvalidOperationException(
                     $"Block '{path}' sets both fluid and falls: a fluid cell has no block to topple.");
+            var stackMax = definition.StackMax ?? 0;
+            if (definition.StackMax.HasValue && (stackMax < 2 || stackMax > 8))
+                throw new InvalidOperationException(
+                    $"Block '{path}' has stackMax {stackMax}; expected 2..8.");
+            if (stackMax >= 2 && fluid)
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets stackMax on a fluid: the state byte already holds its levels.");
+            if (stackMax >= 2 && falls)
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets stackMax with falls: a toppled pile would lose its count.");
             var needsSupport = !fluid && (definition.NeedsSupport ?? false);
             if (falls && needsSupport)
                 throw new InvalidOperationException(
@@ -537,6 +576,7 @@ public static class ContentRegistry
                 Sway = definition.Sway ?? false,
                 LightEmission = emission,
                 Renderer = renderer,
+                StackMax = (byte)stackMax,
                 WoodTaperLevel = taperLevel,
                 HalfWidth = definition.Wood == null ? -1f : definition.Wood.HalfWidth ?? 0.5f,
                 HasItem = !fluid && (definition.HasItem ?? true),

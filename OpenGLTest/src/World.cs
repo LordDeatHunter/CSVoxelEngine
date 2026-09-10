@@ -378,8 +378,10 @@ public class World
 
         if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk)) return;
 
-        // Read the id before the block goes away, so the drop knows what it is
+        // Read the id and state before the block goes away, so the drop knows what it is
+        // (a player-built rock pile drops its own count, not the worldgen hash)
         var brokenId = BlockIdAt(blockPos);
+        var brokenState = _chunkManager.GetStateGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
 
         // Water is not mineable: only a bucket takes it out (and its hardness of 0 would
         // otherwise pop it on first contact)
@@ -402,7 +404,8 @@ public class World
         else if (chunk.RemoveBlockAt(blockPos, _chunkManager))
         {
             if (!creative)
-                _dropManager.SpawnLoot(brokenId, blockPos);
+                _dropManager.SpawnLoot(brokenId, blockPos,
+                    DropManager.PileCount(brokenId, (int)blockPos.X, (int)blockPos.Z, brokenState));
         }
 
         // Water beside or above the hole pours into it on the next fluid tick
@@ -668,6 +671,39 @@ public class World
 
                 return _fluidManager.SetCellImmediate(target, item.UseFluidId, FluidState.Source, _chunkManager);
             }
+            case ItemUseAction.PlaceStack:
+            {
+                // Flint on stone: the raycast still targets the pebble cell itself (non-solid
+                // blocks are hittable), so a hit on the pile augments it while a hit beside it
+                // grounds a fresh pile of one, up to the block's stackMax.
+                if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out var hitNormal))
+                    return false;
+
+                var pile = BlockType.ById[item.UseBlockId];
+                if (pile == null || pile.StackMax < 2) return false;
+
+                var hx = (int)hit.X;
+                var hy = (int)hit.Y;
+                var hz = (int)hit.Z;
+                if (_chunkManager.TryGetCell(hx, hy, hz, out var hitId, out var hitState)
+                    && hitId == item.UseBlockId)
+                {
+                    var count = PebbleGenerator.CountWithState(hx, hz, hitState, pile.StackMax);
+                    if (count < pile.StackMax)
+                    {
+                        var pileChunk = _chunkManager.ChunkAt(hx, hy, hz);
+                        if (pileChunk == null) return false;
+                        if (!pileChunk.SetStateAt(hit, (byte)(count + 1), _chunkManager)) return false;
+                        if (!Camera.IsCreative) Inventory.ConsumeSelected();
+                        return true;
+                    }
+                    // A full pile falls through to a fresh placement against its face.
+                }
+
+                if (!PlaceBlockAtFace(hit, hitNormal, item.UseBlockId, state: 1)) return false;
+                if (!Camera.IsCreative) Inventory.ConsumeSelected();
+                return true;
+            }
             default:
                 return false;
         }
@@ -695,6 +731,24 @@ public class World
         if (!Camera.Raycast(maxDistance, _chunkManager, out var hitPos, out var hitNormal))
             return false;
 
+        if (!PlaceBlockAtFace(hitPos, hitNormal, blockId, state: 0)) return false;
+
+        // Sand placed into thin air falls at once instead of hovering (stackable piles never
+        // fall — the registry forbids the combination — so only the block path topples)
+        var placePos = hitPos + hitNormal;
+        _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
+            (int)placePos.X, (int)placePos.Y, (int)placePos.Z);
+        return true;
+    }
+
+    /// <summary>
+    /// Guards and grounds one block against a raycast hit face: live cubes and the player's
+    /// body refuse solid entries, fragile blocks need solid ground, and a placement into
+    /// water displaces it. <paramref name="state"/> rides into the state byte (a fresh rock
+    /// pile starts at 1). Returns whether one was placed, without spending anything.
+    /// </summary>
+    private bool PlaceBlockAtFace(Vector3 hitPos, Vector3 hitNormal, byte blockId, byte state)
+    {
         var placePos = hitPos + hitNormal;
         var chunkPos = new Vector3(
             MathF.Floor(placePos.X / Chunk.Size),
@@ -723,14 +777,10 @@ public class World
             if (!BlockType.IsSolid(BlockIdAt(below))) return false;
         }
 
-        if (!chunk.PlaceBlockAt(placePos, blockId, _chunkManager)) return false;
+        if (!chunk.PlaceBlockAt(placePos, blockId, _chunkManager, state)) return false;
 
         // A block placed into water displaces it, so the neighbours recompute their levels
         _fluidManager.ScheduleAround(placePos);
-
-        // Sand placed into thin air falls at once instead of hovering
-        _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
-            (int)placePos.X, (int)placePos.Y, (int)placePos.Z);
         return true;
     }
     

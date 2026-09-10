@@ -64,7 +64,7 @@ public sealed class ItemDefinition
     /// <summary>The <c>use</c> object: the action plus the block and item it works with.</summary>
     public sealed class UseDefinition
     {
-        /// <summary><c>pickup_fluid</c> or <c>place_fluid</c>.</summary>
+        /// <summary><c>pickup_fluid</c>, <c>place_fluid</c> or <c>place_stack</c>.</summary>
         public string? Action { get; set; }
 
         /// <summary>Item the use swaps this one for, e.g. <c>item/water_bucket</c>.</summary>
@@ -72,5 +72,12 @@ public sealed class ItemDefinition
 
         /// <summary>Fluid block the action picks up or places, e.g. <c>block/water</c>.</summary>
         public string? Fluid { get; set; }
+
+        /// <summary>
+        /// Stackable block a <c>place_stack</c> action builds up, e.g. <c>block/pebble</c>
+        /// for flint. Right-clicking the block adds one unit, right-clicking anything else
+        /// grounds a fresh pile of one.
+        /// </summary>
+        public string? Block { get; set; }
     }
 }

@@ -526,11 +526,12 @@ public class FluidManager
             }
         }
 
-        if (!chunks.TryGetCell(x, y, z, out var previous, out _)) return;
+        if (!chunks.TryGetCell(x, y, z, out var previous, out var previousState)) return;
 
         if (previous != 0)
         {
-            drops.SpawnLoot(previous, new Vector3(x, y, z));
+            drops.SpawnLoot(previous, new Vector3(x, y, z),
+                DropManager.PileCount(previous, x, z, previousState));
             chunks.UnmarkPlayerPlaced(x, y, z);
         }
 

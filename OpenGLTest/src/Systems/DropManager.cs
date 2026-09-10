@@ -74,17 +74,29 @@ public class DropManager
     /// <summary>
     /// Rolls a destroyed block's loot and drops every rolled id at the centre of the cell the
     /// block occupied. The cell doubles as the loot context, so position-dependent rolls (the
-    /// pebble's flint count) see where the block stood.
+    /// pebble's flint count) see where the block stood. <paramref name="count"/> carries an
+    /// explicit pile size for a player-built stack (see <see cref="PileCount"/>); 0 derives it.
     /// </summary>
-    public void SpawnLoot(byte blockId, Vector3 blockPosition)
+    public void SpawnLoot(byte blockId, Vector3 blockPosition, int count = 0)
     {
         _loot.Clear();
         RollLoot(blockId,
-            new LootContext((int)blockPosition.X, (int)blockPosition.Y, (int)blockPosition.Z),
+            new LootContext((int)blockPosition.X, (int)blockPosition.Y, (int)blockPosition.Z, count),
             _loot);
 
         foreach (var id in _loot)
             Spawn(id, blockPosition);
+    }
+
+    /// <summary>
+    /// Explicit loot count for a destroyed stackable block: its state byte when it holds a
+    /// player-built pile, else 0 meaning "derive from the world". Callers must read the state
+    /// before the block is cleared, and pass 0 straight through for ordinary blocks.
+    /// </summary>
+    public static int PileCount(byte blockId, int x, int z, byte state)
+    {
+        var max = BlockType.ById[blockId]?.StackMax ?? 0;
+        return max >= 2 && state >= 1 && state <= max ? state : 0;
     }
 
     /// <summary>

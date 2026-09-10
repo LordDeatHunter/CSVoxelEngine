@@ -88,6 +88,9 @@ public class TntManager
                 MathF.Floor(z / (float)Chunk.Size));
             if (!chunks.Chunks.TryGetValue(chunkPos, out var chunk)) continue;
 
+            // The blast clears the state byte with the block, so a player-built pile's
+            // count is read first or its loot falls back to the worldgen hash.
+            var removedState = chunks.GetStateGlobal(x, y, z);
             var removed = chunk.ClearBlockAt(new Vector3(x, y, z));
             if (removed == 0) continue;
 
@@ -114,7 +117,8 @@ public class TntManager
             else
             {
                 // Same loot a mined block would leave (stone drops cobblestone)
-                drops.SpawnLoot(removed, new Vector3(x, y, z));
+                drops.SpawnLoot(removed, new Vector3(x, y, z),
+                    DropManager.PileCount(removed, x, z, removedState));
             }
 
             // The cell is air now either way, so the buried LOD must duck below it
@@ -147,10 +151,12 @@ public class TntManager
                     MathF.Floor(y / (float)Chunk.Size),
                     MathF.Floor(z / (float)Chunk.Size));
                 if (!chunks.Chunks.TryGetValue(pebbleChunkPos, out var pebbleChunk)) continue;
+                var standingState = chunks.GetStateGlobal(x, y, z);
                 if (pebbleChunk.ClearBlockAt(new Vector3(x, y, z)) == 0) continue;
                 touchedChunks.Add(pebbleChunkPos);
 
-                drops.SpawnLoot(standing, new Vector3(x, y, z));
+                drops.SpawnLoot(standing, new Vector3(x, y, z),
+                    DropManager.PileCount(standing, x, z, standingState));
             }
         }
 

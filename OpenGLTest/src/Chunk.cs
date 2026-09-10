@@ -706,8 +706,10 @@ public class Chunk : IDisposable
     /// <summary>
     /// Fills a block. Returns false if the cell is outside this chunk or already occupied, so
     /// callers can avoid spending an item on a placement that never happened.
+    /// <paramref name="state"/> rides along into the state byte (a freshly grounded rock pile
+    /// starts at 1); 0 clears it, which is what every ordinary placement wants.
     /// </summary>
-    public bool PlaceBlockAt(Vector3 worldPos, byte blockId, ChunkManager chunkManager)
+    public bool PlaceBlockAt(Vector3 worldPos, byte blockId, ChunkManager chunkManager, byte state = 0)
     {
         var localX = (int)(worldPos.X - Position.X * Size);
         var localY = (int)(worldPos.Y - Position.Y * Size);
@@ -719,9 +721,31 @@ public class Chunk : IDisposable
         var existing = _blocks[Idx(localX, localY, localZ)];
         if (existing != 0 && !BlockType.IsFluid(existing)) return false;
 
-        _blocks[Idx(localX, localY, localZ)] = blockId;
-        if (existing == 0) _solidCount++;
-        ClearState(Idx(localX, localY, localZ));
+        // One write does id, count and state together: SetBlockRaw moves _solidCount only
+        // on air <-> non-air transitions, so displacing water keeps the count.
+        SetBlockRaw(localX, localY, localZ, blockId, state);
+
+        chunkManager.MarkPlayerPlaced((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
+        chunkManager.ImmediateRemesh(Position);
+        MarkNeighborsDirty(worldPos, chunkManager);
+        return true;
+    }
+
+    /// <summary>
+    /// Rewrites one cell's state byte with no id change — a rock pile growing by one — and
+    /// remeshes like a placement so the new stone shows at once. Returns false outside this
+    /// chunk or on air.
+    /// </summary>
+    public bool SetStateAt(Vector3 worldPos, byte state, ChunkManager chunkManager)
+    {
+        var localX = (int)(worldPos.X - Position.X * Size);
+        var localY = (int)(worldPos.Y - Position.Y * Size);
+        var localZ = (int)(worldPos.Z - Position.Z * Size);
+
+        if (!InBounds(localX, localY, localZ)) return false;
+        var i = Idx(localX, localY, localZ);
+        if (_blocks[i] == 0) return false;
+        SetBlockRaw(localX, localY, localZ, _blocks[i], state);
 
         chunkManager.MarkPlayerPlaced((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
         chunkManager.ImmediateRemesh(Position);
@@ -1021,7 +1045,7 @@ public class Chunk : IDisposable
             // Pebbles render as 1-3 ankle-high boxes sharing the cell; see EmitPebbles
             if (type.Renderer == BlockRenderer.Pebbles)
             {
-                EmitPebbles(vertices, indices, ref indexOffset, padded, pIdx, sunLight, blockLight,
+                EmitPebbles(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
                     x, y, z, type, basePos);
                 continue;
             }
@@ -1646,12 +1670,13 @@ public class Chunk : IDisposable
     /// the ground's top face, which still draws because pebbles never occlude.
     /// </summary>
     private void EmitPebbles(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        byte[] padded, int pIdx, byte[] sunLight, byte[] blockLight,
+        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
         int x, int y, int z, BlockType type, Vector3 basePos)
     {
         var worldX = (int)Position.X * Size + x;
         var worldZ = (int)Position.Z * Size + z;
-        var count = PebbleGenerator.CountAt(worldX, worldZ);
+        var maxCount = type.StackMax >= 2 ? type.StackMax : 3;
+        var count = PebbleGenerator.CountWithState(worldX, worldZ, paddedState[pIdx], maxCount);
         var variant = PebbleGenerator.VariantAt(worldX, worldZ);
 
         Span<float> sunF = stackalloc float[6];

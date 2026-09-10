@@ -74,7 +74,9 @@ public sealed class LootTable
 
         public int Rolls(LootContext context) => Provider switch
         {
-            RollProvider.PebbleCount => PebbleGenerator.CountAt(context.X, context.Z),
+            RollProvider.PebbleCount => context.Count > 0
+                ? context.Count
+                : PebbleGenerator.CountAt(context.X, context.Z),
             _ => RollRange.Sample(),
         };
 

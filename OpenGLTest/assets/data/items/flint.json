@@ -1,1 +1,2 @@
-{ "name": "flint", "texture": "assets/textures/items/flint.png" }
+{ "name": "Flint", "texture": "assets/textures/items/flint.png",
+  "use": { "action": "place_stack", "block": "block/pebble" } }
