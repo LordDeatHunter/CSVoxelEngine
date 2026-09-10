@@ -115,7 +115,8 @@ public sealed record BlockType
     public BlockRenderer Renderer { get; init; } = BlockRenderer.Model;
 
     /// <summary>
-    /// How many units of this block stack in one cell, candle-style (pebbles hold up to 3);
+    /// How many units of this block stack in one cell, candle-style (pebbles hold up to 3,
+    /// branch piles up to 4);
     /// 0 for an ordinary single-state block. The count lives in the chunk's state byte, where
     /// 0 means "untouched worldgen" (the generator's own default) and 1..StackMax is an
     /// explicit player-built pile. Never set on fluids (their state holds levels instead).

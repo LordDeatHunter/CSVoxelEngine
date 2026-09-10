@@ -139,6 +139,16 @@ public sealed class ContentTests
     }
 
     [Fact]
+    public void BranchPileHitboxCoversMaxPileHeight()
+    {
+        var pile = ContentRegistry.RequireBlock("branch_pile");
+        var box = Assert.Single(pile.Hitboxes);
+        Assert.Equal(Vector3.Zero, box.Min);
+        Assert.Equal(new Vector3(1f, 0.5f, 1f), box.Max);
+        Assert.True(box.Max.Y >= BranchPileGenerator.PileTop(pile.StackMax));
+    }
+
+    [Fact]
     public void TaperedWoodHitboxFollowsHalfWidth()
     {
         var twig = Assert.Single(ContentRegistry.RequireBlock("twig").Hitboxes);

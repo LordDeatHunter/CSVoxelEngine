@@ -504,9 +504,10 @@ public static class ContentRegistry
                 null or "model" => BlockRenderer.Model,
                 "tapered_wood" => BlockRenderer.TaperedWood,
                 "pebbles" => BlockRenderer.Pebbles,
+                "branch_pile" => BlockRenderer.BranchPile,
                 "fluid" => BlockRenderer.Fluid,
                 _ => throw new InvalidOperationException(
-                    $"Block '{path}' has unknown renderer '{definition.Renderer}'; expected model, tapered_wood, pebbles or fluid."),
+                    $"Block '{path}' has unknown renderer '{definition.Renderer}'; expected model, tapered_wood, pebbles, branch_pile or fluid."),
             };
 
             var onBreak = definition.OnBreak switch
@@ -865,6 +866,7 @@ public static class ContentRegistry
             pool.Provider = providerName switch
             {
                 "pebble_count" => LootTable.RollProvider.PebbleCount,
+                "pile_count" => LootTable.RollProvider.PileCount,
                 _ => throw new InvalidOperationException(
                     $"Loot table '{path}' uses unknown roll provider '{providerName}'."),
             };

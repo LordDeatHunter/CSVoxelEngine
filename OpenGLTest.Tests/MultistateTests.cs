@@ -6,8 +6,9 @@ namespace silkgltriangle.Tests;
 
 /// <summary>
 /// Multi-state blocks (candle-style piles): flint grounds and grows pebble piles of 1-3,
-/// with the count riding the chunk state byte. Worldgen piles never write state (0 keeps the
-/// position-hash default); player piles store 1..max explicitly.
+/// branches ground and grow crossed-stick piles of 1-4, with the count riding the chunk
+/// state byte. Worldgen pebble piles never write state (0 keeps the position-hash default);
+/// player piles store 1..max explicitly, and a bare branch pile reads as one stick.
 /// </summary>
 public sealed class MultistateTests
 {
@@ -15,6 +16,8 @@ public sealed class MultistateTests
 
     private static byte Pebble => ContentRegistry.RequireBlock("pebble").Id;
     private static byte Flint => ContentRegistry.RequireItem("flint").Id;
+    private static byte BranchPile => ContentRegistry.RequireBlock("branch_pile").Id;
+    private static byte Branch => ContentRegistry.RequireItem("branch").Id;
 
     [Fact]
     public void PebbleIsAThreeStateStackableBlock()
@@ -116,5 +119,81 @@ public sealed class MultistateTests
         var mesh = center.GenerateMeshData(manager, greedy: false);
         Assert.NotNull(mesh);
         Assert.Equal(20 * expected, mesh.Vertices.Count);
+    }
+
+    [Fact]
+    public void BranchPileIsAFourStateStackableBlock()
+    {
+        var pile = BlockType.ById[BranchPile]!;
+        Assert.Equal(4, pile.StackMax);
+        Assert.Equal(BlockRenderer.BranchPile, pile.Renderer);
+        Assert.False(BlockType.IsGreedy(BranchPile));
+    }
+
+    [Fact]
+    public void BranchSpendsFromItsStackToBuildBranchPiles()
+    {
+        var branch = ItemType.Types[Branch];
+        Assert.Equal(ItemUseAction.PlaceStack, branch.UseAction);
+        Assert.Equal(BranchPile, branch.UseBlockId);
+        Assert.Equal(0, branch.UseResultId);
+    }
+
+    [Fact]
+    public void BranchPileStateReadsBackDirectly()
+    {
+        var pile = BlockType.ById[BranchPile]!;
+        for (byte state = 1; state <= pile.StackMax; state++)
+            Assert.Equal(state, BranchPileGenerator.CountWithState(state, pile.StackMax));
+        Assert.Equal(1, BranchPileGenerator.CountWithState(0, pile.StackMax));
+    }
+
+    [Fact]
+    public void BranchPileLootDropsTheExplicitPile()
+    {
+        var table = ContentRegistry.LootTableFor("branch_pile");
+        Assert.NotNull(table);
+
+        var into = new List<byte>();
+        table.Roll(new LootContext(8, 0, 8, Count: 3), into);
+        Assert.Equal([Branch, Branch, Branch], into);
+
+        into.Clear();
+        table.Roll(new LootContext(8, 0, 8), into);
+        Assert.Equal([Branch], into);
+    }
+
+    [Fact]
+    public void PileCountPassesBranchPileStatesThrough()
+    {
+        Assert.Equal(0, DropManager.PileCount(BranchPile, 8, 8, 0));
+        Assert.Equal(4, DropManager.PileCount(BranchPile, 8, 8, 4));
+    }
+
+    [Fact]
+    public void BranchPileMeshGrowsOneStickPerState()
+    {
+        // One stick is five emitted faces (the bottom is skipped): 20 verts, 30 indices.
+        foreach (var state in new byte[] { 1, 2, 3, 4 })
+        {
+            var (manager, center) = MeshTestWorld.WalledArea();
+            center.SetBlockRaw(8, 8, 8, BranchPile, state);
+
+            var mesh = center.GenerateMeshData(manager, greedy: false);
+            Assert.NotNull(mesh);
+            Assert.Equal(20 * state, mesh.Vertices.Count);
+            Assert.Equal(30 * state, mesh.Indices.Count);
+        }
+    }
+
+    [Fact]
+    public void BareBranchPileMeshDefaultsToOneStick()
+    {
+        var (manager, center) = MeshTestWorld.WalledArea();
+        center.SetBlockRaw(8, 8, 8, BranchPile, 0);
+
+        var mesh = center.GenerateMeshData(manager, greedy: false);
+        Assert.NotNull(mesh);
+        Assert.Equal(20, mesh.Vertices.Count);
     }
 }

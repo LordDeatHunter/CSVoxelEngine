@@ -1,1 +1,2 @@
-{ "name": "branch", "texture": "assets/textures/items/branch.png" }
+{ "name": "branch", "texture": "assets/textures/items/branch.png",
+  "use": { "action": "place_stack", "block": "block/branch_pile" } }

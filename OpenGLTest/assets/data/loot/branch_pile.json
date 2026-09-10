@@ -1,0 +1,8 @@
+{
+  "pools": [
+    {
+      "rolls": { "provider": "pile_count" },
+      "entries": [ { "item": "item/branch" } ]
+    }
+  ]
+}

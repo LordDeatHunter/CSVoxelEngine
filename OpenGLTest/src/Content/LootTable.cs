@@ -54,6 +54,7 @@ public sealed class LootTable
     {
         Fixed,
         PebbleCount,
+        PileCount,
     }
 
     internal sealed class Entry
@@ -77,6 +78,8 @@ public sealed class LootTable
             RollProvider.PebbleCount => context.Count > 0
                 ? context.Count
                 : PebbleGenerator.CountAt(context.X, context.Z),
+            // Player-only piles never read the world: a bare block is one unit.
+            RollProvider.PileCount => context.Count > 0 ? context.Count : 1,
             _ => RollRange.Sample(),
         };
 

@@ -992,9 +992,9 @@ public class Chunk : IDisposable
     /// Turns the padded block snapshot into vertices. Plain full cubes (<see cref="BlockType.IsGreedy"/>)
     /// go through the binary greedy pass first (<see cref="EmitGreedyFaces"/>), which merges
     /// identical neighbouring faces into one quad. The per-voxel loop then handles the rest: each
-    /// block picks an emitter from its <see cref="BlockType.Renderer"/> — the two procedural ones
-    /// (tapered wood, pebbles) build their geometry from tiles, everything else replays its baked
-    /// model's quads.
+    /// block picks an emitter from its <see cref="BlockType.Renderer"/> — the procedural ones
+    /// (tapered wood, pebbles, branch piles) build their geometry from tiles, everything else
+    /// replays its baked model's quads.
     /// </summary>
     private ChunkMeshData GenerateMeshDataFromSnapshot(byte[] padded, byte[] paddedState,
         byte[] sunLight, byte[] blockLight, MeshBufferPool pool, bool greedy)
@@ -1046,6 +1046,14 @@ public class Chunk : IDisposable
             if (type.Renderer == BlockRenderer.Pebbles)
             {
                 EmitPebbles(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
+                    x, y, z, type, basePos);
+                continue;
+            }
+
+            // Branch piles render as 1-4 crossed sticks sharing the cell; see EmitBranchPile
+            if (type.Renderer == BlockRenderer.BranchPile)
+            {
+                EmitBranchPile(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
                     x, y, z, type, basePos);
                 continue;
             }
@@ -1708,6 +1716,63 @@ public class Chunk : IDisposable
             {
                 if (face == 5) continue;
                 var tile = face == 4 ? type.Top : type.Side;
+                BoxFaceCorners(min, max, face, out var p0, out var p1, out var p2, out var p3);
+                var normal = CubeFaces[face].normal;
+                EmitQuad(vertices, indices, ref indexOffset, basePos,
+                    SpinY(p0, cx, cz, cos, sin), SpinY(p1, cx, cz, cos, sin),
+                    SpinY(p2, cx, cz, cos, sin), SpinY(p3, cx, cz, cos, sin),
+                    SpinY(normal, 0f, 0f, cos, sin),
+                    CropUv(face, p0), CropUv(face, p1), CropUv(face, p2), CropUv(face, p3), tile,
+                    ShadeLut[(face << 2) | 3], sunF[face], blockF[face]);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Emits the 1-4 crossed sticks sharing a branch-pile cell: long thin logs laid across
+    /// each other campfire-style (see BranchPileGenerator), bark on the long faces and the
+    /// log-top rings on the cut ends, each spun about Y by its pile yaw. UVs come from the
+    /// unrotated corners, so the texture stays put while the geometry spins. The bottom face
+    /// is skipped: the lowest stick sits coplanar on the ground's top face, which still draws
+    /// because branch piles never occlude.
+    /// </summary>
+    private void EmitBranchPile(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+        int x, int y, int z, BlockType type, Vector3 basePos)
+    {
+        var worldX = (int)Position.X * Size + x;
+        var worldZ = (int)Position.Z * Size + z;
+        var maxCount = type.StackMax >= 2 ? type.StackMax : 4;
+        var count = BranchPileGenerator.CountWithState(paddedState[pIdx], maxCount);
+        var variant = BranchPileGenerator.VariantAt(worldX, worldZ);
+
+        Span<float> sunF = stackalloc float[6];
+        Span<float> blockF = stackalloc float[6];
+        var lightBase = LightIdx(x, y, z);
+        for (var i = 0; i < 6; i++)
+        {
+            var lightCell = BlockType.Occludes(padded[pIdx + FaceNeighborDelta[i]])
+                ? lightBase
+                : lightBase + LightFaceDelta[i];
+            sunF[i] = sunLight[lightCell] / 15f;
+            blockF[i] = blockLight[lightCell] / 15f;
+        }
+
+        for (var b = 0; b < count; b++)
+        {
+            BranchPileGenerator.GetCenter(worldX, worldZ, variant, b, out var cx, out var cz);
+            var half = BranchPileGenerator.LengthAt(worldX, worldZ, b) * 0.5f;
+            var halfThick = BranchPileGenerator.Thickness * 0.5f;
+            var yaw = BranchPileGenerator.YawAt(worldX, worldZ, b);
+            var cos = MathF.Cos(yaw);
+            var sin = MathF.Sin(yaw);
+            var y0 = BranchPileGenerator.LayerY(b);
+            var min = new Vector3(cx - half, y0, cz - halfThick);
+            var max = new Vector3(cx + half, y0 + BranchPileGenerator.Thickness, cz + halfThick);
+            for (var face = 0; face < 6; face++)
+            {
+                if (face == 5) continue;
+                var tile = face is 2 or 3 ? type.Top : type.Side;
                 BoxFaceCorners(min, max, face, out var p0, out var p1, out var p2, out var p3);
                 var normal = CubeFaces[face].normal;
                 EmitQuad(vertices, indices, ref indexOffset, basePos,

@@ -42,14 +42,15 @@ public sealed class BlockDefinition
     /// water behaviour: every tick, full 7-block range, infinite sources, never hardens.</summary>
     public FlowDefinition? Flow { get; set; }
 
-    /// <summary>"model" | "tapered_wood" | "pebbles" | "fluid".</summary>
+    /// <summary>"model" | "tapered_wood" | "pebbles" | "branch_pile" | "fluid".</summary>
     public string? Renderer { get; set; }
 
     /// <summary>
     /// How many units of this block stack in one cell, candle-style (pebble piles hold up to
-    /// 3). The count lives in the chunk's state byte: 0 means "untouched worldgen" (the
+    /// 3, branch piles up to 4). The count lives in the chunk's state byte: 0 means "untouched worldgen" (the
     /// feature's own default, e.g. the pebble position hash) and 1..max is an explicit
-    /// player-built pile. Only legal with <see cref="Renderer"/> <c>"pebbles"</c> for now;
+    /// player-built pile. Only legal with a pile renderer (<c>"pebbles"</c> or
+    /// <c>"branch_pile"</c>) for now;
     /// never combines with <see cref="Fluid"/> or <see cref="Falls"/> (a toppled pile would
     /// have nowhere to keep its count).
     /// </summary>

@@ -1,0 +1,17 @@
+{
+  "model": {
+    "parent": "block/cube_column",
+    "textures": { "end": "log_top", "side": "log_side" }
+  },
+  "hardness": 0,
+  "renderer": "branch_pile",
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "light": { "passes": true },
+  "hasItem": false,
+  "needsSupport": true,
+  "stackMax": 4,
+  "loot": "branch_pile",
+  "hitbox": { "min": [0, 0, 0], "max": [1, 0.5, 1] }
+}

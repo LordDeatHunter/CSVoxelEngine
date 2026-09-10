@@ -382,7 +382,7 @@ public sealed class GreedyMeshingTests
             0, 0, 0, 0, 0, 0, 0, 0,
             Block("stone"), Block("stone"), Block("dirt"), Block("grass"), Block("log"),
             Block("glass"), Block("glass"), Block("leaves"), Block("leaves"), Block("lamp"),
-            Block("pebble"), Block("branch"), water,
+            Block("pebble"), Block("branch_pile"), Block("branch"), water,
         ];
         var rng = new Random(seed);
         // Fill in a fixed order: the dictionary's enumeration order changes per process

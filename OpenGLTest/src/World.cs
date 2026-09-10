@@ -689,9 +689,9 @@ public class World
             }
             case ItemUseAction.PlaceStack:
             {
-                // Flint on stone: the raycast still targets the pebble cell itself (non-solid
-                // blocks are hittable), so a hit on the pile augments it while a hit beside it
-                // grounds a fresh pile of one, up to the block's stackMax.
+                // Flint on stone, branch on ground: the raycast still targets the pile cell
+                // itself (non-solid blocks are hittable), so a hit on the pile augments it
+                // while a hit beside it grounds a fresh pile of one, up to the block's stackMax.
                 if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out var hitNormal))
                     return false;
 
@@ -704,7 +704,11 @@ public class World
                 if (_chunkManager.TryGetCell(hx, hy, hz, out var hitId, out var hitState)
                     && hitId == item.UseBlockId)
                 {
-                    var count = PebbleGenerator.CountWithState(hx, hz, hitState, pile.StackMax);
+                    // Worldgen piles keep their position-hash default (pebbles); player-only
+                    // piles (branch piles) have no default and read a bare block as one.
+                    var count = pile.Renderer == BlockRenderer.BranchPile
+                        ? BranchPileGenerator.CountWithState(hitState, pile.StackMax)
+                        : PebbleGenerator.CountWithState(hx, hz, hitState, pile.StackMax);
                     if (count < pile.StackMax)
                     {
                         var pileChunk = _chunkManager.ChunkAt(hx, hy, hz);
