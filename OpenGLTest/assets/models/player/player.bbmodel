@@ -1,0 +1,1354 @@
+﻿{
+    "meta":  {
+                 "format_version":  "4.0",
+                 "model_format":  "free",
+                 "box_uv":  false
+             },
+    "textures":  [
+                     {
+                         "id":  "0",
+                         "use_as_default":  false,
+                         "namespace":  "",
+                         "group":  "",
+                         "uv_width":  64,
+                         "name":  "skin.png",
+                         "source":  "skin.png",
+                         "height":  64,
+                         "particle":  false,
+                         "sync_to_project":  "skin.png",
+                         "width":  64,
+                         "uv_height":  64,
+                         "path":  "",
+                         "selected":  false,
+                         "folder":  "",
+                         "layers":  {
+                                        "enabled":  false
+                                    }
+                     }
+                 ],
+    "timeline_setups":  [
+
+                        ],
+    "visible_box":  [
+                        1,
+                        1,
+                        0
+                    ],
+    "elements":  [
+                     {
+                         "to":  [
+                                    4,
+                                    22,
+                                    2
+                                ],
+                         "origin":  [
+                                        0,
+                                        12,
+                                        0
+                                    ],
+                         "color":  0,
+                         "render_order":  "default",
+                         "uuid":  "c166b13e-97ac-4e17-86a1-bae259327654",
+                         "name":  "Torso",
+                         "type":  "cube",
+                         "locked":  false,
+                         "from":  [
+                                      -4,
+                                      12,
+                                      -2
+                                  ],
+                         "rescale":  false,
+                         "faces":  {
+                                       "south":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                16,
+                                                                0,
+                                                                32,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "north":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                16,
+                                                                0,
+                                                                32,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "up":  {
+                                                  "texture":  0,
+                                                  "rotation":  0,
+                                                  "uv":  [
+                                                             0,
+                                                             0,
+                                                             16,
+                                                             16
+                                                         ],
+                                                  "enabled":  true
+                                              },
+                                       "west":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               16,
+                                                               0,
+                                                               32,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "down":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               32,
+                                                               0,
+                                                               48,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "east":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               16,
+                                                               0,
+                                                               32,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                }
+                                   },
+                         "allow_mirror_modeling":  true,
+                         "box_uv":  false,
+                         "autouv":  0,
+                         "rotation":  {
+                                          "origin":  [
+                                                         0,
+                                                         12,
+                                                         0
+                                                     ],
+                                          "axis":  "y",
+                                          "angle":  0,
+                                          "rescale":  false
+                                      }
+                     },
+                     {
+                         "to":  [
+                                    3.4,
+                                    28.8,
+                                    3.4
+                                ],
+                         "origin":  [
+                                        0,
+                                        22,
+                                        0
+                                    ],
+                         "color":  0,
+                         "render_order":  "default",
+                         "uuid":  "81b60222-ee58-4f19-9fe1-afc7cbfc0c71",
+                         "name":  "Head",
+                         "type":  "cube",
+                         "locked":  false,
+                         "from":  [
+                                      -3.4,
+                                      22,
+                                      -3.4
+                                  ],
+                         "rescale":  false,
+                         "faces":  {
+                                       "south":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                48,
+                                                                0,
+                                                                64,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "north":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                16,
+                                                                16,
+                                                                32,
+                                                                32
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "up":  {
+                                                  "texture":  0,
+                                                  "rotation":  0,
+                                                  "uv":  [
+                                                             48,
+                                                             0,
+                                                             64,
+                                                             16
+                                                         ],
+                                                  "enabled":  true
+                                              },
+                                       "west":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               48,
+                                                               0,
+                                                               64,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "down":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               0,
+                                                               0,
+                                                               16,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "east":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               48,
+                                                               0,
+                                                               64,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                }
+                                   },
+                         "allow_mirror_modeling":  true,
+                         "box_uv":  false,
+                         "autouv":  0,
+                         "rotation":  {
+                                          "origin":  [
+                                                         0,
+                                                         22,
+                                                         0
+                                                     ],
+                                          "axis":  "y",
+                                          "angle":  0,
+                                          "rescale":  false
+                                      }
+                     },
+                     {
+                         "to":  [
+                                    7.2,
+                                    21.2,
+                                    1.6
+                                ],
+                         "origin":  [
+                                        5.6,
+                                        21.2,
+                                        0
+                                    ],
+                         "color":  0,
+                         "render_order":  "default",
+                         "uuid":  "9cf96d29-6650-4089-8f6c-8d753d257201",
+                         "name":  "UpperArmR",
+                         "type":  "cube",
+                         "locked":  false,
+                         "from":  [
+                                      4,
+                                      15.2,
+                                      -1.6
+                                  ],
+                         "rescale":  false,
+                         "faces":  {
+                                       "south":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                16,
+                                                                0,
+                                                                32,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "north":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                16,
+                                                                0,
+                                                                32,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "up":  {
+                                                  "texture":  0,
+                                                  "rotation":  0,
+                                                  "uv":  [
+                                                             16,
+                                                             0,
+                                                             32,
+                                                             16
+                                                         ],
+                                                  "enabled":  true
+                                              },
+                                       "west":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               16,
+                                                               0,
+                                                               32,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "down":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               16,
+                                                               0,
+                                                               32,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "east":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               16,
+                                                               0,
+                                                               32,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                }
+                                   },
+                         "allow_mirror_modeling":  true,
+                         "box_uv":  false,
+                         "autouv":  0,
+                         "rotation":  {
+                                          "origin":  [
+                                                         5.6,
+                                                         21.2,
+                                                         0
+                                                     ],
+                                          "axis":  "y",
+                                          "angle":  0,
+                                          "rescale":  false
+                                      }
+                     },
+                     {
+                         "to":  [
+                                    7.2,
+                                    15.2,
+                                    1.6
+                                ],
+                         "origin":  [
+                                        5.6,
+                                        15.2,
+                                        0
+                                    ],
+                         "color":  0,
+                         "render_order":  "default",
+                         "uuid":  "b6558c5a-fd38-4e4a-b675-295ede7f161d",
+                         "name":  "ForearmR",
+                         "type":  "cube",
+                         "locked":  false,
+                         "from":  [
+                                      4,
+                                      9.2,
+                                      -1.6
+                                  ],
+                         "rescale":  false,
+                         "faces":  {
+                                       "south":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                0,
+                                                                0,
+                                                                16,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "north":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                0,
+                                                                0,
+                                                                16,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "up":  {
+                                                  "texture":  0,
+                                                  "rotation":  0,
+                                                  "uv":  [
+                                                             16,
+                                                             0,
+                                                             32,
+                                                             16
+                                                         ],
+                                                  "enabled":  true
+                                              },
+                                       "west":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               0,
+                                                               0,
+                                                               16,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "down":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               0,
+                                                               0,
+                                                               16,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "east":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               0,
+                                                               0,
+                                                               16,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                }
+                                   },
+                         "allow_mirror_modeling":  true,
+                         "box_uv":  false,
+                         "autouv":  0,
+                         "rotation":  {
+                                          "origin":  [
+                                                         5.6,
+                                                         15.2,
+                                                         0
+                                                     ],
+                                          "axis":  "y",
+                                          "angle":  0,
+                                          "rescale":  false
+                                      }
+                     },
+                     {
+                         "to":  [
+                                    3.2,
+                                    12,
+                                    1.6
+                                ],
+                         "origin":  [
+                                        1.6,
+                                        12,
+                                        0
+                                    ],
+                         "color":  0,
+                         "render_order":  "default",
+                         "uuid":  "2885255d-447f-45cb-ae0c-0736fdef396c",
+                         "name":  "ThighR",
+                         "type":  "cube",
+                         "locked":  false,
+                         "from":  [
+                                      0,
+                                      6,
+                                      -1.6
+                                  ],
+                         "rescale":  false,
+                         "faces":  {
+                                       "south":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                32,
+                                                                0,
+                                                                48,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "north":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                32,
+                                                                0,
+                                                                48,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "up":  {
+                                                  "texture":  0,
+                                                  "rotation":  0,
+                                                  "uv":  [
+                                                             32,
+                                                             0,
+                                                             48,
+                                                             16
+                                                         ],
+                                                  "enabled":  true
+                                              },
+                                       "west":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               32,
+                                                               0,
+                                                               48,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "down":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               32,
+                                                               0,
+                                                               48,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "east":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               32,
+                                                               0,
+                                                               48,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                }
+                                   },
+                         "allow_mirror_modeling":  true,
+                         "box_uv":  false,
+                         "autouv":  0,
+                         "rotation":  {
+                                          "origin":  [
+                                                         1.6,
+                                                         12,
+                                                         0
+                                                     ],
+                                          "axis":  "y",
+                                          "angle":  0,
+                                          "rescale":  false
+                                      }
+                     },
+                     {
+                         "to":  [
+                                    3.2,
+                                    6,
+                                    1.6
+                                ],
+                         "origin":  [
+                                        1.6,
+                                        6,
+                                        0
+                                    ],
+                         "color":  0,
+                         "render_order":  "default",
+                         "uuid":  "bdc4b75a-2268-4270-b622-312f55668e01",
+                         "name":  "ShinR",
+                         "type":  "cube",
+                         "locked":  false,
+                         "from":  [
+                                      0,
+                                      0,
+                                      -1.6
+                                  ],
+                         "rescale":  false,
+                         "faces":  {
+                                       "south":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                32,
+                                                                0,
+                                                                48,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "north":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                32,
+                                                                0,
+                                                                48,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "up":  {
+                                                  "texture":  0,
+                                                  "rotation":  0,
+                                                  "uv":  [
+                                                             32,
+                                                             0,
+                                                             48,
+                                                             16
+                                                         ],
+                                                  "enabled":  true
+                                              },
+                                       "west":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               32,
+                                                               0,
+                                                               48,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "down":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               0,
+                                                               16,
+                                                               16,
+                                                               32
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "east":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               32,
+                                                               0,
+                                                               48,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                }
+                                   },
+                         "allow_mirror_modeling":  true,
+                         "box_uv":  false,
+                         "autouv":  0,
+                         "rotation":  {
+                                          "origin":  [
+                                                         1.6,
+                                                         6,
+                                                         0
+                                                     ],
+                                          "axis":  "y",
+                                          "angle":  0,
+                                          "rescale":  false
+                                      }
+                     },
+                     {
+                         "to":  [
+                                    -4,
+                                    21.2,
+                                    1.6
+                                ],
+                         "origin":  [
+                                        -5.6,
+                                        21.2,
+                                        0
+                                    ],
+                         "color":  0,
+                         "render_order":  "default",
+                         "uuid":  "823207b5-53d2-4318-a4f1-42ff1a581af2",
+                         "name":  "UpperArmL",
+                         "type":  "cube",
+                         "locked":  false,
+                         "from":  [
+                                      -7.2,
+                                      15.2,
+                                      -1.6
+                                  ],
+                         "rescale":  false,
+                         "faces":  {
+                                       "south":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                16,
+                                                                0,
+                                                                32,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "north":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                16,
+                                                                0,
+                                                                32,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "up":  {
+                                                  "texture":  0,
+                                                  "rotation":  0,
+                                                  "uv":  [
+                                                             16,
+                                                             0,
+                                                             32,
+                                                             16
+                                                         ],
+                                                  "enabled":  true
+                                              },
+                                       "west":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               16,
+                                                               0,
+                                                               32,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "down":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               16,
+                                                               0,
+                                                               32,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "east":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               16,
+                                                               0,
+                                                               32,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                }
+                                   },
+                         "allow_mirror_modeling":  true,
+                         "box_uv":  false,
+                         "autouv":  0,
+                         "rotation":  {
+                                          "origin":  [
+                                                         -5.6,
+                                                         21.2,
+                                                         0
+                                                     ],
+                                          "axis":  "y",
+                                          "angle":  0,
+                                          "rescale":  false
+                                      }
+                     },
+                     {
+                         "to":  [
+                                    -4,
+                                    15.2,
+                                    1.6
+                                ],
+                         "origin":  [
+                                        -5.6,
+                                        15.2,
+                                        0
+                                    ],
+                         "color":  0,
+                         "render_order":  "default",
+                         "uuid":  "fda291e0-c025-4fc4-9295-0de2515c6cb2",
+                         "name":  "ForearmL",
+                         "type":  "cube",
+                         "locked":  false,
+                         "from":  [
+                                      -7.2,
+                                      9.2,
+                                      -1.6
+                                  ],
+                         "rescale":  false,
+                         "faces":  {
+                                       "south":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                0,
+                                                                0,
+                                                                16,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "north":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                0,
+                                                                0,
+                                                                16,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "up":  {
+                                                  "texture":  0,
+                                                  "rotation":  0,
+                                                  "uv":  [
+                                                             16,
+                                                             0,
+                                                             32,
+                                                             16
+                                                         ],
+                                                  "enabled":  true
+                                              },
+                                       "west":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               0,
+                                                               0,
+                                                               16,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "down":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               0,
+                                                               0,
+                                                               16,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "east":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               0,
+                                                               0,
+                                                               16,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                }
+                                   },
+                         "allow_mirror_modeling":  true,
+                         "box_uv":  false,
+                         "autouv":  0,
+                         "rotation":  {
+                                          "origin":  [
+                                                         -5.6,
+                                                         15.2,
+                                                         0
+                                                     ],
+                                          "axis":  "y",
+                                          "angle":  0,
+                                          "rescale":  false
+                                      }
+                     },
+                     {
+                         "to":  [
+                                    0,
+                                    12,
+                                    1.6
+                                ],
+                         "origin":  [
+                                        -1.6,
+                                        12,
+                                        0
+                                    ],
+                         "color":  0,
+                         "render_order":  "default",
+                         "uuid":  "9a7de395-0e42-4602-b9cf-389563af847e",
+                         "name":  "ThighL",
+                         "type":  "cube",
+                         "locked":  false,
+                         "from":  [
+                                      -3.2,
+                                      6,
+                                      -1.6
+                                  ],
+                         "rescale":  false,
+                         "faces":  {
+                                       "south":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                32,
+                                                                0,
+                                                                48,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "north":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                32,
+                                                                0,
+                                                                48,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "up":  {
+                                                  "texture":  0,
+                                                  "rotation":  0,
+                                                  "uv":  [
+                                                             32,
+                                                             0,
+                                                             48,
+                                                             16
+                                                         ],
+                                                  "enabled":  true
+                                              },
+                                       "west":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               32,
+                                                               0,
+                                                               48,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "down":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               32,
+                                                               0,
+                                                               48,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "east":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               32,
+                                                               0,
+                                                               48,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                }
+                                   },
+                         "allow_mirror_modeling":  true,
+                         "box_uv":  false,
+                         "autouv":  0,
+                         "rotation":  {
+                                          "origin":  [
+                                                         -1.6,
+                                                         12,
+                                                         0
+                                                     ],
+                                          "axis":  "y",
+                                          "angle":  0,
+                                          "rescale":  false
+                                      }
+                     },
+                     {
+                         "to":  [
+                                    0,
+                                    6,
+                                    1.6
+                                ],
+                         "origin":  [
+                                        -1.6,
+                                        6,
+                                        0
+                                    ],
+                         "color":  0,
+                         "render_order":  "default",
+                         "uuid":  "14ecb9b7-20fc-4ba8-988c-3215e2958767",
+                         "name":  "ShinL",
+                         "type":  "cube",
+                         "locked":  false,
+                         "from":  [
+                                      -3.2,
+                                      0,
+                                      -1.6
+                                  ],
+                         "rescale":  false,
+                         "faces":  {
+                                       "south":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                32,
+                                                                0,
+                                                                48,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "north":  {
+                                                     "texture":  0,
+                                                     "rotation":  0,
+                                                     "uv":  [
+                                                                32,
+                                                                0,
+                                                                48,
+                                                                16
+                                                            ],
+                                                     "enabled":  true
+                                                 },
+                                       "up":  {
+                                                  "texture":  0,
+                                                  "rotation":  0,
+                                                  "uv":  [
+                                                             32,
+                                                             0,
+                                                             48,
+                                                             16
+                                                         ],
+                                                  "enabled":  true
+                                              },
+                                       "west":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               32,
+                                                               0,
+                                                               48,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "down":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               0,
+                                                               16,
+                                                               16,
+                                                               32
+                                                           ],
+                                                    "enabled":  true
+                                                },
+                                       "east":  {
+                                                    "texture":  0,
+                                                    "rotation":  0,
+                                                    "uv":  [
+                                                               32,
+                                                               0,
+                                                               48,
+                                                               16
+                                                           ],
+                                                    "enabled":  true
+                                                }
+                                   },
+                         "allow_mirror_modeling":  true,
+                         "box_uv":  false,
+                         "autouv":  0,
+                         "rotation":  {
+                                          "origin":  [
+                                                         -1.6,
+                                                         6,
+                                                         0
+                                                     ],
+                                          "axis":  "y",
+                                          "angle":  0,
+                                          "rescale":  false
+                                      }
+                     }
+                 ],
+    "variable_placeholders_buttons":  [
+
+                                      ],
+    "resolution":  {
+                       "height":  64,
+                       "width":  64
+                   },
+    "name":  "player",
+    "model_identifier":  "",
+    "variable_placeholders":  "",
+    "unhandled_root_fields":  {
+
+                              },
+    "outliner":  [
+                     {
+                         "export":  true,
+                         "origin":  [
+                                        0,
+                                        12,
+                                        0
+                                    ],
+                         "mirror_uv":  false,
+                         "autouv":  0,
+                         "name":  "Torso",
+                         "isOpen":  false,
+                         "locked":  false,
+                         "selected":  false,
+                         "shade":  true,
+                         "uuid":  "26352bf1-921d-4e6d-abcc-a3d1fdec797c",
+                         "children":  [
+                                          "c166b13e-97ac-4e17-86a1-bae259327654"
+                                      ],
+                         "visibility":  true,
+                         "rotation":  [
+                                          0,
+                                          0,
+                                          0
+                                      ]
+                     },
+                     {
+                         "export":  true,
+                         "origin":  [
+                                        0,
+                                        22,
+                                        0
+                                    ],
+                         "mirror_uv":  false,
+                         "autouv":  0,
+                         "name":  "Head",
+                         "isOpen":  false,
+                         "locked":  false,
+                         "selected":  false,
+                         "shade":  true,
+                         "uuid":  "7d11d043-9288-4ac2-a716-c8133e04869e",
+                         "children":  [
+                                          "81b60222-ee58-4f19-9fe1-afc7cbfc0c71"
+                                      ],
+                         "visibility":  true,
+                         "rotation":  [
+                                          0,
+                                          0,
+                                          0
+                                      ]
+                     },
+                     {
+                         "export":  true,
+                         "origin":  [
+                                        5.6,
+                                        21.2,
+                                        0
+                                    ],
+                         "mirror_uv":  false,
+                         "autouv":  0,
+                         "name":  "UpperArmR",
+                         "isOpen":  false,
+                         "locked":  false,
+                         "selected":  false,
+                         "shade":  true,
+                         "uuid":  "12fddaa3-1b1d-49c1-ba74-943294c3a9e7",
+                         "children":  [
+                                          "9cf96d29-6650-4089-8f6c-8d753d257201"
+                                      ],
+                         "visibility":  true,
+                         "rotation":  [
+                                          0,
+                                          0,
+                                          0
+                                      ]
+                     },
+                     {
+                         "export":  true,
+                         "origin":  [
+                                        5.6,
+                                        15.2,
+                                        0
+                                    ],
+                         "mirror_uv":  false,
+                         "autouv":  0,
+                         "name":  "ForearmR",
+                         "isOpen":  false,
+                         "locked":  false,
+                         "selected":  false,
+                         "shade":  true,
+                         "uuid":  "c85bc4e7-3fe3-4ade-8948-68c99bfbf148",
+                         "children":  [
+                                          "b6558c5a-fd38-4e4a-b675-295ede7f161d"
+                                      ],
+                         "visibility":  true,
+                         "rotation":  [
+                                          0,
+                                          0,
+                                          0
+                                      ]
+                     },
+                     {
+                         "export":  true,
+                         "origin":  [
+                                        1.6,
+                                        12,
+                                        0
+                                    ],
+                         "mirror_uv":  false,
+                         "autouv":  0,
+                         "name":  "ThighR",
+                         "isOpen":  false,
+                         "locked":  false,
+                         "selected":  false,
+                         "shade":  true,
+                         "uuid":  "292bb82c-f5f5-4f29-8eac-2dce9c7a2039",
+                         "children":  [
+                                          "2885255d-447f-45cb-ae0c-0736fdef396c"
+                                      ],
+                         "visibility":  true,
+                         "rotation":  [
+                                          0,
+                                          0,
+                                          0
+                                      ]
+                     },
+                     {
+                         "export":  true,
+                         "origin":  [
+                                        1.6,
+                                        6,
+                                        0
+                                    ],
+                         "mirror_uv":  false,
+                         "autouv":  0,
+                         "name":  "ShinR",
+                         "isOpen":  false,
+                         "locked":  false,
+                         "selected":  false,
+                         "shade":  true,
+                         "uuid":  "d906e38e-a15a-481b-ab7b-9bdb47cdd52c",
+                         "children":  [
+                                          "bdc4b75a-2268-4270-b622-312f55668e01"
+                                      ],
+                         "visibility":  true,
+                         "rotation":  [
+                                          0,
+                                          0,
+                                          0
+                                      ]
+                     },
+                     {
+                         "export":  true,
+                         "origin":  [
+                                        -5.6,
+                                        21.2,
+                                        0
+                                    ],
+                         "mirror_uv":  false,
+                         "autouv":  0,
+                         "name":  "UpperArmL",
+                         "isOpen":  false,
+                         "locked":  false,
+                         "selected":  false,
+                         "shade":  true,
+                         "uuid":  "0badcde2-23ec-4327-8de6-ae56ea615498",
+                         "children":  [
+                                          "823207b5-53d2-4318-a4f1-42ff1a581af2"
+                                      ],
+                         "visibility":  true,
+                         "rotation":  [
+                                          0,
+                                          0,
+                                          0
+                                      ]
+                     },
+                     {
+                         "export":  true,
+                         "origin":  [
+                                        -5.6,
+                                        15.2,
+                                        0
+                                    ],
+                         "mirror_uv":  false,
+                         "autouv":  0,
+                         "name":  "ForearmL",
+                         "isOpen":  false,
+                         "locked":  false,
+                         "selected":  false,
+                         "shade":  true,
+                         "uuid":  "e56d6783-9edd-466d-ac57-71d92747d091",
+                         "children":  [
+                                          "fda291e0-c025-4fc4-9295-0de2515c6cb2"
+                                      ],
+                         "visibility":  true,
+                         "rotation":  [
+                                          0,
+                                          0,
+                                          0
+                                      ]
+                     },
+                     {
+                         "export":  true,
+                         "origin":  [
+                                        -1.6,
+                                        12,
+                                        0
+                                    ],
+                         "mirror_uv":  false,
+                         "autouv":  0,
+                         "name":  "ThighL",
+                         "isOpen":  false,
+                         "locked":  false,
+                         "selected":  false,
+                         "shade":  true,
+                         "uuid":  "eabb362d-0f58-4d63-abc3-818064bcc946",
+                         "children":  [
+                                          "9a7de395-0e42-4602-b9cf-389563af847e"
+                                      ],
+                         "visibility":  true,
+                         "rotation":  [
+                                          0,
+                                          0,
+                                          0
+                                      ]
+                     },
+                     {
+                         "export":  true,
+                         "origin":  [
+                                        -1.6,
+                                        6,
+                                        0
+                                    ],
+                         "mirror_uv":  false,
+                         "autouv":  0,
+                         "name":  "ShinL",
+                         "isOpen":  false,
+                         "locked":  false,
+                         "selected":  false,
+                         "shade":  true,
+                         "uuid":  "022cddcc-80a8-4670-a38a-d792b2fec546",
+                         "children":  [
+                                          "14ecb9b7-20fc-4ba8-988c-3215e2958767"
+                                      ],
+                         "visibility":  true,
+                         "rotation":  [
+                                          0,
+                                          0,
+                                          0
+                                      ]
+                     }
+                 ]
+}

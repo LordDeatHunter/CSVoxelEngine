@@ -1,15 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using Silk.NET.OpenGL;
 
 namespace silkgltriangle;
 
 /// <summary>
 /// Blocky Minecraft-like player model with two-segment limbs: upper arm + forearm and
-/// thigh + shin instead of Minecraft's single-piece limbs. Classic Steve proportions at
-/// 1.8 blocks tall. Pure pose math (headless-testable) plus cuboid mesh builders.
-/// The model faces -Z at yaw -90, i.e. the same direction the camera looks at spawn.
+/// thigh + shin instead of Minecraft's single-piece limbs. The shape (part pivots, cubes,
+/// skin) comes from a <see cref="PlayerRig"/> — loaded from the Blockbench project at
+/// assets/models/player/player.bbmodel when present, built-in Steve otherwise — while the
+/// posing itself stays procedural below. The model faces -Z at yaw -90, i.e. the same
+/// direction the camera looks at spawn.
 /// </summary>
 public class PlayerModel
 {
@@ -63,6 +66,9 @@ public class PlayerModel
     private float _moveBlend;
     private float _mineT = 1f;
     private float _time;
+
+    /// <summary>The shape being posed: pivots, cubes and skin. Swapped for the file rig at startup.</summary>
+    public PlayerRig Rig { get; set; } = PlayerRig.BuiltIn();
 
     /// <summary>0 when a mine hit just landed, 1 when the hand is back at rest.</summary>
     public float MineT => _mineT;
@@ -164,6 +170,8 @@ public class PlayerModel
     public Matrix4x4 GetPartMatrix(string part, Vector3 eyePos, float yawDeg, float pitchDeg, float backOffset = 0f)
     {
         var pose = GetPose();
+        var rig = Rig;
+        Vector3 Pivot(string name) => rig.Parts[name].Pivot;
         var feet = eyePos - new Vector3(0f, Camera.EyeHeight, 0f);
         if (backOffset != 0f)
         {
@@ -178,46 +186,48 @@ public class PlayerModel
 
         Matrix4x4 Torso() =>
             Matrix4x4.CreateFromAxisAngle(swingAxis, pose.TorsoPitch)
-            * Matrix4x4.CreateTranslation(0f, HipY, 0f) * root;
+            * Matrix4x4.CreateTranslation(Pivot("Torso")) * root;
 
         Matrix4x4 Head() =>
             Matrix4x4.CreateFromAxisAngle(swingAxis, pitchDeg * MathF.PI / 180f * 0.8f)
-            * Matrix4x4.CreateTranslation(0f, NeckY, 0f) * root;
+            * Matrix4x4.CreateTranslation(Pivot("Head")) * root;
 
-        Matrix4x4 UpperArm(float x, float shoulder)
+        Matrix4x4 UpperArm(Vector3 pivot, float shoulder)
         {
             // Drift the hands toward the view centre so they read at the bottom of the
             // frame instead of out at the edges. Right arm (+X) yaws one way, left the other.
-            var inward = (x > 0f ? 1f : -1f) * ArmInwardYaw;
+            var inward = (pivot.X > 0f ? 1f : -1f) * ArmInwardYaw;
             return Matrix4x4.CreateFromAxisAngle(swingAxis, shoulder)
                 * Matrix4x4.CreateFromAxisAngle(Vector3.UnitY, inward)
-                * Matrix4x4.CreateTranslation(x, ShoulderY, 0f) * root;
+                * Matrix4x4.CreateTranslation(pivot) * root;
         }
 
-        Matrix4x4 Thigh(float x, float hip) =>
+        Matrix4x4 Thigh(Vector3 pivot, float hip) =>
             Matrix4x4.CreateFromAxisAngle(swingAxis, hip)
-            * Matrix4x4.CreateTranslation(x, HipY, 0f) * root;
+            * Matrix4x4.CreateTranslation(pivot) * root;
 
+        // Child joints ride their parent: the elbow offset is the file's forearm pivot minus
+        // its upper-arm pivot, so reshaped limbs keep working.
         return part switch
         {
             "Torso" => Torso(),
             "Head" => Head(),
-            "UpperArmL" => UpperArm(-ShoulderX, pose.LeftShoulder),
-            "UpperArmR" => UpperArm(ShoulderX, pose.RightShoulder),
+            "UpperArmL" => UpperArm(Pivot("UpperArmL"), pose.LeftShoulder),
+            "UpperArmR" => UpperArm(Pivot("UpperArmR"), pose.RightShoulder),
             "ForearmL" => Matrix4x4.CreateFromAxisAngle(swingAxis, pose.LeftElbow)
-                * Matrix4x4.CreateTranslation(0f, -UpperArmLength, 0f)
-                * UpperArm(-ShoulderX, pose.LeftShoulder),
+                * Matrix4x4.CreateTranslation(Pivot("ForearmL") - Pivot("UpperArmL"))
+                * UpperArm(Pivot("UpperArmL"), pose.LeftShoulder),
             "ForearmR" => Matrix4x4.CreateFromAxisAngle(swingAxis, pose.RightElbow)
-                * Matrix4x4.CreateTranslation(0f, -UpperArmLength, 0f)
-                * UpperArm(ShoulderX, pose.RightShoulder),
-            "ThighL" => Thigh(-HipX, pose.LeftHip),
-            "ThighR" => Thigh(HipX, pose.RightHip),
+                * Matrix4x4.CreateTranslation(Pivot("ForearmR") - Pivot("UpperArmR"))
+                * UpperArm(Pivot("UpperArmR"), pose.RightShoulder),
+            "ThighL" => Thigh(Pivot("ThighL"), pose.LeftHip),
+            "ThighR" => Thigh(Pivot("ThighR"), pose.RightHip),
             "ShinL" => Matrix4x4.CreateFromAxisAngle(swingAxis, pose.LeftKnee)
-                * Matrix4x4.CreateTranslation(0f, -ThighLength, 0f)
-                * Thigh(-HipX, pose.LeftHip),
+                * Matrix4x4.CreateTranslation(Pivot("ShinL") - Pivot("ThighL"))
+                * Thigh(Pivot("ThighL"), pose.LeftHip),
             "ShinR" => Matrix4x4.CreateFromAxisAngle(swingAxis, pose.RightKnee)
-                * Matrix4x4.CreateTranslation(0f, -ThighLength, 0f)
-                * Thigh(HipX, pose.RightHip),
+                * Matrix4x4.CreateTranslation(Pivot("ShinR") - Pivot("ThighR"))
+                * Thigh(Pivot("ThighR"), pose.RightHip),
             _ => Matrix4x4.Identity,
         };
     }
@@ -237,15 +247,108 @@ public class PlayerModel
     public static readonly string[] FirstPersonParts =
         ["Torso", "UpperArmL", "UpperArmR", "ForearmL", "ForearmR", "ThighL", "ThighR", "ShinL", "ShinR"];
 
-    /// <summary>Which shared mesh each body part draws (left/right share one).</summary>
-    public static string MeshFor(string part) => part switch
+    /// <summary>
+    /// The shape being posed: one skin texture plus a pivot and pivot-relative cuboids per
+    /// part, keyed by the <see cref="BodyParts"/> names. Either parsed out of the Blockbench
+    /// project (<see cref="FromBbmodel"/>) or the built-in Steve (<see cref="BuiltIn"/>).
+    /// </summary>
+    public sealed class PlayerRig
     {
-        "UpperArmL" or "UpperArmR" => "UpperArm",
-        "ForearmL" or "ForearmR" => "Forearm",
-        "ThighL" or "ThighR" => "Thigh",
-        "ShinL" or "ShinR" => "Shin",
-        _ => part,
-    };
+        public byte[] TexturePixels = [];
+        public int TextureWidth;
+        public int TextureHeight;
+        public readonly Dictionary<string, RigPart> Parts = new(StringComparer.Ordinal);
+
+        public sealed class RigPart
+        {
+            public Vector3 Pivot;
+            public readonly List<RigCube> Cubes = new();
+        }
+
+        public sealed class RigCube
+        {
+            public Vector3 Min, Max;
+            public UvRect?[] Faces = new UvRect?[6];
+        }
+
+        /// <summary>Steve with two-segment limbs, matching the historical hardcoded model.</summary>
+        public static PlayerRig BuiltIn()
+        {
+            var rig = new PlayerRig
+            {
+                TexturePixels = PalettePixels(),
+                TextureWidth = PaletteCols,
+                TextureHeight = PaletteRows,
+            };
+
+            void Add(string name, Vector3 pivot, Vector3 min, Vector3 max, int[] swatches)
+            {
+                var part = new RigPart { Pivot = pivot };
+                var faces = new UvRect?[6];
+                for (var f = 0; f < 6; f++)
+                    faces[f] = Cell(swatches[f]);
+                part.Cubes.Add(new RigCube { Min = min, Max = max, Faces = faces });
+                rig.Parts[name] = part;
+            }
+
+            var hw = LimbWidth * 0.5f;
+            Add("Torso", new Vector3(0f, HipY, 0f),
+                new Vector3(-TorsoWidth * 0.5f, 0f, -TorsoDepth * 0.5f),
+                new Vector3(TorsoWidth * 0.5f, TorsoHeight, TorsoDepth * 0.5f), TorsoSwatches);
+            var hs = HeadSize * 0.5f;
+            Add("Head", new Vector3(0f, NeckY, 0f),
+                new Vector3(-hs, 0f, -hs), new Vector3(hs, HeadSize, hs), HeadSwatches);
+            foreach (var side in new[] { ("L", -1f), ("R", 1f) })
+            {
+                var ax = ShoulderX * side.Item2;
+                Add("UpperArm" + side.Item1, new Vector3(ax, ShoulderY, 0f),
+                    new Vector3(-hw, -UpperArmLength, -hw), new Vector3(hw, 0f, hw), UpperArmSwatches);
+                Add("Forearm" + side.Item1, new Vector3(ax, ShoulderY - UpperArmLength, 0f),
+                    new Vector3(-hw, -ForearmLength, -hw), new Vector3(hw, 0f, hw), ForearmSwatches);
+                var hx = HipX * side.Item2;
+                Add("Thigh" + side.Item1, new Vector3(hx, HipY, 0f),
+                    new Vector3(-hw, -ThighLength, -hw), new Vector3(hw, 0f, hw), ThighSwatches);
+                Add("Shin" + side.Item1, new Vector3(hx, HipY - ThighLength, 0f),
+                    new Vector3(-hw, -ShinLength, -hw), new Vector3(hw, 0f, hw), ShinSwatches);
+            }
+            return rig;
+        }
+
+        /// <summary>Maps parsed file data onto the rig; a file without a texture keeps the palette.</summary>
+        public static PlayerRig FromBbmodel(BbmodelData data)
+        {
+            var rig = new PlayerRig();
+            if (data.TexturePixels != null)
+            {
+                rig.TexturePixels = data.TexturePixels;
+                rig.TextureWidth = data.TextureWidth;
+                rig.TextureHeight = data.TextureHeight;
+            }
+            else
+            {
+                rig.TexturePixels = PalettePixels();
+                rig.TextureWidth = PaletteCols;
+                rig.TextureHeight = PaletteRows;
+            }
+
+            foreach (var (name, part) in data.Parts)
+            {
+                var rigPart = new RigPart { Pivot = part.Pivot };
+                foreach (var cube in part.Cubes)
+                    rigPart.Cubes.Add(new RigCube { Min = cube.Min, Max = cube.Max, Faces = cube.Faces });
+                rig.Parts[name] = rigPart;
+            }
+            return rig;
+        }
+
+        private static UvRect Cell(int swatch)
+        {
+            var col = swatch % PaletteCols;
+            var row = swatch / PaletteCols;
+            return new UvRect(new Vector2(col / (float)PaletteCols, row / (float)PaletteRows),
+                new Vector2((col + 1) / (float)PaletteCols, (row + 1) / (float)PaletteRows));
+        }
+    }
 
     /// <summary>
     /// The 4x2 solid-colour palette texture (top-first RGBA): skin, shirt, pants, hair,
@@ -292,54 +395,50 @@ public class PlayerModel
     private static readonly int[] ShinSwatches = [Pants, Pants, Pants, Pants, Pants, Shoe];
 
     /// <summary>
-    /// One mesh per shared shape (6 total): torso (origin at hips, grows up), head (origin
-    /// at neck, grows up), upper arm / thigh (origin at shoulder / hip, hang down),
-    /// forearm / shin (origin at elbow / knee, hang down). Child pivots compose by
-    /// translating down the parent length (see <see cref="GetPartMatrix"/>).
+    /// One mesh per rig part: every present face of every cuboid in the shared
+    /// <see cref="Vertex"/> layout, textured from the rig's skin. The vertex colour stays
+    /// white; asymmetric sculpts get their own left/right meshes automatically.
     /// </summary>
-    public static Dictionary<string, Mesh> BuildMeshes(GL gl) => new()
+    public static Dictionary<string, Mesh> BuildMeshes(GL gl, PlayerRig rig)
     {
-        ["Torso"] = CreateCuboid(gl, TorsoWidth, TorsoHeight, TorsoDepth, TorsoHeight * 0.5f, TorsoSwatches),
-        ["Head"] = CreateCuboid(gl, HeadSize, HeadSize, HeadSize, HeadSize * 0.5f, HeadSwatches),
-        ["UpperArm"] = CreateCuboid(gl, LimbWidth, UpperArmLength, LimbWidth, -UpperArmLength * 0.5f, UpperArmSwatches),
-        ["Forearm"] = CreateCuboid(gl, LimbWidth, ForearmLength, LimbWidth, -ForearmLength * 0.5f, ForearmSwatches),
-        ["Thigh"] = CreateCuboid(gl, LimbWidth, ThighLength, LimbWidth, -ThighLength * 0.5f, ThighSwatches),
-        ["Shin"] = CreateCuboid(gl, LimbWidth, ShinLength, LimbWidth, -ShinLength * 0.5f, ShinSwatches),
-    };
+        var meshes = new Dictionary<string, Mesh>(StringComparer.Ordinal);
+        foreach (var (name, part) in rig.Parts)
+            meshes[name] = BuildPartMesh(gl, part);
+        return meshes;
+    }
 
-    /// <summary>
-    /// A cuboid in the shared <see cref="Vertex"/> layout, centred on x/z with its y span
-    /// at <paramref name="centerY"/> (pivot-relative, so limbs hang down from their joint).
-    /// Each face samples one palette swatch; the vertex colour stays white.
-    /// </summary>
-    internal static Mesh CreateCuboid(GL gl, float sx, float sy, float sz, float centerY, int[] faceSwatches)
+    private static Mesh BuildPartMesh(GL gl, PlayerRig.RigPart part)
     {
-        var vertices = new Vertex[24];
-        var indices = new ushort[36];
+        var vertices = new List<Vertex>();
+        var indices = new List<ushort>();
+        Span<Vector2> corners = stackalloc Vector2[4];
 
-        for (var face = 0; face < 6; face++)
+        foreach (var cube in part.Cubes)
         {
-            var positions = Chunk.CubeFaces[face].face;
-            var normal = Chunk.CubeFaces[face].normal;
-            var uv = SwatchUv(faceSwatches[face]);
-
-            for (var corner = 0; corner < 4; corner++)
+            var size = cube.Max - cube.Min;
+            for (var face = 0; face < 6; face++)
             {
-                var p = positions[corner];
-                vertices[face * 4 + corner] = new Vertex(
-                    new Vector3((p.X - 0.5f) * sx, (p.Y - 0.5f) * sy + centerY, (p.Z - 0.5f) * sz),
-                    255, 255, 255, 255, uv, 0, 1f, 0f, normal);
-            }
+                // A face omitted in the file leaves a hole (open reinforced edges, no cap).
+                if (cube.Faces[face] is not { } rect) continue;
+                rect.CornersTo(corners);
 
-            var o = (ushort)(face * 4);
-            indices[face * 6 + 0] = o;
-            indices[face * 6 + 1] = (ushort)(o + 1);
-            indices[face * 6 + 2] = (ushort)(o + 2);
-            indices[face * 6 + 3] = o;
-            indices[face * 6 + 4] = (ushort)(o + 2);
-            indices[face * 6 + 5] = (ushort)(o + 3);
+                var positions = Chunk.CubeFaces[face].face;
+                var normal = Chunk.CubeFaces[face].normal;
+                var quadBase = (ushort)vertices.Count;
+                for (var corner = 0; corner < 4; corner++)
+                {
+                    var p = positions[corner];
+                    vertices.Add(new Vertex(
+                        cube.Min + new Vector3(p.X * size.X, p.Y * size.Y, p.Z * size.Z),
+                        255, 255, 255, 255, corners[corner], 0, 1f, 0f, normal));
+                }
+                indices.AddRange([(ushort)quadBase, (ushort)(quadBase + 1), (ushort)(quadBase + 2),
+                    quadBase, (ushort)(quadBase + 2), (ushort)(quadBase + 3)]);
+            }
         }
 
-        return new Mesh(gl, vertices, indices);
+        return new Mesh(gl,
+            CollectionsMarshal.AsSpan(vertices),
+            CollectionsMarshal.AsSpan(indices));
     }
 }

@@ -39,6 +39,12 @@ public class RenderManager : IDisposable
     private ItemMeshCache itemMeshes;
     private uint _playerPaletteTex;
     private Dictionary<string, Mesh> _playerMeshes = new();
+
+    /// <summary>Blockbench project behind the player model; a missing or broken file falls back to built-in Steve.</summary>
+    public const string PlayerModelPath = "assets/models/player/player.bbmodel";
+
+    /// <summary>The player shape being drawn: the Blockbench file when it loads, built-in Steve otherwise.</summary>
+    public PlayerModel.PlayerRig PlayerRig { get; private set; } = PlayerModel.PlayerRig.BuiltIn();
     private uint textureAtlas;
     private uint outlineVao;
     private uint outlineVbo;
@@ -323,9 +329,17 @@ public class RenderManager : IDisposable
 
         blockCubes = new BlockCubeCache(gl);
         itemMeshes = new ItemMeshCache(gl);
-        _playerPaletteTex = TextureLoader.Upload(gl, PlayerModel.PalettePixels(),
-            PlayerModel.PaletteCols, PlayerModel.PaletteRows);
-        _playerMeshes = PlayerModel.BuildMeshes(gl);
+        try
+        {
+            PlayerRig = PlayerModel.PlayerRig.FromBbmodel(BbmodelLoader.Load(PlayerModelPath));
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Player model '{PlayerModelPath}' not used ({e.Message}); using built-in Steve.");
+        }
+        _playerPaletteTex = TextureLoader.Upload(gl, PlayerRig.TexturePixels,
+            PlayerRig.TextureWidth, PlayerRig.TextureHeight);
+        _playerMeshes = PlayerModel.BuildMeshes(gl, PlayerRig);
         ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes);
         CreateSelectionGeometry();
     }
@@ -1664,7 +1678,7 @@ public class RenderManager : IDisposable
             var model = player.GetPartMatrix(part, camera.Position, camera.Yaw, camera.Pitch,
                 PlayerModel.FirstPersonBodyBack);
             SetDrawUniforms(model, model * viewProj, 1f);
-            _playerMeshes[PlayerModel.MeshFor(part)].Render();
+            _playerMeshes[part].Render();
         }
 
         BindWorldTextures();
@@ -1675,7 +1689,7 @@ public class RenderManager : IDisposable
         var model = player.GetPartMatrix(part, camera.Position, camera.Yaw, camera.Pitch);
         shadowShader.SetUniform("uModel", model);
         shadowShader.SetUniform("uLightMVP", model * _lightViewProj);
-        _playerMeshes[PlayerModel.MeshFor(part)].Render();
+        _playerMeshes[part].Render();
     }
 
     /// <summary>
