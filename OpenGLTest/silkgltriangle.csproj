@@ -22,6 +22,9 @@
         <PackageReference Include="StbImageSharp" Version="2.30.15" />
         <PackageReference Include="StbImageWriteSharp" Version="1.16.7" />
         <PackageReference Include="StbTrueTypeSharp" Version="1.26.13" />
+        <PackageReference Include="NAudio" Version="2.*" />
+        <PackageReference Include="NAudio.WinMM" Version="2.*" />
+        <PackageReference Include="NLayer.NAudioSupport" Version="1.*" />
     </ItemGroup>
     <ItemGroup>
         <None Update="assets\shaders\**\*.glsl">
@@ -31,6 +34,9 @@
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
         <None Update="assets\fonts\**\*.ttf">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="assets\sfx\**\*">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
         <None Update="assets\**\*.json">

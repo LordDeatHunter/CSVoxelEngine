@@ -129,6 +129,8 @@ public class RenderManager : IDisposable
 
     // How high the sun is, 0 at night and 1 well into the day; the ray pass scales with it
     private float _dayness;
+    /// <summary>0 at night, 1 in full day; drives the ambience crossfade.</summary>
+    public float Dayness => _dayness;
     private Matrix4x4 _lightViewProj = Matrix4x4.Identity;
 
     // Inverse of the current view-projection, for the shaders that reconstruct a world

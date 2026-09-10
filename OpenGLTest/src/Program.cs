@@ -12,6 +12,7 @@ public static class Program
     private static WindowManager windowManager;
     private static InputManager inputManager;
     private static RenderManager renderManager;
+    private static AmbienceManager? ambience;
     private static World world;
     private static VisualDirector? visualDirector;
     private static bool visualScriptFailed;
@@ -79,6 +80,8 @@ public static class Program
         {
             if (!inventoryView.IsOpen) world.Inventory.Scroll(wheel.Y);
         };
+
+        ambience = new AmbienceManager();
 
         debugEnabled = Environment.GetEnvironmentVariable(DebugVariable)?.Trim() is "1" or "true";
 
@@ -345,6 +348,7 @@ public static class Program
         FrameProfiler.Begin(ProfileSection.Lighting);
         renderManager.SetLighting(windowManager.Window.Time + timeOffset, world.Camera, world.PrimedTnt,
             world.Camera.IsEyeInWater, world.Camera.IsEyeInLava, world.Campfires.LitCells);
+        ambience?.Update(renderManager.Dayness, (float)Math.Clamp(deltaTime, 0.0, 0.25));
         renderManager.BeginFrame(world.Camera);
         FrameProfiler.End(ProfileSection.Lighting);
 
@@ -383,6 +387,7 @@ public static class Program
 
     private static void OnClosing()
     {
+        ambience?.Dispose();
         renderManager?.Dispose();
         inputManager?.Dispose();
     }
