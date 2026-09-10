@@ -517,7 +517,7 @@ public class RenderManager : IDisposable
 
         var dayness = Smooth01((elevation + 0.08f) / 0.33f);
         _dayness = dayness;
-        var duskAmount = elevation > -0.1f ? Math.Clamp(1f - MathF.Abs(elevation) * 5f, 0f, 1f) : 0f;
+        var duskAmount = Math.Clamp(1f - MathF.Abs(elevation) * 5f, 0f, 1f);
 
         _sunColor = Mix(new Vector3(0.3f, 0.4f, 0.7f), new Vector3(1f, 0.96f, 0.88f), dayness);
         _sunColor = Mix(_sunColor, new Vector3(1f, 0.5f, 0.25f), duskAmount * 0.55f);
