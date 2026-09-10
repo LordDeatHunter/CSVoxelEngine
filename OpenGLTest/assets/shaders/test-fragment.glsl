@@ -226,8 +226,18 @@ void main() {
         float pulse = 0.9 + 0.1 * sin(uTime * 2.0 + fWorldPos.x * 1.3 + fWorldPos.z * 1.7);
         col = (albedo * 2.0 + vec3(0.55, 0.13, 0.01)) * pulse;
     } else if (isWater) {
-        vec3 nW = WaveNormal(fWorldPos.xz, uTime, uWaterNormalScale);
-        nW = normalize(nW + vec3(wob1 * 0.09, 0.0, wob2 * 0.09));   // fine glitter on top of the swell
+        // WaveNormal always points up: correct for the surface top, but using it for a
+        // vertical waterfall pins V.N near 0, so the Schlick fresnel below saturates to 1
+        // and every underground fall becomes a full mirror of the (daytime) sky fallback.
+        // Tops keep the wave normal; sides keep their geometric normal and borrow only
+        // the wave tilt, so a fall viewed head-on mostly refracts instead of mirroring.
+        vec3 geomN = normalize(fNormal);
+        vec3 nWup = WaveNormal(fWorldPos.xz, uTime, uWaterNormalScale);
+        nWup = normalize(nWup + vec3(wob1 * 0.09, 0.0, wob2 * 0.09));   // fine glitter on top of the swell
+        vec2 tilt = nWup.xz / max(nWup.y, 0.2);
+        vec3 nW = geomN.y > 0.5
+            ? nWup
+            : normalize(geomN + vec3(tilt.x, 0.0, tilt.y) * 0.35 + vec3(wob1 * 0.03, 0.0, wob2 * 0.03));
         vec3 V = normalize(uCameraPos - fWorldPos);
         float cosT = max(dot(V, nW), 0.0);
         float F = 0.06 + 0.94 * pow(1.0 - cosT, 5.0);
@@ -249,7 +259,8 @@ void main() {
         vec3 scenePos = hp.xyz / hp.w;
         float thickness = distance(scenePos, fWorldPos) * (1.0 - uUnderwater);
 
-        vec3 waterLight = uAmbient * (0.12 + 0.88 * fSun) + uSunColor * (uSunIntensity * fSun * shadow * 0.6);
+        vec3 waterLight = uAmbient * (0.12 + 0.88 * fSun) + uSunColor * (uSunIntensity * fSun * shadow * 0.6)
+                          + (torch + pl) * 0.6;
         vec3 refr = behind * exp(-uWaterAbsorb * thickness)
                   + uWaterScatter * waterLight * (1.0 - exp(-0.1 * thickness));
 
@@ -259,11 +270,15 @@ void main() {
             vec2 rr = rp.xy / rp.w * 0.5 + 0.5 + nW.xz * 0.08;
             refl = texture(uReflectionMap, clamp(rr, 0.001, 0.999)).rgb;
         }
+        // No sky to mirror underground: dim the reflection (fallback or stale mirror
+        // alike) by the voxel skylight, or sealed caves glow sky-blue in daytime.
+        refl *= clamp(0.12 + 0.88 * fSun, 0.0, 1.0);
         col = mix(refr, refl, F);
 
         vec3 H = normalize(V + uSunDir);
         float ndh = max(dot(nW, H), 0.0);
-        waterSpec = (pow(ndh, 300.0) * 0.45 + pow(ndh, 24.0) * 0.05) * shadow;
+        // Sun glitter needs skylight to exist: without the fSun gate it shines through rock.
+        waterSpec = (pow(ndh, 300.0) * 0.45 + pow(ndh, 24.0) * 0.05) * shadow * fSun;
         col += uSunColor * (waterSpec * uSunIntensity);
     }
 
