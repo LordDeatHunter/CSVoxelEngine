@@ -108,6 +108,10 @@ public class UIRenderer : IDisposable
     // Flat sprite textures for the list rows; the hotbar and the preview draw the same ids
     // as extruded 3D meshes through DrawItemIcon instead
     private readonly Dictionary<byte, uint> _itemIcons = new();
+    // One unit square per sheet frame, UV'd to that frame's array slice (see UvRect.Tile):
+    // the icon texture of a spritesheet item holds one slice per frame, so picking a frame
+    // is picking a mesh, and every frame mipmaps without bleeding into its neighbours.
+    private readonly Dictionary<byte, Mesh[]> _itemFrames = new();
     private readonly int _locAlphaCutoff;
 
     // Unit shapes, scaled per draw so a colour or size change costs no buffer work
@@ -141,7 +145,17 @@ public class UIRenderer : IDisposable
 
         _crosshairTexture = TextureLoader.LoadFromFile(gl, "assets/textures/crosshair.png");
         foreach (var (id, type) in ItemType.Types)
-            _itemIcons[id] = TextureLoader.LoadFromFile(gl, type.TexturePath);
+        {
+            _itemIcons[id] = type.Animation == ItemAnimationMode.None
+                ? TextureLoader.LoadFromFile(gl, type.TexturePath)
+                : TextureLoader.LoadSpritesheet(gl, type.TexturePath,
+                    type.SpriteCols, type.SpriteRows, type.FrameCount);
+            if (type.Animation == ItemAnimationMode.None) continue;
+            var frames = new Mesh[type.FrameCount];
+            for (var f = 0; f < frames.Length; f++)
+                frames[f] = Primitives.CreateSquare(gl, 1f, uv: UvRect.Tile((ushort)f));
+            _itemFrames[id] = frames;
+        }
         _locAlphaCutoff = _shader.GetUniformLocation("uAlphaCutoff");
         _unitSquare = Primitives.CreateSquare(gl, 1f);
 
@@ -368,7 +382,9 @@ public class UIRenderer : IDisposable
     }
 
     /// <summary>Draws the hotbar centred along the bottom edge, highlighting the selected slot.</summary>
-    public void DrawHotbar(Inventory inventory)
+    /// <param name="headingDegrees">Compass heading (0 = north), picking heading-driven sheet frames.</param>
+    /// <param name="timeSeconds">Scene clock, picking loop-driven sheet frames.</param>
+    public void DrawHotbar(Inventory inventory, float headingDegrees, float timeSeconds)
     {
         var stride = SlotSize + SlotGap;
         var rowWidth = Inventory.SlotCount * SlotSize + (Inventory.SlotCount - 1) * SlotGap;
@@ -397,7 +413,7 @@ public class UIRenderer : IDisposable
             var iconSize = SlotSize * IconFill * inventory.PopScaleAt(i);
             // Items show their flat sprites here like the list rows; blocks keep 3D cubes
             if (ItemType.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
-                DrawTexture(centre, new Vector2(iconSize), icon);
+                DrawItemSprite(centre, new Vector2(iconSize), id, icon, headingDegrees, timeSeconds);
             else
                 DrawBlockIcon(centre, iconSize, id);
         }
@@ -425,7 +441,8 @@ public class UIRenderer : IDisposable
     /// picked name on the right. The hotbar stays visible underneath so picks can be aimed
     /// at slots. <paramref name="time"/> spins the preview.
     /// </summary>
-    public void DrawInventoryPanel(Inventory inventory, InventoryView view, float time)
+    public void DrawInventoryPanel(Inventory inventory, InventoryView view, float time,
+        float headingDegrees)
     {
         var top = PanelTop;
         var bottom = _screenSize.Y - BottomMargin - (SlotSize + 14f);
@@ -457,7 +474,7 @@ public class UIRenderer : IDisposable
             for (var i = 0; i < tools.Count; i++)
             {
                 var selected = view.SelectedToolInstance == tools[i].InstanceId;
-                DrawEntryRow(i, listTop, tools[i].ItemId, tools[i].Name, "1", selected);
+                DrawEntryRow(i, listTop, tools[i].ItemId, tools[i].Name, "1", selected, headingDegrees, time);
             }
         }
         else if (view.Tab == InventoryCategory.Crafting)
@@ -467,14 +484,14 @@ public class UIRenderer : IDisposable
                 DrawEntryRow(i, listTop, craftable[i].ResultId,
                     Inventory.DisplayName(craftable[i].ResultId),
                     craftable[i].ResultCount.ToString(),
-                    view.SelectedId == craftable[i].ResultId);
+                    view.SelectedId == craftable[i].ResultId, headingDegrees, time);
         }
         else
         {
             var rows = inventory.StackEntries(view.Tab);
             for (var i = 0; i < rows.Count; i++)
                 DrawEntryRow(i, listTop, rows[i].Id, rows[i].Name, rows[i].Count.ToString(),
-                    view.SelectedId == rows[i].Id);
+                    view.SelectedId == rows[i].Id, headingDegrees, time);
         }
 
         DrawPreview(inventory, view, time);
@@ -537,7 +554,8 @@ public class UIRenderer : IDisposable
             ? $"{inventory.Craftable().Count}/{ContentRegistry.CraftingRecipes.Count}"
             : $"{inventory.UsedOf(tab)}/{Inventory.CapacityOf(tab)}";
 
-    private void DrawEntryRow(int row, float listTop, byte id, string name, string count, bool selected)
+    private void DrawEntryRow(int row, float listTop, byte id, string name, string count, bool selected,
+        float headingDegrees, float timeSeconds)
     {
         var centreY = listTop + row * RowHeight + RowHeight * 0.5f;
         var centre = new Vector2(PanelLeft + PanelWidth * 0.5f, centreY);
@@ -546,7 +564,7 @@ public class UIRenderer : IDisposable
 
         var iconCentre = new Vector2(PanelLeft + PanelPad + RowIcon * 0.5f + 4f, centreY);
         if (ItemType.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
-            DrawTexture(iconCentre, new Vector2(RowIcon), icon);
+            DrawItemSprite(iconCentre, new Vector2(RowIcon), id, icon, headingDegrees, timeSeconds);
         else
             DrawBlockIcon(iconCentre, RowIcon, id);
 
@@ -629,6 +647,24 @@ public class UIRenderer : IDisposable
             y += lineStep;
         }
         DrawTextCentred("Click again to craft", centre.X, y, _countScale, Rgba.White);
+    }
+
+    /// <summary>
+    /// A flat item sprite: the sheet frame the moment picks for an animated item, the whole
+    /// texture for a plain one. Falls back to the whole texture when the frame meshes are
+    /// missing, so an icon never vanishes over a cache mismatch.
+    /// </summary>
+    private void DrawItemSprite(Vector2 centre, Vector2 size, byte id, uint texture,
+        float headingDegrees, float timeSeconds)
+    {
+        if (_itemFrames.TryGetValue(id, out var frames)
+            && ItemType.Types.TryGetValue(id, out var type))
+        {
+            var frame = Math.Clamp(type.FrameAt(timeSeconds, headingDegrees), 0, frames.Length - 1);
+            DrawMesh(frames[frame], RectTransform(centre, size), Rgba.White, texture);
+            return;
+        }
+        DrawTexture(centre, size, texture);
     }
 
     /// <summary>
@@ -742,6 +778,9 @@ public class UIRenderer : IDisposable
         _gl.DeleteTexture(_crosshairTexture);
         foreach (var icon in _itemIcons.Values)
             _gl.DeleteTexture(icon);
+        foreach (var frames in _itemFrames.Values)
+            foreach (var frame in frames)
+                frame.Dispose();
 
         GC.SuppressFinalize(this);
     }

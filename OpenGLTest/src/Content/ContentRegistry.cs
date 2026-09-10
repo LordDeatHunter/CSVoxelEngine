@@ -269,15 +269,52 @@ public static class ContentRegistry
             };
 
             var id = ItemIds[name];
+            var sheet = ParseSpritesheet(definition.Spritesheet, path);
             types[id] = new ItemType(id, definition.Name ?? name, definition.Texture)
             {
                 UseAction = action,
                 UseResultId = ResolveUseTarget(use?.Result, "use.result", path),
                 UseFluidId = ResolveUseTarget(use?.Fluid, "use.fluid", path),
+                SpriteCols = sheet.Cols,
+                SpriteRows = sheet.Rows,
+                FrameCount = sheet.Frames,
+                Animation = sheet.Mode,
+                AnimationFps = sheet.Fps,
             };
         }
 
         ItemType.Types = types;
+    }
+
+    private readonly record struct ParsedSheet(int Cols, int Rows, int Frames, ItemAnimationMode Mode, float Fps);
+
+    private static ParsedSheet ParseSpritesheet(ItemDefinition.SpritesheetDefinition? sheet, string path)
+    {
+        if (sheet == null) return new ParsedSheet(1, 1, 1, ItemAnimationMode.None, 8f);
+
+        if (sheet.Cols is not { } cols || cols < 1)
+            throw new InvalidOperationException(
+                $"Item '{path}' has a spritesheet without a positive cols.");
+        if (sheet.Rows is not { } rows || rows < 1)
+            throw new InvalidOperationException(
+                $"Item '{path}' has a spritesheet without a positive rows.");
+        var frames = sheet.Frames ?? cols * rows;
+        if (frames < 1 || frames > cols * rows)
+            throw new InvalidOperationException(
+                $"Item '{path}' has spritesheet.frames {sheet.Frames}; expected 1..{cols * rows}.");
+        var mode = sheet.Mode?.Trim().ToLowerInvariant() switch
+        {
+            "heading" => ItemAnimationMode.Heading,
+            "loop" => ItemAnimationMode.Loop,
+            _ => throw new InvalidOperationException(
+                $"Item '{path}' has spritesheet.mode '{sheet.Mode}'; expected heading or loop."),
+        };
+        var fps = sheet.Fps ?? 8f;
+        if (!float.IsFinite(fps) || fps <= 0f)
+            throw new InvalidOperationException(
+                $"Item '{path}' has spritesheet.fps {sheet.Fps}; expected a positive number.");
+
+        return new ParsedSheet(cols, rows, frames, mode, fps);
     }
 
     // Items are parsed before blocks, so only the id maps exist here; what those ids turn out

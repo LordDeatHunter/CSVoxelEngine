@@ -38,4 +38,17 @@ public static class Compass
         var index = ((int)MathF.Round(heading / 45f) % 8 + 8) % 8;
         return Cardinals[index];
     }
+
+    /// <summary>
+    /// Spritesheet frame whose needle points at world north for this heading: the needle sits
+    /// still in the world while the holder turns, so its screen angle is the target bearing
+    /// (north = 0) minus the heading, snapped to the nearest of <paramref name="frameCount"/>
+    /// evenly spaced clockwise frames (frame 0 faces north).
+    /// </summary>
+    public static int HeadingFrame(float headingDegrees, int frameCount)
+    {
+        if (frameCount <= 0) return 0;
+        var relative = (WrapDelta(-headingDegrees) + 360f) % 360f;
+        return (int)MathF.Floor(relative / 360f * frameCount + 0.5f) % frameCount;
+    }
 }

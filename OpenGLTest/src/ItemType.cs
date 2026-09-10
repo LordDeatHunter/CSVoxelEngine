@@ -1,6 +1,18 @@
+using System;
 using System.Collections.Generic;
 
 namespace silkgltriangle;
+
+/// <summary>How a spritesheet item picks its frame each draw.</summary>
+public enum ItemAnimationMode
+{
+    /// <summary>No sheet: the whole texture is the sprite.</summary>
+    None,
+    /// <summary>Frame follows the player's compass heading, so frame 0 faces north.</summary>
+    Heading,
+    /// <summary>Frames slide by at <see cref="ItemType.AnimationFps"/>.</summary>
+    Loop,
+}
 
 /// <summary>
 /// Pure items: pickups that are not blocks, loaded from <c>assets/data/items/&lt;name&gt;.json</c>
@@ -42,6 +54,38 @@ public sealed class ItemType
 
     /// <summary>Fluid block id the use picks up or places; 0 when the item declares no use.</summary>
     public byte UseFluidId { get; internal init; }
+
+    /// <summary>Cells across the spritesheet texture; 1 for a plain sprite.</summary>
+    public int SpriteCols { get; internal init; } = 1;
+
+    /// <summary>Cells down the spritesheet texture; 1 for a plain sprite.</summary>
+    public int SpriteRows { get; internal init; } = 1;
+
+    /// <summary>Frames used from the top-left, row-major; 1 for a plain sprite.</summary>
+    public int FrameCount { get; internal init; } = 1;
+
+    /// <summary>How the frame is picked each draw; <see cref="ItemAnimationMode.None"/> for a plain sprite.</summary>
+    public ItemAnimationMode Animation { get; internal init; } = ItemAnimationMode.None;
+
+    /// <summary>Frames per second for <see cref="ItemAnimationMode.Loop"/>; ignored otherwise.</summary>
+    public float AnimationFps { get; internal init; } = 8f;
+
+    /// <summary>Frame to draw for this item at this moment.</summary>
+    /// <param name="timeSeconds">Scene clock, driving <see cref="ItemAnimationMode.Loop"/>.</param>
+    /// <param name="headingDegrees">Compass heading (0 = north), driving <see cref="ItemAnimationMode.Heading"/>.</param>
+    public int FrameAt(float timeSeconds, float headingDegrees) => Animation switch
+    {
+        ItemAnimationMode.Heading => Compass.HeadingFrame(headingDegrees, FrameCount),
+        ItemAnimationMode.Loop => LoopFrame(timeSeconds, AnimationFps, FrameCount),
+        _ => 0,
+    };
+
+    /// <summary>Loop frame at a moment: frame 0 at t = 0, advancing at <paramref name="fps"/>.</summary>
+    public static int LoopFrame(float timeSeconds, float fps, int frameCount)
+    {
+        if (frameCount <= 0 || fps <= 0f || !float.IsFinite(timeSeconds)) return 0;
+        return ((int)MathF.Floor(timeSeconds * fps) % frameCount + frameCount) % frameCount;
+    }
 
     /// <summary>Whether an id is a pure item rather than a block (or air/unknown).</summary>
     public static bool IsItem(byte id) => Types.ContainsKey(id);

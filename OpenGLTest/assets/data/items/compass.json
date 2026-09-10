@@ -1,1 +1,3 @@
-{ "name": "Compass", "texture": "assets/textures/items/compass.png" }
+{ "name": "Compass", "texture": "assets/textures/items/compass.png",
+  // 128x128 sheet of 32x32 needles, row-major clockwise: frame 0 faces north.
+  "spritesheet": { "cols": 4, "rows": 4, "mode": "heading" } }

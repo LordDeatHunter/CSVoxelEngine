@@ -71,8 +71,7 @@ public sealed class CompassTests
 
     [Fact]
     public void CompassShowsOnlyWhileEquippedOnHotbar()
-    {
-        var inventory = new Inventory();
+    {        var inventory = new Inventory();
         var compass = ContentRegistry.RequireItem("compass").Id;
 
         Assert.False(inventory.ContainsInHotbar(compass));
@@ -84,5 +83,67 @@ public sealed class CompassTests
         // Equipping the shown id again clears the slot (toggle off)
         inventory.EquipStackable(3, compass);
         Assert.False(inventory.ContainsInHotbar(compass));
+    }
+
+    [Fact]
+    public void CompassIsAHeadingSpritesheet()
+    {
+        var compass = ContentRegistry.RequireItem("compass");
+        Assert.Equal(ItemAnimationMode.Heading, compass.Animation);
+        Assert.Equal(4, compass.SpriteCols);
+        Assert.Equal(4, compass.SpriteRows);
+        Assert.Equal(16, compass.FrameCount);
+    }
+
+    [Fact]
+    public void PlainItemsHaveNoAnimation()
+    {
+        var flint = ContentRegistry.RequireItem("flint");
+        Assert.Equal(ItemAnimationMode.None, flint.Animation);
+        Assert.Equal(1, flint.FrameCount);
+        Assert.Equal(0, flint.FrameAt(123f, 90f));
+    }
+
+    [Theory]
+    // Facing north the needle points up; turning clockwise swings it counter-clockwise,
+    // so facing east it points left (west, frame 12 of the clockwise sheet).
+    [InlineData(0f, 0)]
+    [InlineData(90f, 12)]
+    [InlineData(180f, 8)]
+    [InlineData(270f, 4)]
+    [InlineData(-90f, 4)]
+    [InlineData(45f, 14)]
+    [InlineData(359f, 0)]
+    [InlineData(11.25f, 0)]
+    [InlineData(12f, 15)]
+    public void HeadingFrameKeepsTheNeedleOnNorth(float heading, int expected)
+    {
+        Assert.Equal(expected, Compass.HeadingFrame(heading, 16));
+    }
+
+    [Fact]
+    public void CompassFrameIgnoresTime()
+    {
+        var compass = ContentRegistry.RequireItem("compass");
+        Assert.Equal(12, compass.FrameAt(999f, 90f));
+    }
+
+    [Theory]
+    [InlineData(0f, 0)]
+    [InlineData(0.125f, 1)]
+    [InlineData(0.249f, 1)]
+    [InlineData(2f, 0)]
+    [InlineData(-0.125f, 15)]
+    public void LoopFrameSlidesOneFramePerTick(float time, int expected)
+    {
+        Assert.Equal(expected, ItemType.LoopFrame(time, 8f, 16));
+    }
+
+    [Theory]
+    [InlineData(8f, 0)]
+    [InlineData(0f, 16)]
+    public void LoopFrameIgnoresDegenerateInput(float fps, int frames)
+    {
+        Assert.Equal(0, ItemType.LoopFrame(1f, fps, frames));
     }
 }

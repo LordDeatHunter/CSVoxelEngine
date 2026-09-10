@@ -1824,9 +1824,10 @@ public class RenderManager : IDisposable
         ui.DrawFps(fps);
         if (showProfiler)
             ui.DrawProfiler(FrameProfiler.Lines);
-        ui.DrawHotbar(inventory);
+        var heading = camera != null ? Compass.HeadingFromYaw(camera.Yaw) : 0f;
+        ui.DrawHotbar(inventory, heading, time);
         if (view.IsOpen)
-            ui.DrawInventoryPanel(inventory, view, time);
+            ui.DrawInventoryPanel(inventory, view, time, heading);
         ui.End();
     }
 

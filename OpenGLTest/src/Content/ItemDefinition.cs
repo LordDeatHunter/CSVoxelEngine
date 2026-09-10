@@ -12,6 +12,33 @@ public sealed class ItemDefinition
     /// <summary>What right-clicking with the item does; omitted for a plain pickup.</summary>
     public UseDefinition? Use { get; set; }
 
+    /// <summary>
+    /// Optional spritesheet: the texture holds a grid of frames instead of one sprite.
+    /// Frames are row-major (frame 0 is the top-left cell) and picked per draw by
+    /// <c>mode</c>: <c>heading</c> selects from the player's compass heading (north = 0),
+    /// <c>loop</c> slides through them at <c>fps</c>. Omit the whole object for a plain sprite.
+    /// </summary>
+    public SpritesheetDefinition? Spritesheet { get; set; }
+
+    /// <summary>The <c>spritesheet</c> object: grid size plus how frames are picked.</summary>
+    public sealed class SpritesheetDefinition
+    {
+        /// <summary>Cells across the texture.</summary>
+        public int? Cols { get; set; }
+
+        /// <summary>Cells down the texture.</summary>
+        public int? Rows { get; set; }
+
+        /// <summary>Frames used, from the top-left; defaults to the whole grid.</summary>
+        public int? Frames { get; set; }
+
+        /// <summary><c>heading</c> or <c>loop</c>.</summary>
+        public string? Mode { get; set; }
+
+        /// <summary>Frames per second for <c>loop</c>; defaults to 8.</summary>
+        public float? Fps { get; set; }
+    }
+
     /// <summary>The <c>use</c> object: the action plus the block and item it works with.</summary>
     public sealed class UseDefinition
     {

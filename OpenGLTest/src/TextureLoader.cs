@@ -27,6 +27,47 @@ public static class TextureLoader
         UploadArray(gl, [rgba], width, height);
 
     /// <summary>
+    /// Uploads a grid spritesheet as one slice per frame (row-major from the top-left), so each
+    /// frame mipmaps in isolation instead of bleeding into its neighbours. Every failure names
+    /// <paramref name="path"/>, like the content errors in <c>ContentRegistry</c>.
+    /// </summary>
+    public static uint LoadSpritesheet(GL gl, string path, int cols, int rows, int frames)
+    {
+        using var stream = File.OpenRead(path);
+        var image = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
+        if (cols < 1 || rows < 1 || frames < 1 || frames > cols * rows)
+            throw new InvalidOperationException(
+                $"Item '{path}' has a {cols}x{rows} spritesheet using {frames} frames; expected 1..{cols * rows} frames of a positive grid.");
+        if (image.Width % cols != 0 || image.Height % rows != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' is {image.Width}x{image.Height} but its spritesheet is {cols}x{rows}: cells must divide the texture evenly.");
+
+        var layers = new byte[frames][];
+        for (var f = 0; f < frames; f++)
+            layers[f] = CropFrame(image.Data, image.Width, image.Height, cols, rows, f);
+        return UploadArray(gl, layers, image.Width / cols, image.Height / rows);
+    }
+
+    /// <summary>
+    /// Copies one row-major cell out of a top-first RGBA buffer: the same crop the UI sheet
+    /// split and the item-drop fallback below share.
+    /// </summary>
+    public static byte[] CropFrame(byte[] rgba, int width, int height, int cols, int rows, int frame)
+    {
+        var cellWidth = width / cols;
+        var cellHeight = height / rows;
+        var col = frame % cols;
+        var row = frame / cols;
+        var cell = new byte[cellWidth * cellHeight * 4];
+        for (var y = 0; y < cellHeight; y++)
+        {
+            var src = ((row * cellHeight + y) * width + col * cellWidth) * 4;
+            System.Buffer.BlockCopy(rgba, src, cell, y * cellWidth * 4, cellWidth * 4);
+        }
+        return cell;
+    }
+
+    /// <summary>
     /// Uploads one array texture with a slice per entry of <paramref name="layers"/> (each a
     /// top-first RGBA buffer of <paramref name="width"/> × <paramref name="height"/>), slice
     /// <c>i</c> being <c>layers[i]</c>. Mipmaps are generated per slice, so neighbouring tiles

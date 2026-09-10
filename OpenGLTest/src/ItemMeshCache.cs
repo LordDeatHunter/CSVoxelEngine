@@ -45,9 +45,25 @@ public class ItemMeshCache : IDisposable
         using var stream = File.OpenRead(type.TexturePath);
         var image = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
 
-        var texture = TextureLoader.Upload(_gl, image.Data, image.Width, image.Height);
-        var mesh = Primitives.CreateExtrudedSprite(_gl, image.Data, image.Width, image.Height);
-        return (mesh, texture);
+        // The flat UI icons animate through the sheet's slices; the extruded drop keeps showing
+        // one face, so a sheet is cropped to its first frame instead of stretching all of them.
+        if (type.Animation != ItemAnimationMode.None)
+        {
+            if (image.Width % type.SpriteCols != 0 || image.Height % type.SpriteRows != 0)
+                throw new InvalidOperationException(
+                    $"Item '{type.TexturePath}' is {image.Width}x{image.Height} but its spritesheet is {type.SpriteCols}x{type.SpriteRows}: cells must divide the texture evenly.");
+            var cell = TextureLoader.CropFrame(image.Data, image.Width, image.Height,
+                type.SpriteCols, type.SpriteRows, 0);
+            var cellWidth = image.Width / type.SpriteCols;
+            var cellHeight = image.Height / type.SpriteRows;
+            var texture = TextureLoader.Upload(_gl, cell, cellWidth, cellHeight);
+            var mesh = Primitives.CreateExtrudedSprite(_gl, cell, cellWidth, cellHeight);
+            return (mesh, texture);
+        }
+
+        var singleTexture = TextureLoader.Upload(_gl, image.Data, image.Width, image.Height);
+        var singleMesh = Primitives.CreateExtrudedSprite(_gl, image.Data, image.Width, image.Height);
+        return (singleMesh, singleTexture);
     }
 
     public void Dispose()
