@@ -1,4 +1,5 @@
 {
+  "name": "Flower",
   "model": {
     "parent": "block/cross",
     "textures": { "cross": "flower" }

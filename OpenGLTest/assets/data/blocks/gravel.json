@@ -1,4 +1,5 @@
 {
+  "name": "Gravel",
   "model": { "parent": "block/cube_all", "textures": { "all": "gravel" } },
   "hardness": 3,
   "falls": true

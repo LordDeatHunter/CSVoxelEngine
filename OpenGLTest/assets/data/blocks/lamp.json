@@ -1,4 +1,5 @@
 {
+  "name": "Lamp",
   "model": { "parent": "block/cube_all", "textures": { "all": "lantern_lit" } },
   "light": { "emission": 15 }
 }

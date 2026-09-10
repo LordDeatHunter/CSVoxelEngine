@@ -1,4 +1,5 @@
 {
+  "name": "TNT",
   "model": {
     "parent": "block/cube_column",
     "textures": { "end": "tnt_top", "side": "tnt_side" }

@@ -1,4 +1,5 @@
 {
+  "name": "Stone",
   "model": { "parent": "block/cube_all", "textures": { "all": "stone" } },
   "loot": "stone"
 }

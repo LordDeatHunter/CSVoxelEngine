@@ -106,6 +106,29 @@ public sealed class ContentTests
     }
 
     [Fact]
+    public void BlocksCarryDisplayNamesFromJson()
+    {
+        Assert.Equal("Stone", ContentRegistry.RequireBlock("stone").DisplayName);
+        Assert.Equal("TNT", ContentRegistry.RequireBlock("tnt").DisplayName);
+        Assert.Equal("Mud Bricks", ContentRegistry.RequireBlock("mud_bricks").DisplayName);
+        Assert.Equal("Branch Pile", ContentRegistry.RequireBlock("branch_pile").DisplayName);
+    }
+
+    [Fact]
+    public void EveryBlockHasADisplayName()
+    {
+        Assert.All(BlockType.Types.Values,
+            type => Assert.False(string.IsNullOrWhiteSpace(type.DisplayName)));
+    }
+
+    [Fact]
+    public void InventoryShowsBlockDisplayNames()
+    {
+        var stone = ContentRegistry.RequireBlock("stone");
+        Assert.Equal("Stone", Inventory.DisplayName(stone.Id));
+    }
+
+    [Fact]
     public void UnknownContentThrowsNamingIt()
     {
         var ex = Assert.Throws<InvalidOperationException>(() => ContentRegistry.RequireBlock("nope"));

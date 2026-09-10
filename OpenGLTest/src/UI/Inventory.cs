@@ -406,7 +406,7 @@ public class Inventory
     /// <summary>Display name for a list row or preview heading.</summary>
     public static string DisplayName(byte id)
     {
-        if (BlockType.ById[id] != null) return BlockType.ById[id]!.Name;
+        if (BlockType.ById[id] != null) return BlockType.ById[id]!.DisplayName;
         if (ItemType.Types.TryGetValue(id, out var item)) return item.Name;
         return $"unknown {id}";
     }

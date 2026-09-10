@@ -1,4 +1,5 @@
 {
+  "name": "Pebble",
   "model": { "parent": "block/cube_all", "textures": { "all": "stone" } },
   "hardness": 0,
   "renderer": "pebbles",

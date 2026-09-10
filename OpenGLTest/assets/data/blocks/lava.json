@@ -1,4 +1,5 @@
 {
+  "name": "Lava",
   "model": { "parent": "block/cube_all", "textures": { "all": "lava_still" } },
   "fluid": true,
   "renderer": "fluid",

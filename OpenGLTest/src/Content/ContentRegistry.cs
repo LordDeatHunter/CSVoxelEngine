@@ -605,6 +605,7 @@ public static class ContentRegistry
             var type = new BlockType
             {
                 Name = name,
+                DisplayName = definition.Name ?? name,
                 Id = id,
                 MaxHealth = definition.Hardness ?? BlockType.DefaultMaxHealth,
                 Solid = solid,

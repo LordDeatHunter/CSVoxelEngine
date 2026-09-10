@@ -227,6 +227,7 @@ trailing commas.
 | field | default | meaning |
 |---|---|---|
 | `model` | required | a `"block/cube_all"`-style path under `assets/models/`, **or** an inline model object with the same schema |
+| `name` | file name | display name for inventory rows and preview headings (`BlockType.DisplayName`) |
 | `hardness` | 5 | hits to break, one per `World.BlockHitSeconds`; `0` means it breaks on first contact (pebble) |
 | `solid` | true | collides with bodies (`BlockType.IsSolid`) |
 | `occludes` | full cube && !cutout | hides a neighbouring full cube's face (`OccludesNeighbours`) |

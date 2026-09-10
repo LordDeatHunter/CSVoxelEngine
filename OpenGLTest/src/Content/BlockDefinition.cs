@@ -10,6 +10,9 @@ namespace silkgltriangle;
 /// </summary>
 public sealed class BlockDefinition
 {
+    /// <summary>Display name; defaults to the file name when omitted.</summary>
+    public string? Name { get; set; }
+
     /// <summary>Model file name (<c>"block/cube_all"</c>) or an inline model object.</summary>
     public JsonElement Model { get; set; }
 

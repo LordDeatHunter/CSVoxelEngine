@@ -1,4 +1,5 @@
 {
+  "name": "Leaves",
   "model": { "parent": "block/cube_all", "textures": { "all": "leaves" } },
   "hardness": 2,
   "cutout": true,

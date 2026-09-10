@@ -161,7 +161,7 @@ public sealed class CraftingTests
 
         session.FeedMore(0, inventory);
         Assert.True(session.IsReady(inventory));
-        Assert.Equal("Ready — craft 1 dirt", session.StatusLine(inventory));
+        Assert.Equal("Ready — craft 1 Dirt", session.StatusLine(inventory));
 
         Assert.True(session.Craft(inventory));
         Assert.Equal(stoneBefore - 2, inventory.CountFor(stone));

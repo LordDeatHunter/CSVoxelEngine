@@ -1,4 +1,5 @@
 {
+  "name": "Water",
   "model": { "parent": "block/cube_all", "textures": { "all": "water_still" } },
   "fluid": true,
   "renderer": "fluid",

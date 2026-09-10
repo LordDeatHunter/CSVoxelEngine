@@ -1,3 +1,4 @@
 {
+  "name": "Mud Bricks",
   "model": { "parent": "block/cube_all", "textures": { "all": "mud_bricks" } }
 }

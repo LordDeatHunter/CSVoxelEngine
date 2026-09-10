@@ -75,6 +75,9 @@ public sealed record BlockType
     /// <summary>String id: the block's file name under <c>assets/data/blocks</c>.</summary>
     public required string Name { get; init; }
 
+    /// <summary>Display name for inventory rows and preview headings.</summary>
+    public required string DisplayName { get; init; }
+
     /// <summary>Byte id assigned at load; what chunk storage holds.</summary>
     public required byte Id { get; init; }
 
