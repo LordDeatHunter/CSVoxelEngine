@@ -6,8 +6,9 @@ namespace silkgltriangle;
 
 /// <summary>
 /// Owns the live primed TNT: spawns cubes where TNT blocks finish mining, ticks their fuses,
-/// and detonates them. A blast clears a sphere of blocks (dropping nothing) and primes any TNT
-/// caught in it, so blasts chain. The player itself is never harmed. Main thread only.
+/// and detonates them. A blast clears a sphere of blocks (dropping nothing) and primes any dry TNT
+/// caught in it, so blasts chain; submerged TNT just clears. The player itself is never harmed.
+/// Main thread only.
 /// </summary>
 public class TntManager
 {
@@ -27,6 +28,20 @@ public class TntManager
     public void Spawn(Vector3 blockPosition, byte blockId)
     {
         _primed.Add(new PrimedTnt(blockPosition + new Vector3(0.5f), blockId));
+    }
+
+    /// <summary>
+    /// Whether the cell touches fluid on any face, in which case its fuse is wet and it
+    /// clears instead of priming. Unloaded neighbours read as absent, never as contact.
+    /// </summary>
+    public static bool IsSubmerged(ChunkManager chunks, int x, int y, int z)
+    {
+        return (chunks.TryGetCell(x + 1, y, z, out var id, out _) && BlockType.IsFluid(id))
+            || (chunks.TryGetCell(x - 1, y, z, out id, out _) && BlockType.IsFluid(id))
+            || (chunks.TryGetCell(x, y + 1, z, out id, out _) && BlockType.IsFluid(id))
+            || (chunks.TryGetCell(x, y - 1, z, out id, out _) && BlockType.IsFluid(id))
+            || (chunks.TryGetCell(x, y, z + 1, out id, out _) && BlockType.IsFluid(id))
+            || (chunks.TryGetCell(x, y, z - 1, out id, out _) && BlockType.IsFluid(id));
     }
 
     public void Update(float deltaTime, ChunkManager chunks, LodManager lod, DropManager drops,
@@ -109,7 +124,8 @@ public class TntManager
                 blastedLeaves.Add(new Vector3(x, y, z));
             }
 
-            if (BlockType.ById[removed]?.OnBreak == BlockBreakAction.PrimeTnt)
+            if (BlockType.ById[removed]?.OnBreak == BlockBreakAction.PrimeTnt
+                && !IsSubmerged(chunks, x, y, z))
             {
                 // Deferred: the live list is being iterated further up the call stack
                 _pendingSpawns.Add((new Vector3(x + 0.5f, y + 0.5f, z + 0.5f), removed));

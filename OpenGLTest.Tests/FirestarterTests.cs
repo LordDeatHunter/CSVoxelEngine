@@ -170,6 +170,32 @@ public sealed class FirestarterTests
     }
 
     [Fact]
+    public void DryTntIsNotSubmerged()
+    {
+        var (manager, _) = MeshTestWorld.WalledArea();
+        var tnt = ContentRegistry.RequireBlock("tnt").Id;
+        manager.Chunks[Vector3.Zero].SetBlockRaw(8, 8, 8, tnt, 0);
+        Assert.False(TntManager.IsSubmerged(manager, 8, 8, 8));
+    }
+
+    [Theory]
+    [InlineData(1, 0, 0)]
+    [InlineData(-1, 0, 0)]
+    [InlineData(0, 1, 0)]
+    [InlineData(0, -1, 0)]
+    [InlineData(0, 0, 1)]
+    [InlineData(0, 0, -1)]
+    public void TntTouchingWaterOnAnyFaceIsSubmerged(int dx, int dy, int dz)
+    {
+        var (manager, _) = MeshTestWorld.WalledArea();
+        var tnt = ContentRegistry.RequireBlock("tnt").Id;
+        var water = ContentRegistry.RequireBlock("water").Id;
+        manager.Chunks[Vector3.Zero].SetBlockRaw(8, 8, 8, tnt, 0);
+        manager.Chunks[Vector3.Zero].SetBlockRaw(8 + dx, 8 + dy, 8 + dz, water, FluidState.Source);
+        Assert.True(TntManager.IsSubmerged(manager, 8, 8, 8));
+    }
+
+    [Fact]
     public void ItemStackEntityCarriesComponentsPerInstance()
     {
         var first = new ItemStack(1, Firestarter);

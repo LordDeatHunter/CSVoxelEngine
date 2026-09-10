@@ -433,8 +433,10 @@ public class World
         // Creative breaks drop nothing, but the effects still play: TNT primes, trees fall.
         var creative = Camera.IsCreative;
 
-        // TNT never drops — once its HP runs out it primes on the spot instead
-        if (BlockType.ById[brokenId]?.OnBreak == BlockBreakAction.PrimeTnt)
+        // TNT never drops — once its HP runs out it primes on the spot instead.
+        // A submerged cell just clears: a wet fuse fizzles instead of priming.
+        if (BlockType.ById[brokenId]?.OnBreak == BlockBreakAction.PrimeTnt
+            && !TntManager.IsSubmerged(_chunkManager, (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z))
         {
             if (chunk.RemoveBlockAt(blockPos, _chunkManager))
                 _tntManager.Spawn(blockPos, brokenId);
@@ -660,9 +662,10 @@ public class World
 
     /// <summary>
     /// Strikes the selected firestarter at the aimed block: a full branch pile has a
-    /// per-use chance to light, and a TNT block has the same per-use chance to prime,
-    /// every attempt spends one durability and starts the item's use delay, and aiming
-    /// anywhere else does nothing. Returns whether the fire lit or the TNT primed.
+    /// per-use chance to light, and a dry TNT block has the same per-use chance to prime
+    /// (a TNT cell touching fluid never primes), every attempt spends one durability and
+    /// starts the item's use delay, and aiming anywhere else does nothing. Returns whether
+    /// the fire lit or the TNT primed.
     /// </summary>
     private bool TryIgniteCampfire(float maxDistance, ItemType item, int instanceId)
     {
@@ -678,7 +681,8 @@ public class World
         {
             var delay = item.UseDelaySeconds > 0f ? item.UseDelaySeconds : 0f;
             Inventory.MarkToolUsed(instanceId, now, delay);
-            var primed = Random.Shared.NextSingle() < item.UseChance;
+            var primed = !TntManager.IsSubmerged(_chunkManager, hx, hy, hz)
+                && Random.Shared.NextSingle() < item.UseChance;
             if (primed)
             {
                 var cell = new Vector3(hx, hy, hz);
