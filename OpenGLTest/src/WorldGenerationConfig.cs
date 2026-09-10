@@ -368,16 +368,16 @@ public static class WorldGenerationConfig
 
     // --- Campfire particles (FireParticleSystem + FireParticleRenderer) ---
     // Embers and smoke rising off lit firepits, spawned per lit cell near the camera.
-    public const float FireEmberLifetime = 0.9f;
-    public const float FireSmokeLifetime = 2.5f;
-    public const float FireEmberRise = 1.6f;
-    public const float FireSmokeRise = 1.0f;
+    public const float FireEmberLifetime = 1.8f;
+    public const float FireSmokeLifetime = 5.0f;
+    public const float FireEmberRise = 0.8f;
+    public const float FireSmokeRise = 0.5f;
     public const float FireEmberSize = 0.09f;
     public const float FireSmokeSize = 0.22f;
     public const float FireSmokeGrow = 0.12f;
-    public const int FireParticleMax = 256;
-    public const float FireEmberPerSecond = 12f;
-    public const float FireSmokePerSecond = 4f;
+    public const int FireParticleMax = 512;
+    public const float FireEmberPerSecond = 36f;
+    public const float FireSmokePerSecond = 8f;
     public const float FireParticleRadius = 48f;
 
     // --- Pebbles (PebbleGenerator) ---
