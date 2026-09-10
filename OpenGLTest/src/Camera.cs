@@ -282,6 +282,10 @@ public class Camera
         if (moveInput.LengthSquared() > 1f)
             moveInput = Vector3.Normalize(moveInput);
 
+        // Walking backwards is slower; flight keeps full speed in every direction.
+        var backing = keyboard.IsKeyPressed(Key.S) && !keyboard.IsKeyPressed(Key.W);
+        if (backing && !IsFlying) moveSpeed *= 0.3f;
+
         // Flight ignores the water entirely, so a submerged player can still fly out.
         // Creative mode on foot swims like survival.
         var swimming = IsInWater && !IsFlying;
