@@ -36,6 +36,12 @@ public class Camera
     /// <summary>View eye: the head in first person, the pulled-in shoulder camera in third.</summary>
     public Vector3 RenderEye => Position + _shoulderOffset;
     /// <summary>
+    /// F5 transition state, 0 in first person and 1 in shoulder-surf, eased over
+    /// <c>ShoulderTransitionSeconds</c>. The camera offset, the view direction and the
+    /// head opacity all ride this, so toggling never snaps.
+    /// </summary>
+    public float ShoulderBlend => MathUtils.SmoothStep(_shoulderBlendT);
+    /// <summary>
     /// Direction the screen looks along. Equals the head facing in first person; in
     /// shoulder-surf it tilts from the offset camera back onto the crosshair aim point,
     /// which is also the direction <see cref="Raycast"/> fires.
@@ -122,9 +128,14 @@ public class Camera
     // Two Space presses within this window toggle flight
     private const float DoubleTapWindow = 0.3f;
 
+    // F5 transition: the camera glides and the head fades over this long, eased.
+    private const float ShoulderTransitionSeconds = 0.5f;
+
     private bool _f5WasPressed;
     private Vector3 _shoulderOffset = Vector3.Zero;
     private Vector3 _shoulderViewDir = Vector3.Zero;
+    // Linear 0..1 timer behind ShoulderBlend; toggling mid-glide reverses smoothly.
+    private float _shoulderBlendT;
 
     // Set to "x,y,z" to start the eye at an exact spot instead of the surface spawn
     private const string SpawnOverrideVariable = "VOXEL_SPAWN";
@@ -264,6 +275,7 @@ public class Camera
         _verticalVelocity = 0f;
         _shoulderOffset = Vector3.Zero;
         _shoulderViewDir = Vector3.Zero;
+        _shoulderBlendT = IsShoulderSurf ? 1f : 0f;
     }
 
     /// <summary>
@@ -304,6 +316,8 @@ public class Camera
         UpdateCreativeToggle(keyboard);
         UpdateFlightToggle(deltaTime, keyboard);
         UpdateShoulderToggle(keyboard);
+        _shoulderBlendT = Math.Clamp(_shoulderBlendT
+            + (IsShoulderSurf ? deltaTime : -deltaTime) / ShoulderTransitionSeconds, 0f, 1f);
         UpdateWaterState(chunkManager);
 
         var sprinting = keyboard.IsKeyPressed(Key.ShiftLeft);
@@ -537,7 +551,9 @@ public class Camera
         if (pressed && !_f5WasPressed)
         {
             IsShoulderSurf = !IsShoulderSurf;
-            if (!IsShoulderSurf)
+        // Past halfway through the F5 glide the camera owns the crosshair; before that
+        // the head still aims, so the rules switch mid-glide where the two nearly agree.
+        if (ShoulderBlend <= 0.5f)
                 _shoulderOffset = Vector3.Zero;
             Console.WriteLine($"Shoulder {(IsShoulderSurf ? "ON" : "OFF")}");
         }
@@ -548,7 +564,7 @@ public class Camera
     private void UpdateShoulderOffset(ChunkManager chunkManager)
     {
         var forward = GetForwardVector();
-        if (!IsShoulderSurf)
+        if (!IsShoulderSurf && _shoulderBlendT <= 0f)
         {
             _shoulderOffset = Vector3.Zero;
             _shoulderViewDir = forward;
@@ -578,8 +594,11 @@ public class Camera
             break;
         }
 
-        _shoulderOffset = resolved;
-        var viewDir = Position + forward * ShoulderAimDistance - (Position + resolved);
+        // The glide rides the blend: at 0 the camera sits in the head no matter what the
+        // march found, so toggling out slides back along the collision-free line.
+        var effective = resolved * ShoulderBlend;
+        _shoulderOffset = effective;
+        var viewDir = forward * ShoulderAimDistance - effective;
         _shoulderViewDir = viewDir.LengthSquared() < 1e-8f ? forward : Vector3.Normalize(viewDir);
     }
 

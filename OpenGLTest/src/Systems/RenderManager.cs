@@ -1720,7 +1720,9 @@ public class RenderManager : IDisposable
     /// Draws the player body at the camera's feet, facing with the camera yaw. First person
     /// draws everything but the head, shifted slightly back so the eye sits forward of the
     /// chest; shoulder-surf draws the full body (head included) unshifted at the true feet.
-    /// The shadow pass always draws the same body unshifted, head included.
+    /// The F5 glide uses one opaque shell sliding between those offsets while the head fades
+    /// in on top, so no two shells ever coexist to z-fight. The shadow pass always draws the
+    /// same body unshifted, head included.
     /// </summary>
     public void RenderPlayer(Camera camera, PlayerModel player)
     {
@@ -1732,8 +1734,19 @@ public class RenderManager : IDisposable
         gl.ActiveTexture(TextureUnit.Texture0);
         gl.BindTexture(TextureTarget.Texture2DArray, _playerPaletteTex);
 
+        var blend = camera.ShoulderBlend;
         var viewProj = camera.GetViewProjection();
-        if (camera.IsShoulderSurf)
+        if (blend <= 0f)
+        {
+            foreach (var part in PlayerModel.FirstPersonParts)
+            {
+                var model = player.GetPartMatrix(part, camera.Position, camera.Yaw, camera.Pitch,
+                    PlayerModel.FirstPersonBodyBack);
+                SetDrawUniforms(model, model * viewProj, 1f);
+                _playerMeshes[part].Render();
+            }
+        }
+        else if (blend >= 1f)
         {
             foreach (var part in PlayerModel.BodyParts)
             {
@@ -1747,13 +1760,18 @@ public class RenderManager : IDisposable
         }
         else
         {
-            foreach (var part in PlayerModel.FirstPersonParts)
+            var back = PlayerModel.FirstPersonBodyBack * (1f - blend);
+            foreach (var part in PlayerModel.BodyParts)
             {
-                var model = player.GetPartMatrix(part, camera.Position, camera.Yaw, camera.Pitch,
-                    PlayerModel.FirstPersonBodyBack);
+                var model = player.GetPartMatrix(part, camera.Position, camera.Yaw, camera.Pitch, back);
                 SetDrawUniforms(model, model * viewProj, 1f);
                 _playerMeshes[part].Render();
             }
+            gl.DepthMask(false);
+            var head = player.GetPartMatrix("Head", camera.Position, camera.Yaw, camera.Pitch);
+            SetDrawUniforms(head, head * viewProj, blend);
+            _playerMeshes["Head"].Render();
+            gl.DepthMask(true);
         }
 
         BindWorldTextures();
@@ -1778,7 +1796,7 @@ public class RenderManager : IDisposable
     {
         if (camera == null || player == null || selectedId == 0 || !hasHeld) return;
 
-        var backOffset = camera.IsShoulderSurf ? 0f : PlayerModel.FirstPersonBodyBack;
+        var backOffset = PlayerModel.FirstPersonBodyBack * (1f - camera.ShoulderBlend);
         var hand = player.GetHandAnchorMatrix(camera.Position, camera.Yaw, backOffset);
         var viewProj = camera.GetViewProjection();
 

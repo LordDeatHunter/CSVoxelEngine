@@ -8,6 +8,8 @@ public sealed class ShoulderCameraTests
 {
     public ShoulderCameraTests() => TestContent.EnsureLoaded();
 
+    private static readonly Vector3 HeadStart = new(0.5f, 5.5f, 0.5f);
+
     private static (Camera Camera, ScriptedKeyboard Keys, ChunkManager Manager, Chunk Center) Setup(
         Vector3 position)
     {
@@ -28,45 +30,20 @@ public sealed class ShoulderCameraTests
         Update(camera, keys, manager);
     }
 
+    // Runs the F5 glide to its endpoint (0.5 s). Headless heads fall while settling, so
+    // callers re-teleport to the scenario start before asserting on geometry.
+    private static void Settle(Camera camera, ScriptedKeyboard keys, ChunkManager manager, int frames = 14)
+    {
+        for (var i = 0; i < frames; i++)
+            Update(camera, keys, manager);
+    }
+
     private static void BuildWall(Chunk center, int x)
     {
         var stone = ContentRegistry.RequireBlock("stone").Id;
         for (var y = 0; y < Chunk.Size; y++)
         for (var z = 0; z < Chunk.Size; z++)
             center.SetBlockRaw(x, y, z, stone, 0);
-    }
-
-    [Fact]
-    public void F5TogglesShoulderModeAndRenderEyeStaysAtHeadInFirstPerson()
-    {
-        var (camera, keys, manager, _) = Setup(new Vector3(0.5f, 5.5f, 0.5f));
-
-        Assert.False(camera.IsShoulderSurf);
-        Assert.Equal(camera.Position, camera.RenderEye);
-
-        Tap(camera, keys, manager, Key.F5);
-        Assert.True(camera.IsShoulderSurf);
-
-        Tap(camera, keys, manager, Key.F5);
-        Assert.False(camera.IsShoulderSurf);
-        Assert.Equal(camera.Position, camera.RenderEye);
-    }
-
-    [Fact]
-    public void ShoulderCameraSitsBehindAboveAndToTheSideConvergingOnAim()
-    {
-        var (camera, keys, manager, _) = Setup(new Vector3(0.5f, 5.5f, 0.5f));
-
-        Tap(camera, keys, manager, Key.F5);
-
-        var offset = camera.RenderEye - camera.Position;
-        Assert.True(offset.X < -2f, $"offset.X {offset.X} should reach behind (+X facing)");
-        Assert.True(offset.Y > 0.3f, $"offset.Y {offset.Y} should sit above the head");
-        Assert.True(offset.Z > 0.3f, $"offset.Z {offset.Z} should favour the right shoulder");
-
-        var facing = camera.Forward;
-        var alignment = Vector3.Dot(camera.ViewDirection, facing);
-        Assert.True(alignment > 0.99f, $"view {alignment} should nearly match the head facing");
     }
 
     private static void BuildFloor(Chunk center, int y)
@@ -78,15 +55,66 @@ public sealed class ShoulderCameraTests
     }
 
     [Fact]
+    public void F5GlidesCameraAndHeadOverHalfASecond()
+    {
+        var (camera, keys, manager, _) = Setup(HeadStart);
+
+        Assert.False(camera.IsShoulderSurf);
+        Assert.Equal(0f, camera.ShoulderBlend);
+        Assert.Equal(camera.Position, camera.RenderEye);
+
+        // 0.1 s into the 0.5 s glide: SmoothStep(0.2) is about 0.104, camera partway out.
+        Tap(camera, keys, manager, Key.F5);
+        Assert.True(camera.IsShoulderSurf);
+        Assert.InRange(camera.ShoulderBlend, 0.09f, 0.12f);
+        Assert.InRange((camera.RenderEye - camera.Position).Length(), 0.3f, 0.5f);
+
+        Settle(camera, keys, manager);
+        Assert.Equal(1f, camera.ShoulderBlend);
+
+        // Toggling back out glides the same way in reverse.
+        Tap(camera, keys, manager, Key.F5);
+        Assert.False(camera.IsShoulderSurf);
+        Assert.InRange(camera.ShoulderBlend, 0.88f, 0.91f);
+
+        Settle(camera, keys, manager);
+        Assert.Equal(0f, camera.ShoulderBlend);
+        Assert.Equal(camera.Position, camera.RenderEye);
+    }
+
+    [Fact]
+    public void ShoulderCameraSitsBehindAboveAndToTheSideConvergingOnAim()
+    {
+        var (camera, keys, manager, _) = Setup(HeadStart);
+
+        Tap(camera, keys, manager, Key.F5);
+        Settle(camera, keys, manager);
+        camera.TestTeleport(HeadStart, yaw: 0f, pitch: 0f);
+        Update(camera, keys, manager);
+
+        var offset = camera.RenderEye - camera.Position;
+        Assert.True(offset.X < -2f, $"offset.X {offset.X} should reach behind (+X facing)");
+        Assert.True(offset.Y > 0.3f, $"offset.Y {offset.Y} should sit above the head");
+        Assert.True(offset.Z > 0.3f, $"offset.Z {offset.Z} should favour the right shoulder");
+
+        var facing = camera.Forward;
+        var alignment = Vector3.Dot(camera.ViewDirection, facing);
+        Assert.True(alignment > 0.99f, $"view {alignment} should nearly match the head facing");
+    }
+
+    [Fact]
     public void ShoulderRaycastHitsTheBlockUnderTheCrosshair()
     {
-        var (camera, keys, manager, center) = Setup(new Vector3(0.5f, 5.5f, 0.5f));
+        var (camera, keys, manager, center) = Setup(HeadStart);
         BuildWall(center, x: 4);
 
         Assert.True(camera.Raycast(10f, manager, out var fpHit, out _));
         Assert.Equal(new Vector3(4f, 5f, 0f), fpHit);
 
         Tap(camera, keys, manager, Key.F5);
+        Settle(camera, keys, manager);
+        camera.TestTeleport(HeadStart, yaw: 0f, pitch: 0f);
+        Update(camera, keys, manager);
 
         Assert.True(camera.Raycast(10f, manager, out var shoulderHit, out _));
         Assert.Equal(fpHit, shoulderHit);
@@ -95,13 +123,16 @@ public sealed class ShoulderCameraTests
     [Fact]
     public void ShoulderRaycastReachesAsFarFromThePlayerAsFirstPerson()
     {
-        var (camera, keys, manager, center) = Setup(new Vector3(0.5f, 5.5f, 0.5f));
+        var (camera, keys, manager, center) = Setup(HeadStart);
         BuildWall(center, x: 7);
 
         Assert.True(camera.Raycast(10f, manager, out var fpHit, out _));
         Assert.Equal(new Vector3(7f, 5f, 0f), fpHit);
 
         Tap(camera, keys, manager, Key.F5);
+        Settle(camera, keys, manager);
+        camera.TestTeleport(HeadStart, yaw: 0f, pitch: 0f);
+        Update(camera, keys, manager);
 
         Assert.True(camera.Raycast(10f, manager, out var shoulderHit, out _));
         Assert.Equal(fpHit, shoulderHit);
@@ -112,7 +143,7 @@ public sealed class ShoulderCameraTests
     {
         var (manager, center) = MeshTestWorld.WalledArea();
         var camera = new Camera(null, null);
-        camera.TestTeleport(new Vector3(0.5f, 5.5f, 0.5f), yaw: 45f, pitch: -45f);
+        camera.TestTeleport(HeadStart, yaw: 45f, pitch: -45f);
         var keys = new ScriptedKeyboard();
         BuildFloor(center, y: 1);
 
@@ -120,11 +151,15 @@ public sealed class ShoulderCameraTests
         Assert.Equal(new Vector3(2f, 1f, 2f), fpHit);
 
         keys.Press([Key.F5]);
-        camera.Update(0.05f, keys, manager);
+        Update(camera, keys, manager);
         keys.ReleaseAll();
-        camera.Update(0.05f, keys, manager);
+        Update(camera, keys, manager);
+        Settle(camera, keys, manager);
+        camera.TestTeleport(HeadStart, yaw: 45f, pitch: -45f);
+        Update(camera, keys, manager);
 
         Assert.True(camera.IsShoulderSurf);
+        Assert.Equal(1f, camera.ShoulderBlend);
         Assert.True(camera.Raycast(10f, manager, out var shoulderHit, out _));
         var stone = ContentRegistry.RequireBlock("stone").Id;
         Assert.Equal(stone, manager.GetBlockGlobal(
@@ -136,12 +171,16 @@ public sealed class ShoulderCameraTests
     [Fact]
     public void ShoulderRaycastDoesNotExceedFirstPersonReach()
     {
-        var (camera, keys, manager, center) = Setup(new Vector3(0.5f, 5.5f, 0.5f));
+        var (camera, keys, manager, center) = Setup(HeadStart);
         BuildWall(center, x: 11);
 
         Assert.False(camera.Raycast(10f, manager, out _, out _));
 
         Tap(camera, keys, manager, Key.F5);
+        Settle(camera, keys, manager);
+        camera.TestTeleport(HeadStart, yaw: 0f, pitch: 0f);
+        Update(camera, keys, manager);
+
         Assert.True(camera.IsShoulderSurf);
         Assert.False(camera.Raycast(10f, manager, out _, out _));
     }
@@ -149,11 +188,14 @@ public sealed class ShoulderCameraTests
     [Fact]
     public void ShoulderRaycastRefusesABlockHiddenFromTheHeadBehindAPillar()
     {
-        var (camera, keys, manager, center) = Setup(new Vector3(0.5f, 5.5f, 0.5f));
+        var (camera, keys, manager, center) = Setup(HeadStart);
         var stone = ContentRegistry.RequireBlock("stone").Id;
         BuildWall(center, x: 4);
 
         Tap(camera, keys, manager, Key.F5);
+        Settle(camera, keys, manager);
+        camera.TestTeleport(HeadStart, yaw: 0f, pitch: 0f);
+        Update(camera, keys, manager);
         Assert.True(camera.IsShoulderSurf);
 
         // Sanity: with open sightlines the wall is targeted, so a later miss comes from
@@ -167,7 +209,11 @@ public sealed class ShoulderCameraTests
         Assert.False(camera.Raycast(10f, manager, out _, out _));
 
         // ...while first person honestly reports the pillar itself.
-        camera.TestTeleport(new Vector3(0.5f, 5.5f, 0.5f), yaw: 0f, pitch: 0f);
+        Tap(camera, keys, manager, Key.F5);
+        Settle(camera, keys, manager);
+        camera.TestTeleport(HeadStart, yaw: 0f, pitch: 0f);
+        Update(camera, keys, manager);
+        Assert.Equal(0f, camera.ShoulderBlend);
         Assert.True(camera.Raycast(10f, manager, out var fpHit, out _));
         Assert.Equal(new Vector3(2f, 5f, 0f), fpHit);
     }
@@ -175,10 +221,14 @@ public sealed class ShoulderCameraTests
     [Fact]
     public void ShoulderCameraPullsInFrontOfAWallBehindThePlayer()
     {
-        var (camera, keys, manager, center) = Setup(new Vector3(8.5f, 5.5f, 8.5f));
+        var wallStart = new Vector3(8.5f, 5.5f, 8.5f);
+        var (camera, keys, manager, center) = Setup(wallStart);
         BuildWall(center, x: 5);
 
         Tap(camera, keys, manager, Key.F5);
+        Settle(camera, keys, manager);
+        camera.TestTeleport(wallStart, yaw: 0f, pitch: 0f);
+        Update(camera, keys, manager);
 
         var offsetLength = (camera.RenderEye - camera.Position).Length();
         Assert.True(offsetLength < 3f, $"offset {offsetLength} should be pulled in short of the wall");
