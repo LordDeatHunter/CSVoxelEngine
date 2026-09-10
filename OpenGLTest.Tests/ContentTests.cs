@@ -108,6 +108,12 @@ public sealed class ContentTests
     }
 
     [Fact]
+    public void TntTakesTwoHitsToMine()
+    {
+        Assert.Equal(2, ContentRegistry.RequireBlock("tnt").MaxHealth);
+    }
+
+    [Fact]
     public void NoneLootTableDropsNothing()
     {
         var into = new List<byte>();

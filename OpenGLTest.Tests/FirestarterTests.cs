@@ -196,6 +196,28 @@ public sealed class FirestarterTests
     }
 
     [Fact]
+    public void PlayerPrimedFuseBurnsTwoSeconds()
+    {
+        var tnt = ContentRegistry.RequireBlock("tnt").Id;
+        var primed = new PrimedTnt(new Vector3(8, 8, 8), tnt, TntManager.PlayerFuseSeconds);
+        primed.Update(1.9f, null!);
+        Assert.False(primed.IsDue);
+        primed.Update(0.2f, null!);
+        Assert.True(primed.IsDue);
+    }
+
+    [Fact]
+    public void ChainPrimedFuseBurnsHalfASecond()
+    {
+        var tnt = ContentRegistry.RequireBlock("tnt").Id;
+        var primed = new PrimedTnt(new Vector3(8, 8, 8), tnt, TntManager.ChainFuseSeconds);
+        primed.Update(0.49f, null!);
+        Assert.False(primed.IsDue);
+        primed.Update(0.01f, null!);
+        Assert.True(primed.IsDue);
+    }
+
+    [Fact]
     public void ItemStackEntityCarriesComponentsPerInstance()
     {
         var first = new ItemStack(1, Firestarter);

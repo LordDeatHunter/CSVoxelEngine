@@ -15,6 +15,12 @@ public class TntManager
     /// <summary>Blast radius in blocks, measured from the primed cube's centre.</summary>
     public const float BlastRadius = 4f;
 
+    /// <summary>Fuse for a cube lit by hand (firestarter).</summary>
+    public const float PlayerFuseSeconds = 2f;
+
+    /// <summary>Fuse for a cube lit by another blast, so chains go off promptly.</summary>
+    public const float ChainFuseSeconds = 0.5f;
+
     private readonly List<PrimedTnt> _primed = [];
     // Spawned while iterating _primed (chained TNT); drained after the tick
     private readonly List<(Vector3 Position, byte BlockId)> _pendingSpawns = [];
@@ -23,11 +29,13 @@ public class TntManager
 
     /// <summary>
     /// Primes a cube at the centre of the cell the block occupied. The cube carries
-    /// <paramref name="blockId"/> so it renders as the block that primed.
+    /// <paramref name="blockId"/> so it renders as the block that primed, and burns for
+    /// <paramref name="fuseSeconds"/> (<see cref="PlayerFuseSeconds"/> when lit by hand,
+    /// <see cref="ChainFuseSeconds"/> when lit by a blast).
     /// </summary>
-    public void Spawn(Vector3 blockPosition, byte blockId)
+    public void Spawn(Vector3 blockPosition, byte blockId, float fuseSeconds)
     {
-        _primed.Add(new PrimedTnt(blockPosition + new Vector3(0.5f), blockId));
+        _primed.Add(new PrimedTnt(blockPosition + new Vector3(0.5f), blockId, fuseSeconds));
     }
 
     /// <summary>
@@ -60,7 +68,7 @@ public class TntManager
         }
 
         foreach (var (position, blockId) in _pendingSpawns)
-            _primed.Add(new PrimedTnt(position, blockId));
+            _primed.Add(new PrimedTnt(position, blockId, ChainFuseSeconds));
         _pendingSpawns.Clear();
     }
 

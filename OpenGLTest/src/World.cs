@@ -680,7 +680,7 @@ public class World
                 var cell = new Vector3(hx, hy, hz);
                 if (_chunkManager.ChunkAt(hx, hy, hz)?.RemoveBlockAt(cell, _chunkManager) == true)
                 {
-                    _tntManager.Spawn(cell, hitId);
+                    _tntManager.Spawn(cell, hitId, TntManager.PlayerFuseSeconds);
                     _fluidManager.ScheduleAround(cell);
                     if (LodRegion.LowerColumnBelow(hx, hy, hz))
                         _lodManager.MarkEditedColumn(hx, hz);

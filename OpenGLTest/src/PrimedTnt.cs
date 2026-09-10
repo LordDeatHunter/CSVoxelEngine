@@ -10,8 +10,8 @@ namespace silkgltriangle;
 /// </summary>
 public class PrimedTnt
 {
-    /// <summary>Seconds from priming to detonation.</summary>
-    public const float FuseSeconds = 4f;
+    /// <summary>Seconds from priming to detonation, set by whatever lit it.</summary>
+    public float FuseDuration { get; }
 
     // Slightly inside a full block so a cube spawned where a block just was rests in the freed
     // cell instead of clipping its solid neighbours
@@ -38,7 +38,7 @@ public class PrimedTnt
     private float _age;
 
     /// <summary>Seconds left on the fuse.</summary>
-    public float FuseRemaining { get; private set; } = FuseSeconds;
+    public float FuseRemaining { get; private set; }
 
     /// <summary>Whether the fuse has run out and this should detonate.</summary>
     public bool IsDue => FuseRemaining <= 0f;
@@ -49,7 +49,7 @@ public class PrimedTnt
         get
         {
             // Blink rate ramps from 4 to ~16 Hz as the fuse burns down
-            var progress = 1f - Math.Clamp(FuseRemaining / FuseSeconds, 0f, 1f);
+            var progress = 1f - Math.Clamp(FuseRemaining / FuseDuration, 0f, 1f);
             var rate = MathUtils.Lerp(4f, 16f, progress);
             return ((int)(_age * rate) & 1) == 0 ? 1f : 0f;
         }
@@ -60,15 +60,17 @@ public class PrimedTnt
     {
         get
         {
-            var progress = 1f - Math.Clamp(FuseRemaining / FuseSeconds, 0f, 1f);
+            var progress = 1f - Math.Clamp(FuseRemaining / FuseDuration, 0f, 1f);
             return 1f + 0.1f * progress * (WhiteFlash == 1f ? 1f : 0f);
         }
     }
 
-    public PrimedTnt(Vector3 position, byte blockId)
+    public PrimedTnt(Vector3 position, byte blockId, float fuseSeconds)
     {
         Position = position;
         BlockId = blockId;
+        FuseDuration = fuseSeconds;
+        FuseRemaining = fuseSeconds;
 
         // Small random pop so the cube visibly ejects instead of appearing dead still, with an
         // upward bias so surface-primed TNT lands back on top rather than inside the floor
