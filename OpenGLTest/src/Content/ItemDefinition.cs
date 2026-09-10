@@ -12,6 +12,12 @@ public sealed class ItemDefinition
     /// <summary>What right-clicking with the item does; omitted for a plain pickup.</summary>
     public UseDefinition? Use { get; set; }
 
+    /// <summary>Uses before a durability item breaks; omitted (0) for endless items.</summary>
+    public int? Durability { get; set; }
+
+    /// <summary>Seconds between uses of this item; omitted for the global click rate.</summary>
+    public float? UseDelay { get; set; }
+
     /// <summary>
     /// How the item sits in the hand when held, Minecraft-style: rotation as
     /// [pitch, yaw, roll] degrees composed yaw, then pitch, then roll; translation in
@@ -64,7 +70,7 @@ public sealed class ItemDefinition
     /// <summary>The <c>use</c> object: the action plus the block and item it works with.</summary>
     public sealed class UseDefinition
     {
-        /// <summary><c>pickup_fluid</c>, <c>place_fluid</c> or <c>place_stack</c>.</summary>
+        /// <summary><c>pickup_fluid</c>, <c>place_fluid</c>, <c>place_stack</c> or <c>ignite_campfire</c>.</summary>
         public string? Action { get; set; }
 
         /// <summary>Item the use swaps this one for, e.g. <c>item/water_bucket</c>.</summary>
@@ -76,8 +82,14 @@ public sealed class ItemDefinition
         /// <summary>
         /// Stackable block a <c>place_stack</c> action builds up, e.g. <c>block/pebble</c>
         /// for flint. Right-clicking the block adds one unit, right-clicking anything else
-        /// grounds a fresh pile of one.
+        /// grounds a fresh pile of one. For <c>ignite_campfire</c> it names the firepit
+        /// block (a max-count branch pile) the spark can light.
         /// </summary>
         public string? Block { get; set; }
+
+        /// <summary>
+        /// Per-use success chance 0..1 for <c>ignite_campfire</c>; omitted means always.
+        /// </summary>
+        public float? Chance { get; set; }
     }
 }

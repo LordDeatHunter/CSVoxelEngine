@@ -275,9 +275,23 @@ public static class ContentRegistry
                 "pickup_fluid" => ItemUseAction.PickupFluid,
                 "place_fluid" => ItemUseAction.PlaceFluid,
                 "place_stack" => ItemUseAction.PlaceStack,
+                "ignite_campfire" => ItemUseAction.IgniteCampfire,
                 _ => throw new InvalidOperationException(
-                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid or place_stack."),
+                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack or ignite_campfire."),
             };
+
+            var durability = definition.Durability ?? 0;
+            if (durability < 0 || durability > 1000)
+                throw new InvalidOperationException(
+                    $"Item '{path}' has durability {durability}; expected 0..1000.");
+            var useDelay = definition.UseDelay ?? 0f;
+            if (!float.IsFinite(useDelay) || useDelay < 0f || useDelay > 60f)
+                throw new InvalidOperationException(
+                    $"Item '{path}' has useDelay {definition.UseDelay}; expected 0..60 seconds.");
+            var chance = use?.Chance ?? 1f;
+            if (!float.IsFinite(chance) || chance <= 0f || chance > 1f)
+                throw new InvalidOperationException(
+                    $"Item '{path}' has use.chance {use?.Chance}; expected 0..1 exclusive of 0.");
 
             var id = ItemIds[name];
             var sheet = ParseSpritesheet(definition.Spritesheet, path);
@@ -288,6 +302,9 @@ public static class ContentRegistry
                 UseResultId = ResolveUseTarget(use?.Result, "use.result", path),
                 UseFluidId = ResolveUseTarget(use?.Fluid, "use.fluid", path),
                 UseBlockId = ResolveUseTarget(use?.Block, "use.block", path),
+                UseChance = chance,
+                MaxDurability = durability,
+                UseDelaySeconds = useDelay,
                 SpriteCols = sheet.Cols,
                 SpriteRows = sheet.Rows,
                 FrameCount = sheet.Frames,
@@ -421,6 +438,27 @@ public static class ContentRegistry
                 if (item.UseFluidId != 0)
                     throw new InvalidOperationException(
                         $"Item '{path}' has use.action 'place_stack' with a use.fluid: that field belongs to the bucket actions.");
+                continue;
+            }
+
+            if (item.UseAction == ItemUseAction.IgniteCampfire)
+            {
+                var target = BlockType.ById[item.UseBlockId];
+                if (target == null)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'ignite_campfire' but its use.block is not a block.");
+                if (target.StackMax < 2)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'ignite_campfire' but block '{target.Name}' sets no stackMax: the firepit must be a max-count pile.");
+                if (item.UseResultId != 0)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'ignite_campfire' with a use.result: an ignite action spends durability, it never morphs.");
+                if (item.UseFluidId != 0)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'ignite_campfire' with a use.fluid: that field belongs to the bucket actions.");
+                if (item.MaxDurability < 1)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'ignite_campfire' without durability: ignite items must declare uses before breaking.");
                 continue;
             }
 

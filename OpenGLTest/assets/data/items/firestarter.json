@@ -1,0 +1,3 @@
+{ "name": "Firestarter", "texture": "assets/textures/items/firestarter.png",
+  "durability": 10, "useDelay": 1.5,
+  "use": { "action": "ignite_campfire", "block": "block/branch_pile", "chance": 0.15 } }

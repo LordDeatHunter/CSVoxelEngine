@@ -37,6 +37,8 @@ public class World
     private readonly FluidManager _fluidManager = new();
     private readonly LeafParticleSystem _leaves = new();
     private readonly BlockDebrisSystem _debris = new();
+    private readonly CampfireManager _campfires = new();
+    private readonly FireParticleSystem _fire = new();
     // Trees currently toppling over after their base log was mined
     private readonly List<TopplingTree> _toppling = [];
     private readonly IWindow _window;
@@ -75,6 +77,12 @@ public class World
 
     /// <summary>Live mining debris, feeding the small-cube entity pass.</summary>
     public IReadOnlyList<BlockDebris> Debris => _debris.Debris;
+
+    /// <summary>Lit campfire block entities, feeding lights and fire particles.</summary>
+    public CampfireManager Campfires => _campfires;
+
+    /// <summary>Live campfire embers and smoke, feeding the fire billboard pass.</summary>
+    public IReadOnlyList<FireParticle> FireParticles => _fire.Particles;
 
     // Break overlay strength. Quantized to whole hits, so it steps with the damage dealt
     // instead of sweeping continuously.
@@ -143,6 +151,8 @@ public class World
         _falling.Update((float)deltaTime, _chunkManager, _dropManager, _fluidManager);
         _leaves.Update((float)deltaTime, Camera.Position, _chunkManager);
         _debris.Update((float)deltaTime, _chunkManager);
+        _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
+        _fire.Update((float)deltaTime, _campfires.LitCells, Camera.Position);
 
         // Falling cubes shove the player aside instead of landing inside them; strictly
         // one-way, the player never deflects a cube
@@ -208,6 +218,7 @@ public class World
         renderManager.RenderFallingBlocks(Camera, _falling.Falling);
         renderManager.RenderLeafParticles(Camera, _leaves.Particles);
         renderManager.RenderBlockDebris(Camera, _debris.Debris);
+        renderManager.RenderFireParticles(Camera, _fire.Particles);
         foreach (var tree in _toppling)
             renderManager.RenderTopplingTree(Camera, tree);
         renderManager.RenderPlayer(Camera, Player);
@@ -615,6 +626,12 @@ public class World
         if (id != 0 && Inventory.SelectedCount > 0
             && ItemType.Types.TryGetValue(id, out var item) && item.UseAction != ItemUseAction.None)
         {
+            if (item.UseAction == ItemUseAction.IgniteCampfire)
+            {
+                if (Inventory.SelectedToolInstance is var igniteInstance and > 0)
+                    TryIgniteCampfire(maxDistance, item, igniteInstance);
+                return;
+            }
             // Only morph the tool if the action actually took effect
             if (TryUseItem(maxDistance, item, out var resultId) && Inventory.SelectedToolInstance is var instance and > 0)
                 Inventory.MorphTool(instance, resultId);
@@ -622,6 +639,33 @@ public class World
         }
 
         TryPlaceSelectedBlock(maxDistance);
+    }
+
+    /// <summary>
+    /// Strikes the selected firestarter at the aimed firepit: a full branch pile has a
+    /// per-use chance to light, every attempt spends one durability and starts the item's
+    /// use delay, and aiming anywhere else does nothing. Returns whether the fire lit.
+    /// </summary>
+    private bool TryIgniteCampfire(float maxDistance, ItemType item, int instanceId)
+    {
+        var now = _window.Time;
+        if (!Inventory.ToolReadyAt(instanceId, now)) return false;
+        if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+
+        var hx = (int)hit.X;
+        var hy = (int)hit.Y;
+        var hz = (int)hit.Z;
+        if (!_chunkManager.TryGetCell(hx, hy, hz, out var hitId, out var hitState)) return false;
+        var pile = BlockType.ById[item.UseBlockId];
+        if (pile == null || hitId != item.UseBlockId) return false;
+        if (BranchPileGenerator.CountWithState(hitState, pile.StackMax) < pile.StackMax) return false;
+        if (_campfires.IsLit(hx, hy, hz)) return false;
+
+        var delay = item.UseDelaySeconds > 0f ? item.UseDelaySeconds : 0f;
+        Inventory.MarkToolUsed(instanceId, now, delay);
+        var lit = Random.Shared.NextSingle() < item.UseChance && _campfires.Ignite(hx, hy, hz);
+        Inventory.DamageTool(instanceId);
+        return lit;
     }
 
     /// <summary>

@@ -65,7 +65,7 @@ public class Inventory
 
     // One entry per tool; InstanceId is handed out increasing and never reused, so a
     // hotbar slot can name its instance and dead references are detectable
-    private readonly List<ToolEntry> _tools = [];
+    private readonly List<ItemStack> _tools = [];
     private int _nextToolInstance = 1;
 
     private readonly HotbarSlot[] _hotbar = new HotbarSlot[SlotCount];
@@ -100,10 +100,12 @@ public class Inventory
         if (BlockType.ById[id] is { } block)
             return block is { HasItem: true, Fluid: false } ? InventoryCategory.Blocks : null;
         if (ItemType.IsItem(id))
-            // Tools are the items that morph on use (a bucket becomes its full form, and back):
-            // each instance is tracked on its own. A use with no result spends from its stack
-            // instead (flint grounds rock piles), so those stay plain Misc pickups.
-            return ItemType.Types[id].UseResultId != 0
+            // Tools are the items with per-instance state: anything that morphs on use (a
+            // bucket becomes its full form, and back) plus anything with durability (a
+            // firestarter wears out). Each instance is tracked on its own. A use with no
+            // result and no durability spends from its stack instead (flint grounds rock
+            // piles), so those stay plain Misc pickups.
+            return ItemType.Types[id].UseResultId != 0 || ItemType.Types[id].MaxDurability > 0
                 ? InventoryCategory.Tools
                 : InventoryCategory.Misc;
         return null;
@@ -152,7 +154,7 @@ public class Inventory
                 var newTool = CountFor(id) == 0;
                 var firstNewIndex = _tools.Count;
                 for (var i = 0; i < Math.Min(room, amount); i++)
-                    _tools.Add(new ToolEntry(_nextToolInstance++, id));
+                    _tools.Add(new ItemStack(_nextToolInstance++, id));
                 if (newTool)
                     EquipNewTool(_tools[firstNewIndex].InstanceId);
                 return true;
@@ -179,9 +181,11 @@ public class Inventory
     /// </summary>
     public bool MorphTool(int instanceId, byte toId)
     {
-        var index = _tools.FindIndex(t => t.InstanceId == instanceId);
-        if (index < 0) return false;
-        _tools[index] = _tools[index] with { ItemId = toId };
+        var stack = _tools.FirstOrDefault(t => t.InstanceId == instanceId);
+        if (stack == null) return false;
+        stack.DefinitionId = toId;
+        if (ItemType.Types.TryGetValue(toId, out var type) && type.MaxDurability > 0 && !stack.UsesDurability)
+            stack.Set(new DurabilityComponent(type.MaxDurability, type.MaxDurability));
         for (var i = 0; i < _hotbar.Length; i++)
             if (_hotbar[i] is { IsTool: true } slot && slot.ToolInstance == instanceId)
                 _popElapsed[i] = 0f;
@@ -276,7 +280,7 @@ public class Inventory
     {
         var slot = _hotbar[Wrap(index)];
         if (slot.IsTool)
-            return _tools.FirstOrDefault(t => t.InstanceId == slot.ToolInstance).ItemId;
+            return _tools.FirstOrDefault(t => t.InstanceId == slot.ToolInstance)?.DefinitionId ?? 0;
         return slot.Id;
     }
 
@@ -320,7 +324,7 @@ public class Inventory
         {
             InventoryCategory.Blocks => _blocks.GetValueOrDefault(id),
             InventoryCategory.Misc => _misc.GetValueOrDefault(id),
-            InventoryCategory.Tools => _tools.Count(t => t.ItemId == id),
+            InventoryCategory.Tools => _tools.Count(t => t.DefinitionId == id),
             _ => 0,
         };
     }
@@ -423,14 +427,52 @@ public class Inventory
     /// <summary>One row per tool instance (name-sorted, oldest first within a name).</summary>
     public IReadOnlyList<ToolRow> ToolEntries() =>
         _tools
-            .OrderBy(t => DisplayName(t.ItemId), StringComparer.OrdinalIgnoreCase)
+            .OrderBy(t => DisplayName(t.DefinitionId), StringComparer.OrdinalIgnoreCase)
             .ThenBy(t => t.InstanceId)
-            .Select(t => new ToolRow(t.InstanceId, t.ItemId, DisplayName(t.ItemId)))
+            .Select(t => new ToolRow(t.InstanceId, t.DefinitionId, DisplayName(t.DefinitionId)))
             .ToArray();
 
     /// <summary>Item id a tool instance currently is, or 0 when it is gone.</summary>
     public byte ToolItemId(int instanceId) =>
-        _tools.FirstOrDefault(t => t.InstanceId == instanceId).ItemId;
+        _tools.FirstOrDefault(t => t.InstanceId == instanceId)?.DefinitionId ?? 0;
+
+    /// <summary>Durability left on a tool instance, or null when it has none / is gone.</summary>
+    public int? ToolDurabilityLeft(int instanceId)
+    {
+        var stack = _tools.FirstOrDefault(t => t.InstanceId == instanceId);
+        if (stack == null || !stack.UsesDurability) return null;
+        return stack.Get<DurabilityComponent>().UsesLeft;
+    }
+
+    /// <summary>Durability fraction 0..1 for the bar, or null when endless / gone.</summary>
+    public float? ToolDurabilityFraction(int instanceId)
+    {
+        var stack = _tools.FirstOrDefault(t => t.InstanceId == instanceId);
+        if (stack == null || !stack.UsesDurability) return null;
+        return stack.DurabilityFraction;
+    }
+
+    /// <summary>Spends durability on a tool instance, removing it when it breaks. Returns true when it broke.</summary>
+    public bool DamageTool(int instanceId, int amount = 1)
+    {
+        var stack = _tools.FirstOrDefault(t => t.InstanceId == instanceId);
+        if (stack == null) return false;
+        if (!stack.UsesDurability) return false;
+        if (!stack.Damage(amount)) return false;
+        RemoveTool(instanceId);
+        return true;
+    }
+
+    /// <summary>Whether a tool instance's use delay has elapsed at this scene time.</summary>
+    public bool ToolReadyAt(int instanceId, double now)
+    {
+        var stack = _tools.FirstOrDefault(t => t.InstanceId == instanceId);
+        return stack != null && stack.CanUseAt(now);
+    }
+
+    /// <summary>Starts a tool instance's use-delay cooldown at this scene time.</summary>
+    public void MarkToolUsed(int instanceId, double now, float delay) =>
+        _tools.FirstOrDefault(t => t.InstanceId == instanceId)?.MarkUsed(now, delay);
 
     /// <summary>Advances the slot pop animations.</summary>
     public void Update(float deltaTime)
@@ -477,7 +519,7 @@ public class Inventory
     {
         if (CategoryOf(id) == InventoryCategory.Tools)
         {
-            foreach (var instance in _tools.Where(t => t.ItemId == id).Take(count).ToArray())
+            foreach (var instance in _tools.Where(t => t.DefinitionId == id).Take(count).ToArray())
                 RemoveTool(instance.InstanceId);
             return;
         }
@@ -550,15 +592,13 @@ public class Inventory
                 _blocks[type.Id] = StartingStock;
         for (var i = 0; i < StartingBuckets; i++)
             if (ItemType.Types.Values.FirstOrDefault(t => t.UseAction == ItemUseAction.PickupFluid) is { } bucket)
-                _tools.Add(new ToolEntry(_nextToolInstance++, bucket.Id));
+                _tools.Add(new ItemStack(_nextToolInstance++, bucket.Id));
         // A plain pickup like flint, found by display name the way the bucket is found
         // by behaviour. No use action: it only ever sits on the hotbar for the compass.
         if (ItemType.Types.Values.FirstOrDefault(t =>
                 t.Name.Equals("Compass", StringComparison.OrdinalIgnoreCase)) is { } compass)
             _misc[compass.Id] = _misc.GetValueOrDefault(compass.Id) + StartingCompasses;
     }
-
-    private sealed record ToolEntry(int InstanceId, byte ItemId);
 
     /// <summary>One stackable list row: icon, name and the pool count for that id.</summary>
     public readonly record struct StackRow(byte Id, string Name, int Count);

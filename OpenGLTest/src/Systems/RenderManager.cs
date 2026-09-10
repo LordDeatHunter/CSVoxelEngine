@@ -68,6 +68,7 @@ public class RenderManager : IDisposable
     // Falling leaves: one dynamic billboard batch drawn in the entity pass, after the
     // cubes. Null until LoadResources builds it.
     private LeafParticleRenderer? _leaves;
+    private FireParticleRenderer? _fire;
 
     // Directional sun shadows: RenderShadows fills _shadowDepthTex (a depth-only FBO
     // attachment, sampled as a comparison sampler on unit 1) through _lightViewProj, and
@@ -326,6 +327,7 @@ public class RenderManager : IDisposable
         _clouds = new CloudRenderer(gl);
         _rays = new UnderwaterRaysRenderer(gl);
         _leaves = new LeafParticleRenderer(gl);
+        _fire = new FireParticleRenderer(gl);
 
         blockCubes = new BlockCubeCache(gl);
         itemMeshes = new ItemMeshCache(gl);
@@ -477,7 +479,8 @@ public class RenderManager : IDisposable
     /// it fades the underwater tint in and out. <paramref name="eyeInLava"/> picks the lava
     /// variant of that tint, so a submerged view reads red instead of blue.
     /// </summary>
-    public void SetLighting(double time, Camera? camera, IReadOnlyList<PrimedTnt>? primed, bool underwater, bool eyeInLava)
+    public void SetLighting(double time, Camera? camera, IReadOnlyList<PrimedTnt>? primed, bool underwater, bool eyeInLava,
+        IReadOnlyList<Vector3>? campfires = null)
     {
         // The window clock is the only time source this pass has; clamp the step so a hitch
         // (or the very first frame) cannot jump the fade
@@ -536,6 +539,18 @@ public class RenderManager : IDisposable
                 var flash = tnt.WhiteFlash;
                 _pointColors[_pointCount] = new Vector3(1f, 0.45f, 0.15f) * 1.2f
                     + new Vector3(1f, 0.9f, 0.8f) * (flash * 2f);
+                _pointCount++;
+            }
+        }
+        // Lit campfires each add a warm flickering point light above the pile
+        if (campfires != null)
+        {
+            var flicker = 0.9f + 0.25f * MathF.Sin(_time * 11f) * MathF.Sin(_time * 5.3f + 1.7f);
+            foreach (var cell in campfires)
+            {
+                if (_pointCount >= WorldGenerationConfig.MaxPointLights) break;
+                _pointPos[_pointCount] = cell + new Vector3(0.5f, 1.0f, 0.5f);
+                _pointColors[_pointCount] = new Vector3(1f, 0.5f, 0.15f) * (1.6f * flicker);
                 _pointCount++;
             }
         }
@@ -1654,6 +1669,14 @@ public class RenderManager : IDisposable
             _ambient, _fogColor, _fogNear, _fogFar);
     }
 
+    public void RenderFireParticles(Camera camera, IReadOnlyList<FireParticle> fire)
+    {
+        if (camera == null || fire.Count == 0 || _fire == null) return;
+
+        _fire.Render(fire, camera.GetViewProjection(), camera.Position, camera.Forward,
+            _fogColor, _fogNear, _fogFar);
+    }
+
     /// <summary>
     /// Draws the live mining debris as small cubes textured as the block they broke off
     /// from. Each cube spins and tumbles about its centre and fades through the world
@@ -2030,6 +2053,7 @@ public class RenderManager : IDisposable
         _clouds?.Dispose();
         _rays?.Dispose();
         _leaves?.Dispose();
+        _fire?.Dispose();
         _sunQuad.Dispose();
         gl.DeleteTexture(_sunTexture);
         gl.DeleteFramebuffer(_shadowFbo);

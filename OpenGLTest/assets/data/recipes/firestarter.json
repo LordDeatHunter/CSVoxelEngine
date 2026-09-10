@@ -1,0 +1,8 @@
+{
+  "result": "item/firestarter",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/vine", "count": 1 },
+    { "item": "item/branch", "count": 1 }
+  ]
+}

@@ -103,6 +103,12 @@ public class UIRenderer : IDisposable
     private const float CraftButtonH = 46f;
     private const float StatusH = 22f;
 
+    // Durability bar under a tool icon: fraction of the slot width, a few px tall.
+    private const float DurabilityHeight = 5f;
+    private const float DurabilityFill = 0.8f;
+    private const float DurabilityPadBottom = 6f;
+    private static readonly Rgba DurabilityBack = Rgba.Grey(0.05f, 0.9f);
+
     // Frame-timing overlay (DrawProfiler), in pixels
     private const float ProfilerLeft = 10f;
     private const float ProfilerPadding = 6f;
@@ -265,7 +271,17 @@ public class UIRenderer : IDisposable
         DrawRect(centre with { Y = centre.Y - half.Y + inset }, horizontal, color);
         DrawRect(centre with { Y = centre.Y + half.Y - inset }, horizontal, color);
         DrawRect(centre with { X = centre.X - half.X + inset }, vertical, color);
-        DrawRect(centre with { X = centre.X + half.X - inset }, vertical, color);
+        DrawRect(centre with { X = centre.X + half.X + inset }, vertical, color);
+    }
+
+    private void DrawDurabilityBar(Vector2 centre, float width, float fraction)
+    {
+        var f = MathUtils.Clamp01(fraction);
+        DrawRect(centre, new Vector2(width, DurabilityHeight), DurabilityBack);
+        if (f <= 0f) return;
+        var fill = new Rgba((byte)(230 - 104 * f), (byte)(110 + 107 * f), (byte)(110 - 23 * f));
+        DrawRect(new Vector2(centre.X - width * 0.5f + width * f * 0.5f, centre.Y),
+            new Vector2(width * f, DurabilityHeight), fill);
     }
 
     /// <summary>
@@ -473,6 +489,18 @@ public class UIRenderer : IDisposable
                 DrawBlockIcon(centre, iconSize, id);
         }
 
+        // Durability bars sit along the slot bottom, under the icons so they stay visible.
+        for (var i = 0; i < Inventory.SlotCount; i++)
+        {
+            var slot = inventory.SlotAt(i);
+            if (!slot.IsTool) continue;
+            var fraction = inventory.ToolDurabilityFraction(slot.ToolInstance);
+            if (fraction == null) continue;
+            var centre = new Vector2(firstCentreX + i * stride,
+                centreY + SlotSize * 0.5f - DurabilityPadBottom - DurabilityHeight * 0.5f);
+            DrawDurabilityBar(centre, SlotSize * DurabilityFill, fraction.Value);
+        }
+
         // Counts overlay the slot's bottom-right corner, after the icons so text is on top.
         // Slots share pool totals, so two slots showing one block show the same number.
         if (_font != null)
@@ -529,7 +557,8 @@ public class UIRenderer : IDisposable
             for (var i = 0; i < tools.Count; i++)
             {
                 var selected = view.SelectedToolInstance == tools[i].InstanceId;
-                DrawEntryRow(i, listTop, tools[i].ItemId, tools[i].Name, "1", selected, false, headingDegrees, time);
+                DrawEntryRow(i, listTop, tools[i].ItemId, tools[i].Name, "1", selected, false, headingDegrees, time,
+                    null, inventory.ToolDurabilityFraction(tools[i].InstanceId));
             }
         }
         else if (view.Tab == InventoryCategory.Crafting)
@@ -615,7 +644,7 @@ public class UIRenderer : IDisposable
             : $"{inventory.UsedOf(tab)}/{Inventory.CapacityOf(tab)}";
 
     private void DrawEntryRow(int row, float listTop, byte id, string name, string count, bool selected,
-        bool dim, float headingDegrees, float timeSeconds, Rgba? accent = null)
+        bool dim, float headingDegrees, float timeSeconds, Rgba? accent = null, float? durability = null)
     {
         var centreY = listTop + row * RowHeight + RowHeight * 0.5f;
         var centre = new Vector2(PanelLeft + PanelWidth * 0.5f, centreY);
@@ -641,6 +670,14 @@ public class UIRenderer : IDisposable
             DrawText(count,
                 new Vector2(PanelLeft + PanelWidth - PanelPad - 8f - size.X, centreY - 9f),
                 _countScale, dim && !selected ? TextDim : Rgba.White);
+        }
+
+        if (durability != null)
+        {
+            var barLeft = iconCentre.X + RowIcon * 0.5f + 8f;
+            const float barWidth = 140f;
+            DrawDurabilityBar(new Vector2(barLeft + barWidth * 0.5f, centreY + 11f),
+                barWidth, durability.Value);
         }
     }
 

@@ -57,10 +57,19 @@ public sealed class ItemType
     public byte UseFluidId { get; internal init; }
 
     /// <summary>
-    /// Stackable block id a <see cref="ItemUseAction.PlaceStack"/> use builds up (flint grows
-    /// pebble piles); 0 for every other action.
+    /// Stackable block id an ignite/place_stack use works on (firepit block for
+    /// <see cref="ItemUseAction.IgniteCampfire"/>); 0 for every other action.
     /// </summary>
     public byte UseBlockId { get; internal init; }
+
+    /// <summary>Per-use success chance 0..1 for ignite uses; 1 for everything else.</summary>
+    public float UseChance { get; internal init; } = 1f;
+
+    /// <summary>Uses before this item breaks (10 for a firestarter); 0 means endless.</summary>
+    public int MaxDurability { get; internal init; }
+
+    /// <summary>Seconds between uses of this item; 0 means the global click rate applies.</summary>
+    public float UseDelaySeconds { get; internal init; }
 
     /// <summary>Cells across the spritesheet texture; 1 for a plain sprite.</summary>
     public int SpriteCols { get; internal init; } = 1;
