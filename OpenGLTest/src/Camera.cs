@@ -24,6 +24,25 @@ public class Camera
     /// Flight itself is noclip — it passes through walls.
     /// </summary>
     public bool IsCreative { get; private set; }
+    /// <summary>
+    /// Over-shoulder third-person view toggled with F5. The player body stays where the
+    /// physics put it (<see cref="Position"/> is still the head); the view eye moves behind
+    /// + to the side (<see cref="RenderEye"/>) and tilts back onto the aim point
+    /// (<see cref="ViewDirection"/>), which <see cref="Raycast"/> also fires along, so the
+    /// highlight lands under the crosshair. Movement, collision and swimming keep reading
+    /// <see cref="Position"/>.
+    /// </summary>
+    public bool IsShoulderSurf { get; private set; }
+    /// <summary>View eye: the head in first person, the pulled-in shoulder camera in third.</summary>
+    public Vector3 RenderEye => Position + _shoulderOffset;
+    /// <summary>
+    /// Direction the screen looks along. Equals the head facing in first person; in
+    /// shoulder-surf it tilts from the offset camera back onto the crosshair aim point,
+    /// which is also the direction <see cref="Raycast"/> fires.
+    /// </summary>
+    public Vector3 ViewDirection => _shoulderViewDir.LengthSquared() > 1e-8f
+        ? Vector3.Normalize(_shoulderViewDir)
+        : GetForwardVector();
     [Obsolete("Renamed to IsCreative.")]
     public bool IsNoclip => IsCreative;
     public float VerticalVelocity => _verticalVelocity;
@@ -87,8 +106,25 @@ public class Camera
     // How hard a flow carries a swimmer along it, in blocks/s
     private const float FlowPushSpeed = 2f;
 
+    // Shoulder-surf framing, in blocks, relative to the head eye. RPG-style:
+    // behind, above and out to the right shoulder. The view direction stays parallel
+    // to the look so aiming (which still fires from the head) keeps its feel.
+    private const float ShoulderBackDist = 3.5f;
+    private const float ShoulderHeightOffset = 0.7f;
+    private const float ShoulderSideOffset = 0.9f;
+    // How far short of a blocking wall the pulled-in camera stops, and the march step.
+    private const float ShoulderPullMargin = 0.3f;
+    private const float ShoulderProbeStep = 0.175f;
+    // The camera converges on this point ahead of the head, so the crosshair sits on
+    // the same block the raycast hits. Matches World.InteractionReach.
+    private const float ShoulderAimDistance = 10f;
+
     // Two Space presses within this window toggle flight
     private const float DoubleTapWindow = 0.3f;
+
+    private bool _f5WasPressed;
+    private Vector3 _shoulderOffset = Vector3.Zero;
+    private Vector3 _shoulderViewDir = Vector3.Zero;
 
     // Set to "x,y,z" to start the eye at an exact spot instead of the surface spawn
     private const string SpawnOverrideVariable = "VOXEL_SPAWN";
@@ -226,6 +262,8 @@ public class Camera
         // A teleport is not a fall: without this a scenario dropped at altitude keeps the
         // speed it built up before the jump and plummets through the frame it wanted
         _verticalVelocity = 0f;
+        _shoulderOffset = Vector3.Zero;
+        _shoulderViewDir = Vector3.Zero;
     }
 
     /// <summary>
@@ -265,6 +303,7 @@ public class Camera
 
         UpdateCreativeToggle(keyboard);
         UpdateFlightToggle(deltaTime, keyboard);
+        UpdateShoulderToggle(keyboard);
         UpdateWaterState(chunkManager);
 
         var sprinting = keyboard.IsKeyPressed(Key.ShiftLeft);
@@ -345,6 +384,8 @@ public class Camera
         {
             Position += frameMovement;
             IsGrounded = false;
+            UpdateShoulderOffset(chunkManager);
+            RefreshEyeWaterState(chunkManager);
             return;
         }
 
@@ -372,6 +413,9 @@ public class Camera
         {
             IsGrounded = false;
         }
+
+        UpdateShoulderOffset(chunkManager);
+        RefreshEyeWaterState(chunkManager);
     }
 
     /// <summary>
@@ -485,6 +529,85 @@ public class Camera
         }
 
         _spaceWasPressed = spacePressed;
+    }
+
+    private void UpdateShoulderToggle(IKeyboard keyboard)
+    {
+        var pressed = keyboard.IsKeyPressed(Key.F5);
+        if (pressed && !_f5WasPressed)
+        {
+            IsShoulderSurf = !IsShoulderSurf;
+            if (!IsShoulderSurf)
+                _shoulderOffset = Vector3.Zero;
+            Console.WriteLine($"Shoulder {(IsShoulderSurf ? "ON" : "OFF")}");
+        }
+
+        _f5WasPressed = pressed;
+    }
+
+    private void UpdateShoulderOffset(ChunkManager chunkManager)
+    {
+        var forward = GetForwardVector();
+        if (!IsShoulderSurf)
+        {
+            _shoulderOffset = Vector3.Zero;
+            _shoulderViewDir = forward;
+            return;
+        }
+
+        var right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
+        var desired = -forward * ShoulderBackDist + Vector3.UnitY * ShoulderHeightOffset + right * ShoulderSideOffset;
+        var length = desired.Length();
+        if (length < float.Epsilon)
+        {
+            _shoulderOffset = Vector3.Zero;
+            _shoulderViewDir = forward;
+            return;
+        }
+
+        var steps = Math.Max(1, (int)MathF.Ceiling(length / ShoulderProbeStep));
+        var resolved = desired;
+        for (var i = 1; i <= steps; i++)
+        {
+            var probe = Position + desired * (i / (float)steps);
+            if (!IsCameraBlocked(probe, chunkManager))
+                continue;
+
+            var safeT = Math.Max(0f, (i - 1) / (float)steps - ShoulderPullMargin / length);
+            resolved = desired * safeT;
+            break;
+        }
+
+        _shoulderOffset = resolved;
+        var viewDir = Position + forward * ShoulderAimDistance - (Position + resolved);
+        _shoulderViewDir = viewDir.LengthSquared() < 1e-8f ? forward : Vector3.Normalize(viewDir);
+    }
+
+    private static bool IsCameraBlocked(Vector3 point, ChunkManager chunkManager)
+    {
+        var id = chunkManager.GetBlockGlobal(
+            (int)MathF.Floor(point.X),
+            (int)MathF.Floor(point.Y),
+            (int)MathF.Floor(point.Z));
+        return BlockType.IsSolid(id);
+    }
+
+    private void RefreshEyeWaterState(ChunkManager chunkManager)
+    {
+        if (!IsShoulderSurf)
+            return;
+
+        var eye = Position + _shoulderOffset;
+        var eyeX = (int)MathF.Floor(eye.X);
+        var eyeY = (int)MathF.Floor(eye.Y);
+        var eyeZ = (int)MathF.Floor(eye.Z);
+        IsEyeInWater = eye.Y < chunkManager.GetFluidSurfaceGlobal(eyeX, eyeY, eyeZ);
+        IsEyeInLava = false;
+        if (IsEyeInWater && chunkManager.TryGetCell(eyeX, eyeY, eyeZ, out var eyeId, out _)
+            && BlockType.IsFluid(eyeId))
+        {
+            IsEyeInLava = BlockType.Emission[eyeId] > 0;
+        }
     }
 
     private Vector3 MoveOnAxis(Vector3 start, float delta, int axis, ChunkManager chunkManager, out bool collided)
@@ -645,12 +768,12 @@ public class Camera
 
     public Matrix4x4 GetViewMatrix()
     {
-        var forward = GetForwardVector();
-        var right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
+        var viewDir = ViewDirection;
+        var right = Vector3.Normalize(Vector3.Cross(viewDir, Vector3.UnitY));
         var up = Vector3.Transform(Vector3.UnitY,
-            Matrix4x4.CreateFromAxisAngle(forward, _roll));
-        var eye = Position + Vector3.UnitY * _bobHeight + right * _bobStrafe;
-        return Matrix4x4.CreateLookAt(eye, eye + forward, up);
+            Matrix4x4.CreateFromAxisAngle(viewDir, _roll));
+        var eye = Position + Vector3.UnitY * _bobHeight + right * _bobStrafe + _shoulderOffset;
+        return Matrix4x4.CreateLookAt(eye, eye + viewDir, up);
     }
 
     public Matrix4x4 GetProjectionMatrix() =>
@@ -674,11 +797,15 @@ public class Camera
     }
 
     /// <summary>
-    /// Walks the view ray cell by cell (DDA) and reports the first cell it can target. Fluids are
-    /// transparent to targeting unless <paramref name="includeFluids"/> is set, which only an item
-    /// that works on them (the bucket) asks for. A cell only counts when the ray enters one of
-    /// the block's hitboxes (see <see cref="BlockHitbox"/>), so small blocks like flowers are
-    /// aimed through everywhere outside their shape.
+    /// Walks the view ray cell by cell (DDA) and reports the first cell it can target. The ray
+    /// leaves the head in first person and the shoulder camera in third person, along
+    /// <see cref="ViewDirection"/>, so the highlight always lands under the crosshair. In
+    /// third person the head then re-casts toward the cursor target under first-person
+    /// rules and must reach the same cell, so range and line-of-sight never exceed first
+    /// person. Fluids are transparent to targeting unless <paramref name="includeFluids"/>
+    /// is set, which only an item that works on them (the bucket) asks for. A cell only
+    /// counts when the ray enters one of the block's hitboxes (see <see cref="BlockHitbox"/>),
+    /// so small blocks like flowers are aimed through everywhere outside their shape.
     /// </summary>
     public bool Raycast(float maxDistance, ChunkManager chunkManager, out Vector3 hitPosition, out Vector3 hitNormal,
         bool includeFluids = false) =>
@@ -692,24 +819,74 @@ public class Camera
     public bool Raycast(float maxDistance, ChunkManager chunkManager, out Vector3 hitPosition, out Vector3 hitNormal,
         out int hitBoxIndex, bool includeFluids = false)
     {
-        var direction = GetForwardVector();
-        var currentPosition = Position.Floor();
+        hitPosition = Vector3.Zero;
+        hitNormal = Vector3.Zero;
+        hitBoxIndex = 0;
+
+        if (!IsShoulderSurf)
+        {
+            return RaycastFrom(Position, GetForwardVector(), maxDistance, 0f, stopAtRange: false,
+                chunkManager, out hitPosition, out hitNormal, out hitBoxIndex, out _, includeFluids);
+        }
+
+        // Crosshair target from the shoulder camera. Its walk is longer than head reach
+        // because it starts behind the head; the head check below cuts it back down.
+        var camRange = maxDistance + _shoulderOffset.Length();
+        if (!RaycastFrom(RenderEye, ViewDirection, camRange, camRange * 3 + 2, stopAtRange: true,
+                chunkManager, out var camHit, out var camNormal, out var camBox, out var camT, includeFluids))
+            return false;
+
+        // Head validation: the head re-casts toward the exact surface point the camera
+        // hit, under first-person rules, and must arrive at the same cell. Range and
+        // line-of-sight therefore never exceed first person: nothing is mined or placed
+        // through walls or past what the head could hit itself.
+        var surface = RenderEye + ViewDirection * camT;
+        var toSurface = surface - Position;
+        var headDist = toSurface.Length();
+        if (headDist < 1e-4f)
+        {
+            (hitPosition, hitNormal, hitBoxIndex) = (camHit, camNormal, camBox);
+            return true;
+        }
+        if (!RaycastFrom(Position, toSurface / headDist, maxDistance, 0f, stopAtRange: false,
+                chunkManager, out var headHit, out _, out _, out _, includeFluids))
+            return false;
+        if (headHit != camHit)
+            return false;
+
+        (hitPosition, hitNormal, hitBoxIndex) = (camHit, camNormal, camBox);
+        return true;
+    }
+
+    private static bool RaycastFrom(Vector3 origin, Vector3 direction, float range, float cellCap, bool stopAtRange,
+        ChunkManager chunkManager, out Vector3 hitPosition, out Vector3 hitNormal, out int hitBoxIndex,
+        out float hitT, bool includeFluids)
+    {
+        // A diagonal ray crosses up to 3 cells per block travelled, so a walk counted in
+        // iterations starves rays that travel further (shoulder camera) or aim steeply.
+        // Capped walks therefore count cells generously and stop on travelled distance
+        // instead; the uncapped walk is first person exactly as it always was. tMax holds
+        // the distance to the next cell boundary per axis, so its minimum is where the
+        // current cell ends.
+        var currentPosition = origin.Floor();
         var step = direction.Sign();
         var tDelta = Vector3.Abs(Vector3.One / direction);
         var dist = Vector3.Distance(Vector3.Zero, direction);
+        var stepLimit = stopAtRange ? cellCap : range * dist;
         var lastStepNormal = Vector3.Zero;
 
         var tMax = new Vector3(
-            (step.X > 0 ? currentPosition.X + 1 - Position.X : Position.X - currentPosition.X) * tDelta.X,
-            (step.Y > 0 ? currentPosition.Y + 1 - Position.Y : Position.Y - currentPosition.Y) * tDelta.Y,
-            (step.Z > 0 ? currentPosition.Z + 1 - Position.Z : Position.Z - currentPosition.Z) * tDelta.Z
+            (step.X > 0 ? currentPosition.X + 1 - origin.X : origin.X - currentPosition.X) * tDelta.X,
+            (step.Y > 0 ? currentPosition.Y + 1 - origin.Y : origin.Y - currentPosition.Y) * tDelta.Y,
+            (step.Z > 0 ? currentPosition.Z + 1 - origin.Z : origin.Z - currentPosition.Z) * tDelta.Z
         );
 
         hitPosition = Vector3.Zero;
         hitNormal = Vector3.Zero;
         hitBoxIndex = 0;
+        hitT = 0f;
 
-        for (var i = 0; i < maxDistance * dist; i++)
+        for (var i = 0; i < stepLimit; i++)
         {
             // currentPosition components are floored floats, so the int casts are exact
             var cellX = (int)currentPosition.X;
@@ -736,6 +913,10 @@ public class Camera
                     hitPosition = currentPosition;
                     hitNormal = lastStepNormal == Vector3.Zero ? -direction.Sign() : lastStepNormal;
                     hitBoxIndex = 0;
+                    if (!RayIntersectsBox(origin, direction, currentPosition, currentPosition + Vector3.One,
+                            float.PositiveInfinity, out var cellT, out _))
+                        cellT = 0f;
+                    hitT = cellT;
                     return true;
                 }
 
@@ -746,7 +927,7 @@ public class Camera
                 {
                     var boxMin = currentPosition + boxes[b].Min;
                     var boxMax = currentPosition + boxes[b].Max;
-                    if (!RayIntersectsBox(Position, direction, boxMin, boxMax, maxDistance, out var t, out var normal))
+                    if (!RayIntersectsBox(origin, direction, boxMin, boxMax, range, out var t, out var normal))
                         continue;
                     if (t < bestT)
                     {
@@ -760,6 +941,7 @@ public class Camera
                 {
                     hitPosition = currentPosition;
                     hitBoxIndex = bestBox;
+                    hitT = bestT;
                     // The eye inside the box has no entry face: fall back to the cell entry.
                     hitNormal = bestNormal == Vector3.Zero
                         ? (lastStepNormal == Vector3.Zero ? -direction.Sign() : lastStepNormal)
@@ -767,6 +949,9 @@ public class Camera
                     return true;
                 }
             }
+
+            if (stopAtRange && Math.Min(tMax.X, Math.Min(tMax.Y, tMax.Z)) > range)
+                break;
 
             if (tMax.X < tMax.Y && tMax.X < tMax.Z)
             {

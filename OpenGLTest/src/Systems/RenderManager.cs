@@ -492,7 +492,7 @@ public class RenderManager : IDisposable
         _time = (float)time;
         if (camera != null)
         {
-            _cameraPos = camera.Position;
+            _cameraPos = camera.RenderEye;
             // Inverting the exact matrix the depth was written with is what makes the shaders'
             // position reconstruction independent of the clip-depth convention.
             if (!Matrix4x4.Invert(camera.GetViewProjection(), out _invViewProj))
@@ -611,7 +611,7 @@ public class RenderManager : IDisposable
 
         const float r = WorldGenerationConfig.ShadowRadiusBlocks;
         const float d = 2.5f * r;
-        var target = camera.Position + camera.Forward * (r * 0.35f);
+        var target = camera.RenderEye + camera.ViewDirection * (r * 0.35f);
 
         // Snap in the provisional light space, then bring the snapped point back to world
         // space and rebuild the view around it
@@ -909,7 +909,7 @@ public class RenderManager : IDisposable
         // CullWater ran a moment ago, so a frame with no water on screen skips the whole
         // mirrored render rather than filling a texture nothing will sample.
         if (!WorldGenerationConfig.WaterEnabled || camera == null || !_waterVisible
-            || camera.Position.Y < WaterPlaneY || _reflFbo == 0)
+            || camera.RenderEye.Y < WaterPlaneY || _reflFbo == 0)
         {
             SetWorldUniform("uReflValid", 0f);
             return;
@@ -924,9 +924,9 @@ public class RenderManager : IDisposable
 
         // Mirror position and facing across the horizontal plane; pitch stays within
         // ±89° through the mirror, so UnitY never parallels the view direction.
-        var fwd = camera.Forward;
-        var mirroredPos = new Vector3(camera.Position.X, 2f * WaterPlaneY - camera.Position.Y,
-            camera.Position.Z);
+        var fwd = camera.ViewDirection;
+        var mirroredPos = new Vector3(camera.RenderEye.X, 2f * WaterPlaneY - camera.RenderEye.Y,
+            camera.RenderEye.Z);
         var mirroredFwd = new Vector3(fwd.X, -fwd.Y, fwd.Z);
         var view = Matrix4x4.CreateLookAt(mirroredPos, mirroredPos + mirroredFwd, Vector3.UnitY);
         _reflViewProj = view * camera.GetProjectionMatrix();
@@ -1057,7 +1057,7 @@ public class RenderManager : IDisposable
 
         // Straight onto the fresh sky, before any terrain: see RenderSun
         if (camera != null)
-            RenderSun(camera.Forward, camera.GetProjectionMatrix());
+            RenderSun(camera.ViewDirection, camera.GetProjectionMatrix());
 
         // Exactly once a frame, before any pass appends to it: the ring rolls onto its next
         // slot and waits on the fence that says the GPU is done reading it.
@@ -1288,7 +1288,7 @@ public class RenderManager : IDisposable
         var viewProj = camera.GetViewProjection();
         chunkShader.SetUniform(_locChunkViewProj, viewProj);
         var frustum = new Frustum(viewProj);
-        var camChunkPos = (camera.Position / Chunk.Size).Floor();
+        var camChunkPos = (camera.RenderEye / Chunk.Size).Floor();
 
         // Sort chunks by distance for better cache coherency and early z-rejection
         _visibleChunks.Clear();
@@ -1355,8 +1355,8 @@ public class RenderManager : IDisposable
         if (camera == null) return;
 
         var frustum = new Frustum(camera.GetViewProjection());
-        var camChunkPos = (camera.Position / Chunk.Size).Floor();
-        var camPos = camera.Position;
+        var camChunkPos = (camera.RenderEye / Chunk.Size).Floor();
+        var camPos = camera.RenderEye;
 
         for (var i = 0; i < chunks.Count; i++)
         {
@@ -1476,7 +1476,7 @@ public class RenderManager : IDisposable
 
         var viewProj = camera.GetViewProjection();
         var frustum = new Frustum(viewProj);
-        var camPos = camera.Position;
+        var camPos = camera.RenderEye;
 
         _visibleRegions.Clear();
 
@@ -1666,7 +1666,7 @@ public class RenderManager : IDisposable
     {
         if (camera == null || leaves.Count == 0 || _leaves == null) return;
 
-        _leaves.Render(leaves, camera.GetViewProjection(), camera.Position, camera.Forward,
+        _leaves.Render(leaves, camera.GetViewProjection(), camera.RenderEye, camera.ViewDirection,
             textureAtlas, TextureAtlas.TileWidth, _sunDir, _sunColor, _sunIntensity,
             _ambient, _fogColor, _fogNear, _fogFar);
     }
@@ -1675,7 +1675,7 @@ public class RenderManager : IDisposable
     {
         if (camera == null || fire.Count == 0 || _fire == null) return;
 
-        _fire.Render(fire, camera.GetViewProjection(), camera.Position, camera.Forward,
+        _fire.Render(fire, camera.GetViewProjection(), camera.RenderEye, camera.ViewDirection,
             _fogColor, _fogNear, _fogFar);
     }
 
@@ -1683,7 +1683,7 @@ public class RenderManager : IDisposable
     {
         if (camera == null || bubbles.Count == 0 || _bubbles == null) return;
 
-        _bubbles.Render(bubbles, camera.GetViewProjection(), camera.Position, camera.Forward,
+        _bubbles.Render(bubbles, camera.GetViewProjection(), camera.RenderEye, camera.ViewDirection,
             _fogColor, _fogNear, _fogFar);
     }
 
@@ -1717,10 +1717,10 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Draws the player body (everything but the head) at the camera's feet, facing with
-    /// the camera yaw and shifted slightly back so the eye sits forward of the chest:
-    /// looking down shows the shirt front, legs and feet instead of the neck. The shadow
-    /// pass draws the same body unshifted, head included. The right arm pumps on mining hits.
+    /// Draws the player body at the camera's feet, facing with the camera yaw. First person
+    /// draws everything but the head, shifted slightly back so the eye sits forward of the
+    /// chest; shoulder-surf draws the full body (head included) unshifted at the true feet.
+    /// The shadow pass always draws the same body unshifted, head included.
     /// </summary>
     public void RenderPlayer(Camera camera, PlayerModel player)
     {
@@ -1729,18 +1729,31 @@ public class RenderManager : IDisposable
         worldShader.Use();
         BindWorldTextures();
 
-        // The palette is a single-slice array texture like the item sprites, so the world
-        // shader reads it through the same sampler; the atlas goes back on afterwards.
         gl.ActiveTexture(TextureUnit.Texture0);
         gl.BindTexture(TextureTarget.Texture2DArray, _playerPaletteTex);
 
         var viewProj = camera.GetViewProjection();
-        foreach (var part in PlayerModel.FirstPersonParts)
+        if (camera.IsShoulderSurf)
         {
-            var model = player.GetPartMatrix(part, camera.Position, camera.Yaw, camera.Pitch,
-                PlayerModel.FirstPersonBodyBack);
-            SetDrawUniforms(model, model * viewProj, 1f);
-            _playerMeshes[part].Render();
+            foreach (var part in PlayerModel.BodyParts)
+            {
+                var model = player.GetPartMatrix(part, camera.Position, camera.Yaw, camera.Pitch);
+                SetDrawUniforms(model, model * viewProj, 1f);
+                _playerMeshes[part].Render();
+            }
+            var head = player.GetPartMatrix("Head", camera.Position, camera.Yaw, camera.Pitch);
+            SetDrawUniforms(head, head * viewProj, 1f);
+            _playerMeshes["Head"].Render();
+        }
+        else
+        {
+            foreach (var part in PlayerModel.FirstPersonParts)
+            {
+                var model = player.GetPartMatrix(part, camera.Position, camera.Yaw, camera.Pitch,
+                    PlayerModel.FirstPersonBodyBack);
+                SetDrawUniforms(model, model * viewProj, 1f);
+                _playerMeshes[part].Render();
+            }
         }
 
         BindWorldTextures();
@@ -1765,8 +1778,8 @@ public class RenderManager : IDisposable
     {
         if (camera == null || player == null || selectedId == 0 || !hasHeld) return;
 
-        var hand = player.GetHandAnchorMatrix(camera.Position, camera.Yaw,
-            PlayerModel.FirstPersonBodyBack);
+        var backOffset = camera.IsShoulderSurf ? 0f : PlayerModel.FirstPersonBodyBack;
+        var hand = player.GetHandAnchorMatrix(camera.Position, camera.Yaw, backOffset);
         var viewProj = camera.GetViewProjection();
 
         worldShader.Use();

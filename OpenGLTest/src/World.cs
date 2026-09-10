@@ -153,11 +153,11 @@ public class World
 
         _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager, _falling, _leaves);
         _falling.Update((float)deltaTime, _chunkManager, _dropManager, _fluidManager);
-        _leaves.Update((float)deltaTime, Camera.Position, _chunkManager);
+        _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager);
         _debris.Update((float)deltaTime, _chunkManager);
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
-        _fire.Update((float)deltaTime, _campfires.LitCells, Camera.Position);
-        _bubbles.Update((float)deltaTime, Camera.Position, Camera.Forward, Camera.IsEyeInWater, _chunkManager);
+        _fire.Update((float)deltaTime, _campfires.LitCells, Camera.RenderEye);
+        _bubbles.Update((float)deltaTime, Camera.RenderEye, Camera.ViewDirection, Camera.IsEyeInWater, _chunkManager);
 
         // Falling cubes shove the player aside instead of landing inside them; strictly
         // one-way, the player never deflects a cube
@@ -602,7 +602,7 @@ public class World
     /// </summary>
     public void ThrowSelected(bool wholeStack = false)
     {
-        var forward = Camera.Forward;
+        var forward = Camera.ViewDirection;
 
         // A held tool is one instance: it leaves the pool and every hotbar slot holding it
         if (Inventory.SelectedToolInstance is var instance and > 0)
