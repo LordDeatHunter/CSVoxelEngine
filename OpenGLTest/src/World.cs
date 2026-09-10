@@ -728,13 +728,18 @@ public class World
         {
             if (item.UseAction == ItemUseAction.IgniteCampfire)
             {
-                if (Inventory.SelectedToolInstance is var igniteInstance and > 0)
-                    TryIgniteCampfire(maxDistance, item, igniteInstance);
+                if (Inventory.SelectedToolInstance is var igniteInstance and > 0
+                    && TryIgniteCampfire(maxDistance, item, igniteInstance))
+                    Player.Punch();
                 return;
             }
             // Only morph the tool if the action actually took effect
-            if (TryUseItem(maxDistance, item, out var resultId) && Inventory.SelectedToolInstance is var instance and > 0)
-                Inventory.MorphTool(instance, resultId);
+            if (TryUseItem(maxDistance, item, out var resultId))
+            {
+                if (Inventory.SelectedToolInstance is var instance and > 0)
+                    Inventory.MorphTool(instance, resultId);
+                Player.Punch();
+            }
             return;
         }
 
@@ -923,6 +928,7 @@ public class World
 
         if (!PlaceBlockAtFace(hitPos, hitNormal, blockId, state: 0)) return false;
 
+        Player.Punch();
         // Sand placed into thin air falls at once instead of hovering (stackable piles never
         // fall — the registry forbids the combination — so only the block path topples)
         var placePos = hitPos + hitNormal;

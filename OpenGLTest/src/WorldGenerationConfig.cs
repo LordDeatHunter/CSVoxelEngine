@@ -210,6 +210,16 @@ public static class WorldGenerationConfig
     public const float LavaPatchThreshold = 0.2f;
     public const float LavaPoolChance = 0.3f;
 
+    // --- Malachite ore (MalachiteGenerator) ---
+    // Common coal-like blobs replacing stone at any depth: cells where the vein field
+    // exceeds MalachiteThreshold become ore. Deposits average ~50 ores each and most
+    // chunk columns hold several, so casual mining runs into ore without a dedicated
+    // hunt. Frequency sets the blob diameter; the threshold sets deposit size and
+    // spacing (measured in MalachiteTests, not guessed).
+    public const bool MalachiteEnabled = true;
+    public const float MalachiteFrequency = 1f / 18f;
+    public const float MalachiteThreshold = 0.88f;
+
     // --- Terrain shape (natural rolling base with large flat patches) ---
     // The base is the original rolling terrain (BaseFrequency, 6-octave product noise times
     // BaseAmplitude). A rare low-frequency mask flattens large patches toward gentle meadow

@@ -411,6 +411,10 @@ public class Chunk : IDisposable
         if (WorldGenerationConfig.WormCavesEnabled)
             WormCarver.Carve(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
+        // After the carvers, so veins rim cave walls instead of being eaten by them.
+        if (WorldGenerationConfig.MalachiteEnabled)
+            MalachiteGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
+
         // After the carvers (so caves under the sea floor flood) and before the trees and
         // pebbles, which skip submerged columns rather than growing underwater
         if (WorldGenerationConfig.WaterEnabled)
