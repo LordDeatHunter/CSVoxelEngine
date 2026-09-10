@@ -8,9 +8,9 @@ flat in uint fLayer;
 uniform sampler2DArray uTex;
 uniform vec4 uColor;
 uniform bool uUseTexture;
-// Alpha discard threshold for cutout draws (extruded item sprites). 0 disables: without it
-// the sprite's transparent front texels would still write depth and swallow the extrusion
-// walls behind them whenever the slab turns.
+// Alpha discard threshold for cutout draws (extruded item sprites, cutout block
+// icons). 0 disables: without it the sprite's transparent front texels would still
+// write depth and swallow the extrusion walls behind them whenever the slab turns.
 uniform float uAlphaCutoff;
 
 out vec4 FragColor;

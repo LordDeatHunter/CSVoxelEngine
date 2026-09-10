@@ -250,7 +250,18 @@ public class UIRenderer : IDisposable
                     * IconRotation
                     * FlipToScreen(centre);
 
+        // Cutout blocks (flower, leaves) carry transparent texels: discard them so they
+        // draw neither colour nor depth, exactly like the world opaque pass and DrawItemIcon.
+        // Without this the invisible pixels depth-swallow geometry behind them.
+        var cutout = BlockType.ById[blockId]?.Cutout == true;
+        if (cutout)
+        {
+            _shader.Use();
+            _shader.SetUniform(_locAlphaCutoff, 0.5f);
+        }
         DrawMesh(mesh, model, Rgba.White, _atlasTexture);
+        if (cutout)
+            _shader.SetUniform(_locAlphaCutoff, 0f);
 
         _gl.Disable(EnableCap.DepthTest);
     }
@@ -716,7 +727,17 @@ public class UIRenderer : IDisposable
                     * rotation
                     * FlipToScreen(centre);
 
+        // Same cutout discard as DrawBlockIcon: the spinning preview would otherwise
+        // rasterize the sprite's transparent texels (and their depth) as black.
+        var cutout = BlockType.ById[blockId]?.Cutout == true;
+        if (cutout)
+        {
+            _shader.Use();
+            _shader.SetUniform(_locAlphaCutoff, 0.5f);
+        }
         DrawMesh(mesh, model, Rgba.White, _atlasTexture);
+        if (cutout)
+            _shader.SetUniform(_locAlphaCutoff, 0f);
 
         _gl.Disable(EnableCap.DepthTest);
     }
