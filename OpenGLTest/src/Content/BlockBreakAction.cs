@@ -1,7 +1,8 @@
 namespace silkgltriangle;
 
-/// <summary>What happens when a block is destroyed: roll its loot table, or prime it as TNT
-/// (which drops nothing and spawns a <see cref="PrimedTnt"/> instead).</summary>
+/// <summary>What happens when a block is destroyed: roll its loot table like normal.
+/// <see cref="PrimeTnt"/> additionally marks the block as primable: a firestarter strike or
+/// a nearby blast spawns a <see cref="PrimedTnt"/> instead of dropping.</summary>
 public enum BlockBreakAction
 {
     Drop,

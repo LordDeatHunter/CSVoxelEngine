@@ -430,20 +430,12 @@ public class World
 
         _debris.Burst(blockPos, brokenId, WorldGenerationConfig.BlockDebrisOnBreak);
 
-        // Creative breaks drop nothing, but the effects still play: TNT primes, trees fall.
+        // Creative breaks drop nothing, but trees still fall.
         var creative = Camera.IsCreative;
 
-        // TNT never drops — once its HP runs out it primes on the spot instead.
-        // A submerged cell just clears: a wet fuse fizzles instead of priming.
-        if (BlockType.ById[brokenId]?.OnBreak == BlockBreakAction.PrimeTnt
-            && !TntManager.IsSubmerged(_chunkManager, (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z))
-        {
-            if (chunk.RemoveBlockAt(blockPos, _chunkManager))
-                _tntManager.Spawn(blockPos, brokenId);
-        }
         // A mined wood block fells whatever it was holding up instead of dropping one
         // block (see FellWood): a trunk cut drops the crown, a branch cut only its children
-        else if (TreeGenerator.WoodLevel(brokenId) >= 0)
+        if (TreeGenerator.WoodLevel(brokenId) >= 0)
             FellWood(blockPos, brokenId, chunk, creative);
         // Everything else rolls its loot table, but only once a block was actually cleared
         else if (chunk.RemoveBlockAt(blockPos, _chunkManager))

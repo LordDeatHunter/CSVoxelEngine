@@ -98,6 +98,16 @@ public sealed class ContentTests
     }
 
     [Fact]
+    public void TntDropsItselfWhenDestroyed()
+    {
+        var tnt = ContentRegistry.RequireBlock("tnt");
+        Assert.Null(tnt.LootTable);
+        var into = new List<byte>();
+        DropManager.RollLoot(tnt.Id, new LootContext(0, 0, 0), into);
+        Assert.Equal(new[] { tnt.Id }, into);
+    }
+
+    [Fact]
     public void NoneLootTableDropsNothing()
     {
         var into = new List<byte>();

@@ -5,8 +5,8 @@ using System.Numerics;
 namespace silkgltriangle;
 
 /// <summary>
-/// Owns the live primed TNT: spawns cubes where TNT blocks finish mining, ticks their fuses,
-/// and detonates them. A blast clears a sphere of blocks (dropping nothing) and primes any dry TNT
+/// Owns the live primed TNT: spawns cubes where firestarter strikes and blasts light TNT,
+/// ticks their fuses, and detonates them. A blast clears a sphere of blocks (dropping nothing) and primes any dry TNT
 /// caught in it, so blasts chain; submerged TNT just clears. The player itself is never harmed.
 /// Main thread only.
 /// </summary>

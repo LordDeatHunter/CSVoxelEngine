@@ -4,6 +4,5 @@
     "parent": "block/cube_column",
     "textures": { "end": "tnt_top", "side": "tnt_side" }
   },
-  "onBreak": "prime_tnt",
-  "loot": "none"
+  "onBreak": "prime_tnt"
 }
