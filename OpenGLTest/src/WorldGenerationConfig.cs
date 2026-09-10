@@ -355,6 +355,17 @@ public static class WorldGenerationConfig
     public const int LeafParticleBurstFell = 24;
     public const int LeafParticleBurstBlast = 16;
 
+    // --- Mining debris (BlockDebris + BlockDebrisSystem) ---
+    // Small block-textured cubes chipped off on every mining hit plus a bigger burst when
+    // the block breaks. Visual only: they fall, bounce and fade, never collect.
+    public const int BlockDebrisMax = 512;
+    public const int BlockDebrisPerHit = 4;
+    public const int BlockDebrisOnBreak = 20;
+    public const float BlockDebrisLifetime = 2.0f;
+    public const float BlockDebrisSize = 0.12f;
+    // Seconds a cube takes to fade out at the end of its life (or after landing)
+    public const float BlockDebrisFadeSeconds = 0.4f;
+
     // --- Pebbles (PebbleGenerator) ---
     // Ankle-high stones in rare low-frequency patches; a density roll thins inside them
     public const bool PebblesEnabled = true;

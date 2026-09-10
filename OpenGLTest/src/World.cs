@@ -36,6 +36,7 @@ public class World
     private readonly FallingBlockManager _falling = new();
     private readonly FluidManager _fluidManager = new();
     private readonly LeafParticleSystem _leaves = new();
+    private readonly BlockDebrisSystem _debris = new();
     // Trees currently toppling over after their base log was mined
     private readonly List<TopplingTree> _toppling = [];
     private readonly IWindow _window;
@@ -71,6 +72,9 @@ public class World
 
     /// <summary>Live falling leaves, feeding the batched billboard pass.</summary>
     public IReadOnlyList<LeafParticle> LeafParticles => _leaves.Particles;
+
+    /// <summary>Live mining debris, feeding the small-cube entity pass.</summary>
+    public IReadOnlyList<BlockDebris> Debris => _debris.Debris;
 
     // Break overlay strength. Quantized to whole hits, so it steps with the damage dealt
     // instead of sweeping continuously.
@@ -138,6 +142,7 @@ public class World
         _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager, _falling, _leaves);
         _falling.Update((float)deltaTime, _chunkManager, _dropManager, _fluidManager);
         _leaves.Update((float)deltaTime, Camera.Position, _chunkManager);
+        _debris.Update((float)deltaTime, _chunkManager);
 
         // Falling cubes shove the player aside instead of landing inside them; strictly
         // one-way, the player never deflects a cube
@@ -202,6 +207,7 @@ public class World
         renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
         renderManager.RenderFallingBlocks(Camera, _falling.Falling);
         renderManager.RenderLeafParticles(Camera, _leaves.Particles);
+        renderManager.RenderBlockDebris(Camera, _debris.Debris);
         foreach (var tree in _toppling)
             renderManager.RenderTopplingTree(Camera, tree);
         renderManager.RenderPlayer(Camera, Player);
@@ -333,7 +339,11 @@ public class World
             // the frame boundary, so the animation stays in step with the hit rhythm
             _popElapsed = _hitTimer;
 
-            if (_breakDamage < _breakMaxHealth) continue;
+            if (_breakDamage < _breakMaxHealth)
+            {
+                _debris.Burst(_breakingBlockPosition, _breakingBlockId, WorldGenerationConfig.BlockDebrisPerHit);
+                continue;
+            }
 
             RemoveBlock(_breakingBlockPosition);
             StopBreaking();
@@ -390,6 +400,8 @@ public class World
         // Water is not mineable: only a bucket takes it out (and its hardness of 0 would
         // otherwise pop it on first contact)
         if (BlockType.IsFluid(brokenId)) return;
+
+        _debris.Burst(blockPos, brokenId, WorldGenerationConfig.BlockDebrisOnBreak);
 
         // Creative breaks drop nothing, but the effects still play: TNT primes, trees fall.
         var creative = Camera.IsCreative;

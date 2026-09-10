@@ -1655,6 +1655,35 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
+    /// Draws the live mining debris as small cubes textured as the block they broke off
+    /// from. Each cube spins and tumbles about its centre and fades through the world
+    /// shader's alpha, like the item drops but smaller and never collected.
+    /// </summary>
+    public void RenderBlockDebris(Camera camera, IReadOnlyList<BlockDebris> debris)
+    {
+        if (camera == null || debris.Count == 0) return;
+
+        worldShader.Use();
+        BindWorldTextures();
+
+        var viewProj = camera.GetViewProjection();
+
+        foreach (var cube in debris)
+        {
+            var mesh = blockCubes.Get(cube.BlockId);
+            if (mesh == null) continue;
+
+            var model = Matrix4x4.CreateScale(cube.Size)
+                        * Matrix4x4.CreateRotationX(cube.Tumble)
+                        * Matrix4x4.CreateRotationY(cube.Spin)
+                        * Matrix4x4.CreateTranslation(cube.Position);
+
+            SetDrawUniforms(model, model * viewProj, MathUtils.Clamp01(cube.Alpha));
+            mesh.Render();
+        }
+    }
+
+    /// <summary>
     /// Draws the player body (everything but the head) at the camera's feet, facing with
     /// the camera yaw and shifted slightly back so the eye sits forward of the chest:
     /// looking down shows the shirt front, legs and feet instead of the neck. The shadow
