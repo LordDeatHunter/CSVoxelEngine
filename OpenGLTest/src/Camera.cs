@@ -55,7 +55,8 @@ public class Camera
     private const float Gravity = 34f;
     private const float JumpSpeed = 11f;
     private const float PlayerHeight = 1.8f;
-    private const float EyeHeight = 1.62f;
+    /// <summary>Eye above the feet; the player model roots itself here.</summary>
+    public const float EyeHeight = 1.62f;
     private const float PlayerRadius = 0.30f;
     private const float CollisionStepSize = 0.05f;
 

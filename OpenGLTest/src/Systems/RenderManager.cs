@@ -37,6 +37,8 @@ public class RenderManager : IDisposable
     private UIRenderer ui;
     private BlockCubeCache blockCubes;
     private ItemMeshCache itemMeshes;
+    private uint _playerPaletteTex;
+    private Dictionary<string, Mesh> _playerMeshes = new();
     private uint textureAtlas;
     private uint outlineVao;
     private uint outlineVbo;
@@ -321,6 +323,9 @@ public class RenderManager : IDisposable
 
         blockCubes = new BlockCubeCache(gl);
         itemMeshes = new ItemMeshCache(gl);
+        _playerPaletteTex = TextureLoader.Upload(gl, PlayerModel.PalettePixels(),
+            PlayerModel.PaletteCols, PlayerModel.PaletteRows);
+        _playerMeshes = PlayerModel.BuildMeshes(gl);
         ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes);
         CreateSelectionGeometry();
     }
@@ -606,7 +611,8 @@ public class RenderManager : IDisposable
     /// <see cref="ChunkDrawBatch"/>; TNT, falling blocks and trees keep the plain program.
     /// </summary>
     public void RenderShadows(Camera camera, IReadOnlyList<Chunk> chunks,
-        IReadOnlyList<PrimedTnt> primed, IReadOnlyList<FallingBlock> falling, IEnumerable<TopplingTree> trees)
+        IReadOnlyList<PrimedTnt> primed, IReadOnlyList<FallingBlock> falling, IEnumerable<TopplingTree> trees,
+        PlayerModel? player = null)
     {
         // The dry strength, not the wet-faded one: submerged, the caustics and the sun shafts
         // still sample this map even though the world diffuse has stopped using it.
@@ -704,6 +710,17 @@ public class RenderManager : IDisposable
             shadowShader.SetUniform("uModel", model);
             shadowShader.SetUniform("uLightMVP", model * _lightViewProj);
             mesh.Render();
+        }
+
+        if (player != null && camera != null)
+        {
+            gl.ActiveTexture(TextureUnit.Texture0);
+            gl.BindTexture(TextureTarget.Texture2DArray, _playerPaletteTex);
+            foreach (var part in PlayerModel.BodyParts)
+                DrawPlayerPartShadow(player, part, camera);
+            DrawPlayerPartShadow(player, "Head", camera);
+            gl.ActiveTexture(TextureUnit.Texture0);
+            gl.BindTexture(TextureTarget.Texture2DArray, textureAtlas);
         }
 
         // Back to the default framebuffer and the blend state the world passes expect
@@ -1624,6 +1641,44 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
+    /// Draws the player body (everything but the head) at the camera's feet, facing with
+    /// the camera yaw and shifted slightly back so the eye sits forward of the chest:
+    /// looking down shows the shirt front, legs and feet instead of the neck. The shadow
+    /// pass draws the same body unshifted, head included. The right arm pumps on mining hits.
+    /// </summary>
+    public void RenderPlayer(Camera camera, PlayerModel player)
+    {
+        if (camera == null || player == null) return;
+
+        worldShader.Use();
+        BindWorldTextures();
+
+        // The palette is a single-slice array texture like the item sprites, so the world
+        // shader reads it through the same sampler; the atlas goes back on afterwards.
+        gl.ActiveTexture(TextureUnit.Texture0);
+        gl.BindTexture(TextureTarget.Texture2DArray, _playerPaletteTex);
+
+        var viewProj = camera.GetViewProjection();
+        foreach (var part in PlayerModel.FirstPersonParts)
+        {
+            var model = player.GetPartMatrix(part, camera.Position, camera.Yaw, camera.Pitch,
+                PlayerModel.FirstPersonBodyBack);
+            SetDrawUniforms(model, model * viewProj, 1f);
+            _playerMeshes[PlayerModel.MeshFor(part)].Render();
+        }
+
+        BindWorldTextures();
+    }
+
+    private void DrawPlayerPartShadow(PlayerModel player, string part, Camera camera)
+    {
+        var model = player.GetPartMatrix(part, camera.Position, camera.Yaw, camera.Pitch);
+        shadowShader.SetUniform("uModel", model);
+        shadowShader.SetUniform("uLightMVP", model * _lightViewProj);
+        _playerMeshes[PlayerModel.MeshFor(part)].Render();
+    }
+
+    /// <summary>
     /// Draws a felled tree swinging around its base. The mesh uploads on first sight (GL is
     /// only legal on this thread); an empty mesh means nothing visible was collected.
     /// </summary>
@@ -1863,6 +1918,10 @@ public class RenderManager : IDisposable
         ui.Dispose();
         blockCubes.Dispose();
         itemMeshes.Dispose();
+        foreach (var mesh in _playerMeshes.Values)
+            mesh.Dispose();
+        _playerMeshes.Clear();
+        gl.DeleteTexture(_playerPaletteTex);
         worldShader.Dispose();
         chunkShader.Dispose();
         selectionShader.Dispose();

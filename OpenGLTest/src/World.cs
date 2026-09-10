@@ -52,6 +52,12 @@ public class World
     private float _popElapsed = BlockPopSeconds;
     public Camera Camera { get; }
 
+    /// <summary>The blocky player body: walk-swung limbs, mine-pumping right arm.</summary>
+    public PlayerModel Player { get; } = new();
+
+    private Vector3 _prevCamPos;
+    private bool _hasPrevCamPos;
+
     /// <summary>The player's hotbar; its selected slot decides what block placing puts down.</summary>
     public Inventory Inventory { get; } = new();
 
@@ -91,6 +97,19 @@ public class World
         FrameProfiler.Begin(ProfileSection.Camera);
         Camera.Update((float)deltaTime, keyboard, _chunkManager);
         FrameProfiler.End(ProfileSection.Camera);
+
+        // The walk cycle runs off real horizontal speed, so the limbs keep up with sprint,
+        // swim and flight instead of playing a fixed-rate loop.
+        var camPos = Camera.Position;
+        var horizontalSpeed = 0f;
+        if (_hasPrevCamPos && deltaTime > 0.0)
+        {
+            var step = camPos - _prevCamPos;
+            horizontalSpeed = new Vector3(step.X, 0f, step.Z).Length() / (float)deltaTime;
+        }
+        _prevCamPos = camPos;
+        _hasPrevCamPos = true;
+        Player.Update((float)deltaTime, horizontalSpeed);
 
         // Times itself, as ChunkUnload / ChunkApply / ChunkDirty
         _chunkManager.Update(Camera);
@@ -148,7 +167,7 @@ public class World
     {
         // Depth-only sun pass first: every world draw below samples the shadow map it fills
         FrameProfiler.Begin(ProfileSection.Shadows);
-        renderManager.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling);
+        renderManager.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player);
         FrameProfiler.End(ProfileSection.Shadows);
 
         FrameProfiler.Begin(ProfileSection.Reflection);
@@ -176,6 +195,7 @@ public class World
         renderManager.RenderLeafParticles(Camera, _leaves.Particles);
         foreach (var tree in _toppling)
             renderManager.RenderTopplingTree(Camera, tree);
+        renderManager.RenderPlayer(Camera, Player);
         FrameProfiler.End(ProfileSection.EntityPass);
 
         // Water last of the world passes: it blends, so everything it can cover has to be in
@@ -258,6 +278,7 @@ public class World
         if (Camera.IsCreative)
         {
             StopBreaking();
+            Player.Punch();
             RemoveBlock(_selectedBlockPosition);
             return;
         }
@@ -279,7 +300,10 @@ public class World
         if (_breakMaxHealth <= 0)
         {
             if (BlockType.ById[_breakingBlockId] != null)
+            {
+                Player.Punch();
                 RemoveBlock(_selectedBlockPosition);
+            }
             StopBreaking();
             return;
         }
@@ -292,6 +316,7 @@ public class World
         {
             _hitTimer -= BlockHitSeconds;
             _breakDamage++;
+            Player.Punch();
 
             // Start the pop from where the hit actually landed inside this frame, not from
             // the frame boundary, so the animation stays in step with the hit rhythm
