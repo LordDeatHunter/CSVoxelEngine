@@ -1,0 +1,23 @@
+{
+  // Perf fly-around: settle, then teleport legs + sustained sprint walks to force streaming.
+  // Run: VOXEL_DEBUG=1 VOXEL_TIME=60 VOXEL_SCRIPT=visual-examples/perf-fly.json
+  "steps": [
+    { "op": "wait", "seconds": 10 },
+    { "op": "screenshot", "name": "perf_spawn" },
+    { "op": "teleport", "pos": [0.5, 60.5, 0.5], "yaw": -90, "pitch": -10 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 10 },
+    { "op": "screenshot", "name": "perf_leg1" },
+    { "op": "teleport", "pos": [150.5, 50.5, -80.5], "yaw": -90, "pitch": -15 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 8 },
+    { "op": "teleport", "pos": [228.5, 10.5, -138.5], "yaw": 0, "pitch": -22 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "perf_bay" },
+    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 8 },
+    { "op": "teleport", "pos": [-120.5, 70.5, 100.5], "yaw": 90, "pitch": -20 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 8 },
+    { "op": "screenshot", "name": "perf_end" }
+  ]
+}

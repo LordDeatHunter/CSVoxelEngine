@@ -224,6 +224,7 @@ public static class FrameProfiler
         var cpuMs = ToMilliseconds(cpuTicks) / frames;
 
         var gpuAvgMs = new double[SectionCount];
+        var gpuMaxMs = new double[SectionCount];
         var gpuSamples = new int[SectionCount];
         double gpuSumMs = 0;
         var gpuAny = false;
@@ -231,6 +232,7 @@ public static class FrameProfiler
         {
             if (_gpuSamples[i] == 0) continue;
             gpuAvgMs[i] = _gpuAccumNs[i] / (double)_gpuSamples[i] / 1_000_000.0;
+            gpuMaxMs[i] = _gpuMaxNs[i] / 1_000_000.0;
             gpuSamples[i] = _gpuSamples[i];
             gpuSumMs += gpuAvgMs[i];
             gpuAny = true;
@@ -267,7 +269,7 @@ public static class FrameProfiler
         _consoleLine =
             $"perf frame {frameMs:F2}ms {fps}fps cpu {cpuMs:F2} gpu {gpuText} " +
             $"gc {gc0 - _gcBase0}/{gc1 - _gcBase1}/{gc2 - _gcBase2} " +
-            $"chunks {_chunkCount}/{_visibleChunkCount} | {JoinSections(frames, gpuAvgMs, gpuSamples)}";
+            $"chunks {_chunkCount}/{_visibleChunkCount} | {JoinSections(frames, gpuAvgMs, gpuMaxMs, gpuSamples)}";
         _consolePending = true;
 
         _gcBase0 = gc0;
@@ -289,15 +291,19 @@ public static class FrameProfiler
     private static string FormatRow(string label, double avgMs, double maxMs, string gpuMs) =>
         $"{label,-10}{avgMs,6:F2}{maxMs,7:F2}{gpuMs,6}";
 
-    private static string JoinSections(int frames, double[] gpuAvgMs, int[] gpuSamples)
+    // One section per `label avg~max`, with a `/gpuAvg~gpuMax` suffix where a render
+    // pass reported GPU samples. `~` is the worst single frame in the publish window,
+    // `/` separates the CPU pair from the GPU pair — the overlay's fixed-width rows
+    // cannot fit the GPU max, so this console line is the record for spike hunting.
+    private static string JoinSections(int frames, double[] gpuAvgMs, double[] gpuMaxMs, int[] gpuSamples)
     {
         var parts = new string[SectionCount];
         for (var i = 0; i < SectionCount; i++)
             parts[i] = gpuSamples[i] > 0
-                ? $"{Labels[i]} {ToMilliseconds(_accumTicks[i]) / frames:F2}/{gpuAvgMs[i]:F2}"
-                : $"{Labels[i]} {ToMilliseconds(_accumTicks[i]) / frames:F2}";
+                ? $"{Labels[i]} {ToMilliseconds(_accumTicks[i]) / frames:F2}~{ToMilliseconds(_maxTicks[i]):F2}/{gpuAvgMs[i]:F2}~{gpuMaxMs[i]:F2}"
+                : $"{Labels[i]} {ToMilliseconds(_accumTicks[i]) / frames:F2}~{ToMilliseconds(_maxTicks[i]):F2}";
         return string.Join(" | ", parts)
-               + $" | {OtherLabel} {ToMilliseconds(_accumOtherTicks) / frames:F2}";
+               + $" | {OtherLabel} {ToMilliseconds(_accumOtherTicks) / frames:F2}~{ToMilliseconds(_maxOtherTicks):F2}";
     }
 
     private static double ToMilliseconds(long ticks) => ticks / TicksPerMillisecond;

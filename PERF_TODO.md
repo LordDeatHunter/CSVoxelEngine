@@ -26,11 +26,12 @@ Two profiler traps, read before trusting a number:
   calls it inside the `ProgramUpdate` span). A 15-25 ms `progUpdate` during a script
   is chunk/LOD/fluid work, not input overhead. In real play `progUpdate` is ~0.2-0.5 ms.
   CPU-section sums therefore exceed the frame in scripted runs by design.
-- The `perf` console line shows per-section **avg only**. Worst-frame spikes are
-  invisible there — read `max` from the in-game `X` overlay, or extend the console
-  line (open item 18). `lighting` CPU absorbs the GPU stall (it is the frame's first
-  GL call), so a fat `lighting` row with a matching GPU sum means GPU-bound, not
-  lighting-bound.
+- The `perf` console line shows `avg~max` per section (`~` = worst single frame in
+  the 1 s window) with a `/gpuAvg~gpuMax` suffix on render passes (item 18) — read
+  the `~` half for spikes, the avg half for steady cost. `lighting` CPU absorbs the
+  GPU stall (it is the frame's first GL call), so a fat `lighting` row with a
+  matching GPU sum means GPU-bound, not lighting-bound. The `X` overlay keeps CPU
+  avg+max and GPU avg only (fixed-width rows); the console line is the spike record.
 
 ## Current profile (2026-09-11 fly, 58 `perf` lines)
 
@@ -125,10 +126,12 @@ queue started draining instead of ballooning.
   cloud mesh density (`CloudCellSize`/`CloudMaxLevels`) — all structural (chunk
   pipeline couplings, FBO realloc, field rebuild), not slider material. If a low
   preset is ever wanted, that is a feature, not perf work.)
-- [ ] **18. Log per-section max, not just avg.** The `perf` console line hides the
-  very spikes this file tracks (fluid max, `chunkApply` max). Add `avg/max` pairs
-  (or a `~max` suffix) to `JoinSections`, and a per-pass GPU max next to the avg.
-  Without this every future item is measured half-blind.
+- [x] **18. Log per-section max, not just avg.** (done 2026-09-11: `JoinSections`
+  emits `label avg~max` plus `/gpuAvg~gpuMax` on render passes; overlay untouched —
+  its 29-char rows cannot fit a GPU max inside the 32-glyph budget. Build clean,
+  351/353 tests with the 2 failures pre-existing on HEAD. First verification run
+  (`basic.json`, streaming) immediately showed what avg hid: `chunkApply ~149`,
+  `lod ~57`, `fluidTick ~47`, `reflect` CPU ~44 ms worst-frame in the window.)
 - [ ] **19. Slice the streaming burst.** `lod` 10.7 / `chunkDirty` 6.3 /
   `chunkApply` 5.8 ms peaks during stream-in. Candidates: bound LOD cover-test work
   per frame (level-0 slice), adaptive `MaxDirtyChunksPerFrame` /
