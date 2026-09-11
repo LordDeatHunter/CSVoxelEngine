@@ -224,8 +224,14 @@ fragments; the mesher/renderer change is preserved in the stash named in item 5.
    front-to-back order (translucent keeps its CPU sort either way). Do not retry unless a CPU-bound
    profile shows cull + sort above ~1 ms. Status recorded in `MESHER_PLAN.md`.
 
-- [ ] **10. GC and runtime settings.** (the `chunk.lifetime` half is **done** 2026-09-09 as part of
-  `MESHER_PLAN.md` Phase 4; the GC and runtime settings below are still open.)
+- [x] **10. GC and runtime settings.** (implemented 2026-09-11: `GCSettings.LatencyMode =
+  SustainedLowLatency` at the top of `Program.Main`, explicit
+  `<ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>` and `<TieredPGO>true</TieredPGO>`
+  in `silkgltriangle.csproj`. Server GC deliberately off. Build clean, 345/347 tests with the 2
+  failures pre-existing on HEAD (`FallingBlockTests.SevenTower…`,
+  `WoodShapeTests.PlayerWalksPast…`). Frame-time measurement still to do: Release build, rest +
+  streaming `perf` lines checking `other max` and the `gc` header. The `chunk.lifetime` half was
+  already **done** 2026-09-09 as part of `MESHER_PLAN.md` Phase 4; text kept below.)
   `GCSettings.LatencyMode = SustainedLowLatency` in
   `Program.Main`; explicit `<ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>`
   and `<TieredPGO>true</TieredPGO>` in the csproj. Do not enable Server GC without measuring.

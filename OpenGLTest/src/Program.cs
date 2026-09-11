@@ -53,6 +53,11 @@ public static class Program
 
     public static void Main()
     {
+        // PERF_TODO item 10: keep full blocking Gen2s off the frame path. SustainedLowLatency
+        // defers them in favour of background collections; the startup line already logs the
+        // effective latency mode via PrintBuildDiagnostics, so a perf capture records it.
+        GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
+
         GameSettings.ResetToDefaults();
         GameSettings.Load();
         windowManager = new WindowManager();
