@@ -2166,7 +2166,8 @@ public class RenderManager : IDisposable
     }
 
     public void RenderUI(IWindow window, Inventory inventory, InventoryView view, float time,
-        int fps, bool showProfiler, Camera? camera = null, bool showCoordinates = true)
+        int fps, bool showProfiler, Camera? camera = null, bool showCoordinates = true,
+        PauseMenuView? menu = null)
     {
         ui.Begin(window.Size);
 
@@ -2181,7 +2182,7 @@ public class RenderManager : IDisposable
                 Rgba.FromFloat(tint.X, tint.Y, tint.Z, alpha));
         }
 
-        if (!view.IsOpen)
+        if (!view.IsOpen && (menu == null || !menu.IsOpen))
             ui.DrawCrosshair();
         if (camera != null && HasCompassEquipped(inventory))
             ui.DrawCompass(camera.Yaw, camera.Position, showCoordinates);
@@ -2192,6 +2193,8 @@ public class RenderManager : IDisposable
         ui.DrawHotbar(inventory, heading, time);
         if (view.IsOpen)
             ui.DrawInventoryPanel(inventory, view, time, heading);
+        if (menu != null)
+            ui.DrawPauseMenu(menu);
         ui.End();
     }
 
@@ -2200,6 +2203,7 @@ public class RenderManager : IDisposable
     public InventoryCategory? UiPanelTabAt(Vector2 point) => ui.PanelTabAt(point);
     public int? UiPanelRowAt(Vector2 point, int rowCount) => ui.PanelRowAt(point, rowCount);
     public CraftHit UiCraftHitAt(Vector2 point, InventoryView view) => ui.CraftHitAt(point, view);
+    public PauseMenuHit UiPauseMenuHitAt(Vector2 point, PauseMenuView menu) => ui.PauseMenuHitAt(point, menu);
 
     // The compass item id, resolved once: null when no item named "compass" is registered,
     // in which case the HUD compass never shows rather than throwing every frame.

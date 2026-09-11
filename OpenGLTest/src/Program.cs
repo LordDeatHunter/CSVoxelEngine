@@ -20,7 +20,9 @@ public static class Program
     private static bool xWasPressed;
     private static bool qWasPressed;
     private static bool eWasPressed;
+    private static bool escWasPressed;
     private static readonly InventoryView inventoryView = new();
+    private static readonly PauseMenuView pauseMenuView = new();
     private static double debugLogTimer;
     private static double fpsTimer;
     private static int fpsFrames;
@@ -71,6 +73,12 @@ public static class Program
 
         inputManager.Mouse?.MouseUp += (_, button) =>
         {
+            if (pauseMenuView.IsOpen)
+            {
+                if (button == MouseButton.Left && inputManager.Mouse != null)
+                    HandleMenuClick(inputManager.Mouse.Position);
+                return;
+            }
             if (button == MouseButton.Right) placeTimer = MAX_PLACE_TIMER;
             if (button == MouseButton.Left && inventoryView.IsOpen && inputManager.Mouse != null)
                 HandleInventoryClick(inputManager.Mouse.Position);
@@ -78,7 +86,7 @@ public static class Program
 
         inputManager.Mouse?.Scroll += (_, wheel) =>
         {
-            if (!inventoryView.IsOpen) world.Inventory.Scroll(wheel.Y);
+            if (!inventoryView.IsOpen && !pauseMenuView.IsOpen) world.Inventory.Scroll(wheel.Y);
         };
 
         ambience = new AmbienceManager();
@@ -187,13 +195,30 @@ public static class Program
         }
         xWasPressed = xPressed;
 
+        // ESC toggles the pause menu instead of closing the game: first press opens it,
+        // ESC on the settings page steps back to the main page, ESC there resumes the game.
+        // An open [E] panel is closed first so the two never overlap.
+        var escPressed = inputManager.Keyboard?.IsKeyPressed(Key.Escape) == true;
+        if (escPressed && !escWasPressed)
+        {
+            if (inventoryView.IsOpen)
+                SetInventoryOpen(false);
+            else if (pauseMenuView.Page == PauseMenuPage.Closed)
+                SetPauseMenu(PauseMenuPage.Main);
+            else if (pauseMenuView.Page == PauseMenuPage.Settings)
+                SetPauseMenu(PauseMenuPage.Main);
+            else
+                SetPauseMenu(PauseMenuPage.Closed);
+        }
+        escWasPressed = escPressed;
+
         // The [E] panel owns the mouse: clicks equip, hotbar keys rest, and the world runs on
         var ePressed = inputManager.Keyboard?.IsKeyPressed(Key.E) == true;
-        if (ePressed && !eWasPressed)
+        if (ePressed && !eWasPressed && !pauseMenuView.IsOpen)
             SetInventoryOpen(!inventoryView.IsOpen);
         eWasPressed = ePressed;
 
-        if (!inventoryView.IsOpen)
+        if (!inventoryView.IsOpen && !pauseMenuView.IsOpen)
         {
             // 1-10 grabs the hotbar slot directly; scroll still walks it one step at a time
             var numberKeys = new[] { Key.Number1, Key.Number2, Key.Number3, Key.Number4, Key.Number5,
@@ -219,22 +244,19 @@ public static class Program
             }
         }
 
-        world.Update((float)deltaTime, inputManager.Keyboard);
+        // The menu freezes the simulation: the world keeps rendering behind the overlay
+        // but physics, chunks, fluids and mining all hold still until resume.
+        if (!pauseMenuView.IsOpen)
+        {
+            world.Update((float)deltaTime, inputManager.Keyboard);
 
-        FrameProfiler.Begin(ProfileSection.Breaking);
-        world.UpdateBlockBreaking(deltaTime,
-            !inventoryView.IsOpen && inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true);
-        FrameProfiler.End(ProfileSection.Breaking);
+            FrameProfiler.Begin(ProfileSection.Breaking);
+            world.UpdateBlockBreaking(deltaTime,
+                !inventoryView.IsOpen && inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true);
+            FrameProfiler.End(ProfileSection.Breaking);
+        }
 
         LogDebugLine(deltaTime);
-
-        if (inputManager.Keyboard?.IsKeyPressed(Key.Escape) == true)
-        {
-            if (inventoryView.IsOpen)
-                SetInventoryOpen(false);
-            else
-                windowManager.Window.Close();
-        }
     }
 
     /// <summary>
@@ -252,6 +274,36 @@ public static class Program
         world.Camera.SuppressLook = open;
         if (inputManager.Mouse != null)
             inputManager.Mouse.Cursor.CursorMode = open ? CursorMode.Normal : CursorMode.Disabled;
+    }
+
+    private static void SetPauseMenu(PauseMenuPage page)
+    {
+        if (page != PauseMenuPage.Closed && inventoryView.IsOpen)
+            SetInventoryOpen(false);
+        pauseMenuView.Page = page;
+        var open = page != PauseMenuPage.Closed;
+        world.Camera.SuppressLook = open;
+        if (inputManager.Mouse != null)
+            inputManager.Mouse.Cursor.CursorMode = open ? CursorMode.Normal : CursorMode.Disabled;
+    }
+
+    private static void HandleMenuClick(System.Numerics.Vector2 position)
+    {
+        switch (renderManager.UiPauseMenuHitAt(position, pauseMenuView))
+        {
+            case PauseMenuHit.Resume:
+                SetPauseMenu(PauseMenuPage.Closed);
+                break;
+            case PauseMenuHit.Settings:
+                SetPauseMenu(PauseMenuPage.Settings);
+                break;
+            case PauseMenuHit.Exit:
+                windowManager.Window.Close();
+                break;
+            case PauseMenuHit.Back:
+                SetPauseMenu(PauseMenuPage.Main);
+                break;
+        }
     }
 
     /// <summary>
@@ -366,7 +418,8 @@ public static class Program
         var hideHud = visualDirector?.TakeScreenshot == true && visualDirector.ScreenshotHideHud;
         if (!hideHud)
             world.RenderUI(renderManager, inventoryView,
-                (float)(windowManager.Window.Time + timeOffset), shownFps, debugEnabled);
+                (float)(windowManager.Window.Time + timeOffset), shownFps, debugEnabled,
+                showCoordinates: true, menu: pauseMenuView);
         FrameProfiler.End(ProfileSection.UiPass);
 
         if (visualDirector?.TakeScreenshot == true)

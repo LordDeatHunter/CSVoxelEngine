@@ -597,6 +597,47 @@ public class UIRenderer : IDisposable
         DrawPreview(inventory, view, time, headingDegrees);
     }
 
+    /// <summary>
+    /// The ESC pause menu over the still-rendered game: a fullscreen dim standing in for a
+    /// blur (this pass has no blur target; the dark translucency keeps the scene visible
+    /// but unreadable, like the Godot reference's BlurOverlay in overlay mode), then a
+    /// centred title with RESUME / SETTINGS / EXIT buttons, or the settings title with a
+    /// BACK button. Click targets come from <see cref="PauseMenuLayout"/> so drawing and
+    /// hit-testing can never drift apart.
+    /// </summary>
+    public void DrawPauseMenu(PauseMenuView view)
+    {
+        if (view.Page == PauseMenuPage.Closed) return;
+
+        DrawRect(_screenSize * 0.5f, _screenSize, Rgba.Grey(0f, 0.62f));
+
+        var screen = _screenSize;
+        if (view.Page == PauseMenuPage.Main)
+        {
+            DrawTextCentred("PAUSED", screen.X * 0.5f,
+                PauseMenuLayout.TitleTop(screen, view.Page), _headScale, Rgba.White);
+            DrawMenuButton(PauseMenuLayout.MainButtonCentre(screen, 0), "RESUME");
+            DrawMenuButton(PauseMenuLayout.MainButtonCentre(screen, 1), "SETTINGS");
+            DrawMenuButton(PauseMenuLayout.MainButtonCentre(screen, 2), "EXIT");
+            return;
+        }
+
+        DrawTextCentred("SETTINGS", screen.X * 0.5f,
+            PauseMenuLayout.TitleTop(screen, view.Page), _headScale, Rgba.White);
+        DrawMenuButton(PauseMenuLayout.BackButtonCentre(screen), "BACK");
+    }
+
+    /// <summary>Menu button or BACK under a screen point (pixels, top-left origin), if any.</summary>
+    public PauseMenuHit PauseMenuHitAt(Vector2 point, PauseMenuView view) =>
+        PauseMenuLayout.HitAt(point, _screenSize, view.Page);
+
+    private void DrawMenuButton(Vector2 centre, string label)
+    {
+        DrawRect(centre, PauseMenuLayout.ButtonSize, SlotBackground);
+        DrawBorder(centre, PauseMenuLayout.ButtonSize, SlotBorder, SelectedBorderColor);
+        DrawTextCentred(label, centre.X, centre.Y - 9f, _countScale, Rgba.White);
+    }
+
     /// <summary>Hotbar slot under a screen point (pixels, top-left origin), if any.</summary>
     public int? HotbarSlotAt(Vector2 point)
     {
