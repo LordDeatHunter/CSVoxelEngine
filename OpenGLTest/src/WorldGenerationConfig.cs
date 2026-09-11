@@ -18,6 +18,11 @@ public static class WorldGenerationConfig
     // How many dirty chunks to process per frame (kick off mesh gen)
     public const int MaxDirtyChunksPerFrame = 64;
 
+    // How many dirty-set entries one frame scans for mesh candidates. The set holds
+    // thousands of entries mid-stream, so an uncapped scan is milliseconds by itself;
+    // leftovers simply wait for the next frames (item 19).
+    public const int MaxDirtyScanPerFrame = 1024;
+
     // How many mesh generation tasks can run concurrently on the thread pool
     public const int MaxConcurrentMeshGenerations = 4;
 
@@ -118,6 +123,11 @@ public static class WorldGenerationConfig
 
     // How many completed LOD region meshes to upload to GPU per frame
     public const int MaxLodUploadsPerFrame = 8;
+
+    // How many unburied level-0 regions one buried-flag pass cover-tests. Level-0 tests
+    // walk 16 columns of chunk lookups each, so the uncapped pass is ~10 ms mid-stream;
+    // new regions, coarser levels and still-buried regions are always tested (item 19).
+    public const int MaxLodCoverTestsPerFrame = 64;
 
     // --- Terrain ---
     // Every noise channel derives its seed from this one (TerrainGenerator, NoiseCaves, WormCarver)

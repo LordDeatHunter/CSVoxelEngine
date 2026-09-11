@@ -68,6 +68,25 @@ public sealed class ChunkManagerTests
     }
 
     [Fact]
+    public void DirtyScanCapPacesTheDrain()
+    {
+        var manager = new ChunkManager(null!);
+        const int total = 1500;
+        for (var i = 0; i < total; i++)
+            manager.MarkDirty(new Vector3(5000 + i, 0, 0));
+
+        var camera = new Camera(null, null);
+        camera.TestTeleport(new Vector3(0f, 30f, 0f), yaw: 0f, pitch: 0f);
+        manager.Update(camera);
+
+        // Out-of-range entries drop on sight, but only up to the per-frame scan cap;
+        // the rest wait for the next frames instead of costing milliseconds at once.
+        Assert.Equal(total - WorldGenerationConfig.MaxDirtyScanPerFrame, manager.DirtyCount);
+        manager.Update(camera);
+        Assert.Equal(0, manager.DirtyCount);
+    }
+
+    [Fact]
     public void UnloadBumpsMeshVersion()
     {
         var manager = new ChunkManager(null!);

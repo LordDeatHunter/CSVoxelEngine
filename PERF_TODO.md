@@ -1,7 +1,7 @@
 # Performance TODO
 
 Merged 2026-09-11 from `PERF_TODO.md` + `FLUID_PERF.md` (the latter deleted).
-All old items 1-12, 15, 16, 17 and fluid items 1, 2, 4, 5, 6 are **done**; what matters
+All old items 1-12, 15-19 and fluid items 1, 2, 4, 5, 6 are **done**; what matters
 about them is under "Ruled out" and "Done (one line each)". Work the Open items
 top to bottom. Full per-item history lives in git (`git log --oneline -- PERF_TODO.md FLUID_PERF.md`).
 
@@ -107,8 +107,17 @@ avg data (max is not logged; see item 18). No `TEMP-DIAG` strings in tree.
   `GeometryAllocator`, one `MultiDrawElementsIndirect` per chunk pass
   (four chunk passes 11.5 -> 1.7 ms). 10 `SustainedLowLatency` + concurrent GC +
   TieredPGO, no Server GC; chunk fade on real delta time. 12 Per-pass GPU timers
-  in overlay + console (`cpu/gpu` pairs). 15 Cloud cell 16, max 2 layers
-  (field mesh -63 %). 17 Translucent/neighbour/apply/LOD scratch pooled.
+   in overlay + console (`cpu/gpu` pairs). 15 Cloud cell 16, max 2 layers
+   (field mesh -63 %). 16 Settings menu covers every live knob (reflection
+   quality, shadow toggle, water shading, cloud opacity, resolution, FPS cap);
+   structural knobs (render distance, shadow res, LOD, cloud density)
+   deliberately unexposed. 17 Translucent/neighbour/apply/LOD scratch pooled.
+18 Console `perf` line logs `avg~max` per section plus `/gpuAvg~gpuMax` on
+   render passes (overlay keeps CPU max + GPU avg: 32-glyph budget).
+19 Dirty-scan cap (1024) + sliced LOD cover pass (new/coarse/still-buried regions
+   always tested, unburied level-0 64/frame round-robin with convergence forcing).
+   chunkDirty peak-window 3.32→1.84; lod peak-window 9.32→8.48; chunkApply left
+   alone (flat per-upload cost — cutting it only slows convergence).
 Fluid: early-outs kept MC semantics, per-frame spread (`MaxFluidCellsPerFrame`
 2048, backlog cap 8192), `Inventory.Update` out of the `FluidTick` span,
 `HashSet<long>` dirty tracking. Total fluid writes rose 4x (51k -> 202k) as the
@@ -116,28 +125,6 @@ queue started draining instead of ballooning.
 
 ## Open items
 
-- [x] **16. GPU quality knobs, exposed and documented.** (done: the settings menu
-  covers every live knob — Display: VSync/resolution/FPS cap; Graphics: shadow
-  toggle, leaf sway, sun size/glow, cloud opacity; Water: reflection toggle +
-  Low/Med/High quality (0.25/0.5/1.0 scale), waves, refraction, caustics, sun-shaft
-  strength — all read live via `GameSettings`, persisted to settings.json. Checked
-  2026-09-11 against the original lever list. Deliberately **not** exposed: render
-  distance (`ChunkRadius`), shadow map resolution (`ShadowMapSize`), LOD cascade and
-  cloud mesh density (`CloudCellSize`/`CloudMaxLevels`) — all structural (chunk
-  pipeline couplings, FBO realloc, field rebuild), not slider material. If a low
-  preset is ever wanted, that is a feature, not perf work.)
-- [x] **18. Log per-section max, not just avg.** (done 2026-09-11: `JoinSections`
-  emits `label avg~max` plus `/gpuAvg~gpuMax` on render passes; overlay untouched —
-  its 29-char rows cannot fit a GPU max inside the 32-glyph budget. Build clean,
-  351/353 tests with the 2 failures pre-existing on HEAD. First verification run
-  (`basic.json`, streaming) immediately showed what avg hid: `chunkApply ~149`,
-  `lod ~57`, `fluidTick ~47`, `reflect` CPU ~44 ms worst-frame in the window.)
-- [ ] **19. Slice the streaming burst.** `lod` 10.7 / `chunkDirty` 6.3 /
-  `chunkApply` 5.8 ms peaks during stream-in. Candidates: bound LOD cover-test work
-  per frame (level-0 slice), adaptive `MaxDirtyChunksPerFrame` /
-  `MaxMeshUploadsPerFrame` from last frame's time instead of fixed 64/32, spread
-  `ApplyCompletedMeshes` uploads across two frames when the frame is already long.
-  Measure with the perf-fly scenario, settled-vs-streaming table.
 - [ ] **20. Screenshot off the render thread.** 7-18 ms `screenshot` spike per shot.
   Encode the PNG on a worker (or skip the readback stall with a PBO) — scripted
   visual runs become hitch-free and manual F2-style shots stop dropping a frame.
@@ -151,8 +138,8 @@ queue started draining instead of ballooning.
   and confuses every log reading. Time `Drive` overhead and `World.Update`
   separately (or exclude the inner sections from the outer span).
 - [ ] **23. Underwater + cloud steady costs behind flags.** `raysPass` 1.5-2.3 ms
-  GPU submerged (`WaterRaySteps` 20, `WaterRayMaxDistance` 40), `cloudPass` up to
-  1.5 ms, `lodPass` GPU ~1.5 ms steady. These belong in item 16's quality ladder,
+   GPU submerged (`WaterRaySteps` 20, `WaterRayMaxDistance` 40), `cloudPass` up to
+   1.5 ms, `lodPass` GPU ~1.5 ms steady. These belong behind quality flags,
   but verify each halves cleanly with its knob before wiring it in.
 - [ ] **24. Re-check translucent sort + `CullWater` per frame.** Post-MDI the CPU
   side is small at rest, but streaming numbers were not isolated per pass. If a
@@ -163,6 +150,11 @@ queue started draining instead of ballooning.
   17). Temporary `GC.GetTotalAllocatedBytes` counters per subsystem like item 7 did,
   then pool the winner. Do not guess — item 7 showed the guess (mesh lists) was
   only half the allocations.
+- [ ] **26. LOD upload bursts.** Worst `lod` single frames (~160 ms at stream-in)
+  exceed what the cover pass can cost (a few ms upper bound over ~700 regions), so
+  the suspect is the upload loop's up-to-8 synchronous Mesh allocs/uploads per frame
+  in the same section. Verify with a TEMP-DIAG split of the three `lod` parts,
+  then pace uploads or shrink the per-upload cost.
 
 ## Measurements
 
@@ -171,3 +163,4 @@ queue started draining instead of ballooning.
 | 11 (phase 4) | Release, T1000 | spawn still, scripted 40 s | four chunk passes 11.5 -> 1.7 ms; frame 28.2/32.1 -> 26.6/30.7 ms (GPU-bound session, stall relocated into `lighting`) |
 | fluid 1+2+4 | Release, T1000 | bay, `VOXEL_TIME=70`, ~35 s | `fluidTick` avg 0.55-0.66 ms, typical max 11-16 ms, one ~41-48 ms loading outlier; queue 100-196k -> 8-12k; writes 51k -> 202k |
 | **fly 2026-09-11** | Release, T1000, this merge | `perf-fly.json` (settle + land/water/far legs) | settled 8.8-10.5 ms (95-114 fps); streaming 18-39 ms (25-54 fps); `reflect` GPU 0 -> 8 ms on water; `worldPass` GPU to 5.6 ms; `raysPass` 1.5-2.3 ms submerged; pools to 512/128 MB; GC 17-25 gen0/s streaming, 1-3 settled |
+| 19 | Release, T1000 | `perf-fly.json`, HEAD worktree vs branch back-to-back | chunkDirty peak-window 3.32→1.84, whole-mean 0.27→0.20; lod peak-window 9.32→8.48, whole-mean 1.32→1.52 (extra convergence passes); chunkApply 6.48→6.40, settled identical; 2 new tests (`LodManagerTests`, scan-cap), 353/355 suite (2 pre-existing fails) |

@@ -37,6 +37,17 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
     private int _lastBuriedRegionSetVersion = -1;
     private Vector3? _lastBuriedCamChunk;
 
+    // Regions added since the last cover pass. They start unburied, so the next pass
+    // tests them first: same-frame evaluation, exactly like the uncapped pass did.
+    private readonly List<LodRegion> _pendingCover = new();
+
+    // Round-robin cursor into RegionList for the unburied level-0 slice, and whether
+    // the slice has lapped it since the inputs last changed. While false the pass runs
+    // every frame, so a region added at rest still converges instead of waiting for
+    // the next input change that may never come.
+    private int _coverCursor;
+    private bool _coverConverged = true;
+
     // Per level: 2D region offsets within that level's radius, sorted closest-first
     private static readonly (int dx, int dz)[][] SortedOffsets = BuildSortedOffsets();
 
@@ -237,6 +248,16 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
         // IsCoveredByChunks), so the pass is skipped while none of them moved. A region added above
         // starts with IsBuried == false; the add bumps the region-set version, so the pass always runs
         // in the frame a region appears and never draws a shell for a frame it should not.
+        UpdateCoverFlags(chunkManager, camChunk);
+    }
+
+    /// <summary>
+    /// Refreshes buried flags when their inputs moved, spreading the expensive unburied
+    /// level-0 cover tests over frames (see <see cref="UpdateBuriedFlags"/>). Headless-safe:
+    /// it needs only the region list and a chunk manager, so tests drive it directly.
+    /// </summary>
+    internal void UpdateCoverFlags(ChunkManager chunkManager, Vector3 camChunk)
+    {
         if (chunkManager.MeshVersion != _lastBuriedMeshVersion
             || _regionSetVersion != _lastBuriedRegionSetVersion
             || camChunk != _lastBuriedCamChunk)
@@ -244,19 +265,23 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
             _lastBuriedMeshVersion = chunkManager.MeshVersion;
             _lastBuriedRegionSetVersion = _regionSetVersion;
             _lastBuriedCamChunk = camChunk;
-            UpdateBuriedFlags(chunkManager, camChunk);
+            _coverConverged = false;
         }
+
+        if (!_coverConverged)
+            _coverConverged = UpdateBuriedFlags(chunkManager, camChunk);
     }
 
     /// <summary>
     /// Registers a region in both the lookup table and <see cref="RegionList"/>.
     /// Main thread only.
     /// </summary>
-    private void AddRegion((int Level, int X, int Z) key, LodRegion region)
+    internal void AddRegion((int Level, int X, int Z) key, LodRegion region)
     {
         Regions[key] = region;
         region.ListIndex = RegionList.Count;
         RegionList.Add(region);
+        _pendingCover.Add(region);
         _regionSetVersion++;
     }
 
@@ -265,7 +290,7 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
     /// The caller removes it from <see cref="Regions"/> itself, which is where the key lives.
     /// Main thread only.
     /// </summary>
-    private void RemoveRegion(LodRegion region)
+    internal void RemoveRegion(LodRegion region)
     {
         var index = region.ListIndex;
         if (index < 0) return;
@@ -280,6 +305,7 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
 
         RegionList.RemoveAt(last);
         region.ListIndex = -1;
+        _pendingCover.Remove(region);
         _regionSetVersion++;
     }
 
@@ -297,15 +323,60 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
     /// Runs only when a chunk was meshed or unloaded, a region was added or removed, or the
     /// camera changed chunk; see <see cref="Update"/>.
     /// </summary>
-    private void UpdateBuriedFlags(ChunkManager chunkManager, Vector3 camChunk)
+    private bool UpdateBuriedFlags(ChunkManager chunkManager, Vector3 camChunk)
     {
-        for (var i = 0; i < RegionList.Count; i++)
+        // New regions first: they start unburied and the uploads cap additions per
+        // frame below the slice budget, so same-frame evaluation is preserved.
+        var budget = WorldGenerationConfig.MaxLodCoverTestsPerFrame;
+        foreach (var region in _pendingCover)
         {
-            var region = RegionList[i];
             region.IsBuried = region.Level > 0
                 ? IsCoveredByFinerLevel(region.Level, region.X, region.Z)
                 : IsCoveredByChunks(region, chunkManager, camChunk);
+            if (region.Level == 0)
+                budget--;
         }
+        _pendingCover.Clear();
+
+        // Coarser levels cost four lookups each and a stale buried flag is a hole in
+        // the horizon, so both run every pass. Only stale-unburied is harmless
+        // (overdraw the depth buffer already hides from above), which is what the
+        // bounded slice below spends its budget on.
+        for (var i = 0; i < RegionList.Count; i++)
+        {
+            var region = RegionList[i];
+            if (region.Level > 0 || region.IsBuried)
+                region.IsBuried = region.Level > 0
+                    ? IsCoveredByFinerLevel(region.Level, region.X, region.Z)
+                    : IsCoveredByChunks(region, chunkManager, camChunk);
+        }
+
+        if (RegionList.Count == 0)
+            return true;
+
+        // Round-robin over the list; swap-removal may skip or repeat an entry when the
+        // list changes mid-cycle, which only ever delays overdraw, never a hole.
+        if (_coverCursor >= RegionList.Count || _coverCursor < 0)
+            _coverCursor = RegionList.Count - 1;
+        var idx = _coverCursor;
+        for (var visited = 0; visited < RegionList.Count; visited++)
+        {
+            var region = RegionList[idx];
+            if (region.Level == 0 && !region.IsBuried)
+            {
+                if (budget <= 0)
+                {
+                    _coverCursor = idx;
+                    return false;
+                }
+                region.IsBuried = IsCoveredByChunks(region, chunkManager, camChunk);
+                budget--;
+            }
+            if (--idx < 0)
+                idx = RegionList.Count - 1;
+        }
+        _coverCursor = idx;
+        return true;
     }
 
     /// <summary>

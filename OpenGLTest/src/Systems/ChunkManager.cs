@@ -51,6 +51,9 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     public int LoadedChunkCount => _loadedChunkCount;
 
+    /// <summary>Dirty-set size, for tests asserting the scan cap paces the drain.</summary>
+    internal int DirtyCount => _dirtyChunks.Count;
+
     private int _loadedChunkCount;
 
     // The camera chunk the last unload scan ran for, and how many frames ago that was. See
@@ -231,9 +234,19 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
 
         _dirtyCandidates.Clear();
 
+        // The set holds thousands of entries mid-stream and every one costs several
+        // dictionary probes, so the scan itself is capped: leftovers wait for the next
+        // frames, which meshgen (64 starts/frame, 4 concurrent builds) cannot outrun
+        // anyway. Drops do not need a second visit — out-of-range entries are removed
+        // on sight and missing-neighbour ones are re-added by QueueChunk on arrival.
+        var scanned = 0;
+
         // Lock-free enumeration, no snapshot; removing through it while enumerating is safe
         foreach (var kvp in _dirtyChunks)
         {
+            if (++scanned > WorldGenerationConfig.MaxDirtyScanPerFrame)
+                break;
+
             var pos = kvp.Key;
             var distSq = Vector3.DistanceSquared(pos, camChunk);
 
