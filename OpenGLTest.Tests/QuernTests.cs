@@ -114,6 +114,25 @@ public sealed class QuernTests
     }
 
     [Fact]
+    public void QuernHitboxesAreTheTwoRocks()
+    {
+        var boxes = ContentRegistry.RequireBlock("quern").Hitboxes;
+        Assert.Equal(2, boxes.Length);
+        Assert.Equal(1f / 16f, boxes[0].Min.X);
+        Assert.Equal(0f, boxes[0].Min.Y);
+        Assert.Equal(1f / 16f, boxes[0].Min.Z);
+        Assert.Equal(15f / 16f, boxes[0].Max.X);
+        Assert.Equal(6f / 16f, boxes[0].Max.Y);
+        Assert.Equal(15f / 16f, boxes[0].Max.Z);
+        Assert.Equal(3f / 16f, boxes[1].Min.X);
+        Assert.Equal(7f / 16f, boxes[1].Min.Y);
+        Assert.Equal(3f / 16f, boxes[1].Min.Z);
+        Assert.Equal(13f / 16f, boxes[1].Max.X);
+        Assert.Equal(10f / 16f, boxes[1].Max.Y);
+        Assert.Equal(13f / 16f, boxes[1].Max.Z);
+    }
+
+    [Fact]
     public void InsertRefusesNonCrushable()
     {
         var (_, querns, _) = QuernSetup();

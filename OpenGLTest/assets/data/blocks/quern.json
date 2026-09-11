@@ -47,5 +47,11 @@
     ]
   },
   "hardness": 5,
-  "renderer": "quern"
+  "renderer": "quern",
+  // The two rocks: base and resting plate. The plate box is the rest pose and never
+  // follows the spin — hitboxes are static per-type data. The handle has no box.
+  "hitbox": [
+    { "min": [0.0625, 0, 0.0625], "max": [0.9375, 0.375, 0.9375] },
+    { "min": [0.1875, 0.4375, 0.1875], "max": [0.8125, 0.625, 0.8125] }
+  ]
 }
