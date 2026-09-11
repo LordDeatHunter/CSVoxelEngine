@@ -215,8 +215,10 @@ public static class Program
 
         if (visualDirector != null)
         {
-            FrameProfiler.Begin(ProfileSection.ProgramUpdate);
+            // Drive's world calls time themselves; wrapping it in the input shell would
+            // count every world section twice (item 22), so only the shell is timed here.
             visualDirector.Drive(deltaTime);
+            FrameProfiler.Begin(ProfileSection.ProgramUpdate);
             LogDebugLine(deltaTime);
             if (visualDirector.IsDone)
                 windowManager.Window.Close();

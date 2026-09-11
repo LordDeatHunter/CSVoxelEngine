@@ -62,12 +62,16 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
             case "mine":
                 _keys.ReleaseAll();
                 world.Update(deltaTime, _keys);
+                FrameProfiler.Begin(ProfileSection.Breaking);
                 world.UpdateBlockBreaking(deltaTime, isHolding: true);
+                FrameProfiler.End(ProfileSection.Breaking);
                 TickTimed(deltaTime, step, "mine");
                 break;
 
             case "place":
+                FrameProfiler.Begin(ProfileSection.UsePlace);
                 world.TryUseSelected(World.InteractionReach);
+                FrameProfiler.End(ProfileSection.UsePlace);
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} place/use");
                 Advance();
                 break;

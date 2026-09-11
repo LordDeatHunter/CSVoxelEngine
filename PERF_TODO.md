@@ -1,7 +1,7 @@
 # Performance TODO
 
 Merged 2026-09-11 from `PERF_TODO.md` + `FLUID_PERF.md` (the latter deleted).
-All old items 1-12, 15-21 and fluid items 1, 2, 4, 5, 6 are **done**; what matters
+All old items 1-12, 15-22 and fluid items 1, 2, 4, 5, 6 are **done**; what matters
 about them is under "Ruled out" and "Done (one line each)". Work the Open items
 top to bottom. Full per-item history lives in git (`git log --oneline -- PERF_TODO.md FLUID_PERF.md`).
 
@@ -22,10 +22,11 @@ dotnet run --project silkgltriangle.csproj -c Release --no-build
 
 Two profiler traps, read before trusting a number:
 
-- In scripted runs `progUpdate` **contains** `World.Update` (`VisualDirector.Drive`
-  calls it inside the `ProgramUpdate` span). A 15-25 ms `progUpdate` during a script
-  is chunk/LOD/fluid work, not input overhead. In real play `progUpdate` is ~0.2-0.5 ms.
-  CPU-section sums therefore exceed the frame in scripted runs by design.
+- In scripted runs `progUpdate` is just the log/close shell (~0.01 ms): `Drive`'s
+  world calls time themselves since item 22, so the CPU sections sum to the frame
+  instead of doubling it. (Pre-22 logs show `progUpdate` 5-25 ms containing all of
+  `World.Update` — do not compare across that boundary.) In real play `progUpdate`
+  is the input shell (~0.2-0.5 ms).
 - The `perf` console line shows `avg~max` per section (`~` = worst single frame in
   the 1 s window) with a `/gpuAvg~gpuMax` suffix on render passes (item 18) — read
   the `~` half for spikes, the avg half for steady cost. `lighting` CPU absorbs the
@@ -128,6 +129,9 @@ avg data (max is not logged; see item 18). No `TEMP-DIAG` strings in tree.
    The ~200 ms first-second monster exists in both runs (different attribution) —
    driver warmup, not pool cost. No test (GL-owned, constants only); the fly is
    the verification (zero `grew to` lines for opaque).
+22 Scripted `Drive` no longer wrapped in the input shell (`ProgramUpdate` covers
+   only the log/close shell; mine/place steps use the `Breaking`/`UsePlace` rows
+   like real play). `progUpdate` 5-25 ms→~0.01 in scripted runs, CPU sums to frame.
 Fluid: early-outs kept MC semantics, per-frame spread (`MaxFluidCellsPerFrame`
 2048, backlog cap 8192), `Inventory.Update` out of the `FluidTick` span,
 `HashSet<long>` dirty tracking. Total fluid writes rose 4x (51k -> 202k) as the
@@ -135,10 +139,6 @@ queue started draining instead of ballooning.
 
 ## Open items
 
-- [ ] **22. Fix the scripted-run profiler nesting.** `progUpdate` wrapping
-  `VisualDirector.Drive` (which calls `World.Update`) double-counts CPU vs frame
-  and confuses every log reading. Time `Drive` overhead and `World.Update`
-  separately (or exclude the inner sections from the outer span).
 - [ ] **23. Underwater + cloud steady costs behind flags.** `raysPass` 1.5-2.3 ms
    GPU submerged (`WaterRaySteps` 20, `WaterRayMaxDistance` 40), `cloudPass` up to
    1.5 ms, `lodPass` GPU ~1.5 ms steady. These belong behind quality flags,
@@ -168,3 +168,4 @@ queue started draining instead of ballooning.
 | 19 | Release, T1000 | `perf-fly.json`, HEAD worktree vs branch back-to-back | chunkDirty peak-window 3.32→1.84, whole-mean 0.27→0.20; lod peak-window 9.32→8.48, whole-mean 1.32→1.52 (extra convergence passes); chunkApply 6.48→6.40, settled identical; 2 new tests (`LodManagerTests`, scan-cap), 353/355 suite (2 pre-existing fails) |
 | 20 | Release, T1000 | `perf-fly.json` before/after | shot-section 7-18 ms avg→0.3-0.9 avg (28-50 ms readback max); FPS-1 frames 5→1 per run; all 4 PNGs byte-comparable sizes; 2 new tests (flip round-trip, worker drain), 355/357 suite (2 pre-existing fails) |
 | 21 | Release, T1000 | `perf-fly.json` before/after | growths opaque 2→0, translucent 3→1; chunkApply streaming peak-window 5.43→4.39, worst streaming frame 45.8→24.2; settled identical; suite 358/359 (1 pre-existing fail, WoodShape flaked to pass) |
+| 22 | Release, T1000 | `basic.json` + temp mine/place scenario | `progUpdate` 5-25 ms→0.00-0.01 in scripted runs, CPU sums to frame; `breaking`/`usePlace` rows attribute mine/place steps; no new tests (span pattern already covered), suite green except pre-existing + new BlockMovement failure from the leaves commit |
