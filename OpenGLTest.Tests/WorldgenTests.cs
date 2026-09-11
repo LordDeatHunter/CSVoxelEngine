@@ -32,6 +32,26 @@ public sealed class WorldgenTests
     }
 
     [Fact]
+    public void TrunkShapeIsCachedAcrossChunks()
+    {
+        var found = false;
+        for (var x = 100; x < 300 && !found; x++)
+        for (var z = 100; z < 300 && !found; z++)
+        {
+            if (!TreeGenerator.TryGetTrunk(x, z, out var baseY1, out var shape1))
+                continue;
+            Assert.True(TreeGenerator.TryGetTrunk(x, z, out var baseY2, out var shape2));
+            Assert.Equal(baseY1, baseY2);
+            // Record-struct equality compares the wood/blob lists by reference, so this
+            // only passes when the second call hit the shape cache (item 25).
+            Assert.Equal(shape1, shape2);
+            found = true;
+        }
+
+        Assert.True(found);
+    }
+
+    [Fact]
     public void BeachColumnsNeverCapWithGrass()
     {
         var sand = ContentRegistry.RequireBlock("sand").Id;

@@ -18,6 +18,13 @@ public static class TreeGenerator
     private const int PlacementSalt = 0x7E5715;
     private const int ShapeSalt = 0x7EE51F;
 
+    // Trunk shapes are a pure function of (x, z), but every chunk in reach rebuilds each
+    // one (plus the canopy-top pass does it again), so shapes dominate worldgen garbage.
+    // Cached exactly like worm paths: deterministic, read-only after build (callers only
+    // enumerate the lists), safe to share across the generation workers.
+    private static readonly ConcurrentDictionary<(int X, int Z), (int BaseY, TreeShape Shape)> ShapeCache = new();
+    private const int ShapeCacheLimit = 16384;
+
     /// <summary>Block the canopy is made of; the wood ids come from <see cref="WoodId"/>.</summary>
     public static readonly byte LeavesBlock;
 
@@ -108,7 +115,20 @@ public static class TreeGenerator
             return false;
 
         baseY = height + 1;
+        var skey = (x, z);
+        if (ShapeCache.TryGetValue(skey, out var cached))
+        {
+            baseY = cached.BaseY;
+            shape = cached.Shape;
+            return true;
+        }
+
+        // Crude growth cap like the column and worm caches; a full reset just rebuilds.
+        if (ShapeCache.Count >= ShapeCacheLimit)
+            ShapeCache.Clear();
+
         shape = BuildShape(x, z, baseY);
+        ShapeCache[skey] = (baseY, shape);
         return true;
     }
 

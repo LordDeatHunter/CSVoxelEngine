@@ -1,9 +1,9 @@
 # Performance TODO
 
 Merged 2026-09-11 from `PERF_TODO.md` + `FLUID_PERF.md` (the latter deleted).
-All old items 1-12, 15-24 and fluid items 1, 2, 4, 5, 6 are **done**; what matters
-about them is under "Ruled out" and "Done (one line each)". Work the Open items
-top to bottom. Full per-item history lives in git (`git log --oneline -- PERF_TODO.md FLUID_PERF.md`).
+Everything is **done** except open item 26; what matters about the rest is under
+"Ruled out" and "Done (one line each)". Full per-item history lives in git
+(`git log --oneline -- PERF_TODO.md FLUID_PERF.md`).
 
 Machine for every number below: Release, Quadro T1000 (GL 4.6, driver 597.06),
 12 CPUs, `SustainedLowLatency`, `VOXEL_TIME=60`, `VOXEL_DEBUG=1`.
@@ -141,6 +141,11 @@ avg data (max is not logged; see item 18). No `TEMP-DIAG` strings in tree.
    sorts trivial (≤0.5 max) and walks spiking to 24 ms; walk avgs roughly halved
    over water. No unit test (translucent slices need GL); fly-verified with water
    intact and no errors.
+25 Trunk-shape cache (`TreeGenerator`, same bounded-dict pattern as worm paths):
+   TEMP-DIAG showed ~900k shape builds per fly (15/chunk, no sharing) dominating
+   deco allocation; hits run at 88%, builds down ~25x. Streaming gen0 17.1→13.2/s,
+   frame mean 17.7→15.1 ms in the streaming window. ColumnCache exonerated
+   (99.97% hits) and left alone. One test (cache-hit proof via struct equality).
 Fluid: early-outs kept MC semantics, per-frame spread (`MaxFluidCellsPerFrame`
 2048, backlog cap 8192), `Inventory.Update` out of the `FluidTick` span,
 `HashSet<long>` dirty tracking. Total fluid writes rose 4x (51k -> 202k) as the
@@ -148,12 +153,6 @@ queue started draining instead of ballooning.
 
 ## Open items
 
-- [ ] **25. Worldgen allocation during streaming.** Settled GC is clean (1-3 gen0/s)
-  but streaming still does 17-25/s with 8-11 gen1/s. Suspects: `TerrainGenerator`
-  column/compute temps, worm-path cache churn, LOD scratch (partially pooled in
-  17). Temporary `GC.GetTotalAllocatedBytes` counters per subsystem like item 7 did,
-  then pool the winner. Do not guess — item 7 showed the guess (mesh lists) was
-  only half the allocations.
 - [ ] **26. LOD upload bursts.** Worst `lod` single frames (~160 ms at stream-in)
   exceed what the cover pass can cost (a few ms upper bound over ~700 regions), so
   the suspect is the upload loop's up-to-8 synchronous Mesh allocs/uploads per frame
@@ -173,3 +172,4 @@ queue started draining instead of ballooning.
 | 22 | Release, T1000 | `basic.json` + temp mine/place scenario | `progUpdate` 5-25 ms→0.00-0.01 in scripted runs, CPU sums to frame; `breaking`/`usePlace` rows attribute mine/place steps; no new tests (span pattern already covered), suite green except pre-existing + new BlockMovement failure from the leaves commit |
 | 23 | Release, T1000 | `perf-fly.json` at 20 vs temp-10 ray steps + opacity-0 `basic.json` run | raysPass GPU 0.71→0.45 underwater (march halves, copy fixed); cloudPass GPU →0.00 flat at opacity 0; end-shots differ by run variance only; suite 362/364 (2 known fails, no new tests: GL-owned) |
 | 24 | Release, T1000 | TEMP-DIAG walk/sort split + `perf-fly.json` | sorts ≤0.5 max (exonerated); walks spiked to 24 ms → new `TranslucentRenderable` list, walk avgs roughly halved over water; water intact, no errors; suite 362/364 (2 known fails, no new tests: GL-owned) |
+| 25 | Release, T1000 | TEMP-DIAG alloc counters + `perf-fly.json` before/after | ~900k shape builds (15/chunk) → trunk-shape cache, 88% hits, builds ~25x down; streaming gen0 17.1→13.2/s; ColumnCache 99.97% hits (left alone); 1 new test; suite 363/365 (2 known fails) |
