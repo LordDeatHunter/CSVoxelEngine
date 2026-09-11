@@ -11,9 +11,6 @@ public sealed class GameSettingsTests
     {
         GameSettings.ResetToDefaults();
         Assert.Equal(WorldGenerationConfig.ShadowsEnabled, GameSettings.Shadows);
-        Assert.Equal(WorldGenerationConfig.FogNearBlocks, GameSettings.FogNear);
-        Assert.Equal(WorldGenerationConfig.FogFarBlocks, GameSettings.FogFar);
-        Assert.Equal(WorldGenerationConfig.DayLengthSeconds, GameSettings.DayLengthSeconds);
         Assert.Equal(WorldGenerationConfig.LeafSwayStrength, GameSettings.LeafSway);
         Assert.Equal(WorldGenerationConfig.SunAngularRadiusDeg, GameSettings.SunSize);
         Assert.Equal(WorldGenerationConfig.SunGlowIntensity, GameSettings.SunGlow);
@@ -32,7 +29,7 @@ public sealed class GameSettingsTests
         try
         {
             GameSettings.ResetToDefaults();
-            GameSettings.FogNear = 123f;
+            GameSettings.WaterWaves = 3.5f;
             GameSettings.Shadows = !GameSettings.Shadows;
             GameSettings.SunGlow = 1.25f;
             GameSettings.ResolutionIndex = 0;
@@ -40,10 +37,10 @@ public sealed class GameSettingsTests
             GameSettings.Save(path);
 
             GameSettings.ResetToDefaults();
-            Assert.Equal(WorldGenerationConfig.FogNearBlocks, GameSettings.FogNear);
+            Assert.Equal(WorldGenerationConfig.WaterNormalScale, GameSettings.WaterWaves);
             GameSettings.Load(path);
 
-            Assert.Equal(123f, GameSettings.FogNear);
+            Assert.Equal(3.5f, GameSettings.WaterWaves);
             Assert.Equal(!WorldGenerationConfig.ShadowsEnabled, GameSettings.Shadows);
             Assert.Equal(1.25f, GameSettings.SunGlow);
             Assert.Equal(0, GameSettings.ResolutionIndex);
@@ -64,12 +61,12 @@ public sealed class GameSettingsTests
         {
             File.WriteAllText(path, "{ not json");
             GameSettings.ResetToDefaults();
-            GameSettings.FogFar = 999f;
+            GameSettings.WaterCaustics = 0.9f;
             GameSettings.Load(path);
-            Assert.Equal(999f, GameSettings.FogFar);
+            Assert.Equal(0.9f, GameSettings.WaterCaustics);
 
             GameSettings.Load(Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".json"));
-            Assert.Equal(999f, GameSettings.FogFar);
+            Assert.Equal(0.9f, GameSettings.WaterCaustics);
         }
         finally
         {
@@ -85,16 +82,16 @@ public sealed class GameSettingsTests
         try
         {
             GameSettings.ResetToDefaults();
-            GameSettings.FogNear = -1000f;
-            GameSettings.FogFar = 1e9f;
+            GameSettings.SunSize = -1000f;
+            GameSettings.WaterCaustics = 1e9f;
             GameSettings.ResolutionIndex = 99;
             GameSettings.Save(path);
 
             GameSettings.ResetToDefaults();
             GameSettings.Load(path);
 
-            Assert.Equal(SettingsRows.FogNearMin, GameSettings.FogNear);
-            Assert.Equal(SettingsRows.FogFarMax, GameSettings.FogFar);
+            Assert.Equal(SettingsRows.SunSizeMin, GameSettings.SunSize);
+            Assert.Equal(SettingsRows.WaterCausticsMax, GameSettings.WaterCaustics);
             Assert.Equal(GameSettings.Resolutions.Length - 1, GameSettings.ResolutionIndex);
         }
         finally
@@ -127,30 +124,41 @@ public sealed class GameSettingsTests
     }
 
     [Fact]
-    public void LayoutHitsBackAndFirstRows()
+    public void LayoutHitsBackTabsAndRows()
     {
         GameSettings.ResetToDefaults();
         var screen = new Vector2(1920f, 1080f);
-        Assert.True(SettingsLayout.MaxScroll(screen) > 0f);
 
-        var back = SettingsLayout.HitAt(SettingsLayout.BackCentre(screen), 0f, screen);
+        Assert.Equal(5, SettingsRows.Tabs.Length);
+        Assert.Equal(3, SettingsRows.RowsInTab("Display").Length);
+        Assert.Equal(6, SettingsRows.RowsInTab("Water").Length);
+
+        var back = SettingsLayout.HitAt(SettingsLayout.BackCentre(screen), "Display", screen);
         Assert.Equal(SettingsHitKind.Back, back.Kind);
 
-        // Row 0 is the VSync toggle; row 4 the first slider (Fog Near).
-        var toggle = SettingsLayout.HitAt(SettingsLayout.RowCentre(0, 0f, screen), 0f, screen);
+        var tab = SettingsLayout.HitAt(SettingsLayout.TabCentre(2, screen), "Display", screen);
+        Assert.Equal(SettingsHitKind.Tab, tab.Kind);
+        Assert.Equal(2, tab.Row);
+        Assert.Equal("Water", SettingsRows.Tabs[tab.Row]);
+
+        // Display tab row 0 is the VSync toggle; Graphics tab row 1 is the Leaf Sway slider.
+        var toggle = SettingsLayout.HitAt(SettingsLayout.RowCentre(0, screen), "Display", screen);
         Assert.Equal(SettingsHitKind.Toggle, toggle.Kind);
-        Assert.Equal(0, toggle.Row);
+        Assert.Equal(SettingsRows.RowsInTab("Display")[0], toggle.Row);
 
-        var slider = SettingsLayout.HitAt(SettingsLayout.RowCentre(4, 0f, screen), 0f, screen);
+        var slider = SettingsLayout.HitAt(SettingsLayout.RowCentre(1, screen), "Graphics", screen);
         Assert.Equal(SettingsHitKind.Slider, slider.Kind);
+        var abs = SettingsRows.RowsInTab("Graphics")[1];
+        Assert.Equal(abs, slider.Row);
+        Assert.Equal(1, SettingsLayout.TabRowOf("Graphics", abs));
 
-        var (centre, size) = SettingsLayout.TrackRect(4, 0f, screen);
-        Assert.Equal(0f, SettingsLayout.SliderFraction(centre.X - size.X, 4, 0f, screen));
-        Assert.Equal(1f, SettingsLayout.SliderFraction(centre.X + size.X, 4, 0f, screen));
-        if (SettingsRows.All[4] is SliderRow fog)
-            Assert.Equal(fog.Min, SettingsLayout.SliderValue(fog, 0f));
+        var (centre, size) = SettingsLayout.TrackRect(1, screen);
+        Assert.Equal(0f, SettingsLayout.SliderFraction(centre.X - size.X, 1, screen));
+        Assert.Equal(1f, SettingsLayout.SliderFraction(centre.X + size.X, 1, screen));
+        if (SettingsRows.All[abs] is SliderRow sway)
+            Assert.Equal(sway.Min, SettingsLayout.SliderValue(sway, 0f));
 
-        var miss = SettingsLayout.HitAt(new Vector2(5f, 5f), 0f, screen);
+        var miss = SettingsLayout.HitAt(new Vector2(5f, 5f), "Display", screen);
         Assert.Equal(SettingsHitKind.None, miss.Kind);
     }
 }

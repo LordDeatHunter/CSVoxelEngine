@@ -3,11 +3,13 @@ using System.Numerics;
 
 namespace silkgltriangle;
 
-/// <summary>What a click on the settings page landed on; Row indexes <see cref="SettingsRows.All"/>.</summary>
+/// <summary>What a click on the settings page landed on; Row indexes <see cref="SettingsRows.All"/>,
+/// except for Tab where it indexes <see cref="SettingsRows.Tabs"/>.</summary>
 public enum SettingsHitKind
 {
     None,
     Back,
+    Tab,
     Toggle,
     Slider,
     Options,
@@ -31,12 +33,6 @@ public sealed record OptionsRow(string Section, string Label, string[] Options,
 /// </summary>
 public static class SettingsRows
 {
-    public const float FogNearMin = 50f;
-    public const float FogNearMax = 600f;
-    public const float FogFarMin = 400f;
-    public const float FogFarMax = 2500f;
-    public const float DayLengthMin = 60f;
-    public const float DayLengthMax = 1800f;
     public const float LeafSwayMax = 2f;
     public const float SunSizeMin = 0.5f;
     public const float SunSizeMax = 8f;
@@ -49,6 +45,8 @@ public static class SettingsRows
     public const float SensitivityMax = 0.6f;
     public const float FovMin = 60f;
     public const float FovMax = 100f;
+
+    public static readonly string[] Tabs = ["Display", "Graphics", "Water", "Audio", "Controls"];
 
     public static readonly SettingsRow[] All =
     [
@@ -63,12 +61,6 @@ public static class SettingsRows
 
         new ToggleRow("Graphics", "Shadows",
             () => GameSettings.Shadows, v => GameSettings.Shadows = v),
-        new SliderRow("Graphics", "Fog Near", FogNearMin, FogNearMax, 0, "",
-            () => GameSettings.FogNear, v => GameSettings.FogNear = v),
-        new SliderRow("Graphics", "Fog Far", FogFarMin, FogFarMax, 0, "",
-            () => GameSettings.FogFar, v => GameSettings.FogFar = v),
-        new SliderRow("Graphics", "Day Length", DayLengthMin, DayLengthMax, 0, "s",
-            () => GameSettings.DayLengthSeconds, v => GameSettings.DayLengthSeconds = v),
         new SliderRow("Graphics", "Leaf Sway", 0f, LeafSwayMax, 2, "",
             () => GameSettings.LeafSway, v => GameSettings.LeafSway = v),
         new SliderRow("Graphics", "Sun Size", SunSizeMin, SunSizeMax, 1, "deg",
@@ -101,6 +93,18 @@ public static class SettingsRows
             () => GameSettings.FieldOfView, v => GameSettings.FieldOfView = v),
     ];
 
+    /// <summary>Indexes into <see cref="All"/> of the rows on one tab, in draw order.</summary>
+    public static int[] RowsInTab(string tab)
+    {
+        var rows = new int[All.Length];
+        var n = 0;
+        for (var i = 0; i < All.Length; i++)
+            if (All[i].Section == tab)
+                rows[n++] = i;
+        Array.Resize(ref rows, n);
+        return rows;
+    }
+
     public static string FormatValue(SettingsRow row) => row switch
     {
         ToggleRow t => t.Get() ? "ON" : "OFF",
@@ -110,25 +114,28 @@ public static class SettingsRows
     };
 }
 
-/// <summary>Per-open state of the settings page: list scroll and the slider being dragged.</summary>
+/// <summary>Per-open state of the settings page: active tab and the slider being dragged
+/// (an index into <see cref="SettingsRows.All"/>).</summary>
 public sealed class SettingsMenuView
 {
-    public float ScrollOffset { get; set; }
+    public string Tab { get; set; } = SettingsRows.Tabs[0];
     public int? DragRow { get; set; }
 }
 
 /// <summary>
-/// Pure settings-page geometry (no GL): row rectangles, the slider track and click
-/// hit-testing, so tests cover the targets the renderer draws. Y down, pixels.
+/// Pure settings-page geometry (no GL): tab strip, row rectangles, the slider track and
+/// click hit-testing, so tests cover the targets the renderer draws. Y down, pixels.
+/// Rows are addressed two ways: tab-relative for geometry, absolute (<see cref="SettingsRows.All"/>)
+/// in hit results.
 /// </summary>
 public static class SettingsLayout
 {
-    public const float PanelWidth = 640f;
+    public const float PanelWidth = 880f;
     public const float PanelTop = 64f;
     public const float PanelBottomMargin = 16f;
     public const float TitleHeight = 44f;
-    public const float SectionHeight = 30f;
-    public const float RowHeight = 40f;
+    public const float TabHeight = 52f;
+    public const float RowHeight = 46f;
     public const float BackHeight = 52f;
     public const float BackGap = 12f;
     public const float LabelWidth = 210f;
@@ -138,7 +145,7 @@ public static class SettingsLayout
 
     public static float PanelLeft(Vector2 screenSize) => (screenSize.X - PanelWidth) * 0.5f;
 
-    public static float ListTop(Vector2 screenSize) => PanelTop + TitleHeight;
+    public static float ListTop(Vector2 screenSize) => PanelTop + TitleHeight + TabHeight;
 
     public static float ListBottom(Vector2 screenSize) =>
         screenSize.Y - PanelBottomMargin - BackGap - BackHeight;
@@ -146,50 +153,34 @@ public static class SettingsLayout
     public static Vector2 BackCentre(Vector2 screenSize) =>
         new(screenSize.X * 0.5f, ListBottom(screenSize) + BackGap + BackHeight * 0.5f);
 
-    public static float ContentHeight()
+    public static float TabWidth() => PanelWidth / SettingsRows.Tabs.Length;
+
+    public static Vector2 TabCentre(int tab, Vector2 screenSize) =>
+        new(PanelLeft(screenSize) + TabWidth() * (tab + 0.5f),
+            PanelTop + TitleHeight + TabHeight * 0.5f);
+
+    public static float RowTop(int tabRow, Vector2 screenSize) =>
+        ListTop(screenSize) + tabRow * RowHeight;
+
+    public static Vector2 RowCentre(int tabRow, Vector2 screenSize) =>
+        new(screenSize.X * 0.5f, RowTop(tabRow, screenSize) + RowHeight * 0.5f);
+
+    /// <summary>Tab-relative position of an absolute row on its tab (-1 when off-tab).</summary>
+    public static int TabRowOf(string tab, int absRow)
     {
-        var height = 0f;
-        string? section = null;
-        foreach (var row in SettingsRows.All)
-        {
-            if (row.Section != section)
-            {
-                section = row.Section;
-                height += SectionHeight;
-            }
-            height += RowHeight;
-        }
-        return height;
+        var rows = SettingsRows.RowsInTab(tab);
+        for (var i = 0; i < rows.Length; i++)
+            if (rows[i] == absRow)
+                return i;
+        return -1;
     }
-
-    public static float MaxScroll(Vector2 screenSize) =>
-        Math.Max(0f, ContentHeight() - (ListBottom(screenSize) - ListTop(screenSize)));
-
-    public static float RowTop(int row, float scrollOffset, Vector2 screenSize)
-    {
-        var y = ListTop(screenSize) - scrollOffset;
-        string? section = null;
-        for (var i = 0; i <= row; i++)
-        {
-            if (SettingsRows.All[i].Section != section)
-            {
-                section = SettingsRows.All[i].Section;
-                y += SectionHeight;
-            }
-            if (i < row) y += RowHeight;
-        }
-        return y;
-    }
-
-    public static Vector2 RowCentre(int row, float scrollOffset, Vector2 screenSize) =>
-        new(screenSize.X * 0.5f, RowTop(row, scrollOffset, screenSize) + RowHeight * 0.5f);
 
     /// <summary>Slider track rectangle: between the label column and the value slot.</summary>
-    public static (Vector2 Centre, Vector2 Size) TrackRect(int row, float scrollOffset, Vector2 screenSize)
+    public static (Vector2 Centre, Vector2 Size) TrackRect(int tabRow, Vector2 screenSize)
     {
         var left = PanelLeft(screenSize) + LabelWidth;
         var right = PanelLeft(screenSize) + PanelWidth - ValueWidth;
-        var y = RowCentre(row, scrollOffset, screenSize).Y;
+        var y = RowCentre(tabRow, screenSize).Y;
         return (new Vector2((left + right) * 0.5f, y), new Vector2(right - left, TrackHeight));
     }
 
@@ -197,41 +188,48 @@ public static class SettingsLayout
     public static float ValueRight(Vector2 screenSize) =>
         PanelLeft(screenSize) + PanelWidth - 8f;
 
-    public static Vector2 ToggleCentre(int row, float scrollOffset, Vector2 screenSize)
-    {
-        var (centre, _) = TrackRect(row, scrollOffset, screenSize);
-        return centre;
-    }
+    public static Vector2 ToggleCentre(int tabRow, Vector2 screenSize) =>
+        TrackRect(tabRow, screenSize).Centre;
 
-    public static SettingsHit HitAt(Vector2 point, float scrollOffset, Vector2 screenSize)
+    public static SettingsHit HitAt(Vector2 point, string tab, Vector2 screenSize)
     {
         if (Math.Abs(point.X - screenSize.X * 0.5f) <= PauseMenuLayout.ButtonWidth * 0.5f
             && Math.Abs(point.Y - BackCentre(screenSize).Y) <= BackHeight * 0.5f)
             return new SettingsHit(SettingsHitKind.Back);
 
-        if (point.X < PanelLeft(screenSize) || point.X > PanelLeft(screenSize) + PanelWidth
-            || point.Y < ListTop(screenSize) || point.Y > ListBottom(screenSize))
-            return new SettingsHit(SettingsHitKind.None);
-
-        for (var i = 0; i < SettingsRows.All.Length; i++)
+        var tabTop = PanelTop + TitleHeight;
+        if (point.Y >= tabTop && point.Y < tabTop + TabHeight
+            && point.X >= PanelLeft(screenSize)
+            && point.X < PanelLeft(screenSize) + PanelWidth)
         {
-            var top = RowTop(i, scrollOffset, screenSize);
+            var t = (int)((point.X - PanelLeft(screenSize)) / TabWidth());
+            if (t >= 0 && t < SettingsRows.Tabs.Length)
+                return new SettingsHit(SettingsHitKind.Tab, t);
+        }
+
+        var rows = SettingsRows.RowsInTab(tab);
+        for (var r = 0; r < rows.Length; r++)
+        {
+            var top = RowTop(r, screenSize);
             if (point.Y < top || point.Y >= top + RowHeight) continue;
-            return SettingsRows.All[i] switch
+            if (point.X < PanelLeft(screenSize)
+                || point.X > PanelLeft(screenSize) + PanelWidth)
+                return new SettingsHit(SettingsHitKind.None);
+            return SettingsRows.All[rows[r]] switch
             {
-                ToggleRow => new SettingsHit(SettingsHitKind.Toggle, i),
-                SliderRow => new SettingsHit(SettingsHitKind.Slider, i,
-                    SliderFraction(point.X, i, scrollOffset, screenSize)),
-                OptionsRow => new SettingsHit(SettingsHitKind.Options, i),
+                ToggleRow => new SettingsHit(SettingsHitKind.Toggle, rows[r]),
+                SliderRow => new SettingsHit(SettingsHitKind.Slider, rows[r],
+                    SliderFraction(point.X, r, screenSize)),
+                OptionsRow => new SettingsHit(SettingsHitKind.Options, rows[r]),
                 _ => new SettingsHit(SettingsHitKind.None),
             };
         }
         return new SettingsHit(SettingsHitKind.None);
     }
 
-    public static float SliderFraction(float x, int row, float scrollOffset, Vector2 screenSize)
+    public static float SliderFraction(float x, int tabRow, Vector2 screenSize)
     {
-        var (centre, size) = TrackRect(row, scrollOffset, screenSize);
+        var (centre, size) = TrackRect(tabRow, screenSize);
         return Math.Clamp((x - (centre.X - size.X * 0.5f)) / size.X, 0f, 1f);
     }
 

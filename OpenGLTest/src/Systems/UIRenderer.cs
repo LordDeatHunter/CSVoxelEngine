@@ -626,9 +626,9 @@ public class UIRenderer : IDisposable
     }
 
     /// <summary>
-    /// The settings page: title, scrollable widget list, BACK button. Rows are clipped to
-    /// the list rectangle with the scissor test so scrolling never paints over the title,
-    /// the BACK button or the HUD behind the overlay.
+    /// The settings page: title, one tab strip (Display/Graphics/Water/Audio/Controls), the
+    /// active tab's widget rows, BACK button. The busiest tab holds six rows, so the whole
+    /// page fits without scrolling.
     /// </summary>
     public void DrawSettingsMenu(SettingsMenuView view)
     {
@@ -636,56 +636,49 @@ public class UIRenderer : IDisposable
         var left = SettingsLayout.PanelLeft(screen);
         DrawTextCentred("SETTINGS", screen.X * 0.5f, SettingsLayout.PanelTop, _headScale, Rgba.White);
 
-        var listTop = SettingsLayout.ListTop(screen);
-        var listBottom = SettingsLayout.ListBottom(screen);
-        _gl.Enable(EnableCap.ScissorTest);
-        _gl.Scissor((int)left, (int)(screen.Y - listBottom),
-            (uint)SettingsLayout.PanelWidth, (uint)(listBottom - listTop));
-
-        string? section = null;
-        for (var i = 0; i < SettingsRows.All.Length; i++)
+        for (var t = 0; t < SettingsRows.Tabs.Length; t++)
         {
-            var row = SettingsRows.All[i];
-            var top = SettingsLayout.RowTop(i, view.ScrollOffset, screen);
-            if (row.Section != section)
-            {
-                section = row.Section;
-                if (top + SettingsLayout.SectionHeight >= listTop && top <= listBottom)
-                    DrawText(section.ToUpperInvariant(), new Vector2(left + 8f, top + 5f),
-                        _countScale, AccentGold);
-            }
-            if (top + SettingsLayout.RowHeight < listTop || top > listBottom) continue;
+            var centre = SettingsLayout.TabCentre(t, screen);
+            var size = new Vector2(SettingsLayout.TabWidth() - 4f, SettingsLayout.TabHeight);
+            var active = SettingsRows.Tabs[t] == view.Tab;
+            DrawRect(centre, size, active ? SelectedBackground : SlotBackground);
+            if (active)
+                DrawBorder(centre, size, SlotBorder, SelectedBorderColor);
+            DrawTextCentred(SettingsRows.Tabs[t], centre.X, centre.Y - 8f, _countScale, Rgba.White);
+        }
 
-            var centre = SettingsLayout.RowCentre(i, view.ScrollOffset, screen);
+        var rows = SettingsRows.RowsInTab(view.Tab);
+        for (var r = 0; r < rows.Length; r++)
+        {
+            var row = SettingsRows.All[rows[r]];
+            var centre = SettingsLayout.RowCentre(r, screen);
             DrawText(FitText(row.Label, _countScale, SettingsLayout.LabelWidth - 16f),
                 new Vector2(left + 8f, centre.Y - 8f), _countScale, Rgba.White);
 
             switch (row)
             {
                 case ToggleRow t:
-                    DrawToggle(SettingsLayout.ToggleCentre(i, view.ScrollOffset, screen), t.Get());
+                    DrawToggle(SettingsLayout.ToggleCentre(r, screen), t.Get());
                     DrawValueRight(centre.Y, SettingsRows.FormatValue(row), screen);
                     break;
                 case SliderRow s:
-                    DrawSlider(i, view.ScrollOffset, screen, s,
-                        view.DragRow == i);
+                    DrawSlider(r, screen, s, view.DragRow == rows[r]);
                     DrawValueRight(centre.Y, SettingsRows.FormatValue(row), screen);
                     break;
                 case OptionsRow o:
                     DrawTextCentred($"< {SettingsRows.FormatValue(row)} >",
-                        SettingsLayout.TrackRect(i, view.ScrollOffset, screen).Centre.X,
+                        SettingsLayout.TrackRect(r, screen).Centre.X,
                         centre.Y - 8f, _countScale, Rgba.White);
                     break;
             }
         }
 
-        _gl.Disable(EnableCap.ScissorTest);
         DrawMenuButton(SettingsLayout.BackCentre(screen), "BACK");
     }
 
     /// <summary>Settings widget under a screen point (pixels, top-left origin), if any.</summary>
     public SettingsHit SettingsHitAt(Vector2 point, SettingsMenuView view) =>
-        SettingsLayout.HitAt(point, view.ScrollOffset, _screenSize);
+        SettingsLayout.HitAt(point, view.Tab, _screenSize);
 
     private void DrawValueRight(float centreY, string text, Vector2 screen)
     {
@@ -703,9 +696,9 @@ public class UIRenderer : IDisposable
             DrawSquare(centre, SettingsLayout.ToggleSize - 8f, AccentGold);
     }
 
-    private void DrawSlider(int row, float scrollOffset, Vector2 screen, SliderRow def, bool active)
+    private void DrawSlider(int tabRow, Vector2 screen, SliderRow def, bool active)
     {
-        var (centre, size) = SettingsLayout.TrackRect(row, scrollOffset, screen);
+        var (centre, size) = SettingsLayout.TrackRect(tabRow, screen);
         var fraction = MathUtils.Clamp01((def.Get() - def.Min) / (def.Max - def.Min));
         DrawRect(centre, size, SlotBackground);
         if (fraction > 0f)

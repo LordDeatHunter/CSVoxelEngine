@@ -19,9 +19,6 @@ public static class GameSettings
 
     // Graphics
     public static bool Shadows { get; set; }
-    public static float FogNear { get; set; }
-    public static float FogFar { get; set; }
-    public static float DayLengthSeconds { get; set; }
     public static float LeafSway { get; set; }
     public static float SunSize { get; set; }
     public static float SunGlow { get; set; }
@@ -58,9 +55,6 @@ public static class GameSettings
         ResolutionIndex = 2;
         MaxFpsIndex = 0;
         Shadows = WorldGenerationConfig.ShadowsEnabled;
-        FogNear = WorldGenerationConfig.FogNearBlocks;
-        FogFar = WorldGenerationConfig.FogFarBlocks;
-        DayLengthSeconds = WorldGenerationConfig.DayLengthSeconds;
         LeafSway = WorldGenerationConfig.LeafSwayStrength;
         SunSize = WorldGenerationConfig.SunAngularRadiusDeg;
         SunGlow = WorldGenerationConfig.SunGlowIntensity;
@@ -101,9 +95,6 @@ public static class GameSettings
         ResolutionIndex = Math.Clamp(dto.ResolutionIndex, 0, Resolutions.Length - 1);
         MaxFpsIndex = Math.Clamp(dto.MaxFpsIndex, 0, MaxFpsOptions.Length - 1);
         Shadows = dto.Shadows;
-        FogNear = Math.Clamp(dto.FogNear, SettingsRows.FogNearMin, SettingsRows.FogNearMax);
-        FogFar = Math.Clamp(dto.FogFar, SettingsRows.FogFarMin, SettingsRows.FogFarMax);
-        DayLengthSeconds = Math.Clamp(dto.DayLengthSeconds, SettingsRows.DayLengthMin, SettingsRows.DayLengthMax);
         LeafSway = Math.Clamp(dto.LeafSway, 0f, SettingsRows.LeafSwayMax);
         SunSize = Math.Clamp(dto.SunSize, SettingsRows.SunSizeMin, SettingsRows.SunSizeMax);
         SunGlow = Math.Clamp(dto.SunGlow, 0f, SettingsRows.SunGlowMax);
@@ -128,9 +119,6 @@ public static class GameSettings
             ResolutionIndex = ResolutionIndex,
             MaxFpsIndex = MaxFpsIndex,
             Shadows = Shadows,
-            FogNear = FogNear,
-            FogFar = FogFar,
-            DayLengthSeconds = DayLengthSeconds,
             LeafSway = LeafSway,
             SunSize = SunSize,
             SunGlow = SunGlow,
@@ -162,9 +150,6 @@ public static class GameSettings
         public int ResolutionIndex { get; set; }
         public int MaxFpsIndex { get; set; }
         public bool Shadows { get; set; }
-        public float FogNear { get; set; }
-        public float FogFar { get; set; }
-        public float DayLengthSeconds { get; set; }
         public float LeafSway { get; set; }
         public float SunSize { get; set; }
         public float SunGlow { get; set; }

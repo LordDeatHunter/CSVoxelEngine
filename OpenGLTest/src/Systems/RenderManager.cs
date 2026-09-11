@@ -508,7 +508,7 @@ public class RenderManager : IDisposable
         }
 
         // The sun orbits once per DayLengthSeconds; the phase starts it mid-morning
-        var angle = (float)(time / GameSettings.DayLengthSeconds) * MathF.Tau + 0.8f;
+        var angle = (float)(time / WorldGenerationConfig.DayLengthSeconds) * MathF.Tau + 0.8f;
         _sunDir = Vector3.Normalize(new Vector3(MathF.Cos(angle), MathF.Sin(angle), 0.35f));
         var elevation = _sunDir.Y;
 
@@ -590,9 +590,9 @@ public class RenderManager : IDisposable
         _sunVisibility *= 1f - wet;
         UpdateShadowCamera(camera);
 
-        _fogNear = MathUtils.Lerp(GameSettings.FogNear,
+        _fogNear = MathUtils.Lerp(WorldGenerationConfig.FogNearBlocks,
             WorldGenerationConfig.UnderwaterFogNearBlocks, wet);
-        _fogFar = MathUtils.Lerp(GameSettings.FogFar,
+        _fogFar = MathUtils.Lerp(WorldGenerationConfig.FogFarBlocks,
             WorldGenerationConfig.UnderwaterFogFarBlocks, wet);
 
         if (wet <= 0f) return;

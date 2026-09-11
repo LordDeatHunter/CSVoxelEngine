@@ -113,15 +113,6 @@ public static class Program
 
         inputManager.Mouse?.Scroll += (_, wheel) =>
         {
-            if (pauseMenuView.IsOpen && pauseMenuView.Page == PauseMenuPage.Settings)
-            {
-                var screen = new System.Numerics.Vector2(
-                    windowManager.Window.Size.X, windowManager.Window.Size.Y);
-                settingsMenuView.ScrollOffset = Math.Clamp(
-                    settingsMenuView.ScrollOffset - wheel.Y * 60f,
-                    0f, SettingsLayout.MaxScroll(screen));
-                return;
-            }
             if (!inventoryView.IsOpen && !pauseMenuView.IsOpen) world.Inventory.Scroll(wheel.Y);
         };
 
@@ -255,18 +246,18 @@ public static class Program
             && SettingsRows.All[settingsMenuView.DragRow.Value] is SliderRow drag
             && inputManager.Mouse != null)
         {
-            if (inputManager.Mouse.IsButtonPressed(MouseButton.Left))
+            var tabRow = SettingsLayout.TabRowOf(settingsMenuView.Tab, settingsMenuView.DragRow.Value);
+            if (tabRow < 0 || !inputManager.Mouse.IsButtonPressed(MouseButton.Left))
+            {
+                settingsMenuView.DragRow = null;
+                GameSettings.Save();
+            }
+            else
             {
                 var screen = new System.Numerics.Vector2(
                     windowManager.Window.Size.X, windowManager.Window.Size.Y);
                 drag.Set(SettingsLayout.SliderValue(drag,
-                    SettingsLayout.SliderFraction(inputManager.Mouse.Position.X,
-                        settingsMenuView.DragRow.Value, settingsMenuView.ScrollOffset, screen)));
-            }
-            else
-            {
-                settingsMenuView.DragRow = null;
-                GameSettings.Save();
+                    SettingsLayout.SliderFraction(inputManager.Mouse.Position.X, tabRow, screen)));
             }
         }
 
@@ -341,7 +332,6 @@ public static class Program
         pauseMenuView.Page = page;
         if (page == PauseMenuPage.Settings)
         {
-            settingsMenuView.ScrollOffset = 0f;
             settingsMenuView.DragRow = null;
         }
         var open = page != PauseMenuPage.Closed;
@@ -391,6 +381,10 @@ public static class Program
         {
             case SettingsHitKind.Back:
                 SetPauseMenu(PauseMenuPage.Main);
+                break;
+            case SettingsHitKind.Tab:
+                settingsMenuView.Tab = SettingsRows.Tabs[Math.Clamp(hit.Row, 0, SettingsRows.Tabs.Length - 1)];
+                settingsMenuView.DragRow = null;
                 break;
             case SettingsHitKind.Toggle when SettingsRows.All[hit.Row] is ToggleRow toggle:
                 toggle.Set(!toggle.Get());
