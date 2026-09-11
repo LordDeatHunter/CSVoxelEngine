@@ -343,10 +343,10 @@ public class FluidManager
         chunk.SetBlockRaw(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask, id, state);
 
         var chunkPos = ChunkPosOf(x, y, z);
-        chunks.ImmediateRemesh(chunkPos);
+        chunks.ImmediateRemeshWithBorders(chunkPos, cell);
 
-        // A cell on a chunk border shows up in the neighbour's mesh too; those can wait for
-        // the async budget
+        // Border neighbours were already remeshed synchronously above; they still join the
+        // dirty set so their light catches up through the async budget.
         var chunkKey = Pack(x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift);
         _borderScratch.Clear();
         AddTouchedChunks(x, y, z, _borderScratch);

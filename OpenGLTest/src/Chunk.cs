@@ -702,7 +702,7 @@ public class Chunk : IDisposable
         ClearState(Idx(localX, localY, localZ));
 
         chunkManager.UnmarkPlayerPlaced((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
-        chunkManager.ImmediateRemesh(Position);
+        chunkManager.ImmediateRemeshWithBorders(Position, worldPos);
         MarkNeighborsDirty(worldPos, chunkManager);
         return true;
     }
@@ -730,7 +730,7 @@ public class Chunk : IDisposable
         SetBlockRaw(localX, localY, localZ, blockId, state);
 
         chunkManager.MarkPlayerPlaced((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
-        chunkManager.ImmediateRemesh(Position);
+        chunkManager.ImmediateRemeshWithBorders(Position, worldPos);
         MarkNeighborsDirty(worldPos, chunkManager);
         return true;
     }
@@ -752,7 +752,7 @@ public class Chunk : IDisposable
         SetBlockRaw(localX, localY, localZ, _blocks[i], state);
 
         chunkManager.MarkPlayerPlaced((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
-        chunkManager.ImmediateRemesh(Position);
+        chunkManager.ImmediateRemeshWithBorders(Position, worldPos);
         MarkNeighborsDirty(worldPos, chunkManager);
         return true;
     }

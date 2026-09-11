@@ -389,4 +389,38 @@ public sealed class MeshingTests
 
         Assert.Equal(4, topVertices);
     }
+
+    [Fact]
+    public void ClearingBorderCellExposesNeighbourFace()
+    {
+        // High above the terrain so sunlight is uniform: only culling decides the face count.
+        var h = MeshTestWorld.HighAbove;
+        var manager = new ChunkManager(null!);
+        var eastPos = h + Vector3.UnitX;
+        foreach (var pos in new[] { eastPos, h, eastPos + Vector3.UnitX, eastPos + Vector3.UnitY,
+            eastPos - Vector3.UnitY, eastPos + Vector3.UnitZ, eastPos - Vector3.UnitZ })
+        {
+            var chunk = new Chunk(null!, pos, generateBlockData: false);
+            chunk.IsBlockDataReady = true;
+            manager.Chunks[pos] = chunk;
+        }
+
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        manager.Chunks[h].SetBlockRaw(15, 8, 8, stone, 0);
+        var east = manager.Chunks[eastPos];
+        east.SetBlockRaw(0, 8, 8, stone, 0);
+
+        // The neighbour's west face is culled against the border cell: five faces remain.
+        var before = east.GenerateMeshData(manager);
+        Assert.NotNull(before);
+        Assert.Equal(20, before.Vertices.Count);
+        Assert.Equal(30, before.Indices.Count);
+
+        // Clearing the border cell brings the sixth face back with no other change.
+        manager.Chunks[h].SetBlockRaw(15, 8, 8, 0, 0);
+        var after = east.GenerateMeshData(manager);
+        Assert.NotNull(after);
+        Assert.Equal(24, after.Vertices.Count);
+        Assert.Equal(36, after.Indices.Count);
+    }
 }

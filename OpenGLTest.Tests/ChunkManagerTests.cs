@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Numerics;
 using Xunit;
 
@@ -32,6 +33,38 @@ public sealed class ChunkManagerTests
         var after = manager.MeshVersion;
         manager.ImmediateRemesh(Vector3.Zero);
         Assert.Equal(after, manager.MeshVersion);
+    }
+
+    [Fact]
+    public void BorderBreakRemeshesNeighbourSynchronously()
+    {
+        var manager = new ChunkManager(null!);
+        var h = MeshTestWorld.HighAbove;
+        var eastPos = h + Vector3.UnitX;
+        // The edited chunk and its eastern neighbour each need all six face neighbours
+        // loaded for a synchronous build.
+        var positions = new HashSet<Vector3> { h, eastPos };
+        foreach (var offset in Vector3Directions.CardinalDirections)
+        {
+            positions.Add(h + offset);
+            positions.Add(eastPos + offset);
+        }
+        foreach (var pos in positions)
+        {
+            var chunk = new Chunk(null!, pos, generateBlockData: false);
+            chunk.IsBlockDataReady = true;
+            manager.Chunks[pos] = chunk;
+        }
+
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var center = manager.Chunks[h];
+        center.SetBlockRaw(15, 8, 8, stone, 0);
+
+        // Breaking the border cell remeshes the neighbour in the same call: its mesh is
+        // current without waiting for the async dirty budget.
+        Assert.True(center.RemoveBlockAt(new Vector3(15, 136, 8), manager));
+        Assert.True(center.IsMeshed);
+        Assert.True(manager.Chunks[eastPos].IsMeshed);
     }
 
     [Fact]

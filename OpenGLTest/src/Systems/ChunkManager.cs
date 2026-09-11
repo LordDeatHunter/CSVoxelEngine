@@ -476,6 +476,35 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         }
 
         ApplyMesh(chunk, meshData);
+
+        // A build that started before this edit can still finish afterwards with its pre-edit
+        // snapshot and overwrite this fresh mesh; leaving a dirty entry guarantees the
+        // post-edit rebuild wins in the end.
+        if (_generatingMeshes.ContainsKey(pos))
+            _dirtyChunks.TryAdd(pos, 0);
+    }
+
+    /// <summary>
+    /// Synchronously remeshes the edited chunk plus every face neighbour sharing the edited
+    /// cell, so a block broken or placed on a chunk border never leaves a one-frame hole in
+    /// the neighbour's mesh while the async dirty budget catches up (the neighbour's border
+    /// face was culled against the old block and only a rebuild brings it back). Chunks in
+    /// light radius still rebuild async through <see cref="MarkAreaDirty"/>.
+    /// </summary>
+    public void ImmediateRemeshWithBorders(Vector3 chunkPos, Vector3 cell)
+    {
+        ImmediateRemesh(chunkPos);
+
+        var localX = (int)(cell.X - chunkPos.X * Chunk.Size);
+        var localY = (int)(cell.Y - chunkPos.Y * Chunk.Size);
+        var localZ = (int)(cell.Z - chunkPos.Z * Chunk.Size);
+
+        if (localX == 0) ImmediateRemesh(chunkPos + new Vector3(-1, 0, 0));
+        else if (localX == Chunk.Size - 1) ImmediateRemesh(chunkPos + new Vector3(1, 0, 0));
+        if (localY == 0) ImmediateRemesh(chunkPos + new Vector3(0, -1, 0));
+        else if (localY == Chunk.Size - 1) ImmediateRemesh(chunkPos + new Vector3(0, 1, 0));
+        if (localZ == 0) ImmediateRemesh(chunkPos + new Vector3(0, 0, -1));
+        else if (localZ == Chunk.Size - 1) ImmediateRemesh(chunkPos + new Vector3(0, 0, 1));
     }
 
     /// <summary>
