@@ -573,7 +573,9 @@ public static class Program
         {
             visualDirector.TakeScreenshot = false;
             var size = windowManager.Window.FramebufferSize;
-            VisualCapture.SaveScreenshot(renderManager.gl, size.X, size.Y, visualDirector.ScreenshotPath);
+            var path = visualDirector.ScreenshotPath;
+            var pixels = VisualCapture.ReadPixels(renderManager.gl, size.X, size.Y);
+            VisualCapture.QueueSave(pixels, size.X, size.Y, path);
         }
         FrameProfiler.End(ProfileSection.Screenshot);
 
@@ -591,6 +593,9 @@ public static class Program
     private static void OnClosing()
     {
         ambience?.Dispose();
+        // The last scripted step is usually a screenshot whose encode is still on a
+        // worker; drain it before tearing down GL and the log queue.
+        VisualCapture.WaitForPending();
         renderManager?.Dispose();
         inputManager?.Dispose();
         Log.Shutdown();

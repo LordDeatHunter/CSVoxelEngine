@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using Silk.NET.OpenGL;
 
 namespace silkgltriangle;
@@ -7,16 +9,55 @@ namespace silkgltriangle;
 /// <summary>
 /// Reads the finished frame back from the GPU and writes it as a PNG. Called at the end of
 /// the render callback, so HUD shots include the UI and hidden-HUD shots skip it.
+/// Only the readback runs on the render thread: the row flip, PNG encode and file write
+/// go to a worker, so a shot costs the frame a pipeline stall instead of the full encode.
+/// <see cref="WaitForPending"/> drains in-flight encodes at exit, since the last scripted
+/// step is usually a screenshot.
 /// </summary>
 public static class VisualCapture
 {
-    public static unsafe void SaveScreenshot(GL gl, int width, int height, string path)
+    private static int _pending;
+
+    /// <summary>Encodes still running on workers; the exit path waits for zero.</summary>
+    public static int Pending => Volatile.Read(ref _pending);
+
+    public static unsafe byte[] ReadPixels(GL gl, int width, int height)
     {
         var pixels = new byte[width * height * 4];
         fixed (byte* p = pixels)
             gl.ReadPixels(0, 0, (uint)width, (uint)height,
                 PixelFormat.Rgba, PixelType.UnsignedByte, p);
+        return pixels;
+    }
 
+    public static void QueueSave(byte[] pixels, int width, int height, string path)
+    {
+        Interlocked.Increment(ref _pending);
+        Task.Run(() =>
+        {
+            try
+            {
+                EncodeAndSave(pixels, width, height, path);
+            }
+            catch (Exception e)
+            {
+                Log.WriteLine($"[visual] screenshot failed ({path}): {e.Message}");
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _pending);
+            }
+        });
+    }
+
+    public static void WaitForPending()
+    {
+        while (Volatile.Read(ref _pending) > 0)
+            Thread.Sleep(1);
+    }
+
+    internal static unsafe void EncodeAndSave(byte[] pixels, int width, int height, string path)
+    {
         // GL rows run bottom-first; PNG rows run top-first.
         var rowBytes = width * 4;
         var row = new byte[rowBytes];
