@@ -66,6 +66,10 @@ public class FluidManager
     // keeps a draining pond from allocating per cell per tick
     private readonly List<(int X, int Y, int Z)> _spreadDirections = new(4);
 
+    // Scratch for ordering an over-budget tick lowest-cell-first; only filled when the
+    // tick is capped, so steady-state ticks never pay the copy or the sort
+    private readonly List<long> _tickOrder = [];
+
     // Dirt-to-mud ids, resolved once content is loaded. Every ticked fluid cell checks
     // its dirt neighbours against the mud condition right away, so settled water still
     // converts dirt the moment an edit schedules it, with no timers to keep.
@@ -278,7 +282,9 @@ public class FluidManager
         return true;
     }
 
-    /// <summary>One fluid tick: every scheduled cell recomputes its own level, then spreads.</summary>
+    /// <summary>One fluid tick: scheduled cells recompute their level, then spread.
+    /// Capped at <see cref="WorldGenerationConfig.MaxFluidCellsPerTick"/> cells, lowest first;
+    /// the rest ride the next tick.</summary>
     private void Tick(ChunkManager chunks, DropManager drops)
     {
         (_pending, _next) = (_next, _pending);
@@ -286,62 +292,82 @@ public class FluidManager
         _dirtyChunks.Clear();
         _tickIndex++;
 
-        foreach (var key in _pending)
+        var budget = WorldGenerationConfig.MaxFluidCellsPerTick;
+        if (_pending.Count > budget)
         {
-            Unpack(key, out var x, out var y, out var z);
-
-            // An unloaded cell is dropped silently: nothing has to be remembered for it, so
-            // chunk unloading needs no hook here
-            if (!chunks.TryGetCell(x, y, z, out var id, out var state)) continue;
-            if (!BlockType.IsFluid(id)) continue;
-
-            TryConvertMudAround(x, y, z, chunks);
-
-            // Slow fluids sit this tick out and ride the next one instead of losing their turn
-            var divisor = BlockType.FluidTickDivisorById[id];
-            if (divisor > 1 && _tickIndex % divisor != 0)
-            {
-                _next.Add(key);
-                continue;
-            }
-
-            // Contact hardening runs before the level rules: lava beside water becomes
-            // cobblestone instead of flowing or lingering for another tick
-            var hardensTo = BlockType.HardensToById[id];
-            if (hardensTo != 0 && TouchesFluid(x, y, z, BlockType.HardensTouchingById[id], chunks))
-            {
-                Write(x, y, z, hardensTo, 0, chunks);
-                ScheduleAround(x, y, z);
-                continue;
-            }
-
-            // Sources are infinite: they never thin out and never dry up
-            if (!FluidState.IsSource(state))
-            {
-                var newState = ComputeState(x, y, z, id, chunks);
-                if (newState == StateNone)
-                {
-                    // Cut off from its supply: the cell drains
-                    Write(x, y, z, 0, 0, chunks);
-                    ScheduleAround(x, y, z);
-                    continue;
-                }
-
-                if (newState != state)
-                {
-                    state = (byte)newState;
-                    Write(x, y, z, id, state, chunks);
-                    ScheduleAround(x, y, z);
-                }
-            }
-
-            Spread(x, y, z, id, state, chunks, drops);
+            // Wake-up storm: bound this tick and carry the rest over lowest-cell-first,
+            // so falling columns drain before skirts spread outward off them.
+            _tickOrder.Clear();
+            _tickOrder.AddRange(_pending);
+            _tickOrder.Sort(static (a, b) => UnpackedY(a).CompareTo(UnpackedY(b)));
+            for (var i = budget; i < _tickOrder.Count; i++) _next.Add(_tickOrder[i]);
+            for (var i = 0; i < budget; i++) TickCell(_tickOrder[i], chunks, drops);
+        }
+        else
+        {
+            foreach (var key in _pending) TickCell(key, chunks, drops);
         }
 
         foreach (var chunkPos in _dirtyChunks)
             chunks.MarkDirty(chunkPos);
 
         _pending.Clear();
+    }
+
+    /// <summary>Recomputes one scheduled cell's level, then spreads it.</summary>
+    private void TickCell(long key, ChunkManager chunks, DropManager drops)
+    {
+        Unpack(key, out var x, out var y, out var z);
+
+        // An unloaded cell is dropped silently: nothing has to be remembered for it, so
+        // chunk unloading needs no hook here
+        if (!chunks.TryGetCell(x, y, z, out var id, out var state)) return;
+        if (!BlockType.IsFluid(id)) return;
+
+        // Slow fluids sit this tick out and ride the next one instead of losing their turn
+        var divisor = BlockType.FluidTickDivisorById[id];
+        if (divisor > 1 && _tickIndex % divisor != 0)
+        {
+            _next.Add(key);
+            return;
+        }
+
+        // Contact hardening runs before the level rules: lava beside water becomes
+        // cobblestone instead of flowing or lingering for another tick
+        var hardensTo = BlockType.HardensToById[id];
+        if (hardensTo != 0 && TouchesFluid(x, y, z, BlockType.HardensTouchingById[id], chunks))
+        {
+            Write(x, y, z, hardensTo, 0, chunks);
+            ScheduleAround(x, y, z);
+            return;
+        }
+
+        // Mud watches settled water, so it runs after the early-outs: skipped slow-fluid
+        // ticks and hardening cells never pay the 26-neighbourhood scan, and non-water
+        // fluids skip it inside (water neighbours convert the dirt on their own tick).
+        TryConvertMudAround(x, y, z, id, chunks);
+
+        // Sources are infinite: they never thin out and never dry up
+        if (!FluidState.IsSource(state))
+        {
+            var newState = ComputeState(x, y, z, id, chunks);
+            if (newState == StateNone)
+            {
+                // Cut off from its supply: the cell drains
+                Write(x, y, z, 0, 0, chunks);
+                ScheduleAround(x, y, z);
+                return;
+            }
+
+            if (newState != state)
+            {
+                state = (byte)newState;
+                Write(x, y, z, id, state, chunks);
+                ScheduleAround(x, y, z);
+            }
+        }
+
+        Spread(x, y, z, id, state, chunks, drops);
     }
 
     /// <summary>
@@ -414,6 +440,16 @@ public class FluidManager
     {
         // Level 7 has nothing left to give
         if (FluidState.Amount(state) - 1 <= 0) return;
+
+        // Fast path: spreading only ever writes into an immediate horizontal neighbour
+        // (see the CanFlowInto gate on each Flow below), so when none of the four is
+        // flowable the slope search can pick nothing writable — skip it entirely.
+        // This is exact, not a heuristic: the loop below cannot write otherwise.
+        if (!CanFlowInto(x + 1, y, z, chunks)
+            && !CanFlowInto(x - 1, y, z, chunks)
+            && !CanFlowInto(x, y, z + 1, chunks)
+            && !CanFlowInto(x, y, z - 1, chunks))
+            return;
 
         foreach (var (dx, dy, dz) in ChooseSpreadDirections(x, y, z, fluid, chunks))
         {
@@ -649,9 +685,10 @@ public class FluidManager
     /// so drying out needs no handling — mud simply stays mud. Conversions write through
     /// <see cref="Write"/> like any fluid edit, so their remeshes join the tick's batch.
     /// </summary>
-    private void TryConvertMudAround(int x, int y, int z, ChunkManager chunks)
+    private void TryConvertMudAround(int x, int y, int z, byte fluid, ChunkManager chunks)
     {
         if (!MudIds(out var dirt, out var mud, out var water)) return;
+        if (fluid != water) return;
 
         for (var dx = -1; dx <= 1; dx++)
         for (var dy = -1; dy <= 1; dy++)
@@ -749,9 +786,12 @@ public class FluidManager
     private static void Unpack(long key, out int x, out int y, out int z)
     {
         x = SignExtend((int)((key >> (2 * PackBits)) & PackMask));
-        y = SignExtend((int)((key >> PackBits) & PackMask));
+        y = UnpackedY(key);
         z = SignExtend((int)(key & PackMask));
     }
+
+    // A packed key's Y, for ordering an over-budget tick lowest-cell-first without a full unpack
+    private static int UnpackedY(long key) => SignExtend((int)((key >> PackBits) & PackMask));
 
     // A packed axis keeps only the low PackBits, so its sign bit has to be pushed back up
     private static int SignExtend(int value) => (value << (32 - PackBits)) >> (32 - PackBits);

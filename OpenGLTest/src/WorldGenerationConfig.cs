@@ -181,6 +181,11 @@ public static class WorldGenerationConfig
     public const float FluidTickSeconds = 0.25f;
     public const int MaxFluidTicksPerFrame = 4;
 
+    // Cells processed per fluid tick at most; the remainder rides the next tick instead.
+    // Bounds a chunk-load wake-up storm to a flat per-tick cost rather than one 100ms+
+    // spike, at the price of a longer settling tail after spawn.
+    public const int MaxFluidCellsPerTick = 2048;
+
     // Chunks whose worldgen water is woken per frame (FluidManager.WakeLoadedChunks). Each wake
     // schedules the chunk's fluid frontier and scans its six borders, so a streaming burst is
     // spread over frames; leftovers simply stay queued for the next one.
