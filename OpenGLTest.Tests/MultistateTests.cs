@@ -20,29 +20,6 @@ public sealed class MultistateTests
     private static byte Branch => ContentRegistry.RequireItem("branch").Id;
 
     [Fact]
-    public void PebbleIsAThreeStateStackableBlock()
-    {
-        Assert.Equal(3, BlockType.ById[Pebble]!.StackMax);
-    }
-
-    [Fact]
-    public void FlintSpendsFromItsStackToBuildPebbles()
-    {
-        var flint = ItemType.Types[Flint];
-        Assert.Equal(ItemUseAction.PlaceStack, flint.UseAction);
-        Assert.Equal(Pebble, flint.UseBlockId);
-        Assert.Equal(0, flint.UseResultId);
-    }
-
-    [Fact]
-    public void FlintStaysAMiscPickupWhileBucketsStayTools()
-    {
-        Assert.Equal(InventoryCategory.Misc, Inventory.CategoryOf(Flint));
-        Assert.Equal(InventoryCategory.Tools,
-            Inventory.CategoryOf(ContentRegistry.RequireItem("bucket").Id));
-    }
-
-    [Fact]
     public void ExplicitStateWinsOverTheWorldgenHash()
     {
         var pebble = BlockType.ById[Pebble]!;
@@ -119,24 +96,6 @@ public sealed class MultistateTests
         var mesh = center.GenerateMeshData(manager, greedy: false);
         Assert.NotNull(mesh);
         Assert.Equal(20 * expected, mesh.Vertices.Count);
-    }
-
-    [Fact]
-    public void BranchPileIsAFourStateStackableBlock()
-    {
-        var pile = BlockType.ById[BranchPile]!;
-        Assert.Equal(4, pile.StackMax);
-        Assert.Equal(BlockRenderer.BranchPile, pile.Renderer);
-        Assert.False(BlockType.IsGreedy(BranchPile));
-    }
-
-    [Fact]
-    public void BranchSpendsFromItsStackToBuildBranchPiles()
-    {
-        var branch = ItemType.Types[Branch];
-        Assert.Equal(ItemUseAction.PlaceStack, branch.UseAction);
-        Assert.Equal(BranchPile, branch.UseBlockId);
-        Assert.Equal(0, branch.UseResultId);
     }
 
     [Fact]

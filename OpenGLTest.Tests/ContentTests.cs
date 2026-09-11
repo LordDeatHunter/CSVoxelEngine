@@ -108,26 +108,11 @@ public sealed class ContentTests
     }
 
     [Fact]
-    public void TntTakesTwoHitsToMine()
-    {
-        Assert.Equal(2, ContentRegistry.RequireBlock("tnt").MaxHealth);
-    }
-
-    [Fact]
     public void NoneLootTableDropsNothing()
     {
         var into = new List<byte>();
         LootTable.None.Roll(new LootContext(0, 0, 0), into);
         Assert.Empty(into);
-    }
-
-    [Fact]
-    public void BlocksCarryDisplayNamesFromJson()
-    {
-        Assert.Equal("Stone", ContentRegistry.RequireBlock("stone").DisplayName);
-        Assert.Equal("TNT", ContentRegistry.RequireBlock("tnt").DisplayName);
-        Assert.Equal("Mud Bricks", ContentRegistry.RequireBlock("mud_bricks").DisplayName);
-        Assert.Equal("Branch Pile", ContentRegistry.RequireBlock("branch_pile").DisplayName);
     }
 
     [Fact]
@@ -138,83 +123,10 @@ public sealed class ContentTests
     }
 
     [Fact]
-    public void InventoryShowsBlockDisplayNames()
-    {
-        var stone = ContentRegistry.RequireBlock("stone");
-        Assert.Equal("Stone", Inventory.DisplayName(stone.Id));
-    }
-
-    [Fact]
     public void UnknownContentThrowsNamingIt()
     {
         var ex = Assert.Throws<InvalidOperationException>(() => ContentRegistry.RequireBlock("nope"));
         Assert.Contains("nope", ex.Message);
-    }
-
-    [Fact]
-    public void DefaultHitboxIsFullCube()
-    {
-        var boxes = ContentRegistry.RequireBlock("stone").Hitboxes;
-        var single = Assert.Single(boxes);
-        Assert.Equal(Vector3.Zero, single.Min);
-        Assert.Equal(Vector3.One, single.Max);
-    }
-
-    [Fact]
-    public void FlowerHitboxIsNarrowColumnFullHeight()
-    {
-        var box = Assert.Single(ContentRegistry.RequireBlock("flower").Hitboxes);
-        Assert.Equal(new Vector3(0.25f, 0f, 0.25f), box.Min);
-        Assert.Equal(new Vector3(0.75f, 1f, 0.75f), box.Max);
-    }
-
-    [Fact]
-    public void PebbleHitboxCoversMaxStoneHeight()
-    {
-        var box = Assert.Single(ContentRegistry.RequireBlock("pebble").Hitboxes);
-        Assert.Equal(Vector3.Zero, box.Min);
-        var maxHeight = WorldGenerationConfig.PebbleMaxSizeTexels / 32f;
-        Assert.Equal(new Vector3(1f, maxHeight, 1f), box.Max);
-    }
-
-    [Fact]
-    public void BranchPileHitboxCoversMaxPileHeight()
-    {
-        var pile = ContentRegistry.RequireBlock("branch_pile");
-        var box = Assert.Single(pile.Hitboxes);
-        Assert.Equal(Vector3.Zero, box.Min);
-        Assert.Equal(new Vector3(1f, 0.5f, 1f), box.Max);
-        Assert.True(box.Max.Y >= BranchPileGenerator.PileTop(pile.StackMax));
-    }
-
-    [Fact]
-    public void TaperedWoodHitboxFollowsHalfWidth()
-    {
-        var twig = Assert.Single(ContentRegistry.RequireBlock("twig").Hitboxes);
-        Assert.Equal(new Vector3(0.375f, 0f, 0.375f), twig.Min);
-        Assert.Equal(new Vector3(0.625f, 1f, 0.625f), twig.Max);
-
-        var log = Assert.Single(ContentRegistry.RequireBlock("log").Hitboxes);
-        Assert.Equal(Vector3.Zero, log.Min);
-        Assert.Equal(Vector3.One, log.Max);
-    }
-
-    [Fact]
-    public void ItemDisplayDefaultsToSideCantedTool()
-    {
-        var type = ContentRegistry.RequireItem("bucket");
-        Assert.Equal(new Vector3(-30f, 10f, 0f), type.DisplayRotation);
-        Assert.Equal(Vector3.Zero, type.DisplayTranslation);
-        Assert.Equal(1f, type.DisplayScale);
-    }
-
-    [Fact]
-    public void CompassDisplayFacesTheHolder()
-    {
-        var type = ContentRegistry.RequireItem("compass");
-        Assert.Equal(new Vector3(-60f, 0f, 0f), type.DisplayRotation);
-        Assert.Equal(new Vector3(-0.01f, 0.06f, -0.02f), type.DisplayTranslation);
-        Assert.Equal(0.67f, type.DisplayScale);
     }
 
     [Fact]

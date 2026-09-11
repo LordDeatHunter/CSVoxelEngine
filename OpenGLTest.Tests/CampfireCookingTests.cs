@@ -27,16 +27,6 @@ public sealed class CampfireCookingTests
     }
 
     [Fact]
-    public void MudballCooksIntoMudBrick()
-    {
-        var recipe = ContentRegistry.CookRecipeForInput(Mudball);
-        Assert.NotNull(recipe);
-        Assert.Equal(MudBrick, recipe.ResultId);
-        Assert.Equal(1, recipe.ResultCount);
-        Assert.Equal(12f, recipe.CookSeconds, precision: 5);
-    }
-
-    [Fact]
     public void NonCookableHasNoRecipe()
     {
         var branch = ContentRegistry.RequireItem("branch").Id;

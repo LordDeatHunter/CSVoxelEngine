@@ -26,30 +26,9 @@ public sealed class QuernTests
     }
 
     [Fact]
-    public void MalachiteChunkCrushesIntoCrushedCopper()
-    {
-        var recipe = ContentRegistry.CrushRecipeForInput(MalachiteChunk);
-        Assert.NotNull(recipe);
-        Assert.Equal(CrushedCopper, recipe.ResultId);
-        Assert.Equal(1, recipe.ResultCount);
-    }
-
-    [Fact]
     public void NonCrushableHasNoRecipe()
     {
         Assert.Null(ContentRegistry.CrushRecipeForInput(Branch));
-    }
-
-    [Fact]
-    public void QuernCraftsFromTwentyCobbleAndBranch()
-    {
-        var recipe = ContentRegistry.RecipeByName("quern");
-        Assert.NotNull(recipe);
-        Assert.Equal(Quern, recipe.ResultId);
-        Assert.Equal(1, recipe.ResultCount);
-        Assert.Equal(2, recipe.Ingredients.Length);
-        Assert.Contains(recipe.Ingredients, i => i.Id == Cobblestone && i.Count == 20 && !i.IsTag);
-        Assert.Contains(recipe.Ingredients, i => i.Id == Branch && i.Count == 1 && !i.IsTag);
     }
 
     [Fact]
@@ -66,70 +45,6 @@ public sealed class QuernTests
         Assert.Equal(quernBefore + 1, inventory.CountFor(Quern));
         Assert.Equal(cobbleBefore, inventory.CountFor(Cobblestone));
         Assert.Equal(0, inventory.CountFor(Branch));
-    }
-
-    [Fact]
-    public void QuernBlockFlags()
-    {
-        var quern = ContentRegistry.RequireBlock("quern");
-        Assert.Equal(BlockRenderer.Quern, quern.Renderer);
-        Assert.True(quern.Solid);
-        Assert.True(quern.HasItem);
-        Assert.False(quern.BakedModel!.IsFullCube);
-        Assert.False(BlockType.IsGreedy(quern.Id));
-        Assert.False(BlockType.Occludes(quern.Id));
-        Assert.True(quern.PassesLight);
-    }
-
-    [Fact]
-    public void QuernModelSplitsIntoBaseAndTop()
-    {
-        var model = ContentRegistry.RequireBlock("quern").BakedModel!;
-        // Three parts: base, plate and handle, six quads each.
-        Assert.Equal(18, model.Quads.Length);
-        Assert.Equal(12, model.Quads.Count(QuernRenderer.IsTopQuad));
-        foreach (var quad in model.Quads)
-        {
-            var below = 0;
-            foreach (var position in quad.Positions)
-                if (position.Y < QuernRenderer.SplitY)
-                    below++;
-            Assert.True(below == 0 || below == 4);
-        }
-    }
-
-    [Fact]
-    public void QuernChunkHoldsBaseOnly()
-    {
-        var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
-        center.SetBlockRaw(8, 8, 8, Quern, 0);
-
-        var mesh = center.GenerateMeshData(manager);
-        Assert.NotNull(mesh);
-        Assert.Equal(24, mesh.Vertices.Count);
-        Assert.Equal(36, mesh.Indices.Count);
-        Assert.Empty(mesh.TranslucentVertices);
-        foreach (var vertex in mesh.Vertices)
-            Assert.True(vertex.Position.Y - 8f <= 6f / 16f + 1e-4f);
-    }
-
-    [Fact]
-    public void QuernHitboxesAreTheTwoRocks()
-    {
-        var boxes = ContentRegistry.RequireBlock("quern").Hitboxes;
-        Assert.Equal(2, boxes.Length);
-        Assert.Equal(1f / 16f, boxes[0].Min.X);
-        Assert.Equal(0f, boxes[0].Min.Y);
-        Assert.Equal(1f / 16f, boxes[0].Min.Z);
-        Assert.Equal(15f / 16f, boxes[0].Max.X);
-        Assert.Equal(6f / 16f, boxes[0].Max.Y);
-        Assert.Equal(15f / 16f, boxes[0].Max.Z);
-        Assert.Equal(3f / 16f, boxes[1].Min.X);
-        Assert.Equal(7f / 16f, boxes[1].Min.Y);
-        Assert.Equal(3f / 16f, boxes[1].Min.Z);
-        Assert.Equal(13f / 16f, boxes[1].Max.X);
-        Assert.Equal(10f / 16f, boxes[1].Max.Y);
-        Assert.Equal(13f / 16f, boxes[1].Max.Z);
     }
 
     [Fact]

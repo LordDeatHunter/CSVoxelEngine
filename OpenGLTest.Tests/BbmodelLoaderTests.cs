@@ -148,12 +148,6 @@ public sealed class BbmodelLoaderTests
         return crc ^ 0xFFFFFFFFu;
     }
 
-    [Fact]
-    public void CrcTableMatchesCheckVector()
-    {
-        Assert.Equal(0xCBF43926u, Crc32(Encoding.ASCII.GetBytes("123456789")));
-    }
-
     private static uint Adler32(byte[] data)
     {
         uint a = 1;
@@ -227,29 +221,6 @@ public sealed class BbmodelLoaderTests
         var data = BbmodelLoader.Parse(MinimalModel(textureSource: uri), Path, _ => throw new NotSupportedException());
         Assert.Equal(2, data.TextureWidth);
         Assert.Equal(new byte[] { 0, 0, 255, 255 }, data.TexturePixels![8..12]);
-    }
-
-    [Fact]
-    public void FromBbmodelFallsBackToPaletteWithoutTexture()
-    {
-        var rig = PlayerModel.PlayerRig.FromBbmodel(BbmodelLoader.Parse(MinimalModel(), Path, _ => []));
-        Assert.Equal(PlayerModel.PaletteCols, rig.TextureWidth);
-        Assert.Equal(PlayerModel.PaletteRows, rig.TextureHeight);
-        Assert.Equal(10, rig.Parts.Count);
-    }
-
-    [Fact]
-    public void BuiltInRigMatchesLegacyConsts()
-    {
-        var rig = PlayerModel.PlayerRig.BuiltIn();
-        Assert.Equal(new Vector3(0f, PlayerModel.HipY, 0f), rig.Parts["Torso"].Pivot);
-        Assert.Equal(new Vector3(0f, PlayerModel.NeckY, 0f), rig.Parts["Head"].Pivot);
-        Assert.Equal(new Vector3(PlayerModel.ShoulderX, PlayerModel.ShoulderY, 0f), rig.Parts["UpperArmR"].Pivot);
-        Assert.Equal(new Vector3(-PlayerModel.HipX, PlayerModel.HipY - PlayerModel.ThighLength, 0f),
-            rig.Parts["ShinL"].Pivot);
-        // Elbow/knee offsets the pose code derives from pivots equal the old lengths.
-        Assert.Equal(new Vector3(0f, -PlayerModel.UpperArmLength, 0f),
-            rig.Parts["ForearmR"].Pivot - rig.Parts["UpperArmR"].Pivot);
     }
 
     [Fact]

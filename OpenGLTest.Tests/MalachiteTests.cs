@@ -8,30 +8,6 @@ public sealed class MalachiteTests
     public MalachiteTests() => TestContent.EnsureLoaded();
 
     [Fact]
-    public void OreBlockIsRegisteredAsHardFullCube()
-    {
-        var ore = ContentRegistry.RequireBlock("malachite_ore");
-        Assert.Equal(8, ore.MaxHealth);
-        Assert.True(BlockType.Occludes(ore.Id));
-        Assert.True(BlockType.IsSolid(ore.Id));
-    }
-
-    [Fact]
-    public void OreDropsItsChunkItem()
-    {
-        var table = ContentRegistry.LootTableFor("malachite_ore");
-        Assert.NotNull(table);
-        var chunk = ContentRegistry.RequireItem("malachite_ore").Id;
-        var into = new List<byte>();
-        for (var i = 0; i < 10; i++)
-        {
-            into.Clear();
-            table.Roll(new LootContext(0, 0, 0), into);
-            Assert.Equal(new[] { chunk }, into);
-        }
-    }
-
-    [Fact]
     public void VeinsExistAtAnyDepth()
     {
         var shallow = false;

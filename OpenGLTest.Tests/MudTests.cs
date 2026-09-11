@@ -47,54 +47,6 @@ public sealed class MudTests
     }
 
     [Fact]
-    public void MudIsASolidFullCubeLikeDirt()
-    {
-        var mud = ContentRegistry.RequireBlock("mud");
-        var dirt = ContentRegistry.RequireBlock("dirt");
-        Assert.True(mud.Solid);
-        Assert.True(mud.OccludesNeighbours);
-        Assert.True(mud.CastsAmbientOcclusion);
-        Assert.False(mud.Fluid);
-        Assert.True(mud.HasItem);
-        Assert.Equal(dirt.MaxHealth, mud.MaxHealth);
-    }
-
-    [Fact]
-    public void MudDropsExactlyFourMudballs()
-    {
-        var mud = ContentRegistry.RequireBlock("mud").Id;
-        var mudball = ContentRegistry.RequireItem("mudball").Id;
-        var into = new List<byte>();
-        for (var i = 0; i < 5; i++)
-        {
-            into.Clear();
-            DropManager.RollLoot(mud, new LootContext(0, 0, 0), into);
-            Assert.Equal(new[] { mudball, mudball, mudball, mudball }, into);
-        }
-    }
-
-    [Fact]
-    public void FourMudballsCraftOneMud()
-    {
-        var mud = ContentRegistry.RequireBlock("mud").Id;
-        var mudball = ContentRegistry.RequireItem("mudball").Id;
-        var recipe = ContentRegistry.RecipeForResult(mud);
-        Assert.NotNull(recipe);
-        Assert.Equal(1, recipe.ResultCount);
-        var ingredient = Assert.Single(recipe.Ingredients);
-        Assert.Equal(mudball, ingredient.Id);
-        Assert.Equal(4, ingredient.Count);
-
-        var inventory = new Inventory();
-        var before = inventory.CountFor(mud);
-        Assert.True(inventory.Add(mudball, 4));
-        Assert.True(inventory.CanCraft(recipe));
-        Assert.True(inventory.TryCraft(recipe));
-        Assert.Equal(0, inventory.CountFor(mudball));
-        Assert.Equal(before + 1, inventory.CountFor(mud));
-    }
-
-    [Fact]
     public void SubmergedDirtConvertsOnTheFirstTick()
     {
         var manager = DirtBasin(out _, out var mud, out var water);

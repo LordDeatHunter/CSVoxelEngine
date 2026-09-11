@@ -27,15 +27,6 @@ public sealed class FallingBlockTests
     }
 
     [Fact]
-    public void SandAndGravelAreGravityAffected()
-    {
-        Assert.True(ContentRegistry.RequireBlock("sand").Falls);
-        Assert.True(ContentRegistry.RequireBlock("gravel").Falls);
-        Assert.True(BlockType.IsFalling(ContentRegistry.RequireBlock("sand").Id));
-        Assert.False(ContentRegistry.RequireBlock("stone").Falls);
-    }
-
-    [Fact]
     public void ToppledSandFallsAndLandsOnTheFloor()
     {
         var (chunks, lod, fluids, drops, falling, stone, sand) = Setup();

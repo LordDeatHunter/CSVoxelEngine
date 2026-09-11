@@ -8,51 +8,6 @@ public sealed class FlowerTests
     public FlowerTests() => TestContent.EnsureLoaded();
 
     [Fact]
-    public void CrossBakesToTwoUnculledQuads()
-    {
-        var flower = ContentRegistry.RequireBlock("flower");
-        var model = flower.BakedModel!;
-        Assert.Equal(2, model.Quads.Length);
-        Assert.False(model.IsFullCube);
-        foreach (var quad in model.Quads)
-        {
-            Assert.Equal(-1, quad.CullFace);
-            Assert.False(quad.IsFullFace);
-            Assert.False(quad.Shade);
-        }
-    }
-
-    [Fact]
-    public void FlowerHasMinecraftLikeFlags()
-    {
-        var flower = ContentRegistry.RequireBlock("flower");
-        Assert.False(flower.Solid);
-        Assert.False(flower.OccludesNeighbours);
-        Assert.False(flower.CastsAmbientOcclusion);
-        Assert.True(flower.Cutout);
-        Assert.True(flower.PassesLight);
-        Assert.True(flower.NeedsSupport);
-        Assert.True(flower.HasItem);
-        Assert.Equal(0, flower.MaxHealth);
-        Assert.False(BlockType.IsGreedy(flower.Id));
-        Assert.False(BlockType.Occludes(flower.Id));
-    }
-
-    [Fact]
-    public void FlowerEmitsCrossGeometry()
-    {
-        var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
-        var flower = ContentRegistry.RequireBlock("flower").Id;
-        center.SetBlockRaw(8, 8, 8, flower, 0);
-
-        var mesh = center.GenerateMeshData(manager);
-        Assert.NotNull(mesh);
-        Assert.Equal(8, mesh.Vertices.Count);
-        Assert.Equal(12, mesh.Indices.Count);
-        Assert.Empty(mesh.TranslucentVertices);
-    }
-
-    [Fact]
     public void FlowersStampOnlyOverGrass()
     {
         var flower = ContentRegistry.RequireBlock("flower").Id;

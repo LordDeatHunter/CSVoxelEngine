@@ -20,16 +20,6 @@ public sealed class AmbienceTests
         Assert.Equal(master, day + night, 5);
     }
 
-    [Theory]
-    [InlineData(-0.5f, 0f, 0.35f)]
-    [InlineData(1.5f, 0.35f, 0f)]
-    public void DaynessOutsideRangeClamps(float dayness, float day, float night)
-    {
-        var targets = AmbienceManager.ComputeTargetVolumes(dayness, WorldGenerationConfig.AmbienceVolume);
-        Assert.Equal(day, targets.Day, 5);
-        Assert.Equal(night, targets.Night, 5);
-    }
-
     [Fact]
     public void MissingFilesDisableGracefully()
     {

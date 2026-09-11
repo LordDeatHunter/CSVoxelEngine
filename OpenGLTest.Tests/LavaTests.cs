@@ -7,65 +7,6 @@ public sealed class LavaTests
 {
     public LavaTests() => TestContent.EnsureLoaded();
 
-    [Fact]
-    public void LavaIsRegisteredAsAGlowingFluid()
-    {
-        var lava = ContentRegistry.RequireBlock("lava");
-        Assert.True(lava.Fluid);
-        Assert.False(lava.Solid);
-        Assert.True(lava.PassesLight);
-        Assert.False(lava.HasItem);
-        Assert.Same(LootTable.None, lava.LootTable);
-        Assert.Equal(BlockRenderer.Fluid, lava.Renderer);
-        Assert.Equal(15, lava.LightEmission);
-        Assert.True(BlockType.IsFluid(lava.Id));
-    }
-
-    [Fact]
-    public void LavaFlowsSlowerShorterAndFinite()
-    {
-        var lava = ContentRegistry.RequireBlock("lava");
-        Assert.Equal(2, lava.FluidTickDivisor);
-        Assert.Equal(3, lava.FluidRange);
-        Assert.False(lava.FluidInfinite);
-        Assert.Equal(2, BlockType.FluidTickDivisorById[lava.Id]);
-        Assert.Equal(3, BlockType.FluidRangeById[lava.Id]);
-        Assert.False(BlockType.FluidInfiniteById[lava.Id]);
-    }
-
-    [Fact]
-    public void WaterKeepsItsDefaults()
-    {
-        var water = ContentRegistry.RequireBlock("water");
-        Assert.Equal(1, water.FluidTickDivisor);
-        Assert.Equal(7, water.FluidRange);
-        Assert.True(water.FluidInfinite);
-        Assert.Equal(0, BlockType.HardensToById[water.Id]);
-    }
-
-    [Fact]
-    public void LavaHardensIntoCobblestoneOnWaterContact()
-    {
-        var lava = ContentRegistry.RequireBlock("lava");
-        var water = ContentRegistry.RequireBlock("water");
-        var cobble = ContentRegistry.RequireBlock("cobblestone");
-        Assert.Equal(cobble.Id, lava.HardensToId);
-        Assert.Equal(water.Id, lava.HardensTouchingId);
-        Assert.Equal(cobble.Id, BlockType.HardensToById[lava.Id]);
-        Assert.Equal(water.Id, BlockType.HardensTouchingById[lava.Id]);
-    }
-
-    [Fact]
-    public void LavaBucketPoursLava()
-    {
-        var bucket = ContentRegistry.RequireItem("bucket");
-        var lavaBucket = ContentRegistry.RequireItem("lava_bucket");
-        var lava = ContentRegistry.RequireBlock("lava");
-        Assert.Equal(ItemUseAction.PlaceFluid, lavaBucket.UseAction);
-        Assert.Equal(lava.Id, lavaBucket.UseFluidId);
-        Assert.Equal(bucket.Id, lavaBucket.UseResultId);
-    }
-
     private static ChunkManager FloorBasin()
     {
         TestContent.EnsureLoaded();

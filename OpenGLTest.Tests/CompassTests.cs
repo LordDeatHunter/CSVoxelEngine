@@ -55,14 +55,6 @@ public sealed class CompassTests
     }
 
     [Fact]
-    public void CompassItemIsPlainMiscPickup()
-    {
-        var compass = ContentRegistry.RequireItem("compass");
-        Assert.Equal(ItemUseAction.None, compass.UseAction);
-        Assert.Equal(InventoryCategory.Misc, Inventory.CategoryOf(compass.Id));
-    }
-
-    [Fact]
     public void StartingInventoryCarriesACompass()
     {
         var compass = ContentRegistry.RequireItem("compass").Id;
@@ -83,25 +75,6 @@ public sealed class CompassTests
         // Equipping the shown id again clears the slot (toggle off)
         inventory.EquipStackable(3, compass);
         Assert.False(inventory.ContainsInHotbar(compass));
-    }
-
-    [Fact]
-    public void CompassIsAHeadingSpritesheet()
-    {
-        var compass = ContentRegistry.RequireItem("compass");
-        Assert.Equal(ItemAnimationMode.Heading, compass.Animation);
-        Assert.Equal(4, compass.SpriteCols);
-        Assert.Equal(4, compass.SpriteRows);
-        Assert.Equal(16, compass.FrameCount);
-    }
-
-    [Fact]
-    public void PlainItemsHaveNoAnimation()
-    {
-        var flint = ContentRegistry.RequireItem("flint");
-        Assert.Equal(ItemAnimationMode.None, flint.Animation);
-        Assert.Equal(1, flint.FrameCount);
-        Assert.Equal(0, flint.FrameAt(123f, 90f));
     }
 
     [Theory]

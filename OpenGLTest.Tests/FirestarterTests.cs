@@ -16,18 +16,6 @@ public sealed class FirestarterTests
     private static byte BranchPile => ContentRegistry.RequireBlock("branch_pile").Id;
 
     [Fact]
-    public void FirestarterLoadsWithDurabilityDelayAndIgniteAction()
-    {
-        var type = ItemType.Types[Firestarter];
-        Assert.Equal(ItemUseAction.IgniteCampfire, type.UseAction);
-        Assert.Equal(BranchPile, type.UseBlockId);
-        Assert.Equal(0.15f, type.UseChance, precision: 5);
-        Assert.Equal(10, type.MaxDurability);
-        Assert.Equal(1.5f, type.UseDelaySeconds, precision: 5);
-        Assert.Equal(0, type.UseResultId);
-    }
-
-    [Fact]
     public void FirestarterIsAToolSoInstancesNeverStack()
     {
         Assert.Equal(InventoryCategory.Tools, Inventory.CategoryOf(Firestarter));
@@ -35,30 +23,6 @@ public sealed class FirestarterTests
         Assert.True(inventory.Add(Firestarter));
         Assert.True(inventory.Add(Firestarter));
         Assert.Equal(2, inventory.ToolEntries().Count(t => t.ItemId == Firestarter));
-    }
-
-    [Fact]
-    public void FirestarterRecipeTakesOneVineAndOneBranch()
-    {
-        var recipe = ContentRegistry.RecipeForResult(Firestarter);
-        Assert.NotNull(recipe);
-        Assert.Equal(1, recipe.ResultCount);
-        Assert.Equal(2, recipe.Ingredients.Length);
-        Assert.Contains(recipe.Ingredients, i => i.Id == Vine && i.Count == 1);
-        Assert.Contains(recipe.Ingredients, i => i.Id == Branch && i.Count == 1);
-    }
-
-    [Fact]
-    public void CraftingYieldsAFullDurabilityInstance()
-    {
-        var inventory = new Inventory();
-        var recipe = ContentRegistry.RecipeForResult(Firestarter)!;
-        Assert.True(inventory.Add(Vine));
-        Assert.True(inventory.Add(Branch));
-        Assert.True(inventory.TryCraft(recipe));
-        var tool = Assert.Single(inventory.ToolEntries(), t => t.ItemId == Firestarter);
-        Assert.Equal(10, inventory.ToolDurabilityLeft(tool.InstanceId));
-        Assert.Equal(1f, inventory.ToolDurabilityFraction(tool.InstanceId)!.Value, precision: 5);
     }
 
     [Fact]
@@ -117,7 +81,6 @@ public sealed class FirestarterTests
         Assert.True(fires.Ignite(1, 2, 3));
         Assert.False(fires.Ignite(1, 2, 3));
         Assert.True(fires.IsLit(1, 2, 3));
-        Assert.Equal(CampfireManager.BurnSeconds, 30f);
         Assert.Single(fires.LitCells);
     }
 

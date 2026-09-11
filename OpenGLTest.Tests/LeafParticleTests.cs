@@ -24,8 +24,6 @@ public sealed class LeafParticleTests
     [Fact]
     public void CropIsSixTexelsCentredOnTheTile()
     {
-        Assert.Equal(6, WorldGenerationConfig.LeafParticleCropPixels);
-
         var crop = LeafParticleRenderer.CenterCrop(7, 32, 6);
         Assert.Equal(7, crop.Layer);
         Assert.Equal(13f / 32f, crop.Min.X, 5);

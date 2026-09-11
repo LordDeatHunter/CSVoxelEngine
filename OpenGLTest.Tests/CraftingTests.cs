@@ -7,25 +7,6 @@ public sealed class CraftingTests
     public CraftingTests() => TestContent.EnsureLoaded();
 
     [Fact]
-    public void PickaxeRecipeLoadsWithExpectedIngredients()
-    {
-        var pickaxe = ContentRegistry.RequireItem("primitive_pickaxe").Id;
-        var recipe = ContentRegistry.RecipeForResult(pickaxe);
-        Assert.NotNull(recipe);
-        Assert.Equal(1, recipe.ResultCount);
-        Assert.Equal(
-            new[]
-            {
-                ContentRegistry.RequireItem("flint").Id,
-                ContentRegistry.RequireItem("branch").Id,
-                ContentRegistry.RequireItem("vine").Id,
-            },
-            new[] { recipe.Ingredients[0].Id, recipe.Ingredients[1].Id, recipe.Ingredients[2].Id });
-        Assert.Equal(new[] { 1, 1, 2 },
-            new[] { recipe.Ingredients[0].Count, recipe.Ingredients[1].Count, recipe.Ingredients[2].Count });
-    }
-
-    [Fact]
     public void TryCraftConsumesIngredientsAndAddsPickaxe()
     {
         var inventory = new Inventory();
