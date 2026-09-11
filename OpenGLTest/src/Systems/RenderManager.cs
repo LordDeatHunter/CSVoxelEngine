@@ -1598,6 +1598,52 @@ public class RenderManager : IDisposable
         }
     }
 
+    public void RenderCampfireCooking(Camera camera, CampfireManager campfires)
+    {
+        if (camera == null || campfires == null) return;
+
+        var drew = false;
+        var atlasBound = true;
+        var viewProj = camera.GetViewProjection();
+        foreach (var (cell, slot, itemId, _, _) in campfires.CookingView())
+        {
+            if (!drew)
+            {
+                worldShader.Use();
+                BindWorldTextures();
+                drew = true;
+            }
+
+            Mesh? mesh;
+            if (ItemType.IsItem(itemId))
+            {
+                if (!itemMeshes.TryGet(itemId, out mesh, out var itemTexture)) continue;
+                gl.ActiveTexture(TextureUnit.Texture0);
+                gl.BindTexture(TextureTarget.Texture2DArray, itemTexture);
+                atlasBound = false;
+            }
+            else
+            {
+                if (!atlasBound)
+                {
+                    BindWorldTextures();
+                    atlasBound = true;
+                }
+                mesh = blockCubes.Get(itemId);
+                if (mesh == null) continue;
+            }
+
+            var scale = ItemDrop.Size * (ItemType.IsItem(itemId) ? 1.5f : 1f);
+            var offset = CampfireManager.SlotOffsets[slot % CampfireManager.SlotOffsets.Length];
+            var placed = Matrix4x4.CreateScale(scale)
+                        * Matrix4x4.CreateRotationY(slot * MathF.PI / 2f)
+                        * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f, 0f, 0.5f) + offset);
+
+            SetDrawUniforms(placed, placed * viewProj, 1f);
+            mesh.Render();
+        }
+    }
+
     /// <summary>
     /// Draws the primed TNT cubes at full block size, strobing white through uFlash as their
     /// fuses burn down. Leaves uFlash at 0 so the other world draws stay textured.

@@ -48,6 +48,7 @@ public static class ContentRegistry
     private static readonly Dictionary<byte, BlockModel> BlockModels = new();
     private static readonly Dictionary<byte, BlockDefinition> BlockDefinitions = new();
     private static readonly List<CraftingRecipe> Recipes = new();
+    private static readonly List<CookRecipe> CookRecipes = new();
 
     private static string _assetsRoot = "assets";
     private static ModelLoader? _models;
@@ -89,6 +90,7 @@ public static class ContentRegistry
         LoadBlocks(blockFiles);
         LoadTags(Path.Combine(assetsRoot, "data", "tags"));
         LoadRecipes(Path.Combine(assetsRoot, "data", "recipes"));
+        LoadCookRecipes(Path.Combine(assetsRoot, "data", "cook"));
         ValidateItemUses(itemFiles);
     }
 
@@ -219,6 +221,13 @@ public static class ContentRegistry
     public static CraftingRecipe? RecipeByName(string name) =>
         Recipes.FirstOrDefault(r => r.Name.Equals(name, StringComparison.Ordinal));
 
+    /// <summary>Every compiled campfire recipe, in file-name order.</summary>
+    public static IReadOnlyList<CookRecipe> CookRecipesList => CookRecipes;
+
+    /// <summary>First cook recipe taking this id, or null when it is not cookable.</summary>
+    public static CookRecipe? CookRecipeForInput(byte id) =>
+        CookRecipes.FirstOrDefault(r => r.InputId == id);
+
     /// <summary>Member ids of a loaded tag, sorted ascending, or null when there is no such tag.</summary>
     public static byte[]? TagMembers(string tag) =>
         Tags.TryGetValue(tag, out var members)
@@ -232,6 +241,7 @@ public static class ContentRegistry
         LootTables.Clear();
         Tags.Clear();
         Recipes.Clear();
+        CookRecipes.Clear();
         BlockModels.Clear();
         BlockDefinitions.Clear();
 
@@ -487,6 +497,34 @@ public static class ContentRegistry
         if (!Directory.Exists(folder)) return;
         foreach (var (name, path) in JsonFilesIn(folder))
             Recipes.Add(CompileRecipe(name, ReadJson<RecipeDefinition>(path), path));
+    }
+
+    private static void LoadCookRecipes(string folder)
+    {
+        if (!Directory.Exists(folder)) return;
+        foreach (var (name, path) in JsonFilesIn(folder))
+            CookRecipes.Add(CompileCookRecipe(name, ReadJson<CookRecipeDefinition>(path), path));
+    }
+
+    private static CookRecipe CompileCookRecipe(string name, CookRecipeDefinition definition, string path)
+    {
+        if (definition.Input == null || !TryResolve(definition.Input, out var inputId))
+            throw new InvalidOperationException(
+                $"Cook recipe '{path}' names input '{definition.Input}', which is not a registered block or item.");
+        if (definition.Result == null || !TryResolve(definition.Result, out var resultId))
+            throw new InvalidOperationException(
+                $"Cook recipe '{path}' names result '{definition.Result}', which is not a registered block or item.");
+        var resultCount = definition.Count ?? 1;
+        if (resultCount <= 0)
+            throw new InvalidOperationException($"Cook recipe '{path}' has count {resultCount}; expected 1 or more.");
+        var cookSeconds = definition.CookSeconds ?? 0f;
+        if (!float.IsFinite(cookSeconds) || cookSeconds <= 0f || cookSeconds > 600f)
+            throw new InvalidOperationException(
+                $"Cook recipe '{path}' has cookSeconds {definition.CookSeconds}; expected 0..600 exclusive of 0.");
+        if (CookRecipes.Any(r => r.InputId == inputId))
+            throw new InvalidOperationException(
+                $"Cook recipe '{path}' duplicates the input of '{CookRecipes.First(r => r.InputId == inputId).Name}': one cook recipe per input.");
+        return new CookRecipe(name, inputId, resultId, resultCount, cookSeconds);
     }
 
     private static CraftingRecipe CompileRecipe(string name, RecipeDefinition definition, string path)

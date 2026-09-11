@@ -18,10 +18,32 @@ public sealed class CampfireManager
     public const float BurnSeconds = 30f;
     public const int AshPerExtinguish = 4;
 
+    public const int MaxCookSlots = 4;
+
+    public static readonly Vector3[] SlotOffsets =
+    [
+        new(-0.25f, 0.55f, -0.25f),
+        new(0.25f, 0.55f, -0.25f),
+        new(-0.25f, 0.55f, 0.25f),
+        new(0.25f, 0.55f, 0.25f),
+    ];
+
+    public sealed class CookSlot
+    {
+        public byte InputId;
+        public byte OutputId;
+        public int OutputCount;
+        public float TimeLeft;
+        public float TotalTime;
+        public bool IsDone;
+    }
+
     private readonly Dictionary<(int X, int Y, int Z), float> _lit = new();
+    private readonly Dictionary<(int X, int Y, int Z), List<CookSlot>> _cooking = new();
     private readonly List<(int X, int Y, int Z)> _scratch = new();
     private readonly List<(int X, int Y, int Z)> _stale = new();
     private readonly List<Vector3> _cells = new();
+    private readonly List<byte> _collected = new();
 
     public int LitCount => _lit.Count;
 
@@ -38,10 +60,75 @@ public sealed class CampfireManager
         return true;
     }
 
-    public void NotifyBlockRemoved(int x, int y, int z)
+    public void NotifyBlockRemoved(int x, int y, int z, DropManager? drops = null)
     {
-        if (_lit.Remove((x, y, z)))
+        var key = (x, y, z);
+        if (_lit.Remove(key))
             RefreshCells();
+        if (drops != null)
+            DropCooking(key, drops);
+        else
+            _cooking.Remove(key);
+    }
+
+    public IReadOnlyList<CookSlot>? CookingAt(int x, int y, int z) =>
+        _cooking.TryGetValue((x, y, z), out var slots) ? slots : null;
+
+    public bool TryPlaceFood(int x, int y, int z, byte inputId)
+    {
+        if (!IsLit(x, y, z)) return false;
+        var recipe = ContentRegistry.CookRecipeForInput(inputId);
+        if (recipe == null) return false;
+        var key = (x, y, z);
+        if (!_cooking.TryGetValue(key, out var slots))
+        {
+            slots = new List<CookSlot>(MaxCookSlots);
+            _cooking[key] = slots;
+        }
+        if (slots.Count >= MaxCookSlots) return false;
+        slots.Add(new CookSlot
+        {
+            InputId = inputId,
+            OutputId = recipe.ResultId,
+            OutputCount = recipe.ResultCount,
+            TimeLeft = recipe.CookSeconds,
+            TotalTime = recipe.CookSeconds,
+            IsDone = false,
+        });
+        return true;
+    }
+
+    public IReadOnlyList<byte> CollectFinished(int x, int y, int z)
+    {
+        _collected.Clear();
+        if (!_cooking.TryGetValue((x, y, z), out var slots)) return _collected;
+        for (var i = slots.Count - 1; i >= 0; i--)
+        {
+            if (!slots[i].IsDone) continue;
+            for (var n = 0; n < slots[i].OutputCount; n++)
+                _collected.Add(slots[i].OutputId);
+            slots.RemoveAt(i);
+        }
+        if (slots.Count == 0)
+            _cooking.Remove((x, y, z));
+        return _collected;
+    }
+
+    public IEnumerable<(Vector3 Cell, int Slot, byte ItemId, bool Done, float Progress)> CookingView()
+    {
+        foreach (var (key, slots) in _cooking)
+        {
+            var cell = new Vector3(key.X, key.Y, key.Z);
+            for (var i = 0; i < slots.Count; i++)
+            {
+                var slot = slots[i];
+                var shown = slot.IsDone ? slot.OutputId : slot.InputId;
+                var progress = slot.TotalTime > 0f
+                    ? 1f - Math.Clamp(slot.TimeLeft / slot.TotalTime, 0f, 1f)
+                    : 1f;
+                yield return (cell, i, shown, slot.IsDone, progress);
+            }
+        }
     }
 
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops)
@@ -65,11 +152,53 @@ public sealed class CampfireManager
                 _lit[key] = left;
         }
         foreach (var key in _stale)
+        {
             _lit.Remove(key);
+            DropCooking(key, drops);
+        }
         foreach (var key in _scratch)
             ConsumeBranch(key.X, key.Y, key.Z, chunks, drops);
+        if (_lit.Count > 0)
+            ProgressCooking(deltaTime);
         if (_scratch.Count > 0 || _stale.Count > 0)
             RefreshCells();
+    }
+
+    private void ProgressCooking(float deltaTime)
+    {
+        foreach (var (key, slots) in _cooking)
+        {
+            if (!_lit.ContainsKey(key)) continue;
+            foreach (var slot in slots)
+            {
+                if (slot.IsDone) continue;
+                slot.TimeLeft -= deltaTime;
+                if (slot.TimeLeft <= 0f)
+                {
+                    slot.TimeLeft = 0f;
+                    slot.IsDone = true;
+                }
+            }
+        }
+    }
+
+    private void DropCooking((int X, int Y, int Z) key, DropManager drops)
+    {
+        if (!_cooking.TryGetValue(key, out var slots)) return;
+        _cooking.Remove(key);
+        var cell = new Vector3(key.X, key.Y, key.Z);
+        foreach (var slot in slots)
+        {
+            if (slot.IsDone)
+            {
+                for (var n = 0; n < slot.OutputCount; n++)
+                    drops.Spawn(slot.OutputId, cell);
+            }
+            else
+            {
+                drops.Spawn(slot.InputId, cell);
+            }
+        }
     }
 
     /// <summary>
@@ -93,7 +222,10 @@ public sealed class CampfireManager
             _lit[(x, y, z)] = BurnSeconds;
         }
         else
+        {
             chunk.RemoveBlockAt(cell, chunks);
+            DropCooking((x, y, z), drops);
+        }
         try
         {
             var ash = ContentRegistry.RequireItem("ash").Id;

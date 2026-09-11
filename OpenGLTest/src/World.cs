@@ -308,6 +308,7 @@ public class World
 
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.RenderItemDrops(Camera, _dropManager.Drops);
+        renderManager.RenderCampfireCooking(Camera, _campfires);
         renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
         renderManager.RenderFallingBlocks(Camera, _falling.Falling);
         renderManager.RenderLeafParticles(Camera, _leaves.Particles);
@@ -532,6 +533,8 @@ public class World
             if (!creative)
                 _dropManager.SpawnLoot(brokenId, blockPos,
                     DropManager.PileCount(brokenId, (int)blockPos.X, (int)blockPos.Z, brokenState));
+            if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.BranchPile)
+                _campfires.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, _dropManager);
         }
 
         // Water beside or above the hole pours into it on the next fluid tick
@@ -722,6 +725,11 @@ public class World
     public void TryUseSelected(float maxDistance)
     {
         Camera.NotifyPlayerAction();
+        if (TryCookOrCollect(maxDistance))
+        {
+            Player.Punch();
+            return;
+        }
         var id = Inventory.SelectedBlockId;
         if (id != 0 && Inventory.SelectedCount > 0
             && ItemType.Types.TryGetValue(id, out var item) && item.UseAction != ItemUseAction.None)
@@ -744,6 +752,36 @@ public class World
         }
 
         TryPlaceSelectedBlock(maxDistance);
+    }
+
+    private bool TryCookOrCollect(float maxDistance)
+    {
+        if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        var hx = (int)hit.X;
+        var hy = (int)hit.Y;
+        var hz = (int)hit.Z;
+        if (!_chunkManager.TryGetCell(hx, hy, hz, out var hitId, out _)) return false;
+        if (BlockType.ById[hitId]?.Renderer != BlockRenderer.BranchPile) return false;
+        if (!_campfires.IsLit(hx, hy, hz)) return false;
+
+        var selected = Inventory.SelectedBlockId;
+        if (selected != 0 && Inventory.SelectedCount > 0
+            && ContentRegistry.CookRecipeForInput(selected) != null
+            && _campfires.TryPlaceFood(hx, hy, hz, selected))
+        {
+            if (!Camera.IsCreative)
+                Inventory.ConsumeSelected();
+            return true;
+        }
+
+        var finished = _campfires.CollectFinished(hx, hy, hz);
+        if (finished.Count == 0) return selected != 0 && ContentRegistry.CookRecipeForInput(selected) != null;
+        foreach (var output in finished)
+        {
+            if (!Inventory.Add(output))
+                _dropManager.Spawn(output, new Vector3(hx, hy, hz));
+        }
+        return true;
     }
 
     /// <summary>
