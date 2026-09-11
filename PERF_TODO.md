@@ -211,8 +211,15 @@ fragments; the mesher/renderer change is preserved in the stash named in item 5.
   two mid-stream growth copies. 153 tests pass (new: `ShaderDefinesTests`,
   `GeometryAllocatorTests`, `ChunkDrawShaderTests`); `basic`, `glass` and `water` diffed against
   the HEAD worktree with a same-build control run as the noise floor — every difference is wave
-  phase, cloud drift, sub-block camera position or streaming progress. Details in
-  `MESHER_PLAN.md`; see the `11 (phase 4)` Measurements row.
+   phase, cloud drift, sub-block camera position or streaming progress. Details in
+   `MESHER_PLAN.md`; see the `11 (phase 4)` Measurements row.
+   Phase 5 (compute frustum cull) **RULED OUT** 2026-09-11, no code change: the plan's own gate
+   ("only if Phase 4 leaves a measurable CPU cull cost") is not met — the post-Phase-4 rows above
+   are cull + sort + fill + one MDI combined (`worldPass` 0.50, `shadows` 0.26, `waterPass` 0.09,
+   `reflect` 0.83 ms, ~2 % of the GPU-bound T1000 frame), so a `chunk-cull.comp` + `atomicAdd` +
+   `MultiDrawElementsIndirectCount` path would save at most that while losing the opaque
+   front-to-back order (translucent keeps its CPU sort either way). Do not retry unless a CPU-bound
+   profile shows cull + sort above ~1 ms. Status recorded in `MESHER_PLAN.md`.
 
 - [ ] **10. GC and runtime settings.** (the `chunk.lifetime` half is **done** 2026-09-09 as part of
   `MESHER_PLAN.md` Phase 4; the GC and runtime settings below are still open.)
