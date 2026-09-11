@@ -228,7 +228,7 @@ public class UIRenderer : IDisposable
         }
         catch (Exception e) when (e is IOException or InvalidOperationException)
         {
-            Console.WriteLine($"Warning: count font '{CountFontPath}' not loaded ({e.Message}); hotbar counts hidden.");
+            Log.WriteLine($"Warning: count font '{CountFontPath}' not loaded ({e.Message}); hotbar counts hidden.");
         }
     }
 

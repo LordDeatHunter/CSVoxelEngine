@@ -40,7 +40,9 @@ Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated
 The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, `C` to toggle creative mode (placing costs nothing, breaking drops nothing; double-tap Space toggles flight, but only while creative — flight is noclip and Space/Left Ctrl move up/down while flying), Left Shift to sprint (1.5x on foot, 10x while flying), hold left-click to mine a block (hit-based: one hit per `World.BlockHitSeconds` = 200 ms removes 1 HP of the block's `hardness`, declared in its JSON - 5 for most blocks, so ~1s, 8 for logs, 2 for leaves, and `0` means it pops on first contact like a pebble; damage resets if you release or switch target; instant while creative; stepped progress overlay via `break-*.glsl`; each hit pops the block out and back via `RenderManager.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), 1-10 to pick one of the 10 hotbar slots, `E` for the list inventory (blocks/tools/misc tabs with shared caps of 2048/8/2048; click a row to preview, click a hotbar slot to equip, same item again to unequip; the world keeps running and `E`/Escape closes it), `X` to toggle debug logging (FPS/position/water state to console), Escape to quit.
 
 `X` also raises the **frame profiler overlay** under the FPS counter, and prints the same
-snapshot to the console once a second so a headless run's log carries it. Each row is a section
+snapshot to the console once a second so a headless run's log carries it. Console writes go
+through the async `Log` queue (`OpenGLTest/src/Log.cs`), so a slow terminal never stalls the
+frame that logged; `Log.Shutdown` drains it on exit. Each row is a section
 of the frame — `camera`, the three `chunk*` rows from `ChunkManager.Update`, `lod`, `entities`,
 `fluidWake`, `fluidTick`, `raycast`, `breaking`, plus the `progUpdate` input shell and the
 `player` spawn/animation shell on the update side (right-click use/place work and console

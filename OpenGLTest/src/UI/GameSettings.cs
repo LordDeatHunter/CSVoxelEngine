@@ -140,7 +140,7 @@ public static class GameSettings
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            Console.WriteLine($"Warning: settings not saved ({e.Message})");
+            Log.WriteLine($"Warning: settings not saved ({e.Message})");
         }
     }
 

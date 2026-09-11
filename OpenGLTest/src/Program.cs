@@ -138,7 +138,7 @@ public static class Program
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Ignoring {VisualScriptVariable}=\"{script}\": {e.Message}");
+                Log.WriteLine($"Ignoring {VisualScriptVariable}=\"{script}\": {e.Message}");
                 visualScriptFailed = true;
             }
         }
@@ -156,7 +156,7 @@ public static class Program
 #else
         const string configuration = "Release";
 #endif
-        Console.WriteLine(
+        Log.WriteLine(
             $"Build: {configuration} | debugger {Debugger.IsAttached} | serverGC {GCSettings.IsServerGC}"
             + $" | latency {GCSettings.LatencyMode} | cpus {Environment.ProcessorCount}");
     }
@@ -176,7 +176,7 @@ public static class Program
                 out var offset))
             return offset;
 
-        Console.WriteLine(
+        Log.WriteLine(
             $"Ignoring {TimeOffsetVariable}=\"{timeOverride}\": expected a number of seconds, e.g. 150");
         return 0.0;
     }
@@ -192,7 +192,7 @@ public static class Program
         if (!debugEnabled) return;
 
         if (FrameProfiler.TryTakeSnapshotForConsole(out var profilerLine))
-            Console.WriteLine(profilerLine);
+            Log.WriteLine(profilerLine);
 
         debugLogTimer += deltaTime;
         if (debugLogTimer < 0.2) return;
@@ -200,7 +200,7 @@ public static class Program
         var fps = deltaTime > 0 ? (int)(1 / deltaTime) : 0;
         var camera = world.Camera;
         var position = camera.Position;
-        Console.WriteLine(
+        Log.WriteLine(
             $"FPS {fps} | Pos ({position.X:F2}, {position.Y:F2}, {position.Z:F2}) | Grounded {camera.IsGrounded} | Vy {camera.VerticalVelocity:F2} | Water {camera.IsInWater}/{camera.IsEyeInWater}");
         debugLogTimer = 0;
     }
@@ -231,7 +231,7 @@ public static class Program
         if (xPressed && !xWasPressed)
         {
             debugEnabled = !debugEnabled;
-            Console.WriteLine($"Debug {(debugEnabled ? "ON" : "OFF")}");
+            Log.WriteLine($"Debug {(debugEnabled ? "ON" : "OFF")}");
         }
         xWasPressed = xPressed;
 
@@ -593,5 +593,6 @@ public static class Program
         ambience?.Dispose();
         renderManager?.Dispose();
         inputManager?.Dispose();
+        Log.Shutdown();
     }
 }

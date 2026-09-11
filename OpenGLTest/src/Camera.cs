@@ -212,7 +212,7 @@ public class Camera
             if (TryParseSpawnOverride(spawnOverride, out var overridePosition))
                 return overridePosition;
 
-            Console.WriteLine(
+            Log.WriteLine(
                 $"Ignoring {SpawnOverrideVariable}=\"{spawnOverride}\": expected three comma-separated numbers, e.g. -40,-107,-75");
         }
 
@@ -253,7 +253,7 @@ public class Camera
             if (TryParseLookOverride(lookOverride, out var look))
                 return look;
 
-            Console.WriteLine(
+            Log.WriteLine(
                 $"Ignoring {LookOverrideVariable}=\"{lookOverride}\": expected two comma-separated numbers, e.g. -90,-20");
         }
 
@@ -599,7 +599,7 @@ public class Camera
             if (!IsCreative)
                 IsFlying = false;
             _verticalVelocity = 0f;
-            Console.WriteLine($"Creative {(IsCreative ? "ON" : "OFF")}");
+            Log.WriteLine($"Creative {(IsCreative ? "ON" : "OFF")}");
         }
 
         _creativeWasPressed = creativePressed;
@@ -619,7 +619,7 @@ public class Camera
                 {
                     IsFlying = !IsFlying;
                     _verticalVelocity = 0f;
-                    Console.WriteLine($"Flight {(IsFlying ? "ON" : "OFF")}");
+                    Log.WriteLine($"Flight {(IsFlying ? "ON" : "OFF")}");
                 }
                 _timeSinceSpacePress = float.MaxValue; // a toggle requires a fresh double tap
             }
@@ -643,7 +643,7 @@ public class Camera
                 _orbitPlayerYaw = Yaw;
                 _hasActionTarget = false;
             }
-            Console.WriteLine($"Camera {Mode}");
+            Log.WriteLine($"Camera {Mode}");
         }
 
         _f5WasPressed = pressed;

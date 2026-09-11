@@ -25,7 +25,7 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
 
         if (_step >= scenario.Steps.Count)
         {
-            Console.WriteLine($"[visual] '{scenario.Name}' done ({scenario.Steps.Count} steps).");
+            Log.WriteLine($"[visual] '{scenario.Name}' done ({scenario.Steps.Count} steps).");
             IsDone = true;
             return;
         }
@@ -36,14 +36,14 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
             case "teleport":
                 world.Camera.TestTeleport(step.Pos!.Value,
                     step.Yaw ?? world.Camera.Yaw, step.Pitch ?? world.Camera.Pitch);
-                Console.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} teleport {step.Pos}");
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} teleport {step.Pos}");
                 Advance();
                 break;
 
             case "look":
                 world.Camera.TestTeleport(world.Camera.Position,
                     step.Yaw ?? world.Camera.Yaw, step.Pitch ?? world.Camera.Pitch);
-                Console.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} look yaw {world.Camera.Yaw:F0} pitch {world.Camera.Pitch:F0}");
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} look yaw {world.Camera.Yaw:F0} pitch {world.Camera.Pitch:F0}");
                 Advance();
                 break;
 
@@ -68,7 +68,7 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
 
             case "place":
                 world.TryUseSelected(World.InteractionReach);
-                Console.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} place/use");
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} place/use");
                 Advance();
                 break;
 
@@ -77,7 +77,7 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 world.Inventory.Add(id, step.Count);
                 if (world.Inventory.IdAt(world.Inventory.SelectedIndex) != id)
                     world.Inventory.EquipStackable(world.Inventory.SelectedIndex, id);
-                Console.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} give {step.Count} {step.Block}");
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} give {step.Count} {step.Block}");
                 Advance();
                 break;
 
@@ -85,7 +85,7 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 ScreenshotPath = Path.Combine(scenario.OutputDir, $"{_step + 1:D2}-{step.ShotName}.png");
                 ScreenshotHideHud = step.HideHud;
                 TakeScreenshot = true;
-                Console.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} screenshot -> {ScreenshotPath}");
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} screenshot -> {ScreenshotPath}");
                 Advance();
                 break;
         }
@@ -96,7 +96,7 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
         if (_timeLeft <= 0f)
         {
             _timeLeft = step.Seconds;
-            Console.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} {label} {step.Seconds}s");
+            Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} {label} {step.Seconds}s");
         }
 
         _timeLeft -= (float)deltaTime;

@@ -106,7 +106,7 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in LOD generation: {ex}");
+                Log.WriteLine($"Error in LOD generation: {ex}");
                 Thread.Sleep(1000);
             }
         }

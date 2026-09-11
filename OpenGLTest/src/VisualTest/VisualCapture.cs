@@ -37,6 +37,6 @@ public static class VisualCapture
             new StbImageWriteSharp.ImageWriter().WritePng(data, width, height,
                 StbImageWriteSharp.ColorComponents.RedGreenBlueAlpha, stream);
         }
-        Console.WriteLine($"[visual] saved {path}");
+        Log.WriteLine($"[visual] saved {path}");
     }
 }

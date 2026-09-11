@@ -42,12 +42,12 @@ public sealed class AmbienceManager : IDisposable
         {
             if (!OperatingSystem.IsWindows())
             {
-                Console.WriteLine("Ambience disabled: audio playback is Windows-only.");
+                Log.WriteLine("Ambience disabled: audio playback is Windows-only.");
                 return;
             }
             if (!File.Exists(dayPath) || !File.Exists(nightPath))
             {
-                Console.WriteLine($"Ambience disabled: missing '{dayPath}' or '{nightPath}'.");
+                Log.WriteLine($"Ambience disabled: missing '{dayPath}' or '{nightPath}'.");
                 return;
             }
             day = new Voice(dayPath);
@@ -58,7 +58,7 @@ public sealed class AmbienceManager : IDisposable
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Ambience disabled: {e.Message}");
+            Log.WriteLine($"Ambience disabled: {e.Message}");
             night?.Dispose();
             day?.Dispose();
         }

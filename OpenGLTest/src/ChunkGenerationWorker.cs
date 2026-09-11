@@ -63,7 +63,7 @@ public class ChunkGenerationWorker(ChunkManager chunkManager, Camera camera)
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in chunk generation: {ex}");
+                Log.WriteLine($"Error in chunk generation: {ex}");
                 Thread.Sleep(1000);
             }
         }

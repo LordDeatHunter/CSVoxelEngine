@@ -136,7 +136,7 @@ public sealed unsafe class ChunkDrawBatch : IDisposable
             if (result is GLEnum.TimeoutExpired or GLEnum.WaitFailed && !_fenceWarned)
             {
                 _fenceWarned = true;
-                Console.WriteLine($"ChunkDrawBatch: fence wait returned {result}; chunk draws may tear this frame.");
+                Log.WriteLine($"ChunkDrawBatch: fence wait returned {result}; chunk draws may tear this frame.");
             }
 
             _gl.DeleteSync(_fences[_slot]);
@@ -293,7 +293,7 @@ public sealed unsafe class ChunkDrawBatch : IDisposable
             _draws[newBase + i] = keptDraws[i];
         }
 
-        Console.WriteLine($"Chunk draw ring grew to {perSlot} commands per slot ({Slots} slots)");
+        Log.WriteLine($"Chunk draw ring grew to {perSlot} commands per slot ({Slots} slots)");
     }
 
     /// <summary>Unmaps and deletes both buffers and drops every outstanding fence.</summary>

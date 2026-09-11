@@ -209,6 +209,6 @@ public sealed unsafe class ChunkGeometryPool : IDisposable
         _allocator.Grow(newUnits);
 
         var megabytes = VertexBytes(newUnits) / (1024 * 1024);
-        Console.WriteLine($"Chunk geometry pool '{_name}' grew to {newUnits} units ({megabytes} MB vertices)");
+        Log.WriteLine($"Chunk geometry pool '{_name}' grew to {newUnits} units ({megabytes} MB vertices)");
     }
 }

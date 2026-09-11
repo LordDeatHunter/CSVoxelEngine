@@ -207,7 +207,7 @@ public class RenderManager : IDisposable
 
         // Which GPU actually ran matters for every timing: a hybrid laptop happily renders
         // this on the iGPU unless told otherwise, and the numbers then mean nothing.
-        Console.WriteLine($"GPU: {gl.GetStringS(StringName.Renderer)} | {gl.GetStringS(StringName.Vendor)} | GL {gl.GetStringS(StringName.Version)}");
+        Log.WriteLine($"GPU: {gl.GetStringS(StringName.Renderer)} | {gl.GetStringS(StringName.Vendor)} | GL {gl.GetStringS(StringName.Version)}");
 
         for (var s = 0; s < GpuSectionCount; s++)
         for (var r = 0; r < GpuRingSize; r++)
@@ -377,7 +377,7 @@ public class RenderManager : IDisposable
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Player model '{PlayerModelPath}' not used ({e.Message}); using built-in Steve.");
+            Log.WriteLine($"Player model '{PlayerModelPath}' not used ({e.Message}); using built-in Steve.");
         }
         _playerPaletteTex = TextureLoader.Upload(gl, PlayerRig.TexturePixels,
             PlayerRig.TextureWidth, PlayerRig.TextureHeight);
