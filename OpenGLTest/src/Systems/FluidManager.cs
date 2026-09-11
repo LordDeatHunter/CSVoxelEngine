@@ -21,7 +21,7 @@ namespace silkgltriangle;
 /// loaded — so a sea that a cave or an entrance breached pours into it instead of standing
 /// there as a wall. Once that has settled it costs nothing again.
 ///
-/// Cells are read through <see cref="ChunkManager.TryGetCell"/> and never through
+/// Cells are read through <see cref="TryGetCell"/> and never through
 /// <c>GetBlockGlobal</c>: the latter reports unloaded chunks as air, which would let water
 /// pour into space that has not been generated yet.
 ///
@@ -69,6 +69,22 @@ public class FluidManager
     // Scratch for ordering an over-budget tick lowest-cell-first; only filled when the
     // tick is capped, so steady-state ticks never pay the copy or the sort
     private readonly List<long> _tickOrder = [];
+
+    // The manager the current tick reads and writes through; set by Update before the ticks run
+    private ChunkManager _chunks = null!;
+
+    // Direct-mapped chunk-lookup cache for one tick. Every simulation cell read goes through
+    // TryGetCell; without this each read is a Vector3 hash lookup in the chunk dictionary. A
+    // slope search spans at most a handful of chunks, so 16 slots hold every key it can reach,
+    // validated by the packed chunk key (always non-negative, so -1 is a safe empty sentinel).
+    // The keys are cleared at the top of every Tick: an unload can replace a chunk between
+    // frames, and a cached reference must never outlive that. Only the Chunk is cached, never
+    // its block/state arrays — SetBlockRaw swaps in a fresh state array on the first non-zero
+    // write, so a cached array pointer would miss later fluid state.
+    private const int ChunkCacheSize = 16;
+    private const int ChunkCacheMask = ChunkCacheSize - 1;
+    private readonly Chunk?[] _chunkCache = new Chunk?[ChunkCacheSize];
+    private readonly long[] _chunkCacheKeys = new long[ChunkCacheSize];
 
     // Dirt-to-mud ids, resolved once content is loaded. Every ticked fluid cell checks
     // its dirt neighbours against the mud condition right away, so settled water still
@@ -238,6 +254,10 @@ public class FluidManager
         _accumulator += deltaTime;
         if (_accumulator < WorldGenerationConfig.FluidTickSeconds) return;
 
+        // The tick's helpers read through this and its chunk cache, so they need no manager
+        // argument of their own
+        _chunks = chunks;
+
         var ticks = 0;
         while (_accumulator >= WorldGenerationConfig.FluidTickSeconds
                && ticks < WorldGenerationConfig.MaxFluidTicksPerFrame)
@@ -292,6 +312,10 @@ public class FluidManager
         _dirtyChunks.Clear();
         _tickIndex++;
 
+        // Invalidate the chunk cache: the tick may see chunks an earlier one did, and a
+        // reference cached before an unload must never be handed back
+        _chunkCacheKeys.AsSpan().Fill(-1L);
+
         var budget = WorldGenerationConfig.MaxFluidCellsPerTick;
         if (_pending.Count > budget)
         {
@@ -301,11 +325,11 @@ public class FluidManager
             _tickOrder.AddRange(_pending);
             _tickOrder.Sort(static (a, b) => UnpackedY(a).CompareTo(UnpackedY(b)));
             for (var i = budget; i < _tickOrder.Count; i++) _next.Add(_tickOrder[i]);
-            for (var i = 0; i < budget; i++) TickCell(_tickOrder[i], chunks, drops);
+            for (var i = 0; i < budget; i++) TickCell(_tickOrder[i], drops);
         }
         else
         {
-            foreach (var key in _pending) TickCell(key, chunks, drops);
+            foreach (var key in _pending) TickCell(key, drops);
         }
 
         foreach (var chunkPos in _dirtyChunks)
@@ -315,13 +339,13 @@ public class FluidManager
     }
 
     /// <summary>Recomputes one scheduled cell's level, then spreads it.</summary>
-    private void TickCell(long key, ChunkManager chunks, DropManager drops)
+    private void TickCell(long key, DropManager drops)
     {
         Unpack(key, out var x, out var y, out var z);
 
         // An unloaded cell is dropped silently: nothing has to be remembered for it, so
         // chunk unloading needs no hook here
-        if (!chunks.TryGetCell(x, y, z, out var id, out var state)) return;
+        if (!TryGetCell(x, y, z, out var id, out var state)) return;
         if (!BlockType.IsFluid(id)) return;
 
         // Slow fluids sit this tick out and ride the next one instead of losing their turn
@@ -335,9 +359,9 @@ public class FluidManager
         // Contact hardening runs before the level rules: lava beside water becomes
         // cobblestone instead of flowing or lingering for another tick
         var hardensTo = BlockType.HardensToById[id];
-        if (hardensTo != 0 && TouchesFluid(x, y, z, BlockType.HardensTouchingById[id], chunks))
+        if (hardensTo != 0 && TouchesFluid(x, y, z, BlockType.HardensTouchingById[id]))
         {
-            Write(x, y, z, hardensTo, 0, chunks);
+            Write(x, y, z, hardensTo, 0);
             ScheduleAround(x, y, z);
             return;
         }
@@ -345,16 +369,16 @@ public class FluidManager
         // Mud watches settled water, so it runs after the early-outs: skipped slow-fluid
         // ticks and hardening cells never pay the 26-neighbourhood scan, and non-water
         // fluids skip it inside (water neighbours convert the dirt on their own tick).
-        TryConvertMudAround(x, y, z, id, chunks);
+        TryConvertMudAround(x, y, z, id);
 
         // Sources are infinite: they never thin out and never dry up
         if (!FluidState.IsSource(state))
         {
-            var newState = ComputeState(x, y, z, id, chunks);
+            var newState = ComputeState(x, y, z, id);
             if (newState == StateNone)
             {
                 // Cut off from its supply: the cell drains
-                Write(x, y, z, 0, 0, chunks);
+                Write(x, y, z, 0, 0);
                 ScheduleAround(x, y, z);
                 return;
             }
@@ -362,12 +386,12 @@ public class FluidManager
             if (newState != state)
             {
                 state = (byte)newState;
-                Write(x, y, z, id, state, chunks);
+                Write(x, y, z, id, state);
                 ScheduleAround(x, y, z);
             }
         }
 
-        Spread(x, y, z, id, state, chunks, drops);
+        Spread(x, y, z, id, state, drops);
     }
 
     /// <summary>
@@ -377,14 +401,14 @@ public class FluidManager
     /// 2x2 pool), <see cref="FluidState.Falling"/> when fed from above, else the thinnest
     /// flowing level its neighbours can support.
     /// </summary>
-    private static int ComputeState(int x, int y, int z, byte fluid, ChunkManager chunks)
+    private int ComputeState(int x, int y, int z, byte fluid)
     {
         var maxAmount = 0;
         var sources = 0;
 
         foreach (var (dx, dy, dz) in Horizontals)
         {
-            if (!chunks.TryGetCell(x + dx, y + dy, z + dz, out var id, out var state)) continue;
+            if (!TryGetCell(x + dx, y + dy, z + dz, out var id, out var state)) continue;
             if (id != fluid) continue;
 
             if (FluidState.IsSource(state)) sources++;
@@ -396,14 +420,14 @@ public class FluidManager
         {
             // Two sources side by side become a source themselves, but only where the water
             // cannot simply drain away underneath
-            if (chunks.TryGetCell(x, y - 1, z, out var below, out var belowState)
+            if (TryGetCell(x, y - 1, z, out var below, out var belowState)
                 && ((below != 0 && !BlockType.IsReplaceable(below) && !BlockType.IsFluid(below))
                     || (below == fluid && FluidState.IsSource(belowState))))
                 return FluidState.Source;
         }
 
         // Water pouring in from above always fills the whole cell
-        if (chunks.TryGetCell(x, y + 1, z, out var above, out _) && above == fluid)
+        if (TryGetCell(x, y + 1, z, out var above, out _) && above == fluid)
             return FluidState.Falling;
 
         var range = BlockType.FluidRangeById[fluid];
@@ -418,25 +442,25 @@ public class FluidManager
     /// a cell that already holds fluid recomputes itself on its own tick, which is how the cell
     /// under fresh water turns into a falling column.
     /// </summary>
-    private void Spread(int x, int y, int z, byte fluid, byte state, ChunkManager chunks, DropManager drops)
+    private void Spread(int x, int y, int z, byte fluid, byte state, DropManager drops)
     {
-        if (CanFlowInto(x, y - 1, z, chunks))
+        if (CanFlowInto(x, y - 1, z))
         {
-            Flow(x, y - 1, z, fluid, chunks, drops);
+            Flow(x, y - 1, z, fluid, drops);
 
             // A cell ringed by sources keeps its skirt even while draining downwards
-            if (SourceNeighbourCount(x, y, z, fluid, chunks) >= 3)
-                SpreadSides(x, y, z, fluid, state, chunks, drops);
+            if (SourceNeighbourCount(x, y, z, fluid) >= 3)
+                SpreadSides(x, y, z, fluid, state, drops);
         }
-        else if (FluidState.IsSource(state) || !IsWaterHole(x, y - 1, z, fluid, chunks))
+        else if (FluidState.IsSource(state) || !IsWaterHole(x, y - 1, z, fluid))
         {
             // Standing on something it cannot fall through, so it goes sideways
-            SpreadSides(x, y, z, fluid, state, chunks, drops);
+            SpreadSides(x, y, z, fluid, state, drops);
         }
     }
 
     /// <summary>Flows into the neighbouring cells the slope search picked out.</summary>
-    private void SpreadSides(int x, int y, int z, byte fluid, byte state, ChunkManager chunks, DropManager drops)
+    private void SpreadSides(int x, int y, int z, byte fluid, byte state, DropManager drops)
     {
         // Level 7 has nothing left to give
         if (FluidState.Amount(state) - 1 <= 0) return;
@@ -445,19 +469,19 @@ public class FluidManager
         // (see the CanFlowInto gate on each Flow below), so when none of the four is
         // flowable the slope search can pick nothing writable — skip it entirely.
         // This is exact, not a heuristic: the loop below cannot write otherwise.
-        if (!CanFlowInto(x + 1, y, z, chunks)
-            && !CanFlowInto(x - 1, y, z, chunks)
-            && !CanFlowInto(x, y, z + 1, chunks)
-            && !CanFlowInto(x, y, z - 1, chunks))
+        if (!CanFlowInto(x + 1, y, z)
+            && !CanFlowInto(x - 1, y, z)
+            && !CanFlowInto(x, y, z + 1)
+            && !CanFlowInto(x, y, z - 1))
             return;
 
-        foreach (var (dx, dy, dz) in ChooseSpreadDirections(x, y, z, fluid, chunks))
+        foreach (var (dx, dy, dz) in ChooseSpreadDirections(x, y, z, fluid))
         {
             var nx = x + dx;
             var ny = y + dy;
             var nz = z + dz;
-            if (CanFlowInto(nx, ny, nz, chunks))
-                Flow(nx, ny, nz, fluid, chunks, drops);
+            if (CanFlowInto(nx, ny, nz))
+                Flow(nx, ny, nz, fluid, drops);
         }
     }
 
@@ -467,7 +491,7 @@ public class FluidManager
     /// <see cref="WorldGenerationConfig.FluidSlopeSearchDistance"/> blocks. On flat ground no
     /// direction finds a hole, they all tie, and the water spreads evenly.
     /// </summary>
-    private List<(int X, int Y, int Z)> ChooseSpreadDirections(int x, int y, int z, byte fluid, ChunkManager chunks)
+    private List<(int X, int Y, int Z)> ChooseSpreadDirections(int x, int y, int z, byte fluid)
     {
         var best = NoSlope;
         var chosen = _spreadDirections;
@@ -478,11 +502,24 @@ public class FluidManager
             var nx = x + dx;
             var ny = y + dy;
             var nz = z + dz;
-            if (!CanPassThrough(nx, ny, nz, fluid, chunks)) continue;
+            if (!CanPassThrough(nx, ny, nz, fluid)) continue;
 
-            var distance = IsWaterHole(nx, ny - 1, nz, fluid, chunks)
-                ? 0
-                : SlopeDistance(nx, ny, nz, 1, (-dx, -dy, -dz), fluid, chunks);
+            int distance;
+            if (IsWaterHole(nx, ny - 1, nz, fluid))
+            {
+                // A hole directly under this neighbour is distance 0, the global minimum
+                distance = 0;
+            }
+            else if (best == 0)
+            {
+                // No direction can beat a direct hole, and this branch cannot tie at 0
+                // either (it has no direct hole), so the deep search is skipped whole
+                continue;
+            }
+            else
+            {
+                distance = SlopeDistance(nx, ny, nz, 1, (-dx, -dy, -dz), fluid);
+            }
 
             if (distance < best)
             {
@@ -502,8 +539,7 @@ public class FluidManager
     /// <see cref="WorldGenerationConfig.FluidSlopeSearchDistance"/>. Never turns back on
     /// itself (<paramref name="exclude"/>), so the search fans out.
     /// </summary>
-    private static int SlopeDistance(int x, int y, int z, int depth, (int X, int Y, int Z) exclude,
-        byte fluid, ChunkManager chunks)
+    private int SlopeDistance(int x, int y, int z, int depth, (int X, int Y, int Z) exclude, byte fluid)
     {
         var best = NoSlope;
 
@@ -514,13 +550,19 @@ public class FluidManager
             var nx = x + dx;
             var ny = y + dy;
             var nz = z + dz;
-            if (!CanPassThrough(nx, ny, nz, fluid, chunks)) continue;
+            if (!CanPassThrough(nx, ny, nz, fluid)) continue;
 
-            if (IsWaterHole(nx, ny - 1, nz, fluid, chunks)) return depth;
+            // A hole one step on is the shallowest this call can find, so it wins at once
+            if (IsWaterHole(nx, ny - 1, nz, fluid)) return depth;
+
+            // A hole found at depth + 1 is the shallowest any recursive branch can find.
+            // Once best is that shallow, a later direction is still checked for a direct
+            // hole above, but its recursion can only tie, never beat, so it is skipped.
+            if (best == depth + 1) continue;
 
             if (depth >= WorldGenerationConfig.FluidSlopeSearchDistance) continue;
 
-            var distance = SlopeDistance(nx, ny, nz, depth + 1, (-dx, -dy, -dz), fluid, chunks);
+            var distance = SlopeDistance(nx, ny, nz, depth + 1, (-dx, -dy, -dz), fluid);
             if (distance < best) best = distance;
         }
 
@@ -531,9 +573,9 @@ public class FluidManager
     /// Fills a cell with fluid at the level its surroundings support, popping whatever fragile
     /// block the flow washed away (a pebble drops its flint) and rescheduling the neighbourhood.
     /// </summary>
-    private void Flow(int x, int y, int z, byte fluid, ChunkManager chunks, DropManager drops)
+    private void Flow(int x, int y, int z, byte fluid, DropManager drops)
     {
-        var state = ComputeState(x, y, z, fluid, chunks);
+        var state = ComputeState(x, y, z, fluid);
 
         // Nothing actually reaches this cell (it would drain again next tick): leave it alone
         // rather than washing a block away for a drop of water that never arrives
@@ -544,7 +586,7 @@ public class FluidManager
         byte writeId = fluid;
         byte writeState = (byte)state;
         var hardensTo = BlockType.HardensToById[fluid];
-        if (hardensTo != 0 && TouchesFluid(x, y, z, BlockType.HardensTouchingById[fluid], chunks))
+        if (hardensTo != 0 && TouchesFluid(x, y, z, BlockType.HardensTouchingById[fluid]))
         {
             writeId = hardensTo;
             writeState = 0;
@@ -554,7 +596,7 @@ public class FluidManager
             // ...and so does a flow settling against a fluid that hardens on its touch:
             // water reaching lava crusts to cobblestone too, whichever side ticks first,
             // so the outcome never depends on the schedule's iteration order
-            var crust = HardenedByNeighbour(x, y, z, fluid, chunks);
+            var crust = HardenedByNeighbour(x, y, z, fluid);
             if (crust != 0)
             {
                 writeId = crust;
@@ -562,17 +604,67 @@ public class FluidManager
             }
         }
 
-        if (!chunks.TryGetCell(x, y, z, out var previous, out var previousState)) return;
+        if (!TryGetCell(x, y, z, out var previous, out var previousState)) return;
 
         if (previous != 0)
         {
             drops.SpawnLoot(previous, new Vector3(x, y, z),
                 DropManager.PileCount(previous, x, z, previousState));
-            chunks.UnmarkPlayerPlaced(x, y, z);
+            _chunks.UnmarkPlayerPlaced(x, y, z);
         }
 
-        Write(x, y, z, writeId, writeState, chunks);
+        Write(x, y, z, writeId, writeState);
         ScheduleAround(x, y, z);
+    }
+
+    /// <summary>
+    /// The loaded chunk owning a cell, through the tick's direct-mapped cache. A miss probes
+    /// the chunk dictionary once and stores the reference; because the keys are cleared every
+    /// tick, a hit can never hand back a chunk an unload has since replaced. Only the
+    /// <see cref="Chunk"/> is cached, never its block or state arrays: <see cref="Chunk.SetBlockRaw"/>
+    /// swaps in a fresh state array on the first non-zero write, so a cached array would miss
+    /// later state. The miss path goes through <see cref="ChunkManager.ChunkAt"/>, which keeps
+    /// the tests' contract that a chunk without ready block data reads as unloaded.
+    /// </summary>
+    private bool TryGetChunk(int x, int y, int z, out Chunk? chunk)
+    {
+        var key = Pack(x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift);
+        var slot = (int)((key ^ (key >> 32)) & ChunkCacheMask);
+
+        if (_chunkCacheKeys[slot] != key)
+        {
+            _chunkCacheKeys[slot] = key;
+            chunk = _chunks.ChunkAt(x, y, z);
+            _chunkCache[slot] = chunk;
+        }
+        else
+        {
+            chunk = _chunkCache[slot];
+        }
+
+        return chunk != null;
+    }
+
+    /// <summary>
+    /// Reads a world cell's block id and state through the tick's chunk cache. The contract
+    /// matches <see cref="ChunkManager.TryGetCell"/>: false means the chunk is not loaded, and
+    /// an unloaded cell must never read as air.
+    /// </summary>
+    private bool TryGetCell(int x, int y, int z, out byte id, out byte state)
+    {
+        if (!TryGetChunk(x, y, z, out var chunk))
+        {
+            id = 0;
+            state = 0;
+            return false;
+        }
+
+        var lx = x & Chunk.SizeMask;
+        var ly = y & Chunk.SizeMask;
+        var lz = z & Chunk.SizeMask;
+        id = chunk!.GetLocalBlock(lx, ly, lz);
+        state = chunk.GetLocalState(lx, ly, lz);
+        return true;
     }
 
     /// <summary>
@@ -581,20 +673,19 @@ public class FluidManager
     /// no ambient occlusion, so only the cell's own chunk and the chunks across a border it
     /// touches are affected — never the whole light radius.
     /// </summary>
-    private void Write(int x, int y, int z, byte id, byte state, ChunkManager chunks)
+    private void Write(int x, int y, int z, byte id, byte state)
     {
-        var chunk = chunks.ChunkAt(x, y, z);
-        if (chunk == null) return;
+        if (!TryGetChunk(x, y, z, out var chunk)) return;
 
-        chunk.SetBlockRaw(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask, id, state);
+        chunk!.SetBlockRaw(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask, id, state);
         AddTouchedChunks(x, y, z, _dirtyChunks);
     }
 
     /// <summary>Whether fluid may replace what is in a cell: loaded, not already fluid, and
     /// either air or a fragile block the flow washes away.</summary>
-    private static bool CanFlowInto(int x, int y, int z, ChunkManager chunks)
+    private bool CanFlowInto(int x, int y, int z)
     {
-        return chunks.TryGetCell(x, y, z, out var id, out _) && IsFlowTarget(id);
+        return TryGetCell(x, y, z, out var id, out _) && IsFlowTarget(id);
     }
 
     /// <summary>
@@ -607,31 +698,32 @@ public class FluidManager
 
     /// <summary>Whether a cell would let fluid drain into it: replaceable, or already the same
     /// fluid. What the slope search calls a "hole".</summary>
-    private static bool IsWaterHole(int x, int y, int z, byte fluid, ChunkManager chunks)
+    private bool IsWaterHole(int x, int y, int z, byte fluid)
     {
-        return chunks.TryGetCell(x, y, z, out var id, out _)
+        return TryGetCell(x, y, z, out var id, out _)
                && (BlockType.IsReplaceable(id) || id == fluid);
     }
 
     /// <summary>Whether the slope search may travel through a cell: replaceable, or the same
     /// fluid but not a source (a source is a destination, not a corridor).</summary>
-    private static bool CanPassThrough(int x, int y, int z, byte fluid, ChunkManager chunks)
+    private bool CanPassThrough(int x, int y, int z, byte fluid)
     {
-        if (!chunks.TryGetCell(x, y, z, out var id, out var state)) return false;
+        if (!TryGetCell(x, y, z, out var id, out var state)) return false;
         return BlockType.IsReplaceable(id) || (id == fluid && !FluidState.IsSource(state));
     }
 
     /// <summary>Whether any of the six face neighbours of a cell holds the given fluid.
     /// Unloaded neighbours read as absent, never as contact.</summary>
-    private static bool TouchesFluid(int x, int y, int z, byte fluidId, ChunkManager chunks)    {
+    private bool TouchesFluid(int x, int y, int z, byte fluidId)
+    {
         foreach (var (dx, dy, dz) in Horizontals)
         {
-            if (chunks.TryGetCell(x + dx, y + dy, z + dz, out var id, out _) && id == fluidId)
+            if (TryGetCell(x + dx, y + dy, z + dz, out var id, out _) && id == fluidId)
                 return true;
         }
 
-        return (chunks.TryGetCell(x, y + 1, z, out var above, out _) && above == fluidId)
-               || (chunks.TryGetCell(x, y - 1, z, out var below, out _) && below == fluidId);
+        return (TryGetCell(x, y + 1, z, out var above, out _) && above == fluidId)
+               || (TryGetCell(x, y - 1, z, out var below, out _) && below == fluidId);
     }
 
     /// <summary>
@@ -639,24 +731,24 @@ public class FluidManager
     /// neighbouring fluid hardens on its touch (water reaching lava crusts to the lava's
     /// cobblestone), or 0 when no neighbour does. Unloaded neighbours harden nothing.
     /// </summary>
-    private static byte HardenedByNeighbour(int x, int y, int z, byte fluid, ChunkManager chunks)
+    private byte HardenedByNeighbour(int x, int y, int z, byte fluid)
     {
         foreach (var (dx, dy, dz) in Horizontals)
         {
-            if (chunks.TryGetCell(x + dx, y + dy, z + dz, out var id, out _)
+            if (TryGetCell(x + dx, y + dy, z + dz, out var id, out _)
                 && BlockType.IsFluid(id)
                 && BlockType.HardensTouchingById[id] == fluid
                 && BlockType.HardensToById[id] != 0)
                 return BlockType.HardensToById[id];
         }
 
-        if (chunks.TryGetCell(x, y + 1, z, out var above, out _)
+        if (TryGetCell(x, y + 1, z, out var above, out _)
             && BlockType.IsFluid(above)
             && BlockType.HardensTouchingById[above] == fluid
             && BlockType.HardensToById[above] != 0)
             return BlockType.HardensToById[above];
 
-        if (chunks.TryGetCell(x, y - 1, z, out var below, out _)
+        if (TryGetCell(x, y - 1, z, out var below, out _)
             && BlockType.IsFluid(below)
             && BlockType.HardensTouchingById[below] == fluid
             && BlockType.HardensToById[below] != 0)
@@ -666,12 +758,12 @@ public class FluidManager
     }
 
     /// <summary>Horizontally adjacent source cells of the same fluid.</summary>
-    private static int SourceNeighbourCount(int x, int y, int z, byte fluid, ChunkManager chunks)
+    private int SourceNeighbourCount(int x, int y, int z, byte fluid)
     {
         var count = 0;
         foreach (var (dx, dy, dz) in Horizontals)
         {
-            if (chunks.TryGetCell(x + dx, y + dy, z + dz, out var id, out var state)
+            if (TryGetCell(x + dx, y + dy, z + dz, out var id, out var state)
                 && id == fluid && FluidState.IsSource(state))
                 count++;
         }
@@ -685,7 +777,7 @@ public class FluidManager
     /// so drying out needs no handling — mud simply stays mud. Conversions write through
     /// <see cref="Write"/> like any fluid edit, so their remeshes join the tick's batch.
     /// </summary>
-    private void TryConvertMudAround(int x, int y, int z, byte fluid, ChunkManager chunks)
+    private void TryConvertMudAround(int x, int y, int z, byte fluid)
     {
         if (!MudIds(out var dirt, out var mud, out var water)) return;
         if (fluid != water) return;
@@ -698,10 +790,10 @@ public class FluidManager
             var nx = x + dx;
             var ny = y + dy;
             var nz = z + dz;
-            if (!chunks.TryGetCell(nx, ny, nz, out var id, out _) || id != dirt) continue;
-            if (!IsMudWet(nx, ny, nz, water, chunks)) continue;
+            if (!TryGetCell(nx, ny, nz, out var id, out _) || id != dirt) continue;
+            if (!IsMudWet(nx, ny, nz, water)) continue;
 
-            Write(nx, ny, nz, mud, 0, chunks);
+            Write(nx, ny, nz, mud, 0);
             ScheduleAround(nx, ny, nz);
         }
     }
@@ -710,9 +802,9 @@ public class FluidManager
     /// Whether a dirt cell counts as submerged: a water cell directly above it, and enough
     /// water across the whole 26-neighbourhood. Unloaded neighbours read as absent.
     /// </summary>
-    private static bool IsMudWet(int x, int y, int z, byte water, ChunkManager chunks)
+    private bool IsMudWet(int x, int y, int z, byte water)
     {
-        if (!chunks.TryGetCell(x, y + 1, z, out var above, out _) || above != water) return false;
+        if (!TryGetCell(x, y + 1, z, out var above, out _) || above != water) return false;
 
         var count = 0;
         for (var dx = -1; dx <= 1; dx++)
@@ -720,7 +812,7 @@ public class FluidManager
         for (var dz = -1; dz <= 1; dz++)
         {
             if (dx == 0 && dy == 0 && dz == 0) continue;
-            if (chunks.TryGetCell(x + dx, y + dy, z + dz, out var id, out _) && id == water
+            if (TryGetCell(x + dx, y + dy, z + dz, out var id, out _) && id == water
                 && ++count >= WorldGenerationConfig.MudWaterNeighbours)
                 return true;
         }
