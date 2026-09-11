@@ -1,7 +1,7 @@
 # Performance TODO
 
 Merged 2026-09-11 from `PERF_TODO.md` + `FLUID_PERF.md` (the latter deleted).
-All old items 1-12, 15-22 and fluid items 1, 2, 4, 5, 6 are **done**; what matters
+All old items 1-12, 15-23 and fluid items 1, 2, 4, 5, 6 are **done**; what matters
 about them is under "Ruled out" and "Done (one line each)". Work the Open items
 top to bottom. Full per-item history lives in git (`git log --oneline -- PERF_TODO.md FLUID_PERF.md`).
 
@@ -132,6 +132,10 @@ avg data (max is not logged; see item 18). No `TEMP-DIAG` strings in tree.
 22 Scripted `Drive` no longer wrapped in the input shell (`ProgramUpdate` covers
    only the log/close shell; mine/place steps use the `Breaking`/`UsePlace` rows
    like real play). `progUpdate` 5-25 ms→~0.01 in scripted runs, CPU sums to frame.
+23 Cloud pass skips at opacity 0 (`CloudRenderer.Render` early-out, covers the
+   mirror too); rays were already strength-gated. Steps 20→10 verified 0.71→0.45
+   GPU underwater with no visible change outside shaft-heavy views — default stays
+   20, numbers kept for a future ladder. lodPass measured only (no live knob).
 Fluid: early-outs kept MC semantics, per-frame spread (`MaxFluidCellsPerFrame`
 2048, backlog cap 8192), `Inventory.Update` out of the `FluidTick` span,
 `HashSet<long>` dirty tracking. Total fluid writes rose 4x (51k -> 202k) as the
@@ -139,10 +143,6 @@ queue started draining instead of ballooning.
 
 ## Open items
 
-- [ ] **23. Underwater + cloud steady costs behind flags.** `raysPass` 1.5-2.3 ms
-   GPU submerged (`WaterRaySteps` 20, `WaterRayMaxDistance` 40), `cloudPass` up to
-   1.5 ms, `lodPass` GPU ~1.5 ms steady. These belong behind quality flags,
-  but verify each halves cleanly with its knob before wiring it in.
 - [ ] **24. Re-check translucent sort + `CullWater` per frame.** Post-MDI the CPU
   side is small at rest, but streaming numbers were not isolated per pass. If a
   CPU-bound profile ever shows cull+sort above ~1 ms, revisit — otherwise leave alone.
@@ -169,3 +169,4 @@ queue started draining instead of ballooning.
 | 20 | Release, T1000 | `perf-fly.json` before/after | shot-section 7-18 ms avg→0.3-0.9 avg (28-50 ms readback max); FPS-1 frames 5→1 per run; all 4 PNGs byte-comparable sizes; 2 new tests (flip round-trip, worker drain), 355/357 suite (2 pre-existing fails) |
 | 21 | Release, T1000 | `perf-fly.json` before/after | growths opaque 2→0, translucent 3→1; chunkApply streaming peak-window 5.43→4.39, worst streaming frame 45.8→24.2; settled identical; suite 358/359 (1 pre-existing fail, WoodShape flaked to pass) |
 | 22 | Release, T1000 | `basic.json` + temp mine/place scenario | `progUpdate` 5-25 ms→0.00-0.01 in scripted runs, CPU sums to frame; `breaking`/`usePlace` rows attribute mine/place steps; no new tests (span pattern already covered), suite green except pre-existing + new BlockMovement failure from the leaves commit |
+| 23 | Release, T1000 | `perf-fly.json` at 20 vs temp-10 ray steps + opacity-0 `basic.json` run | raysPass GPU 0.71→0.45 underwater (march halves, copy fixed); cloudPass GPU →0.00 flat at opacity 0; end-shots differ by run variance only; suite 362/364 (2 known fails, no new tests: GL-owned) |

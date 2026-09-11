@@ -72,6 +72,9 @@ public sealed class CloudRenderer : IDisposable
         Vector3 sunDir, Vector3 sunColor, float sunIntensity, Vector3 ambient,
         Vector3 fogColor, float fogNear, float fogFar)
     {
+        if (GameSettings.CloudOpacity <= 0f)
+            return;
+
         var field = WorldGenerationConfig.CloudFieldSize;
         var drift = (time * WorldGenerationConfig.CloudDriftBlocksPerSecond) % field;
         var snapX = MathF.Floor(cameraPos.X / field) * field;
