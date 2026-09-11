@@ -281,8 +281,9 @@ public class World
         // are all in the same tick
         _fluidManager.Update((float)deltaTime, _chunkManager, _dropManager);
 
-        Inventory.Update((float)deltaTime);
         FrameProfiler.End(ProfileSection.FluidTick);
+
+        Inventory.Update((float)deltaTime);
 
         // Water is aimed through unless the held item is out to scoop it, so a pond never
         // stops the player targeting the block under it

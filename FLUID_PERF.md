@@ -1,8 +1,10 @@
 # Fluid tick performance (`fluidTick` ~100ms max)
 
-Status: investigation complete, fixes not yet implemented. Work the checklist top to
-bottom and record a before/after row in [Measurements](#measurements). See `PERF_TODO.md`
-for the repository's general measurement protocol.
+Status: items 1, 2, 4, 5 and 6 are implemented; item 3 is deferred. A later regression
+(`d1fa6db`'s per-tick cap made fluid appear frozen) forced the item-4 bound to be redesigned
+as a per-frame spread. Work the checklist top to bottom and record a before/after row in
+[Measurements](#measurements). See `PERF_TODO.md` for the repository's general measurement
+protocol.
 
 ## Symptom
 
@@ -116,7 +118,10 @@ The algorithm is fine — the per-read and per-frame costs are the problem.
 Work top to bottom. Items 1-3 are safe and independent; item 4 is a bounded-work safety
 valve; items 5-6 are cleanup. Re-measure after each (see [Measurements](#measurements)).
 
-### [ ] 1. Cache chunk lookups within a tick (biggest win, low risk)
+Implemented state: **1, 2, 4 (redesigned), 5 (obsolete) and 6 are done; 3 is deferred.**
+The line numbers quoted below are from the original investigation and have since moved.
+
+### [x] 1. Cache chunk lookups within a tick (biggest win, low risk)
 
 Cut the dictionary tax at the source instead of chasing each call site. Add to
 `FluidManager`:
@@ -149,7 +154,12 @@ the same chunk and become an array index + key compare.
 Expected: the ~1000 lookups/cell collapse to cache probes plus a few misses — the spike
 should drop several-fold on its own.
 
-### [ ] 2. Early-out the slope search (free, do with item 1)
+**Done** (`FluidManager.TryGetChunk`/`TryGetCell`, 16-slot direct-mapped cache, cleared per
+frame). Measured: it did **not** reduce the spike on its own, and cache size made no
+difference (16 vs 256 slots) — so the "biggest win" premise here was wrong and the per-cell
+cost is not dictionary lookups.
+
+### [x] 2. Early-out the slope search (free, do with item 1)
 
 - In `ChooseSpreadDirections`, `break` once `best == 0` — no other direction can beat a
   hole directly under a neighbour.
@@ -157,6 +167,12 @@ should drop several-fold on its own.
   immediately rather than continuing to scan the remaining directions.
 
 Zero semantic change; trims the worst case and lets item 1's win land on the remaining CPU.
+
+**Done**, but not as literally worded: `break` on `best == 0` would drop *tied* directions
+that also have a hole directly beneath (Minecraft's `getSpread` spreads to every minimal
+direction), and a `depth == 1` hit already returned immediately. Implemented
+result-preserving early-outs instead — skip the deep search once `best == 0` while still
+adding other direct holes, and truncate `SlopeDistance` once `best == depth + 1`.
 
 ### [ ] 3. Gate the mud scan (big win, low risk)
 
@@ -170,7 +186,13 @@ ocean water stops paying ~26 lookups/tick.
 With item 1 in place these lookups are already cheap, so measure item 1 first and only
 reach for this if the mud scan still shows up.
 
-### [ ] 4. Bound the per-frame work, not just the per-tick budget
+**Deferred.** The 6-face gate is not exact as written: a dirt cell diagonally adjacent to
+the ticked water can be wet (water directly above it plus two water neighbours) with no
+face-adjacent dirt, so the gate would skip a conversion the 26-scan performs. It is only
+outcome-equivalent under a load-bearing invariant that the water directly above any wet dirt
+is always scheduled (every edit that creates it calls `ScheduleAround`). Not implemented.
+
+### [x] 4. Bound the per-frame work, not just the per-tick budget
 
 `MaxFluidTicksPerFrame (4) x MaxFluidCellsPerTick (2048)` allows 8192 cells in one frame. A
 shared per-frame cell counter that stops `Update`'s tick loop and carries the remainder into
@@ -180,14 +202,27 @@ way item 7 flattened `fluidWake`. Trades a longer settling tail for a flat frame
 Tuning-only alternative if you would rather not add carry logic (instant relief):
 `MaxFluidTicksPerFrame 4 -> 2` and/or `MaxFluidCellsPerTick 2048 -> 1024`.
 
-### [ ] 5. Cheapen the over-budget selection
+**Done (redesigned).** A per-tick cap alone cannot work: `WakeLoadedChunks` schedules every
+frame (~60/s) while a tick runs every `FluidTickSeconds` (~4/s), so a per-tick cap leaves a
+runaway queue and the fluid appears frozen. `Update` now starts a tick at most every
+`FluidTickSeconds` and processes its cells in slices of `MaxFluidCellsPerFrame` under a
+shared per-frame cell counter, while `WakeLoadedChunks` stops scheduling once `_next` reaches
+`MaxFluidBacklogCells`. Per-frame work is bounded *and* the queue drains.
+`MaxFluidCellsPerTick` was renamed `MaxFluidCellsPerFrame` (no per-tick cap remains).
+
+### [x] 5. Cheapen the over-budget selection
 
 While a storm drains, `Tick` does a full `List.Sort` of `_pending` **every** tick
 (`:300-303`) — 50k, 48k, ... elements on consecutive ticks. Only the lowest `budget` cells
 are needed; a quickselect or Y-bucket selection avoids O(n log n) on the whole set. This
 becomes the visible cost once items 1-3 shrink per-cell work.
 
-### [ ] 6. Hygiene (small, do last)
+**Obsolete, resolved by item 4.** The per-tick `_tickOrder` sort and over-budget carry are
+gone: a tick now snapshots its scheduled set and walks it across frames, so there is no
+whole-set sort to cheapen. The `d1fa6db` lowest-Y sort is removed too (pre-`d1fa6db` iterated
+the scheduled set directly); measuring confirmed it was not the spike.
+
+### [x] 6. Hygiene (small, do last)
 
 - Move `Inventory.Update()` out of the `FluidTick` span (`World.cs:284`) so the row is pure
   simulation.
@@ -196,6 +231,10 @@ becomes the visible cost once items 1-3 shrink per-cell work.
 - Note: `Flow`'s extra `ComputeState` is for the **target** cell, not a strict duplicate of
   `TickCell`'s. The real redundancy is re-reading the same neighbours across helpers;
   folding state through would need an API change, so treat it as optional.
+
+**Done.** `Inventory.Update()` moved out of the `FluidTick` span in `World.Update`, and
+`_dirtyChunks`/`_borderScratch` are now `HashSet<long>` of packed chunk keys (unpacked only
+when handing `MarkDirty` a `Vector3`).
 
 ## Diagnosing your spike
 
@@ -224,3 +263,11 @@ Add a row per attempt, before/after, following `PERF_TODO.md` conventions.
 | Item | Build | View/scenario | fluidTick avg | fluidTick max | Notes |
 |---|---|---|---|---|---|
 | baseline | Release | shallows, `VOXEL_TIME=70` | | ~100 ms (reported) | user report, 2026-09-11 |
+| 1+2 (cache + early-outs) | Release | bay, `VOXEL_TIME=70`, ~35 s | 0.62 ms | 29.2 ms | vs HEAD worktree 0.58 / 34.1 ms — within noise; cache 16 vs 256 slots identical |
+| 1+2, over-budget sort removed (diagnostic only) | Release | bay, same | 0.34 ms | 16.3 ms | sort was the dominant cost, not the dictionary; never shipped as-is |
+| 1+2+4 (per-frame spread) | Release | bay, same | 0.55–0.66 ms | typical 11–16 ms, one ~41–48 ms loading outlier | queue 100–196k → 8–12k; total fluid writes 51k → 202k (4x). Item 6 is hygiene-only, not separately measured |
+
+Environment: Release, Quadro T1000 (GL 4.6), 12 cpus, `SustainedLowLatency` GC. Values are
+one run each on a fast machine and fluid timing swings with GPU clocks and streaming state;
+they are indicative, not a benchmark. The max column is the worst frame in a 1 s window
+(console line temporarily extended with `~max` to read it).

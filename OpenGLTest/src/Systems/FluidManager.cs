@@ -62,11 +62,12 @@ public class FluidManager
     private readonly List<long> _tickCells = [];
     private int _tickCursor;
 
-    // Chunks touched by this frame's tick slice, remeshed once the slice is done
-    private readonly HashSet<Vector3> _dirtyChunks = [];
+    // Chunks touched by this frame's tick slice, remeshed once the slice is done. Packed chunk
+    // keys rather than Vector3 so the set never pays the float-vector hashing tax.
+    private readonly HashSet<long> _dirtyChunks = [];
 
     // Scratch for SetCellImmediate's border neighbours (kept off the tick's set)
-    private readonly HashSet<Vector3> _borderScratch = [];
+    private readonly HashSet<long> _borderScratch = [];
 
     // Reused by the slope search: nothing it calls chooses directions again, so one buffer
     // keeps a draining pond from allocating per cell per tick
@@ -301,8 +302,11 @@ public class FluidManager
 
         if (_dirtyChunks.Count > 0)
         {
-            foreach (var chunkPos in _dirtyChunks)
-                chunks.MarkDirty(chunkPos);
+            foreach (var key in _dirtyChunks)
+            {
+                Unpack(key, out var cx, out var cy, out var cz);
+                chunks.MarkDirty(new Vector3(cx, cy, cz));
+            }
             _dirtyChunks.Clear();
         }
     }
@@ -343,11 +347,14 @@ public class FluidManager
 
         // A cell on a chunk border shows up in the neighbour's mesh too; those can wait for
         // the async budget
+        var chunkKey = Pack(x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift);
         _borderScratch.Clear();
         AddTouchedChunks(x, y, z, _borderScratch);
-        foreach (var pos in _borderScratch)
+        foreach (var key in _borderScratch)
         {
-            if (pos != chunkPos) chunks.MarkDirty(pos);
+            if (key == chunkKey) continue;
+            Unpack(key, out var cx, out var cy, out var cz);
+            chunks.MarkDirty(new Vector3(cx, cy, cz));
         }
 
         ScheduleAround(x, y, z);
@@ -863,26 +870,26 @@ public class FluidManager
     }
 
     /// <summary>Adds the chunk owning a cell, plus the face-adjacent chunk on every axis where
-    /// the cell sits on a chunk border, to <paramref name="into"/>.</summary>
-    private static void AddTouchedChunks(int x, int y, int z, HashSet<Vector3> into)
+    /// the cell sits on a chunk border, to <paramref name="into"/> as packed chunk keys.</summary>
+    private static void AddTouchedChunks(int x, int y, int z, HashSet<long> into)
     {
         var cx = x >> Chunk.SizeShift;
         var cy = y >> Chunk.SizeShift;
         var cz = z >> Chunk.SizeShift;
-        into.Add(new Vector3(cx, cy, cz));
+        into.Add(Pack(cx, cy, cz));
 
         var lx = x & Chunk.SizeMask;
         var ly = y & Chunk.SizeMask;
         var lz = z & Chunk.SizeMask;
 
-        if (lx == 0) into.Add(new Vector3(cx - 1, cy, cz));
-        else if (lx == Chunk.SizeMask) into.Add(new Vector3(cx + 1, cy, cz));
+        if (lx == 0) into.Add(Pack(cx - 1, cy, cz));
+        else if (lx == Chunk.SizeMask) into.Add(Pack(cx + 1, cy, cz));
 
-        if (ly == 0) into.Add(new Vector3(cx, cy - 1, cz));
-        else if (ly == Chunk.SizeMask) into.Add(new Vector3(cx, cy + 1, cz));
+        if (ly == 0) into.Add(Pack(cx, cy - 1, cz));
+        else if (ly == Chunk.SizeMask) into.Add(Pack(cx, cy + 1, cz));
 
-        if (lz == 0) into.Add(new Vector3(cx, cy, cz - 1));
-        else if (lz == Chunk.SizeMask) into.Add(new Vector3(cx, cy, cz + 1));
+        if (lz == 0) into.Add(Pack(cx, cy, cz - 1));
+        else if (lz == Chunk.SizeMask) into.Add(Pack(cx, cy, cz + 1));
     }
 
     private static Vector3 ChunkPosOf(int x, int y, int z) =>
