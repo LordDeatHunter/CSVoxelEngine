@@ -121,6 +121,14 @@ public class Camera
     private const float PlayerRadius = 0.30f;
     private const float CollisionStepSize = 0.05f;
 
+    // Auto-step heights: sprinting runs up a full block, plain walking only half a block,
+    // so a one-block terrain step still has to be jumped (or run at) on foot. StepClearance
+    // is a hair of extra lift so a block top the feet land exactly on is not read as a
+    // collision because of float rounding.
+    private const float WalkStepHeight = 0.5f;
+    private const float SprintStepHeight = 1f;
+    private const float StepClearance = 0.001f;
+
     // Swimming. Water has no gravity term: vertical speed eases toward a target instead, so it
     // stays capped by SwimUpSpeed/SinkSpeed however long the player stays under.
     private const float SwimSpeedFactor = 0.5f;
@@ -490,8 +498,19 @@ public class Camera
             return;
         }
 
+        var horizontalStart = Position;
         Position = MoveOnAxis(Position, frameMovement.X, 0, chunkManager, out var collidedX);
         Position = MoveOnAxis(Position, frameMovement.Z, 2, chunkManager, out var collidedZ);
+
+        // Auto-step: on foot and grounded, a low ledge is climbed instead of stopping the
+        // move — sprinting clears a full block, walking only half. The raised attempt replays
+        // the frame's horizontal move from the pre-move spot, so the climb never overshoots.
+        if (!swimming && IsGrounded && (collidedX || collidedZ)
+            && TryStepUp(horizontalStart, frameMovement,
+                IsSprinting ? SprintStepHeight : WalkStepHeight, chunkManager) is { } stepped)
+        {
+            Position = stepped;
+        }
 
         // Swimming into a wall while holding Space climbs it. The boost is applied before the
         // vertical move so the lift lands in the same frame as the collision.
@@ -718,6 +737,42 @@ public class Camera
         {
             IsEyeInLava = BlockType.Emission[eyeId] > 0;
         }
+    }
+
+    /// <summary>
+    /// Auto-step: replays a blocked horizontal move from raised copies of <paramref name="start"/>,
+    /// trying the smallest lift first, and returns the first one that clears the ledge and travels
+    /// the full frame movement. Returns null when the obstacle is taller than <paramref name="stepHeight"/>
+    /// (or the head is boxed in), leaving the caller's normally blocked position in place.
+    /// </summary>
+    private Vector3? TryStepUp(Vector3 start, Vector3 frameMovement, float stepHeight,
+        ChunkManager chunkManager)
+    {
+        if (stepHeight <= 0f)
+            return null;
+
+        var steps = Math.Max(1, (int)MathF.Ceiling(stepHeight / CollisionStepSize));
+        for (var i = 1; i <= steps; i++)
+        {
+            var lift = MathF.Min(i * CollisionStepSize, stepHeight) + StepClearance;
+            var lifted = OffsetAxis(start, 1, lift);
+            if (IsColliding(lifted, chunkManager))
+                continue;
+
+            var stepped = MoveOnAxis(lifted, frameMovement.X, 0, chunkManager, out var blockedX);
+            stepped = MoveOnAxis(stepped, frameMovement.Z, 2, chunkManager, out var blockedZ);
+            if (blockedX || blockedZ)
+                continue;
+
+            // A lift that clears nothing must not teleport the body straight up; only accept
+            // it when the horizontal move actually advanced past the start.
+            if (MathF.Abs(stepped.X - start.X) < 1e-4f && MathF.Abs(stepped.Z - start.Z) < 1e-4f)
+                continue;
+
+            return stepped;
+        }
+
+        return null;
     }
 
     private Vector3 MoveOnAxis(Vector3 start, float delta, int axis, ChunkManager chunkManager, out bool collided)
