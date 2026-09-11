@@ -150,13 +150,20 @@ public class RenderManager : IDisposable
     private float _underwaterT;
     private bool _eyeInLava;
 
-    // Whole-frame GPU time, measured with a ring of TIME_ELAPSED queries so a result is only
-    // ever read once the driver has it (see BeginGpuFrame). Three slots is enough for the
-    // usual one-to-two frame latency.
-    private readonly uint[] _gpuQueries = new uint[3];
-    private readonly bool[] _gpuQueryPending = new bool[3];
-    private int _gpuQueryIndex;
-    private bool _gpuQueryActive;
+    // Per-pass GPU time: every render pass gets its own TIME_ELAPSED query object per
+    // ring slot (see BeginGpuPass). GL forbids nesting TIME_ELAPSED, but consecutive
+    // non-overlapping ranges are legal, so the passes are bracketed one after another and
+    // each range lands in its own query. A result is only ever read when its slot comes
+    // back around, a few frames late, so this never stalls. Three slots cover the usual
+    // one-to-two frame latency. EntityPass runs in two segments per frame (entities, then
+    // bubbles after the water pass), hence up to MaxGpuSegments ranges per (pass, slot).
+    private const int GpuRingSize = 3;
+    private const int MaxGpuSegments = 2;
+    private const int GpuSectionCount = (int)ProfileSection.UiPass + 1;
+    private readonly uint[,,] _gpuPassQueries = new uint[GpuSectionCount, GpuRingSize, MaxGpuSegments];
+    private readonly bool[,,] _gpuPassPending = new bool[GpuSectionCount, GpuRingSize, MaxGpuSegments];
+    private readonly int[] _gpuPassSegUsed = new int[GpuSectionCount];
+    private int _gpuSlot;
 
     /// <summary>Chunks the last <see cref="RenderWorld"/> call passed the frustum test.</summary>
     public int LastVisibleChunkCount { get; private set; }
@@ -200,48 +207,71 @@ public class RenderManager : IDisposable
         // this on the iGPU unless told otherwise, and the numbers then mean nothing.
         Console.WriteLine($"GPU: {gl.GetStringS(StringName.Renderer)} | {gl.GetStringS(StringName.Vendor)} | GL {gl.GetStringS(StringName.Version)}");
 
-        for (var i = 0; i < _gpuQueries.Length; i++)
-            _gpuQueries[i] = gl.GenQuery();
+        for (var s = 0; s < GpuSectionCount; s++)
+        for (var r = 0; r < GpuRingSize; r++)
+        for (var g = 0; g < MaxGpuSegments; g++)
+            _gpuPassQueries[s, r, g] = gl.GenQuery();
 
         LoadResources();
     }
 
     /// <summary>
-    /// Opens this frame's GPU timer and, before reusing the slot, drains whatever result is
-    /// already sitting in it. The query is only read when the driver says it is available, so
-    /// this never stalls the pipeline; a result that is still missing after a full lap of the
-    /// ring is simply dropped. Only one TIME_ELAPSED query may be active at a time, which is
-    /// why this wraps the whole frame instead of individual passes.
+    /// Prepares this frame's GPU timers: drains whatever per-pass results sit in the slot
+    /// about to be reused and resets the per-pass segment counters. A query is only read
+    /// when the driver says it is available, so this never stalls the pipeline; a result
+    /// still missing after a full lap of the ring is simply dropped. Starts no query
+    /// itself — the passes bracket their own ranges with
+    /// <see cref="BeginGpuPass"/>/<see cref="EndGpuPass"/> further down this frame.
     /// </summary>
     public void BeginGpuFrame()
     {
-        var id = _gpuQueries[_gpuQueryIndex];
-
-        if (_gpuQueryPending[_gpuQueryIndex])
+        for (var s = 0; s < GpuSectionCount; s++)
+        for (var g = 0; g < MaxGpuSegments; g++)
         {
-            gl.GetQueryObject(id, QueryObjectParameterName.ResultAvailable, out int available);
-            if (available != 0)
-            {
-                gl.GetQueryObject(id, QueryObjectParameterName.Result, out long nanoseconds);
-                FrameProfiler.ReportGpuNanoseconds(nanoseconds);
-            }
+            if (!_gpuPassPending[s, _gpuSlot, g]) continue;
+            _gpuPassPending[s, _gpuSlot, g] = false;
 
-            _gpuQueryPending[_gpuQueryIndex] = false;
+            gl.GetQueryObject(_gpuPassQueries[s, _gpuSlot, g],
+                QueryObjectParameterName.ResultAvailable, out int available);
+            if (available == 0) continue;
+
+            gl.GetQueryObject(_gpuPassQueries[s, _gpuSlot, g],
+                QueryObjectParameterName.Result, out long nanoseconds);
+            FrameProfiler.ReportGpuPass((ProfileSection)s, nanoseconds);
         }
 
-        gl.BeginQuery(QueryTarget.TimeElapsed, id);
-        _gpuQueryActive = true;
+        Array.Clear(_gpuPassSegUsed);
     }
 
-    /// <summary>Closes the frame's GPU timer and moves the ring on.</summary>
+    /// <summary>
+    /// Opens one pass's GPU timer. Ranges must be consecutive and non-overlapping: every
+    /// <see cref="BeginGpuPass"/> needs its <see cref="EndGpuPass"/> before the next pass
+    /// begins, since GL forbids nesting TIME_ELAPSED. A pass with several draw blocks per
+    /// frame (EntityPass) simply brackets each block; each lands in its own query object
+    /// and the samples add up in the overlay average.
+    /// </summary>
+    public void BeginGpuPass(ProfileSection section)
+    {
+        var s = (int)section;
+        var seg = _gpuPassSegUsed[s];
+        if (seg >= MaxGpuSegments) return;
+        gl.BeginQuery(QueryTarget.TimeElapsed, _gpuPassQueries[s, _gpuSlot, seg]);
+        _gpuPassPending[s, _gpuSlot, seg] = true;
+    }
+
+    /// <summary>Closes the range opened by <see cref="BeginGpuPass"/>.</summary>
+    public void EndGpuPass(ProfileSection section)
+    {
+        var s = (int)section;
+        if (_gpuPassSegUsed[s] >= MaxGpuSegments) return;
+        gl.EndQuery(QueryTarget.TimeElapsed);
+        _gpuPassSegUsed[s]++;
+    }
+
+    /// <summary>Moves the query ring on; the drained slot is reused two frames later.</summary>
     public void EndGpuFrame()
     {
-        if (!_gpuQueryActive) return;
-
-        gl.EndQuery(QueryTarget.TimeElapsed);
-        _gpuQueryActive = false;
-        _gpuQueryPending[_gpuQueryIndex] = true;
-        _gpuQueryIndex = (_gpuQueryIndex + 1) % _gpuQueries.Length;
+        _gpuSlot = (_gpuSlot + 1) % GpuRingSize;
     }
 
     private void LoadResources()
@@ -2269,7 +2299,7 @@ public class RenderManager : IDisposable
         gl.DeleteVertexArray(outlineVao);
         gl.DeleteBuffer(faceVbo);
         gl.DeleteVertexArray(faceVao);
-        foreach (var query in _gpuQueries)
+        foreach (var query in _gpuPassQueries)
             gl.DeleteQuery(query);
         // The chunks that hold slices in these pools are gone by now (the world stops before
         // the render manager does), so freeing the buffers here cannot orphan a live slice.

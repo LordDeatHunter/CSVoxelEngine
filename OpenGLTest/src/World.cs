@@ -290,28 +290,37 @@ public class World
     {
         // Depth-only sun pass first: every world draw below samples the shadow map it fills
         FrameProfiler.Begin(ProfileSection.Shadows);
+        renderManager.BeginGpuPass(ProfileSection.Shadows);
         renderManager.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player);
+        renderManager.EndGpuPass(ProfileSection.Shadows);
         FrameProfiler.End(ProfileSection.Shadows);
 
         FrameProfiler.Begin(ProfileSection.Reflection);
+        renderManager.BeginGpuPass(ProfileSection.Reflection);
         // One frustum pass over the translucent draws feeds both this and the water pass, and
         // tells the reflection whether there is any water on screen to be worth rendering
         renderManager.CullWater(Camera, _chunkManager.Renderable, _lodManager.RegionList);
         renderManager.RenderReflection(Camera, _chunkManager.Renderable, _lodManager.RegionList);
+        renderManager.EndGpuPass(ProfileSection.Reflection);
         FrameProfiler.End(ProfileSection.Reflection);
 
         FrameProfiler.Begin(ProfileSection.LodPass);
+        renderManager.BeginGpuPass(ProfileSection.LodPass);
         renderManager.RenderLod(Camera, _lodManager.RegionList);
+        renderManager.EndGpuPass(ProfileSection.LodPass);
         FrameProfiler.End(ProfileSection.LodPass);
 
         FrameProfiler.Begin(ProfileSection.WorldPass);
+        renderManager.BeginGpuPass(ProfileSection.WorldPass);
         renderManager.RenderWorld(Camera, _chunkManager.Renderable, _window.Time);
+        renderManager.EndGpuPass(ProfileSection.WorldPass);
         FrameProfiler.End(ProfileSection.WorldPass);
 
         // The frustum test inside RenderWorld has just counted what is on screen
         FrameProfiler.SetCounts(_chunkManager.LoadedChunkCount, renderManager.LastVisibleChunkCount);
 
         FrameProfiler.Begin(ProfileSection.EntityPass);
+        renderManager.BeginGpuPass(ProfileSection.EntityPass);
         renderManager.RenderItemDrops(Camera, _dropManager.Drops);
         renderManager.RenderCampfireCooking(Camera, _campfires);
         renderManager.RenderQuerns(Camera, _querns);
@@ -325,12 +334,15 @@ public class World
         renderManager.RenderPlayer(Camera, Player);
         renderManager.RenderHeldItem(Camera, Player, _heldId, _hasHeld,
             (float)_window.Time, Compass.HeadingFromYaw(Camera.Yaw));
+        renderManager.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);
 
         // Water last of the world passes: it blends, so everything it can cover has to be in
         // the depth buffer already
         FrameProfiler.Begin(ProfileSection.WaterPass);
+        renderManager.BeginGpuPass(ProfileSection.WaterPass);
         renderManager.RenderWorldTranslucent(Camera);
+        renderManager.EndGpuPass(ProfileSection.WaterPass);
         FrameProfiler.End(ProfileSection.WaterPass);
 
         // Bubbles ride behind the water pass, not with the other entities: the water writes
@@ -338,18 +350,24 @@ public class World
         // and stays hidden behind it when the eye is out of the water. Drawing them earlier
         // would let the blended surface cover bubbles floating in front of it.
         FrameProfiler.Begin(ProfileSection.EntityPass);
+        renderManager.BeginGpuPass(ProfileSection.EntityPass);
         renderManager.RenderBubbleParticles(Camera, _bubbles.Particles);
+        renderManager.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);
 
         // Clouds blend too, so they go after water has written its depth
         FrameProfiler.Begin(ProfileSection.CloudPass);
+        renderManager.BeginGpuPass(ProfileSection.CloudPass);
         renderManager.RenderClouds(Camera, Camera.IsEyeInWater);
+        renderManager.EndGpuPass(ProfileSection.CloudPass);
         FrameProfiler.End(ProfileSection.CloudPass);
 
         // Additive sun shafts on top of the finished underwater view; it re-reads the depth
         // buffer, so it has to follow everything that writes depth
         FrameProfiler.Begin(ProfileSection.RaysPass);
+        renderManager.BeginGpuPass(ProfileSection.RaysPass);
         renderManager.RenderUnderwaterRays(Camera);
+        renderManager.EndGpuPass(ProfileSection.RaysPass);
         FrameProfiler.End(ProfileSection.RaysPass);
 
         // With no target there is nothing left to draw, so SelectPass only opens past here and
@@ -357,6 +375,7 @@ public class World
         if (!_hasSelectedBlock) return;
 
         FrameProfiler.Begin(ProfileSection.SelectPass);
+        renderManager.BeginGpuPass(ProfileSection.SelectPass);
 
         // While mining, the outline and the break overlay ride along with the popping block
         var popGrow = _isBreaking ? BlockPopGrowNow : 0f;
@@ -375,6 +394,7 @@ public class World
             renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress, popGrow, _breakingBlockId,
                 HitboxesAt(_breakingBlockPosition, _breakingBlockId));
 
+        renderManager.EndGpuPass(ProfileSection.SelectPass);
         FrameProfiler.End(ProfileSection.SelectPass);
     }
 

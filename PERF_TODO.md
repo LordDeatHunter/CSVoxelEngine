@@ -235,7 +235,14 @@ fragments; the mesher/renderer change is preserved in the stash named in item 5.
   so the 0.5 s fade is 0.5 s of wall clock at any frame rate. `LodRegion.Lifetime` still steps
    at 1/60.
 
-- [ ] **12. Per-pass GPU timing.** The profiler's single whole-frame `TIME_ELAPSED` query
+- [x] **12. Per-pass GPU timing.** (done 2026-09-11: the whole-frame `TIME_ELAPSED` query
+  is gone; each render pass brackets its own consecutive non-overlapping range via
+  `RenderManager.BeginGpuPass`/`EndGpuPass` (`ProfileSection` key, 3-slot ring, 2 segments per
+  slot for `EntityPass`'s two blocks), drained on slot reuse a few frames late so it never
+  stalls, and `FrameProfiler` shows per-pass GPU ms next to the CPU avg/max column in the `X`
+  overlay (update-side rows show `--`, header `gpu` is the per-pass sum) and as `cpu/gpu` pairs
+  in the `perf` console line. Build clean, 345/347 tests with the 2 failures pre-existing on
+  HEAD. In-game overlay check still to do before trusting items 13-15.) The profiler's single whole-frame `TIME_ELAPSED` query
   (`RenderManager.BeginGpuFrame`) cannot say which pass is expensive, and on a GPU-bound machine
   every `*Pass` CPU row just absorbs the stall (phase 4 saw `lighting` balloon to 24 ms on the
   T1000). GL forbids nesting `TIME_ELAPSED`, but consecutive non-overlapping ranges are legal, so

@@ -512,10 +512,12 @@ public static class Program
         renderManager.BeginGpuFrame();
 
         FrameProfiler.Begin(ProfileSection.Lighting);
+        renderManager.BeginGpuPass(ProfileSection.Lighting);
         renderManager.SetLighting(windowManager.Window.Time + timeOffset, world.Camera, world.PrimedTnt,
             world.Camera.IsEyeInWater, world.Camera.IsEyeInLava, world.Campfires.LitCells);
         ambience?.Update(renderManager.Dayness, (float)Math.Clamp(deltaTime, 0.0, 0.25));
         renderManager.BeginFrame(world.Camera);
+        renderManager.EndGpuPass(ProfileSection.Lighting);
         FrameProfiler.End(ProfileSection.Lighting);
 
         world.Render(renderManager);
@@ -529,11 +531,13 @@ public static class Program
         }
 
         FrameProfiler.Begin(ProfileSection.UiPass);
+        renderManager.BeginGpuPass(ProfileSection.UiPass);
         var hideHud = visualDirector?.TakeScreenshot == true && visualDirector.ScreenshotHideHud;
         if (!hideHud)
             world.RenderUI(renderManager, inventoryView,
                 (float)(windowManager.Window.Time + timeOffset), shownFps, debugEnabled,
                 showCoordinates: true, menu: pauseMenuView, settings: settingsMenuView);
+        renderManager.EndGpuPass(ProfileSection.UiPass);
         FrameProfiler.End(ProfileSection.UiPass);
 
         if (visualDirector?.TakeScreenshot == true)
