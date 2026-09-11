@@ -1,0 +1,8 @@
+{
+  // First campfire recipe: a mudball baked on a lit campfire hardens into a mud brick.
+  // Fits inside one 30s branch burn with margin for lighting delay.
+  "input": "item/mudball",
+  "result": "item/mud_brick",
+  "count": 1,
+  "cookSeconds": 12
+}

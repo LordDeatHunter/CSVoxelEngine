@@ -1089,6 +1089,9 @@ public class Chunk : IDisposable
             for (var q = 0; q < quads.Length; q++)
             {
                 var quad = quads[q];
+                // The quern's plate and handle spin as a dynamic entity (see QuernManager):
+                // the chunk keeps only the base quads below the model's air gap.
+                if (type.Renderer == BlockRenderer.Quern && QuernRenderer.IsTopQuad(quad)) continue;
                 var cullFace = quad.CullFace;
                 int lightCell;
                 // Bit 3 of the packed normal: this face looks into water, so the fragment

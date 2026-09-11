@@ -1,0 +1,51 @@
+{
+  // Quern: a hand mill in three Blockbench parts — a broad cobblestone base, a stone
+  // grinding plate with a 1-texel air gap above the base, and a wooden handle sunk into
+  // the plate. The chunk meshes only the base (see QuernRenderer.SplitY); the plate and
+  // handle spin as a dynamic entity, so keep every top quad at y >= 7 and every base
+  // quad at y <= 6 or the split misfires.
+  "name": "Quern",
+  "model": {
+    "textures": { "base": "cobblestone", "plate": "stone", "rod_side": "log_side", "rod_top": "log_top" },
+    "elements": [
+      {
+        "from": [1, 0, 1],
+        "to": [15, 6, 15],
+        "faces": {
+          "down": { "texture": "#base", "cullface": "down" },
+          "up": { "texture": "#base" },
+          "north": { "texture": "#base" },
+          "south": { "texture": "#base" },
+          "west": { "texture": "#base" },
+          "east": { "texture": "#base" }
+        }
+      },
+      {
+        "from": [3, 7, 3],
+        "to": [13, 10, 13],
+        "faces": {
+          "down": { "texture": "#plate" },
+          "up": { "texture": "#plate" },
+          "north": { "texture": "#plate" },
+          "south": { "texture": "#plate" },
+          "west": { "texture": "#plate" },
+          "east": { "texture": "#plate" }
+        }
+      },
+      {
+        "from": [10, 9, 10],
+        "to": [12, 15, 12],
+        "faces": {
+          "down": { "texture": "#rod_top" },
+          "up": { "texture": "#rod_top" },
+          "north": { "texture": "#rod_side" },
+          "south": { "texture": "#rod_side" },
+          "west": { "texture": "#rod_side" },
+          "east": { "texture": "#rod_side" }
+        }
+      }
+    ]
+  },
+  "hardness": 5,
+  "renderer": "quern"
+}

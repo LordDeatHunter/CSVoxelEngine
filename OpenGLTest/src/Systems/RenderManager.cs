@@ -37,6 +37,9 @@ public class RenderManager : IDisposable
     private UIRenderer ui;
     private BlockCubeCache blockCubes;
     private ItemMeshCache itemMeshes;
+    // The quern's spinning plate and handle, built from the top quads of its baked model
+    // (see QuernRenderer): the chunk only meshes the base, so this entity completes it.
+    private Mesh? _quernTop;
     private uint _playerPaletteTex;
     private Dictionary<string, Mesh> _playerMeshes = new();
 
@@ -335,6 +338,7 @@ public class RenderManager : IDisposable
 
         blockCubes = new BlockCubeCache(gl);
         itemMeshes = new ItemMeshCache(gl);
+        _quernTop = BuildQuernTopMesh();
         try
         {
             PlayerRig = PlayerModel.PlayerRig.FromBbmodel(BbmodelLoader.Load(PlayerModelPath));
@@ -1598,6 +1602,26 @@ public class RenderManager : IDisposable
         }
     }
 
+    /// <summary>
+    /// The quern's spinning top as a standalone mesh: the plate and handle quads above the
+    /// air gap of its baked model (see <see cref="QuernRenderer"/>), centred on the origin
+    /// so the render pass can yaw it about the cell centre. Like the other content errors,
+    /// a quern that baked with no top quads fails fast here rather than rendering half.
+    /// </summary>
+    private Mesh BuildQuernTopMesh()
+    {
+        var model = ContentRegistry.RequireBlock("quern").BakedModel
+            ?? throw new InvalidOperationException("Block 'quern' has no baked model.");
+        var top = new List<BakedQuad>();
+        foreach (var quad in model.Quads)
+            if (QuernRenderer.IsTopQuad(quad))
+                top.Add(quad);
+        if (top.Count == 0)
+            throw new InvalidOperationException(
+                "Block 'quern' baked with no top quads above the spinning split; check its model's air gap.");
+        return Primitives.CreateBlockModel(gl, top);
+    }
+
     public void RenderCampfireCooking(Camera camera, CampfireManager campfires)
     {
         if (camera == null || campfires == null) return;
@@ -1639,6 +1663,61 @@ public class RenderManager : IDisposable
                         * Matrix4x4.CreateRotationY(slot * MathF.PI / 2f)
                         * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f, 0f, 0.5f) + offset);
 
+            SetDrawUniforms(placed, placed * viewProj, 1f);
+            mesh.Render();
+        }
+    }
+
+    /// <summary>
+    /// Draws every touched quern's spinning top yawed about its cell centre, plus its waiting
+    /// input hovering over the plate. The chunk holds only the base (see
+    /// <see cref="QuernRenderer"/>), so this entity is what completes the quern — at rest
+    /// angle it sits exactly where the static model would. Tops skip the shadow pass, like
+    /// the campfire food below.
+    /// </summary>
+    public void RenderQuerns(Camera camera, QuernManager querns)
+    {
+        if (camera == null || querns == null || !querns.HasAny || _quernTop == null) return;
+
+        worldShader.Use();
+        BindWorldTextures();
+
+        var viewProj = camera.GetViewProjection();
+        var atlasBound = true;
+
+        foreach (var (cell, angle, inputId) in querns.QuernView())
+        {
+            // The top mesh is centred on its own origin, so it yaws in place
+            var center = cell + new Vector3(0.5f, 0.5f, 0.5f);
+            var model = Matrix4x4.CreateRotationY(angle) * Matrix4x4.CreateTranslation(center);
+            SetDrawUniforms(model, model * viewProj, 1f);
+            _quernTop.Render();
+
+            if (inputId == 0) continue;
+
+            Mesh? mesh;
+            if (ItemType.IsItem(inputId))
+            {
+                if (!itemMeshes.TryGet(inputId, out mesh, out var itemTexture)) continue;
+                gl.ActiveTexture(TextureUnit.Texture0);
+                gl.BindTexture(TextureTarget.Texture2DArray, itemTexture);
+                atlasBound = false;
+            }
+            else
+            {
+                if (!atlasBound)
+                {
+                    BindWorldTextures();
+                    atlasBound = true;
+                }
+                mesh = blockCubes.Get(inputId);
+                if (mesh == null) continue;
+            }
+
+            // Hovering over the plate, clear of the handle's orbit
+            var scale = ItemDrop.Size * (ItemType.IsItem(inputId) ? 1.5f : 1f);
+            var placed = Matrix4x4.CreateScale(scale)
+                        * Matrix4x4.CreateTranslation(cell + new Vector3(0.35f, 0.82f, 0.35f));
             SetDrawUniforms(placed, placed * viewProj, 1f);
             mesh.Render();
         }
@@ -2129,6 +2208,7 @@ public class RenderManager : IDisposable
         ui.Dispose();
         blockCubes.Dispose();
         itemMeshes.Dispose();
+        _quernTop?.Dispose();
         foreach (var mesh in _playerMeshes.Values)
             mesh.Dispose();
         _playerMeshes.Clear();

@@ -1,0 +1,8 @@
+{
+  "result": "block/quern",
+  "count": 1,
+  "ingredients": [
+    { "item": "block/cobblestone", "count": 20 },
+    { "item": "item/branch", "count": 1 }
+  ]
+}

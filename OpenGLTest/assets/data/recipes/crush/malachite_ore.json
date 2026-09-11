@@ -1,0 +1,7 @@
+{
+  // First crushing recipe: a malachite chunk ground in the quern. Each full 2s rotation
+  // has a 0.6 chance to throw out crushed copper and consume the chunk.
+  "input": "item/malachite_ore",
+  "result": "item/crushed_copper",
+  "count": 1
+}

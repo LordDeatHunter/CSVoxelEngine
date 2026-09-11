@@ -110,13 +110,20 @@ public static class Primitives
     /// pop, primed TNT and inventory icons all show the same shape the world does. Faces are
     /// shaded as fully unoccluded (AO 3) — nothing stands beside a floating copy of a block.
     /// </summary>
-    public static Mesh CreateBlockModel(GL gl, BakedModel model, float size = 1f)
-    {
-        var quads = model.Quads;
-        var vertices = new Vertex[quads.Length * CornersPerFace];
-        var indices = new ushort[quads.Length * 6];
+    public static Mesh CreateBlockModel(GL gl, BakedModel model, float size = 1f) =>
+        CreateBlockModel(gl, model.Quads, size);
 
-        for (var q = 0; q < quads.Length; q++)
+    /// <summary>
+    /// A subset of a baked model's quads as a standalone mesh, centred on the origin like the
+    /// full-model variant above. The quern's spinning top is built this way: the plate and
+    /// handle quads above its model's air gap, rotating about the cell centre.
+    /// </summary>
+    public static Mesh CreateBlockModel(GL gl, IReadOnlyList<BakedQuad> quads, float size = 1f)
+    {
+        var vertices = new Vertex[quads.Count * CornersPerFace];
+        var indices = new ushort[quads.Count * 6];
+
+        for (var q = 0; q < quads.Count; q++)
         {
             var quad = quads[q];
             // ShadeLut already folds face brightness and AO into a 0..255 byte; an element

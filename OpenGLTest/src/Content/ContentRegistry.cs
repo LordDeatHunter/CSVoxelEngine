@@ -49,6 +49,7 @@ public static class ContentRegistry
     private static readonly Dictionary<byte, BlockDefinition> BlockDefinitions = new();
     private static readonly List<CraftingRecipe> Recipes = new();
     private static readonly List<CookRecipe> CookRecipes = new();
+    private static readonly List<CrushRecipe> CrushRecipes = new();
 
     private static string _assetsRoot = "assets";
     private static ModelLoader? _models;
@@ -90,7 +91,8 @@ public static class ContentRegistry
         LoadBlocks(blockFiles);
         LoadTags(Path.Combine(assetsRoot, "data", "tags"));
         LoadRecipes(Path.Combine(assetsRoot, "data", "recipes"));
-        LoadCookRecipes(Path.Combine(assetsRoot, "data", "cook"));
+        LoadCookRecipes(Path.Combine(assetsRoot, "data", "recipes", "cook"));
+        LoadCrushRecipes(Path.Combine(assetsRoot, "data", "recipes", "crush"));
         ValidateItemUses(itemFiles);
     }
 
@@ -228,6 +230,13 @@ public static class ContentRegistry
     public static CookRecipe? CookRecipeForInput(byte id) =>
         CookRecipes.FirstOrDefault(r => r.InputId == id);
 
+    /// <summary>Every compiled quern recipe, in file-name order.</summary>
+    public static IReadOnlyList<CrushRecipe> CrushRecipesList => CrushRecipes;
+
+    /// <summary>First crush recipe taking this id, or null when it is not crushable.</summary>
+    public static CrushRecipe? CrushRecipeForInput(byte id) =>
+        CrushRecipes.FirstOrDefault(r => r.InputId == id);
+
     /// <summary>Member ids of a loaded tag, sorted ascending, or null when there is no such tag.</summary>
     public static byte[]? TagMembers(string tag) =>
         Tags.TryGetValue(tag, out var members)
@@ -242,6 +251,7 @@ public static class ContentRegistry
         Tags.Clear();
         Recipes.Clear();
         CookRecipes.Clear();
+        CrushRecipes.Clear();
         BlockModels.Clear();
         BlockDefinitions.Clear();
 
@@ -506,6 +516,13 @@ public static class ContentRegistry
             CookRecipes.Add(CompileCookRecipe(name, ReadJson<CookRecipeDefinition>(path), path));
     }
 
+    private static void LoadCrushRecipes(string folder)
+    {
+        if (!Directory.Exists(folder)) return;
+        foreach (var (name, path) in JsonFilesIn(folder))
+            CrushRecipes.Add(CompileCrushRecipe(name, ReadJson<CrushRecipeDefinition>(path), path));
+    }
+
     private static CookRecipe CompileCookRecipe(string name, CookRecipeDefinition definition, string path)
     {
         if (definition.Input == null || !TryResolve(definition.Input, out var inputId))
@@ -525,6 +542,23 @@ public static class ContentRegistry
             throw new InvalidOperationException(
                 $"Cook recipe '{path}' duplicates the input of '{CookRecipes.First(r => r.InputId == inputId).Name}': one cook recipe per input.");
         return new CookRecipe(name, inputId, resultId, resultCount, cookSeconds);
+    }
+
+    private static CrushRecipe CompileCrushRecipe(string name, CrushRecipeDefinition definition, string path)
+    {
+        if (definition.Input == null || !TryResolve(definition.Input, out var inputId))
+            throw new InvalidOperationException(
+                $"Crush recipe '{path}' names input '{definition.Input}', which is not a registered block or item.");
+        if (definition.Result == null || !TryResolve(definition.Result, out var resultId))
+            throw new InvalidOperationException(
+                $"Crush recipe '{path}' names result '{definition.Result}', which is not a registered block or item.");
+        var resultCount = definition.Count ?? 1;
+        if (resultCount <= 0)
+            throw new InvalidOperationException($"Crush recipe '{path}' has count {resultCount}; expected 1 or more.");
+        if (CrushRecipes.Any(r => r.InputId == inputId))
+            throw new InvalidOperationException(
+                $"Crush recipe '{path}' duplicates the input of '{CrushRecipes.First(r => r.InputId == inputId).Name}': one crush recipe per input.");
+        return new CrushRecipe(name, inputId, resultId, resultCount);
     }
 
     private static CraftingRecipe CompileRecipe(string name, RecipeDefinition definition, string path)
@@ -582,8 +616,9 @@ public static class ContentRegistry
                 "pebbles" => BlockRenderer.Pebbles,
                 "branch_pile" => BlockRenderer.BranchPile,
                 "fluid" => BlockRenderer.Fluid,
+                "quern" => BlockRenderer.Quern,
                 _ => throw new InvalidOperationException(
-                    $"Block '{path}' has unknown renderer '{definition.Renderer}'; expected model, tapered_wood, pebbles, branch_pile or fluid."),
+                    $"Block '{path}' has unknown renderer '{definition.Renderer}'; expected model, tapered_wood, pebbles, branch_pile, fluid or quern."),
             };
 
             var onBreak = definition.OnBreak switch

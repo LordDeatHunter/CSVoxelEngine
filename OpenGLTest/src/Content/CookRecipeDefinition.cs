@@ -1,6 +1,6 @@
 namespace silkgltriangle;
 
-/// <summary>JSON shape of <c>assets/data/cook/&lt;name&gt;.json</c>.</summary>
+/// <summary>JSON shape of <c>assets/data/recipes/cook/&lt;name&gt;.json</c>.</summary>
 public sealed class CookRecipeDefinition
 {
     /// <summary>Raw input id, e.g. <c>item/mudball</c>.</summary>

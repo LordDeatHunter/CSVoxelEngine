@@ -45,7 +45,7 @@ public sealed class BlockDefinition
     /// water behaviour: every tick, full 7-block range, infinite sources, never hardens.</summary>
     public FlowDefinition? Flow { get; set; }
 
-    /// <summary>"model" | "tapered_wood" | "pebbles" | "branch_pile" | "fluid".</summary>
+    /// <summary>"model" | "tapered_wood" | "pebbles" | "branch_pile" | "fluid" | "quern".</summary>
     public string? Renderer { get; set; }
 
     /// <summary>

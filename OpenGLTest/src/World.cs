@@ -38,6 +38,7 @@ public class World
     private readonly LeafParticleSystem _leaves = new();
     private readonly BlockDebrisSystem _debris = new();
     private readonly CampfireManager _campfires = new();
+    private readonly QuernManager _querns = new();
     private readonly FireParticleSystem _fire = new();
     private readonly BubbleParticleSystem _bubbles = new();
     // Trees currently toppling over after their base log was mined
@@ -89,6 +90,9 @@ public class World
 
     /// <summary>Lit campfire block entities, feeding lights and fire particles.</summary>
     public CampfireManager Campfires => _campfires;
+
+    /// <summary>Quern block entities: waiting inputs and spinning tops.</summary>
+    public QuernManager Querns => _querns;
 
     /// <summary>Live campfire embers and smoke, feeding the fire billboard pass.</summary>
     public IReadOnlyList<FireParticle> FireParticles => _fire.Particles;
@@ -245,6 +249,7 @@ public class World
         _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager);
         _debris.Update((float)deltaTime, _chunkManager);
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
+        _querns.Update((float)deltaTime, _chunkManager, _dropManager);
         _fire.Update((float)deltaTime, _campfires.LitCells, Camera.RenderEye);
         _bubbles.Update((float)deltaTime, Camera.RenderEye, Camera.ViewDirection, Camera.IsEyeInWater, _chunkManager);
 
@@ -309,6 +314,7 @@ public class World
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.RenderItemDrops(Camera, _dropManager.Drops);
         renderManager.RenderCampfireCooking(Camera, _campfires);
+        renderManager.RenderQuerns(Camera, _querns);
         renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
         renderManager.RenderFallingBlocks(Camera, _falling.Falling);
         renderManager.RenderLeafParticles(Camera, _leaves.Particles);
@@ -535,6 +541,8 @@ public class World
                     DropManager.PileCount(brokenId, (int)blockPos.X, (int)blockPos.Z, brokenState));
             if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.BranchPile)
                 _campfires.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, _dropManager);
+            if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.Quern)
+                _querns.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, _dropManager);
         }
 
         // Water beside or above the hole pours into it on the next fluid tick
@@ -730,6 +738,11 @@ public class World
             Player.Punch();
             return;
         }
+        if (TryQuernInteract(maxDistance))
+        {
+            Player.Punch();
+            return;
+        }
         var id = Inventory.SelectedBlockId;
         if (id != 0 && Inventory.SelectedCount > 0
             && ItemType.Types.TryGetValue(id, out var item) && item.UseAction != ItemUseAction.None)
@@ -781,6 +794,36 @@ public class World
             if (!Inventory.Add(output))
                 _dropManager.Spawn(output, new Vector3(hx, hy, hz));
         }
+        return true;
+    }
+
+    /// <summary>
+    /// Right-click on a quern: holding a crushable inserts one unit into an empty quern,
+    /// anything else spins the plate through one full rotation (a quern already turning
+    /// swallows the click). Returns whether a quern was aimed at.
+    /// </summary>
+    private bool TryQuernInteract(float maxDistance)
+    {
+        if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        var hx = (int)hit.X;
+        var hy = (int)hit.Y;
+        var hz = (int)hit.Z;
+        if (!_chunkManager.TryGetCell(hx, hy, hz, out var hitId, out _)) return false;
+        if (BlockType.ById[hitId]?.Renderer != BlockRenderer.Quern) return false;
+
+        if (_querns.IsSpinning(hx, hy, hz)) return true;
+
+        var selected = Inventory.SelectedBlockId;
+        if (selected != 0 && Inventory.SelectedCount > 0
+            && ContentRegistry.CrushRecipeForInput(selected) != null
+            && _querns.TryInsert(hx, hy, hz, selected))
+        {
+            if (!Camera.IsCreative)
+                Inventory.ConsumeSelected();
+            return true;
+        }
+
+        _querns.StartSpin(hx, hy, hz);
         return true;
     }
 
@@ -1012,6 +1055,11 @@ public class World
         }
 
         if (!chunk.PlaceBlockAt(placePos, blockId, _chunkManager, state)) return false;
+
+        // The chunk only meshes a quern's base: register the cell so its plate draws at
+        // rest until it is inserted into or spun.
+        if (BlockType.ById[blockId]?.Renderer == BlockRenderer.Quern)
+            _querns.Ensure((int)placePos.X, (int)placePos.Y, (int)placePos.Z);
 
         // A block placed into water displaces it, so the neighbours recompute their levels
         _fluidManager.ScheduleAround(placePos);
