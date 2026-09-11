@@ -5,14 +5,17 @@ using System.Numerics;
 namespace silkgltriangle;
 
 /// <summary>
-/// Block-entity registry for campfires: lit full branch piles with a burn timer.
+/// Block-entity registry for campfires: lit branch piles with a per-branch burn timer.
 /// A max-count branch pile is the unlit firepit; igniting it adds an entry here (the
 /// "fire" toggle) without touching block ids or the state byte, so meshing is unaffected.
+/// Every <see cref="BurnSeconds"/> the fire consumes one branch and pops ash, staying lit
+/// until the last branch burns out (which clears the block). A burning pile can be fed
+/// back up with branches while it still has at least one left.
 /// Main thread only, like the other managers.
 /// </summary>
 public sealed class CampfireManager
 {
-    public const float BurnSeconds = 600f;
+    public const float BurnSeconds = 30f;
     public const int AshPerExtinguish = 4;
 
     private readonly Dictionary<(int X, int Y, int Z), float> _lit = new();
@@ -64,12 +67,17 @@ public sealed class CampfireManager
         foreach (var key in _stale)
             _lit.Remove(key);
         foreach (var key in _scratch)
-            Extinguish(key.X, key.Y, key.Z, chunks, drops);
+            ConsumeBranch(key.X, key.Y, key.Z, chunks, drops);
         if (_scratch.Count > 0 || _stale.Count > 0)
             RefreshCells();
     }
 
-    private void Extinguish(int x, int y, int z, ChunkManager chunks, DropManager drops)
+    /// <summary>
+    /// Burns one branch off a lit pile and pops <see cref="AshPerExtinguish"/> ash. A pile
+    /// with branches left stays lit on a fresh timer; the last branch clears the block and
+    /// the fire goes out.
+    /// </summary>
+    private void ConsumeBranch(int x, int y, int z, ChunkManager chunks, DropManager drops)
     {
         _lit.Remove((x, y, z));
         if (!chunks.TryGetCell(x, y, z, out var id, out var state)) return;
@@ -80,7 +88,10 @@ public sealed class CampfireManager
         if (chunk == null) return;
         var cell = new Vector3(x, y, z);
         if (count > 1)
+        {
             chunk.SetStateAt(cell, (byte)(count - 1), chunks);
+            _lit[(x, y, z)] = BurnSeconds;
+        }
         else
             chunk.RemoveBlockAt(cell, chunks);
         try

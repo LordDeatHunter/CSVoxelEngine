@@ -111,13 +111,13 @@ public sealed class FirestarterTests
     }
 
     [Fact]
-    public void CampfireIgnitesOnceAndBurnsTenMinutes()
+    public void CampfireIgnitesOnceAndBurnsThirtySecondsPerBranch()
     {
         var fires = new CampfireManager();
         Assert.True(fires.Ignite(1, 2, 3));
         Assert.False(fires.Ignite(1, 2, 3));
         Assert.True(fires.IsLit(1, 2, 3));
-        Assert.Equal(CampfireManager.BurnSeconds, 600f);
+        Assert.Equal(CampfireManager.BurnSeconds, 30f);
         Assert.Single(fires.LitCells);
     }
 
@@ -134,7 +134,7 @@ public sealed class FirestarterTests
     }
 
     [Fact]
-    public void ExtinguishDecrementsThePileAndDropsFourAsh()
+    public void BurningABranchKeepsTheFireLitAndDropsFourAsh()
     {
         var manager = new ChunkManager(null!);
         var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);
@@ -147,14 +147,67 @@ public sealed class FirestarterTests
         Assert.True(fires.Ignite(0, 0, 0));
         fires.Update(1f, manager, drops);
         Assert.True(fires.IsLit(0, 0, 0));
-        fires.Update(CampfireManager.BurnSeconds, manager, drops);
-        Assert.False(fires.IsLit(0, 0, 0));
+        Assert.Empty(drops.Drops);
+        fires.Update(CampfireManager.BurnSeconds - 1f, manager, drops);
+        Assert.True(fires.IsLit(0, 0, 0));
         Assert.True(manager.TryGetCell(0, 0, 0, out var id, out var state));
         Assert.Equal(BranchPile, id);
         Assert.Equal(3, state);
         Assert.Equal(4, drops.Drops.Count);
         foreach (var drop in drops.Drops)
             Assert.Equal(Ash, drop.BlockId);
+    }
+
+    [Fact]
+    public void BurningTheLastBranchExtinguishesAndClearsTheBlock()
+    {
+        var manager = new ChunkManager(null!);
+        var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);
+        chunk.IsBlockDataReady = true;
+        manager.Chunks[Vector3.Zero] = chunk;
+        chunk.SetBlockRaw(0, 0, 0, BranchPile, 4);
+
+        var fires = new CampfireManager();
+        var drops = new DropManager();
+        Assert.True(fires.Ignite(0, 0, 0));
+        for (var i = 0; i < 3; i++)
+        {
+            fires.Update(CampfireManager.BurnSeconds, manager, drops);
+            Assert.True(fires.IsLit(0, 0, 0));
+        }
+        Assert.Equal(12, drops.Drops.Count);
+        fires.Update(CampfireManager.BurnSeconds, manager, drops);
+        Assert.False(fires.IsLit(0, 0, 0));
+        Assert.True(manager.TryGetCell(0, 0, 0, out var id, out _));
+        Assert.Equal(0, id);
+        Assert.Equal(16, drops.Drops.Count);
+        foreach (var drop in drops.Drops)
+            Assert.Equal(Ash, drop.BlockId);
+    }
+
+    [Fact]
+    public void FeedingBranchesKeepsTheFireGoing()
+    {
+        var manager = new ChunkManager(null!);
+        var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);
+        chunk.IsBlockDataReady = true;
+        manager.Chunks[Vector3.Zero] = chunk;
+        chunk.SetBlockRaw(0, 0, 0, BranchPile, 4);
+
+        var fires = new CampfireManager();
+        var drops = new DropManager();
+        Assert.True(fires.Ignite(0, 0, 0));
+        fires.Update(CampfireManager.BurnSeconds, manager, drops);
+        Assert.True(fires.IsLit(0, 0, 0));
+        Assert.Equal(4, drops.Drops.Count);
+
+        Assert.True(chunk.SetStateAt(new Vector3(0, 0, 0), 4, manager));
+        fires.Update(CampfireManager.BurnSeconds, manager, drops);
+        Assert.True(fires.IsLit(0, 0, 0));
+        Assert.True(manager.TryGetCell(0, 0, 0, out var id, out var state));
+        Assert.Equal(BranchPile, id);
+        Assert.Equal(3, state);
+        Assert.Equal(8, drops.Drops.Count);
     }
 
     [Fact]
