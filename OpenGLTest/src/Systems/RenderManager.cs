@@ -379,6 +379,8 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterAbsorb", WorldGenerationConfig.WaterAbsorb);
         program.SetUniform("uWaterScatter", WorldGenerationConfig.WaterScatter);
         program.SetUniform("uWaterCausticStrength", WorldGenerationConfig.WaterCausticStrength);
+        program.SetUniform("uWaterFancyNear", WorldGenerationConfig.WaterFancyNearBlocks);
+        program.SetUniform("uWaterFancyFar", WorldGenerationConfig.WaterFancyFarBlocks);
         program.SetUniform("uLavaLayer", (float)ContentRegistry.RequireBlock("lava").Top);
         program.SetUniform("uLodLeafColor", _lodLeafColor);
     }
@@ -913,9 +915,10 @@ public class RenderManager : IDisposable
     {
         worldShader.Use();
         // CullWater ran a moment ago, so a frame with no water on screen skips the whole
-        // mirrored render rather than filling a texture nothing will sample.
+        // mirrored render rather than filling a texture nothing will sample. Far-only water
+        // draws through the cheap shader path, which never samples the mirror either.
         if (!WorldGenerationConfig.WaterEnabled || camera == null || !_waterVisible
-            || camera.RenderEye.Y < WaterPlaneY || _reflFbo == 0)
+            || !_nearWaterVisible || camera.RenderEye.Y < WaterPlaneY || _reflFbo == 0)
         {
             SetWorldUniform("uReflValid", 0f);
             return;
@@ -1348,6 +1351,10 @@ public class RenderManager : IDisposable
     // Whether anything the translucent pass will draw is actually water, recomputed by
     // CullWater once a frame. Glass alone does not turn the water-only passes back on.
     private bool _waterVisible;
+    // Whether any of that water is near enough for the fancy model (nearer than
+    // WaterFancyFarBlocks). Far-only water draws through the cheap shader path, which
+    // samples neither the reflection nor the scene copies, so both passes are skipped.
+    private bool _nearWaterVisible;
 
     /// <summary>Frustum-culls the translucent draws once per frame and records whether any water
     /// (chunk or LOD sheet) is on screen. Reflection and the scene copies only run when it is,
@@ -1358,11 +1365,13 @@ public class RenderManager : IDisposable
         _translucentChunks.Clear();
         _translucentRegions.Clear();
         _waterVisible = false;
+        _nearWaterVisible = false;
         if (camera == null) return;
 
         var frustum = new Frustum(camera.GetViewProjection());
         var camChunkPos = (camera.RenderEye / Chunk.Size).Floor();
         var camPos = camera.RenderEye;
+        var fancyFarSq = WorldGenerationConfig.WaterFancyFarBlocks * WorldGenerationConfig.WaterFancyFarBlocks;
 
         for (var i = 0; i < chunks.Count; i++)
         {
@@ -1377,7 +1386,13 @@ public class RenderManager : IDisposable
                 continue;
 
             _translucentChunks.Add((chunk, Vector3.DistanceSquared(chunk.Position, camChunkPos)));
-            if (chunk.HasWaterMesh) _waterVisible = true;
+            if (chunk.HasWaterMesh)
+            {
+                _waterVisible = true;
+                var center = chunk.Position * Chunk.Size + new Vector3(Chunk.Size / 2f);
+                if (Vector3.DistanceSquared(center, camPos) <= fancyFarSq)
+                    _nearWaterVisible = true;
+            }
         }
 
         // Back to front, so overlapping surfaces (a pond seen across a sea) blend in the
@@ -1397,9 +1412,12 @@ public class RenderManager : IDisposable
                 continue;
 
             var center = (min + max) * 0.5f;
-            _translucentRegions.Add((region, Vector3.DistanceSquared(center, camPos)));
+            var regionDistSq = Vector3.DistanceSquared(center, camPos);
+            _translucentRegions.Add((region, regionDistSq));
             // A LOD region's translucent mesh is only ever the water sheet
             _waterVisible = true;
+            if (regionDistSq <= fancyFarSq)
+                _nearWaterVisible = true;
         }
 
         // Finest level first: its sheet sits highest (each coarser level sinks by its own
@@ -1425,7 +1443,8 @@ public class RenderManager : IDisposable
 
         // The refraction reads the frame as it stands right now: everything opaque plus the
         // entities, and nothing translucent yet. Depth comes along for the thickness measure.
-        if (_waterVisible) CopyScene(colour: true);
+        // Skipped for far-only water: the cheap shader path samples neither copy.
+        if (_nearWaterVisible) CopyScene(colour: true);
 
         chunkShader.Use();
         // No cutout here: glass's faint interior must blend instead of discarding away.

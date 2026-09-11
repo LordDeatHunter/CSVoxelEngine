@@ -68,6 +68,8 @@ uniform float uWaterRefractStrength;
 uniform vec3 uWaterAbsorb;
 uniform vec3 uWaterScatter;
 uniform float uWaterCausticStrength;
+uniform float uWaterFancyNear;
+uniform float uWaterFancyFar;
 // Average opaque colour of the leaves tile, for LOD foliage below: far crowns are
 // drawn opaque (no cutout holes) and transparent texels fall back to this.
 uniform vec3 uLodLeafColor;
@@ -226,6 +228,23 @@ void main() {
         float pulse = 0.9 + 0.1 * sin(uTime * 2.0 + fWorldPos.x * 1.3 + fWorldPos.z * 1.7);
         col = (albedo * 2.0 + vec3(0.55, 0.13, 0.01)) * pulse;
     } else if (isWater) {
+        // Far water skips the wave/reflection/refraction model below: past the full-detail
+        // ring each pixel covers metres of surface, so a geometric-normal fresnel between
+        // saturated scatter and the sky mirror reads the same for no texture fetches. The
+        // Near->Far band blends the two so the switch never pops; lava keeps its glow path
+        // above regardless of distance.
+        float fancy = 1.0 - smoothstep(uWaterFancyNear, uWaterFancyFar, dist);
+        vec3 waterLightCheap = uAmbient * (0.12 + 0.88 * fSun) + uSunColor * (uSunIntensity * fSun * shadow * 0.6)
+                     + (torch + pl) * 0.6;
+        float skyDim = clamp(0.12 + 0.88 * fSun, 0.0, 1.0);
+        vec3 vCheap = normalize(uCameraPos - fWorldPos);
+        float cosTcheap = max(dot(vCheap, N), 0.0);
+        float fCheap = 0.06 + 0.94 * pow(1.0 - cosTcheap, 5.0);
+        vec3 cheap = mix(uWaterScatter * waterLightCheap, uFogColor * skyDim, fCheap);
+        if (fancy <= 0.0) {
+            col = cheap;
+            waterSpec = 0.0;
+        } else {
         // WaveNormal always points up: correct for the surface top, but using it for a
         // vertical waterfall pins V.N near 0, so the Schlick fresnel below saturates to 1
         // and every underground fall becomes a full mirror of the (daytime) sky fallback.
@@ -273,13 +292,16 @@ void main() {
         // No sky to mirror underground: dim the reflection (fallback or stale mirror
         // alike) by the voxel skylight, or sealed caves glow sky-blue in daytime.
         refl *= clamp(0.12 + 0.88 * fSun, 0.0, 1.0);
-        col = mix(refr, refl, F);
+        vec3 fancyCol = mix(refr, refl, F);
 
         vec3 H = normalize(V + uSunDir);
         float ndh = max(dot(nW, H), 0.0);
         // Sun glitter needs skylight to exist: without the fSun gate it shines through rock.
         waterSpec = (pow(ndh, 300.0) * 0.45 + pow(ndh, 24.0) * 0.05) * shadow * fSun;
+        col = mix(cheap, fancyCol, fancy);
+        waterSpec *= fancy;
         col += uSunColor * (waterSpec * uSunIntensity);
+        }
     }
 
     float f = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);

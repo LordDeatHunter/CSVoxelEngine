@@ -154,6 +154,13 @@ public static class WorldGenerationConfig
     public static readonly Vector3 WaterScatter = new(0.05f, 0.30f, 0.40f);
     // Brightness of the sunlight caustics on submerged faces
     public const float WaterCausticStrength = 0.6f;
+    // Past WaterFancyFarBlocks water skips its wave/reflection/refraction model for a
+    // geometric-normal fresnel between saturated scatter and the sky mirror (no texture
+    // fetches); the Near->Far band blends the two so the switch never pops. Near sits at
+    // the full-detail ring (ChunkRadius * 16) so LOD water is always cheap, and CullWater
+    // skips the reflection pass and the scene copy when no water is nearer than Far.
+    public const float WaterFancyNearBlocks = 256f;
+    public const float WaterFancyFarBlocks = 384f;
     // Underwater sun shafts: brightness, how far the ray marches and how many samples it takes
     public const float WaterRayStrength = 0.08f;
     public const float WaterRayMaxDistance = 40f;
