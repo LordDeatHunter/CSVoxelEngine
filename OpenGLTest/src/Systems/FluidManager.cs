@@ -51,12 +51,18 @@ public class FluidManager
     // when the index divides evenly, so they flow slower while sharing the one schedule.
     private int _tickIndex;
 
-    // Cells ticking now and cells scheduled for the next tick; swapped every tick so a cell
-    // scheduled while ticking is handled on the following one (no unbounded cascade per tick).
-    private HashSet<long> _pending = [];
-    private HashSet<long> _next = [];
+    // Cells scheduled since the last tick started. Every write, edit and chunk wake adds here;
+    // a tick snapshots it into _tickCells below, so a cell scheduled while ticking is handled on
+    // the following tick (no unbounded cascade within one).
+    private readonly HashSet<long> _next = [];
 
-    // Chunks touched by this tick's writes, remeshed once at the end of it
+    // The current tick's cells. A tick may span several frames: _tickCursor walks this list one
+    // per-frame slice at a time, so a chunk-load wake storm spreads across frames instead of
+    // running in one, while the simulation still keeps up with the wake.
+    private readonly List<long> _tickCells = [];
+    private int _tickCursor;
+
+    // Chunks touched by this frame's tick slice, remeshed once the slice is done
     private readonly HashSet<Vector3> _dirtyChunks = [];
 
     // Scratch for SetCellImmediate's border neighbours (kept off the tick's set)
@@ -65,10 +71,6 @@ public class FluidManager
     // Reused by the slope search: nothing it calls chooses directions again, so one buffer
     // keeps a draining pond from allocating per cell per tick
     private readonly List<(int X, int Y, int Z)> _spreadDirections = new(4);
-
-    // Scratch for ordering an over-budget tick lowest-cell-first; only filled when the
-    // tick is capped, so steady-state ticks never pay the copy or the sort
-    private readonly List<long> _tickOrder = [];
 
     // The manager the current tick reads and writes through; set by Update before the ticks run
     private ChunkManager _chunks = null!;
@@ -136,7 +138,10 @@ public class FluidManager
     public void WakeLoadedChunks(ChunkManager chunks)
     {
         var woken = 0;
-        while (woken < WorldGenerationConfig.MaxWakeChunksPerFrame && chunks.TryDequeueLoaded(out var chunk))
+        var backlog = WorldGenerationConfig.MaxFluidBacklogCells;
+        while (woken < WorldGenerationConfig.MaxWakeChunksPerFrame
+               && _next.Count < backlog
+               && chunks.TryDequeueLoaded(out var chunk))
         {
             woken++;
             // An unload can race the queue: only the chunk still registered at its position
@@ -244,30 +249,77 @@ public class FluidManager
             (int)chunk.Position.Z * Chunk.Size + lz));
 
     /// <summary>
-    /// Runs whole fluid ticks at a fixed rate, at most
-    /// <see cref="WorldGenerationConfig.MaxFluidTicksPerFrame"/> of them per frame. Leftover
-    /// time past that budget is dropped rather than carried, so a hitch (or a chunk-loading
-    /// stall) can never leave the simulation spiralling to catch up.
+    /// Advances the fluid simulation. A new tick starts at most every
+    /// <see cref="WorldGenerationConfig.FluidTickSeconds"/> and at most
+    /// <see cref="WorldGenerationConfig.MaxFluidTicksPerFrame"/> times per frame, but a tick's
+    /// cells are processed in slices of <see cref="WorldGenerationConfig.MaxFluidCellsPerFrame"/>
+    /// so a chunk-load wake storm spreads over several frames instead of running in one.
+    /// Leftover time past the tick budget is dropped, so a hitch can never leave the simulation
+    /// spiralling to catch up.
     /// </summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops)
     {
         _accumulator += deltaTime;
-        if (_accumulator < WorldGenerationConfig.FluidTickSeconds) return;
 
         // The tick's helpers read through this and its chunk cache, so they need no manager
         // argument of their own
         _chunks = chunks;
 
+        // The chunk cache is valid for one frame only: an unload can replace a chunk between
+        // frames, and a reference cached before it must never be handed back
+        _chunkCacheKeys.AsSpan().Fill(-1L);
+
         var ticks = 0;
-        while (_accumulator >= WorldGenerationConfig.FluidTickSeconds
-               && ticks < WorldGenerationConfig.MaxFluidTicksPerFrame)
+        var processed = 0;
+        while (processed < WorldGenerationConfig.MaxFluidCellsPerFrame)
         {
-            _accumulator -= WorldGenerationConfig.FluidTickSeconds;
-            ticks++;
-            Tick(chunks, drops);
+            // The previous tick is fully processed, so start the next one when it is due
+            if (_tickCursor >= _tickCells.Count)
+            {
+                if (_accumulator < WorldGenerationConfig.FluidTickSeconds
+                    || ticks >= WorldGenerationConfig.MaxFluidTicksPerFrame)
+                    break;
+
+                _accumulator -= WorldGenerationConfig.FluidTickSeconds;
+                ticks++;
+                BeginTick();
+                if (_tickCells.Count == 0) continue;
+            }
+
+            // Spend what is left of the frame's cell budget on the current tick, then yield
+            var slice = Math.Min(WorldGenerationConfig.MaxFluidCellsPerFrame - processed,
+                _tickCells.Count - _tickCursor);
+            var end = _tickCursor + slice;
+            for (; _tickCursor < end; _tickCursor++)
+                TickCell(_tickCells[_tickCursor], drops);
+            processed += slice;
+
+            if (_tickCursor < _tickCells.Count) break;
         }
 
         if (_accumulator >= WorldGenerationConfig.FluidTickSeconds) _accumulator = 0f;
+
+        if (_dirtyChunks.Count > 0)
+        {
+            foreach (var chunkPos in _dirtyChunks)
+                chunks.MarkDirty(chunkPos);
+            _dirtyChunks.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Starts a new tick: snapshots the cells scheduled since the last one into
+    /// <see cref="_tickCells"/>, which <see cref="Update"/> then walks across the following
+    /// frames.
+    /// </summary>
+    private void BeginTick()
+    {
+        _tickIndex++;
+
+        _tickCells.Clear();
+        _tickCells.AddRange(_next);
+        _next.Clear();
+        _tickCursor = 0;
     }
 
     /// <summary>
@@ -300,42 +352,6 @@ public class FluidManager
 
         ScheduleAround(x, y, z);
         return true;
-    }
-
-    /// <summary>One fluid tick: scheduled cells recompute their level, then spread.
-    /// Capped at <see cref="WorldGenerationConfig.MaxFluidCellsPerTick"/> cells, lowest first;
-    /// the rest ride the next tick.</summary>
-    private void Tick(ChunkManager chunks, DropManager drops)
-    {
-        (_pending, _next) = (_next, _pending);
-        _next.Clear();
-        _dirtyChunks.Clear();
-        _tickIndex++;
-
-        // Invalidate the chunk cache: the tick may see chunks an earlier one did, and a
-        // reference cached before an unload must never be handed back
-        _chunkCacheKeys.AsSpan().Fill(-1L);
-
-        var budget = WorldGenerationConfig.MaxFluidCellsPerTick;
-        if (_pending.Count > budget)
-        {
-            // Wake-up storm: bound this tick and carry the rest over lowest-cell-first,
-            // so falling columns drain before skirts spread outward off them.
-            _tickOrder.Clear();
-            _tickOrder.AddRange(_pending);
-            _tickOrder.Sort(static (a, b) => UnpackedY(a).CompareTo(UnpackedY(b)));
-            for (var i = budget; i < _tickOrder.Count; i++) _next.Add(_tickOrder[i]);
-            for (var i = 0; i < budget; i++) TickCell(_tickOrder[i], drops);
-        }
-        else
-        {
-            foreach (var key in _pending) TickCell(key, drops);
-        }
-
-        foreach (var chunkPos in _dirtyChunks)
-            chunks.MarkDirty(chunkPos);
-
-        _pending.Clear();
     }
 
     /// <summary>Recomputes one scheduled cell's level, then spreads it.</summary>
