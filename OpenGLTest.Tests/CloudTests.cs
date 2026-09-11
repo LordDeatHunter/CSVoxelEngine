@@ -47,14 +47,17 @@ public sealed class CloudTests(ITestOutputHelper output)
     public void DensityIsPeriodic()
     {
         // The field is drawn as 3x3 copies, so the noise has to repeat exactly at the field width
-        // or the copies would show a seam.
-        const int cells = 256;
-        var points = new[] { (3.3f, 17.9f), (200.25f, 0.5f), (255.9f, 255.1f) };
-        foreach (var (x, z) in points)
+        // or the copies would show a seam. Cover both the legacy 256-cell tuning grid and the
+        // configured grid, so a future cell-size change cannot silently break the live tiling.
+        foreach (var cells in new[] { 256, CloudField.Cells })
         {
-            var baseline = CloudField.Density(x, z, cells, WorldGenerationConfig.CloudSeed);
-            Assert.Equal(baseline, CloudField.Density(x + cells, z, cells, WorldGenerationConfig.CloudSeed), precision: 5);
-            Assert.Equal(baseline, CloudField.Density(x, z + cells, cells, WorldGenerationConfig.CloudSeed), precision: 5);
+            var points = new[] { (3.3f, 17.9f), (200.25f, 0.5f), ((cells - 0.1f), (cells - 0.9f)) };
+            foreach (var (x, z) in points)
+            {
+                var baseline = CloudField.Density(x, z, cells, WorldGenerationConfig.CloudSeed);
+                Assert.Equal(baseline, CloudField.Density(x + cells, z, cells, WorldGenerationConfig.CloudSeed), precision: 5);
+                Assert.Equal(baseline, CloudField.Density(x, z + cells, cells, WorldGenerationConfig.CloudSeed), precision: 5);
+            }
         }
     }
 
@@ -63,22 +66,24 @@ public sealed class CloudTests(ITestOutputHelper output)
     {
         var levels = CloudField.BuildLevels();
         var cells = levels.GetLength(0);
+        var top = WorldGenerationConfig.CloudMaxLevels;
         var filled = 0;
-        var counts = new int[WorldGenerationConfig.CloudMaxLevels + 1];
+        var counts = new int[top + 1];
         for (var x = 0; x < cells; x++)
         for (var z = 0; z < cells; z++)
         {
             var level = levels[x, z];
-            Assert.InRange((int)level, 0, WorldGenerationConfig.CloudMaxLevels);
+            Assert.InRange((int)level, 0, top);
             counts[level]++;
             if (level > 0) filled++;
         }
 
         var coverage = filled / (float)(cells * cells);
-        output.WriteLine($"coverage {coverage:P2}; levels 0..3 = {string.Join(", ", counts)}");
+        output.WriteLine($"coverage {coverage:P2}; levels 0..{top} = {string.Join(", ", counts)}");
         Assert.True(coverage is >= 0.30f and <= 0.45f, $"Coverage {coverage:P2} is outside 30-45 %");
-        Assert.True(counts[2] > 0, "No two-layer cells: the field is a flat sheet");
-        Assert.True(counts[3] > 0, "No three-layer cells: nothing reaches CloudMaxLevels");
+        Assert.True(top >= 2, "CloudMaxLevels must be at least 2 for a layered sky");
+        Assert.True(counts[top - 1] > 0, "No multi-layer cells: the field is a flat sheet");
+        Assert.True(counts[top] > 0, "Nothing reaches CloudMaxLevels");
     }
 
     [Fact]
@@ -212,11 +217,15 @@ public sealed class CloudTests(ITestOutputHelper output)
         Assert.Equal(0, indices.Length % 3);
 
         var top = Y0 + WorldGenerationConfig.CloudMaxLevels * T;
+        // Fillet and octant points can land a hair outside their plane after float rounding, so
+        // allow a few ulps of slack (float epsilon at the 2048-block field edge is ~2.4e-4):
+        // this catches runaway geometry, not rounding.
+        const float slack = 1e-3f;
         foreach (var vertex in vertices)
         {
-            Assert.InRange(vertex.Position.X, 0f, WorldGenerationConfig.CloudFieldSize);
-            Assert.InRange(vertex.Position.Z, 0f, WorldGenerationConfig.CloudFieldSize);
-            Assert.InRange(vertex.Position.Y, Y0, top);
+            Assert.InRange(vertex.Position.X, -slack, WorldGenerationConfig.CloudFieldSize + slack);
+            Assert.InRange(vertex.Position.Z, -slack, WorldGenerationConfig.CloudFieldSize + slack);
+            Assert.InRange(vertex.Position.Y, Y0 - slack, top + slack);
         }
     }
 
@@ -254,6 +263,8 @@ public sealed class CloudTests(ITestOutputHelper output)
         // that some ray will thread. Points within one corner radius of the air are skipped, since
         // that is exactly the shell the rounding carves away.
         const int rays = 1500;
+        // Independent of CloudMaxLevels: the random grids below can stack up to this many layers.
+        const int testMaxLevels = 3;
         const float radius = 3f * S + 4f * T;
         const float step = 0.25f;
         const float skin = R + 0.05f;
@@ -266,7 +277,7 @@ public sealed class CloudTests(ITestOutputHelper output)
             var levels = new byte[5, 5];
             for (var x = 1; x <= 3; x++)
             for (var z = 1; z <= 3; z++)
-                levels[x, z] = (byte)rng.Next(0, 4);
+                levels[x, z] = (byte)rng.Next(0, testMaxLevels + 1);
 
             var (vertices, indices) = CloudField.BuildMesh(levels);
             var count = indices.Length / 3;
@@ -292,7 +303,7 @@ public sealed class CloudTests(ITestOutputHelper output)
             // Nothing solid lives outside this box, so a sample beyond it can never be deep inside
             // the material and the scan can start where the ray enters instead of at the origin.
             var fieldLo = new Vector3(0f, Y0, 0f);
-            var fieldHi = new Vector3(5f * S, Y0 + WorldGenerationConfig.CloudMaxLevels * T, 5f * S);
+            var fieldHi = new Vector3(5f * S, Y0 + testMaxLevels * T, 5f * S);
 
             for (var ray = 0; ray < rays; ray++)
             {

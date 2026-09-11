@@ -6,7 +6,7 @@ namespace silkgltriangle;
 
 /// <summary>
 /// Draws the cloud layer: one static mesh built once from <see cref="CloudField"/>, a 2D grid of
-/// 8-block cells stacked 0..3 layers high and stitched into a single rounded surface with no
+/// CloudCellSize-block cells stacked 0..CloudMaxLevels layers high and stitched into a single rounded surface with no
 /// interior faces. Each frame the field is drawn 3x3 around the camera with a rigid per-copy
 /// offset, so the sky reads as infinite in nine draws; because the noise and the mesh both wrap at
 /// the field edge, a mass crossing the seam continues into the neighbouring copy unbroken. Each

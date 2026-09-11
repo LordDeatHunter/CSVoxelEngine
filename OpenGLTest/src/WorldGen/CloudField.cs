@@ -55,13 +55,22 @@ public static class CloudField
     /// <summary>Cloud density 0..1 at cell coordinates; periodic with period <paramref name="cells"/> in both axes.</summary>
     public static float Density(float cx, float cz, int cells, int seed)
     {
-        // Two scales only: the macro band decides where big masses and open sky go (~512 blocks),
-        // the detail band carves the outlines (~64 blocks down to 16). A finer octave than two
-        // cells would only sprinkle single-cell specks along every edge.
-        var macro = Fbm(cx, cz, cells, 64, 2, seed);
-        var detail = Fbm(cx, cz, cells, 8, 3, seed + 104729);
+        // Wavelengths are fixed in blocks and converted to cell spacings, so coarsening
+        // CloudCellSize keeps the same physical sky instead of silently doubling every cloud.
+        // These are the values the two bands were tuned to at the original 8-block cell: a macro
+        // mass roughly every 512 blocks and outlines down to ~64. Every octave period must still
+        // divide the field, which the power-of-two cell sizes guarantee.
+        var cellSize = WorldGenerationConfig.CloudFieldSize / cells;
+        var macroSpacing = Math.Max(1, (int)MathF.Round(MacroWavelengthBlocks / cellSize));
+        var detailSpacing = Math.Max(1, (int)MathF.Round(DetailWavelengthBlocks / cellSize));
+        var macro = Fbm(cx, cz, cells, macroSpacing, 2, seed);
+        var detail = Fbm(cx, cz, cells, detailSpacing, 3, seed + 104729);
         return 0.45f * macro + 0.55f * detail;
     }
+
+    // Physical wavelengths of the two noise bands, in blocks.
+    private const float MacroWavelengthBlocks = 512f;
+    private const float DetailWavelengthBlocks = 64f;
 
     /// <summary>
     /// Meshes a level grid of any size; cell size and heights come from WorldGenerationConfig.
@@ -608,6 +617,13 @@ public static class CloudField
         {
             var spacing = baseSpacingCells >> i;
             if (spacing < 1) break;
+            // Spacings are computed dynamically from the cell size now (see Density), so validate
+            // every octave, not just the base: a halved spacing that does not divide the field
+            // would silently break the tiling below via the truncated cells / spacing period.
+            if (cells % spacing != 0)
+                throw new ArgumentException(
+                    $"A field of {cells} cells is not a multiple of the {spacing}-cell octave spacing, so the noise would not tile.",
+                    nameof(baseSpacingCells));
 
             sum += amplitude * ValueNoise(cx / spacing, cz / spacing, cells / spacing, seed + 7919 * i);
             total += amplitude;

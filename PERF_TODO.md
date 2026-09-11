@@ -223,7 +223,60 @@ fragments; the mesher/renderer change is preserved in the stash named in item 5.
   time.~~ Done: `RenderWorld` takes the delta from the `time` it already received
   (`_window.Time`), clamped to 0.1 s so a hitch cannot snap every streaming chunk to full alpha,
   so the 0.5 s fade is 0.5 s of wall clock at any frame rate. `LodRegion.Lifetime` still steps
-  at 1/60.
+   at 1/60.
+
+- [ ] **12. Per-pass GPU timing.** The profiler's single whole-frame `TIME_ELAPSED` query
+  (`RenderManager.BeginGpuFrame`) cannot say which pass is expensive, and on a GPU-bound machine
+  every `*Pass` CPU row just absorbs the stall (phase 4 saw `lighting` balloon to 24 ms on the
+  T1000). GL forbids nesting `TIME_ELAPSED`, but consecutive non-overlapping ranges are legal, so
+  give each render pass its own query object, `BeginQuery`/`EndQuery` in sequence across
+  `World.Render`, and read each ring slot a frame or two late exactly like `BeginGpuFrame` does.
+  Surface the per-pass GPU ms in the `X` overlay next to the CPU column. Do this before trusting
+  items 13-15 - the whole point is to stop guessing which pass dominates on the T1000.
+
+- [ ] **13. Cut the reflection pass's redundant geometry.** (attempted 2026-09-11, **REVERTED**:
+  dropping the LOD cascade from the mirror and capping mirrored chunks at 192 blocks left a hard
+  terrain/sky seam in the reflection, and the water's animated wave-normal sample offset
+  (`nW.xz * 0.08` in `test-fragment.glsl`) turned that seam into a visible flicker. **A planar
+  mirror needs continuous far terrain - do not retry a hard cutoff.** Any future attempt must keep
+  the horizon filled, e.g. reuse the previous frame's reflection texture (one-frame lag), lower
+  `WaterReflectionScale` further, or draw only the coarsest LOD level as a horizon fill, rather
+  than removing far geometry outright.) The reflection pass re-renders every visible opaque chunk
+  plus the entire far-terrain LOD cascade plus the cloud layer into a half-res target;
+  `WaterReflectionScale` cuts fill but not vertices, so the pass is expensive on a GPU-bound
+  machine - but the answer is not to leave the mirror with less geometry than the real frame.
+
+- [ ] **14. Half-rate shadow map.** (attempted 2026-09-11, **REVERTED**.) After item 13's revert
+  the water still flickered, and this was the only remaining change able to move the image on a
+  two-frame cadence: the reflection is re-rendered every frame and samples the shadow map, so
+  refreshing the map only every 2nd frame made the mirrored shading step at fps/2. The map and
+  `_lightViewProj` did move together, so if this was the cause the artifact is the cadence itself,
+  not a matrix mismatch - do not retry without a way to keep the reflection in step. For reference,
+  the idea was: the shadow camera snaps to whole texels (`UpdateShadowCamera`) and the sun moves at
+  0.6 deg/s (`DayLengthSeconds = 600`), so a one-frame-old map is visually identical for the main
+  pass; `_shadowRenderDue` gated the redraw and `_shadowMapValid` forced one when the sun came back
+  up. Halving the shadow pass is still worthwhile if it can be made flicker-free; pair with
+  `ShadowMapSize 1024` (item 16) for another 4x fill cut.
+
+- [ ] **15. Cheaper clouds.** (implemented 2026-09-11, *not yet measured in frame time:* `CloudCellSize`
+  8 -> 16 and `CloudMaxLevels` 3 -> 2, with the noise wavelengths pinned in blocks so the sky
+  keeps its physical scale; `CloudTests` updated to assert the configured max. Headless geometry:
+  the full field mesh fell **683245 verts / 2985036 indices -> 254182 / 1090806 (-63 %)**, and the
+  renderer draws it up to nine times twice per frame, so this should be a real win. Confirm the
+  sky still reads and watch the reflection's clouds.) `CloudField.BuildMesh` fillets the configured
+  cell grid (128x128 at 16-block cells), and `CloudRenderer` then draws that mesh up to nine times (3x3 copies), twice each
+  (depth pre-pass + colour), in the main frame and again inside the reflection. Coarsening the
+  cell to 16 blocks quarters the triangle count (Cells 256 -> 128) and dropping to two layers
+  trims the tall cores. **The noise spacings must be expressed in blocks, not cells**, or
+  coarsening the grid silently doubles the size of every cloud (the original 64-cell / 8-cell
+  spacings were tuned at an 8-block cell).
+
+- [ ] **16. GPU quality knobs, exposed and documented.** (`WorldGenerationConfig` only, no
+  logic.) On a T1000 the honest big levers are render distance and pass quality, not CPU work:
+  `ChunkRadius` (16 chunks = 256 blocks), the `LodRegion.Levels` cascade (out to 2048),
+  `ShadowMapSize` / `ShadowRadiusBlocks`, `WaterReflectionScale`, `CloudCellSize` /
+  `CloudMaxLevels`. Decide whether to bake a "low" preset or leave them as hand-tuned constants;
+  if a preset is wanted, drive it from one quality level instead of scattering magic numbers.
 
 ## Measuring
 
@@ -285,3 +338,6 @@ What it says:
 | 9 | Release | spawn, still | 329 avg | 312 avg | FPS is the on-screen counter averaged over 3 settled still shots (15 s settle + 2 s apart) from a scripted run — no X overlay in a headless session, so no per-section ms. Intra-run swing is 280-345 either way, so the frame is unchanged within noise, as expected: vertex fetch was never the bottleneck (GPU ~1.7 ms vs CPU ~3.8 ms) and a rest frame builds no meshes. What moved is memory: vertex lists 48 -> 24 B/vertex (~96 KB per pooled 4096-list), asserted by `VertexPackingRoundTrips`. Leaf holes, water blending, lighting/fog, HUD icons identical before/after; clean log, no shader or chunk-gen errors |
 | 11 (phase 2) | Release | spawn (0,30,0), look -90,-10, VOXEL_TIME=60, still, scripted 20 s, debug overlay on | 54-57 / 40-42 | 51-60 / 38-39 | two interleaved pairs (HEAD worktree vs branch), same 1769 visible chunks. The session was GPU-bound with low clocks (gpu ~= frame): frame 17.5-18.4 / 24.0-24.8 ms head vs 16.7-19.5 / 25.4-25.7 ms branch, worldPass 4.1-5.4 both. No mesh builds happen at rest, so no change was expected; what moved is resident geometry (-14..-20 % vertices, see item 11). The CPU section that absorbs the GPU wait differs: `lighting` 2.8-3.9 ms on head, `shadows` 4.7-7.5 ms on the branch, with the sum and the frame equal - a redistribution of the stall, not a cost |
 | 11 (phase 4) | Release | spawn (0,30,0), look -90,-10, VOXEL_TIME=60, still, scripted 40 s, debug overlay on | 35 / 31 | 38 / 33 | two interleaved pairs (HEAD worktree vs branch), 2148 visible chunks in three of the four runs (head run 2 settled at 1769, a count the head tree also produced in the 20 s runs, so the cull is unchanged). Medians over the settled window (chunkApply 0.00, gc 0/0/0): frame 28.20 / 32.12 -> 26.56 / 30.73 ms, worldPass 4.74 / 3.67 -> 0.50 / 0.51, shadows 1.31 / 1.23 -> 0.26 / 0.27, waterPass 1.83 / 1.19 -> 0.09 / 0.09, reflect 3.63 / 3.59 -> 0.83 / 0.85; the four chunk passes together 11.5 -> 1.7 ms. The session was GPU-bound (CPU sum == frame; `gpu` == frame on the lines where the timer query resolved, `--` on the rest), so most of that is the stall relocating rather than a saving: the unconverted `lodPass` 0.28 -> 0.10 and `uiPass` 1.15 -> 0.25 shrank too, and `lighting`, the frame's first GL call, absorbed it (15.0 -> 24.2 ms). Pools grow during the first stream-in only (opaque 65536 -> 131072 -> 262144 units, translucent 8192 -> 16384); steady state 244801/262144 units opaque (478 of 512 MB) and 12732/16384 translucent, no growth after settle. 153 tests |
+| 13 | Release | spawn, still | T1000 baseline (item 11 phase 4: ~38/33) | REVERTED | LOD dropped from the mirror + mirrored chunks capped at 192 blocks. Reverted - the hard terrain/sky seam is a real defect - but the flicker persisted after this revert, so the seam was not the cause |
+| 14 | Release | spawn, still | T1000 baseline (item 11 phase 4: ~38/33) | REVERTED | Half-rate shadow map. After item 13's revert the flicker remained, and this was the only remaining change on a two-frame cadence (the reflection re-renders every frame and samples the shadow map). Reverted; revisit only with a flicker-free design, measured via item 12 |
+| 15 | Release | spawn, still | PENDING | PENDING | Cloud cell 16 blocks, max 2 layers, wavelengths pinned in blocks. Headless field mesh 683245/2985036 -> 254182/1090806 verts/indices (-63 %); frame time still to measure. Watch the sky scale and the reflection's clouds |
