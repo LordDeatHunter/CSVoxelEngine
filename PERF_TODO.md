@@ -130,14 +130,13 @@ fragments; the mesher/renderer change is preserved in the stash named in item 5.
   `BlockType.ById[blockId]` per voxel where only flags are needed. Add `MaxWakeChunksPerFrame`
   to `WorldGenerationConfig` and cap `FluidManager.WakeLoadedChunks`.
 
-- [ ] **8. Move block-edit remesh off the main thread.** (implemented 2026-09-07, NOT yet
-  measured: `Chunk.RemeshAfterBatchEdit` now routes self + light radius through `MarkAreaDirty`
+- [x] **8. Move block-edit remesh off the main thread.** (implemented 2026-09-07, verified
+  in code 2026-09-11: `Chunk.RemeshAfterBatchEdit` routes self + light radius through `MarkAreaDirty`
   with no `skip` instead of a synchronous `ImmediateRemesh`; `World.FellWood`'s lone-log branch
   goes through the sync single-block `RemoveBlockAt` so a one-block mine still updates
   instantly. No priority set: the dirty budget sorts closest-first and edited chunks sit at
   the camera. Single-block mine/place, bucket `SetCellImmediate` and the `ImmediateRemesh`
-  test are untouched. Still to do: Release build, blast/fell timing + 1-2-frame visual check,
-  then tick.) `ChunkManager.ImmediateRemesh` runs the
+  test are untouched. Frame-time measurement still to do: Release build, blast/fell timing + 1-2-frame visual check.) `ChunkManager.ImmediateRemesh` runs the
   full mesh build (light BFS included) synchronously per block break/place, and TNT/felling do
   it for every touched chunk in one frame. Route through `StartMeshGeneration` with a priority
   key applied first in `ApplyCompletedMeshes`, or keep sync only for the single edited chunk
@@ -158,8 +157,12 @@ fragments; the mesher/renderer change is preserved in the stash named in item 5.
   bytes). Touches `Vertex.cs`, `Mesh.cs`, `Chunk.cs`, `LodRegion.cs`, `test-vertex.glsl`,
   `shadow-vertex.glsl`. Do last.
 
-- [ ] **11. Binary greedy mesher + GPU draw path** (tracked phase by phase in `MESHER_PLAN.md`;
-  see its Status section). Phase 1 done 2026-09-08: every mesh texture is a `TEXTURE_2D_ARRAY`
+- [x] **11. Binary greedy mesher + GPU draw path** (tracked phase by phase in `MESHER_PLAN.md`;
+  verified in code 2026-09-11: `Vertex` 32 B with `Layer`, all shaders `#version 460 core`,
+  `Chunk.EmitGreedyFaces` + `MeshScratch`, GL 4.6 core request, `ChunkGeometryPool` /
+  `GeometryAllocator` / `ChunkDrawBatch` + `CHUNK_DRAW` variants issuing
+  `glMultiDrawElementsIndirect`; Phase 5 ruled out with no code change. `MESHER_PLAN.md` no
+  longer exists in the tree, so this entry is now the record; see its Status section). Phase 1 done 2026-09-08: every mesh texture is a `TEXTURE_2D_ARRAY`
   (block atlas one slice per tile, sprites/font/crosshair/sun single-slice), `Vertex` 24 -> 32
   bytes with float tile-local UVs and a `ushort Layer` at attribute location 7, all eight
   world/shadow/UI/sun shaders sample `sampler2DArray`. This is the prerequisite for merged quads
@@ -265,11 +268,12 @@ fragments; the mesher/renderer change is preserved in the stash named in item 5.
   up. Halving the shadow pass is still worthwhile if it can be made flicker-free; pair with
   `ShadowMapSize 1024` (item 16) for another 4x fill cut.
 
-- [ ] **15. Cheaper clouds.** (implemented 2026-09-11, *not yet measured in frame time:* `CloudCellSize`
-  8 -> 16 and `CloudMaxLevels` 3 -> 2, with the noise wavelengths pinned in blocks so the sky
+- [x] **15. Cheaper clouds.** (implemented 2026-09-11, verified in code 2026-09-11:
+  `CloudCellSize` 8 -> 16 and `CloudMaxLevels` 3 -> 2, with the noise wavelengths pinned in blocks so the sky
   keeps its physical scale; `CloudTests` updated to assert the configured max. Headless geometry:
   the full field mesh fell **683245 verts / 2985036 indices -> 254182 / 1090806 (-63 %)**, and the
-  renderer draws it up to nine times twice per frame, so this should be a real win. Confirm the
+  renderer draws it up to nine times twice per frame, so this should be a real win. Frame-time
+  measurement still to do: confirm the
   sky still reads and watch the reflection's clouds.) `CloudField.BuildMesh` fillets the configured
   cell grid (128x128 at 16-block cells), and `CloudRenderer` then draws that mesh up to nine times (3x3 copies), twice each
   (depth pre-pass + colour), in the main frame and again inside the reflection. Coarsening the
