@@ -834,11 +834,16 @@ public class Chunk : IDisposable
     /// </summary>
     internal ChunkMeshData? GenerateMeshData(ChunkManager chunkManager, bool greedy)
     {
-        // Resolve before renting or touching anything: an abandoned build should cost nothing
-        var neighbors = new Chunk?[27];
-        byte[]?[] neighborStates = new byte[27][];
+        // Resolve before renting or touching anything: an abandoned build should cost nothing.
+        // The neighbourhood lives in the thread's mesh scratch, not in two fresh arrays.
+        var scratch = MeshScratch.Current;
+        var neighbors = scratch.Neighbors;
+        var neighborStates = scratch.NeighborStates;
         if (!TryResolveNeighbors(chunkManager, neighbors, neighborStates))
+        {
+            scratch.ClearNeighbors();
             return null;
+        }
 
         // Nothing to draw: either all air, or a solid block of occluders whose six neighbours
         // seal every boundary face. The second case is most of the deep terrain in the load
@@ -859,6 +864,7 @@ public class Chunk : IDisposable
         {
             FillPaddedSnapshot(padded, paddedState, neighbors, neighborStates);
             FillLightSnapshot(lightBlocks, neighbors);
+            scratch.ClearNeighbors();
             Array.Clear(sunLight, 0, LightCount);
             Array.Clear(blockLight, 0, LightCount);
             ComputeLight(lightBlocks, sunLight, blockLight, queue);
@@ -1009,9 +1015,10 @@ public class Chunk : IDisposable
         ushort indexOffset = 0;
 
         // Fluids build a second, blended mesh drawn after the opaque world, so whatever sits
-        // behind the water shows through it. Most chunks hold none, hence the tiny capacity.
-        var tVertices = new List<Vertex>();
-        var tIndices = new List<ushort>();
+        // behind the water shows through it. Rented like the opaque lists; chunks without
+        // fluid or glass return them untouched (see MeshBufferPool.Return).
+        var tVertices = pool.RentTranslucentVertices();
+        var tIndices = pool.RentTranslucentIndices();
         ushort tIndexOffset = 0;
 
         // Glass shares the translucent lists, so "has a translucent mesh" is not "has water";

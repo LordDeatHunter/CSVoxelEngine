@@ -38,4 +38,17 @@ internal sealed class MeshScratch
     /// <summary>Bit planes of the current slice, 16 rows each: <c>PlaneRows[plane * 16 + row]</c>
     /// bit <c>col</c>.</summary>
     internal readonly ushort[] PlaneRows = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
+
+    /// <summary>One mesh build's 3x3x3 neighbourhood and its state arrays. The build never
+    /// awaits, so sharing the thread's scratch instead of allocating two 27-element arrays
+    /// per build is safe; slots are cleared once the light snapshot no longer needs them so
+    /// pooled threads hold no chunk references at rest.</summary>
+    internal readonly Chunk?[] Neighbors = new Chunk?[27];
+    internal readonly byte[]?[] NeighborStates = new byte[27][];
+
+    internal void ClearNeighbors()
+    {
+        Array.Clear(Neighbors, 0, Neighbors.Length);
+        Array.Clear(NeighborStates, 0, NeighborStates.Length);
+    }
 }

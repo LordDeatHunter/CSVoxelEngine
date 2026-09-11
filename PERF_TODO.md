@@ -285,6 +285,20 @@ fragments; the mesher/renderer change is preserved in the stash named in item 5.
   `CloudMaxLevels`. Decide whether to bake a "low" preset or leave them as hand-tuned constants;
   if a preset is wanted, drive it from one quality level instead of scattering magic numbers.
 
+- [x] **17. Pool the remaining per-build/per-frame lists.** (done 2026-09-11: the item-7
+  remainder — translucent mesh lists, neighbour arrays, the apply-queue drain, LOD scratch
+  grids. `MeshBufferPool` rents translucent lists at 1024/1536 (one full 16x16 water top with
+  no regrow; empty ones never touch the pool, cap 32); the 3x3x3 neighbourhood lives in
+  `MeshScratch` instead of two fresh 27-element arrays per build (cleared after the light
+  snapshot so pooled threads hold no chunk refs); `ApplyCompletedMeshes` drains into a reused
+  `_applyScratch` list with the distance cached on drain instead of a fresh list plus a
+  capturing sort lambda computing `DistanceSquared` per comparison; `LodRegion.BuildMeshData`
+  rents its five scratch grids from `ArrayPool`. The static offset tables
+  (`ChunkGenerationWorker`, `LodManager`) were checked and already build once. Build clean,
+  55/55 meshing+LOD+geometry+cloud tests pass incl. 2 new translucent-pool tests; full suite
+  332/334 with the 2 failures pre-existing on HEAD (`FallingBlockTests.SevenTower…`,
+  `WoodShapeTests.PlayerWalksPast…`, verified via stash). Frame time still to measure.
+
 ## Measuring
 
 Repeatable run (see AGENTS.md for the env vars): `VOXEL_SPAWN=0,30,0`, `VOXEL_TIME=60` (high sun

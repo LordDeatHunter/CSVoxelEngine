@@ -160,50 +160,59 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
 
     private void ApplyCompletedMeshes(Vector3 camChunk)
     {
-        // Drain into a temporary list to sort by distance
-        var pending = new List<(Vector3 pos, Chunk chunk, ChunkMeshData meshData, long seq)>();
+        // Drain into the reusable scratch to sort by distance. Distances are computed once
+        // on drain: the old per-compare DistanceSquared plus the sort lambda's closure
+        // allocated every frame the queue was non-empty.
         while (_completedMeshQueue.TryDequeue(out var item))
         {
-            pending.Add(item);
+            _applyScratch.Add((item.pos, item.chunk, item.meshData, item.seq,
+                Vector3.DistanceSquared(item.pos, camChunk)));
         }
 
-        if (pending.Count == 0) return;
+        if (_applyScratch.Count == 0) return;
 
-        // Sort closest first, then oldest first. List.Sort is unstable, so the sequence
-        // tiebreak is what guarantees a newer mesh for a chunk is applied after an older one
-        // rather than being overwritten by it.
-        pending.Sort((a, b) =>
+        try
         {
-            var byDistance = Vector3.DistanceSquared(a.pos, camChunk)
-                .CompareTo(Vector3.DistanceSquared(b.pos, camChunk));
-            return byDistance != 0 ? byDistance : a.seq.CompareTo(b.seq);
-        });
+            // Sort closest first, then oldest first. List.Sort is unstable, so the sequence
+            // tiebreak is what guarantees a newer mesh for a chunk is applied after an older one
+            // rather than being overwritten by it.
+            _applyScratch.Sort((a, b) =>
+            {
+                var byDistance = a.distSq.CompareTo(b.distSq);
+                return byDistance != 0 ? byDistance : a.seq.CompareTo(b.seq);
+            });
 
-        var appliedCount = 0;
+            var appliedCount = 0;
 
-        foreach (var (pos, chunk, meshData, seq) in pending)
+            foreach (var (pos, chunk, meshData, seq, _) in _applyScratch)
+            {
+                // Skip chunks that moved out of range, were unloaded, or were replaced by a
+                // freshly generated chunk at the same position while this build ran: uploading
+                // into the dead one would leave a mesh in Renderable that no unload ever removes
+                if (Vector3.DistanceSquared(pos, camChunk) > WorldGenerationConfig.ChunkRadiusSq ||
+                    !Chunks.TryGetValue(pos, out var live) || !ReferenceEquals(live, chunk))
+                {
+                    MeshBuffers.Return(meshData);
+                    continue;
+                }
+
+                if (appliedCount < WorldGenerationConfig.MaxMeshUploadsPerFrame)
+                {
+                    ApplyMesh(chunk, meshData);
+                    appliedCount++;
+                }
+                else
+                {
+                    // Re-queue for next frame, keeping the original sequence so a rebuild that
+                    // finishes in the meantime still sorts after it
+                    _completedMeshQueue.Enqueue((pos, chunk, meshData, seq));
+                }
+            }
+        }
+        finally
         {
-            // Skip chunks that moved out of range, were unloaded, or were replaced by a
-            // freshly generated chunk at the same position while this build ran: uploading
-            // into the dead one would leave a mesh in Renderable that no unload ever removes
-            if (Vector3.DistanceSquared(pos, camChunk) > WorldGenerationConfig.ChunkRadiusSq ||
-                !Chunks.TryGetValue(pos, out var live) || !ReferenceEquals(live, chunk))
-            {
-                MeshBuffers.Return(meshData);
-                continue;
-            }
-
-            if (appliedCount < WorldGenerationConfig.MaxMeshUploadsPerFrame)
-            {
-                ApplyMesh(chunk, meshData);
-                appliedCount++;
-            }
-            else
-            {
-                // Re-queue for next frame, keeping the original sequence so a rebuild that
-                // finishes in the meantime still sorts after it
-                _completedMeshQueue.Enqueue((pos, chunk, meshData, seq));
-            }
+            // Don't keep the chunk references alive between frames
+            _applyScratch.Clear();
         }
     }
 
@@ -211,6 +220,10 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     // the per-frame budget sorts on. Cleared after every pass so it holds no chunk references
     // at rest.
     private readonly List<(Vector3 pos, Chunk chunk, float distSq)> _dirtyCandidates = new(256);
+
+    // Reused across frames: finished mesh builds waiting for upload, with the distance the
+    // upload budget sorts on. Same clear-after-pass contract as _dirtyCandidates.
+    private readonly List<(Vector3 pos, Chunk chunk, ChunkMeshData meshData, long seq, float distSq)> _applyScratch = new(64);
 
     private void ProcessDirtyChunks(Vector3 camChunk)
     {

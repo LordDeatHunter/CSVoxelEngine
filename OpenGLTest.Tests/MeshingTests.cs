@@ -201,6 +201,42 @@ public sealed class MeshingTests
     }
 
     [Fact]
+    public void ReturnedTranslucentBuffersAreRentedAgain()
+    {
+        var (manager, center) = MeshTestWorld.WalledArea();
+        center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("water").Id, FluidState.Source);
+
+        var first = center.GenerateMeshData(manager);
+        Assert.NotNull(first);
+        Assert.NotEmpty(first.TranslucentVertices);
+        Assert.Equal(0, manager.MeshBuffers.PooledTranslucentVertexLists);
+
+        manager.MeshBuffers.Return(first);
+        Assert.Equal(1, manager.MeshBuffers.PooledTranslucentVertexLists);
+
+        var second = center.GenerateMeshData(manager);
+        Assert.NotNull(second);
+        Assert.Same(first.TranslucentVertices, second.TranslucentVertices);
+        Assert.Same(first.TranslucentIndices, second.TranslucentIndices);
+        Assert.NotEmpty(second.TranslucentVertices);
+        Assert.Equal(0, manager.MeshBuffers.PooledTranslucentVertexLists);
+    }
+
+    [Fact]
+    public void EmptyTranslucentBuffersAreNotRetained()
+    {
+        var (manager, center) = MeshTestWorld.WalledArea();
+        center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
+
+        var mesh = center.GenerateMeshData(manager);
+        Assert.NotNull(mesh);
+        Assert.Empty(mesh.TranslucentVertices);
+
+        manager.MeshBuffers.Return(mesh);
+        Assert.Equal(0, manager.MeshBuffers.PooledTranslucentVertexLists);
+    }
+
+    [Fact]
     public void VertexPackingRoundTrips()
     {
         Assert.Equal(32u, Vertex.Size);

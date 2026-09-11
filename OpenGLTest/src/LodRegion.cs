@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
@@ -190,17 +191,21 @@ public class LodRegion : IDisposable
         // Top solid cell per LOD column (with 1-cell border): the eroded terrain below, the
         // canopy above it, and their max — the shell actually drawn. Canopy is sampled over
         // each cell's own footprint only (no erosion margin), so a tree lifts just its own
-        // column into a leaf-textured bump instead of a plateau.
-        var groundTop = new int[heightGrid * heightGrid];
-        var topCell = new int[heightGrid * heightGrid];
+        // column into a leaf-textured bump instead of a plateau. Rented: a region build would
+        // otherwise allocate five grids per region on the worker.
+        var gridSize = heightGrid * heightGrid;
+        var groundTop = ArrayPool<int>.Shared.Rent(gridSize);
+        var topCell = ArrayPool<int>.Shared.Rent(gridSize);
         // Which cells the sea covers. Measured as the max over the cell's OWN footprint, with
         // no erosion margin: the eroded minimum would paint water across every beach whose
         // neighbourhood dips below sea level.
-        var isSea = new bool[heightGrid * heightGrid];
+        var isSea = ArrayPool<bool>.Shared.Rent(gridSize);
         // Beaches and gravel caps read from the same uneroded max for the same reason, the
         // gravel with one noise eval at the cell centre per cell.
-        var beachTop = new bool[heightGrid * heightGrid];
-        var gravelTop = new bool[heightGrid * heightGrid];
+        var beachTop = ArrayPool<bool>.Shared.Rent(gridSize);
+        var gravelTop = ArrayPool<bool>.Shared.Rent(gridSize);
+        try
+        {
         for (var i = -1; i <= cells; i++)
         {
             for (var j = -1; j <= cells; j++)
@@ -447,6 +452,15 @@ public class LodRegion : IDisposable
 
         return new LodMeshData(level, rx, rz, vertices, indices, waterVertices, waterIndices,
             yMin, yMax, columnCyMin, columnCyMax);
+        }
+        finally
+        {
+            ArrayPool<int>.Shared.Return(groundTop);
+            ArrayPool<int>.Shared.Return(topCell);
+            ArrayPool<bool>.Shared.Return(isSea);
+            ArrayPool<bool>.Shared.Return(beachTop);
+            ArrayPool<bool>.Shared.Return(gravelTop);
+        }
     }
 }
 
