@@ -1,8 +1,7 @@
 # Performance TODO
 
-Merged 2026-09-11 from `PERF_TODO.md` + `FLUID_PERF.md` (the latter deleted).
-Everything is **done** except open item 26; what matters about the rest is under
-"Ruled out" and "Done (one line each)". Full per-item history lives in git
+Everything here is **done** — this file stays as the measurement protocol, the
+last profile snapshot, and the do-not-retry list. Per-item history lives in git
 (`git log --oneline -- PERF_TODO.md FLUID_PERF.md`).
 
 Machine for every number below: Release, Quadro T1000 (GL 4.6, driver 597.06),
@@ -53,8 +52,8 @@ Settled: `chunkApply`/`chunkDirty`/`lod`/`fluidTick` all <= 0.2 ms.
 GC: streaming 17-25 gen0/s, 8-11 gen1/s, 0-2 gen2/s; settled 1-3 gen0/s, ~0 gen1.
 Pool growth during first stream-in only: opaque 65536 -> 131072 -> 262144 units
 (**512 MB**), translucent to 65536 (128 MB). No growth after settle.
-`fluidTick` avg is 0-0.6 ms settled — the old ~100 ms max was not reproduced in
-avg data (max is not logged; see item 18). No `TEMP-DIAG` strings in tree.
+`fluidTick` avg is 0-0.6 ms settled, with worst frames in the tens of ms at
+stream-in (visible in the `~max` half since the console line grew max columns).
 
 ### Hitch ranking (what actually drops frames)
 
@@ -93,83 +92,3 @@ avg data (max is not logged; see item 18). No `TEMP-DIAG` strings in tree.
   shader ALU (4-tap PCF, 8 point lights), uniform location lookups, indexed mesh
   upload — all audited, not the problem.
 
-## Done (one line each, detail in git history)
-
-1 FrameProfiler + `X` overlay + per-second `perf` line + startup build/GPU line.
-2 Release by default (`Directory.Build.props`), `-c Release` everywhere.
-3 Flat `Renderable`/`RegionList` lists, unload scan on camera-chunk change only,
-  partial dirty selection. 4 Per-pass `ApplyFrameUniforms`, 3 calls/draw.
-6 Buried flags on change only (`MeshVersion`/`SearchVersion`/camera chunk).
-7 Enclosed-chunk fast path, `MeshBufferPool` (cap 128), `MaxWakeChunksPerFrame = 16`.
-8 Batch block-edit remesh via dirty queue (single-block mine stays synchronous).
-9 `Vertex` 48 -> 24 -> 32 B (`Layer` for array textures), packed attrs.
-11 Greedy mesher (-14..-20 % verts on this terrain; AO fragmentation is the ceiling),
-  GL 4.6 core + `TEXTURE_2D_ARRAY` everywhere, pooled `ChunkGeometryPool` /
-  `GeometryAllocator`, one `MultiDrawElementsIndirect` per chunk pass
-  (four chunk passes 11.5 -> 1.7 ms). 10 `SustainedLowLatency` + concurrent GC +
-  TieredPGO, no Server GC; chunk fade on real delta time. 12 Per-pass GPU timers
-   in overlay + console (`cpu/gpu` pairs). 15 Cloud cell 16, max 2 layers
-   (field mesh -63 %). 16 Settings menu covers every live knob (reflection
-   quality, shadow toggle, water shading, cloud opacity, resolution, FPS cap);
-   structural knobs (render distance, shadow res, LOD, cloud density)
-   deliberately unexposed. 17 Translucent/neighbour/apply/LOD scratch pooled.
-18 Console `perf` line logs `avg~max` per section plus `/gpuAvg~gpuMax` on
-   render passes (overlay keeps CPU max + GPU avg: 32-glyph budget).
-19 Dirty-scan cap (1024) + sliced LOD cover pass (new/coarse/still-buried regions
-   always tested, unburied level-0 64/frame round-robin with convergence forcing).
-   chunkDirty peak-window 3.32→1.84; lod peak-window 9.32→8.48; chunkApply left
-   alone (flat per-upload cost — cutting it only slows convergence).
-20 Screenshot flip+encode+write on a worker (`VisualCapture.QueueSave`, drained in
-   `OnClosing`); render thread keeps only `ReadPixels`. FPS-1 shot frames 5→1 per
-   fly, shot-section 7-18 ms avg→sub-ms avg; 28-50 ms readback-stall max remains
-   (PBO is the follow-up if scripted runs ever need it).
-21 Pools start at steady-state size (opaque 65536→262144 = 512 MB at 93 % measured
-   occupancy, translucent 8192→32768 = 64 MB). Mid-stream growths 5→1 per fly;
-   chunkApply streaming peak-window 5.43→4.39, worst streaming frame 45.8→24.2.
-   The ~200 ms first-second monster exists in both runs (different attribution) —
-   driver warmup, not pool cost. No test (GL-owned, constants only); the fly is
-   the verification (zero `grew to` lines for opaque).
-22 Scripted `Drive` no longer wrapped in the input shell (`ProgramUpdate` covers
-   only the log/close shell; mine/place steps use the `Breaking`/`UsePlace` rows
-   like real play). `progUpdate` 5-25 ms→~0.01 in scripted runs, CPU sums to frame.
-23 Cloud pass skips at opacity 0 (`CloudRenderer.Render` early-out, covers the
-   mirror too); rays were already strength-gated. Steps 20→10 verified 0.71→0.45
-   GPU underwater with no visible change outside shaft-heavy views — default stays
-   20, numbers kept for a future ladder. lodPass measured only (no live knob).
-24 `CullWater` walks `TranslucentRenderable` (new list kept in `SyncRenderable`,
-   same swap-remove contract) instead of all meshed chunks. TEMP-DIAG split showed
-   sorts trivial (≤0.5 max) and walks spiking to 24 ms; walk avgs roughly halved
-   over water. No unit test (translucent slices need GL); fly-verified with water
-   intact and no errors.
-25 Trunk-shape cache (`TreeGenerator`, same bounded-dict pattern as worm paths):
-   TEMP-DIAG showed ~900k shape builds per fly (15/chunk, no sharing) dominating
-   deco allocation; hits run at 88%, builds down ~25x. Streaming gen0 17.1→13.2/s,
-   frame mean 17.7→15.1 ms in the streaming window. ColumnCache exonerated
-   (99.97% hits) and left alone. One test (cache-hit proof via struct equality).
-Fluid: early-outs kept MC semantics, per-frame spread (`MaxFluidCellsPerFrame`
-2048, backlog cap 8192), `Inventory.Update` out of the `FluidTick` span,
-`HashSet<long>` dirty tracking. Total fluid writes rose 4x (51k -> 202k) as the
-queue started draining instead of ballooning.
-
-## Open items
-
-- [ ] **26. LOD upload bursts.** Worst `lod` single frames (~160 ms at stream-in)
-  exceed what the cover pass can cost (a few ms upper bound over ~700 regions), so
-  the suspect is the upload loop's up-to-8 synchronous Mesh allocs/uploads per frame
-  in the same section. Verify with a TEMP-DIAG split of the three `lod` parts,
-  then pace uploads or shrink the per-upload cost.
-
-## Measurements
-
-| Item | Build | View / scenario | Result |
-|---|---|---|---|
-| 11 (phase 4) | Release, T1000 | spawn still, scripted 40 s | four chunk passes 11.5 -> 1.7 ms; frame 28.2/32.1 -> 26.6/30.7 ms (GPU-bound session, stall relocated into `lighting`) |
-| fluid 1+2+4 | Release, T1000 | bay, `VOXEL_TIME=70`, ~35 s | `fluidTick` avg 0.55-0.66 ms, typical max 11-16 ms, one ~41-48 ms loading outlier; queue 100-196k -> 8-12k; writes 51k -> 202k |
-| **fly 2026-09-11** | Release, T1000, this merge | `perf-fly.json` (settle + land/water/far legs) | settled 8.8-10.5 ms (95-114 fps); streaming 18-39 ms (25-54 fps); `reflect` GPU 0 -> 8 ms on water; `worldPass` GPU to 5.6 ms; `raysPass` 1.5-2.3 ms submerged; pools to 512/128 MB; GC 17-25 gen0/s streaming, 1-3 settled |
-| 19 | Release, T1000 | `perf-fly.json`, HEAD worktree vs branch back-to-back | chunkDirty peak-window 3.32→1.84, whole-mean 0.27→0.20; lod peak-window 9.32→8.48, whole-mean 1.32→1.52 (extra convergence passes); chunkApply 6.48→6.40, settled identical; 2 new tests (`LodManagerTests`, scan-cap), 353/355 suite (2 pre-existing fails) |
-| 20 | Release, T1000 | `perf-fly.json` before/after | shot-section 7-18 ms avg→0.3-0.9 avg (28-50 ms readback max); FPS-1 frames 5→1 per run; all 4 PNGs byte-comparable sizes; 2 new tests (flip round-trip, worker drain), 355/357 suite (2 pre-existing fails) |
-| 21 | Release, T1000 | `perf-fly.json` before/after | growths opaque 2→0, translucent 3→1; chunkApply streaming peak-window 5.43→4.39, worst streaming frame 45.8→24.2; settled identical; suite 358/359 (1 pre-existing fail, WoodShape flaked to pass) |
-| 22 | Release, T1000 | `basic.json` + temp mine/place scenario | `progUpdate` 5-25 ms→0.00-0.01 in scripted runs, CPU sums to frame; `breaking`/`usePlace` rows attribute mine/place steps; no new tests (span pattern already covered), suite green except pre-existing + new BlockMovement failure from the leaves commit |
-| 23 | Release, T1000 | `perf-fly.json` at 20 vs temp-10 ray steps + opacity-0 `basic.json` run | raysPass GPU 0.71→0.45 underwater (march halves, copy fixed); cloudPass GPU →0.00 flat at opacity 0; end-shots differ by run variance only; suite 362/364 (2 known fails, no new tests: GL-owned) |
-| 24 | Release, T1000 | TEMP-DIAG walk/sort split + `perf-fly.json` | sorts ≤0.5 max (exonerated); walks spiked to 24 ms → new `TranslucentRenderable` list, walk avgs roughly halved over water; water intact, no errors; suite 362/364 (2 known fails, no new tests: GL-owned) |
-| 25 | Release, T1000 | TEMP-DIAG alloc counters + `perf-fly.json` before/after | ~900k shape builds (15/chunk) → trunk-shape cache, 88% hits, builds ~25x down; streaming gen0 17.1→13.2/s; ColumnCache 99.97% hits (left alone); 1 new test; suite 363/365 (2 known fails) |

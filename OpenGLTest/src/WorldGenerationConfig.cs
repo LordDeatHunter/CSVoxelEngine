@@ -121,8 +121,10 @@ public static class WorldGenerationConfig
     // --- Far-terrain LOD ---
     // Level definitions (cell sizes, per-level radii) live in LodRegion.Levels.
 
-    // How many completed LOD region meshes to upload to GPU per frame
-    public const int MaxLodUploadsPerFrame = 8;
+    // How many completed LOD region meshes to upload to GPU per frame. Production
+    // (one BelowNormal builder thread) stays well under this; the cap only bounds
+    // multi-upload burst frames, so halving it from 8 costs no convergence (item 26).
+    public const int MaxLodUploadsPerFrame = 4;
 
     // How many unburied level-0 regions one buried-flag pass cover-tests. Level-0 tests
     // walk 16 columns of chunk lookups each, so the uncapped pass is ~10 ms mid-stream;
