@@ -42,10 +42,13 @@ The app opens a window and grabs the mouse. Controls: WASD to move, mouse to loo
 `X` also raises the **frame profiler overlay** under the FPS counter, and prints the same
 snapshot to the console once a second so a headless run's log carries it. Each row is a section
 of the frame — `camera`, the three `chunk*` rows from `ChunkManager.Update`, `lod`, `entities`,
-`fluidWake`, `fluidTick`, `raycast`, `breaking` on the update side, then `lighting`, `shadows`,
-`lodPass`, `worldPass`, `entityPass`, `waterPass`, `selectPass`, `uiPass` on the render side —
+`fluidWake`, `fluidTick`, `raycast`, `breaking`, plus the `progUpdate` input shell and the
+`player` spawn/animation shell on the update side (right-click use/place work and console
+logging are split out as `usePlace` and `debugLog`), then `lighting`, `shadows`,
+`lodPass`, `worldPass`, `entityPass`, `waterPass`, `selectPass`, `uiPass` on the render side,
+and the `rendShell`/`screenshot`/`publish` frame shell —
 with its average and worst millisecond cost over the last second; `other` is the wall time no
-section claimed (mostly the buffer swap). The header carries the frame time and FPS, the CPU
+section claimed (buffer swap, window pump, OS/GC jitter). The header carries the frame time and FPS, the CPU
 sum against the GPU's own `TIME_ELAPSED` measurement of the whole frame (`--` until the first
 query comes back), GC collections per second and the loaded/visible chunk counts. Timings are
 collected every frame whether or not the overlay is up, so the first second after pressing `X`

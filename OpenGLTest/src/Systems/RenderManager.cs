@@ -159,7 +159,9 @@ public class RenderManager : IDisposable
     // bubbles after the water pass), hence up to MaxGpuSegments ranges per (pass, slot).
     private const int GpuRingSize = 3;
     private const int MaxGpuSegments = 2;
-    private const int GpuSectionCount = (int)ProfileSection.UiPass + 1;
+    // Every section, not just the render passes: UiPass is no longer the last enum value, and an
+    // out-of-range index inside BeginGpuPass would fail silently, so size by the enum.
+    private static readonly int GpuSectionCount = Enum.GetValues<ProfileSection>().Length;
     private readonly uint[,,] _gpuPassQueries = new uint[GpuSectionCount, GpuRingSize, MaxGpuSegments];
     private readonly bool[,,] _gpuPassPending = new bool[GpuSectionCount, GpuRingSize, MaxGpuSegments];
     private readonly int[] _gpuPassSegUsed = new int[GpuSectionCount];

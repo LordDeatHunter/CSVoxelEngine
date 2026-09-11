@@ -21,6 +21,10 @@ public enum ProfileSection
     FluidTick,
     Raycast,
     Breaking,
+    ProgramUpdate,
+    UsePlace,
+    DebugLog,
+    Player,
 
     // Render side
     Lighting,
@@ -33,7 +37,12 @@ public enum ProfileSection
     CloudPass,
     RaysPass,
     SelectPass,
-    UiPass
+    UiPass,
+
+    // Frame shell: work around the measured passes that used to hide inside "other"
+    RenderShell,
+    Screenshot,
+    Publish
 }
 
 /// <summary>
@@ -56,13 +65,15 @@ public static class FrameProfiler
     [
         "camera", "chunkUnld", "chunkApply", "chunkDirty", "lod", "entities",
         "fluidWake", "fluidTick", "raycast", "breaking",
+        "progUpdate", "usePlace", "debugLog", "player",
         "lighting", "shadows", "reflect", "lodPass", "worldPass", "entityPass", "waterPass", "cloudPass",
-        "raysPass", "selectPass", "uiPass"
+        "raysPass", "selectPass", "uiPass",
+        "rendShell", "screenshot", "publish"
     ];
 
     private const string OtherLabel = "other";
 
-    private static readonly int SectionCount = Labels.Length;
+    internal static readonly int SectionCount = Labels.Length;
 
     // Per-frame scratch, cleared by EndFrame
     private static readonly long[] _startTicks = new long[Labels.Length];
@@ -190,7 +201,13 @@ public static class FrameProfiler
         _frames++;
 
         if (_accumWallTicks >= PublishIntervalTicks)
+        {
+            // Timed as its own section: the formatting runs inside EndFrame, so its cost lands
+            // in the next frame's wall and would hide inside that frame's "other" untimed.
+            Begin(ProfileSection.Publish);
             Publish();
+            End(ProfileSection.Publish);
+        }
     }
 
     private static void Publish()

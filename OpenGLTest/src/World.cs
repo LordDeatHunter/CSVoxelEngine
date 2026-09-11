@@ -203,11 +203,15 @@ public class World
 
     public void Update(double deltaTime, IKeyboard? keyboard)
     {
+        FrameProfiler.Begin(ProfileSection.Player);
         EnsureSpawnSettled();
+        FrameProfiler.End(ProfileSection.Player);
 
         FrameProfiler.Begin(ProfileSection.Camera);
         Camera.Update((float)deltaTime, keyboard, _chunkManager);
         FrameProfiler.End(ProfileSection.Camera);
+
+        FrameProfiler.Begin(ProfileSection.Player);
 
         // The walk cycle runs off real horizontal speed, so the limbs keep up with sprint
         // and swim instead of playing a fixed-rate loop. Flying poses no stride, so it
@@ -228,6 +232,9 @@ public class World
         var supported = Camera.IsGrounded || Camera.IsFlying || Camera.IsInWater;
         Player.Update((float)deltaTime, animSpeed, Camera.IsSprinting, supported,
             Camera.VerticalVelocity);
+
+        // The chunk update below times itself, so the player span closes here.
+        FrameProfiler.End(ProfileSection.Player);
 
         // Times itself, as ChunkUnload / ChunkApply / ChunkDirty
         _chunkManager.Update(Camera);

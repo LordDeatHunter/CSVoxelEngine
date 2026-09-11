@@ -34,6 +34,10 @@ public static class Program
     // TODO: move this to player class
     private static double placeTimer = MAX_PLACE_TIMER;
     private static readonly double MAX_PLACE_TIMER = 0.2;
+    // Hotbar hotkeys 1-0, hoisted so the per-frame poll allocates nothing.
+    private static readonly Key[] NumberKeys =
+        [Key.Number1, Key.Number2, Key.Number3, Key.Number4, Key.Number5,
+            Key.Number6, Key.Number7, Key.Number8, Key.Number9, Key.Number0];
 
     // Set to a number of seconds to jump the day/night cycle at startup
     private const string TimeOffsetVariable = "VOXEL_TIME";
@@ -211,12 +215,16 @@ public static class Program
 
         if (visualDirector != null)
         {
+            FrameProfiler.Begin(ProfileSection.ProgramUpdate);
             visualDirector.Drive(deltaTime);
             LogDebugLine(deltaTime);
             if (visualDirector.IsDone)
                 windowManager.Window.Close();
+            FrameProfiler.End(ProfileSection.ProgramUpdate);
             return;
         }
+
+        FrameProfiler.Begin(ProfileSection.ProgramUpdate);
 
         placeTimer = Math.Min(MAX_PLACE_TIMER, placeTimer + deltaTime);
         var xPressed = inputManager.Keyboard?.IsKeyPressed(Key.X) == true;
@@ -275,10 +283,8 @@ public static class Program
         if (!inventoryView.IsOpen && !pauseMenuView.IsOpen)
         {
             // 1-10 grabs the hotbar slot directly; scroll still walks it one step at a time
-            var numberKeys = new[] { Key.Number1, Key.Number2, Key.Number3, Key.Number4, Key.Number5,
-                Key.Number6, Key.Number7, Key.Number8, Key.Number9, Key.Number0 };
-            for (var i = 0; i < numberKeys.Length; i++)
-                if (inputManager.Keyboard?.IsKeyPressed(numberKeys[i]) == true)
+            for (var i = 0; i < NumberKeys.Length; i++)
+                if (inputManager.Keyboard?.IsKeyPressed(NumberKeys[i]) == true)
                     world.Inventory.Select(i);
 
             // One throw per press, so holding Q doesn't empty the slot; Ctrl+Q throws the stack
@@ -290,16 +296,24 @@ public static class Program
                 world.ThrowSelected(wholeStack);
             }
             qWasPressed = qPressed;
+        }
+        FrameProfiler.End(ProfileSection.ProgramUpdate);
 
-            if (inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true && placeTimer >= MAX_PLACE_TIMER)
-            {
-                placeTimer = 0;
-                world.TryUseSelected(World.InteractionReach);
-            }
+        // Right-click use/place does real work (raycast plus a synchronous remesh on bucket
+        // pours and single-block placements), so it gets its own span instead of hiding in
+        // the input shell.
+        if (!inventoryView.IsOpen && !pauseMenuView.IsOpen
+            && inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true && placeTimer >= MAX_PLACE_TIMER)
+        {
+            FrameProfiler.Begin(ProfileSection.UsePlace);
+            placeTimer = 0;
+            world.TryUseSelected(World.InteractionReach);
+            FrameProfiler.End(ProfileSection.UsePlace);
         }
 
         // The menu freezes the simulation: the world keeps rendering behind the overlay
         // but physics, chunks, fluids and mining all hold still until resume.
+        // The update below times itself; the shell spans above and below stay outside it.
         if (!pauseMenuView.IsOpen)
         {
             world.Update((float)deltaTime, inputManager.Keyboard);
@@ -310,7 +324,9 @@ public static class Program
             FrameProfiler.End(ProfileSection.Breaking);
         }
 
+        FrameProfiler.Begin(ProfileSection.DebugLog);
         LogDebugLine(deltaTime);
+        FrameProfiler.End(ProfileSection.DebugLog);
     }
 
     /// <summary>
@@ -514,7 +530,9 @@ public static class Program
     private static void OnRender(double deltaTime)
     {
         // One TIME_ELAPSED query wraps the whole frame, so it has to open before any draw
+        FrameProfiler.Begin(ProfileSection.RenderShell);
         renderManager.BeginGpuFrame();
+        FrameProfiler.End(ProfileSection.RenderShell);
 
         FrameProfiler.Begin(ProfileSection.Lighting);
         renderManager.BeginGpuPass(ProfileSection.Lighting);
@@ -526,6 +544,8 @@ public static class Program
         FrameProfiler.End(ProfileSection.Lighting);
 
         world.Render(renderManager);
+
+        FrameProfiler.Begin(ProfileSection.RenderShell);
         fpsTimer += deltaTime;
         fpsFrames++;
         if (fpsTimer >= 1.0)
@@ -534,6 +554,7 @@ public static class Program
             fpsTimer = 0.0;
             fpsFrames = 0;
         }
+        FrameProfiler.End(ProfileSection.RenderShell);
 
         FrameProfiler.Begin(ProfileSection.UiPass);
         renderManager.BeginGpuPass(ProfileSection.UiPass);
@@ -545,14 +566,20 @@ public static class Program
         renderManager.EndGpuPass(ProfileSection.UiPass);
         FrameProfiler.End(ProfileSection.UiPass);
 
+        // Timed even when no screenshot is due, so the pairing stays obvious; an empty span
+        // costs one Stopwatch read.
+        FrameProfiler.Begin(ProfileSection.Screenshot);
         if (visualDirector?.TakeScreenshot == true)
         {
             visualDirector.TakeScreenshot = false;
             var size = windowManager.Window.FramebufferSize;
             VisualCapture.SaveScreenshot(renderManager.gl, size.X, size.Y, visualDirector.ScreenshotPath);
         }
+        FrameProfiler.End(ProfileSection.Screenshot);
 
+        FrameProfiler.Begin(ProfileSection.RenderShell);
         renderManager.EndGpuFrame();
+        FrameProfiler.End(ProfileSection.RenderShell);
         FrameProfiler.EndFrame();
     }
 
