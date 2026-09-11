@@ -88,7 +88,7 @@ public sealed class CloudRenderer : IDisposable
         _shader.SetUniform("uFogColor", fogColor);
         _shader.SetUniform("uFogNear", fogNear);
         _shader.SetUniform("uFogFar", fogFar);
-        _shader.SetUniform("uOpacity", WorldGenerationConfig.CloudOpacity);
+        _shader.SetUniform("uOpacity", GameSettings.CloudOpacity);
 
         var frustum = new Frustum(viewProj);
         _gl.BindVertexArray(_vao);

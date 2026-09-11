@@ -100,7 +100,7 @@ public sealed class AmbienceManager : IDisposable
             return;
         _startupSeconds = Math.Min(_startupSeconds + Math.Max(0f, deltaTime),
             WorldGenerationConfig.AmbienceStartupFadeSeconds);
-        var master = WorldGenerationConfig.AmbienceVolume * StartupScale(_startupSeconds);
+        var master = GameSettings.AmbienceVolume * StartupScale(_startupSeconds);
         var (dayTarget, nightTarget) = ComputeTargetVolumes(dayness, master);
         _dayVolume = MathUtils.Damp(_dayVolume, dayTarget,
             WorldGenerationConfig.AmbienceFadeRate, deltaTime);

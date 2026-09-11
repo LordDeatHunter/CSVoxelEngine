@@ -605,7 +605,7 @@ public class UIRenderer : IDisposable
     /// BACK button. Click targets come from <see cref="PauseMenuLayout"/> so drawing and
     /// hit-testing can never drift apart.
     /// </summary>
-    public void DrawPauseMenu(PauseMenuView view)
+    public void DrawPauseMenu(PauseMenuView view, SettingsMenuView settings)
     {
         if (view.Page == PauseMenuPage.Closed) return;
 
@@ -622,9 +622,100 @@ public class UIRenderer : IDisposable
             return;
         }
 
-        DrawTextCentred("SETTINGS", screen.X * 0.5f,
-            PauseMenuLayout.TitleTop(screen, view.Page), _headScale, Rgba.White);
-        DrawMenuButton(PauseMenuLayout.BackButtonCentre(screen), "BACK");
+        DrawSettingsMenu(settings);
+    }
+
+    /// <summary>
+    /// The settings page: title, scrollable widget list, BACK button. Rows are clipped to
+    /// the list rectangle with the scissor test so scrolling never paints over the title,
+    /// the BACK button or the HUD behind the overlay.
+    /// </summary>
+    public void DrawSettingsMenu(SettingsMenuView view)
+    {
+        var screen = _screenSize;
+        var left = SettingsLayout.PanelLeft(screen);
+        DrawTextCentred("SETTINGS", screen.X * 0.5f, SettingsLayout.PanelTop, _headScale, Rgba.White);
+
+        var listTop = SettingsLayout.ListTop(screen);
+        var listBottom = SettingsLayout.ListBottom(screen);
+        _gl.Enable(EnableCap.ScissorTest);
+        _gl.Scissor((int)left, (int)(screen.Y - listBottom),
+            (uint)SettingsLayout.PanelWidth, (uint)(listBottom - listTop));
+
+        string? section = null;
+        for (var i = 0; i < SettingsRows.All.Length; i++)
+        {
+            var row = SettingsRows.All[i];
+            var top = SettingsLayout.RowTop(i, view.ScrollOffset, screen);
+            if (row.Section != section)
+            {
+                section = row.Section;
+                if (top + SettingsLayout.SectionHeight >= listTop && top <= listBottom)
+                    DrawText(section.ToUpperInvariant(), new Vector2(left + 8f, top + 5f),
+                        _countScale, AccentGold);
+            }
+            if (top + SettingsLayout.RowHeight < listTop || top > listBottom) continue;
+
+            var centre = SettingsLayout.RowCentre(i, view.ScrollOffset, screen);
+            DrawText(FitText(row.Label, _countScale, SettingsLayout.LabelWidth - 16f),
+                new Vector2(left + 8f, centre.Y - 8f), _countScale, Rgba.White);
+
+            switch (row)
+            {
+                case ToggleRow t:
+                    DrawToggle(SettingsLayout.ToggleCentre(i, view.ScrollOffset, screen), t.Get());
+                    DrawValueRight(centre.Y, SettingsRows.FormatValue(row), screen);
+                    break;
+                case SliderRow s:
+                    DrawSlider(i, view.ScrollOffset, screen, s,
+                        view.DragRow == i);
+                    DrawValueRight(centre.Y, SettingsRows.FormatValue(row), screen);
+                    break;
+                case OptionsRow o:
+                    DrawTextCentred($"< {SettingsRows.FormatValue(row)} >",
+                        SettingsLayout.TrackRect(i, view.ScrollOffset, screen).Centre.X,
+                        centre.Y - 8f, _countScale, Rgba.White);
+                    break;
+            }
+        }
+
+        _gl.Disable(EnableCap.ScissorTest);
+        DrawMenuButton(SettingsLayout.BackCentre(screen), "BACK");
+    }
+
+    /// <summary>Settings widget under a screen point (pixels, top-left origin), if any.</summary>
+    public SettingsHit SettingsHitAt(Vector2 point, SettingsMenuView view) =>
+        SettingsLayout.HitAt(point, view.ScrollOffset, _screenSize);
+
+    private void DrawValueRight(float centreY, string text, Vector2 screen)
+    {
+        var w = TextWidth(text, _countScale);
+        DrawText(text, new Vector2(SettingsLayout.ValueRight(screen) - w, centreY - 8f),
+            _countScale, TextDim);
+    }
+
+    private void DrawToggle(Vector2 centre, bool on)
+    {
+        var size = new Vector2(SettingsLayout.ToggleSize);
+        DrawRect(centre, size, SlotBackground);
+        DrawBorder(centre, size, SlotBorder, SlotBorderColor);
+        if (on)
+            DrawSquare(centre, SettingsLayout.ToggleSize - 8f, AccentGold);
+    }
+
+    private void DrawSlider(int row, float scrollOffset, Vector2 screen, SliderRow def, bool active)
+    {
+        var (centre, size) = SettingsLayout.TrackRect(row, scrollOffset, screen);
+        var fraction = MathUtils.Clamp01((def.Get() - def.Min) / (def.Max - def.Min));
+        DrawRect(centre, size, SlotBackground);
+        if (fraction > 0f)
+        {
+            var fillW = size.X * fraction;
+            DrawRect(new Vector2(centre.X - size.X * 0.5f + fillW * 0.5f, centre.Y),
+                new Vector2(fillW, size.Y), active ? Rgba.White : AccentGold);
+        }
+        DrawSquare(new Vector2(centre.X - size.X * 0.5f + size.X * fraction, centre.Y),
+            14f, active ? Rgba.White : SelectedBorderColor);
     }
 
     /// <summary>Menu button or BACK under a screen point (pixels, top-left origin), if any.</summary>

@@ -508,14 +508,14 @@ public class RenderManager : IDisposable
         }
 
         // The sun orbits once per DayLengthSeconds; the phase starts it mid-morning
-        var angle = (float)(time / WorldGenerationConfig.DayLengthSeconds) * MathF.Tau + 0.8f;
+        var angle = (float)(time / GameSettings.DayLengthSeconds) * MathF.Tau + 0.8f;
         _sunDir = Vector3.Normalize(new Vector3(MathF.Cos(angle), MathF.Sin(angle), 0.35f));
         var elevation = _sunDir.Y;
 
         // The shadow camera fades itself out as the sun sets: at a grazing elevation the
         // shadows stretch to the horizon and the ortho box cannot hold them, and at night
         // there is no direct sun left to remove anyway.
-        _shadowStrength = WorldGenerationConfig.ShadowsEnabled
+        _shadowStrength = GameSettings.Shadows
             ? Smooth01((elevation - 0.02f) / 0.12f)
             : 0f;
 
@@ -590,9 +590,9 @@ public class RenderManager : IDisposable
         _sunVisibility *= 1f - wet;
         UpdateShadowCamera(camera);
 
-        _fogNear = MathUtils.Lerp(WorldGenerationConfig.FogNearBlocks,
+        _fogNear = MathUtils.Lerp(GameSettings.FogNear,
             WorldGenerationConfig.UnderwaterFogNearBlocks, wet);
-        _fogFar = MathUtils.Lerp(WorldGenerationConfig.FogFarBlocks,
+        _fogFar = MathUtils.Lerp(GameSettings.FogFar,
             WorldGenerationConfig.UnderwaterFogFarBlocks, wet);
 
         if (wet <= 0f) return;
@@ -674,7 +674,7 @@ public class RenderManager : IDisposable
         gl.ActiveTexture(TextureUnit.Texture0);
         gl.BindTexture(TextureTarget.Texture2DArray, textureAtlas);
         shadowShader.SetUniform("uTime", _time);
-        shadowShader.SetUniform("uSwayStrength", WorldGenerationConfig.LeafSwayStrength);
+        shadowShader.SetUniform("uSwayStrength", GameSettings.LeafSway);
 
         var frustum = new Frustum(_lightViewProj);
 
@@ -682,7 +682,7 @@ public class RenderManager : IDisposable
         // the entity loops below keep the plain program, which is still bound above for them.
         chunkShadowShader.Use();
         chunkShadowShader.SetUniform(_locChunkShadowTime, _time);
-        chunkShadowShader.SetUniform(_locChunkShadowSway, WorldGenerationConfig.LeafSwayStrength);
+        chunkShadowShader.SetUniform(_locChunkShadowSway, GameSettings.LeafSway);
         chunkShadowShader.SetUniform(_locChunkShadowViewProj, _lightViewProj);
         _chunkDraws.BeginPass(chunks.Count);
 
@@ -776,8 +776,10 @@ public class RenderManager : IDisposable
     /// </summary>
     private void CreateReflectionTarget()
     {
-        var w = Math.Max(2, (int)(_viewportSize.X * WorldGenerationConfig.WaterReflectionScale));
-        var h = Math.Max(2, (int)(_viewportSize.Y * WorldGenerationConfig.WaterReflectionScale));
+        var scale = GameSettings.ReflectionScales[
+            Math.Clamp(GameSettings.ReflectionIndex, 0, GameSettings.ReflectionScales.Length - 1)];
+        var w = Math.Max(2, (int)(_viewportSize.X * scale));
+        var h = Math.Max(2, (int)(_viewportSize.Y * scale));
         if (_reflFbo != 0 && _reflSize.X == w && _reflSize.Y == h) return;
 
         DeleteReflectionTarget();
@@ -914,10 +916,13 @@ public class RenderManager : IDisposable
         IReadOnlyList<LodRegion> regions)
     {
         worldShader.Use();
+        // The target follows the reflection-quality setting: recreating is a no-op while the
+        // size is unchanged, so this can run every frame and pick up slider changes live.
+        CreateReflectionTarget();
         // CullWater ran a moment ago, so a frame with no water on screen skips the whole
         // mirrored render rather than filling a texture nothing will sample. Far-only water
         // draws through the cheap shader path, which never samples the mirror either.
-        if (!WorldGenerationConfig.WaterEnabled || camera == null || !_waterVisible
+        if (!WorldGenerationConfig.WaterEnabled || !GameSettings.WaterReflections || camera == null || !_waterVisible
             || !_nearWaterVisible || camera.RenderEye.Y < WaterPlaneY || _reflFbo == 0)
         {
             SetWorldUniform("uReflValid", 0f);
@@ -1116,10 +1121,10 @@ public class RenderManager : IDisposable
         // The quad has to hold the whole glow, so it is sized to the glow's angular radius and
         // the shader keeps the textured disc inside the inner uDiscFraction of it. The unit
         // square's corners sit at +-0.5, hence the factor 2 to make uHalfSize the true radius.
-        sunShader.SetUniform("uHalfSize", 2f * 100f * MathF.Tan(WorldGenerationConfig.SunAngularRadiusDeg
+        sunShader.SetUniform("uHalfSize", 2f * 100f * MathF.Tan(GameSettings.SunSize
             * WorldGenerationConfig.SunGlowScale * MathF.PI / 180f));
         sunShader.SetUniform("uDiscFraction", 1f / WorldGenerationConfig.SunGlowScale);
-        sunShader.SetUniform("uGlowIntensity", WorldGenerationConfig.SunGlowIntensity);
+        sunShader.SetUniform("uGlowIntensity", GameSettings.SunGlow);
         sunShader.SetUniform("uGlowExponent", WorldGenerationConfig.SunGlowExponent);
         sunShader.SetUniform("uSunColor", _sunColor);
         sunShader.SetUniform("uVisibility", _sunVisibility);
@@ -1190,7 +1195,11 @@ public class RenderManager : IDisposable
         program.SetUniform("uNumPointLights", _pointCount);
         program.SetUniformArray3(locPointPos, _pointPos);
         program.SetUniformArray3(locPointColor, _pointColors);
-        program.SetUniform("uSwayStrength", WorldGenerationConfig.LeafSwayStrength);
+        program.SetUniform("uSwayStrength", GameSettings.LeafSway);
+        // The water look rides here (not the one-time init) so the settings sliders act live.
+        program.SetUniform("uWaterNormalScale", GameSettings.WaterWaves);
+        program.SetUniform("uWaterRefractStrength", GameSettings.WaterRefraction);
+        program.SetUniform("uWaterCausticStrength", GameSettings.WaterCaustics);
         program.SetUniform("uLightViewProj", _lightViewProj);
         program.SetUniform("uShadowStrength", _shadowStrength);
         program.SetUniform("uShadowTexel", 1f / WorldGenerationConfig.ShadowMapSize);
@@ -1255,7 +1264,7 @@ public class RenderManager : IDisposable
     {
         if (camera == null || _rays == null || _eyeInLava) return;
         var wet = MathUtils.SmoothStep(_underwaterT);
-        var strength = wet * _shadowStrengthDry * _dayness * WorldGenerationConfig.WaterRayStrength;
+        var strength = wet * _shadowStrengthDry * _dayness * GameSettings.WaterSunShafts;
         if (strength <= 0.0005f) return;
         CopyScene(colour: false);
         gl.ActiveTexture(TextureUnit.Texture1);
@@ -2167,7 +2176,7 @@ public class RenderManager : IDisposable
 
     public void RenderUI(IWindow window, Inventory inventory, InventoryView view, float time,
         int fps, bool showProfiler, Camera? camera = null, bool showCoordinates = true,
-        PauseMenuView? menu = null)
+        PauseMenuView? menu = null, SettingsMenuView? settings = null)
     {
         ui.Begin(window.Size);
 
@@ -2193,8 +2202,8 @@ public class RenderManager : IDisposable
         ui.DrawHotbar(inventory, heading, time);
         if (view.IsOpen)
             ui.DrawInventoryPanel(inventory, view, time, heading);
-        if (menu != null)
-            ui.DrawPauseMenu(menu);
+        if (menu != null && settings != null)
+            ui.DrawPauseMenu(menu, settings);
         ui.End();
     }
 
@@ -2204,6 +2213,7 @@ public class RenderManager : IDisposable
     public int? UiPanelRowAt(Vector2 point, int rowCount) => ui.PanelRowAt(point, rowCount);
     public CraftHit UiCraftHitAt(Vector2 point, InventoryView view) => ui.CraftHitAt(point, view);
     public PauseMenuHit UiPauseMenuHitAt(Vector2 point, PauseMenuView menu) => ui.PauseMenuHitAt(point, menu);
+    public SettingsHit UiSettingsHitAt(Vector2 point, SettingsMenuView settings) => ui.SettingsHitAt(point, settings);
 
     // The compass item id, resolved once: null when no item named "compass" is registered,
     // in which case the HUD compass never shows rather than throwing every frame.

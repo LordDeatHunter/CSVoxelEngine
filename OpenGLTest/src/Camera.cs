@@ -92,7 +92,6 @@ public class Camera
     /// emissive fluid gets the lava treatment without naming it here.</summary>
     public bool IsEyeInLava { get; private set; }
 
-    private const float DefaultFov = 70f;
     private const float SprintFovBoost = 5f;
     private const float FovDampRate = 6f;
     private const float BobDampRate = 8f;
@@ -107,7 +106,8 @@ public class Camera
     // Collision keeps geometry at least PlayerRadius (0.3) away, so 0.2 never clips.
     private const float NearPlane = 0.2f;
     private const float FarPlane = 4096f; // past the outermost LOD ring (2048 blocks + terrain height)
-    private const float MouseSensitivity = 0.2f;
+    private static float DefaultFov => GameSettings.FieldOfView;
+    private static float MouseSensitivity => GameSettings.MouseSensitivity;
 
     private const float BaseSpeed = 8f;
     // Shift while walking is a regular sprint; the giga boost is flight-only.

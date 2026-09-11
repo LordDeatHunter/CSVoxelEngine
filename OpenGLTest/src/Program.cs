@@ -23,6 +23,10 @@ public static class Program
     private static bool escWasPressed;
     private static readonly InventoryView inventoryView = new();
     private static readonly PauseMenuView pauseMenuView = new();
+    private static readonly SettingsMenuView settingsMenuView = new();
+    private static bool appliedVSync;
+    private static int appliedResolution = -1;
+    private static int appliedMaxFps = -1;
     private static double debugLogTimer;
     private static double fpsTimer;
     private static int fpsFrames;
@@ -49,6 +53,8 @@ public static class Program
 
     public static void Main()
     {
+        GameSettings.ResetToDefaults();
+        GameSettings.Load();
         windowManager = new WindowManager();
 
         windowManager.Window.Load += OnLoad;
@@ -76,7 +82,15 @@ public static class Program
             if (pauseMenuView.IsOpen)
             {
                 if (button == MouseButton.Left && inputManager.Mouse != null)
-                    HandleMenuClick(inputManager.Mouse.Position);
+                {
+                    if (pauseMenuView.Page == PauseMenuPage.Settings)
+                        HandleSettingsClick(inputManager.Mouse.Position);
+                    else
+                        HandleMenuClick(inputManager.Mouse.Position);
+                }
+                if (settingsMenuView.DragRow.HasValue)
+                    GameSettings.Save();
+                settingsMenuView.DragRow = null;
                 return;
             }
             if (button == MouseButton.Right) placeTimer = MAX_PLACE_TIMER;
@@ -84,8 +98,30 @@ public static class Program
                 HandleInventoryClick(inputManager.Mouse.Position);
         };
 
+        inputManager.Mouse?.MouseDown += (_, button) =>
+        {
+            if (!pauseMenuView.IsOpen || pauseMenuView.Page != PauseMenuPage.Settings
+                || button != MouseButton.Left || inputManager.Mouse == null)
+                return;
+            var hit = renderManager.UiSettingsHitAt(inputManager.Mouse.Position, settingsMenuView);
+            if (hit.Kind == SettingsHitKind.Slider && SettingsRows.All[hit.Row] is SliderRow slider)
+            {
+                settingsMenuView.DragRow = hit.Row;
+                slider.Set(SettingsLayout.SliderValue(slider, hit.Fraction));
+            }
+        };
+
         inputManager.Mouse?.Scroll += (_, wheel) =>
         {
+            if (pauseMenuView.IsOpen && pauseMenuView.Page == PauseMenuPage.Settings)
+            {
+                var screen = new System.Numerics.Vector2(
+                    windowManager.Window.Size.X, windowManager.Window.Size.Y);
+                settingsMenuView.ScrollOffset = Math.Clamp(
+                    settingsMenuView.ScrollOffset - wheel.Y * 60f,
+                    0f, SettingsLayout.MaxScroll(screen));
+                return;
+            }
             if (!inventoryView.IsOpen && !pauseMenuView.IsOpen) world.Inventory.Scroll(wheel.Y);
         };
 
@@ -212,6 +248,28 @@ public static class Program
         }
         escWasPressed = escPressed;
 
+        SyncWindowSettings();
+
+        // A slider drag tracks the cursor every frame until release (which saves).
+        if (pauseMenuView.Page == PauseMenuPage.Settings && settingsMenuView.DragRow.HasValue
+            && SettingsRows.All[settingsMenuView.DragRow.Value] is SliderRow drag
+            && inputManager.Mouse != null)
+        {
+            if (inputManager.Mouse.IsButtonPressed(MouseButton.Left))
+            {
+                var screen = new System.Numerics.Vector2(
+                    windowManager.Window.Size.X, windowManager.Window.Size.Y);
+                drag.Set(SettingsLayout.SliderValue(drag,
+                    SettingsLayout.SliderFraction(inputManager.Mouse.Position.X,
+                        settingsMenuView.DragRow.Value, settingsMenuView.ScrollOffset, screen)));
+            }
+            else
+            {
+                settingsMenuView.DragRow = null;
+                GameSettings.Save();
+            }
+        }
+
         // The [E] panel owns the mouse: clicks equip, hotbar keys rest, and the world runs on
         var ePressed = inputManager.Keyboard?.IsKeyPressed(Key.E) == true;
         if (ePressed && !eWasPressed && !pauseMenuView.IsOpen)
@@ -281,10 +339,72 @@ public static class Program
         if (page != PauseMenuPage.Closed && inventoryView.IsOpen)
             SetInventoryOpen(false);
         pauseMenuView.Page = page;
+        if (page == PauseMenuPage.Settings)
+        {
+            settingsMenuView.ScrollOffset = 0f;
+            settingsMenuView.DragRow = null;
+        }
         var open = page != PauseMenuPage.Closed;
         world.Camera.SuppressLook = open;
         if (inputManager.Mouse != null)
             inputManager.Mouse.Cursor.CursorMode = open ? CursorMode.Normal : CursorMode.Disabled;
+    }
+
+    /// <summary>
+    /// Applies the window-level settings when they changed (VSync, size, frame cap); everything
+    /// else is read live by the engine. Cached so the window is only touched on change.
+    /// </summary>
+    private static void SyncWindowSettings()
+    {
+        if (appliedResolution < 0)
+        {
+            appliedVSync = windowManager.Window.VSync;
+            appliedResolution = GameSettings.ResolutionIndex;
+            appliedMaxFps = GameSettings.MaxFpsIndex;
+        }
+        if (GameSettings.VSync != appliedVSync)
+        {
+            appliedVSync = GameSettings.VSync;
+            windowManager.Window.VSync = appliedVSync;
+        }
+        if (GameSettings.ResolutionIndex != appliedResolution)
+        {
+            appliedResolution = GameSettings.ResolutionIndex;
+            var (w, h) = GameSettings.Resolutions[
+                Math.Clamp(appliedResolution, 0, GameSettings.Resolutions.Length - 1)];
+            windowManager.Window.Size = new Vector2D<int>(w, h);
+        }
+        if (GameSettings.MaxFpsIndex != appliedMaxFps)
+        {
+            appliedMaxFps = GameSettings.MaxFpsIndex;
+            var fps = GameSettings.MaxFpsOptions[
+                Math.Clamp(appliedMaxFps, 0, GameSettings.MaxFpsOptions.Length - 1)];
+            windowManager.Window.UpdatesPerSecond = fps;
+            windowManager.Window.FramesPerSecond = fps;
+        }
+    }
+
+    private static void HandleSettingsClick(System.Numerics.Vector2 position)
+    {
+        var hit = renderManager.UiSettingsHitAt(position, settingsMenuView);
+        switch (hit.Kind)
+        {
+            case SettingsHitKind.Back:
+                SetPauseMenu(PauseMenuPage.Main);
+                break;
+            case SettingsHitKind.Toggle when SettingsRows.All[hit.Row] is ToggleRow toggle:
+                toggle.Set(!toggle.Get());
+                GameSettings.Save();
+                break;
+            case SettingsHitKind.Slider when SettingsRows.All[hit.Row] is SliderRow slider:
+                slider.Set(SettingsLayout.SliderValue(slider, hit.Fraction));
+                GameSettings.Save();
+                break;
+            case SettingsHitKind.Options when SettingsRows.All[hit.Row] is OptionsRow options:
+                options.Set((options.Get() + 1) % options.Options.Length);
+                GameSettings.Save();
+                break;
+        }
     }
 
     private static void HandleMenuClick(System.Numerics.Vector2 position)
@@ -419,7 +539,7 @@ public static class Program
         if (!hideHud)
             world.RenderUI(renderManager, inventoryView,
                 (float)(windowManager.Window.Time + timeOffset), shownFps, debugEnabled,
-                showCoordinates: true, menu: pauseMenuView);
+                showCoordinates: true, menu: pauseMenuView, settings: settingsMenuView);
         FrameProfiler.End(ProfileSection.UiPass);
 
         if (visualDirector?.TakeScreenshot == true)
