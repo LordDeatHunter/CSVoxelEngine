@@ -235,6 +235,7 @@ trailing commas.
 | `name` | file name | display name for inventory rows and preview headings (`BlockType.DisplayName`) |
 | `hardness` | 5 | hits to break, one per `World.BlockHitSeconds`; `0` means it breaks on first contact (pebble) |
 | `solid` | true | collides with bodies (`BlockType.IsSolid`) |
+| `movementSpeed` | 0 | how fast the player moves through the block, 0..1: `0` (default) is a solid collider, a positive value makes it non-blocking for the player and scales their speed while the body overlaps it (`1` = full speed), so leaves at `0.75` are waded through at 75% speed; never set on fluids |
 | `occludes` | full cube && !cutout | hides a neighbouring full cube's face (`OccludesNeighbours`) |
 | `cullSelf` | false | also cull faces against a neighbour of the same block (glass) |
 | `castsAO` | `solid` | darkens neighbouring faces (`CastsAmbientOcclusion`) |

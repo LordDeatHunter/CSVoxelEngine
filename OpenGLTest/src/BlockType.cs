@@ -43,6 +43,9 @@ public sealed record BlockType
     internal static readonly bool[] OccludesById = new bool[256];
     internal static readonly bool[] CastsAoById = new bool[256];
 
+    // How fast the player moves through each block while inside it; 0 is a solid collider.
+    internal static readonly float[] MovementSpeedById = new float[256];
+
     // Whether tapered wood may grow a tube or arm into each block id (members of the
     // tree_branch_connectable tag: leaves, never terrain). Flat like the other mesher flags.
     internal static readonly bool[] BranchConnectableById = new bool[256];
@@ -85,6 +88,13 @@ public sealed record BlockType
 
     /// <summary>Whether the block collides with bodies.</summary>
     public bool Solid { get; init; } = true;
+
+    /// <summary>
+    /// How fast the player moves through this block, 0..1. <c>0</c> (the default) is a solid
+    /// collider; a positive value makes the block passable and scales the player's speed while
+    /// the body overlaps it (leaves <c>0.75</c>), with <c>1</c> passable at full speed.
+    /// </summary>
+    public float MovementSpeed { get; init; }
 
     /// <summary>Whether the block hides a neighbouring full cube's face. Defaults to "the baked
     /// model is a full cube and it is not cutout", so it is only known after baking.</summary>
@@ -198,6 +208,13 @@ public sealed record BlockType
     /// (it hits any non-air cell), so this only gates movement and drop physics.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsSolid(byte blockId) => SolidById[blockId];
+
+    /// <summary>
+    /// Speed the player moves through a block while inside it, 0 for a solid collider. A
+    /// positive value also means the block never blocks the body.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float MovementSpeedOf(byte blockId) => MovementSpeedById[blockId];
 
     /// <summary>Whether a block fully hides a neighbouring full cube's face.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

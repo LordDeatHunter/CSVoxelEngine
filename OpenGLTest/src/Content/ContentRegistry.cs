@@ -260,6 +260,7 @@ public static class ContentRegistry
         Array.Clear(BlockType.PassesLightById);
         Array.Clear(BlockType.BranchConnectableById);
         Array.Clear(BlockType.SolidById);
+        Array.Clear(BlockType.MovementSpeedById);
         Array.Clear(BlockType.OccludesById);
         Array.Clear(BlockType.CastsAoById);
         Array.Clear(BlockType.FluidById);
@@ -675,6 +676,15 @@ public static class ContentRegistry
                 throw new InvalidOperationException(
                     $"Block '{path}' sets both falls and needsSupport: a falling block topples instead of popping.");
             var solid = !fluid && (definition.Solid ?? true);
+
+            var movementSpeed = definition.MovementSpeed ?? 0f;
+            if (!float.IsFinite(movementSpeed) || movementSpeed < 0f || movementSpeed > 1f)
+                throw new InvalidOperationException(
+                    $"Block '{path}' has movementSpeed {definition.MovementSpeed}; expected 0..1.");
+            if (movementSpeed > 0f && fluid)
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets movementSpeed on a fluid: swimming handles how fast a body moves through it.");
+
             var type = new BlockType
             {
                 Name = name,
@@ -682,6 +692,7 @@ public static class ContentRegistry
                 Id = id,
                 MaxHealth = definition.Hardness ?? BlockType.DefaultMaxHealth,
                 Solid = solid,
+                MovementSpeed = movementSpeed,
                 CullSelf = definition.CullSelf ?? false,
                 CastsAmbientOcclusion = !fluid && (definition.CastsAO ?? solid),
                 Cutout = definition.Cutout ?? false,
@@ -718,6 +729,7 @@ public static class ContentRegistry
             BlockType.ById[id] = type;
             BlockType.Emission[id] = type.LightEmission;
             BlockType.SolidById[id] = type.Solid;
+            BlockType.MovementSpeedById[id] = type.MovementSpeed;
             BlockType.CastsAoById[id] = type.CastsAmbientOcclusion;
             BlockType.FluidById[id] = type.Fluid;
             BlockType.FluidTickDivisorById[id] = type.FluidTickDivisor;

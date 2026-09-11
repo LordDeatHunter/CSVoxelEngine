@@ -77,6 +77,14 @@ public class Camera
     public float VerticalVelocity => _verticalVelocity;
 
     /// <summary>
+    /// Movement-speed multiplier from the pass-through blocks the body overlaps this frame: the
+    /// smallest block <see cref="BlockType.MovementSpeed"/>, or 1 when none. Flight still reports
+    /// the sampled value even though it does not apply it, so the debug line can tell a flyer from
+    /// a walker standing in a block with no movement speed.
+    /// </summary>
+    public float MovementFactor { get; private set; } = 1f;
+
+    /// <summary>
     /// Whether the player is deep enough in a fluid to swim: some cell of the body's footprint
     /// in the feet..feet+<see cref="SwimDepth"/> band has a fluid surface above the feet. A thin
     /// flowing skirt underfoot is waded through, not swum in.
@@ -440,6 +448,9 @@ public class Camera
         var swimming = IsInWater && !IsFlying;
         IsSprinting = sprinting && moving && !IsFlying && !swimming && IsGrounded;
         if (swimming) moveSpeed *= SwimSpeedFactor;
+        // Pass-through blocks scale the walk instead of blocking it; flight is noclip.
+        MovementFactor = BlockMoveFactor(chunkManager);
+        if (!IsFlying) moveSpeed *= MovementFactor;
         var intendedSpeed = moving ? moveSpeed * moveInput.Length() : 0f;
         UpdateHeadMotion(deltaTime, intendedSpeed, moving, swimming);
 
@@ -718,7 +729,7 @@ public class Camera
             (int)MathF.Floor(point.X),
             (int)MathF.Floor(point.Y),
             (int)MathF.Floor(point.Z));
-        return BlockType.IsSolid(id);
+        return BlockType.IsSolid(id) && BlockType.MovementSpeedOf(id) <= 0f;
     }
 
     private void RefreshEyeWaterState(ChunkManager chunkManager)
@@ -837,6 +848,9 @@ public class Camera
         {
             var blockId = chunkManager.GetBlockGlobal(x, y, z);
             if (!BlockType.IsSolid(blockId)) continue;
+            // A pass-through block (leaves) never blocks the body; it only scales the walk
+            // while the body overlaps it (see BlockMoveFactor).
+            if (BlockType.MovementSpeedOf(blockId) > 0f) continue;
             // Tapered wood collides with its drawn node-and-arms shape instead of the
             // whole cell, so the body slips past thin limbs and under high arms; every
             // other solid block keeps the full-cube test it always had.
@@ -846,6 +860,34 @@ public class Camera
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Movement speed multiplier from the pass-through blocks the body currently occupies: the
+    /// smallest <see cref="BlockType.MovementSpeed"/> among them, or 1 when none. A block with a
+    /// positive movement speed does not collide (see <see cref="IsColliding"/>) but scales the
+    /// player's speed while they wade through it, so leaves slow a walk without stopping it.
+    /// </summary>
+    private float BlockMoveFactor(ChunkManager chunkManager)
+    {
+        var minX = (int)MathF.Floor(Position.X - PlayerRadius);
+        var maxX = (int)MathF.Floor(Position.X + PlayerRadius);
+        var minY = (int)MathF.Floor(Position.Y - EyeHeight);
+        var maxY = (int)MathF.Floor(Position.Y - EyeHeight + PlayerHeight);
+        var minZ = (int)MathF.Floor(Position.Z - PlayerRadius);
+        var maxZ = (int)MathF.Floor(Position.Z + PlayerRadius);
+
+        var factor = 1f;
+        for (var x = minX; x <= maxX; x++)
+        for (var y = minY; y <= maxY; y++)
+        for (var z = minZ; z <= maxZ; z++)
+        {
+            var speed = BlockType.MovementSpeedOf(chunkManager.GetBlockGlobal(x, y, z));
+            if (speed > 0f && speed < factor)
+                factor = speed;
+        }
+
+        return factor;
     }
 
     /// <summary>

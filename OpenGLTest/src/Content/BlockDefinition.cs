@@ -20,6 +20,15 @@ public sealed class BlockDefinition
     public int? Hardness { get; set; }
 
     public bool? Solid { get; set; }
+
+    /// <summary>
+    /// How fast the player moves through this block, 0..1. <c>0</c> (the default) is a normal
+    /// solid collider. A positive value makes the block passable and scales the player's speed
+    /// by that fraction while the body overlaps it (leaves <c>0.75</c>); <c>1</c> is passable at
+    /// full speed. Never combines with <see cref="Fluid"/>, whose movement is swimming.
+    /// </summary>
+    public float? MovementSpeed { get; set; }
+
     public bool? Occludes { get; set; }
     public bool? CullSelf { get; set; }
     public bool? CastsAO { get; set; }

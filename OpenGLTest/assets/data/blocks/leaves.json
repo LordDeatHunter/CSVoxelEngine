@@ -2,6 +2,7 @@
   "name": "Leaves",
   "model": { "parent": "block/cube_all", "textures": { "all": "leaves" } },
   "hardness": 2,
+  "movementSpeed": 0.5,
   "cutout": true,
   "sway": true,
   "occludes": false,

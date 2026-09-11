@@ -54,11 +54,16 @@ public sealed unsafe class ChunkGeometryPool : IDisposable
     /// <summary>Indices per unit — 2048 B of vertices and 192 B of indices per unit.</summary>
     public const int IndicesPerUnit = 96;
 
-    /// <summary>Opaque pool start: 65536 units, i.e. 128 MB of vertices and 12 MB of indices.</summary>
-    public const int OpaqueInitialUnits = 65536;
+    /// <summary>Opaque pool start: 262144 units, i.e. 512 MB of vertices and 48 MB of
+    /// indices. Steady state measured 244801/262144 units (93 %), so this starts where
+    /// the old 65536-unit pool settled after two mid-stream doubling copies (item 21).
+    /// Growth still doubles from here if a view ever needs more.</summary>
+    public const int OpaqueInitialUnits = 262144;
 
-    /// <summary>Translucent pool start: 8192 units, i.e. 16 MB of vertices and 1.5 MB of indices.</summary>
-    public const int TranslucentInitialUnits = 8192;
+    /// <summary>Translucent pool start: 32768 units, i.e. 64 MB of vertices and 6 MB of
+    /// indices. The water-heavy fly settles at 65536, so one doubling remains instead of
+    /// three; 128 MB permanently for water that may not be on screen is wasteful.</summary>
+    public const int TranslucentInitialUnits = 32768;
 
     private readonly GL _gl;
     private readonly GeometryAllocator _allocator;

@@ -201,7 +201,7 @@ public static class Program
         var camera = world.Camera;
         var position = camera.Position;
         Log.WriteLine(
-            $"FPS {fps} | Pos ({position.X:F2}, {position.Y:F2}, {position.Z:F2}) | Grounded {camera.IsGrounded} | Vy {camera.VerticalVelocity:F2} | Water {camera.IsInWater}/{camera.IsEyeInWater}");
+            $"FPS {fps} | Pos ({position.X:F2}, {position.Y:F2}, {position.Z:F2}) | Grounded {camera.IsGrounded} | Vy {camera.VerticalVelocity:F2} | Water {camera.IsInWater}/{camera.IsEyeInWater} | Move {camera.MovementFactor:F2} | Fly {camera.IsFlying}");
         debugLogTimer = 0;
     }
 

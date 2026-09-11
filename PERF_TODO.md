@@ -1,7 +1,7 @@
 # Performance TODO
 
 Merged 2026-09-11 from `PERF_TODO.md` + `FLUID_PERF.md` (the latter deleted).
-All old items 1-12, 15-20 and fluid items 1, 2, 4, 5, 6 are **done**; what matters
+All old items 1-12, 15-21 and fluid items 1, 2, 4, 5, 6 are **done**; what matters
 about them is under "Ruled out" and "Done (one line each)". Work the Open items
 top to bottom. Full per-item history lives in git (`git log --oneline -- PERF_TODO.md FLUID_PERF.md`).
 
@@ -122,6 +122,12 @@ avg data (max is not logged; see item 18). No `TEMP-DIAG` strings in tree.
    `OnClosing`); render thread keeps only `ReadPixels`. FPS-1 shot frames 5→1 per
    fly, shot-section 7-18 ms avg→sub-ms avg; 28-50 ms readback-stall max remains
    (PBO is the follow-up if scripted runs ever need it).
+21 Pools start at steady-state size (opaque 65536→262144 = 512 MB at 93 % measured
+   occupancy, translucent 8192→32768 = 64 MB). Mid-stream growths 5→1 per fly;
+   chunkApply streaming peak-window 5.43→4.39, worst streaming frame 45.8→24.2.
+   The ~200 ms first-second monster exists in both runs (different attribution) —
+   driver warmup, not pool cost. No test (GL-owned, constants only); the fly is
+   the verification (zero `grew to` lines for opaque).
 Fluid: early-outs kept MC semantics, per-frame spread (`MaxFluidCellsPerFrame`
 2048, backlog cap 8192), `Inventory.Update` out of the `FluidTick` span,
 `HashSet<long>` dirty tracking. Total fluid writes rose 4x (51k -> 202k) as the
@@ -129,11 +135,6 @@ queue started draining instead of ballooning.
 
 ## Open items
 
-- [ ] **21. Pre-size the geometry pools.** Opaque doubles twice mid-stream to
-  262144 units = 512 MB before settling at ~93 % occupancy. Raise
-  `OpaqueInitialUnits` (upfront 512 MB) or stream the growth (grow earlier in
-  smaller steps / async copy) so the first fly-over does not hitch on
-  `CopyBufferSubData`. Confirm steady-state occupancy first.
 - [ ] **22. Fix the scripted-run profiler nesting.** `progUpdate` wrapping
   `VisualDirector.Drive` (which calls `World.Update`) double-counts CPU vs frame
   and confuses every log reading. Time `Drive` overhead and `World.Update`
@@ -166,3 +167,4 @@ queue started draining instead of ballooning.
 | **fly 2026-09-11** | Release, T1000, this merge | `perf-fly.json` (settle + land/water/far legs) | settled 8.8-10.5 ms (95-114 fps); streaming 18-39 ms (25-54 fps); `reflect` GPU 0 -> 8 ms on water; `worldPass` GPU to 5.6 ms; `raysPass` 1.5-2.3 ms submerged; pools to 512/128 MB; GC 17-25 gen0/s streaming, 1-3 settled |
 | 19 | Release, T1000 | `perf-fly.json`, HEAD worktree vs branch back-to-back | chunkDirty peak-window 3.32→1.84, whole-mean 0.27→0.20; lod peak-window 9.32→8.48, whole-mean 1.32→1.52 (extra convergence passes); chunkApply 6.48→6.40, settled identical; 2 new tests (`LodManagerTests`, scan-cap), 353/355 suite (2 pre-existing fails) |
 | 20 | Release, T1000 | `perf-fly.json` before/after | shot-section 7-18 ms avg→0.3-0.9 avg (28-50 ms readback max); FPS-1 frames 5→1 per run; all 4 PNGs byte-comparable sizes; 2 new tests (flip round-trip, worker drain), 355/357 suite (2 pre-existing fails) |
+| 21 | Release, T1000 | `perf-fly.json` before/after | growths opaque 2→0, translucent 3→1; chunkApply streaming peak-window 5.43→4.39, worst streaming frame 45.8→24.2; settled identical; suite 358/359 (1 pre-existing fail, WoodShape flaked to pass) |
