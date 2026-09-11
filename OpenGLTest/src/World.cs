@@ -307,7 +307,7 @@ public class World
         renderManager.BeginGpuPass(ProfileSection.Reflection);
         // One frustum pass over the translucent draws feeds both this and the water pass, and
         // tells the reflection whether there is any water on screen to be worth rendering
-        renderManager.CullWater(Camera, _chunkManager.Renderable, _lodManager.RegionList);
+        renderManager.CullWater(Camera, _chunkManager.TranslucentRenderable, _lodManager.RegionList);
         renderManager.RenderReflection(Camera, _chunkManager.Renderable, _lodManager.RegionList);
         renderManager.EndGpuPass(ProfileSection.Reflection);
         FrameProfiler.End(ProfileSection.Reflection);

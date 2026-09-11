@@ -42,7 +42,7 @@ public enum ProfileSection
     // Frame shell: work around the measured passes that used to hide inside "other"
     RenderShell,
     Screenshot,
-    Publish
+    Publish,
 }
 
 /// <summary>
@@ -68,7 +68,7 @@ public static class FrameProfiler
         "progUpdate", "usePlace", "debugLog", "player",
         "lighting", "shadows", "reflect", "lodPass", "worldPass", "entityPass", "waterPass", "cloudPass",
         "raysPass", "selectPass", "uiPass",
-        "rendShell", "screenshot", "publish"
+        "rendShell", "screenshot", "publish",
     ];
 
     private const string OtherLabel = "other";

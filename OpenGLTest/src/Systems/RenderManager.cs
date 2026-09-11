@@ -1400,7 +1400,9 @@ public class RenderManager : IDisposable
     /// <summary>Frustum-culls the translucent draws once per frame and records whether any water
     /// (chunk or LOD sheet) is on screen. Reflection and the scene copies only run when it is,
     /// and RenderWorldTranslucent draws from the lists filled here. Glass-only chunks are listed
-    /// for drawing but never trigger the water-only passes.</summary>
+    /// for drawing but never trigger the water-only passes.
+    /// Takes the translucent subset (<see cref="ChunkManager.TranslucentRenderable"/>), not all
+    /// meshed chunks.</summary>
     public void CullWater(Camera camera, IReadOnlyList<Chunk> chunks, IReadOnlyList<LodRegion> regions)
     {
         _translucentChunks.Clear();

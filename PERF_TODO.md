@@ -1,7 +1,7 @@
 # Performance TODO
 
 Merged 2026-09-11 from `PERF_TODO.md` + `FLUID_PERF.md` (the latter deleted).
-All old items 1-12, 15-23 and fluid items 1, 2, 4, 5, 6 are **done**; what matters
+All old items 1-12, 15-24 and fluid items 1, 2, 4, 5, 6 are **done**; what matters
 about them is under "Ruled out" and "Done (one line each)". Work the Open items
 top to bottom. Full per-item history lives in git (`git log --oneline -- PERF_TODO.md FLUID_PERF.md`).
 
@@ -136,6 +136,11 @@ avg data (max is not logged; see item 18). No `TEMP-DIAG` strings in tree.
    mirror too); rays were already strength-gated. Steps 20→10 verified 0.71→0.45
    GPU underwater with no visible change outside shaft-heavy views — default stays
    20, numbers kept for a future ladder. lodPass measured only (no live knob).
+24 `CullWater` walks `TranslucentRenderable` (new list kept in `SyncRenderable`,
+   same swap-remove contract) instead of all meshed chunks. TEMP-DIAG split showed
+   sorts trivial (≤0.5 max) and walks spiking to 24 ms; walk avgs roughly halved
+   over water. No unit test (translucent slices need GL); fly-verified with water
+   intact and no errors.
 Fluid: early-outs kept MC semantics, per-frame spread (`MaxFluidCellsPerFrame`
 2048, backlog cap 8192), `Inventory.Update` out of the `FluidTick` span,
 `HashSet<long>` dirty tracking. Total fluid writes rose 4x (51k -> 202k) as the
@@ -143,9 +148,6 @@ queue started draining instead of ballooning.
 
 ## Open items
 
-- [ ] **24. Re-check translucent sort + `CullWater` per frame.** Post-MDI the CPU
-  side is small at rest, but streaming numbers were not isolated per pass. If a
-  CPU-bound profile ever shows cull+sort above ~1 ms, revisit — otherwise leave alone.
 - [ ] **25. Worldgen allocation during streaming.** Settled GC is clean (1-3 gen0/s)
   but streaming still does 17-25/s with 8-11 gen1/s. Suspects: `TerrainGenerator`
   column/compute temps, worm-path cache churn, LOD scratch (partially pooled in
@@ -170,3 +172,4 @@ queue started draining instead of ballooning.
 | 21 | Release, T1000 | `perf-fly.json` before/after | growths opaque 2→0, translucent 3→1; chunkApply streaming peak-window 5.43→4.39, worst streaming frame 45.8→24.2; settled identical; suite 358/359 (1 pre-existing fail, WoodShape flaked to pass) |
 | 22 | Release, T1000 | `basic.json` + temp mine/place scenario | `progUpdate` 5-25 ms→0.00-0.01 in scripted runs, CPU sums to frame; `breaking`/`usePlace` rows attribute mine/place steps; no new tests (span pattern already covered), suite green except pre-existing + new BlockMovement failure from the leaves commit |
 | 23 | Release, T1000 | `perf-fly.json` at 20 vs temp-10 ray steps + opacity-0 `basic.json` run | raysPass GPU 0.71→0.45 underwater (march halves, copy fixed); cloudPass GPU →0.00 flat at opacity 0; end-shots differ by run variance only; suite 362/364 (2 known fails, no new tests: GL-owned) |
+| 24 | Release, T1000 | TEMP-DIAG walk/sort split + `perf-fly.json` | sorts ≤0.5 max (exonerated); walks spiked to 24 ms → new `TranslucentRenderable` list, walk avgs roughly halved over water; water intact, no errors; suite 362/364 (2 known fails, no new tests: GL-owned) |

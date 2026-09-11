@@ -115,6 +115,13 @@ public class Chunk : IDisposable
     public int RenderIndex = -1;
 
     /// <summary>
+    /// This chunk's index in <see cref="ChunkManager.TranslucentRenderable"/>, or -1 while
+    /// it is not in that list (no translucent mesh, or unloaded). Same contract as
+    /// <see cref="RenderIndex"/>.
+    /// </summary>
+    public int TranslucentRenderIndex = -1;
+
+    /// <summary>
     /// The lowest terrain-surface height (<see cref="ColumnData.MinHeight"/>: ravines already
     /// cut in, caves not — carvers only remove blocks) anywhere in this chunk's 16x16 column.
     /// Nothing in a chunk whose top is below this can be lit by the sun, which is what the

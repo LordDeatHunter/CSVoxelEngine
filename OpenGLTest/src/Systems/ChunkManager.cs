@@ -33,6 +33,13 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     public readonly List<Chunk> Renderable = new(4096);
 
+    /// <summary>
+    /// The <see cref="Renderable"/> subset with a translucent mesh (water, glass), so
+    /// <c>CullWater</c> walks hundreds of candidates instead of every meshed chunk.
+    /// Same swap-remove contract (<see cref="Chunk.TranslucentRenderIndex"/>), same thread.
+    /// </summary>
+    public readonly List<Chunk> TranslucentRenderable = new(512);
+
     /// <summary>Recycled opaque mesh buffers; see <see cref="MeshBufferPool"/>.</summary>
     public MeshBufferPool MeshBuffers { get; } = new();
 
@@ -337,11 +344,49 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             return;
         }
 
-        if (chunk.RenderIndex >= 0) return;
+        if (chunk.RenderIndex < 0)
+        {
+            chunk.RenderIndex = Renderable.Count;
+            Renderable.Add(chunk);
+            MeshVersion++;
+        }
 
-        chunk.RenderIndex = Renderable.Count;
-        Renderable.Add(chunk);
-        MeshVersion++;
+        SyncTranslucent(chunk);
+    }
+
+    /// <summary>
+    /// Keeps <see cref="TranslucentRenderable"/> matching the chunk's translucent mesh.
+    /// No <see cref="MeshVersion"/> bump: its only consumer is the LOD cover gate, which
+    /// reads <c>IsMeshed</c>, never slices.
+    /// </summary>
+    private void SyncTranslucent(Chunk chunk)
+    {
+        if (chunk.HasTranslucentMesh)
+        {
+            if (chunk.TranslucentRenderIndex >= 0) return;
+            chunk.TranslucentRenderIndex = TranslucentRenderable.Count;
+            TranslucentRenderable.Add(chunk);
+            return;
+        }
+
+        RemoveTranslucent(chunk);
+    }
+
+    private void RemoveTranslucent(Chunk chunk)
+    {
+        var index = chunk.TranslucentRenderIndex;
+        if (index < 0) return;
+
+        var last = TranslucentRenderable.Count - 1;
+        if (index != last)
+        {
+            var moved = TranslucentRenderable[last];
+            TranslucentRenderable[index] = moved;
+            moved.TranslucentRenderIndex = index;
+        }
+
+        TranslucentRenderable.RemoveAt(last);
+        chunk.TranslucentRenderIndex = -1;
     }
 
     /// <summary>
@@ -351,6 +396,10 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     private void RemoveRenderable(Chunk chunk)
     {
+        // Unload calls this while slices are still set (Dispose nulls them after), so the
+        // translucent membership is dropped here too rather than trusting the caller.
+        RemoveTranslucent(chunk);
+
         var index = chunk.RenderIndex;
         if (index < 0) return;
 
