@@ -156,6 +156,28 @@ public static class WorldGenerationConfig
     // into a texture this fraction of the viewport (half res ≈ quarter cost).
     public const float WaterReflectionScale = 0.5f;
 
+    // Reflection temporal reuse: the planar mirror is re-rendered at most every other frame and
+    // the finished texture (with the view-projection that produced it) is reused in between.
+    // These are the per-frame deltas that force an immediate refresh instead, so a hard turn,
+    // a fast move or a changed projection never samples a stale mirror. They are per-FRAME and
+    // not per-second: at 30 fps the effective limits are half the 60 fps figures quoted below.
+    // The gate therefore refreshes more often on slow frames, which is the safe direction.
+    // View-direction change since the frame that produced the cached mirror, in degrees. The
+    // water shader clamps its projected mirror lookup to [0.001,0.999] (test-fragment.glsl:289)
+    // after a wave offset of nW.xz * 0.08 (:288), so rotating past this smears the clamped
+    // screen edge; 1 deg/frame is ~60 deg/s at 60 fps, i.e. any real pan refreshes every frame.
+    public const float ReflectionReuseMaxDegrees = 1.0f;
+    // Eye movement in blocks. BaseSpeed 8 with SprintMultiplier 1.5 (Camera.cs) is <= 0.2
+    // blocks/frame at 60 fps and still reuses; FlyBoostMultiplier 10 is ~1.3 and always refreshes.
+    public const float ReflectionReuseMaxMoveBlocks = 0.35f;
+    // Vertical FOV change, in degrees. Camera.GetProjectionMatrix builds from _currentFov, which
+    // eases toward the sprint boost via MathUtils.Damp, and that projection is baked into the
+    // cached reflection view-projection.
+    public const float ReflectionReuseMaxFovDegrees = 0.1f;
+    // Viewport aspect change, the other GetProjectionMatrix input. A tiny resize can round to the
+    // same reflection texture size, so the FBO-recreation trigger alone does not cover it.
+    public const float ReflectionReuseMaxAspect = 0.001f;
+
     // Wave normal steepness multiplier for the water shading (geometry moves less than it looks)
     public const float WaterNormalScale = 2.0f;
     // Screen-space refraction offset at the camera, in uv units; shrinks with distance in the shader

@@ -90,6 +90,14 @@ public class RenderManager : IDisposable
     private Vector2D<int> _reflSize;
     private Matrix4x4 _reflViewProj = Matrix4x4.Identity;
 
+    // Temporal reuse: the mirror is re-rendered at most every other frame. These describe the
+    // camera that actually produced the current _reflTex, so a frame that skips the render can
+    // re-push the matrix that matches the texture instead of this frame's.
+    private ReflectionReuse.ReflectionPose _reflPose;
+    // A real mirror render happened and _reflTex still matches _reflPose.
+    private bool _reflMirrorValid;
+    private bool _reflReusedLastFrame;
+
     // The scene copies the water pass refracts through: the default framebuffer's colour on
     // unit 3 and its depth on unit 4, snapshotted by CopyScene just before the water draws.
     private uint _sceneColorTex;
@@ -805,16 +813,24 @@ public class RenderManager : IDisposable
     /// Builds the half-res reflection texture: a colour target plus a depth texture, sized
     /// from the viewport. Called from <see cref="LoadResources"/> and
     /// <see cref="SetViewport"/>; recreating only when the size actually changed.
+    /// Returns true when the target was actually (re)created, which also invalidates the
+    /// temporal-reuse cache in <see cref="RenderReflection"/> - the fresh colour texture holds
+    /// nothing a water fragment may sample.
     /// </summary>
-    private void CreateReflectionTarget()
+    private bool CreateReflectionTarget()
     {
         var scale = GameSettings.ReflectionScales[
             Math.Clamp(GameSettings.ReflectionIndex, 0, GameSettings.ReflectionScales.Length - 1)];
         var w = Math.Max(2, (int)(_viewportSize.X * scale));
         var h = Math.Max(2, (int)(_viewportSize.Y * scale));
-        if (_reflFbo != 0 && _reflSize.X == w && _reflSize.Y == h) return;
+        if (_reflFbo != 0 && _reflSize.X == w && _reflSize.Y == h) return false;
 
         DeleteReflectionTarget();
+        // The new colour texture is TexImage2D'd with null data below, so its contents are
+        // undefined: the cached mirror is gone and the next eligible frame must render one.
+        // Clearing the flag here (rather than relying on the return value) is what covers the
+        // SetViewport call site, whose recreation happens outside RenderReflection entirely.
+        _reflMirrorValid = false;
         _reflSize = new Vector2D<int>(w, h);
 
         _reflTex = gl.GenTexture();
@@ -852,6 +868,7 @@ public class RenderManager : IDisposable
 
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         gl.BindTexture(TextureTarget.Texture2D, 0);
+        return true;
     }
 
     private void DeleteReflectionTarget()
@@ -943,6 +960,10 @@ public class RenderManager : IDisposable
     /// Skipped (leaving <c>uReflValid</c> at 0) when there is no water to reflect in or
     /// the eye itself is below the surface. Runs after <see cref="RenderShadows"/> so the
     /// shadow map it samples is already filled.
+    /// The mirror is re-rendered at most every other frame: a reused frame issues no GL work
+    /// at all and simply re-pushes the cached <c>_reflViewProj</c> that produced the texture,
+    /// with the refresh decision in <see cref="ReflectionReuse.ShouldRefresh"/> and its
+    /// thresholds in <see cref="WorldGenerationConfig"/>.
     /// </summary>
     public void RenderReflection(Camera camera, IReadOnlyList<Chunk> chunks,
         IReadOnlyList<LodRegion> regions)
@@ -950,14 +971,33 @@ public class RenderManager : IDisposable
         worldShader.Use();
         // The target follows the reflection-quality setting: recreating is a no-op while the
         // size is unchanged, so this can run every frame and pick up slider changes live.
-        CreateReflectionTarget();
+        var targetRecreated = CreateReflectionTarget();
         // CullWater ran a moment ago, so a frame with no water on screen skips the whole
         // mirrored render rather than filling a texture nothing will sample. Far-only water
         // draws through the cheap shader path, which never samples the mirror either.
         if (!WorldGenerationConfig.WaterEnabled || !GameSettings.WaterReflections || camera == null || !_waterVisible
             || !_nearWaterVisible || camera.RenderEye.Y < WaterPlaneY || _reflFbo == 0)
         {
+            // A frame that fell through here must never be reused from: however old the
+            // texture is, it no longer stands in any known relation to the current camera.
+            _reflMirrorValid = false;
+            _reflReusedLastFrame = false;
             SetWorldUniform("uReflValid", 0f);
+            return;
+        }
+
+        // Pitch stays within ±89° through the mirror, so UnitY never parallels the view direction.
+        var fwd = camera.ViewDirection;
+        var pose = new ReflectionReuse.ReflectionPose(camera.RenderEye, fwd, camera.CurrentFov,
+            _viewportSize.X / (float)Math.Max(1, _viewportSize.Y), WaterPlaneY);
+        if (!ReflectionReuse.ShouldRefresh(_reflPose, pose, _reflMirrorValid, targetRecreated,
+                _reflReusedLastFrame))
+        {
+            _reflReusedLastFrame = true;
+            // _reflTex still holds the mirror built from _reflPose, so the water has to project
+            // through the matrix that produced it - this frame's would make the mirror swim.
+            SetWorldUniform("uReflViewProj", _reflViewProj);
+            SetWorldUniform("uReflValid", 1f);
             return;
         }
 
@@ -968,9 +1008,7 @@ public class RenderManager : IDisposable
         gl.BindTexture(TextureTarget.Texture2D, 0);
         gl.ActiveTexture(TextureUnit.Texture0);
 
-        // Mirror position and facing across the horizontal plane; pitch stays within
-        // ±89° through the mirror, so UnitY never parallels the view direction.
-        var fwd = camera.ViewDirection;
+        // Mirror position and facing across the horizontal plane.
         var mirroredPos = new Vector3(camera.RenderEye.X, 2f * WaterPlaneY - camera.RenderEye.Y,
             camera.RenderEye.Z);
         var mirroredFwd = new Vector3(fwd.X, -fwd.Y, fwd.Z);
@@ -1081,6 +1119,10 @@ public class RenderManager : IDisposable
         // Restores the real eye's fog/camera uniforms; uReflViewProj survives in the program.
         ApplyFrameUniforms();
         SetWorldUniform("uReflValid", 1f);
+        // _reflTex now matches this camera, so the next frame may reuse it (once).
+        _reflPose = pose;
+        _reflMirrorValid = true;
+        _reflReusedLastFrame = false;
     }
 
     private static float Smooth01(float t)
