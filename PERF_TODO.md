@@ -169,15 +169,6 @@ nothing from **Ruled out** — overlaps are called out inline.
 
 ### CPU / streaming
 
-- [ ] **C1 · LOD growth-min is O(cells x window^2)** — `LodRegion.BuildMeshData`
-  (`LodRegion.cs:209-252`). Level 2 reads a 22x22 window per 8-block cell
-  (~0.5 M `FineHeight` calls per region) plus a separate `cellSize^2` canopy scan
-  per cell. A rectangular min is separable (horizontal then vertical), ~10x fewer
-  reads. Worker-side, like C9: `BuildMeshData` runs on the LodGen thread
-  (`LodManager.cs:111`) while `lod` measures only the main-thread
-  `LodManager.Update` (`World.cs:242-244`), so the win is LodGen throughput during
-  the #1 hitch, not a smaller `lod` row.
-  **Impact high · risk med · effort M** (needs an exact-equality test).
 - [ ] **C3 · Chunk-gen workers re-scan the whole offset list** —
   `ChunkGenerationWorker.FindClosestNeededChunk` (`ChunkGenerationWorker.cs:100-112`)
   restarts the ~15k-entry sorted-offset scan on every call, two `ContainsKey` per
@@ -197,21 +188,6 @@ nothing from **Ruled out** — overlaps are called out inline.
 - [ ] **C7 · Per-frame `Inventory.CanAccept` delegate** — `World.Update`
   (`World.cs:250`) passes a method group, allocating a delegate every frame. Cache
   it in a field. **Impact negligible · risk low · effort S.**
-- [ ] **C9 · One broken block makes every LOD height sample a dictionary probe** —
-  `BuildMeshData` sets `hasCaps = !ColumnHeightCaps.IsEmpty` once
-  (`LodRegion.cs:177`) and `FineHeight` (`:179-189`) then does a
-  `ConcurrentDictionary` lookup on an `(int, int)` tuple per sample while it holds
-  (`:185`). The cap table is never emptied (`LowerColumnBelow`, `:93-108`), so the
-  first block the player mines turns a plain array read into a hashed probe for the
-  ~0.5 M `FineHeight` calls a level-2 region build makes (the count C1 measures) —
-  for the rest of the session, in every region, including ones nowhere near the edit.
-  Bucket the caps by chunk column and resolve the bucket once per prefetched
-  heightmap (`:170-173`): a region with no capped column then pays nothing, and a
-  capped one pays one probe per chunk column instead of one per block. Distinct from
-  C1, which cuts how often `FineHeight` is called — this cuts what a call costs, and
-  the two compose. Distinct from D2, which is about `ColumnHeightCaps` growing
-  without bound, not the read-path probe. Worker-side like C1.
-  **Impact med · risk low · effort M.**
 - [ ] **C11 · The LOD worker snapshots the dirty set every loop** —
   `LodManager.WorkerLoop` calls `TakeDirtyRegion` on every iteration
   (`LodManager.cs:101-124`, the call at `:107`) and `TakeDirtyRegion` enumerates
@@ -249,8 +225,11 @@ nothing from **Ruled out** — overlaps are called out inline.
   (`Chunk.cs:597-599`) and `WormCarver.CellCache` (`WormCarver.cs:111-112`) drop
   everything at their cap, so a far teleport recomputes (part of the teleport
   hitch). LRU / generation-stamped eviction would keep reuse across a move.
-  `LodRegion.ColumnHeightCaps` (`LodRegion.cs:87`) also grows unbounded over a long
-  editing session. **Impact med · risk low-med · effort M.**
+  `LodRegion.ColumnCaps` (`LodRegion.cs:105`) also grows unbounded over a long
+  editing session: since C9 it holds one dense `Chunk.Size * Chunk.Size` cap bucket
+  per *edited chunk column*, never evicted — cheaper than the old per-fine-column
+  entries once a column is heavily mined, more expensive for a single isolated
+  block. **Impact med · risk low-med · effort M.**
 - [ ] **D3 · Dead code** — `ChunkDrawBatch.PassCount`
   (`ChunkDrawBatch.cs:117`) is never read. **Impact nil · effort S.**
 - [ ] **D5 · The geometry free list is a flat linearly-scanned list** —
@@ -304,26 +283,43 @@ nothing from **Ruled out** — overlaps are called out inline.
   above the noise floor. `Camera`'s per-frame collision scans are additional
   evidence for D1's impact rather than a separate entry.
 
-**Suggested first pass:** C10 and C8 landed this round, both worker-side. C10
-guards the two carve calls in `Chunk.GenerateBlockData` on
-`column.MaxHeight >= lowerBoundY`, so `NoiseCaves.Carve` and `WormCarver.Carve` are
-skipped on chunks whose columns all end below the chunk floor — the sea chunks the
-`needsWater` clause keeps alive over their own sea floor — removing a 1000-call cave
-noise lattice per such chunk with bit-identical block output. The identity claim is
-pinned by an all-solid carver probe, its positive control (so the probe cannot pass
-vacuously), a submerged-chunk equality test, and a cross-tree block hash over 360
-generated chunks spanning land, shoreline and fully submerged columns. C8 rents the
-four output lists of `LodRegion.BuildMeshData` from a LOD-sized `MeshBufferPool`
-owned by `LodManager` — 24576/36864 opaque, sized from the measured per-level peak of
-~21.5k vertices rather than the old 8192 literal, and 4096/6144 water — returned on
-the main thread after the upload or on the out-of-range drop, so a region build no
-longer LOH-allocates its output. Neither shows in a profiled section: size C10 with a
-chunks/s generation-rate capture over the water-bay leg and C8 with the streaming
-gen0/gen2 GC counts before pricing either. Next: C1 together with C9 (measure the
-pair against LodGen throughput), then R2 (against `raysPass`), the biggest single GPU
-prize left. R10 is the biggest structural render win; hold it until the cheaper LOD
-items above have been measured, since they may move `lod` enough to reprice it — and
-it overlaps R5.
+**Suggested first pass:** C1 and C9 landed this round, both worker-side and both
+inside `LodRegion.BuildMeshData`. C1 replaced the fused O(cells x window^2) growth-min
+with a materialised fine-height grid — the region grown by `cellSize + margin` per
+side, filled chunk column by chunk column straight out of the prefetched heightmaps —
+and a separable rectangular min over it: one horizontal pass per cell row, reused by
+every column in that row, then a `windowSpan` vertical scan per cell. The per-cell
+uneroded max (which feeds isSea/beachTop/gravelTop) and the canopy scan were left
+exactly where they were, each still scanning the cell's own footprint. The retired
+bullet's ~10x estimate was wrong and the honest accounting is worth carrying forward:
+at level 2 a region build now costs ~395k array touches (grid fill 81,796 writes,
+horizontal half 213,928 compares, vertical half 25,432, per-cell max 73,984) against
+559,504 `FineHeight` calls before — roughly **1.4x fewer samples, not ~10x**, because
+the horizontal half runs at fine-Z resolution for every cell row and so dominates. The
+structural win is per-sample *cost*: a stride-1 compare over an L2-resident `int[]`
+instead of two shifts, a subtract, a jagged double deref and — once anything has been
+mined — a tuple hash plus a `ConcurrentDictionary` probe. A monotonic-deque sliding
+minimum and a van-Herk-style cell-aligned block min were both considered and rejected:
+each lands near 180k compares for the horizontal half against its current 213,928, a
+thin slice of the ~395k total since the grid fill dominates, bought at a real cost in
+provable bit-identity. That is the obvious next lever if a LodGen capture ever prices
+it as worth the risk. C9 replaced the per-fine-column `ConcurrentDictionary` cap table
+with per-chunk-column cap buckets — a dense `Chunk.Size * Chunk.Size` array indexed
+exactly like a heightmap — resolved once per prefetched heightmap, so a region with no
+edited column pays nothing and an edited one pays one probe per chunk column instead of
+one per sample. The identity claim is pinned by a `separableMin` test seam with
+full-output equality against the original nested window at every level over six region
+coordinates, a capped-region equality test, an exact window-reach edge test at the
+region boundary, and a cross-tree hash of every LOD vertex/index/column buffer over
+75 regions x 3 levels in both a clean and a capped phase, with the capped phase
+asserted non-vacuous on each tree. Neither item shows in a profiled section — `lod`
+measures only the main-thread `LodManager.Update` (`World.cs:242-244`) while
+`BuildMeshData` runs on the LodGen thread — so size both with a LodGen throughput
+capture during the #1 streaming hitch before pricing further LOD work. Next: **R2**
+(half-res underwater rays, measured against `raysPass`), the biggest single GPU prize
+left. R10 is the biggest structural render win; hold it until the cheaper LOD items
+above have been measured, since they may move `lod` enough to reprice it — and it
+overlaps R5.
 
 ## Ruled out (do not retry without new evidence)
 

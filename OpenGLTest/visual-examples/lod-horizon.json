@@ -1,0 +1,55 @@
+// LOD horizon: four elevated, grounded vantage points, each looking out over the coarse LOD
+// band that lies beyond the 256-block full-detail ring (WorldGenerationConfig.ChunkRadius 16
+// chunks) and out to the level-2 ring at 2048 blocks. This is the scenario to reach for when a
+// change touches far-terrain geometry: the checked-in scenarios all frame near chunks.
+//
+// The vantage points are not guesses. A headless probe ranked prominent high terrain from the
+// heightmap, then generated the real blocks around each summit and scored candidate stand
+// points by the fraction of a 5x3 view fan (+/-22 deg yaw, -16..-4 deg pitch) that escapes 112
+// blocks unobstructed, then re-scored the shortlist with a fan widened to +/-40 deg yaw to
+// match the real horizontal FOV. The four below score 93/89/100/85% on that wider fan, which
+// matters because this world is densely forested and most summits put a trunk or a canopy
+// straight through the frame:
+//   A (-192, -148) h=83  prominence 19.7  look +Z  mean terrain -0.9 out to 700 blocks
+//   B ( 292,  292) h=54  prominence 18.3  look -Z  mean terrain  1.8
+//   C ( 258,  136) h=64  prominence 14.6  look +X  mean terrain -6.9
+//   D (-616,   92) h=43  prominence 14.4  look -Z  mean terrain -3.0
+// Every direction has a non-positive worst rise/run out to 700 blocks, so nothing near rises
+// into the view and hides the band. The scores are a guide, not a guarantee: the probe assumes
+// the eye ends up at terrain height, while the player actually lands wherever physics puts it,
+// so every vantage here was also confirmed by opening the rendered frame. Moving D to its
+// nominally better neighbour (-610, 96) put the landing inside a canopy and blacked the shot
+// out - hence the verified point below rather than the top-scoring one.
+//
+// Four teleports rather than teleport + 90 deg look: the director has no flight op and
+// TestTeleport zeroes vertical velocity, so the eye ends up at terrain level wherever the
+// player lands, and a blind 90 deg turn from a scored vantage lands on an unscored one (in
+// practice, a tree). Each teleport drops 30 blocks above its stand point; the waits let the
+// player land and settle AND let the LodGen worker build the rings before the shot.
+// Pitch -10 centres the band: from summit A the terrain 256 blocks out sits ~18 deg below the
+// eye and 2048 blocks out ~2 deg below, so that span brackets the middle of the frame.
+//
+// Timing is part of the framing. RenderManager.cs:551 drives the sun from wall-clock elapsed
+// time plus VOXEL_TIME over a 600 s cycle (angle = t/600*tau + 0.8), so sunset falls at clock
+// t = 224 s and a longer script simply walks off the end of the day - an earlier draft with
+// 55/45/45/45 s waits shot its fourth frame in the dark. The waits below put all four shots at
+// clock t = 52/92/132/172 s with VOXEL_TIME=10, i.e. sun elevation 76..31 degrees, well clear
+// of both the dawn and the dusk ramp.
+//
+// Run from OpenGLTest/: VOXEL_TIME=10 VOXEL_SCRIPT=visual-examples/lod-horizon.json
+{
+  "steps": [
+    { "op": "teleport", "pos": [-191.5, 113.5, -147.5], "yaw": 90, "pitch": -10 },
+    { "op": "wait", "seconds": 40 },
+    { "op": "screenshot", "name": "lod_a", "hideHud": true },
+    { "op": "teleport", "pos": [292.5, 84.5, 292.5], "yaw": -90, "pitch": -10 },
+    { "op": "wait", "seconds": 35 },
+    { "op": "screenshot", "name": "lod_b", "hideHud": true },
+    { "op": "teleport", "pos": [258.5, 94.5, 136.5], "yaw": 0, "pitch": -10 },
+    { "op": "wait", "seconds": 35 },
+    { "op": "screenshot", "name": "lod_c", "hideHud": true },
+    { "op": "teleport", "pos": [-615.5, 73.5, 92.5], "yaw": -90, "pitch": -10 },
+    { "op": "wait", "seconds": 35 },
+    { "op": "screenshot", "name": "lod_d", "hideHud": true }
+  ]
+}

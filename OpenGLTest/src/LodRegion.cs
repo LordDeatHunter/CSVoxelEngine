@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Threading;
 using Silk.NET.OpenGL;
 
 namespace silkgltriangle;
@@ -96,8 +97,23 @@ public class LodRegion : IDisposable
 
     // Destroying blocks exposes the LOD buried beneath the surface. These per-column caps
     // force the LOD height below every removed block so the LOD always stays hidden.
-    // Keyed by fine (x, z); value is the max fine height LOD may treat as solid.
-    private static readonly ConcurrentDictionary<(int X, int Z), int> ColumnHeightCaps = new();
+    // Bucketed by chunk column (item C9): the value is a Chunk.Size * Chunk.Size array of caps
+    // indexed exactly like a heightmap (((x & SizeMask) << SizeShift) | (z & SizeMask)), NoCap
+    // where the column is uncapped. A region build then resolves one bucket per prefetched
+    // heightmap instead of hashing an (x, z) tuple per height sample, so an unedited region pays
+    // nothing and an edited one pays one probe per chunk column, not one per sample.
+    private static readonly ConcurrentDictionary<(int CX, int CZ), int[]> ColumnCaps = new();
+
+    // "Never capped". A cap is always a removed block's Y minus one, so int.MaxValue can never
+    // compare below a real terrain height and the uncapped case needs no separate test.
+    private const int NoCap = int.MaxValue;
+
+    private static int[] NewCapBucket()
+    {
+        var bucket = new int[Chunk.Size * Chunk.Size];
+        Array.Fill(bucket, NoCap);
+        return bucket;
+    }
 
     /// <summary>
     /// Caps a column's LOD height below a removed block. Returns false when the LOD
@@ -105,18 +121,28 @@ public class LodRegion : IDisposable
     /// </summary>
     public static bool LowerColumnBelow(int x, int y, int z)
     {
-        var noiseHeight = Chunk.GetColumnHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
-            [((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
+        var cx = x >> Chunk.SizeShift;
+        var cz = z >> Chunk.SizeShift;
+        var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
+        var current = Chunk.GetColumnHeights(cx, cz)[local];
 
-        var current = ColumnHeightCaps.TryGetValue((x, z), out var cap)
-            ? Math.Min(cap, noiseHeight)
-            : noiseHeight;
+        ColumnCaps.TryGetValue((cx, cz), out var bucket);
+        if (bucket != null)
+        {
+            var cap = Volatile.Read(ref bucket[local]);
+            if (cap < current) current = cap;   // NoCap never wins, so this is the old Math.Min
+        }
 
         // Removed block was above the LOD-relevant terrain (e.g. a player-placed block)
         if (y > current)
             return false;
 
-        ColumnHeightCaps[(x, z)] = y - 1;
+        // Caps are written on the main thread and read on LodGen. The bucket reference publishes
+        // through the ConcurrentDictionary; Volatile.Write orders the element write behind it, which
+        // is strictly stronger than the plain dictionary write this replaces, so a future
+        // multi-threaded LodGen (item C5) stays safe.
+        bucket ??= ColumnCaps.GetOrAdd((cx, cz), static _ => NewCapBucket());
+        Volatile.Write(ref bucket[local], y - 1);
         return true;
     }
 
@@ -173,8 +199,14 @@ public class LodRegion : IDisposable
     /// range. Production callers must always pass the pool; the parameter is optional only so
     /// headless tests can build a region standalone, in which case the lists are plain
     /// allocations and nothing has to be returned.
+    ///
+    /// <paramref name="separableMin"/> is the test seam for item C1: false runs the original
+    /// fused nested-window scan instead of the separable rectangular min, and
+    /// <c>LodHeightSamplingTests</c> asserts the two produce bit-identical output. Production
+    /// always leaves it true.
     /// </summary>
-    public static LodMeshData BuildMeshData(int level, int rx, int rz, MeshBufferPool? buffers = null)
+    public static LodMeshData BuildMeshData(int level, int rx, int rz, MeshBufferPool? buffers = null,
+        bool separableMin = true)
     {
         var spec = Levels[level];
         var cellSize = spec.CellSize;
@@ -190,23 +222,43 @@ public class LodRegion : IDisposable
         var chunkSpan = regionChunkSpan + 2;
         var baseChunkX = rx * regionChunkSpan - 1;
         var baseChunkZ = rz * regionChunkSpan - 1;
+        var hasCaps = !ColumnCaps.IsEmpty;
         var heightmaps = new int[chunkSpan * chunkSpan][];
+        // One cap-bucket resolution per prefetched heightmap (item C9). Null for every chunk column
+        // the player has never edited — which is all of them until the first mined block — and the
+        // whole array is skipped while the table is empty. Same shape and lifetime as heightmaps.
+        var capmaps = hasCaps ? new int[chunkSpan * chunkSpan][] : null;
         for (var cx = 0; cx < chunkSpan; cx++)
         for (var cz = 0; cz < chunkSpan; cz++)
+        {
             heightmaps[cx * chunkSpan + cz] = Chunk.GetColumnHeights(baseChunkX + cx, baseChunkZ + cz);
+            if (capmaps != null && ColumnCaps.TryGetValue((baseChunkX + cx, baseChunkZ + cz), out var bucket))
+                capmaps[cx * chunkSpan + cz] = bucket;
+        }
 
         var baseFineX = rx * spec.RegionBlocks;
         var baseFineZ = rz * spec.RegionBlocks;
-        var hasCaps = !ColumnHeightCaps.IsEmpty;
+
+        // Fine-height grid covering the union of every cell's sample window: the region grown by
+        // cellSize + margin on each side - the same reach LodManager.MarkEditedColumn uses. Filling
+        // it chunk column by chunk column out of the prefetched heightmaps turns each sample into a
+        // contiguous copy (the per-sample chunk-index math FineHeight does disappears) and applies
+        // the C9 cap bucket once per chunk column as it copies.
+        var fineMargin = cellSize + margin;                  // 3 / 7 / 15, always < Chunk.Size
+        var fineSpan = spec.RegionBlocks + 2 * fineMargin;   // 70 / 142 / 286
+        var fineOriginX = baseFineX - fineMargin;
+        var fineOriginZ = baseFineZ - fineMargin;
+        var windowSpan = cellSize + 2 * margin;              // 4 / 10 / 22
 
         int FineHeight(int fineX, int fineZ)
         {
             var cx = (fineX >> Chunk.SizeShift) - baseChunkX;
             var cz = (fineZ >> Chunk.SizeShift) - baseChunkZ;
-            var height = heightmaps[cx * chunkSpan + cz][((fineX & Chunk.SizeMask) << Chunk.SizeShift) | (fineZ & Chunk.SizeMask)];
+            var local = ((fineX & Chunk.SizeMask) << Chunk.SizeShift) | (fineZ & Chunk.SizeMask);
+            var height = heightmaps[cx * chunkSpan + cz][local];
 
-            if (hasCaps && ColumnHeightCaps.TryGetValue((fineX, fineZ), out var cap) && cap < height)
-                height = cap;
+            var caps = capmaps?[cx * chunkSpan + cz];
+            if (caps != null && caps[local] < height) height = caps[local];
 
             return height;
         }
@@ -227,20 +279,114 @@ public class LodRegion : IDisposable
         // gravel with one noise eval at the cell centre per cell.
         var beachTop = ArrayPool<bool>.Shared.Rent(gridSize);
         var gravelTop = ArrayPool<bool>.Shared.Rent(gridSize);
+        // Item C1: the fine heights every cell window reads (index fx * fineSpan + fz), and one row
+        // of the separable min's horizontal half, rebuilt per cell row and reused by every column.
+        // Level 2 is the largest at 81796 ints, well inside ArrayPool<int>.Shared's largest bucket.
+        // Both are rented unconditionally, seam path included, so the finally has no condition.
+        var fine = ArrayPool<int>.Shared.Rent(fineSpan * fineSpan);
+        var xMin = ArrayPool<int>.Shared.Rent(fineSpan);
         try
         {
+        if (separableMin)
+        {
+            // Every grid element is written before it is read: the prefetched chunk columns span
+            // fine X [baseFineX - 16, baseFineX + RegionBlocks + 16), which strictly contains the
+            // grid's [baseFineX - fineMargin, baseFineX + RegionBlocks + fineMargin) because
+            // fineMargin <= 15. ArrayPool hands back uncleared arrays, so that total coverage is
+            // load-bearing - narrowing this fill would silently read a previous region's heights.
+            for (var cx = 0; cx < chunkSpan; cx++)
+            for (var cz = 0; cz < chunkSpan; cz++)
+            {
+                var heights = heightmaps[cx * chunkSpan + cz];
+                var caps = capmaps?[cx * chunkSpan + cz];
+                var wx0 = (baseChunkX + cx) << Chunk.SizeShift;
+                var wz0 = (baseChunkZ + cz) << Chunk.SizeShift;
+                var lx0 = Math.Max(0, fineOriginX - wx0);
+                var lx1 = Math.Min(Chunk.Size, fineOriginX + fineSpan - wx0);
+                var lz0 = Math.Max(0, fineOriginZ - wz0);
+                var lz1 = Math.Min(Chunk.Size, fineOriginZ + fineSpan - wz0);
+                for (var lx = lx0; lx < lx1; lx++)
+                {
+                    var src = lx << Chunk.SizeShift;
+                    var dst = (wx0 + lx - fineOriginX) * fineSpan + (wz0 - fineOriginZ);
+                    // Split on caps so the uncapped case - every chunk column in an unedited
+                    // world - stays a branch-free copy.
+                    if (caps == null)
+                        for (var lz = lz0; lz < lz1; lz++)
+                            fine[dst + lz] = heights[src + lz];
+                    else
+                        for (var lz = lz0; lz < lz1; lz++)
+                        {
+                            var h = heights[src + lz];
+                            var c = caps[src + lz];
+                            fine[dst + lz] = c < h ? c : h;
+                        }
+                }
+            }
+        }
+
+        // Cell row i's X window starts at grid offset i * cellSize - margin + fineMargin, which is
+        // exactly (i + 1) * cellSize because fineMargin == cellSize + margin: 0 at i == -1 and
+        // RegionBlocks + cellSize at i == cells, whose window end + windowSpan is exactly fineSpan.
+        // Nothing indexes outside the grid and no clamping is involved - the grid is sized to the
+        // one-cell overrun rather than clamped against it.
         for (var i = -1; i <= cells; i++)
         {
+            if (separableMin)
+            {
+                // Horizontal half of the separable rectangular min: one minimum per fine Z over
+                // this cell row's X window, reused by every j below. Integer min is associative and
+                // commutative, so min(window) == min over Z of (min over X) - bit-identical to the
+                // nested scan, including the i == -1 / i == cells rows that reach one cell past the
+                // region. Both accesses are stride 1 and the whole grid is L2-resident, and
+                // adjacent cell rows re-read windowSpan - cellSize of the same rows.
+                var wx = (i + 1) * cellSize;
+                Array.Copy(fine, wx * fineSpan, xMin, 0, fineSpan);
+                for (var w = 1; w < windowSpan; w++)
+                {
+                    var row = fine.AsSpan((wx + w) * fineSpan, fineSpan);
+                    var acc = xMin.AsSpan(0, fineSpan);
+                    for (var fz = 0; fz < fineSpan; fz++)
+                        if (row[fz] < acc[fz]) acc[fz] = row[fz];
+                }
+            }
+
             for (var j = -1; j <= cells; j++)
             {
-                var minHeight = int.MaxValue;
+                int minHeight;
                 var maxOwn = int.MinValue;
-                for (var dx = -margin; dx < cellSize + margin; dx++)
-                for (var dz = -margin; dz < cellSize + margin; dz++)
+                if (separableMin)
                 {
-                    var h = FineHeight(baseFineX + i * cellSize + dx, baseFineZ + j * cellSize + dz);
-                    if (h < minHeight) minHeight = h;
-                    if (h > maxOwn && dx >= 0 && dx < cellSize && dz >= 0 && dz < cellSize) maxOwn = h;
+                    // Vertical half of the min
+                    var wz = (j + 1) * cellSize;
+                    minHeight = xMin[wz];
+                    for (var w = 1; w < windowSpan; w++)
+                        if (xMin[wz + w] < minHeight) minHeight = xMin[wz + w];
+
+                    // The uneroded per-cell max is NOT separable and is not meant to be: it reads
+                    // the cell's own footprint only (no margin), exactly as before, just out of the
+                    // grid.
+                    var ox = i * cellSize + fineMargin;
+                    var oz = j * cellSize + fineMargin;
+                    for (var dx = 0; dx < cellSize; dx++)
+                    {
+                        var row = (ox + dx) * fineSpan + oz;
+                        for (var dz = 0; dz < cellSize; dz++)
+                            if (fine[row + dz] > maxOwn) maxOwn = fine[row + dz];
+                    }
+                }
+                else
+                {
+                    // Test seam (item C1): the original fused O(window^2) scan, kept so
+                    // LodHeightSamplingTests can compare full output against it.
+                    minHeight = int.MaxValue;
+                    for (var dx = -margin; dx < cellSize + margin; dx++)
+                    for (var dz = -margin; dz < cellSize + margin; dz++)
+                    {
+                        var h = FineHeight(baseFineX + i * cellSize + dx, baseFineZ + j * cellSize + dz);
+                        if (h < minHeight) minHeight = h;
+                        if (h > maxOwn && dx >= 0 && dx < cellSize && dz >= 0 && dz < cellSize) maxOwn = h;
+                    }
                 }
 
                 isSea[(i + 1) * heightGrid + (j + 1)] =
@@ -486,6 +632,8 @@ public class LodRegion : IDisposable
             ArrayPool<bool>.Shared.Return(isSea);
             ArrayPool<bool>.Shared.Return(beachTop);
             ArrayPool<bool>.Shared.Return(gravelTop);
+            ArrayPool<int>.Shared.Return(fine);
+            ArrayPool<int>.Shared.Return(xMin);
         }
     }
 }
