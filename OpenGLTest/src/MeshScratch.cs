@@ -51,4 +51,12 @@ internal sealed class MeshScratch
         Array.Clear(Neighbors, 0, Neighbors.Length);
         Array.Clear(NeighborStates, 0, NeighborStates.Length);
     }
+
+    /// <summary>The nine chunk-column heightmaps the light volume spans (see
+    /// <c>Chunk.FillLightColumnHeights</c>), in (dx * 3 + dz) order. Reused per build instead of
+    /// probing the ColumnData cache once per light-volume column (PERF_TODO C2); cleared once the
+    /// sun seeds are placed, like <see cref="ClearNeighbors"/>.</summary>
+    internal readonly int[]?[] LightColumnHeights = new int[9][];
+
+    internal void ClearLightColumns() => Array.Clear(LightColumnHeights, 0, LightColumnHeights.Length);
 }

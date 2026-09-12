@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
-using System.Threading.Tasks;
 using Silk.NET.OpenGL;
 
 namespace silkgltriangle;
@@ -61,6 +60,13 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// <summary>Dirty-set size, for tests asserting the scan cap paces the drain.</summary>
     internal int DirtyCount => _dirtyChunks.Count;
 
+    /// <summary>Mesh-dispatcher state, for MeshSchedulingTests.</summary>
+    internal int PendingMeshWorkCount => _pendingMeshWork.Count;
+
+    internal int ActiveMeshRunnerCount => Volatile.Read(ref _activeMeshRunners);
+
+    internal int GeneratingMeshCount => _generatingMeshes.Count;
+
     private int _loadedChunkCount;
 
     // The camera chunk the last unload scan ran for, and how many frames ago that was. See
@@ -90,7 +96,30 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
 
     // Track active mesh generation to avoid duplicates
     private readonly ConcurrentDictionary<Vector3, byte> _generatingMeshes = new();
-    private readonly SemaphoreSlim _meshSemaphore = new(WorldGenerationConfig.MaxConcurrentMeshGenerations);
+
+    // Mesh builds are dispatched as plain thread-pool work items rather than one
+    // Task.Run(async ...) per chunk: at up to MaxDirtyChunksPerFrame starts a frame, the closure +
+    // delegate + Task + state machine per start fed the streaming gen0 rate (PERF_TODO C4).
+    // Scheduling now only enqueues a (pos, chunk) pair; at most MaxConcurrentMeshGenerations
+    // runners are in flight and each drains the queue, so the old semaphore's cap survives with
+    // nothing ever blocking on a wait. Main thread enqueues (ProcessDirtyChunks), pool threads
+    // dequeue.
+    private readonly ConcurrentQueue<(Vector3 pos, Chunk chunk)> _pendingMeshWork = new();
+    private int _activeMeshRunners;
+
+    /// <summary>
+    /// One drain pass over <see cref="_pendingMeshWork"/>, queued straight to the thread pool
+    /// instead of wrapped in a Task. It carries nothing but its manager, so scheduling a chunk
+    /// costs no closure, delegate, state machine or Task - the chunk travels in the queue. One
+    /// instance is allocated per dispatch, not per chunk: a runner keeps draining until the queue
+    /// is empty, so dispatches are far rarer than builds under load and at most
+    /// <see cref="WorldGenerationConfig.MaxConcurrentMeshGenerations"/> exist at once. A fresh
+    /// instance per dispatch also means no work item is ever queued twice.
+    /// </summary>
+    private sealed class MeshRunner(ChunkManager owner) : IThreadPoolWorkItem
+    {
+        public void Execute() => owner.RunMeshWork();
+    }
 
     // World cells the player built (integer coords): breaking one never fells a tree, it just
     // drops as-is with no toppling entity. Main thread only, like every other block edit.
@@ -420,33 +449,89 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     {
         if (!_generatingMeshes.TryAdd(pos, 0))
             return;
-        
-        Task.Run(async () =>
+
+        _pendingMeshWork.Enqueue((pos, chunk));
+        TryStartMeshRunner();
+    }
+
+    /// <summary>
+    /// Queues one more runner if the concurrency cap allows. Callers must have made their work
+    /// visible - enqueued it, or decremented the runner count - BEFORE calling: the interlocked
+    /// read below is what orders against that store, and doing it the other way round would let
+    /// the last runner exit with work still queued. The cap cannot be exceeded because the count
+    /// is claimed by CAS before the item is queued, and every queued runner decrements exactly
+    /// once in its finally.
+    /// </summary>
+    private void TryStartMeshRunner()
+    {
+        while (true)
         {
-            await _meshSemaphore.WaitAsync();
-            try
-            {
-                if (!Chunks.ContainsKey(pos))
-                    return;
+            // Interlocked rather than a plain or volatile read: neither orders against the
+            // preceding store, and a stale "cap is full" here strands the work.
+            var active = Interlocked.CompareExchange(ref _activeMeshRunners, 0, 0);
+            if (active >= WorldGenerationConfig.MaxConcurrentMeshGenerations)
+                return;
+            if (Interlocked.CompareExchange(ref _activeMeshRunners, active + 1, active) != active)
+                continue;
+            // preferLocal: false - a thread's local queue is LIFO and drained only by that thread,
+            // so a runner queued from inside another runner could sit behind its own work.
+            ThreadPool.UnsafeQueueUserWorkItem(new MeshRunner(this), preferLocal: false);
+            return;
+        }
+    }
 
-                var meshData = chunk.GenerateMeshData(this);
-                if (meshData == null)
-                {
-                    // A face neighbour was unloaded between the scheduling check and this
-                    // snapshot; meshing across that hole would bake border artifacts, so the
-                    // build is dropped and the chunk retried once the world settles
-                    _dirtyChunks.TryAdd(pos, 0);
-                    return;
-                }
+    private void RunMeshWork()
+    {
+        try
+        {
+            while (_pendingMeshWork.TryDequeue(out var work))
+                BuildMeshFor(work.pos, work.chunk);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _activeMeshRunners);
+        }
 
-                _completedMeshQueue.Enqueue((pos, chunk, meshData, Interlocked.Increment(ref _meshSequence)));
-            }
-            finally
+        // Work enqueued after the last TryDequeue but before the decrement would have found the cap
+        // full and queued nothing; this second look is what keeps it from being stranded.
+        if (!_pendingMeshWork.IsEmpty)
+            TryStartMeshRunner();
+    }
+
+    /// <summary>
+    /// One mesh build, on a thread-pool thread - the old Task body unchanged, plus a catch:
+    /// Task.Run turned a throw into an unobserved task exception, while one escaping a raw work
+    /// item tears the process down, so it is logged and the runner carries on exactly as
+    /// <see cref="ChunkGenerationWorker"/> does. The finally sits outside the catch so a failed
+    /// build still releases its dedupe slot.
+    /// </summary>
+    private void BuildMeshFor(Vector3 pos, Chunk chunk)
+    {
+        try
+        {
+            if (!Chunks.ContainsKey(pos))
+                return;
+
+            var meshData = chunk.GenerateMeshData(this);
+            if (meshData == null)
             {
-                _generatingMeshes.TryRemove(pos, out _);
-                _meshSemaphore.Release();
+                // A face neighbour was unloaded between the scheduling check and this
+                // snapshot; meshing across that hole would bake border artifacts, so the
+                // build is dropped and the chunk retried once the world settles
+                _dirtyChunks.TryAdd(pos, 0);
+                return;
             }
-        });
+
+            _completedMeshQueue.Enqueue((pos, chunk, meshData, Interlocked.Increment(ref _meshSequence)));
+        }
+        catch (Exception ex)
+        {
+            Log.WriteLine($"Error meshing chunk {pos}: {ex}");
+        }
+        finally
+        {
+            _generatingMeshes.TryRemove(pos, out _);
+        }
     }
 
     /// <summary>

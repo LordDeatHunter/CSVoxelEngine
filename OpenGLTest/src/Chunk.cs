@@ -29,8 +29,8 @@ public class Chunk : IDisposable
     // border must still light this chunk's faces. The 3x3x3 neighbor chunks cover it
     // (LightBorder < Size). A padded-snapshot index (px,py,pz) maps to light index
     // (px+LightOffset, py+LightOffset, pz+LightOffset).
-    private const int LightBorder = WorldGenerationConfig.LightPropagationRadius;
-    private const int LightSize = Size + LightBorder * 2;
+    internal const int LightBorder = WorldGenerationConfig.LightPropagationRadius;
+    internal const int LightSize = Size + LightBorder * 2;
     private const int LightSq = LightSize * LightSize;
     private const int LightCount = LightSize * LightSq;
     private const int LightOffset = LightBorder - 1;
@@ -184,14 +184,35 @@ public class Chunk : IDisposable
 
     private static int FloorDiv(int a, int b) => a >= 0 ? a / b : -((-a + b - 1) / b);
 
-    /// <summary>Terrain height at a world (x, z) column, via the cached heightmaps.</summary>
-    private static int ColumnHeight(int worldX, int worldZ)
+    /// <summary>
+    /// Per-axis map from a light-volume coordinate (0..LightSize-1) to the neighbourhood chunk
+    /// index (0..2) and the block index inside it (0..Size-1). The volume spans LightBorder cells
+    /// into each neighbour: [1, LightBorder) of the previous chunk, all of this one, then
+    /// [0, LightBorder) of the next. Shared by FillLightSnapshot and ComputeLight so the block
+    /// snapshot and the sun seeds can never disagree about which column a cell sits in.
+    /// </summary>
+    internal static void BuildLightAxisMap(Span<int> mapChunk, Span<int> mapLocal)
     {
-        var cx = FloorDiv(worldX, Size);
-        var cz = FloorDiv(worldZ, Size);
-        var lx = worldX - cx * Size;
-        var lz = worldZ - cz * Size;
-        return GetColumnHeights(cx, cz)[(lx << SizeShift) | lz];
+        for (var l = 0; l < LightSize; l++)
+        {
+            if (l < LightBorder) { mapChunk[l] = 0; mapLocal[l] = l + 1; }
+            else if (l < LightBorder + Size) { mapChunk[l] = 1; mapLocal[l] = l - LightBorder; }
+            else { mapChunk[l] = 2; mapLocal[l] = l - LightBorder - Size; }
+        }
+    }
+
+    /// <summary>
+    /// The nine chunk-column heightmaps the light volume centred on chunk (chunkX, chunkZ) spans,
+    /// written to columns[dx * 3 + dz] for chunk column (chunkX - 1 + dx, chunkZ - 1 + dz). Because
+    /// LightBorder (15) is smaller than Size (16) the volume never reaches past those nine, so
+    /// fetching them once replaces LightSize^2 cache probes (PERF_TODO C2) while resolving to the
+    /// exact same ColumnData instances.
+    /// </summary>
+    internal static void FillLightColumnHeights(int chunkX, int chunkZ, int[]?[] columns)
+    {
+        for (var dx = 0; dx < 3; dx++)
+        for (var dz = 0; dz < 3; dz++)
+            columns[dx * 3 + dz] = GetColumnHeights(chunkX - 1 + dx, chunkZ - 1 + dz);
     }
 
     /// <summary>
@@ -210,12 +231,7 @@ public class Chunk : IDisposable
         // chunk, the full own chunk, then [0, LightBorder) of the next one.
         Span<int> mapChunk = stackalloc int[LightSize];
         Span<int> mapLocal = stackalloc int[LightSize];
-        for (var l = 0; l < LightSize; l++)
-        {
-            if (l < LightBorder) { mapChunk[l] = 0; mapLocal[l] = l + 1; }
-            else if (l < LightBorder + Size) { mapChunk[l] = 1; mapLocal[l] = l - LightBorder; }
-            else { mapChunk[l] = 2; mapLocal[l] = l - LightBorder - Size; }
-        }
+        BuildLightAxisMap(mapChunk, mapLocal);
 
         for (var lx = 0; lx < LightSize; lx++)
         for (var ly = 0; ly < LightSize; ly++)
@@ -247,12 +263,22 @@ public class Chunk : IDisposable
     /// </summary>
     private void ComputeLight(byte[] light, byte[] sun, byte[] block, int[] queue)
     {
-        var worldX0 = (int)Position.X * Size - LightBorder;
         var worldY0 = LowerBoundY - LightBorder;
-        var worldZ0 = (int)Position.Z * Size - LightBorder;
 
         var head = 0;
         var tail = 0;
+
+        // The LightSize^2 volume columns only ever land in the 3x3 chunk columns around this one
+        // (LightBorder < Size), so their heightmaps are fetched once here instead of probing the
+        // ColumnData cache per column (PERF_TODO C2). Same nine ColumnData instances, same heights -
+        // only the number of dictionary probes changes.
+        Span<int> mapChunk = stackalloc int[LightSize];
+        Span<int> mapLocal = stackalloc int[LightSize];
+        BuildLightAxisMap(mapChunk, mapLocal);
+
+        var scratch = MeshScratch.Current;
+        var columns = scratch.LightColumnHeights;
+        FillLightColumnHeights((int)Position.X, (int)Position.Z, columns);
 
         // Sunlight seeds: air cells at or above the terrain height see the sky directly.
         // Leaves seed too: canopies pass light, so the sky reaches straight through them
@@ -260,10 +286,11 @@ public class Chunk : IDisposable
         // wood boxes seed as well (see PassesLight): a thin limb never casts a full shadow.
         for (var lx = 0; lx < LightSize; lx++)
         {
-            var worldX = worldX0 + lx;
+            var columnRow = mapChunk[lx] * 3;
+            var heightRow = mapLocal[lx] << SizeShift;
             for (var lz = 0; lz < LightSize; lz++)
             {
-                var height = ColumnHeight(worldX, worldZ0 + lz);
+                var height = columns[columnRow + mapChunk[lz]]![heightRow | mapLocal[lz]];
                 var columnBase = (lx * LightSize) * LightSize + lz;
                 for (var ly = 0; ly < LightSize; ly++)
                 {
@@ -277,6 +304,8 @@ public class Chunk : IDisposable
                 }
             }
         }
+
+        scratch.ClearLightColumns();
 
         SpreadLight(light, sun, queue, ref head, ref tail);
 

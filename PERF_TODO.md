@@ -194,12 +194,6 @@ nothing from **Ruled out** — overlaps are called out inline.
   `LodManager.Update` (`World.cs:242-244`), so the win is LodGen throughput during
   the #1 hitch, not a smaller `lod` row.
   **Impact high · risk med · effort M** (needs an exact-equality test).
-- [ ] **C2 · Light volume re-reads column data 2,116x per build** —
-  `Chunk.ComputeLight` (`Chunk.cs:261-279`) calls `ColumnHeight` for each of the
-  46x46 columns, and each call is a `ConcurrentDictionary` probe
-  (`Chunk.cs:188-195`) although only ~9 chunk columns are in the volume. Precompute
-  those columns once per build and index an array.
-  **Impact med-high · risk low · effort S.**
 - [ ] **C3 · Chunk-gen workers re-scan the whole offset list** —
   `ChunkGenerationWorker.FindClosestNeededChunk` (`ChunkGenerationWorker.cs:100-112`)
   restarts the ~15k-entry sorted-offset scan on every call, two `ContainsKey` per
@@ -207,10 +201,6 @@ nothing from **Ruled out** — overlaps are called out inline.
   sleeping. Shared frontier/cursor, or a per-worker persistent cursor. This is
   algorithmic — distinct from the ruled-out *worker priorities*.
   **Impact med-high · risk low-med · effort M.**
-- [ ] **C4 · Mesh start allocates a closure + state machine + Task per chunk** —
-  `ChunkManager.StartMeshGeneration` (`ChunkManager.cs:424-449`), up to 64/frame.
-  Parameterised work item or a small dedicated mesh pool; feeds the streaming GC
-  (17-25 gen0/s). **Impact med · risk low · effort S.**
 - [ ] **C5 · Parallelise / cap LOD region builds** — `LodManager` builds on one
   BelowNormal thread (`LodManager.cs:87-94`); region builds are pure and
   independent. A small worker pool would parallelise the streaming `lod` burst,
@@ -391,7 +381,7 @@ nothing from **Ruled out** — overlaps are called out inline.
   above the noise floor. `Camera`'s per-frame collision scans are additional
   evidence for D1's impact rather than a separate entry.
 
-**Suggested first pass:** C2 + C4 (small, safe), then D4 and R9 — the two new items
+**Suggested first pass:** D4 and R9 — the two new items
 whose targets sit inside a measured row (`lod` up to 10.7, `uiPass` 0.5-1) and both
 bounded. Then the worker-side streaming pair C10 + C8: neither appears in any
 profiled section, so size them with a chunks/s generation-rate capture and the gen2
