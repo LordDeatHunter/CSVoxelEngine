@@ -77,7 +77,35 @@ public class Shader : IDisposable
         throw new Exception($"{type} compilation failed:\n{infoLog}");
     }
 
-    public void Use() => _gl.UseProgram(Handle);
+    // PERF_TODO R5. worldShader.Use() alone ran 20x a frame, most of them back-to-back in
+    // EntityPass, and ApplyFrameUniforms/SetWorldUniform flip programs twice per call. Every
+    // glUseProgram in this codebase goes through this method - verified with
+    //   grep -rn "\.UseProgram[(]" OpenGLTest/src --include=*.cs
+    // which must return exactly one line, the _gl.UseProgram below - so one static handle
+    // covers every shader-owning class with no invalidation list: there is no path that can
+    // change the bound program behind this cache's back. If anyone ever adds a raw
+    // gl.UseProgram elsewhere, this cache goes stale silently; re-run that grep.
+    //
+    // Two traps in that grep, both already paid for. The unqualified `grep -rn "UseProgram"`
+    // returns two hits - the second is a doc-comment mention in RenderManager - so it can
+    // never return a single line. And the pattern is written with the bracket class [(]
+    // rather than a plain ( so that THIS comment does not match it either; spelled the
+    // obvious way, the check finds itself here and reports two hits forever.
+    //
+    // Render thread only, like every other GL call here (AGENTS.md) - plain field, no lock.
+    private static uint _boundProgram;
+
+    /// <summary>
+    /// Makes this program current, skipping the <c>glUseProgram</c> when it already is
+    /// (PERF_TODO R5). See the comment on <see cref="_boundProgram"/> for why one static
+    /// field is sufficient and needs no invalidation list.
+    /// </summary>
+    public void Use()
+    {
+        if (_boundProgram == Handle) return;
+        _gl.UseProgram(Handle);
+        _boundProgram = Handle;
+    }
 
     public void Dispose()
     {
@@ -90,6 +118,11 @@ public class Shader : IDisposable
         if (_disposed) return;
 
         _gl.DeleteProgram(Handle);
+        // Belt-and-braces: GL is free to hand the deleted name back out to the next
+        // CreateProgram, and a recycled handle matching a stale _boundProgram would make a
+        // later Use() skip a bind it needed. Shaders are only ever disposed at shutdown today,
+        // so this never fires in practice - it costs one comparison and removes the hazard.
+        if (_boundProgram == Handle) _boundProgram = 0;
         _disposed = true;
     }
 

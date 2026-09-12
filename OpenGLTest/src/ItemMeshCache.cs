@@ -19,6 +19,15 @@ public class ItemMeshCache : IDisposable
 
     public ItemMeshCache(GL gl) => _gl = gl;
 
+    /// <summary>
+    /// Raised after this cache has uploaded a texture, i.e. after it has bound (and unbound) a
+    /// Texture2DArray on whatever texture unit happened to be active. Textures are built lazily,
+    /// on first sight of an item frame, which means this can fire in the middle of a render pass;
+    /// <c>RenderManager</c> hooks it up to its texture-unit cache so that clobbering is recorded
+    /// rather than merely survived by luck (PERF_TODO R5). Null by default - nothing here needs it.
+    /// </summary>
+    internal Action? GlStateChanged { get; set; }
+
     /// <summary>The mesh and texture for an item id, or false for non-item ids.</summary>
     public bool TryGet(byte itemId, out Mesh mesh, out uint texture) =>
         TryGetFrame(itemId, 0, out mesh, out texture);
@@ -60,7 +69,11 @@ public class ItemMeshCache : IDisposable
     private uint BuildTexture(ItemType type, int frame)
     {
         var (pixels, width, height) = FramePixels(type, frame);
-        return TextureLoader.Upload(_gl, pixels, width, height);
+        var texture = TextureLoader.Upload(_gl, pixels, width, height);
+        // Upload bound and unbound a Texture2DArray on the live active unit; tell whoever is
+        // tracking unit state. Only the texture path needs this - BuildMesh touches no unit.
+        GlStateChanged?.Invoke();
+        return texture;
     }
 
     // One cell of a spritesheet, or the whole texture for a plain sprite. The mesh it

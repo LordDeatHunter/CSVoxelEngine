@@ -390,6 +390,10 @@ public class RenderManager : IDisposable
 
         blockCubes = new BlockCubeCache(gl);
         itemMeshes = new ItemMeshCache(gl);
+        // Item textures are uploaded lazily, on first sight, from inside the entity and UI passes,
+        // and TextureLoader.Upload binds on whatever unit is live. UIRenderer shares this instance,
+        // so one hook covers both callers.
+        itemMeshes.GlStateChanged = InvalidateTextureUnits;
         _quernTop = BuildQuernTopMesh();
         try
         {
@@ -404,6 +408,9 @@ public class RenderManager : IDisposable
         _playerMeshes = PlayerModel.BuildMeshes(gl, PlayerRig);
         ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes);
         CreateSelectionGeometry();
+        // Everything above binds raw - the atlas build, the loader, the sun's filter tweak and
+        // the three render targets - so nothing the cache thinks it knows survives load.
+        InvalidateTextureUnits();
     }
 
     /// <summary>
@@ -523,6 +530,8 @@ public class RenderManager : IDisposable
 
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         gl.BindTexture(TextureTarget.Texture2D, 0);
+        // Raw binds above, and _shadowDepthTex is a brand-new name.
+        InvalidateTextureUnits();
     }
 
     public void SetViewport(Vector2D<int> size)
@@ -532,6 +541,9 @@ public class RenderManager : IDisposable
         CreateReflectionTarget();
         CreateSceneCopy();
         CreateRaysTarget();
+        // Belt-and-braces: each creator already invalidates on its own recreate path, but a
+        // resize is rare enough that a second reset costs nothing and cannot be forgotten.
+        InvalidateTextureUnits();
     }
 
     /// <summary>
@@ -722,10 +734,8 @@ public class RenderManager : IDisposable
         // The depth texture is this pass's render target, so it must not stay bound to unit 1
         // while it draws: sampling and rendering the same texture is a feedback loop, and
         // drivers are free to return garbage for it. BindWorldTextures rebinds it afterwards.
-        gl.ActiveTexture(TextureUnit.Texture1);
-        gl.BindTexture(TextureTarget.Texture2D, 0);
-        gl.ActiveTexture(TextureUnit.Texture0);
-        gl.BindTexture(TextureTarget.Texture2DArray, textureAtlas);
+        BindUnit(1, TextureTarget.Texture2D, 0);
+        BindUnit(0, TextureTarget.Texture2DArray, textureAtlas);
         shadowShader.SetUniform("uTime", _time);
         shadowShader.SetUniform("uSwayStrength", GameSettings.LeafSway);
 
@@ -758,12 +768,9 @@ public class RenderManager : IDisposable
             // sentinel on a chunk with no block data cannot wrap and cull everything.)
             if (chunk.UpperBoundY + 1 < chunk.SurfaceMinY) continue;
 
-            var min = chunk.Position * Chunk.Size;
-            var max = min + new Vector3(Chunk.Size);
+            if (!frustum.IntersectsAABB(chunk.WorldMin, chunk.WorldMax)) continue;
 
-            if (!frustum.IntersectsAABB(min, max)) continue;
-
-            _chunkDraws.Add(chunk.OpaqueSlice!.Value, min, 1f);
+            _chunkDraws.Add(chunk.OpaqueSlice!.Value, chunk.WorldMin, 1f);
         }
 
         _chunkDraws.Draw(OpaqueChunkGeometry.Vao, chunkShadowShader, _locChunkShadowDrawBase);
@@ -806,13 +813,11 @@ public class RenderManager : IDisposable
 
         if (player != null && camera != null)
         {
-            gl.ActiveTexture(TextureUnit.Texture0);
-            gl.BindTexture(TextureTarget.Texture2DArray, _playerPaletteTex);
+            BindUnit(0, TextureTarget.Texture2DArray, _playerPaletteTex);
             foreach (var part in PlayerModel.BodyParts)
                 DrawPlayerPartShadow(player, part, camera);
             DrawPlayerPartShadow(player, "Head", camera);
-            gl.ActiveTexture(TextureUnit.Texture0);
-            gl.BindTexture(TextureTarget.Texture2DArray, textureAtlas);
+            BindUnit(0, TextureTarget.Texture2DArray, textureAtlas);
         }
 
         // Back to the default framebuffer and the blend state the world passes expect
@@ -881,6 +886,9 @@ public class RenderManager : IDisposable
 
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         gl.BindTexture(TextureTarget.Texture2D, 0);
+        // Recreate path only. The size-unchanged early return above binds nothing, and this
+        // method runs every frame - invalidating up there would cost a full rebind per frame.
+        InvalidateTextureUnits();
         return true;
     }
 
@@ -891,6 +899,8 @@ public class RenderManager : IDisposable
         gl.DeleteTexture(_reflTex);
         gl.DeleteTexture(_reflDepthTex);
         _reflFbo = 0;
+        // Deleting a texture reverts its bindings to 0 on every unit of the current context.
+        InvalidateTextureUnits();
     }
 
     /// <summary>
@@ -937,6 +947,8 @@ public class RenderManager : IDisposable
         gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
 
         gl.BindTexture(TextureTarget.Texture2D, 0);
+        // Recreate path only (the size-unchanged early return above binds nothing).
+        InvalidateTextureUnits();
     }
 
     private void DeleteSceneCopy()
@@ -946,6 +958,8 @@ public class RenderManager : IDisposable
         gl.DeleteTexture(_sceneDepthTex);
         _sceneColorTex = 0;
         _sceneDepthTex = 0;
+        // Deleting a texture reverts its bindings to 0 on every unit of the current context.
+        InvalidateTextureUnits();
     }
 
     /// <summary>
@@ -1000,6 +1014,8 @@ public class RenderManager : IDisposable
 
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         gl.BindTexture(TextureTarget.Texture2D, 0);
+        // Recreate path only (the size-unchanged early return above binds nothing).
+        InvalidateTextureUnits();
     }
 
     private void DeleteRaysTarget()
@@ -1008,6 +1024,8 @@ public class RenderManager : IDisposable
         gl.DeleteFramebuffer(_raysFbo);
         gl.DeleteTexture(_raysTex);
         _raysFbo = 0;
+        // Deleting a texture reverts its bindings to 0 on every unit of the current context.
+        InvalidateTextureUnits();
     }
 
     /// <summary>Snapshots the default framebuffer's colour and depth into the scene textures so the
@@ -1017,14 +1035,12 @@ public class RenderManager : IDisposable
     {
         if (colour)
         {
-            gl.ActiveTexture(TextureUnit.Texture3);
-            gl.BindTexture(TextureTarget.Texture2D, _sceneColorTex);
+            BindUnit(3, TextureTarget.Texture2D, _sceneColorTex);
             gl.CopyTexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, 0, 0, (uint)_sceneSize.X, (uint)_sceneSize.Y);
         }
-        gl.ActiveTexture(TextureUnit.Texture4);
-        gl.BindTexture(TextureTarget.Texture2D, _sceneDepthTex);
+        BindUnit(4, TextureTarget.Texture2D, _sceneDepthTex);
         gl.CopyTexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, 0, 0, (uint)_sceneSize.X, (uint)_sceneSize.Y);
-        gl.ActiveTexture(TextureUnit.Texture0);
+        ActiveUnit(0);
     }
 
     /// <summary>
@@ -1079,9 +1095,8 @@ public class RenderManager : IDisposable
         // The reflection texture is this pass's render target, so it must not stay bound
         // to unit 2 while it draws: sampling and rendering the same texture is a
         // feedback loop (see RenderShadows for unit 1). Later passes rebind it.
-        gl.ActiveTexture(TextureUnit.Texture2);
-        gl.BindTexture(TextureTarget.Texture2D, 0);
-        gl.ActiveTexture(TextureUnit.Texture0);
+        BindUnit(2, TextureTarget.Texture2D, 0);
+        ActiveUnit(0);
 
         // Mirror position and facing across the horizontal plane.
         var mirroredPos = new Vector3(camera.RenderEye.X, 2f * WaterPlaneY - camera.RenderEye.Y,
@@ -1100,8 +1115,7 @@ public class RenderManager : IDisposable
         // RenderSun leaves its own program and its disc on unit 0; the mirrored world draws
         // below want ours and the atlas back.
         worldShader.Use();
-        gl.ActiveTexture(TextureUnit.Texture0);
-        gl.BindTexture(TextureTarget.Texture2DArray, textureAtlas);
+        BindUnit(0, TextureTarget.Texture2DArray, textureAtlas);
         gl.Disable(EnableCap.Blend);
 
         // Fog and specular inside the texture want the mirrored eye; the clip drops
@@ -1121,12 +1135,9 @@ public class RenderManager : IDisposable
             var chunk = chunks[i];
             if (!chunk.HasMesh) continue;
 
-            var min = chunk.Position * Chunk.Size;
-            var max = min + new Vector3(Chunk.Size);
+            if (!frustum.IntersectsAABB(chunk.WorldMin, chunk.WorldMax)) continue;
 
-            if (!frustum.IntersectsAABB(min, max)) continue;
-
-            _visibleChunks.Add((chunk, Vector3.DistanceSquared(min, mirroredPos)));
+            _visibleChunks.Add((chunk, Vector3.DistanceSquared(chunk.WorldMin, mirroredPos)));
         }
 
         _visibleChunks.Sort((a, b) => a.distSq.CompareTo(b.distSq));
@@ -1136,7 +1147,7 @@ public class RenderManager : IDisposable
         _chunkDraws.BeginPass(_visibleChunks.Count);
 
         foreach (var (chunk, _) in _visibleChunks)
-            _chunkDraws.Add(chunk.OpaqueSlice!.Value, chunk.Position * Chunk.Size,
+            _chunkDraws.Add(chunk.OpaqueSlice!.Value, chunk.WorldMin,
                 MathF.Min(1f, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
 
         _chunkDraws.Draw(OpaqueChunkGeometry.Vao, chunkShader, _locChunkDrawBase);
@@ -1215,6 +1226,9 @@ public class RenderManager : IDisposable
     /// </summary>
     public void BeginFrame(Camera? camera)
     {
+        // The once-a-frame hard reset for the texture-unit cache: the UI pass, the particle
+        // renderers and anything that rebuilt a GL texture ran since the last one.
+        InvalidateTextureUnits();
         gl.ClearColor(_skyColor.X, _skyColor.Y, _skyColor.Z, 1f);
         gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
@@ -1260,8 +1274,7 @@ public class RenderManager : IDisposable
         gl.BlendFunc(BlendingFactor.One, BlendingFactor.One);
 
         sunShader.Use();
-        gl.ActiveTexture(TextureUnit.Texture0);
-        gl.BindTexture(TextureTarget.Texture2DArray, _sunTexture);
+        BindUnit(0, TextureTarget.Texture2DArray, _sunTexture);
 
         // Rotation only: dropping the camera position is what pins the quad at infinity
         var viewRot = Matrix4x4.CreateLookAt(Vector3.Zero, forward, Vector3.UnitY);
@@ -1285,24 +1298,115 @@ public class RenderManager : IDisposable
         gl.Enable(EnableCap.DepthTest);
     }
 
+    // PERF_TODO R5. What the context already has selected and bound on units 0-4. Every
+    // render-path ActiveTexture/BindTexture in this class goes through the three primitives
+    // below, so a redundant one costs nothing; everything that can change those units behind
+    // their back calls InvalidateTextureUnits (see its doc comment for the full audit).
+    // Render thread only, like every other GL call here (AGENTS.md) - plain field, no lock.
+    private readonly TextureUnitCache _texUnits = new();
+
+    /// <summary>Selects a texture unit. Issued wherever this class used to issue a bare
+    /// <c>gl.ActiveTexture</c>, 1:1.</summary>
+    private void ActiveUnit(int unit)
+    {
+        if (_texUnits.MarkActive(unit)) gl.ActiveTexture(TextureUnit.Texture0 + unit);
+    }
+
+    /// <summary>
+    /// Replaces a <c>gl.ActiveTexture</c> + <c>gl.BindTexture</c> pair, 1:1. The select is
+    /// unconditional work for the cache (it may still skip the GL call), so the active unit
+    /// after this call is exactly what it is without the cache - which matters because
+    /// <see cref="CopyScene"/>'s <c>glCopyTexSubImage2D</c>, the three <c>Create*Target</c>
+    /// methods (see the remark on <see cref="CreateRaysTarget"/>) and
+    /// <see cref="TextureLoader.Upload"/> all act on whatever unit happens to be active. Only
+    /// the redundant bind is elided here, never the trajectory.
+    /// </summary>
+    private void BindUnit(int unit, TextureTarget target, uint texture)
+    {
+        ActiveUnit(unit);
+        if (_texUnits.MarkBound(unit, (int)target, texture)) gl.BindTexture(target, texture);
+    }
+
+    /// <summary>
+    /// <see cref="BindWorldTextures"/> ONLY. Skips the select as well when the binding already
+    /// matches, which is what turns a fully redundant replay into zero GL calls. Safe by a
+    /// purely local argument: nothing between BindWorldTextures' five binds reads the active
+    /// unit, and the method ends with an unconditional <c>ActiveUnit(0)</c> that restores its
+    /// documented postcondition. Do not use it anywhere else without repeating that argument -
+    /// in particular not near a copy, an upload, or a call out to another class.
+    /// </summary>
+    private void BindLazy(int unit, TextureTarget target, uint texture)
+    {
+        if (_texUnits.Matches(unit, (int)target, texture)) return;
+        ActiveUnit(unit);
+        gl.BindTexture(target, texture);
+        _texUnits.MarkBound(unit, (int)target, texture);
+    }
+
+    /// <summary>
+    /// Forgets the tracked unit state, so the next <see cref="BindUnit"/> / <see cref="BindLazy"/>
+    /// re-issues its GL calls. This is the maintained audit of every site that can change unit 0-4
+    /// or the active unit behind the primitives' back; each one calls this.
+    /// <para><b>Invalidates:</b>
+    /// <see cref="BeginFrame"/> (the once-a-frame hard reset);
+    /// <see cref="LoadResources"/> (the sun upload, <c>TextureAtlas.Build</c>,
+    /// <c>TextureLoader.LoadFromFile</c> and the target creators all bind raw);
+    /// <see cref="CreateShadowMap"/>;
+    /// <see cref="CreateReflectionTarget"/> on its recreate path only (it is called every frame and
+    /// early-returns without binding when the size is unchanged) and
+    /// <see cref="DeleteReflectionTarget"/>;
+    /// <see cref="CreateSceneCopy"/> / <see cref="DeleteSceneCopy"/>;
+    /// <see cref="CreateRaysTarget"/> / <see cref="DeleteRaysTarget"/>;
+    /// <see cref="SetViewport"/>;
+    /// <see cref="RenderLeafParticles"/> and <see cref="RenderBubbleParticles"/> (both renderers
+    /// bind their own sprite to unit 0);
+    /// <see cref="RenderUnderwaterRays"/> (the rays renderer detours through unit 5);
+    /// <see cref="RenderUI"/> (the font and the item icons take unit 0, and this pass spans the
+    /// frame boundary);
+    /// and <c>ItemMeshCache.BuildTexture</c> through its <c>GlStateChanged</c> callback - item
+    /// textures are built lazily <em>inside</em> the entity pass and <c>TextureLoader.Upload</c>
+    /// binds on whatever unit is live. Every <c>glDeleteTextures</c> is in this list too, because
+    /// deleting a texture reverts its bindings to 0 in the current context; the only ones that are
+    /// not are <see cref="Dispose"/>'s and the other classes' Dispose-time deletes, which run after
+    /// the last frame.
+    /// </para>
+    /// <para><b>Provably cannot invalidate</b>, so do not add a call "just in case":
+    /// <c>CloudRenderer</c>, <c>FireParticleRenderer</c>, the selection pass and the break pass
+    /// contain no <c>ActiveTexture</c>/<c>BindTexture</c> at all - their VAO/VBO binds are buffer
+    /// state, and the program they switch is handled by <c>Shader.Use</c>'s own cache.
+    /// <c>ChunkDrawBatch</c>, <c>ChunkGeometryPool</c> and <c>Mesh.Render</c> touch VAO/VBO/indirect
+    /// state only. <see cref="CopyScene"/>'s <c>glCopyTexSubImage2D</c> changes texture
+    /// <em>contents</em>, not bindings (its own select/bind pair is routed through
+    /// <see cref="BindUnit"/> precisely because the copy destination is the active unit's binding).
+    /// <c>BitmapFont</c>'s texture creation runs in the <c>UIRenderer</c> constructor, before the
+    /// first frame. <see cref="SetLighting"/> runs between the UI pass and <see cref="BeginFrame"/>
+    /// and issues no texture bind, which is what makes the top of BeginFrame a valid reset point.
+    /// <see cref="RenderSun"/> early-returns on invisibility <em>before</em> its unit-0 bind, so on
+    /// a night frame it leaves unit 0 alone - BeginFrame's reset covers both cases.
+    /// </para>
+    /// </summary>
+    private void InvalidateTextureUnits() => _texUnits.Invalidate();
+
     /// <summary>
     /// Binds the world textures for a world draw: the atlas on unit 0, the shadow map on
     /// unit 1, the reflection texture on unit 2 and the scene colour/depth copies on units 3
     /// and 4. Unit 0 is left active on the way out, because <see cref="RenderItemDrops"/>
-    /// binds an item's own texture assuming that.
+    /// binds an item's own texture assuming that; the trailing unconditional
+    /// <see cref="ActiveUnit"/> call is what upholds that postcondition now that the five binds
+    /// themselves may skip their selects.
+    /// <para>PERF_TODO R5: this runs ~18x a frame, most of them back-to-back inside the entity
+    /// pass, and it used to cost 10 GL calls every time. A replay whose five bindings all still
+    /// match costs 0; the dominant entity-pass case - unit 0 swapped away to an item sprite and
+    /// back - costs 1.</para>
     /// </summary>
     private void BindWorldTextures()
     {
-        gl.ActiveTexture(TextureUnit.Texture1);
-        gl.BindTexture(TextureTarget.Texture2D, _shadowDepthTex);
-        gl.ActiveTexture(TextureUnit.Texture2);
-        gl.BindTexture(TextureTarget.Texture2D, _reflTex);
-        gl.ActiveTexture(TextureUnit.Texture3);
-        gl.BindTexture(TextureTarget.Texture2D, _sceneColorTex);
-        gl.ActiveTexture(TextureUnit.Texture4);
-        gl.BindTexture(TextureTarget.Texture2D, _sceneDepthTex);
-        gl.ActiveTexture(TextureUnit.Texture0);
-        gl.BindTexture(TextureTarget.Texture2DArray, textureAtlas);
+        BindLazy(1, TextureTarget.Texture2D, _shadowDepthTex);
+        BindLazy(2, TextureTarget.Texture2D, _reflTex);
+        BindLazy(3, TextureTarget.Texture2D, _sceneColorTex);
+        BindLazy(4, TextureTarget.Texture2D, _sceneDepthTex);
+        BindLazy(0, TextureTarget.Texture2DArray, textureAtlas);
+        ActiveUnit(0);
     }
 
     /// <summary>
@@ -1427,13 +1531,14 @@ public class RenderManager : IDisposable
         if (strength <= 0.0005f) return;
         if (_raysFbo == 0) return;             // no target to march into (never happens after LoadResources)
         CopyScene(colour: false);
-        gl.ActiveTexture(TextureUnit.Texture1);
-        gl.BindTexture(TextureTarget.Texture2D, _shadowDepthTex);
-        gl.ActiveTexture(TextureUnit.Texture4);
-        gl.BindTexture(TextureTarget.Texture2D, _sceneDepthTex);
-        gl.ActiveTexture(TextureUnit.Texture0);
+        BindUnit(1, TextureTarget.Texture2D, _shadowDepthTex);
+        BindUnit(4, TextureTarget.Texture2D, _sceneDepthTex);
+        ActiveUnit(0);
         _rays.Render(_raysFbo, _raysTex, _raysSize, _viewportSize, _invViewProj, _cameraPos, _sunDir,
             _sunColor, strength, WaterPlaneY, _lightViewProj, _time);
+        // UnderwaterRaysRenderer selects unit 5 for the upsample and puts unit 0 back. Unit 5 is
+        // untracked so the records happen to survive, but the renderer does not promise that.
+        InvalidateTextureUnits();
     }
 
     // Wall-clock timestamp of the previous RenderWorld, so the chunk fade-in can advance by
@@ -1466,7 +1571,7 @@ public class RenderManager : IDisposable
 
         var viewProj = camera.GetViewProjection();
         chunkShader.SetUniform(_locChunkViewProj, viewProj);
-        var frustum = new Frustum(viewProj);
+        var frustum = camera.GetViewFrustum();
         var camChunkPos = (camera.RenderEye / Chunk.Size).Floor();
 
         // Sort chunks by distance for better cache coherency and early z-rejection
@@ -1482,10 +1587,7 @@ public class RenderManager : IDisposable
             if (!chunk.HasMesh && !chunk.HasTranslucentMesh)
                 continue;
 
-            var min = chunk.Position * Chunk.Size;
-            var max = min + new Vector3(Chunk.Size);
-
-            if (!frustum.IntersectsAABB(min, max))
+            if (!frustum.IntersectsAABB(chunk.WorldMin, chunk.WorldMax))
                 continue;
 
             var distSq = Vector3.DistanceSquared(chunk.Position, camChunkPos);
@@ -1507,7 +1609,7 @@ public class RenderManager : IDisposable
             // Water-only chunks are in the list purely to have their lifetime advanced
             if (chunk.OpaqueSlice is not { } slice) continue;
 
-            _chunkDraws.Add(slice, chunk.Position * Chunk.Size,
+            _chunkDraws.Add(slice, chunk.WorldMin,
                 MathF.Min(1F, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
         }
 
@@ -1540,7 +1642,7 @@ public class RenderManager : IDisposable
         _nearWaterVisible = false;
         if (camera == null) return;
 
-        var frustum = new Frustum(camera.GetViewProjection());
+        var frustum = camera.GetViewFrustum();
         var camChunkPos = (camera.RenderEye / Chunk.Size).Floor();
         var camPos = camera.RenderEye;
         var fancyFarSq = WorldGenerationConfig.WaterFancyFarBlocks * WorldGenerationConfig.WaterFancyFarBlocks;
@@ -1551,17 +1653,14 @@ public class RenderManager : IDisposable
             if (!chunk.HasTranslucentMesh)
                 continue;
 
-            var min = chunk.Position * Chunk.Size;
-            var max = min + new Vector3(Chunk.Size);
-
-            if (!frustum.IntersectsAABB(min, max))
+            if (!frustum.IntersectsAABB(chunk.WorldMin, chunk.WorldMax))
                 continue;
 
             _translucentChunks.Add((chunk, Vector3.DistanceSquared(chunk.Position, camChunkPos)));
             if (chunk.HasWaterMesh)
             {
                 _waterVisible = true;
-                var center = chunk.Position * Chunk.Size + new Vector3(Chunk.Size / 2f);
+                var center = chunk.WorldMin + new Vector3(Chunk.Size / 2f);
                 if (Vector3.DistanceSquared(center, camPos) <= fancyFarSq)
                     _nearWaterVisible = true;
             }
@@ -1632,7 +1731,7 @@ public class RenderManager : IDisposable
         _chunkDraws.BeginPass(_translucentChunks.Count);
 
         foreach (var (chunk, _) in _translucentChunks)
-            _chunkDraws.Add(chunk.TranslucentSlice!.Value, chunk.Position * Chunk.Size,
+            _chunkDraws.Add(chunk.TranslucentSlice!.Value, chunk.WorldMin,
                 MathF.Min(1f, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
 
         _chunkDraws.Draw(TranslucentChunkGeometry.Vao, chunkShader, _locChunkDrawBase);
@@ -1672,7 +1771,7 @@ public class RenderManager : IDisposable
         BindWorldTextures();
 
         var viewProj = camera.GetViewProjection();
-        var frustum = new Frustum(viewProj);
+        var frustum = camera.GetViewFrustum();
         var camPos = camera.RenderEye;
 
         _visibleRegions.Clear();
@@ -1767,8 +1866,7 @@ public class RenderManager : IDisposable
             if (ItemType.IsItem(drop.BlockId))
             {
                 if (!itemMeshes.TryGet(drop.BlockId, out mesh, out var itemTexture)) continue;
-                gl.ActiveTexture(TextureUnit.Texture0);
-                gl.BindTexture(TextureTarget.Texture2DArray, itemTexture);
+                BindUnit(0, TextureTarget.Texture2DArray, itemTexture);
                 atlasBound = false;
             }
             else
@@ -1833,8 +1931,7 @@ public class RenderManager : IDisposable
             if (ItemType.IsItem(itemId))
             {
                 if (!itemMeshes.TryGet(itemId, out mesh, out var itemTexture)) continue;
-                gl.ActiveTexture(TextureUnit.Texture0);
-                gl.BindTexture(TextureTarget.Texture2DArray, itemTexture);
+                BindUnit(0, TextureTarget.Texture2DArray, itemTexture);
                 atlasBound = false;
             }
             else
@@ -1890,8 +1987,7 @@ public class RenderManager : IDisposable
             if (ItemType.IsItem(inputId))
             {
                 if (!itemMeshes.TryGet(inputId, out mesh, out var itemTexture)) continue;
-                gl.ActiveTexture(TextureUnit.Texture0);
-                gl.BindTexture(TextureTarget.Texture2DArray, itemTexture);
+                BindUnit(0, TextureTarget.Texture2DArray, itemTexture);
                 atlasBound = false;
             }
             else
@@ -1987,6 +2083,9 @@ public class RenderManager : IDisposable
         _leaves.Render(leaves, camera.GetViewProjection(), camera.RenderEye, camera.ViewDirection,
             textureAtlas, TextureAtlas.TileWidth, _sunDir, _sunColor, _sunIntensity,
             _ambient, _fogColor, _fogNear, _fogFar);
+        // LeafParticleRenderer binds unit 0 itself. It happens to be the same atlas today, but
+        // the renderer does not promise that.
+        InvalidateTextureUnits();
     }
 
     public void RenderFireParticles(Camera camera, IReadOnlyList<FireParticle> fire)
@@ -2003,6 +2102,8 @@ public class RenderManager : IDisposable
 
         _bubbles.Render(bubbles, camera.GetViewProjection(), camera.RenderEye, camera.ViewDirection,
             _fogColor, _fogNear, _fogFar);
+        // BubbleParticleRenderer binds its own sprite to unit 0.
+        InvalidateTextureUnits();
     }
 
     /// <summary>
@@ -2049,8 +2150,7 @@ public class RenderManager : IDisposable
         worldShader.Use();
         BindWorldTextures();
 
-        gl.ActiveTexture(TextureUnit.Texture0);
-        gl.BindTexture(TextureTarget.Texture2DArray, _playerPaletteTex);
+        BindUnit(0, TextureTarget.Texture2DArray, _playerPaletteTex);
 
         var blend = camera.ShoulderBlend;
         var viewProj = camera.GetViewProjection();
@@ -2135,8 +2235,7 @@ public class RenderManager : IDisposable
                         * hand;
             SetDrawUniforms(model, model * viewProj, 1f);
 
-            gl.ActiveTexture(TextureUnit.Texture0);
-            gl.BindTexture(TextureTarget.Texture2DArray, texture);
+            BindUnit(0, TextureTarget.Texture2DArray, texture);
             mesh.Render();
             BindWorldTextures();
             return;
@@ -2368,6 +2467,8 @@ public class RenderManager : IDisposable
         if (menu != null && settings != null)
             ui.DrawPauseMenu(menu, settings);
         ui.End();
+        // The font and the item icons take unit 0, and this pass sits across the frame boundary.
+        InvalidateTextureUnits();
     }
 
     /// <summary>Delegates click hit-testing to the UI pass (valid after a frame has begun).</summary>

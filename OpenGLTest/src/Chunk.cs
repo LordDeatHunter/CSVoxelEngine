@@ -57,6 +57,14 @@ public class Chunk : IDisposable
 
     public Vector3 Position { get; }
 
+    /// <summary>World-space corners of this chunk's cell, computed once (PERF_TODO R11).
+    /// <see cref="Position"/> is get-only and set only in the constructor, so these never
+    /// need invalidating. Four render passes frustum-test these every frame.</summary>
+    public Vector3 WorldMin { get; }
+
+    /// <inheritdoc cref="WorldMin"/>
+    public Vector3 WorldMax { get; }
+
     /// <summary>
     /// Where this chunk's opaque geometry lives in the render manager's opaque
     /// <see cref="ChunkGeometryPool"/>, or <c>null</c> when there is nothing to draw.
@@ -382,6 +390,8 @@ public class Chunk : IDisposable
     {
         _ = gl;
         Position = position;
+        WorldMin = position * Size;
+        WorldMax = WorldMin + new Vector3(Size);
 
         if (generateBlockData)
         {

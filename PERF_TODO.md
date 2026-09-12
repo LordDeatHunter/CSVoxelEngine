@@ -62,10 +62,12 @@ The `raysPass` row likewise predates the half-res underwater march and is pendin
 re-capture with the fly, as is the `cloudPass` figure in hitch #4 below (pre-R4). **No
 `perf-fly` capture has been re-run since either change, so every number above this line is
 still the old snapshot.** The post-change figures that do exist were taken with scripted
-scenarios rather than the fly — R2's `rays-halfres.json` `raysPass` pair, and this round's
+scenarios rather than the fly — R2's `rays-halfres.json` `raysPass` pair, and the R4 round's
 `clouds-mirror.json` `cloudPass` recapture, which found no measurable change — and both
 live in the git history of this file (`git log -p -- PERF_TODO.md`). They are different
-scenarios: do not mix them with a `perf-fly` number.
+scenarios: do not mix them with a `perf-fly` number. The R5/R7/R11 round *did* run `perf-fly`
+under `VOXEL_DEBUG=1` on both trees, but quoted nothing from it (every row overlapped, see
+**Suggested first pass**), so it is not a recapture and the table above is untouched by it.
 
 Streaming-second breakdown (avg over the 1 s window, so peaks are higher):
 `lod` up to 10.7, `chunkDirty` up to 6.3, `chunkApply` up to 5.8, `fluidTick`
@@ -109,20 +111,20 @@ nothing from **Ruled out** — overlaps are called out inline.
 
 ### GPU / render passes
 
-- [ ] **R3 · Half-res scene copies for water — resolved and PARKED this round** —
-  `CopyScene` (`RenderManager.cs:1016-1028`), called with colour+depth at `:1619` and
-  depth-only at `:1429`. The condition R2 left on this bullet was resolved against the code
+- [ ] **R3 · Half-res scene copies for water — resolved and PARKED, not implemented** —
+  `CopyScene` (`RenderManager.cs:1033-1043`), called with colour+depth at `:1718` and
+  depth-only at `:1533`. The condition R2 left on this bullet was resolved against the code
   rather than implemented, and it settles three ways.
   **(a) The depth copy cannot move.** `CopyScene(bool colour)` copies depth
   *unconditionally* — only the colour half is gated by the parameter — and both call sites
   write the same `_sceneDepthTex`, which R2's depth-aware upsample pins at full res. So the
-  `:1619` call keeps paying a full-res `DepthComponent24` `CopyTexSubImage2D` whatever R3
+  `:1718` call keeps paying a full-res `DepthComponent24` `CopyTexSubImage2D` whatever R3
   does, and a second, half-res depth used only by the water pass is the same *additive* cost
   (an extra texture plus an extra reduction, on top of a full-res copy that still has to
   happen) that R2 already rejected on the rays side. Only the RGBA8 colour copy is left.
   **(b) The shader claim holds.** `test-fragment.glsl`'s refraction really is
   resolution-independent: `uv = gl_FragCoord.xy * uInvViewport` (`:267`) against
-  `uInvViewport = 1/_viewportSize` (`RenderManager.cs:1362`), bilinear `texture()` fetches
+  `uInvViewport = 1/_viewportSize` (`RenderManager.cs:1466-1467`), bilinear `texture()` fetches
   (`:270-272`), a `uInvViewProj` unprojection (`:276`) — no `texelFetch` and no pixel indices
   anywhere in the file. The shader would need zero changes.
   **(c) But the ceiling is tiny and the change is not "sample less".** The colour copy is
@@ -131,7 +133,7 @@ nothing from **Ruled out** — overlaps are called out inline.
   also contains every translucent chunk draw and every LOD water sheet. That capture
   demonstrably *included* the colour copy: the same line reports `reflect 0.83 ms`, and
   `RenderReflection` early-returns unless `_nearWaterVisible`
-  (`RenderManager.cs:1053-1054`) — the very flag that gates the copy — so near water was on
+  (`RenderManager.cs:1069-1070`) — the very flag that gates the copy — so near water was on
   screen when it was taken. 0.09 ms is therefore a real ceiling for the whole pass, not a
   figure that might have excluded the work. And `CopyTexSubImage2D` cannot downscale, so this
   is not a sampling change but new plumbing: an FBO, a texture, sizing and teardown across
@@ -143,21 +145,12 @@ nothing from **Ruled out** — overlaps are called out inline.
   **Parked, not disproven:** effort M *plus* a perceptual gate, for an unmeasurable slice of
   an already-gated 0.09 ms pass. Revisit only if a capture ever isolates the colour copy as
   its own row. **Impact low · risk low-med · effort M + perceptual gate.**
-- [ ] **R5 · Render-state rebind cache** — `BindWorldTextures()` runs 18x a frame
-  (`RenderManager.cs:1336,1495,1543,1603,1627,1649,1699,1715,1745,1772,1797,1832,1889,1921,1967,1994,2012,2046`)
-  and `worldShader.Use()` 20x, most of them back-to-back inside `EntityPass`
-  (`World.cs:330-346`). Track the bound program and unit->texture bindings and skip
-  redundants; invalidate when the sun/cloud/rays/UI passes swap state.
-  **Impact low · risk low · effort S.**
 - [ ] **R6 · Gate GPU timing queries behind the debug flag** — `BeginGpuPass` /
-  `EndGpuPass` (`RenderManager.cs:255-271`) and `BeginGpuFrame` (`:228-246`) issue
+  `EndGpuPass` (`RenderManager.cs:274-290`) and `BeginGpuFrame` (`:247-265`) issue
   ~40-70 GL query calls a frame regardless of the overlay. Gating on `X` gives up
   "the first second after X already has data" (a deliberate property) — decide the
   trade. Different from the ruled-out *GL debug context*.
   **Impact low-med · risk low · effort S.**
-- [ ] **R7 · Cache the camera view-projection** — `Camera.GetViewProjection`
-  (`Camera.cs:989`) rebuilds view+proj at 22 call sites a frame. Dirty-flag it.
-  **Impact low · risk low · effort S.**
 - [ ] **R8 · UI per-frame string allocations** — `UIRenderer.cs:344` (`FPS`),
   `:397` (compass), `:435` (coords), plus the hotbar's `.ToString()` counts. Format
   only when the value changes, or into a reusable buffer; feeds settled GC.
@@ -165,30 +158,24 @@ nothing from **Ruled out** — overlaps are called out inline.
 - [ ] **R10 · Every LOD region owns a `Mesh`** — `LodRegion` creates a VAO + VBO +
   EBO per region and another set for its water sheet (`LodRegion.cs:110-128`), and
   each draw is a `BindVertexArray` + `DrawElements` behind three uniform sets:
-  `RenderManager.RenderLod` (`RenderManager.cs:1577-1586`), the mirror's region loop
-  (`:1047-1054`) and the water sheets (`:1517-1524`). Three radius-8 rings
+  `RenderManager.RenderLod` (`RenderManager.cs:1805-1814`), the mirror's region loop
+  (`:1171-1178`) and the water sheets (`:1745-1752`). Three radius-8 rings
   (`LodRegion.cs:39-44`) are several hundred regions, so a water frame walks them
   three times paying a bind, three uniforms and a draw per survivor, plus GL object
   create/delete churn as regions stream in and out (`LodManager.cs:219-243`). Give
   LOD its own `ChunkGeometryPool` + `GeometryAllocator` and push regions through
   `ChunkDrawBatch.Draw` (`ChunkDrawBatch.cs:202-216`) exactly as chunks already are,
   so each pass becomes one `glMultiDrawElementsIndirect`. The CPU cull stays where it
-  is, so this is *not* the ruled-out *compute frustum cull*. Overlaps R5 — three of
-  the binds R5 counts are the LOD passes' (`RenderManager.cs:1543` is `RenderLod`'s),
-  so landing R10 first shrinks R5's target; measure R5 after, not before.
+  is, so this is *not* the ruled-out *compute frustum cull*. **The R5 overlap is gone:**
+  R5 has landed, so the texture binds the LOD passes issue already cost nothing when the
+  bindings are unchanged: `BindWorldTextures()` at `RenderManager.cs:1723`
+  (`RenderWorldTranslucent`, ahead of the water sheets) and `:1771` (`RenderLod`), plus the
+  mirror LOD walk's single atlas `BindUnit` at `:1118`. R10 can no longer be credited with
+  removing any of them, so what remains is R10's own case and only that: a VAO + VBO + EBO
+  per region and another set per water sheet, a `BindVertexArray` + three uniform sets + a
+  `DrawElements` per *surviving* region across three ring walks, and GL object create/delete
+  churn as regions stream. Price it on those terms alone.
   **Impact med-high · risk med · effort L.**
-- [ ] **R11 · Chunk AABBs and the view frustum are rebuilt per pass** — four passes
-  recompute `chunk.Position * Chunk.Size` and `min + new Vector3(Chunk.Size)` for
-  every renderable chunk: `RenderShadows` (`RenderManager.cs:740-741`),
-  `RenderReflection` (`:1011-1012`), `RenderWorld` (`:1356-1357`) and `CullWater`
-  (`:1425-1426`); three of them independently build a `Frustum` from the identical
-  unchanged `camera.GetViewProjection()` (`:1340`, `:1414`, `:1546`), paying six
-  plane extractions and normalisations (`Frustum.cs:10-59`) three times over. Store
-  the world-space min/max on `Chunk` once — `Position` is get-only (`Chunk.cs:58`) —
-  and build the view frustum once a frame beside the cached view-projection. Not R7,
-  which caches the matrix rather than the planes derived from it; the shadow and
-  mirror frusta use different matrices (`_lightViewProj`, `_reflViewProj`) and are
-  untouched. **Impact low · risk low · effort S.**
 
 ### CPU / streaming
 
@@ -230,7 +217,7 @@ nothing from **Ruled out** — overlaps are called out inline.
   (`LeafParticleRenderer.cs:159-170`), so the replacement must preserve draw order —
   a head index plus a modular walk in the renderers, not a swap-remove.
   (b) `Chunk.GenerateBlockData` recounts solids with a scalar `foreach` over all 4096
-  bytes (`Chunk.cs:446-450`), which `BlockCount - _blocks.AsSpan().Count(BlockType.Air)`
+  bytes (`Chunk.cs:495-499`), which `BlockCount - _blocks.AsSpan().Count(BlockType.Air)`
   does vectorised. (c) `LodManager.RemoveRegion` drops the region from
   `_pendingCover` with a linear `List.Remove` on every unload (`LodManager.cs:308`).
   **Impact low · risk low-med (a), low (b, c) · effort S.**
@@ -245,7 +232,7 @@ nothing from **Ruled out** — overlaps are called out inline.
   **Impact med · risk med · effort L** (broad but mechanical). `LodManager` is
   already keyed by integer tuples, so this is chunk-side only.
 - [ ] **D2 · Cache eviction is a wholesale `Clear()`** — `Chunk.ColumnCache`
-  (`Chunk.cs:597-599`) and `WormCarver.CellCache` (`WormCarver.cs:111-112`) drop
+  (`Chunk.cs:646-648`) and `WormCarver.CellCache` (`WormCarver.cs:111-112`) drop
   everything at their cap, so a far teleport recomputes (part of the teleport
   hitch). LRU / generation-stamped eviction would keep reuse across a move.
   `LodRegion.ColumnCaps` (`LodRegion.cs:105`) also grows unbounded over a long
@@ -297,10 +284,20 @@ nothing from **Ruled out** — overlaps are called out inline.
   keys, the per-tick chunk lookup is already cached, and the tick path allocates
   nothing. Adjacent to the ruled-out *fluid chunk-cache* entry but checked
   independently; `fluidTick` (4.6 ms streaming) has no structural lever left.
-- `Shader` uniform caching (`Shader.cs:98-108`), `MeshBufferPool`, `ChunkDrawBatch`,
+- `Shader` uniform caching (`Shader.cs:129-141`), `MeshBufferPool`, `ChunkDrawBatch`,
   `BlockCubeCache`, `ModelBaker`, `Vertex` — all already cached, pooled, batched or
   packed; re-read this round, nothing new. (`Shader` is also in the ruled-out
   omnibus line; recorded here so it is not re-opened from the other direction.)
+- Dropping the **mirror's cloud depth pre-pass** — considered during R4 and deliberately
+  declined, recorded here so it is not re-opened blind. The cloud mesh is closed and
+  watertight (`CloudTests.RoundedMeshIsWatertight`), so a view ray crosses at least two
+  surfaces, and the mirror's `CullFace(Front)` removes the far side of a *single* mass but
+  not overlapping fillet pieces and not two separate masses stacked along one ray. Dropping
+  it would darken clouds in the water but not in the sky — a mirror/sky disagreement. The
+  main pass's pre-pass is the once-per-pixel blend guard and is not a candidate either. With
+  R4's nine draws already collapsed to one instanced draw, what remains to win there is a
+  single depth-only instanced draw on a sub-full-res target. The full R4 write-up is in
+  `git log -p -- PERF_TODO.md`.
 - `MalachiteGenerator.Stamp` (`MalachiteGenerator.cs:41-47`) — the 4096-cell loop
   looks like a noise hot spot but the `GetNoise` call is already gated on
   `blocks[i] != RockBlock` (`:46`), so noise only runs on stone. The remaining lever
@@ -311,138 +308,297 @@ nothing from **Ruled out** — overlaps are called out inline.
   only if a profile shows a doubling in steady state.
 - `TntManager`, `CampfireManager`, `QuernManager`, `DropManager`,
   `FallingBlockManager`, `TopplingTree`, `AmbienceManager`, `TextureAtlas`,
-  `Camera` — walked this round; no allocation, redundancy or algorithmic finding
-  above the noise floor. `Camera`'s per-frame collision scans are additional
-  evidence for D1's impact rather than a separate entry.
+  `Camera` — walked in an earlier round; no allocation, redundancy or algorithmic
+  finding above the noise floor. `Camera`'s per-frame collision scans are additional
+  evidence for D1's impact rather than a separate entry. (R7 and R11 have since landed
+  *in* `Camera` — the view-projection and view-frustum caches — but they were their own
+  bullets, not findings from that walk, so this entry still stands.)
 
-**Suggested first pass:** R4 and R12 landed this round. **R3 was resolved and parked rather than
-implemented** — the short version is that R2's composite pins the scene *depth* copy at full res,
-leaving only a colour copy inside a pass whose whole measured cost is 0.09 ms, and halving that
-copy would buy a perceptual gate; the full finding is in R3's bullet above.
+**Suggested first pass:** R5, R7 and R11 landed this round, as one pass. All three are
+output-preserving bookkeeping with no visual surface, so the gate looked for *zero* structural
+change rather than for an acceptable difference. **R3 is unchanged and still parked** — its bullet
+above carries the finding.
 
-**R4 — cloud instancing.** The per-copy arithmetic came out of `CloudRenderer` first, into a
-GL-free helper: `CloudCopies` (`OpenGLTest/src/Systems/CloudCopies.cs`) with `Drift`, `Snap` and
-`Gather`, the last running the 3x3 ring in the original `ix`/`iz` nesting order, frustum-testing
-each copy's AABB and packing the survivors to the front of a caller-supplied span. That is the one
-headlessly testable part of R4 and it is pinned by `OpenGLTest.Tests/CloudCopiesTests.cs` (8
-facts); the equivalence proof is `GatherOffsetsMatchThePerCopyArithmetic`, exact float equality
-against an inline reimplementation of the pre-extraction expression over 60 snap/drift/field
-combinations, plus `GatherPacksSurvivorsToTheFrontPreservingOrder` for the same set in the same
-relative order under a frustum that provably culls. The draw was then instanced:
-`cloud-vertex.glsl`'s `uniform vec2 uOffset` became `layout (location = 2) in vec2 vOffset`
-(locations 0 and 1 were the only ones in use), the C# side allocates a nine-entry instance VBO with
-`VertexAttribDivisor(2, 1)`, uploads `offsets[..count]` with one `NamedBufferSubData`, and each
-sweep became one `glDrawElementsInstanced`. **The CPU cull is exactly where it was** — the instance
-count *is* the survivor count, so a culled copy is still not drawn. The zero-survivor early return
-sits beside the `CloudOpacity <= 0` guard, **before any GL call**, because returning after
-`_shader.Use()` or `BindVertexArray(_vao)` would leave that binding current for the mirror path.
-`CloudTests.CloudVertexShaderTakesAPerInstanceOffset` pins the GLSL half of the CPU/shader
-contract. Covered **only** visually: `VertexAttribDivisor(2, 1)` itself, whose absence renders one
-untiled cloud field instead of the 3x3, and the GL draw structure — the VAO bracket, the two sweeps
-and the `ColorMask`/`DepthMask` toggles between them.
+**R5a — the program cache, correct by construction.** `Shader.Use()` (`Shader.cs:103-108`) now holds
+a `private static uint _boundProgram` and returns without a GL call when that handle is already
+bound. One static field covers all twelve shader-owning classes with **no invalidation list at
+all**, because there is exactly one `glUseProgram` call in the tree. The check that proves it, and
+the one to re-run before trusting the cache:
 
-**Both depth pre-passes were kept.** The main-pass one is the once-per-pixel blend guard, as the
-bullet always said. The mirror's was considered and **deliberately declined** — recorded here so
-nobody re-opens it blind: the cloud mesh is closed and watertight
-(`CloudTests.RoundedMeshIsWatertight`), so a view ray crosses at least two surfaces, and the
-mirror's `CullFace(Front)` (`RenderManager.cs:1178`) removes the far side of a *single* mass but
-not overlapping fillet pieces and not two separate masses stacked along one ray. Dropping it would
-darken clouds in the water but not in the sky — a mirror/sky disagreement. And with nine draws
-already collapsed to one, what remains to win there is a single depth-only instanced draw on a
-sub-full-res target.
+```
+grep -rn "\.UseProgram[(]" OpenGLTest/src --include=*.cs
+```
 
-**R4's win is submission-side and nothing else**, and the capture says so. Instancing removes zero
-vertices and zero fragments. What stands is arithmetic off the code: per `Render` call, up to 18
-`DrawElements` each behind a `uOffset` uniform set collapse to exactly 2 `DrawElementsInstanced`
-plus one `NamedBufferSubData`, and `Render` runs twice a frame (main pass + mirror, the mirror at
-most every other frame under reflection temporal reuse) — **up to 34 fewer draw calls and up to 34
-fewer uniform updates a frame**. The `cloudPass` recapture found **no measurable change in either
-half and nothing is quoted from it**: the GPU difference came in under a tenth of the within-tree
-run-to-run spread (the half that should not move did not move), and the CPU difference did not
-exceed the baseline's own spread — that bracket averages 0.01-0.02 ms in total, i.e. it sits on
-`FrameProfiler`'s F2 print resolution, so a submission-side saving is invisible there by
-construction. Note too that `cloudPass` brackets only the **main** pass (`World.cs:367-371`); the
-mirror's cloud draw folds into `reflect` (`World.cs:306-313`) with no bracket of its own, and
-reflection temporal reuse makes that row's per-window composition incomparable — which is why the
-mirror half is argued from draw count and never from a timing.
+It must return exactly one line, inside `Shader.Use()`. **Use that spelling.** Two plainer forms
+cannot return one line and will mislead whoever runs them: the unqualified `grep -rn "UseProgram"`
+also matches a doc comment in `RenderManager.cs` ("...survive any number of `UseProgram`
+switches"), and the plain-paren `"\.UseProgram("` also matches `Shader.cs`'s own comment, which
+quotes the grep and therefore matches itself. The bracket class `[(]` matches the real call and not
+the comment. `Dispose` clears `_boundProgram` when it deletes its own handle so a recycled GL name
+can never produce a false hit; shaders are only disposed at shutdown, so that is belt-and-braces.
 
-**R12 — DSA pool uploads.** `ChunkGeometryPool.Upload` no longer binds anything: the three
-`BindBuffer(CopyWriteBuffer, ...)` calls are gone and the two writes are
-`gl.NamedBufferSubData(_vbo, ...)` / `(_ebo, ...)`. Same buffers, same offsets, same spans, same
-bytes, same layout — **up to 3 binds x up to 32 uploads (`MaxMeshUploadsPerFrame`) x 2 pools = up
-to 192 client-side GL calls a frame removed** during streaming. `CreateBuffers`' and `Grow`'s own
-`CopyWriteBuffer` binds stay, because `glBufferStorage` and `glCopyBufferSubData` still need bound
-targets; `AGENTS.md:171` was corrected to match (`NamedBufferSubData uploads`). **No unit test was
-added and none should be — the change introduces no new arithmetic.** It was proved instead by a
-temporary readback: every write read back off the GPU at its computed offset and byte-compared
-against its source span, the identical patch applied to both the working tree and a pristine-HEAD
-export, one `perf-fly` run each — 112198 and 111606 verified uploads, **zero mismatches** on either
-pool for either write on either tree — plus a negative control (vertex readback offset shifted one
-byte) that made mismatches track uploads 1:1 while the untouched index check stayed at zero, so the
-check was provably capable of failing. The instrumentation was removed from both trees afterwards.
-`chunkApply` was recaptured too and **nothing is quoted**: the difference came in at half the
-within-tree spread, which was expected — the row is CPU-side, it times the whole apply loop rather
-than the two writes, and its per-window content is set by how many meshes generation happened to
-deliver that second. A cross-tree upload-sequence hash was not available, and that is measured
-rather than assumed: the two verification runs uploaded different numbers of chunks, because mesh
-completion comes off worker threads.
+**R5b — the texture-unit cache, and why there are three primitives rather than one.**
+`OpenGLTest/src/Systems/TextureUnitCache.cs` is a GL-free `internal sealed class` (the
+`CloudCopies` / `HalfResTarget` / `ReflectionReuse` precedent) tracking units 0-4 plus the active
+unit. `RenderManager` drives it through three private primitives sitting just above
+`BindWorldTextures` (`RenderManager.cs:1310`, `:1324`, `:1338`):
 
-**Gate machinery, for whoever measures next.** `visual-examples/clouds-mirror.json` is new this
-round and is the cloud instrument: a grounded shore vantage over the water bay, a pose-stable
-teleport+screenshot burst framing cloud reflections in the water (`mirror_graze`, `mirror_wide`),
-three repeats of one pose as a same-build noise floor, two clouds-against-sky shots, and a
-grounded, dry 12 s hold at the end that publishes the `cloudPass` windows. Bare teleport+screenshot
-bursts with no `wait` between them tick no physics, so the pose is pixel-stable; a `wait` after a
-mid-air teleport resumes free-fall, so any held pose must be grounded, and a hold that ends
-underwater makes `RenderClouds` early-return and publishes empty `cloudPass` windows. Its header
-carries the detail; three traps matter beyond it:
+- `BindUnit(unit, target, tex)` **stays eager** — it always makes the unit active (the cache may
+  still skip the `glActiveTexture` itself) and then skips only a redundant `glBindTexture`. This is
+  the load-bearing design decision of R5 and the one a future reader is most likely to try to
+  "simplify" away. It exists because three things bind on *whatever unit is live*: `CopyScene`'s
+  `glCopyTexSubImage2D` (`RenderManager.cs:1033-1043`), the three `Create*Target` methods (whose own
+  comment at `:977-978` states they assume unit 0 on entry), and `TextureLoader.Upload`
+  (`TextureLoader.cs:91,116`), reached lazily from `ItemMeshCache` *inside* the entity pass. A lazy
+  select would change the active-unit trajectory at those points; eager keeps it byte-identical to
+  pre-R5 at every point in the frame.
+- `BindLazy` skips the select too, and is used **only inside `BindWorldTextures`**, where the proof
+  is local: nothing between its five binds reads the active unit, and the method ends with an
+  unconditional `ActiveUnit(0)` restoring its documented postcondition. Do not use it anywhere else
+  without repeating that argument.
+- `InvalidateTextureUnits()` (`:1388`). **Its doc comment is the canonical audit** — every site that
+  can change unit 0-4 or the active unit behind the cache's back, plus the matching "provably cannot
+  invalidate" list. Read it there rather than trusting a copy here: it is maintained beside the code
+  and this file is not. Two of its entries look redundant and are not — the
+  `ItemMeshCache.GlStateChanged` callback, which fires from `BuildTexture` because item textures are
+  built *lazily mid-pass*, and the note that `RenderSun` early-returns *before* its unit-0 bind on
+  night frames, which the negative control below turned into the load-bearing sentence of the whole
+  audit.
 
-- **The floor is not uniform across the frame.** In the mirror shots the sky region is an
-  essentially exact instrument (a level or two) while the water region floors in the *hundreds* —
-  the wave normal is animated from wall-clock `uTime`, so the surface is in an arbitrary phase
-  cross-run. Compare per region, never as one whole-frame number, and treat the water region as a
-  gross-breakage check (a missing 3x3 copy, an offset in the wrong place, the untiled single field
-  a missing divisor produces) rather than as a measurement.
-- **A 3-run floor under-samples the same-binary tail** on shots where the differing fraction sits
-  near the p99 knee — `clouds_up`, `clouds_closeup` and `sky_closeup` all swing on a small change
-  in cloud-edge pixel count. Use the full within-vs-cross pairing matrix there, or a 3-run floor
-  will read sampling noise as a regression.
+`BindWorldTextures()` is now five `BindLazy` calls plus that trailing `ActiveUnit(0)`. Thirteen
+other render-path bind sites were routed 1:1 through `BindUnit`/`ActiveUnit`; every create/delete
+site was left raw and paired with an invalidation entry. The pre-existing gap where `RenderShadows`
+unbinds unit 1 and leaves it unbound until the next `BindWorldTextures` is **reproduced, not
+fixed** — this round was output-preserving, and an implementer who "corrects" it breaks that.
+
+**R7 and R11 are key-validated, not dirty-flagged.** `Camera.GetViewProjection()` and the new
+`Camera.GetViewFrustum()` both go through one `EnsureViewCache()`, keyed on a `ViewProjKey` record
+struct holding *exactly* the mutable fields the two builders read — `Position`, `_shoulderViewDir`,
+`_shoulderOffset`, `Yaw`, `Pitch`, `_roll`, `_bobHeight`, `_bobStrafe`, `_currentFov`,
+`_aspectRatio` (`NearPlane`/`FarPlane` are `const` and deliberately excluded) — compared
+**bit-for-bit** through `BitConverter.SingleToInt32Bits`. The record's generated equality is
+deliberately unused: `float.Equals` calls `+0f`/`-0f` equal and `NaN`/`NaN` equal, which would break
+the argument. That argument is: a hit means the inputs were bit-identical, so the recomputation
+would have produced a bit-identical matrix — output preservation is a **proof**, not a hope, and it
+needs none of the wiring the bullet's literal "dirty-flag it" would have required at the ~14 camera
+write sites (`Update`, the `OnMouseMove` callback, `TestTeleport`, `PushOutOf`, the
+`FramebufferResize` lambda). Matrix and frustum share the one key and the one miss branch, so they
+cannot drift apart. `GetViewMatrix()` and `GetProjectionMatrix()` were left **uncached on purpose**:
+they are the correct answer for the three standalone mirror `GetProjectionMatrix()` calls, and they
+are the tests' oracle.
+
+R11's chunk half stores `WorldMin`/`WorldMax` on `Chunk`, computed in the constructor with
+character-for-character the expressions the passes used, so the values are bit-identical; `Position`
+is get-only and assigned once, so there is no invalidation path at all. Note that R11's bullet named
+only `RenderWorld` and `CullWater` as re-deriving the camera frustum — **`RenderLod` built the
+identical third one from the identical matrix** and was taken too. Its *region* AABBs are
+per-region, not per-chunk, and stayed out of scope, as did the shadow and mirror frusta
+(`_lightViewProj`, `_reflViewProj`).
+
+**What the tests pin, and what only GL covers.** 30 new facts across
+`CameraViewProjectionCacheTests` (16), `ChunkBoundsTests` (3) and `TextureUnitCacheTests` (11); the
+suite went 417 -> 447 with the same two known failures
+(`BlockMovementTests.LeavesDeclareThreeQuarterMovementSpeed`,
+`FallingBlockTests.SevenTowerChainRebuildsFullyWithNoDrops`). The camera class carries **one
+single-field fact per key field**, driven through an `internal TestSetViewState` seam added for
+exactly that, precisely because an oracle-only fact —
+`Assert.Equal(cam.GetViewMatrix() * cam.GetProjectionMatrix(), cam.GetViewProjection())` — **passes
+with no cache at all**, and a walking drive moves several key fields at once, so a field *dropped*
+from the key would be invisible. `KeyHoldsExactlyTheMatrixInputs` reflects the key's shape against a
+hard-coded allowlist, making an edit to the key a conscious act. What those facts **cannot** catch
+is a *new* `Camera` field wired into `GetViewMatrix` tomorrow with no matching key entry; that
+failure mode is visible (a camera input that stops working), not subtle. `Frustum` is a readonly
+struct of private planes with no equality, so the frustum facts compare *behaviour*:
+`IntersectsAABB` over a fixed lattice, with both outcomes required to occur so no fact can pass
+vacuously. Covered **only** by GL and by nothing headless: `Shader.Use`'s actual skip and the actual
+`glActiveTexture`/`glBindTexture` elision. `Shader` owns a GL handle with no GL-free seam, and R5
+adds no new *arithmetic* to `RenderManager`, so following the R12 precedent the GL call sites got no
+unit test. Those halves are covered by the harness below and by the screenshot gate.
+
+**The invalidation list was proved by measurement, not by reading.** A temporary `VOXEL_BINDCHECK=1`
+harness (R12's readback precedent) verified *every skipped call* against GL: `GL_CURRENT_PROGRAM` in
+`Shader.Use`, the cache's **recorded** active unit in `ActiveUnit`, and the unit's real binding in
+`BindUnit`/`BindLazy` — the latter saving and restoring the live active unit so the harness could
+not corrupt the trajectory it was measuring. Counters sat behind a *separate* `VOXEL_BINDSTATS=1`
+flag, so a counting run carries no `glGetInteger` stalls and its timing stays usable. **Eleven
+scripted runs, 33 504 frames, 2 717 848 verified skips (1 789 480 program, 298 662 active-unit,
+629 706 bind), zero mismatches of any kind.** The two non-scriptable entries —
+`CreateReflectionTarget`'s recreate path and `SetViewport` — were driven **mechanically rather than
+by hand**, which is a departure from the plan and a better one: a probe fired inside the render loop
+at fixed frames in all eleven runs, changing `GameSettings.ReflectionIndex` three times and resizing
+the viewport down and back. `Program.OnFramebufferResize` does nothing but call
+`RenderManager.SetViewport`, so the `RenderManager`-side path an OS resize reaches is exactly the
+one the probe reached; what is *not* covered is Silk's event plumbing above it, which touches no
+texture state. All instrumentation was removed afterwards —
+`grep -rn "VOXEL_BINDCHECK\|VOXEL_BINDSTATS" OpenGLTest/` is empty.
+
+**The negative control did not behave as predicted, and that is the most reusable thing this round
+learned.** Deleting the UI pass's invalidation entry alone (the plan's chosen control): **zero**
+mismatches. Deleting `BeginFrame`'s hard reset alone: **zero**. Deleting *both*, on a daytime run:
+still **zero**. Only with both gone *and* the run at night (`VOXEL_TIME=300`) did the check fire —
+2437 mismatches over 971 frames on `basic.json` (2.51/frame) and 5097 over 2053 frames on
+`clouds-mirror.json` (2.48/frame), linear in frames rendered and every one the same shape,
+`unit 0 Texture2DArray expected 1 actual 26`: the atlas expected, the UI's own texture actually
+bound. Restoring both entries returned the identical night run to 0 mismatches over 972 frames. The
+mechanism is that the two entries are **mutually redundant covers for one hazard** — the UI pass's
+raw unit-0 bind crossing the frame boundary — and that on a day frame `RenderSun` rebinds unit 0
+before anything can skip; only at night, where it early-returns *before* its bind, does the stale
+record survive to be skipped. Both entries stay: the redundancy is defence in depth. The lesson for
+any future state cache here is that a single-entry deletion is not a sufficient control, and that
+the sun's day/night branch is a real state divide a daytime-only sweep will miss.
+
+**Measurement: the skipped calls are large in count and invisible in the profiler, and no timing is
+quoted as a saving.**
+
+- *Arithmetic off the source.* `BindWorldTextures()` has **18** call sites and HEAD's body issued
+  **10** raw GL calls each (5 `glActiveTexture` + 5 `glBindTexture`) — up to 180 client-side calls a
+  frame. After R5, a fully-matching replay costs **0** and the entity-pass restore after an
+  item-sprite swap costs **1**, both pinned by `TextureUnitCacheTests`. **Do not generalise 10 -> 0
+  to the thirteen `BindUnit`-routed sites:** they keep their eager select and save at most the one
+  redundant bind each. `worldShader.Use()` has 20 call sites, and `SetWorldUniform` /
+  `ApplyFrameUniforms` each flip two programs per call.
+- *Measured, and only from `VOXEL_BINDSTATS` runs.* Capture rule: from `OpenGLTest/`,
+  `VOXEL_BINDSTATS=1 VOXEL_DEBUG=1 VOXEL_TIME=60 VOXEL_SCRIPT=visual-examples/<s>.json dotnet run -c
+  Release --no-build`, one run each; counters are cumulative from process start (load frames
+  included), read off the single final line printed in `Dispose` and divided by the frame count on
+  that same line. `basic.json`, 1083 frames: **85.29** skipped `glUseProgram`, **9.07** skipped
+  `glActiveTexture`, **17.00** skipped `glBindTexture` per frame — **111.4** client-side GL calls
+  elided a frame. `perf-fly.json`, 6943 frames: 86.99 / 8.39 / 20.40 — **115.8** a frame. Worth
+  saying plainly, since R5's bullet framed the item as a texture-bind problem: **the program half
+  alone is larger than both texture halves combined.**
+- **Never take a timing from a `VOXEL_BINDCHECK` run** — every skip there carries a `glGetInteger`
+  pipeline stall and those runs render at roughly half rate. Skipped-call counts come from
+  `VOXEL_BINDSTATS`; timings never come from `VOXEL_BINDCHECK`.
+- *R7 / R11 arithmetic.* 20 static `GetViewProjection()` call sites remain in `RenderManager` (21
+  before R11 took `CullWater`'s), but the per-*frame* number is better than the site count suggests:
+  every `camera.*` reference in `RenderManager` is a read and `Camera.Update` runs before the render
+  block (`Program.cs:321` against `:541`/`:544`/`:548`/`:565`), so the pose is fixed across the
+  frame and the rebuild count is **at most one per frame** — one `CreateLookAt`, one
+  `CreateFromAxisAngle`, one `CreatePerspectiveFieldOfView` and one 4x4 multiply. `new Frustum(` in
+  `RenderManager` went **5 -> 2** (only `_lightViewProj` and `_reflViewProj` remain), each build
+  being six plane extractions and normalisations; `chunk.Position * Chunk.Size` went **8 -> 0** and
+  `new Vector3(Chunk.Size)` **4 -> 0**, removing a three-multiply-plus-three-add per renderable
+  chunk per pass across four passes.
+- **Timing: no profiler row resolves the change on either scenario, and nothing is quoted.** Capture
+  rule, applied identically to both trees: both built Release and run `--no-build`, same session,
+  strictly serial and interleaved, the baseline given a cold discarded first run, `VOXEL_TIME=60`
+  fixed, `VOXEL_DEBUG=1` on both; the instrument is `FrameProfiler`'s per-second `perf` line, the
+  first line of every run dropped (it covers the world-load burst), a run's value for a row being
+  the mean of that row's per-second CPU averages, and the trees compared by the **spread** of
+  per-run values rather than by a single pair. `perf-fly.json` at 6 runs per tree in a
+  **counterbalanced** design (3 pairs baseline-first, 3 pairs work-first) plus `basic.json` at 4
+  runs per tree: **every row overlaps**, including every row this round touches. The whole-frame
+  means differ by less than half the run-to-run spread, so that difference is not quotable either.
+  Why the row cannot resolve it: `FrameProfiler` prints section figures at F2 milliseconds
+  (`FrameProfiler.cs:292,303`), a 0.01 ms quantum, while the whole saving is ~112-116 client-side GL
+  calls plus at most one matrix rebuild and two frustum builds a frame — and the same-tree
+  run-to-run spread on the very rows targeted is already 1-6 quanta. Same situation that left the R4
+  round's `cloudPass` and `chunkApply` unresolvable. **"No measurable change, and here is why the
+  row cannot resolve it" is the answer**, not a number reached for to fill the gap.
+
+**The visual gate found zero structural change, and it was established by measurement rather than by
+eye.** 20 scripted runs across the four pose-stable scenarios — `entity-binds.json`,
+`clouds-mirror.json`, `rays-halfres.json`, `lod-horizon.json` — at 5 runs each: 3 against a pristine
+`git archive HEAD` export built in a scratchpad and 2 against the working tree, which was never
+mutated to produce the baseline. Five runs per scenario give 4 same-build pairs and 6 cross-tree
+pairs, so *cross* is compared against the **distribution** of same-build rather than against one
+sample of it. Cross-tree pairs came out statistically indistinguishable from same-build pairs, and
+on most shots the most-similar pair of all ten is a **cross** pair — which could not happen if the
+change had altered output. Six shots flagged on the weaker single-pair test and all six were run to
+ground as sampling or streaming effects, none as a rendering change. The three highest-value frames
+were also read by eye on both trees: the held block cube, the held **item sprite** (the riskiest
+path in the round — the only place a non-atlas `Texture2DArray` lands on unit 0 and is restored by
+`BindWorldTextures` inside the same method) and two ground drops all render with their correct
+textures.
+
+**Gate machinery, for whoever measures next.** Two scenarios are new or changed this round.
+`visual-examples/entity-binds.json` frames what R5 actually risked and nothing checked in did: the
+entity pass's unit-0 ping-pong — a held block (cube path, unit 0 = atlas), a held *item* (the sprite
+path, which is also what triggers `ItemMeshCache`'s lazy texture build, so the **first** held-item
+frame runs a different path from the repeats), ground drops, and three repeats of one pose as a
+same-build floor. Every shot passes `hideHud: true`. Its shot numbering is **07/11/12/13/14/19**,
+not 1..6, because each `give` needs a grounded `wait` after it: `World.Update` is what refreshes the
+held id from the inventory, so a `give` followed straight by a `screenshot` renders the *previous*
+held item. Its `give` op needed a one-line change to the visual-test tooling (not to game code):
+`VisualDirector.cs:80` is now `var id = ContentRegistry.Require(step.Block!);` — `RequireBlock` is
+blocks-only by design, and `Require` returns a **`byte`**, so there is no trailing `.Id`; that
+detail already cost one compile. Item ids survive `Inventory.Add`/`EquipStackable` unchanged. Note
+also that `19-drops` is a **correct-texture** check and not a pixel instrument: drops bob and settle
+on run-dependent physics, so they land in visibly different positions between two runs of the *same*
+build. Five traps beyond that, three of them new:
+
+- **New: `wait` ticks physics once per *rendered* frame.** `VisualDirector`'s `wait` calls
+  `world.Update(deltaTime, _keys)` once per rendered frame and accumulates real `deltaTime`, so the
+  *number* of physics steps for a given simulated duration is **frame-rate dependent**. Any round
+  that makes the engine faster therefore lands at a slightly different camera depth and chunk
+  streaming state, and a naive pixel gate reads that as a regression. This is the single most
+  important thing to know before designing the next gate.
+- **New: chunks fade in on the wall clock.** `RenderManager.cs:1150-1151` and `:1810-1812` draw at
+  `min(1, lifetime / MAX_LIFETIME)` with `MAX_LIFETIME` = 0.5 s of wall clock, so a distant LOD
+  region caught mid-fade differs by up to ~208 levels between runs of the **same** build.
+  `clouds-mirror.json`'s `14-sky_level` and `16-sky_closeup` both frame such a region, and because
+  it straddles about 1 % of the frame the **full-frame p99 flips between 1 and 122** depending on
+  which side of the percentile it lands — p99 is not a usable whole-frame statistic on those two
+  shots. Use the area statistic (% of pixels above 2 levels) or a region crop.
+- **New: one same-build pair versus one cross-tree pair is not a sufficient gate** for an
+  output-preserving round. It produced four false alarms here that only extra runs cleared. Budget
+  5 runs per scenario from the start. The same lesson applies to timing: with 3 runs per tree a
+  single row *will* separate by chance — this round's first capture flagged `lighting` as
+  work-lower, which is mechanistically impossible (`SetLighting` holds the frame's cache **miss**,
+  which now does strictly more work than before), and the check that caught it was **reversing the
+  interleave order**, not adding more runs of the same order.
+- **The floor is not uniform across the frame.** In `clouds-mirror.json`'s mirror shots the sky
+  region is an essentially exact instrument (a level or two) while the water region floors in the
+  *hundreds* — the wave normal is animated from wall-clock `uTime`, so the surface is in an
+  arbitrary phase cross-run. Compare per region, never as one whole-frame number, and treat the
+  water region as a gross-breakage check rather than as a measurement.
 - **Session effects exceed the quantity being measured.** The *same* pristine binary read
-  `cloudPass` gpuAvg 1.460, 1.501 and 1.551 in three different sessions this round. Re-run the
-  baseline in the same session as the change, interleaved run for run; never difference against
-  stored captures from an earlier session, and give the baseline its cold first run too — a freshly
-  built binary streams more slowly on its first run, which moves both the loaded chunk set and the
-  wall clock at every shot.
+  `cloudPass` gpuAvg 1.460, 1.501 and 1.551 in three different sessions. Re-run the baseline in the
+  same session as the change, interleaved run for run; never difference against stored captures from
+  an earlier session, and give the baseline its own cold first run — a freshly built binary streams
+  more slowly on its first run, which moves both the loaded chunk set and the wall clock at every
+  shot.
 
-`clouds.json` is the sky-side regression check, not a measuring instrument: every shot but the
-first follows a mid-air teleport plus a 0.3 s `wait`, and `VisualDirector.Drive` ticks the world
-for `wait`, so the camera free-falls before the shutter. (`clouds_up` waits 3 s from y=30.5 and
-simply lands back at the spawn pose, which is why it alone is pose-stable.) And `perf-fly.json`'s
-`screenshot` ops do **not** pass `hideHud`, unlike both cloud scenarios, so its shots bake in the
-live profiler HUD across roughly x 0..570 — numbers that change every frame, which alone puts about
-half the frame's pixels above 2 levels *within* one binary. Any pixel gate on `perf-fly` must mask
-those columns, or the scenario must gain `hideHud: true`. Two traps carried forward from R2:
-`water.json`'s four underwater shots are **not** a usable instrument (free-falling camera plus
-drifting bubble particles give a 15-25 level same-build floor), and any frame-to-frame statistic
-must be normalised for wall-clock sun drift before it is compared across builds, or it reads
-backwards. Carried forward from earlier rounds: `lod` measures only the main-thread
-`LodManager.Update` (`World.cs:241-243`) while `LodRegion.BuildMeshData` runs on the LodGen thread,
-so size any further LOD work with a LodGen throughput capture during the #1 streaming hitch rather
-than off a `lod` row.
+Carried forward, still true: `clouds.json` is a sky-side regression check and **not** a measuring
+instrument (every shot but the first follows a mid-air teleport plus a `wait`, and `wait` ticks the
+world, so the camera free-falls before the shutter; `clouds_up` alone is pose-stable). A 3-run floor
+under-samples the same-binary tail on shots where the differing fraction sits near the p99 knee
+(`clouds_up`, `clouds_closeup`, `sky_closeup`). `perf-fly.json`'s `screenshot` ops do **not** pass
+`hideHud`, so its shots bake in the live profiler HUD across roughly x 0..570 — numbers that change
+every frame, which alone puts about half the frame's pixels above 2 levels *within* one binary; mask
+those columns or give the scenario `hideHud: true`. `water.json`'s four underwater shots are **not**
+a usable instrument (free-falling camera plus drifting bubbles give a 15-25 level same-build floor).
+Any frame-to-frame statistic must be normalised for wall-clock sun drift before it is compared
+across builds, or it reads backwards. And `lod` measures only the main-thread `LodManager.Update`
+(`World.cs:241-243`) while `LodRegion.BuildMeshData` runs on the LodGen thread, so size any further
+LOD work with a LodGen throughput capture during the #1 streaming hitch rather than off a `lod` row.
 
-Next: **R5**, then **R7 + R11** as one pass. R5 is the largest of the cheap render-side items still
-standing — 18 `BindWorldTextures()` and 20 `worldShader.Use()` a frame, most of them back-to-back
-inside `EntityPass` — it is pure bookkeeping with no visual surface, so it needs no perceptual
-gate, and its risk is confined to the invalidation list (the sun, cloud, rays and UI passes swap
-state behind its back). R10's bullet notes that landing R10 first would shrink R5's target, but R10
-is L and held behind the cheaper LOD items, so take R5 now and re-price the LOD binds against it
-afterwards rather than parking an S item behind an L one. R7 and R11 belong together: R7 caches the
-view-projection `Camera.GetViewProjection` rebuilds at 22 call sites, R11 caches the *planes* three
-passes independently re-derive from that same unchanged matrix plus the per-chunk world AABBs four
-passes recompute — both S, both output-preserving, and both as headlessly testable as this round's
-`CloudCopies` was, since `Frustum` and the AABB arithmetic are already GL-free. R10 remains the
-biggest structural render win; hold it until the cheaper LOD items above have been measured, since
-they may move `lod` enough to reprice it — and it overlaps R5.
+Next: **C3**, then **C7 + C11 + R8** as one cheap sweep. C3 is the largest un-taken item aimed at
+hitch #1 — chunk streaming, still the only phase that actually drops frames (100+ fps settled down
+to 25-55 while streaming) — and it is an algorithmic change to `FindClosestNeededChunk`, distinct
+from the ruled-out *worker priorities*. It is also the right shape for this workflow: the method is
+GL-free, so "the same chunk is chosen" can be pinned headlessly against the current scan exactly as
+`ChunkBoundsTests` pinned the AABB arithmetic and `CloudCopies` pinned the cloud offsets, and it
+needs no perceptual gate. Its one real risk is that four worker threads would share the new
+frontier/cursor, so the round's design work is the concurrency argument, not the scan. C7, C11 and
+R8 then bundle as one cheap pass with no visual surface: C11 has a **documented in-repo precedent
+for the exact replacement** (`ChunkManager.cs:139-141`, `:251-252` — a lock-free `foreach` over the
+dictionary instead of a key snapshot), C7 is a one-field delegate cache, and R8 feeds settled GC;
+all three are S and one file each. **C12** is the same shape but keep it separable rather than
+folded in: its part (a) is *not* purely mechanical, since the particle lists are drawn in order
+under alpha blending, so a head index needs a modular walk in the renderers and a draw-order
+argument, while (b) and (c) are one-liners. **R6** is S but is a *trade-off* rather than a win —
+gating the GPU timing queries on the overlay gives up the deliberate "the first second after `X`
+already has data" property — so it wants a human decision before it is taken, not an autonomous
+round. **D5** still says *measure first* and its own bullet doubts there is a win; if it is picked
+up, take only the measurement (log `FreeBlockCount` on the pool-growth line and capture it
+mid-stream and just after a teleport), not the rewrite. **R10** remains the biggest structural
+render win but is L, and R5 landing has made its case **narrower, not wider** — the bind saving is
+gone and only the per-region VAO/draw/uniform churn is left. Hold it until C5 and C11 have been
+measured, since they may move the `lod` row enough to re-price it. **D1** is broad-but-mechanical L
+and is best taken on its own; **D2** is M and pays mainly on the teleport hitch; **D3** is
+nil-impact dead code that can ride along with anything. **R3** stays parked — read its bullet before
+re-opening it.
 
 ## Ruled out (do not retry without new evidence)
 

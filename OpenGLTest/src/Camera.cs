@@ -205,6 +205,17 @@ public class Camera
     private float _bobHeight;
     private float _bobStrafe;
     private float _roll;
+
+    // PERF_TODO R7: GetViewProjection ran at 22 call sites a frame, rebuilding view and
+    // projection every time. The cache is validated against its own inputs rather than
+    // dirty-flagged: the key holds exactly the mutable state GetViewMatrix and
+    // GetProjectionMatrix read, compared bit-for-bit, so a hit means the recomputation
+    // would have produced a bit-identical matrix. Render and update run on one thread
+    // (AGENTS.md), so these are plain fields with no lock.
+    private ViewProjKey _vpKey;
+    private Matrix4x4 _viewProj;
+    private Frustum _viewFrustum;
+    private bool _vpValid;
     private float _verticalVelocity;
     private Vector2 _lastMousePosition;
     private bool _firstMouseMovement = true;
@@ -301,7 +312,7 @@ public class Camera
         mouse = input?.Mice.FirstOrDefault();
 
         if (window != null)
-            window.FramebufferResize += size => { _aspectRatio = size.X / (float)size.Y; };
+            window.FramebufferResize += size => SetAspectRatio(size.X / (float)size.Y);
 
         if (mouse == null) return;
         mouse.Cursor.CursorMode = CursorMode.Disabled;
@@ -337,6 +348,27 @@ public class Camera
     {
         Yaw = yaw;
         Pitch = Math.Clamp(pitch, -89f, 89f);
+    }
+
+    /// <summary>
+    /// Sets the projection aspect ratio. The window's FramebufferResize handler calls this and
+    /// nothing else, so a test exercising the real resize mutation path calls the same method
+    /// the game does rather than mimicking it (PERF_TODO R7).
+    /// </summary>
+    internal void SetAspectRatio(float aspect) => _aspectRatio = aspect;
+
+    /// <summary>Test seam: sets one view-state field in isolation, so a fact can prove that
+    /// <see cref="GetViewProjection"/>'s cache key really contains it. Nothing in the game
+    /// calls this; Update() owns all of these fields during play.</summary>
+    internal void TestSetViewState(float? fov = null, float? roll = null, float? bobHeight = null,
+        float? bobStrafe = null, Vector3? shoulderOffset = null, Vector3? shoulderViewDir = null)
+    {
+        if (fov.HasValue) _currentFov = fov.Value;
+        if (roll.HasValue) _roll = roll.Value;
+        if (bobHeight.HasValue) _bobHeight = bobHeight.Value;
+        if (bobStrafe.HasValue) _bobStrafe = bobStrafe.Value;
+        if (shoulderOffset.HasValue) _shoulderOffset = shoulderOffset.Value;
+        if (shoulderViewDir.HasValue) _shoulderViewDir = shoulderViewDir.Value;
     }
 
     /// <summary>
@@ -986,7 +1018,115 @@ public class Camera
     public Matrix4x4 GetProjectionMatrix() =>
         Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI * _currentFov / 180f, _aspectRatio, NearPlane, FarPlane);
 
-    public Matrix4x4 GetViewProjection() => GetViewMatrix() * GetProjectionMatrix();
+    /// <summary>
+    /// View * projection, cached per distinct camera pose (PERF_TODO R7). Twenty-two call
+    /// sites a frame used to rebuild both matrices; the cache is keyed on
+    /// <see cref="ViewProjKey"/> and compared bit-for-bit, so a hit only ever returns the
+    /// matrix the recomputation would have produced.
+    ///
+    /// The invariant: the key holds EVERY field <see cref="GetViewMatrix"/> and
+    /// <see cref="GetProjectionMatrix"/> read. Adding a field to either builder without
+    /// adding it here is the one way this goes wrong.
+    /// <c>CameraViewProjectionCacheTests</c> carries one fact per key field to catch a field
+    /// being dropped from the key, and <c>KeyHoldsExactlyTheMatrixInputs</c> makes editing
+    /// the key a conscious act. <see cref="GetViewMatrix"/> and
+    /// <see cref="GetProjectionMatrix"/> stay deliberately uncached: they are the mirror
+    /// pass's standalone answer and the tests' oracle.
+    ///
+    /// <see cref="GetViewFrustum"/> shares this one key and is refreshed in the same place,
+    /// so the two can never drift apart.
+    /// </summary>
+    public Matrix4x4 GetViewProjection()
+    {
+        EnsureViewCache();
+        return _viewProj;
+    }
+
+    /// <summary>
+    /// The view frustum of <see cref="GetViewProjection"/>, built once per distinct camera
+    /// pose (PERF_TODO R11). Three passes - RenderWorld, CullWater and RenderLod - used to
+    /// derive this independently from the identical unchanged matrix, paying six plane
+    /// extractions and normalisations three times a frame. The shadow and mirror frusta are
+    /// built from <c>_lightViewProj</c> / <c>_reflViewProj</c> and are deliberately not
+    /// routed through here.
+    /// </summary>
+    public Frustum GetViewFrustum()
+    {
+        EnsureViewCache();
+        return _viewFrustum;
+    }
+
+    /// <summary>
+    /// Revalidates the cached view-projection matrix and its frustum against the current
+    /// pose. One key and one miss branch for both, so a caller can never see a frustum that
+    /// belongs to a different matrix than <see cref="GetViewProjection"/> returns; rebuilding
+    /// the frustum on a matrix miss is free relative to the matrix build itself.
+    /// </summary>
+    private void EnsureViewCache()
+    {
+        var key = CurrentViewProjKey();
+        if (_vpValid && SameBits(in _vpKey, in key)) return;
+
+        _vpKey = key;
+        _viewProj = GetViewMatrix() * GetProjectionMatrix();
+        _viewFrustum = new Frustum(_viewProj);
+        _vpValid = true;
+    }
+
+    /// <summary>
+    /// Exactly the mutable state the two matrix builders read. <see cref="GetViewMatrix"/>
+    /// reads <see cref="ViewDirection"/> (<c>_shoulderViewDir</c> when non-degenerate, else
+    /// <see cref="GetForwardVector"/> -> <see cref="Yaw"/>/<see cref="Pitch"/>),
+    /// <c>_roll</c>, <see cref="Position"/>, <c>_bobHeight</c>, <c>_bobStrafe</c> and
+    /// <c>_shoulderOffset</c>; <see cref="GetProjectionMatrix"/> reads <c>_currentFov</c>
+    /// and <c>_aspectRatio</c>. <c>NearPlane</c>/<c>FarPlane</c> are <c>const</c> and so are
+    /// deliberately not in the key.
+    /// </summary>
+    private ViewProjKey CurrentViewProjKey() =>
+        new(Position, _shoulderViewDir, _shoulderOffset, Yaw, Pitch, _roll, _bobHeight, _bobStrafe,
+            _currentFov, _aspectRatio);
+
+    /// <summary>
+    /// Bit-for-bit key comparison. Deliberately not <c>==</c> or the record's generated
+    /// equality: <c>float</c> equality calls +0f and -0f equal and the generated
+    /// <c>Equals</c> calls NaN and NaN equal, and the correctness argument here is strictly
+    /// "the inputs were bit-identical, therefore the recomputation would have been
+    /// bit-identical".
+    /// </summary>
+    private static bool SameBits(in ViewProjKey a, in ViewProjKey b) =>
+        SameBits(a.Position, b.Position)
+        && SameBits(a.ShoulderViewDir, b.ShoulderViewDir)
+        && SameBits(a.ShoulderOffset, b.ShoulderOffset)
+        && SameBits(a.Yaw, b.Yaw)
+        && SameBits(a.Pitch, b.Pitch)
+        && SameBits(a.Roll, b.Roll)
+        && SameBits(a.BobHeight, b.BobHeight)
+        && SameBits(a.BobStrafe, b.BobStrafe)
+        && SameBits(a.Fov, b.Fov)
+        && SameBits(a.Aspect, b.Aspect);
+
+    private static bool SameBits(float a, float b) =>
+        BitConverter.SingleToInt32Bits(a) == BitConverter.SingleToInt32Bits(b);
+
+    private static bool SameBits(in Vector3 a, in Vector3 b) =>
+        SameBits(a.X, b.X) && SameBits(a.Y, b.Y) && SameBits(a.Z, b.Z);
+
+    /// <summary>
+    /// The inputs of <see cref="GetViewProjection"/>'s cache, and nothing else. Adding a
+    /// member here means the matrix builders gained an input; removing one means they lost
+    /// it. See the invariant on <see cref="GetViewProjection"/>.
+    /// </summary>
+    private readonly record struct ViewProjKey(
+        Vector3 Position,
+        Vector3 ShoulderViewDir,
+        Vector3 ShoulderOffset,
+        float Yaw,
+        float Pitch,
+        float Roll,
+        float BobHeight,
+        float BobStrafe,
+        float Fov,
+        float Aspect);
 
     /// <summary>View direction, for aiming the shadow camera ahead of the player.</summary>
     public Vector3 Forward => GetForwardVector();

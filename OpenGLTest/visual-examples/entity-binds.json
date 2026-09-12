@@ -1,0 +1,64 @@
+{
+  // Scripted visual test: run with VOXEL_TIME=60 VOXEL_SCRIPT=visual-examples/entity-binds.json
+  // (working directory OpenGLTest/, e.g. via dotnet run). Shots land in visual/entity-binds/.
+  // VOXEL_TIME=60 is the standard measurement setting and must be fixed when this scenario is
+  // used as a cross-tree pixel gate: the sun angle is wall-clock driven, so an unset VOXEL_TIME
+  // lights the two trees differently and the comparison reads a difference that is not there.
+  // Ops: teleport {pos, yaw?, pitch?}, look {yaw?, pitch?}, wait {seconds},
+  // walk {keys?, seconds}, mine {seconds}, place, give {block, count?},
+  // screenshot {name?, hideHud?}.
+  //
+  // Frames what PERF_TODO R5's texture-unit cache actually risks, which none of the other
+  // checked-in scenarios does: the entity pass's unit-0 ping-pong. RenderHeldItem's
+  // item-sprite branch is the only place a non-atlas Texture2DArray lands on unit 0 and is
+  // then restored by BindWorldTextures inside the same method, and it is also what triggers
+  // ItemMeshCache's LAZY texture build mid-pass - so the first held-item frame runs a
+  // different path from the repeats, which is why the three bind_still repeats exist.
+  // RenderItemDrops does the same ping-pong for ground drops.
+  //
+  // Poses are pixel-stable on purpose: teleport, look and screenshot never call world.Update
+  // (VisualDirector), so a bare teleport/look + screenshot burst with no wait inside it
+  // re-renders the identical pose. A wait after a mid-air teleport would resume free-fall
+  // and move the camera, so every teleport here lands on the ground before any wait.
+  //
+  // The one place a wait is mandatory: World.Update is what refreshes the held id from the
+  // inventory, so a `give` followed straight by a screenshot renders the PREVIOUS held item.
+  // Each give is followed by a short grounded wait - the player is standing still on the
+  // ground by then, so the pose does not move.
+  //
+  // hideHud on every shot: the HUD bakes the live FPS/profiler text into the frame, which
+  // makes a cross-tree pixel comparison read a difference that is not there.
+  "steps": [
+    { "op": "wait", "seconds": 8 },
+    { "op": "teleport", "pos": [0.5, 5.0, 0.5], "yaw": -90, "pitch": 0 },
+    { "op": "wait", "seconds": 4 },
+
+    // Held BLOCK: RenderHeldItem's cube path, drawn with unit 0 = the atlas.
+    { "op": "give", "block": "block/stone", "count": 8 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "look", "yaw": -90, "pitch": -10 },
+    { "op": "screenshot", "name": "held_block", "hideHud": true },
+
+    // Held ITEM: RenderHeldItem's sprite path - unit 0 swapped to the item's own texture and
+    // restored by BindWorldTextures within the same method. The highest-value frame here.
+    { "op": "give", "block": "item/primitive_pickaxe", "count": 1 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "look", "yaw": -90, "pitch": -10 },
+    { "op": "screenshot", "name": "held_item", "hideHud": true },
+
+    // Same pose three times: the same-build noise floor for this scenario, and the repeats
+    // that run after ItemMeshCache has already built the item texture.
+    { "op": "screenshot", "name": "bind_still_0", "hideHud": true },
+    { "op": "screenshot", "name": "bind_still_1", "hideHud": true },
+    { "op": "screenshot", "name": "bind_still_2", "hideHud": true },
+
+    // Ground drops: RenderItemDrops' per-drop unit-0 ping-pong, restored by BindWorldTextures.
+    // Negative pitch looks DOWN in this engine, so this aims at the sand a couple of blocks
+    // ahead - far enough that breaking it does not drop the player into the hole.
+    { "op": "look", "yaw": -90, "pitch": -30 },
+    { "op": "mine", "seconds": 4 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "look", "yaw": -90, "pitch": -30 },
+    { "op": "screenshot", "name": "drops", "hideHud": true }
+  ]
+}

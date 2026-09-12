@@ -77,7 +77,7 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 break;
 
             case "give":
-                var id = ContentRegistry.RequireBlock(step.Block!).Id;
+                var id = ContentRegistry.Require(step.Block!);
                 world.Inventory.Add(id, step.Count);
                 if (world.Inventory.IdAt(world.Inventory.SelectedIndex) != id)
                     world.Inventory.EquipStackable(world.Inventory.SelectedIndex, id);
