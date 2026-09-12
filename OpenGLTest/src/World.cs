@@ -41,6 +41,12 @@ public class World
     private readonly QuernManager _querns = new();
     private readonly FireParticleSystem _fire = new();
     private readonly BubbleParticleSystem _bubbles = new();
+
+    // Inventory is assigned in its own initialiser and never replaced, so the method group is the
+    // same closed delegate every frame; passing `Inventory.CanAccept` inline at the DropManager call
+    // allocated a fresh one per frame (PERF_TODO C7).
+    private readonly Func<byte, bool> _canAcceptDrop;
+
     // Trees currently toppling over after their base log was mined
     private readonly List<TopplingTree> _toppling = [];
     private readonly IWindow _window;
@@ -121,6 +127,7 @@ public class World
         _chunkManager = new ChunkManager(gl, opaqueGeometry, translucentGeometry);
         _generationWorker = new ChunkGenerationWorker(_chunkManager, Camera);
         _lodManager = new LodManager(gl);
+        _canAcceptDrop = Inventory.CanAccept;
 
         _generationWorker.Start();
         _lodManager.Start(Camera);
@@ -247,7 +254,7 @@ public class World
 
         // Drops collected this tick land in the inventory pools. A full pool ignores the
         // drop (it is never attracted), and an id with no pool is discarded.
-        _dropManager.Update((float)deltaTime, Camera.Position, _chunkManager, Inventory.CanAccept);
+        _dropManager.Update((float)deltaTime, Camera.Position, _chunkManager, _canAcceptDrop);
         foreach (var blockId in _dropManager.Collected)
             Inventory.Add(blockId);
 

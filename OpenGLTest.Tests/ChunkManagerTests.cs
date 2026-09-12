@@ -102,4 +102,40 @@ public sealed class ChunkManagerTests
         Assert.False(manager.Chunks.ContainsKey(Vector3.Zero));
         Assert.True(manager.MeshVersion > before);
     }
+
+    /// <summary>
+    /// ChunkRemovalVersion moves only when an unload pass really dropped a chunk, and by the time
+    /// it moves the dropped position is already needed again. Both halves are load-bearing for the
+    /// generation workers' scan frontier (PERF_TODO C3): the first is why a settled world does not
+    /// reset the frontier every frame, and the second is the ordering guard — the bump sits after
+    /// the whole unload loop, so it can never be observed while the position is still sitting in
+    /// _queuedChunkPositions and therefore still not needed. Both outcomes happen in this one fact,
+    /// so it cannot pass vacuously.
+    /// </summary>
+    [Fact]
+    public void UnloadBumpsChunkRemovalVersionOnlyWhenAChunkLeaves()
+    {
+        var manager = new ChunkManager(null!);
+        var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);
+        chunk.IsBlockDataReady = true;
+        manager.Chunks[Vector3.Zero] = chunk;
+
+        var camera = new Camera(null, null);
+        camera.TestTeleport(Vector3.Zero, yaw: 0f, pitch: 0f);
+        var before = manager.ChunkRemovalVersion;
+
+        // _lastUnloadCamChunk starts null, so this first Update really does run the unload scan -
+        // it just finds nothing out of range.
+        manager.Update(camera);
+        Assert.True(manager.Chunks.ContainsKey(Vector3.Zero));
+        Assert.Equal(before, manager.ChunkRemovalVersion);
+
+        camera.TestTeleport(new Vector3(2000f, 30f, 2000f), yaw: 0f, pitch: 0f);
+        manager.Update(camera);
+
+        Assert.False(manager.Chunks.ContainsKey(Vector3.Zero));
+        Assert.True(manager.ChunkRemovalVersion > before);
+        // Fails if the increment is ever moved ahead of the _queuedChunkPositions.TryRemove.
+        Assert.True(manager.NeedsChunk(Vector3.Zero));
+    }
 }

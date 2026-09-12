@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Xunit;
 
@@ -187,5 +189,50 @@ public sealed class LodManagerTests
         lods.AddRegion((0, -1, -1), HeadlessRegion(-1, -1, 7));
         lods.UpdateCoverFlags(chunks, Vector3.Zero);
         Assert.True(coarse.IsBuried);
+    }
+
+    /// <summary>Covers item C11: TakeDirtyRegion now walks the dirty dictionary itself instead of
+    /// materialising <c>.Keys</c>. The fact pins the drain's BEHAVIOUR — every pending region is
+    /// handed out exactly once and the set then reports empty — not the enumeration mechanism: a
+    /// test cannot observe the absence of the Keys snapshot's locks or its copy, only that the
+    /// claim semantics are unchanged. The dirty regions are produced through the real path
+    /// (FindClosestNeededRegion fills _queued, which is the only thing MarkEditedColumn will mark),
+    /// so the producer half is exercised too.</summary>
+    [Fact]
+    public void DirtyRegionsDrainExactlyOnce()
+    {
+        var lods = new LodManager(null!);
+        var cam = new Camera(null, null);
+        cam.TestTeleport(Vector3.Zero, 0f, 0f);
+        lods.AttachCamera(cam);
+
+        var claimed = new HashSet<(int Level, int X, int Z)>();
+        for (var i = 0; i < 8; i++)
+        {
+            var next = lods.FindClosestNeededRegion();
+            Assert.NotNull(next);
+            Assert.True(claimed.Add(next!.Value), "the scan handed out the same region twice");
+        }
+
+        lods.MarkEditedColumn(0, 0);
+
+        var drained = new List<(int Level, int X, int Z)>();
+        while (lods.TakeDirtyRegion() is { } key)
+            drained.Add(key);
+
+        Assert.NotEmpty(drained);
+        Assert.All(drained, key => Assert.Contains(key, claimed));
+        Assert.Equal(drained.Count, drained.Distinct().Count());
+        Assert.Null(lods.TakeDirtyRegion());
+    }
+
+    /// <summary>Covers item C11's common case: the LodGen worker calls TakeDirtyRegion on every
+    /// spin and the set is empty for nearly all of them, so the empty walk must stay correct (and,
+    /// unobservably from here, allocate nothing). Behaviour only — the fact cannot see whether a
+    /// key snapshot was taken.</summary>
+    [Fact]
+    public void AnEmptyDirtySetReturnsNull()
+    {
+        Assert.Null(new LodManager(null!).TakeDirtyRegion());
     }
 }

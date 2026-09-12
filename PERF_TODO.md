@@ -151,10 +151,6 @@ nothing from **Ruled out** — overlaps are called out inline.
   "the first second after X already has data" (a deliberate property) — decide the
   trade. Different from the ruled-out *GL debug context*.
   **Impact low-med · risk low · effort S.**
-- [ ] **R8 · UI per-frame string allocations** — `UIRenderer.cs:344` (`FPS`),
-  `:397` (compass), `:435` (coords), plus the hotbar's `.ToString()` counts. Format
-  only when the value changes, or into a reusable buffer; feeds settled GC.
-  **Impact low · risk low · effort S.**
 - [ ] **R10 · Every LOD region owns a `Mesh`** — `LodRegion` creates a VAO + VBO +
   EBO per region and another set for its water sheet (`LodRegion.cs:110-128`), and
   each draw is a `BindVertexArray` + `DrawElements` behind three uniform sets:
@@ -174,18 +170,12 @@ nothing from **Ruled out** — overlaps are called out inline.
   removing any of them, so what remains is R10's own case and only that: a VAO + VBO + EBO
   per region and another set per water sheet, a `BindVertexArray` + three uniform sets + a
   `DrawElements` per *surviving* region across three ring walks, and GL object create/delete
-  churn as regions stream. Price it on those terms alone.
+  churn as regions stream. Price it on those terms alone. **Hold it until C5 has been
+  measured**, since C5 may move the `lod` row enough to re-price this one.
   **Impact med-high · risk med · effort L.**
 
 ### CPU / streaming
 
-- [ ] **C3 · Chunk-gen workers re-scan the whole offset list** —
-  `ChunkGenerationWorker.FindClosestNeededChunk` (`ChunkGenerationWorker.cs:100-112`)
-  restarts the ~15k-entry sorted-offset scan on every call, two `ContainsKey` per
-  offset, on four threads; once the world fills, each scan runs to the end before
-  sleeping. Shared frontier/cursor, or a per-worker persistent cursor. This is
-  algorithmic — distinct from the ruled-out *worker priorities*.
-  **Impact med-high · risk low-med · effort M.**
 - [ ] **C5 · Parallelise / cap LOD region builds** — `LodManager` builds on one
   BelowNormal thread (`LodManager.cs:87-94`); region builds are pure and
   independent. A small worker pool would parallelise the streaming `lod` burst,
@@ -195,21 +185,9 @@ nothing from **Ruled out** — overlaps are called out inline.
   `ChunkManager.UnloadDistantChunks` (`ChunkManager.cs:164-167`): O(unloads x
   placements). Per-chunk buckets or a spatial index.
   **Impact low-med · risk low · effort M.**
-- [ ] **C7 · Per-frame `Inventory.CanAccept` delegate** — `World.Update`
-  (`World.cs:250`) passes a method group, allocating a delegate every frame. Cache
-  it in a field. **Impact negligible · risk low · effort S.**
-- [ ] **C11 · The LOD worker snapshots the dirty set every loop** —
-  `LodManager.WorkerLoop` calls `TakeDirtyRegion` on every iteration
-  (`LodManager.cs:101-124`, the call at `:107`) and `TakeDirtyRegion` enumerates
-  `_dirtyRegions.Keys` (`:156-165`), which takes the dictionary's locks and
-  materialises a full key copy even when the set is empty — which it is for most of
-  the worker's spins. `ChunkManager` already documents and uses the alternative: a
-  `foreach` over the dictionary itself is lock-free, copies nothing, and supports
-  removal while enumerating (`ChunkManager.cs:139-141`, `:251-252`). Same change here.
-  **Impact low · risk low · effort S.**
 - [ ] **C12 · Bundled micro-allocations and O(n) evictions** — three unrelated
-  one-liners, grouped because each fix is mechanical, the way R8 groups the UI string
-  sites. (a) The four particle systems evict at capacity with `List<T>.RemoveAt(0)`,
+  one-liners, grouped because each fix is small and local, not because they share a
+  subsystem. (a) The four particle systems evict at capacity with `List<T>.RemoveAt(0)`,
   an O(n) shift over up to 512 entries (`LeafParticleSystem.cs:129-130`,
   `BubbleParticleSystem.cs:55-56`, `FireParticleSystem.cs:59-60`,
   `BlockDebrisSystem.cs:40-41`); a head index makes it O(1). Not purely mechanical:
@@ -314,291 +292,428 @@ nothing from **Ruled out** — overlaps are called out inline.
   *in* `Camera` — the view-projection and view-frustum caches — but they were their own
   bullets, not findings from that walk, so this entry still stands.)
 
-**Suggested first pass:** R5, R7 and R11 landed this round, as one pass. All three are
-output-preserving bookkeeping with no visual surface, so the gate looked for *zero* structural
+**Suggested first pass:** **C3** landed, with **C7 + C11 + R8** as one cheap sweep alongside it. All
+four are output-preserving with no intended visual surface, so the gate looked for *zero* structural
 change rather than for an acceptable difference. **R3 is unchanged and still parked** — its bullet
-above carries the finding.
+above carries the finding. The blow-by-blow write-ups of the earlier R4 and R5/R7/R11 rounds are in
+`git log -p -- PERF_TODO.md`; what is kept below is what the next round needs, not the history.
 
-**R5a — the program cache, correct by construction.** `Shader.Use()` (`Shader.cs:103-108`) now holds
-a `private static uint _boundProgram` and returns without a GL call when that handle is already
-bound. One static field covers all twelve shader-owning classes with **no invalidation list at
-all**, because there is exactly one `glUseProgram` call in the tree. The check that proves it, and
-the one to re-run before trusting the cache:
+### What landed
 
-```
-grep -rn "\.UseProgram[(]" OpenGLTest/src --include=*.cs
-```
+- **C3 · the shared scan frontier.** `OpenGLTest/src/Systems/ChunkScanFrontier.cs` — a GL-free
+  `internal sealed class` (the `CloudCopies` / `TextureUnitCache` precedent) holding one *immutable*
+  node `(Center, RemovalVersion, Index)` swapped by `Interlocked.CompareExchange`, shared by all
+  four chunk-gen threads of a `ChunkGenerationWorker`. `FindClosestNeededChunk`
+  (`ChunkGenerationWorker.cs:118`) is now two lines — sample the camera chunk and
+  `ChunkManager.ChunkRemovalVersion`, then `_frontier.FindNext(camChunk, version, _needsChunk)` — in
+  place of the full walk of the sorted offset array. `SortedOffsets` is `internal` so tests can build
+  a frontier over the real array: **17077 entries**, exactly the `ChunkRadiusSq = 256` lattice count
+  and exactly the settled `LoadedChunkCount` (the old bullet's "~15k" was an estimate; do not carry
+  it forward, and note that an intermediate figure of 17157 appeared in this round's own working
+  notes and is also wrong). `_needsChunk` caches the `ChunkManager.NeedsChunk` method group, since
+  the scan calls it once per probed offset.
+- **C3's counter.** `ChunkManager.ChunkRemovalVersion` (`ChunkManager.cs:74`), incremented once per
+  unload pass that actually dropped a chunk (`:228`), gated on `removed > 0`.
+- **R8 · the HUD string cache.** `OpenGLTest/src/Systems/UITextCache.cs`, GL-free and
+  render-thread-only (so no locking), with four members — `Fps`, `CompassReadout`, `Coords`, and
+  `SlotCount` keyed *per slot*. `UIRenderer` holds one `_textCache` (`:189`) and calls it at the four
+  per-frame sites: `:385` (FPS), `:438` (compass readout), `:476` (coords), `:652` (hotbar count).
+  Only the **formatting** is cached — every `DrawText` / `DrawTextCentred` / `MeasureSize` call still
+  runs every frame, so R9's glyph batching sees identical submissions.
+  `DrawInventoryPanel`'s `.ToString()` sites (`:723`, `:1193`, `:1259`) were deliberately left alone:
+  panel-only, not named by the bullet.
+- **C11 · the LOD dirty drain.** `LodManager.TakeDirtyRegion` (`:202`) walks the
+  `ConcurrentDictionary` itself instead of `.Keys`. `FindClosestNeededRegion` (`:220`) and a new
+  one-line `AttachCamera` (`:113`, split out of `Start`) were promoted to `internal` so the drain
+  could be driven headlessly against its **real producer path** rather than against a hand-seeded
+  set; `Start` and `WorkerLoop` are otherwise untouched.
+- **C7.** `World._canAcceptDrop` (`World.cs:48`), one cached `Func<byte, bool>` assigned in the
+  constructor (`:130`) — after the field initialisers run, since the `Inventory` auto-property is
+  initialised in declaration order and a field initialiser declared above it would capture null.
 
-It must return exactly one line, inside `Shader.Use()`. **Use that spelling.** Two plainer forms
-cannot return one line and will mislead whoever runs them: the unqualified `grep -rn "UseProgram"`
-also matches a doc comment in `RenderManager.cs` ("...survive any number of `UseProgram`
-switches"), and the plain-paren `"\.UseProgram("` also matches `Shader.cs`'s own comment, which
-quotes the grep and therefore matches itself. The bracket class `[(]` matches the real call and not
-the comment. `Dispose` clears `_boundProgram` when it deletes its own handle so a recycled GL name
-can never produce a false hit; shaders are only disposed at shutdown, so that is belt-and-braces.
+### The C3 concurrency argument — the reusable artefact of this round
 
-**R5b — the texture-unit cache, and why there are three primitives rather than one.**
-`OpenGLTest/src/Systems/TextureUnitCache.cs` is a GL-free `internal sealed class` (the
-`CloudCopies` / `HalfResTarget` / `ReflectionReuse` precedent) tracking units 0-4 plus the active
-unit. `RenderManager` drives it through three private primitives sitting just above
-`BindWorldTextures` (`RenderManager.cs:1310`, `:1324`, `:1338`):
+This is the part to read before touching chunk streaming, `ChunkManager`'s dictionaries, or the
+frontier itself. The code's own doc comments carry it in full beside the code; this is the summary.
 
-- `BindUnit(unit, target, tex)` **stays eager** — it always makes the unit active (the cache may
-  still skip the `glActiveTexture` itself) and then skips only a redundant `glBindTexture`. This is
-  the load-bearing design decision of R5 and the one a future reader is most likely to try to
-  "simplify" away. It exists because three things bind on *whatever unit is live*: `CopyScene`'s
-  `glCopyTexSubImage2D` (`RenderManager.cs:1033-1043`), the three `Create*Target` methods (whose own
-  comment at `:977-978` states they assume unit 0 on entry), and `TextureLoader.Upload`
-  (`TextureLoader.cs:91,116`), reached lazily from `ItemMeshCache` *inside* the entity pass. A lazy
-  select would change the active-unit trajectory at those points; eager keeps it byte-identical to
-  pre-R5 at every point in the frame.
-- `BindLazy` skips the select too, and is used **only inside `BindWorldTextures`**, where the proof
-  is local: nothing between its five binds reads the active unit, and the method ends with an
-  unconditional `ActiveUnit(0)` restoring its documented postcondition. Do not use it anywhere else
-  without repeating that argument.
-- `InvalidateTextureUnits()` (`:1388`). **Its doc comment is the canonical audit** — every site that
-  can change unit 0-4 or the active unit behind the cache's back, plus the matching "provably cannot
-  invalidate" list. Read it there rather than trusting a copy here: it is maintained beside the code
-  and this file is not. Two of its entries look redundant and are not — the
-  `ItemMeshCache.GlStateChanged` callback, which fires from `BuildTexture` because item textures are
-  built *lazily mid-pass*, and the note that `RenderSun` early-returns *before* its unit-0 bind on
-  night frames, which the negative control below turned into the load-bearing sentence of the whole
-  audit.
+**The invariant.** If the published node is `(C, V, K)`, then *every offset index below `K` was
+observed not-needed by a worker that had sampled exactly centre `C` and removal version `V`*. A
+caller trusts that prefix **only** when its own freshly sampled `(center, version)` pair matches;
+otherwise it scans from index 0. The node's three fields are `readonly` and written before the
+exchange, which is a full fence, so a reader that sees the reference sees all three consistently.
 
-`BindWorldTextures()` is now five `BindLazy` calls plus that trailing `ActiveUnit(0)`. Thirteen
-other render-path bind sites were routed 1:1 through `BindUnit`/`ActiveUnit`; every create/delete
-site was left raw and paired with an invalidation entry. The pre-existing gap where `RenderShadows`
-unbinds unit 1 and leaves it unbound until the next `BindWorldTextures` is **reproduced, not
-fixed** — this round was output-preserving, and an implementer who "corrects" it breaks that.
+**Why the trusted prefix stays valid.** `NeedsChunk(p)` is
+`!Chunks.ContainsKey(p) && !_queuedChunkPositions.ContainsKey(p)` (`ChunkManager.cs:815`). An *add*
+to either dictionary only makes a position *less* needed, which is the safe direction, so only a
+**removal** can turn a position needed. Today there is exactly one removal site for each dictionary —
+`Chunks.TryRemove` at `ChunkManager.cs:200` and `_queuedChunkPositions.TryRemove` at `:210` — and
+both are inside `UnloadDistantChunks`, which bumps the version after the loop. So between one bump
+and the next, the only positions that can turn needed belong to an unload pass currently in flight,
+and that pass's own bump necessarily follows it.
 
-**R7 and R11 are key-validated, not dirty-flagged.** `Camera.GetViewProjection()` and the new
-`Camera.GetViewFrustum()` both go through one `EnsureViewCache()`, keyed on a `ViewProjKey` record
-struct holding *exactly* the mutable fields the two builders read — `Position`, `_shoulderViewDir`,
-`_shoulderOffset`, `Yaw`, `Pitch`, `_roll`, `_bobHeight`, `_bobStrafe`, `_currentFov`,
-`_aspectRatio` (`NearPlane`/`FarPlane` are `const` and deliberately excluded) — compared
-**bit-for-bit** through `BitConverter.SingleToInt32Bits`. The record's generated equality is
-deliberately unused: `float.Equals` calls `+0f`/`-0f` equal and `NaN`/`NaN` equal, which would break
-the argument. That argument is: a hit means the inputs were bit-identical, so the recomputation
-would have produced a bit-identical matrix — output preservation is a **proof**, not a hope, and it
-needs none of the wiring the bullet's literal "dirty-flag it" would have required at the ~14 camera
-write sites (`Update`, the `OnMouseMove` callback, `TestTeleport`, `PushOutOf`, the
-`FramebufferResize` lambda). Matrix and frustum share the one key and the one miss branch, so they
-cannot drift apart. `GetViewMatrix()` and `GetProjectionMatrix()` were left **uncached on purpose**:
-they are the correct answer for the three standalone mirror `GetProjectionMatrix()` calls, and they
-are the tests' oracle.
+**Why the bump is published *after* the loop, and must never be moved up.** A loaded chunk lives in
+**both** dictionaries: `QueueChunk` `TryAdd`s the position to `_queuedChunkPositions` (`:574`) and
+never removes it on the success path. So a position does **not** become needed at the
+`Chunks.TryRemove` at `:200`; it becomes needed ten lines later at the `_queuedChunkPositions`
+removal at `:210`, after `RemoveRenderable`, `MeshVersion++`, `chunk.Dispose()` and the loaded-count
+decrement. A bump placed next to `Chunks.TryRemove` would announce the transition *before it had
+happened*, and a worker probing inside that window would publish a frontier that skips the position
+**permanently** — exactly the starvation this design exists to prevent, reachable in exactly the
+scenario the old bullet worried about. The increment therefore counts removals and fires once, after
+the `foreach` closes. That is also ~800 fewer interlocked ops per chunk-border crossing than a
+per-removal bump would have cost.
 
-R11's chunk half stores `WorldMin`/`WorldMax` on `Chunk`, computed in the constructor with
-character-for-character the expressions the passes used, so the values are bit-identical; `Position`
-is get-only and assigned once, so there is no invalidation path at all. Note that R11's bullet named
-only `RenderWorld` and `CullWater` as re-deriving the camera frustum — **`RenderLod` built the
-identical third one from the identical matrix** and was taken too. Its *region* AABBs are
-per-region, not per-chunk, and stayed out of scope, as did the shadow and mirror frusta
-(`_lightViewProj`, `_reflViewProj`).
+**The bounded imprecision, stated as a cost rather than a hazard.** The end-of-loop bump does not
+make the frontier instantaneously exact: while an unload pass is in flight, positions turn needed
+while the version still reads its old value, so a call that sampled that old version can skip one.
+It is skipped by *that call only* — the published node carries the version it was computed under and
+is therefore **self-invalidating**: the bump that ends the loop discards every such node, and the
+next call scans from 0. The worst case is latency, not starvation: a worker that returned null just
+inside the window sleeps `GenerationDelayIdleMs` (200 ms, `WorldGenerationConfig.cs:33`) before
+rescanning. That is not a regression — the pre-change full scan had the identical hole (sweep to the
+end, a position turns needed behind the read head, sleep 200 ms) — and the other three workers,
+sampling after the bump, find it immediately.
 
-**What the tests pin, and what only GL covers.** 30 new facts across
-`CameraViewProjectionCacheTests` (16), `ChunkBoundsTests` (3) and `TextureUnitCacheTests` (11); the
-suite went 417 -> 447 with the same two known failures
+**The camera-reverses case, by name.** A camera that goes C → C′ → C without any worker ever
+observing C′ is closed by the **version**, not by the centre: the unload at C′ bumped it, so the node
+is discarded even though the centre matches again. This is also why the design no longer depends on
+the coincidence that generation and unload share a radius (`ChunkManager.cs:197`) — that equality is
+now only why the frontier *survives* a still camera, not why it is *safe*.
+
+**Why the exchange is never retried.** Retrying a failed `CompareExchange` is the only way `FindNext`
+could spin, so a lost race is simply dropped. Losing only shrinks the frontier (more scanning), never
+skips. A late publish carrying a stale version is likewise harmless: nobody whose version sample is
+current will match it, so everyone full-scans until a current node is published. A successful CAS
+chain is strictly monotone in index, because `Publish` succeeds only when the node reference is
+exactly the one the call read and only ever offers `index > start`. And `index <= start` publishes
+nothing, so a converged worker polling every 200 ms allocates no `Node` and executes no loop body at
+all.
+
+**Why a hit publishes `i` and not `i + 1`.** Only indices the call actually *proved* not-needed are
+published. It costs one re-test of the returned offset on the next call and removes any need to
+reason about whether `QueueChunk` succeeded, was deduped, or threw.
+
+**Disagreeing threads degrade, never break.** `Camera.Position` is an unsynchronised
+`{ get; private set; }` (`Camera.cs:20`) already read by the worker threads before this round; that
+was not changed and nothing here depends on fixing it. Four threads that briefly disagree about the
+centre each reset the node and scan from 0 — i.e. the pre-C3 behaviour for the sub-frame window in
+which they disagree, and never worse. A `NaN` centre never matches and always full-scans.
+
+**The wake model is untouched.** `FindNext` introduces no waiting, no signalling and no sleeping;
+`WorkerLoop` keeps its existing `GenerationDelayIdleMs` idle poll. There is no wake to miss.
+
+**The standing obligation — read this before adding a removal.** *If a future change removes a
+position from `ChunkManager.Chunks` or from `_queuedChunkPositions` anywhere other than
+`UnloadDistantChunks` without bumping `ChunkRemovalVersion`, the frontier can starve that chunk.*
+Nothing structurally prevents it: `Chunks` is a **public** `ConcurrentDictionary` and
+`OpenGLTest.Tests/MeshingTests.cs:49` already removes through it. The single-site property is a
+convention, not an enforced invariant. Two facts guard it —
+`ChunkScanFrontierTests.FrontierTrustsThePrefixUntilTheRemovalVersionMoves` (converge, free a
+low-index position **without** bumping, assert the frontier deliberately does not find it, then bump
+and assert it comes straight back: this fails if the bump is ever dropped or misplaced) and
+`ChunkManagerTests.UnloadBumpsChunkRemovalVersionOnlyWhenAChunkLeaves` (whose final assertion is
+`NeedsChunk(Vector3.Zero)` *after* the bump is observable, which fails if the increment is moved
+ahead of the `_queuedChunkPositions` removal).
+
+**Why the bump is gated on `removed > 0`.** `UnloadDistantChunks` runs on a chunk-border crossing
+*or* every `UnloadScanFallbackFrames` = 120 frames (`ChunkManager.cs:171`), even when nothing has
+moved. An ungated bump would therefore fire roughly twice a second on a fully settled world and
+restart four full scans forever — the exact cost C3 exists to remove. The gate's no-bump half is
+pinned empirically, not merely argued: the first half of
+`UnloadBumpsChunkRemovalVersionOnlyWhenAChunkLeaves` is a *real* unload scan (it runs because
+`_lastUnloadCamChunk` is a `Vector3?` that starts null) which finds nothing and must leave the
+version untouched.
+
+**What a passing concurrency test does and does not prove.** `ChunkScanFrontierTests`' four-thread
+coverage fact and its freed-behind-the-frontier stress fact demonstrate the absence of the races they
+happen to exercise, on one machine and one scheduler — not the absence of races. They were run five
+times consecutively, green each time, and that is still not proof. The safety claim rests on the
+invariant above; the tests are a check on it, not a substitute. Both the frontier's doc comment and
+the test class doc say so, and a future round must not upgrade "five green runs" into evidence. Note
+also that two threads returning the *same* position is expected and benign — `QueueChunk` dedupes at
+`_queuedChunkPositions.TryAdd` (`ChunkManager.cs:574`) — so no fact asserts distinctness of returns.
+
+### The R8 bit key, so nobody "simplifies" it to `==`
+
+`UITextCache` compares float keys **bit-for-bit** through `BitConverter.SingleToInt32Bits`, following
+R7's `ViewProjKey` precedent, because a cache hit must *prove* the text would be identical.
+`$"{-0f:0.0}"` renders `"-0.0"` while `$"{0f:0.0}"` renders `"0.0"`, and `-0f == 0f` is true, so an
+`==` key would put the wrong sign on the coordinate line whenever the player stands just on the
+negative side of an axis. This is neither hypothetical nor only a headless fact: the HUD read below
+captured `XYZ -0.0 / 70.5 / -0.0` **on screen** on both trees.
+`UITextCacheTests.NegativeZeroDoesNotReuseThePositiveZeroText` is the fact that justifies the key.
+
+One BCL detail measured on the way and worth keeping: **`int.ToString()` returns a shared cached
+instance for values 0..299 on this runtime (.NET 9)**, so any future allocation-shaped fact using
+`ReferenceEquals` on a formatted small integer passes vacuously. `SlotCountsAreCachedPerSlot` uses
+counts above 299 for exactly that reason.
+
+### Tests
+
+The suite went **447 -> 464** with the same two known failures
 (`BlockMovementTests.LeavesDeclareThreeQuarterMovementSpeed`,
-`FallingBlockTests.SevenTowerChainRebuildsFullyWithNoDrops`). The camera class carries **one
-single-field fact per key field**, driven through an `internal TestSetViewState` seam added for
-exactly that, precisely because an oracle-only fact —
-`Assert.Equal(cam.GetViewMatrix() * cam.GetProjectionMatrix(), cam.GetViewProjection())` — **passes
-with no cache at all**, and a walking drive moves several key fields at once, so a field *dropped*
-from the key would be invisible. `KeyHoldsExactlyTheMatrixInputs` reflects the key's shape against a
-hard-coded allowlist, making an edit to the key a conscious act. What those facts **cannot** catch
-is a *new* `Camera` field wired into `GetViewMatrix` tomorrow with no matching key entry; that
-failure mode is visible (a camera input that stops working), not subtle. `Frustum` is a readonly
-struct of private planes with no equality, so the frustum facts compare *behaviour*:
-`IntersectsAABB` over a fixed lattice, with both outcomes required to occur so no fact can pass
-vacuously. Covered **only** by GL and by nothing headless: `Shader.Use`'s actual skip and the actual
-`glActiveTexture`/`glBindTexture` elision. `Shader` owns a GL handle with no GL-free seam, and R5
-adds no new *arithmetic* to `RenderManager`, so following the R12 precedent the GL call sites got no
-unit test. Those halves are covered by the harness below and by the screenshot gate.
+`FallingBlockTests.SevenTowerChainRebuildsFullyWithNoDrops`): +2 `LodManagerTests`, +6
+`UITextCacheTests`, +1 `ChunkManagerTests`, +6 `ChunkScanFrontierTests`, +2
+`ChunkGenerationWorkerTests`. C7 and the `UIRenderer` wiring deliberately add none — `World` and
+`UIRenderer` both need live GL/window objects that no test builds, so their coverage is the compiler
+plus the HUD eyeball read below. Note that the suite declares 405 `[Fact]`/`[Theory]` attributes
+against 464 executed cases; `[Theory]` expansion accounts for the gap, so reconcile a delta by
+counting attributes per file rather than against the executed total.
 
-**The invalidation list was proved by measurement, not by reading.** A temporary `VOXEL_BINDCHECK=1`
-harness (R12's readback precedent) verified *every skipped call* against GL: `GL_CURRENT_PROGRAM` in
-`Shader.Use`, the cache's **recorded** active unit in `ActiveUnit`, and the unit's real binding in
-`BindUnit`/`BindLazy` — the latter saving and restoring the live active unit so the harness could
-not corrupt the trajectory it was measuring. Counters sat behind a *separate* `VOXEL_BINDSTATS=1`
-flag, so a counting run carries no `glGetInteger` stalls and its timing stays usable. **Eleven
-scripted runs, 33 504 frames, 2 717 848 verified skips (1 789 480 program, 298 662 active-unit,
-629 706 bind), zero mismatches of any kind.** The two non-scriptable entries —
-`CreateReflectionTarget`'s recreate path and `SetViewport` — were driven **mechanically rather than
-by hand**, which is a departure from the plan and a better one: a probe fired inside the render loop
-at fixed frames in all eleven runs, changing `GameSettings.ReflectionIndex` three times and resizing
-the viewport down and back. `Program.OnFramebufferResize` does nothing but call
-`RenderManager.SetViewport`, so the `RenderManager`-side path an OS resize reaches is exactly the
-one the probe reached; what is *not* covered is Silk's event plumbing above it, which touches no
-texture state. All instrumentation was removed afterwards —
-`grep -rn "VOXEL_BINDCHECK\|VOXEL_BINDSTATS" OpenGLTest/` is empty.
+C3's equivalence is pinned two ways, both headless and both against the **deleted** scan preserved
+verbatim as an oracle: `ChunkScanFrontierTests.FrontierReturnsExactlyWhatAFullScanWouldReturn`
+(2000 rounds against a full-scan reference with the centre moving and positions freed mid-run, then a
+second phase over a *settled* sphere, which is what produces the null answers the fact's own
+anti-vacuity guard needs) and `ChunkGenerationWorkerTests.WorkerPicksTheSameChunkTheFullScanWould`
+(400 rounds end-to-end against the real `ChunkManager.NeedsChunk` and a real `Camera`, with two
+camera moves mid-run). `SortedOffsetsAreClosestFirstAndCoverTheRadius` pins the *property* the
+frontier's closest-first claim rests on — non-decreasing `LengthSquared`, no duplicates, set-equal to
+the `ChunkRadiusSq` lattice — and explicitly **does not** pin tie order among equidistant offsets,
+because `BuildSortedOffsets` uses an unstable `List.Sort`.
 
-**The negative control did not behave as predicted, and that is the most reusable thing this round
-learned.** Deleting the UI pass's invalidation entry alone (the plan's chosen control): **zero**
-mismatches. Deleting `BeginFrame`'s hard reset alone: **zero**. Deleting *both*, on a daytime run:
-still **zero**. Only with both gone *and* the run at night (`VOXEL_TIME=300`) did the check fire —
-2437 mismatches over 971 frames on `basic.json` (2.51/frame) and 5097 over 2053 frames on
-`clouds-mirror.json` (2.48/frame), linear in frames rendered and every one the same shape,
-`unit 0 Texture2DArray expected 1 actual 26`: the atlas expected, the UI's own texture actually
-bound. Restoring both entries returned the identical night run to 0 mismatches over 972 frames. The
-mechanism is that the two entries are **mutually redundant covers for one hazard** — the UI pass's
-raw unit-0 bind crossing the frame boundary — and that on a day frame `RenderSun` rebinds unit 0
-before anything can skip; only at night, where it early-returns *before* its bind, does the stale
-record survive to be skipped. Both entries stay: the redundancy is defence in depth. The lesson for
-any future state cache here is that a single-entry deletion is not a sufficient control, and that
-the sun's day/night branch is a real state divide a daytime-only sweep will miss.
+### The visual gate: zero structural change, and three new traps
 
-**Measurement: the skipped calls are large in count and invisible in the profiler, and no timing is
-quoted as a saving.**
+63 scripted runs across the four pose-stable scenarios — `entity-binds.json` (`VOXEL_TIME` 60),
+`clouds-mirror.json` (60), `rays-halfres.json` (180), `lod-horizon.json` (10) — against a pristine
+`git archive HEAD` export built in a scratchpad, the working tree never mutated to produce a
+baseline. Every shot passed on the structural statistic; every flag was run to ground as sampling or
+as *earlier* chunk arrival, none as a rendering change. Three things learned that belong beside the
+traps already recorded below.
 
-- *Arithmetic off the source.* `BindWorldTextures()` has **18** call sites and HEAD's body issued
-  **10** raw GL calls each (5 `glActiveTexture` + 5 `glBindTexture`) — up to 180 client-side calls a
-  frame. After R5, a fully-matching replay costs **0** and the entity-pass restore after an
-  item-sprite swap costs **1**, both pinned by `TextureUnitCacheTests`. **Do not generalise 10 -> 0
-  to the thirteen `BindUnit`-routed sites:** they keep their eager select and save at most the one
-  redundant bind each. `worldShader.Use()` has 20 call sites, and `SetWorldUniform` /
-  `ApplyFrameUniforms` each flip two programs per call.
-- *Measured, and only from `VOXEL_BINDSTATS` runs.* Capture rule: from `OpenGLTest/`,
-  `VOXEL_BINDSTATS=1 VOXEL_DEBUG=1 VOXEL_TIME=60 VOXEL_SCRIPT=visual-examples/<s>.json dotnet run -c
-  Release --no-build`, one run each; counters are cumulative from process start (load frames
-  included), read off the single final line printed in `Dispose` and divided by the frame count on
-  that same line. `basic.json`, 1083 frames: **85.29** skipped `glUseProgram`, **9.07** skipped
-  `glActiveTexture`, **17.00** skipped `glBindTexture` per frame — **111.4** client-side GL calls
-  elided a frame. `perf-fly.json`, 6943 frames: 86.99 / 8.39 / 20.40 — **115.8** a frame. Worth
-  saying plainly, since R5's bullet framed the item as a texture-bind problem: **the program half
-  alone is larger than both texture halves combined.**
-- **Never take a timing from a `VOXEL_BINDCHECK` run** — every skip there carries a `glGetInteger`
-  pipeline stall and those runs render at roughly half rate. Skipped-call counts come from
-  `VOXEL_BINDSTATS`; timings never come from `VOXEL_BINDCHECK`.
-- *R7 / R11 arithmetic.* 20 static `GetViewProjection()` call sites remain in `RenderManager` (21
-  before R11 took `CullWater`'s), but the per-*frame* number is better than the site count suggests:
-  every `camera.*` reference in `RenderManager` is a read and `Camera.Update` runs before the render
-  block (`Program.cs:321` against `:541`/`:544`/`:548`/`:565`), so the pose is fixed across the
-  frame and the rebuild count is **at most one per frame** — one `CreateLookAt`, one
-  `CreateFromAxisAngle`, one `CreatePerspectiveFieldOfView` and one 4x4 multiply. `new Frustum(` in
-  `RenderManager` went **5 -> 2** (only `_lightViewProj` and `_reflViewProj` remain), each build
-  being six plane extractions and normalisations; `chunk.Position * Chunk.Size` went **8 -> 0** and
-  `new Vector3(Chunk.Size)` **4 -> 0**, removing a three-multiply-plus-three-add per renderable
-  chunk per pass across four passes.
-- **Timing: no profiler row resolves the change on either scenario, and nothing is quoted.** Capture
-  rule, applied identically to both trees: both built Release and run `--no-build`, same session,
-  strictly serial and interleaved, the baseline given a cold discarded first run, `VOXEL_TIME=60`
-  fixed, `VOXEL_DEBUG=1` on both; the instrument is `FrameProfiler`'s per-second `perf` line, the
-  first line of every run dropped (it covers the world-load burst), a run's value for a row being
-  the mean of that row's per-second CPU averages, and the trees compared by the **spread** of
-  per-run values rather than by a single pair. `perf-fly.json` at 6 runs per tree in a
-  **counterbalanced** design (3 pairs baseline-first, 3 pairs work-first) plus `basic.json` at 4
-  runs per tree: **every row overlaps**, including every row this round touches. The whole-frame
-  means differ by less than half the run-to-run spread, so that difference is not quotable either.
-  Why the row cannot resolve it: `FrameProfiler` prints section figures at F2 milliseconds
-  (`FrameProfiler.cs:292,303`), a 0.01 ms quantum, while the whole saving is ~112-116 client-side GL
-  calls plus at most one matrix rebuild and two frustum builds a frame — and the same-tree
-  run-to-run spread on the very rows targeted is already 1-6 quanta. Same situation that left the R4
-  round's `cloudPass` and `chunkApply` unresolvable. **"No measurable change, and here is why the
-  row cannot resolve it" is the answer**, not a number reached for to fill the gap.
+- **New, and the most important: the pose-stable scenarios carry a per-run latent noise scalar, and
+  an unbalanced run design manufactures false marginals.** A 1-D MDS on the structural difference
+  matrix recovers 88-95 % of the variance with the **same run ordering on every shot of a scenario**,
+  and the two trees interleave fully along it — on `lod-horizon` the single *least*-similar pair of
+  all 28 was two runs of the same pristine baseline binary, and the most-similar pairs were
+  cross-tree. A deliberate calibration run at `VOXEL_TIME=11` instead of `10` (a one-second, 0.6°
+  sun advance) sat further from all eight real runs than any of them sat from each other, so the
+  statistic's entire dynamic range on that scenario is a sub-second wall-clock **sun phase** reaching
+  the frame through shadow-map texel alignment. The prescribed 3-baseline + 2-work design put both
+  work runs adjacent at one end of that axis by session position alone and produced a false marginal
+  p = 0.057-0.086; a 4th baseline run added *late* in the session landed at the opposite extreme and
+  collapsed it to p = 0.62-0.68. **Use equal run counts per tree, with neither tree owning the early
+  or the late slots.** It is the same lesson as "reversing the interleave, not adding runs, is what
+  catches a false positive", applied to the pixel gate.
+- **New: the `area%` statistic (fraction of pixels above 2 levels) does not discriminate on two of
+  the four scenarios.** It reads 8-30 % for two runs of the *same* binary on `lod-horizon` (the sun
+  drift above) and saturates near 43 % for almost every pair on `rays-halfres` (the underwater
+  animation phase that scenario's own header documents). The statistic that discriminates is the
+  previous round's **clustered** one: per-pixel luma difference >= 24 **and** at least 5 of the 25
+  pixels in the same 5x5 box also flagged, so isolated dither/quantisation speckle fails the
+  connectivity test while a moved ridge or a missing chunk survives it. Report both; where they
+  disagree, the clustered statistic is the authority. On `rays-halfres` the clustered figure was
+  `0.0000` on essentially every pair of every shot while `area%` flagged two shots — that is the
+  shape of an animation-phase false positive. And judge *cross* against the **distribution** of
+  same-build (an exact one-sided Mann-Whitney U over the pairs), never against one sample of it.
+- **New: the gate could not see R8 at all, and `perf-fly` cannot substitute.** Every `screenshot` op
+  in all four pose-stable scenarios passes `hideHud: true` — verified 10/10 `rays-halfres`, 7/7
+  `clouds-mirror`, 4/4 `lod-horizon`, 6/6 `entity-binds` — and `Program.cs:563-564` skips
+  `world.RenderUI` on those frames, so no HUD text reaches any gate shot. `perf-fly.json` hides
+  nothing, but it exercises only **one** of R8's four sites: the compass readout and the coordinate
+  line are gated on `HasCompassEquipped(inventory)` (`RenderManager.cs:2458`) and `perf-fly` gives the
+  player nothing, so neither ever draws, and with no items there are no hotbar counts either. A HUD
+  check needs a throwaway scenario that **equips a compass last** (`VisualDirector`'s `give` calls
+  `EquipStackable(SelectedIndex)`, so each `give` overwrites the previous one) and is run with
+  `VOXEL_DEBUG=0` so the profiler panel does not cover the leftmost hotbar slots, which is where
+  `give` always lands its stack. Two such scenarios were driven from the scratchpad on both trees and
+  rendered character-identical text (`N 000` / `SE 124` / `W 269` / `E 090`;
+  `XYZ 8.5 / 1.6 / -12.5`, then `XYZ -0.0 / 70.5 / -0.0`, then `XYZ -0.0 / 2.6 / -0.0`; hotbar `178`
+  -> `185` after a give -> `59` after a block swap), which also demonstrates the cache invalidating
+  rather than sticking.
 
-**The visual gate found zero structural change, and it was established by measurement rather than by
-eye.** 20 scripted runs across the four pose-stable scenarios — `entity-binds.json`,
-`clouds-mirror.json`, `rays-halfres.json`, `lod-horizon.json` — at 5 runs each: 3 against a pristine
-`git archive HEAD` export built in a scratchpad and 2 against the working tree, which was never
-mutated to produce the baseline. Five runs per scenario give 4 same-build pairs and 6 cross-tree
-pairs, so *cross* is compared against the **distribution** of same-build rather than against one
-sample of it. Cross-tree pairs came out statistically indistinguishable from same-build pairs, and
-on most shots the most-similar pair of all ten is a **cross** pair — which could not happen if the
-change had altered output. Six shots flagged on the weaker single-pair test and all six were run to
-ground as sampling or streaming effects, none as a rendering change. The three highest-value frames
-were also read by eye on both trees: the held block cube, the held **item sprite** (the riskiest
-path in the round — the only place a non-atlas `Texture2DArray` lands on unit 0 and is restored by
-`BindWorldTextures` inside the same method) and two ground drops all render with their correct
-textures.
+**The C3 gate rule, and how it was discharged.** C3 changes *when* chunks arrive, never what they
+contain, so on a streaming-heavy scenario **a chunk arriving a frame earlier or later is not a
+failure; a chunk that never arrives is.** The discriminator is same-tree repeatability: a difference
+that varies between two runs of one tree is sampling; a feature present in all runs of one tree and
+absent from all runs of the other, at a shot taken well after its teleport, is a real change. Both
+halves were checked. On `lod-horizon`, at all four shots, **all eight runs report identical loaded
+chunk counts (17077) and identical LOD region counts (718 / 1265 / 926 / 1259) with bit-identical
+camera poses** — nothing late, nothing missing. On `clouds-mirror`, whose sky shots are taken ~7 s in
+and *are* mid-stream, the working tree was consistently **ahead** (1256-1296 LOD regions against the
+baseline's 943-1161, with one baseline run not even finished loading chunks) — i.e. more far terrain
+present, never less. The decisive control, and the reusable technique: **raise the scenario's opening
+`wait` and re-run both trees.** With the opening wait taken from 8 s to 55 s (the modified scenario
+kept in the scratchpad and passed by absolute path, so nothing was written into either tree), all four
+runs reach exactly 17077 chunks / 1296 regions at every shot and a **cross-tree** pair becomes the
+most similar of all (sky region clustered `0.0000`) while a same-build baseline pair does not. Two
+different trees produced a near-identical frame; two runs of the same tree did not.
 
-**Gate machinery, for whoever measures next.** Two scenarios are new or changed this round.
-`visual-examples/entity-binds.json` frames what R5 actually risked and nothing checked in did: the
-entity pass's unit-0 ping-pong — a held block (cube path, unit 0 = atlas), a held *item* (the sprite
-path, which is also what triggers `ItemMeshCache`'s lazy texture build, so the **first** held-item
-frame runs a different path from the repeats), ground drops, and three repeats of one pose as a
-same-build floor. Every shot passes `hideHud: true`. Its shot numbering is **07/11/12/13/14/19**,
-not 1..6, because each `give` needs a grounded `wait` after it: `World.Update` is what refreshes the
-held id from the inventory, so a `give` followed straight by a `screenshot` renders the *previous*
-held item. Its `give` op needed a one-line change to the visual-test tooling (not to game code):
-`VisualDirector.cs:80` is now `var id = ContentRegistry.Require(step.Block!);` — `RequireBlock` is
-blocks-only by design, and `Require` returns a **`byte`**, so there is no trailing `.Id`; that
-detail already cost one compile. Item ids survive `Inventory.Add`/`EquipStackable` unchanged. Note
-also that `19-drops` is a **correct-texture** check and not a pixel instrument: drops bob and settle
-on run-dependent physics, so they land in visibly different positions between two runs of the *same*
-build. Five traps beyond that, three of them new:
+One scraping trap found the hard way: the `[visual] saved <path>` log line is printed several frames
+**after** the shutter, by which time the director has already run the next teleport. Key any log
+scraping on the `[visual] N/M screenshot ->` line instead; keying on `saved` reads the wrong frame's
+pose and chunk counts entirely, and it cost one wrong diagnosis here.
 
-- **New: `wait` ticks physics once per *rendered* frame.** `VisualDirector`'s `wait` calls
+### Measurement: C3's generation rate separates cleanly; nothing else is quotable
+
+The four chunk-gen worker threads are covered by **no profiled section**, so no `FrameProfiler` row
+can measure C3 and none was reached for. The honest instrument already exists, and the next round
+should not have to rediscover it: under `VOXEL_DEBUG=1` the per-second `perf` line carries
+`chunks {N}/{V}` (`FrameProfiler.cs:272`), where `N` is `ChunkManager.LoadedChunkCount`
+(`ChunkManager.cs:80`). **`N` is a NET counter** — incremented in `QueueChunk` (`:582`), decremented
+in `UnloadDistantChunks` (`:209`) — so the quantity is a *net loaded-chunk delta*, never "chunks
+generated"; each `lod-horizon` leg begins with a mass purge of the previous ring, and that bias is
+identical on both trees.
+
+**Capture rule, applied identically to both trees.** Both trees built Release and run `--no-build`;
+the baseline is a `git archive HEAD` export re-verified pristine before use; one session, strictly
+serial, never concurrent, each run from its own tree's `OpenGLTest/` directory:
+`VOXEL_DEBUG=1 VOXEL_TIME=10 VOXEL_SCRIPT=visual-examples/lod-horizon.json dotnet run -c Release
+--no-build`. One cold baseline run first, **discarded**. Then 4 runs per tree in a **counterbalanced**
+order — `b1, w1, b2, w2, w3, b3, w4, b4`, i.e. two pairs baseline-first and two pairs work-first. The
+window is leg 1, everything before the script's *second* teleport: drop the run's first `perf` line
+(it covers the world-load burst), then take consecutive lines from there until `N` first reaches 99 %
+of its maximum over the leg; the run's value is `(N_end - N_start) / intervals`, one interval counted
+as one second. Compare the trees by the **spread** of per-run values, never by a single pair.
+
+**Result — net loaded-chunk delta per second, leg 1 of `lod-horizon`:**
+
+| Tree | Per-run values | Spread | Median |
+|---|---|---|---|
+| Baseline (672c113) | 2498.0, 2573.8, 2770.0, 2732.8 | 2498.0-2770.0 | 2653.3 |
+| Working tree (C3) | 3203.7, 3190.7, 4326.0, 4221.5 | 3190.7-4326.0 | 3712.6 |
+
+The spreads are **disjoint** (baseline max 2770.0 < working min 3190.7), the ratio of medians is
+**1.40**, and the exact one-sided permutation p = 1/70 = **0.0143** — the smallest value attainable
+at n = 4 + 4. All four pairs separate in the same direction regardless of which tree ran first, which
+is what the counterbalancing was for. A second, fixed-duration form of the same capture (net delta
+over exactly the first **two** intervals of the window, which removes the whole-second quantisation
+of the window end) is also disjoint in the same direction: baseline 5333-6098, working 7602-8675,
+ratio 1.54, same p. The 8 `lod-horizon` gate logs from the visual step — a different,
+*non*-counterbalanced design in an earlier session, so explicitly not part of this capture and not
+mixed into the spreads — are disjoint the same way (baseline 2409.8-2817.0, working 3070.7-4244.0).
+
+Caveats, all real. A `perf` line publishes on the first frame at or past 1 s of accumulated wall time
+and the accumulator is then *zeroed* rather than decremented (`FrameProfiler.cs:203`, `:281`), so an
+interval is >= 1 s by up to one frame; counting it as 1 s overstates both trees — ~0.9 % baseline
+against ~1.3 % working tree, a ~0.4 % edge to the working tree, two orders below the ~40 % gap, so it
+does not create the separation. The in-window mean frame times are **not** usable as a frame-cost
+claim, because the working tree's window spans 2-3 intervals against the baseline's 4 and therefore
+covers only the densest part of the burst; no frame-time conclusion is drawn. And a single run is
+coarse, since the window end is quantised to whole seconds — four runs per tree with disjoint spreads
+is what makes the figure quotable; one pair would not.
+
+**Why the rate moves, mechanistically.** During the fill the near ring is already loaded, so the
+first needed offset sits out near the rim and the pre-change scan walked most of the 17077-entry list
+before **every** generated chunk, on each of four threads. The frontier amortises that walk to
+roughly once per centre, which holds because `UnloadDistantChunks` runs only on a chunk-border
+crossing or every 120 frames (`ChunkManager.cs:171`) and the bump is gated on `removed > 0`, so
+version bumps batch into the crossing frame instead of arriving per unloaded chunk. Measured on the
+real array single-threaded, a full fill costs just over **2 probes per offset in total** (each index
+is probed once as the scan walks past it, and once when the next call re-tests the offset it
+returned, since a hit publishes `i` and not `i + 1`);
+`ChunkScanFrontierTests.TheScanCostIsAmortisedNotPerCall` pins that under 3x, a bound the pre-change
+O(offsets)-per-call scan misses by four orders of magnitude.
+
+**The settled case is arithmetic off the source, not a measurement.** `LoadedChunkCount` converges to
+exactly 17077, which is exactly the offset count, so on a settled world every offset is in `Chunks`
+and `NeedsChunk`'s `&&` short-circuits after **one** `ContainsKey`. 17077 offsets x 1 probe x 4
+threads x 5 scans/s (`GenerationDelayIdleMs` = 200 ms) is on the order of **342 000 dictionary probes
+a second before the change and none after** — the frontier is converged, `Publish` early-returns, the
+loop body never executes and no `Node` is allocated, so a 200 ms poll costs one volatile read and two
+comparisons per worker. 683 000 is the upper bound if neither dictionary held the position; the older
+"two `ContainsKey` per offset" framing over-counts the settled case for exactly this reason.
+
+No `perf-fly` capture was run this round, so the profile table at the top of this file is untouched by
+it, exactly as it was untouched by the R5/R7/R11 round.
+
+### Carried forward from earlier rounds — still true, still load-bearing
+
+**On the R5 program and texture-unit caches**, whose design a future reader is most likely to try to
+"simplify": `RenderManager`'s `BindUnit(unit, target, tex)` **stays eager** — it always makes the unit
+active and skips only a redundant `glBindTexture` — because three things bind on *whatever unit is
+live* (`CopyScene`'s `glCopyTexSubImage2D`, the three `Create*Target` methods, and
+`TextureLoader.Upload`, reached lazily from `ItemMeshCache` inside the entity pass). `BindLazy` skips
+the select too and is used **only** inside `BindWorldTextures`, where the proof is local. The
+canonical audit of what can change units 0-4 behind the cache's back is the doc comment on
+`InvalidateTextureUnits()` — read it beside the code, not a copy here. The one check that proves the
+program cache needs no invalidation list is
+`grep -rn "\.UseProgram[(]" OpenGLTest/src --include=*.cs`, which must return exactly one line inside
+`Shader.Use()`; **use that exact spelling**, since plainer forms also match doc comments (including
+one that quotes the grep and therefore matches itself). The pre-existing gap where `RenderShadows`
+unbinds unit 1 and leaves it unbound until the next `BindWorldTextures` is **reproduced, not fixed**;
+an implementer who "corrects" it breaks output preservation. And the negative-control lesson:
+deleting the UI pass's invalidation entry alone gave **zero** mismatches, as did deleting
+`BeginFrame`'s hard reset alone, as did deleting *both* on a daytime run — only both gone **and** a
+night run (`VOXEL_TIME=300`) fired the check, because `RenderSun` early-returns before its unit-0
+bind at night. **A single-entry deletion is not a sufficient control, and a daytime-only sweep misses
+a real state divide.**
+
+**On R7/R11**: `Camera.GetViewProjection()` and `GetViewFrustum()` share one `EnsureViewCache()` keyed
+on a `ViewProjKey` compared bit-for-bit (the record's generated equality is deliberately unused,
+because `float.Equals` calls `+0f`/`-0f` equal and `NaN`/`NaN` equal, which would break the proof).
+`GetViewMatrix()` / `GetProjectionMatrix()` are uncached **on purpose**: they are the correct answer
+for the standalone mirror projections and they are the tests' oracle.
+`KeyHoldsExactlyTheMatrixInputs` makes editing the key a conscious act; what no headless fact can
+catch is a *new* `Camera` field wired into `GetViewMatrix` tomorrow with no matching key entry.
+
+**Gate traps that still apply to any scenario-based comparison:**
+
+- **`wait` ticks physics once per *rendered* frame.** `VisualDirector`'s `wait` calls
   `world.Update(deltaTime, _keys)` once per rendered frame and accumulates real `deltaTime`, so the
-  *number* of physics steps for a given simulated duration is **frame-rate dependent**. Any round
-  that makes the engine faster therefore lands at a slightly different camera depth and chunk
-  streaming state, and a naive pixel gate reads that as a regression. This is the single most
-  important thing to know before designing the next gate.
-- **New: chunks fade in on the wall clock.** `RenderManager.cs:1150-1151` and `:1810-1812` draw at
-  `min(1, lifetime / MAX_LIFETIME)` with `MAX_LIFETIME` = 0.5 s of wall clock, so a distant LOD
-  region caught mid-fade differs by up to ~208 levels between runs of the **same** build.
-  `clouds-mirror.json`'s `14-sky_level` and `16-sky_closeup` both frame such a region, and because
-  it straddles about 1 % of the frame the **full-frame p99 flips between 1 and 122** depending on
-  which side of the percentile it lands — p99 is not a usable whole-frame statistic on those two
-  shots. Use the area statistic (% of pixels above 2 levels) or a region crop.
-- **New: one same-build pair versus one cross-tree pair is not a sufficient gate** for an
-  output-preserving round. It produced four false alarms here that only extra runs cleared. Budget
-  5 runs per scenario from the start. The same lesson applies to timing: with 3 runs per tree a
-  single row *will* separate by chance — this round's first capture flagged `lighting` as
-  work-lower, which is mechanistically impossible (`SetLighting` holds the frame's cache **miss**,
-  which now does strictly more work than before), and the check that caught it was **reversing the
-  interleave order**, not adding more runs of the same order.
-- **The floor is not uniform across the frame.** In `clouds-mirror.json`'s mirror shots the sky
-  region is an essentially exact instrument (a level or two) while the water region floors in the
-  *hundreds* — the wave normal is animated from wall-clock `uTime`, so the surface is in an
-  arbitrary phase cross-run. Compare per region, never as one whole-frame number, and treat the
-  water region as a gross-breakage check rather than as a measurement.
-- **Session effects exceed the quantity being measured.** The *same* pristine binary read
-  `cloudPass` gpuAvg 1.460, 1.501 and 1.551 in three different sessions. Re-run the baseline in the
-  same session as the change, interleaved run for run; never difference against stored captures from
-  an earlier session, and give the baseline its own cold first run — a freshly built binary streams
-  more slowly on its first run, which moves both the loaded chunk set and the wall clock at every
-  shot.
+  number of physics steps for a given simulated duration is **frame-rate dependent**. Any round that
+  makes the engine faster lands at a slightly different camera depth and streaming state, and a naive
+  pixel gate reads that as a regression.
+- **Chunks and LOD regions fade in on the wall clock** (`RenderManager.cs:1150-1151`, `:1810-1812`,
+  `MAX_LIFETIME` 0.5 s), so a region caught mid-fade differs by up to ~208 levels between runs of the
+  **same** build. `clouds-mirror.json`'s `14-sky_level` and `16-sky_closeup` frame such a region and
+  their full-frame p99 flips between 1 and 122 depending on which side of the percentile it lands —
+  **p99 is not a usable whole-frame statistic on those two shots.**
+- **The floor is not uniform across the frame.** In `clouds-mirror.json`'s mirror shots the sky region
+  is an essentially exact instrument while the water region floors in the *hundreds*, because the
+  wave normal is animated from wall-clock `uTime`. Compare per region (fix the horizon row once by
+  eye on one baseline image and reuse that crop for every run of the shot) and treat the water region
+  as a gross-breakage check rather than a measurement.
+- **Session effects exceed the quantity being measured.** The same pristine binary read `cloudPass`
+  gpuAvg 1.460, 1.501 and 1.551 in three different sessions. Always re-run the baseline in the same
+  session, interleaved run for run, never against stored captures from an earlier session; and give
+  the baseline a **cold discarded first run**, since a freshly built binary streams more slowly on its
+  first run, which moves both the loaded chunk set and the wall clock at every shot.
+- **Budget at least 5 runs per scenario from the start** — and, per this round's finding above, split
+  them evenly between the trees. One same-build pair against one cross-tree pair is not a gate.
+- `entity-binds.json`'s `19-drops` is a **correct-texture eyeball check, not a pixel instrument**:
+  drops bob and settle on run-dependent physics and land in visibly different positions between two
+  runs of the *same* build. Its shot numbering is 07/11/12/13/14/19 because each `give` needs a
+  grounded `wait` after it — `World.Update` is what refreshes the held id from the inventory, so a
+  `give` followed straight by a `screenshot` renders the *previous* held item.
+- `clouds.json` is a sky-side regression check and **not** a measuring instrument (every shot but the
+  first follows a mid-air teleport plus a `wait`, and `wait` ticks the world, so the camera free-falls
+  before the shutter; `clouds_up` alone is pose-stable). `water.json`'s four underwater shots are
+  likewise not usable (a 15-25 level same-build floor). `perf-fly.json`'s `screenshot` ops do **not**
+  pass `hideHud`, so its shots bake in the live profiler HUD across roughly x 0..570 — useful for
+  reading HUD text, useless as a pixel instrument unless those columns are masked.
+- Any frame-to-frame statistic must be normalised for wall-clock **sun drift** before it is compared
+  across builds, or it reads backwards.
+- `lod` measures only the main-thread `LodManager.Update` while `LodRegion.BuildMeshData` runs on the
+  LodGen thread, so size any further LOD work with a **LodGen throughput capture** during the #1
+  streaming hitch rather than off a `lod` row.
 
-Carried forward, still true: `clouds.json` is a sky-side regression check and **not** a measuring
-instrument (every shot but the first follows a mid-air teleport plus a `wait`, and `wait` ticks the
-world, so the camera free-falls before the shutter; `clouds_up` alone is pose-stable). A 3-run floor
-under-samples the same-binary tail on shots where the differing fraction sits near the p99 knee
-(`clouds_up`, `clouds_closeup`, `sky_closeup`). `perf-fly.json`'s `screenshot` ops do **not** pass
-`hideHud`, so its shots bake in the live profiler HUD across roughly x 0..570 — numbers that change
-every frame, which alone puts about half the frame's pixels above 2 levels *within* one binary; mask
-those columns or give the scenario `hideHud: true`. `water.json`'s four underwater shots are **not**
-a usable instrument (free-falling camera plus drifting bubbles give a 15-25 level same-build floor).
-Any frame-to-frame statistic must be normalised for wall-clock sun drift before it is compared
-across builds, or it reads backwards. And `lod` measures only the main-thread `LodManager.Update`
-(`World.cs:241-243`) while `LodRegion.BuildMeshData` runs on the LodGen thread, so size any further
-LOD work with a LodGen throughput capture during the #1 streaming hitch rather than off a `lod` row.
-
-Next: **C3**, then **C7 + C11 + R8** as one cheap sweep. C3 is the largest un-taken item aimed at
-hitch #1 — chunk streaming, still the only phase that actually drops frames (100+ fps settled down
-to 25-55 while streaming) — and it is an algorithmic change to `FindClosestNeededChunk`, distinct
-from the ruled-out *worker priorities*. It is also the right shape for this workflow: the method is
-GL-free, so "the same chunk is chosen" can be pinned headlessly against the current scan exactly as
-`ChunkBoundsTests` pinned the AABB arithmetic and `CloudCopies` pinned the cloud offsets, and it
-needs no perceptual gate. Its one real risk is that four worker threads would share the new
-frontier/cursor, so the round's design work is the concurrency argument, not the scan. C7, C11 and
-R8 then bundle as one cheap pass with no visual surface: C11 has a **documented in-repo precedent
-for the exact replacement** (`ChunkManager.cs:139-141`, `:251-252` — a lock-free `foreach` over the
-dictionary instead of a key snapshot), C7 is a one-field delegate cache, and R8 feeds settled GC;
-all three are S and one file each. **C12** is the same shape but keep it separable rather than
-folded in: its part (a) is *not* purely mechanical, since the particle lists are drawn in order
-under alpha blending, so a head index needs a modular walk in the renderers and a draw-order
-argument, while (b) and (c) are one-liners. **R6** is S but is a *trade-off* rather than a win —
-gating the GPU timing queries on the overlay gives up the deliberate "the first second after `X`
-already has data" property — so it wants a human decision before it is taken, not an autonomous
-round. **D5** still says *measure first* and its own bullet doubts there is a win; if it is picked
-up, take only the measurement (log `FreeBlockCount` on the pool-growth line and capture it
-mid-stream and just after a teleport), not the rewrite. **R10** remains the biggest structural
-render win but is L, and R5 landing has made its case **narrower, not wider** — the bind saving is
-gone and only the per-region VAO/draw/uniform churn is left. Hold it until C5 and C11 have been
-measured, since they may move the `lod` row enough to re-price it. **D1** is broad-but-mechanical L
-and is best taken on its own; **D2** is M and pays mainly on the teleport hitch; **D3** is
-nil-impact dead code that can ride along with anything. **R3** stays parked — read its bullet before
-re-opening it.
+Next: **C5**, then **C12 + D3** as one cheap sweep. **C5** is the largest remaining item still aimed
+at hitch #1 — chunk streaming is still the only phase that actually drops frames, and `lod` is its
+top row at up to 10.7 ms. Region builds are pure and independent, which is the right shape for a small
+worker pool, and this round has just demonstrated that the streaming burst *is* measurable with a
+scripted capture rather than a profiler row, so C5 can be priced honestly: use a **LodGen throughput**
+capture during the burst (regions built per second, the same shape as the net loaded-chunk rule
+above), not the main-thread `lod` row, which only measures `LodManager.Update`. The thing to design
+for is **contention**: C5's pool would compete for cores with the four chunk-gen threads — now
+hungrier per unit time, since C3 removed the scan that was throttling them — and with the mesh pool.
+`R10`'s own bullet says to hold R10 until C5 has been measured, so C5 also unblocks the biggest
+remaining render item. Then **C12 + D3** as the cheap sweep: C12's parts (b) (`Chunk.GenerateBlockData`'s
+scalar solid recount, which `BlockCount - _blocks.AsSpan().Count(BlockType.Air)` does vectorised) and
+(c) (`LodManager.RemoveRegion`'s linear `List.Remove` on `_pendingCover`) are one-liners, and D3 is
+nil-impact dead code that rides along with anything — but **C12(a) must carry its own draw-order
+argument**: the four particle lists are drawn in order under `SrcAlpha`/`OneMinusSrcAlpha`, so
+replacing `RemoveAt(0)` needs a head index plus a **modular walk in the renderers**, not a swap-remove,
+and that part is not mechanical. **C6** is next-after — it shares `UnloadDistantChunks` with C3's
+counter, so whoever takes it should re-read the standing obligation above before touching that method.
+**D1** (packed chunk keys) is a broad-but-mechanical L, best taken on its own, and it would also make
+the frontier's per-probe `NeedsChunk` cheaper. **D2** is M and pays mainly on the teleport hitch.
+**D5** is measurement-only: log `FreeBlockCount` on the pool-growth line and capture it mid-stream and
+just after a teleport — take the measurement, not the rewrite, since its own bullet doubts there is a
+win. **R6** is S but is a *trade-off* rather than a win — gating the GPU timing queries on the overlay
+gives up the deliberate "the first second after `X` already has data" property — so it wants a human
+decision, not an autonomous round. **R10** remains the biggest structural render win but is L, and R5
+landing narrowed its case to the per-region VAO/draw/uniform churn alone. **R3** stays parked — read
+its bullet before re-opening it.
 
 ## Ruled out (do not retry without new evidence)
 
@@ -626,6 +741,7 @@ re-opening it.
 - Mud 6-face gate as specified: not outcome-equivalent (diagonal dirt can be wet
   with no face-adjacent dirt). Only valid under an unproven scheduling invariant.
 - VSync/limiters, GL debug context, per-frame `GetError`, worker priorities
-  (thread-priority tuning — Open C3 is an algorithmic change, not this),
+  (thread-priority tuning — the landed chunk-scan frontier is the algorithmic
+  change aimed at that scan, not this),
   shader ALU (4-tap PCF, 8 point lights), uniform location lookups, indexed mesh
   upload — all audited, not the problem.

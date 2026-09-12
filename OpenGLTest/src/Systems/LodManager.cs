@@ -106,10 +106,16 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
         return perLevel;
     }
 
+    /// <summary>Binds the camera the region scan measures distance from. Split out of
+    /// <see cref="Start"/> so tests can reach <see cref="FindClosestNeededRegion"/> — which
+    /// dereferences the camera through <c>CameraRegion</c> — without spawning the LodGen thread.
+    /// </summary>
+    internal void AttachCamera(Camera camera) => _camera = camera;
+
     public void Start(Camera camera)
     {
         if (_isRunning) return;
-        _camera = camera;
+        AttachCamera(camera);
         _isRunning = true;
 
         var thread = new Thread(WorkerLoop)
@@ -185,18 +191,33 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
 
     private static int FloorDiv(int a, int b) => a >= 0 ? a / b : -((-a + b - 1) / b);
 
-    private (int Level, int X, int Z)? TakeDirtyRegion()
+    /// <summary>
+    /// Claims one dirty region for rebuild, or null if none are pending. The worker calls this on
+    /// every spin and the set is empty for nearly all of them, so the walk goes over the dictionary
+    /// itself rather than over <c>.Keys</c>: the ConcurrentDictionary enumerator is lock-free and
+    /// copies nothing, and removing entries through it while enumerating is explicitly supported
+    /// (the same shape ChunkManager's unload pass and its dirty-chunk scan already use and document).
+    /// Internal so tests can drive it without starting the LodGen thread.
+    /// </summary>
+    internal (int Level, int X, int Z)? TakeDirtyRegion()
     {
-        foreach (var key in _dirtyRegions.Keys)
+        foreach (var kvp in _dirtyRegions)
         {
-            if (_dirtyRegions.TryRemove(key, out _))
-                return key;
+            if (_dirtyRegions.TryRemove(kvp.Key, out _))
+                return kvp.Key;
         }
 
         return null;
     }
 
-    private (int Level, int X, int Z)? FindClosestNeededRegion()
+    /// <summary>
+    /// The closest region, finest level first, that is neither loaded nor already claimed; claims
+    /// it in <c>_queued</c> and returns it, or null when every level is full.
+    /// Internal (rather than private) because it is the only path that fills <c>_queued</c>, and
+    /// <see cref="MarkEditedColumn"/> refuses to mark a region that is not in it — so a test of the
+    /// dirty-set drain can only produce a dirty region by going through this scan first.
+    /// </summary>
+    internal (int Level, int X, int Z)? FindClosestNeededRegion()
     {
         for (var level = 0; level < LodRegion.Levels.Length; level++)
         {

@@ -184,6 +184,10 @@ public class UIRenderer : IDisposable
     private readonly float _countScale;
     private readonly float _headScale;
 
+    // Formats the per-frame HUD strings only when their values change; the draws still happen
+    // every frame (PERF_TODO R8).
+    private readonly UITextCache _textCache = new();
+
     // Longest run DrawText draws. BitmapFont.Layout clamps its output to the scratch span it
     // is handed, so this single constant bounds all three text buffers at once — the glyph
     // scratch, the vertex scratch and the static index buffer — and a longer string is
@@ -378,7 +382,7 @@ public class UIRenderer : IDisposable
         DrawTexture(ScreenCentre, new Vector2(CrosshairSize), _crosshairTexture);
 
     public void DrawFps(int fps) =>
-        DrawText($"FPS {fps}", new Vector2(ProfilerLeft, FpsTop), _countScale, Rgba.White);
+        DrawText(_textCache.Fps(fps), new Vector2(ProfilerLeft, FpsTop), _countScale, Rgba.White);
 
     /// <summary>
     /// Draws the frame-timing table under the FPS text: a translucent panel sized to the block
@@ -431,7 +435,7 @@ public class UIRenderer : IDisposable
         DrawRect(new Vector2(cx, CompassTop + CompassHeight * 0.5f),
             new Vector2(CompassWidth, CompassHeight), PanelBackground);
 
-        var readout = $"{Compass.CardinalName(heading)} {(int)MathF.Round(heading) % 360:D3}";
+        var readout = _textCache.CompassReadout(heading);
         DrawTextCentred(readout, cx, CompassTop + CompassReadoutTop, _countScale, Rgba.White);
 
         var tickTop = CompassTop + CompassTickTop;
@@ -469,7 +473,7 @@ public class UIRenderer : IDisposable
 
         if (showCoordinates && _font != null)
         {
-            var coords = $"XYZ {position.X:0.0} / {position.Y:0.0} / {position.Z:0.0}";
+            var coords = _textCache.Coords(position);
             DrawTextCentred(coords, cx, CompassTop + CompassHeight + CompassCoordsGap,
                 _countScale, Rgba.White);
         }
@@ -645,7 +649,7 @@ public class UIRenderer : IDisposable
             for (var i = 0; i < Inventory.SlotCount; i++)
             {
                 if (inventory.IdAt(i) == 0) continue;
-                var text = inventory.CountAt(i).ToString();
+                var text = _textCache.SlotCount(i, inventory.CountAt(i));
                 var size = _font.MeasureSize(text.AsSpan(), _countScale);
                 var slotRight = firstCentreX + i * stride + SlotSize * 0.5f;
                 var slotBottom = centreY + SlotSize * 0.5f;

@@ -51,6 +51,28 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     public int MeshVersion { get; private set; }
 
+    private int _chunkRemovalVersion;
+
+    /// <summary>
+    /// Bumped once per unload pass that actually dropped a chunk. <see cref="NeedsChunk"/> can only
+    /// go from false back to true for a position when that position has left BOTH <see cref="Chunks"/>
+    /// and _queuedChunkPositions, and UnloadDistantChunks is the only place in the tree that removes
+    /// from either. The bump is published AFTER the whole loop, so by the time a reader sees a new
+    /// value every position dropped by that pass is genuinely needed again — a reader that saw this
+    /// value unchanged across an interval knows no removal pass completed during it, which is what
+    /// lets the generation workers' shared scan frontier trust a prefix it proved not-needed earlier
+    /// (PERF_TODO C3, see ChunkScanFrontier).
+    /// Do not move the increment up next to Chunks.TryRemove: a loaded chunk is in BOTH dictionaries
+    /// (QueueChunk TryAdds to _queuedChunkPositions and never removes it), so the position only becomes
+    /// needed at the _queuedChunkPositions.TryRemove below, and a bump published before that announces
+    /// a transition that has not happened yet — which lets a frontier skip the position permanently.
+    /// Distinct from <see cref="MeshVersion"/>, which also moves on meshing events and would reset the
+    /// frontier constantly mid-stream.
+    /// Written on the main thread, read by the generation workers; wraparound needs 2^31 removal passes
+    /// inside one worker call and is not defended against.
+    /// </summary>
+    public int ChunkRemovalVersion => Volatile.Read(ref _chunkRemovalVersion);
+
     /// <summary>
     /// How many chunks are loaded. A maintained counter rather than <c>Chunks.Count</c>,
     /// which locks every segment of the dictionary to add the per-segment counts up.
@@ -165,6 +187,8 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
 
     private void UnloadDistantChunks(Vector3 camChunk)
     {
+        var removed = 0;
+
         // The ConcurrentDictionary enumerator is lock-free and copies nothing (unlike Keys),
         // and removing entries through it while enumerating is explicitly supported.
         foreach (var kvp in Chunks)
@@ -174,6 +198,8 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
                 continue;
 
             if (!Chunks.TryRemove(pos, out var chunk)) continue;
+
+            removed++;
 
             // Dispose nulls both slices, so the Renderable bookkeeping has to happen first
             RemoveRenderable(chunk);
@@ -195,6 +221,11 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
                 cell.Y >= y0 && cell.Y < y0 + Chunk.Size &&
                 cell.Z >= z0 && cell.Z < z0 + Chunk.Size);
         }
+
+        // After the loop, not inside it: the position only becomes needed once it has left
+        // _queuedChunkPositions too, and the gate keeps a settled world (the 120-frame fallback scan
+        // at Update, which finds nothing) from bumping at all and restarting four scans twice a second.
+        if (removed > 0) Interlocked.Increment(ref _chunkRemovalVersion);
     }
 
     private void ApplyCompletedMeshes(Vector3 camChunk)
