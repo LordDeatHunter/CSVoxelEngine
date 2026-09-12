@@ -41,6 +41,14 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
     // tests them first: same-frame evaluation, exactly like the uncapped pass did.
     private readonly List<LodRegion> _pendingCover = new();
 
+    // How many of a coarse region's finer-level children (at its own key) are currently
+    // loaded, keyed by the COARSE region's (Level, X, Z) — i.e. a level-1 region's count is
+    // the number of its level-0 children present in Regions, and a level-2 region's count is
+    // its level-1 children. Maintained incrementally by AddRegion/RemoveRegion so
+    // IsCoveredByFinerLevel becomes a single lookup and integer compare instead of
+    // ratio*ratio ContainsKey probes. Main thread only, like RegionList/AddRegion/RemoveRegion.
+    private readonly Dictionary<(int Level, int X, int Z), int> _finerChildCounts = new();
+
     // Round-robin cursor into RegionList for the unburied level-0 slice, and whether
     // the slice has lapped it since the inputs last changed. While false the pass runs
     // every frame, so a region added at rest still converges instead of waiting for
@@ -283,6 +291,11 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
         RegionList.Add(region);
         _pendingCover.Add(region);
         _regionSetVersion++;
+
+        // Derived from the region, not the caller-supplied key, so this increment and
+        // RemoveRegion's decrement read the same source and cannot disagree.
+        if (TryParentKey((region.Level, region.X, region.Z), out var parentKey))
+            _finerChildCounts[parentKey] = _finerChildCounts.GetValueOrDefault(parentKey) + 1;
     }
 
     /// <summary>
@@ -307,6 +320,34 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
         region.ListIndex = -1;
         _pendingCover.Remove(region);
         _regionSetVersion++;
+
+        if (TryParentKey((region.Level, region.X, region.Z), out var parentKey))
+        {
+            var remaining = _finerChildCounts[parentKey] - 1;
+            if (remaining <= 0)
+                _finerChildCounts.Remove(parentKey);
+            else
+                _finerChildCounts[parentKey] = remaining;
+        }
+    }
+
+    /// <summary>
+    /// The coarser-level key a region at <paramref name="key"/> feeds its loaded-child count
+    /// into, or false for the topmost level, which has no parent. Region grids are aligned at
+    /// the origin and sizes are power-of-two multiples of each other, so a child maps onto
+    /// its parent by a plain integer division (floored, since region coordinates go negative).
+    /// </summary>
+    private static bool TryParentKey((int Level, int X, int Z) key, out (int Level, int X, int Z) parentKey)
+    {
+        if (key.Level >= LodRegion.Levels.Length - 1)
+        {
+            parentKey = default;
+            return false;
+        }
+
+        var ratio = LodRegion.Levels[key.Level + 1].RegionBlocks / LodRegion.Levels[key.Level].RegionBlocks;
+        parentKey = (key.Level + 1, FloorDiv(key.X, ratio), FloorDiv(key.Z, ratio));
+        return true;
     }
 
     /// <summary>
@@ -415,18 +456,12 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
 
     private bool IsCoveredByFinerLevel(int level, int x, int z)
     {
+        // Region grids are aligned at the origin and sizes are power-of-two multiples, so one
+        // region maps onto exactly ratio x ratio regions of the finer level: this region is
+        // covered once that many of its finer-level children are loaded. AddRegion/RemoveRegion
+        // keep _finerChildCounts current, so this is one lookup instead of ratio*ratio probes.
         var finer = level - 1;
-        // Region grids are aligned at the origin and sizes are power-of-two multiples,
-        // so one region maps onto exactly ratio x ratio regions of the finer level
         var ratio = LodRegion.Levels[level].RegionBlocks / LodRegion.Levels[finer].RegionBlocks;
-
-        for (var dx = 0; dx < ratio; dx++)
-        for (var dz = 0; dz < ratio; dz++)
-        {
-            if (!Regions.ContainsKey((finer, x * ratio + dx, z * ratio + dz)))
-                return false;
-        }
-
-        return true;
+        return _finerChildCounts.TryGetValue((level, x, z), out var count) && count == ratio * ratio;
     }
 }

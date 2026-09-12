@@ -24,6 +24,14 @@ public sealed class LodManagerTests
         return new LodRegion(null!, data);
     }
 
+    // A coarse-level (level > 0) region's burial test never touches ColumnCyMin/Max
+    // (see IsCoveredByFinerLevel), so empty arrays are safe here.
+    private static LodRegion CoarseHeadlessRegion(int level, int x, int z)
+    {
+        var data = new LodMeshData(level, x, z, [], [], [], [], 0f, 0f, [], []);
+        return new LodRegion(null!, data);
+    }
+
     private static void MeshColumns(ChunkManager chunks, int baseCx, int baseCz, int cy)
     {
         var empty = new ChunkMeshData([], [], [], [], false);
@@ -78,5 +86,106 @@ public sealed class LodManagerTests
         Assert.True(covered.IsBuried);
         Assert.True(lateCovered.IsBuried);
         Assert.False(control.IsBuried);
+    }
+
+    /// <summary>Covers item D4: IsCoveredByFinerLevel now reads a loaded-child count kept by
+    /// AddRegion/RemoveRegion instead of probing Regions directly, so a coarse region must
+    /// flip buried only once every one of its ratio*ratio finer children is loaded, and flip
+    /// back the moment any of them unloads.</summary>
+    [Fact]
+    public void CoarseRegionBuriedOnlyWhenEveryFinerChildIsLoaded()
+    {
+        var chunks = new ChunkManager(null!);
+        var lods = new LodManager(null!);
+
+        // Level 1's RegionBlocks (128) / level 0's (64) = ratio 2, so region (1,0,0) is
+        // covered exactly when all four of level 0's (0,0)/(0,1)/(1,0)/(1,1) are loaded.
+        var coarse = CoarseHeadlessRegion(1, 0, 0);
+        lods.AddRegion((1, 0, 0), coarse);
+
+        lods.AddRegion((0, 0, 0), HeadlessRegion(0, 0, 7));
+        lods.AddRegion((0, 0, 1), HeadlessRegion(0, 1, 7));
+        lods.AddRegion((0, 1, 0), HeadlessRegion(1, 0, 7));
+
+        lods.UpdateCoverFlags(chunks, Vector3.Zero);
+        Assert.False(coarse.IsBuried);
+
+        var lastChild = HeadlessRegion(1, 1, 7);
+        lods.AddRegion((0, 1, 1), lastChild);
+        lods.UpdateCoverFlags(chunks, Vector3.Zero);
+        Assert.True(coarse.IsBuried);
+
+        // Unloading any one child must uncover the coarse region again.
+        lods.Regions.TryRemove((0, 1, 1), out var removed);
+        lods.RemoveRegion(removed!);
+        lods.UpdateCoverFlags(chunks, Vector3.Zero);
+        Assert.False(coarse.IsBuried);
+    }
+
+    /// <summary>Covers item D4's incremental bookkeeping across a same-key rebuild: LodManager.
+    /// Update removes the old region at a key and immediately adds its replacement at that same
+    /// key (a mesh rebuild), which must leave the parent's loaded-child count unchanged rather
+    /// than drifting up or down every rebuild.</summary>
+    [Fact]
+    public void RebuildingARegionAtItsOwnKeyLeavesParentCoverageUnchanged()
+    {
+        var chunks = new ChunkManager(null!);
+        var lods = new LodManager(null!);
+
+        var coarse = CoarseHeadlessRegion(1, 0, 0);
+        lods.AddRegion((1, 0, 0), coarse);
+
+        lods.AddRegion((0, 0, 0), HeadlessRegion(0, 0, 7));
+        lods.AddRegion((0, 0, 1), HeadlessRegion(0, 1, 7));
+        lods.AddRegion((0, 1, 0), HeadlessRegion(1, 0, 7));
+        var original = HeadlessRegion(1, 1, 7);
+        lods.AddRegion((0, 1, 1), original);
+
+        lods.UpdateCoverFlags(chunks, Vector3.Zero);
+        Assert.True(coarse.IsBuried);
+
+        // Same remove-then-add-at-the-same-key sequence LodManager.Update runs when a region's
+        // mesh is rebuilt (see the `replaced` handling there).
+        lods.RemoveRegion(original);
+        var rebuilt = HeadlessRegion(1, 1, 7);
+        lods.AddRegion((0, 1, 1), rebuilt);
+
+        lods.UpdateCoverFlags(chunks, Vector3.Zero);
+        Assert.True(coarse.IsBuried);
+    }
+
+    /// <summary>Covers item D4 at negative region coordinates, the case a truncating integer
+    /// divide silently gets wrong: C# `/` rounds toward zero, so level-0 child x = -3 would map
+    /// onto parent x = -1 instead of -2 and be counted into the wrong coarse region. Rings
+    /// extend outward from the origin in both directions, so this is the common case away from
+    /// spawn, not an edge case.</summary>
+    [Fact]
+    public void CoarseRegionAtNegativeCoordinatesCountsItsOwnChildren()
+    {
+        var chunks = new ChunkManager(null!);
+        var lods = new LodManager(null!);
+
+        // Same ratio 2 as the positive case (level 1's RegionBlocks / level 0's), so coarse
+        // region (1,-1,-1) spans level-0 (-2,-2), (-2,-1), (-1,-2) and (-1,-1).
+        var coarse = CoarseHeadlessRegion(1, -1, -1);
+        lods.AddRegion((1, -1, -1), coarse);
+
+        lods.AddRegion((0, -2, -2), HeadlessRegion(-2, -2, 7));
+        lods.AddRegion((0, -2, -1), HeadlessRegion(-2, -1, 7));
+        lods.AddRegion((0, -1, -2), HeadlessRegion(-1, -2, 7));
+
+        lods.UpdateCoverFlags(chunks, Vector3.Zero);
+        Assert.False(coarse.IsBuried);
+
+        // A neighbour one coarse region over, whose real parent is (1,-2,-1), so it must not
+        // count here. A parent key built with a truncating divide collapses -3 and -2 onto the
+        // same parent x (-3 / 2 == -1 == -2 / 2) and mis-buckets children like this one.
+        lods.AddRegion((0, -3, -1), HeadlessRegion(-3, -1, 7));
+        lods.UpdateCoverFlags(chunks, Vector3.Zero);
+        Assert.False(coarse.IsBuried);
+
+        lods.AddRegion((0, -1, -1), HeadlessRegion(-1, -1, 7));
+        lods.UpdateCoverFlags(chunks, Vector3.Zero);
+        Assert.True(coarse.IsBuried);
     }
 }

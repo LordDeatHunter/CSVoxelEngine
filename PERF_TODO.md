@@ -127,22 +127,6 @@ nothing from **Ruled out** — overlaps are called out inline.
   `:397` (compass), `:435` (coords), plus the hotbar's `.ToString()` counts. Format
   only when the value changes, or into a reusable buffer; feeds settled GC.
   **Impact low · risk low · effort S.**
-- [ ] **R9 · One draw call per UI glyph** — `UIRenderer.DrawText`
-  (`UIRenderer.cs:446-464`) calls `DrawMesh` once per glyph for the shadow and once
-  more for the face, and `DrawMesh` (`:1292-1306`) re-issues `Use()`, three
-  name-keyed `SetUniform` calls, a texture bind and a `BindVertexArray` +
-  `DrawElements` every time. `DrawProfiler` (`:352-376`) draws one line per row and
-  the overlay emits 4 header rows plus one row per `ProfileSection` plus an `other`
-  row — 33 lines (`FrameProfiler.cs:255-267`, 28 sections at `:14-45`) — so the `X`
-  overlay alone is on the order of 1800 draws a frame, which is the `uiPass` 0.5-1 ms
-  the hitch list tells you to subtract. Lay the glyph quads into one dynamic vertex
-  buffer with per-vertex colour and issue one `DrawElements` per text run; every
-  glyph already shares the font texture. This is *not* the ruled-out *uniform
-  location lookups* audit — `Shader` already caches them (`Shader.cs:98-108`) — and
-  it is not R8, which is about the strings feeding the text rather than the drawing
-  of it. The win is largest in the debug configuration `perf-fly` runs under; with
-  the overlay off only the hotbar, compass and crosshair remain.
-  **Impact med · risk low · effort M.**
 - [ ] **R10 · Every LOD region owns a `Mesh`** — `LodRegion` creates a VAO + VBO +
   EBO per region and another set for its water sheet (`LodRegion.cs:110-128`), and
   each draw is a `BindVertexArray` + `DrawElements` behind three uniform sets:
@@ -316,20 +300,6 @@ nothing from **Ruled out** — overlaps are called out inline.
   editing session. **Impact med · risk low-med · effort M.**
 - [ ] **D3 · Dead code** — `ChunkDrawBatch.PassCount`
   (`ChunkDrawBatch.cs:117`) is never read. **Impact nil · effort S.**
-- [ ] **D4 · Coarse-region burial re-probes the region table every pass** —
-  `UpdateBuriedFlags` (`LodManager.cs:326`) walks the whole `RegionList` and
-  re-evaluates every level > 0 region (`:345-352`), and `IsCoveredByFinerLevel`
-  (`:416-431`) does `ratio * ratio` `ConcurrentDictionary.ContainsKey` probes per
-  region — 4 each, given the `RegionBlocks` ratios (`LodRegion.cs:39-44`) — across
-  the coarse regions of two radius-8 rings, on every frame the pass has not
-  converged. The answer changes only when a region is added or removed, and both
-  already funnel through `AddRegion` / `RemoveRegion` (`LodManager.cs:279-310`):
-  keep a loaded-finer-child count per coarse key there and reduce the test to an
-  integer compare. This one *is* on the main thread inside `LodManager.Update`,
-  so it lands in the `lod` row (up to 10.7 ms, #1 hitch). `IsCoveredByChunks`
-  (`LodManager.cs:388-415`) is deliberately left alone — it already has the
-  distance early-out and the round-robin budget.
-  **Impact med · risk low-med · effort M.**
 - [ ] **D5 · The geometry free list is a flat linearly-scanned list** —
   `GeometryAllocator` keeps free blocks in one offset-sorted `List<(int, int)>`
   (`GeometryAllocator.cs:24`); `TryAllocate` first-fits by walking it from the front
@@ -381,14 +351,16 @@ nothing from **Ruled out** — overlaps are called out inline.
   above the noise floor. `Camera`'s per-frame collision scans are additional
   evidence for D1's impact rather than a separate entry.
 
-**Suggested first pass:** D4 and R9 — the two new items
-whose targets sit inside a measured row (`lod` up to 10.7, `uiPass` 0.5-1) and both
-bounded. Then the worker-side streaming pair C10 + C8: neither appears in any
-profiled section, so size them with a chunks/s generation-rate capture and the gen2
-GC count rather than a row. Then C1 together with C9 (measure the pair against LodGen
+**Suggested first pass:** D4 and R9 landed this round (both structural: D4 replaced
+the coarse-region burial probe with an incrementally maintained loaded-child count,
+R9 replaced the per-glyph shadow+face draw pair with one batched `DrawElements` per
+text run; re-run the `perf-fly` capture before pricing the win on `lod`/`uiPass`).
+Next: the worker-side streaming pair C10 + C8 — neither appears in any profiled
+section, so size them with a chunks/s generation-rate capture and the gen2 GC count
+rather than a row. Then C1 together with C9 (measure the pair against LodGen
 throughput), then R2 (against `raysPass`), now the biggest single GPU prize left.
-R10 is the biggest structural render win; hold it until the cheaper LOD items
-above have been measured, since they may move `lod` enough to reprice it — and it
+R10 is the biggest structural render win; hold it until the cheaper LOD items above
+have been measured, since they may move `lod` enough to reprice it — and it
 overlaps R5.
 
 ## Ruled out (do not retry without new evidence)

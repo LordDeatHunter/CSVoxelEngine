@@ -184,9 +184,24 @@ public class UIRenderer : IDisposable
     private readonly float _countScale;
     private readonly float _headScale;
 
+    // Longest run DrawText draws. BitmapFont.Layout clamps its output to the scratch span it
+    // is handed, so this single constant bounds all three text buffers at once — the glyph
+    // scratch, the vertex scratch and the static index buffer — and a longer string is
+    // truncated by layout rather than overrunning any of them.
+    private const int MaxTextGlyphs = 64;
+
     // Scratch for one DrawText call; reused so text layout allocates nothing per frame.
     // Safe to share: all UI drawing happens on the main thread.
-    private readonly GlyphInstance[] _glyphScratch = new GlyphInstance[64];
+    private readonly GlyphInstance[] _glyphScratch = new GlyphInstance[MaxTextGlyphs];
+
+    // One dynamic buffer for every glyph quad of a text run (shadow copies and face copies
+    // both), so DrawText issues a single DrawElements instead of one per glyph per pass
+    // (see DrawTextBatch). Sized for the worst case: every scratch slot as both a shadow and
+    // a face quad. The index buffer is static — each quad's 6 indices only ever reference its
+    // own 4 vertices at a fixed offset, exactly like the particle renderers' dynamic quads.
+    private const int MaxTextQuads = MaxTextGlyphs * 2;
+    private readonly Vertex[] _textVerts = new Vertex[MaxTextQuads * 4];
+    private readonly uint _textVao, _textVbo, _textEbo;
 
     private Matrix4x4 _projection;
     private Vector2 _screenSize;
@@ -230,6 +245,28 @@ public class UIRenderer : IDisposable
         {
             Log.WriteLine($"Warning: count font '{CountFontPath}' not loaded ({e.Message}); hotbar counts hidden.");
         }
+
+        // Text batch buffers: a dynamic VBO refilled per run (DrawTextBatch) and a static EBO
+        // whose indices never change — quad q always draws vertices [4q, 4q+4) — exactly the
+        // pattern the particle renderers use for their own per-frame dynamic quads.
+        _textVao = _gl.GenVertexArray();
+        _gl.BindVertexArray(_textVao);
+
+        _textVbo = _gl.GenBuffer();
+        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _textVbo);
+        _gl.BufferData<Vertex>(BufferTargetARB.ArrayBuffer,
+            (nuint)(_textVerts.Length * Vertex.Size), _textVerts, BufferUsageARB.DynamicDraw);
+
+        var textIndices = new ushort[MaxTextQuads * 6];
+        BuildQuadIndices(textIndices);
+
+        _textEbo = _gl.GenBuffer();
+        _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _textEbo);
+        _gl.BufferData<ushort>(BufferTargetARB.ElementArrayBuffer,
+            (nuint)(textIndices.Length * sizeof(ushort)), textIndices, BufferUsageARB.StaticDraw);
+
+        Mesh.ConfigureVertexAttribs(_gl);
+        _gl.BindVertexArray(0);
     }
 
     /// <summary>Starts a UI pass sized to the window. Must be paired with <see cref="End"/>.</summary>
@@ -442,6 +479,13 @@ public class UIRenderer : IDisposable
     /// Screen-space text with its top-left corner at <paramref name="topLeft"/> (pixels, Y
     /// down). A one-pixel dark shadow is drawn under each glyph so the text reads over
     /// bright icons. Strings longer than 64 characters are truncated.
+    ///
+    /// Every glyph of the run — shadow copies and face copies alike — is written into one
+    /// dynamic vertex buffer and drawn with a single <see cref="GL.DrawElements"/> call
+    /// (<see cref="DrawTextBatch"/>), instead of the two draws per glyph a naive per-glyph
+    /// <see cref="DrawMesh"/> would cost. Shadows are laid out before faces in the index
+    /// order, so a glyph's face still draws over every shadow, exactly as separate draw
+    /// calls in that order would.
     /// </summary>
     public void DrawText(string text, Vector2 topLeft, float scale, Rgba color)
     {
@@ -450,17 +494,99 @@ public class UIRenderer : IDisposable
 
         var instances = _glyphScratch.AsSpan();
         var n = _font.Layout(text.AsSpan(), topLeft, scale, instances);
-
-        // Every shadow first, so each glyph's face draws over every shadow
-        for (var i = 0; i < n; i++)
-            DrawMesh(instances[i].Mesh,
-                RectTransform(instances[i].Centre + new Vector2(1f, 1f), instances[i].Size),
-                CountShadow, _font.Texture);
+        if (n == 0)
+            return;
 
         for (var i = 0; i < n; i++)
-            DrawMesh(instances[i].Mesh,
-                RectTransform(instances[i].Centre, instances[i].Size),
-                color, _font.Texture);
+            WriteGlyphQuad(_textVerts.AsSpan(i * 4, 4), instances[i],
+                instances[i].Centre + new Vector2(1f, 1f), CountShadow);
+        for (var i = 0; i < n; i++)
+            WriteGlyphQuad(_textVerts.AsSpan((n + i) * 4, 4), instances[i],
+                instances[i].Centre, color);
+
+        DrawTextBatch(n * 2);
+    }
+
+    /// <summary>
+    /// Fills a static quad index buffer: quad <c>i</c> draws vertices <c>[4i, 4i+4)</c> as
+    /// <c>4i, 4i+1, 4i+2, 4i, 4i+2, 4i+3</c> — the same triangle split and winding
+    /// <see cref="Primitives.CreateRectangle"/> bakes into a single-quad mesh, so a batched
+    /// glyph keeps the exact diagonal its own mesh had.
+    /// </summary>
+    internal static void BuildQuadIndices(Span<ushort> indices)
+    {
+        for (var i = 0; i < indices.Length / 6; i++)
+        {
+            var v = (ushort)(i * 4);
+            var o = i * 6;
+            indices[o + 0] = v;
+            indices[o + 1] = (ushort)(v + 1);
+            indices[o + 2] = (ushort)(v + 2);
+            indices[o + 3] = v;
+            indices[o + 4] = (ushort)(v + 2);
+            indices[o + 5] = (ushort)(v + 3);
+        }
+    }
+
+    /// <summary>
+    /// Writes one glyph's 4 vertices into <paramref name="quad"/>, positioned exactly where
+    /// <see cref="RectTransform"/> would have placed a unit rect of
+    /// <paramref name="instance"/>.Size at <paramref name="centre"/> — this is that
+    /// transform's closed form, which is why the local bottom corner lands at
+    /// <c>centre.Y + half.Y</c> (the rect transform scales Y negatively).
+    /// <paramref name="color"/> rides per-vertex instead of arriving as a per-draw uniform.
+    /// Corner order matches the static text EBO (see <see cref="BuildQuadIndices"/>).
+    /// </summary>
+    internal static void WriteGlyphQuad(Span<Vertex> quad, GlyphInstance instance, Vector2 centre,
+        Rgba color)
+    {
+        Span<Vector2> corners = stackalloc Vector2[4];
+        instance.Uv.CornersTo(corners);
+        var half = instance.Size * 0.5f;
+
+        quad[0] = new Vertex(new Vector3(centre.X - half.X, centre.Y + half.Y, 0f),
+            color.R, color.G, color.B, color.A, corners[0]);
+        quad[1] = new Vertex(new Vector3(centre.X - half.X, centre.Y - half.Y, 0f),
+            color.R, color.G, color.B, color.A, corners[1]);
+        quad[2] = new Vertex(new Vector3(centre.X + half.X, centre.Y - half.Y, 0f),
+            color.R, color.G, color.B, color.A, corners[2]);
+        quad[3] = new Vertex(new Vector3(centre.X + half.X, centre.Y + half.Y, 0f),
+            color.R, color.G, color.B, color.A, corners[3]);
+    }
+
+    /// <summary>
+    /// Uploads the first <paramref name="quadCount"/> quads of <see cref="_textVerts"/> and
+    /// draws them in one call. Colour rides per-vertex (see <see cref="WriteGlyphQuad"/>), so
+    /// <c>uColor</c> stays white here: ui-fragment.glsl computes <c>fColor * uColor * texel</c>
+    /// and a white <c>uColor</c> is an exact identity, so the per-vertex tint reproduces the
+    /// old per-draw tint uniform exactly. That identity depends on the fragment shader keeping
+    /// its per-vertex term — drop <c>fColor</c> there and all text turns white.
+    ///
+    /// Sets the same three uniforms <see cref="DrawMesh"/> does and no others, so
+    /// <c>uAlphaCutoff</c> keeps the sticky value it had before.
+    /// </summary>
+    private void DrawTextBatch(int quadCount)
+    {
+        _shader.Use();
+        _shader.SetUniform("uModel", Matrix4x4.Identity);
+        _shader.SetUniform("uColor", Rgba.White.ToVector4());
+        _shader.SetUniform("uUseTexture", true);
+
+        _gl.ActiveTexture(TextureUnit.Texture0);
+        _gl.BindTexture(TextureTarget.Texture2DArray, _font!.Texture);
+
+        _gl.BindVertexArray(_textVao);
+        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _textVbo);
+        _gl.BufferSubData<Vertex>(BufferTargetARB.ArrayBuffer, 0,
+            new ReadOnlySpan<Vertex>(_textVerts, 0, quadCount * 4));
+        unsafe
+        {
+            _gl.DrawElements(PrimitiveType.Triangles, (uint)(quadCount * 6),
+                DrawElementsType.UnsignedShort, null);
+        }
+        // Leave no VAO bound: the text VAO owns a long-lived ELEMENT_ARRAY_BUFFER binding, and
+        // any later element-buffer bind while it happened to be current would rewrite it.
+        _gl.BindVertexArray(0);
     }
 
     /// <summary>Draws the hotbar centred along the bottom edge, highlighting the selected slot.</summary>
@@ -1332,6 +1458,9 @@ public class UIRenderer : IDisposable
         _font?.Dispose();
         _unitSquare.Dispose();
         _shader.Dispose();
+        _gl.DeleteBuffer(_textVbo);
+        _gl.DeleteBuffer(_textEbo);
+        _gl.DeleteVertexArray(_textVao);
         _gl.DeleteTexture(_crosshairTexture);
         foreach (var icon in _itemIcons.Values)
             _gl.DeleteTexture(icon);

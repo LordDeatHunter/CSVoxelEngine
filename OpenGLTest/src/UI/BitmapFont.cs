@@ -7,16 +7,18 @@ using StbTrueTypeSharp;
 namespace silkgltriangle;
 
 /// <summary>
-/// One screen-space draw of a single glyph: which baked mesh to draw and where. Produced by
-/// <see cref="BitmapFont.Layout"/>; the caller draws each through the UI shader.
+/// One screen-space draw of a single glyph: its atlas UV rect and where to place it. Produced by
+/// <see cref="BitmapFont.Layout"/>; the caller batches every glyph of a run into one dynamic
+/// vertex buffer and draws it through the UI shader in a single call (see
+/// <see cref="UIRenderer.DrawText"/>).
 /// </summary>
-public readonly record struct GlyphInstance(Mesh Mesh, Vector2 Centre, Vector2 Size);
+public readonly record struct GlyphInstance(Vector2 Centre, Vector2 Size, UvRect Uv);
 
 /// <summary>
 /// A TrueType font baked once into a GL atlas, for crisp screen-space text. The ASCII
-/// printable range is rasterized with <c>stbtt_BakeFontBitmap</c> and each non-empty glyph
-/// gets a unit-rect mesh carrying its atlas UVs, so drawing text is just one textured quad
-/// per character through the existing UI shader — no per-frame buffer work.
+/// printable range is rasterized with <c>stbtt_BakeFontBitmap</c> and each non-empty glyph's
+/// atlas UV rect is cached, so laying out text is pure CPU work — the caller turns the result
+/// into one batched draw instead of a per-glyph mesh and draw call.
 ///
 /// The atlas holds white texels with coverage in alpha, so the draw tint fully controls the
 /// text colour (see the ui-fragment shader). Owned and drawn by <see cref="UIRenderer"/>.
@@ -33,7 +35,8 @@ public sealed class BitmapFont : IDisposable
 
     private readonly GL _gl;
     private readonly StbTrueType.stbtt_bakedchar[] _baked = new StbTrueType.stbtt_bakedchar[NumChars];
-    private readonly Mesh?[] _meshes = new Mesh?[NumChars];
+    // Null for glyphs with no ink (space and friends); Layout skips them.
+    private readonly UvRect?[] _glyphUv = new UvRect?[NumChars];
     private readonly int _atlasSide;
     private readonly uint _texture;
     private bool _disposed;
@@ -55,7 +58,7 @@ public sealed class BitmapFont : IDisposable
             {
                 _atlasSide = side;
                 _texture = Upload(gl, bitmap, side);
-                BuildGlyphMeshes(gl, side);
+                ComputeGlyphUvs(side);
                 return;
             }
 
@@ -102,7 +105,7 @@ public sealed class BitmapFont : IDisposable
             var centre = new Vector2(
                 topLeft.X + (q.X0 + q.X1) * 0.5f,
                 topLeft.Y + (q.Y0 + q.Y1) * 0.5f - minY);
-            outInstances[i] = new GlyphInstance(_meshes[q.Index]!, centre, new Vector2(q.X1 - q.X0, q.Y1 - q.Y0));
+            outInstances[i] = new GlyphInstance(centre, new Vector2(q.X1 - q.X0, q.Y1 - q.Y0), _glyphUv[q.Index]!.Value);
         }
 
         return count;
@@ -153,9 +156,9 @@ public sealed class BitmapFont : IDisposable
         return texture;
     }
 
-    // One unit rect per non-empty glyph in the same UV convention the chunk mesher uses
+    // One atlas UV rect per non-empty glyph, in the same convention the chunk mesher uses
     // (Min is the top-left of the tile), so the existing UI transform draws them upright.
-    private void BuildGlyphMeshes(GL gl, int side)
+    private void ComputeGlyphUvs(int side)
     {
         for (var i = 0; i < NumChars; i++)
         {
@@ -163,10 +166,9 @@ public sealed class BitmapFont : IDisposable
             if (b.x1 <= b.x0 || b.y1 <= b.y0)
                 continue;
 
-            var uv = new UvRect(
+            _glyphUv[i] = new UvRect(
                 new Vector2(b.x0 / (float)side, b.y0 / (float)side),
                 new Vector2(b.x1 / (float)side, b.y1 / (float)side));
-            _meshes[i] = Primitives.CreateRectangle(gl, 1f, 1f, Rgba.White, uv);
         }
     }
 
@@ -199,7 +201,7 @@ public sealed class BitmapFont : IDisposable
                 StbTrueType.stbtt_GetBakedQuad(baked, _atlasSide, _atlasSide, index, &qx, &qy, &q, 1);
                 x = qx;
 
-                if (_meshes[index] == null)
+                if (_glyphUv[index] == null)
                     continue;
 
                 var quad = new CharQuad(q.x0 * scale, q.y0 * scale, q.x1 * scale, q.y1 * scale, index);
@@ -230,8 +232,6 @@ public sealed class BitmapFont : IDisposable
             return;
         _disposed = true;
 
-        foreach (var mesh in _meshes)
-            mesh?.Dispose();
         _gl.DeleteTexture(_texture);
 
         GC.SuppressFinalize(this);
