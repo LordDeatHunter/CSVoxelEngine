@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Xunit;
@@ -230,5 +231,89 @@ public sealed class WorldgenTests
         var tile = ContentRegistry.RequireBlock("gravel").FaceTiles[4];
         Assert.Contains(mesh.Vertices, v =>
             v.Layer == tile && v.UV.X >= 0f && v.UV.X <= 1f && v.UV.Y >= 0f && v.UV.Y <= 1f);
+    }
+
+    /// <summary>
+    /// First chunk column whose whole 16x16 footprint ends below sea level, so the chunk at
+    /// chunk-Y 0 is kept alive by <c>needsWater</c> yet is entirely above its own terrain —
+    /// exactly the case C10's carve guard skips (MaxHeight &lt; lowerBoundY == 0).
+    /// </summary>
+    private static (int cx, int cz) FindSubmergedChunkColumn()
+    {
+        for (var cx = 0; cx < 40; cx++)
+        for (var cz = -20; cz < 20; cz++)
+            if (Chunk.GetColumnData(cx, cz).MaxHeight < WorldGenerationConfig.SeaLevel)
+                return (cx, cz);
+
+        Assert.Fail("no fully submerged chunk column in cx [0,40) x cz [-20,20)");
+        return (0, 0);
+    }
+
+    [Fact]
+    public void CarversWriteNothingBelowTheColumnTop()
+    {
+        // The premise C10's guard rests on: over a chunk whose columns all end below its
+        // floor, both carvers are pure no-ops. The probe starts all-solid so NoiseCaves'
+        // `blocks[idx] == BlockType.Air` continue cannot mask a write.
+        var (cx, cz) = FindSubmergedChunkColumn();
+        var column = Chunk.GetColumnData(cx, cz);
+        var probe = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        Array.Fill(probe, TerrainGenerator.RockBlock);
+
+        NoiseCaves.Carve(probe, column, cx * Chunk.Size, 0, cz * Chunk.Size);
+        WormCarver.Carve(probe, column, cx * Chunk.Size, 0, cz * Chunk.Size);
+
+        Assert.DoesNotContain(BlockType.Air, probe);
+    }
+
+    [Fact]
+    public void CarversDoWriteInsideTheTerrain()
+    {
+        // Positive control: the same all-solid probe well inside the terrain does come back
+        // carved, so CarversWriteNothingBelowTheColumnTop cannot pass vacuously.
+        var found = false;
+        for (var cx = 0; cx < 24 && !found; cx++)
+        for (var cz = 0; cz < 24 && !found; cz++)
+        {
+            var column = Chunk.GetColumnData(cx, cz);
+            var cy = (column.MinHeight - 48) >> Chunk.SizeShift;
+            var probe = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+            Array.Fill(probe, TerrainGenerator.RockBlock);
+
+            NoiseCaves.Carve(probe, column, cx * Chunk.Size, cy * Chunk.Size, cz * Chunk.Size);
+            WormCarver.Carve(probe, column, cx * Chunk.Size, cy * Chunk.Size, cz * Chunk.Size);
+
+            found = Array.IndexOf(probe, BlockType.Air) >= 0;
+        }
+
+        Assert.True(found);
+    }
+
+    [Fact]
+    public void SubmergedSeaChunkGeneratesIdenticalBlocks()
+    {
+        // Same shape as SameChunkGeneratesIdenticalBlocks, but on the chunk C10's guard
+        // actually fires on: fully submerged, so the carvers are skipped and only the
+        // needsWater body runs.
+        var (cx, cz) = FindSubmergedChunkColumn();
+        Assert.True(Chunk.GetColumnData(cx, cz).MaxHeight < WorldGenerationConfig.SeaLevel);
+
+        var pos = new Vector3(cx, 0, cz);
+        var a = new Chunk(null!, pos, generateBlockData: true);
+        var b = new Chunk(null!, pos, generateBlockData: true);
+
+        Assert.Equal(a.SurfaceMinY, b.SurfaceMinY);
+        for (var x = 0; x < Chunk.Size; x++)
+        for (var y = 0; y < Chunk.Size; y++)
+        for (var z = 0; z < Chunk.Size; z++)
+            Assert.Equal(a.GetLocalBlock(x, y, z), b.GetLocalBlock(x, y, z));
+
+        var water = ContentRegistry.RequireBlock("water").Id;
+        var flooded = false;
+        for (var x = 0; x < Chunk.Size && !flooded; x++)
+        for (var y = 0; y < Chunk.Size && !flooded; y++)
+        for (var z = 0; z < Chunk.Size && !flooded; z++)
+            flooded = a.GetLocalBlock(x, y, z) == water;
+        Assert.True(flooded, $"submerged chunk ({cx},0,{cz}) holds no water");
     }
 }

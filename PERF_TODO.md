@@ -173,7 +173,7 @@ nothing from **Ruled out** — overlaps are called out inline.
   (`LodRegion.cs:209-252`). Level 2 reads a 22x22 window per 8-block cell
   (~0.5 M `FineHeight` calls per region) plus a separate `cellSize^2` canopy scan
   per cell. A rectangular min is separable (horizontal then vertical), ~10x fewer
-  reads. Worker-side, like C8 and C9: `BuildMeshData` runs on the LodGen thread
+  reads. Worker-side, like C9: `BuildMeshData` runs on the LodGen thread
   (`LodManager.cs:111`) while `lod` measures only the main-thread
   `LodManager.Update` (`World.cs:242-244`), so the win is LodGen throughput during
   the #1 hitch, not a smaller `lod` row.
@@ -197,26 +197,6 @@ nothing from **Ruled out** — overlaps are called out inline.
 - [ ] **C7 · Per-frame `Inventory.CanAccept` delegate** — `World.Update`
   (`World.cs:250`) passes a method group, allocating a delegate every frame. Cache
   it in a field. **Impact negligible · risk low · effort S.**
-- [ ] **C8 · LOD mesh builds allocate their output lists every time** —
-  `LodRegion.BuildMeshData` news a `List<Vertex>(8192)`, a `List<ushort>(12288)` and
-  two water lists per region (`LodRegion.cs:303-306`) and hands them out through
-  `LodMeshData` (`:453-454`, `:467-469`); the main thread copies them into a `Mesh`
-  (`:120-127`) and nothing ever returns them. `Vertex` is 32 bytes (`Vertex.cs:44-47`
-  documents the padding that holds it there), so the vertex list alone is a 256 KB
-  LOH allocation per region build, and the builder runs continuously while streaming.
-  The same method already rents its five working grids from `ArrayPool` for exactly
-  this reason (`LodRegion.cs:191-206`, returned at `:458-462`) — these four lists are
-  the only unpooled allocation left in it. `MeshBufferPool` (`MeshBufferPool.cs`)
-  already implements the rent-on-a-worker / return-on-the-main-thread contract a
-  queued `LodMeshData` needs, but not as-is: `Return` takes a `ChunkMeshData`
-  (`:96`) and it rents at 4096/6144 (`:19-20`) against LOD's 8192/12288, so a shared
-  pool would regrow on every LOD rent or drift the chunk rents upward. Use a second
-  `MeshBufferPool` instance sized for LOD, or add a `Return` overload taking the four
-  lists directly; return them after the upload (`LodManager.cs:234`) and on the
-  out-of-range drop (`:228-232`). The saving is worker-side and does not appear in
-  any profiled section — it lands on the streaming GC numbers (17-25 gen0/s,
-  **0-2 gen2/s**; a 256 KB `List<Vertex>` is an LOH/gen2 allocation) and on LodGen
-  throughput. **Impact med-high · risk low · effort M.**
 - [ ] **C9 · One broken block makes every LOD height sample a dictionary probe** —
   `BuildMeshData` sets `hasCaps = !ColumnHeightCaps.IsEmpty` once
   (`LodRegion.cs:177`) and `FineHeight` (`:179-189`) then does a
@@ -232,33 +212,6 @@ nothing from **Ruled out** — overlaps are called out inline.
   the two compose. Distinct from D2, which is about `ColumnHeightCaps` growing
   without bound, not the read-path probe. Worker-side like C1.
   **Impact med · risk low · effort M.**
-- [ ] **C10 · Cave carvers run on chunks holding no solid block** —
-  `Chunk.GenerateBlockData` skips its whole body for a chunk above the terrain
-  (`Chunk.cs:392-401`), but the `needsWater` clause keeps sea chunks that sit above
-  their own sea floor and below sea level, and those still call `NoiseCaves.Carve`
-  and `WormCarver.Carve` (`:415-419`). `NoiseCaves.Carve` (`NoiseCaves.cs:47-59`)
-  runs `SampleLattice` (`:63-87`) first, which evaluates eight 3D noise fields at all
-  125 lattice points — 1000 `GetNoise` calls, exactly (`Grid = 16/4 + 1 = 5` from
-  `CaveNoiseStride = 4`, `NoiseCaves.cs:17-20` and `WorldGenerationConfig.cs:297`;
-  `Channels = 8` at `NoiseCaves.cs:32`) — before `CarveBlocks`
-  (`NoiseCaves.cs:89-129`) breaks out of every column on its first `depth < 0`.
-  Guard both carve calls on `column.MaxHeight >= lowerBoundY`
-  (`ColumnData.cs:27`). Bit-identical by construction: carving only ever writes
-  `BlockType.Air` (`NoiseCaves.cs:125`, `WormCarver.cs:97`), `CarveBlocks` breaks
-  at `depth < 0` (`NoiseCaves.cs:108-109`), and `WormCarver.CarveNode` skips at
-  `depth < margin` where `margin = WormSurfaceMargin * (1 - EntranceWeight)` is in
-  `[0, 6]` — `EntranceWeight` is a SmoothStep in `[0,1]` and
-  `WormSurfaceMargin = 6f` (`WormCarver.cs:84,94-95`;
-  `WorldGenerationConfig.cs:347`) — so neither carver can
-  touch a chunk whose columns all end below its floor. This is *not* the *worldgen
-  noise reduction* under **Not chasing**: no field, octave count or threshold moves;
-  sampling is skipped only where its result is provably discarded. Ship it with an
-  exact-equality test shaped like `WorldgenTests.SameChunkGeneratesIdenticalBlocks`.
-  The saving is entirely on the four `ChunkGenerationWorker` threads, which no
-  profiled section measures — it shows up as reduced contention during the streaming
-  burst (the #1 hitch), over water, which is where `perf-fly` spawns. Confirm with a
-  chunks/s generation-rate capture over the water-bay leg before and after.
-  **Impact med · risk low · effort S.**
 - [ ] **C11 · The LOD worker snapshots the dirty set every loop** —
   `LodManager.WorkerLoop` calls `TakeDirtyRegion` on every iteration
   (`LodManager.cs:101-124`, the call at `:107`) and `TakeDirtyRegion` enumerates
@@ -351,17 +304,26 @@ nothing from **Ruled out** — overlaps are called out inline.
   above the noise floor. `Camera`'s per-frame collision scans are additional
   evidence for D1's impact rather than a separate entry.
 
-**Suggested first pass:** D4 and R9 landed this round (both structural: D4 replaced
-the coarse-region burial probe with an incrementally maintained loaded-child count,
-R9 replaced the per-glyph shadow+face draw pair with one batched `DrawElements` per
-text run; re-run the `perf-fly` capture before pricing the win on `lod`/`uiPass`).
-Next: the worker-side streaming pair C10 + C8 — neither appears in any profiled
-section, so size them with a chunks/s generation-rate capture and the gen2 GC count
-rather than a row. Then C1 together with C9 (measure the pair against LodGen
-throughput), then R2 (against `raysPass`), now the biggest single GPU prize left.
-R10 is the biggest structural render win; hold it until the cheaper LOD items above
-have been measured, since they may move `lod` enough to reprice it — and it
-overlaps R5.
+**Suggested first pass:** C10 and C8 landed this round, both worker-side. C10
+guards the two carve calls in `Chunk.GenerateBlockData` on
+`column.MaxHeight >= lowerBoundY`, so `NoiseCaves.Carve` and `WormCarver.Carve` are
+skipped on chunks whose columns all end below the chunk floor — the sea chunks the
+`needsWater` clause keeps alive over their own sea floor — removing a 1000-call cave
+noise lattice per such chunk with bit-identical block output. The identity claim is
+pinned by an all-solid carver probe, its positive control (so the probe cannot pass
+vacuously), a submerged-chunk equality test, and a cross-tree block hash over 360
+generated chunks spanning land, shoreline and fully submerged columns. C8 rents the
+four output lists of `LodRegion.BuildMeshData` from a LOD-sized `MeshBufferPool`
+owned by `LodManager` — 24576/36864 opaque, sized from the measured per-level peak of
+~21.5k vertices rather than the old 8192 literal, and 4096/6144 water — returned on
+the main thread after the upload or on the out-of-range drop, so a region build no
+longer LOH-allocates its output. Neither shows in a profiled section: size C10 with a
+chunks/s generation-rate capture over the water-bay leg and C8 with the streaming
+gen0/gen2 GC counts before pricing either. Next: C1 together with C9 (measure the
+pair against LodGen throughput), then R2 (against `raysPass`), the biggest single GPU
+prize left. R10 is the biggest structural render win; hold it until the cheaper LOD
+items above have been measured, since they may move `lod` enough to reprice it — and
+it overlaps R5.
 
 ## Ruled out (do not retry without new evidence)
 

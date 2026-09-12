@@ -28,6 +28,26 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
     private readonly ConcurrentDictionary<(int Level, int X, int Z), byte> _queued = new();
     private readonly ConcurrentDictionary<(int Level, int X, int Z), byte> _dirtyRegions = new();
     private readonly ConcurrentQueue<LodMeshData> _completedMeshes = new();
+
+    /// <summary>
+    /// LOD-sized twin of <see cref="ChunkManager.MeshBuffers"/>. The LodGen worker rents a region
+    /// build's four output lists here and the main thread hands them back in
+    /// <see cref="ApplyCompletedMeshes"/>, after the upload or on the out-of-range drop — a queued
+    /// LodMeshData can wait frames, so returning on the worker would hand out a live list.
+    /// Water lists come back even when empty (retainEmptyTranslucent): unlike a chunk mesher, a
+    /// region build rents them every time, so dropping the empty ones would drain the pool inland.
+    /// The retention caps are 4 because one LodGen thread has a single rent outstanding while the
+    /// main thread returns at most MaxLodUploadsPerFrame per frame; a deeper burst simply misses
+    /// the pool and allocates, exactly as every build did before.
+    /// </summary>
+    public MeshBufferPool MeshBuffers { get; } = new(
+        vertexCapacity: LodRegion.MeshVertexCapacity,
+        indexCapacity: LodRegion.MeshIndexCapacity,
+        translucentVertexCapacity: LodRegion.WaterVertexCapacity,
+        translucentIndexCapacity: LodRegion.WaterIndexCapacity,
+        maxPooled: 4,
+        maxPooledTranslucent: 4,
+        retainEmptyTranslucent: true);
     private volatile bool _isRunning;
     private Camera? _camera;
 
@@ -116,7 +136,7 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
                 if (next.HasValue)
                 {
                     var (level, x, z) = next.Value;
-                    _completedMeshes.Enqueue(LodRegion.BuildMeshData(level, x, z));
+                    EnqueueCompletedMesh(LodRegion.BuildMeshData(level, x, z, MeshBuffers));
                 }
                 else
                 {
@@ -130,6 +150,10 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
             }
         }
     }
+
+    /// <summary>The LodGen worker's only handoff to the main thread; internal so tests can drive
+    /// <see cref="ApplyCompletedMeshes"/> without starting a thread.</summary>
+    internal void EnqueueCompletedMesh(LodMeshData data) => _completedMeshes.Enqueue(data);
 
     /// <summary>
     /// Marks the LOD regions (on every level) whose sampling window covers the edited
@@ -224,6 +248,25 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
             _queued.TryRemove(key, out _);
         }
 
+        ApplyCompletedMeshes(camRegions);
+
+        // The flags depend only on which chunks are loaded and meshed (MeshVersion), which regions
+        // exist (_regionSetVersion) and the camera chunk (the distance early-out in
+        // IsCoveredByChunks), so the pass is skipped while none of them moved. A region added above
+        // starts with IsBuried == false; the add bumps the region-set version, so the pass always runs
+        // in the frame a region appears and never draws a shell for a frame it should not.
+        UpdateCoverFlags(chunkManager, camChunk);
+    }
+
+    /// <summary>
+    /// Uploads finished region builds to the GPU, capped per frame, and drops the ones that left
+    /// the camera's range while they waited. Owns the returned end of the rent/return contract on
+    /// <see cref="MeshBuffers"/>: every dequeued <see cref="LodMeshData"/> hands its four lists
+    /// back exactly once here, on both exits, and nothing reads them afterwards. Main thread only
+    /// (GL); internal so tests can drive both paths without a worker thread.
+    /// </summary>
+    internal void ApplyCompletedMeshes(ReadOnlySpan<(int camX, int camZ)> camRegions)
+    {
         var uploaded = 0;
         while (uploaded < WorldGenerationConfig.MaxLodUploadsPerFrame && _completedMeshes.TryDequeue(out var data))
         {
@@ -236,10 +279,14 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
             if (dx * dx + dz * dz > radius * radius)
             {
                 _queued.TryRemove(key, out _);
+                // Nothing was ever built from this data, so its lists recycle straight away.
+                MeshBuffers.Return(data.Vertices, data.Indices, data.WaterVertices, data.WaterIndices);
                 continue;
             }
 
             var region = new LodRegion(gl, data);
+            // BufferData copies synchronously, so the lists can be recycled at once.
+            MeshBuffers.Return(data.Vertices, data.Indices, data.WaterVertices, data.WaterIndices);
             if (Regions.TryRemove(key, out var replaced))
             {
                 region.Lifetime = replaced.Lifetime; // rebuilt region keeps its fade state
@@ -250,13 +297,6 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
             AddRegion(key, region);
             uploaded++;
         }
-
-        // The flags depend only on which chunks are loaded and meshed (MeshVersion), which regions
-        // exist (_regionSetVersion) and the camera chunk (the distance early-out in
-        // IsCoveredByChunks), so the pass is skipped while none of them moved. A region added above
-        // starts with IsBuried == false; the add bumps the region-set version, so the pass always runs
-        // in the frame a region appears and never draws a shell for a frame it should not.
-        UpdateCoverFlags(chunkManager, camChunk);
     }
 
     /// <summary>

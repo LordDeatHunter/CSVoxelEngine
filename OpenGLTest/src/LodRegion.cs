@@ -43,6 +43,19 @@ public class LodRegion : IDisposable
         new(CellSize: 8, RegionBlocks: 256, RegionRadius: 8, SampleMargin: 7, HeightBias: 6),  // to 2048 blocks
     ];
 
+    // Rent sizes for a region build's output lists. Every level is 32x32 cells (64/2, 128/4,
+    // 256/8) and each cell emits a top quad plus a `top - neighborTop` side skirt per side, so
+    // the opaque pair is sized from the measured working set rather than a guess: over each
+    // level's full region ring the peak was 21476 vertices (L0), 18184 (L1), 11508 (L2). At a
+    // 24576 rent a list grows 24576 -> 49152 -> 98304 at worst, and AddQuad refuses past
+    // ~65532 vertices, so a grown list never passes MeshBufferPool's capacity*4 ceiling and no
+    // real region is ever dropped instead of pooled. The sea sheet is one +Y quad per sea cell,
+    // so 1024 quads = 4096 vertices / 6144 indices is the exact water worst case.
+    public const int MeshVertexCapacity = 24576;
+    public const int MeshIndexCapacity = 36864;
+    public const int WaterVertexCapacity = 4096;
+    public const int WaterIndexCapacity = 6144;
+
     public const float MAX_LIFETIME = 0.5f;
     public double Lifetime;
 
@@ -150,8 +163,18 @@ public class LodRegion : IDisposable
     /// <summary>
     /// Builds a region mesh on a background thread (CPU only, no GL calls).
     /// Vertices are local in X/Z (relative to the region origin) and absolute in Y.
+    ///
+    /// The four output lists are rented from <paramref name="buffers"/> — a
+    /// <see cref="MeshBufferPool"/> sized at <see cref="MeshVertexCapacity"/> /
+    /// <see cref="WaterVertexCapacity"/> — and travel out inside the returned
+    /// <see cref="LodMeshData"/>; this method never returns them, because a completed build can
+    /// wait in the upload queue across frames. <see cref="LodManager"/> hands them back on the
+    /// main thread once the region is on the GPU, or when a finished build is dropped out of
+    /// range. Production callers must always pass the pool; the parameter is optional only so
+    /// headless tests can build a region standalone, in which case the lists are plain
+    /// allocations and nothing has to be returned.
     /// </summary>
-    public static LodMeshData BuildMeshData(int level, int rx, int rz)
+    public static LodMeshData BuildMeshData(int level, int rx, int rz, MeshBufferPool? buffers = null)
     {
         var spec = Levels[level];
         var cellSize = spec.CellSize;
@@ -300,10 +323,13 @@ public class LodRegion : IDisposable
         var gravel = BlockType.ById[TerrainGenerator.GravelBlock]!;
         var leaves = BlockType.ById[TreeGenerator.LeavesBlock]!;
 
-        var vertices = new List<Vertex>(8192);
-        var indices = new List<ushort>(12288);
-        var waterVertices = new List<Vertex>();
-        var waterIndices = new List<ushort>();
+        // Rented, not allocated: LodManager returns them on the main thread once the region is on
+        // the GPU, or when a finished build is dropped out of range — never here, on the LodGen
+        // worker, because a completed LodMeshData can wait in the upload queue across frames.
+        var vertices = buffers?.RentVertices() ?? new List<Vertex>(MeshVertexCapacity);
+        var indices = buffers?.RentIndices() ?? new List<ushort>(MeshIndexCapacity);
+        var waterVertices = buffers?.RentTranslucentVertices() ?? new List<Vertex>(WaterVertexCapacity);
+        var waterIndices = buffers?.RentTranslucentIndices() ?? new List<ushort>(WaterIndexCapacity);
         var yMin = float.MaxValue;
         var yMax = float.MinValue;
 
@@ -464,6 +490,15 @@ public class LodRegion : IDisposable
     }
 }
 
+/// <summary>
+/// One finished region build on its way from the LodGen worker to the main thread.
+///
+/// The four lists are rented from <see cref="LodManager"/>'s <see cref="MeshBufferPool"/> by
+/// <see cref="LodRegion.BuildMeshData"/> and are owned by whoever dequeues this record: the main
+/// thread returns them exactly once, either after the GPU upload or when the build is dropped
+/// out of range. Nothing may read them after that return, and the worker must never return them
+/// itself — a completed build can sit in the upload queue for several frames.
+/// </summary>
 public record LodMeshData(int Level, int X, int Z, List<Vertex> Vertices, List<ushort> Indices,
     List<Vertex> WaterVertices, List<ushort> WaterIndices, float YMin, float YMax,
     int[] ColumnCyMin, int[] ColumnCyMax);

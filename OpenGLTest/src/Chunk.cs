@@ -441,10 +441,20 @@ public class Chunk : IDisposable
         var worldX0 = (int)Position.X * Size;
         var worldZ0 = (int)Position.Z * Size;
 
-        if (WorldGenerationConfig.NoiseCavesEnabled)
+        // Both carvers only ever clear blocks at or below their own column's terrain top:
+        // NoiseCaves breaks each column at `depth < 0` before it reads a block or a sample, and
+        // WormCarver skips every y at `depth < margin`, margin = WormSurfaceMargin * (1 - EntranceWeight)
+        // in [0, 6] (EntranceWeight is a clamped SmoothStep). Both read this chunk's own
+        // column.Heights, so a chunk whose tallest column ends below its floor is untouchable by
+        // either and skipping them is bit-identical. It saves the 1000-call cave lattice
+        // (NoiseCaves.SampleLattice) on every sea chunk the needsWater clause above keeps alive
+        // over its own sea floor.
+        var carvable = column.MaxHeight >= lowerBoundY;
+
+        if (carvable && WorldGenerationConfig.NoiseCavesEnabled)
             NoiseCaves.Carve(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
-        if (WorldGenerationConfig.WormCavesEnabled)
+        if (carvable && WorldGenerationConfig.WormCavesEnabled)
             WormCarver.Carve(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
         // After the carvers, so veins rim cave walls instead of being eaten by them.

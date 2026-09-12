@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace silkgltriangle;
 
 /// <summary>
-/// Recycles the vertex and index lists a chunk mesh build fills. Each build otherwise
+/// Recycles the vertex and index lists a mesh build fills. Each build otherwise
 /// allocates a ~128 KB <c>List&lt;Vertex&gt;(4096)</c> on the large object heap, which is what
 /// turns a streaming burst into gen2 collections. Builds rent on the mesh workers and the
 /// main thread (<see cref="ChunkManager.ImmediateRemesh"/>); lists come back only on the main
@@ -13,6 +13,20 @@ namespace silkgltriangle;
 /// The translucent lists are pooled separately at a smaller rent: most chunks hold no fluid
 /// or glass, so empty ones never touch the pool and ocean chunks rent once at a capacity
 /// that already fits a full 16x16 water top.
+/// <para>
+/// The capacities are instance state because <see cref="LodManager"/> owns a second,
+/// LOD-sized pool for the four output lists of a region build (<c>LodRegion.BuildMeshData</c>):
+/// a region build is an order of magnitude larger than a chunk build, so one shared pool would
+/// either regrow on every LOD rent or drift the chunk rents upward. That pool follows the same
+/// contract — rented on the LodGen thread, returned on the main thread after the upload or on
+/// the out-of-range drop, never on the worker.
+/// </para>
+/// <para>
+/// <c>retainEmptyTranslucent</c> exists for that LOD pool. A chunk mesher only fills the
+/// translucent lists when the chunk holds fluid or glass, so dropping the empty ones costs
+/// nothing; a region build rents its water lists on every build and an inland region fills
+/// none, so dropping those would drain the pool instead of recycling it.
+/// </para>
 /// </summary>
 public sealed class MeshBufferPool
 {
@@ -32,18 +46,27 @@ public sealed class MeshBufferPool
     // the rent capacity are ~25 MB.
     private const int MaxPooled = 128;
 
-    // A list that outgrew its rent capacity keeps the larger array, so the next canopy chunk it
-    // serves does not regrow it; but a few dense chunks reach 30k+ vertices (a 3 MB array), and
-    // over a long session every pooled list would drift to that size. Anything past this ceiling
-    // (786 KB of vertices) is left to the GC instead.
-    private const int MaxRetainedVertexCapacity = VertexCapacity * 4;
-    private const int MaxRetainedIndexCapacity = IndexCapacity * 4;
-
     // Fewer translucent lists are ever in flight (only water/glass chunks rent), and each
     // one is a quarter of the opaque rent, so the cap is lower.
     private const int MaxPooledTranslucent = 32;
-    private const int MaxRetainedTranslucentVertexCapacity = TranslucentVertexCapacity * 4;
-    private const int MaxRetainedTranslucentIndexCapacity = TranslucentIndexCapacity * 4;
+
+    private readonly int _vertexCapacity;
+    private readonly int _indexCapacity;
+    private readonly int _translucentVertexCapacity;
+    private readonly int _translucentIndexCapacity;
+    private readonly int _maxPooled;
+    private readonly int _maxPooledTranslucent;
+    private readonly bool _retainEmptyTranslucent;
+
+    // A list that outgrew its rent capacity keeps the larger array, so the next canopy chunk it
+    // serves does not regrow it; but a few dense chunks reach 30k+ vertices (a 3 MB array), and
+    // over a long session every pooled list would drift to that size. Anything past this ceiling
+    // (786 KB of vertices at the chunk rent) is left to the GC instead. A list only ever doubles,
+    // so four times the rent capacity is two growth steps of headroom.
+    private readonly int _maxRetainedVertexCapacity;
+    private readonly int _maxRetainedIndexCapacity;
+    private readonly int _maxRetainedTranslucentVertexCapacity;
+    private readonly int _maxRetainedTranslucentIndexCapacity;
 
     private readonly Stack<List<Vertex>> _vertices = new();
     private readonly Stack<List<ushort>> _indices = new();
@@ -51,13 +74,40 @@ public sealed class MeshBufferPool
     private readonly Stack<List<ushort>> _translucentIndices = new();
     private readonly object _lock = new();
 
+    /// <summary>
+    /// Every parameter defaults to the chunk-sized pool, so <c>new MeshBufferPool()</c> is
+    /// exactly the pool <see cref="ChunkManager"/> has always used. <see cref="LodManager"/>
+    /// passes the region-build sizes instead.
+    /// </summary>
+    public MeshBufferPool(
+        int vertexCapacity = VertexCapacity,
+        int indexCapacity = IndexCapacity,
+        int translucentVertexCapacity = TranslucentVertexCapacity,
+        int translucentIndexCapacity = TranslucentIndexCapacity,
+        int maxPooled = MaxPooled,
+        int maxPooledTranslucent = MaxPooledTranslucent,
+        bool retainEmptyTranslucent = false)
+    {
+        _vertexCapacity = vertexCapacity;
+        _indexCapacity = indexCapacity;
+        _translucentVertexCapacity = translucentVertexCapacity;
+        _translucentIndexCapacity = translucentIndexCapacity;
+        _maxPooled = maxPooled;
+        _maxPooledTranslucent = maxPooledTranslucent;
+        _retainEmptyTranslucent = retainEmptyTranslucent;
+        _maxRetainedVertexCapacity = vertexCapacity * 4;
+        _maxRetainedIndexCapacity = indexCapacity * 4;
+        _maxRetainedTranslucentVertexCapacity = translucentVertexCapacity * 4;
+        _maxRetainedTranslucentIndexCapacity = translucentIndexCapacity * 4;
+    }
+
     public List<Vertex> RentVertices()
     {
         lock (_lock)
         {
             if (_vertices.Count > 0) return _vertices.Pop();
         }
-        return new List<Vertex>(VertexCapacity);
+        return new List<Vertex>(_vertexCapacity);
     }
 
     public List<ushort> RentIndices()
@@ -66,7 +116,7 @@ public sealed class MeshBufferPool
         {
             if (_indices.Count > 0) return _indices.Pop();
         }
-        return new List<ushort>(IndexCapacity);
+        return new List<ushort>(_indexCapacity);
     }
 
     public List<Vertex> RentTranslucentVertices()
@@ -75,7 +125,7 @@ public sealed class MeshBufferPool
         {
             if (_translucentVertices.Count > 0) return _translucentVertices.Pop();
         }
-        return new List<Vertex>(TranslucentVertexCapacity);
+        return new List<Vertex>(_translucentVertexCapacity);
     }
 
     public List<ushort> RentTranslucentIndices()
@@ -84,50 +134,54 @@ public sealed class MeshBufferPool
         {
             if (_translucentIndices.Count > 0) return _translucentIndices.Pop();
         }
-        return new List<ushort>(TranslucentIndexCapacity);
+        return new List<ushort>(_translucentIndexCapacity);
     }
 
     /// <summary>
-    /// Takes the lists of a build that is finished with (uploaded or discarded). Lists
-    /// below the rent capacity — the empty-mesh placeholders — and lists that grew past
-    /// <see cref="MaxRetainedVertexCapacity"/> are left to the GC. Translucent lists only
-    /// come back when they actually drew something: most chunks have no fluid or glass.
+    /// Takes the lists of a chunk build that is finished with (uploaded or discarded).
     /// </summary>
-    public void Return(ChunkMeshData data)
+    public void Return(ChunkMeshData data) =>
+        Return(data.Vertices, data.Indices, data.TranslucentVertices, data.TranslucentIndices);
+
+    /// <summary>
+    /// Takes the four lists of a build that is finished with (uploaded or discarded). Lists
+    /// below the rent capacity — the empty-mesh placeholders — and lists that grew past four
+    /// times it are left to the GC. Translucent lists only come back when they actually drew
+    /// something, unless the pool was built with <c>retainEmptyTranslucent</c>: most chunks
+    /// have no fluid or glass, but a region build rents its water lists every time.
+    /// </summary>
+    public void Return(List<Vertex> vertices, List<ushort> indices,
+                       List<Vertex> translucentVertices, List<ushort> translucentIndices)
     {
-        var vertices = data.Vertices;
-        var indices = data.Indices;
-        var tVertices = data.TranslucentVertices;
-        var tIndices = data.TranslucentIndices;
         lock (_lock)
         {
-            if (vertices.Capacity >= VertexCapacity && vertices.Capacity <= MaxRetainedVertexCapacity
-                && _vertices.Count < MaxPooled)
+            if (vertices.Capacity >= _vertexCapacity && vertices.Capacity <= _maxRetainedVertexCapacity
+                && _vertices.Count < _maxPooled)
             {
                 vertices.Clear();
                 _vertices.Push(vertices);
             }
-            if (indices.Capacity >= IndexCapacity && indices.Capacity <= MaxRetainedIndexCapacity
-                && _indices.Count < MaxPooled)
+            if (indices.Capacity >= _indexCapacity && indices.Capacity <= _maxRetainedIndexCapacity
+                && _indices.Count < _maxPooled)
             {
                 indices.Clear();
                 _indices.Push(indices);
             }
-            if (tVertices.Count > 0
-                && tVertices.Capacity >= TranslucentVertexCapacity
-                && tVertices.Capacity <= MaxRetainedTranslucentVertexCapacity
-                && _translucentVertices.Count < MaxPooledTranslucent)
+            if ((_retainEmptyTranslucent || translucentVertices.Count > 0)
+                && translucentVertices.Capacity >= _translucentVertexCapacity
+                && translucentVertices.Capacity <= _maxRetainedTranslucentVertexCapacity
+                && _translucentVertices.Count < _maxPooledTranslucent)
             {
-                tVertices.Clear();
-                _translucentVertices.Push(tVertices);
+                translucentVertices.Clear();
+                _translucentVertices.Push(translucentVertices);
             }
-            if (tIndices.Count > 0
-                && tIndices.Capacity >= TranslucentIndexCapacity
-                && tIndices.Capacity <= MaxRetainedTranslucentIndexCapacity
-                && _translucentIndices.Count < MaxPooledTranslucent)
+            if ((_retainEmptyTranslucent || translucentIndices.Count > 0)
+                && translucentIndices.Capacity >= _translucentIndexCapacity
+                && translucentIndices.Capacity <= _maxRetainedTranslucentIndexCapacity
+                && _translucentIndices.Count < _maxPooledTranslucent)
             {
-                tIndices.Clear();
-                _translucentIndices.Push(tIndices);
+                translucentIndices.Clear();
+                _translucentIndices.Push(translucentIndices);
             }
         }
     }
