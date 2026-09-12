@@ -104,6 +104,17 @@ public class RenderManager : IDisposable
     private uint _sceneDepthTex;
     private Vector2D<int> _sceneSize;
 
+    // The half-resolution target the underwater sun-shaft march renders into before a
+    // full-res depth-aware upsample composites it back (see CreateRaysTarget). Layout is
+    // RGBA16F at half the viewport per axis: rgb is the additive shaft colour and a is the
+    // world-space distance that pixel marched, capped at
+    // WorldGenerationConfig.WaterRayMaxDistance, which the upsample keys its depth-aware
+    // weights off. No depth attachment - the march is a full-screen triangle with the depth
+    // test off, so there is nothing to test against.
+    private uint _raysFbo;
+    private uint _raysTex;
+    private Vector2D<int> _raysSize;
+
     // The sea surface the reflection mirrors across (a source cell's top), and the
     // per-frame clip that keeps below-plane geometry out of the reflection texture.
     // _clipY rides ApplyFrameUniforms into uClipY; -1e9 disables the discard.
@@ -318,6 +329,7 @@ public class RenderManager : IDisposable
         chunkShader.SetUniform("uAlphaCutoff", 0.5f);
         CreateReflectionTarget();
         CreateSceneCopy();
+        CreateRaysTarget();
 
         // Everything a world draw sets per draw, resolved once here (see SetDrawUniforms)
         _locModel = worldShader.GetUniformLocation("uModel");
@@ -519,6 +531,7 @@ public class RenderManager : IDisposable
         gl.Viewport(size);
         CreateReflectionTarget();
         CreateSceneCopy();
+        CreateRaysTarget();
     }
 
     /// <summary>
@@ -935,6 +948,68 @@ public class RenderManager : IDisposable
         _sceneDepthTex = 0;
     }
 
+    /// <summary>
+    /// Builds the half-resolution colour target the underwater ray march writes into, sized
+    /// from the viewport by <see cref="HalfResTarget"/>. Called from
+    /// <see cref="LoadResources"/> and <see cref="SetViewport"/>, recreating only when the
+    /// half-res size actually changed - two adjacent viewport widths often share one, which is
+    /// what keeps a drag-resize from churning GL objects on every pixel of drag.
+    /// <para>
+    /// Unlike <see cref="CreateReflectionTarget"/> this one needs no validity flag and cannot
+    /// flash on a resize: the march covers the target with a full-screen triangle, blending
+    /// off and no clear, on every frame it runs, and nothing samples the texture before that
+    /// draw. The undefined contents of a fresh allocation are therefore never observable.
+    /// </para>
+    /// Like its two siblings this assumes <c>ActiveTexture</c> is unit 0 on entry - the
+    /// convention <see cref="CopyScene"/> restores before it returns.
+    /// </summary>
+    private void CreateRaysTarget()
+    {
+        var desired = HalfResTarget.For(_viewportSize.X, _viewportSize.Y);
+        if (!HalfResTarget.ShouldRecreate(_raysFbo != 0, new HalfResTarget.Size(_raysSize.X, _raysSize.Y), desired))
+            return;
+
+        DeleteRaysTarget();
+        _raysSize = new Vector2D<int>(desired.Width, desired.Height);
+
+        _raysTex = gl.GenTexture();
+        gl.BindTexture(TextureTarget.Texture2D, _raysTex);
+        unsafe
+        {
+            // Half-float, not Rgba8: alpha carries a marched distance in blocks (up to
+            // WaterRayMaxDistance), which a normalised 8-bit channel cannot hold, and 8-bit
+            // rgb would re-band the deliberately dithered, dim additive term.
+            gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.Rgba16f,
+                (uint)desired.Width, (uint)desired.Height, 0, PixelFormat.Rgba, PixelType.Float, null);
+        }
+        // The upsample fetches texels explicitly and clamps the coordinates itself, so the
+        // filter and wrap modes here are belt-and-braces.
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
+
+        _raysFbo = gl.GenFramebuffer();
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, _raysFbo);
+        gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+            TextureTarget.Texture2D, _raysTex, 0);
+
+        var status = gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
+        if (status != GLEnum.FramebufferComplete)
+            throw new Exception($"Underwater rays framebuffer incomplete: {status}");
+
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        gl.BindTexture(TextureTarget.Texture2D, 0);
+    }
+
+    private void DeleteRaysTarget()
+    {
+        if (_raysFbo == 0) return;
+        gl.DeleteFramebuffer(_raysFbo);
+        gl.DeleteTexture(_raysTex);
+        _raysFbo = 0;
+    }
+
     /// <summary>Snapshots the default framebuffer's colour and depth into the scene textures so the
     /// water pass can refract what is behind the surface and measure how thick the water is. Two
     /// texture copies, no FBO: the window has no MSAA, so CopyTexSubImage2D reads it directly.</summary>
@@ -1331,22 +1406,34 @@ public class RenderManager : IDisposable
         gl.DepthMask(true);
     }
 
-    /// <summary>Sun shafts through the water, drawn as one additive full-screen pass while the eye
-    /// is submerged. Needs the depth of everything drawn so far (water surface included), so the
-    /// depth texture is re-copied here before the march.</summary>
+    /// <summary>Sun shafts through the water, drawn while the eye is submerged. Needs the depth of
+    /// everything drawn so far (water surface included), so the depth texture is re-copied here
+    /// before the march.
+    /// The march itself runs at HALF resolution into <see cref="_raysFbo"/> and is composited back
+    /// to full resolution by a depth-aware upsample (PERF_TODO R2) - a quarter of the marched
+    /// pixels, with the loop's step count, sample count and per-sample formula untouched.
+    /// The depth copy stays FULL resolution deliberately: the composite runs at full-res pixels and
+    /// weighs each half-res tap against the distance the full-res pixel marches, so it needs a
+    /// full-res depth reference, and the default framebuffer's own depth is unsamplable while it is
+    /// the draw target (which is why CopyScene exists). A half-res depth alongside this one would be
+    /// additive cost, not a saving - see R3 in PERF_TODO.md, which shares this machinery.
+    /// Both draws sit inside this one method, so the RaysPass GPU bracket around the call in
+    /// World.RenderFrame still measures the whole pass and FrameProfiler needs no change.</summary>
     public void RenderUnderwaterRays(Camera? camera)
     {
         if (camera == null || _rays == null || _eyeInLava) return;
         var wet = MathUtils.SmoothStep(_underwaterT);
         var strength = wet * _shadowStrengthDry * _dayness * GameSettings.WaterSunShafts;
         if (strength <= 0.0005f) return;
+        if (_raysFbo == 0) return;             // no target to march into (never happens after LoadResources)
         CopyScene(colour: false);
         gl.ActiveTexture(TextureUnit.Texture1);
         gl.BindTexture(TextureTarget.Texture2D, _shadowDepthTex);
         gl.ActiveTexture(TextureUnit.Texture4);
         gl.BindTexture(TextureTarget.Texture2D, _sceneDepthTex);
         gl.ActiveTexture(TextureUnit.Texture0);
-        _rays.Render(_invViewProj, _cameraPos, _sunDir, _sunColor, strength, WaterPlaneY, _lightViewProj, _time);
+        _rays.Render(_raysFbo, _raysTex, _raysSize, _viewportSize, _invViewProj, _cameraPos, _sunDir,
+            _sunColor, strength, WaterPlaneY, _lightViewProj, _time);
     }
 
     // Wall-clock timestamp of the previous RenderWorld, so the chunk fade-in can advance by
@@ -2340,6 +2427,7 @@ public class RenderManager : IDisposable
         gl.DeleteTexture(_shadowDepthTex);
         DeleteReflectionTarget();
         DeleteSceneCopy();
+        DeleteRaysTarget();
         gl.DeleteBuffer(outlineVbo);
         gl.DeleteBuffer(outlineEbo);
         gl.DeleteVertexArray(outlineVao);

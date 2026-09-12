@@ -42,7 +42,7 @@ Two profiler traps, read before trusting a number:
 | Settled, over water | 9.4-11.4 ms | 88-106 | `reflect` GPU 0 when no water on screen, up to ~8 ms when the bay is in view; `worldPass` GPU 3.5-5.6 ms is the largest steady cost |
 | Streaming (first 10 s) | 18-39 ms | 25-54 | worst 1 s window 32.9 ms avg (true single-frame max higher, not logged) |
 | Teleport | one ~30 ms window | ~34 | unload storm 17077 -> 4991 chunks, `lod` 2-3 ms |
-| Underwater | ~10-14 ms | 72-100 | `raysPass` GPU 1.5-2.3 ms while submerged |
+| Underwater | ~10-14 ms | 72-100 | `raysPass` GPU 1.5-2.3 ms while submerged (pre-half-res, see below) |
 | Screenshot step | +7-18 ms | 1 fps that frame | PNG encode on the render thread (scripted runs only) |
 
 The `reflect` row above predates reflection temporal reuse: the mirror is now
@@ -57,6 +57,11 @@ slow-pan), not a streaming window or the sprint-heavy fly average. Re-capture wi
 the fly in **How to measure** and compare the `reflect` `/gpuAvg~gpuMax` suffix
 before pricing any further reflection work; the acceptance bar is visual — no
 ghosting or swimming below the thresholds, and no flash on a drag-resize.
+
+The `raysPass` row likewise predates the half-res underwater march and is pending
+re-capture with the fly. The only post-change figure in this file is the scripted
+`rays-halfres.json` pair in **Suggested first pass**, which is a different scenario
+and not a `perf-fly` number — do not mix the two.
 
 Streaming-second breakdown (avg over the 1 s window, so peaks are higher):
 `lod` up to 10.7, `chunkDirty` up to 6.3, `chunkApply` up to 5.8, `fluidTick`
@@ -77,8 +82,9 @@ stream-in (visible in the `~max` half since the console line grew max columns).
    `worldPass` GPU up to 5.6 ms. Looking at the bay costs ~2x dry land; the
    `reflect` figure predates reflection temporal reuse and is pending re-capture.
 3. **Geometry pool doubling mid-stream** (opaque to 512 MB) — one-time copy hitch.
-4. **Underwater `raysPass`** (1.5-2.3 ms GPU) and **`cloudPass`** (0.7-1.5 ms when
-   clouds in view). Clouds were already cut 63 % (item 15); remainder is steady, not spiky.
+4. **Underwater `raysPass`** (1.5-2.3 ms GPU, pre-half-res — pending re-capture) and
+   **`cloudPass`** (0.7-1.5 ms when clouds in view). Clouds were already cut 63 %
+   (item 15); remainder is steady, not spiky.
 5. **Fluid wake storm** at spawn over the sea — now bounded (queue 100-196k -> 8-12k),
    secondary to item 1.
 6. **Screenshot encode** 7-18 ms — scripted runs only, but fix anyway (item 20).
@@ -92,15 +98,26 @@ nothing from **Ruled out** — overlaps are called out inline.
 
 ### GPU / render passes
 
-- [ ] **R2 · Half-res underwater rays** — `UnderwaterRaysRenderer` +
-  `rays-fragment.glsl`, driven at `RenderManager.cs:1295-1308`; `raysPass`
-  1.5-2.3 ms, the #4 hitch. March into a half-res target and upsample additively;
-  copy the scene depth half-res too (`:1301`). **Impact high · risk low-med · effort M.**
 - [ ] **R3 · Half-res scene copies for water** — `CopyScene`
-  (`RenderManager.cs:924-936`), called with colour+depth at `:1490` and depth at
-  `:1301`. Refraction is low-frequency, so downsample through an FBO blit instead
+  (`RenderManager.cs:1016-1028`), called with colour+depth at `:1619` and depth at
+  `:1429`. Refraction is low-frequency, so downsample through an FBO blit instead
   of a full-res `CopyTexSubImage2D`. The shader's normalised UV/NDC math
   (`test-fragment.glsl:267-279`) is resolution-independent, so this is plumbing.
+  **Read this first — R2 shipped the march half of its own bullet and deliberately
+  *not* the "copy the scene depth half-res too" half, and the reason is structural
+  rather than unfinished work.** The rays pass now composites through a depth-aware
+  upsample whose weights compare the world-space distance each half-res tap marched
+  against the distance the *full-res* pixel marched, so it needs a full-res depth
+  reference at full-res pixels — and the default framebuffer's own depth is
+  unsamplable while it is the draw target, which is the reason `CopyScene` exists at
+  all. `CopyScene(colour: false)` at `RenderManager.cs:1429` therefore stays full-res,
+  and a half-res depth for the march *alongside* the retained full-res copy would be
+  additive cost (a reduction draw plus a second texture), not a saving. So R3 must
+  either keep a full-res depth copy alive for the rays composite — in which case the
+  win narrows to the colour copy at `:1619` plus a depth downsample used only by the
+  water pass — or move the composite onto a half-res depth reference and re-run R2's
+  perceptual gate (`visual-examples/rays-halfres.json`, see **Suggested first pass**).
+  The colour copy for refraction is unaffected either way.
   **Impact med · risk low-med · effort M.**
 - [ ] **R4 · Cloud batching / mirror pre-pass** — `CloudRenderer.Render` /
   `DrawCopies` (`CloudRenderer.cs:71-128`): up to nine fixed-offset copies drawn
@@ -258,7 +275,12 @@ nothing from **Ruled out** — overlaps are called out inline.
 - Hierarchical / compute GPU cull — the ruled-out entry measures post-MDI
   cull+sort+fill at ~2%; revisit only if CPU cull+sort exceeds ~1 ms.
 - Shader ALU cuts (the caustic Voronoi net, 8 point lights, 4-tap PCF) — ruled out;
-  the half-res route (R2/R3) is the allowed lever.
+  the half-res route is the allowed lever. R2 has landed on that route (the underwater
+  rays march), leaving R3 as its open half. The ruling itself is unchanged, and R2
+  respected it: the march's step count, sample count and per-sample formula are
+  byte-identical and are now pinned by
+  `WaterTests.RayMarchStaysUnchangedByTheHalfResRound`, so a future tweak cannot
+  quietly re-open shader ALU.
 - Worldgen noise reduction in `TerrainGenerator` / `NoiseCaves` — pure-function
   worldgen, changes visuals; not pursued.
 - `FluidManager` — audited this round and nothing new found: cells are packed `long`
@@ -283,43 +305,88 @@ nothing from **Ruled out** — overlaps are called out inline.
   above the noise floor. `Camera`'s per-frame collision scans are additional
   evidence for D1's impact rather than a separate entry.
 
-**Suggested first pass:** C1 and C9 landed this round, both worker-side and both
-inside `LodRegion.BuildMeshData`. C1 replaced the fused O(cells x window^2) growth-min
-with a materialised fine-height grid — the region grown by `cellSize + margin` per
-side, filled chunk column by chunk column straight out of the prefetched heightmaps —
-and a separable rectangular min over it: one horizontal pass per cell row, reused by
-every column in that row, then a `windowSpan` vertical scan per cell. The per-cell
-uneroded max (which feeds isSea/beachTop/gravelTop) and the canopy scan were left
-exactly where they were, each still scanning the cell's own footprint. The retired
-bullet's ~10x estimate was wrong and the honest accounting is worth carrying forward:
-at level 2 a region build now costs ~395k array touches (grid fill 81,796 writes,
-horizontal half 213,928 compares, vertical half 25,432, per-cell max 73,984) against
-559,504 `FineHeight` calls before — roughly **1.4x fewer samples, not ~10x**, because
-the horizontal half runs at fine-Z resolution for every cell row and so dominates. The
-structural win is per-sample *cost*: a stride-1 compare over an L2-resident `int[]`
-instead of two shifts, a subtract, a jagged double deref and — once anything has been
-mined — a tuple hash plus a `ConcurrentDictionary` probe. A monotonic-deque sliding
-minimum and a van-Herk-style cell-aligned block min were both considered and rejected:
-each lands near 180k compares for the horizontal half against its current 213,928, a
-thin slice of the ~395k total since the grid fill dominates, bought at a real cost in
-provable bit-identity. That is the obvious next lever if a LodGen capture ever prices
-it as worth the risk. C9 replaced the per-fine-column `ConcurrentDictionary` cap table
-with per-chunk-column cap buckets — a dense `Chunk.Size * Chunk.Size` array indexed
-exactly like a heightmap — resolved once per prefetched heightmap, so a region with no
-edited column pays nothing and an edited one pays one probe per chunk column instead of
-one per sample. The identity claim is pinned by a `separableMin` test seam with
-full-output equality against the original nested window at every level over six region
-coordinates, a capped-region equality test, an exact window-reach edge test at the
-region boundary, and a cross-tree hash of every LOD vertex/index/column buffer over
-75 regions x 3 levels in both a clean and a capped phase, with the capped phase
-asserted non-vacuous on each tree. Neither item shows in a profiled section — `lod`
-measures only the main-thread `LodManager.Update` (`World.cs:242-244`) while
-`BuildMeshData` runs on the LodGen thread — so size both with a LodGen throughput
-capture during the #1 streaming hitch before pricing further LOD work. Next: **R2**
-(half-res underwater rays, measured against `raysPass`), the biggest single GPU prize
-left. R10 is the biggest structural render win; hold it until the cheaper LOD items
-above have been measured, since they may move `lod` enough to reprice it — and it
-overlaps R5.
+**Suggested first pass:** R2 landed this round: the underwater sun-shaft march now runs
+at half resolution. `RenderManager` owns a half-res RGBA16F target (`_raysFbo` /
+`_raysTex` / `_raysSize`, created in `LoadResources` and `SetViewport`, deleted in
+`Dispose`), sized by a GL-free `HalfResTarget` helper
+(`OpenGLTest/src/Systems/HalfResTarget.cs`) whose ceil-to-half, min-2 and
+should-recreate arithmetic is the one headlessly testable part of the change
+(`OpenGLTest.Tests/HalfResTargetTests.cs`, 7 facts; texture allocation and framebuffer
+completeness are deliberately not covered there and are only reachable by running the
+game). `RenderUnderwaterRays` (`RenderManager.cs:1422-1437`) is now two draws inside
+one method, so the existing `RaysPass` bracket around the call in `World.Render`
+(`World.cs:375-379`) still measures the whole pass and `FrameProfiler` needed no
+change. Draw 1 is the untouched march writing every texel of the half-res target with
+blending off and no clear — the *only* edit to `rays-fragment.glsl` is that its `FragColor` alpha now
+carries the world-space distance that pixel marched (capped at `WaterRayMaxDistance`)
+instead of a constant 1. Draw 2 is a new `rays-upsample-fragment.glsl` compositing
+additively at full res. The upsample is bilateral on *marched distance*, not on raw
+depth — the projection is Direct3D-style 0..1 so no near/far linearisation would be
+correct — weighting each of the four half-res taps by
+`bilinear * exp(-|tapLen - pixelLen| / WaterRayUpsampleToleranceBlocks)`
+(`WorldGenerationConfig.cs:206`, 2 blocks) and falling back to the single
+nearest-distance tap when all four are rejected. Comparing the distance a tap
+*actually marched* rather than a re-derived estimate is what keeps the composite
+self-consistent with whatever the march sampled. The 20-step loop, its sample count
+and its per-sample formula are untouched and now pinned by
+`WaterTests.RayMarchStaysUnchangedByTheHalfResRound`. What R2 deliberately did **not**
+do is the second half of its own bullet, the half-res scene-depth copy — folded into
+R3 above with the structural reason; the depth copy is still full-res.
+
+Structurally: the march runs over a quarter of the pixels, and nothing else about it
+changed. The new full-res composite (four `texelFetch`es, one `mat4` multiply and four
+`exp`s per pixel) plus the retained full-res depth copy are what keep the measured win
+below that quarter. The one measured number this round, and no other — **no `perf-fly`
+capture was re-run, so every figure above this paragraph is still the old snapshot**:
+
+| `raysPass`, 1280x720 | gpuAvg | gpuMax | windows |
+|---|---|---|---|
+| pristine HEAD (f4436eb) | 0.743 ms | 0.774 ms | 15 over 3 runs |
+| half-res (this round) | 0.355 ms | 0.404 ms | 17 over 3 runs |
+
+Capture method, which matters more than usual here: `visual-examples/rays-halfres.json`
+under `VOXEL_TIME=180 VOXEL_DEBUG=1`, taking only profiler windows lying wholly inside
+that scenario's closing 10 s submerged hold, discarding each run's first such window
+(it straddles the dry/wet transition), and requiring every FPS line in the window to
+report the hold pose, `Water True/True` and `Grounded True` (settled, so no
+post-teleport streaming churn); three suffix-less windows were dropped. Do **not**
+select lines by the presence of a `/gpuAvg~gpuMax` suffix — the `RaysPass` bracket sits
+*outside* `RenderUnderwaterRays`, so a window publishes a `raysPass` line whether or not
+the pass ran, and `gpuAvg` is a mean over a 1 s publish window, so any window holding
+dry frames is deflated toward zero.
+
+Perceptually, honestly: the verdict was *indistinguishable in motion at 1:1*, but it is
+not free. The shaft body is softer — the march's interleaved-gradient dither now sits on
+2 px cells, so grain RMS falls 3.24 -> 1.77 while doubling in screen scale — with mean
+luminance preserved to 0.16 levels. Strong silhouettes carry a 1-2 px rim covering
+0.115 % of the frame at ~10 levels; it is a *darkening* on the terrain side, i.e. the
+bilateral weight erring conservative and rejecting mismatched taps, not a bright halo
+leaking across the edge, and the silhouette itself stays equally crisp because geometry
+is still drawn full-res. Shimmer under a 0.5 °/frame pan and flicker at a fixed camera
+both came out marginally *better* than full-res once wall-clock sun drift is normalised
+out — the opposite of the expected half-res crawl, because the bilateral upsample
+low-passes the dither. Two traps for whoever re-runs this gate: `water.json`'s four
+underwater shots are **not** a usable instrument (the camera free-falls at every shot and
+bubble particles drift through frame, giving a same-build noise floor of 15-25 levels
+against 3-7 for a pose-exact shot), and any frame-to-frame statistic must be normalised
+for sun drift before it is compared across builds — raw, the half-res tree reads 2.3x
+*worse* on flicker, which is entirely the varying screenshot gap against a dimming sun.
+Both are recorded in `rays-halfres.json`'s own header, which is the scenario to use:
+bare teleport+screenshot bursts with no wait between them tick no physics, so the pose
+is pixel-stable. Carried forward from the previous round: `lod` measures only the
+main-thread `LodManager.Update` (`World.cs:241-243`) while `LodRegion.BuildMeshData`
+runs on the LodGen thread, so size any further LOD work with a LodGen throughput capture
+during the #1 streaming hitch rather than off a `lod` row.
+
+Next: **R3**, the natural follow-on now that half-res machinery is live in the tree —
+but read its caveat above first, because the rays composite pins the *depth* copy at
+full res and narrows R3 to the colour copy unless it also re-runs R2's perceptual gate.
+If that makes R3 thinner than its bullet claims, take **R4** instead (cloud batching —
+the other half of hitch #4, a straight draw-count cut with no resolution trade and no
+perceptual gate), with **R12** as the cheap S alongside it since it feeds `chunkApply`
+in the #1 streaming hitch. R10 is still the biggest structural render win; hold it until
+the cheaper LOD items above have been measured, since they may move `lod` enough to
+reprice it — and it overlaps R5.
 
 ## Ruled out (do not retry without new evidence)
 

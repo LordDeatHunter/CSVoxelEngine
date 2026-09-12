@@ -199,6 +199,11 @@ public static class WorldGenerationConfig
     public const float WaterRayStrength = 0.08f;
     public const float WaterRayMaxDistance = 40f;
     public const int WaterRaySteps = 20;
+    // How far apart two marched distances have to be, in blocks, before the half-res sun-shaft
+    // upsample (rays-upsample-fragment.glsl) stops letting one bleed into the other. The falloff
+    // is exponential, so ~2 blocks of mismatch keeps about a third of a tap's weight and a
+    // silhouette several blocks deep rejects its neighbours outright.
+    public const float WaterRayUpsampleToleranceBlocks = 2f;
 
     // Beaches ring the sea: dry columns up to BeachAboveSeaLevel over the waterline and
     // submerged columns down to BeachBelowSeaLevel under it build their top and soil band

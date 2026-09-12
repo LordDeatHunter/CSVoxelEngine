@@ -7,6 +7,12 @@
 // inverse of the very matrix that wrote it, so the projection's clip-depth convention cancels
 // out - the C# System.Numerics projection is Direct3D-style 0..1, and no near/far
 // linearization would be correct here.
+// The march renders into a HALF-RESOLUTION target (RenderManager's _raysFbo) and is
+// composited back to full resolution additively by rays-upsample-fragment.glsl, which
+// keys its weights off the marched distance this shader writes into alpha. The
+// gl_FragCoord-based jitter below therefore varies per HALF-RES pixel, so its grain is
+// two screen pixels wide; that is intended - the step count, the sample count and the
+// per-sample formula are deliberately untouched, only the resolution changed.
 in vec2 fUv;
 uniform sampler2D uSceneDepth;
 uniform sampler2DShadow uShadowMap;
@@ -52,5 +58,8 @@ void main() {
     }
     // Brighter looking toward the sun (forward scattering), never zero looking away
     float phase = 0.2 + 0.8 * pow(max(dot(dir, uSunDir), 0.0), 4.0);
-    FragColor = vec4(uSunColor * (accum * uStrength * phase), 1.0);
+    // Alpha carries the world-space distance in blocks this pixel marched (len, computed
+    // above and capped at uMaxDistance) so the upsample can reject half-res taps that came
+    // from the other side of a silhouette. The rgb term is unchanged.
+    FragColor = vec4(uSunColor * (accum * uStrength * phase), len);
 }

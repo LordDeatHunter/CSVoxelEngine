@@ -1,0 +1,121 @@
+// Underwater sun shafts, framed for the half-res rays round (PERF_TODO R2). The four
+// underwater shots in water.json prove the pass still runs; none of them is framed to expose
+// the three artifacts a half-resolution march is judged on - aliasing/shimmer along a shaft
+// edge, haloing or light leaking across a depth discontinuity, and temporal flicker. This
+// scenario frames all three, and ends with a submerged hold long enough to read a raysPass
+// GPU figure off the profiler.
+//
+// Run from OpenGLTest/: VOXEL_TIME=180 VOXEL_SCRIPT=visual-examples/rays-halfres.json
+// Add VOXEL_DEBUG=1 for the profiler lines the closing hold exists to produce.
+// VOXEL_TIME=180 is not a free choice: the pass is gated off entirely when
+// wet * shadowStrength * dayness * WaterSunShafts <= 0.0005 (RenderManager.RenderUnderwaterRays),
+// and the sun angle is wall-clock driven (angle = (Window.Time + VOXEL_TIME)/600*tau + 0.8,
+// RenderManager.cs:551). At 180 the sun sits low behind the shore for this whole ~30 s run -
+// elevation 0.42 falling to 0.18, strength ~0.08, i.e. 140x the gate - which is what makes the
+// shafts bright and well separated. A near-overhead sun (VOXEL_TIME=70) renders almost no
+// shaft structure at all, and past ~210 dayness collapses and the pass gates off mid-run.
+//
+// WHY THE BURSTS CARRY NO WAITS. This is the mechanism the whole scenario is built on and it
+// is not obvious: teleport, look and screenshot never call world.Update (VisualDirector.cs:36-48,
+// 88-94), so they advance no physics whatsoever. Camera.IsEyeInWater is recomputed only inside
+// the physics update, RenderManager's _underwaterT fades over 0.15 s of RENDERED frames, and
+// the bubble particles are stepped from World.Update too. So a run of bare teleport+screenshot
+// pairs holds the eye pixel-stable, keeps the underwater state saturated at whatever the
+// preceding wait computed, and freezes the bubbles - the only thing still moving between two
+// such frames is wall-clock uTime and the sun angle. Insert a wait between burst shots and the
+// camera resumes free-falling at ~2 blocks/s (there is no flight op, and TestTeleport only
+// zeroes vertical velocity), which would swamp the frame-to-frame statistic the bursts exist
+// to produce. Every burst below is preceded by a wait that ENDS submerged, and carries no wait
+// inside it.
+//
+// The vantage points were picked by rendering candidates and opening the frames, not guessed:
+//
+// (A) settle - [243.5, -2.5, -143.5], 6 s. Streams the bay and settles the water state. The
+//     camera sinks through it, from y=-2.5 to the seabed at y=-12.38, Grounded True and
+//     Water True/True at the end (verified from the debug log), which is the precondition
+//     every later burst depends on.
+//
+// (A1) shaft_edge_terrace - [212.5, -1.5, -140.5] yaw 180 pitch 10. water.json's
+//     water_under_shafts position, re-pitched from 25 to 10 so the frame is not mostly open
+//     water: the low sun fans six or seven well-separated shafts across a stepped shore
+//     terrace, and the terrace rim runs diagonally through the shaft field against the dark
+//     blue distance. Bright shaft edges crossing a hard silhouette against a dark background
+//     is exactly where a naive half-res upsample leaks, so this is the primary frame.
+//
+// (A2) shaft_edge_near - [208.5, -2.5, -134.5] yaw 190 pitch 20. A near shore face fills the
+//     left half of the frame with the glow band behind it. This is the largest depth
+//     discontinuity in the scenario - a few blocks of marched distance on the rock against the
+//     40-block cap (WaterRayMaxDistance) on the water behind it - so it is the frame that
+//     tests the bilateral weight rather than the shaft edges.
+//
+// (B) shaft_pan_0..4 - A1's pose, yaw 180 / 180.5 / 181 / 181.5 / 182, no waits. Half a degree
+//     is roughly four full-res pixels of horizontal motion at this FOV, i.e. two half-res
+//     texels: enough for a half-res sample grid to re-land, little enough that the shafts
+//     themselves barely move. Differencing consecutive frames of this burst is the shimmer and
+//     edge-crawl evidence; compare the magnitude of that frame-to-frame delta between builds.
+//
+// (C) shaft_still_0..2 - A1's pose, unchanged, three times, no waits. The camera does not move
+//     at all, so any difference inside this burst from a single build is temporal flicker.
+//     These three are also the sanity check on the no-wait design itself: if they differ by
+//     more than the sun-drift floor, something is still ticking and no burst number is
+//     trustworthy.
+//
+// (D) the timing hold - [250.5, -3.5, -150.5], 10 s, LAST, after every screenshot. This is the
+//     only part of the run that ticks physics for any length of time, so the camera sinks; it
+//     comes to rest Grounded True at y=-10.38 with Water True/True and stays there, verified
+//     from the log. With VOXEL_DEBUG=1 that yields ten profiler windows lying wholly inside a
+//     continuously submerged stretch, which is the only way to read a raysPass GPU figure that
+//     is not deflated by dry frames (FrameProfiler publishes a mean over a 1 s window and the
+//     RaysPass bracket runs whether or not the pass early-returns, so a mixed window is
+//     meaningless). The hold ends near clock t=205, still well clear of the dayness collapse.
+//
+// WHAT THE R2 GATE ACTUALLY MEASURED WITH THIS FILE, and why it exists rather than water.json
+// alone. Three runs of this scenario per build, pristine HEAD vs the half-res tree, 1280x720:
+//
+//   - The same-build control floor here is 3-7 levels (99th percentile of |delta| between two
+//     runs of ONE binary), because the burst shots are pose-exact. water.json's four underwater
+//     shots score 15-25 levels on the same statistic, for two reasons that have nothing to do
+//     with rendering: the camera is in free fall at each of them, so the eye height at capture
+//     varies 0.25-0.34 blocks run to run, and bubble particles drift through the frame (they
+//     appeared, at different positions, in 5 of 6 runs across BOTH builds). Those shots' max
+//     |delta| reaches 118 levels between two runs of the SAME binary. water.json therefore
+//     cannot resolve a shaft change worth a few levels; these shots can, and did.
+//
+//   - Reading the bursts: the raw frame-to-frame delta of shaft_still_* is NOT a build property.
+//     The gap between two screenshots is wall-clock and varies per run, and the sun dims through
+//     it, which shows up as a signed mean tracking mean|delta| at a fixed ratio (~3.0 in both
+//     builds). Normalise before comparing: divide by that drift, or high-pass the difference
+//     field (the dimming is spatially smooth, flicker is not). Raw, the half-res tree looked
+//     2.3x worse; normalised it is 0.579 vs 0.846, i.e. slightly BETTER. Do not skip that step.
+{
+  "steps": [
+    { "op": "teleport", "pos": [243.5, -2.5, -143.5], "yaw": 20, "pitch": 5 },
+    { "op": "wait", "seconds": 6 },
+
+    { "op": "teleport", "pos": [212.5, -1.5, -140.5], "yaw": 180, "pitch": 10 },
+    { "op": "screenshot", "name": "shaft_edge_terrace", "hideHud": true },
+    { "op": "teleport", "pos": [208.5, -2.5, -134.5], "yaw": 190, "pitch": 20 },
+    { "op": "screenshot", "name": "shaft_edge_near", "hideHud": true },
+
+    { "op": "teleport", "pos": [212.5, -1.5, -140.5], "yaw": 180.0, "pitch": 10 },
+    { "op": "screenshot", "name": "shaft_pan_0", "hideHud": true },
+    { "op": "teleport", "pos": [212.5, -1.5, -140.5], "yaw": 180.5, "pitch": 10 },
+    { "op": "screenshot", "name": "shaft_pan_1", "hideHud": true },
+    { "op": "teleport", "pos": [212.5, -1.5, -140.5], "yaw": 181.0, "pitch": 10 },
+    { "op": "screenshot", "name": "shaft_pan_2", "hideHud": true },
+    { "op": "teleport", "pos": [212.5, -1.5, -140.5], "yaw": 181.5, "pitch": 10 },
+    { "op": "screenshot", "name": "shaft_pan_3", "hideHud": true },
+    { "op": "teleport", "pos": [212.5, -1.5, -140.5], "yaw": 182.0, "pitch": 10 },
+    { "op": "screenshot", "name": "shaft_pan_4", "hideHud": true },
+
+    { "op": "teleport", "pos": [212.5, -1.5, -140.5], "yaw": 180, "pitch": 10 },
+    { "op": "screenshot", "name": "shaft_still_0", "hideHud": true },
+    { "op": "teleport", "pos": [212.5, -1.5, -140.5], "yaw": 180, "pitch": 10 },
+    { "op": "screenshot", "name": "shaft_still_1", "hideHud": true },
+    { "op": "teleport", "pos": [212.5, -1.5, -140.5], "yaw": 180, "pitch": 10 },
+    { "op": "screenshot", "name": "shaft_still_2", "hideHud": true },
+
+    { "op": "teleport", "pos": [250.5, -3.5, -150.5], "yaw": 90, "pitch": 0 },
+    { "op": "wait", "seconds": 10 }
+  ]
+}
