@@ -59,9 +59,13 @@ before pricing any further reflection work; the acceptance bar is visual — no
 ghosting or swimming below the thresholds, and no flash on a drag-resize.
 
 The `raysPass` row likewise predates the half-res underwater march and is pending
-re-capture with the fly. The only post-change figure in this file is the scripted
-`rays-halfres.json` pair in **Suggested first pass**, which is a different scenario
-and not a `perf-fly` number — do not mix the two.
+re-capture with the fly, as is the `cloudPass` figure in hitch #4 below (pre-R4). **No
+`perf-fly` capture has been re-run since either change, so every number above this line is
+still the old snapshot.** The post-change figures that do exist were taken with scripted
+scenarios rather than the fly — R2's `rays-halfres.json` `raysPass` pair, and this round's
+`clouds-mirror.json` `cloudPass` recapture, which found no measurable change — and both
+live in the git history of this file (`git log -p -- PERF_TODO.md`). They are different
+scenarios: do not mix them with a `perf-fly` number.
 
 Streaming-second breakdown (avg over the 1 s window, so peaks are higher):
 `lod` up to 10.7, `chunkDirty` up to 6.3, `chunkApply` up to 5.8, `fluidTick`
@@ -83,8 +87,15 @@ stream-in (visible in the `~max` half since the console line grew max columns).
    `reflect` figure predates reflection temporal reuse and is pending re-capture.
 3. **Geometry pool doubling mid-stream** (opaque to 512 MB) — one-time copy hitch.
 4. **Underwater `raysPass`** (1.5-2.3 ms GPU, pre-half-res — pending re-capture) and
-   **`cloudPass`** (0.7-1.5 ms when clouds in view). Clouds were already cut 63 %
-   (item 15); remainder is steady, not spiky.
+   **`cloudPass`** (0.7-1.5 ms when clouds in view — pre-R4, also pending a `perf-fly`
+   re-capture). Clouds were already cut 63 % (item 15); remainder is steady, not spiky.
+   R4 has since removed the nine-draws-per-sweep structure — each sweep is one instanced
+   draw — but that change is *submission-side only* (the same nine copies are still
+   rasterised twice per pass), and the recapture found **`cloudPass` unchanged within
+   run-to-run spread in both halves**; the win is up to 34 fewer draw calls and up to 34
+   fewer uniform updates a frame. That recapture is a different scenario
+   (`clouds-mirror.json`'s shore hold, see **Suggested first pass**), so it is *not* a
+   like-for-like correction of the 0.7-1.5 ms figure above.
 5. **Fluid wake storm** at spawn over the sea — now bounded (queue 100-196k -> 8-12k),
    secondary to item 1.
 6. **Screenshot encode** 7-18 ms — scripted runs only, but fix anyway (item 20).
@@ -98,33 +109,40 @@ nothing from **Ruled out** — overlaps are called out inline.
 
 ### GPU / render passes
 
-- [ ] **R3 · Half-res scene copies for water** — `CopyScene`
-  (`RenderManager.cs:1016-1028`), called with colour+depth at `:1619` and depth at
-  `:1429`. Refraction is low-frequency, so downsample through an FBO blit instead
-  of a full-res `CopyTexSubImage2D`. The shader's normalised UV/NDC math
-  (`test-fragment.glsl:267-279`) is resolution-independent, so this is plumbing.
-  **Read this first — R2 shipped the march half of its own bullet and deliberately
-  *not* the "copy the scene depth half-res too" half, and the reason is structural
-  rather than unfinished work.** The rays pass now composites through a depth-aware
-  upsample whose weights compare the world-space distance each half-res tap marched
-  against the distance the *full-res* pixel marched, so it needs a full-res depth
-  reference at full-res pixels — and the default framebuffer's own depth is
-  unsamplable while it is the draw target, which is the reason `CopyScene` exists at
-  all. `CopyScene(colour: false)` at `RenderManager.cs:1429` therefore stays full-res,
-  and a half-res depth for the march *alongside* the retained full-res copy would be
-  additive cost (a reduction draw plus a second texture), not a saving. So R3 must
-  either keep a full-res depth copy alive for the rays composite — in which case the
-  win narrows to the colour copy at `:1619` plus a depth downsample used only by the
-  water pass — or move the composite onto a half-res depth reference and re-run R2's
-  perceptual gate (`visual-examples/rays-halfres.json`, see **Suggested first pass**).
-  The colour copy for refraction is unaffected either way.
-  **Impact med · risk low-med · effort M.**
-- [ ] **R4 · Cloud batching / mirror pre-pass** — `CloudRenderer.Render` /
-  `DrawCopies` (`CloudRenderer.cs:71-128`): up to nine fixed-offset copies drawn
-  twice (depth pre-pass + colour), plus again in the mirror; `cloudPass` 0.7-1.5 ms.
-  Instance the 3x3 into one draw per pass; consider dropping the pre-pass for the
-  mirror only. Keep the main-pass pre-pass — it is the once-per-pixel blend guard.
-  **Impact med · risk low-med · effort M.**
+- [ ] **R3 · Half-res scene copies for water — resolved and PARKED this round** —
+  `CopyScene` (`RenderManager.cs:1016-1028`), called with colour+depth at `:1619` and
+  depth-only at `:1429`. The condition R2 left on this bullet was resolved against the code
+  rather than implemented, and it settles three ways.
+  **(a) The depth copy cannot move.** `CopyScene(bool colour)` copies depth
+  *unconditionally* — only the colour half is gated by the parameter — and both call sites
+  write the same `_sceneDepthTex`, which R2's depth-aware upsample pins at full res. So the
+  `:1619` call keeps paying a full-res `DepthComponent24` `CopyTexSubImage2D` whatever R3
+  does, and a second, half-res depth used only by the water pass is the same *additive* cost
+  (an extra texture plus an extra reduction, on top of a full-res copy that still has to
+  happen) that R2 already rejected on the rays side. Only the RGBA8 colour copy is left.
+  **(b) The shader claim holds.** `test-fragment.glsl`'s refraction really is
+  resolution-independent: `uv = gl_FragCoord.xy * uInvViewport` (`:267`) against
+  `uInvViewport = 1/_viewportSize` (`RenderManager.cs:1362`), bilinear `texture()` fetches
+  (`:270-272`), a `uInvViewProj` unprojection (`:276`) — no `texelFetch` and no pixel indices
+  anywhere in the file. The shader would need zero changes.
+  **(c) But the ceiling is tiny and the change is not "sample less".** The colour copy is
+  gated behind `if (_nearWaterVisible)` and sits inside a `waterPass` measured at **0.09 ms
+  GPU total** (the compute-frustum-cull capture under **Ruled out** below) — a figure that
+  also contains every translucent chunk draw and every LOD water sheet. That capture
+  demonstrably *included* the colour copy: the same line reports `reflect 0.83 ms`, and
+  `RenderReflection` early-returns unless `_nearWaterVisible`
+  (`RenderManager.cs:1053-1054`) — the very flag that gates the copy — so near water was on
+  screen when it was taken. 0.09 ms is therefore a real ceiling for the whole pass, not a
+  figure that might have excluded the work. And `CopyTexSubImage2D` cannot downscale, so this
+  is not a sampling change but new plumbing: an FBO, a texture, sizing and teardown across
+  `CreateSceneCopy` / `DeleteSceneCopy` / `SetViewport` / `Dispose`, and a
+  `glBlitFramebuffer` that still *reads* the full-res framebuffer and saves only the write
+  side (arithmetic off the format, no timing claim: 3.69 MB -> 0.92 MB of RGBA8 writes per
+  frame at 1280x720). Its cost is blurring everything seen through water — a perceptual
+  change, which drags R2's full perceptual gate along with it.
+  **Parked, not disproven:** effort M *plus* a perceptual gate, for an unmeasurable slice of
+  an already-gated 0.09 ms pass. Revisit only if a capture ever isolates the colour copy as
+  its own row. **Impact low · risk low-med · effort M + perceptual gate.**
 - [ ] **R5 · Render-state rebind cache** — `BindWorldTextures()` runs 18x a frame
   (`RenderManager.cs:1336,1495,1543,1603,1627,1649,1699,1715,1745,1772,1797,1832,1889,1921,1967,1994,2012,2046`)
   and `worldShader.Use()` 20x, most of them back-to-back inside `EntityPass`
@@ -171,18 +189,6 @@ nothing from **Ruled out** — overlaps are called out inline.
   which caches the matrix rather than the planes derived from it; the shadow and
   mirror frusta use different matrices (`_lightViewProj`, `_reflViewProj`) and are
   untouched. **Impact low · risk low · effort S.**
-- [ ] **R12 · Three buffer binds per pool upload** — `ChunkGeometryPool.Upload`
-  (`ChunkGeometryPool.cs:102-128`) binds `CopyWriteBuffer` to the VBO, then the
-  EBO, then 0 (`:119,122,125`) around its two `BufferSubData` calls, up to
-  `MaxMeshUploadsPerFrame` = 32 times a frame per pool
-  (`WorldGenerationConfig.cs:16`). `glNamedBufferSubData` (4.5 DSA; the context is
-  4.6) writes both with no binding at all, which also retires the comment's reason
-  for routing through `CopyWriteBuffer` in the first place (avoiding a stray
-  `ElementArrayBuffer` bind rewriting whichever VAO is current). Feeds `chunkApply`
-  (up to 5.8 ms streaming). This is *not* the ruled-out *indexed mesh upload* audit —
-  the index and vertex data and their layout are unchanged; only the three
-  `BindBuffer` calls wrapping the two writes go away.
-  **Impact low · risk low · effort S.**
 
 ### CPU / streaming
 
@@ -276,8 +282,12 @@ nothing from **Ruled out** — overlaps are called out inline.
   cull+sort+fill at ~2%; revisit only if CPU cull+sort exceeds ~1 ms.
 - Shader ALU cuts (the caustic Voronoi net, 8 point lights, 4-tap PCF) — ruled out;
   the half-res route is the allowed lever. R2 has landed on that route (the underwater
-  rays march), leaving R3 as its open half. The ruling itself is unchanged, and R2
-  respected it: the march's step count, sample count and per-sample formula are
+  rays march). R3 was the other half of it and has since been **repriced down to parked** —
+  read its bullet above rather than treating it as a live lever: the rays composite pins the
+  scene *depth* copy at full res, leaving only a colour copy inside a pass whose entire
+  measured GPU cost is 0.09 ms, and downsampling that copy would cost a perceptual gate.
+  The ruling itself is unchanged, and R2 respected it: the march's step count, sample
+  count and per-sample formula are
   byte-identical and are now pinned by
   `WaterTests.RayMarchStaysUnchangedByTheHalfResRound`, so a future tweak cannot
   quietly re-open shader ALU.
@@ -305,88 +315,134 @@ nothing from **Ruled out** — overlaps are called out inline.
   above the noise floor. `Camera`'s per-frame collision scans are additional
   evidence for D1's impact rather than a separate entry.
 
-**Suggested first pass:** R2 landed this round: the underwater sun-shaft march now runs
-at half resolution. `RenderManager` owns a half-res RGBA16F target (`_raysFbo` /
-`_raysTex` / `_raysSize`, created in `LoadResources` and `SetViewport`, deleted in
-`Dispose`), sized by a GL-free `HalfResTarget` helper
-(`OpenGLTest/src/Systems/HalfResTarget.cs`) whose ceil-to-half, min-2 and
-should-recreate arithmetic is the one headlessly testable part of the change
-(`OpenGLTest.Tests/HalfResTargetTests.cs`, 7 facts; texture allocation and framebuffer
-completeness are deliberately not covered there and are only reachable by running the
-game). `RenderUnderwaterRays` (`RenderManager.cs:1422-1437`) is now two draws inside
-one method, so the existing `RaysPass` bracket around the call in `World.Render`
-(`World.cs:375-379`) still measures the whole pass and `FrameProfiler` needed no
-change. Draw 1 is the untouched march writing every texel of the half-res target with
-blending off and no clear — the *only* edit to `rays-fragment.glsl` is that its `FragColor` alpha now
-carries the world-space distance that pixel marched (capped at `WaterRayMaxDistance`)
-instead of a constant 1. Draw 2 is a new `rays-upsample-fragment.glsl` compositing
-additively at full res. The upsample is bilateral on *marched distance*, not on raw
-depth — the projection is Direct3D-style 0..1 so no near/far linearisation would be
-correct — weighting each of the four half-res taps by
-`bilinear * exp(-|tapLen - pixelLen| / WaterRayUpsampleToleranceBlocks)`
-(`WorldGenerationConfig.cs:206`, 2 blocks) and falling back to the single
-nearest-distance tap when all four are rejected. Comparing the distance a tap
-*actually marched* rather than a re-derived estimate is what keeps the composite
-self-consistent with whatever the march sampled. The 20-step loop, its sample count
-and its per-sample formula are untouched and now pinned by
-`WaterTests.RayMarchStaysUnchangedByTheHalfResRound`. What R2 deliberately did **not**
-do is the second half of its own bullet, the half-res scene-depth copy — folded into
-R3 above with the structural reason; the depth copy is still full-res.
+**Suggested first pass:** R4 and R12 landed this round. **R3 was resolved and parked rather than
+implemented** — the short version is that R2's composite pins the scene *depth* copy at full res,
+leaving only a colour copy inside a pass whose whole measured cost is 0.09 ms, and halving that
+copy would buy a perceptual gate; the full finding is in R3's bullet above.
 
-Structurally: the march runs over a quarter of the pixels, and nothing else about it
-changed. The new full-res composite (four `texelFetch`es, one `mat4` multiply and four
-`exp`s per pixel) plus the retained full-res depth copy are what keep the measured win
-below that quarter. The one measured number this round, and no other — **no `perf-fly`
-capture was re-run, so every figure above this paragraph is still the old snapshot**:
+**R4 — cloud instancing.** The per-copy arithmetic came out of `CloudRenderer` first, into a
+GL-free helper: `CloudCopies` (`OpenGLTest/src/Systems/CloudCopies.cs`) with `Drift`, `Snap` and
+`Gather`, the last running the 3x3 ring in the original `ix`/`iz` nesting order, frustum-testing
+each copy's AABB and packing the survivors to the front of a caller-supplied span. That is the one
+headlessly testable part of R4 and it is pinned by `OpenGLTest.Tests/CloudCopiesTests.cs` (8
+facts); the equivalence proof is `GatherOffsetsMatchThePerCopyArithmetic`, exact float equality
+against an inline reimplementation of the pre-extraction expression over 60 snap/drift/field
+combinations, plus `GatherPacksSurvivorsToTheFrontPreservingOrder` for the same set in the same
+relative order under a frustum that provably culls. The draw was then instanced:
+`cloud-vertex.glsl`'s `uniform vec2 uOffset` became `layout (location = 2) in vec2 vOffset`
+(locations 0 and 1 were the only ones in use), the C# side allocates a nine-entry instance VBO with
+`VertexAttribDivisor(2, 1)`, uploads `offsets[..count]` with one `NamedBufferSubData`, and each
+sweep became one `glDrawElementsInstanced`. **The CPU cull is exactly where it was** — the instance
+count *is* the survivor count, so a culled copy is still not drawn. The zero-survivor early return
+sits beside the `CloudOpacity <= 0` guard, **before any GL call**, because returning after
+`_shader.Use()` or `BindVertexArray(_vao)` would leave that binding current for the mirror path.
+`CloudTests.CloudVertexShaderTakesAPerInstanceOffset` pins the GLSL half of the CPU/shader
+contract. Covered **only** visually: `VertexAttribDivisor(2, 1)` itself, whose absence renders one
+untiled cloud field instead of the 3x3, and the GL draw structure — the VAO bracket, the two sweeps
+and the `ColorMask`/`DepthMask` toggles between them.
 
-| `raysPass`, 1280x720 | gpuAvg | gpuMax | windows |
-|---|---|---|---|
-| pristine HEAD (f4436eb) | 0.743 ms | 0.774 ms | 15 over 3 runs |
-| half-res (this round) | 0.355 ms | 0.404 ms | 17 over 3 runs |
+**Both depth pre-passes were kept.** The main-pass one is the once-per-pixel blend guard, as the
+bullet always said. The mirror's was considered and **deliberately declined** — recorded here so
+nobody re-opens it blind: the cloud mesh is closed and watertight
+(`CloudTests.RoundedMeshIsWatertight`), so a view ray crosses at least two surfaces, and the
+mirror's `CullFace(Front)` (`RenderManager.cs:1178`) removes the far side of a *single* mass but
+not overlapping fillet pieces and not two separate masses stacked along one ray. Dropping it would
+darken clouds in the water but not in the sky — a mirror/sky disagreement. And with nine draws
+already collapsed to one, what remains to win there is a single depth-only instanced draw on a
+sub-full-res target.
 
-Capture method, which matters more than usual here: `visual-examples/rays-halfres.json`
-under `VOXEL_TIME=180 VOXEL_DEBUG=1`, taking only profiler windows lying wholly inside
-that scenario's closing 10 s submerged hold, discarding each run's first such window
-(it straddles the dry/wet transition), and requiring every FPS line in the window to
-report the hold pose, `Water True/True` and `Grounded True` (settled, so no
-post-teleport streaming churn); three suffix-less windows were dropped. Do **not**
-select lines by the presence of a `/gpuAvg~gpuMax` suffix — the `RaysPass` bracket sits
-*outside* `RenderUnderwaterRays`, so a window publishes a `raysPass` line whether or not
-the pass ran, and `gpuAvg` is a mean over a 1 s publish window, so any window holding
-dry frames is deflated toward zero.
+**R4's win is submission-side and nothing else**, and the capture says so. Instancing removes zero
+vertices and zero fragments. What stands is arithmetic off the code: per `Render` call, up to 18
+`DrawElements` each behind a `uOffset` uniform set collapse to exactly 2 `DrawElementsInstanced`
+plus one `NamedBufferSubData`, and `Render` runs twice a frame (main pass + mirror, the mirror at
+most every other frame under reflection temporal reuse) — **up to 34 fewer draw calls and up to 34
+fewer uniform updates a frame**. The `cloudPass` recapture found **no measurable change in either
+half and nothing is quoted from it**: the GPU difference came in under a tenth of the within-tree
+run-to-run spread (the half that should not move did not move), and the CPU difference did not
+exceed the baseline's own spread — that bracket averages 0.01-0.02 ms in total, i.e. it sits on
+`FrameProfiler`'s F2 print resolution, so a submission-side saving is invisible there by
+construction. Note too that `cloudPass` brackets only the **main** pass (`World.cs:367-371`); the
+mirror's cloud draw folds into `reflect` (`World.cs:306-313`) with no bracket of its own, and
+reflection temporal reuse makes that row's per-window composition incomparable — which is why the
+mirror half is argued from draw count and never from a timing.
 
-Perceptually, honestly: the verdict was *indistinguishable in motion at 1:1*, but it is
-not free. The shaft body is softer — the march's interleaved-gradient dither now sits on
-2 px cells, so grain RMS falls 3.24 -> 1.77 while doubling in screen scale — with mean
-luminance preserved to 0.16 levels. Strong silhouettes carry a 1-2 px rim covering
-0.115 % of the frame at ~10 levels; it is a *darkening* on the terrain side, i.e. the
-bilateral weight erring conservative and rejecting mismatched taps, not a bright halo
-leaking across the edge, and the silhouette itself stays equally crisp because geometry
-is still drawn full-res. Shimmer under a 0.5 °/frame pan and flicker at a fixed camera
-both came out marginally *better* than full-res once wall-clock sun drift is normalised
-out — the opposite of the expected half-res crawl, because the bilateral upsample
-low-passes the dither. Two traps for whoever re-runs this gate: `water.json`'s four
-underwater shots are **not** a usable instrument (the camera free-falls at every shot and
-bubble particles drift through frame, giving a same-build noise floor of 15-25 levels
-against 3-7 for a pose-exact shot), and any frame-to-frame statistic must be normalised
-for sun drift before it is compared across builds — raw, the half-res tree reads 2.3x
-*worse* on flicker, which is entirely the varying screenshot gap against a dimming sun.
-Both are recorded in `rays-halfres.json`'s own header, which is the scenario to use:
-bare teleport+screenshot bursts with no wait between them tick no physics, so the pose
-is pixel-stable. Carried forward from the previous round: `lod` measures only the
-main-thread `LodManager.Update` (`World.cs:241-243`) while `LodRegion.BuildMeshData`
-runs on the LodGen thread, so size any further LOD work with a LodGen throughput capture
-during the #1 streaming hitch rather than off a `lod` row.
+**R12 — DSA pool uploads.** `ChunkGeometryPool.Upload` no longer binds anything: the three
+`BindBuffer(CopyWriteBuffer, ...)` calls are gone and the two writes are
+`gl.NamedBufferSubData(_vbo, ...)` / `(_ebo, ...)`. Same buffers, same offsets, same spans, same
+bytes, same layout — **up to 3 binds x up to 32 uploads (`MaxMeshUploadsPerFrame`) x 2 pools = up
+to 192 client-side GL calls a frame removed** during streaming. `CreateBuffers`' and `Grow`'s own
+`CopyWriteBuffer` binds stay, because `glBufferStorage` and `glCopyBufferSubData` still need bound
+targets; `AGENTS.md:171` was corrected to match (`NamedBufferSubData uploads`). **No unit test was
+added and none should be — the change introduces no new arithmetic.** It was proved instead by a
+temporary readback: every write read back off the GPU at its computed offset and byte-compared
+against its source span, the identical patch applied to both the working tree and a pristine-HEAD
+export, one `perf-fly` run each — 112198 and 111606 verified uploads, **zero mismatches** on either
+pool for either write on either tree — plus a negative control (vertex readback offset shifted one
+byte) that made mismatches track uploads 1:1 while the untouched index check stayed at zero, so the
+check was provably capable of failing. The instrumentation was removed from both trees afterwards.
+`chunkApply` was recaptured too and **nothing is quoted**: the difference came in at half the
+within-tree spread, which was expected — the row is CPU-side, it times the whole apply loop rather
+than the two writes, and its per-window content is set by how many meshes generation happened to
+deliver that second. A cross-tree upload-sequence hash was not available, and that is measured
+rather than assumed: the two verification runs uploaded different numbers of chunks, because mesh
+completion comes off worker threads.
 
-Next: **R3**, the natural follow-on now that half-res machinery is live in the tree —
-but read its caveat above first, because the rays composite pins the *depth* copy at
-full res and narrows R3 to the colour copy unless it also re-runs R2's perceptual gate.
-If that makes R3 thinner than its bullet claims, take **R4** instead (cloud batching —
-the other half of hitch #4, a straight draw-count cut with no resolution trade and no
-perceptual gate), with **R12** as the cheap S alongside it since it feeds `chunkApply`
-in the #1 streaming hitch. R10 is still the biggest structural render win; hold it until
-the cheaper LOD items above have been measured, since they may move `lod` enough to
-reprice it — and it overlaps R5.
+**Gate machinery, for whoever measures next.** `visual-examples/clouds-mirror.json` is new this
+round and is the cloud instrument: a grounded shore vantage over the water bay, a pose-stable
+teleport+screenshot burst framing cloud reflections in the water (`mirror_graze`, `mirror_wide`),
+three repeats of one pose as a same-build noise floor, two clouds-against-sky shots, and a
+grounded, dry 12 s hold at the end that publishes the `cloudPass` windows. Bare teleport+screenshot
+bursts with no `wait` between them tick no physics, so the pose is pixel-stable; a `wait` after a
+mid-air teleport resumes free-fall, so any held pose must be grounded, and a hold that ends
+underwater makes `RenderClouds` early-return and publishes empty `cloudPass` windows. Its header
+carries the detail; three traps matter beyond it:
+
+- **The floor is not uniform across the frame.** In the mirror shots the sky region is an
+  essentially exact instrument (a level or two) while the water region floors in the *hundreds* —
+  the wave normal is animated from wall-clock `uTime`, so the surface is in an arbitrary phase
+  cross-run. Compare per region, never as one whole-frame number, and treat the water region as a
+  gross-breakage check (a missing 3x3 copy, an offset in the wrong place, the untiled single field
+  a missing divisor produces) rather than as a measurement.
+- **A 3-run floor under-samples the same-binary tail** on shots where the differing fraction sits
+  near the p99 knee — `clouds_up`, `clouds_closeup` and `sky_closeup` all swing on a small change
+  in cloud-edge pixel count. Use the full within-vs-cross pairing matrix there, or a 3-run floor
+  will read sampling noise as a regression.
+- **Session effects exceed the quantity being measured.** The *same* pristine binary read
+  `cloudPass` gpuAvg 1.460, 1.501 and 1.551 in three different sessions this round. Re-run the
+  baseline in the same session as the change, interleaved run for run; never difference against
+  stored captures from an earlier session, and give the baseline its cold first run too — a freshly
+  built binary streams more slowly on its first run, which moves both the loaded chunk set and the
+  wall clock at every shot.
+
+`clouds.json` is the sky-side regression check, not a measuring instrument: every shot but the
+first follows a mid-air teleport plus a 0.3 s `wait`, and `VisualDirector.Drive` ticks the world
+for `wait`, so the camera free-falls before the shutter. (`clouds_up` waits 3 s from y=30.5 and
+simply lands back at the spawn pose, which is why it alone is pose-stable.) And `perf-fly.json`'s
+`screenshot` ops do **not** pass `hideHud`, unlike both cloud scenarios, so its shots bake in the
+live profiler HUD across roughly x 0..570 — numbers that change every frame, which alone puts about
+half the frame's pixels above 2 levels *within* one binary. Any pixel gate on `perf-fly` must mask
+those columns, or the scenario must gain `hideHud: true`. Two traps carried forward from R2:
+`water.json`'s four underwater shots are **not** a usable instrument (free-falling camera plus
+drifting bubble particles give a 15-25 level same-build floor), and any frame-to-frame statistic
+must be normalised for wall-clock sun drift before it is compared across builds, or it reads
+backwards. Carried forward from earlier rounds: `lod` measures only the main-thread
+`LodManager.Update` (`World.cs:241-243`) while `LodRegion.BuildMeshData` runs on the LodGen thread,
+so size any further LOD work with a LodGen throughput capture during the #1 streaming hitch rather
+than off a `lod` row.
+
+Next: **R5**, then **R7 + R11** as one pass. R5 is the largest of the cheap render-side items still
+standing — 18 `BindWorldTextures()` and 20 `worldShader.Use()` a frame, most of them back-to-back
+inside `EntityPass` — it is pure bookkeeping with no visual surface, so it needs no perceptual
+gate, and its risk is confined to the invalidation list (the sun, cloud, rays and UI passes swap
+state behind its back). R10's bullet notes that landing R10 first would shrink R5's target, but R10
+is L and held behind the cheaper LOD items, so take R5 now and re-price the LOD binds against it
+afterwards rather than parking an S item behind an L one. R7 and R11 belong together: R7 caches the
+view-projection `Camera.GetViewProjection` rebuilds at 22 call sites, R11 caches the *planes* three
+passes independently re-derive from that same unchanged matrix plus the per-chunk world AABBs four
+passes recompute — both S, both output-preserving, and both as headlessly testable as this round's
+`CloudCopies` was, since `Frustum` and the AABB arithmetic are already GL-free. R10 remains the
+biggest structural render win; hold it until the cheaper LOD items above have been measured, since
+they may move `lod` enough to reprice it — and it overlaps R5.
 
 ## Ruled out (do not retry without new evidence)
 

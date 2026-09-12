@@ -114,15 +114,12 @@ public sealed unsafe class ChunkGeometryPool : IDisposable
                     $"Chunk geometry pool '{_name}' could not fit {units} units after growing.");
         }
 
-        // Uploads go through the copy-write target on purpose: binding ElementArrayBuffer would
-        // rewrite whichever VAO happens to be bound (a Mesh leaves its own VAO bound after Render).
-        _gl.BindBuffer(BufferTargetARB.CopyWriteBuffer, _vbo);
-        _gl.BufferSubData(BufferTargetARB.CopyWriteBuffer, (nint)VertexBytes(unit), vertices);
-
-        _gl.BindBuffer(BufferTargetARB.CopyWriteBuffer, _ebo);
-        _gl.BufferSubData(BufferTargetARB.CopyWriteBuffer, (nint)IndexBytes(unit), indices);
-
-        _gl.BindBuffer(BufferTargetARB.CopyWriteBuffer, 0);
+        // Both writes name their buffer directly, so the upload binds nothing at all: there is no
+        // target to route around and nothing can stomp the current VAO's element binding (which a
+        // plain ElementArrayBuffer bind would, since a Mesh leaves its own VAO bound after Render).
+        // RebindVao stays the one and only legitimate ElementArrayBuffer bind.
+        _gl.NamedBufferSubData(_vbo, (nint)VertexBytes(unit), vertices);
+        _gl.NamedBufferSubData(_ebo, (nint)IndexBytes(unit), indices);
 
         return new GeometrySlice(unit, units, vertices.Length, indices.Length);
     }
@@ -149,8 +146,8 @@ public sealed unsafe class ChunkGeometryPool : IDisposable
 
     /// <summary>
     /// Allocates an immutable-size vertex/index buffer pair for <paramref name="units"/> units.
-    /// <c>DynamicStorageBit</c> is the only flag needed: the pool is written with
-    /// <c>glBufferSubData</c> and never mapped.
+    /// <c>DynamicStorageBit</c> is the only flag needed: it is exactly what permits the
+    /// <c>glNamedBufferSubData</c> writes <see cref="Upload"/> does, and the pool is never mapped.
     /// </summary>
     private (uint Vbo, uint Ebo) CreateBuffers(int units)
     {

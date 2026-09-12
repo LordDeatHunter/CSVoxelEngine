@@ -168,7 +168,7 @@ OpenGLTest/
                                #   chunk passes are one MultiDrawElementsIndirect each
       UnderwaterRaysRenderer.cs # additive full-screen sun shafts while the eye is submerged
       ChunkGeometryPool.cs     # the two shared chunk vertex/index buffers (opaque, translucent):
-                               #   BufferStorage VBO+EBO+VAO, BufferSubData uploads, grow by copy
+                               #   BufferStorage VBO+EBO+VAO, NamedBufferSubData uploads, grow by copy
       GeometryAllocator.cs     # GL-free first-fit free list with coalescing, in units of
                                #   64 vertices / 96 indices; hands out the pools' GeometrySlices
       ChunkDrawBatch.cs        # persistent-mapped 3-slot ring of DrawElementsIndirectCommands +

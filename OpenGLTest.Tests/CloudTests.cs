@@ -473,4 +473,29 @@ public sealed class CloudTests(ITestOutputHelper output)
         Assert.True(File.Exists(Path.Combine(root, "shaders", "cloud-vertex.glsl")));
         Assert.True(File.Exists(Path.Combine(root, "shaders", "cloud-fragment.glsl")));
     }
+
+    /// <summary>
+    /// The 3x3 sweep is one instanced draw, so the copy offset arrives as a per-instance vertex
+    /// attribute rather than a uniform set between draws. That makes the attribute LOCATION a
+    /// contract between this shader and CloudRenderer's vertex-array setup, and nothing else can
+    /// check it: a mismatch compiles and links fine and only shows up as clouds in the wrong place.
+    ///
+    /// What this fact does NOT cover, because it lives on the C# side: the
+    /// <c>VertexAttribDivisor(2, 1)</c> that makes the attribute advance per instance instead of per
+    /// vertex. Without the divisor every instance reads the first offset and the nine copies collapse
+    /// onto one untiled field - only the visual gate catches that.
+    /// </summary>
+    [Fact]
+    public void CloudVertexShaderTakesAPerInstanceOffset()
+    {
+        var vertex = File.ReadAllText(
+            Path.Combine(TestContent.FindAssetsRoot(), "shaders", "cloud-vertex.glsl"));
+
+        Assert.Contains("layout (location = 2) in vec2 vOffset", vertex);
+        // The per-copy uniform is gone: a leftover would mean the CPU is still expected to set one
+        // offset per draw, which is exactly the per-copy submission instancing replaced.
+        Assert.DoesNotContain("uOffset", vertex);
+        // Still a rigid whole-copy translation in x and z, so a copy cannot tear.
+        Assert.Contains("vec3(vPosition.x + vOffset.x, vPosition.y, vPosition.z + vOffset.y)", vertex);
+    }
 }

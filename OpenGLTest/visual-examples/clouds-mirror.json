@@ -1,0 +1,153 @@
+// Clouds in the water mirror, framed for the cloud-batching round (PERF_TODO R4). clouds.json
+// is the sky-side check and stays as it is, but it cannot see the half of R4 that changes the
+// mirror: all five of its vantage points sit at x=0.5, z=0.5 over dry land and never look at
+// water, so RenderReflection's cloud draw (RenderManager.cs:1172) never appears in any of its
+// frames. This scenario frames that draw - clouds reflected in open water - and, in the same
+// shots, the real clouds above the horizon, so a mirror-only blend difference shows up as a
+// mirror/sky disagreement inside ONE image rather than across two. It ends with a grounded,
+// dry hold long enough to read a cloudPass figure off the profiler.
+//
+// Run from OpenGLTest/: VOXEL_TIME=60 VOXEL_SCRIPT=visual-examples/clouds-mirror.json
+// Add VOXEL_DEBUG=1 for the profiler lines the closing hold exists to produce.
+// VOXEL_TIME=60 is the standard measurement setting and, here, a requirement: the sun is
+// wall-clock driven (angle = (Window.Time + VOXEL_TIME)/600*tau + 0.8, RenderManager.cs:551),
+// and the mirror wants daylight. At 60 this ~25 s run sits in high sun for all of it.
+//
+// THE TWO TRAPS. Both were hit while building this file, not theorised:
+//
+//  1. A bare teleport+screenshot burst with no wait between the shots ticks NO physics -
+//     VisualDirector.Drive calls world.Update only for wait/walk/mine (VisualDirector.cs:50-66),
+//     never for teleport/look/screenshot - so the pose is pixel-stable and nothing drifts but
+//     wall-clock uTime, the sun angle and the cloud drift. Every burst below therefore carries
+//     no waits. The flip side is that Camera.IsEyeInWater is ALSO only recomputed in the
+//     physics update, so a burst inherits the water state of whatever wait preceded it. A first
+//     draft settled at [228.5, 12.5, -138.5] - which is open bay, not beach - and sank to the
+//     seabed; every later shot then rendered with the underwater tint and NO CLOUDS AT ALL
+//     (RenderClouds early-returns when eyeInWater, RenderManager.cs:1392) however far above the
+//     water the camera was teleported. The settle below is on dry sand and ends Water
+//     False/False, which is the precondition every shot here depends on.
+//
+//  2. A wait after a mid-air teleport resumes free fall - there is no flight op and TestTeleport
+//     only zeroes vertical velocity - so any HELD pose must be grounded and dry. The same first
+//     draft held at [222.5, 14.5, -138.5], fell 20 blocks into the bay and published its whole
+//     window set from underwater, where cloudPass reads 0.00~0.00 because the pass never runs.
+//     A dry window is to cloudPass exactly what a dry window is to raysPass in rays-halfres.json.
+//
+// The vantage points come from a headless heightmap probe over x 150..330, z -230..-60 followed
+// by rendering the candidates and opening the frames, not from guessing. The bay's shoreline
+// (column height 0) runs along z ~= -118 for x 206..230, with land rising to +z (h=5 at z=-110,
+// h=8 at z=-106, h=12 at z=-98) and the floor dropping to -15 out at z=-150. Sea level is 0 and
+// WaterPlaneY is 8/9, so every eye position below is clearly above the surface - the mirror is
+// only drawn when savedCamPos.Y >= WaterPlaneY (RenderManager.cs:1172).
+//
+// (A) settle - [222.5, 20.5, -106.5] yaw -90 pitch -3, 8 s. Dry sand well above the waterline;
+//     the camera lands at eye y=9.62, Grounded True, Water False/False (verified from the debug
+//     log). The 8 s streams the bay, settles physics and warms the reflection target. Yaw -90
+//     faces -Z, i.e. straight out over the water (yaw 0 faces +X).
+//
+// (B) mirror_graze - [222.5, 2.5, -160.5] yaw -90 pitch -3. Low over deep water, 40 blocks out
+//     from the shore. The shallow depression keeps the fresnel term high, so the reflection wins
+//     over the refraction and whole cloud shapes read as white masses across much of the frame,
+//     with the real clouds above the far shore in the top third. This is the primary mirror
+//     frame and the noise-floor pose.
+//
+//     mirror_wide - [222.5, 2.5, -135.5] yaw -90 pitch -4. The same grazing geometry closer in,
+//     where the treeline and beach cut a hard silhouette across the middle of the frame with
+//     reflected clouds below it and real clouds above it. This is the frame to read for a
+//     mirror/sky disagreement, because both populations are present, adjacent and separated by
+//     a high-contrast edge.
+//
+//     Note on the depression angle: a steeper look (pitch -12 from y=14.5, and -20 from y=10.5)
+//     was tried first and rejected. It does put both cloud populations in frame, but fresnel
+//     collapses with the angle and the water goes over to refraction - the seabed dominates and
+//     the reflected clouds nearly vanish, which is the opposite of what this scenario is for.
+//     Shallow depressions from a low eye are what make the mirror legible.
+//
+// (C) mirror_still_0..2 - mirror_graze's pose, unchanged, three times, no waits. The camera does
+//     not move at all, so any difference inside this burst from a single build is the same-build
+//     noise floor, and any difference beyond that floor means something is still ticking and no
+//     number from this run is trustworthy. Same role shaft_still_* plays in rays-halfres.json.
+//
+// (D) sky_level - [222.5, 200.5, -128.5] yaw -90 pitch -8. Above the layer (CloudHeight 160)
+//     looking slightly down: cloud tops tile away to the horizon, so one run covers the sky half
+//     of R4 as well as the mirror half. The 3x3 sweep's field boundaries are visible here, which
+//     is where a wrong per-instance offset or a missing copy would show.
+//     sky_closeup - [222.5, 100.5, -128.5] yaw -90 pitch 25. Under the layer looking up, so the
+//     undersides and the overlapping rounded pieces fill the frame. Overlap is what the depth
+//     pre-pass exists to resolve (it is the once-per-pixel blend guard), so this is the frame
+//     that would darken if a pre-pass were ever dropped.
+//
+// (E) the timing hold - [222.5, 9.7, -106.5] yaw -90 pitch -3, 12 s, LAST, after every
+//     screenshot. Same stand point as the settle, teleported a fraction of a block above its
+//     known rest height so it grounds within one tick instead of free-falling, and the pose then
+//     holds constant for the rest of the wait at Grounded True, Water False/False. Both the bay
+//     and a sky full of clouds are in frame. With VOXEL_DEBUG=1 that yields ~12 profiler windows
+//     lying wholly inside one dry, motionless stretch; discard the first (it straddles the
+//     teleport) and the rest are directly comparable between builds. cloudPass brackets only the
+//     MAIN pass - the mirror's cloud draw sits inside the Reflection bracket with no bracket of
+//     its own - so this hold measures the sky half; the mirror half is argued from draw count.
+//
+// HOW TO READ THESE SHOTS: THE FLOOR IS NOT UNIFORM ACROSS THE FRAME. The figures below are the
+// CORRECTED ones, re-measured over three runs per binary at 1280x720. The first draft of this
+// header quoted a two-run measurement for the water region and for sky_closeup and both were
+// badly optimistic; a three-run floor is the minimum here, and on the knee shots noted below even
+// that under-samples. Statistic = 99th percentile of per-pixel max-channel |delta| in 0-255
+// levels. The horizon sits at about row 300 of 720 in the mirror shots - NOT 340 as the first
+// draft said; rows 300..339 are already water and score 200+ - and the two halves behave
+// completely differently:
+//
+//   - ABOVE the horizon (rows 0..300, real clouds against sky): p99 = 0-6 levels cross-run, and
+//     0-1 levels between the three stills inside one run. This region is an essentially exact
+//     instrument - anything above a handful of levels there is a real rendering difference.
+//     sky_closeup is NOT such an instrument despite being almost all sky: over three runs it
+//     floors near 200 levels whole-frame and near 97 in rows 0..600, because its differing pixels
+//     sit right on the 1% knee - thin cloud EDGES moved by drift = time * CloudDriftBlocksPerSecond
+//     against a wall clock that varies between runs - so p99 there swings on a tiny change in
+//     edge-pixel count. Use clouds.json's clouds_closeup for the same subject instead.
+//   - BELOW it (the water, i.e. the mirror itself): p99 = 140-165 levels cross-run, and tens of
+//     levels between stills inside one run, growing with the gap between the two shots. This is
+//     not noise that better framing can remove: the wave normal is animated from wall-clock
+//     uTime, so the surface is in a different phase in every frame and, cross-run, in an
+//     arbitrary phase. Reflected cloud MASSES stay in place; the ripple modulating them does not.
+//   - sky_level's lower half is terrain seen from 200 blocks up and floors above 200 levels
+//     cross-run (the first draft said 90, again off two runs), because the shot follows a
+//     teleport with no wait and the loaded/meshed chunk set depends on streaming history. Read
+//     sky_level above the horizon only - rows 0..360 there floor at 0-1 levels, the tightest
+//     instrument this scenario has.
+//
+// So: compare the sky region numerically and hold it to a few levels; compare the water region
+// against the 140-165 level same-build floor, where it can only catch gross breakage (a missing
+// 3x3 copy, an offset landing in the wrong place, an un-tiled single field); and read the mirror
+// structurally by eye - do the same reflected cloud masses sit in the same places with the same
+// shapes. Recompute the floor on whatever machine and resolution you are on before trusting it.
+//
+// The closing hold publishes 10-12 perf windows on this machine, 9-11 after the capture rule
+// keeps only those lying wholly inside the hold and discards the first surviving one, and
+// cloudPass reports a healthy non-zero GPU cost in every one of them - unlike raysPass, which a
+// dry hold would gate off entirely. That is the property the hold exists to guarantee.
+{
+  "steps": [
+    { "op": "teleport", "pos": [222.5, 20.5, -106.5], "yaw": -90, "pitch": -3 },
+    { "op": "wait", "seconds": 8 },
+
+    { "op": "teleport", "pos": [222.5, 2.5, -160.5], "yaw": -90, "pitch": -3 },
+    { "op": "screenshot", "name": "mirror_graze", "hideHud": true },
+    { "op": "teleport", "pos": [222.5, 2.5, -135.5], "yaw": -90, "pitch": -4 },
+    { "op": "screenshot", "name": "mirror_wide", "hideHud": true },
+
+    { "op": "teleport", "pos": [222.5, 2.5, -160.5], "yaw": -90, "pitch": -3 },
+    { "op": "screenshot", "name": "mirror_still_0", "hideHud": true },
+    { "op": "teleport", "pos": [222.5, 2.5, -160.5], "yaw": -90, "pitch": -3 },
+    { "op": "screenshot", "name": "mirror_still_1", "hideHud": true },
+    { "op": "teleport", "pos": [222.5, 2.5, -160.5], "yaw": -90, "pitch": -3 },
+    { "op": "screenshot", "name": "mirror_still_2", "hideHud": true },
+
+    { "op": "teleport", "pos": [222.5, 200.5, -128.5], "yaw": -90, "pitch": -8 },
+    { "op": "screenshot", "name": "sky_level", "hideHud": true },
+    { "op": "teleport", "pos": [222.5, 100.5, -128.5], "yaw": -90, "pitch": 25 },
+    { "op": "screenshot", "name": "sky_closeup", "hideHud": true },
+
+    { "op": "teleport", "pos": [222.5, 9.7, -106.5], "yaw": -90, "pitch": -3 },
+    { "op": "wait", "seconds": 12 }
+  ]
+}
