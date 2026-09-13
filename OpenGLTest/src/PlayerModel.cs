@@ -219,22 +219,18 @@ public class PlayerModel
         // Mining raises the right hand up-forward into view, peaking mid-swing, on top of
         // whatever the walk cycle is doing. sin(pi*t) is 0 at both ends, 1 in the middle.
         // Kept below the carrying pose's range so the two never stack past the vertical.
-        if (_mineT < 1f)
-        {
-            var pump = MathF.Sin(MathF.PI * _mineT);
-            rightShoulder += pump * 1.0f;
-            rightElbow += pump * 0.4f;
-        }
+        // Applied by WithMinePump to the pose this method returns, not just the ground pose,
+        // so a swing still plays while the player is jumping or falling.
+        var pump = _mineT < 1f ? MathF.Sin(MathF.PI * _mineT) : 0f;
 
         var bobAmp = MathUtils.Lerp(WalkBobAmp, RunBobAmp, _runBlend);
         var bob = MathF.Abs(MathF.Cos(_walkPhase)) * bobAmp * _moveBlend;
-        var torsoPitch = -_moveBlend * MathUtils.Lerp(WalkTorsoPitch, RunTorsoPitch, _runBlend)
-            - (_mineT < 1f ? MathF.Sin(MathF.PI * _mineT) * 0.03f : 0f);
+        var torsoPitch = -_moveBlend * MathUtils.Lerp(WalkTorsoPitch, RunTorsoPitch, _runBlend);
         var ground = new Pose(swing, -swing, leftKnee, rightKnee,
             leftShoulder, rightShoulder, leftElbow, rightElbow, torsoPitch, bob);
 
         if (_airBlend <= 0.001f)
-            return ground;
+            return WithMinePump(ground, pump);
 
         var rise = MathUtils.Clamp01(_airVelocity / 11f);
         var fall = MathUtils.Clamp01(-_airVelocity / 12f);
@@ -256,7 +252,7 @@ public class PlayerModel
             airLeftShoulder, airRightShoulder, airLeftElbow, airRightElbow, airTorso, 0f);
 
         var t = _airBlend;
-        return new Pose(
+        var blended = new Pose(
             MathUtils.Lerp(ground.LeftHip, air.LeftHip, t),
             MathUtils.Lerp(ground.RightHip, air.RightHip, t),
             MathUtils.Lerp(ground.LeftKnee, air.LeftKnee, t),
@@ -267,6 +263,16 @@ public class PlayerModel
             MathUtils.Lerp(ground.RightElbow, air.RightElbow, t),
             MathUtils.Lerp(ground.TorsoPitch, air.TorsoPitch, t),
             MathUtils.Lerp(ground.Bob, 0f, t));
+        return WithMinePump(blended, pump);
+    }
+
+    private static Pose WithMinePump(in Pose pose, float pump)
+    {
+        if (pump <= 0f)
+            return pose;
+        return new Pose(pose.LeftHip, pose.RightHip, pose.LeftKnee, pose.RightKnee,
+            pose.LeftShoulder, pose.RightShoulder + pump, pose.LeftElbow,
+            pose.RightElbow + pump * 0.4f, pose.TorsoPitch - pump * 0.03f, pose.Bob);
     }
 
     /// <summary>

@@ -130,6 +130,21 @@ public sealed class PlayerModelTests
     }
 
     [Fact]
+    public void PunchSwingsTheRightArmWhileAirborne()
+    {
+        var player = new PlayerModel();
+        for (var i = 0; i < 180; i++)
+            player.Update(1f / 60f, 0f, sprinting: false, grounded: false, verticalVelocity: -12f);
+        Assert.True(player.AirBlend > 0.9f);
+        var airborneRest = player.GetPose().RightShoulder;
+
+        player.Punch();
+        player.Update(0.125f, 0f, sprinting: false, grounded: false, verticalVelocity: -12f);
+        var airborneSwing = player.GetPose().RightShoulder;
+        Assert.True(airborneSwing > airborneRest + 0.5f);
+    }
+
+    [Fact]
     public void BodyRootedAtFeetBelowTheEyeFacingCameraYaw()
     {
         var player = new PlayerModel();
