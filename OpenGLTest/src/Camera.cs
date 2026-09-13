@@ -133,6 +133,8 @@ public class Camera
     public const float EyeHeight = 1.62f;
     private const float PlayerRadius = 0.30f;
     private const float CollisionStepSize = 0.05f;
+    // How fast a mob knockback shove decays; larger stops the slide sooner.
+    private const float KnockbackDamping = 6f;
 
     // Auto-step heights: sprinting runs up a full block, plain walking only half a block,
     // so a one-block terrain step still has to be jumped (or run at) on foot. StepClearance
@@ -229,6 +231,9 @@ public class Camera
     private float _timeSinceSpacePress = float.MaxValue;
     // Averaged flow of the fluid cells the body is in, refreshed by UpdateWaterState
     private Vector3 _waterFlow;
+
+    // Decaying horizontal shove from a mob hit, integrated into the walk each frame
+    private Vector3 _knockback;
 
     // Damage shake: trauma 0..1, fed by AddShake and decayed in Update. The view offset
     // and roll ride trauma-squared, so small hits tremble and big hits lurch.
@@ -347,6 +352,7 @@ public class Camera
         // A teleport is not a fall: without this a scenario dropped at altitude keeps the
         // speed it built up before the jump and plummets through the frame it wanted
         _verticalVelocity = 0f;
+        _knockback = Vector3.Zero;
         _shoulderOffset = Vector3.Zero;
         _shoulderViewDir = Vector3.Zero;
         _shoulderBlendT = IsShoulderSurf ? 1f : 0f;
@@ -410,6 +416,24 @@ public class Camera
     {
         if (amount <= 0f) return;
         _trauma = Math.Min(1f, _trauma + amount);
+    }
+
+    /// <summary>
+    /// Knocks the player back from a mob hit: a horizontal shove that decays over a few tenths of
+    /// a second — the normal collision still stops it, so a hit can never push the player through
+    /// a wall — plus a small upward pop. Flight ignores both (and cannot be hit).
+    /// </summary>
+    public void AddKnockback(Vector3 horizontalDirection, float horizontalSpeed, float lift)
+    {
+        horizontalDirection.Y = 0f;
+        if (horizontalDirection.LengthSquared() > 1e-6f)
+        {
+            horizontalDirection = Vector3.Normalize(horizontalDirection);
+            _knockback.X = horizontalDirection.X * horizontalSpeed;
+            _knockback.Z = horizontalDirection.Z * horizontalSpeed;
+        }
+        if (!IsFlying && lift > 0f)
+            _verticalVelocity = MathF.Max(_verticalVelocity, lift);
     }
 
     private void UpdateShake(float deltaTime)
@@ -482,6 +506,8 @@ public class Camera
         _shoulderBlendT = Math.Clamp(_shoulderBlendT
             + (IsShoulderSurf ? deltaTime : -deltaTime) / ShoulderTransitionSeconds, 0f, 1f);
         UpdateWaterState(chunkManager);
+        _knockback.X = MathUtils.Damp(_knockback.X, 0f, KnockbackDamping, deltaTime);
+        _knockback.Z = MathUtils.Damp(_knockback.Z, 0f, KnockbackDamping, deltaTime);
 
         var sprinting = keyboard.IsKeyPressed(Key.ShiftLeft);
         var moveSpeed = BaseSpeed * (sprinting ? (IsFlying ? FlyBoostMultiplier : SprintMultiplier) : 1f);
@@ -539,6 +565,18 @@ public class Camera
         UpdateShake(deltaTime);
 
         var frameMovement = moveInput * moveSpeed * deltaTime;
+
+        // Mob knockback rides the walk like the water flow below: a decaying horizontal shove that
+        // the same axis moves still stop against a wall. Flight clears it (it cannot be hit).
+        if (IsFlying)
+        {
+            _knockback = Vector3.Zero;
+        }
+        else
+        {
+            frameMovement.X += _knockback.X * deltaTime;
+            frameMovement.Z += _knockback.Z * deltaTime;
+        }
 
         // Flowing water carries the player with it. Added before the horizontal moves below, so
         // the push is still stopped by a wall rather than shoving the player through it.

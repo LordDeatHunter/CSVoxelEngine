@@ -165,6 +165,71 @@ public sealed class SlimeTests
         Assert.Empty(manager.Slimes);
     }
 
+    [Fact]
+    public void KnockbackPushesThePlayerAndThenDecays()
+    {
+        var chunks = FloorWorld(ContentRegistry.RequireBlock("stone").Id);
+        var camera = new Camera(null, null);
+        camera.TestTeleport(new Vector3(2.5f, 1f + Camera.EyeHeight, 8.5f), yaw: 0f, pitch: 0f);
+        var keys = new ScriptedKeyboard();
+
+        camera.AddKnockback(new Vector3(1f, 0f, 0f), 6f, 0f);
+        var startX = camera.Position.X;
+        for (var i = 0; i < 6; i++)
+            camera.Update(Dt, keys, chunks);
+        Assert.True(camera.Position.X > startX + 0.1f);
+
+        for (var i = 0; i < 60; i++)
+            camera.Update(Dt, keys, chunks);
+        var settledX = camera.Position.X;
+        for (var i = 0; i < 6; i++)
+            camera.Update(Dt, keys, chunks);
+        Assert.InRange(MathF.Abs(camera.Position.X - settledX), 0f, 1e-3f);
+    }
+
+    [Fact]
+    public void KnockbackCannotPushThePlayerThroughAWall()
+    {
+        var chunks = FloorWorld(ContentRegistry.RequireBlock("stone").Id);
+        for (var y = 1; y <= 2; y++)
+            chunks.Chunks[Vector3.Zero].SetBlockRaw(4, y, 8, ContentRegistry.RequireBlock("stone").Id, 0);
+        var camera = new Camera(null, null);
+        camera.TestTeleport(new Vector3(3.2f, 1f + Camera.EyeHeight, 8.5f), yaw: 0f, pitch: 0f);
+        var keys = new ScriptedKeyboard();
+
+        camera.AddKnockback(new Vector3(1f, 0f, 0f), 12f, 0f);
+        for (var i = 0; i < 30; i++)
+            camera.Update(Dt, keys, chunks);
+
+        Assert.True(camera.Position.X < 3.8f, $"slid into the wall: {camera.Position.X}");
+    }
+
+    [Fact]
+    public void AirborneSlimeHitKnocksThePlayerBack()
+    {
+        var chunks = FloorWorld(ContentRegistry.RequireBlock("stone").Id);
+        var drops = new DropManager();
+        var manager = Manager();
+        var camera = new Camera(null, null);
+        camera.TestTeleport(new Vector3(3.0f, 1f + Camera.EyeHeight, 2.5f), yaw: 0f, pitch: 0f);
+        manager.Spawn(new Vector3(2.5f, 1f + Slime.HalfExtent, 2.5f));
+        var keys = new ScriptedKeyboard();
+
+        var damaged = false;
+        for (var i = 0; i < 300 && !damaged; i++)
+        {
+            manager.Update(Dt, chunks, drops, camera);
+            damaged = manager.DamageDealtThisFrame > 0;
+        }
+        Assert.True(damaged);
+
+        // The slime sits to the -X side, so the knockback must carry the player further +X.
+        var beforeX = camera.Position.X;
+        for (var i = 0; i < 8; i++)
+            camera.Update(Dt, keys, chunks);
+        Assert.True(camera.Position.X > beforeX + 0.02f);
+    }
+
     // Builds the surface layer of a 7x7 chunk area at each column's real worldgen height, so the
     // spawn ring finds solid loaded ground and two clear cells above every dry column.
     private static ChunkManager SurfaceWorld()

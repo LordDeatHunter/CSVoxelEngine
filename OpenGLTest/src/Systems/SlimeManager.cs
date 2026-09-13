@@ -60,6 +60,10 @@ public sealed class SlimeManager
                 {
                     slime.NotifyContactDamage();
                     DamageDealtThisFrame += WorldGenerationConfig.SlimeContactDamage;
+                    var away = new Vector3(
+                        playerPosition.X - slime.Position.X, 0f, playerPosition.Z - slime.Position.Z);
+                    camera.AddKnockback(away, WorldGenerationConfig.SlimeKnockbackSpeed,
+                        WorldGenerationConfig.SlimeKnockbackLift);
                 }
                 else if (slime.IsGrounded)
                 {

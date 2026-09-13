@@ -580,4 +580,8 @@ public static class WorldGenerationConfig
     public const int SlimeSpawnTries = 8;
     public const int SlimeContactDamage = 4;
     public const float SlimeShoveSpeed = 3.5f;
+    // Knockback a slime hit gives the player: a horizontal shove (decayed by Camera) plus a small
+    // upward pop so the hit reads even on flat ground.
+    public const float SlimeKnockbackSpeed = 6f;
+    public const float SlimeKnockbackLift = 4.5f;
 }
