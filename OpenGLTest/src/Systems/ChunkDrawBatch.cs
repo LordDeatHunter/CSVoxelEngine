@@ -113,9 +113,6 @@ public sealed unsafe class ChunkDrawBatch : IDisposable
         Allocate(InitialCommandsPerSlot);
     }
 
-    /// <summary>Commands appended since the last <see cref="BeginPass"/> (diagnostics).</summary>
-    public int PassCount => _passCount;
-
     /// <summary>
     /// Rotates to the next slot at the top of a frame: fences the slot the previous frame drew
     /// from, then waits until the GPU is finished with the slot about to be overwritten.

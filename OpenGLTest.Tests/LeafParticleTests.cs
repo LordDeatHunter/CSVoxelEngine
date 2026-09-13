@@ -124,4 +124,33 @@ public sealed class LeafParticleTests
         system.BurstCells(cells, 10, new Random(6));
         Assert.Equal(10, system.Particles.Count);
     }
+
+    /// <summary>
+    /// C12(a): eviction at the cap drops the OLDEST leaf and leaves every survivor in spawn
+    /// order. BurstRespectsMaxParticles above pins only the COUNT, so it would pass a
+    /// swap-remove that quietly reordered the sequence; this fact is what makes the
+    /// ParticleRing swap safe to trust. The leaf renderer depth-sorts every frame and so does
+    /// not care about source order, but the ring is shared with BlockDebrisSystem, whose order
+    /// does reach the GPU (see ParticleRing's doc comment), and the invariant is one invariant.
+    ///
+    /// One leaf per distinct cell makes each spawn identifiable without touching the particle:
+    /// Burst places a leaf at cell + 0.5 + jitter with every jitter component in [-0.5, 0.5),
+    /// so the position lies in [cell, cell + 1) and MathF.Floor recovers the spawn index. No
+    /// Update is driven here, so nothing moves after it is placed.
+    /// </summary>
+    [Fact]
+    public void EvictionDropsTheOldestLeafAndKeepsTheRestInSpawnOrder()
+    {
+        const int overflow = 50;
+        var max = WorldGenerationConfig.LeafParticleMax;
+        var system = new LeafParticleSystem();
+        var rng = new Random(11);
+
+        for (var i = 0; i < max + overflow; i++)
+            system.Burst(new Vector3(i, 100f, 0f), 1, rng);
+
+        Assert.Equal(max, system.Particles.Count);
+        for (var i = 0; i < max; i++)
+            Assert.Equal(overflow + i, (int)MathF.Floor(system.Particles[i].Position.X));
+    }
 }

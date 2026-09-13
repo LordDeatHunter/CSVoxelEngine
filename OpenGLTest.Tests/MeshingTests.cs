@@ -423,4 +423,45 @@ public sealed class MeshingTests
         Assert.Equal(24, after.Vertices.Count);
         Assert.Equal(36, after.Indices.Count);
     }
+
+    /// <summary>
+    /// Item C12(b): GenerateBlockData's final recount is vectorised
+    /// (BlockCount - _blocks.AsSpan().Count(BlockType.Air)) rather than a scalar foreach over
+    /// all 4096 cells. Pins the new form against an independent scalar oracle walking the public
+    /// GetLocalBlock, which is the shape of the loop that was deleted -- the fast path that
+    /// consumes the count (_solidCount == 0 skips meshing entirely) only ever sees one number,
+    /// so a recount that was wrong by any amount but zero would be invisible to every other fact.
+    ///
+    /// Real generated chunks, not hand-built ones: the deleted loop ran after carving, stamping
+    /// and FillWater, so the only interesting inputs are chunks that actually went through all of
+    /// it. The column is walked from below the sea floor up past the surface and at least one
+    /// chunk must come back non-empty and at least one all-air, so neither the "everything solid"
+    /// nor the "above the terrain, early return" branch can carry the fact alone.
+    /// </summary>
+    [Fact]
+    public void SolidCountMatchesAScalarRecount()
+    {
+        var sawSolid = false;
+        var sawAir = false;
+
+        for (var cy = 0; cy <= 8; cy++)
+        {
+            var chunk = new Chunk(null!, new Vector3(3, cy, -5), generateBlockData: false);
+            chunk.GenerateBlockData();
+
+            var scalar = 0;
+            for (var x = 0; x < Chunk.Size; x++)
+            for (var y = 0; y < Chunk.Size; y++)
+            for (var z = 0; z < Chunk.Size; z++)
+                if (chunk.GetLocalBlock(x, y, z) != BlockType.Air)
+                    scalar++;
+
+            Assert.Equal(scalar, chunk.SolidCount);
+            sawSolid |= scalar > 0;
+            sawAir |= scalar == 0;
+        }
+
+        Assert.True(sawSolid, "no generated chunk in the column held a block: the fact is vacuous");
+        Assert.True(sawAir, "no generated chunk in the column was empty: the early-return branch went untested");
+    }
 }

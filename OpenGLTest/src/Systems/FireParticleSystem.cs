@@ -10,7 +10,7 @@ namespace silkgltriangle;
 /// </summary>
 public sealed class FireParticleSystem
 {
-    private readonly List<FireParticle> _particles = [];
+    private readonly ParticleRing<FireParticle> _particles = new(WorldGenerationConfig.FireParticleMax);
     private float _emberDebt;
     private float _smokeDebt;
 

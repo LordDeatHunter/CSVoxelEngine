@@ -10,7 +10,7 @@ namespace silkgltriangle;
 /// </summary>
 public class LeafParticleSystem
 {
-    private readonly List<LeafParticle> _particles = [];
+    private readonly ParticleRing<LeafParticle> _particles = new(WorldGenerationConfig.LeafParticleMax);
     private float _spawnDebt;
     private byte _leavesId;
     private bool _leavesResolved;

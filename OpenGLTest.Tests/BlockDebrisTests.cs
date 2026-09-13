@@ -78,4 +78,34 @@ public sealed class BlockDebrisTests
         system.Burst(new Vector3(8f, 3f, 8f), StoneId, WorldGenerationConfig.BlockDebrisMax + 50, new Random(5));
         Assert.Equal(WorldGenerationConfig.BlockDebrisMax, system.Debris.Count);
     }
+
+    /// <summary>
+    /// C12(a), and the load-bearing one of the four order facts: debris is the ONLY particle
+    /// system whose source order reaches the GPU. RenderManager.RenderBlockDebris walks
+    /// <see cref="BlockDebrisSystem.Debris"/> with a plain foreach and submits each cube in that
+    /// order, with depth writes on and - on any frame where leaves also drew - blending still
+    /// enabled at SrcAlpha/OneMinusSrcAlpha, so overlapping semi-transparent cubes composite in
+    /// submission order (ParticleRing's doc comment carries the full argument). BurstRespectsMax
+    /// above pins only the count and would pass a swap-remove that reordered the sequence.
+    ///
+    /// One cube per distinct cell makes each spawn identifiable: Burst places a cube at
+    /// cell + 0.5 + jitter with every jitter component in [-0.3, 0.3), so the position lies in
+    /// [cell + 0.2, cell + 0.8) and MathF.Floor recovers the spawn index. No Update is driven,
+    /// so nothing moves after it is placed.
+    /// </summary>
+    [Fact]
+    public void EvictionDropsTheOldestCubeAndKeepsTheRestInSpawnOrder()
+    {
+        const int overflow = 50;
+        var max = WorldGenerationConfig.BlockDebrisMax;
+        var system = new BlockDebrisSystem();
+        var rng = new Random(12);
+
+        for (var i = 0; i < max + overflow; i++)
+            system.Burst(new Vector3(i, 100f, 0f), StoneId, 1, rng);
+
+        Assert.Equal(max, system.Debris.Count);
+        for (var i = 0; i < max; i++)
+            Assert.Equal(overflow + i, (int)MathF.Floor(system.Debris[i].Position.X));
+    }
 }

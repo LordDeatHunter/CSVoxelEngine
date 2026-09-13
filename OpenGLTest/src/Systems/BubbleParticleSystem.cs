@@ -10,7 +10,7 @@ namespace silkgltriangle;
 /// </summary>
 public sealed class BubbleParticleSystem
 {
-    private readonly List<BubbleParticle> _particles = [];
+    private readonly ParticleRing<BubbleParticle> _particles = new(WorldGenerationConfig.BubbleParticleMax);
     private float _spawnDebt;
 
     public IReadOnlyList<BubbleParticle> Particles => _particles;

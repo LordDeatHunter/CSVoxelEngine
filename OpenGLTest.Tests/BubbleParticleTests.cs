@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Xunit;
 
@@ -102,5 +103,47 @@ public sealed class BubbleParticleTests
 
         Assert.True(system.Particles.Count <= WorldGenerationConfig.BubbleParticleMax);
         Assert.NotEmpty(system.Particles);
+    }
+
+    /// <summary>
+    /// C12(a): eviction at the cap drops the OLDEST bubble and leaves every survivor in spawn
+    /// order. SystemRespectsMaxParticles above pins only the count and would pass a swap-remove
+    /// that reordered the sequence. BubblePerSecond is 1 and the lifetime is 4 s, so the cap is
+    /// not reachable by driving Update alone; the fill uses AddForTest (a bare append with no
+    /// eviction, exactly as it was over the List this replaces) and then ONE real Update supplies
+    /// the spawn that forces the eviction through the production path.
+    ///
+    /// Identity is by REFERENCE, not by position: unlike the leaf and debris facts this one does
+    /// drive Update, so every position moves. One second of debt at BubblePerSecond = 1 spawns
+    /// exactly one bubble, and every pre-filled bubble survives that step - age 1 s against a
+    /// lifetime of at least BubbleLifetime * 0.7 = 2.8 s, and a rise of BubbleRise plus wobble
+    /// under 0.7 blocks against a surface 14 blocks above - so the survivor set is exactly the
+    /// fill minus its head, with the new bubble at the tail.
+    /// </summary>
+    [Fact]
+    public void EvictionDropsTheOldestBubbleAndKeepsTheRestInSpawnOrder()
+    {
+        var (chunks, _) = WaterColumn(top: 15);
+        var max = WorldGenerationConfig.BubbleParticleMax;
+        var system = new BubbleParticleSystem();
+        var rng = new Random(13);
+
+        var filled = new List<BubbleParticle>();
+        for (var i = 0; i < max; i++)
+        {
+            var bubble = new BubbleParticle(new Vector3(8.5f, 2f, 8.5f), rng);
+            filled.Add(bubble);
+            system.AddForTest(bubble);
+        }
+        Assert.Equal(max, system.Particles.Count);
+
+        system.Update(1f, new Vector3(8.5f, 3f, 8.5f), -Vector3.UnitZ, true, chunks, rng);
+
+        Assert.Equal(max, system.Particles.Count);
+        for (var i = 0; i < max - 1; i++)
+            Assert.Same(filled[i + 1], system.Particles[i]);
+        Assert.DoesNotContain(filled[0], system.Particles);
+        // Anti-vacuity: the tail really is a newly spawned bubble, not the fill shifted along.
+        Assert.NotSame(filled[max - 1], system.Particles[max - 1]);
     }
 }

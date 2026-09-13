@@ -1,0 +1,162 @@
+// Particles: the only checked-in scenario that frames the four particle systems
+// (LeafParticleSystem, BlockDebrisSystem, BubbleParticleSystem, FireParticleSystem). The
+// other pose-stable scenarios frame terrain, sky, water and entities and contain no
+// particle at all, so before this file a change to particle storage or particle draw order
+// had no visual coverage whatsoever.
+//
+// Run from OpenGLTest/: VOXEL_TIME=60 VOXEL_SCRIPT=visual-examples/particles.json
+// Shots land in visual/particles/. VOXEL_TIME is pinned at 60 (the standard measurement
+// setting shared with entity-binds and clouds-mirror) only so two runs are lit the same
+// way; see the exclusion note below for why this file is still not a pixel instrument.
+//
+// ============================================================================
+// WHAT THIS SCENARIO IS AND IS NOT AN INSTRUMENT FOR — read before using it.
+// ============================================================================
+// It is NOT a pixel instrument, and it is deliberately EXCLUDED from the statistical
+// cross-tree gate that rays-halfres / clouds-mirror / lod-horizon / entity-binds carry.
+// Three independent reasons, any one of which is enough:
+//   1. Particles are physics- and RNG-driven. Every spawn draws from Random.Shared for its
+//      position jitter, its toss and its lifetime, so the same build renders visibly
+//      different particle positions from one run to the next.
+//   2. `wait` ticks world.Update once per RENDERED frame, so how far a particle has fallen
+//      by the shutter is a function of the frame rate, which is exactly what a performance
+//      round changes. A faster tree would show particles at different heights and a pixel
+//      statistic would read that as a rendering difference.
+//   3. The eviction path this scenario was written for is not even reachable here for three
+//      of the four systems: ambient leaves settle near 270 of LeafParticleMax 512, bubbles
+//      near 4 of 128 and debris near 40 of 512. Only fire particles (36 embers/s + 8 smoke/s
+//      per lit cell against a 512 cap) realistically evict in play.
+// Folding it into a Mann-Whitney gate would therefore be vacuous in one direction and a
+// false-alarm generator in the other.
+//
+// Its job is a PRESENCE and DRAW-ORDER check judged BY EYE: are the systems present at all,
+// are the positions plausible, do the sprites blend correctly against terrain rather than
+// drawing as opaque squares or vanishing, is a whole pass missing, are the debris cubes
+// obviously re-sorted. The headless facts are what pin eviction ORDER exactly —
+// LeafParticleTests / BlockDebrisTests / BubbleParticleTests / FireParticleTests each carry
+// an EvictionDropsTheOldest...AndKeepsTheRestInSpawnOrder fact, and ParticleRingTests'
+// randomised differential fact pins the ring itself against a List<T> oracle.
+//
+// ============================================================================
+// NO FIRE LEG, and the reason is structural rather than a missing pose.
+// ============================================================================
+// A lit campfire CANNOT be produced from a scripted scenario with the director's present
+// op set, so this file frames leaves, debris and bubbles only; fire particles are covered
+// headlessly, by FireParticleTests, and by nothing else.
+// The chain, verified against the code and then against a real Inventory headlessly rather
+// than guessed at: the only ignition site in the tree is CampfireManager.Ignite, reached
+// only from World.TryIgniteCampfire, reached only from World.TryUseSelected's
+// ItemUseAction.IgniteCampfire branch — and that branch is guarded by
+// `Inventory.SelectedToolInstance is var igniteInstance and > 0`. A firestarter is a TOOL
+// (Inventory.CategoryOf -> Tools, because it has durability), and tools live as per-instance
+// entries that a hotbar slot points at through HotbarSlot.ToolInstance. VisualDirector's
+// `give` op equips with `Inventory.EquipStackable(SelectedIndex, id)`, which writes
+// `new HotbarSlot(false, id, 0)` — a NON-tool slot with instance 0. So after
+// `give item/firestarter` the selected slot reports the right id and a non-zero count but
+// SelectedToolInstance == 0, the guard fails, and TryUseSelected returns before
+// TryIgniteCampfire is ever called. Every `place` op aimed at a branch pile is a no-op.
+// Measured headlessly: `after give firestarter: selId 31 count 6 tool 0`.
+// This was also confirmed in the live game — a probe scenario built a max-count branch pile
+// (give item/branch, four `place` ops) and then struck it 14 times over 22 s; the pile never
+// lit and the shots were opened to confirm it.
+// Even if the director could equip a tool, the leg would still be probabilistic: the
+// firestarter's use chance is 0.15 per strike on a 1.5 s cooldown with 10 uses per instance,
+// so a checked-in scenario would flake at a few percent per run.
+// Adding a `giveTool` op to VisualDirector would fix this, but that is a change to the
+// director and belongs to whichever round wants fire coverage on screen.
+//
+// ============================================================================
+// THE THREE LEGS, and why each pose is the one that actually shows its system.
+// ============================================================================
+// Every pose below was found by probing and then confirmed by OPENING the rendered frame,
+// the same standard lod-horizon's header records for its vantage points. The first drafts
+// are recorded here because they look reasonable and do not work, and someone will
+// otherwise re-derive them:
+//   - A single "mine the canopy for 4 s then shoot" leg, which the round's plan proposed,
+//     renders NOTHING identifiable. Mining for several seconds digs a tunnel: the debris
+//     spawn at the block being broken, which by then is inside the hole and occluded, and
+//     leaf debris is green against green canopy. Two separate legs with different framings
+//     is what works.
+//   - Mining the ground at a shallow down-pitch from a standing pose also renders nothing:
+//     the break is out of frame or inside its own pit.
+//
+// LEG 1 — LEAVES, in dense forest looking UP into the canopy.
+//   Stand point (-25.5, -43.5) sits inside a dense stand: a headless probe over a 96x96
+//   block patch found the trunk at (-29, 27, -43) carrying 444 leaf cells within 5 blocks,
+//   with ground top 26 and a clear landing column at x -25. The teleport drops ~5 blocks and
+//   the wait lands the player, so the eye ends up at forest-floor level whatever physics
+//   does with it.
+//   Pitch +25 puts the canopy underside in frame. Leaves are BRIGHT green sprites and the
+//   canopy underside is nearly black, which is the whole reason this pitch was chosen —
+//   at pitch 0 or below, leaf sprites sit against lit canopy and are hard to pick out.
+//   `mine 1.5` breaks canopy cells at the crosshair: each mined tree block runs
+//   World.RemoveBlock -> LeafParticleSystem.Burst (LeafParticleBurstMined = 6), on top of
+//   the ambient fall the system spawns continuously around the camera (30/s within a radius
+//   of 24). The shutter follows immediately: `screenshot` ticks no physics, so the particles
+//   are frozen exactly where the last update left them.
+//
+// LEG 2 — DEBRIS, on the bright hillside above the eastern bay.
+//   (12.5, 30.5) is a grass shelf beside a trunk with sky and water in frame, chosen because
+//   debris cubes are small (BlockDebrisSize 0.12) and short-lived (BlockDebrisLifetime 2 s)
+//   and need a bright, uncluttered backdrop. Pitch -25 puts the mined cell about 2.5 blocks
+//   ahead, close enough that a 0.12-block cube is tens of pixels across.
+//   The mine is split 2.0 + 0.4 s ON PURPOSE. Debris arrive two ways: 4 per HIT
+//   (BlockDebrisPerHit, one hit every BlockHitSeconds = 0.2 s) and 20 on the BREAK
+//   (BlockDebrisOnBreak). A single long mine tends to put the shutter mid-break with the
+//   surviving cubes down inside the pit; the short second mine lands the shutter shortly
+//   after a break instead, which is what produces the open-air scatter of a dozen-odd cubes
+//   the shot was confirmed to contain. This is also the shot where DRAW ORDER is visible at
+//   all: RenderManager.RenderBlockDebris walks its list with a plain foreach and submits in
+//   that order, so overlapping semi-transparent cubes are the one place submission order
+//   reaches the GPU.
+//
+// LEG 3 — BUBBLES, at water.json's verified underwater point.
+//   (250.5, -3.5, -150.5) is the swimmable part of the bay at x~250, z~-140, reused verbatim
+//   from water.json's `water_under_sun` shot, so the pose is already known to put the eye
+//   under the surface. Pitch +40 looks up the bubble column: BubbleParticleSystem spawns at
+//   the mouth (eye + forward*0.3 - 0.18 y) and the bubbles rise, so looking up is the only
+//   pitch that frames more than the newest one. BubblePerSecond is 1 against a 4 s lifetime,
+//   so roughly four bubbles are alive at once and the 6 s wait is what guarantees the column
+//   has filled; the confirmed shot carries three clearly visible bubbles blended against the
+//   water. The trailing `look` re-aims without moving the camera (VisualDirector's `look`
+//   calls TestTeleport at the CURRENT position), which re-pins the pitch after the wait's
+//   physics.
+//
+// CONFIRMED, not assumed: the file was run twice end to end and all six shots were opened.
+// Both runs carry leaf sprites against the canopy (including a part-faded one, which is the
+// SrcAlpha/OneMinusSrcAlpha blend visibly doing its job rather than a sprite popping out),
+// a dozen-odd tumbling debris cubes around the mined cell with several overlapping, and
+// bubbles rising against the water. Two run-to-run differences are expected and are NOT
+// breakage: particle positions and counts differ (see the exclusion note), and the HELD ITEM
+// may or may not appear in the debris shot, because mining drops loot that is auto-collected
+// and a FRESH id equips itself into a hotbar slot (Inventory.EquipNewStackable) which may or
+// may not be the selected one by the time of the shutter.
+//
+// hideHud: true on every shot, following every other gate scenario: the HUD bakes live
+// FPS/profiler text into the frame. Program.cs skips world.RenderUI on those frames
+// entirely, so no HUD text can reach any shot here.
+{
+  "steps": [
+    { "op": "wait", "seconds": 8 },
+
+    // LEG 1 — leaves: dense canopy, looking up, freshly disturbed.
+    { "op": "teleport", "pos": [-25.5, 32.5, -43.5], "yaw": 180, "pitch": 0 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "look", "yaw": 180, "pitch": 25 },
+    { "op": "mine", "seconds": 1.5 },
+    { "op": "screenshot", "name": "leaves_canopy", "hideHud": true },
+
+    // LEG 2 — debris: bright hillside, close mined cell, shutter just after a break.
+    { "op": "teleport", "pos": [12.5, 25.5, 30.5], "yaw": 90, "pitch": -25 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "mine", "seconds": 2.0 },
+    { "op": "mine", "seconds": 0.4 },
+    { "op": "screenshot", "name": "debris_hits", "hideHud": true },
+
+    // LEG 3 — bubbles: submerged, looking up the exhaled column.
+    { "op": "teleport", "pos": [250.5, -3.5, -150.5], "yaw": 90, "pitch": 40 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "look", "yaw": 90, "pitch": 40 },
+    { "op": "screenshot", "name": "bubbles_column", "hideHud": true }
+  ]
+}

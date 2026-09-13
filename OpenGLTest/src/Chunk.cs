@@ -51,6 +51,13 @@ public class Chunk : IDisposable
     // and a chunk holding nothing but sea water still has a surface to draw.
     private int _solidCount;
 
+    /// <summary>
+    /// Test seam: the non-air cell count <see cref="GenerateBlockData"/> reports. It exists so
+    /// the vectorised recount there can be pinned against an independent scalar oracle walking
+    /// <see cref="GetLocalBlock"/>; nothing in the engine reads it.
+    /// </summary>
+    internal int SolidCount => _solidCount;
+
     private static readonly Vector3[] NeighborOffsets = Vector3Directions.CardinalDirections;
     public double lifetime = 0.0f;
     public const float MAX_LIFETIME = 0.5f;
@@ -492,11 +499,12 @@ public class Chunk : IDisposable
         if (WorldGenerationConfig.FlowersEnabled)
             FlowerGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
-        // Carving removed an unknown number of blocks; a recount is cheaper than bookkeeping
-        var solid = 0;
-        foreach (var block in _blocks)
-            if (block != BlockType.Air) solid++;
-        _solidCount = solid;
+        // Carving removed an unknown number of blocks; a recount is cheaper than bookkeeping.
+        // Counting AIR and subtracting beats counting non-air: BlockType.Air is
+        // `public const byte Air = 0`, so this binds to the vectorised
+        // MemoryExtensions.Count<byte> with no cast, where a "!= Air" predicate would
+        // have to run one comparison per cell.
+        _solidCount = BlockCount - _blocks.AsSpan().Count(BlockType.Air);
 
         // Only a chunk that actually got flooded can have a frontier to report, plus any
         // chunk low enough to hold lava pockets (the scan itself is fluid-generic)

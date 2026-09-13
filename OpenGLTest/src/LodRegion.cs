@@ -72,6 +72,13 @@ public class LodRegion : IDisposable
     /// </summary>
     public int ListIndex = -1;
 
+    /// <summary>
+    /// This region's index in <c>LodManager._pendingCover</c>, or -1 while it is not in that
+    /// list. Maintained by <see cref="LodManager"/> on the main thread only, exactly like
+    /// <see cref="ListIndex"/>, so removal is a swap instead of a linear scan.
+    /// </summary>
+    public int PendingCoverIndex = -1;
+
     public readonly int Level;
     public readonly int X, Z;          // region grid coordinates (in this level's grid)
     public readonly int SizeBlocks;

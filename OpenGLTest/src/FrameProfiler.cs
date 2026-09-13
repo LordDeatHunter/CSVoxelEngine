@@ -102,6 +102,8 @@ public static class FrameProfiler
 
     private static int _chunkCount;
     private static int _visibleChunkCount;
+    private static long _lodBuildCount;
+    private static int _lodRegionCount;
 
     private static readonly List<string> _lines = [];
     private static string _consoleLine = string.Empty;
@@ -130,11 +132,19 @@ public static class FrameProfiler
         _frameTicks[index] += Stopwatch.GetTimestamp() - _startTicks[index];
     }
 
-    /// <summary>Header counts, pushed by the systems that own them (cheap int stores).</summary>
-    public static void SetCounts(int chunks, int visible)
+    /// <summary>
+    /// Header counts, pushed by the systems that own them (cheap int stores).
+    /// <paramref name="lodBuilds"/> is <see cref="LodManager.CompletedBuildCount"/> — cumulative
+    /// region builds — and <paramref name="lodRegions"/> the live region count; both are optional
+    /// so callers that have no LOD to report (tests, any future call site) stay unchanged.
+    /// They reach the console line only, never the HUD overlay: see <see cref="Publish"/>.
+    /// </summary>
+    public static void SetCounts(int chunks, int visible, long lodBuilds = 0, int lodRegions = 0)
     {
         _chunkCount = chunks;
         _visibleChunkCount = visible;
+        _lodBuildCount = lodBuilds;
+        _lodRegionCount = lodRegions;
     }
 
     /// <summary>
@@ -269,7 +279,14 @@ public static class FrameProfiler
         _consoleLine =
             $"perf frame {frameMs:F2}ms {fps}fps cpu {cpuMs:F2} gpu {gpuText} " +
             $"gc {gc0 - _gcBase0}/{gc1 - _gcBase1}/{gc2 - _gcBase2} " +
-            $"chunks {_chunkCount}/{_visibleChunkCount} | {JoinSections(frames, gpuAvgMs, gpuMaxMs, gpuSamples)}";
+            $"chunks {_chunkCount}/{_visibleChunkCount} " +
+            // LodGen throughput instrument: cumulative builds / live regions. Console line ONLY —
+            // the overlay rows are fixed-width, and every gate screenshot passes hideHud:true while
+            // perf-fly bakes the HUD in, so keeping this off _lines guarantees it cannot move a
+            // gate pixel. The token is `regions`, never `lod`: `lod` is already a ProfileSection
+            // label inside JoinSections and a scraper keyed on it would match the wrong field.
+            $"regions {_lodBuildCount}/{_lodRegionCount} | " +
+            $"{JoinSections(frames, gpuAvgMs, gpuMaxMs, gpuSamples)}";
         _consolePending = true;
 
         _gcBase0 = gc0;

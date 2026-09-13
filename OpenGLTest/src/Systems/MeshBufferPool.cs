@@ -18,8 +18,11 @@ namespace silkgltriangle;
 /// LOD-sized pool for the four output lists of a region build (<c>LodRegion.BuildMeshData</c>):
 /// a region build is an order of magnitude larger than a chunk build, so one shared pool would
 /// either regrow on every LOD rent or drift the chunk rents upward. That pool follows the same
-/// contract — rented on the LodGen thread, returned on the main thread after the upload or on
-/// the out-of-range drop, never on the worker.
+/// contract — rented on the <see cref="WorldGenerationConfig.MaxConcurrentLodGenerations"/>
+/// LodGen threads, returned on the main thread after the upload or on the out-of-range drop,
+/// never on a worker. Several concurrent renters are safe for the same reason the mesh workers
+/// are: every Rent and Return takes the instance lock, and its retention ceilings are sized
+/// from the LOD in-flight bound (see <c>LodManager.MeshBuffers</c>).
 /// </para>
 /// <para>
 /// <c>retainEmptyTranslucent</c> exists for that LOD pool. A chunk mesher only fills the

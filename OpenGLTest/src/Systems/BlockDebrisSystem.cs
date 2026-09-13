@@ -10,7 +10,7 @@ namespace silkgltriangle;
 /// </summary>
 public class BlockDebrisSystem
 {
-    private readonly List<BlockDebris> _debris = [];
+    private readonly ParticleRing<BlockDebris> _debris = new(WorldGenerationConfig.BlockDebrisMax);
 
     public IReadOnlyList<BlockDebris> Debris => _debris;
 

@@ -7,10 +7,16 @@ using System.Threading;
 namespace silkgltriangle;
 
 /// <summary>
-/// Manages far-terrain LOD regions across all LOD levels: a background thread builds
-/// region meshes from the heightmap cache (CPU only), the main thread uploads them to
-/// the GPU with a per-frame cap and unloads regions that fall out of range.
+/// Manages far-terrain LOD regions across all LOD levels: a pool of
+/// <see cref="WorldGenerationConfig.MaxConcurrentLodGenerations"/> BelowNormal LodGen threads
+/// builds region meshes from the heightmap cache (CPU only), the main thread uploads them to
+/// the GPU with a per-frame cap and unloads regions that fall out of range. That constant ships
+/// at 1 — C5 measured a wider pool and declined it (the reasoning is on the constant) — but
+/// everything here is written for N workers and is correct at any N.
 /// Levels are filled finest-first so detail appears near the player before the horizon.
+/// Each worker claims a region through <see cref="ClaimNextRegion"/>, which registers the key in
+/// <c>_building</c>; the claim protocol, not the concurrent collections, is what keeps two
+/// workers off one region (item C5).
 /// </summary>
 public class LodManager(Silk.NET.OpenGL.GL gl)
 {
@@ -28,6 +34,16 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
     private readonly ConcurrentDictionary<(int Level, int X, int Z), byte> _queued = new();
     private readonly ConcurrentDictionary<(int Level, int X, int Z), byte> _dirtyRegions = new();
     private readonly ConcurrentQueue<LodMeshData> _completedMeshes = new();
+    private long _completedBuildCount;
+
+    /// <summary>
+    /// The regions currently claimed by a LodGen worker: entered by whichever claim path handed
+    /// the key out and removed by <see cref="ReleaseRegion"/> once the build has been enqueued.
+    /// It is the ONLY thing that stops two workers building the same region concurrently, which
+    /// neither <c>_queued</c> nor <c>_dirtyRegions</c> can do -- a key stays in <c>_queued</c> for
+    /// its whole build, and <see cref="MarkEditedColumn"/> re-dirties exactly those keys. Item C5.
+    /// </summary>
+    private readonly ConcurrentDictionary<(int Level, int X, int Z), byte> _building = new();
 
     /// <summary>
     /// LOD-sized twin of <see cref="ChunkManager.MeshBuffers"/>. The LodGen worker rents a region
@@ -36,17 +52,32 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
     /// LodMeshData can wait frames, so returning on the worker would hand out a live list.
     /// Water lists come back even when empty (retainEmptyTranslucent): unlike a chunk mesher, a
     /// region build rents them every time, so dropping the empty ones would drain the pool inland.
-    /// The retention caps are 4 because one LodGen thread has a single rent outstanding while the
-    /// main thread returns at most MaxLodUploadsPerFrame per frame; a deeper burst simply misses
-    /// the pool and allocates, exactly as every build did before.
+    /// <para>
+    /// The retention ceilings are DERIVED from the in-flight bound, not chosen. Outstanding rents
+    /// are capped at <see cref="WorldGenerationConfig.MaxLodBuildsInFlight"/> = 8 (finished builds
+    /// waiting in <c>_completedMeshes</c>, each pinning its four lists) plus
+    /// <see cref="WorldGenerationConfig.MaxConcurrentLodGenerations"/> (builds in progress), so
+    /// the bound is 8 + N. The ceiling is sized for the largest pool C5 measured (N = 3, bound 11)
+    /// rather than for the N = 1 the measurement told it to ship, so that raising the constant
+    /// stays a one-token experiment: 16 keeps the whole in-flight set recyclable with headroom for
+    /// the frame's returns at any N up to 8. Below the bound a steady fraction of returns would be
+    /// dropped and re-rented as fresh LOH allocations, inverting the win C8 landed.
+    /// The arithmetic, so the next round need not redo it: Vertex is 32 bytes, so one build's
+    /// four lists are 24576*32 + 36864*2 + 4096*32 + 6144*2 ~= 1.00 MB; 11 in flight ~= 11 MB,
+    /// 16 retained ~= 15.7 MB, never trimmed once the burst has filled the pool. If that idle
+    /// retention ever matters the lever is MaxLodBuildsInFlight, not the ceiling.
+    /// The return end is still MAIN THREAD ONLY and unchanged by C5 — only the rent end became
+    /// MaxConcurrentLodGenerations-wide, and every Rent/Return is locked, so the contract holds at
+    /// any N even though the shipped N is 1.
+    /// </para>
     /// </summary>
     public MeshBufferPool MeshBuffers { get; } = new(
         vertexCapacity: LodRegion.MeshVertexCapacity,
         indexCapacity: LodRegion.MeshIndexCapacity,
         translucentVertexCapacity: LodRegion.WaterVertexCapacity,
         translucentIndexCapacity: LodRegion.WaterIndexCapacity,
-        maxPooled: 4,
-        maxPooledTranslucent: 4,
+        maxPooled: 16,
+        maxPooledTranslucent: 16,
         retainEmptyTranslucent: true);
     private volatile bool _isRunning;
     private Camera? _camera;
@@ -59,6 +90,9 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
 
     // Regions added since the last cover pass. They start unburied, so the next pass
     // tests them first: same-frame evaluation, exactly like the uncapped pass did.
+    // Each entry carries its own index back in LodRegion.PendingCoverIndex, so an unload
+    // swap-removes instead of scanning (item C12(c)); UpdateBuriedFlags resets those
+    // indices when it drains the list.
     private readonly List<LodRegion> _pendingCover = new();
 
     // How many of a coarse region's finer-level children (at its own key) are currently
@@ -108,7 +142,7 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
 
     /// <summary>Binds the camera the region scan measures distance from. Split out of
     /// <see cref="Start"/> so tests can reach <see cref="FindClosestNeededRegion"/> — which
-    /// dereferences the camera through <c>CameraRegion</c> — without spawning the LodGen thread.
+    /// dereferences the camera through <c>CameraRegion</c> — without spawning the LodGen threads.
     /// </summary>
     internal void AttachCamera(Camera camera) => _camera = camera;
 
@@ -118,13 +152,20 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
         AttachCamera(camera);
         _isRunning = true;
 
-        var thread = new Thread(WorkerLoop)
+        for (var i = 0; i < WorldGenerationConfig.MaxConcurrentLodGenerations; i++)
         {
-            IsBackground = true,
-            Name = "LodGen",
-            Priority = ThreadPriority.BelowNormal
-        };
-        thread.Start();
+            var thread = new Thread(WorkerLoop)
+            {
+                IsBackground = true,
+                Name = $"LodGen-{i}",
+                Priority = ThreadPriority.BelowNormal
+            };
+            thread.Start();
+        }
+
+        // Managed thread names are not observable from Process.GetCurrentProcess().Threads, so
+        // this line is the only way to confirm the pool size a running build actually spawned.
+        Log.WriteLine($"LodGen: {WorldGenerationConfig.MaxConcurrentLodGenerations} workers");
     }
 
     public void Stop()
@@ -138,15 +179,17 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
         {
             try
             {
-                var next = TakeDirtyRegion() ?? FindClosestNeededRegion();
-                if (next.HasValue)
+                switch (TryBuildOneRegion())
                 {
-                    var (level, x, z) = next.Value;
-                    EnqueueCompletedMesh(LodRegion.BuildMeshData(level, x, z, MeshBuffers));
-                }
-                else
-                {
-                    Thread.Sleep(WorldGenerationConfig.GenerationDelayIdleMs);
+                    // Nothing left to build anywhere: the long poll, exactly as before.
+                    case LodBuildOutcome.Idle:
+                        Thread.Sleep(WorldGenerationConfig.GenerationDelayIdleMs);
+                        break;
+                    // Work exists and only the main thread's drain is behind, so backing off for
+                    // the idle poll would stall the streaming burst a fifth of a second at a time.
+                    case LodBuildOutcome.Throttled:
+                        Thread.Sleep(WorldGenerationConfig.LodBuildThrottleDelayMs);
+                        break;
                 }
             }
             catch (Exception ex)
@@ -157,9 +200,31 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
         }
     }
 
+    /// <summary>
+    /// How many region builds the LodGen worker has finished since startup. The counter is
+    /// CUMULATIVE and monotone: it counts BUILDS, never live regions, so a region that is
+    /// uploaded, unloaded and rebuilt counts three times and nothing ever decrements it.
+    /// That is deliberately unlike <see cref="ChunkManager.LoadedChunkCount"/>, which is a NET
+    /// counter (incremented in <c>QueueChunk</c>, decremented in <c>UnloadDistantChunks</c>) and
+    /// therefore carries the purge bias PERF_TODO's C3 capture rule documents: once the streaming
+    /// ring is full, loads and unloads cancel and the net rate plateaus near zero even while the
+    /// generator is at full tilt. A cumulative counter has no purge bias and no plateau, so a
+    /// throughput capture over it can use a fixed-duration window instead of chasing convergence.
+    /// Read on the main thread through <see cref="Interlocked.Read(ref long)"/> because the
+    /// increment happens on a LodGen worker and a long store is not atomic on 32-bit runtimes.
+    /// </summary>
+    public long CompletedBuildCount => Interlocked.Read(ref _completedBuildCount);
+
     /// <summary>The LodGen worker's only handoff to the main thread; internal so tests can drive
-    /// <see cref="ApplyCompletedMeshes"/> without starting a thread.</summary>
-    internal void EnqueueCompletedMesh(LodMeshData data) => _completedMeshes.Enqueue(data);
+    /// <see cref="ApplyCompletedMeshes"/> without starting a thread. Counting here rather than at
+    /// the upload is what makes <see cref="CompletedBuildCount"/> a measure of BUILDER throughput:
+    /// a build that is dropped out of range in <see cref="ApplyCompletedMeshes"/> still cost the
+    /// worker its full build, so it still counts.</summary>
+    internal void EnqueueCompletedMesh(LodMeshData data)
+    {
+        Interlocked.Increment(ref _completedBuildCount);
+        _completedMeshes.Enqueue(data);
+    }
 
     /// <summary>
     /// Marks the LOD regions (on every level) whose sampling window covers the edited
@@ -197,14 +262,41 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
     /// itself rather than over <c>.Keys</c>: the ConcurrentDictionary enumerator is lock-free and
     /// copies nothing, and removing entries through it while enumerating is explicitly supported
     /// (the same shape ChunkManager's unload pass and its dirty-chunk scan already use and document).
-    /// Internal so tests can drive it without starting the LodGen thread.
+    /// Internal so tests can drive it without starting the LodGen threads.
+    ///
+    /// The returned key is ALREADY registered in <c>_building</c> and the caller must hand it to
+    /// <see cref="ReleaseRegion"/> -- see <see cref="TryBuildOneRegion"/>. The <c>_building</c>
+    /// probe at the top of the loop is a cheap PRE-FILTER and never the guarantee; the
+    /// registration gated on <c>TryAdd</c>'s result, taken inside the same take, is. The window the
+    /// pre-filter alone leaves open is the subtlest fact of item C5: <see cref="MarkEditedColumn"/>
+    /// re-dirties any key that is still in <c>_queued</c>, and a key stays in <c>_queued</c> for
+    /// its whole build, so between worker A's <c>TryRemove</c> here and any registration made after
+    /// the return, the main thread can re-add that same key and worker B can take it. Two builds of
+    /// one region then run concurrently and apply in COMPLETION order, so the older snapshot can
+    /// land last: a stale LOD shell left standing over a freshly mined column, which is exactly
+    /// what the region's column caps exist to prevent. An advisory mark plus an unchecked TryAdd
+    /// after the return does not close that; branching on the TryAdd result does.
     /// </summary>
     internal (int Level, int X, int Z)? TakeDirtyRegion()
     {
         foreach (var kvp in _dirtyRegions)
         {
-            if (_dirtyRegions.TryRemove(kvp.Key, out _))
-                return kvp.Key;
+            // Pre-filter: SKIP without removing, so a region that is mid-build keeps its dirty
+            // mark and is rebuilt on a later spin instead of losing the edit.
+            if (_building.ContainsKey(kvp.Key)) continue;
+
+            if (!_dirtyRegions.TryRemove(kvp.Key, out _)) continue;
+
+            // The real gate. Losing the race means another worker claimed the key between the
+            // pre-filter and here, so the mark goes BACK rather than being dropped: a collision
+            // costs a rebuild delay, never an edit.
+            if (!_building.TryAdd(kvp.Key, 0))
+            {
+                _dirtyRegions.TryAdd(kvp.Key, 0);
+                continue;
+            }
+
+            return kvp.Key;
         }
 
         return null;
@@ -216,6 +308,14 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
     /// Internal (rather than private) because it is the only path that fills <c>_queued</c>, and
     /// <see cref="MarkEditedColumn"/> refuses to mark a region that is not in it — so a test of the
     /// dirty-set drain can only produce a dirty region by going through this scan first.
+    ///
+    /// The returned key is ALREADY registered in <c>_building</c> and the caller must hand it to
+    /// <see cref="ReleaseRegion"/>. The scan is deliberately UNSHARED between workers, unlike the
+    /// chunk lattice's scan frontier (item C3): a full scan is at most 591 probes (197 offsets x 3
+    /// levels at RegionRadius 8) against that lattice's 17077, and it runs once per BUILD rather
+    /// than once per probe, so it is noise beside a build costing tens of milliseconds. Concurrent
+    /// callers racing on <c>_queued.TryAdd</c> is not a problem to solve here but the very thing
+    /// that fans the workers out onto distinct regions.
     /// </summary>
     internal (int Level, int X, int Z)? FindClosestNeededRegion()
     {
@@ -227,12 +327,82 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
             {
                 var key = (level, camX + dx, camZ + dz);
                 if (Regions.ContainsKey(key)) continue;
-                if (_queued.TryAdd(key, 0))
-                    return key;
+                if (!_queued.TryAdd(key, 0)) continue;
+
+                // The _queued claim succeeded but another worker already holds the key in
+                // _building, so this one must UN-CLAIM _queued before moving on. The rollback is
+                // not optional: ApplyCompletedMeshes' out-of-range branch removes a key from
+                // _queued while its builder may still hold it in _building, so winning _queued
+                // here while losing _building is reachable -- and a _queued entry with nothing
+                // building is a region that never builds and can never re-enter this scan (the
+                // TryAdd above would keep failing), i.e. a permanent hole in the horizon.
+                if (!_building.TryAdd(key, 0))
+                {
+                    _queued.TryRemove(key, out _);
+                    continue;
+                }
+
+                return key;
             }
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// The next region a LodGen worker should build: pending rebuilds first, then the closest
+    /// region the horizon is still missing. A thin alias now that both paths register their own
+    /// key -- the returned key IS registered in <c>_building</c> and the caller MUST hand it back
+    /// to <see cref="ReleaseRegion"/>, or that region never builds again.
+    /// </summary>
+    internal (int Level, int X, int Z)? ClaimNextRegion() => TakeDirtyRegion() ?? FindClosestNeededRegion();
+
+    /// <summary>Drops a worker's claim on a region, making it takeable again. Idempotent.</summary>
+    internal void ReleaseRegion((int Level, int X, int Z) key) => _building.TryRemove(key, out _);
+
+    /// <summary>Test seam: how many finished builds are waiting for the main thread's drain.</summary>
+    internal int PendingUploadCount => _completedMeshes.Count;
+
+    /// <summary>Test seam: lets a test play the main thread's drain without a GL context.</summary>
+    internal bool TryTakeCompletedMesh(out LodMeshData data) => _completedMeshes.TryDequeue(out data!);
+
+    /// <summary>Test seam: regions claimed by the closest-needed scan and not yet dropped.</summary>
+    internal int QueuedClaimCount => _queued.Count;
+
+    /// <summary>Test seam: regions a worker currently holds. Zero once every worker released.</summary>
+    internal int BuildingClaimCount => _building.Count;
+
+    /// <summary>
+    /// One iteration of a LodGen worker: claim a region, build it, hand the result to the main
+    /// thread. The whole loop body, factored out so the concurrency can be driven headlessly.
+    ///
+    /// Two orderings here are load-bearing. (a) The in-flight cap is checked BEFORE any claim is
+    /// taken. Checking it after would mean either leaking a <c>_queued</c> claim that nothing would
+    /// ever build (a permanent horizon hole, see <see cref="FindClosestNeededRegion"/>) or silently
+    /// dropping a dirty mark that had already been removed from the set. (b) The release sits in a
+    /// <c>finally</c> that runs AFTER <see cref="EnqueueCompletedMesh"/>, so a rebuild of the same
+    /// key cannot start until the earlier build is already on the queue: queue order is build
+    /// order, which is what makes the last mesh applied for a key the newest one.
+    /// </summary>
+    internal LodBuildOutcome TryBuildOneRegion()
+    {
+        if (_completedMeshes.Count >= WorldGenerationConfig.MaxLodBuildsInFlight)
+            return LodBuildOutcome.Throttled;
+
+        var next = ClaimNextRegion();
+        if (next is not { } key)
+            return LodBuildOutcome.Idle;
+
+        try
+        {
+            EnqueueCompletedMesh(LodRegion.BuildMeshData(key.Level, key.X, key.Z, MeshBuffers));
+        }
+        finally
+        {
+            ReleaseRegion(key);
+        }
+
+        return LodBuildOutcome.Built;
     }
 
     private (int X, int Z) CameraRegion(int level)
@@ -350,6 +520,7 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
         Regions[key] = region;
         region.ListIndex = RegionList.Count;
         RegionList.Add(region);
+        region.PendingCoverIndex = _pendingCover.Count;
         _pendingCover.Add(region);
         _regionSetVersion++;
 
@@ -379,7 +550,28 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
 
         RegionList.RemoveAt(last);
         region.ListIndex = -1;
-        _pendingCover.Remove(region);
+
+        // Same swap-remove as above, against _pendingCover (item C12(c)). Honest sizing: this
+        // list is drained in the frame it is filled -- AddRegion bumps _regionSetVersion, which
+        // forces a UpdateBuriedFlags pass, which Clear()s it unconditionally at the top -- so its
+        // length is bounded by MaxLodUploadsPerFrame and the List.Remove this replaces scanned at
+        // most four entries. This removes an O(n) a future change could make hot, not a measured
+        // cost.
+        var pending = region.PendingCoverIndex;
+        if (pending >= 0)
+        {
+            var lastPending = _pendingCover.Count - 1;
+            if (pending != lastPending)
+            {
+                var movedPending = _pendingCover[lastPending];
+                _pendingCover[pending] = movedPending;
+                movedPending.PendingCoverIndex = pending;
+            }
+
+            _pendingCover.RemoveAt(lastPending);
+            region.PendingCoverIndex = -1;
+        }
+
         _regionSetVersion++;
 
         if (TryParentKey((region.Level, region.X, region.Z), out var parentKey))
@@ -437,7 +629,12 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
                 : IsCoveredByChunks(region, chunkManager, camChunk);
             if (region.Level == 0)
                 budget--;
+            region.PendingCoverIndex = -1;
         }
+
+        // Every entry is leaving the list, so every index must go back to -1 here. Without this
+        // a region added in one pass and removed after a later one would swap-remove against a
+        // stale index and corrupt whichever region happens to sit there now.
         _pendingCover.Clear();
 
         // Coarser levels cost four lookups each and a stale buried flag is a hole in
@@ -525,4 +722,15 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
         var ratio = LodRegion.Levels[level].RegionBlocks / LodRegion.Levels[finer].RegionBlocks;
         return _finerChildCounts.TryGetValue((level, x, z), out var count) && count == ratio * ratio;
     }
+}
+
+/// <summary>What one spin of a LodGen worker did, which is what tells the loop how to back off:
+/// <see cref="Idle"/> means there is nothing to build anywhere (the long poll), while
+/// <see cref="Throttled"/> means work exists and only the main thread's upload drain is behind,
+/// which must not be waited on for <c>GenerationDelayIdleMs</c>. Item C5.</summary>
+internal enum LodBuildOutcome
+{
+    Built,
+    Idle,
+    Throttled
 }

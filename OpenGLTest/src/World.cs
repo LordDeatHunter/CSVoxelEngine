@@ -332,7 +332,8 @@ public class World
         FrameProfiler.End(ProfileSection.WorldPass);
 
         // The frustum test inside RenderWorld has just counted what is on screen
-        FrameProfiler.SetCounts(_chunkManager.LoadedChunkCount, renderManager.LastVisibleChunkCount);
+        FrameProfiler.SetCounts(_chunkManager.LoadedChunkCount, renderManager.LastVisibleChunkCount,
+            _lodManager.CompletedBuildCount, _lodManager.RegionList.Count);
 
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.BeginGpuPass(ProfileSection.EntityPass);
