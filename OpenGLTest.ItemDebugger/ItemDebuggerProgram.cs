@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Numerics;
 using Silk.NET.Input;
@@ -30,8 +31,13 @@ public static class ItemDebuggerProgram
     private static Vector3 _pan;
     private static Vector3 _modelOffset;
     private const float BodyYaw = -90f;
+    private static bool _firstPerson;
+    private static float _lookYaw = BodyYaw;
+    private static float _lookPitch;
+    private static Vector2 _mouseDelta;
     private static Vector2 _lastMouse;
-    private static bool _mouseReady;
+    private static bool _haveMouse;
+    private static bool _captured;
     private static bool _leftDrag;
     private static bool _rightDrag;
     private static bool _middleDrag;
@@ -91,11 +97,23 @@ public static class ItemDebuggerProgram
         if (!string.IsNullOrEmpty(select))
             TrySelectByName(select);
 
+        if (string.Equals(Environment.GetEnvironmentVariable("ITEM_DEBUGGER_VIEW")?.Trim(), "first",
+                StringComparison.OrdinalIgnoreCase))
+            _firstPerson = true;
+
+        var look = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_LOOK")?.Trim();
+        if (!string.IsNullOrEmpty(look) && TryParseLook(look, out var lookYaw, out var lookPitch))
+        {
+            _lookYaw = lookYaw;
+            _lookPitch = lookPitch;
+        }
+
         _input = new InputManager(_window);
         if (_input.Mouse is { } mouse)
         {
             mouse.MouseDown += OnMouseDown;
             mouse.MouseUp += OnMouseUp;
+            mouse.MouseMove += OnMouseMove;
             mouse.Scroll += OnScroll;
         }
     }
@@ -115,8 +133,19 @@ public static class ItemDebuggerProgram
         return false;
     }
 
+    private static bool TryParseLook(string value, out float yaw, out float pitch)
+    {
+        yaw = _lookYaw;
+        pitch = _lookPitch;
+        var parts = value.Split(',');
+        return parts.Length == 2
+            && float.TryParse(parts[0].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out yaw)
+            && float.TryParse(parts[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out pitch);
+    }
+
     private static void OnUpdate(double deltaTime)
-    {        if (_closing)
+    {
+        if (_closing)
         {
             _window.Close();
             return;
@@ -124,36 +153,30 @@ public static class ItemDebuggerProgram
 
         var dt = Math.Clamp(deltaTime, 0.0, 0.05);
         _time += deltaTime;
+
+        var motion = _mouseDelta;
+        _mouseDelta = Vector2.Zero;
         var mouse = _input?.Mouse;
 
         if (mouse != null)
         {
-            var position = new Vector2(mouse.Position.X, mouse.Position.Y);
-            if (!_mouseReady)
-            {
-                _lastMouse = position;
-                _mouseReady = true;
-            }
-            var delta = position - _lastMouse;
-            _lastMouse = position;
-
             if (_leftDrag && mouse.IsButtonPressed(MouseButton.Left))
             {
-                _orbitYaw -= delta.X * 0.4f;
-                _orbitPitch = Math.Clamp(_orbitPitch + delta.Y * 0.4f, -85f, 85f);
+                if (_firstPerson) Look(motion);
+                else Orbit(motion);
             }
 
             if (_rightDrag && mouse.IsButtonPressed(MouseButton.Right))
-                MoveModel(delta);
+                MoveModel(motion);
 
             if (_middleDrag && mouse.IsButtonPressed(MouseButton.Middle))
-                Pan(delta);
+                Pan(motion);
 
             if (_dragSlider is { } label)
             {
                 var slider = _ui.Slider(label);
                 if (slider != null && mouse.IsButtonPressed(MouseButton.Left))
-                    slider.Set(ItemDebuggerUi.ValueAt(slider, position.X));
+                    slider.Set(ItemDebuggerUi.ValueAt(slider, mouse.Position.X));
                 else
                     _dragSlider = null;
             }
@@ -167,15 +190,31 @@ public static class ItemDebuggerProgram
         var size = _window.Size;
         if (size.X <= 0 || size.Y <= 0) return;
 
-        var view = BuildView();
         var projection = Matrix4x4.CreatePerspectiveFieldOfView(
-            60f * MathF.PI / 180f, size.X / (float)size.Y, 0.05f, 200f);
+            70f * MathF.PI / 180f, size.X / (float)size.Y, 0.05f, 200f);
         var eye = BodyEye();
 
-        _scene.Render(view * projection, eye, BodyYaw, 0f, Player, Editor, (float)_time, size);
+        Matrix4x4 view;
+        float bodyYaw;
+        if (_firstPerson)
+        {
+            // The model stays put and the camera looks around it. The game turns the body with
+            // the camera, but with no world on screen that would make the one visible thing -
+            // the hand and item - rotate in lockstep, so horizontal look could never be seen.
+            bodyYaw = BodyYaw;
+            var forward = ForwardFrom(_lookYaw, _lookPitch);
+            view = Matrix4x4.CreateLookAt(eye, eye + forward, Vector3.UnitY);
+        }
+        else
+        {
+            bodyYaw = BodyYaw;
+            view = BuildView();
+        }
+
+        _scene.Render(view * projection, eye, bodyYaw, 0f, Player, Editor, (float)_time, size, _firstPerson);
 
         _scene.Ui.Begin(size);
-        _ui.Draw(_scene.Ui, Editor, _mode, new Vector2(size.X, size.Y), _status);
+        _ui.Draw(_scene.Ui, Editor, _mode, new Vector2(size.X, size.Y), _status, _firstPerson);
         _scene.Ui.End();
         _gl.BindVertexArray(0);
 
@@ -213,6 +252,30 @@ public static class ItemDebuggerProgram
             MathF.Cos(pitch) * MathF.Sin(yaw),
             MathF.Sin(pitch),
             MathF.Cos(pitch) * MathF.Cos(yaw));
+    }
+
+    private static void Orbit(Vector2 delta)
+    {
+        _orbitYaw -= delta.X * 0.4f;
+        _orbitPitch = Math.Clamp(_orbitPitch + delta.Y * 0.4f, -85f, 85f);
+    }
+
+    private static void Look(Vector2 delta)
+    {
+        const float sensitivity = 0.2f;
+        _lookYaw += delta.X * sensitivity;
+        _lookPitch = Math.Clamp(_lookPitch - delta.Y * sensitivity, -89f, 89f);
+    }
+
+    // Camera.GetForwardVector's convention: yaw 0 faces +X, pitch positive looks up.
+    private static Vector3 ForwardFrom(float yawDeg, float pitchDeg)
+    {
+        var yaw = yawDeg * MathF.PI / 180f;
+        var pitch = pitchDeg * MathF.PI / 180f;
+        return Vector3.Normalize(new Vector3(
+            MathF.Cos(pitch) * MathF.Cos(yaw),
+            MathF.Sin(pitch),
+            MathF.Cos(pitch) * MathF.Sin(yaw)));
     }
 
     private static void Pan(Vector2 delta)
@@ -277,6 +340,7 @@ public static class ItemDebuggerProgram
                 return;
             }
             _leftDrag = true;
+            SetCursorCaptured(true);
             return;
         }
 
@@ -290,9 +354,33 @@ public static class ItemDebuggerProgram
         {
             _leftDrag = false;
             _dragSlider = null;
+            SetCursorCaptured(false);
         }
         else if (button == MouseButton.Right) _rightDrag = false;
         else if (button == MouseButton.Middle) _middleDrag = false;
+    }
+
+    private static void OnMouseMove(IMouse mouse, Vector2 position)
+    {
+        if (!_haveMouse)
+        {
+            _lastMouse = position;
+            _haveMouse = true;
+            return;
+        }
+        _mouseDelta += position - _lastMouse;
+        _lastMouse = position;
+    }
+
+    private static void SetCursorCaptured(bool captured)
+    {
+        if (_captured == captured) return;
+        _captured = captured;
+        if (_input?.Mouse is { } mouse)
+            mouse.Cursor.CursorMode = captured ? CursorMode.Disabled : CursorMode.Normal;
+        // Swallow the jump the mode switch causes instead of turning it into a look.
+        _haveMouse = false;
+        _mouseDelta = Vector2.Zero;
     }
 
     private static void OnScroll(IMouse mouse, ScrollWheel wheel)
@@ -321,6 +409,11 @@ public static class ItemDebuggerProgram
                 break;
             case DebugButton.Mine:
                 Player.Punch();
+                break;
+            case DebugButton.FirstPerson:
+                _firstPerson = !_firstPerson;
+                _lookYaw = BodyYaw;
+                _lookPitch = 0f;
                 break;
             case DebugButton.ReloadDisplay:
                 Editor.ReloadDisplay();

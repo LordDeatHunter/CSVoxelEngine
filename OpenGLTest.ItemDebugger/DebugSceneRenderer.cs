@@ -87,7 +87,7 @@ public sealed class DebugSceneRenderer : IDisposable
     }
 
     public void Render(Matrix4x4 viewProj, Vector3 eyePos, float bodyYaw, float bodyPitch,
-        PlayerModel player, ItemDisplayEditor editor, float time, Vector2D<int> size)
+        PlayerModel player, ItemDisplayEditor editor, float time, Vector2D<int> size, bool firstPerson)
     {
         _gl.Viewport(0, 0, (uint)size.X, (uint)size.Y);
         _gl.ClearColor(0.53f, 0.64f, 0.76f, 1f);
@@ -103,21 +103,25 @@ public sealed class DebugSceneRenderer : IDisposable
         _world.Use();
         ApplyFrameUniforms(viewProj, eyePos, time, size);
 
+        // First person is the game's framing: the head is not drawn and the body slides back so
+        // the eye sits forward of the chest, which is also where the held item is anchored.
+        var backOffset = firstPerson ? PlayerModel.FirstPersonBodyBack : 0f;
         BindWorldTextures();
         BindArray(0, _paletteTex);
         foreach (var part in PlayerModel.BodyParts)
-            DrawPart(part, viewProj, eyePos, bodyYaw, bodyPitch, player);
-        DrawPart("Head", viewProj, eyePos, bodyYaw, bodyPitch, player);
+            DrawPart(part, viewProj, eyePos, bodyYaw, bodyPitch, player, backOffset);
+        if (!firstPerson)
+            DrawPart("Head", viewProj, eyePos, bodyYaw, bodyPitch, player, backOffset);
 
-        DrawHeldItem(viewProj, eyePos, bodyYaw, player, editor, time);
+        DrawHeldItem(viewProj, eyePos, bodyYaw, player, editor, time, backOffset);
     }
 
     private void DrawHeldItem(Matrix4x4 viewProj, Vector3 eyePos, float bodyYaw, PlayerModel player,
-        ItemDisplayEditor editor, float time)
+        ItemDisplayEditor editor, float time, float backOffset)
     {
         if (!editor.HasSelection) return;
 
-        var hand = player.GetHandAnchorMatrix(eyePos, bodyYaw);
+        var hand = player.GetHandAnchorMatrix(eyePos, bodyYaw, backOffset);
 
         if (editor.IsPureItem && ItemRegistry.TryGet(editor.SelectedId) is { } type)
         {
@@ -139,9 +143,9 @@ public sealed class DebugSceneRenderer : IDisposable
     }
 
     private void DrawPart(string part, in Matrix4x4 viewProj, Vector3 eyePos, float yaw, float pitch,
-        PlayerModel player)
+        PlayerModel player, float backOffset)
     {
-        var model = player.GetPartMatrix(part, eyePos, yaw, pitch);
+        var model = player.GetPartMatrix(part, eyePos, yaw, pitch, backOffset);
         Draw(_playerMeshes[part], model, viewProj);
     }
 

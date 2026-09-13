@@ -23,6 +23,7 @@ public enum DebugButton
     Run,
     Jump,
     Mine,
+    FirstPerson,
 }
 
 /// <summary>One editable number: a labelled track the debugger draws and hit-tests.</summary>
@@ -89,7 +90,7 @@ public sealed class ItemDebuggerUi
 
     private readonly List<(Vector2 Centre, Vector2 Size, int Entry)> _slots = new();
     private readonly List<DebugSlider> _sliders = new();
-    private readonly List<(Vector2 Centre, Vector2 Size, DebugButton Button, bool Enabled, bool Active)> _buttons = new();
+    private readonly List<(Vector2 Centre, Vector2 Size, DebugButton Button, string Label, bool Enabled, bool Active)> _buttons = new();
 
     public ItemDebuggerUi()
     {
@@ -148,7 +149,7 @@ public sealed class ItemDebuggerUi
 
     public DebugButton? ButtonAt(Vector2 point)
     {
-        foreach (var (centre, size, button, enabled, _) in _buttons)
+        foreach (var (centre, size, button, _, enabled, _) in _buttons)
         {
             if (!enabled) continue;
             if (MathF.Abs(point.X - centre.X) <= size.X * 0.5f
@@ -164,10 +165,11 @@ public sealed class ItemDebuggerUi
     public static float ValueAt(DebugSlider slider, float x) =>
         slider.Min + Fraction(slider, x) * (slider.Max - slider.Min);
 
-    public void Draw(UIRenderer ui, ItemDisplayEditor editor, PreviewMode mode, Vector2 screen, string status)
+    public void Draw(UIRenderer ui, ItemDisplayEditor editor, PreviewMode mode, Vector2 screen, string status,
+        bool firstPerson)
     {
         BuildGrid(screen);
-        BuildControls(editor, mode, screen);
+        BuildControls(editor, mode, screen, firstPerson);
 
         DrawPanel(ui, new Vector2(Pad + PanelWidth * 0.5f, screen.Y * 0.5f),
             new Vector2(PanelWidth, screen.Y - Pad * 2f));
@@ -207,7 +209,7 @@ public sealed class ItemDebuggerUi
         }
     }
 
-    private void BuildControls(ItemDisplayEditor editor, PreviewMode mode, Vector2 screen)
+    private void BuildControls(ItemDisplayEditor editor, PreviewMode mode, Vector2 screen, bool firstPerson)
     {
         _sliders.Clear();
         _buttons.Clear();
@@ -230,6 +232,11 @@ public sealed class ItemDebuggerUi
 
         AddButton(new Vector2((left + right) * 0.5f, y + ButtonH * 0.5f),
             new Vector2(width, ButtonH), DebugButton.Mine, "MINE SWING", true, false);
+        y += ButtonH + ButtonGap;
+
+        AddButton(new Vector2((left + right) * 0.5f, y + ButtonH * 0.5f),
+            new Vector2(width, ButtonH), DebugButton.FirstPerson,
+            firstPerson ? "VIEW: FIRST PERSON" : "VIEW: THIRD PERSON", true, firstPerson);
         y += ButtonH + ButtonGap + 10f;
 
         if (editor.IsPureItem) AddDisplaySliders(editor);
@@ -298,7 +305,7 @@ public sealed class ItemDebuggerUi
         _sliders.Add(new DebugSlider(label, min, max, decimals, get, set));
 
     private void AddButton(Vector2 centre, Vector2 size, DebugButton button, string label, bool enabled, bool active) =>
-        _buttons.Add((centre, size, button, enabled, active));
+        _buttons.Add((centre, size, button, label, enabled, active));
 
     private int TotalRows() => (Entries.Count + _columns - 1) / _columns;
 
@@ -345,13 +352,12 @@ public sealed class ItemDebuggerUi
         else if (!string.IsNullOrEmpty(status))
             ui.DrawText(status, new Vector2(left, Pad + 30f), scale, Accent);
 
-        foreach (var (centre, size, button, enabled, active) in _buttons)
+        foreach (var (centre, size, _, label, enabled, active) in _buttons)
         {
             var background = !enabled ? ButtonOff : active ? Accent : ButtonBg;
             ui.DrawRect(centre, size, background);
             ui.DrawBorder(centre, size, 1f, PanelLine);
 
-            var label = Label(button);
             var width = ui.MeasureTextWidth(label, scale);
             ui.DrawText(label, new Vector2(centre.X - width * 0.5f, centre.Y - TextCap * 0.5f), scale,
                 enabled ? Rgba.White : TextDim);
@@ -374,17 +380,4 @@ public sealed class ItemDebuggerUi
                 new Vector2(6f, 20f), Knob);
         }
     }
-
-    private static string Label(DebugButton button) => button switch
-    {
-        DebugButton.Save => "SAVE TO JSON",
-        DebugButton.ReloadDisplay => "RELOAD FROM JSON",
-        DebugButton.ResetRenderer => "RESET PREVIEW",
-        DebugButton.Idle => "IDLE",
-        DebugButton.Walk => "WALK",
-        DebugButton.Run => "RUN",
-        DebugButton.Jump => "JUMP",
-        DebugButton.Mine => "MINE SWING",
-        _ => "",
-    };
 }
