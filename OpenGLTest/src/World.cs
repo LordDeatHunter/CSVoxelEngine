@@ -458,8 +458,40 @@ public class World : IItemUseWorld
         renderManager.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);
 
-        // Water last of the world passes: it blends, so everything it can cover has to be in
-        // the depth buffer already
+        // The selection/breaking overlay is world geometry on the targeted block, so it draws with
+        // the entities and BEFORE the water pass. Drawn after it, the water's written depth would
+        // cull the overlay outright whenever the targeted block sits under the surface while the
+        // eye is above it - the crack simply would not appear. Drawing it here lets the water blend
+        // and refract over it exactly as it does over the block itself. Guarded rather than an early
+        // return, which would skip the passes below.
+        if (_hasSelectedBlock)
+        {
+            FrameProfiler.Begin(ProfileSection.SelectPass);
+            renderManager.BeginGpuPass(ProfileSection.SelectPass);
+
+            // While mining, the outline and the break overlay ride along with the popping block
+            var popGrow = _isBreaking ? BlockPopGrowNow : 0f;
+
+            // The chunk mesh still holds the block at rest size, so the popped cube is only
+            // needed (and only hides it) while it is grown
+            if (popGrow > 0f)
+                renderManager.RenderBlockPop(Camera, _breakingBlockPosition, _breakingBlockId, popGrow,
+                    HitboxesAt(_breakingBlockPosition, _breakingBlockId));
+
+            var selectedId = BlockIdAt(_selectedBlockPosition);
+            renderManager.RenderBlockSelection(Camera, _selectedBlockPosition, _selectedFaceNormal, popGrow,
+                selectedId, _selectedBoxIndex, HitboxesAt(_selectedBlockPosition, selectedId));
+
+            if (_isBreaking)
+                renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress, popGrow, _breakingBlockId,
+                    HitboxesAt(_breakingBlockPosition, _breakingBlockId));
+
+            renderManager.EndGpuPass(ProfileSection.SelectPass);
+            FrameProfiler.End(ProfileSection.SelectPass);
+        }
+
+        // Water draws after the world and entities: it blends, so everything it can cover has to be
+        // in the depth buffer already
         FrameProfiler.Begin(ProfileSection.WaterPass);
         renderManager.BeginGpuPass(ProfileSection.WaterPass);
         renderManager.RenderWorldTranslucent(Camera);
@@ -496,33 +528,6 @@ public class World : IItemUseWorld
         renderManager.RenderUnderwaterRays(Camera);
         renderManager.EndGpuPass(ProfileSection.RaysPass);
         FrameProfiler.End(ProfileSection.RaysPass);
-
-        // With no target there is nothing left to draw, so SelectPass only opens past here and
-        // its Begin/End stay balanced across the early return
-        if (!_hasSelectedBlock) return;
-
-        FrameProfiler.Begin(ProfileSection.SelectPass);
-        renderManager.BeginGpuPass(ProfileSection.SelectPass);
-
-        // While mining, the outline and the break overlay ride along with the popping block
-        var popGrow = _isBreaking ? BlockPopGrowNow : 0f;
-
-        // The chunk mesh still holds the block at rest size, so the popped cube is only
-        // needed (and only hides it) while it is grown
-        if (popGrow > 0f)
-            renderManager.RenderBlockPop(Camera, _breakingBlockPosition, _breakingBlockId, popGrow,
-                HitboxesAt(_breakingBlockPosition, _breakingBlockId));
-
-        var selectedId = BlockIdAt(_selectedBlockPosition);
-        renderManager.RenderBlockSelection(Camera, _selectedBlockPosition, _selectedFaceNormal, popGrow,
-            selectedId, _selectedBoxIndex, HitboxesAt(_selectedBlockPosition, selectedId));
-
-        if (_isBreaking)
-            renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress, popGrow, _breakingBlockId,
-                HitboxesAt(_breakingBlockPosition, _breakingBlockId));
-
-        renderManager.EndGpuPass(ProfileSection.SelectPass);
-        FrameProfiler.End(ProfileSection.SelectPass);
     }
 
     /// <summary>
