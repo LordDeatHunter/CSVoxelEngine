@@ -71,6 +71,8 @@ public class RenderManager : IDisposable
     private Mesh _sunQuad;
     private float _sunVisibility;
 
+    private uint _breakProgressTexture;
+
     // The cloud layer as one static, stitched mesh (see CloudRenderer), drawn translucent
     // after the water pass. Null until LoadResources builds it.
     private CloudRenderer? _clouds;
@@ -362,6 +364,13 @@ public class RenderManager : IDisposable
 
         selectionShader = new Shader(gl, selectionVs, selectionFs);
         breakShader = new Shader(gl, breakVs, breakFs);
+        // The crack sprite is a single column of BreakOverlayFrames stacked 32x32 frames, so
+        // each frame becomes its own array slice and no mip level bleeds a neighbour in.
+        _breakProgressTexture = TextureLoader.LoadSpritesheet(gl, "assets/textures/environment/break_progress.png",
+            1, WorldGenerationConfig.BreakOverlayFrames, WorldGenerationConfig.BreakOverlayFrames);
+        breakShader.Use();
+        breakShader.SetUniform("uBreakProgress", 0);
+        breakShader.SetUniform("uOpacity", WorldGenerationConfig.BreakOverlayOpacity);
 
         shadowShader = new Shader(gl, shadowVs, shadowFs);
         // The depth pass still samples the atlas, to punch the cutout tiles' holes
@@ -1393,9 +1402,11 @@ public class RenderManager : IDisposable
     /// the last frame.
     /// </para>
     /// <para><b>Provably cannot invalidate</b>, so do not add a call "just in case":
-    /// <c>CloudRenderer</c>, <c>FireParticleRenderer</c>, the selection pass and the break pass
-    /// contain no <c>ActiveTexture</c>/<c>BindTexture</c> at all - their VAO/VBO binds are buffer
+    /// <c>CloudRenderer</c>, <c>FireParticleRenderer</c> and the selection pass contain no
+    /// <c>ActiveTexture</c>/<c>BindTexture</c> at all - their VAO/VBO binds are buffer
     /// state, and the program they switch is handled by <c>Shader.Use</c>'s own cache.
+    /// <see cref="RenderBlockBreaking"/> binds its crack sprite through <see cref="BindUnit"/>,
+    /// which updates the cache rather than invalidating it, so it needs no call either.
     /// <c>ChunkDrawBatch</c>, <c>ChunkGeometryPool</c> and <c>Mesh.Render</c> touch VAO/VBO/indirect
     /// state only. <see cref="CopyScene"/>'s <c>glCopyTexSubImage2D</c> changes texture
     /// <em>contents</em>, not bindings (its own select/bind pair is routed through
@@ -2353,10 +2364,11 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Draws the block-breaking progress overlay on every face of each of the block's hitboxes:
-    /// a dark fill with a bright leading edge grows from the face centers as progress
-    /// goes 0 -> 1 (see break-fragment.glsl). <paramref name="grow"/> is the block's
-    /// current pop growth so the overlay tracks it while mining.
+    /// Draws the block-breaking crack overlay on every face of each of the block's hitboxes:
+    /// the sprite steps through <see cref="WorldGenerationConfig.BreakOverlayFrames"/> stacked
+    /// frames as progress goes 0 -> 1, the first frame being blank (see break-fragment.glsl).
+    /// <paramref name="grow"/> is the block's current pop growth so the overlay tracks it while
+    /// mining.
     /// </summary>
     public void RenderBlockBreaking(Camera camera, Vector3 blockPosition, float progress, float grow = 0f,
         byte blockId = 0, BlockHitbox[]? boxes = null)
@@ -2369,7 +2381,10 @@ public class RenderManager : IDisposable
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
         boxes ??= BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
-        breakShader.SetUniform("uProgress", progress);
+        var frame = Math.Clamp((int)(progress * WorldGenerationConfig.BreakOverlayFrames), 0,
+            WorldGenerationConfig.BreakOverlayFrames - 1);
+        breakShader.SetUniform("uFrame", (float)frame);
+        BindUnit(0, TextureTarget.Texture2DArray, _breakProgressTexture);
 
         gl.BindVertexArray(faceVao);
         // Inflated slightly past the grown box so the overlay never z-fights the block
@@ -2426,12 +2441,21 @@ public class RenderManager : IDisposable
 
         Span<float> faceVertices =
         [
-            0f, 0f, 0f, 1f, 0f, 0f, 1f, 1f, 0f, 0f, 1f, 0f,
-            1f, 0f, 1f, 0f, 0f, 1f, 0f, 1f, 1f, 1f, 1f, 1f,
-            0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 1f, 1f,
-            1f, 0f, 0f, 1f, 0f, 1f, 1f, 1f, 1f, 1f, 1f, 0f,
-            0f, 1f, 0f, 0f, 1f, 1f, 1f, 1f, 1f, 1f, 1f, 0f,
-            0f, 0f, 1f, 1f, 0f, 1f, 1f, 0f, 0f, 0f, 0f, 0f
+            // Cube faces in Chunk.CubeFaces order, each a 4-vertex triangle fan, interleaved as
+            // position.xyz + face-local uv. The two in-plane axes carry uv 0..1 so every face
+            // samples the whole break sprite frame.
+            0f, 0f, 0f, 0f, 0f,   1f, 0f, 0f, 1f, 0f,
+            1f, 1f, 0f, 1f, 1f,   0f, 1f, 0f, 0f, 1f,
+            1f, 0f, 1f, 1f, 0f,   0f, 0f, 1f, 0f, 0f,
+            0f, 1f, 1f, 0f, 1f,   1f, 1f, 1f, 1f, 1f,
+            0f, 0f, 1f, 1f, 0f,   0f, 0f, 0f, 0f, 0f,
+            0f, 1f, 0f, 0f, 1f,   0f, 1f, 1f, 1f, 1f,
+            1f, 0f, 0f, 0f, 0f,   1f, 0f, 1f, 1f, 0f,
+            1f, 1f, 1f, 1f, 1f,   1f, 1f, 0f, 0f, 1f,
+            0f, 1f, 0f, 0f, 0f,   0f, 1f, 1f, 0f, 1f,
+            1f, 1f, 1f, 1f, 1f,   1f, 1f, 0f, 1f, 0f,
+            0f, 0f, 1f, 0f, 1f,   1f, 0f, 1f, 1f, 1f,
+            1f, 0f, 0f, 1f, 0f,   0f, 0f, 0f, 0f, 0f
         ];
 
         faceVao = gl.GenVertexArray();
@@ -2441,9 +2465,12 @@ public class RenderManager : IDisposable
         gl.BufferData<float>(BufferTargetARB.ArrayBuffer, faceVertices, BufferUsageARB.StaticDraw);
         unsafe
         {
-            gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), (void*)0);
+            gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 5 * sizeof(float), (void*)0);
+            gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 5 * sizeof(float),
+                (void*)(3 * sizeof(float)));
         }
         gl.EnableVertexAttribArray(0);
+        gl.EnableVertexAttribArray(1);
         gl.BindVertexArray(0);
     }
 
@@ -2553,6 +2580,7 @@ public class RenderManager : IDisposable
         _bubbles?.Dispose();
         _sunQuad.Dispose();
         gl.DeleteTexture(_sunTexture);
+        gl.DeleteTexture(_breakProgressTexture);
         gl.DeleteFramebuffer(_shadowFbo);
         gl.DeleteTexture(_shadowDepthTex);
         DeleteReflectionTarget();

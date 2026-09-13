@@ -118,6 +118,14 @@ public static class WorldGenerationConfig
     // remesh every chunk in this radius, not just face-adjacent ones.
     public const int LightPropagationRadius = 15;
 
+    // --- Mining ---
+    // The block-breaking crack sprite (assets/textures/environment/break_progress.png) is a
+    // vertical strip of this many square frames, top frame first and blank (0 % damage). The
+    // progress 0..1 picks the frame; uBreakProgress's alpha is only the crack shape, so the
+    // opacity below is what keeps the black cracks from fully hiding the block underneath.
+    public const int BreakOverlayFrames = 8;
+    public const float BreakOverlayOpacity = 0.6f;
+
     // --- Sky ---
     // Angular radius of the visible sun disc in degrees. The real sun is 0.27 degrees across
     // its radius, but at that size it reads as a pinprick, so games exaggerate it.
