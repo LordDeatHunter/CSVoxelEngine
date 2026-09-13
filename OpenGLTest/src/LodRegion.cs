@@ -4,7 +4,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
-using Silk.NET.OpenGL;
 
 namespace silkgltriangle;
 
@@ -31,6 +30,12 @@ public readonly record struct LodLevelSpec(int CellSize, int RegionBlocks, int R
 /// show through once the camera goes underground. For the same reason the finest level is
 /// skipped wherever the full-detail chunks are drawn: caves reach into the shell band under
 /// the surface, so the shell would otherwise appear inside them.
+///
+/// A region owns no GL objects of its own: both its meshes live in the render manager's shared
+/// LOD <see cref="ChunkGeometryPool"/> as <see cref="GeometrySlice"/>s, and the three region
+/// walks submit them through <see cref="ChunkDrawBatch"/> exactly as the chunk passes do — one
+/// <c>glMultiDrawElementsIndirect</c> per pass instead of a bind, three uniforms and a draw per
+/// surviving region (item R10).
 /// </summary>
 public class LodRegion : IDisposable
 {
@@ -91,16 +96,29 @@ public class LodRegion : IDisposable
     /// </summary>
     public readonly int[] ColumnCyMin, ColumnCyMax;
 
-    private Mesh? _mesh;
+    /// <summary>
+    /// Where this region's terrain shell lives in the render manager's LOD
+    /// <see cref="ChunkGeometryPool"/>, or <c>null</c> when the build produced no shell geometry.
+    /// The LOD and mirror passes turn these into <c>glMultiDrawElementsIndirect</c> commands.
+    /// </summary>
+    public GeometrySlice? OpaqueSlice { get; private set; }
 
-    // The sea sheet is a separate mesh so the renderer can draw it blended, after everything
-    // opaque (see RenderManager.RenderWorldTranslucent)
-    private Mesh? _waterMesh;
+    /// <summary>
+    /// Where this region's sea sheet lives in the same pool, or <c>null</c> when no cell of the
+    /// region is below sea level. The sea sheet is a separate slice so the renderer can draw it
+    /// blended, after everything opaque (see RenderManager.RenderWorldTranslucent).
+    /// </summary>
+    public GeometrySlice? WaterSlice { get; private set; }
 
-    public bool HasMesh => _mesh != null;
+    // The pool both slices came from, so Dispose can hand the space back without an unload
+    // having to thread a pool reference in. One pool covers both meshes: the pair is born from
+    // one LodMeshData and dies in the same Dispose, so their lifetimes never diverge.
+    private ChunkGeometryPool? _pool;
+
+    public bool HasMesh => OpaqueSlice != null;
 
     /// <summary>Whether any cell of this region is below sea level, i.e. it has a water sheet.</summary>
-    public bool HasWaterMesh => _waterMesh != null;
+    public bool HasWaterMesh => WaterSlice != null;
 
     // Destroying blocks exposes the LOD buried beneath the surface. These per-column caps
     // force the LOD height below every removed block so the LOD always stays hidden.
@@ -153,7 +171,42 @@ public class LodRegion : IDisposable
         return true;
     }
 
-    public LodRegion(GL gl, LodMeshData data)
+    /// <summary>
+    /// Draw order for the opaque LOD pass, as a plain scalar comparison so it can be pinned
+    /// headlessly (see <c>LodDrawOrderTests</c>). Since R10 the LOD pass submits through
+    /// <see cref="ChunkDrawBatch"/>, whose <c>glMultiDrawElementsIndirect</c> executes commands
+    /// in array order, so this ordering IS the submission order and is load-bearing.
+    ///
+    /// Coarsest level first, then front to back within a level; where levels still
+    /// overlap (a coarse region only partly covered by finer ones) finer geometry
+    /// draws over the coarser mesh buried beneath it
+    /// </summary>
+    public static int CompareOpaqueDraw(int levelA, float distSqA, int levelB, float distSqB)
+        => levelA != levelB
+            ? levelB.CompareTo(levelA)
+            : distSqA.CompareTo(distSqB);
+
+    /// <summary>
+    /// Draw order for the LOD water sheets, as a plain scalar comparison so it can be pinned
+    /// headlessly (see <c>LodDrawOrderTests</c>). Deliberately the opposite level order to
+    /// <see cref="CompareOpaqueDraw"/>; like it, this is the submission order since R10.
+    ///
+    /// Finest level first: its sheet sits highest (each coarser level sinks by its own
+    /// height bias), so the duplicates underneath it fail the depth test instead of
+    /// double-blending the same stretch of sea
+    /// </summary>
+    public static int CompareWaterDraw(int levelA, float distSqA, int levelB, float distSqB)
+        => levelA != levelB
+            ? levelA.CompareTo(levelB)
+            : distSqB.CompareTo(distSqA);
+
+    /// <param name="pool">
+    /// The shared LOD geometry pool both meshes upload into. Null is allowed only when every
+    /// vertex list in <paramref name="data"/> is empty, which is the headless-test case: a
+    /// non-empty mesh with no pool throws, exactly as <c>Chunk.UpdateMesh</c> does.
+    /// </param>
+    /// <param name="data">A finished background build (see <see cref="BuildMeshData"/>).</param>
+    public LodRegion(ChunkGeometryPool? pool, LodMeshData data)
     {
         Level = data.Level;
         X = data.X;
@@ -163,33 +216,50 @@ public class LodRegion : IDisposable
         YMax = data.YMax;
         ColumnCyMin = data.ColumnCyMin;
         ColumnCyMax = data.ColumnCyMax;
-        _mesh = data.Vertices.Count == 0
-            ? null
-            : new Mesh(gl, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.Vertices),
+
+        if (data.Vertices.Count > 0)
+        {
+            _pool = pool ?? throw new InvalidOperationException(
+                "non-empty LOD region mesh without a geometry pool");
+            OpaqueSlice = _pool.Upload(
+                System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.Vertices),
                 System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.Indices));
-        _waterMesh = data.WaterVertices.Count == 0
-            ? null
-            : new Mesh(gl, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.WaterVertices),
+        }
+
+        if (data.WaterVertices.Count > 0)
+        {
+            _pool = pool ?? throw new InvalidOperationException(
+                "non-empty LOD region mesh without a geometry pool");
+            WaterSlice = _pool.Upload(
+                System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.WaterVertices),
                 System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.WaterIndices));
+        }
     }
 
-    public void Render()
+    /// <summary>
+    /// Hands both slices back to the pool they came from and forgets them. Freeing twice
+    /// throws inside the allocator, so each slice is nulled the moment it is released.
+    /// </summary>
+    private void ReleaseSlices()
     {
-        _mesh?.Render();
-    }
+        if (OpaqueSlice is { } opaque)
+        {
+            _pool?.Free(opaque);
+            OpaqueSlice = null;
+        }
 
-    /// <summary>Draws only this region's sea sheet; called from the blended pass.</summary>
-    public void RenderWater()
-    {
-        _waterMesh?.Render();
+        if (WaterSlice is { } water)
+        {
+            _pool?.Free(water);
+            WaterSlice = null;
+        }
+
+        _pool = null;
     }
 
     public void Dispose()
     {
-        _mesh?.Dispose();
-        _mesh = null;
-        _waterMesh?.Dispose();
-        _waterMesh = null;
+        ReleaseSlices();
         GC.SuppressFinalize(this);
     }
 

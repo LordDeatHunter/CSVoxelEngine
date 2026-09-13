@@ -65,6 +65,38 @@ public sealed unsafe class ChunkGeometryPool : IDisposable
     /// three; 128 MB permanently for water that may not be on screen is wasteful.</summary>
     public const int TranslucentInitialUnits = 32768;
 
+    /// <summary>LOD pool start: 163840 units, i.e. 320 MB of vertices and 30 MB of indices.
+    /// Measured, the way <see cref="OpaqueInitialUnits"/> records 244801/262144: on
+    /// <c>perf-fly.json</c> the pool peaked at <b>118004 of 131072</b> units (90 %) at 660
+    /// resident regions and never grew across four runs — but 90 % is not headroom. Occupancy
+    /// runs at a steady <b>176-181 units per resident region</b> (shell plus sheet), so the 759
+    /// resident ceiling below projects to <b>~137400 units</b>, which 131072 does not cover.
+    /// 163840 covers that projection with 19 % spare and still leaves the doubling in reserve.
+    /// No size makes growth impossible — every region at its level's peak shell plus a full sheet
+    /// would be ~331 units each, i.e. ~251000 — so this is sized for the measured world, not the
+    /// arithmetic worst case.
+    ///
+    /// One pool holds both the LOD region shells and their sea sheets: a region's two meshes are
+    /// born from one <c>LodMeshData</c> and freed together in one <c>Dispose</c>, so their
+    /// lifetimes never diverge and the chunk pools' size-driven opaque/translucent split (512 MB
+    /// vs 64 MB) does not transfer.
+    ///
+    /// Sizing runs off the resident ceiling, not the settled count. The settled live set is 591
+    /// regions (197 integer offsets inside RegionRadius 8, times the three <c>LodRegion.Levels</c>),
+    /// but generation scans at <c>RegionRadius</c> (LodManager.BuildSortedOffsets) while retention
+    /// and the out-of-range upload drop test use <c>RegionRadius + 1</c> — 253 offsets per level, so
+    /// 759 regions can be resident at once. That hysteresis band is occupied exactly while the
+    /// camera is moving, which is when the pool is under pressure.
+    ///
+    /// A shell floors at 1024 top quads (every level is 32x32 cells and each cell emits at least a
+    /// top quad) = 4096 vertices / 6144 indices = 64 units, and a full sea sheet is the same 64
+    /// units, so the degenerate sea-heavy floor is 759 * 128 = 97152 units. Measured per-level peak
+    /// shells are 336/285/180 units and a single pathological region can reach 1024 units (AddQuad
+    /// refuses past ~65532 vertices). 163840 therefore clears the degenerate floor with 69 %
+    /// headroom and leaves exactly one doubling in reserve — the posture
+    /// <see cref="TranslucentInitialUnits"/> documents.</summary>
+    public const int LodInitialUnits = 163840;
+
     private readonly GL _gl;
     private readonly GeometryAllocator _allocator;
     private readonly string _name;
@@ -94,6 +126,17 @@ public sealed unsafe class ChunkGeometryPool : IDisposable
     public int UsedUnits => _allocator.UsedUnits;
 
     /// <summary>
+    /// Units a mesh of this size occupies: the larger of the two ceilings, since one unit covers
+    /// <see cref="VerticesPerUnit"/> vertices AND <see cref="IndicesPerUnit"/> indices at the same
+    /// unit offset. Quad geometry sits exactly on the 4:6 ratio, so the two ceilings agree and
+    /// nothing is wasted; anything else rounds up to whichever buffer runs out first. This is the
+    /// pool's one piece of arithmetic that needs no GL context, so it is public and pinned by
+    /// <c>LodGeometryPoolTests</c> rather than inferred from a running renderer.
+    /// </summary>
+    public static int UnitsFor(int vertexCount, int indexCount) =>
+        Math.Max(CeilDiv(vertexCount, VerticesPerUnit), CeilDiv(indexCount, IndicesPerUnit));
+
+    /// <summary>
     /// Copies one chunk mesh into the pool and returns the slice it landed in. The copy is
     /// synchronous, so the caller may recycle its lists as soon as this returns (which is what
     /// <c>ChunkManager.ApplyMesh</c> does with the <see cref="MeshBufferPool"/> lists).
@@ -101,7 +144,7 @@ public sealed unsafe class ChunkGeometryPool : IDisposable
     /// <exception cref="ArgumentException">Both spans are empty; callers must skip empty meshes.</exception>
     public GeometrySlice Upload(ReadOnlySpan<Vertex> vertices, ReadOnlySpan<ushort> indices)
     {
-        var units = Math.Max(CeilDiv(vertices.Length, VerticesPerUnit), CeilDiv(indices.Length, IndicesPerUnit));
+        var units = UnitsFor(vertices.Length, indices.Length);
         if (units <= 0)
             throw new ArgumentException("Refusing to allocate a pool slice for an empty mesh.", nameof(vertices));
 

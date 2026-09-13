@@ -116,7 +116,7 @@ public class World
         BlockPopGrow * MathUtils.Pulse(_popElapsed / BlockPopSeconds);
 
     public World(GL gl, ChunkGeometryPool opaqueGeometry, ChunkGeometryPool translucentGeometry,
-        IWindow window, IInputContext input)
+        ChunkGeometryPool lodGeometry, IWindow window, IInputContext input)
     {
         _window = window;
         Camera = new Camera(window, input);
@@ -126,7 +126,7 @@ public class World
             _spawnSettled = true;
         _chunkManager = new ChunkManager(gl, opaqueGeometry, translucentGeometry);
         _generationWorker = new ChunkGenerationWorker(_chunkManager, Camera);
-        _lodManager = new LodManager(gl);
+        _lodManager = new LodManager(lodGeometry);
         _canAcceptDrop = Inventory.CanAccept;
 
         _generationWorker.Start();

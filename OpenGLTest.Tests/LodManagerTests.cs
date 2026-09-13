@@ -573,4 +573,79 @@ public sealed class LodManagerTests
         Assert.Equal(k, reclaimed!.Value);
         Assert.Equal(1, lods.BuildingClaimCount);
     }
+
+    // ---------------------------------------------------------------------------------------
+    // Item R10: a region's geometry now lives in a shared ChunkGeometryPool instead of its own
+    // GL objects, which makes two seams worth pinning — the rebuild path's free-before-upload
+    // order in ApplyCompletedMeshes, and the null-pool/empty-mesh case that roughly twenty
+    // headless call sites across this suite depend on to build regions without a GL context.
+    // ---------------------------------------------------------------------------------------
+
+    /// <summary>A rebuilt region must not restart its fade: the shell would pop back to
+    /// transparent and re-dissolve in place every time its columns are edited. After R10's
+    /// reorder the replacement is freed BEFORE the rebuild is uploaded (so the new slice can
+    /// reuse the exact hole the old one just vacated), which means the fade state can no longer
+    /// be read off the old region after the fact — it is captured before the dispose and applied
+    /// to the new region. This fact pins that hand-off, which is the reorder's one cross-
+    /// dependency and the only thing that could have been lost in it.</summary>
+    [Fact]
+    public void ARebuiltRegionInheritsTheReplacedRegionsLifetime()
+    {
+        var lods = new LodManager(null!);
+        var camRegions = new[] { (0, 0), (0, 0), (0, 0) };
+
+        lods.EnqueueCompletedMesh(RentedEmptyMesh(lods, 0, 0, 0));
+        lods.ApplyCompletedMeshes(camRegions);
+
+        var first = lods.Regions[(0, 0, 0)];
+        first.Lifetime = 0.75;
+
+        lods.EnqueueCompletedMesh(RentedEmptyMesh(lods, 0, 0, 0));
+        lods.ApplyCompletedMeshes(camRegions);
+
+        var rebuilt = lods.Regions[(0, 0, 0)];
+        Assert.NotSame(first, rebuilt);
+        Assert.Equal(0.75, rebuilt.Lifetime);
+
+        // The replacement is a replacement, not an addition: one key, one region, one entry.
+        Assert.Single(lods.Regions);
+        Assert.Single(lods.RegionList);
+    }
+
+    /// <summary>The headless seam, pinned directly. A region whose four vertex lists are all
+    /// empty allocates nothing, so it needs no pool — which is what lets every fact in this
+    /// suite (and LodBuildPoolTests, LodBufferPoolTests, LodColumnCapTests, LodBuildCostProbe
+    /// and FallingBlockTests) construct regions with a null pool and no GL context at all.
+    /// Both slices stay null, and the two Has* flags read straight off them.</summary>
+    [Fact]
+    public void AnEmptyRegionMeshNeedsNoPool()
+    {
+        var region = new LodRegion(null!, new LodMeshData(0, 0, 0, [], [], [], [], 0f, 0f, [], []));
+
+        Assert.False(region.HasMesh);
+        Assert.False(region.HasWaterMesh);
+        Assert.Null(region.OpaqueSlice);
+        Assert.Null(region.WaterSlice);
+
+        // Disposing a region that never allocated must not reach a pool it does not have.
+        region.Dispose();
+    }
+
+    /// <summary>The other side of that seam: real geometry with no pool is a programming error,
+    /// not a silently empty region, exactly as <c>Chunk.UpdateMesh</c> treats it. Both upload
+    /// sites are guarded separately because an all-sea region legitimately has a sheet and no
+    /// shell, so the shell block cannot stand in for the sheet's check.</summary>
+    [Fact]
+    public void ANonEmptyRegionMeshWithoutAPoolThrows()
+    {
+        List<Vertex> quad = [new(), new(), new(), new()];
+        List<ushort> indices = [0, 1, 2, 0, 2, 3];
+
+        Assert.Throws<InvalidOperationException>(
+            () => new LodRegion(null, new LodMeshData(0, 0, 0, quad, indices, [], [], 0f, 0f, [], [])));
+
+        // An all-sea region reaches the second guard without ever touching the first.
+        Assert.Throws<InvalidOperationException>(
+            () => new LodRegion(null, new LodMeshData(0, 0, 0, [], [], quad, indices, 0f, 0f, [], [])));
+    }
 }

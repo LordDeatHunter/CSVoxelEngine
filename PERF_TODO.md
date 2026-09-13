@@ -86,10 +86,18 @@ stream-in (visible in the `~max` half since the console line grew max columns).
 
 1. **Chunk streaming burst** — gen + mesh schedule + upload + LOD rebuild.
    100+ fps settled -> 25-55 fps streaming. `lod`/`chunkDirty`/`chunkApply` rows.
+   R10 has since cut the `lod` row's settled median **0.51 -> 0.41 ms** on `perf-fly` (region
+   upload stopped creating GL objects), but its **worst-frame** behaviour on a teleport did not
+   move in either direction — see **Measurement: R10**. The 2-3 ms teleport `lod` figure in the
+   table above is therefore still the figure to beat, and it was not beaten.
 2. **Reflection + world pass when water is on screen** — `reflect` GPU 0 -> 8 ms,
    `worldPass` GPU up to 5.6 ms. Looking at the bay costs ~2x dry land; the
    `reflect` figure predates reflection temporal reuse and is pending re-capture.
 3. **Geometry pool doubling mid-stream** (opaque to 512 MB) — one-time copy hitch.
+   There are now **three** pools, not two: R10 added `lod` at 163840 units (**350 MB**), sized off
+   a measured peak of 117844 units (72 %) so it never grows on `perf-fly` or on any of the four
+   gate scenarios. Committed VRAM across the three is ~1.05 GB on the reference machine and it
+   allocates cleanly there; a fourth pool should re-check that budget rather than assume it.
 4. **Underwater `raysPass`** (1.5-2.3 ms GPU, pre-half-res — pending re-capture) and
    **`cloudPass`** (0.7-1.5 ms when clouds in view — pre-R4, also pending a `perf-fly`
    re-capture). Clouds were already cut 63 % (item 15); remainder is steady, not spiky.
@@ -116,19 +124,19 @@ protocol above before trusting it. The entries below the passes repeat nothing f
 ### GPU / render passes
 
 - [ ] **R3 · Half-res scene copies for water — resolved and PARKED, not implemented** —
-  `CopyScene` (`RenderManager.cs:1033-1043`), called with colour+depth at `:1718` and
-  depth-only at `:1533`. The condition R2 left on this bullet was resolved against the code
+  `CopyScene` (`RenderManager.cs:1046-1056`), called with colour+depth at `:1734` and
+  depth-only at `:1550`. The condition R2 left on this bullet was resolved against the code
   rather than implemented, and it settles three ways.
   **(a) The depth copy cannot move.** `CopyScene(bool colour)` copies depth
   *unconditionally* — only the colour half is gated by the parameter — and both call sites
   write the same `_sceneDepthTex`, which R2's depth-aware upsample pins at full res. So the
-  `:1718` call keeps paying a full-res `DepthComponent24` `CopyTexSubImage2D` whatever R3
+  `:1734` call keeps paying a full-res `DepthComponent24` `CopyTexSubImage2D` whatever R3
   does, and a second, half-res depth used only by the water pass is the same *additive* cost
   (an extra texture plus an extra reduction, on top of a full-res copy that still has to
   happen) that R2 already rejected on the rays side. Only the RGBA8 colour copy is left.
   **(b) The shader claim holds.** `test-fragment.glsl`'s refraction really is
   resolution-independent: `uv = gl_FragCoord.xy * uInvViewport` (`:267`) against
-  `uInvViewport = 1/_viewportSize` (`RenderManager.cs:1466-1467`), bilinear `texture()` fetches
+  `uInvViewport = 1/_viewportSize` (`RenderManager.cs:1483-1484`), bilinear `texture()` fetches
   (`:270-272`), a `uInvViewProj` unprojection (`:276`) — no `texelFetch` and no pixel indices
   anywhere in the file. The shader would need zero changes.
   **(c) But the ceiling is tiny and the change is not "sample less".** The colour copy is
@@ -137,7 +145,7 @@ protocol above before trusting it. The entries below the passes repeat nothing f
   also contains every translucent chunk draw and every LOD water sheet. That capture
   demonstrably *included* the colour copy: the same line reports `reflect 0.83 ms`, and
   `RenderReflection` early-returns unless `_nearWaterVisible`
-  (`RenderManager.cs:1069-1070`) — the very flag that gates the copy — so near water was on
+  (`RenderManager.cs:1081-1082`) — the very flag that gates the copy — so near water was on
   screen when it was taken. 0.09 ms is therefore a real ceiling for the whole pass, not a
   figure that might have excluded the work. And `CopyTexSubImage2D` cannot downscale, so this
   is not a sampling change but new plumbing: an FBO, a texture, sizing and teardown across
@@ -155,41 +163,6 @@ protocol above before trusting it. The entries below the passes repeat nothing f
   "the first second after X already has data" (a deliberate property) — decide the
   trade. Different from the ruled-out *GL debug context*.
   **Impact low-med · risk low · effort S.**
-- [ ] **R10 · Every LOD region owns a `Mesh`** — `LodRegion` creates a VAO + VBO +
-  EBO per region and another set for its water sheet (`LodRegion.cs:110-128`), and
-  each draw is a `BindVertexArray` + `DrawElements` behind three uniform sets:
-  `RenderManager.RenderLod` (`RenderManager.cs:1805-1814`), the mirror's region loop
-  (`:1171-1178`) and the water sheets (`:1745-1752`). Three radius-8 rings
-  (`LodRegion.cs:39-44`) are several hundred regions, so a water frame walks them
-  three times paying a bind, three uniforms and a draw per survivor, plus GL object
-  create/delete churn as regions stream in and out (`LodManager.cs:219-243`). Give
-  LOD its own `ChunkGeometryPool` + `GeometryAllocator` and push regions through
-  `ChunkDrawBatch.Draw` (`ChunkDrawBatch.cs:202-216`) exactly as chunks already are,
-  so each pass becomes one `glMultiDrawElementsIndirect`. The CPU cull stays where it
-  is, so this is *not* the ruled-out *compute frustum cull*. **The R5 overlap is gone:**
-  R5 has landed, so the texture binds the LOD passes issue already cost nothing when the
-  bindings are unchanged: `BindWorldTextures()` at `RenderManager.cs:1723`
-  (`RenderWorldTranslucent`, ahead of the water sheets) and `:1771` (`RenderLod`), plus the
-  mirror LOD walk's single atlas `BindUnit` at `:1118`. R10 can no longer be credited with
-  removing any of them, so what remains is R10's own case and only that: a VAO + VBO + EBO
-  per region and another set per water sheet, a `BindVertexArray` + three uniform sets + a
-  `DrawElements` per *surviving* region across three ring walks, and GL object create/delete
-  churn as regions stream. Price it on those terms alone. **The hold on C5 is discharged** — C5 has
-  been measured (see **Measurement** below) — **and the honest re-pricing is that nothing moved.**
-  C5's pool *would* have re-priced R10 upward: at two LodGen workers the main-thread `lod`
-  **average** rose (median 1.2 ms baseline -> 1.8 ms, disjoint, p = 0.0143; -> 2.4 ms at three, not
-  disjoint) while the `lod` **worst** frame did not move in any direction (medians 32.3 / 31.7 /
-  23.8 ms), and regions arriving 1.26-1.31x sooner would have exercised the per-region bind + three
-  uniforms + draw and the GL create/delete churn harder per unit time. **But the pool was declined
-  and ships at one worker**, so the shipped tree's arrival rate and `lod` row are the baseline ones
-  and none of those figures describes it. Read them as what a future pool would cost, never as R10's
-  case. They are in any case **descriptive, not a C5 result** — `lod` measures `LodManager.Update`,
-  not the builders. R10 therefore stands exactly on its own pre-C5 terms and its impact rating is
-  unchanged in both directions. The one durable number the capture handed R10 is the size of the set
-  it walks: every tree converges to **591 live regions** (197 offsets x 3 levels, `LodRegion.cs`
-  `RegionRadius = 8`), the same at every pool size, confirmed on three raised-wait controls in the
-  visual gate below — so price the per-frame walk against 591 and not against the arrival rate.
-  **Impact med-high · risk med · effort L.**
 
 ### CPU / streaming
 
@@ -257,7 +230,7 @@ protocol above before trusting it. The entries below the passes repeat nothing f
   (`Chunk.cs:646-648`) and `WormCarver.CellCache` (`WormCarver.cs:111-112`) drop
   everything at their cap, so a far teleport recomputes (part of the teleport
   hitch). LRU / generation-stamped eviction would keep reuse across a move.
-  `LodRegion.ColumnCaps` (`LodRegion.cs:105`) also grows unbounded over a long
+  `LodRegion.ColumnCaps` (`LodRegion.cs:130`) also grows unbounded over a long
   editing session: since C9 it holds one dense `Chunk.Size * Chunk.Size` cap bucket
   per *edited chunk column*, never evicted — cheaper than the old per-fine-column
   entries once a column is heavily mined, more expensive for a single isolated
@@ -274,21 +247,60 @@ protocol above before trusting it. The entries below the passes repeat nothing f
   (`GeometryAllocator.cs:24`); `TryAllocate` first-fits by walking it from the front
   (`:61-80`) and `Free` walks it again for the insertion point (`:95-107`) before an
   O(n) `List.Insert` (`:109`) and the coalesce (`:113-130`). Both run on the render
-  thread from `ChunkGeometryPool.Upload` / `Free` (`ChunkGeometryPool.cs:102-128`,
-  `:131`) — up to 32 uploads a frame (`WorldGenerationConfig.cs:16`) and one free per
+  thread from `ChunkGeometryPool.Upload` / `Free` (`ChunkGeometryPool.cs:144-167`,
+  `:171`) — up to 32 uploads a frame (`WorldGenerationConfig.MaxMeshUploadsPerFrame`,
+  `WorldGenerationConfig.cs:16`) and one free per
   disposed chunk, which is what the teleport unload storm (17077 -> 4991 chunks)
   turns into a burst. A size-bucketed free list, or an offset-keyed sorted structure
   beside a largest-block index, makes both O(log n). **Measure first:**
   `FreeBlockCount` exists (`GeometryAllocator.cs:42`) but is never logged, so add it
   to the pool-growth log line and capture it mid-stream and just after a teleport
   before committing — the pool's own comment reports 93 % steady-state utilisation
-  (`ChunkGeometryPool.cs:57-61`), which implies a short list and possibly no win at
+  (`ChunkGeometryPool.cs:57-61`, unchanged by R10), which implies a short list and possibly no win at
   all. The class is GL-free with exhaustive headless coverage
   (`OpenGLTest.Tests/GeometryAllocatorTests.cs`), so the invariants are already
   pinned. Distinct from hitch #3 (*geometry pool doubling mid-stream*): that is the
   GL buffer reallocation and copy on the rare grow, this is the CPU-side
   first-fit/coalesce scan that runs on every upload and free whether or not the pool
-  grows. **Impact unknown (measure) · risk low · effort M.**
+  grows.
+  **R10 changed the shape of this item without fixing it, and the new client is the interesting
+  one.** There are now **three** pools on this allocator, and the third — `lod`
+  (`ChunkGeometryPool.LodInitialUnits`) — is a much higher-churn client than either chunk pool.
+  LOD churn is **paired**: a region's shell and its sea sheet are two separate `GeometrySlice`s in
+  one pool, so an arrival costs up to **2 `TryAllocate`** and a departure up to **2 `Free`**. And
+  unlike the chunk side, which is capped at 32 uploads a frame, the LOD **unload** path
+  (`LodManager.Update`'s retention loop) is **unbounded per frame**: a far teleport can hand the
+  whole departing resident set to `Free` inside one frame. That makes the free-list scan a **named
+  counter-mechanism to R10's own churn claim**, not merely a latent cost — R10 removed per-region
+  `glDelete*` and put these scans in their place, which is why R10's measurement tested the `lod`
+  row in both directions.
+  **What the round pinned, so the next measurement starts from numbers rather than estimates.**
+  At the 759-region resident ceiling, with every other region departed, the LOD free list peaks at
+  **exactly 380 blocks** (each departed region's shell and sheet coalesce into one 128-unit block;
+  every survivor separates two holes), `LargestFreeBlock` 128 and `UsedUnits` 48512 —
+  `GeometryAllocatorTests.MidTeleportFragmentationPeaksAtAKnownBlockCount`. Every remaining `Free`
+  in such a storm linearly scans that list from the front and `List.Insert`s into it.
+  **But fragmentation is not the defect — scan cost is.**
+  `GeometryAllocatorTests.AFullStreamInAndOutCycleCoalescesBackToOneBlock` frees 1518 slices in a
+  deterministic shuffle and still ends at `FreeBlockCount` 1 with `LargestFreeBlock == Capacity`,
+  so the coalescing is sound and nothing leaks across a stream-in/stream-out cycle. A future round
+  must chase the scan, not a leak.
+  **And the realistic case is well short of the pinned worst case.** R10's `perf-fly` capture found
+  only **5 frames in a 60 s fly with any departure at all**, the largest being **148 regions in one
+  frame** (660 -> 512 resident), i.e. <= 296 `Free` calls — not the 1518 the ceiling allows, because
+  perf-fly's 424-block teleport only clears level 0 and part of level 1 (the three levels reach
+  512 / 1024 / 2048 blocks). Departures are geographically clustered — whole rings vacate together —
+  so the list coalesces aggressively as it drains. R10 also measured the other end: the publish
+  window containing that 148-region unload reported `lod 0.19~0.49` on the **baseline** tree, so the
+  whole of HEAD's per-region GL deletion burst cost at most 0.49 ms, and the free-list scans that
+  replaced it were not separable from it in either direction.
+  **A prepared remedy R10 deliberately did not take:** fusing a region's shell and sheet into one
+  paired allocation would halve LOD's allocator traffic outright (one `TryAllocate` and one `Free`
+  per region). It was rejected for R10 because it needs a new pool API — `Upload` allocates exactly
+  one slice — and because a rebuild that gains or loses its sheet resizes the pair, which the
+  current free-then-upload order handles only by accident. If D5 is ever taken, price this against
+  the data-structure change; it may be the cheaper half.
+  **Impact unknown (measure) · risk low · effort M.**
 
 ### Not chasing (recorded so it is not re-proposed)
 
@@ -341,15 +353,154 @@ protocol above before trusting it. The entries below the passes repeat nothing f
   *in* `Camera` — the view-projection and view-frustum caches — but they were their own
   bullets, not findings from that walk, so this entry still stands.)
 
-**Suggested first pass:** **C5** was taken, with **C12 + D3** as one cheap sweep alongside it. C12
-and D3 landed clean and are gone from the backlog. **C5's code landed and its measurement did not
-support it** — its bullet above is rewritten as *"needs a different shape"* and stays open, the R3
-precedent. Everything in the round is output-preserving, so the gate looked for *zero* structural
-change rather than for an acceptable difference. The blow-by-blow write-ups of the earlier R4,
-R5/R7/R11 and C3/R8 rounds are in `git log -p -- PERF_TODO.md`; what is kept below is what the next
-round needs, not the history.
+**This round took R10, alone, as the file's closing paragraph said to.** It is the largest
+structural change of the series and it **landed**: LOD regions no longer own GL objects, and the
+three per-region ring walks are one `glMultiDrawElementsIndirect` each. The round was priced
+two-sidedly on purpose — R10 replaces GL object deletion with free-list scanning, so its own churn
+claim had a named counter-mechanism — and the honest outcome is that the claim **split**: the
+submission side and the arrival side are disjoint wins, the departure/teleport side is neutral in
+both directions and is quoted nowhere. R10's pool sizing also corrected a number that was wrong
+everywhere in this file: the LOD resident *ceiling* is **759**, not the settled **591**. Everything
+in the round is output-preserving, so the gate looked for *zero* structural change rather than for
+an acceptable difference. The blow-by-blow write-ups of the earlier R4, R5/R7/R11, C3/R8 and
+C5/C12/D3 rounds are in `git log -p -- PERF_TODO.md`; what is kept below is what the next round
+needs, not the history.
 
 ### What landed
+
+- **R10 · LOD regions no longer own GL objects; all three ring walks are one multi-draw each.**
+  `LodRegion` had a `Mesh` (VAO + VBO + EBO) for its terrain shell and a second `Mesh` for its sea
+  sheet. Both are gone. A region now holds `OpaqueSlice` / `WaterSlice` — two `GeometrySlice?`s in
+  one shared `ChunkGeometryPool` — and `RenderManager.RenderLod`, the mirror's region loop in
+  `RenderReflection` and the water sheets in `RenderWorldTranslucent` each became `BeginPass` + an
+  `Add` loop + one `ChunkDrawBatch.Draw(LodGeometry.Vao, chunkShader, …)`, i.e. one
+  `glMultiDrawElementsIndirect`. The CPU frustum cull did **not** move — this is not the ruled-out
+  *compute frustum cull*.
+- **R10 · One LOD pool, not two, and why.** `RenderManager.LodGeometry` (`RenderManager.cs:42`,
+  constructed at `:382`, disposed at `:2562`) holds **both** the shells and the sheets. The chunk
+  side's opaque/translucent split exists for a *sizing* reason (512 MB vs 64 MB, stated in the
+  constants' own comments), not a correctness one, and it does not transfer: a region's two meshes
+  are born from one `LodMeshData` and die in the same `Dispose`, so their lifetimes never diverge.
+  One pool means one VAO for all of LOD and **one free list for D5 to observe**. They stay two
+  *separate* slices in that one pool — fusing them into a paired allocation would halve LOD's
+  allocator traffic but needs a new pool API; that is recorded in D5's bullet as a prepared remedy,
+  deliberately not folded in here.
+- **R10 · `LodInitialUnits`, and the 591-settled / 759-resident correction that outlives R10.**
+  `ChunkGeometryPool.LodInitialUnits = 163840` (320 MB of vertices + 30 MB of indices), set from
+  measurement: `perf-fly` peaked at **118004 of 131072 units (90 %)** at 660 resident regions and
+  never grew, but 90 % is not headroom. Occupancy is a steady **176-181 units per resident region**
+  (shell plus sheet). **The sizing runs off the resident ceiling, not the settled count, and that
+  distinction was wrong everywhere in this file before R10:** generation scans at `RegionRadius`
+  (`LodManager.cs:122`, 197 integer offsets at radius 8, x 3 `LodRegion.Levels` = the familiar
+  **591**) while **retention and the out-of-range upload drop test use `RegionRadius + 1`**
+  (`LodManager.cs:438`, `:474`) — 253 offsets per level, so **759 regions can be resident at once**.
+  That hysteresis band is occupied exactly while the camera is moving, which is when the pool is
+  under pressure; `lod-horizon` was observed at 665 resident. 759 x 176-181 projects to ~137400
+  units, which 131072 does not cover; 163840 does, with the doubling still in reserve. At 163840 the
+  re-verified peak is **117844 (72 %)** and the pool grew in **none** of the 12 `perf-fly` runs or
+  the 42 visual-gate runs. Both counts are pinned headlessly by `LodGeometryPoolTests`
+  (`TheSettledRegionSetIsFiveNinetyOne`, `TheResidentCeilingIsSevenFiftyNine`), derived from
+  `LodRegion.Levels` rather than hard-coded, so changing any level's `RegionRadius` fails a test
+  instead of silently under-sizing the pool.
+- **R10 · the null-pool seam, which ~20 headless call sites depend on.** `LodRegion`'s constructor
+  is `LodRegion(ChunkGeometryPool? pool, LodMeshData data)` — **pool first**, so the existing
+  `new LodRegion(null!, data)` sites still bind — and `LodManager`'s primary constructor is
+  `LodManager(ChunkGeometryPool? lodGeometry = null)`, so every `new LodManager(null!)` compiles
+  untouched. A region uploads only the lists that are non-empty and takes
+  `_pool = pool ?? throw new InvalidOperationException(…)` immediately before each upload — **two**
+  guards, not one, because an all-sea region legitimately has a sheet and no shell — mirroring
+  `Chunk.UpdateMesh`. Empty meshes need no pool at all, which is what keeps `LodManagerTests`,
+  `LodBuildPoolTests`, `LodBufferPoolTests`, `LodColumnCapTests`, `LodBuildCostProbe` and
+  `FallingBlockTests` running headlessly. Pinned by `LodManagerTests.AnEmptyRegionMeshNeedsNoPool`
+  and `ANonEmptyRegionMeshWithoutAPoolThrows` (which covers **both** guards). **Do not "tidy" those
+  parameter orders** — roughly 500 lines of burial and cover-flag coverage stop compiling.
+  `LodManager`'s `GL` parameter is gone entirely; it had exactly one use.
+- **R10 · LOD shares `RenderManager`'s single `_chunkDraws` instance, and the reason is a hazard
+  worth recording accurately.** A second `ChunkDrawBatch` is **possible** — it would simply have to
+  `glBindBufferBase` inside `Draw`, or take its own binding point. Today's class does **neither**:
+  `Allocate` binds the SSBO to `SsboBinding = 0` once at construction (`ChunkDrawBatch.cs:259`) and
+  `Draw` never rebinds, so a second instance would silently make every chunk draw read LOD's
+  per-draw data **with no GL error**. That is latent, not live, because R10 shares the one instance
+  — but any future round that wants a second instance must fix the binding first. Sharing also buys
+  one `BeginFrame`, one fence set and one cursor.
+- **R10 · the draw ring's command budget is per *frame*, cumulative across every `BeginPass` — not
+  per pass.** `_cursor` resets only in `BeginFrame` (`ChunkDrawBatch.cs:143`) and `BeginPass` grows
+  when `_cursor + maxCommands > _capacityPerSlot` (`:155-156`). The shadow pass alone reserves
+  `chunks.Count` (17077 in the gate scenarios) against 32768 per slot, and R10 adds three more
+  reservations of <= 591 each. `Grow` calls `glFinish` (`ChunkDrawBatch.cs:272`), a full pipeline
+  stall, and logs at `:293` — so that line is the instrument. **It appeared in none of the 12
+  `perf-fly` runs and none of the 42 gate runs, on either tree.** The margin is comfortable but not
+  infinite; a fourth pass should re-check it.
+- **R10 · LOD draws through `chunkShader`, the existing `CHUNK_DRAW` variant. No new shader
+  variant, no shader edit** — and the compatibility argument is recorded here so a future round need
+  not re-derive it line by line. `worldShader` and `chunkShader` are the **same**
+  `test-vertex.glsl` / `test-fragment.glsl` pair, differing only by `#define CHUNK_DRAW`
+  (`RenderManager.cs:24`, `:329-332`). A region's model matrix was always a pure translation, so the
+  variant's `TO_WORLD(p) = p + chunkOrigin` (`test-vertex.glsl:18`) reproduces
+  `(uModel * vec4(p,1)).xyz` (`:23`) exactly; the vertex shader's own comment at
+  `test-vertex.glsl:95` — *"uModel is a pure translation for chunks/LOD, so the normal is
+  unchanged"* — is precisely the assumption the `CHUNK_DRAW` branch makes when it sets
+  `fNormal = vNormal`. The water and `lodLeaves` alpha flags live in the **shared** fragment shader,
+  so they are unaffected; `LodMeshData.Indices` / `WaterIndices` are already `List<ushort>`,
+  matching `ChunkGeometryPool.Upload`'s signature, so no index-width conversion appears anywhere.
+  `Add`'s `(origin, alpha)` pair is byte-for-byte what the old `SetDrawUniforms` call computed:
+  origin `new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks)` and alpha
+  `MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME))`. `RenderLod` still advances
+  `Lifetime` and the mirror still does not — that asymmetry is preserved verbatim.
+- **R10 · the `uAlphaCutoff` restore moved programs, and `SetDrawUniforms` is now entity-only.** In
+  `RenderWorldTranslucent` the two `worldShader.SetUniform(_locAlphaCutoff, 0f/0.5f)` lines are
+  gone; instead `chunkShader.SetUniform(_locChunkAlphaCutoff, 0.5f)` **moved** from just after the
+  chunk translucent `Draw` to just after the LOD water `Draw` (`RenderManager.cs:1738`, `:1768`), so
+  the sheets still submit at cutoff 0 and the chunk path still ends at 0.5. Pass order is unchanged:
+  chunk translucent multi-draw first, LOD water multi-draw second. `worldShader`'s cutoff is no
+  longer touched by that pass at all and stays at the 0.5 `BeginFrame` sets. `SetDrawUniforms`
+  (`RenderManager.cs:1498`) is now reached only by entity, block-cube, item and outline draws, and
+  its doc comment says so. `Mesh` stays in the tree for exactly those consumers.
+- **R10 · the two LOD sort comparators are now `LodRegion.CompareOpaqueDraw` /
+  `CompareWaterDraw`** (`LodRegion.cs:184`, `:198`), taking plain scalars so they can be pinned with
+  no `LodRegion` instance, no `LodMeshData` and no `TestContent`. `RenderLod`'s and `CullWater`'s
+  `Sort` lambdas delegate to them (`RenderManager.cs:1816`, `:1715`) with their original rationale
+  comments carried verbatim. **This matters more than it looks:** `glMultiDrawElementsIndirect`
+  executes commands in array order, so since R10 these orderings **are** the submission order — a
+  future refactor that reorders an `Add` loop silently changes depth resolution and water blending.
+  `LodDrawOrderTests` pins both, mutation-checked (inverting the level comparison in either
+  comparator fails its own fact and the disagreement fact with it). The mirror's region list is
+  **deliberately unsorted** (it adds `(region, 0f)`, as it always has) and now carries a comment at
+  `RenderManager.cs:1183` saying so — do not "fix" it into a comparator.
+- **R10 · `ApplyCompletedMeshes` frees a replaced region *before* uploading its rebuild**
+  (`LodManager.cs:501-508`). The `Regions.TryRemove` block moved above the construction, carrying
+  `replaced.Lifetime` across in an object initializer. The reason is pool occupancy: a same-sized
+  rebuild now lands in the exact hole it just vacated, so a rebuild leaves the free list
+  **unchanged** instead of appending one — pinned by
+  `GeometryAllocatorTests.ASameSizeReallocationAfterAFreeReusesTheSameOffset`, and it means rebuilds
+  contribute no net allocator traffic at all. **The one behavioural difference, recorded in the code
+  comment too:** if `ChunkGeometryPool.Upload` throws — reachable only when the allocator still
+  cannot fit after a grow (`ChunkGeometryPool.cs:156-157`) — the replaced region is already out of
+  `Regions` and `RegionList` with nothing scheduled to rebuild it, where before the reorder the
+  stale region survived. Accepted deliberately: that throw means the pool could neither fit nor
+  grow, which is unrecoverable and already fatal in practice. The happy path is identical.
+- **R10 · `MaxLodUploadsPerFrame` was NOT retuned, and that is a decision, not an oversight.** It
+  stays at 4 and still bounds the same quantity — regions becoming resident per frame — but each
+  unit of that work is now strictly cheaper: 6 GL object creations + 4 `glBufferData` per arriving
+  region become 1-2 `glNamedBufferSubData`. The one **new** tail risk is that an upload inside the
+  cap window can trigger `ChunkGeometryPool.Grow`, a full-pool GPU copy already ranked hitch #3; the
+  mitigation is the sizing above plus the growth log line, not a new knob. Retuning the cap would
+  have been an unmeasured knob change smuggled into a structural round.
+- **R10 · the C5 artefacts were untouched and sit upstream of everything R10 changed.** The
+  `_building` claim protocol with both rollbacks, `MaxLodBuildsInFlight`, `LodBuildThrottleDelayMs`,
+  the Idle/Throttled split, `MaxConcurrentLodGenerations = 1` and the `CompletedBuildCount`
+  instrument are all *before* `ApplyCompletedMeshes` in the pipeline; `CompletedBuildCount` counts at
+  **enqueue**, deliberately, so it still measures builder throughput and R10 cannot have moved it.
+  `LodRegion.BuildMeshData` was not touched, and the out-of-range drop branch still touches no GL.
+- **R10 · one side effect worth knowing about, which is NOT a creditable result.** `Shader.Use`
+  caches the bound program (`Shader.cs:103-108`). HEAD bound `worldShader` in all three LOD paths,
+  so `RenderWorld`'s `chunkShader.Use()` was a real `glUseProgram` every frame; it is now a no-op.
+  `worldPass` CPU moved with it (0.86-0.89 -> 0.82-0.86, disjoint at 4+4 but **touching at 6+6**),
+  and the measurement rule below excludes that row anyway. Recorded as a mechanism, quoted as
+  nothing.
+- **R10 · one step of the sequence committed ~280 MB of VRAM for a pool with no consumer.** That was
+  the plumbing step and it existed for exactly one step; it is not a shipped condition. Noted only so
+  a bisect landing on it is not mistaken for a leak.
 
 - **C5 · the LodGen pool.** `LodManager.Start` now spawns
   `WorldGenerationConfig.MaxConcurrentLodGenerations` dedicated `Thread`s named `LodGen-{i}`,
@@ -404,7 +555,7 @@ round needs, not the history.
   only public block reader, so the new form could not otherwise be pinned against a scalar oracle.
   No measurement was taken and none should be invented.
 - **C12(c).** `LodManager.RemoveRegion`'s `_pendingCover.Remove(region)` is now an index-tracked
-  swap-remove mirroring `LodRegion.ListIndex`: `LodRegion.PendingCoverIndex` (`LodRegion.cs:80`,
+  swap-remove mirroring `LodRegion.ListIndex`: `LodRegion.PendingCoverIndex` (`LodRegion.cs:85`,
   main-thread only), set in `AddRegion`, swapped in `RemoveRegion`, and **reset to -1 for every entry
   in `UpdateBuriedFlags` before the `Clear()`** — without that reset a region added before one pass
   and unloaded after a later one would swap-remove against a stale index and corrupt whichever region
@@ -420,7 +571,7 @@ round needs, not the history.
   `BubbleParticleRenderer` and `FireParticleRenderer` each **re-derive their own back-to-front order
   every frame** (`Array.Sort` over a depth array, then indexed access), so source order is already
   discarded by three of the four consumers. `RenderManager.RenderBlockDebris`
-  (`RenderManager.cs:2114`) is the one path where submission order reaches the GPU — it walks its
+  (`RenderManager.cs:2131`) is the one path where submission order reaches the GPU — it walks its
   list with a plain `foreach`. Its blend state is **conditional and must be stated as such**: debris
   always draws with depth writes **on** (`LeafParticleRenderer` restores `DepthMask(true)` at `:174`
   and `RenderBlockDebris` sets no blend state of its own), and it inherits `Blend` still enabled at
@@ -561,6 +712,98 @@ is the specific "simplification" those facts exist to catch.
 `LodBuildPoolTests.cs` is also the **only** file in the tree that can execute the `TryAdd` loser
 branches at all, and `LodManagerTests.ALostDirtyClaimIsReDirtiedNotDropped` points at it by name in
 its doc comment — if it is renamed, that reference must move with it.
+
+### Measurement: R10 — a disjoint submission-side win, and a churn claim that SPLIT
+
+**The rule, written down and fixed in the scratchpad before the first working-tree run, and
+reproduced here verbatim because conclusions are quoted off it:**
+
+> *R10 changes only how LOD geometry is submitted and where it is stored — never which regions
+> exist, what they contain, when they arrive, or the order they draw in. A difference in
+> `regions N/M`, `chunks N`, region arrival timing or draw order between trees is a gate failure,
+> not a result. The only rows R10 may be credited with are `lod` (region upload and unload, where
+> the per-region GL object churn lived) and the LOD-drawing CPU sections `lodPass`, `reflect` and
+> `waterPass`. `lod` is tested in both directions: R10 replaces GL object deletion with free-list
+> scanning, so a regression there is as much a result as a saving.*
+
+**Method.** Baseline = `git archive HEAD` exported into the scratchpad and built there; the working
+tree was never stashed or mutated. `perf-fly.json`, `VOXEL_DEBUG=1 VOXEL_TIME=60`, `--no-build -c
+Release`, run from each tree's own `OpenGLTest/`, strictly serial and never concurrent. One cold run
+discarded, then **4 + 4 counterbalanced** (P W W P / W P P W), plus **2 + 2 more** after the pool
+constant was corrected, to confirm the quoted figures describe the shipped binary. Exact one-sided
+Mann-Whitney U in both directions (`p = 1/70 = 0.0143` is the floor at 4 + 4), plus explicit min/max
+disjointness. Headline p-values are reported at the **pre-registered** n = 4 + 4; the 6 + 6 figures
+are supporting, not a substituted design. Survivor and departure counts needed an instrument neither
+tree carries, so — following C5's tree-B precedent — a **copy** of the working tree was patched,
+built and run in the scratchpad; the repo was never patched.
+
+**1. Countable, no profiler needed (R4's method), from the instrumented run rather than estimated.**
+Settled world: **592-666 resident regions** (median 641); opaque walk survivors 120-159 (median
+145), mirror walk 125-151 (median 136), water sheets 96-141 (median 121) — **median 402, max 436
+surviving regions across the three walks of one water frame**. HEAD paid, per water frame,
+402 x (`BindVertexArray` + 3 `glUniform` + `DrawElements`) = **402 binds, 1206 uniform uploads and
+402 draws**, plus 402 CPU `Matrix4x4.CreateTranslation` + `model * viewProj` compositions and
+402 x (2 mat4 + 1 float) of uniform payload. R10 pays **3 binds, 3 `glUniform1i` and 3
+`glMultiDrawElementsIndirect`**, plus 402 `ChunkDrawBatch.Add` writes into the mapped SSBO ring.
+Per region **arrival**, 6 GL object creations + 4 `glBufferData` become 1-2
+`glNamedBufferSubData`; per **departure**, 6 `glDelete*` become up to 2 `GeometryAllocator.Free`.
+
+**2. The two-sided churn test — the headline, and it is reported in both directions.** Stated before
+the figures, as the rule requires: *a `lod` regression on the teleport leg is a reportable result and
+a reason to re-price R10 downward, and the countable cut in item 1 may not be used in its place.*
+
+- **The departure half is NEUTRAL, measured, and nothing is quoted from it.** `tp14` (far teleport)
+  `lod` avg **touches at 0.92** between the groups and so fails disjointness; the `tp14` and `tp10`
+  worst-frame rows overlap, and on `tp10` the **work tree trends higher** — the free-list-scan
+  counter-mechanism showing its face without reaching significance. All four teleport rows are
+  quoted nowhere. **Why neither side resolves, mechanically:** in one baseline run the publish window
+  containing the largest unload of the fly reports `lod 0.19~0.49`, so HEAD's *entire* deletion burst
+  cost at most 0.49 ms. Driver-side `glDelete*` really is deferred and cheap — there was little to
+  win, and correspondingly little to lose to the scans that replaced it.
+- **The burst is an order of magnitude smaller than the arithmetic ceiling.** Only **5 frames in a
+  60 s fly have any departure at all**, the largest being **148 regions in one frame** (660 -> 512
+  resident): HEAD ~888 `glDelete*` against R10 <= 296 `Free`, not the 1518 the 759-region ceiling
+  allows. perf-fly's 424-block teleport clears level 0 and part of level 1 only (the levels reach
+  512 / 1024 / 2048 blocks).
+- **The arrival half IS credited.** `lod` settled-window median **0.51 -> 0.41 ms**, disjoint
+  (P min 0.50 vs W max 0.425), p = **0.0143** at 4 + 4 and 0.0011 at 6 + 6. With departures occupying
+  5 frames of a 60 s run, this row is essentially all upload.
+
+**Credited rows, all disjoint, all in the same direction in every counterbalanced pair whichever
+tree ran first:**
+
+| Row | HEAD | R10 | Disjointness | exact 1-sided p (4+4 / 6+6) |
+|---|---|---|---|---|
+| `lodPass` CPU | med **0.16 ms** | med **0.05 ms** (3.2x) | P min 0.15 vs W max 0.05 | **0.0143** / 0.0011 |
+| `waterPass` CPU | med **0.13 ms** | med **0.03 ms** (4.3x) | P min 0.13 vs W max 0.03 | **0.0143** / 0.0011 |
+| `lod` settled | med **0.51 ms** | med **0.41 ms** | P min 0.50 vs W max 0.425 | **0.0143** / 0.0011 |
+
+**Quoted nowhere, listed so the omissions are visible:** `reflect` CPU (0.695-0.725 vs 0.695-0.78,
+not disjoint either way — the mirror's region loop is a small share of a pass that also carries the
+mirror chunk draw, the sun disc and the clouds); all four teleport `lod` rows; `worldPass` CPU
+(disjoint at 4 + 4, **touching at 6 + 6**, and excluded by the rule regardless). **The GPU guards did
+not move** — `lodPass` GPU 1.41-1.43 on both trees, `waterPass` GPU 0.73-0.75 vs 0.72-0.75,
+`worldPass` GPU 3.035-3.18 vs 3.06-3.18 — so the CPU saving is not paid on the GPU.
+
+**Guards the rule demands, all clear.** Max `chunks` **17077** on all 12 runs. Final
+`regions 928/666` **identical on all 12 runs, both trees**. Per-second arrival trajectories differ
+only within the same-tree spread. `fps`, `frame`, total `cpu`, `gc`, `chunkApply` and `shadows` all
+overlap. **No `Chunk draw ring grew` line on either tree in any run** — R10 introduced no `glFinish`
+stall.
+
+**Growth signals, read off the same runs on both trees.** (a) The `lod` pool **never grew**, but
+peaked at **118004 of 131072 units (90 %)** at 660 resident regions, and occupancy is a steady
+176-181 units per resident region — so the 759-region resident ceiling projects to ~137400 units,
+which 131072 does not cover. 90 % is not headroom, so `LodInitialUnits` was raised **131072 ->
+163840** and its comment rewritten to record the observed figures the way `OpaqueInitialUnits`
+records 244801/262144. Re-verified at 163840: **117844 (72 %)**, no growth, and the two corrected-tree
+runs land inside the earlier group on every credited row. The only other growth line on either tree
+is the pre-existing `translucent` doubling, identical on both. (b) `Chunk draw ring grew`: never, on
+either tree, in any run.
+
+**This was a `perf-fly` capture, but it does not update the profile table at the top of this file:**
+it read only the LOD-related rows against a same-session baseline. The table remains the old
+snapshot, as it has been since C3/R8.
 
 ### Measurement: C5 is a real but small speedup that is paid for twice over
 
@@ -714,7 +957,24 @@ it, exactly as it was untouched by the C3/R8 and R5/R7/R11 rounds.
 
 ### Tests
 
-The suite went **464 -> 485** with the same two known failures
+R10 took the suite **485 -> 503** with the same two known failures, and added no GL to any of them.
+The 18 new facts follow the series precedent — extract the GL-free arithmetic and pin it with exact
+equalities. **+8 `LodGeometryPoolTests`** (a new GL-free file touching only `ChunkGeometryPool`'s
+constants and statics and `LodRegion.Levels`): `ChunkGeometryPool.UnitsFor`'s two ceilings, the
+region shell's worst-case rent (384 units), a full sheet (64), a flat shell floor (64), and the
+**591 settled / 759 resident** counts derived from `LodRegion.Levels` rather than hard-coded, plus
+the two pool-size floors. **+4 `LodDrawOrderTests`** pinning `LodRegion.CompareOpaqueDraw` /
+`CompareWaterDraw` and that the two passes deliberately disagree on level order — mutation-checked
+by inverting each comparator's level comparison. **+3 `GeometryAllocatorTests`**: same-size
+reallocation into the freed hole, a full 1518-slice stream-in/stream-out cycle coalescing back to
+one block, and the mid-teleport fragmentation peak of exactly **380** free blocks (the figure D5's
+bullet now quotes). **+3 `LodManagerTests`**: the rebuilt region inheriting the replaced region's
+`Lifetime`, an empty region mesh needing no pool, and a non-empty one without a pool throwing —
+the last two being the headless seam ~20 call sites depend on. `LodBuildPoolTests` and
+`LodBuildCostProbe` are wall-clock-deadline harnesses tuned to this machine; R10 does not touch the
+builder path and **no flakiness was observed in them — nothing was loosened**.
+
+Before R10, the suite went **464 -> 485** with the same two known failures
 (`BlockMovementTests.LeavesDeclareThreeQuarterMovementSpeed`,
 `FallingBlockTests.SevenTowerChainRebuildsFullyWithNoDrops`), which were re-verified on HEAD before
 any code was written so a pre-existing flake could not be attributed to this round. Added: +7
@@ -739,6 +999,84 @@ only that no build came back empty, because a timing assertion on a shared CI-le
 flake generator. Keep it: it is the cheapest way to re-price the LOD builder. Keep
 `LodBuildPoolTests.cs` too — it is the only file that can execute the claim paths' `TryAdd` loser
 branches at all.
+
+### The visual gate: R10 is output-preserving, and the sharper test that proved it
+
+**The R10 gate rule, fixed before any image was compared and reproduced verbatim:**
+
+> *R10 is output-preserving at the pixel level — same geometry, same origins, same alphas, same
+> order, different submission — so the gate looks for ZERO structural change and any difference is a
+> bug to diagnose, not noise to accept. Specifically: a missing region, a region drawn at the wrong
+> offset (terrain from one region appearing over another's footprint, which is what a mis-derived
+> `BaseVertex`/`FirstIndex` looks like), a missing or double-blended water sheet, an LOD sheet drawn
+> with the cutout on (the `uAlphaCutoff` move), or LOD terrain disagreeing with the full-detail
+> chunks at the seam. The one sub-threshold difference that is expected and acceptable is
+> silhouette-level float noise from `uViewProj * (p + origin)` replacing `(model*viewProj) * p`; it
+> must not reach the clustered threshold anywhere.*
+
+**Run counts: 42 runs in all** — 4 + 4 counterbalanced per pose-stable instrument (`lod-horizon`
+`VOXEL_TIME` 10, `clouds-mirror` 60, `rays-halfres` 180, `entity-binds` 60), plus a 4 + 4 settled
+`clouds-mirror` control, plus 2 `particles` runs judged by eye and excluded from the statistics.
+Baseline was the pristine `git archive HEAD` export built in the scratchpad; the working tree was
+never stashed or mutated and the one scenario override lived in a scratchpad copy passed by absolute
+path. Statistics are the previous round's `gate.py`/`gate44.py` verbatim so the numbers stay
+comparable: `area%` reported, the **clustered** statistic (luma delta >= 24 **and** >= 5 of the 25
+pixels in the same 5x5 box) the authority, cross pairs judged against the same-build distribution
+with an exact one-sided Mann-Whitney U. Counts scraped off `[visual] N/M screenshot ->`, never
+`[visual] saved`.
+
+**Every instrument passes.**
+
+- **`lod-horizon`** (8 runs), the instrument built for exactly this change and the primary gate:
+  all 4 shots pass, **0/16 flags on every shot and both statistics** (clustered p 0.6167-0.7316).
+  **All eight runs report identical counts at all four shots** — `chunks 17077`, the same
+  visible-chunk counts, and the same cumulative-builds/live-regions pairs — so no raised-wait control
+  was needed. The C3 signature is back: on 3 of 4 shots the most-similar pair of all 28 is a **cross**
+  pair while the least similar is a same-build **baseline** pair.
+- **`clouds-mirror`** (8 runs): all 7 shots pass full-frame **and** on both halves of the fixed
+  horizon crop. Last round the sky half flagged on all five `mirror_*` shots; this round it does not.
+- **`clouds-mirror` settled control** (8 runs, opening wait 8 -> 55 s): every run of both trees reaches
+  exactly `chunks 17077/1296` and `regions 591/591`; all 7 shots pass the clustered statistic. One
+  `area%` flag traced through the full 28-pair matrix to a single spread-out **baseline** run — the
+  four work runs are tight among themselves and every cross pair above the same-build max is a
+  pairing with that one run.
+- **`rays-halfres`** (8 runs): all 10 shots pass; `clust%` is 0.0000 on all 28 pairs on 7 of them.
+  Two `area%` flags are the documented animation-phase false positive — **maxdelta over all 28 pairs
+  is 16 and 15 levels**, so not one pixel reaches the structural threshold of 24.
+- **`entity-binds`** (8 runs): all 6 shots pass. Last round's five-shot flag does not appear, which
+  is itself a cross-check: that flag was *arrival rate*, and R10 does not touch arrival.
+- **`particles`** (2 runs, by eye, excluded): all six shots opened — leaves with visible alpha fades,
+  8-12 debris cubes correctly textured and depth-sorted against terrain and each other, bubbles
+  blended and correctly ordered in front of the seabed. No missing pass.
+
+**The one difference found, and how it was run to ground rather than waved through.** The gate's own
+cross-vs-same design can only ever conclude "indistinguishable from run-to-run noise", which is
+weaker than this rule demands, so the round added a sharper test: a pixel counts only if **all four
+baseline runs agree exactly, all four work runs agree exactly, and the two constants differ**, which
+removes the sun-phase and streaming axes entirely. It finds a deterministic per-tree residue of at
+most **335 px of 921600 (0.036 %)**, of which 0-57 px locally satisfy the 5-of-25 connectivity test.
+Three independent lines identify it: (1) it **tracks LOD screen coverage exactly** — zero on all ten
+underground `rays-halfres` shots, 2 px on `entity-binds` (both in the horizon band), and 172 of 190
+(91 %) inside a 60 px horizon band on `lod-horizon/06-lod_b`; (2) **every flagged pixel sits on a
+strong edge** — baseline local 3x3 luma range median 41-71 and 10th percentile 25-36 against a
+whole-frame median of 0-20, with none in a flat interior, which a wrong offset, a missing region, a
+missing sheet or a wrong cutoff would necessarily produce; (3) **seen directly** — on the settled
+control's `14-sky_level` the largest difference in the whole frame is **exactly one pixel**, foliage
+on all four baseline runs and sand on all four work runs, with its right and lower neighbours already
+sand on *both* trees. Amplified crops of the largest cluster show 1-3 px specks tracing individual
+LOD cell edges: no shifted feature, no missing patch, no displaced footprint. This is precisely the
+silhouette float noise the rule names as expected, and it is invisible to the gate's own statistic.
+
+**So: R10 is output-preserving but NOT bit-exact,** and that should not be claimed. `gl_Position`
+moved from a CPU-composed `(model * viewProj) * p` to `uViewProj * (p + origin)`; with region origins
+out to 2048 blocks the composed matrix is where precision was actually being lost, so the new path is
+if anything the better-conditioned one, but the last bits differ. A future round wanting a
+pixel-exact LOD path would have to compose the matrix the old way.
+
+**Structural checks across all 46 logs:** no `Chunk draw ring grew` line on either tree; the only
+pool-growth line anywhere is the pre-existing `translucent` doubling, 10 times on each tree; **the
+`lod` pool never grew in any run**, corroborating the 163840-unit sizing across four scenarios beyond
+`perf-fly`. No exception, no unhandled error, no `glGetError` report.
 
 ### The visual gate: zero structural change, and the gate saw C5 for the first time
 
@@ -882,7 +1220,7 @@ catch is a *new* `Camera` field wired into `GetViewMatrix` tomorrow with no matc
   number of physics steps for a given simulated duration is **frame-rate dependent**. Any round that
   makes the engine faster lands at a slightly different camera depth and streaming state, and a naive
   pixel gate reads that as a regression.
-- **Chunks and LOD regions fade in on the wall clock** (`RenderManager.cs:1150-1151`, `:1810-1812`,
+- **Chunks and LOD regions fade in on the wall clock** (`RenderManager.cs:1162-1163`, `:1822-1826`,
   `MAX_LIFETIME` 0.5 s), so a region caught mid-fade differs by up to ~208 levels between runs of the
   **same** build. `clouds-mirror.json`'s `14-sky_level` and `16-sky_closeup` frame such a region and
   their full-frame p99 flips between 1 and 122 depending on which side of the percentile it lands —
@@ -934,37 +1272,73 @@ catch is a *new* `Camera` field wired into `GetViewMatrix` tomorrow with no matc
   rendered frame so particle height tracks frame rate, and three of the four systems never reach
   their eviction path at these densities. It has no fire leg — `VisualDirector`'s `give` cannot equip
   a tool, so a firestarter can never be used (see the gate section above).
+- **New (R10): a real per-tree difference can be invisible to the cross-vs-same-build statistic, and
+  the within-tree-constant test is how you see it.** The run-to-run noise floor on these scenarios —
+  sun phase reaching the frame through shadow-map texel alignment — is **two orders of magnitude
+  larger** than the deterministic residue R10 actually produced (<= 0.036 % of a frame), so a
+  Mann-Whitney against the same-build distribution can only ever say "indistinguishable from noise".
+  That is not the same as "no change", and it is weaker than a zero-structural-change rule demands.
+  The instrument that resolves it: count a pixel only if **all runs of the baseline agree exactly,
+  all runs of the work tree agree exactly, and the two constants differ**. Then confirm what it
+  finds three ways rather than asserting it is noise — does the residue track the changed subsystem's
+  on-screen coverage (it should be *zero* where that subsystem does not draw); does every flagged
+  pixel sit on a strong local luma edge (a wrong offset, a missing object or a wrong blend mode
+  necessarily produces flat-interior differences too); and what does the single largest difference in
+  the frame actually look like when opened. This should become standing machinery for any
+  output-preserving round.
+- **New (R10): `lod-horizon` needed no raised-wait control**, unlike `clouds-mirror` and
+  `entity-binds`. All eight runs converge to identical chunk, visible-chunk **and** region counts at
+  every shot at its stock 40/35/35/35 waits. `clouds-mirror` is still not settled at its stock 8 s
+  opening wait (regions 302-342 across runs on *both* trees) and still needs the control.
 
-Next: **C5 left no loose end — its pool size was decided, not deferred.**
-`MaxConcurrentLodGenerations` ships at **1**: gate 2's branch 4, with two workers declined as well as
-three, because 18 % of burst frame rate is too much to pay for 1.26x on a quantity that already had
-7.8-8.2x of drain headroom. The claim protocol, the in-flight cap, the throughput instrument and
-their facts all stayed. Do **not** re-open the pool size; the capture is above and a larger pool has
-been measured.
+Next: **R10 landed and the render side is now out of structural items.** LOD was the last subsystem
+on the old per-object draw path; everything that draws terrain — chunks, shadows, the mirror, LOD
+and its sea sheets — now goes through one `ChunkDrawBatch` and one `glMultiDrawElementsIndirect` per
+pass. What remains open on the GPU side is **R3** (parked, read its bullet before re-opening) and
+**R6** (reserved for a human — it is a *trade-off*, not a win, and must not be taken autonomously).
+So the next round is a CPU round, and it should be, because R10's own measurement said so twice: the
+credited wins were all CPU-side submission cost, and the departure/teleport `lod` row — the one thing
+that would have pointed at more render work — did not move in either direction.
 
-Take **R10** first. It is the biggest remaining item and the biggest structural render win (L), its
-hold on C5 is discharged, and R5 landing already narrowed its case to the per-region VAO/VBO/EBO
-churn plus a bind, three uniforms and a draw per surviving region across three ring walks. Price it
-on that alone: C5's re-pricing came out **neutral**, because the pool was declined and the shipped
-tree's `lod` row and arrival rate are the baseline ones, so nothing this round re-rates R10 in either
-direction. The one number C5 did hand it is the size of the set it walks — **591 live regions**, the
-same at every pool size.
+**Take D2 first.** It is now the most interesting CPU item in the file and two independent rounds
+have pointed at it. C5 measured that **a LOD build is terrain generation in disguise**:
+`LodRegion.BuildMeshData` prefetches 36 / 100 / 324 chunk columns at levels 0 / 1 / 2 and *generates
+on the spot* any column missing from `Chunk.ColumnCache`, so the LOD builder and the four chunk-gen
+threads contend on one 16384-entry cache that a single level-2 ring sweeps roughly three times over
+before dropping **everything** at its cap. With C5's thread pool declined, cutting that work is the
+**only** lever left on that contention, and the same wholesale `Clear()` is a named part of the
+teleport hitch. Its bullet already carries the arithmetic and the second site
+(`WormCarver.CellCache`). Effort M, risk low-med, and unlike R10 it has a plausible path to the
+`lod`/`chunkDirty` rows the hitch ranking's item 1 is about.
 
-After that, in rough order of confidence: **C6** (`_playerPlaced.RemoveWhere`), which shares
-`UnloadDistantChunks` with C3's removal counter — **re-read the standing obligation in Carried
-forward before touching that method**, it is the one place a careless edit can starve a chunk
-permanently. **D1** (packed chunk keys) is a broad-but-mechanical L, best taken entirely on its own,
-and it would also make the frontier's per-probe `NeedsChunk` cheaper. **D2** has been promoted by
-this round's evidence and is now the most interesting CPU item after R10: C5 measured that LOD builds
-are terrain generation in disguise and that `Chunk.ColumnCache`'s 16384-entry wholesale `Clear()` is
-the shared resource both the chunk-gen threads and the LOD builders contend on — cutting that work is
-the lever C5's thread pool was reaching for and missed, and with the pool declined it is the *only*
-lever left on that contention. **D5** is measurement-only: log
-`FreeBlockCount` on the pool-growth line and capture it mid-stream and just after a teleport; take
-the measurement, not the rewrite, since its own bullet doubts there is a win. **R6** is S but is a
-*trade-off* rather than a win — gating the GPU timing queries on the overlay gives up the deliberate
-"the first second after `X` already has data" property — so it is **reserved for a human decision and
-must not be taken autonomously**. **R3** stays parked; read its bullet before re-opening it.
+**Then C6**, the cheapest remaining item — but **re-read the standing obligation on C3's chunk-scan
+frontier in Carried forward *before* touching `UnloadDistantChunks`**, not after. C6 shares that
+method with the removal counter, and it is the one place in the tree where a careless edit can starve
+a chunk permanently; the bump's position after the unload loop and its `removed > 0` gate are both
+load-bearing and both killed by named facts.
+
+**D1** (packed chunk keys) is a broad-but-mechanical L and is best taken entirely on its own, with
+nothing else in the round; it would also make the frontier's per-probe `NeedsChunk` cheaper. Note
+that `LodManager` is already keyed by integer tuples, so D1 is chunk-side only and R10 changed
+nothing about that.
+
+**D5 is measurement only, and R10 made it more interesting without fixing it.** There are now
+**three** pools on one allocator and the third is a much higher-churn client: LOD churn is **paired**
+(up to 2 `TryAllocate` per arrival, 2 `Free` per departure) and its unload path is **unbounded per
+frame**, unlike the chunk side's 32-per-frame cap. R10 pinned the pathological free-list length
+(**380** blocks mid-teleport at the resident ceiling) *and* measured the realistic one (the largest
+real burst in a 60 s fly is 148 regions in one frame, <= 296 `Free`s, with departures geographically
+clustered so the list coalesces as it drains). It also proved the coalescing is sound — nothing leaks
+across a full stream-in/stream-out cycle — so **D5's defect is scan cost, not fragmentation**. Take
+the measurement its bullet asks for (log `FreeBlockCount` on the pool-growth line, capture it
+mid-stream and just after a teleport, now on **three** pools), not the rewrite; and price the "fuse a
+region's shell and sheet into one paired allocation" remedy recorded there against the data-structure
+change, since it may be the cheaper half.
+
+**R3** stays parked; read its bullet rather than the one-line summary. **C5's pool size is decided
+and closed** — `MaxConcurrentLodGenerations` ships at **1**, both larger pools were measured and
+declined, and the capture is above: do not re-propose "a bigger pool". **R6 stays reserved for a
+human.**
 
 ## Ruled out (do not retry without new evidence)
 

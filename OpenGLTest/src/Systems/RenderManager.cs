@@ -31,6 +31,16 @@ public class RenderManager : IDisposable
     /// <summary>The shared vertex/index buffers every chunk's translucent (water/glass) mesh lives in.</summary>
     public ChunkGeometryPool TranslucentChunkGeometry { get; private set; }
 
+    /// <summary>
+    /// The shared vertex/index buffers every LOD region lives in — both a region's terrain shell
+    /// AND its sea sheet. One pool covers both because a region's two meshes are born from one
+    /// <c>LodMeshData</c> and freed together in one <c>LodRegion.Dispose</c>, so their lifetimes
+    /// never diverge; the chunk pools' opaque/translucent split exists for a sizing reason
+    /// (512 MB vs 64 MB), not a correctness one, and does not transfer. See
+    /// <see cref="ChunkGeometryPool.LodInitialUnits"/> for the sizing derivation.
+    /// </summary>
+    public ChunkGeometryPool LodGeometry { get; private set; }
+
     // The persistent-mapped indirect-command ring + ChunkInfo SSBO the chunk passes fill and
     // draw with one MultiDrawElementsIndirect each.
     private ChunkDrawBatch _chunkDraws;
@@ -363,11 +373,13 @@ public class RenderManager : IDisposable
         _locChunkShadowSway = chunkShadowShader.GetUniformLocation("uSwayStrength");
         CreateShadowMap();
 
-        // The shared chunk geometry, and the ring the chunk passes build their draw commands
-        // in. All three issue GL calls, so they belong here on the render thread; World (and
-        // through it ChunkManager and Chunk.UpdateMesh) is handed the two pools by Program.
+        // The shared chunk and LOD geometry, and the ring the chunk passes build their draw
+        // commands in. All four issue GL calls, so they belong here on the render thread; World
+        // (and through it ChunkManager and Chunk.UpdateMesh, and LodManager) is handed the three
+        // pools by Program.
         OpaqueChunkGeometry = new ChunkGeometryPool(gl, ChunkGeometryPool.OpaqueInitialUnits, "opaque");
         TranslucentChunkGeometry = new ChunkGeometryPool(gl, ChunkGeometryPool.TranslucentInitialUnits, "translucent");
+        LodGeometry = new ChunkGeometryPool(gl, ChunkGeometryPool.LodInitialUnits, "lod");
         _chunkDraws = new ChunkDrawBatch(gl);
 
         sunShader = new Shader(gl, sunVs, sunFs);
@@ -1151,8 +1163,8 @@ public class RenderManager : IDisposable
                 MathF.Min(1f, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
 
         _chunkDraws.Draw(OpaqueChunkGeometry.Vao, chunkShader, _locChunkDrawBase);
-        // The LOD regions below draw through the plain program's uniform path
-        worldShader.Use();
+        // The LOD regions below ride the same program and the same ring: chunkShader is still in
+        // use from the chunk pass above and _locChunkViewProj already holds _reflViewProj.
 
         _visibleRegions.Clear();
         for (var i = 0; i < regions.Count; i++)
@@ -1168,14 +1180,19 @@ public class RenderManager : IDisposable
             _visibleRegions.Add((region, 0f));
         }
 
+        // Deliberately unsorted: the list above adds (region, 0f) and the mirror has always
+        // drawn regions in list order. Do not "fix" it into one of LodRegion's comparators —
+        // that would change what the mirror shows, which is not this item's business.
+
+        _chunkDraws.BeginPass(_visibleRegions.Count);
+
+        // The mirror does not advance Lifetime; it reads the value RenderLod left last frame.
         foreach (var (region, _) in _visibleRegions)
-        {
-            var model = Matrix4x4.CreateTranslation(region.X * region.SizeBlocks, 0f,
-                region.Z * region.SizeBlocks);
-            SetDrawUniforms(model, model * _reflViewProj,
+            _chunkDraws.Add(region.OpaqueSlice!.Value,
+                new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks),
                 MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)));
-            region.Render();
-        }
+
+        _chunkDraws.Draw(LodGeometry.Vao, chunkShader, _locChunkDrawBase);
 
         // Clouds in the mirror are what makes the reflection readable on open water (the sky
         // itself is a flat colour). The mirror flips triangle winding, so cull front faces
@@ -1475,8 +1492,8 @@ public class RenderManager : IDisposable
     /// for world positions and normals), its full MVP and its fade alpha. Exactly three
     /// <c>glUniform</c> calls through cached locations — the rest of the world shader's state
     /// was uploaded once by <see cref="ApplyFrameUniforms"/>.
-    /// Entity and LOD draws only: chunks go through <see cref="ChunkDrawBatch"/>, where a
-    /// uniform could not vary between the sub-draws of one multi-draw anyway.
+    /// Entity draws only: chunks and LOD regions both go through <see cref="ChunkDrawBatch"/>,
+    /// where a uniform could not vary between the sub-draws of one multi-draw anyway.
     /// </summary>
     private void SetDrawUniforms(in Matrix4x4 model, in Matrix4x4 mvp, float alpha)
     {
@@ -1691,12 +1708,11 @@ public class RenderManager : IDisposable
                 _nearWaterVisible = true;
         }
 
-        // Finest level first: its sheet sits highest (each coarser level sinks by its own
-        // height bias), so the duplicates underneath it fail the depth test instead of
-        // double-blending the same stretch of sea
-        _translucentRegions.Sort((a, b) => a.region.Level != b.region.Level
-            ? a.region.Level.CompareTo(b.region.Level)
-            : b.distSq.CompareTo(a.distSq));
+        // Finest level first, then back to front within a level. The rationale lives on
+        // LodRegion.CompareWaterDraw, which is pinned headlessly (LodDrawOrderTests); since R10
+        // this ordering is also the glMultiDrawElementsIndirect submission order.
+        _translucentRegions.Sort((a, b) =>
+            LodRegion.CompareWaterDraw(a.region.Level, a.distSq, b.region.Level, b.distSq));
     }
 
     /// <summary>
@@ -1735,24 +1751,21 @@ public class RenderManager : IDisposable
                 MathF.Min(1f, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
 
         _chunkDraws.Draw(TranslucentChunkGeometry.Vao, chunkShader, _locChunkDrawBase);
-        // Later chunk passes reuse this program and need the cutout behaviour back.
-        chunkShader.SetUniform(_locChunkAlphaCutoff, 0.5f);
 
-        // The LOD water sheets below still draw through the plain program's uniform path
-        worldShader.Use();
-        worldShader.SetUniform(_locAlphaCutoff, 0f);
+        // The LOD water sheets ride the same program, the same ring and the same cutout-free
+        // state the chunk water just used; only the pool VAO differs. Chunk translucent first,
+        // LOD water second, exactly as before.
+        _chunkDraws.BeginPass(_translucentRegions.Count);
 
         foreach (var (region, _) in _translucentRegions)
-        {
-            var model = Matrix4x4.CreateTranslation(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks);
-            SetDrawUniforms(model, model * viewProj,
+            _chunkDraws.Add(region.WaterSlice!.Value,
+                new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks),
                 MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)));
 
-            region.RenderWater();
-        }
+        _chunkDraws.Draw(LodGeometry.Vao, chunkShader, _locChunkDrawBase);
 
-        // Later passes reuse this program and need the cutout behaviour back.
-        worldShader.SetUniform(_locAlphaCutoff, 0.5f);
+        // Later chunk passes reuse this program and need the cutout behaviour back.
+        chunkShader.SetUniform(_locChunkAlphaCutoff, 0.5f);
     }
 
     private readonly List<(LodRegion region, float distSq)> _visibleRegions = new(256);
@@ -1767,10 +1780,11 @@ public class RenderManager : IDisposable
     {
         if (camera == null) return;
 
-        worldShader.Use();
+        chunkShader.Use();
         BindWorldTextures();
 
         var viewProj = camera.GetViewProjection();
+        chunkShader.SetUniform(_locChunkViewProj, viewProj);
         var frustum = camera.GetViewFrustum();
         var camPos = camera.RenderEye;
 
@@ -1795,23 +1809,26 @@ public class RenderManager : IDisposable
             _visibleRegions.Add((region, Vector3.DistanceSquared(center, camPos)));
         }
 
-        // Coarsest level first, then front to back within a level; where levels still
-        // overlap (a coarse region only partly covered by finer ones) finer geometry
-        // draws over the coarser mesh buried beneath it
-        _visibleRegions.Sort((a, b) => a.region.Level != b.region.Level
-            ? b.region.Level.CompareTo(a.region.Level)
-            : a.distSq.CompareTo(b.distSq));
+        // Coarsest level first, then front to back within a level. The rationale lives on
+        // LodRegion.CompareOpaqueDraw, which is pinned headlessly (LodDrawOrderTests); since R10
+        // this ordering is also the glMultiDrawElementsIndirect submission order.
+        _visibleRegions.Sort((a, b) =>
+            LodRegion.CompareOpaqueDraw(a.region.Level, a.distSq, b.region.Level, b.distSq));
+
+        _chunkDraws.BeginPass(_visibleRegions.Count);
 
         foreach (var (region, _) in _visibleRegions)
         {
             region.Lifetime += 1.0 / 60.0;
 
-            var model = Matrix4x4.CreateTranslation(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks);
-            SetDrawUniforms(model, model * viewProj,
+            _chunkDraws.Add(region.OpaqueSlice!.Value,
+                new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks),
                 MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)));
-
-            region.Render();
         }
+
+        // chunkShader's uAlphaCutoff is already 0.5 (set once at construction and restored by
+        // BeginFrame), which is exactly what worldShader carried here.
+        _chunkDraws.Draw(LodGeometry.Vao, chunkShader, _locChunkDrawBase);
     }
 
     /// <summary>
@@ -2536,11 +2553,13 @@ public class RenderManager : IDisposable
         gl.DeleteVertexArray(faceVao);
         foreach (var query in _gpuPassQueries)
             gl.DeleteQuery(query);
-        // The chunks that hold slices in these pools are gone by now (the world stops before
-        // the render manager does), so freeing the buffers here cannot orphan a live slice.
+        // The chunks and LOD regions that hold slices in these pools are gone by now (the world
+        // stops before the render manager does), so freeing the buffers here cannot orphan a
+        // live slice.
         _chunkDraws.Dispose();
         OpaqueChunkGeometry.Dispose();
         TranslucentChunkGeometry.Dispose();
+        LodGeometry.Dispose();
         gl.Dispose();
     }
 }

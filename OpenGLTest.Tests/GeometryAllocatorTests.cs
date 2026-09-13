@@ -144,4 +144,121 @@ public sealed class GeometryAllocatorTests
         Assert.Throws<ArgumentOutOfRangeException>(() => allocator.Free(0, 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => new GeometryAllocator(0));
     }
+
+    // -------------------------------------------------------------------------------------
+    // Item R10: LOD regions now stream through a shared ChunkGeometryPool, which makes this
+    // allocator the thing that absorbs region churn. The three facts below are the GL-free
+    // half of R10's churn claim: what a rebuild costs the free list (nothing, after the
+    // free-before-upload reorder in LodManager.ApplyCompletedMeshes), what a full stream-in /
+    // stream-out cycle leaves behind (nothing), and how long the free list Free() linearly
+    // scans actually gets mid-teleport. They are exact numbers rather than estimates because
+    // item D5 is about that scan and needs a figure to argue against.
+    // -------------------------------------------------------------------------------------
+
+    /// <summary>The free-before-upload order in <c>LodManager.ApplyCompletedMeshes</c> only pays
+    /// off if a same-sized reallocation actually reuses the hole, which first fit guarantees:
+    /// the hole is the first block large enough, and an exact fit removes the block outright.
+    /// So a rebuild of unchanged size leaves the free list byte-for-byte as it found it.</summary>
+    [Fact]
+    public void ASameSizeReallocationAfterAFreeReusesTheSameOffset()
+    {
+        var allocator = new GeometryAllocator(64);
+        Assert.True(allocator.TryAllocate(5, out var first));
+        Assert.True(allocator.TryAllocate(7, out var middle));
+        Assert.True(allocator.TryAllocate(3, out var last));
+        Assert.Equal(0, first);
+        Assert.Equal(5, middle);
+        Assert.Equal(12, last);
+
+        var blocksBefore = allocator.FreeBlockCount;
+        var usedBefore = allocator.UsedUnits;
+        Assert.Equal(1, blocksBefore);
+        Assert.Equal(15, usedBefore);
+
+        allocator.Free(middle, 7);
+        Assert.Equal(2, allocator.FreeBlockCount);
+
+        Assert.True(allocator.TryAllocate(7, out var rebuilt));
+        Assert.Equal(middle, rebuilt);
+        Assert.Equal(blocksBefore, allocator.FreeBlockCount);
+        Assert.Equal(usedBefore, allocator.UsedUnits);
+    }
+
+    // The resident-ceiling LOD set: LodManager generates regions inside RegionRadius but only
+    // drops them past RegionRadius + 1, so 253 offsets x 3 levels = 759 regions can be resident
+    // at once (pinned from LodRegion.Levels by LodGeometryPoolTests). Each one holds two slices,
+    // a terrain shell and a sea sheet, and both floor at 64 units.
+    private const int ResidentRegions = 759;
+    private const int SliceUnits = 64;
+
+    private static GeometryAllocator FullResidentSet()
+    {
+        var allocator = new GeometryAllocator(ResidentRegions * SliceUnits * 2);
+        for (var i = 0; i < ResidentRegions; i++)
+        {
+            Assert.True(allocator.TryAllocate(SliceUnits, out var shell));
+            Assert.True(allocator.TryAllocate(SliceUnits, out var sheet));
+            Assert.Equal(i * SliceUnits * 2, shell);
+            Assert.Equal(i * SliceUnits * 2 + SliceUnits, sheet);
+        }
+
+        Assert.Equal(0, allocator.FreeBlockCount);
+        Assert.Equal(allocator.Capacity, allocator.UsedUnits);
+        return allocator;
+    }
+
+    /// <summary>A far teleport unloads the whole resident LOD set — <c>LodManager.Update</c>'s
+    /// unload loop is unbounded per frame — and the departures arrive in region-list order, not
+    /// allocation order. Coalescing has to survive that: whatever order the 1518 slices come back
+    /// in, the pool must end as one whole free block, or the next stream-in fragments forever.
+    /// The order here is the fixed permutation i * 617 mod 1518 (617 is coprime with 1518), so
+    /// the fact is a shuffle without depending on any Random implementation.</summary>
+    [Fact]
+    public void AFullStreamInAndOutCycleCoalescesBackToOneBlock()
+    {
+        var allocator = FullResidentSet();
+        var slices = ResidentRegions * 2;
+
+        for (var i = 0; i < slices; i++)
+            allocator.Free(i * 617 % slices * SliceUnits, SliceUnits);
+
+        Assert.Equal(1, allocator.FreeBlockCount);
+        Assert.Equal(allocator.Capacity, allocator.LargestFreeBlock);
+        Assert.Equal(0, allocator.UsedUnits);
+
+        // And the reclaimed space is genuinely one run, not one run by arithmetic only.
+        Assert.True(allocator.TryAllocate(allocator.Capacity, out var whole));
+        Assert.Equal(0, whole);
+    }
+
+    /// <summary>How long the list <c>Free</c> linearly scans really gets, pinned rather than
+    /// estimated (item D5). Half the resident set gone, worst case for fragmentation because
+    /// every survivor separates two holes: each departed region's shell and sheet coalesce into
+    /// one 128-unit block and nothing else merges, so the free list holds exactly one block per
+    /// departed region. Of the 759 resident regions 380 have even indices, so that is 380 blocks
+    /// — and each of the remaining 758 frees walks that list from the front.</summary>
+    [Fact]
+    public void MidTeleportFragmentationPeaksAtAKnownBlockCount()
+    {
+        var allocator = FullResidentSet();
+
+        var departed = 0;
+        for (var i = 0; i < ResidentRegions; i += 2)
+        {
+            allocator.Free(i * SliceUnits * 2, SliceUnits);
+            allocator.Free(i * SliceUnits * 2 + SliceUnits, SliceUnits);
+            departed++;
+        }
+
+        Assert.Equal(380, departed);
+        Assert.Equal(380, allocator.FreeBlockCount);
+        Assert.Equal(SliceUnits * 2, allocator.LargestFreeBlock);
+        Assert.Equal((ResidentRegions - departed) * SliceUnits * 2, allocator.UsedUnits);
+
+        // A survivor's own rebuild still fits without growing, because a whole region-sized
+        // hole is exactly what a departed neighbour leaves.
+        Assert.True(allocator.TryAllocate(SliceUnits * 2, out var reused));
+        Assert.Equal(0, reused);
+        Assert.Equal(379, allocator.FreeBlockCount);
+    }
 }

@@ -83,7 +83,8 @@ public static class Program
         inputManager = new InputManager(windowManager.Window);
         renderManager = new RenderManager(windowManager.Window);
         world = new World(renderManager.gl, renderManager.OpaqueChunkGeometry,
-            renderManager.TranslucentChunkGeometry, windowManager.Window, inputManager.InputContext);
+            renderManager.TranslucentChunkGeometry, renderManager.LodGeometry,
+            windowManager.Window, inputManager.InputContext);
         world.Player.Rig = renderManager.PlayerRig;
 
         inputManager.Mouse?.MouseUp += (_, button) =>

@@ -9,17 +9,26 @@ namespace silkgltriangle;
 /// <summary>
 /// Manages far-terrain LOD regions across all LOD levels: a pool of
 /// <see cref="WorldGenerationConfig.MaxConcurrentLodGenerations"/> BelowNormal LodGen threads
-/// builds region meshes from the heightmap cache (CPU only), the main thread uploads them to
-/// the GPU with a per-frame cap and unloads regions that fall out of range. That constant ships
-/// at 1 — C5 measured a wider pool and declined it (the reasoning is on the constant) — but
-/// everything here is written for N workers and is correct at any N.
+/// builds region meshes from the heightmap cache (CPU only), the main thread uploads them into
+/// the render manager's shared LOD <see cref="ChunkGeometryPool"/> with a per-frame cap and
+/// unloads regions that fall out of range. That constant ships at 1 — C5 measured a wider pool
+/// and declined it (the reasoning is on the constant) — but everything here is written for N
+/// workers and is correct at any N.
 /// Levels are filled finest-first so detail appears near the player before the horizon.
 /// Each worker claims a region through <see cref="ClaimNextRegion"/>, which registers the key in
 /// <c>_building</c>; the claim protocol, not the concurrent collections, is what keeps two
 /// workers off one region (item C5).
 /// </summary>
-public class LodManager(Silk.NET.OpenGL.GL gl)
+public class LodManager(ChunkGeometryPool? lodGeometry = null)
 {
+    /// <summary>
+    /// The shared pool every resident region's terrain shell and sea sheet is uploaded into, or
+    /// null in headless tests, which only ever build empty meshes. One pool covers both meshes
+    /// because a region's pair is born from one <see cref="LodMeshData"/> and freed together.
+    /// Render thread only, like the two chunk pools.
+    /// </summary>
+    private readonly ChunkGeometryPool? _lodGeometry = lodGeometry;
+
     public readonly ConcurrentDictionary<(int Level, int X, int Z), LodRegion> Regions = new();
 
     /// <summary>
@@ -475,15 +484,31 @@ public class LodManager(Silk.NET.OpenGL.GL gl)
                 continue;
             }
 
-            var region = new LodRegion(gl, data);
-            // BufferData copies synchronously, so the lists can be recycled at once.
-            MeshBuffers.Return(data.Vertices, data.Indices, data.WaterVertices, data.WaterIndices);
+            // A rebuild frees the region it replaces BEFORE uploading the new one, so a
+            // same-sized rebuild lands back in the exact hole it just vacated: the pool's free
+            // list comes out of a rebuild unchanged instead of gaining a fragment, and the two
+            // copies never occupy the pool at the same time. The fade state is the only thing
+            // the new region needs from the old one, so it is carried across by hand.
+            //
+            // The order does change one failure path, deliberately. LodRegion's constructor can
+            // throw out of ChunkGeometryPool.Upload, whose single reachable throw is "could not
+            // fit N units after growing"; after this reorder the replaced region is already out
+            // of Regions and RegionList when that happens, with nothing scheduled to rebuild it,
+            // where the old order left the stale region standing. Accepted: that throw means the
+            // pool could neither fit the slice nor grow to hold it, which is unrecoverable and
+            // already fatal in practice.
+            var carriedLifetime = 0.0;
             if (Regions.TryRemove(key, out var replaced))
             {
-                region.Lifetime = replaced.Lifetime; // rebuilt region keeps its fade state
+                carriedLifetime = replaced.Lifetime; // rebuilt region keeps its fade state
                 RemoveRegion(replaced);
                 replaced.Dispose();
             }
+
+            var region = new LodRegion(_lodGeometry, data) { Lifetime = carriedLifetime };
+            // ChunkGeometryPool.Upload copies synchronously (glNamedBufferSubData), so the lists
+            // can be recycled at once.
+            MeshBuffers.Return(data.Vertices, data.Indices, data.WaterVertices, data.WaterIndices);
 
             AddRegion(key, region);
             uploaded++;
