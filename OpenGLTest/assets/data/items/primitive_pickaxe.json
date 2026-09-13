@@ -1,5 +1,6 @@
 { "name": "Primitive Pickaxe", "texture": "assets/textures/items/primitive_pickaxe.png",
   // Head axis swung fore-aft so a tip faces away from the holder instead of sideways.
-  "display": { "rotation": [0, 90, 0] },
+  "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.4 },
   // Flint tier: power 1 matches the bare-hand damage, so it exists to pass pickaxe gates.
-  "tool": { "power": 1.0 } }
+  "tool": { "power": 1.0 }
+}
