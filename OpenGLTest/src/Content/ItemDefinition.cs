@@ -12,6 +12,14 @@ public sealed class ItemDefinition
     /// <summary>What right-clicking with the item does; omitted for a plain pickup.</summary>
     public UseDefinition? Use { get; set; }
 
+    /// <summary>
+    /// Optional tool block: writing it marks the item as a mining tool and carries the numbers
+    /// the break loop reads. Which <c>tools</c> tags a block accepts are satisfied by membership
+    /// in <c>assets/data/tags/&lt;tag&gt;.json</c> (an item listed in <c>pickaxe.json</c> is a
+    /// pickaxe), not by this object.
+    /// </summary>
+    public ToolDefinition? Tool { get; set; }
+
     /// <summary>Uses before a durability item breaks; omitted (0) for endless items.</summary>
     public int? Durability { get; set; }
 
@@ -38,6 +46,20 @@ public sealed class ItemDefinition
 
         /// <summary>Uniform multiplier; default 1.</summary>
         public float? Scale { get; set; }
+    }
+
+    /// <summary>
+    /// The <c>tool</c> object: an item's mining numbers. <c>power</c> is damage per hit
+    /// (default 1, the bare-hand baseline) and <c>hitDelayMs</c> is the gap between hits in
+    /// milliseconds (default 200, today's pace), so 5000 is one hit per five seconds.
+    /// </summary>
+    public sealed class ToolDefinition
+    {
+        /// <summary>Damage one hit deals to a block's hardness; default 1.</summary>
+        public float? Power { get; set; }
+
+        /// <summary>Milliseconds between hits while mining; default 200.</summary>
+        public float? HitDelayMs { get; set; }
     }
 
     /// <summary>

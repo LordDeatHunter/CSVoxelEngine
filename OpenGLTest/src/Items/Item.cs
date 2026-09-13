@@ -60,6 +60,17 @@ public abstract class Item
     /// <summary>Uses before this item breaks (10 for a firestarter); 0 means endless.</summary>
     public int MaxDurability { get; internal init; }
 
+    /// <summary>Whether the item declares a <c>tool</c> block and therefore mines as a tool
+    /// rather than at the bare-hand baseline. Membership in tool tags comes from the tag
+    /// files, not from this flag.</summary>
+    public bool IsTool { get; internal init; }
+
+    /// <summary>Damage one hit deals to block hardness; 1 is the bare-hand baseline.</summary>
+    public float ToolPower { get; internal init; } = 1f;
+
+    /// <summary>Milliseconds between hits while mining; see <see cref="Mining"/>.</summary>
+    public float HitDelayMs { get; internal init; } = Mining.DefaultHitGapMs;
+
     /// <summary>Seconds between uses of this item; 0 means the global click rate applies.</summary>
     public float UseDelaySeconds { get; internal init; }
 
@@ -168,5 +179,8 @@ public abstract class Item
         DisplayRotation = spec.Rotation;
         DisplayTranslation = spec.Translation;
         DisplayScale = spec.Scale;
+        IsTool = spec.IsTool;
+        ToolPower = spec.ToolPower;
+        HitDelayMs = spec.HitDelayMs;
     }
 }

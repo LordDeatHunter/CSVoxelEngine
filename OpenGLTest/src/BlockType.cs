@@ -18,8 +18,9 @@ public sealed record BlockType
     /// <summary>Air is not a registered block; id 0 always means "nothing here".</summary>
     public const byte Air = 0;
 
-    /// <summary>Hits a block takes before it breaks; one hit lands per World.BlockHitSeconds.</summary>
-    public const int DefaultMaxHealth = 5;
+    /// <summary>Damage a block takes before it breaks; one hit deals the held tool's power.
+    /// See <see cref="Mining"/>.</summary>
+    public const float DefaultHardness = 5f;
 
     /// <summary>Every registered block by id; null where no block owns that id.</summary>
     public static readonly BlockType?[] ById = new BlockType?[256];
@@ -89,7 +90,16 @@ public sealed record BlockType
     /// <see cref="SfxLibrary.DefaultGroup"/>.</summary>
     public string Sfx { get; init; } = SfxLibrary.DefaultGroup;
 
-    public int MaxHealth { get; init; } = DefaultMaxHealth;
+    /// <summary>Damage this block takes before breaking; one hit deals the held tool's power.</summary>
+    public float Hardness { get; init; } = DefaultHardness;
+
+    /// <summary>Whether the <see cref="Tools"/> gate refuses hits from the wrong tool kind or a
+    /// tool below the required power; false lets any tool or bare hand mine it.</summary>
+    public bool RequiresTool { get; init; }
+
+    /// <summary>Tool tag name to minimum power the held item must provide, or null when the
+    /// block sets none. Only read while <see cref="RequiresTool"/> is set; see <see cref="Mining"/>.</summary>
+    public IReadOnlyDictionary<string, float>? Tools { get; init; }
 
     /// <summary>Whether the block collides with bodies.</summary>
     public bool Solid { get; init; } = true;

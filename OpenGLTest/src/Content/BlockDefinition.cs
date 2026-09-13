@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.Json;
 
 namespace silkgltriangle;
@@ -16,8 +17,23 @@ public sealed class BlockDefinition
     /// <summary>Model file name (<c>"block/cube_all"</c>) or an inline model object.</summary>
     public JsonElement Model { get; set; }
 
-    /// <summary>Hits to break; see <see cref="BlockType.MaxHealth"/>.</summary>
-    public int? Hardness { get; set; }
+    /// <summary>Damage needed to break; one hit deals the held tool's power. Default 5.</summary>
+    public float? Hardness { get; set; }
+
+    /// <summary>
+    /// When true, a hit only damages the block if the held item belongs to one of the
+    /// <see cref="Tools"/> tags at or above its required power; anything else deals 0 and makes
+    /// no progress. When false (default), any tool or bare hand mines it and <see cref="Tools"/>
+    /// is ignored.
+    /// </summary>
+    public bool? RequiresTool { get; set; }
+
+    /// <summary>
+    /// Tag name to minimum tool power: <c>{"pickaxe": 1.0}</c> admits any item listed in the
+    /// <c>pickaxe</c> tag whose tool power is 1.0 or more. A <c>0</c> requirement admits any
+    /// member of that tag. Ignored unless <see cref="RequiresTool"/> is set.
+    /// </summary>
+    public Dictionary<string, float>? Tools { get; set; }
 
     public bool? Solid { get; set; }
 

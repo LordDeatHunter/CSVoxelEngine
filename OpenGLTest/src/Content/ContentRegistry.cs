@@ -336,6 +336,17 @@ public static class ContentRegistry
             var id = ItemIds[name];
             var sheet = ParseSpritesheet(definition.Spritesheet, path);
             var display = ParseDisplay(definition.Display, path);
+
+            var tool = definition.Tool;
+            var power = tool?.Power ?? 1f;
+            if (!float.IsFinite(power) || power <= 0f)
+                throw new InvalidOperationException(
+                    $"Item '{path}' has tool.power {tool?.Power}; expected a positive number.");
+            var hitDelay = tool?.HitDelayMs ?? Mining.DefaultHitGapMs;
+            if (!float.IsFinite(hitDelay) || hitDelay < 1f || hitDelay > 60000f)
+                throw new InvalidOperationException(
+                    $"Item '{path}' has tool.hitDelayMs {tool?.HitDelayMs}; expected 1..60000 milliseconds.");
+
             types[id] = ItemFactory.Create(name, new ItemFactory.ItemSpec(
                 id, definition.Name ?? name, definition.Texture,
                 action,
@@ -344,7 +355,8 @@ public static class ContentRegistry
                 ResolveUseTarget(use?.Block, "use.block", path),
                 chance, durability, useDelay,
                 sheet.Cols, sheet.Rows, sheet.Frames, sheet.Mode, sheet.Fps,
-                display.Rotation, display.Translation, display.Scale));
+                display.Rotation, display.Translation, display.Scale,
+                tool != null, power, hitDelay));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ItemIds, StringComparer.Ordinal));
@@ -695,13 +707,39 @@ public static class ContentRegistry
                 throw new InvalidOperationException(
                     $"Block '{path}' sets movementSpeed on a fluid: swimming handles how fast a body moves through it.");
 
+            var hardness = definition.Hardness ?? BlockType.DefaultHardness;
+            if (!float.IsFinite(hardness) || hardness < 0f)
+                throw new InvalidOperationException(
+                    $"Block '{path}' has hardness {definition.Hardness}; expected 0 or more.");
+
+            var requiresTool = definition.RequiresTool ?? false;
+            IReadOnlyDictionary<string, float>? tools = null;
+            if (definition.Tools is { Count: > 0 } authoredTools)
+            {
+                var table = new Dictionary<string, float>(authoredTools.Count, StringComparer.Ordinal);
+                foreach (var (tag, required) in authoredTools)
+                {
+                    if (string.IsNullOrWhiteSpace(tag))
+                        throw new InvalidOperationException($"Block '{path}' has a tools entry with no tag name.");
+                    if (!float.IsFinite(required) || required < 0f)
+                        throw new InvalidOperationException(
+                            $"Block '{path}' has tools.{tag} {required}; expected 0 or more.");
+                    table[tag] = required;
+                }
+                tools = table;
+            }
+            if (requiresTool && tools == null)
+                Log.Warn($"Block '{path}' sets requiresTool but lists no tools; the gate is inert and any tool mines it.");
+
             var type = new BlockType
             {
                 Name = name,
                 DisplayName = definition.Name ?? name,
                 Id = id,
                 Sfx = ResolveSfx(path, definition.Sfx),
-                MaxHealth = definition.Hardness ?? BlockType.DefaultMaxHealth,
+                Hardness = hardness,
+                RequiresTool = requiresTool,
+                Tools = tools,
                 Solid = solid,
                 MovementSpeed = movementSpeed,
                 CullSelf = definition.CullSelf ?? false,
@@ -832,6 +870,17 @@ public static class ContentRegistry
                 throw new InvalidOperationException(
                     $"Tag '{BranchConnectableTag}' names id {id}: tapered wood only grows into blocks.");
             BlockType.BranchConnectableById[id] = true;
+        }
+
+        // Tool tags are free-form strings, so a block may gate on one no item provides: a typo,
+        // or content authored ahead of its tool. Warn and leave the gate as written (nothing can
+        // mine the block until a matching item exists) rather than abort startup.
+        foreach (var type in BlockType.Types.Values)
+        {
+            if (type.Tools == null) continue;
+            foreach (var tag in type.Tools.Keys)
+                if (!Tags.TryGetValue(tag, out var members) || !members.Any(ItemRegistry.IsItem))
+                    Log.Warn($"Block '{type.Name}' gates on tool tag '{tag}', which no item provides.");
         }
     }
 

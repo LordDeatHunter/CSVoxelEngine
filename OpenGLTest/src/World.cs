@@ -17,9 +17,10 @@ public class World : IItemUseWorld
     // How far the player can target blocks (10 blocks)
     public const float InteractionReach = 10f;
 
-    // Seconds of holding left-click per mining hit. Each hit removes 1 HP from the
-    // targeted block; time short of a full interval deals nothing (creative breaks instantly).
-    public const float BlockHitSeconds = 0.2f;
+    // Seconds of holding left-click per bare-hand mining hit. Each hit removes the held
+    // tool's power from the block's hardness; time short of a full interval deals nothing
+    // (creative breaks instantly). A tool declares its own pace through item JSON.
+    public const float BlockHitSeconds = Mining.DefaultHitGapMs / 1000f;
 
     // A hit makes the block jump out and settle back. Kept below BlockHitSeconds so the
     // pop always finishes before the next hit restarts it.
@@ -60,8 +61,12 @@ public class World : IItemUseWorld
     private bool _isBreaking;
     private Vector3 _breakingBlockPosition;
     private byte _breakingBlockId;
-    private int _breakDamage;
-    private int _breakMaxHealth;
+    private byte _breakingHeldId;
+    private float _breakDamage;
+    private float _breakHardness;
+    private float _breakPower;
+    private float _breakHitSeconds = Mining.DefaultHitGapMs / 1000f;
+    private bool _breakAllowed;
     private float _hitTimer;
     private float _popElapsed = BlockPopSeconds;
     public Camera Camera { get; }
@@ -130,7 +135,7 @@ public class World : IItemUseWorld
 
     // Break overlay strength. Quantized to whole hits, so it steps with the damage dealt
     // instead of sweeping continuously.
-    private float BreakProgress => _breakMaxHealth > 0 ? _breakDamage / (float)_breakMaxHealth : 0f;
+    private float BreakProgress => _breakHardness > 0f ? _breakDamage / _breakHardness : 0f;
 
     // Growth of the block being mined: 0 at rest, eased up to BlockPopGrow and back down
     // over BlockPopSeconds after each hit lands
@@ -530,11 +535,14 @@ public class World : IItemUseWorld
     
     /// <summary>
     /// Drives hit-based mining: the first hit on a block lands the instant it is targeted, so a
-    /// quick tap counts as one hit, then one hit per BlockHitSeconds while it is held, each
-    /// removing 1 HP, and the block breaks when its HP runs out (see BlockType.MaxHealth, the
-    /// block's JSON hardness). A block of hardness 0 breaks on first contact. Damage is discarded
-    /// when the target changes or the button is released. Creative instamines (one block per
-    /// frame, as before). Call after Update so the selection is current.
+    /// quick tap counts as one hit, then one hit per the held item's pace while it is held (<see
+    /// cref="Mining"/>; a bare hand uses the baseline). Each hit removes the held tool's power
+    /// from the block's float hardness, and the block breaks when the damage reaches it. A block
+    /// whose <c>requiresTool</c> gate refuses the held tool (wrong kind, or below its required
+    /// power) takes 0 damage and shows no progress, though the swing still plays. A block of
+    /// hardness 0 breaks on first contact. Damage is discarded when the target, the held tool or
+    /// the button changes. Creative instamines (one block per frame) and ignores the gate.
+    /// Call after Update so the selection is current.
     /// </summary>
     public void UpdateBlockBreaking(double deltaTime, bool isHolding)
     {
@@ -564,30 +572,41 @@ public class World : IItemUseWorld
             return;
         }
 
-        if (!_isBreaking || _selectedBlockPosition != _breakingBlockPosition)
+        var heldId = Inventory.SelectedBlockId;
+        var held = heldId != 0 && Inventory.SelectedCount > 0 ? ItemRegistry.TryGet(heldId) : null;
+
+        // A new target or a different held item restarts the break: the gate, damage and pace
+        // all belong to that pairing, so carrying progress over would apply the wrong numbers
+        if (!_isBreaking || _selectedBlockPosition != _breakingBlockPosition || heldId != _breakingHeldId)
         {
             _isBreaking = true;
             _breakingBlockPosition = _selectedBlockPosition;
             _breakingBlockId = BlockIdAt(_selectedBlockPosition);
-            _breakMaxHealth = BlockType.ById[_breakingBlockId]?.MaxHealth ?? 0;
-            _breakDamage = 0;
+            _breakingHeldId = heldId;
+            _breakHardness = BlockType.ById[_breakingBlockId]?.Hardness ?? 0f;
+            _breakAllowed = Mining.CanMine(_breakingBlockId, held);
+            _breakPower = Mining.Power(held);
+            _breakHitSeconds = Mining.HitGapSeconds(held);
+            _breakDamage = 0f;
             // Seed the timer a whole interval in so the loop below lands the first hit this
             // frame: a tap then counts as one hit instead of being released before the gap
             // it would have to survive.
-            _hitTimer = BlockHitSeconds;
+            _hitTimer = _breakHitSeconds;
             _popElapsed = BlockPopSeconds;
         }
 
-        // Zero health covers two cases: a real block of hardness 0 (pebbles) pops on first
+        // Zero hardness covers two cases: a real block of hardness 0 (pebbles) pops on first
         // contact with no hold-to-mine, while air or an unloaded chunk has nothing to mine
-        // at all — the id being a registered block is what tells them apart.
-        if (_breakMaxHealth <= 0)
+        // at all — the id being a registered block is what tells them apart. A refused tool
+        // whiffs instead of popping the block.
+        if (_breakHardness <= 0f)
         {
             if (BlockType.ById[_breakingBlockId] != null)
             {
                 Player.Punch();
                 PlayHitSfx(_breakingBlockId);
-                RemoveBlock(_selectedBlockPosition);
+                if (_breakAllowed)
+                    RemoveBlock(_selectedBlockPosition);
             }
             StopBreaking();
             return;
@@ -597,10 +616,9 @@ public class World : IItemUseWorld
         _popElapsed += (float)deltaTime;
 
         // A long frame can carry more than one hit; the leftover time rolls into the next
-        while (_hitTimer >= BlockHitSeconds)
+        while (_hitTimer >= _breakHitSeconds)
         {
-            _hitTimer -= BlockHitSeconds;
-            _breakDamage++;
+            _hitTimer -= _breakHitSeconds;
             Player.Punch();
             PlayHitSfx(_breakingBlockId);
 
@@ -608,7 +626,14 @@ public class World : IItemUseWorld
             // the frame boundary, so the animation stays in step with the hit rhythm
             _popElapsed = _hitTimer;
 
-            if (_breakDamage < _breakMaxHealth)
+            // A refused tool still swings and sounds, but deals nothing: no damage, no debris
+            // and no progress, so the block can never come down that way
+            if (!_breakAllowed)
+                continue;
+
+            _breakDamage += _breakPower;
+
+            if (_breakDamage < _breakHardness)
             {
                 _debris.Burst(_breakingBlockPosition, _breakingBlockId, WorldGenerationConfig.BlockDebrisPerHit);
                 continue;
@@ -623,8 +648,10 @@ public class World : IItemUseWorld
     private void StopBreaking()
     {
         _isBreaking = false;
-        _breakDamage = 0;
-        _breakMaxHealth = 0;
+        _breakDamage = 0f;
+        _breakHardness = 0f;
+        _breakAllowed = false;
+        _breakHitSeconds = Mining.DefaultHitGapMs / 1000f;
         _hitTimer = 0f;
         _popElapsed = BlockPopSeconds;
     }

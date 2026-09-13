@@ -23,8 +23,9 @@ public sealed class CraftingTests
         Assert.True(inventory.Add(branch));
         Assert.True(inventory.Add(vine, 2));
         var firestarter = ContentRegistry.RecipeForResult(ContentRegistry.RequireItem("firestarter").Id)!;
+        var axe = ContentRegistry.RecipeForResult(ContentRegistry.RequireItem("primitive_axe").Id)!;
         var quern = ContentRegistry.RecipeByName("quern")!;
-        Assert.Equal([firestarter, recipe, quern], inventory.Craftable());
+        Assert.Equal([firestarter, axe, recipe, quern], inventory.Craftable());
 
         Assert.True(inventory.TryCraft(recipe));
         Assert.Equal(0, inventory.CountFor(flint));
@@ -119,7 +120,7 @@ public sealed class CraftingTests
         // Only one set on hand: a batch of two fails and consumes nothing.
         Assert.False(inventory.TryCraft(recipe, 2, (index, ingredient) => ingredient.Id));
         Assert.Equal(1, inventory.CountFor(flint));
-        Assert.Equal(3, inventory.Craftable().Count);
+        Assert.Equal(4, inventory.Craftable().Count);
         Assert.Equal(0, inventory.CountFor(pickaxe));
     }
 

@@ -1,5 +1,7 @@
 {
   "name": "Cobblestone",
   "model": { "parent": "block/cube_all", "textures": { "all": "cobblestone" } },
-  "sfx": "hit_rock"
+  "sfx": "hit_rock",
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 }
 }

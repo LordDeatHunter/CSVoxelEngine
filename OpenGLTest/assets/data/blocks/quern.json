@@ -48,6 +48,8 @@
   },
   "hardness": 5,
   "sfx": "hit_rock",
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
   "renderer": "quern",
   // The two rocks: base and resting plate. The plate box is the rest pose and never
   // follows the spin — hitboxes are static per-type data. The handle has no box.

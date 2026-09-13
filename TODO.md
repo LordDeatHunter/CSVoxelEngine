@@ -73,6 +73,10 @@ same world, and a player can move between them freely — neither arc gates the 
   session direction without requiring combat. Also good onboarding.
 - [ ] **`P-9` · Character progression (shared RPG spine)** — P2, L.
   XP from gathering/crafting/killing; perks that feed both Arc A and Arc B. See `P-15`.
+- [ ] **`P-30` · Universal mining tool (power glove / drill)** — P3, S–M.
+  A tool that passes every block's `tools` gate no matter its kind, so nothing is ever refused
+  (a powered mining glove or drill). Built on `P-1`'s tool-tag + `requiresTool` gating: either a
+  flag that bypasses the gate or one item that belongs to every tool tag.
 
 ### Survival basics
 

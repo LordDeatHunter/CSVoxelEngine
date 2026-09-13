@@ -6,6 +6,8 @@
   },
   "renderer": "tapered_wood",
   "sfx": "hit_wood",
+  "requiresTool": true,
+  "tools": { "axe": 1 },
   "wood": { "taperLevel": 5, "halfWidth": 0.125 },
   "hasItem": false,
   "occludes": false,

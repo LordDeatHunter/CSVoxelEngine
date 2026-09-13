@@ -32,7 +32,10 @@ public static class ItemFactory
         float AnimationFps,
         Vector3 Rotation,
         Vector3 Translation,
-        float Scale);
+        float Scale,
+        bool IsTool,
+        float ToolPower,
+        float HitDelayMs);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,

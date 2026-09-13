@@ -1,0 +1,9 @@
+{
+  "result": "item/primitive_axe",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/flint", "count": 1 },
+    { "item": "item/branch", "count": 1 },
+    { "item": "item/vine", "count": 2 }
+  ]
+}

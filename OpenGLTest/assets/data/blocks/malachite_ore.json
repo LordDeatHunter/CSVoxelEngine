@@ -3,5 +3,7 @@
   "model": { "parent": "block/cube_all", "textures": { "all": "malachite_ore" } },
   "sfx": "hit_rock",
   "hardness": 8,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
   "loot": "malachite_ore"
 }

@@ -6,5 +6,7 @@
   },
   "hardness": 8,
   "sfx": "hit_wood",
+  "requiresTool": true,
+  "tools": { "axe": 1 },
   "wood": { "taperLevel": 0, "halfWidth": 0.5 }
 }
