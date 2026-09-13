@@ -33,7 +33,7 @@ public readonly record struct HotbarSlot(bool IsTool, byte Id, int ToolInstance)
 ///
 /// Pickups go through <see cref="Add"/>, which refuses what does not fit — the caller must
 /// leave a refused drop on the ground (see <see cref="CanAccept"/>). The player spawns with
-/// a test stock of 50 of every block plus one bucket.
+/// a test stock of 50 of every block plus one bucket, one axe and one compass.
 /// </summary>
 public class Inventory
 {
@@ -47,13 +47,6 @@ public class Inventory
 
     /// <summary>Test stock of every placeable block the player spawns with.</summary>
     public const int StartingStock = 50;
-
-    /// <summary>Empty buckets the player spawns with; water is only reachable with one.</summary>
-    public const int StartingBuckets = 1;
-
-    /// <summary>Compasses in the misc pool at spawn; the player equips one to a hotbar
-    /// slot through the [E] panel to turn the HUD compass on.</summary>
-    public const int StartingCompasses = 1;
 
     // A pickup makes the slot's icon jump and settle back, echoing the count change
     // drawn in the slot's corner
@@ -582,17 +575,20 @@ public class Inventory
     public Inventory()
     {
         // Test stock: 50 of every placeable block, so placing and the category caps can
-        // be tried without mining first; one bucket, since water needs one to reach
+        // be tried without mining first; one each of the starting bucket, axe and compass.
         foreach (var type in BlockType.Types.Values)
             if (type.HasItem && !type.Fluid)
                 _blocks[type.Id] = StartingStock;
-        for (var i = 0; i < StartingBuckets; i++)
-            if (ItemRegistry.FindByAction(ItemUseAction.PickupFluid) is { } bucket)
-                _tools.Add(new ItemStack(_nextToolInstance++, bucket));
-        // A plain pickup like flint, found by display name the way the bucket is found
-        // by behaviour. No use action: it only ever sits on the hotbar for the compass.
+        // One bucket, since water needs one to reach, plus the axe, found by behaviour and
+        // display name the way the compass below is.
+        if (ItemRegistry.FindByAction(ItemUseAction.PickupFluid) is { } bucket)
+            _tools.Add(new ItemStack(_nextToolInstance++, bucket));
+        if (ItemRegistry.FindByName("Primitive Axe") is { } axe)
+            _tools.Add(new ItemStack(_nextToolInstance++, axe));
+        // A plain pickup like flint, found by display name. No use action: it only ever
+        // sits on the hotbar for the compass.
         if (ItemRegistry.FindByName("Compass") is { } compass)
-            _misc[compass.Id] = _misc.GetValueOrDefault(compass.Id) + StartingCompasses;
+            _misc[compass.Id] = _misc.GetValueOrDefault(compass.Id) + 1;
     }
 
     /// <summary>One stackable list row: icon, name and the pool count for that id.</summary>

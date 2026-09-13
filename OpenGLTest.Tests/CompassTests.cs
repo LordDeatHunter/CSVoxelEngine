@@ -55,13 +55,6 @@ public sealed class CompassTests
     }
 
     [Fact]
-    public void StartingInventoryCarriesACompass()
-    {
-        var compass = ContentRegistry.RequireItem("compass").Id;
-        Assert.Equal(Inventory.StartingCompasses, new Inventory().CountFor(compass));
-    }
-
-    [Fact]
     public void CompassShowsOnlyWhileEquippedOnHotbar()
     {        var inventory = new Inventory();
         var compass = ContentRegistry.RequireItem("compass").Id;

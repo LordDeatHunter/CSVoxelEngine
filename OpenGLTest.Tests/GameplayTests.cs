@@ -78,8 +78,9 @@ public sealed class GameplayTests
     public void InventoryMorphSwapsBucketForWaterBucketInPlace()
     {
         var inventory = new Inventory();
+        var bucket = ContentRegistry.RequireItem("bucket").Id;
         var filled = ContentRegistry.RequireItem("water_bucket").Id;
-        var instance = Assert.Single(inventory.ToolEntries()).InstanceId;
+        var instance = Assert.Single(inventory.ToolEntries(), t => t.ItemId == bucket).InstanceId;
         inventory.EquipTool(0, instance);
 
         Assert.True(inventory.MorphTool(instance, filled));

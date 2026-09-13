@@ -1,3 +1,4 @@
+using System.Linq;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -98,8 +99,8 @@ public sealed class InventoryTests
         var filled = ContentRegistry.RequireItem("water_bucket").Id;
         Assert.True(inventory.Add(bucket));
 
-        var tools = inventory.ToolEntries();
-        Assert.Equal(2, tools.Count);
+        var tools = inventory.ToolEntries().Where(t => t.ItemId == bucket).ToArray();
+        Assert.Equal(2, tools.Length);
         inventory.EquipTool(0, tools[0].InstanceId);
         inventory.EquipTool(3, tools[1].InstanceId);
 
@@ -112,7 +113,7 @@ public sealed class InventoryTests
     public void RemovingAToolEmptiesItsSlots()
     {
         var inventory = new Inventory();
-        var instance = Assert.Single(inventory.ToolEntries()).InstanceId;
+        var instance = inventory.ToolEntries()[0].InstanceId;
         inventory.EquipTool(0, instance);
         inventory.EquipTool(3, instance);
 

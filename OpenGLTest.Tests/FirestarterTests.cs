@@ -68,7 +68,8 @@ public sealed class FirestarterTests
     public void BucketsHaveNoDurabilityBar()
     {
         var inventory = new Inventory();
-        var instance = Assert.Single(inventory.ToolEntries()).InstanceId;
+        var bucket = ContentRegistry.RequireItem("bucket").Id;
+        var instance = Assert.Single(inventory.ToolEntries(), t => t.ItemId == bucket).InstanceId;
         Assert.Null(inventory.ToolDurabilityLeft(instance));
         Assert.Null(inventory.ToolDurabilityFraction(instance));
         Assert.False(inventory.DamageTool(instance));
