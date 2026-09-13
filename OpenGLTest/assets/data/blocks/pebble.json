@@ -1,6 +1,7 @@
 {
   "name": "Pebble",
   "model": { "parent": "block/cube_all", "textures": { "all": "stone" } },
+  "sfx": "hit_rock",
   "hardness": 0,
   "renderer": "pebbles",
   "solid": false,

@@ -31,8 +31,8 @@ public sealed class AmbienceTests
     }
 
     [Theory]
-    [InlineData("forest-ambience.mp3")]
-    [InlineData("night-ambience.mp3")]
+    [InlineData("ambience/forest_ambience.mp3")]
+    [InlineData("ambience/night_ambience.mp3")]
     public void RealMp3sDecodeWithoutOsCodecs(string fileName)
     {
         var path = FindSfxAsset(fileName);
@@ -54,8 +54,8 @@ public sealed class AmbienceTests
     }
 
     [Theory]
-    [InlineData("forest-ambience.mp3")]
-    [InlineData("night-ambience.mp3")]
+    [InlineData("ambience/forest_ambience.mp3")]
+    [InlineData("ambience/night_ambience.mp3")]
     public void LoopWrapsIntoSecondPlaythrough(string fileName)
     {
         var path = FindSfxAsset(fileName);

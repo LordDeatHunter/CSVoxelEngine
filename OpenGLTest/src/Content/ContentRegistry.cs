@@ -54,6 +54,10 @@ public static class ContentRegistry
     private static string _assetsRoot = "assets";
     private static ModelLoader? _models;
 
+    // Every sfx group discovered under assets/sfx at load, used to validate block "sfx" names.
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>> _sfxGroups =
+        new Dictionary<string, IReadOnlyList<string>>();
+
     /// <summary>
     /// Parses <c>data/items</c>, <c>data/blocks</c>, <c>data/loot</c> and every model they
     /// reference, assigns ids (air = 0, then blocks by name, then items by name) and publishes
@@ -65,6 +69,7 @@ public static class ContentRegistry
         Reset();
 
         _models = new ModelLoader(Path.Combine(assetsRoot, "models"), JsonOptions);
+        _sfxGroups = SfxLibrary.Scan(Path.Combine(assetsRoot, "sfx"));
 
         var blockFiles = JsonFilesIn(Path.Combine(assetsRoot, "data", "blocks"));
         var itemFiles = JsonFilesIn(Path.Combine(assetsRoot, "data", "items"));
@@ -266,6 +271,7 @@ public static class ContentRegistry
         CrushRecipes.Clear();
         BlockModels.Clear();
         BlockDefinitions.Clear();
+        _sfxGroups = new Dictionary<string, IReadOnlyList<string>>();
         ItemRegistry.Reset();
 
         Array.Clear(BlockType.ById);
@@ -694,6 +700,7 @@ public static class ContentRegistry
                 Name = name,
                 DisplayName = definition.Name ?? name,
                 Id = id,
+                Sfx = ResolveSfx(path, definition.Sfx),
                 MaxHealth = definition.Hardness ?? BlockType.DefaultMaxHealth,
                 Solid = solid,
                 MovementSpeed = movementSpeed,
@@ -920,6 +927,17 @@ public static class ContentRegistry
         return LootTables.TryGetValue(loot, out var table)
             ? table
             : throw new InvalidOperationException($"Block '{path}' names loot table '{loot}', which does not exist.");
+    }
+
+    // A block's sfx is non-fatal: an unknown group is a warning and the default, not a crash,
+    // so a block still plays *something* while the audio asset is being authored.
+    internal static string ResolveSfx(string path, string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return SfxLibrary.DefaultGroup;
+        if (_sfxGroups.ContainsKey(name)) return name;
+
+        Log.Warn($"Block '{path}' names sfx group '{name}', which has no .wav files under assets/sfx; using '{SfxLibrary.DefaultGroup}'.");
+        return SfxLibrary.DefaultGroup;
     }
 
     private static BlockModel ResolveModel(JsonElement model, string path)

@@ -84,6 +84,11 @@ public sealed record BlockType
     /// <summary>Byte id assigned at load; what chunk storage holds.</summary>
     public required byte Id { get; init; }
 
+    /// <summary>Sound group played when this block is mined or hit (see <see cref="SfxManager"/>),
+    /// resolved from the block's <c>sfx</c> JSON and defaulting to
+    /// <see cref="SfxLibrary.DefaultGroup"/>.</summary>
+    public string Sfx { get; init; } = SfxLibrary.DefaultGroup;
+
     public int MaxHealth { get; init; } = DefaultMaxHealth;
 
     /// <summary>Whether the block collides with bodies.</summary>

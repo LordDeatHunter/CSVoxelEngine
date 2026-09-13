@@ -43,6 +43,7 @@ public class World : IItemUseWorld
     private readonly QuernManager _querns = new();
     private readonly FireParticleSystem _fire = new();
     private readonly BubbleParticleSystem _bubbles = new();
+    private readonly SfxManager? _sfx;
 
     // Inventory is assigned in its own initialiser and never replaced, so the method group is the
     // same closed delegate every frame; passing `Inventory.CanAccept` inline at the DropManager call
@@ -137,9 +138,10 @@ public class World : IItemUseWorld
         BlockPopGrow * MathUtils.Pulse(_popElapsed / BlockPopSeconds);
 
     public World(GL gl, ChunkGeometryPool opaqueGeometry, ChunkGeometryPool translucentGeometry,
-        ChunkGeometryPool lodGeometry, IWindow window, IInputContext input)
+        ChunkGeometryPool lodGeometry, IWindow window, IInputContext input, SfxManager? sfx = null)
     {
         _window = window;
+        _sfx = sfx;
         Camera = new Camera(window, input);
         _spawnX = Camera.Position.X;
         _spawnZ = Camera.Position.Z;
@@ -278,8 +280,11 @@ public class World : IItemUseWorld
         // Drops collected this tick land in the inventory pools. A full pool ignores the
         // drop (it is never attracted), and an id with no pool is discarded.
         _dropManager.Update((float)deltaTime, Camera.Position, _chunkManager, _canAcceptDrop);
+        var pickedUp = false;
         foreach (var blockId in _dropManager.Collected)
-            Inventory.Add(blockId);
+            pickedUp |= Inventory.Add(blockId);
+        if (pickedUp)
+            _sfx?.Play(SfxLibrary.PickupGroup);
 
         _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager, _falling, _leaves);
         _falling.Update((float)deltaTime, _chunkManager, _dropManager, _fluidManager);
@@ -554,6 +559,7 @@ public class World : IItemUseWorld
         {
             StopBreaking();
             Player.Punch();
+            PlayHitSfx(BlockIdAt(_selectedBlockPosition));
             RemoveBlock(_selectedBlockPosition);
             return;
         }
@@ -577,6 +583,7 @@ public class World : IItemUseWorld
             if (BlockType.ById[_breakingBlockId] != null)
             {
                 Player.Punch();
+                PlayHitSfx(_breakingBlockId);
                 RemoveBlock(_selectedBlockPosition);
             }
             StopBreaking();
@@ -592,6 +599,7 @@ public class World : IItemUseWorld
             _hitTimer -= BlockHitSeconds;
             _breakDamage++;
             Player.Punch();
+            PlayHitSfx(_breakingBlockId);
 
             // Start the pop from where the hit actually landed inside this frame, not from
             // the frame boundary, so the animation stays in step with the hit rhythm
@@ -626,6 +634,11 @@ public class World : IItemUseWorld
         // blockPos components are floored floats, so the int casts are exact
         return _chunkManager.GetBlockGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
     }
+
+    // One hit, one sound: an unknown or air id falls back to the default group, which is what
+    // a block with no authored sfx plays too. A null manager (headless/tests) is silent.
+    private void PlayHitSfx(byte blockId) =>
+        _sfx?.Play(BlockType.ById[blockId]?.Sfx ?? SfxLibrary.DefaultGroup);
 
     /// <summary>
     /// Hitboxes for the outline, break overlay and mining pop. Tapered wood resolves

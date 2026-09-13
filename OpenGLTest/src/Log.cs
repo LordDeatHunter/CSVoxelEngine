@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Threading;
 
 namespace silkgltriangle;
@@ -13,7 +14,11 @@ namespace silkgltriangle;
 /// </summary>
 public static class Log
 {
-    private static readonly BlockingCollection<string> _queue = new();
+    // Optional colour for a line; null keeps the terminal's default. The colour is applied by
+    // the writer thread, so setting Console.ForegroundColor never races another writer.
+    private readonly record struct Entry(string Line, ConsoleColor? Color);
+
+    private static readonly BlockingCollection<Entry> _queue = new();
     private static readonly Thread _writer = new(WriteLoop)
     {
         IsBackground = true,
@@ -23,16 +28,25 @@ public static class Log
     static Log() => _writer.Start();
 
     /// <summary>Enqueues one line; never blocks. Falls back to a direct write after shutdown.</summary>
-    public static void WriteLine(string line)
+    public static void WriteLine(string line) => Enqueue(new Entry(line, null));
+
+    /// <summary>Enqueues one line drawn in <paramref name="color"/> where the terminal supports it.</summary>
+    public static void WriteLine(string line, ConsoleColor color) => Enqueue(new Entry(line, color));
+
+    /// <summary>Enqueues a warning line, drawn yellow. Non-fatal content problems use this so a
+    /// bad field degrades to a default instead of aborting startup.</summary>
+    public static void Warn(string line) => Enqueue(new Entry(line, ConsoleColor.Yellow));
+
+    private static void Enqueue(Entry entry)
     {
         try
         {
-            _queue.Add(line);
+            _queue.Add(entry);
         }
         catch (InvalidOperationException)
         {
             // Shutdown already ran (background workers can outlive it): same as the old path.
-            Console.WriteLine(line);
+            WriteDirect(entry);
         }
     }
 
@@ -43,20 +57,60 @@ public static class Log
         _queue.CompleteAdding();
         if (_writer.Join(TimeSpan.FromSeconds(2)))
             return;
-        while (_queue.TryTake(out var line))
-            Console.WriteLine(line);
+        while (_queue.TryTake(out var entry))
+            WriteDirect(entry);
     }
 
     private static void WriteLoop()
     {
         try
         {
-            foreach (var line in _queue.GetConsumingEnumerable())
-                Console.WriteLine(line);
+            foreach (var entry in _queue.GetConsumingEnumerable())
+                WriteDirect(entry);
         }
         catch (ObjectDisposedException)
         {
             // Stdout went away (process teardown); Shutdown drains what is left.
+        }
+    }
+
+    // A redirected or detached console can refuse colour changes; in that case the line is
+    // still written, just without the tint. The write itself is never retried, so a broken
+    // pipe cannot double up a line.
+    private static void WriteDirect(Entry entry)
+    {
+        if (entry.Color is not { } color)
+        {
+            Console.WriteLine(entry.Line);
+            return;
+        }
+
+        ConsoleColor previous;
+        try
+        {
+            previous = Console.ForegroundColor;
+            Console.ForegroundColor = color;
+        }
+        catch (Exception e) when (e is IOException or PlatformNotSupportedException)
+        {
+            Console.WriteLine(entry.Line);
+            return;
+        }
+
+        try
+        {
+            Console.WriteLine(entry.Line);
+        }
+        finally
+        {
+            try
+            {
+                Console.ForegroundColor = previous;
+            }
+            catch (Exception e) when (e is IOException or PlatformNotSupportedException)
+            {
+                // The console went away mid-line; nothing left to restore.
+            }
         }
     }
 }

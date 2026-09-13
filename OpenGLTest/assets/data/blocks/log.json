@@ -5,5 +5,6 @@
     "textures": { "end": "log_top", "side": "log_side" }
   },
   "hardness": 8,
+  "sfx": "hit_wood",
   "wood": { "taperLevel": 0, "halfWidth": 0.5 }
 }

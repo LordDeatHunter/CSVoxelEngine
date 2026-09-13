@@ -5,6 +5,7 @@
     "textures": { "end": "log_top", "side": "log_side" }
   },
   "hardness": 0,
+  "sfx": "hit_wood",
   "renderer": "branch_pile",
   "solid": false,
   "occludes": false,

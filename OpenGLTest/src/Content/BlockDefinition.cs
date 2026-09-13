@@ -82,6 +82,13 @@ public sealed class BlockDefinition
     /// block's name if one exists, otherwise the block drops itself.</summary>
     public string? Loot { get; set; }
 
+    /// <summary>
+    /// Sound group played while this block is mined (see <see cref="SfxManager"/>), e.g.
+    /// <c>"hit_rock"</c> or <c>"hit_wood"</c>. Omitted, or naming a group with no files under
+    /// <c>assets/sfx</c>, falls back to <see cref="SfxLibrary.DefaultGroup"/> with a warning.
+    /// </summary>
+    public string? Sfx { get; set; }
+
     /// <summary>Voxel light behaviour of a block.</summary>
     public sealed class LightDefinition
     {

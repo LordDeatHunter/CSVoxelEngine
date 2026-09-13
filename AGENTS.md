@@ -254,6 +254,7 @@ trailing commas.
 | `flow` | water behaviour | per-fluid tuning, only legal with `fluid: true`: `tickDivisor` (ticks between updates, lava `2` = half water speed), `range` (sideways spread 1..7, lava `3`), `infinite` (adjacent sources birth new ones, lava `false`), and the `hardensTo` + `hardensTouching` pair (lava hardens to `cobblestone` on touching `block/water`) |
 | `onBreak` | `"drop"` | `drop` (roll loot) or `prime_tnt` (no drop, spawns a `PrimedTnt`) |
 | `loot` | the table sharing this block's name, else drop self | loot table name; `"none"` drops nothing |
+| `sfx` | `hit_default` | sound group played while the block is mined, e.g. `hit_rock` (stone family) or `hit_wood` (wood family). A group is every `<group>.wav` / `<group>_N.wav` directly under `assets/sfx`, and one variant is picked at random per hit (`SfxManager`). An unknown group warns yellow and uses the default |
 | `hitbox` | full cube | selection boxes in cell-local 0..1 space: one `{"min": [x,y,z], "max": [x,y,z]}` object or an array of them; the outline draws all, the raycast only targets through one |
 
 Two traps worth repeating: a **model that is not a full cube needs `light.passes: true`** (which

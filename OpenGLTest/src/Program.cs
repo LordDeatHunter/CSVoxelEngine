@@ -13,6 +13,7 @@ public static class Program
     private static InputManager inputManager;
     private static RenderManager renderManager;
     private static AmbienceManager? ambience;
+    private static SfxManager? sfx;
     private static World world;
     private static VisualDirector? visualDirector;
     private static bool visualScriptFailed;
@@ -82,9 +83,10 @@ public static class Program
 
         inputManager = new InputManager(windowManager.Window);
         renderManager = new RenderManager(windowManager.Window);
+        sfx = new SfxManager();
         world = new World(renderManager.gl, renderManager.OpaqueChunkGeometry,
             renderManager.TranslucentChunkGeometry, renderManager.LodGeometry,
-            windowManager.Window, inputManager.InputContext);
+            windowManager.Window, inputManager.InputContext, sfx);
         world.Player.Rig = renderManager.PlayerRig;
 
         inputManager.Mouse?.MouseUp += (_, button) =>
@@ -596,6 +598,7 @@ public static class Program
     private static void OnClosing()
     {
         ambience?.Dispose();
+        sfx?.Dispose();
         // The last scripted step is usually a screenshot whose encode is still on a
         // worker; drain it before tearing down GL and the log queue.
         VisualCapture.WaitForPending();

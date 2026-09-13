@@ -1,5 +1,6 @@
 {
   "name": "Stone",
   "model": { "parent": "block/cube_all", "textures": { "all": "stone" } },
+  "sfx": "hit_rock",
   "loot": "stone"
 }

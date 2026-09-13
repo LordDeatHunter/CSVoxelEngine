@@ -1,6 +1,7 @@
 {
   "name": "Malachite Ore",
   "model": { "parent": "block/cube_all", "textures": { "all": "malachite_ore" } },
+  "sfx": "hit_rock",
   "hardness": 8,
   "loot": "malachite_ore"
 }
