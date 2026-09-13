@@ -566,4 +566,18 @@ public static class WorldGenerationConfig
     // past the caps stays standing (and still drops normally when mined).
     public const int TreeFellWoodCap = 256;
     public const int TreeFellTotalCap = 512;
+
+    // --- Slimes (SlimeManager) ---
+    // Forest mobs that hop at the player. Natural spawns appear on dry forest surface in a ring
+    // around the player and are culled when they stray too far. Damage only lands while a slime
+    // is airborne; a grounded touch shoves it instead. Combat values live here so a future
+    // player-attack pass reads one place.
+    public const int SlimeMaxAlive = 8;
+    public const float SlimeSpawnIntervalSeconds = 4f;
+    public const float SlimeSpawnMinRadiusBlocks = 20f;
+    public const float SlimeSpawnMaxRadiusBlocks = 40f;
+    public const float SlimeDespawnRadiusBlocks = 64f;
+    public const int SlimeSpawnTries = 8;
+    public const int SlimeContactDamage = 4;
+    public const float SlimeShoveSpeed = 3.5f;
 }

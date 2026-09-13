@@ -1,0 +1,10 @@
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "item/slimeball", "weight": 1, "count": { "min": 1, "max": 2 } }
+      ]
+    }
+  ]
+}

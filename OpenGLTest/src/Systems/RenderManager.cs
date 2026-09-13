@@ -53,6 +53,11 @@ public class RenderManager : IDisposable
     private uint _playerPaletteTex;
     private Dictionary<string, Mesh> _playerMeshes = new();
 
+    // The slime entity mesh and skin, built from its data-driven Blockbench project at load.
+    // Null only when no 'slime' entity kind is registered, in which case the pass is a no-op.
+    private Mesh? _slimeMesh;
+    private uint _slimeTexture;
+
     /// <summary>Blockbench project behind the player model; a missing or broken file falls back to built-in Steve.</summary>
     public const string PlayerModelPath = "assets/models/player/player.bbmodel";
 
@@ -432,6 +437,13 @@ public class RenderManager : IDisposable
         _playerPaletteTex = TextureLoader.Upload(gl, PlayerRig.TexturePixels,
             PlayerRig.TextureWidth, PlayerRig.TextureHeight);
         _playerMeshes = PlayerModel.BuildMeshes(gl, PlayerRig);
+        if (EntityRegistry.TryGet("slime") is { } slimeType)
+        {
+            var slimeModel = EntityModel.Load(slimeType.ModelPath);
+            _slimeMesh = slimeModel.BuildMesh(gl);
+            _slimeTexture = TextureLoader.Upload(gl, slimeModel.TexturePixels,
+                slimeModel.TextureWidth, slimeModel.TextureHeight);
+        }
         ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes);
         CreateSelectionGeometry();
         // Everything above binds raw - the atlas build, the loader, the sun's filter tweak and
@@ -742,7 +754,7 @@ public class RenderManager : IDisposable
     /// </summary>
     public void RenderShadows(Camera camera, IReadOnlyList<Chunk> chunks,
         IReadOnlyList<PrimedTnt> primed, IReadOnlyList<FallingBlock> falling, IEnumerable<TopplingTree> trees,
-        PlayerModel? player = null)
+        PlayerModel? player = null, IReadOnlyList<Slime>? slimes = null)
     {
         // The dry strength, not the wet-faded one: submerged, the caustics and the sun shafts
         // still sample this map even though the world diffuse has stopped using it.
@@ -823,6 +835,17 @@ public class RenderManager : IDisposable
             shadowShader.SetUniform("uModel", model);
             shadowShader.SetUniform("uLightMVP", model * _lightViewProj);
             mesh.Render();
+        }
+
+        if (slimes != null && _slimeMesh != null)
+        {
+            foreach (var slime in slimes)
+            {
+                var model = SlimeTransform(slime);
+                shadowShader.SetUniform("uModel", model);
+                shadowShader.SetUniform("uLightMVP", model * _lightViewProj);
+                _slimeMesh.Render();
+            }
         }
 
         foreach (var tree in trees)
@@ -2105,6 +2128,38 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
+    /// Draws the live slimes from the shared entity mesh, each squashed/stretched and yawed by
+    /// its own state and textured with its own skin. Restores the atlas on unit 0 on the way out
+    /// so the passes that follow (the water and cloud passes) see the world textures again.
+    /// </summary>
+    public void RenderSlimes(Camera camera, IReadOnlyList<Slime> slimes)
+    {
+        if (camera == null || _slimeMesh == null || slimes.Count == 0) return;
+
+        worldShader.Use();
+        BindWorldTextures();
+        BindUnit(0, TextureTarget.Texture2DArray, _slimeTexture);
+
+        var viewProj = camera.GetViewProjection();
+        foreach (var slime in slimes)
+        {
+            var model = SlimeTransform(slime);
+            SetDrawUniforms(model, model * viewProj, 1f);
+            _slimeMesh.Render();
+        }
+
+        BindWorldTextures();
+    }
+
+    // The model's base sits on y = 0 while Position is the body centre, so the feet offset lifts
+    // it onto the ground; scaling about the origin then squashes it from its base, not its middle.
+    private static Matrix4x4 SlimeTransform(Slime slime) =>
+        Matrix4x4.CreateScale(slime.HorizontalScale, slime.VerticalScale, slime.HorizontalScale)
+        * Matrix4x4.CreateRotationY(slime.Facing)
+        * Matrix4x4.CreateTranslation(
+            slime.Position.X, slime.Position.Y - Slime.HalfExtent, slime.Position.Z);
+
+    /// <summary>
     /// Draws every live falling leaf in one batched billboard draw. Leaves are too small to
     /// cast shadows, so they skip the shadow pass; their own shader carries the frame light
     /// and fog, which is final by the time the entity pass runs.
@@ -2571,6 +2626,9 @@ public class RenderManager : IDisposable
             mesh.Dispose();
         _playerMeshes.Clear();
         gl.DeleteTexture(_playerPaletteTex);
+        _slimeMesh?.Dispose();
+        if (_slimeTexture != 0)
+            gl.DeleteTexture(_slimeTexture);
         worldShader.Dispose();
         chunkShader.Dispose();
         selectionShader.Dispose();

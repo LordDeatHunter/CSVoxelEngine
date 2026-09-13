@@ -37,6 +37,7 @@ public class World : IItemUseWorld
     private readonly DropManager _dropManager = new();
     private readonly TntManager _tntManager = new();
     private readonly FallingBlockManager _falling = new();
+    private readonly SlimeManager? _slimes;
     private readonly FluidManager _fluidManager = new();
     private readonly LeafParticleSystem _leaves = new();
     private readonly BlockDebrisSystem _debris = new();
@@ -115,6 +116,9 @@ public class World : IItemUseWorld
     /// <summary>Live falling sand/gravel cubes.</summary>
     public IReadOnlyList<FallingBlock> Falling => _falling.Falling;
 
+    /// <summary>Live slimes, feeding the entity and shadow passes.</summary>
+    public IReadOnlyList<Slime> Slimes => _slimes?.Slimes ?? (IReadOnlyList<Slime>)Array.Empty<Slime>();
+
     /// <summary>Live falling leaves, feeding the batched billboard pass.</summary>
     public IReadOnlyList<LeafParticle> LeafParticles => _leaves.Particles;
 
@@ -156,6 +160,8 @@ public class World : IItemUseWorld
         _generationWorker = new ChunkGenerationWorker(_chunkManager, Camera);
         _lodManager = new LodManager(lodGeometry);
         _canAcceptDrop = Inventory.CanAccept;
+        if (EntityRegistry.TryGet("slime") is { } slimeType)
+            _slimes = new SlimeManager(slimeType);
 
         _generationWorker.Start();
         _lodManager.Start(Camera);
@@ -305,6 +311,18 @@ public class World : IItemUseWorld
         foreach (var block in _falling.Falling)
             Camera.PushOutOf(block.Position, FallingBlock.HalfExtent, _chunkManager);
 
+        // Slimes hop at the player: an airborne touch bills damage, a grounded one is just
+        // shoved aside. The manager only reports the amount; the health pool stays here.
+        if (_slimes != null)
+        {
+            _slimes.Update((float)deltaTime, _chunkManager, _dropManager, Camera);
+            if (_slimes.DamageDealtThisFrame > 0)
+            {
+                _health.TakeDamage(_slimes.DamageDealtThisFrame);
+                Camera.AddShake(Math.Clamp(_slimes.DamageDealtThisFrame / 20f, 0.2f, 1f));
+            }
+        }
+
         UpdateToppling((float)deltaTime);
         FrameProfiler.End(ProfileSection.Entities);
 
@@ -413,7 +431,7 @@ public class World : IItemUseWorld
         // Depth-only sun pass first: every world draw below samples the shadow map it fills
         FrameProfiler.Begin(ProfileSection.Shadows);
         renderManager.BeginGpuPass(ProfileSection.Shadows);
-        renderManager.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player);
+        renderManager.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player, Slimes);
         renderManager.EndGpuPass(ProfileSection.Shadows);
         FrameProfiler.End(ProfileSection.Shadows);
 
@@ -449,6 +467,7 @@ public class World : IItemUseWorld
         renderManager.RenderQuerns(Camera, _querns);
         renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
         renderManager.RenderFallingBlocks(Camera, _falling.Falling);
+        renderManager.RenderSlimes(Camera, Slimes);
         renderManager.RenderBlockDebris(Camera, _debris.Debris);
         foreach (var tree in _toppling)
             renderManager.RenderTopplingTree(Camera, tree);

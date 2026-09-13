@@ -380,6 +380,34 @@ Other invariants:
   - 3D cave noise is sampled on a `CaveNoiseStride` lattice (aligned to world coordinates so adjacent chunks share boundary samples) and trilinearly interpolated per block before thresholding.
 - **Far-terrain LOD**: full-detail chunks load to `ChunkRadius` (16 chunks = 256 blocks); a cascade of LOD rings defined in `LodRegion.Levels` extends the render distance (level 1: 2-block cells to 512, level 2: 4-block cells to 1024, level 3: 8-block cells to 2048 blocks). Regions are columns meshed at reduced resolution straight from the heightmap cache (no block data). Each level's heights are eroded (min over a widened fine-column window) and biased downward so its mesh sits strictly inside real terrain *and* strictly below the next finer level — finer geometry always buries coarser via the depth buffer, so no masking or camera-driven remeshing exists. Because those shells are stacked, only one level may actually be drawn per area — otherwise they are all visible once the camera is inside the terrain — so `LodManager.UpdateBuriedFlags` marks each region whose footprint is fully covered by *loaded* finer-level regions (region grids nest exactly: one region = ratio×ratio regions of the finer level) and `RenderLod` skips those. Testing loaded regions rather than each level's radius means an unbuilt finer region can never open a hole in the horizon. The finest level (0) has no finer level to hide it, so it is additionally marked buried wherever the full-detail chunks its shell could show through are loaded *and* meshed (`LodManager.IsCoveredByChunks`, using the per-column inclusive chunk-Y ranges recorded at region build in `LodRegion.ColumnCyMin/ColumnCyMax` and `Chunk.IsMeshed`, which unlike `HasMesh` is true for all-air and fully enclosed chunks too). This is needed because caves cut into the band the shell occupies and would otherwise show it from inside; presence is tested per chunk rather than by horizontal distance because the load volume is a sphere. LOD side faces use grass at the top cell, dirt above `NominalDirtDepth` and the stone tile below it, so far cliffs match near ones. The nesting invariants (`SampleMargin(L+1) >= SampleMargin(L) + CellSize(L) - 1`, `HeightBias(L+1) >= HeightBias(L) + CellSize(L)`) must hold when adding levels, and `Camera.NearPlane`/`FarPlane` are tuned to keep those separations from z-fighting at the outermost ring. LOD draws before chunks, coarsest level first (`RenderManager.RenderLod`). Destroying a block would expose the buried LOD, so removals cap that column's LOD height below the removed block (`LodRegion.LowerColumnBelow`) and affected regions on every level rebuild (`LodManager.MarkEditedColumn`); placements need nothing.
 
+## Biomes (not implemented yet)
+
+There is **no biome system**. The only biome is **forest**, and `TerrainGenerator.IsForest(x, z)`
+currently returns `true` for every column. It exists so gameplay that cares about biome (today just
+slime spawning, see below) asks one seam instead of hardcoding "everywhere". When real biomes land,
+they should be a pure function of world position like the rest of worldgen, so neighbours agree
+without shared state, and `IsForest` is the place to resolve them (or to delegate to a new
+`BiomeAt(x, z)`). Terrain already has non-biome variation — rolling base terrain vs rare flat
+"meadow" patches, ravines, beaches (`IsBeachHeight`), gravel patches (`IsGravelPatch`) — none of
+which is a biome today.
+
+## Entities
+
+Entities (mobs) are data-driven like blocks: `assets/data/entities/<name>.json` gives a display
+`name`, an `hp` pool, an optional `loot` table rolled on death, and an optional `model` Blockbench
+project (default `assets/models/entity/<name>.bbmodel`). `ContentRegistry.Load` parses them into
+`EntityType`s published on `EntityRegistry` (`RequireEntity`/`TryGet`). Entity models reuse
+`BbmodelLoader` (which takes an optional required-group list: the player rig passes `RequiredParts`,
+entities pass none) and `EntityModel`, which bakes the whole project into one mesh plus its skin.
+
+The first entity is the **slime** (`Slime` + `Systems/SlimeManager.cs`), owned by `World`. It hops
+toward the player, damages on contact only while airborne, is shoved (harmlessly) by the player
+when grounded, and rolls its `loot` table on death. Natural spawns appear on dry forest surface in a
+20-40 block ring around the player; `SlimeManager` holds the cap, cadence, damage and shove numbers
+via `WorldGenerationConfig.Slime*`. **There is no player-attack path yet** — a slime can take
+damage through `Slime.TakeDamage` but nothing in the input layer calls it, so killing one (and the
+combat path generally) is a future session.
+
 ## Conventions
 
 - C# with file-scoped namespaces, one type per file, `_camelCase` private fields, PascalCase public members. Primary constructors are used where natural (`ChunkManager(GL gl)`).

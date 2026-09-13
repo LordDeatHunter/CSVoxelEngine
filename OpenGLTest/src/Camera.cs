@@ -1076,6 +1076,29 @@ public class Camera
         }
     }
 
+    /// <summary>
+    /// Whether an entity cube at <paramref name="center"/> with the given half extent touches
+    /// the player's body box. Bodies only touch when they genuinely overlap: a face flush
+    /// against the body does not count, exactly like <see cref="OverlapsPlayer"/>.
+    /// </summary>
+    public bool BodyTouches(Vector3 center, float halfExtent)
+    {
+        var min = new Vector3(
+            Position.X - PlayerRadius,
+            Position.Y - EyeHeight,
+            Position.Z - PlayerRadius);
+        var max = new Vector3(
+            Position.X + PlayerRadius,
+            Position.Y - EyeHeight + PlayerHeight,
+            Position.Z + PlayerRadius);
+        var eMin = center - new Vector3(halfExtent);
+        var eMax = center + new Vector3(halfExtent);
+
+        return min.X < eMax.X && max.X > eMin.X
+            && min.Y < eMax.Y && max.Y > eMin.Y
+            && min.Z < eMax.Z && max.Z > eMin.Z;
+    }
+
     public Matrix4x4 GetViewMatrix()
     {
         var viewDir = ViewDirection;

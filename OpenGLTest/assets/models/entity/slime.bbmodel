@@ -1,0 +1,63 @@
+{
+    "meta": {
+        "format_version": "4.0",
+        "model_format": "free",
+        "box_uv": false
+    },
+    "name": "slime",
+    "resolution": {
+        "width": 32,
+        "height": 32
+    },
+    "textures": [
+        {
+            "id": "0",
+            "name": "slime.png",
+            "source": "slime.png",
+            "width": 32,
+            "height": 32,
+            "uv_width": 32,
+            "uv_height": 32,
+            "particle": false,
+            "use_as_default": false,
+            "render_mode": "default"
+        }
+    ],
+    "elements": [
+        {
+            "name": "Body",
+            "uuid": "5f1e0000-0000-4000-8000-000000000001",
+            "type": "cube",
+            "from": [-6, 0, -6],
+            "to": [6, 12, 6],
+            "box_uv": false,
+            "rescale": false,
+            "locked": false,
+            "rotation": {
+                "origin": [0, 0, 0],
+                "axis": "y",
+                "angle": 0,
+                "rescale": false
+            },
+            "faces": {
+                "north": { "uv": [0, 0, 12, 12], "texture": 0, "rotation": 0 },
+                "south": { "uv": [16, 0, 28, 12], "texture": 0, "rotation": 0 },
+                "west": { "uv": [16, 0, 28, 12], "texture": 0, "rotation": 0 },
+                "east": { "uv": [16, 0, 28, 12], "texture": 0, "rotation": 0 },
+                "up": { "uv": [16, 0, 28, 12], "texture": 0, "rotation": 0 },
+                "down": { "uv": [16, 0, 28, 12], "texture": 0, "rotation": 0 }
+            }
+        }
+    ],
+    "outliner": [
+        {
+            "name": "Body",
+            "origin": [0, 0, 0],
+            "uuid": "5f1e0000-0000-4000-8000-0000000000a0",
+            "export": true,
+            "visibility": true,
+            "rotation": [0, 0, 0],
+            "children": ["5f1e0000-0000-4000-8000-000000000001"]
+        }
+    ]
+}

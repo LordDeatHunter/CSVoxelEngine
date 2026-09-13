@@ -99,6 +99,7 @@ public static class ContentRegistry
         LoadRecipes(Path.Combine(assetsRoot, "data", "recipes"));
         LoadCookRecipes(Path.Combine(assetsRoot, "data", "recipes", "cook"));
         LoadCrushRecipes(Path.Combine(assetsRoot, "data", "recipes", "crush"));
+        LoadEntities(assetsRoot);
         ValidateItemUses(itemFiles);
     }
 
@@ -225,6 +226,9 @@ public static class ContentRegistry
     /// <see cref="RequireBlock"/>.</summary>
     public static Item RequireItem(string name) => ItemRegistry.RequireItem(name);
 
+    /// <summary>The entity kind registered under that JSON file name.</summary>
+    public static EntityType RequireEntity(string name) => EntityRegistry.Require(name);
+
     /// <summary>The compiled loot table of that name, or null when there is none.</summary>
     public static LootTable? LootTableFor(string name) =>
         LootTables.GetValueOrDefault(name);
@@ -273,6 +277,7 @@ public static class ContentRegistry
         BlockDefinitions.Clear();
         _sfxGroups = new Dictionary<string, IReadOnlyList<string>>();
         ItemRegistry.Reset();
+        EntityRegistry.Reset();
 
         Array.Clear(BlockType.ById);
         Array.Clear(BlockType.Emission);
@@ -523,6 +528,50 @@ public static class ContentRegistry
     {
         foreach (var (name, path) in JsonFilesIn(folder))
             LootTables[name] = CompileLootTable(name, ReadJson<LootTableDefinition>(path), path);
+    }
+
+    /// <summary>
+    /// Parses <c>data/entities</c> into <see cref="EntityType"/>s: display name, health and the
+    /// loot table rolled on death, resolved against the already-compiled tables. The model path
+    /// is checked here so a missing Blockbench project fails at startup naming the file.
+    /// </summary>
+    private static void LoadEntities(string assetsRoot)
+    {
+        var types = new Dictionary<string, EntityType>(StringComparer.Ordinal);
+        foreach (var (name, path) in JsonFilesIn(Path.Combine(assetsRoot, "data", "entities")))
+        {
+            var definition = ReadJson<EntityDefinition>(path);
+
+            var hp = definition.Hp
+                ?? throw new InvalidOperationException($"Entity '{path}' has no hp.");
+            if (hp < 1)
+                throw new InvalidOperationException($"Entity '{path}' has hp {hp}; expected 1 or more.");
+
+            LootTable? loot = null;
+            if (definition.Loot is { Length: > 0 } lootName && lootName != "none")
+            {
+                loot = LootTables.GetValueOrDefault(lootName)
+                    ?? throw new InvalidOperationException(
+                        $"Entity '{path}' names loot table '{lootName}', which does not exist.");
+            }
+
+            var model = definition.Model is { Length: > 0 } authored
+                ? authored
+                : Path.Combine(assetsRoot, "models", "entity", name + ".bbmodel");
+            if (!File.Exists(model))
+                throw new InvalidOperationException($"Entity '{path}' names model '{model}', which does not exist.");
+
+            types[name] = new EntityType
+            {
+                Name = name,
+                DisplayName = definition.Name ?? name,
+                MaxHealth = hp,
+                LootTable = loot,
+                ModelPath = model,
+            };
+        }
+
+        EntityRegistry.Publish(types);
     }
 
     private static void LoadRecipes(string folder)

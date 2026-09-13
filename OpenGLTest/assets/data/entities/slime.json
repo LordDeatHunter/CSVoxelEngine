@@ -1,0 +1,6 @@
+{
+  "name": "Slime",
+  "hp": 8,
+  "loot": "slime",
+  "model": "assets/models/entity/slime.bbmodel"
+}

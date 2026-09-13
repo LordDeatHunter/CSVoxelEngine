@@ -8,7 +8,7 @@ using StbImageSharp;
 namespace silkgltriangle;
 
 /// <summary>
-/// Parsed Blockbench project for the player model: one skin texture plus named rigid parts
+/// Parsed Blockbench project: one skin texture plus named rigid parts
 /// with pivot-relative cuboids. Cube faces land in <see cref="Chunk.CubeFaces"/> order, so the
 /// mesh builder reuses the exact winding the chunk mesher uses.
 /// </summary>
@@ -40,9 +40,11 @@ public sealed class BbmodelCube
 }
 
 /// <summary>
-/// Minimal Blockbench (.bbmodel) reader for the player rig. It understands axis-aligned cubes
-/// with per-face UVs — the posing itself stays procedural in <see cref="PlayerModel"/>, so group
-/// and cube rotations must be zero and every failure names the file that caused it.
+/// Minimal Blockbench (.bbmodel) reader for rigid models: axis-aligned cubes with per-face UVs,
+/// grouped by named parts. The player rig gives <see cref="RequiredParts"/> so a partially
+/// authored rig fails fast; entity models pass no required parts and keep whatever groups the
+/// file has. Rotations stay procedural, so group and cube angles must be zero and every failure
+/// names the file that caused it.
 /// </summary>
 public static class BbmodelLoader
 {
@@ -55,13 +57,29 @@ public static class BbmodelLoader
     private static readonly string[] FaceKeys = ["north", "south", "west", "east", "up", "down"];
     private const float UnitsPerBlock = 16f;
 
-    public static BbmodelData Load(string path) => Parse(File.ReadAllText(path), path, File.ReadAllBytes);
+    /// <summary>Loads a player rig model: every <see cref="RequiredParts"/> group must be non-empty.</summary>
+    public static BbmodelData Load(string path) => Load(path, RequiredParts);
+
+    /// <summary>
+    /// Loads a model, requiring <paramref name="requiredParts"/> groups (each non-empty). Pass an
+    /// empty list for an entity model that keeps whatever groups it authored.
+    /// </summary>
+    public static BbmodelData Load(string path, IReadOnlyList<string> requiredParts) =>
+        Parse(File.ReadAllText(path), path, File.ReadAllBytes, requiredParts);
+
+    /// <summary>
+    /// Parses bbmodel JSON against the player's <see cref="RequiredParts"/>.
+    /// </summary>
+    public static BbmodelData Parse(string json, string path, Func<string, byte[]> readBytes) =>
+        Parse(json, path, readBytes, RequiredParts);
 
     /// <summary>
     /// Parses bbmodel JSON. <paramref name="readBytes"/> resolves a relative texture source
-    /// against the model's location (a stub in tests).
+    /// against the model's location (a stub in tests). <paramref name="requiredParts"/> is the set
+    /// of groups that must each hold at least one cube; empty means no such requirement.
     /// </summary>
-    public static BbmodelData Parse(string json, string path, Func<string, byte[]> readBytes)
+    public static BbmodelData Parse(string json, string path, Func<string, byte[]> readBytes,
+        IReadOnlyList<string> requiredParts)
     {
         JsonDocument doc;
         try
@@ -70,7 +88,7 @@ public static class BbmodelLoader
         }
         catch (JsonException e)
         {
-            throw new InvalidOperationException($"Player model '{path}' is not valid JSON: {e.Message}", e);
+            throw new InvalidOperationException($"Model '{path}' is not valid JSON: {e.Message}", e);
         }
 
         using (doc)
@@ -85,19 +103,19 @@ public static class BbmodelLoader
                 if (resolution.TryGetProperty("height", out var h)) data.ResolutionHeight = (int)Num(h, path, "resolution");
             }
             if (data.ResolutionWidth <= 0 || data.ResolutionHeight <= 0)
-                throw new InvalidOperationException($"Player model '{path}' needs a positive 'resolution'.");
+                throw new InvalidOperationException($"Model '{path}' needs a positive 'resolution'.");
 
             var cubesByUuid = IndexCubes(Req(root, "elements", path, "the model"), path,
                 data.ResolutionWidth, data.ResolutionHeight);
             ReadOutliner(Req(root, "outliner", path, "the model"), path, data, cubesByUuid, null);
 
             var missing = new List<string>();
-            foreach (var name in RequiredParts)
+            foreach (var name in requiredParts)
                 if (!data.Parts.TryGetValue(name, out var part) || part.Cubes.Count == 0)
                     missing.Add(name);
             if (missing.Count > 0)
                 throw new InvalidOperationException(
-                    $"Player model '{path}' needs one non-empty group per part; missing: {string.Join(", ", missing)}.");
+                    $"Model '{path}' needs one non-empty group per part; missing: {string.Join(", ", missing)}.");
 
             ReadTexture(root, path, readBytes, data);
             return data;
@@ -108,7 +126,7 @@ public static class BbmodelLoader
         JsonElement elements, string path, int texWidth, int texHeight)
     {
         if (elements.ValueKind != JsonValueKind.Array)
-            throw new InvalidOperationException($"Player model '{path}' has no 'elements' array.");
+            throw new InvalidOperationException($"Model '{path}' has no 'elements' array.");
 
         var cubes = new Dictionary<string, (Vector3, Vector3, UvRect?[])>(StringComparer.Ordinal);
         foreach (var el in elements.EnumerateArray())
@@ -116,10 +134,10 @@ public static class BbmodelLoader
             if (el.ValueKind != JsonValueKind.Object) continue;
             if (el.TryGetProperty("type", out var type) && type.GetString() != "cube")
                 throw new InvalidOperationException(
-                    $"Player model '{path}' element '{NameOf(el)}' is not a cube: only cubes are supported.");
+                    $"Model '{path}' element '{NameOf(el)}' is not a cube: only cubes are supported.");
             if (CubeAngle(el) != 0f)
                 throw new InvalidOperationException(
-                    $"Player model '{path}' cube '{NameOf(el)}' is rotated: un-rotate it, posing is procedural.");
+                    $"Model '{path}' cube '{NameOf(el)}' is rotated: un-rotate it, posing is procedural.");
 
             var from = ReadVec3(Req(el, "from", path, $"cube '{NameOf(el)}'"), path, $"cube '{NameOf(el)}'") / UnitsPerBlock;
             var to = ReadVec3(Req(el, "to", path, $"cube '{NameOf(el)}'"), path, $"cube '{NameOf(el)}'") / UnitsPerBlock;
@@ -140,7 +158,7 @@ public static class BbmodelLoader
         Dictionary<string, (Vector3 Min, Vector3 Max, UvRect?[] Faces)> cubesByUuid, string? group)
     {
         if (outliner.ValueKind != JsonValueKind.Array)
-            throw new InvalidOperationException($"Player model '{path}' has no 'outliner' array.");
+            throw new InvalidOperationException($"Model '{path}' has no 'outliner' array.");
 
         foreach (var entry in outliner.EnumerateArray())
         {
@@ -150,7 +168,7 @@ public static class BbmodelLoader
             {
                 if (group == null)
                     throw new InvalidOperationException(
-                        $"Player model '{path}' has a cube outside any group: put every cube in a part group.");
+                        $"Model '{path}' has a cube outside any group: put every cube in a part group.");
                 if (cubesByUuid.TryGetValue(entry.GetString() ?? "", out var cube))
                     AddCube(data, group, path, cube);
                 continue;
@@ -161,7 +179,7 @@ public static class BbmodelLoader
             var pivot = ReadVec3(Req(entry, "origin", path, $"group '{name}'"), path, $"group '{name}'") / UnitsPerBlock;
             if (GroupAngle(entry) != 0f)
                 throw new InvalidOperationException(
-                    $"Player model '{path}' group '{name}' is rotated: keep groups unrotated, posing is procedural.");
+                    $"Model '{path}' group '{name}' is rotated: keep groups unrotated, posing is procedural.");
 
             if (!data.Parts.ContainsKey(name))
                 data.Parts[name] = new BbmodelPart { Pivot = pivot };
@@ -200,10 +218,10 @@ public static class BbmodelLoader
                 continue;
             if (face.TryGetProperty("rotation", out var rotation) && Num(rotation, path, $"cube '{cubeName}'") != 0f)
                 throw new InvalidOperationException(
-                    $"Player model '{path}' cube '{cubeName}' has a rotated face UV: set it back to 0.");
+                    $"Model '{path}' cube '{cubeName}' has a rotated face UV: set it back to 0.");
             if (!face.TryGetProperty("uv", out var uv) || uv.ValueKind != JsonValueKind.Array || uv.GetArrayLength() != 4)
                 throw new InvalidOperationException(
-                    $"Player model '{path}' cube '{cubeName}' needs per-face 'uv' with 4 numbers: switch the cube to per-face UV.");
+                    $"Model '{path}' cube '{cubeName}' needs per-face 'uv' with 4 numbers: switch the cube to per-face UV.");
 
             var x1 = Num(uv[0], path, $"cube '{cubeName}'");
             var y1 = Num(uv[1], path, $"cube '{cubeName}'");
@@ -244,7 +262,7 @@ public static class BbmodelLoader
             }
             catch (FormatException e)
             {
-                throw new InvalidOperationException($"Player model '{path}' has a corrupt embedded texture.", e);
+                throw new InvalidOperationException($"Model '{path}' has a corrupt embedded texture.", e);
             }
         }
         else
@@ -258,7 +276,7 @@ public static class BbmodelLoader
             catch (Exception e)
             {
                 throw new InvalidOperationException(
-                    $"Player model '{path}' references texture '{source}' which could not be read: {e.Message}", e);
+                    $"Model '{path}' references texture '{source}' which could not be read: {e.Message}", e);
             }
         }
 
@@ -272,7 +290,7 @@ public static class BbmodelLoader
         }
         catch (Exception e)
         {
-            throw new InvalidOperationException($"Player model '{path}' texture could not be decoded as PNG.", e);
+            throw new InvalidOperationException($"Model '{path}' texture could not be decoded as PNG.", e);
         }
     }
 
@@ -309,19 +327,19 @@ public static class BbmodelLoader
     {
         if (obj.ValueKind == JsonValueKind.Object && obj.TryGetProperty(name, out var value))
             return value;
-        throw new InvalidOperationException($"Player model '{path}' {context} is missing '{name}'.");
+        throw new InvalidOperationException($"Model '{path}' {context} is missing '{name}'.");
     }
 
     private static Vector3 ReadVec3(JsonElement array, string path, string context)
     {
         if (array.ValueKind != JsonValueKind.Array || array.GetArrayLength() != 3)
-            throw new InvalidOperationException($"Player model '{path}' {context} needs 3 numbers.");
+            throw new InvalidOperationException($"Model '{path}' {context} needs 3 numbers.");
         return new Vector3(Num(array[0], path, context), Num(array[1], path, context), Num(array[2], path, context));
     }
 
     private static float Num(JsonElement el, string path, string context)
     {
         if (el.ValueKind == JsonValueKind.Number) return (float)el.GetDouble();
-        throw new InvalidOperationException($"Player model '{path}' {context} needs a number.");
+        throw new InvalidOperationException($"Model '{path}' {context} needs a number.");
     }
 }

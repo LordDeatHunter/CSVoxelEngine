@@ -99,6 +99,13 @@ public static class TerrainGenerator
     public static bool IsGravelPatch(float x, float z) =>
         GravelNoise.GetNoise(x, z) > WorldGenerationConfig.GravelThreshold;
 
+    /// <summary>
+    /// Whether world column (x, z) is a forest biome. There is no biome system yet — the whole
+    /// world is forest — but spawn rules already ask here, so introducing real biomes later only
+    /// has to change this one place. See the "Biomes" section in AGENTS.md.
+    /// </summary>
+    public static bool IsForest(int x, int z) => true;
+
     /// <summary>OpenSimplex2 noise seeded from the world seed; more than one octave turns on FBm.</summary>
     internal static FastNoiseLite MakeNoise(int seedOffset, float frequency, int octaves = 1)
     {
