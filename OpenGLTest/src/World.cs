@@ -529,12 +529,12 @@ public class World : IItemUseWorld
     }
     
     /// <summary>
-    /// Drives hit-based mining: holding left-click on a block lands one hit per
-    /// BlockHitSeconds, each removing 1 HP, and the block breaks when its HP runs out
-    /// (see BlockType.MaxHealth, the block's JSON hardness). A block of hardness 0 breaks on
-    /// first contact. A partial interval deals no damage, and damage is discarded when the
-    /// target changes or the button is released. Creative instamines (one block per frame, as
-    /// before). Call after Update so the selection is current.
+    /// Drives hit-based mining: the first hit on a block lands the instant it is targeted, so a
+    /// quick tap counts as one hit, then one hit per BlockHitSeconds while it is held, each
+    /// removing 1 HP, and the block breaks when its HP runs out (see BlockType.MaxHealth, the
+    /// block's JSON hardness). A block of hardness 0 breaks on first contact. Damage is discarded
+    /// when the target changes or the button is released. Creative instamines (one block per
+    /// frame, as before). Call after Update so the selection is current.
     /// </summary>
     public void UpdateBlockBreaking(double deltaTime, bool isHolding)
     {
@@ -571,7 +571,10 @@ public class World : IItemUseWorld
             _breakingBlockId = BlockIdAt(_selectedBlockPosition);
             _breakMaxHealth = BlockType.ById[_breakingBlockId]?.MaxHealth ?? 0;
             _breakDamage = 0;
-            _hitTimer = 0f;
+            // Seed the timer a whole interval in so the loop below lands the first hit this
+            // frame: a tap then counts as one hit instead of being released before the gap
+            // it would have to survive.
+            _hitTimer = BlockHitSeconds;
             _popElapsed = BlockPopSeconds;
         }
 
