@@ -224,8 +224,9 @@ public class UIRenderer : IDisposable
         _shader.SetUniform("uTex", 0);
 
         _crosshairTexture = TextureLoader.LoadFromFile(gl, "assets/textures/crosshair.png");
-        foreach (var (id, type) in ItemType.Types)
+        foreach (var (id, type) in ItemRegistry.ById)
         {
+            if (type is BlockItem) continue;
             _itemIcons[id] = type.Animation == ItemAnimationMode.None
                 ? TextureLoader.LoadFromFile(gl, type.TexturePath)
                 : TextureLoader.LoadSpritesheet(gl, type.TexturePath,
@@ -624,7 +625,7 @@ public class UIRenderer : IDisposable
             // The pop marks a pickup; IconFill leaves enough margin for it to stay in the slot
             var iconSize = SlotSize * IconFill * inventory.PopScaleAt(i);
             // Items show their flat sprites here like the list rows; blocks keep 3D cubes
-            if (ItemType.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
+            if (ItemRegistry.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
                 DrawItemSprite(centre, new Vector2(iconSize), id, icon, headingDegrees, timeSeconds);
             else
                 DrawBlockIcon(centre, iconSize, id);
@@ -922,7 +923,7 @@ public class UIRenderer : IDisposable
             new Vector2(4f, RowHeight - 4f), dim ? TextDim : barColor);
 
         var iconCentre = new Vector2(PanelLeft + PanelPad + RowIcon * 0.5f + 8f, centreY);
-        if (ItemType.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
+        if (ItemRegistry.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
             DrawItemSprite(iconCentre, new Vector2(RowIcon), id, icon, headingDegrees, timeSeconds);
         else
             DrawBlockIcon(iconCentre, RowIcon, id);
@@ -986,7 +987,7 @@ public class UIRenderer : IDisposable
             new Vector2(cardSize.X - 4f, 2f), AccentGold);
 
         var spin = time * 0.9f;
-        if (ItemType.IsItem(id))
+        if (ItemRegistry.IsItem(id))
             DrawItemIcon(centre with { Y = centre.Y - 12f }, PreviewSize * 0.7f, id, spin);
         else
             DrawBlockIconSpinning(centre with { Y = centre.Y - 12f }, PreviewSize * 0.7f, id, spin);
@@ -1139,7 +1140,7 @@ public class UIRenderer : IDisposable
 
     private void DrawIdIcon(Vector2 centre, float size, byte id, float headingDegrees, float timeSeconds)
     {
-        if (ItemType.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
+        if (ItemRegistry.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
             DrawItemSprite(centre, new Vector2(size), id, icon, headingDegrees, timeSeconds);
         else
             DrawBlockIcon(centre, size, id);
@@ -1173,7 +1174,7 @@ public class UIRenderer : IDisposable
 
         var iconCentre = new Vector2(cardLeft + DetailPad + 32f, y + 38f);
         var spin = time * 0.9f;
-        if (ItemType.IsItem(recipe.ResultId))
+        if (ItemRegistry.IsItem(recipe.ResultId))
             DrawItemIcon(iconCentre, 56f, recipe.ResultId, spin);
         else
             DrawBlockIconSpinning(iconCentre, 60f, recipe.ResultId, spin);
@@ -1291,7 +1292,7 @@ public class UIRenderer : IDisposable
         float headingDegrees, float timeSeconds)
     {
         if (_itemFrames.TryGetValue(id, out var frames)
-            && ItemType.Types.TryGetValue(id, out var type))
+            && ItemRegistry.TryGet(id) is { } type)
         {
             var frame = Math.Clamp(type.FrameAt(timeSeconds, headingDegrees), 0, frames.Length - 1);
             DrawMesh(frames[frame], RectTransform(centre, size), Rgba.White, texture);

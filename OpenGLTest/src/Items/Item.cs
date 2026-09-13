@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Numerics;
 
 namespace silkgltriangle;
@@ -11,35 +10,28 @@ public enum ItemAnimationMode
     None,
     /// <summary>Frame follows the player's compass heading, so frame 0 faces north.</summary>
     Heading,
-    /// <summary>Frames slide by at <see cref="ItemType.AnimationFps"/>.</summary>
+    /// <summary>Frames slide by at <see cref="Item.AnimationFps"/>.</summary>
     Loop,
 }
 
 /// <summary>
-/// Pure items: pickups that are not blocks, loaded from <c>assets/data/items/&lt;name&gt;.json</c>
-/// by <see cref="ContentRegistry"/>. They have no <see cref="BlockType"/> entry, so they can
-/// never be placed or meshed into chunks — they only exist as <see cref="ItemDrop"/> entities
-/// (rendered from their 2D sprite, see <see cref="Primitives.CreateExtrudedSprite"/>) and as
-/// <see cref="Inventory"/> slots. Ids live in the same byte space as block ids and are handed
-/// out after them, so the two never collide.
+/// Source-of-truth data for one item: a static singleton built from
+/// <c>assets/data/items/&lt;name&gt;.json</c> by <see cref="ItemFactory"/> and stored in
+/// <see cref="ItemRegistry"/>. Instances never change after <see cref="ContentRegistry.Load"/> —
+/// per-world state (count, durability, cooldown, rename, enchantments) lives on
+/// <see cref="ItemStack"/> instead.
+///
+/// Behaviour families subclass this (bucket pickup/place, stack placing, igniting) and a single
+/// item can go further with its own code class registered in
+/// <see cref="ItemFactory.CustomCreators"/> (see <see cref="FirestarterItem"/>). Gameplay asks
+/// "what does this item do" through the virtuals below instead of branching on ids.
 /// </summary>
-public sealed class ItemType
+public abstract class Item
 {
-    /// <summary>Every registered item by id.</summary>
-    public static IReadOnlyDictionary<byte, ItemType> Types { get; internal set; } =
-        new Dictionary<byte, ItemType>();
-
-    internal ItemType(byte id, string name, string texturePath)
-    {
-        Id = id;
-        Name = name;
-        TexturePath = texturePath;
-    }
-
-    /// <summary>Byte id assigned at load.</summary>
+    /// <summary>Byte id assigned at load; shares the block id space (air = 0).</summary>
     public byte Id { get; }
 
-    /// <summary>Display name for future tooltips/crafting UI.</summary>
+    /// <summary>Display name for inventory rows and preview headings.</summary>
     public string Name { get; }
 
     /// <summary>Sprite source, relative to the working directory like every other asset.</summary>
@@ -97,11 +89,30 @@ public sealed class ItemType
     /// <summary>Held-item uniform scale multiplier.</summary>
     public float DisplayScale { get; internal init; } = 1f;
 
+    /// <summary>Which inventory pool this item stores into. Replaces the old
+    /// <c>UseResultId != 0 || MaxDurability > 0</c> probe in <c>Inventory.CategoryOf</c>.</summary>
+    public virtual InventoryCategory StorageCategory =>
+        UseResultId != 0 || MaxDurability > 0 ? InventoryCategory.Tools : InventoryCategory.Misc;
+
     /// <summary>
-    /// Held-item transform in hand space: scaled, rotated (yaw, then pitch, then roll),
-    /// then translated. The renderer composes it under the hand matrix, so the item rides
-    /// the arm swing and the mine pump.
+    /// Whether holding this item should make the block selection raycast see fluids. Only an
+    /// item that scoops one needs to aim at water; for everything else the water is aimed
+    /// through, so a pond never blocks placing a block on its floor.
     /// </summary>
+    public virtual bool TargetsFluids => false;
+
+    /// <summary>
+    /// Right-click behaviour while holding this item, against whatever the player is aiming
+    /// at. Pure decision + effect logic through <paramref name="ctx"/>; the caller
+    /// (<c>World.TryUseSelected</c>) applies the returned morph and punch. The base answers
+    /// "nothing happens" so plain pickups need no override. <paramref name="stack"/> is the
+    /// selected tool instance, or null for stackable (misc) items like flint.
+    /// </summary>
+    public virtual ItemUseResult OnUse(ItemUseContext ctx, ItemStack? stack) => ItemUseResult.Ignored;
+
+    /// <summary>Held-item transform in hand space: scaled, rotated (yaw, then pitch, then roll),
+    /// then translated. The renderer composes it under the hand matrix, so the item rides
+    /// the arm swing and the mine pump.</summary>
     public Matrix4x4 DisplayMatrix()
     {
         var radians = DisplayRotation * (MathF.PI / 180f);
@@ -127,14 +138,35 @@ public sealed class ItemType
         return ((int)MathF.Floor(timeSeconds * fps) % frameCount + frameCount) % frameCount;
     }
 
-    /// <summary>Whether an id is a pure item rather than a block (or air/unknown).</summary>
-    public static bool IsItem(byte id) => Types.ContainsKey(id);
+    /// <summary>Minimal member for synthetic items (see <see cref="BlockItem"/>).</summary>
+    protected Item(byte id, string name)
+    {
+        Id = id;
+        Name = name;
+        TexturePath = "";
+    }
 
-    /// <summary>
-    /// Whether holding this id should make the block selection raycast see fluids. Only an item
-    /// that scoops one needs to aim at water; for everything else the water is aimed through,
-    /// so a pond never blocks placing a block on its floor.
-    /// </summary>
-    public static bool TargetsFluids(byte id) =>
-        Types.TryGetValue(id, out var type) && type.UseAction == ItemUseAction.PickupFluid;
+    /// <summary>Data-driven member: every JSON-backed item is built from one of these by
+    /// <see cref="ItemFactory"/>.</summary>
+    protected Item(ItemFactory.ItemSpec spec)
+    {
+        Id = spec.Id;
+        Name = spec.Name;
+        TexturePath = spec.TexturePath;
+        UseAction = spec.Action;
+        UseResultId = spec.ResultId;
+        UseFluidId = spec.FluidId;
+        UseBlockId = spec.BlockId;
+        UseChance = spec.Chance;
+        MaxDurability = spec.Durability;
+        UseDelaySeconds = spec.UseDelay;
+        SpriteCols = spec.SpriteCols;
+        SpriteRows = spec.SpriteRows;
+        FrameCount = spec.FrameCount;
+        Animation = spec.Animation;
+        AnimationFps = spec.AnimationFps;
+        DisplayRotation = spec.Rotation;
+        DisplayTranslation = spec.Translation;
+        DisplayScale = spec.Scale;
+    }
 }

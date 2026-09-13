@@ -109,7 +109,7 @@ public sealed class CompassTests
     [InlineData(-0.125f, 15)]
     public void LoopFrameSlidesOneFramePerTick(float time, int expected)
     {
-        Assert.Equal(expected, ItemType.LoopFrame(time, 8f, 16));
+        Assert.Equal(expected, Item.LoopFrame(time, 8f, 16));
     }
 
     [Theory]
@@ -117,6 +117,6 @@ public sealed class CompassTests
     [InlineData(0f, 16)]
     public void LoopFrameIgnoresDegenerateInput(float fps, int frames)
     {
-        Assert.Equal(0, ItemType.LoopFrame(1f, fps, frames));
+        Assert.Equal(0, Item.LoopFrame(1f, fps, frames));
     }
 }

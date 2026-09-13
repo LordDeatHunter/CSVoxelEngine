@@ -10,7 +10,7 @@ namespace silkgltriangle;
 /// <summary>
 /// Loads every block, item, loot table, tag and model from <c>assets/data</c> and
 /// <c>assets/models</c>, hands out byte ids and fills the static tables on
-/// <see cref="BlockType"/> and <see cref="ItemType"/>.
+/// <see cref="BlockType"/> and <see cref="ItemRegistry"/>.
 ///
 /// Two phases, both on the main thread at startup and both before the <see cref="World"/> (and
 /// therefore any worker thread) exists:
@@ -47,9 +47,9 @@ public static class ContentRegistry
     private static readonly Dictionary<string, HashSet<byte>> Tags = new(StringComparer.Ordinal);
     private static readonly Dictionary<byte, BlockModel> BlockModels = new();
     private static readonly Dictionary<byte, BlockDefinition> BlockDefinitions = new();
-    private static readonly List<CraftingRecipe> Recipes = new();
-    private static readonly List<CookRecipe> CookRecipes = new();
-    private static readonly List<CrushRecipe> CrushRecipes = new();
+    private static readonly List<CraftingRecipe> Recipes = [];
+    private static readonly List<CookRecipe> CookRecipes = [];
+    private static readonly List<CrushRecipe> CrushRecipes = [];
 
     private static string _assetsRoot = "assets";
     private static ModelLoader? _models;
@@ -89,11 +89,27 @@ public static class ContentRegistry
         LoadItems(itemFiles);
         LoadLootTables(Path.Combine(assetsRoot, "data", "loot"));
         LoadBlocks(blockFiles);
+        PublishBlockItems();
         LoadTags(Path.Combine(assetsRoot, "data", "tags"));
         LoadRecipes(Path.Combine(assetsRoot, "data", "recipes"));
         LoadCookRecipes(Path.Combine(assetsRoot, "data", "recipes", "cook"));
         LoadCrushRecipes(Path.Combine(assetsRoot, "data", "recipes", "crush"));
         ValidateItemUses(itemFiles);
+    }
+
+    /// <summary>
+    /// Wraps every placeable block in a <see cref="BlockItem"/> and registers those alongside
+    /// the pure items, so drops, recipes and the hotbar resolve blocks and items through one
+    /// <see cref="ItemRegistry"/>. Runs after <see cref="LoadBlocks"/>, which is when the
+    /// HasItem/fluid flags first exist; the mirror is <see cref="Inventory.CategoryOf"/>.
+    /// </summary>
+    private static void PublishBlockItems()
+    {
+        var blocks = new List<BlockItem>();
+        foreach (var type in BlockType.Types.Values)
+            if (type is { HasItem: true, Fluid: false })
+                blocks.Add(new BlockItem(type));
+        ItemRegistry.PublishBlockItems(blocks);
     }
 
     /// <summary>
@@ -202,11 +218,7 @@ public static class ContentRegistry
 
     /// <summary>The item registered under that JSON file name; items only, like
     /// <see cref="RequireBlock"/>.</summary>
-    public static ItemType RequireItem(string name)
-    {
-        if (ItemIds.TryGetValue(name, out var id)) return ItemType.Types[id];
-        throw new InvalidOperationException($"No item named '{name}' is registered.");
-    }
+    public static Item RequireItem(string name) => ItemRegistry.RequireItem(name);
 
     /// <summary>The compiled loot table of that name, or null when there is none.</summary>
     public static LootTable? LootTableFor(string name) =>
@@ -254,6 +266,7 @@ public static class ContentRegistry
         CrushRecipes.Clear();
         BlockModels.Clear();
         BlockDefinitions.Clear();
+        ItemRegistry.Reset();
 
         Array.Clear(BlockType.ById);
         Array.Clear(BlockType.Emission);
@@ -282,7 +295,7 @@ public static class ContentRegistry
 
     private static void LoadItems(List<(string Name, string Path)> files)
     {
-        var types = new Dictionary<byte, ItemType>();
+        var types = new Dictionary<byte, Item>();
         foreach (var (name, path) in files)
         {
             var definition = ReadJson<ItemDefinition>(path);
@@ -317,27 +330,18 @@ public static class ContentRegistry
             var id = ItemIds[name];
             var sheet = ParseSpritesheet(definition.Spritesheet, path);
             var display = ParseDisplay(definition.Display, path);
-            types[id] = new ItemType(id, definition.Name ?? name, definition.Texture)
-            {
-                UseAction = action,
-                UseResultId = ResolveUseTarget(use?.Result, "use.result", path),
-                UseFluidId = ResolveUseTarget(use?.Fluid, "use.fluid", path),
-                UseBlockId = ResolveUseTarget(use?.Block, "use.block", path),
-                UseChance = chance,
-                MaxDurability = durability,
-                UseDelaySeconds = useDelay,
-                SpriteCols = sheet.Cols,
-                SpriteRows = sheet.Rows,
-                FrameCount = sheet.Frames,
-                Animation = sheet.Mode,
-                AnimationFps = sheet.Fps,
-                DisplayRotation = display.Rotation,
-                DisplayTranslation = display.Translation,
-                DisplayScale = display.Scale,
-            };
+            types[id] = ItemFactory.Create(name, new ItemFactory.ItemSpec(
+                id, definition.Name ?? name, definition.Texture,
+                action,
+                ResolveUseTarget(use?.Result, "use.result", path),
+                ResolveUseTarget(use?.Fluid, "use.fluid", path),
+                ResolveUseTarget(use?.Block, "use.block", path),
+                chance, durability, useDelay,
+                sheet.Cols, sheet.Rows, sheet.Frames, sheet.Mode, sheet.Fps,
+                display.Rotation, display.Translation, display.Scale));
         }
 
-        ItemType.Types = types;
+        ItemRegistry.Publish(types, new Dictionary<string, byte>(ItemIds, StringComparer.Ordinal));
     }
 
     private readonly record struct ParsedSheet(int Cols, int Rows, int Frames, ItemAnimationMode Mode, float Fps);
@@ -415,7 +419,7 @@ public static class ContentRegistry
     {
         if (name == null) return 0;
 
-        if (!TryResolve(name, out var id) || id == BlockType.Air || ItemType.Types.ContainsKey(id))
+        if (!TryResolve(name, out var id) || id == BlockType.Air || ItemRegistry.IsItem(id))
             throw new InvalidOperationException(
                 $"Block '{path}' names '{name}' in {field}, which is not a registered block.");
         if (requireFluid && (!BlockType.FluidById[id] || id == ownerId))
@@ -438,7 +442,7 @@ public static class ContentRegistry
     {
         foreach (var (name, path) in files)
         {
-            var item = ItemType.Types[ItemIds[name]];
+            var item = ItemRegistry.ById[ItemIds[name]];
             if (item.UseAction == ItemUseAction.None) continue;
 
             if (item.UseAction == ItemUseAction.PlaceStack)
@@ -491,7 +495,7 @@ public static class ContentRegistry
                 throw new InvalidOperationException(
                     $"Item '{path}' has use.action '{item.UseAction}' but its use.fluid is not a fluid block.");
 
-            if (!ItemType.IsItem(item.UseResultId))
+            if (!ItemRegistry.IsItem(item.UseResultId))
                 throw new InvalidOperationException(
                     $"Item '{path}' has use.action '{item.UseAction}' but its use.result is not an item.");
         }
@@ -817,7 +821,7 @@ public static class ContentRegistry
                 $"Missing required block tag '{BranchConnectableTag}': expected '{Path.Combine(folder, BranchConnectableTag)}.json'.");
         foreach (var id in connectable)
         {
-            if (BlockType.ById[id] == null || ItemType.IsItem(id))
+            if (BlockType.ById[id] == null || ItemRegistry.IsItem(id))
                 throw new InvalidOperationException(
                     $"Tag '{BranchConnectableTag}' names id {id}: tapered wood only grows into blocks.");
             BlockType.BranchConnectableById[id] = true;

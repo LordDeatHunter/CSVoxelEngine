@@ -20,14 +20,14 @@ public enum ItemUseAction
 
     /// <summary>
     /// Builds up a multi-state block (flint on a pebble pile): augments the targeted pile
-    /// or grounds a fresh one, spending one unit. See <see cref="ItemType.UseBlockId"/>.
+    /// or grounds a fresh one, spending one unit. See <see cref="Item.UseBlockId"/>.
     /// </summary>
     PlaceStack,
 
     /// <summary>
     /// Strikes a spark at a fully built firepit (a max-count branch pile): a chance per
     /// use to light it, spending durability instead of morphing. See
-    /// <see cref="ItemType.UseBlockId"/> and <see cref="ItemType.UseChance"/>.
+    /// <see cref="Item.UseBlockId"/> and <see cref="Item.UseChance"/>.
     /// </summary>
     IgniteCampfire,
 }

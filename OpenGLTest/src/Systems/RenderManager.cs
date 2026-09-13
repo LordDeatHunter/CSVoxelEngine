@@ -1861,7 +1861,7 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// Draws the floating item drops, each spinning about its own centre and pulsing in scale.
-    /// Block drops draw their atlas cube; pure items (see <see cref="ItemType"/>) draw their
+    /// Block drops draw their atlas cube; pure items (see <see cref="Item"/>) draw their
     /// extruded sprite with its own texture bound (the shader's sampler just reads unit 0).
     /// </summary>
     public void RenderItemDrops(Camera camera, IReadOnlyList<ItemDrop> drops)
@@ -1880,7 +1880,7 @@ public class RenderManager : IDisposable
         foreach (var drop in drops)
         {
             Mesh? mesh;
-            if (ItemType.IsItem(drop.BlockId))
+            if (ItemRegistry.IsItem(drop.BlockId))
             {
                 if (!itemMeshes.TryGet(drop.BlockId, out mesh, out var itemTexture)) continue;
                 BindUnit(0, TextureTarget.Texture2DArray, itemTexture);
@@ -1945,7 +1945,7 @@ public class RenderManager : IDisposable
             }
 
             Mesh? mesh;
-            if (ItemType.IsItem(itemId))
+            if (ItemRegistry.IsItem(itemId))
             {
                 if (!itemMeshes.TryGet(itemId, out mesh, out var itemTexture)) continue;
                 BindUnit(0, TextureTarget.Texture2DArray, itemTexture);
@@ -1962,7 +1962,7 @@ public class RenderManager : IDisposable
                 if (mesh == null) continue;
             }
 
-            var scale = ItemDrop.Size * (ItemType.IsItem(itemId) ? 1.5f : 1f);
+            var scale = ItemDrop.Size * (ItemRegistry.IsItem(itemId) ? 1.5f : 1f);
             var offset = CampfireManager.SlotOffsets[slot % CampfireManager.SlotOffsets.Length];
             var placed = Matrix4x4.CreateScale(scale)
                         * Matrix4x4.CreateRotationY(slot * MathF.PI / 2f)
@@ -2001,7 +2001,7 @@ public class RenderManager : IDisposable
             if (inputId == 0) continue;
 
             Mesh? mesh;
-            if (ItemType.IsItem(inputId))
+            if (ItemRegistry.IsItem(inputId))
             {
                 if (!itemMeshes.TryGet(inputId, out mesh, out var itemTexture)) continue;
                 BindUnit(0, TextureTarget.Texture2DArray, itemTexture);
@@ -2019,7 +2019,7 @@ public class RenderManager : IDisposable
             }
 
             // Hovering over the plate, clear of the handle's orbit
-            var scale = ItemDrop.Size * (ItemType.IsItem(inputId) ? 1.5f : 1f);
+            var scale = ItemDrop.Size * (ItemRegistry.IsItem(inputId) ? 1.5f : 1f);
             var placed = Matrix4x4.CreateScale(scale)
                         * Matrix4x4.CreateTranslation(cell + new Vector3(0.35f, 0.82f, 0.35f));
             SetDrawUniforms(placed, placed * viewProj, 1f);
@@ -2239,9 +2239,9 @@ public class RenderManager : IDisposable
         worldShader.Use();
         BindWorldTextures();
 
-        if (ItemType.IsItem(selectedId))
+        if (ItemRegistry.IsItem(selectedId))
         {
-            if (!ItemType.Types.TryGetValue(selectedId, out var type)) return;
+            if (ItemRegistry.TryGet(selectedId) is not { } type) return;
             var frame = Math.Clamp(type.FrameAt(timeSeconds, headingDegrees), 0,
                 Math.Max(0, type.FrameCount - 1));
             if (!itemMeshes.TryGetFrame(selectedId, frame, out var mesh, out var texture)) return;

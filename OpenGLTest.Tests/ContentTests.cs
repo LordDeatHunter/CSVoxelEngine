@@ -13,7 +13,9 @@ public sealed class ContentTests
     [Fact]
     public void BlockAndItemIdsFitInSharedByteRange()
     {
-        var ids = BlockType.Types.Keys.Concat(ItemType.Types.Keys).ToArray();
+        var ids = BlockType.Types.Keys
+            .Concat(ItemRegistry.All.Where(i => i is not BlockItem).Select(i => i.Id))
+            .ToArray();
         Assert.NotEmpty(ids);
         Assert.Equal(ids.Length, ids.Distinct().Count());
         Assert.All(ids, id => Assert.NotEqual(BlockType.Air, id));

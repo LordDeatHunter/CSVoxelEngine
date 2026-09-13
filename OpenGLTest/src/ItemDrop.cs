@@ -4,8 +4,8 @@ using System.Numerics;
 namespace silkgltriangle;
 
 /// <summary>
-/// A collectable left behind by mining: usually a block, sometimes a pure item (see
-/// <see cref="ItemType"/>). A drop pops out where the block was, falls under
+    /// A collectable left behind by mining: usually a block, sometimes a pure item (see
+    /// <see cref="Item"/>). A drop pops out where the block was, falls under
 /// gravity and rests on the terrain, spinning and breathing in scale, until the player comes
 /// close enough — then it accelerates towards them and is collected on contact. Once latched
 /// onto the player it flies straight and ignores terrain.
@@ -85,7 +85,7 @@ public class ItemDrop
     public float Scale => VisualSize * (1f + PulseAmount * MathUtils.Oscillate(_age, PulsePeriod));
 
     // Collision stays at the shared Size: the item boost is visual only
-    private float VisualSize => Size * (ItemType.IsItem(BlockId) ? ItemSizeMultiplier : 1f);
+    private float VisualSize => Size * (ItemRegistry.IsItem(BlockId) ? ItemSizeMultiplier : 1f);
 
     public ItemDrop(byte blockId, Vector3 position, Vector3? toss = null)
     {

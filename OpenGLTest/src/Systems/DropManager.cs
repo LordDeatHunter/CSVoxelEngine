@@ -35,7 +35,7 @@ public class DropManager
     /// </summary>
     public void Spawn(byte blockId, Vector3 blockPosition)
     {
-        if (BlockType.ById[blockId] == null && !ItemType.IsItem(blockId)) return;
+        if (BlockType.ById[blockId] == null && !ItemRegistry.IsItem(blockId)) return;
 
         _drops.Add(new ItemDrop(blockId, blockPosition + new Vector3(0.5f)));
     }
@@ -46,7 +46,7 @@ public class DropManager
     /// </summary>
     public void SpawnAt(byte blockId, Vector3 position, Vector3? toss = null)
     {
-        if (BlockType.ById[blockId] == null && !ItemType.IsItem(blockId)) return;
+        if (BlockType.ById[blockId] == null && !ItemRegistry.IsItem(blockId)) return;
 
         _drops.Add(new ItemDrop(blockId, position, toss));
     }

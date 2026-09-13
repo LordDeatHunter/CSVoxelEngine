@@ -8,9 +8,11 @@ using Silk.NET.Windowing;
 namespace silkgltriangle;
 
 /// <summary>
-/// Main world class that manages the camera, chunks, and world generation.
+/// Main world class that manages the camera, chunks, and world generation. Implements
+/// <see cref="IItemUseWorld"/> once so every <see cref="Item"/> override runs its effects here
+/// instead of growing a branch in the world.
 /// </summary>
-public class World
+public class World : IItemUseWorld
 {
     // How far the player can target blocks (10 blocks)
     public const float InteractionReach = 10f;
@@ -70,6 +72,11 @@ public class World
     private bool _hasPrevCamPos;
     private byte _heldId;
     private bool _hasHeld;
+
+    // Tool instance the item use dispatcher is currently running for (0 for stackable misc
+    // items like flint). Read by the IItemUseWorld tail so overrides never thread it through.
+    // Main thread only, set and cleared around each OnUse call.
+    private int _activeToolInstance;
 
     // True once the player rests exactly on real ground at the origin spawn. The camera's
     // initial position is only a heightmap guess (pre-carve, see Camera.SpawnPosition), and
@@ -297,7 +304,7 @@ public class World
         FrameProfiler.Begin(ProfileSection.Raycast);
         _hasSelectedBlock = Camera.Raycast(InteractionReach, _chunkManager,
             out _selectedBlockPosition, out _selectedFaceNormal, out _selectedBoxIndex,
-            includeFluids: ItemType.TargetsFluids(Inventory.SelectedBlockId));
+            includeFluids: ItemRegistry.TryGet(Inventory.SelectedBlockId)?.TargetsFluids ?? false);
         FrameProfiler.End(ProfileSection.Raycast);
     }
 
@@ -762,10 +769,10 @@ public class World
     }
 
     /// <summary>
-    /// Right-click: uses the selected slot's item when it declares a use action (a bucket
-    /// scoops or pours water), otherwise places the selected block. A successful use morphs
-    /// the tool instance in place, so every hotbar slot holding that bucket flips with it
-    /// and scooping and pouring alternate on the same button.
+    /// Right-click: uses the selected slot's item through its own <see cref="Item.OnUse"/>
+    /// (a bucket scoops or pours, flint grounds a pile, a firestarter strikes), otherwise places
+    /// the selected block. A successful tool use morphs the instance in place, so every hotbar
+    /// slot holding that bucket flips with it and scooping and pouring alternate on one button.
     /// </summary>
     public void TryUseSelected(float maxDistance)
     {
@@ -781,28 +788,131 @@ public class World
             return;
         }
         var id = Inventory.SelectedBlockId;
-        if (id != 0 && Inventory.SelectedCount > 0
-            && ItemType.Types.TryGetValue(id, out var item) && item.UseAction != ItemUseAction.None)
+        var item = id != 0 && Inventory.SelectedCount > 0 ? ItemRegistry.TryGet(id) : null;
+        if (item == null || item is BlockItem || item.UseAction == ItemUseAction.None)
         {
-            if (item.UseAction == ItemUseAction.IgniteCampfire)
-            {
-                if (Inventory.SelectedToolInstance is var igniteInstance and > 0
-                    && TryIgniteCampfire(maxDistance, item, igniteInstance))
-                    Player.Punch();
-                return;
-            }
-            // Only morph the tool if the action actually took effect
-            if (TryUseItem(maxDistance, item, out var resultId))
-            {
-                if (Inventory.SelectedToolInstance is var instance and > 0)
-                    Inventory.MorphTool(instance, resultId);
-                Player.Punch();
-            }
+            TryPlaceSelectedBlock(maxDistance);
             return;
         }
-
-        TryPlaceSelectedBlock(maxDistance);
+        DispatchUse(item, maxDistance);
     }
+
+    /// <summary>
+    /// Runs one item's <see cref="Item.OnUse"/> and applies its outcome: morph the tool instance
+    /// in place (only when the use took effect) and punch. Durability, cooldowns and stack
+    /// spending already happened inside the override.
+    /// </summary>
+    private void DispatchUse(Item item, float maxDistance)
+    {
+        var instance = Inventory.SelectedToolInstance;
+        _activeToolInstance = instance;
+        try
+        {
+            var stack = instance > 0 ? Inventory.GetToolStack(instance) : null;
+            var result = item.OnUse(new ItemUseContext(this, maxDistance, instance), stack);
+            if (result.Applied && result.MorphToId.HasValue && instance > 0)
+                Inventory.MorphTool(instance, result.MorphToId.Value);
+            if (result.Punch)
+                Player.Punch();
+        }
+        finally
+        {
+            _activeToolInstance = 0;
+        }
+    }
+
+    #region IItemUseWorld
+    // One implementation for every Item override: queries read the live managers, effects write
+    // them, and the inventory tail runs through the dispatcher's active tool instance.
+
+    double IItemUseWorld.NowSeconds => _window.Time;
+
+    bool IItemUseWorld.IsCreative => Camera.IsCreative;
+
+    bool IItemUseWorld.RaycastFluidSource(float maxDistance, out Vector3 hit) =>
+        Camera.Raycast(maxDistance, _chunkManager, out hit, out _, includeFluids: true);
+
+    bool IItemUseWorld.RaycastSolid(float maxDistance, out Vector3 hit, out Vector3 normal) =>
+        Camera.Raycast(maxDistance, _chunkManager, out hit, out normal);
+
+    bool IItemUseWorld.TryGetCell(int x, int y, int z, out byte id, out byte state) =>
+        _chunkManager.TryGetCell(x, y, z, out id, out state);
+
+    byte IItemUseWorld.GetBlockAt(Vector3 pos) => BlockIdAt(pos);
+
+    bool IItemUseWorld.ScoopFluidCell(Vector3 pos) =>
+        _fluidManager.SetCellImmediate(pos, 0, 0, _chunkManager);
+
+    bool IItemUseWorld.PourFluidCell(Vector3 pos, byte fluidId) =>
+        _fluidManager.SetCellImmediate(pos, fluidId, FluidState.Source, _chunkManager);
+
+    bool IItemUseWorld.PlaceBlockAtFace(Vector3 hit, Vector3 normal, byte blockId, byte state) =>
+        PlaceBlockAtFace(hit, normal, blockId, state);
+
+    void IItemUseWorld.AfterPlaced(Vector3 pos) =>
+        _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
+            (int)pos.X, (int)pos.Y, (int)pos.Z);
+
+    int IItemUseWorld.PileCountFor(byte blockId, int x, int y, int z, byte state)
+    {
+        var pile = BlockType.ById[blockId];
+        if (pile == null)
+            return 0;
+        return pile.Renderer == BlockRenderer.BranchPile
+            ? BranchPileGenerator.CountWithState(state, pile.StackMax)
+            : PebbleGenerator.CountWithState(x, z, state, pile.StackMax);
+    }
+
+    bool IItemUseWorld.SetPileCount(Vector3 pos, byte count)
+    {
+        var chunk = _chunkManager.ChunkAt((int)pos.X, (int)pos.Y, (int)pos.Z);
+        return chunk != null && chunk.SetStateAt(pos, count, _chunkManager);
+    }
+
+    void IItemUseWorld.UnmarkPlayerPlaced(int x, int y, int z) =>
+        _chunkManager.UnmarkPlayerPlaced(x, y, z);
+
+    void IItemUseWorld.SpawnLoot(byte blockId, Vector3 pos) =>
+        _dropManager.SpawnLoot(blockId, pos);
+
+    bool IItemUseWorld.IsCampfireLit(int x, int y, int z) => _campfires.IsLit(x, y, z);
+
+    bool IItemUseWorld.IgniteCampfire(int x, int y, int z) => _campfires.Ignite(x, y, z);
+
+    bool IItemUseWorld.IsPrimedTntBlock(byte id) =>
+        BlockType.ById[id]?.OnBreak == BlockBreakAction.PrimeTnt;
+
+    bool IItemUseWorld.IsCellSubmerged(int x, int y, int z) =>
+        TntManager.IsSubmerged(_chunkManager, x, y, z);
+
+    bool IItemUseWorld.RemoveCellForPrime(Vector3 cell) =>
+        _chunkManager.ChunkAt((int)cell.X, (int)cell.Y, (int)cell.Z)?.RemoveBlockAt(cell, _chunkManager) == true;
+
+    void IItemUseWorld.SpawnPrimedTnt(Vector3 cell, byte blockId) =>
+        _tntManager.Spawn(cell, blockId, TntManager.PlayerFuseSeconds);
+
+    void IItemUseWorld.ScheduleFluidAround(Vector3 cell) => _fluidManager.ScheduleAround(cell);
+
+    void IItemUseWorld.MarkLodColumnEdited(int x, int y, int z)
+    {
+        if (LodRegion.LowerColumnBelow(x, y, z))
+            _lodManager.MarkEditedColumn(x, z);
+    }
+
+    bool IItemUseWorld.ToolReady() =>
+        _activeToolInstance > 0 && Inventory.ToolReadyAt(_activeToolInstance, _window.Time);
+
+    void IItemUseWorld.MarkToolUsed(float delaySeconds)
+    {
+        if (_activeToolInstance > 0)
+            Inventory.MarkToolUsed(_activeToolInstance, _window.Time, delaySeconds);
+    }
+
+    bool IItemUseWorld.DamageTool(int amount) =>
+        _activeToolInstance > 0 && Inventory.DamageTool(_activeToolInstance, amount);
+
+    void IItemUseWorld.ConsumeSelected() => Inventory.ConsumeSelected();
+    #endregion
 
     private bool TryCookOrCollect(float maxDistance)
     {
@@ -862,164 +972,6 @@ public class World
 
         _querns.StartSpin(hx, hy, hz);
         return true;
-    }
-
-    /// <summary>
-    /// Strikes the selected firestarter at the aimed block: a full branch pile has a
-    /// per-use chance to light, and a dry TNT block has the same per-use chance to prime
-    /// (a TNT cell touching fluid never primes), every attempt spends one durability and
-    /// starts the item's use delay, and aiming anywhere else does nothing. Returns whether
-    /// the fire lit or the TNT primed.
-    /// </summary>
-    private bool TryIgniteCampfire(float maxDistance, ItemType item, int instanceId)
-    {
-        var now = _window.Time;
-        if (!Inventory.ToolReadyAt(instanceId, now)) return false;
-        if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
-
-        var hx = (int)hit.X;
-        var hy = (int)hit.Y;
-        var hz = (int)hit.Z;
-        if (!_chunkManager.TryGetCell(hx, hy, hz, out var hitId, out var hitState)) return false;
-        if (BlockType.ById[hitId]?.OnBreak == BlockBreakAction.PrimeTnt)
-        {
-            var delay = item.UseDelaySeconds > 0f ? item.UseDelaySeconds : 0f;
-            Inventory.MarkToolUsed(instanceId, now, delay);
-            var primed = !TntManager.IsSubmerged(_chunkManager, hx, hy, hz)
-                && Random.Shared.NextSingle() < item.UseChance;
-            if (primed)
-            {
-                var cell = new Vector3(hx, hy, hz);
-                if (_chunkManager.ChunkAt(hx, hy, hz)?.RemoveBlockAt(cell, _chunkManager) == true)
-                {
-                    _tntManager.Spawn(cell, hitId, TntManager.PlayerFuseSeconds);
-                    _fluidManager.ScheduleAround(cell);
-                    if (LodRegion.LowerColumnBelow(hx, hy, hz))
-                        _lodManager.MarkEditedColumn(hx, hz);
-                }
-                else
-                {
-                    primed = false;
-                }
-            }
-            Inventory.DamageTool(instanceId);
-            return primed;
-        }
-        var pile = BlockType.ById[item.UseBlockId];
-        if (pile == null || hitId != item.UseBlockId) return false;
-        if (BranchPileGenerator.CountWithState(hitState, pile.StackMax) < pile.StackMax) return false;
-        if (_campfires.IsLit(hx, hy, hz)) return false;
-
-        var campfireDelay = item.UseDelaySeconds > 0f ? item.UseDelaySeconds : 0f;
-        Inventory.MarkToolUsed(instanceId, now, campfireDelay);
-        var lit = Random.Shared.NextSingle() < item.UseChance && _campfires.Ignite(hx, hy, hz);
-        Inventory.DamageTool(instanceId);
-        return lit;
-    }
-
-    /// <summary>
-    /// Runs one item use action against whatever the player is aiming at. Returns whether it
-    /// took effect, which is what decides if the item is spent. Bucket edits go through
-    /// <see cref="FluidManager.SetCellImmediate"/>, the only fluid write that remeshes on the
-    /// spot, so the water appears or vanishes on the click rather than on the next tick.
-    /// </summary>
-    private bool TryUseItem(float maxDistance, ItemType item, out byte resultId)
-    {
-        resultId = item.UseResultId;
-        switch (item.UseAction)
-        {
-            case ItemUseAction.PickupFluid:
-            {
-                // The raycast already limits fluid hits to sources, so a bucket can never
-                // scoop a flowing skirt out from under the source feeding it
-                if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out _, includeFluids: true))
-                    return false;
-
-                if (!_chunkManager.TryGetCell((int)hit.X, (int)hit.Y, (int)hit.Z, out var id, out var state))
-                    return false;
-                if (!BlockType.IsFluid(id) || !FluidState.IsSource(state)) return false;
-
-                // An empty bucket scoops whatever fluid it hit, becoming the full bucket
-                // whose pour targets that fluid; a fluid with no full bucket cannot be taken
-                if (id != item.UseFluidId)
-                {
-                    resultId = 0;
-                    foreach (var (candidateId, candidate) in ItemType.Types)
-                    {
-                        if (candidate.UseAction == ItemUseAction.PlaceFluid && candidate.UseFluidId == id)
-                        {
-                            resultId = candidateId;
-                            break;
-                        }
-                    }
-
-                    if (resultId == 0) return false;
-                }
-
-                return _fluidManager.SetCellImmediate(hit, 0, 0, _chunkManager);
-            }
-            case ItemUseAction.PlaceFluid:
-            {
-                // Fluids are excluded from this cast, so aiming at a pond hits its floor and
-                // the face offset lands the source inside the water instead of in front of it
-                if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out var hitNormal))
-                    return false;
-
-                var target = hit + hitNormal;
-                var existing = BlockIdAt(target);
-                if (!BlockType.IsReplaceable(existing) && !BlockType.IsFluid(existing)) return false;
-
-                // A fragile block in the way pops exactly as a flow washing over it would
-                // (but a creative pour drops nothing)
-                if (existing != 0 && !BlockType.IsFluid(existing))
-                {
-                    if (!Camera.IsCreative)
-                        _dropManager.SpawnLoot(existing, target);
-                    _chunkManager.UnmarkPlayerPlaced((int)target.X, (int)target.Y, (int)target.Z);
-                }
-
-                return _fluidManager.SetCellImmediate(target, item.UseFluidId, FluidState.Source, _chunkManager);
-            }
-            case ItemUseAction.PlaceStack:
-            {
-                // Flint on stone, branch on ground: the raycast still targets the pile cell
-                // itself (non-solid blocks are hittable), so a hit on the pile augments it
-                // while a hit beside it grounds a fresh pile of one, up to the block's stackMax.
-                if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out var hitNormal))
-                    return false;
-
-                var pile = BlockType.ById[item.UseBlockId];
-                if (pile == null || pile.StackMax < 2) return false;
-
-                var hx = (int)hit.X;
-                var hy = (int)hit.Y;
-                var hz = (int)hit.Z;
-                if (_chunkManager.TryGetCell(hx, hy, hz, out var hitId, out var hitState)
-                    && hitId == item.UseBlockId)
-                {
-                    // Worldgen piles keep their position-hash default (pebbles); player-only
-                    // piles (branch piles) have no default and read a bare block as one.
-                    var count = pile.Renderer == BlockRenderer.BranchPile
-                        ? BranchPileGenerator.CountWithState(hitState, pile.StackMax)
-                        : PebbleGenerator.CountWithState(hx, hz, hitState, pile.StackMax);
-                    if (count < pile.StackMax)
-                    {
-                        var pileChunk = _chunkManager.ChunkAt(hx, hy, hz);
-                        if (pileChunk == null) return false;
-                        if (!pileChunk.SetStateAt(hit, (byte)(count + 1), _chunkManager)) return false;
-                        if (!Camera.IsCreative) Inventory.ConsumeSelected();
-                        return true;
-                    }
-                    // A full pile falls through to a fresh placement against its face.
-                }
-
-                if (!PlaceBlockAtFace(hit, hitNormal, item.UseBlockId, state: 1)) return false;
-                if (!Camera.IsCreative) Inventory.ConsumeSelected();
-                return true;
-            }
-            default:
-                return false;
-        }
     }
 
     /// <summary>

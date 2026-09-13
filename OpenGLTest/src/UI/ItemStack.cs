@@ -24,28 +24,68 @@ public record struct DisplayNameComponent(string? CustomName)
 }
 
 /// <summary>
-/// One item instance (ECS-spike entity): the definition id plus per-instance components.
-/// Stackable pool items never get here; every <see cref="InventoryCategory.Tools"/> pickup
-/// creates one of these, so durability, cooldowns and (later) enchantments/renames stay
-/// per item instead of per id. Components live in a small map so new ones can be added
-/// without touching the entity shape.
+/// One item instance: the <see cref="Item"/> singleton it is plus the per-stack metadata that
+/// makes this existence distinct — count, durability, cooldown, rename and enchantments.
+/// The definition never changes out from under the stack; <see cref="SetItem"/> (morphing a
+/// bucket full, pouring it back out) swaps both together. Components live in a small map so new
+/// ones can be added without touching the entity shape.
 /// </summary>
 public sealed class ItemStack
 {
     public int InstanceId { get; }
-    public byte DefinitionId { get; set; }
+
+    /// <summary>The singleton this stack is an instance of; never null past construction.</summary>
+    public Item Item { get; private set; }
+
+    /// <summary>Definition id, mirroring <see cref="Item.Id"/> for byte-oriented callers.</summary>
+    public byte DefinitionId => Item.Id;
+
+    /// <summary>Units in this stack. Tool instances stay at 1; pool counts live in
+    /// <see cref="Inventory"/>, which hands out one stack view per tool.</summary>
+    public int Count { get; set; } = 1;
+
+    /// <summary>Enchantment levels by id. Data only for now: nothing reads them yet, but the map
+    /// travels with the stack so a future table or anvil has somewhere to write.</summary>
+    public Dictionary<string, int> Enchantments { get; } = new(StringComparer.Ordinal);
 
     private readonly Dictionary<Type, object> _components = new();
 
     public ItemStack(int instanceId, byte definitionId)
+        : this(instanceId, ItemRegistry.TryGet(definitionId)
+            ?? throw new InvalidOperationException(
+                $"No item with id {definitionId} is registered; content must load first."))
+    {
+    }
+
+    public ItemStack(int instanceId, Item item)
     {
         InstanceId = instanceId;
-        DefinitionId = definitionId;
-        if (ItemType.Types.TryGetValue(definitionId, out var type) && type.MaxDurability > 0)
-            Set(new DurabilityComponent(type.MaxDurability, type.MaxDurability));
+        Item = item;
+        if (item.MaxDurability > 0)
+            Set(new DurabilityComponent(item.MaxDurability, item.MaxDurability));
         Set(new CooldownComponent(0));
         Set(new DisplayNameComponent(null));
     }
+
+    /// <summary>Morphs the stack into another item in place, topping durability up when the new
+    /// form has some and this stack had none (a poured-out bucket stays endless, a fresh
+    /// firestarter starts full).</summary>
+    public void SetItem(Item item)
+    {
+        Item = item;
+        if (item.MaxDurability > 0 && !UsesDurability)
+            Set(new DurabilityComponent(item.MaxDurability, item.MaxDurability));
+    }
+
+    /// <summary>Layers a player rename over the definition name; null clears it.</summary>
+    public void Rename(string? customName) => Set(new DisplayNameComponent(customName));
+
+    /// <summary>Rename if set, else the definition name.</summary>
+    public string ResolvedName => Get<DisplayNameComponent>().Resolve(Item.Name);
+
+    /// <summary>Enchantment level for this id, or 0 when absent.</summary>
+    public int EnchantmentLevel(string enchantment) =>
+        Enchantments.GetValueOrDefault(enchantment);
 
     public void Set<T>(T component) where T : struct => _components[typeof(T)] = component;
 

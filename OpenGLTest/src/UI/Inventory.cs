@@ -88,9 +88,9 @@ public class Inventory
 
     /// <summary>
     /// Whether the selected slot holds a block that can actually be placed. Pure items
-    /// (see <see cref="ItemType"/>) are collected but never placed.
+    /// (see <see cref="ItemRegistry"/>) are collected but never placed.
     /// </summary>
-    public bool CanPlaceSelected => SelectedBlockId != 0 && SelectedCount > 0 && !ItemType.IsItem(SelectedBlockId);
+    public bool CanPlaceSelected => SelectedBlockId != 0 && SelectedCount > 0 && !ItemRegistry.IsItem(SelectedBlockId);
 
     /// <summary>Pool an id stores into, or null when it is not collectable (air, fluids,
     /// blocks without an item form, unknown ids).</summary>
@@ -99,16 +99,7 @@ public class Inventory
         if (id == 0) return null;
         if (BlockType.ById[id] is { } block)
             return block is { HasItem: true, Fluid: false } ? InventoryCategory.Blocks : null;
-        if (ItemType.IsItem(id))
-            // Tools are the items with per-instance state: anything that morphs on use (a
-            // bucket becomes its full form, and back) plus anything with durability (a
-            // firestarter wears out). Each instance is tracked on its own. A use with no
-            // result and no durability spends from its stack instead (flint grounds rock
-            // piles), so those stay plain Misc pickups.
-            return ItemType.Types[id].UseResultId != 0 || ItemType.Types[id].MaxDurability > 0
-                ? InventoryCategory.Tools
-                : InventoryCategory.Misc;
-        return null;
+        return ItemRegistry.TryGet(id)?.StorageCategory;
     }
 
     public static int CapacityOf(InventoryCategory category) => category switch
@@ -183,9 +174,9 @@ public class Inventory
     {
         var stack = _tools.FirstOrDefault(t => t.InstanceId == instanceId);
         if (stack == null) return false;
-        stack.DefinitionId = toId;
-        if (ItemType.Types.TryGetValue(toId, out var type) && type.MaxDurability > 0 && !stack.UsesDurability)
-            stack.Set(new DurabilityComponent(type.MaxDurability, type.MaxDurability));
+        var item = ItemRegistry.TryGet(toId);
+        if (item == null) return false;
+        stack.SetItem(item);
         for (var i = 0; i < _hotbar.Length; i++)
             if (_hotbar[i] is { IsTool: true } slot && slot.ToolInstance == instanceId)
                 _popElapsed[i] = 0f;
@@ -407,7 +398,7 @@ public class Inventory
     public static string DisplayName(byte id)
     {
         if (BlockType.ById[id] != null) return BlockType.ById[id]!.DisplayName;
-        if (ItemType.Types.TryGetValue(id, out var item)) return item.Name;
+        if (ItemRegistry.TryGet(id) is { } item) return item.Name;
         return $"unknown {id}";
     }
 
@@ -435,6 +426,11 @@ public class Inventory
     /// <summary>Item id a tool instance currently is, or 0 when it is gone.</summary>
     public byte ToolItemId(int instanceId) =>
         _tools.FirstOrDefault(t => t.InstanceId == instanceId)?.DefinitionId ?? 0;
+
+    /// <summary>Live tool stack for an instance id, or null when it is gone. Used by the item
+    /// use dispatcher to hand the override its per-instance state.</summary>
+    public ItemStack? GetToolStack(int instanceId) =>
+        _tools.FirstOrDefault(t => t.InstanceId == instanceId);
 
     /// <summary>Durability left on a tool instance, or null when it has none / is gone.</summary>
     public int? ToolDurabilityLeft(int instanceId)
@@ -591,12 +587,11 @@ public class Inventory
             if (type.HasItem && !type.Fluid)
                 _blocks[type.Id] = StartingStock;
         for (var i = 0; i < StartingBuckets; i++)
-            if (ItemType.Types.Values.FirstOrDefault(t => t.UseAction == ItemUseAction.PickupFluid) is { } bucket)
-                _tools.Add(new ItemStack(_nextToolInstance++, bucket.Id));
+            if (ItemRegistry.FindByAction(ItemUseAction.PickupFluid) is { } bucket)
+                _tools.Add(new ItemStack(_nextToolInstance++, bucket));
         // A plain pickup like flint, found by display name the way the bucket is found
         // by behaviour. No use action: it only ever sits on the hotbar for the compass.
-        if (ItemType.Types.Values.FirstOrDefault(t =>
-                t.Name.Equals("Compass", StringComparison.OrdinalIgnoreCase)) is { } compass)
+        if (ItemRegistry.FindByName("Compass") is { } compass)
             _misc[compass.Id] = _misc.GetValueOrDefault(compass.Id) + StartingCompasses;
     }
 

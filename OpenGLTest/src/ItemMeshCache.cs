@@ -7,7 +7,7 @@ using StbImageSharp;
 namespace silkgltriangle;
 
 /// <summary>
-/// Lazily built extruded-sprite meshes plus their GL textures, one per <see cref="ItemType"/>.
+/// Lazily built extruded-sprite meshes plus their GL textures, one per <see cref="Item"/>.
 /// Mirrors <see cref="BlockCubeCache"/>: the world drop pass and (later) any other item draw
 /// share one copy. Everything here is created on first sight from the main thread, where GL
 /// calls are legal.
@@ -41,7 +41,7 @@ public class ItemMeshCache : IDisposable
     {
         mesh = null!;
         texture = 0;
-        if (!ItemType.Types.TryGetValue(itemId, out var type))
+        if (ItemRegistry.TryGet(itemId) is not { } type)
             return false;
 
         frame = Math.Clamp(frame, 0, Math.Max(0, type.FrameCount - 1));
@@ -60,13 +60,13 @@ public class ItemMeshCache : IDisposable
         return true;
     }
 
-    private Mesh BuildMesh(ItemType type, int frame)
+    private Mesh BuildMesh(Item type, int frame)
     {
         var (pixels, width, height) = FramePixels(type, frame);
         return Primitives.CreateExtrudedSprite(_gl, pixels, width, height);
     }
 
-    private uint BuildTexture(ItemType type, int frame)
+    private uint BuildTexture(Item type, int frame)
     {
         var (pixels, width, height) = FramePixels(type, frame);
         var texture = TextureLoader.Upload(_gl, pixels, width, height);
@@ -78,7 +78,7 @@ public class ItemMeshCache : IDisposable
 
     // One cell of a spritesheet, or the whole texture for a plain sprite. The mesh it
     // extrudes is identical for every frame, so callers share it and vary only the texture.
-    private static (byte[] Pixels, int Width, int Height) FramePixels(ItemType type, int frame)
+    private static (byte[] Pixels, int Width, int Height) FramePixels(Item type, int frame)
     {
         using var stream = File.OpenRead(type.TexturePath);
         var image = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
