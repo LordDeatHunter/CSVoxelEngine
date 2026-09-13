@@ -37,6 +37,13 @@ public abstract class Item
     /// <summary>Sprite source, relative to the working directory like every other asset.</summary>
     public string TexturePath { get; }
 
+    /// <summary>
+    /// File name (no extension) of the JSON under <c>assets/data/items</c> this item was built
+    /// from; empty for synthetic items and block items, which own no item JSON. The item
+    /// debugger writes a pure item's <c>display</c> block back to this file.
+    /// </summary>
+    public string SourceName { get; internal init; } = "";
+
     /// <summary>What right-clicking with this item does; <see cref="ItemUseAction.None"/> for a
     /// plain pickup.</summary>
     public ItemUseAction UseAction { get; internal init; }
@@ -164,6 +171,7 @@ public abstract class Item
         Id = spec.Id;
         Name = spec.Name;
         TexturePath = spec.TexturePath;
+        SourceName = spec.SourceName;
         UseAction = spec.Action;
         UseResultId = spec.ResultId;
         UseFluidId = spec.FluidId;

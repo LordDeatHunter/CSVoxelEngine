@@ -35,7 +35,8 @@ public static class ItemFactory
         float Scale,
         bool IsTool,
         float ToolPower,
-        float HitDelayMs);
+        float HitDelayMs,
+        string SourceName);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,

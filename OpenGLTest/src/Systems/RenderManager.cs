@@ -2232,10 +2232,21 @@ public class RenderManager : IDisposable
     // Held-item sizing, in blocks. The sprite is unit-sized and the cube is full-block;
     // both are shrunk to sit in the palm. The grips lift the shape just clear of the
     // forearm with a nudge outward (+X, away from the body) and forward (-Z).
-    private const float HeldItemScale = 0.5f;
-    private static readonly Vector3 HeldItemGrip = new(0.03f, 0.10f, -0.04f);
-    private const float HeldBlockScale = 0.38f;
-    private static readonly Vector3 HeldBlockGrip = new(0.08f, 0.10f, -0.02f);
+    // Public so the item debugger can show and tune the same defaults the game ships.
+    public const float HeldItemScale = 0.5f;
+    public static readonly Vector3 HeldItemGrip = new(0.03f, 0.10f, -0.04f);
+    public const float HeldBlockScale = 0.38f;
+    public static readonly Vector3 HeldBlockGrip = new(0.08f, 0.10f, -0.02f);
+
+    /// <summary>
+    /// The held-item model matrix: uniform scale, the item's display transform, the grip nudge,
+    /// then the hand anchor. Shared by <see cref="RenderHeldItem"/> and the item debugger so the
+    /// preview can never drift from what the game draws. Blocks pass
+    /// <see cref="Matrix4x4.Identity"/> as <paramref name="displayTransform"/>: their shape is
+    /// the block's own baked model, not a display-configured sprite.
+    /// </summary>
+    public static Matrix4x4 PoseHeldItem(Matrix4x4 hand, Matrix4x4 displayTransform, float scale, Vector3 grip) =>
+        Matrix4x4.CreateScale(scale) * displayTransform * Matrix4x4.CreateTranslation(grip) * hand;
 
     /// <summary>
     /// Draws the selected hotbar slot in the right hand: a block as its 3D cube, a pure
@@ -2262,10 +2273,7 @@ public class RenderManager : IDisposable
                 Math.Max(0, type.FrameCount - 1));
             if (!itemMeshes.TryGetFrame(selectedId, frame, out var mesh, out var texture)) return;
 
-            var model = Matrix4x4.CreateScale(HeldItemScale)
-                        * type.DisplayMatrix()
-                        * Matrix4x4.CreateTranslation(HeldItemGrip)
-                        * hand;
+            var model = PoseHeldItem(hand, type.DisplayMatrix(), HeldItemScale, HeldItemGrip);
             SetDrawUniforms(model, model * viewProj, 1f);
 
             BindUnit(0, TextureTarget.Texture2DArray, texture);
@@ -2276,9 +2284,7 @@ public class RenderManager : IDisposable
 
         var cube = blockCubes.Get(selectedId);
         if (cube == null) return;
-        var blockModel = Matrix4x4.CreateScale(HeldBlockScale)
-                         * Matrix4x4.CreateTranslation(HeldBlockGrip)
-                         * hand;
+        var blockModel = PoseHeldItem(hand, Matrix4x4.Identity, HeldBlockScale, HeldBlockGrip);
         SetDrawUniforms(blockModel, blockModel * viewProj, 1f);
         cube.Render();
     }

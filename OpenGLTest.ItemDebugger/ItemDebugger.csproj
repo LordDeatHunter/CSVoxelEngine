@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net9.0</TargetFramework>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <LangVersion>default</LangVersion>
+        <Nullable>annotations</Nullable>
+        <AssemblyName>ItemDebugger</AssemblyName>
+        <RootNamespace>silkgltriangle</RootNamespace>
+        <!-- Match the game's runtime behaviour so the preview is the shipping renderer. -->
+        <RollForward>LatestMajor</RollForward>
+        <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+        <TieredPGO>true</TieredPGO>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Reuses the engine: content registry, shaders, player rig and item/block mesh caches.
+             Referencing the Exe project is deliberate - one source of truth for the renderer. -->
+        <ProjectReference Include="..\OpenGLTest\silkgltriangle.csproj" />
+    </ItemGroup>
+
+</Project>

@@ -549,7 +549,6 @@ public class UIRenderer : IDisposable
     {
         if (_font == null || string.IsNullOrEmpty(text))
             return;
-
         var instances = _glyphScratch.AsSpan();
         var n = _font.Layout(text.AsSpan(), topLeft, scale, instances);
         if (n == 0)
@@ -564,6 +563,14 @@ public class UIRenderer : IDisposable
 
         DrawTextBatch(n * 2);
     }
+
+    /// <summary>Draw scale mapping a digit's cap-height to <paramref name="pixels"/>, for
+    /// callers that do not hold the font (the item debugger) and size their own text with it.</summary>
+    public float CapHeightScale(float pixels) => _font?.ScaleForCapHeight(pixels) ?? 1f;
+
+    /// <summary>Pixel width of <paramref name="text"/> at a draw scale, for anchoring.</summary>
+    public float MeasureTextWidth(string text, float scale) =>
+        _font == null || string.IsNullOrEmpty(text) ? 0f : _font.MeasureSize(text.AsSpan(), scale).X;
 
     /// <summary>
     /// Fills a static quad index buffer: quad <c>i</c> draws vertices <c>[4i, 4i+4)</c> as
@@ -1352,6 +1359,19 @@ public class UIRenderer : IDisposable
             return;
         }
         DrawTexture(centre, size, texture);
+    }
+
+    /// <summary>
+    /// A pure item's flat 2D sprite, sized to <paramref name="pixels"/> square and drawn with the
+    /// frame the given moment picks (frame 0 for a plain sprite). This is what the hotbar and
+    /// inventory rows show; the item debugger uses it for its grid so icons read as sprites.
+    /// Air, blocks and unknown ids draw nothing.
+    /// </summary>
+    public void DrawItemSprite(Vector2 centre, float pixels, byte itemId, float headingDegrees,
+        float timeSeconds)
+    {
+        if (!ItemRegistry.IsItem(itemId) || !_itemIcons.TryGetValue(itemId, out var texture)) return;
+        DrawItemSprite(centre, new Vector2(pixels), itemId, texture, headingDegrees, timeSeconds);
     }
 
     /// <summary>

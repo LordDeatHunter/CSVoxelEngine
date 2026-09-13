@@ -356,7 +356,7 @@ public static class ContentRegistry
                 chance, durability, useDelay,
                 sheet.Cols, sheet.Rows, sheet.Frames, sheet.Mode, sheet.Fps,
                 display.Rotation, display.Translation, display.Scale,
-                tool != null, power, hitDelay));
+                tool != null, power, hitDelay, name));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ItemIds, StringComparer.Ordinal));
