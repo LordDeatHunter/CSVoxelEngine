@@ -1,0 +1,8 @@
+{
+  "name": "Obsidian",
+  "model": { "parent": "block/cube_all", "textures": { "all": "obsidian" } },
+  "sfx": "hit_rock",
+  "requiresTool": true,
+  "tools": { "pickaxe": 2 },
+  "loot": "obsidian"
+}

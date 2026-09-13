@@ -583,7 +583,9 @@ public class Inventory
         // display name the way the compass below is.
         if (ItemRegistry.FindByAction(ItemUseAction.PickupFluid) is { } bucket)
             _tools.Add(new ItemStack(_nextToolInstance++, bucket));
-        if (ItemRegistry.FindByName("Primitive Axe") is { } axe)
+        if (ItemRegistry.FindByName("Copper Pickaxe") is { } pickaxe)
+            _tools.Add(new ItemStack(_nextToolInstance++, pickaxe));
+        if (ItemRegistry.FindByName("Copper Axe") is { } axe)
             _tools.Add(new ItemStack(_nextToolInstance++, axe));
         // A plain pickup like flint, found by display name. No use action: it only ever
         // sits on the hotbar for the compass.

@@ -1,5 +1,3 @@
 {
-  // Items that mine as pickaxes. A block gating on "pickaxe" accepts any of these at or
-  // above the required power (see BlockDefinition.tools).
-  "items": ["item/primitive_pickaxe"]
+  "items": ["item/primitive_pickaxe", "item/copper_pickaxe"]
 }

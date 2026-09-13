@@ -1,5 +1,3 @@
 {
-  // Items that mine as axes. A block gating on "axe" accepts any of these at or above the
-  // required power (see BlockDefinition.tools).
-  "items": ["item/primitive_axe"]
+  "items": ["item/primitive_axe", "item/copper_axe"]
 }
