@@ -80,7 +80,8 @@ public static class WorldGenerationConfig
     public const string NightAmbiencePath = "assets/sfx/ambience/night_ambience.mp3";
     // Peak volume of each loop when fully faded in (0..1)
     public const float AmbienceVolume = 0.35f;
-    // Exponential approach rate per second toward the crossfade targets
+    // Exponential approach rate per second the day/night crossfade eases toward the current
+    // dayness; the master volume is applied directly so a slider change is instant
     public const float AmbienceFadeRate = 0.8f;
     // Both loops rise from silence over this many seconds at startup
     public const float AmbienceStartupFadeSeconds = 8f;

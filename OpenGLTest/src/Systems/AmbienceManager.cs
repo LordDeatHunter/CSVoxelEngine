@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 using NLayer.NAudioSupport;
 
 // WinMM playback is Windows-only by design; the constructor refuses non-Windows up front
@@ -23,6 +24,7 @@ public sealed class AmbienceManager : IDisposable
     private readonly Voice? _night;
     private float _dayVolume;
     private float _nightVolume;
+    private float _smoothedDayness;
     private float _startupSeconds;
     private bool _disposed;
 
@@ -76,11 +78,12 @@ public sealed class AmbienceManager : IDisposable
 
     /// <summary>
     /// Builds the looping playback chain for one file: managed MP3 decode, the seamless
-    /// repeat, then a volume stage. The repeat must sit below the volume stage because
-    /// that stage pads end-of-stream with silence instead of reporting it. Headless-safe
+    /// repeat, then a volume stage. Volume is applied to the decoded float samples with a
+    /// <see cref="VolumeSampleProvider"/> because the decoder's format is 32-bit IEEE float,
+    /// which <c>WaveChannel32</c> (a 16-bit-input stage) silently fails to scale. Headless-safe
     /// (touches no audio device), so tests cover it.
     /// </summary>
-    internal static (Voice voice, WaveChannel32 volume) CreateLoopSource(string path)
+    internal static (Voice voice, VolumeSampleProvider volume) CreateLoopSource(string path)
     {
         var voice = new Voice(path, startPlaying: false);
         return (voice, voice.Volume);
@@ -91,8 +94,9 @@ public sealed class AmbienceManager : IDisposable
         MathUtils.SmoothStep(0f, WorldGenerationConfig.AmbienceStartupFadeSeconds, elapsedSeconds);
 
     /// <summary>
-    /// Eases both loop volumes toward their crossfade targets. The startup fade holds the
-    /// master down for the first seconds, so launch rises gradually instead of jumping in.
+    /// Crossfades the two loops by the lighting pass's dayness, easing the crossfade shape
+    /// toward it. The live master volume (the slider) and the startup rise are applied
+    /// directly, so a volume change is heard immediately rather than fading in or out.
     /// </summary>
     public void Update(float dayness, float deltaTime)
     {
@@ -100,16 +104,15 @@ public sealed class AmbienceManager : IDisposable
             return;
         _startupSeconds = Math.Min(_startupSeconds + Math.Max(0f, deltaTime),
             WorldGenerationConfig.AmbienceStartupFadeSeconds);
+
+        var targetDayness = MathUtils.Clamp01(dayness);
+        _smoothedDayness = MathUtils.Damp(_smoothedDayness, targetDayness,
+            WorldGenerationConfig.AmbienceFadeRate, deltaTime);
+        if (MathF.Abs(_smoothedDayness - targetDayness) < 0.001f)
+            _smoothedDayness = targetDayness;
+
         var master = GameSettings.AmbienceVolume * StartupScale(_startupSeconds);
-        var (dayTarget, nightTarget) = ComputeTargetVolumes(dayness, master);
-        _dayVolume = MathUtils.Damp(_dayVolume, dayTarget,
-            WorldGenerationConfig.AmbienceFadeRate, deltaTime);
-        _nightVolume = MathUtils.Damp(_nightVolume, nightTarget,
-            WorldGenerationConfig.AmbienceFadeRate, deltaTime);
-        if (MathF.Abs(_dayVolume - dayTarget) < 0.001f)
-            _dayVolume = dayTarget;
-        if (MathF.Abs(_nightVolume - nightTarget) < 0.001f)
-            _nightVolume = nightTarget;
+        (_dayVolume, _nightVolume) = ComputeTargetVolumes(_smoothedDayness, master);
         _day!.Volume.Volume = _dayVolume;
         _night!.Volume.Volume = _nightVolume;
     }
@@ -129,7 +132,7 @@ public sealed class AmbienceManager : IDisposable
     /// </summary>
     internal sealed class Voice : IDisposable
     {
-        public WaveChannel32 Volume { get; }
+        public VolumeSampleProvider Volume { get; }
         public long SourceLength => _source.Length;
         private readonly ManagedMpegStream _source;
         private readonly LoopStream _loop;
@@ -139,21 +142,18 @@ public sealed class AmbienceManager : IDisposable
         {
             ManagedMpegStream? source = null;
             LoopStream? loop = null;
-            WaveChannel32? volume = null;
             try
             {
                 source = new ManagedMpegStream(path);
                 loop = new LoopStream(source);
-                volume = new WaveChannel32(loop) { Volume = 0f };
+                Volume = new VolumeSampleProvider(loop.ToSampleProvider()) { Volume = 0f };
                 _source = source;
                 _loop = loop;
-                Volume = volume;
                 if (startPlaying)
-                    _output = StartLoop(volume);
+                    _output = StartLoop(Volume.ToWaveProvider());
             }
             catch
             {
-                volume?.Dispose();
                 loop?.Dispose();
                 source?.Dispose();
                 throw;
@@ -163,7 +163,7 @@ public sealed class AmbienceManager : IDisposable
         public int ReadLoop(byte[] buffer, int offset, int count) =>
             _loop.Read(buffer, offset, count);
 
-        private static WaveOutEvent StartLoop(WaveStream source)
+        private static WaveOutEvent StartLoop(IWaveProvider source)
         {
             var output = new WaveOutEvent();
             try
@@ -183,7 +183,6 @@ public sealed class AmbienceManager : IDisposable
         {
             _output?.Dispose();
             _loop.Dispose();
-            Volume.Dispose();
             _source.Dispose();
         }
     }

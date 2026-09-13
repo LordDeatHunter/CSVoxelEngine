@@ -86,6 +86,8 @@ public static class SettingsRows
 
         new SliderRow("Audio", "Ambience", 0f, 1f, 2, "",
             () => GameSettings.AmbienceVolume, v => GameSettings.AmbienceVolume = v),
+        new SliderRow("Audio", "SFX", 0f, 1f, 2, "",
+            () => GameSettings.SfxVolume, v => GameSettings.SfxVolume = v),
 
         new SliderRow("Controls", "Mouse Sensitivity", SensitivityMin, SensitivityMax, 2, "",
             () => GameSettings.MouseSensitivity, v => GameSettings.MouseSensitivity = v),

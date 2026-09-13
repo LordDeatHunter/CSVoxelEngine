@@ -544,6 +544,7 @@ public static class Program
         renderManager.SetLighting(windowManager.Window.Time + timeOffset, world.Camera, world.PrimedTnt,
             world.Camera.IsEyeInWater, world.Camera.IsEyeInLava, world.Campfires.LitCells);
         ambience?.Update(renderManager.Dayness, (float)Math.Clamp(deltaTime, 0.0, 0.25));
+        sfx?.Update();
         renderManager.BeginFrame(world.Camera);
         renderManager.EndGpuPass(ProfileSection.Lighting);
         FrameProfiler.End(ProfileSection.Lighting);

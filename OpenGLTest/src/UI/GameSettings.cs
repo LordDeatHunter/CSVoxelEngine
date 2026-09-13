@@ -34,6 +34,7 @@ public static class GameSettings
 
     // Audio
     public static float AmbienceVolume { get; set; }
+    public static float SfxVolume { get; set; }
 
     // Controls
     public static float MouseSensitivity { get; set; }
@@ -66,6 +67,7 @@ public static class GameSettings
         WaterCaustics = WorldGenerationConfig.WaterCausticStrength;
         WaterSunShafts = WorldGenerationConfig.WaterRayStrength;
         AmbienceVolume = WorldGenerationConfig.AmbienceVolume;
+        SfxVolume = WorldGenerationConfig.SfxVolume;
         MouseSensitivity = 0.2f;
         FieldOfView = 70f;
     }
@@ -91,23 +93,24 @@ public static class GameSettings
         }
         if (dto == null) return;
 
-        VSync = dto.VSync;
-        ResolutionIndex = Math.Clamp(dto.ResolutionIndex, 0, Resolutions.Length - 1);
-        MaxFpsIndex = Math.Clamp(dto.MaxFpsIndex, 0, MaxFpsOptions.Length - 1);
-        Shadows = dto.Shadows;
-        LeafSway = Math.Clamp(dto.LeafSway, 0f, SettingsRows.LeafSwayMax);
-        SunSize = Math.Clamp(dto.SunSize, SettingsRows.SunSizeMin, SettingsRows.SunSizeMax);
-        SunGlow = Math.Clamp(dto.SunGlow, 0f, SettingsRows.SunGlowMax);
-        CloudOpacity = Math.Clamp(dto.CloudOpacity, 0f, 1f);
-        WaterReflections = dto.WaterReflections;
-        ReflectionIndex = Math.Clamp(dto.ReflectionIndex, 0, ReflectionScales.Length - 1);
-        WaterWaves = Math.Clamp(dto.WaterWaves, 0f, SettingsRows.WaterWavesMax);
-        WaterRefraction = Math.Clamp(dto.WaterRefraction, 0f, SettingsRows.WaterRefractionMax);
-        WaterCaustics = Math.Clamp(dto.WaterCaustics, 0f, SettingsRows.WaterCausticsMax);
-        WaterSunShafts = Math.Clamp(dto.WaterSunShafts, 0f, SettingsRows.WaterSunShaftsMax);
-        AmbienceVolume = Math.Clamp(dto.AmbienceVolume, 0f, 1f);
-        MouseSensitivity = Math.Clamp(dto.MouseSensitivity, SettingsRows.SensitivityMin, SettingsRows.SensitivityMax);
-        FieldOfView = Math.Clamp(dto.FieldOfView, SettingsRows.FovMin, SettingsRows.FovMax);
+        if (dto.VSync is { } vSync) VSync = vSync;
+        if (dto.ResolutionIndex is { } resolution) ResolutionIndex = Math.Clamp(resolution, 0, Resolutions.Length - 1);
+        if (dto.MaxFpsIndex is { } maxFps) MaxFpsIndex = Math.Clamp(maxFps, 0, MaxFpsOptions.Length - 1);
+        if (dto.Shadows is { } shadows) Shadows = shadows;
+        if (dto.LeafSway is { } leafSway) LeafSway = Math.Clamp(leafSway, 0f, SettingsRows.LeafSwayMax);
+        if (dto.SunSize is { } sunSize) SunSize = Math.Clamp(sunSize, SettingsRows.SunSizeMin, SettingsRows.SunSizeMax);
+        if (dto.SunGlow is { } sunGlow) SunGlow = Math.Clamp(sunGlow, 0f, SettingsRows.SunGlowMax);
+        if (dto.CloudOpacity is { } clouds) CloudOpacity = Math.Clamp(clouds, 0f, 1f);
+        if (dto.WaterReflections is { } reflections) WaterReflections = reflections;
+        if (dto.ReflectionIndex is { } reflection) ReflectionIndex = Math.Clamp(reflection, 0, ReflectionScales.Length - 1);
+        if (dto.WaterWaves is { } waves) WaterWaves = Math.Clamp(waves, 0f, SettingsRows.WaterWavesMax);
+        if (dto.WaterRefraction is { } refraction) WaterRefraction = Math.Clamp(refraction, 0f, SettingsRows.WaterRefractionMax);
+        if (dto.WaterCaustics is { } caustics) WaterCaustics = Math.Clamp(caustics, 0f, SettingsRows.WaterCausticsMax);
+        if (dto.WaterSunShafts is { } shafts) WaterSunShafts = Math.Clamp(shafts, 0f, SettingsRows.WaterSunShaftsMax);
+        if (dto.AmbienceVolume is { } ambience) AmbienceVolume = Math.Clamp(ambience, 0f, 1f);
+        if (dto.SfxVolume is { } sfx) SfxVolume = Math.Clamp(sfx, 0f, 1f);
+        if (dto.MouseSensitivity is { } sensitivity) MouseSensitivity = Math.Clamp(sensitivity, SettingsRows.SensitivityMin, SettingsRows.SensitivityMax);
+        if (dto.FieldOfView is { } fov) FieldOfView = Math.Clamp(fov, SettingsRows.FovMin, SettingsRows.FovMax);
     }
 
     public static void Save(string? path = null)
@@ -130,6 +133,7 @@ public static class GameSettings
             WaterCaustics = WaterCaustics,
             WaterSunShafts = WaterSunShafts,
             AmbienceVolume = AmbienceVolume,
+            SfxVolume = SfxVolume,
             MouseSensitivity = MouseSensitivity,
             FieldOfView = FieldOfView,
         };
@@ -144,24 +148,27 @@ public static class GameSettings
         }
     }
 
+    // Nullable so a settings file written before a field existed keeps that field's default
+    // instead of clobbering it with 0/false (a missing SfxVolume must not mean "muted").
     private sealed class SettingsDto
     {
-        public bool VSync { get; set; }
-        public int ResolutionIndex { get; set; }
-        public int MaxFpsIndex { get; set; }
-        public bool Shadows { get; set; }
-        public float LeafSway { get; set; }
-        public float SunSize { get; set; }
-        public float SunGlow { get; set; }
-        public float CloudOpacity { get; set; }
-        public bool WaterReflections { get; set; }
-        public int ReflectionIndex { get; set; }
-        public float WaterWaves { get; set; }
-        public float WaterRefraction { get; set; }
-        public float WaterCaustics { get; set; }
-        public float WaterSunShafts { get; set; }
-        public float AmbienceVolume { get; set; }
-        public float MouseSensitivity { get; set; }
-        public float FieldOfView { get; set; }
+        public bool? VSync { get; set; }
+        public int? ResolutionIndex { get; set; }
+        public int? MaxFpsIndex { get; set; }
+        public bool? Shadows { get; set; }
+        public float? LeafSway { get; set; }
+        public float? SunSize { get; set; }
+        public float? SunGlow { get; set; }
+        public float? CloudOpacity { get; set; }
+        public bool? WaterReflections { get; set; }
+        public int? ReflectionIndex { get; set; }
+        public float? WaterWaves { get; set; }
+        public float? WaterRefraction { get; set; }
+        public float? WaterCaustics { get; set; }
+        public float? WaterSunShafts { get; set; }
+        public float? AmbienceVolume { get; set; }
+        public float? SfxVolume { get; set; }
+        public float? MouseSensitivity { get; set; }
+        public float? FieldOfView { get; set; }
     }
 }

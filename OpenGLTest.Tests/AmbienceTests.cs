@@ -94,6 +94,81 @@ public sealed class AmbienceTests
         Assert.Equal(1f, AmbienceManager.StartupScale(float.MaxValue));
     }
 
+    [Fact]
+    public void UpdateTracksTheAmbienceVolumeSetting()
+    {
+        var path = FindSfxAsset("ambience/forest_ambience.mp3");
+        if (path == null) return;
+        using var ambience = new AmbienceManager(path, path);
+        if (!ambience.Enabled) return;
+
+        try
+        {
+            GameSettings.ResetToDefaults();
+            GameSettings.AmbienceVolume = 1f;
+            for (var i = 0; i < 400; i++) ambience.Update(1f, 0.016f);
+            var loud = ambience.DayVolume;
+
+            GameSettings.AmbienceVolume = 0.05f;
+            for (var i = 0; i < 400; i++) ambience.Update(1f, 0.016f);
+            var quiet = ambience.DayVolume;
+
+            Assert.True(quiet < loud * 0.5f, $"day volume {loud} -> {quiet}");
+        }
+        finally
+        {
+            GameSettings.ResetToDefaults();
+        }
+    }
+
+    [Fact]
+    public void MasterVolumeChangeIsInstant()
+    {
+        var path = FindSfxAsset("ambience/forest_ambience.mp3");
+        if (path == null) return;
+        using var ambience = new AmbienceManager(path, path);
+        if (!ambience.Enabled) return;
+
+        try
+        {
+            GameSettings.ResetToDefaults();
+            GameSettings.AmbienceVolume = 1f;
+            // Past the 8 s startup fade, so the master scale is exactly 1.
+            for (var i = 0; i < 600; i++) ambience.Update(1f, 0.016f);
+            Assert.Equal(1f, ambience.DayVolume, 3);
+
+            GameSettings.AmbienceVolume = 0f;
+            ambience.Update(1f, 0.016f);
+            Assert.Equal(0f, ambience.DayVolume, 3);
+        }
+        finally
+        {
+            GameSettings.ResetToDefaults();
+        }
+    }
+
+    [Fact]
+    public void VolumeStageScalesAndSilencesTheLoop()
+    {
+        var path = FindSfxAsset("ambience/forest_ambience.mp3");
+        if (path == null) return;
+        var (voice, volume) = AmbienceManager.CreateLoopSource(path);
+        using (voice)
+        {
+            volume.Volume = 1f;
+            var loud = new float[8192];
+            var read = volume.Read(loud, 0, loud.Length);
+            Assert.True(read > 0);
+            Assert.Contains(loud, sample => sample != 0f);
+
+            volume.Volume = 0f;
+            var silent = new float[8192];
+            read = volume.Read(silent, 0, silent.Length);
+            Assert.True(read > 0);
+            Assert.All(silent, sample => Assert.Equal(0f, sample));
+        }
+    }
+
     private static string? FindSfxAsset(string fileName)
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

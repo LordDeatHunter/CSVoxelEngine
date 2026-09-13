@@ -20,6 +20,7 @@ public sealed class GameSettingsTests
         Assert.Equal(WorldGenerationConfig.WaterCausticStrength, GameSettings.WaterCaustics);
         Assert.Equal(WorldGenerationConfig.WaterRayStrength, GameSettings.WaterSunShafts);
         Assert.Equal(WorldGenerationConfig.AmbienceVolume, GameSettings.AmbienceVolume);
+        Assert.Equal(WorldGenerationConfig.SfxVolume, GameSettings.SfxVolume);
     }
 
     [Fact]
@@ -34,6 +35,7 @@ public sealed class GameSettingsTests
             GameSettings.SunGlow = 1.25f;
             GameSettings.ResolutionIndex = 0;
             GameSettings.MouseSensitivity = 0.42f;
+            GameSettings.SfxVolume = 0.31f;
             GameSettings.Save(path);
 
             GameSettings.ResetToDefaults();
@@ -45,6 +47,7 @@ public sealed class GameSettingsTests
             Assert.Equal(1.25f, GameSettings.SunGlow);
             Assert.Equal(0, GameSettings.ResolutionIndex);
             Assert.Equal(0.42f, GameSettings.MouseSensitivity);
+            Assert.Equal(0.31f, GameSettings.SfxVolume);
         }
         finally
         {
@@ -93,6 +96,28 @@ public sealed class GameSettingsTests
             Assert.Equal(SettingsRows.SunSizeMin, GameSettings.SunSize);
             Assert.Equal(SettingsRows.WaterCausticsMax, GameSettings.WaterCaustics);
             Assert.Equal(GameSettings.Resolutions.Length - 1, GameSettings.ResolutionIndex);
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+            GameSettings.ResetToDefaults();
+        }
+    }
+
+    [Fact]
+    public void MissingFieldsKeepCurrentValues()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".json");
+        try
+        {
+            File.WriteAllText(path, "{ \"VSync\": true }");
+            GameSettings.ResetToDefaults();
+            GameSettings.Load(path);
+
+            Assert.True(GameSettings.VSync);
+            Assert.Equal(WorldGenerationConfig.AmbienceVolume, GameSettings.AmbienceVolume);
+            Assert.Equal(WorldGenerationConfig.SfxVolume, GameSettings.SfxVolume);
+            Assert.Equal(WorldGenerationConfig.CloudOpacity, GameSettings.CloudOpacity);
         }
         finally
         {

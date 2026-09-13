@@ -97,7 +97,7 @@ public sealed class SfxTests
     [Fact]
     public void MixerMixesAClipThenFallsSilent()
     {
-        using var mixer = new SfxMixer(1f);
+        using var mixer = new SfxMixer();
         mixer.Play([1000, 1000, 1000, 1000]);
 
         var buffer = new byte[16];
@@ -113,18 +113,35 @@ public sealed class SfxTests
     [Fact]
     public void MixerAppliesAndClampsVolume()
     {
-        using var mixer = new SfxMixer(0.5f);
+        using var mixer = new SfxMixer { Volume = 0.5f };
         mixer.Play([1000, 1000]);
 
         var half = new byte[4];
         mixer.Read(half, 0, half.Length);
         Assert.Equal(500, BitConverter.ToInt16(half, 0));
 
-        using var loud = new SfxMixer(1f);
+        using var loud = new SfxMixer();
         loud.Play([short.MaxValue, short.MaxValue]);
         loud.Play([short.MaxValue, short.MaxValue]);
         var clamped = new byte[4];
         loud.Read(clamped, 0, clamped.Length);
         Assert.Equal(short.MaxValue, BitConverter.ToInt16(clamped, 0));
+    }
+
+    [Fact]
+    public void MixerVolumeMutesAndClamps()
+    {
+        using var mixer = new SfxMixer();
+        mixer.Play([1000, 1000]);
+        mixer.Volume = 0f;
+
+        var silent = new byte[4];
+        mixer.Read(silent, 0, silent.Length);
+        Assert.All(silent, b => Assert.Equal(0, b));
+
+        mixer.Volume = 5f;
+        Assert.Equal(1f, mixer.Volume);
+        mixer.Volume = -1f;
+        Assert.Equal(0f, mixer.Volume);
     }
 }

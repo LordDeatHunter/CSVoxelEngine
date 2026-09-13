@@ -10,7 +10,7 @@ namespace silkgltriangle;
 /// guards the active list against <see cref="Read"/>, which NAudio calls on its playback
 /// thread while the game thread is free to start another one-shot.
 /// </summary>
-internal sealed class SfxMixer(float volume) : IWaveProvider, IDisposable
+internal sealed class SfxMixer : IWaveProvider, IDisposable
 {
     internal const int SampleRate = 44100;
     internal const int Channels = 2;
@@ -24,10 +24,17 @@ internal sealed class SfxMixer(float volume) : IWaveProvider, IDisposable
 
     private readonly object _gate = new();
     private readonly List<ActiveClip> _active = new();
-    private readonly float _volume = Math.Clamp(volume, 0f, 1f);
+    private volatile float _volume = 1f;
     private int[] _scratch = new int[4096];
 
     public WaveFormat WaveFormat { get; } = new(SampleRate, BitsPerSample, Channels);
+
+    /// <summary>Master volume 0..1, written from the game thread and read on the audio thread.</summary>
+    public float Volume
+    {
+        get => _volume;
+        set => _volume = Math.Clamp(value, 0f, 1f);
+    }
 
     public void Play(short[] samples)
     {

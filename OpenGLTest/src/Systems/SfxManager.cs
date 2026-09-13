@@ -31,7 +31,7 @@ public sealed class SfxManager : IDisposable
     /// <summary>False when no audio could be started; <see cref="Play"/> then does nothing.</summary>
     public bool Enabled { get; }
 
-    public SfxManager(string sfxRoot = "assets/sfx", float volume = WorldGenerationConfig.SfxVolume)
+    public SfxManager(string sfxRoot = "assets/sfx")
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -68,7 +68,7 @@ public sealed class SfxManager : IDisposable
                 return;
             }
 
-            _mixer = new SfxMixer(volume);
+            _mixer = new SfxMixer();
             _output = new WaveOutEvent();
             _output.Init(_mixer);
             _output.Play();
@@ -82,6 +82,13 @@ public sealed class SfxManager : IDisposable
             _mixer = null;
             Log.WriteLine($"SFX disabled: {e.Message}");
         }
+    }
+
+    /// <summary>Pushes the live SFX volume setting onto the mixer; call once per frame.</summary>
+    public void Update()
+    {
+        if (_mixer != null)
+            _mixer.Volume = GameSettings.SfxVolume;
     }
 
     /// <summary>
