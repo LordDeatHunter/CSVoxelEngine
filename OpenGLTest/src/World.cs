@@ -449,9 +449,7 @@ public class World : IItemUseWorld
         renderManager.RenderQuerns(Camera, _querns);
         renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
         renderManager.RenderFallingBlocks(Camera, _falling.Falling);
-        renderManager.RenderLeafParticles(Camera, _leaves.Particles);
         renderManager.RenderBlockDebris(Camera, _debris.Debris);
-        renderManager.RenderFireParticles(Camera, _fire.Particles);
         foreach (var tree in _toppling)
             renderManager.RenderTopplingTree(Camera, tree);
         renderManager.RenderPlayer(Camera, Player);
@@ -468,22 +466,28 @@ public class World : IItemUseWorld
         renderManager.EndGpuPass(ProfileSection.WaterPass);
         FrameProfiler.End(ProfileSection.WaterPass);
 
-        // Bubbles ride behind the water pass, not with the other entities: the water writes
-        // depth, so a depth-tested bubble draws over the surface when the eye is submerged
-        // and stays hidden behind it when the eye is out of the water. Drawing them earlier
-        // would let the blended surface cover bubbles floating in front of it.
-        FrameProfiler.Begin(ProfileSection.EntityPass);
-        renderManager.BeginGpuPass(ProfileSection.EntityPass);
-        renderManager.RenderBubbleParticles(Camera, _bubbles.Particles);
-        renderManager.EndGpuPass(ProfileSection.EntityPass);
-        FrameProfiler.End(ProfileSection.EntityPass);
-
         // Clouds blend too, so they go after water has written its depth
         FrameProfiler.Begin(ProfileSection.CloudPass);
         renderManager.BeginGpuPass(ProfileSection.CloudPass);
         renderManager.RenderClouds(Camera, Camera.IsEyeInWater);
         renderManager.EndGpuPass(ProfileSection.CloudPass);
         FrameProfiler.End(ProfileSection.CloudPass);
+
+        // The depthless blended particles draw last, after the clouds, because none of them writes
+        // depth: a cloud painted after them would cover every leaf and ember in front of it, since
+        // the depth buffer still holds whatever is behind the particle rather than the particle.
+        // Drawing them here lets the clouds' own depth pre-pass do the occluding - a particle in
+        // front of a cloud passes the test and blends over it, one behind it is hidden - while the
+        // terrain and water depth already in the buffer still hides particles behind them.
+        // Bubbles ride along: they need the water pass' depth (they only exist submerged, where
+        // the clouds are skipped anyway) and used to be the only pass drawn at this point.
+        FrameProfiler.Begin(ProfileSection.EntityPass);
+        renderManager.BeginGpuPass(ProfileSection.EntityPass);
+        renderManager.RenderLeafParticles(Camera, _leaves.Particles);
+        renderManager.RenderFireParticles(Camera, _fire.Particles);
+        renderManager.RenderBubbleParticles(Camera, _bubbles.Particles);
+        renderManager.EndGpuPass(ProfileSection.EntityPass);
+        FrameProfiler.End(ProfileSection.EntityPass);
 
         // Additive sun shafts on top of the finished underwater view; it re-reads the depth
         // buffer, so it has to follow everything that writes depth

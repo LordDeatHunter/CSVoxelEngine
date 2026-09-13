@@ -21,17 +21,14 @@ namespace silkgltriangle;
 /// <c>RenderManager.RenderBlockDebris</c> (RenderManager.cs:2114) walks its list with a plain
 /// <c>foreach</c> and submits each cube in exactly that order.</para>
 ///
-/// <para><b>The debris blend state, stated conditionally, because the unconditional version is
-/// false.</b> Debris always draws with depth WRITES ON - LeafParticleRenderer clears its own
-/// <c>DepthMask(false)</c> by restoring <c>DepthMask(true)</c> before it returns
-/// (LeafParticleRenderer.cs:174) - and RenderBlockDebris sets no blend state of its own. Whenever
-/// leaves drew that frame, debris therefore also inherits <c>Blend</c> still ENABLED at
-/// <c>SrcAlpha</c>/<c>OneMinusSrcAlpha</c>, which LeafParticleRenderer set at
-/// LeafParticleRenderer.cs:159-160 and never disables. That inheritance is conditional: the leaf
-/// renderer returns early when there are no leaves (LeafParticleRenderer.cs:103), and World.cs
-/// draws leaves (World.cs:345) immediately before debris (World.cs:346). So on any frame with live
-/// leaves, overlapping semi-transparent debris cubes composite in submission order, and submission
-/// order is visually load-bearing.</para>
+/// <para><b>The debris blend state.</b> Debris always draws with depth WRITES ON - the leaf
+/// renderer clears its own <c>DepthMask(false)</c> by restoring <c>DepthMask(true)</c> before it
+/// returns (LeafParticleRenderer.cs:174) - and RenderBlockDebris sets no blend state of its own.
+/// <c>Blend</c> is already ENABLED at <c>SrcAlpha</c>/<c>OneMinusSrcAlpha</c> by
+/// <c>RenderManager.BeginFrame</c> and left that way by the opaque passes, so debris composites
+/// regardless of whether any leaves are alive; the leaf pass no longer runs just before debris in
+/// any case, since it draws after the cloud pass. So overlapping semi-transparent debris cubes
+/// composite in submission order, and submission order is visually load-bearing.</para>
 ///
 /// <para><b>What that buys.</b> Because indexing and enumeration here are OLDEST-FIRST, this type
 /// reproduces <see cref="List{T}"/>'s sequence element for element under the same operations, so
