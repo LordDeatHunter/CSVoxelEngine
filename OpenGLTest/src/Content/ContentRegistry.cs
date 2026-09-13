@@ -352,6 +352,15 @@ public static class ContentRegistry
                 throw new InvalidOperationException(
                     $"Item '{path}' has tool.hitDelayMs {tool?.HitDelayMs}; expected 1..60000 milliseconds.");
 
+            var blockDamage = definition.BlockDamage ?? Mining.DefaultBlockDamage;
+            if (!float.IsFinite(blockDamage) || blockDamage <= 0f || blockDamage > 1000f)
+                throw new InvalidOperationException(
+                    $"Item '{path}' has blockDamage {definition.BlockDamage}; expected a positive number up to 1000.");
+            var entityDamage = definition.EntityDamage ?? Mining.DefaultEntityDamage;
+            if (!float.IsFinite(entityDamage) || entityDamage < 0f || entityDamage > 1000f)
+                throw new InvalidOperationException(
+                    $"Item '{path}' has entityDamage {definition.EntityDamage}; expected 0..1000.");
+
             types[id] = ItemFactory.Create(name, new ItemFactory.ItemSpec(
                 id, definition.Name ?? name, definition.Texture,
                 action,
@@ -361,7 +370,7 @@ public static class ContentRegistry
                 chance, durability, useDelay,
                 sheet.Cols, sheet.Rows, sheet.Frames, sheet.Mode, sheet.Fps,
                 display.Rotation, display.Translation, display.Scale,
-                tool != null, power, hitDelay, name));
+                tool != null, power, hitDelay, blockDamage, entityDamage, name));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ItemIds, StringComparer.Ordinal));

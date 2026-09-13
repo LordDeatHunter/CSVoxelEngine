@@ -70,6 +70,12 @@ public class World : IItemUseWorld
     private bool _breakAllowed;
     private float _hitTimer;
     private float _popElapsed = BlockPopSeconds;
+
+    // Punch cadence: the left-click attack runs on the held item's mining pace. Seeded to
+    // infinity while the button is up, so the first frame of a press punches at once, exactly
+    // like the break timer's seeded first hit.
+    private float _punchTimer = float.PositiveInfinity;
+    private float _punchGap = Mining.DefaultHitGapMs / 1000f;
     public Camera Camera { get; }
 
     /// <summary>The blocky player body: walk-swung limbs, mine-pumping right arm.</summary>
@@ -562,26 +568,45 @@ public class World : IItemUseWorld
     }
     
     /// <summary>
-    /// Drives hit-based mining: the first hit on a block lands the instant it is targeted, so a
-    /// quick tap counts as one hit, then one hit per the held item's pace while it is held (<see
-    /// cref="Mining"/>; a bare hand uses the baseline). Each hit removes the held tool's power
-    /// from the block's float hardness, and the block breaks when the damage reaches it. A block
-    /// whose <c>requiresTool</c> gate refuses the held tool (wrong kind, or below its required
-    /// power) takes 0 damage and shows no progress, though the swing still plays. A block of
-    /// hardness 0 breaks on first contact. Damage is discarded when the target, the held tool or
-    /// the button changes. Creative instamines (one block per frame) and ignores the gate.
+    /// Drives the left-click action, attack-first. A slime inside the forward punch cone
+    /// (see <see cref="Combat"/>) takes the swing — <c>entityDamage</c> plus a shove — and the
+    /// block under the crosshair is left alone for as long as one is there; with the cone clear
+    /// the block is mined. Mining itself is hit-based: the first hit on a block lands the instant
+    /// it is targeted, so a quick tap counts as one hit, then one hit per the held item's pace
+    /// while it is held (<see cref="Mining"/>; a bare hand uses the baseline). Each hit removes
+    /// the held item's <c>blockDamage</c> from the block's float hardness, and the block breaks
+    /// when the damage reaches it. A block whose <c>requiresTool</c> gate refuses the held tool
+    /// (wrong kind, or below its required tier) takes 0 damage and shows no progress, though the
+    /// swing still plays. A block of hardness 0 breaks on first contact. Damage is discarded when
+    /// the target, the held tool or the button changes. A click with no block under the
+    /// crosshair still swings the fist. Creative instamines and ignores the gate.
     /// Call after Update so the selection is current.
     /// </summary>
     public void UpdateBlockBreaking(double deltaTime, bool isHolding)
     {
-        if (!isHolding || !_hasSelectedBlock)
+        if (!isHolding)
         {
             StopBreaking();
+            _punchTimer = float.PositiveInfinity;
             return;
         }
 
         // Orbit mode turns the body toward the aim while the action fires at once.
         Camera.NotifyPlayerAction();
+
+        // Attack-first: while a slime is in the punch cone it owns the swing, so no block is
+        // mined through it (including while the punch itself is on cooldown).
+        if (UpdatePunch(deltaTime))
+        {
+            StopBreaking();
+            return;
+        }
+
+        if (!_hasSelectedBlock)
+        {
+            StopBreaking();
+            return;
+        }
 
         // A bucket makes water selectable; left-clicking it must still do nothing, since
         // RemoveBlock refuses fluids anyway (and water's hardness of 0 would pop instantly)
@@ -601,7 +626,7 @@ public class World : IItemUseWorld
         }
 
         var heldId = Inventory.SelectedBlockId;
-        var held = heldId != 0 && Inventory.SelectedCount > 0 ? ItemRegistry.TryGet(heldId) : null;
+        var held = HeldItem();
 
         // A new target or a different held item restarts the break: the gate, damage and pace
         // all belong to that pairing, so carrying progress over would apply the wrong numbers
@@ -613,7 +638,7 @@ public class World : IItemUseWorld
             _breakingHeldId = heldId;
             _breakHardness = BlockType.ById[_breakingBlockId]?.Hardness ?? 0f;
             _breakAllowed = Mining.CanMine(_breakingBlockId, held);
-            _breakPower = Mining.Power(held);
+            _breakPower = Mining.BlockDamage(held);
             _breakHitSeconds = Mining.HitGapSeconds(held);
             _breakDamage = 0f;
             // Seed the timer a whole interval in so the loop below lands the first hit this
@@ -682,6 +707,91 @@ public class World : IItemUseWorld
         _breakHitSeconds = Mining.DefaultHitGapMs / 1000f;
         _hitTimer = 0f;
         _popElapsed = BlockPopSeconds;
+    }
+
+    /// <summary>The item in hand, or null when the selected slot holds nothing.</summary>
+    private Item? HeldItem()
+    {
+        var id = Inventory.SelectedBlockId;
+        return id != 0 && Inventory.SelectedCount > 0 ? ItemRegistry.TryGet(id) : null;
+    }
+
+    /// <summary>
+    /// The punch half of the left-click action. While a slime sits in the forward cone the
+    /// swing belongs to it: once the held item's pace has elapsed the nearest one takes
+    /// <c>entityDamage</c> and a knockback shove. Returns true when a slime owns the swing (the
+    /// caller must not mine). With the cone clear the timer keeps running, so the first slime to
+    /// enter is punched at once; and when there is no block targeted either, the fist still
+    /// swings on the same pace, so left-clicking the sky plays the animation.
+    /// </summary>
+    private bool UpdatePunch(double deltaTime)
+    {
+        var held = HeldItem();
+        _punchGap = Mining.HitGapSeconds(held);
+        _punchTimer += (float)deltaTime;
+
+        if (TryFindPunchTarget(out var target))
+        {
+            if (_punchTimer < _punchGap)
+                return true;
+
+            _punchTimer = 0f;
+            Player.Punch();
+            target.TakeDamage(Combat.PunchDamage(held));
+            var away = new Vector3(
+                target.Position.X - Camera.Position.X, 0f, target.Position.Z - Camera.Position.Z);
+            target.Shove(away, WorldGenerationConfig.SlimePunchShoveSpeed);
+            return true;
+        }
+
+        if (!_hasSelectedBlock && _punchTimer >= _punchGap)
+        {
+            _punchTimer = 0f;
+            Player.Punch();
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Nearest slime inside the forward punch cone with an unobstructed line of sight, or false
+    /// when none is in reach. The punch fires from the head along the aim, so a wall between the
+    /// player and a slime stops it.
+    /// </summary>
+    private bool TryFindPunchTarget(out Slime target)
+    {
+        target = null!;
+        if (_slimes == null)
+            return false;
+
+        var slimes = _slimes.Slimes;
+        if (slimes.Count == 0)
+            return false;
+
+        var origin = Camera.Position;
+        var direction = Camera.ViewDirection;
+        var bestDistance = float.PositiveInfinity;
+        Slime? best = null;
+
+        for (var i = 0; i < slimes.Count; i++)
+        {
+            var slime = slimes[i];
+            if (!Combat.InPunchCone(origin, direction, slime.Position, out var distance))
+                continue;
+            if (Camera.SegmentHitsBlock(origin, slime.Position, _chunkManager))
+                continue;
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = slime;
+            }
+        }
+
+        if (best == null)
+            return false;
+
+        target = best;
+        return true;
     }
 
     /// <summary>

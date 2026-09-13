@@ -1342,11 +1342,29 @@ public class Camera
         return true;
     }
 
+    /// <summary>
+    /// Whether any targetable block cell lies on the segment from <paramref name="from"/> to
+    /// <paramref name="to"/>: the line-of-sight test the punch uses so a slime behind a wall
+    /// cannot be hit. Uses the same box-aware walk as <see cref="Raycast"/> (so flowers and
+    /// thin wood are aimed through), and fluids never block.
+    /// </summary>
+    public bool SegmentHitsBlock(Vector3 from, Vector3 to, ChunkManager chunkManager)
+    {
+        var delta = to - from;
+        var distance = delta.Length();
+        if (distance < 1e-4f) return false;
+
+        // A diagonal segment crosses up to 3 cells per block travelled; cap the walk on cells
+        // and stop on travelled distance, exactly like the capped shoulder-camera walk.
+        var steps = Math.Max(1, (int)MathF.Ceiling(distance * 3f) + 2);
+        return RaycastFrom(from, delta / distance, distance, steps, stopAtRange: true,
+            chunkManager, out _, out _, out _, out _, includeFluids: false);
+    }
+
     private static bool RaycastFrom(Vector3 origin, Vector3 direction, float range, float cellCap, bool stopAtRange,
         ChunkManager chunkManager, out Vector3 hitPosition, out Vector3 hitNormal, out int hitBoxIndex,
         out float hitT, bool includeFluids)
-    {
-        // A diagonal ray crosses up to 3 cells per block travelled, so a walk counted in
+    {        // A diagonal ray crosses up to 3 cells per block travelled, so a walk counted in
         // iterations starves rays that travel further (shoulder camera) or aim steeply.
         // Capped walks therefore count cells generously and stop on travelled distance
         // instead; the uncapped walk is first person exactly as it always was. tMax holds

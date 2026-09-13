@@ -2,5 +2,7 @@
   "name": "Primitive Pickaxe",
   "texture": "assets/textures/items/primitive_pickaxe.png",
   "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.4 },
+  "blockDamage": 1.0,
+  "entityDamage": 3,
   "tool": { "power": 1.0, "hitDelayMs": 300 }
 }

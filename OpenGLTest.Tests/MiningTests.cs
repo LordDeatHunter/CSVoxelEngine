@@ -114,4 +114,42 @@ public sealed class MiningTests
             Assert.Equal(expected, block.Hardness, precision: 3);
         }
     }
+
+    [Fact]
+    public void EntityDamageDefaultsToTheBareHandAndToolsOverride()
+    {
+        // Every item punches for the bare-hand baseline unless it declares entityDamage.
+        Assert.Equal(1f, Mining.EntityDamage(null));
+        Assert.Equal(1f, ItemOf("flint").EntityDamage);
+        Assert.Equal(1, Combat.PunchDamage(null));
+
+        // Tools are weapons too: primitive 3, copper 5, and the untiered blade 6.
+        Assert.Equal(3f, ItemOf("primitive_pickaxe").EntityDamage);
+        Assert.Equal(3f, ItemOf("primitive_axe").EntityDamage);
+        Assert.Equal(5f, ItemOf("copper_pickaxe").EntityDamage);
+        Assert.Equal(5f, ItemOf("copper_axe").EntityDamage);
+        Assert.Equal(6f, ItemOf("obsidian_blade").EntityDamage);
+
+        Assert.Equal(3, Combat.PunchDamage(ItemOf("primitive_pickaxe")));
+        Assert.Equal(5, Combat.PunchDamage(ItemOf("copper_pickaxe")));
+        Assert.Equal(6, Combat.PunchDamage(ItemOf("obsidian_blade")));
+    }
+
+    [Fact]
+    public void BlockDamageIsTheItemsNumberWhilePowerOnlyGates()
+    {
+        // power is the mining tier; blockDamage is what a hit removes. The tools keep the damage
+        // the old power value used to deal.
+        var pickaxe = ItemOf("primitive_pickaxe");
+        Assert.Equal(1f, pickaxe.ToolPower);
+        Assert.Equal(1f, pickaxe.BlockDamage);
+        Assert.Equal(1f, Mining.BlockDamage(pickaxe));
+        Assert.Equal(1f, Mining.HitDamage(BlockOf("stone"), pickaxe));
+        Assert.Equal(2f, Mining.BlockDamage(ItemOf("copper_pickaxe")));
+
+        // A plain pickup and a bare hand fall back to the baseline.
+        Assert.Equal(0.5f, Mining.BlockDamage(ItemOf("flint")));
+        Assert.Equal(0.5f, Mining.BlockDamage(null));
+        Assert.Equal(0.5f, Mining.HitDamage(BlockOf("dirt"), null));
+    }
 }

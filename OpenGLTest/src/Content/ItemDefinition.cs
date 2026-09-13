@@ -13,10 +13,25 @@ public sealed class ItemDefinition
     public UseDefinition? Use { get; set; }
 
     /// <summary>
+    /// Damage one left-click hit removes from a block's hardness; omitted for the bare-hand
+    /// baseline (0.5). Independent of <see cref="Tool"/>, which is what gates whether the block
+    /// may be mined at all.
+    /// </summary>
+    public float? BlockDamage { get; set; }
+
+    /// <summary>
+    /// Damage one punch deals to an enemy; omitted for the bare-hand baseline (1). A weapon like
+    /// the obsidian blade raises this without needing a <see cref="Tool"/> block.
+    /// </summary>
+    public float? EntityDamage { get; set; }
+
+    /// <summary>
     /// Optional tool block: writing it marks the item as a mining tool and carries the numbers
-    /// the break loop reads. Which <c>tools</c> tags a block accepts are satisfied by membership
-    /// in <c>assets/data/tags/&lt;tag&gt;.json</c> (an item listed in <c>pickaxe.json</c> is a
-    /// pickaxe), not by this object.
+    /// the mining gate reads. <c>power</c> is the item's <em>tier</em> — the number a block's
+    /// <c>tools</c> requirement compares against — not its damage, which is
+    /// <see cref="BlockDamage"/>. Which <c>tools</c> tags a block accepts are satisfied by
+    /// membership in <c>assets/data/tags/&lt;tag&gt;.json</c> (an item listed in
+    /// <c>pickaxe.json</c> is a pickaxe), not by this object.
     /// </summary>
     public ToolDefinition? Tool { get; set; }
 
@@ -49,13 +64,15 @@ public sealed class ItemDefinition
     }
 
     /// <summary>
-    /// The <c>tool</c> object: an item's mining numbers. <c>power</c> is damage per hit
-    /// (default 0.5, the bare-hand baseline) and <c>hitDelayMs</c> is the gap between hits in
-    /// milliseconds (default 600), so 5000 is one hit per five seconds.
+    /// The <c>tool</c> object: an item's mining numbers. <c>power</c> is its mining tier, the
+    /// number a block's <c>tools</c> requirement compares against (default 0.5, the bare-hand
+    /// baseline); the damage a hit actually removes is the item's <see cref="BlockDamage"/>.
+    /// <c>hitDelayMs</c> is the gap between hits in milliseconds (default 600), so 5000 is one
+    /// hit per five seconds.
     /// </summary>
     public sealed class ToolDefinition
     {
-        /// <summary>Damage one hit deals to a block's hardness; default 0.5.</summary>
+        /// <summary>Mining tier compared against a block's <c>tools</c> requirement; default 0.5.</summary>
         public float? Power { get; set; }
 
         /// <summary>Milliseconds between hits while mining; default 600.</summary>

@@ -72,11 +72,19 @@ public abstract class Item
     /// files, not from this flag.</summary>
     public bool IsTool { get; internal init; }
 
-    /// <summary>Damage one hit deals to block hardness; the bare-hand baseline by default.</summary>
+    /// <summary>Mining tier: what a block's <c>tools</c> requirement is compared against, and
+    /// nothing else. Not a damage number — a hit removes <see cref="BlockDamage"/>.</summary>
     public float ToolPower { get; internal init; } = Mining.DefaultPower;
 
     /// <summary>Milliseconds between hits while mining; see <see cref="Mining"/>.</summary>
     public float HitDelayMs { get; internal init; } = Mining.DefaultHitGapMs;
+
+    /// <summary>Damage one left-click hit removes from a block's hardness; the bare-hand
+    /// baseline by default.</summary>
+    public float BlockDamage { get; internal init; } = Mining.DefaultBlockDamage;
+
+    /// <summary>Damage one punch deals to an enemy; the bare-hand baseline by default.</summary>
+    public float EntityDamage { get; internal init; } = Mining.DefaultEntityDamage;
 
     /// <summary>Seconds between uses of this item; 0 means the global click rate applies.</summary>
     public float UseDelaySeconds { get; internal init; }
@@ -190,5 +198,7 @@ public abstract class Item
         IsTool = spec.IsTool;
         ToolPower = spec.ToolPower;
         HitDelayMs = spec.HitDelayMs;
+        BlockDamage = spec.BlockDamage;
+        EntityDamage = spec.EntityDamage;
     }
 }
