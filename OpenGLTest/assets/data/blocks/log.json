@@ -4,7 +4,7 @@
     "parent": "block/cube_column",
     "textures": { "end": "log_top", "side": "log_side" }
   },
-  "hardness": 8,
+  "hardness": 24,
   "sfx": "hit_wood",
   "requiresTool": true,
   "tools": { "axe": 1 },

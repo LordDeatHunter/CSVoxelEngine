@@ -45,7 +45,7 @@ public sealed class MiningTests
         var log = ContentRegistry.RequireBlock("log");
         Assert.True(log.RequiresTool);
         Assert.Equal(1f, log.Tools!["axe"]);
-        Assert.Equal(8f, log.Hardness);
+        Assert.Equal(24f, log.Hardness);
 
         // An ungated block carries no gate at all.
         var dirt = ContentRegistry.RequireBlock("dirt");
@@ -97,5 +97,20 @@ public sealed class MiningTests
     {
         Assert.Equal(0.2f, Mining.HitGapSeconds(null), precision: 4);
         Assert.Equal(0.2f, Mining.HitGapSeconds(ItemOf("flint")), precision: 4);
+    }
+
+    [Fact]
+    public void NaturalWoodHardnessTapersFromTheFullWidthLog()
+    {
+        const float hardnessPerTaperLevel = 0.15f;
+        var baseHp = ContentRegistry.RequireBlock("log").Hardness;
+        Assert.Equal(24f, baseHp, precision: 3);
+
+        foreach (var name in new[] { "branch", "limb", "sprig", "switch", "twig" })
+        {
+            var block = ContentRegistry.RequireBlock(name);
+            var expected = baseHp * (1f - hardnessPerTaperLevel * block.WoodTaperLevel);
+            Assert.Equal(expected, block.Hardness, precision: 3);
+        }
     }
 }
