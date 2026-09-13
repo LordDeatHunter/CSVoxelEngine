@@ -15,9 +15,19 @@ public sealed class Slime
     private const float TerminalVelocity = -30f;
     private const float CollisionStepSize = 0.05f;
     private const float GroundFriction = 8f;
-    private const float WaterSinkSpeed = -2f;
-    private const float WaterDrag = 4f;
     private const float LandSquashSeconds = 0.25f;
+
+    // Buoyancy, tuned like the item drops: instead of gravity a floating slime eases toward a
+    // rise proportional to how far under the surface it is, so it climbs, barely overshoots and
+    // bobs at the top. Water drags its sideways hop away and shrinks the hop itself.
+    private const float FloatSpeed = 1.5f;
+    private const float BuoyancyStiffness = 3f;
+    private const float WaterDrag = 4f;
+    private const float WaterFriction = 3f;
+
+    // In water the hop keeps a land hop's total speed but halves its vertical share, moving the
+    // rest into the horizontal, so the slime skims forward low and roughly twice as fast.
+    private const float WaterHopVerticalFactor = 0.5f;
 
     // A hop rises a little over a block (v^2 / 2g with g = 28), so the slime can climb one step
     // on its way to the player without any special-cased step-up.
@@ -38,6 +48,7 @@ public sealed class Slime
     private float _airBlend;
     private float _damageCooldown;
     private float _nextHop;
+    private bool _inWater;
 
     public Slime(EntityType type, Vector3 position)
     {
@@ -65,8 +76,9 @@ public sealed class Slime
     /// <summary>Yaw in radians the body faces (toward the player); the model faces -Z at 0.</summary>
     public float Facing { get; private set; }
 
-    /// <summary>Whether a touch may deal damage right now (airborne, off cooldown).</summary>
-    public bool CanDealContactDamage => IsAirborne && _damageCooldown <= 0f;
+    /// <summary>Whether a touch may deal damage right now: airborne (not merely floating in
+    /// water), and past the per-hop cooldown.</summary>
+    public bool CanDealContactDamage => IsAirborne && !_inWater && _damageCooldown <= 0f;
 
     /// <summary>Vertical draw scale: stretched in the air, squashed for a moment on landing.</summary>
     public float VerticalScale => 1f + 0.12f * _airBlend - 0.18f * _landPulse;
@@ -108,7 +120,9 @@ public sealed class Slime
 
         ApplyPhysics(deltaTime, chunks);
 
-        if (!IsGrounded) return;
+        // Hop while grounded, or while floating in water where the buoyancy and drag applied
+        // above damp the hop into a weak paddle at the player instead of a full leap.
+        if (!IsGrounded && !_inWater) return;
 
         _hopTimer += deltaTime;
         if (_hopTimer < _nextHop) return;
@@ -124,25 +138,53 @@ public sealed class Slime
         if (toPlayer.LengthSquared() < 1e-6f) return;
 
         toPlayer = Vector3.Normalize(toPlayer);
-        _velocity.X = toPlayer.X * HopSpeed;
-        _velocity.Z = toPlayer.Z * HopSpeed;
-        _velocity.Y = HopJumpSpeed;
+        _velocity = HopVelocity(toPlayer, _inWater);
         IsGrounded = false;
 
         // The model faces -Z at yaw 0, so this rotation points -Z at the player.
         Facing = MathF.Atan2(-toPlayer.X, -toPlayer.Z);
     }
 
+    /// <summary>
+    /// Launch velocity for a hop along the unit horizontal <paramref name="direction"/>. A land
+    /// hop uses the full vertical lift; a water hop keeps the same total speed but halves the
+    /// vertical component and moves the rest into the horizontal, so it reads as a low forward
+    /// skim — a jumping slide.
+    /// </summary>
+    internal static Vector3 HopVelocity(Vector3 direction, bool inWater)
+    {
+        if (!inWater)
+            return new Vector3(direction.X * HopSpeed, HopJumpSpeed, direction.Z * HopSpeed);
+
+        var totalSpeed = MathF.Sqrt(HopSpeed * HopSpeed + HopJumpSpeed * HopJumpSpeed);
+        var vertical = HopJumpSpeed * WaterHopVerticalFactor;
+        var horizontal = MathF.Sqrt(MathF.Max(0f, totalSpeed * totalSpeed - vertical * vertical));
+        return new Vector3(direction.X * horizontal, vertical, direction.Z * horizontal);
+    }
+
     private void ApplyPhysics(float deltaTime, ChunkManager chunks)
     {
         var feetY = Position.Y - HalfExtent;
-        var submerged = feetY < chunks.GetFluidSurfaceGlobal(
+        var surfaceY = chunks.GetFluidSurfaceGlobal(
             (int)MathF.Floor(Position.X), (int)MathF.Floor(feetY), (int)MathF.Floor(Position.Z));
+        var floating = feetY < surfaceY;
+        _inWater = floating;
 
-        if (submerged)
-            _velocity.Y = MathUtils.Damp(_velocity.Y, WaterSinkSpeed, WaterDrag, deltaTime);
+        if (floating)
+        {
+            var targetY = Math.Clamp((surfaceY - feetY) * BuoyancyStiffness, -FloatSpeed, FloatSpeed);
+            _velocity.Y = MathUtils.Damp(_velocity.Y, targetY, WaterDrag, deltaTime);
+
+            // Water scrubs the sideways motion so a floating slime drifts and bobs rather than
+            // coasting: the same treatment the item drops get.
+            var drag = MathF.Exp(-WaterFriction * deltaTime);
+            _velocity.X *= drag;
+            _velocity.Z *= drag;
+        }
         else
+        {
             _velocity.Y = MathF.Max(_velocity.Y - Gravity * deltaTime, TerminalVelocity);
+        }
 
         // Ground friction scrubs the shove off once the slime is standing, so a poke slides it a
         // short way and stops instead of launching it across the field.

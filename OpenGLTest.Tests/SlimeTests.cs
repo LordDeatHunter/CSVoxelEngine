@@ -230,6 +230,48 @@ public sealed class SlimeTests
         Assert.True(camera.Position.X > beforeX + 0.02f);
     }
 
+    [Fact]
+    public void SlimeFloatsUpToTheWaterSurface()
+    {
+        var chunks = PoolWorld(waterCells: 5);
+        var slime = new Slime(EntityRegistry.Require("slime"), new Vector3(8.5f, 1f + Slime.HalfExtent, 8.5f));
+        var player = new Vector3(8.5f, 6.62f, 8.5f);
+
+        for (var i = 0; i < 600; i++)
+            slime.Update(Dt, chunks, player);
+
+        // The top source (y = 5) surfaces at 5 + 8/9, so a buoyant slime rises to bob there
+        // instead of sinking to the floor it spawned on.
+        var feet = slime.Position.Y - Slime.HalfExtent;
+        Assert.InRange(feet, 5.5f, 6.3f);
+        Assert.False(slime.IsGrounded);
+    }
+
+    [Fact]
+    public void WaterHopIsFlatterAndFasterAtTheSameTotalSpeed()
+    {
+        var land = Slime.HopVelocity(Vector3.UnitX, inWater: false);
+        var water = Slime.HopVelocity(Vector3.UnitX, inWater: true);
+
+        // Same total speed, half the lift, and the released vertical moved into the horizontal.
+        Assert.Equal(land.Length(), water.Length(), 4);
+        Assert.Equal(land.Y / 2f, water.Y, 4);
+        Assert.True(water.X > land.X * 1.9f, $"water horizontal {water.X} vs land {land.X}");
+    }
+
+    // A flat floor with source water stacked on top; a slime spawned at the floor is submerged.
+    private static ChunkManager PoolWorld(int waterCells)
+    {
+        var chunks = FloorWorld(ContentRegistry.RequireBlock("stone").Id);
+        var chunk = chunks.Chunks[Vector3.Zero];
+        var water = ContentRegistry.RequireBlock("water").Id;
+        for (var x = 0; x < Chunk.Size; x++)
+        for (var z = 0; z < Chunk.Size; z++)
+        for (var y = 1; y <= waterCells; y++)
+            chunk.SetBlockRaw(x, y, z, water, 0);
+        return chunks;
+    }
+
     // Builds the surface layer of a 7x7 chunk area at each column's real worldgen height, so the
     // spawn ring finds solid loaded ground and two clear cells above every dry column.
     private static ChunkManager SurfaceWorld()

@@ -401,12 +401,14 @@ project (default `assets/models/entity/<name>.bbmodel`). `ContentRegistry.Load` 
 entities pass none) and `EntityModel`, which bakes the whole project into one mesh plus its skin.
 
 The first entity is the **slime** (`Slime` + `Systems/SlimeManager.cs`), owned by `World`. It hops
-toward the player, damages on contact only while airborne, is shoved (harmlessly) by the player
-when grounded, and rolls its `loot` table on death. Natural spawns appear on dry forest surface in a
-20-40 block ring around the player; `SlimeManager` holds the cap, cadence, damage and shove numbers
-via `WorldGenerationConfig.Slime*`. **There is no player-attack path yet** — a slime can take
-damage through `Slime.TakeDamage` but nothing in the input layer calls it, so killing one (and the
-combat path generally) is a future session.
+toward the player, damages on contact only while airborne (a slime merely bobbing in water is
+harmless), is shoved (harmlessly) by the player when grounded, floats to the surface of water like an
+item drop (its water hops keep a land hop's total speed but halve the vertical and move it into the
+horizontal, so it skims forward as a low jumping slide), and rolls its `loot` table on death. Natural
+spawns appear on dry forest surface in a 20-40 block ring around the player; `SlimeManager` holds the
+cap, cadence, damage and shove numbers via `WorldGenerationConfig.Slime*`. **There is no
+player-attack path yet** — a slime can take damage through `Slime.TakeDamage` but nothing in the
+input layer calls it, so killing one (and the combat path generally) is a future session.
 
 ## Conventions
 
