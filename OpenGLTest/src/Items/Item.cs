@@ -72,8 +72,8 @@ public abstract class Item
     /// files, not from this flag.</summary>
     public bool IsTool { get; internal init; }
 
-    /// <summary>Damage one hit deals to block hardness; 1 is the bare-hand baseline.</summary>
-    public float ToolPower { get; internal init; } = 1f;
+    /// <summary>Damage one hit deals to block hardness; the bare-hand baseline by default.</summary>
+    public float ToolPower { get; internal init; } = Mining.DefaultPower;
 
     /// <summary>Milliseconds between hits while mining; see <see cref="Mining"/>.</summary>
     public float HitDelayMs { get; internal init; } = Mining.DefaultHitGapMs;

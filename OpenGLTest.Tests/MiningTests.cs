@@ -16,12 +16,13 @@ public sealed class MiningTests
         var pickaxe = ItemOf("primitive_pickaxe");
         Assert.True(pickaxe.IsTool);
         Assert.Equal(1f, pickaxe.ToolPower);
-        Assert.Equal(Mining.DefaultHitGapMs, pickaxe.HitDelayMs);
+        Assert.Equal(400f, pickaxe.HitDelayMs);
+        Assert.Equal(400f, ItemOf("primitive_axe").HitDelayMs);
 
         // A plain pickup declares no tool block, so it keeps the bare-hand baseline.
         var flint = ItemOf("flint");
         Assert.False(flint.IsTool);
-        Assert.Equal(1f, flint.ToolPower);
+        Assert.Equal(0.5f, flint.ToolPower);
         Assert.Equal(Mining.DefaultHitGapMs, flint.HitDelayMs);
     }
 
@@ -80,7 +81,7 @@ public sealed class MiningTests
         var dirt = BlockOf("dirt");
         Assert.True(Mining.CanMine(dirt, null));
         Assert.True(Mining.CanMine(dirt, ItemOf("primitive_pickaxe")));
-        Assert.Equal(1f, Mining.HitDamage(dirt, null));
+        Assert.Equal(0.5f, Mining.HitDamage(dirt, null));
     }
 
     [Fact]
@@ -95,8 +96,8 @@ public sealed class MiningTests
     [Fact]
     public void HitGapDefaultsToTheBaseline()
     {
-        Assert.Equal(0.2f, Mining.HitGapSeconds(null), precision: 4);
-        Assert.Equal(0.2f, Mining.HitGapSeconds(ItemOf("flint")), precision: 4);
+        Assert.Equal(0.6f, Mining.HitGapSeconds(null), precision: 4);
+        Assert.Equal(0.6f, Mining.HitGapSeconds(ItemOf("flint")), precision: 4);
     }
 
     [Fact]

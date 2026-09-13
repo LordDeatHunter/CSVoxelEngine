@@ -9,9 +9,12 @@ namespace silkgltriangle;
 /// </summary>
 public static class Mining
 {
-    /// <summary>Gap between hits for a bare hand or any item that declares no tool pace: the
-    /// baseline the old fixed hit interval used.</summary>
-    public const float DefaultHitGapMs = 200f;
+    /// <summary>Gap between hits for a bare hand or any item that declares no tool pace.</summary>
+    public const float DefaultHitGapMs = 300f;
+
+    /// <summary>Damage per hit a bare hand or an item with no tool power deals against a
+    /// block's hardness.</summary>
+    public const float DefaultPower = 0.5f;
 
     /// <summary>Whether the held item may damage this block under its requiresTool gate.</summary>
     public static bool CanMine(byte blockId, Item? held)
@@ -28,8 +31,8 @@ public static class Mining
         return Refused(block, held) ? 0f : Power(held);
     }
 
-    /// <summary>Damage per hit of the held item; a bare hand deals the 1 baseline.</summary>
-    public static float Power(Item? held) => held?.ToolPower ?? 1f;
+    /// <summary>Damage per hit of the held item; a bare hand deals the baseline.</summary>
+    public static float Power(Item? held) => held?.ToolPower ?? DefaultPower;
 
     /// <summary>Whether a held power meets a required power (float tiers: a 0 requirement
     /// admits any member of the tag).</summary>

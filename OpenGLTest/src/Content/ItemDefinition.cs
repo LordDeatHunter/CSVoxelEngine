@@ -50,15 +50,15 @@ public sealed class ItemDefinition
 
     /// <summary>
     /// The <c>tool</c> object: an item's mining numbers. <c>power</c> is damage per hit
-    /// (default 1, the bare-hand baseline) and <c>hitDelayMs</c> is the gap between hits in
-    /// milliseconds (default 200, today's pace), so 5000 is one hit per five seconds.
+    /// (default 0.5, the bare-hand baseline) and <c>hitDelayMs</c> is the gap between hits in
+    /// milliseconds (default 600), so 5000 is one hit per five seconds.
     /// </summary>
     public sealed class ToolDefinition
     {
-        /// <summary>Damage one hit deals to a block's hardness; default 1.</summary>
+        /// <summary>Damage one hit deals to a block's hardness; default 0.5.</summary>
         public float? Power { get; set; }
 
-        /// <summary>Milliseconds between hits while mining; default 200.</summary>
+        /// <summary>Milliseconds between hits while mining; default 600.</summary>
         public float? HitDelayMs { get; set; }
     }
 

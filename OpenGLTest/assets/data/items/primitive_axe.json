@@ -1,8 +1,6 @@
 {
   "name": "Primitive Axe",
   "texture": "assets/textures/items/primitive_axe.png",
-  // Same fore-aft head axis as the pickaxe so the blade faces away from the holder.
   "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.4 },
-  // Flint tier: power 1 matches the bare-hand damage, so it exists to pass axe gates.
-  "tool": { "power": 1.0 }
+  "tool": { "power": 1.0, "hitDelayMs": 300 }
 }

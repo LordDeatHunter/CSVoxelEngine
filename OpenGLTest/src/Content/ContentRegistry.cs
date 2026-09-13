@@ -338,7 +338,7 @@ public static class ContentRegistry
             var display = ParseDisplay(definition.Display, path);
 
             var tool = definition.Tool;
-            var power = tool?.Power ?? 1f;
+            var power = tool?.Power ?? Mining.DefaultPower;
             if (!float.IsFinite(power) || power <= 0f)
                 throw new InvalidOperationException(
                     $"Item '{path}' has tool.power {tool?.Power}; expected a positive number.");
