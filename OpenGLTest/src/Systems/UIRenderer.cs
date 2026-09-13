@@ -39,6 +39,14 @@ public class UIRenderer : IDisposable
 
     private const float CrosshairSize = 32f;
 
+    // Hearts row above the hotbar, in pixels. The sprites are 32px wide with 1px of empty
+    // padding down each side, so only the middle 30px are drawn and the stride matches it:
+    // neighbours sit exactly edge to edge with no double-padding gap.
+    private const float HeartDrawWidth = 30f;
+    private const float HeartDrawHeight = 32f;
+    private const float HeartStride = 30f;
+    private const float HeartGap = 10f;
+
     // Hotbar metrics, in pixels
     private const float SlotSize = 56f;
     private const float SlotGap = 6f;
@@ -163,6 +171,8 @@ public class UIRenderer : IDisposable
     private readonly Shader _shader;
     private readonly uint _atlasTexture;
     private readonly uint _crosshairTexture;
+    private readonly uint _heartTexture;
+    private readonly uint _heartEmptyTexture;
     private readonly BlockCubeCache _blockCubes;
     private readonly ItemMeshCache _itemMeshes;
 
@@ -177,6 +187,12 @@ public class UIRenderer : IDisposable
 
     // Unit shapes, scaled per draw so a colour or size change costs no buffer work
     private readonly Mesh _unitSquare;
+
+    // Heart sprites with the 1px side padding cropped out of their UVs (see the Heart
+    // metrics above): full width for empty/full, left half for a half heart.
+    private readonly Mesh _heartEmptyMesh;
+    private readonly Mesh _heartFullMesh;
+    private readonly Mesh _heartHalfMesh;
 
     // Count font, baked once from the TTF. Null when the file is missing or broken, in
     // which case the hotbar simply draws no counts.
@@ -224,6 +240,13 @@ public class UIRenderer : IDisposable
         _shader.SetUniform("uTex", 0);
 
         _crosshairTexture = TextureLoader.LoadFromFile(gl, "assets/textures/crosshair.png");
+        _heartTexture = TextureLoader.LoadFromFile(gl, "assets/textures/ui/heart.png");
+        _heartEmptyTexture = TextureLoader.LoadFromFile(gl, "assets/textures/ui/heart_empty.png");
+        var heartUv = new UvRect(new Vector2(1f / 32f, 0f), new Vector2(31f / 32f, 1f));
+        var heartHalfUv = new UvRect(new Vector2(1f / 32f, 0f), new Vector2(16f / 32f, 1f));
+        _heartEmptyMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartUv);
+        _heartFullMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartUv);
+        _heartHalfMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartHalfUv);
         foreach (var (id, type) in ItemRegistry.ById)
         {
             if (type is BlockItem) continue;
@@ -381,6 +404,36 @@ public class UIRenderer : IDisposable
 
     public void DrawCrosshair() =>
         DrawTexture(ScreenCentre, new Vector2(CrosshairSize), _crosshairTexture);
+
+    /// <summary>
+    /// The survival hearts: 10 in a row centred above the hotbar, 1 heart per 10 HP.
+    /// Every heart draws its empty shell first and the red heart over it — full, left
+    /// half (5 HP steps), or nothing — so damage reads heart by heart like Minecraft.
+    /// </summary>
+    public void DrawHearts(int health)
+    {
+        var hp = Math.Clamp(health, 0, PlayerHealth.MaxHealth);
+        var rowWidth = HeartDrawWidth + (PlayerHealth.HeartCount - 1) * HeartStride;
+        var firstX = (_screenSize.X - rowWidth) * 0.5f + HeartDrawWidth * 0.5f;
+        var hotbarTop = _screenSize.Y - BottomMargin - SlotSize;
+        var centreY = hotbarTop - HeartGap - HeartDrawHeight * 0.5f;
+        var fullSize = new Vector2(HeartDrawWidth, HeartDrawHeight);
+        var halfSize = new Vector2(HeartDrawWidth * 0.5f, HeartDrawHeight);
+
+        for (var i = 0; i < PlayerHealth.HeartCount; i++)
+        {
+            var centre = new Vector2(firstX + i * HeartStride, centreY);
+            DrawMesh(_heartEmptyMesh, RectTransform(centre, fullSize), Rgba.White, _heartEmptyTexture);
+
+            var fill = Math.Clamp(hp - i * PlayerHealth.HpPerHeart, 0, PlayerHealth.HpPerHeart);
+            if (fill >= PlayerHealth.HpPerHeart)
+                DrawMesh(_heartFullMesh, RectTransform(centre, fullSize), Rgba.White, _heartTexture);
+            else if (fill >= PlayerHealth.HpPerHeart / 2)
+                DrawMesh(_heartHalfMesh,
+                    RectTransform(centre with { X = centre.X - HeartDrawWidth * 0.25f }, halfSize),
+                    Rgba.White, _heartTexture);
+        }
+    }
 
     public void DrawFps(int fps) =>
         DrawText(_textCache.Fps(fps), new Vector2(ProfilerLeft, FpsTop), _countScale, Rgba.White);
@@ -1467,6 +1520,11 @@ public class UIRenderer : IDisposable
         _gl.DeleteBuffer(_textEbo);
         _gl.DeleteVertexArray(_textVao);
         _gl.DeleteTexture(_crosshairTexture);
+        _gl.DeleteTexture(_heartTexture);
+        _gl.DeleteTexture(_heartEmptyTexture);
+        _heartEmptyMesh.Dispose();
+        _heartFullMesh.Dispose();
+        _heartHalfMesh.Dispose();
         foreach (var icon in _itemIcons.Values)
             _gl.DeleteTexture(icon);
         foreach (var frames in _itemFrames.Values)

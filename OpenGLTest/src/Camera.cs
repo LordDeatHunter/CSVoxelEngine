@@ -100,6 +100,11 @@ public class Camera
     /// emissive fluid gets the lava treatment without naming it here.</summary>
     public bool IsEyeInLava { get; private set; }
 
+    /// <summary>Whether any cell the body overlaps holds an emissive fluid (lava): the
+    /// damage volume for lava burns. Glow tells lava apart from water, exactly like
+    /// <see cref="IsEyeInLava"/>, so a new emissive fluid burns unnamed.</summary>
+    public bool IsInLava { get; private set; }
+
     private const float SprintFovBoost = 5f;
     private const float FovDampRate = 6f;
     private const float BobDampRate = 8f;
@@ -224,6 +229,16 @@ public class Camera
     private float _timeSinceSpacePress = float.MaxValue;
     // Averaged flow of the fluid cells the body is in, refreshed by UpdateWaterState
     private Vector3 _waterFlow;
+
+    // Damage shake: trauma 0..1, fed by AddShake and decayed in Update. The view offset
+    // and roll ride trauma-squared, so small hits tremble and big hits lurch.
+    private float _trauma;
+    private float _shakeTime;
+    private Vector3 _shakeOffset = Vector3.Zero;
+    private float _shakeRoll;
+    private const float ShakeDecaySeconds = 0.7f;
+    private const float ShakeMaxOffset = 0.3f;
+    private const float ShakeMaxRoll = 0.04f;
 
     private readonly IWindow? window;
     private readonly IMouse? mouse;
@@ -361,7 +376,8 @@ public class Camera
     /// <see cref="GetViewProjection"/>'s cache key really contains it. Nothing in the game
     /// calls this; Update() owns all of these fields during play.</summary>
     internal void TestSetViewState(float? fov = null, float? roll = null, float? bobHeight = null,
-        float? bobStrafe = null, Vector3? shoulderOffset = null, Vector3? shoulderViewDir = null)
+        float? bobStrafe = null, Vector3? shoulderOffset = null, Vector3? shoulderViewDir = null,
+        Vector3? shakeOffset = null, float? shakeRoll = null)
     {
         if (fov.HasValue) _currentFov = fov.Value;
         if (roll.HasValue) _roll = roll.Value;
@@ -369,6 +385,8 @@ public class Camera
         if (bobStrafe.HasValue) _bobStrafe = bobStrafe.Value;
         if (shoulderOffset.HasValue) _shoulderOffset = shoulderOffset.Value;
         if (shoulderViewDir.HasValue) _shoulderViewDir = shoulderViewDir.Value;
+        if (shakeOffset.HasValue) _shakeOffset = shakeOffset.Value;
+        if (shakeRoll.HasValue) _shakeRoll = shakeRoll.Value;
     }
 
     /// <summary>
@@ -381,6 +399,39 @@ public class Camera
         if (!IsOrbit) return;
         _actionYaw = Yaw;
         _hasActionTarget = true;
+    }
+
+    /// <summary>
+    /// Kicks the damage shake: <paramref name="amount"/> adds to trauma (0..1, clamped),
+    /// which <see cref="Update"/> decays back to still over <c>ShakeDecaySeconds</c>.
+    /// Callers scale it by the hit — World bills fall and lava ticks through here.
+    /// </summary>
+    public void AddShake(float amount)
+    {
+        if (amount <= 0f) return;
+        _trauma = Math.Min(1f, _trauma + amount);
+    }
+
+    private void UpdateShake(float deltaTime)
+    {
+        _shakeTime += Math.Max(0f, deltaTime);
+        if (_trauma <= 0f)
+        {
+            _shakeOffset = Vector3.Zero;
+            _shakeRoll = 0f;
+            return;
+        }
+
+        _trauma = Math.Max(0f, _trauma - Math.Max(0f, deltaTime) / ShakeDecaySeconds);
+        // Squared falloff plus mismatched sines per axis, so the view shudders instead of
+        // swaying on one clean frequency.
+        var t = _trauma * _trauma;
+        var time = _shakeTime;
+        _shakeOffset = new Vector3(
+            MathF.Sin(time * 39.7f) * ShakeMaxOffset * t,
+            MathF.Sin(time * 44.3f + 1.3f) * ShakeMaxOffset * 0.6f * t,
+            MathF.Sin(time * 31.9f + 2.1f) * ShakeMaxOffset * t);
+        _shakeRoll = MathF.Sin(time * 47.7f + 0.7f) * ShakeMaxRoll * t;
     }
 
     private static float DampAngle(float current, float target, float rate, float deltaTime)
@@ -485,6 +536,7 @@ public class Camera
         if (!IsFlying) moveSpeed *= MovementFactor;
         var intendedSpeed = moving ? moveSpeed * moveInput.Length() : 0f;
         UpdateHeadMotion(deltaTime, intendedSpeed, moving, swimming);
+        UpdateShake(deltaTime);
 
         var frameMovement = moveInput * moveSpeed * deltaTime;
 
@@ -631,6 +683,25 @@ public class Camera
         {
             IsEyeInLava = BlockType.Emission[eyeId] > 0;
         }
+
+        // Lava burns on body contact, not just eye contact: a wade through a shallow pool
+        // keeps the eye dry but still has to hurt.
+        var lava = false;
+        var bodyMinX = (int)MathF.Floor(Position.X - PlayerRadius);
+        var bodyMaxX = (int)MathF.Floor(Position.X + PlayerRadius);
+        var bodyMinY = (int)MathF.Floor(feetY);
+        var bodyMaxY = (int)MathF.Floor(feetY + PlayerHeight);
+        var bodyMinZ = (int)MathF.Floor(Position.Z - PlayerRadius);
+        var bodyMaxZ = (int)MathF.Floor(Position.Z + PlayerRadius);
+        for (var x = bodyMinX; x <= bodyMaxX && !lava; x++)
+        for (var y = bodyMinY; y <= bodyMaxY && !lava; y++)
+        for (var z = bodyMinZ; z <= bodyMaxZ && !lava; z++)
+        {
+            var id = chunkManager.GetBlockGlobal(x, y, z);
+            if (BlockType.IsFluid(id) && BlockType.Emission[id] > 0)
+                lava = true;
+        }
+        IsInLava = lava;
     }
 
     private void UpdateHeadMotion(float deltaTime, float intendedSpeed, bool moving, bool swimming)
@@ -1010,8 +1081,8 @@ public class Camera
         var viewDir = ViewDirection;
         var right = Vector3.Normalize(Vector3.Cross(viewDir, Vector3.UnitY));
         var up = Vector3.Transform(Vector3.UnitY,
-            Matrix4x4.CreateFromAxisAngle(viewDir, _roll));
-        var eye = Position + Vector3.UnitY * _bobHeight + right * _bobStrafe + _shoulderOffset;
+            Matrix4x4.CreateFromAxisAngle(viewDir, _roll + _shakeRoll));
+        var eye = Position + Vector3.UnitY * _bobHeight + right * _bobStrafe + _shoulderOffset + _shakeOffset;
         return Matrix4x4.CreateLookAt(eye, eye + viewDir, up);
     }
 
@@ -1077,14 +1148,15 @@ public class Camera
     /// Exactly the mutable state the two matrix builders read. <see cref="GetViewMatrix"/>
     /// reads <see cref="ViewDirection"/> (<c>_shoulderViewDir</c> when non-degenerate, else
     /// <see cref="GetForwardVector"/> -> <see cref="Yaw"/>/<see cref="Pitch"/>),
-    /// <c>_roll</c>, <see cref="Position"/>, <c>_bobHeight</c>, <c>_bobStrafe</c> and
-    /// <c>_shoulderOffset</c>; <see cref="GetProjectionMatrix"/> reads <c>_currentFov</c>
+    /// <c>_roll</c>, <c>_shakeRoll</c>, <see cref="Position"/>, <c>_bobHeight</c>,
+    /// <c>_bobStrafe</c>, <c>_shoulderOffset</c> and <c>_shakeOffset</c>;
+    /// <see cref="GetProjectionMatrix"/> reads <c>_currentFov</c>
     /// and <c>_aspectRatio</c>. <c>NearPlane</c>/<c>FarPlane</c> are <c>const</c> and so are
     /// deliberately not in the key.
     /// </summary>
     private ViewProjKey CurrentViewProjKey() =>
         new(Position, _shoulderViewDir, _shoulderOffset, Yaw, Pitch, _roll, _bobHeight, _bobStrafe,
-            _currentFov, _aspectRatio);
+            _shakeOffset, _shakeRoll, _currentFov, _aspectRatio);
 
     /// <summary>
     /// Bit-for-bit key comparison. Deliberately not <c>==</c> or the record's generated
@@ -1102,6 +1174,8 @@ public class Camera
         && SameBits(a.Roll, b.Roll)
         && SameBits(a.BobHeight, b.BobHeight)
         && SameBits(a.BobStrafe, b.BobStrafe)
+        && SameBits(a.ShakeOffset, b.ShakeOffset)
+        && SameBits(a.ShakeRoll, b.ShakeRoll)
         && SameBits(a.Fov, b.Fov)
         && SameBits(a.Aspect, b.Aspect);
 
@@ -1125,6 +1199,8 @@ public class Camera
         float Roll,
         float BobHeight,
         float BobStrafe,
+        Vector3 ShakeOffset,
+        float ShakeRoll,
         float Fov,
         float Aspect);
 

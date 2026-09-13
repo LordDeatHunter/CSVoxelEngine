@@ -194,6 +194,14 @@ public sealed class CameraViewProjectionCacheTests
         OneFieldMoves(cam => cam.TestSetViewState(bobStrafe: 0.25f));
 
     [Fact]
+    public void ShakeOffsetChangeChangesTheMatrix() =>
+        OneFieldMoves(cam => cam.TestSetViewState(shakeOffset: new Vector3(0.2f, -0.1f, 0.15f)));
+
+    [Fact]
+    public void ShakeRollChangeChangesTheMatrix() =>
+        OneFieldMoves(cam => cam.TestSetViewState(shakeRoll: 0.03f));
+
+    [Fact]
     public void ShoulderOffsetChangeChangesTheMatrix() =>
         OneFieldMoves(cam => cam.TestSetViewState(shoulderOffset: new Vector3(0.6f, 0.2f, -1.5f)));
 
@@ -211,7 +219,7 @@ public sealed class CameraViewProjectionCacheTests
         string[] expected =
         [
             "Position", "ShoulderViewDir", "ShoulderOffset", "Yaw", "Pitch",
-            "Roll", "BobHeight", "BobStrafe", "Fov", "Aspect",
+            "Roll", "BobHeight", "BobStrafe", "ShakeOffset", "ShakeRoll", "Fov", "Aspect",
         ];
 
         var key = typeof(Camera).GetNestedType("ViewProjKey", BindingFlags.NonPublic);
@@ -280,6 +288,10 @@ public sealed class CameraViewProjectionCacheTests
         FrustumAgrees(cam, "after bob height change");
         cam.TestSetViewState(bobStrafe: 0.25f);
         FrustumAgrees(cam, "after bob strafe change");
+        cam.TestSetViewState(shakeOffset: new Vector3(0.2f, -0.1f, 0.15f));
+        FrustumAgrees(cam, "after shake offset change");
+        cam.TestSetViewState(shakeRoll: 0.03f);
+        FrustumAgrees(cam, "after shake roll change");
         cam.TestSetViewState(shoulderOffset: new Vector3(0.6f, 0.2f, -1.5f));
         FrustumAgrees(cam, "after shoulder offset change");
         cam.TestSetViewState(shoulderViewDir: Vector3.Normalize(new Vector3(0.3f, -0.2f, 0.9f)));

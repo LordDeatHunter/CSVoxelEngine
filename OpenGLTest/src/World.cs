@@ -89,6 +89,20 @@ public class World : IItemUseWorld
     /// <summary>The player's hotbar; its selected slot decides what block placing puts down.</summary>
     public Inventory Inventory { get; } = new();
 
+    // First-cut survival: the HP pool plus the fall state feeding it. Landings of 5+
+    // blocks bill (blocks-4)*10 HP, lava burns 10 HP/s on body contact, and death
+    // respawns at spawn keeping the inventory. Creative and flight are immune.
+    private readonly PlayerHealth _health = new();
+
+    /// <summary>Current HP, 0-100, drawn as 10 hearts in the HUD.</summary>
+    public int Health => _health.Health;
+    private bool _wasGrounded = true;
+    private float _fallPeakFeet;
+    private float _prevFeet;
+    private bool _hasFallState;
+    private Vector3 _respawnEye;
+    private bool _hasRespawnEye;
+
     /// <summary>Live primed TNT, feeding the renderer's dynamic point lights.</summary>
     public IReadOnlyList<PrimedTnt> PrimedTnt => _tntManager.Primed;
 
@@ -227,6 +241,8 @@ public class World : IItemUseWorld
 
         FrameProfiler.Begin(ProfileSection.Player);
 
+        UpdateHealth((float)deltaTime);
+
         // The walk cycle runs off real horizontal speed, so the limbs keep up with sprint
         // and swim instead of playing a fixed-rate loop. Flying poses no stride, so it
         // feeds zero speed and the limbs ease back to rest.
@@ -306,6 +322,80 @@ public class World : IItemUseWorld
             out _selectedBlockPosition, out _selectedFaceNormal, out _selectedBoxIndex,
             includeFluids: ItemRegistry.TryGet(Inventory.SelectedBlockId)?.TargetsFluids ?? false);
         FrameProfiler.End(ProfileSection.Raycast);
+    }
+
+    /// <summary>
+    /// First-cut survival tick, after <see cref="Camera.Update"/> so grounded state is fresh:
+    /// tracks the fall from its highest feet position, burns in lava, decays the damage
+    /// flash, and respawns at spawn keeping the inventory. A multi-block jump in one frame
+    /// is a teleport (spawn settle, scripts), never a fall. Landing in water cushions the
+    /// fall; creative and flight skip every damage source.
+    /// </summary>
+    private void UpdateHealth(float deltaTime)
+    {
+        if (_spawnSettled && !_hasRespawnEye)
+        {
+            _respawnEye = Camera.Position;
+            _hasRespawnEye = true;
+        }
+
+        var beforeHp = _health.Health;
+        var feet = Camera.Position.Y - Camera.EyeHeight;
+        if (!_hasFallState)
+        {
+            _fallPeakFeet = feet;
+            _prevFeet = feet;
+            _wasGrounded = Camera.IsGrounded;
+            _hasFallState = true;
+        }
+
+        if (MathF.Abs(feet - _prevFeet) > 4f)
+        {
+            _fallPeakFeet = feet;
+            _wasGrounded = Camera.IsGrounded;
+        }
+        else if (Camera.IsFlying)
+        {
+            _fallPeakFeet = feet;
+            _wasGrounded = Camera.IsGrounded;
+        }
+        else if (!Camera.IsGrounded)
+        {
+            if (_wasGrounded)
+                _fallPeakFeet = MathF.Max(_fallPeakFeet, _prevFeet);
+            _fallPeakFeet = MathF.Max(_fallPeakFeet, feet);
+            _wasGrounded = false;
+        }
+        else if (!_wasGrounded)
+        {
+            var drop = _fallPeakFeet - feet;
+            if (!Camera.IsCreative && !Camera.IsInWater)
+                _health.TakeDamage(PlayerHealth.FallDamage(drop));
+            _fallPeakFeet = feet;
+            _wasGrounded = true;
+        }
+        else
+        {
+            _fallPeakFeet = feet;
+        }
+        _prevFeet = feet;
+
+        _health.UpdateLava(deltaTime, Camera.IsInLava, Camera.IsCreative || Camera.IsFlying);
+        _health.Update(deltaTime);
+
+        if (_health.Health < beforeHp)
+            Camera.AddShake(Math.Clamp((beforeHp - _health.Health) / 40f, 0.2f, 1f));
+
+        if (!_health.IsDead)
+            return;
+
+        _health.Respawn();
+        var home = _hasRespawnEye ? _respawnEye : Camera.Position;
+        Camera.TestTeleport(home, Camera.Yaw, Camera.Pitch);
+        _fallPeakFeet = home.Y - Camera.EyeHeight;
+        _prevFeet = _fallPeakFeet;
+        _wasGrounded = false;
+        Log.WriteLine("Respawned");
     }
 
     public void Render(RenderManager renderManager)
@@ -429,7 +519,8 @@ public class World : IItemUseWorld
         int fps, bool showProfiler, bool showCoordinates = true, PauseMenuView? menu = null,
         SettingsMenuView? settings = null)
     {
-        renderManager.RenderUI(_window, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings);
+        renderManager.RenderUI(_window, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings,
+            _health.Health, _health.DamageFlash);
     }
     
     /// <summary>

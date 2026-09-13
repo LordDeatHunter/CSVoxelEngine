@@ -80,6 +80,13 @@ same world, and a player can move between them freely — neither arc gates the 
   Health pool, damage sources (fall, drowning, lava, mobs, starvation), death screen, respawn at
   spawn/bed. Default death drops **everything**; the items that soften that come later (`P-29`).
   Prerequisite for hostiles and for Arc A.
+  - Progress (first cut): 100 HP pool (`PlayerHealth`), 10-heart HUD above the hotbar
+    (`heart` over `heart_empty`, 1px side padding cropped, half-heart steps), damage
+    vignette + trauma-based screen shake, fall damage ((blocks-4)*10 HP from 5+ blocks,
+    water landings cushion, creative/flight immune), lava DoT (10 HP/s in half-second
+    ticks, body contact via emissive-fluid check, no burning yet), simple respawn at spawn
+    keeping inventory. Still open: death screen (`U-5`), drop-everything on death,
+    drowning/hunger/mobs/starvation, regen.
 - [ ] **`P-11` · Hunger / food** — P1, M.
   Food items, eating, hunger/saturation drain. Note cooking currently produces a building
   material (`mudball → mud_brick`), so no edibles exist yet; add the first real foods here.

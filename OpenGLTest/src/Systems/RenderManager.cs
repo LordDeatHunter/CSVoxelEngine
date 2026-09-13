@@ -78,6 +78,10 @@ public class RenderManager : IDisposable
     // Underwater sun shafts, one additive full-screen pass. Null until LoadResources builds it.
     private UnderwaterRaysRenderer? _rays;
 
+    // Damage reddening: one full-screen radial-gradient pass, drawn first inside the UI pass.
+    // Null until LoadResources builds it.
+    private DamageVignetteRenderer? _vignette;
+
     // Falling leaves: one dynamic billboard batch drawn in the entity pass, after the
     // cubes. Null until LoadResources builds it.
     private LeafParticleRenderer? _leaves;
@@ -396,6 +400,7 @@ public class RenderManager : IDisposable
         _sunQuad = Primitives.CreateSquare(gl, 1f);
         _clouds = new CloudRenderer(gl);
         _rays = new UnderwaterRaysRenderer(gl);
+        _vignette = new DamageVignetteRenderer(gl);
         _leaves = new LeafParticleRenderer(gl);
         _fire = new FireParticleRenderer(gl);
         _bubbles = new BubbleParticleRenderer(gl);
@@ -2455,7 +2460,8 @@ public class RenderManager : IDisposable
 
     public void RenderUI(IWindow window, Inventory inventory, InventoryView view, float time,
         int fps, bool showProfiler, Camera? camera = null, bool showCoordinates = true,
-        PauseMenuView? menu = null, SettingsMenuView? settings = null)
+        PauseMenuView? menu = null, SettingsMenuView? settings = null,
+        int health = PlayerHealth.MaxHealth, float damageFlash = 0f)
     {
         ui.Begin(window.Size);
 
@@ -2470,6 +2476,9 @@ public class RenderManager : IDisposable
                 Rgba.FromFloat(tint.X, tint.Y, tint.Z, alpha));
         }
 
+        if (damageFlash > 0.001f)
+            _vignette?.Render(window.Size, damageFlash, time);
+
         if (!view.IsOpen && (menu == null || !menu.IsOpen))
             ui.DrawCrosshair();
         if (camera != null && HasCompassEquipped(inventory))
@@ -2479,6 +2488,8 @@ public class RenderManager : IDisposable
             ui.DrawProfiler(FrameProfiler.Lines);
         var heading = camera != null ? Compass.HeadingFromYaw(camera.Yaw) : 0f;
         ui.DrawHotbar(inventory, heading, time);
+        if (!view.IsOpen && (menu == null || !menu.IsOpen))
+            ui.DrawHearts(health);
         if (view.IsOpen)
             ui.DrawInventoryPanel(inventory, view, time, heading);
         if (menu != null && settings != null)
@@ -2536,6 +2547,7 @@ public class RenderManager : IDisposable
         sunShader.Dispose();
         _clouds?.Dispose();
         _rays?.Dispose();
+        _vignette?.Dispose();
         _leaves?.Dispose();
         _fire?.Dispose();
         _bubbles?.Dispose();
