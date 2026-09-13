@@ -62,6 +62,11 @@ public class PlayerModel
     // Extra stride rate on top of the speed-scaled walk cadence, so running reads as a
     // faster cadence and not just a sped-up walk loop.
     private const float RunStrideBoost = 2.5f;
+    // Global gauge on the whole stride cadence, walk and run alike. The speed-scaled
+    // rate above sets how fast the cycle *should* read; 0.7 slows both cycles by 30%
+    // without touching the swing amplitudes (the legs and arms travel the same arc,
+    // just over a longer stride period).
+    private const float GaitSpeedScale = 0.5f;
     private const float MoveBlendRate = 8f;
     private const float RunBlendRate = 6f;
     private const float AirBlendRate = 10f;
@@ -157,7 +162,7 @@ public class PlayerModel
 
         // Stride rate grows with speed so feet roughly keep up with the ground, plus an
         // extra kick while running so the cadence lifts beyond a sped-up walk.
-        _walkPhase += deltaTime * (4f + horizontalSpeed * 0.9f + _runBlend * RunStrideBoost);
+        _walkPhase += deltaTime * GaitSpeedScale * (4f + horizontalSpeed * 0.9f + _runBlend * RunStrideBoost);
 
         if (_mineT < 1f)
             _mineT = Math.Min(1f, _mineT + deltaTime / MineDuration);
