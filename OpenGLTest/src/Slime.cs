@@ -30,9 +30,11 @@ public sealed class Slime
     private const float WaterHopVerticalFactor = 0.5f;
 
     // A hop rises a little over a block (v^2 / 2g with g = 28), so the slime can climb one step
-    // on its way to the player without any special-cased step-up.
-    private const float HopSpeed = 4f;
-    private const float HopJumpSpeed = 8.5f;
+    // on its way to the player without any special-cased step-up. Both launch speeds carry the
+    // distance factor so a flat hop's range (2*H*V/g) grows by its square: sqrt(1.5) is 1.5x.
+    private const float HopDistanceFactor = 1.2247449f; // sqrt(1.5)
+    private const float HopSpeed = 4f * HopDistanceFactor;
+    private const float HopJumpSpeed = 8.5f * HopDistanceFactor;
     private const float HopIntervalSeconds = 1.2f;
     private const float HopIntervalJitter = 0.3f;
 

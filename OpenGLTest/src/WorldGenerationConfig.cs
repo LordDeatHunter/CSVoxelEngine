@@ -573,12 +573,12 @@ public static class WorldGenerationConfig
     // is airborne; a grounded touch shoves it instead. Combat values live here so a future
     // player-attack pass reads one place.
     public const int SlimeMaxAlive = 8;
-    public const float SlimeSpawnIntervalSeconds = 4f;
+    public const float SlimeSpawnIntervalSeconds = 8f;
     public const float SlimeSpawnMinRadiusBlocks = 20f;
     public const float SlimeSpawnMaxRadiusBlocks = 40f;
     public const float SlimeDespawnRadiusBlocks = 64f;
     public const int SlimeSpawnTries = 8;
-    public const int SlimeContactDamage = 4;
+    public const int SlimeContactDamage = 12;
     public const float SlimeShoveSpeed = 3.5f;
     // Knockback a slime hit gives the player: a horizontal shove (decayed by Camera) plus a small
     // upward pop so the hit reads even on flat ground.

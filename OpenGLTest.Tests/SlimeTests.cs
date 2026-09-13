@@ -222,6 +222,7 @@ public sealed class SlimeTests
             damaged = manager.DamageDealtThisFrame > 0;
         }
         Assert.True(damaged);
+        Assert.Equal(WorldGenerationConfig.SlimeContactDamage, manager.DamageDealtThisFrame);
 
         // The slime sits to the -X side, so the knockback must carry the player further +X.
         var beforeX = camera.Position.X;
