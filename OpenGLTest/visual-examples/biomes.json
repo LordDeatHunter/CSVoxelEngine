@@ -1,0 +1,32 @@
+{
+  // Biome check: run from OpenGLTest/ with
+  //   VOXEL_TIME=30 VOXEL_SCRIPT=visual-examples/biomes.json
+  // Shots land in visual/biomes/. VOXEL_TIME=30 puts the sun in the morning, bright enough to
+  // read the sand and the sea without the low-sun underwater shafts of water.json.
+  //
+  // The vantage points were found by a headless probe that scanned BiomeAt around the origin:
+  //   desert coast (8, -1112) h=5 with a cactus cluster at (-88, 4, -1093)
+  //   ocean beach  (-64, -914) h=2, deep basin (79, -897) h=-24
+  // Both are ~900-1100 blocks from spawn, so each teleport starts well above its stand point
+  // and the long waits do double duty: the player lands, and the streaming ring fills around
+  // the new position before the frame is taken. Pitches stay shallow where they can: a steep
+  // downward look brings the first-person hand into frame.
+  "steps": [
+    { "op": "teleport", "pos": [-81.5, 24.5, -1093.5], "yaw": 180, "pitch": -8 },
+    { "op": "wait", "seconds": 45 },
+    { "op": "screenshot", "name": "desert_cacti", "hideHud": true },
+    { "op": "teleport", "pos": [8.5, 48.5, -1112.5], "yaw": 200, "pitch": -28 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "desert_dunes", "hideHud": true },
+
+    { "op": "teleport", "pos": [-64.5, 34.5, -916.5], "yaw": 7, "pitch": -8 },
+    { "op": "wait", "seconds": 35 },
+    { "op": "screenshot", "name": "ocean_shore", "hideHud": true },
+    { "op": "teleport", "pos": [79.5, 12.5, -897.5], "yaw": 0, "pitch": -25 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "screenshot", "name": "ocean_deep", "hideHud": true },
+    { "op": "teleport", "pos": [79.5, -18.5, -897.5], "yaw": 20, "pitch": 0 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "ocean_under", "hideHud": true }
+  ]
+}

@@ -118,11 +118,18 @@ public sealed class BlockDefinition
     /// <summary>Wood-family membership: taper step and the half-width its box is drawn at.</summary>
     public sealed class WoodDefinition
     {
-        /// <summary>0 is the full-cube log, 1..5 step branch down to twig.</summary>
+        /// <summary>0 is the family's base, each step up narrows toward its tip.</summary>
         public int? TaperLevel { get; set; }
 
         /// <summary>Half edge length of the tapered box, in blocks.</summary>
         public float? HalfWidth { get; set; }
+
+        /// <summary>
+        /// Which wood family this level belongs to, e.g. <c>"tree"</c> (the default) or
+        /// <c>"cactus"</c>. Levels are numbered per family, and wood of different families never
+        /// welds, so a cactus cannot grow into a trunk.
+        /// </summary>
+        public string? Family { get; set; }
     }
 
     /// <summary>Per-fluid simulation tuning, mirroring how water and lava differ.</summary>

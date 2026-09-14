@@ -41,29 +41,31 @@ public static class WoodShape
 
     /// <summary>
     /// Whether two vertically adjacent cells belong to the same wood run or a branch grows
-    /// into the tag: stacked trunk cells share a level, every other vertical wood step
-    /// thins by one, and any wood joined to a <see cref="IsBranchConnectable"/> block above
-    /// or below extends a tube into it.
+    /// into the tag: both must be wood of the same family (a cactus never welds to a trunk),
+    /// stacked cells share a level, every other vertical wood step thins by one, and any wood
+    /// joined to a <see cref="IsBranchConnectable"/> block above or below extends a tube into it.
     /// </summary>
     public static bool ConnectsVertical(byte a, byte b)
     {
         if (!IsWood(a)) return false;
         if (IsBranchConnectable(b)) return true;
         if (!IsWood(b)) return false;
+        if (BlockType.WoodFamilyOf(a) != BlockType.WoodFamilyOf(b)) return false;
         return Math.Abs(WoodLevel(a) - WoodLevel(b)) <= 1;
     }
 
     /// <summary>
-    /// Whether two horizontally adjacent cells join: a limb step always thins by exactly
-    /// one, so same-level or wider-apart touches are foreign wood (a sibling limb, another
-    /// tree) and must not weld — unless the neighbour is <see cref="IsBranchConnectable"/>,
-    /// which always takes an arm.
+    /// Whether two horizontally adjacent cells join: both must be wood of the same family, and
+    /// a limb step always thins by exactly one, so same-level or wider-apart touches are foreign
+    /// wood (a sibling limb, another tree, a cactus) and must not weld — unless the neighbour is
+    /// <see cref="IsBranchConnectable"/>, which always takes an arm.
     /// </summary>
     public static bool ConnectsHorizontal(byte a, byte b)
     {
         if (!IsWood(a)) return false;
         if (IsBranchConnectable(b)) return true;
         if (!IsWood(b)) return false;
+        if (BlockType.WoodFamilyOf(a) != BlockType.WoodFamilyOf(b)) return false;
         return Math.Abs(WoodLevel(a) - WoodLevel(b)) == 1;
     }
 

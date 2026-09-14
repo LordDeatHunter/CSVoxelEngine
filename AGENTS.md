@@ -182,8 +182,10 @@ OpenGLTest/
       LodManager.cs            # LOD region lifecycle: worker thread builds, main thread uploads/unloads, burial flags
       FluidManager.cs          # the fluid tick: scheduled cells, level recompute + spread, batched remeshes
     WorldGen/
-      TerrainGenerator.cs      # the 2D half: owns every 2D noise channel; Compute(chunkX, chunkZ) -> ColumnData
-      ColumnData.cs            # per-chunk-column arrays: Heights (ravines included), DirtDepth, EntranceWeight, CaveIntensity
+      TerrainGenerator.cs      # the 2D half: owns every 2D noise channel and the biome split; Compute -> ColumnData
+      Biome.cs                 # the Forest / Desert / Ocean enum
+      ColumnData.cs            # per-chunk-column arrays: Heights, DirtDepth, EntranceWeight, CaveIntensity, Biomes
+      CactusGenerator.cs       # desert saguaros: tapered stem + pitchfork arms, no leaves (wood.family "cactus")
       NoiseCaves.cs            # 3D-noise caves (cheese rooms, wide/narrow spaghetti, deep caverns) on a strided lattice
       WormCarver.cs            # worm-carved tunnels: per-XZ-cell deterministic paths, cached, carved sphere by sphere
       LavaGenerator.cs         # deep lava pockets: cave floors at/below LavaMaxY pond over inside patch mask + pool roll
@@ -252,8 +254,9 @@ trailing commas.
 | `light.emission` | 0 | 0..15 (`LightEmission`) |
 | `light.passes` | `!fullCube` | whether voxel light travels through the cell (`PassesLight`) |
 | `renderer` | `"model"` | `model` (baked quads), `tapered_wood`, `pebbles` or `fluid` (procedural emitters); a fluid's model only supplies its tile |
-| `wood.taperLevel` | none | 0 = full-cube log, 1..5 taper steps; across all blocks 0..5 must be covered exactly once |
+| `wood.taperLevel` | none | 0 = the family's base, each step up narrows toward its tip; each family's levels must be covered contiguously from 0 (tree 0..5, cactus 0..2) |
 | `wood.halfWidth` | 0.5 | half edge length of the tapered box, in blocks (`HalfWidth`) |
+| `wood.family` | `"tree"` | which taper family this level belongs to; wood of two families never welds. `"cactus"` is the 3-level saguaro set |
 | `hasItem` | true | enters the blocks pool and can be hotbarred; false for taper wood and pebbles |
 | `needsSupport` | false | pops, rolling its loot, when the block below is removed; also makes the block replaceable, so a flow washes it away |
 | `falls` | false | gravity-affected (sand, gravel): topples into a `FallingBlock` entity when the cell below stops being solid, sinks through water, slides off lone supports; never combines with `fluid`/`needsSupport` |
@@ -384,18 +387,36 @@ Other invariants:
   - Caves fade out within ~`CaveSurfaceFadeEnd` blocks of the surface (`WormSurfaceMargin` for worms), except inside entrance zones — sparse patches where `ColumnData.EntranceWeight` lifts the fade and caves reach the sky.
   - Worldgen is a **pure function of world position**: each chunk generates its own blocks with no cross-chunk writes, so neighbours agree at their borders without shared state. Worm paths are cached per 64-block XZ cell in `WormCarver` exactly the way column data is cached per chunk column in `Chunk.GetColumnData` (compute-then-overwrite, wholesale `Clear` at the size limit — entries are deterministic, so a race yields identical values).
   - 3D cave noise is sampled on a `CaveNoiseStride` lattice (aligned to world coordinates so adjacent chunks share boundary samples) and trilinearly interpolated per block before thresholding.
-- **Far-terrain LOD**: full-detail chunks load to `ChunkRadius` (16 chunks = 256 blocks); a cascade of LOD rings defined in `LodRegion.Levels` extends the render distance (level 1: 2-block cells to 512, level 2: 4-block cells to 1024, level 3: 8-block cells to 2048 blocks). Regions are columns meshed at reduced resolution straight from the heightmap cache (no block data). Each level's heights are eroded (min over a widened fine-column window) and biased downward so its mesh sits strictly inside real terrain *and* strictly below the next finer level — finer geometry always buries coarser via the depth buffer, so no masking or camera-driven remeshing exists. Because those shells are stacked, only one level may actually be drawn per area — otherwise they are all visible once the camera is inside the terrain — so `LodManager.UpdateBuriedFlags` marks each region whose footprint is fully covered by *loaded* finer-level regions (region grids nest exactly: one region = ratio×ratio regions of the finer level) and `RenderLod` skips those. Testing loaded regions rather than each level's radius means an unbuilt finer region can never open a hole in the horizon. The finest level (0) has no finer level to hide it, so it is additionally marked buried wherever the full-detail chunks its shell could show through are loaded *and* meshed (`LodManager.IsCoveredByChunks`, using the per-column inclusive chunk-Y ranges recorded at region build in `LodRegion.ColumnCyMin/ColumnCyMax` and `Chunk.IsMeshed`, which unlike `HasMesh` is true for all-air and fully enclosed chunks too). This is needed because caves cut into the band the shell occupies and would otherwise show it from inside; presence is tested per chunk rather than by horizontal distance because the load volume is a sphere. LOD side faces use grass at the top cell, dirt above `NominalDirtDepth` and the stone tile below it, so far cliffs match near ones. The nesting invariants (`SampleMargin(L+1) >= SampleMargin(L) + CellSize(L) - 1`, `HeightBias(L+1) >= HeightBias(L) + CellSize(L)`) must hold when adding levels, and `Camera.NearPlane`/`FarPlane` are tuned to keep those separations from z-fighting at the outermost ring. LOD draws before chunks, coarsest level first (`RenderManager.RenderLod`). Destroying a block would expose the buried LOD, so removals cap that column's LOD height below the removed block (`LodRegion.LowerColumnBelow`) and affected regions on every level rebuild (`LodManager.MarkEditedColumn`); placements need nothing.
+- **Far-terrain LOD**: full-detail chunks load to `ChunkRadius` (16 chunks = 256 blocks); a cascade of LOD rings defined in `LodRegion.Levels` extends the render distance (level 1: 2-block cells to 512, level 2: 4-block cells to 1024, level 3: 8-block cells to 2048 blocks). Regions are columns meshed at reduced resolution straight from the heightmap cache (no block data). Each level's heights are eroded (min over a widened fine-column window) and biased downward so its mesh sits strictly inside real terrain *and* strictly below the next finer level — finer geometry always buries coarser via the depth buffer, so no masking or camera-driven remeshing exists. Because those shells are stacked, only one level may actually be drawn per area — otherwise they are all visible once the camera is inside the terrain — so `LodManager.UpdateBuriedFlags` marks each region whose footprint is fully covered by *loaded* finer-level regions (region grids nest exactly: one region = ratio×ratio regions of the finer level) and `RenderLod` skips those. Testing loaded regions rather than each level's radius means an unbuilt finer region can never open a hole in the horizon. The finest level (0) has no finer level to hide it, so it is additionally marked buried wherever the full-detail chunks its shell could show through are loaded *and* meshed (`LodManager.IsCoveredByChunks`, using the per-column inclusive chunk-Y ranges recorded at region build in `LodRegion.ColumnCyMin/ColumnCyMax` and `Chunk.IsMeshed`, which unlike `HasMesh` is true for all-air and fully enclosed chunks too). This is needed because caves cut into the band the shell occupies and would otherwise show it from inside; presence is tested per chunk rather than by horizontal distance because the load volume is a sphere. LOD side faces use grass at the top cell, dirt above `NominalDirtDepth` and the stone tile below it, so far cliffs match near ones; a desert cell wears sand over sandstone and a sea-floor cell the sand/gravel/stone band its depth picks (`LodRegion.BuildMeshData` reads `Chunk.GetColumnBiomes`). The nesting invariants (`SampleMargin(L+1) >= SampleMargin(L) + CellSize(L) - 1`, `HeightBias(L+1) >= HeightBias(L) + CellSize(L)`) must hold when adding levels, and `Camera.NearPlane`/`FarPlane` are tuned to keep those separations from z-fighting at the outermost ring. LOD draws before chunks, coarsest level first (`RenderManager.RenderLod`). Destroying a block would expose the buried LOD, so removals cap that column's LOD height below the removed block (`LodRegion.LowerColumnBelow`) and affected regions on every level rebuild (`LodManager.MarkEditedColumn`); placements need nothing.
 
-## Biomes (not implemented yet)
+## Biomes
 
-There is **no biome system**. The only biome is **forest**, and `TerrainGenerator.IsForest(x, z)`
-currently returns `true` for every column. It exists so gameplay that cares about biome (today just
-slime spawning, see below) asks one seam instead of hardcoding "everywhere". When real biomes land,
-they should be a pure function of world position like the rest of worldgen, so neighbours agree
-without shared state, and `IsForest` is the place to resolve them (or to delegate to a new
-`BiomeAt(x, z)`). Terrain already has non-biome variation — rolling base terrain vs rare flat
-"meadow" patches, ravines, beaches (`IsBeachHeight`), gravel patches (`IsGravelPatch`) — none of
-which is a biome today.
+Three biomes: **forest** (the original rolling grass/dirt/stone terrain), **desert** (dunes of
+sand over sandstone) and **ocean** (a flooded basin ramping from a sandy shore down to bare stone).
+Selection is a pure function of (x, z) from two low-frequency noise fields — continentalness
+(low = ocean) and aridity (high = desert, on land only) — in `TerrainGenerator.BiomeWeights`;
+`TerrainGenerator.BiomeAt` classifies the result. Both weights are smooth 0..1 and
+`TerrainGenerator.Compute` lerps the height between the forest, desert-dune and ocean-ramp profiles
+by them, so a border is a slope, never a cliff; a per-column hash (`DitherBiome`) also breaks the
+grass/sand material line into a ragged patchwork. The ocean ramp falls to `OceanFloorHeight` with
+rare warped **trenches** cut in, and its floor wears sand, gravel or stone by depth
+(`OceanSandDepth`/`OceanGravelDepth`). A desert column is sand over `SandstoneDepth` sandstone
+blocks, then stone; a ravined (bare-stone) column keeps that rule.
+
+`ColumnData.Biomes` carries the per-column classification for the chunk mesher and the far LOD
+(`Chunk.GetColumnBiomes`); the LOD samples it per cell and wears the matching tile, so a distant
+desert and sea floor agree with the near chunks. Vegetation is biome-gated: trees (`TreeGenerator`)
+and flowers (`FlowerGenerator`) are forest-only, and the desert grows **cacti**
+(`CactusGenerator`) — a tapered stem that throws a few arms which bend upward into prongs, no
+leaves. Slime spawning already asks `TerrainGenerator.IsForest(x, z)`, which is now a real test.
+
+Cactus wood is a second **wood family**: a block's JSON may set `wood.family` (default `"tree"`),
+and `ContentRegistry.BuildWoodLevels` validates each family's levels contiguously from 0 (tree 6,
+cactus 3). Wood of two families never welds (`WoodShape` checks the family), which is what lets a
+cactus reuse the tapered-wood mesh, its shape-accurate hitboxes and tree felling (`TopplingTree`
+floods any wood family) without a trunk and a cactus joining. The three blocks are `cactus` (stem,
+level 0), `cactus_arm` (1) and `cactus_tip` (2), with generated `cactus_side`/`cactus_top` tiles
+and `sandstone`; see `tools/generate-biome-textures.ps1` for the placeholder art.
 
 ## Entities
 

@@ -35,18 +35,27 @@ public sealed class WorldgenTests
     [Fact]
     public void TrunkShapeIsCachedAcrossChunks()
     {
+        // Biomes put desert and ocean beside the origin, so walk chunk columns until one is
+        // forest (where trees grow) instead of assuming a fixed square is wooded.
         var found = false;
-        for (var x = 100; x < 300 && !found; x++)
-        for (var z = 100; z < 300 && !found; z++)
+        for (var cx = 0; cx <= 64 && !found; cx++)
+        for (var cz = -64; cz <= 64 && !found; cz++)
         {
-            if (!TreeGenerator.TryGetTrunk(x, z, out var baseY1, out var shape1))
+            if (!TerrainGenerator.IsForest(cx * Chunk.Size + Chunk.Size / 2, cz * Chunk.Size + Chunk.Size / 2))
                 continue;
-            Assert.True(TreeGenerator.TryGetTrunk(x, z, out var baseY2, out var shape2));
-            Assert.Equal(baseY1, baseY2);
-            // Record-struct equality compares the wood/blob lists by reference, so this
-            // only passes when the second call hit the shape cache (item 25).
-            Assert.Equal(shape1, shape2);
-            found = true;
+
+            for (var x = cx * Chunk.Size; x < cx * Chunk.Size + Chunk.Size && !found; x++)
+            for (var z = cz * Chunk.Size; z < cz * Chunk.Size + Chunk.Size && !found; z++)
+            {
+                if (!TreeGenerator.TryGetTrunk(x, z, out var baseY1, out var shape1))
+                    continue;
+                Assert.True(TreeGenerator.TryGetTrunk(x, z, out var baseY2, out var shape2));
+                Assert.Equal(baseY1, baseY2);
+                // Record-struct equality compares the wood/blob lists by reference, so this
+                // only passes when the second call hit the shape cache (item 25).
+                Assert.Equal(shape1, shape2);
+                found = true;
+            }
         }
 
         Assert.True(found);

@@ -1,0 +1,7 @@
+{
+  "name": "Sandstone",
+  "model": { "parent": "block/cube_all", "textures": { "all": "sandstone" } },
+  "sfx": "hit_rock",
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 }
+}

@@ -23,15 +23,21 @@ public sealed class ColumnData
     /// <summary>Shift applied to the cave thresholds so some areas are riddled and others nearly solid.</summary>
     public readonly float[] CaveIntensity;
 
+    /// <summary>The biome of each column, same (x, z) indexing as <see cref="Heights"/>; decides
+    /// which surface materials <see cref="Chunk.GenerateBlockData"/> lays down.</summary>
+    public readonly Biome[] Biomes;
+
     public readonly int MinHeight;
     public readonly int MaxHeight;
 
-    public ColumnData(int[] heights, byte[] dirtDepth, float[] entranceWeight, float[] caveIntensity)
+    public ColumnData(int[] heights, byte[] dirtDepth, float[] entranceWeight, float[] caveIntensity,
+        Biome[]? biomes = null)
     {
         Heights = heights;
         DirtDepth = dirtDepth;
         EntranceWeight = entranceWeight;
         CaveIntensity = caveIntensity;
+        Biomes = biomes ?? ForestBiomes(heights.Length);
 
         var min = int.MaxValue;
         var max = int.MinValue;
@@ -43,5 +49,13 @@ public sealed class ColumnData
 
         MinHeight = min;
         MaxHeight = max;
+    }
+
+    private static Biome[] ForestBiomes(int length)
+    {
+        var biomes = new Biome[length];
+        for (var i = 0; i < length; i++)
+            biomes[i] = Biome.Forest;
+        return biomes;
     }
 }

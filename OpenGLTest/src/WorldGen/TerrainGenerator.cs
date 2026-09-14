@@ -22,6 +22,12 @@ public static class TerrainGenerator
     private static readonly FastNoiseLite EntranceNoise;
     private static readonly FastNoiseLite IntensityNoise;
     private static readonly FastNoiseLite GravelNoise;
+    private static readonly FastNoiseLite ContinentNoise;
+    private static readonly FastNoiseLite AridityNoise;
+    private static readonly FastNoiseLite DuneNoise;
+    private static readonly FastNoiseLite TrenchMask;
+    private static readonly FastNoiseLite TrenchRidge;
+    private static readonly FastNoiseLite TrenchWarp;
 
     // The terrain palette: the generator owns the choice of which blocks natural ground is made
     // of, and Chunk only fills its columns with them. Resolved once here so the per-voxel fill
@@ -48,6 +54,9 @@ public static class TerrainGenerator
     /// <summary>Block capping beach columns where <see cref="IsGravelPatch"/> holds.</summary>
     public static readonly byte GravelBlock;
 
+    /// <summary>Block a desert column's soil band is made of, under its surface sand.</summary>
+    public static readonly byte SandstoneBlock;
+
     static TerrainGenerator()
     {
         SurfaceBlock = ContentRegistry.RequireBlock("grass").Id;
@@ -57,6 +66,7 @@ public static class TerrainGenerator
         MudBlock = ContentRegistry.RequireBlock("mud").Id;
         SandBlock = ContentRegistry.RequireBlock("sand").Id;
         GravelBlock = ContentRegistry.RequireBlock("gravel").Id;
+        SandstoneBlock = ContentRegistry.RequireBlock("sandstone").Id;
 
         // The rolling base keeps the original seed and settings exactly, so natural terrain
         // is unchanged wherever the flat mask stays at zero. The mask is rare and
@@ -73,12 +83,24 @@ public static class TerrainGenerator
         EntranceNoise = MakeNoise(31, WorldGenerationConfig.EntranceFrequency);
         IntensityNoise = MakeNoise(41, WorldGenerationConfig.CaveIntensityFrequency);
         GravelNoise = MakeNoise(61, WorldGenerationConfig.GravelFrequency);
+        ContinentNoise = MakeNoise(70, WorldGenerationConfig.ContinentFrequency, octaves: 2);
+        AridityNoise = MakeNoise(71, WorldGenerationConfig.AridityFrequency, octaves: 2);
+        DuneNoise = MakeNoise(72, WorldGenerationConfig.DuneFrequency, octaves: 3);
+        TrenchMask = MakeNoise(73, WorldGenerationConfig.TrenchMaskFrequency);
+        TrenchRidge = MakeNoise(74, WorldGenerationConfig.TrenchFrequency);
 
         // Displaces the ridge lookup so ravines wind instead of following straight noise contours
         RavineWarp = new FastNoiseLite(WorldGenerationConfig.Seed + 22);
         RavineWarp.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2);
         RavineWarp.SetFrequency(WorldGenerationConfig.RavineWarpFrequency);
         RavineWarp.SetDomainWarpAmp(WorldGenerationConfig.RavineWarpAmplitude);
+
+        // Trench lines wind the same way, so a gash runs along the basin floor instead of
+        // tracking a straight noise contour
+        TrenchWarp = new FastNoiseLite(WorldGenerationConfig.Seed + 75);
+        TrenchWarp.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2);
+        TrenchWarp.SetFrequency(WorldGenerationConfig.TrenchWarpFrequency);
+        TrenchWarp.SetDomainWarpAmp(WorldGenerationConfig.TrenchWarpAmplitude);
     }
 
     /// <summary>
@@ -99,12 +121,78 @@ public static class TerrainGenerator
     public static bool IsGravelPatch(float x, float z) =>
         GravelNoise.GetNoise(x, z) > WorldGenerationConfig.GravelThreshold;
 
+    /// <summary>Biome at a world column; a pure function of (x, z) like the rest of the 2D half.</summary>
+    public static Biome BiomeAt(float x, float z) => BiomeWeights(x, z, out _, out _);
+
     /// <summary>
-    /// Whether world column (x, z) is a forest biome. There is no biome system yet — the whole
-    /// world is forest — but spawn rules already ask here, so introducing real biomes later only
-    /// has to change this one place. See the "Biomes" section in AGENTS.md.
+    /// 0..1 weights of the two climate biomes, plus the biome they classify to. Ocean takes the
+    /// share of continentalness that falls low; desert takes the dry share of what is left, so a
+    /// coastal blend never grows a desert out over the water. Both weights are smooth, which is
+    /// what lets <see cref="Compute"/> lerp the height across a border instead of stepping.
     /// </summary>
-    public static bool IsForest(int x, int z) => true;
+    public static Biome BiomeWeights(float x, float z, out float oceanWeight, out float desertWeight)
+    {
+        // Not "if (!enabled) return": the flag is a compile-time const, and a dead branch would
+        // read as unreachable. Zeroing the weights keeps the toggle a real expression.
+        var continent = ContinentNoise.GetNoise(x, z);
+        oceanWeight = WorldGenerationConfig.BiomesEnabled
+            ? 1f - MathUtils.SmoothStep(WorldGenerationConfig.ContinentOceanStart,
+                WorldGenerationConfig.ContinentOceanEnd, continent)
+            : 0f;
+
+        var aridity = AridityNoise.GetNoise(x, z);
+        desertWeight = WorldGenerationConfig.BiomesEnabled
+            ? MathUtils.SmoothStep(WorldGenerationConfig.DesertStart,
+                WorldGenerationConfig.DesertEnd, aridity) * (1f - oceanWeight)
+            : 0f;
+
+        return oceanWeight >= 0.5f ? Biome.Ocean
+            : desertWeight >= 0.5f ? Biome.Desert
+            : Biome.Forest;
+    }
+
+    /// <summary>Whether world column (x, z) is forest; vegetation and spawn rules ask here.</summary>
+    public static bool IsForest(int x, int z) => BiomeAt(x, z) == Biome.Forest;
+
+    /// <summary>
+    /// How many blocks a trench lowers the ocean floor at (x, z): a warped ridged band (|n| near
+    /// zero) gives the gash line, a rarity mask makes trenches finite, and the parabolic profile
+    /// gives steep walls like <see cref="RavineDepthAt"/>. The caller weights it by the ocean
+    /// share so a trench only ever cuts underwater.
+    /// </summary>
+    private static float TrenchDepthAt(float x, float z)
+    {
+        var mask = MathUtils.SmoothStep(WorldGenerationConfig.TrenchMaskStart,
+            WorldGenerationConfig.TrenchMaskEnd, TrenchMask.GetNoise(x, z));
+        if (mask <= 0f) return 0f;
+
+        var warpedX = x;
+        var warpedZ = z;
+        TrenchWarp.DomainWarp(ref warpedX, ref warpedZ);
+
+        var ridge = MathF.Abs(TrenchRidge.GetNoise(warpedX, warpedZ));
+        if (ridge >= WorldGenerationConfig.TrenchWidth) return 0f;
+
+        var t = ridge / WorldGenerationConfig.TrenchWidth;
+        return WorldGenerationConfig.TrenchDepth * mask * (1f - t * t);
+    }
+
+    /// <summary>
+    /// Nudges a column's biome across the forest/desert material line inside the blend band, so
+    /// the grass-to-sand edge reads as a ragged patchwork instead of a drawn contour. Only the
+    /// surface material flips; the height already came from the smooth desert weight, so the
+    /// ground stays continuous.
+    /// </summary>
+    private static Biome DitherBiome(float x, float z, Biome biome, float desertWeight)
+    {
+        if (biome is not (Biome.Forest or Biome.Desert)) return biome;
+        if (MathF.Abs(desertWeight - 0.5f) >= WorldGenerationConfig.BiomeBorderDither) return biome;
+
+        var h = SplitMix64.Hash((int)x, (int)z, WorldGenerationConfig.Seed ^ 0x5B10);
+        var unit = (SplitMix64.Mix(h + 0x9E3779B97F4A7C15UL) >> 40) * (1f / (1 << 24));
+        if (unit >= 0.5f) return biome;
+        return biome == Biome.Forest ? Biome.Desert : Biome.Forest;
+    }
 
     /// <summary>OpenSimplex2 noise seeded from the world seed; more than one octave turns on FBm.</summary>
     internal static FastNoiseLite MakeNoise(int seedOffset, float frequency, int octaves = 1)
@@ -130,6 +218,7 @@ public static class TerrainGenerator
         var dirtDepth = new byte[count];
         var entrance = new float[count];
         var intensity = new float[count];
+        var biomes = new Biome[count];
 
         var baseX = (float)chunkX * Chunk.Size;
         var baseZ = (float)chunkZ * Chunk.Size;
@@ -159,6 +248,26 @@ public static class TerrainGenerator
                         + SwellNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.SwellAmplitude;
                     heightF = baseHeight + flat * (plains - baseHeight);
                 }
+
+                // Biome blend: dunes lift the desert share of the land, then the ocean ramp empties
+                // the basins. Both are weighted 0..1, so a border lerps between the profiles and
+                // comes out as a slope, never a cliff.
+                var biome = BiomeWeights(worldX, worldZ, out var oceanWeight, out var desertWeight);
+                if (desertWeight > 0f)
+                {
+                    var dune = baseHeight + DuneNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.DuneAmplitude;
+                    heightF = MathUtils.Lerp(heightF, dune, desertWeight);
+                }
+
+                if (oceanWeight > 0f)
+                {
+                    var depth = MathF.Pow(oceanWeight, WorldGenerationConfig.OceanDepthExponent);
+                    var oceanHeight = MathUtils.Lerp(WorldGenerationConfig.OceanShoreHeight,
+                        WorldGenerationConfig.OceanFloorHeight, depth);
+                    oceanHeight -= TrenchDepthAt(worldX, worldZ) * oceanWeight;
+                    heightF = MathUtils.Lerp(heightF, oceanHeight, oceanWeight);
+                }
+
                 var height = (int)heightF;
 
                 // Sampled once and reused: the same value cuts the ravine into the heightmap and
@@ -188,10 +297,11 @@ public static class TerrainGenerator
                     EntranceNoise.GetNoise(worldX, worldZ));
 
                 intensity[i] = IntensityNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.CaveIntensityRange;
+                biomes[i] = DitherBiome(worldX, worldZ, biome, desertWeight);
             }
         }
 
-        return new ColumnData(heights, dirtDepth, entrance, intensity);
+        return new ColumnData(heights, dirtDepth, entrance, intensity, biomes);
     }
 
     /// <summary>

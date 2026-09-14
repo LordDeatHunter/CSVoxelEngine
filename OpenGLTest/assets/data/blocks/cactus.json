@@ -1,0 +1,14 @@
+{
+  "name": "Cactus",
+  "model": {
+    "parent": "block/cube_column",
+    "textures": { "end": "cactus_top", "side": "cactus_side" }
+  },
+  "hardness": 2,
+  "renderer": "tapered_wood",
+  "sfx": "hit_wood",
+  "wood": { "taperLevel": 0, "halfWidth": 0.375, "family": "cactus" },
+  "occludes": false,
+  "castsAO": false,
+  "light": { "passes": true }
+}

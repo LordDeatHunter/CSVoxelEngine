@@ -451,7 +451,7 @@ public class Chunk : IDisposable
             for (var z = 0; z < Size; z++)
             {
                 var i = (x << SizeShift) | z;
-                GenerateColumn(x, z, column.Heights[i], column.DirtDepth[i], lowerBoundY);
+                GenerateColumn(x, z, column.Heights[i], column.DirtDepth[i], lowerBoundY, column.Biomes[i]);
             }
         }
 
@@ -492,6 +492,10 @@ public class Chunk : IDisposable
 
         if (WorldGenerationConfig.TreesEnabled)
             TreeGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
+
+        // Desert-only, so it never competes with the forest canopy for the same cell
+        if (WorldGenerationConfig.CactusEnabled)
+            CactusGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
 
         if (WorldGenerationConfig.PebblesEnabled)
             PebbleGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
@@ -665,27 +669,57 @@ public class Chunk : IDisposable
     /// </summary>
     public static int[] GetColumnHeights(int chunkX, int chunkZ) => GetColumnData(chunkX, chunkZ).Heights;
 
+    /// <summary>Per-column biomes for a chunk column, indexed like
+    /// <see cref="GetColumnHeights"/>. The far LOD reads this to pick biome surface tiles.</summary>
+    public static Biome[] GetColumnBiomes(int chunkX, int chunkZ) => GetColumnData(chunkX, chunkZ).Biomes;
+
     // Solid from the chunk floor up to the terrain height: grass on top, dirt for dirtDepth
     // blocks under it, stone below that. dirtDepth == 0 marks a bare stone column
     // (see ColumnData.DirtDepth) - deep ravine walls, where the top block is stone as well.
     // A submerged column tops out in dirt instead: grass does not grow on a sea floor.
     // Shoreline columns (see TerrainGenerator.IsBeachHeight) build from sand instead, capped
     // with gravel where TerrainGenerator.IsGravelPatch holds.
-    private void GenerateColumn(int x, int z, int terrainHeight, int dirtDepth, int lowerBoundY)
+    private void GenerateColumn(int x, int z, int terrainHeight, int dirtDepth, int lowerBoundY, Biome biome)
     {
         var topBlock = TerrainGenerator.IsSubmerged(terrainHeight)
             ? TerrainGenerator.SoilBlock
             : TerrainGenerator.SurfaceBlock;
         var soilBlock = TerrainGenerator.SoilBlock;
+        var soilDepth = dirtDepth;
 
-        if (dirtDepth != 0 && TerrainGenerator.IsBeachHeight(terrainHeight))
+        switch (biome)
         {
-            var worldX = (int)Position.X * Size + x;
-            var worldZ = (int)Position.Z * Size + z;
-            topBlock = TerrainGenerator.IsGravelPatch(worldX, worldZ)
-                ? TerrainGenerator.GravelBlock
-                : TerrainGenerator.SandBlock;
-            soilBlock = TerrainGenerator.SandBlock;
+            case Biome.Desert:
+                // Dune sand over sandstone. A ravine that stripped the soil (dirtDepth 0)
+                // still reads as bare rock, the same rule the forest column uses.
+                topBlock = TerrainGenerator.SandBlock;
+                soilBlock = TerrainGenerator.SandstoneBlock;
+                soilDepth = dirtDepth == 0 ? 0 : WorldGenerationConfig.SandstoneDepth;
+                break;
+
+            case Biome.Ocean:
+                // Depth below the waterline picks the floor: shelf sand, slope gravel, deep
+                // basin stone. Each material fills its own band, so there is no soil gradient.
+                (topBlock, soilBlock) =
+                    terrainHeight >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanSandDepth
+                        ? (TerrainGenerator.SandBlock, TerrainGenerator.SandBlock)
+                        : terrainHeight >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanGravelDepth
+                            ? (TerrainGenerator.GravelBlock, TerrainGenerator.GravelBlock)
+                            : (TerrainGenerator.RockBlock, TerrainGenerator.RockBlock);
+                soilDepth = 2;
+                break;
+
+            default:
+                if (dirtDepth != 0 && TerrainGenerator.IsBeachHeight(terrainHeight))
+                {
+                    var worldX = (int)Position.X * Size + x;
+                    var worldZ = (int)Position.Z * Size + z;
+                    topBlock = TerrainGenerator.IsGravelPatch(worldX, worldZ)
+                        ? TerrainGenerator.GravelBlock
+                        : TerrainGenerator.SandBlock;
+                    soilBlock = TerrainGenerator.SandBlock;
+                }
+                break;
         }
 
         for (var y = 0; y < Size; y++)
@@ -693,9 +727,9 @@ public class Chunk : IDisposable
             var depth = terrainHeight - (lowerBoundY + y);
             if (depth < 0) break;
 
-            _blocks[Idx(x, y, z)] = dirtDepth == 0 ? TerrainGenerator.RockBlock
+            _blocks[Idx(x, y, z)] = soilDepth == 0 ? TerrainGenerator.RockBlock
                 : depth == 0 ? topBlock
-                : depth <= dirtDepth ? soilBlock
+                : depth <= soilDepth ? soilBlock
                 : TerrainGenerator.RockBlock;
         }
     }

@@ -226,6 +226,13 @@ public static class ContentRegistry
     /// <see cref="RequireBlock"/>.</summary>
     public static Item RequireItem(string name) => ItemRegistry.RequireItem(name);
 
+    /// <summary>Id of a loaded wood family (e.g. "tree", "cactus"), for content that has to
+    /// name one at startup.</summary>
+    public static byte RequireWoodFamily(string name) =>
+        BlockType.WoodFamilyIdsByName.TryGetValue(name, out var id)
+            ? id
+            : throw new InvalidOperationException($"No wood family named '{name}' is registered.");
+
     /// <summary>The entity kind registered under that JSON file name.</summary>
     public static EntityType RequireEntity(string name) => EntityRegistry.Require(name);
 
@@ -295,6 +302,9 @@ public static class ContentRegistry
         Array.Clear(BlockType.HardensTouchingById);
         Array.Clear(BlockType.ReplaceableById);
         Array.Clear(BlockType.FallsById);
+        Array.Fill(BlockType.WoodFamilyById, BlockType.NoWoodFamily);
+        BlockType.WoodByLevelByFamily.Clear();
+        BlockType.WoodFamilyIdsByName.Clear();
 
         // Air owns no definition but still has to let light through and stop nothing
         BlockType.PassesLightById[BlockType.Air] = true;
@@ -693,6 +703,7 @@ public static class ContentRegistry
     {
         var types = new Dictionary<byte, BlockType>();
         var hardenPending = new List<(byte Id, string? To, string? Touching, string Path)>();
+        var woodFamilies = new Dictionary<byte, string>();
 
         foreach (var (name, path) in files)
         {
@@ -841,6 +852,8 @@ public static class ContentRegistry
             BlockModels[id] = ResolveModel(definition.Model, path);
             BlockDefinitions[id] = definition;
             types[id] = type;
+            if (definition.Wood != null)
+                woodFamilies[id] = definition.Wood.Family ?? "tree";
 
             BlockType.ById[id] = type;
             BlockType.Emission[id] = type.LightEmission;
@@ -871,29 +884,65 @@ public static class ContentRegistry
         }
 
         BlockType.Types = types;
-        BlockType.WoodByLevel = BuildWoodLevels(types);
+        BuildWoodLevels(types, woodFamilies);
     }
 
-    // Taper levels must cover 0..5 exactly once, or TreeGenerator would grow gaps
-    private static byte[] BuildWoodLevels(Dictionary<byte, BlockType> types)
+    /// <summary>
+    /// Builds the per-family taper tables. A family's levels must be contiguous from 0, so a
+    /// growth walk that clamps to the top can never land on a missing step; the tree family
+    /// additionally keeps all six steps, since <see cref="TreeGenerator"/> walks 0..5.
+    /// </summary>
+    private static void BuildWoodLevels(Dictionary<byte, BlockType> types, Dictionary<byte, string> families)
     {
-        var byLevel = new byte[6];
-        var seen = new string?[6];
-        foreach (var type in types.Values)
+        // Pinned so a family id is stable across runs and across content reloads in tests
+        var familyIds = new Dictionary<string, byte>(StringComparer.Ordinal)
         {
-            if (type.WoodTaperLevel < 0) continue;
-            if (seen[type.WoodTaperLevel] != null)
+            ["tree"] = BlockType.TreeWoodFamily,
+            ["cactus"] = BlockType.CactusWoodFamily,
+        };
+        byte nextFamily = BlockType.CactusWoodFamily + 1;
+
+        var byFamily = new Dictionary<string, Dictionary<int, byte>>(StringComparer.Ordinal);
+        foreach (var (id, family) in families)
+        {
+            if (!byFamily.TryGetValue(family, out var levels))
+            {
+                levels = new Dictionary<int, byte>();
+                byFamily[family] = levels;
+            }
+
+            var level = types[id].WoodTaperLevel;
+            if (levels.TryGetValue(level, out var existing))
                 throw new InvalidOperationException(
-                    $"Blocks '{seen[type.WoodTaperLevel]}' and '{type.Name}' both claim wood.taperLevel {type.WoodTaperLevel}.");
-            seen[type.WoodTaperLevel] = type.Name;
-            byLevel[type.WoodTaperLevel] = type.Id;
+                    $"Blocks '{types[existing].Name}' and '{types[id].Name}' both claim family '{family}' wood.taperLevel {level}.");
+            levels[level] = id;
         }
 
-        for (var level = 0; level < seen.Length; level++)
-            if (seen[level] == null)
-                throw new InvalidOperationException($"No block declares wood.taperLevel {level}.");
+        foreach (var (family, levels) in byFamily)
+        {
+            if (!familyIds.TryGetValue(family, out var familyId))
+                familyIds[family] = familyId = nextFamily++;
 
-        return byLevel;
+            var max = 0;
+            foreach (var level in levels.Keys)
+                if (level > max) max = level;
+
+            var table = new byte[max + 1];
+            for (var level = 0; level <= max; level++)
+            {
+                if (!levels.TryGetValue(level, out var id))
+                    throw new InvalidOperationException(
+                        $"Wood family '{family}' has no block at taper level {level}.");
+                table[level] = id;
+                BlockType.WoodFamilyById[id] = familyId;
+            }
+
+            BlockType.WoodByLevelByFamily[familyId] = table;
+            BlockType.WoodFamilyIdsByName[family] = familyId;
+        }
+
+        if (!byFamily.TryGetValue("tree", out var tree) || tree.Count != 6)
+            throw new InvalidOperationException("Wood family 'tree' must declare taper levels 0..5.");
     }
 
     /// <summary>Tag tapered wood may grow tubes and arms into, beyond parent/child wood.</summary>

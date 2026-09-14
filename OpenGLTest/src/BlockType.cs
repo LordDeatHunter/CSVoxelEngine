@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
@@ -31,9 +32,26 @@ public sealed record BlockType
     /// <summary>Whether voxel light travels through each block id; see Chunk's light passes.</summary>
     public static readonly bool[] PassesLightById = new bool[256];
 
-    /// <summary>Wood block per taper level: index 0 is the full-cube log, 1..5 step branch down
-    /// to twig. Built and validated by the registry from each block's <c>wood.taperLevel</c>.</summary>
-    public static byte[] WoodByLevel { get; internal set; } = [];
+    /// <summary>Family id of the tree wood set: log (0) down to twig (5).</summary>
+    public const byte TreeWoodFamily = 0;
+
+    /// <summary>Family id of the cactus wood set: stem (0) down to tip (2).</summary>
+    public const byte CactusWoodFamily = 1;
+
+    /// <summary>Family of a block that is not tapered wood at all.</summary>
+    public const byte NoWoodFamily = 255;
+
+    /// <summary>Family a block's taper levels belong to, from its <c>wood.family</c>, or
+    /// <see cref="NoWoodFamily"/>. Wood of two different families never welds.</summary>
+    internal static readonly byte[] WoodFamilyById = new byte[256];
+
+    /// <summary>Family name to id, for content that has to name a family (e.g. the cactus
+    /// generator resolving <c>"cactus"</c> once at startup).</summary>
+    internal static readonly Dictionary<string, byte> WoodFamilyIdsByName = new(StringComparer.Ordinal);
+
+    /// <summary>Wood block per family and taper level, each family's levels contiguous from 0.
+    /// Built and validated by the registry from each block's <c>wood.taperLevel</c>.</summary>
+    internal static readonly Dictionary<byte, byte[]> WoodByLevelByFamily = new();
 
     /// <summary>Every registered block keyed by id, for code that enumerates types.</summary>
     public static IReadOnlyDictionary<byte, BlockType> Types { get; internal set; } =
@@ -280,4 +298,15 @@ public sealed record BlockType
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float WoodHalfWidth(byte blockId) => ById[blockId]?.HalfWidth ?? -1f;
 
+    /// <summary>Wood family of a block id, or <see cref="NoWoodFamily"/> when it is not wood.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static byte WoodFamilyOf(byte blockId) => WoodFamilyById[blockId];
+
+    /// <summary>Wood block of a family at a taper level, clamped to the family's top level the
+    /// way growth clamps rather than running off the end.</summary>
+    public static byte WoodBlock(byte family, int level)
+    {
+        var levels = WoodByLevelByFamily[family];
+        return levels[(uint)level < (uint)levels.Length ? level : levels.Length - 1];
+    }
 }

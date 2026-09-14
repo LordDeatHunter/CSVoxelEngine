@@ -284,6 +284,51 @@ public static class WorldGenerationConfig
     public const float GravelFrequency = 1f / 48f;
     public const float GravelThreshold = 0.45f;
 
+    // --- Biomes ---
+    // Biome is a pure function of (x, z): continentalness (low = ocean) splits ocean from land,
+    // aridity splits desert from forest on land. Both feed smooth 0..1 weights, so the height
+    // profile lerps across a border instead of stepping, and a per-column hash breaks the
+    // grass/sand material line into a ragged patchwork.
+    public const bool BiomesEnabled = true;
+
+    // Continentalness: a ~1400-block wavelength keeps ocean basins several regions wide.
+    public const float ContinentFrequency = 1f / 1400f;
+    public const float ContinentOceanStart = -0.30f;   // at or below: full ocean
+    public const float ContinentOceanEnd = -0.04f;     // at or above: full land
+
+    // Aridity: desert where it runs high, on land only (~900-block patches).
+    public const float AridityFrequency = 1f / 900f;
+    public const float DesertStart = 0.10f;
+    public const float DesertEnd = 0.32f;
+
+    // Ocean depth ramp: the shelf sits just over the waterline and the basin falls to the floor.
+    public const float OceanShoreHeight = 3f;       // blocks, the shallowest shelf
+    public const float OceanFloorHeight = -44f;     // blocks, the deepest basin centre
+    public const float OceanDepthExponent = 1.35f;  // >1 keeps a wide shelf and a steep drop
+
+    // Ocean floor materials by depth below sea level: sand near the beach, gravel down the
+    // slope, bare stone in the deep basin.
+    public const int OceanSandDepth = 4;
+    public const int OceanGravelDepth = 16;
+
+    // Trenches: rare narrow gashes in the ocean floor, cut like a ravine but only underwater.
+    public const float TrenchFrequency = 1f / 420f;
+    public const float TrenchWarpFrequency = 1f / 160f;
+    public const float TrenchWarpAmplitude = 18f;
+    public const float TrenchMaskFrequency = 1f / 900f;
+    public const float TrenchMaskStart = 0.25f;
+    public const float TrenchMaskEnd = 0.5f;
+    public const float TrenchWidth = 0.05f;
+    public const float TrenchDepth = 34f;
+
+    // Desert dunes: smooth rolling sand hills over the base terrain.
+    public const float DuneFrequency = 1f / 90f;
+    public const float DuneAmplitude = 7f;
+    // Sandstone strata: sand on top, this many sandstone blocks under it, then stone.
+    public const int SandstoneDepth = 4;
+    // Width of the grass/desert blend band where the surface material dithers, 0 disables it.
+    public const float BiomeBorderDither = 0.16f;
+
     // Fluid simulation: one tick every FluidTickSeconds, at most MaxFluidTicksPerFrame of them
     // in a frame so a hitch never turns into a spiral of catch-up ticks
     public const float FluidTickSeconds = 0.25f;
@@ -475,6 +520,28 @@ public static class WorldGenerationConfig
     // No trunk roots this close (Chebyshev) to the origin column, so the surface spawn the
     // camera picks there is always in the open
     public const int TreeSpawnClearRadius = 3;
+
+    // --- Cacti (CactusGenerator) ---
+    // Desert saguaros: a tapered stem throws a few arms that bend upward into prongs like a
+    // pitchfork. Three taper sizes (wood.family "cactus", levels 0..2) and no leaves.
+    public const bool CactusEnabled = true;
+    // A desert column grows a candidate with this probability; spacing (below) thins it
+    public const float CactusDensity = 0.010f;
+    // A candidate is kept only when its hash is the lowest within this Chebyshev radius
+    public const int CactusSpacingRadius = 2;
+    public const int CactusMinHeight = 3;
+    public const int CactusMaxHeight = 6;
+    public const int CactusMaxArms = 3;
+    // Cells a prong climbs after its arm bends up; its top cell wears the tip size
+    public const int CactusProngMinRise = 2;
+    public const int CactusProngMaxRise = 4;
+    public const int CactusRootDepth = 2;
+    public const int CactusMinGroundHeight = 1;
+    public const int CactusMaxGroundHeight = 90;
+    public const int CactusMaxSlope = 2;
+    // Chunk border margin: how far a stem outside this chunk can still reach into it
+    public const int CactusReachBlocks = 6;
+    public const int CactusMaxHeightBlocks = 12;
 
     // --- Canopy wind (leaf-wave vertex shader) ---
     // Master strength of the leaf sway, 0 disables it; wavelengths and gusts live in

@@ -82,6 +82,10 @@ public static class TreeGenerator
             && Math.Abs(z) <= WorldGenerationConfig.TreeSpawnClearRadius)
             return false;
 
+        // Forest only: desert grows cacti and the ocean floor is bare (see CactusGenerator)
+        if (!TerrainGenerator.IsForest(x, z))
+            return false;
+
         var own = PlacementHash(x, z);
         if (own >= WorldGenerationConfig.TreeDensity)
             return false;
@@ -147,17 +151,20 @@ public static class TreeGenerator
     private static readonly (int Dx, int Dz)[] Directions =
         [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
-    /// <summary>Taper level to wood block: 0 is the full-cube log, 1..5 step Branch down to
-    /// Twig. Limbs stop before exceeding level 5, so this never clamps two cells in a row.
-    /// The mapping itself comes from each block's <c>wood.taperLevel</c>, so adding a taper
-    /// step is a JSON change (see <see cref="BlockType.WoodByLevel"/>).</summary>
-    public static byte WoodId(int level) => BlockType.WoodByLevel[(uint)level < 6u ? level : 5];
+    /// <summary>Taper level to wood block in the tree family: 0 is the full-cube log, 1..5 step
+    /// Branch down to Twig. Limbs stop before exceeding the family's top level, so this never
+    /// clamps two cells in a row. The mapping comes from each block's <c>wood.taperLevel</c>,
+    /// so adding a taper step is a JSON change.</summary>
+    public static byte WoodId(int level) => BlockType.WoodBlock(BlockType.TreeWoodFamily, level);
 
     /// <summary>Level of a wood block id, inverse of <see cref="WoodId"/> (leaves: -1).</summary>
     public static int WoodLevel(byte blockId) => BlockType.ById[blockId]?.WoodTaperLevel ?? -1;
 
-    /// <summary>Wood of any taper or leaves: the blocks whose removal disturbs the far-LOD canopy.</summary>
-    public static bool IsTreeBlock(byte blockId) => WoodLevel(blockId) >= 0 || blockId == LeavesBlock;
+    /// <summary>Tree wood of any taper, or leaves: the blocks whose removal disturbs the far-LOD
+    /// canopy. Cactus wood is excluded because it has no canopy.</summary>
+    public static bool IsTreeBlock(byte blockId) =>
+        blockId == LeavesBlock
+        || (WoodLevel(blockId) >= 0 && BlockType.WoodFamilyOf(blockId) == BlockType.TreeWoodFamily);
 
     /// <summary>A trunk's wood cells plus the leaf-blob centres; world coordinates.</summary>
     public record struct TreeShape(

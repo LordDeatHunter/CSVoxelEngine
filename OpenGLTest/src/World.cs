@@ -1086,8 +1086,10 @@ public class World : IItemUseWorld
         }
 
         // The whole canopy came down above the caps: disturb it once at the break (its reach
-        // covers the crown) and rebuild every touched column so no ghost lingers at range
-        TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z);
+        // covers the crown) and rebuild every touched column so no ghost lingers at range. A
+        // cactus has no canopy, so it only needs the column rebuild.
+        if (BlockType.WoodFamilyOf(brokenId) == BlockType.TreeWoodFamily)
+            TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z);
         foreach (var ((lx, lz), _) in lowestY)
             _lodManager.MarkEditedColumn(lx, lz);
 

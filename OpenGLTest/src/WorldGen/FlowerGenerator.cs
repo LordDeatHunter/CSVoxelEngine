@@ -30,6 +30,8 @@ public static class FlowerGenerator
     /// <summary>Whether the surface column (x, z) grows a flower.</summary>
     public static bool TryGetFlower(int x, int z)
     {
+        // A meadow plant: desert and ocean columns stay bare
+        if (!TerrainGenerator.IsForest(x, z)) return false;
         if (PatchNoise.GetNoise(x, z) <= WorldGenerationConfig.FlowerPatchThreshold) return false;
         return UnitHash(x, z, DensitySalt) < WorldGenerationConfig.FlowerDensity;
     }
