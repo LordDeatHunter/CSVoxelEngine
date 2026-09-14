@@ -29,7 +29,8 @@ same world, and a player can move between them freely — neither arc gates the 
 ### Suggested first wave
 
 1. `M-1` save/load — the foundation everything else hangs off.
-2. `P-1` real tools — the pickaxe exists but currently does nothing.
+2. `P-1` real tools — the mechanic landed (tool tags, `requiresTool` gate, pace/damage);
+   what is left is tool durability and the shovel/hoe/sword kinds.
 3. `M-2` SFX + `U-1` tooltips + `V-3` footstep dust — cheap, high-feel wins.
 4. `P-10` health + `P-11` hunger + `P-13` fall damage/drowning — the survival skeleton.
 5. `P-24` biomes + `P-25` ores + `V-1` weather — make the world worth exploring.
@@ -47,6 +48,12 @@ same world, and a player can move between them freely — neither arc gates the 
   speed multiplier while mining, and per-instance durability (the `Inventory.DamageTool` /
   `MaxDurability` machinery already exists for the firestarter). Unlocks axe/shovel/hoe and the
   whole metal tier ladder.
+  - Progress: tool tags (`assets/data/tags/pickaxe.json`, `axe.json`), the `requiresTool` +
+    per-block `tools` tier gate, per-item `tool.power` / `hitDelayMs` mining pace and
+    `blockDamage` all landed (`Mining`, `MiningTests`); `entityDamage` and `attack` came with
+    them (see `F-4`). Flint and copper axe/pickaxe exist and log hardness was raised so the axe
+    matters. Still open: per-tool durability (only the firestarter spends uses today) and the
+    shovel/hoe/sword kinds.
 - [ ] **`P-2` · Crafting stations gate recipes** — P1, M.
   The `E` panel today crafts any recipe in the list from anywhere. Add a `station` field to
   recipes and require the player to be at the matching station (crafting table, campfire, quern,
@@ -59,6 +66,9 @@ same world, and a player can move between them freely — neither arc gates the 
 - [ ] **`P-4` · Finish the copper chain** — P1, M.
   `crushed_copper` currently dead-ends. Wire it to a copper ingot and copper tools/blocks, a tier
   above flint. This is the first real "I advanced" moment.
+  - Progress: the quern's `malachite → crushed_copper` crush is in, and the Copper Ingot plus
+    copper pickaxe/axe items exist with correct tiers and art. Nothing crafts the ingot from
+    crushed copper or the tools from the ingot yet, so `crushed_copper` still dead-ends.
 - [ ] **`P-5` · Light progression: torch → lamp → fire as fuel** — P1, S–M.
   Torch block (cheap, emission ~14, `needsSupport` on walls/floor) before the existing
   `lamp` (emission 15). Wire placed lights into the shader's 8 point-light budget so a torch
@@ -89,8 +99,9 @@ same world, and a player can move between them freely — neither arc gates the 
     vignette + trauma-based screen shake, fall damage ((blocks-4)*10 HP from 5+ blocks,
     water landings cushion, creative/flight immune), lava DoT (10 HP/s in half-second
     ticks, body contact via emissive-fluid check, no burning yet), simple respawn at spawn
-    keeping inventory. Still open: death screen (`U-5`), drop-everything on death,
-    drowning/hunger/mobs/starvation, regen.
+    keeping inventory. Slimes now deal contact damage (12 HP) and knockback, so mob damage is
+    live too. Still open: death screen (`U-5`), drop-everything on death,
+    drowning/hunger/starvation, regen.
 - [ ] **`P-11` · Hunger / food** — P1, M.
   Food items, eating, hunger/saturation drain. Note cooking currently produces a building
   material (`mudball → mud_brick`), so no edibles exist yet; add the first real foods here.
@@ -99,6 +110,8 @@ same world, and a player can move between them freely — neither arc gates the 
 - [ ] **`P-13` · Fall damage + drowning** — P1, S.
   Turn swimming into a real hazard. Depends on `P-10`; the water systems already expose
   `IsInWater` / `IsEyeInWater` / `IsSubmerged`.
+  - Progress: fall damage landed with `P-10` (5+ blocks, water cushions, creative/flight
+    immune). Drowning is still open, so swimming is currently harmless.
 - [ ] **`P-29` · Death-mitigation gear** — P2, M.
   Counter `P-10`'s drop-everything rule once it starts to hurt: a **backpack** that expands
   inventory and, on death, drops as a single item holding its whole contents; **binding**
@@ -164,12 +177,22 @@ same world, and a player can move between them freely — neither arc gates the 
   Cows/sheep/chickens; wandering, breeding, drops, leads. Needs entity AI + spawning.
 - [ ] **`F-3` · Mobs — hostiles (night / caves)** — P2, XL.
   Spawn rules keyed to light and time, simple voxel pathing, attacks, loot. Depends on `P-10`.
+  - Progress (first cut): the slime landed — data-driven entity with a Blockbench model, hop AI
+    that homes on the player, airborne contact damage and knockback, a shove when grounded,
+    floats on water, death loot (`slimeball`), despawn and a spawn cap. It spawns on dry forest
+    surface in a 20-40 block ring only: not yet light/time-keyed, no cave spawns, hop-chase
+    rather than voxel pathing, and it is the only hostile.
 - [ ] **`F-4` · Combat** — P2, L.
   First cut: a **sword** — left-click swings, and left-clicking mid-swing chains a swing-back
   left-to-right combo — plus **right-click to shield/block**. A **bow** with arrows covers ranged,
   and **one magic spell (fireball)** bridges into Arc A (`P-14`). Later passes add attack
   cooldown, armor, knockback and mob drops. Watch the right-click conflict with place/use and
   `World.ThrowSelected`.
+  - Progress (first cut): melee landed. Left-click punches the nearest slime in the forward cone
+    for the held item's `entityDamage` (bare hand 1, flint tools 3, copper 5) with knockback; the
+    obsidian blade (`attack: "slice"`) swings the two-phase, two-target sweep (`SliceCombo`) and
+    the arm carries it across the front. Still open: right-click shield/block, bow + arrows, and
+    the fireball bridging to `P-14`; attack cooldown and armor also remain.
 - [ ] **`F-5` · Weather & day/night threat** — P1, M.
   Rain/snow, thunder, cold at night so shelter matters; drives the visual pass (`V-1`).
 - [ ] **`F-6` · Fire spread & extinguishing** — P2, M.
@@ -246,6 +269,9 @@ same world, and a player can move between them freely — neither arc gates the 
   Break/place/step/splash/fire/UI sounds on the existing NAudio stack (day/night ambience already
   crossfades there). Note: the old plan said "Silk.NET audio" — the code actually uses
   NAudio + NLayer, so build on that.
+  - Progress (first cut): `SfxManager` + `SfxMixer` play a random clip of a group on block hits
+    (per-block `sfx` groups `hit_rock` / `hit_wood` / `hit_default`) and item pickup, with an SFX
+    volume slider beside the ambience one. Still open: place/step/splash/fire/UI.
 - [ ] **`M-3` · Keep content JSON-only** — ongoing.
   New blocks/items/recipes/structures stay data, not code, per AGENTS.md. Add schema fields as
   the systems above need them (tool, station, harvest tier, food, biome...).
