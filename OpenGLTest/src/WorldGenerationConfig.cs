@@ -291,13 +291,13 @@ public static class WorldGenerationConfig
     // grass/sand material line into a ragged patchwork.
     public const bool BiomesEnabled = true;
 
-    // Continentalness: a ~1400-block wavelength keeps ocean basins several regions wide.
-    public const float ContinentFrequency = 1f / 1400f;
+    // Continentalness: a ~2800-block wavelength keeps ocean basins 1-2k blocks across.
+    public const float ContinentFrequency = 1f / 2800f;
     public const float ContinentOceanStart = -0.30f;   // at or below: full ocean
     public const float ContinentOceanEnd = -0.04f;     // at or above: full land
 
-    // Aridity: desert where it runs high, on land only (~900-block patches).
-    public const float AridityFrequency = 1f / 900f;
+    // Aridity: desert where it runs high, on land only (1-2k-block patches).
+    public const float AridityFrequency = 1f / 1800f;
     public const float DesertStart = 0.10f;
     public const float DesertEnd = 0.32f;
 
@@ -321,9 +321,10 @@ public static class WorldGenerationConfig
     public const float TrenchWidth = 0.05f;
     public const float TrenchDepth = 34f;
 
-    // Desert dunes: smooth rolling sand hills over the base terrain.
-    public const float DuneFrequency = 1f / 90f;
-    public const float DuneAmplitude = 7f;
+    // Desert dunes: smooth rolling sand hills over the base terrain, spaced well apart so the
+    // dunes read as broad swells rather than choppy lumps.
+    public const float DuneFrequency = 1f / 170f;
+    public const float DuneAmplitude = 8f;
     // Sandstone strata: sand on top, this many sandstone blocks under it, then stone.
     public const int SandstoneDepth = 4;
     // Width of the grass/desert blend band where the surface material dithers, 0 disables it.
