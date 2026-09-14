@@ -382,7 +382,7 @@ Other invariants:
 - Worldgen must stay deterministic and thread-safe (`FastNoiseLite.GetNoise` is read-only after setup; noise instances are configured once in static constructors and never re-tuned per call). All noise seeds derive from `WorldGenerationConfig.Seed` plus fixed per-channel offsets (`TerrainGenerator.MakeNoise`). Before player edits, terrain obeys:
   - **Nothing generated is ever solid above `height(x,z)`** — heights come from `Chunk.GetColumnData(...).Heights` (or the `GetColumnHeights` wrapper) and already include ravines, which are cut into the heightmap so the far LOD sees them too. The block at `height` is solid unless a cave or entrance carved it.
   - Both carvers only ever **remove** blocks: `Chunk.GenerateBlockData` fills the columns (grass at depth 0, dirt down to `DirtDepth`, stone below), then `NoiseCaves.Carve` and `WormCarver.Carve` clear air out of the result and `_solidCount` is recounted.
-  - **Sea water** fills every air cell at `y <= SeaLevel` in columns whose `height < SeaLevel`, in `Chunk.FillWater` after both carvers and before trees and pebbles, so sea-floor caves flood while land caves stay dry and nothing grows underwater (`TerrainGenerator.IsSubmerged`; submerged columns also top out in dirt instead of grass). Generated water is always a **source** (state `0`), so the sea needs no state array at all. Set `WaterEnabled = false` to turn the whole thing off.
+  - **Water** fills every air cell at `y <= SeaLevel` in a **wet** column, in `Chunk.FillWater` after both carvers and before trees and pebbles: an ocean floor, or a forest lake/river bed, where a hashed lake bowl or a warped river ridge channel carves the above-sea forest floor below the waterline (`TerrainGenerator.IsWaterColumn`; the carve in `Compute` and the fill read the same weights, so they agree, and the far LOD's sea sheet uses it too). Every other below-waterline basin is left **dry** — the forest is not flooded wholesale now that ocean carries the bulk of the water — and a desert stays dry; sand and gravel ring actual water only (`TerrainGenerator.SurfaceWaterWeight` gates the height band), never a dry ravine floor in the band. Both the carve and the flood test are scaled by `TerrainGenerator.SurfaceWaterGate` (`WaterDesertFadeStart`/`WaterDesertFadeEnd`), which fades the body out over the last stretch before the desert, so a pond closes on its own forest rim instead of ending in a vertical wall where the hard forest/desert classification flips, while lakes away from a desert keep their full depth. Sea-floor caves still flood, nothing grows in water (wet columns top out in dirt instead of grass), and `IsSubmerged(height)` is now only the height test — a below-waterline column is not necessarily wet. Generated water is always a **source** (state `0`). `WaterEnabled = false` turns the water off; `LakesAndRiversEnabled = false` leaves oceans only.
   - **Lava pockets** pond over dry cave floors at/below `LavaMaxY` (`LavaGenerator.Stamp`, after the sea so flooded caves stay water): a patch mask plus a per-cell roll, buried under the terrain so ravines and entrances stay dry. Generated lava is likewise all sources; set `LavaEnabled = false` to turn it off.
   - Caves fade out within ~`CaveSurfaceFadeEnd` blocks of the surface (`WormSurfaceMargin` for worms), except inside entrance zones — sparse patches where `ColumnData.EntranceWeight` lifts the fade and caves reach the sky.
   - Worldgen is a **pure function of world position**: each chunk generates its own blocks with no cross-chunk writes, so neighbours agree at their borders without shared state. Worm paths are cached per 64-block XZ cell in `WormCarver` exactly the way column data is cached per chunk column in `Chunk.GetColumnData` (compute-then-overwrite, wholesale `Clear` at the size limit — entries are deterministic, so a race yields identical values).
@@ -391,7 +391,8 @@ Other invariants:
 
 ## Biomes
 
-Three biomes: **forest** (the original rolling grass/dirt/stone terrain), **desert** (dunes of
+Three biomes: **forest** (smooth rolling grass hills with flat valleys between them; the floor sits
+above sea level, so carved water is always enclosed), **desert** (dunes of
 sand over sandstone) and **ocean** (a flooded basin ramping from a sandy shore down to bare stone).
 Selection is a pure function of (x, z) from two low-frequency noise fields — continentalness
 (low = ocean) and aridity (high = desert, on land only) — in `TerrainGenerator.BiomeWeights`;
@@ -400,8 +401,20 @@ Selection is a pure function of (x, z) from two low-frequency noise fields — c
 by them, so a border is a slope, never a cliff; a per-column hash (`DitherBiome`) also breaks the
 grass/sand material line into a ragged patchwork. The ocean ramp falls to `OceanFloorHeight` with
 rare warped **trenches** cut in, and its floor wears sand, gravel or stone by depth
-(`OceanSandDepth`/`OceanGravelDepth`). A desert column is sand over `SandstoneDepth` sandstone
-blocks, then stone; a ravined (bare-stone) column keeps that rule.
+(`OceanSandDepth`/`OceanGravelDepth`). The forest floor is a broad swell plus a positive-only hill
+field gated by a hill-region mask (`Hill*`/`ForestBaseHeight`), so hills rise in patches with flats
+between them. A rare warped **mountain** ridge (`Mountain*`, gated by a low-frequency mask and
+faded out near the origin) lifts an occasional range well above the hills; a crest above
+`MountainRockHeight` is bare stone (`Chunk.GenerateColumn` reads the stripped soil, the far LOD a
+matching rock cap), so it reads as rock rather than another wooded hill. A low-frequency
+**openness** mask (`Openness*`) flattens the hills a little and thins the trees toward none, so the
+forest alternates between rolling woodland and open grass instead of one uniform canopy
+(`TreeGenerator.TryGetTrunk` reads `TerrainGenerator.ForestOpenness`). On land a hashed lake bowl
+and a warped river ridge carve below the waterline and flood only those (forest only; a desert
+stays dry; both fade out toward a desert so a pond closes on its own rim) — see the Water invariant
+below.
+A desert column is sand over `SandstoneDepth` sandstone blocks, then stone; a ravined
+(bare-stone) column keeps that rule.
 
 `ColumnData.Biomes` carries the per-column classification for the chunk mesher and the far LOD
 (`Chunk.GetColumnBiomes`); the LOD samples it per cell and wears the matching tile, so a distant

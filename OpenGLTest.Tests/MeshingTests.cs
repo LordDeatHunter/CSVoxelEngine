@@ -444,7 +444,16 @@ public sealed class MeshingTests
         var sawSolid = false;
         var sawAir = false;
 
-        for (var cy = 0; cy <= 8; cy++)
+        // Bracket the column's own surface instead of assuming it sits in chunk-Y 0..8: with
+        // lakes and rivers a column can now be a dry basin whose floor is well below 0, and a
+        // fixed range would then see only the air above it.
+        var column = Chunk.GetColumnData(3, -5);
+        var cyLo = (column.MinHeight >> Chunk.SizeShift) - 1;
+        // +TreeMaxHeightBlocks clears the tree/cactus canopy above the terrain, so a high chunk
+        // is genuinely empty (the early-return branch) rather than full of leaves.
+        var cyHi = ((column.MaxHeight + WorldGenerationConfig.TreeMaxHeightBlocks) >> Chunk.SizeShift) + 1;
+
+        for (var cy = cyLo; cy <= cyHi; cy++)
         {
             var chunk = new Chunk(null!, new Vector3(3, cy, -5), generateBlockData: false);
             chunk.GenerateBlockData();

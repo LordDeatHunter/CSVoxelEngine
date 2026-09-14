@@ -47,8 +47,8 @@ public static class FlowerGenerator
         for (var z = 0; z < Chunk.Size; z++)
         {
             var height = column.Heights[(x << Chunk.SizeShift) | z];
-            // Submerged columns and beaches stay bare: flowers are a meadow plant
-            if (TerrainGenerator.IsSubmerged(height)) continue;
+            // Wet columns and beaches stay bare: flowers are a meadow plant
+            if (TerrainGenerator.IsWaterColumn(worldX0 + x, worldZ0 + z, height)) continue;
             if (TerrainGenerator.IsBeachHeight(height)) continue;
             var ly = height + 1 - worldY0;
             if ((uint)ly >= Chunk.Size) continue;

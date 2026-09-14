@@ -243,18 +243,25 @@ public sealed class WorldgenTests
     }
 
     /// <summary>
-    /// First chunk column whose whole 16x16 footprint ends below sea level, so the chunk at
+    /// First ocean chunk column whose whole 16x16 footprint ends below sea level, so the chunk at
     /// chunk-Y 0 is kept alive by <c>needsWater</c> yet is entirely above its own terrain —
-    /// exactly the case C10's carve guard skips (MaxHeight &lt; lowerBoundY == 0).
+    /// exactly the case C10's carve guard skips (MaxHeight &lt; lowerBoundY == 0). It must be
+    /// ocean: a forest basin below the waterline is now dry, so only ocean is guaranteed wet
+    /// (see TerrainGenerator.IsWaterColumn).
     /// </summary>
     private static (int cx, int cz) FindSubmergedChunkColumn()
     {
-        for (var cx = 0; cx < 40; cx++)
-        for (var cz = -20; cz < 20; cz++)
+        // Gate on the cheap biome test first: GetColumnData is a full column of noise.
+        for (var cx = -160; cx <= 160; cx++)
+        for (var cz = -160; cz <= 160; cz++)
+        {
+            if (TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8) != Biome.Ocean)
+                continue;
             if (Chunk.GetColumnData(cx, cz).MaxHeight < WorldGenerationConfig.SeaLevel)
                 return (cx, cz);
+        }
 
-        Assert.Fail("no fully submerged chunk column in cx [0,40) x cz [-20,20)");
+        Assert.Fail("no fully submerged ocean chunk column within 160 chunks");
         return (0, 0);
     }
 

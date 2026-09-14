@@ -90,6 +90,12 @@ public static class TreeGenerator
         if (own >= WorldGenerationConfig.TreeDensity)
             return false;
 
+        // Open forest regions thin the trees to nothing (see TerrainGenerator.ForestOpenness). The
+        // mask is read only for the few columns that already pass the raw density, so the common
+        // case never pays for the extra noise.
+        if (own >= WorldGenerationConfig.TreeDensity * (1f - TerrainGenerator.ForestOpenness(x, z)))
+            return false;
+
         var s = WorldGenerationConfig.TreeSpacingRadius;
         for (var dx = -s; dx <= s; dx++)
         for (var dz = -s; dz <= s; dz++)
@@ -102,9 +108,10 @@ public static class TreeGenerator
         var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
         var li = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
         var height = column.Heights[li];
-        // Nothing grows on a sea floor; the stamps only write into air anyway, but a submerged
-        // trunk would still poke its crown out of the water
-        if (TerrainGenerator.IsSubmerged(height))
+        // Nothing grows in water; the stamps only write into air anyway, but a trunk in a lake or
+        // river would still poke its crown out of the surface. A dry basin below the waterline is
+        // land now, so the test is the wet one, not the height one.
+        if (TerrainGenerator.IsWaterColumn(x, z, height))
             return false;
         if (column.DirtDepth[li] < WorldGenerationConfig.TreeMinSoil)
             return false;

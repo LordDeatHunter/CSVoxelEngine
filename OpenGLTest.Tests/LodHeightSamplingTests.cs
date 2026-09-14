@@ -36,6 +36,34 @@ public sealed class LodHeightSamplingTests
         return floor;
     }
 
+    /// <summary>An all-land level-<paramref name="level"/> region with relief, so the edge-cap fact
+    /// moves real ground rather than a seabed already under water or a dead-flat shell.</summary>
+    private static (int Rx, int Rz) FindLandRegion(int level)
+    {
+        for (var rx = 900; rx <= 1100; rx++)
+        for (var rz = 0; rz <= 60; rz++)
+        {
+            var floor = RegionFloor(level, rx, rz);
+            if (floor < 0) continue;
+            if (RegionCeiling(level, rx, rz) - floor >= 6)
+                return (rx, rz);
+        }
+
+        Assert.Fail("no relieved all-land level-0 region found near rx 900..1100");
+        return (0, 0);
+    }
+
+    private static int RegionCeiling(int level, int rx, int rz)
+    {
+        var span = LodRegion.Levels[level].RegionBlocks / Chunk.Size;
+        var ceiling = int.MinValue;
+        for (var cx = -1; cx <= span; cx++)
+        for (var cz = -1; cz <= span; cz++)
+            foreach (var h in Chunk.GetColumnHeights(rx * span + cx, rz * span + cz))
+                if (h > ceiling) ceiling = h;
+        return ceiling;
+    }
+
     /// <summary>
     /// Full-output equality: every buffer the build emits, not just the vertices. A min that
     /// diverged only on a border cell would still move ColumnCyMin or the region AABB.
@@ -136,27 +164,34 @@ public sealed class LodHeightSamplingTests
         // (cell i = -1, dx = -margin). The grid is sized to exactly that one-cell overrun rather
         // than clamped against it, so a wrong origin reads a neighbouring row — a wrong height,
         // not an exception — and only a column-by-column reach test catches it.
-        const int Level = 0, Rx = 999, Rz = 0;
+        const int Level = 0;
+        // The forest refactor moved the terrain under (999, 0), so scan for an all-land region
+        // instead of hardcoding one: the cap below its floor must land under real ground for the
+        // border skirt to move. Far from the other tests' caps (level 1 (777,777), level 2 (555,-555)).
+        var (rx, rz) = FindLandRegion(Level);
         var spec = LodRegion.Levels[Level];
-        var baseFineX = Rx * spec.RegionBlocks;
-        var baseFineZ = Rz * spec.RegionBlocks;
-        var floor = RegionFloor(Level, Rx, Rz);
+        var baseFineX = rx * spec.RegionBlocks;
+        var baseFineZ = rz * spec.RegionBlocks;
+        var floor = RegionFloor(Level, rx, rz);
 
-        var baseline = LodRegion.BuildMeshData(Level, Rx, Rz);
+        var baseline = LodRegion.BuildMeshData(Level, rx, rz);
 
         // One column short of the reach: outside every sample window, outside the grid, and the
         // ColumnCyMin loop reads raw uncapped heightmaps, so this must change nothing at all.
         Assert.True(LodRegion.LowerColumnBelow(baseFineX - 4, floor - 32, baseFineZ + 32));
-        var outside = LodRegion.BuildMeshData(Level, Rx, Rz);
+        var outside = LodRegion.BuildMeshData(Level, rx, rz);
         AssertSameMesh(baseline, outside);
 
         // The first column a window does reach. Its border groundTop drives the -X skirt and the
-        // AO of the i = 0 column, so dropping it 33 below the region floor must move geometry.
-        Assert.True(LodRegion.LowerColumnBelow(baseFineX - 3, floor - 32, baseFineZ + 32));
-        var inside = LodRegion.BuildMeshData(Level, Rx, Rz);
+        // AO of the i = 0 column, so dropping that whole border line below the region floor must
+        // move geometry. A line rather than one column, so an unlucky flat spot at a single Z
+        // cannot hide the effect.
+        for (var fz = baseFineZ - 3; fz <= baseFineZ + spec.RegionBlocks + 3; fz += 2)
+            Assert.True(LodRegion.LowerColumnBelow(baseFineX - 3, floor - 32, fz));
+        var inside = LodRegion.BuildMeshData(Level, rx, rz);
         Assert.False(baseline.Vertices.SequenceEqual(inside.Vertices));
 
         // ...and the separable pass still agrees with the nested one at that extreme column.
-        AssertSameMesh(LodRegion.BuildMeshData(Level, Rx, Rz, null, separableMin: false), inside);
+        AssertSameMesh(LodRegion.BuildMeshData(Level, rx, rz, null, separableMin: false), inside);
     }
 }

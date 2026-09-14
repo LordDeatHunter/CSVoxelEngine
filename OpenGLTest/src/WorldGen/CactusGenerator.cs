@@ -89,7 +89,7 @@ public static class CactusGenerator
         var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
         var li = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
         var height = column.Heights[li];
-        if (TerrainGenerator.IsSubmerged(height))
+        if (TerrainGenerator.IsWaterColumn(x, z, height))
             return false;
         if (height < WorldGenerationConfig.CactusMinGroundHeight || height > WorldGenerationConfig.CactusMaxGroundHeight)
             return false;

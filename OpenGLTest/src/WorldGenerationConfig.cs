@@ -284,6 +284,48 @@ public static class WorldGenerationConfig
     public const float GravelFrequency = 1f / 48f;
     public const float GravelThreshold = 0.45f;
 
+    // --- Surface water (lakes and rivers) ---
+    // The forest floor sits above sea level, so an un-carved column is always the dry rim of any
+    // carved water: a lake is a bowl and a river a channel, and water fills only the part cut
+    // below the waterline, which keeps it enclosed instead of floating on a slope. The carve and
+    // the flood test read the same LakeWeight/RiverWeight functions (TerrainGenerator). Forest
+    // only: a desert stays dry, and sand/gravel show only where these weights are present.
+    public const bool LakesAndRiversEnabled = true;
+    // Below this water-body weight a below-waterline column is left dry.
+    public const float WaterBodyThreshold = 0.05f;
+    // The lake/river carve and the flood test are scaled by 1 - smoothstep of desertWeight over
+    // [WaterDesertFadeStart, WaterDesertFadeEnd], so a bowl or channel tapers out and closes on
+    // forest ground just before the hard forest/desert line (0.5). Only the last stretch before the
+    // desert is affected, so lakes elsewhere in the forest keep their full depth. Without it a pond
+    // that straddled the border was carved only on the forest side and ended in a vertical wall
+    // against the uncarved desert (see TerrainGenerator.SurfaceWaterGate).
+    public const float WaterDesertFadeStart = 0.3f;
+    public const float WaterDesertFadeEnd = 0.5f;
+
+    // Lakes: one hashed candidate per cell, which keeps them small and scattered instead of the
+    // broad sheets a raw noise threshold carves. The bed sits LakeDepth below sea level at the
+    // centre and the bowl returns to the un-carved land at the rim, so a lake is always closed.
+    public const int LakeCellBlocks = 192;      // candidate grid, one possible lake per cell
+    public const float LakeChance = 0.35f;      // fraction of cells that grow a lake
+    public const float LakeMinRadius = 18f;
+    public const float LakeMaxRadius = 34f;
+    public const float LakeDepth = 5f;
+    public const int LakeSpawnClearRadius = 72; // no lake this close to the origin spawn
+
+    // Rivers: warped ridge lines (|noise| near zero) gated by a rarity mask. The channel is cut
+    // RiverBedDepth below the waterline, then faded out as the local land climbs above RiverLowEnd,
+    // so a river runs through the lowlands and dries into a wash as it climbs.
+    public const float RiverFrequency = 1f / 520f;
+    public const float RiverWarpFrequency = 1f / 220f;
+    public const float RiverWarpAmplitude = 26f;
+    public const float RiverMaskFrequency = 1f / 700f;
+    public const float RiverMaskStart = 0.4f;
+    public const float RiverMaskEnd = 0.6f;
+    public const float RiverWidth = 0.045f;
+    public const float RiverBedDepth = 3f;
+    public const float RiverLowStart = 14f;    // at or below: full channel carve
+    public const float RiverLowEnd = 30f;      // at or above: no carve (dry wash)
+
     // --- Biomes ---
     // Biome is a pure function of (x, z): continentalness (low = ocean) splits ocean from land,
     // aridity splits desert from forest on land. Both feed smooth 0..1 weights, so the height
@@ -391,32 +433,66 @@ public static class WorldGenerationConfig
     public const float MalachiteFrequency = 1f / 18f;
     public const float MalachiteThreshold = 0.88f;
 
-    // --- Terrain shape (natural rolling base with large flat patches) ---
-    // The base is the original rolling terrain (BaseFrequency, 6-octave product noise times
-    // BaseAmplitude). A rare low-frequency mask flattens large patches toward gentle meadow
-    // rolling on a broad swell, so most of the world keeps its natural look and only some
-    // 200-400 block regions go flat. Mask values between the smoothstep edges are partial,
-    // which gives soft natural transitions rather than a hard second biome.
-    public const float BaseFrequency = 0.001f;
-    public const float BaseAmplitude = 256f;
-    public const float FlatMaskFrequency = 1f / 600f;   // wavelength ~600 blocks: flat-patch scale
-    public const float FlatStart = 0.2f;                // fully natural below this...
-    public const float FlatEnd = 0.6f;                  // ...fully flat above this (soft blend between)
-    public const float MeadowFrequency = 1f / 160f;     // gentle rolling inside the flats
-    public const float MeadowAmplitude = 9f;            // blocks, +- around the local base level
-    public const float SwellFrequency = 1f / 900f;      // continent-scale undulation the flats ride on
-    public const float SwellAmplitude = 22f;            // blocks; neighboring meadows sit at different levels
+    // --- Forest terrain shape (smooth rolling hills with flat valleys between them) ---
+    // The floor is a broad swell plus a positive-only hill field gated by a low-frequency
+    // hill-region mask, so hill masses rise in patches and flat valleys run between them instead
+    // of one continuous bumpy mass. The floor sits well above sea level, which is what lets a
+    // lake or river be contained: an un-carved forest column is the dry rim, so carved water can
+    // only sit in its own bowl or channel.
+    public const float ForestBaseHeight = 12f;           // valley floor, blocks above sea level
+    public const float ForestSwellFrequency = 1f / 1400f; // continent-scale undulation the hills ride on
+    public const float ForestSwellAmplitude = 6f;        // blocks
+    public const float HillFrequency = 1f / 260f;        // hill wavelength
+    public const float HillAmplitude = 32f;              // blocks a fully-masked hill adds
+    public const float HillMaskFrequency = 1f / 700f;    // where hill masses sit versus open flats
+    public const float HillMaskStart = 0.28f;            // fully flat below this...
+    public const float HillMaskEnd = 0.62f;              // ...fully hilly above this (soft blend between)
+    public const float HillWarpFrequency = 1f / 520f;    // makes hill outlines wind instead of blobbing
+    public const float HillWarpAmplitude = 40f;          // blocks of sideways displacement
+    public const float ValleyRoughFrequency = 1f / 90f;  // small roughness on the valley floors
+    public const float ValleyRoughAmplitude = 2.5f;      // blocks
+
+    // --- Forest mountains (occasional, not common) ---
+    // Rare tall ranges: a warped ridged field (peaks where |noise| is near zero) gated by a
+    // low-frequency, high-threshold mask, so an occasional mountain rises out of the rolling
+    // hills. The ridge is raised to MountainSharpness so only the crest climbs, leaving the
+    // hills around it intact.
+    public const bool MountainsEnabled = true;
+    public const float MountainFrequency = 1f / 240f;     // ridge line spacing
+    public const float MountainWarpFrequency = 1f / 420f;  // how tightly a range winds
+    public const float MountainWarpAmplitude = 30f;        // blocks of sideways displacement
+    public const float MountainMaskFrequency = 1f / 1600f; // where ranges sit versus plain hills
+    public const float MountainMaskStart = 0.38f;          // no mountain below this...
+    public const float MountainMaskEnd = 0.62f;            // ...a full range above it
+    public const float MountainAmplitude = 60f;            // blocks a fully-masked crest adds
+    public const float MountainSharpness = 3f;             // >1 sharpens the crest into a peak
+    // Above this altitude a forest column turns to bare rock, so a high crest reads as a rocky
+    // mountain instead of another tree-covered hill (trees also stop at TreeMaxGroundHeight).
+    public const float MountainRockHeight = 56f;
+    // No crests this close to the origin (faded in by the second radius), so the spawn view
+    // stays a forest valley rather than a random summit.
+    public const float MountainSpawnClearStart = 48f;
+    public const float MountainSpawnClearEnd = 120f;
+
+    // --- Forest openness (woodland versus open grass) ---
+    // A low-frequency mask that says how open the forest is at (x, z). Trees thin out to none
+    // as it rises and the hill mass flattens a little, so the forest alternates between rolling
+    // woodland and open grassy regions instead of one uniform canopy.
+    public const float OpennessFrequency = 1f / 900f;
+    public const float OpennessStart = 0.0f;               // below this: fully wooded...
+    public const float OpennessEnd = 0.45f;                // ...above it: fully open
+    public const float OpennessHillReduction = 0.5f;       // fraction of hill height an open region drops
 
     // --- Ravines (2D, cut into the heightmap so the far LOD shows them too) ---
     public const bool RavinesEnabled = true;
-    public const float RavineRidgeFrequency = 1f / 300f;   // spacing of candidate canyon lines
+    public const float RavineRidgeFrequency = 1f / 900f;   // spacing of candidate canyon lines
     public const float RavineWarpFrequency = 1f / 150f;    // how tightly the lines wind
-    public const float RavineWarpAmplitude = 20f;          // blocks of sideways displacement
+    public const float RavineWarpAmplitude = 14f;          // blocks of sideways displacement
     public const float RavineMaskFrequency = 1f / 600f;    // rarity: ravines exist where mask noise is high
-    public const float RavineMaskStart = 0.4f;
-    public const float RavineMaskEnd = 0.55f;
-    public const float RavineWidth = 0.06f;                // ridge noise band; ~12-15 blocks half-width
-    public const float RavineDepth = 50f;                  // blocks, at full mask
+    public const float RavineMaskStart = 0.6f;
+    public const float RavineMaskEnd = 0.74f;
+    public const float RavineWidth = 0.035f;               // ridge noise band; ~7-9 blocks half-width
+    public const float RavineDepth = 26f;                  // blocks, at full mask
     // Columns a ravine lowers by at least this many blocks are bare stone (no grass/dirt): the
     // soil layer thins from the rim inward so steep walls read as exposed rock, not as terraces
     public const int RavineBareStoneDepth = 6;

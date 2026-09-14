@@ -204,7 +204,7 @@ public class World : IItemUseWorld
         const float spawnLift = 0.02f;
         var holdEye = estimate + 1 + Camera.EyeHeight + spawnLift;
 
-        if (WorldGenerationConfig.WaterEnabled && heightmap < WorldGenerationConfig.SeaLevel)
+        if (TerrainGenerator.IsWaterColumn(sx, sz, heightmap))
         {
             if (!_chunkManager.TryGetCell(sx, WorldGenerationConfig.SeaLevel, sz, out _, out _))
             {

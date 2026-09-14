@@ -4,28 +4,58 @@
   // Shots land in visual/biomes/. VOXEL_TIME=30 puts the sun in the morning, bright enough to
   // read the sand and the sea without the low-sun underwater shafts of water.json.
   //
-  // The vantage points were found by a headless probe that scanned BiomeAt around the origin:
-  //   desert with a cactus at (3, 8, -2224)
-  //   ocean beach (-5, -1825) h=0, deep basin (-82, -1917) h=-29
-  // Both are ~900-1100 blocks from spawn, so each teleport starts well above its stand point
-  // and the long waits do double duty: the player lands, and the streaming ring fills around
-  // the new position before the frame is taken. Pitches stay shallow where they can: a steep
-  // downward look brings the first-person hand into frame.
+  // The vantage points were found by a headless probe:
+  //   forest around (-80, 8) with desert starting to the east, and an interior forest lake at (-616, 408)
+  //   a forest mountain peak at (120, 73, -280), and an interior open meadow around (-328, 14, 8)
+  //   desert with a cactus at (3, 11, -2224)
+  //   ocean beach (-47, 941) h=-1, deep basin (59, 943) h=-30
+  // Every teleport starts well above its stand point and the long waits do double duty: the
+  // player lands, and the streaming ring fills around the new position before the frame is taken.
+  // Pitches stay shallow where they can: a steep downward look brings the first-person hand in.
+  // The aerial forest shots teleport up and screenshot with no wait: a teleport + screenshot pair
+  // ticks no physics, so the pose is held exactly.
   "steps": [
-    { "op": "teleport", "pos": [9.5, 32.5, -2224.5], "yaw": 180, "pitch": -8 },
+    { "op": "teleport", "pos": [-80.5, 90.5, 8.5], "yaw": 0, "pitch": -18 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "teleport", "pos": [-80.5, 90.5, 8.5], "yaw": 0, "pitch": -18 },
+    { "op": "screenshot", "name": "forest_aerial", "hideHud": true },
+    { "op": "teleport", "pos": [-80.5, 22.5, 8.5], "yaw": 0, "pitch": -4 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "forest_ground", "hideHud": true },
+    { "op": "teleport", "pos": [-606.5, 18.5, 382.5], "yaw": 108, "pitch": -20 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "teleport", "pos": [-616.5, 40.5, 464.5], "yaw": -90, "pitch": -32 },
+    { "op": "screenshot", "name": "forest_lake", "hideHud": true },
+
+    { "op": "teleport", "pos": [40.5, 120.5, -320.5], "yaw": 27, "pitch": -24 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [40.5, 120.5, -320.5], "yaw": 27, "pitch": -24 },
+    { "op": "screenshot", "name": "forest_mountain", "hideHud": true },
+    { "op": "teleport", "pos": [120.5, 48.5, -190.5], "yaw": -90, "pitch": 8 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "forest_mountain_ground", "hideHud": true },
+    { "op": "teleport", "pos": [-328.5, 82.5, 8.5], "yaw": 0, "pitch": -22 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-328.5, 82.5, 8.5], "yaw": 0, "pitch": -22 },
+    { "op": "screenshot", "name": "forest_open_aerial", "hideHud": true },
+    { "op": "teleport", "pos": [-328.5, 30.5, 8.5], "yaw": 0, "pitch": -2 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "forest_open_ground", "hideHud": true },
+
+    { "op": "teleport", "pos": [9.5, 35.5, -2224.5], "yaw": 180, "pitch": -8 },
     { "op": "wait", "seconds": 45 },
     { "op": "screenshot", "name": "desert_cacti", "hideHud": true },
-    { "op": "teleport", "pos": [3.5, 60.5, -2224.5], "yaw": 200, "pitch": -28 },
+    { "op": "teleport", "pos": [3.5, 63.5, -2224.5], "yaw": 200, "pitch": -28 },
     { "op": "wait", "seconds": 20 },
     { "op": "screenshot", "name": "desert_dunes", "hideHud": true },
 
-    { "op": "teleport", "pos": [-4.5, 34.5, -1824.5], "yaw": -130, "pitch": -8 },
+    { "op": "teleport", "pos": [-46.5, 33.5, 941.5], "yaw": 1, "pitch": -8 },
     { "op": "wait", "seconds": 35 },
     { "op": "screenshot", "name": "ocean_shore", "hideHud": true },
-    { "op": "teleport", "pos": [-81.5, 12.5, -1917.5], "yaw": 0, "pitch": -25 },
+    { "op": "teleport", "pos": [58.5, 9.5, 943.5], "yaw": 0, "pitch": -25 },
     { "op": "wait", "seconds": 25 },
     { "op": "screenshot", "name": "ocean_deep", "hideHud": true },
-    { "op": "teleport", "pos": [-81.5, -24.5, -1917.5], "yaw": 20, "pitch": 0 },
+    { "op": "teleport", "pos": [58.5, -27.5, 943.5], "yaw": 20, "pitch": 0 },
     { "op": "wait", "seconds": 8 },
     { "op": "screenshot", "name": "ocean_under", "hideHud": true }
   ]

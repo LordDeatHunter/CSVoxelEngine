@@ -356,6 +356,9 @@ public class LodRegion : IDisposable
         // gravel with one noise eval at the cell centre per cell.
         var beachTop = ArrayPool<bool>.Shared.Rent(gridSize);
         var gravelTop = ArrayPool<bool>.Shared.Rent(gridSize);
+        // Bare-rock mountain tops, matching the chunk mesher's rock line, so a distant peak
+        // shows the same stone cap the near chunks do.
+        var rockTop = ArrayPool<bool>.Shared.Rent(gridSize);
         var biomeGrid = ArrayPool<Biome>.Shared.Rent(gridSize);
         var seaFloor = ArrayPool<byte>.Shared.Rent(gridSize);
         // Item C1: the fine heights every cell window reads (index fx * fineSpan + fz), and one row
@@ -468,19 +471,26 @@ public class LodRegion : IDisposable
                     }
                 }
 
-                isSea[(i + 1) * heightGrid + (j + 1)] =
-                    WorldGenerationConfig.WaterEnabled && maxOwn < WorldGenerationConfig.SeaLevel;
+                // Biome read at the cell centre, like the gravel patch below: the coarse cell
+                // wears one material even where its footprint straddles a border.
+                var centreX = baseFineX + i * cellSize + cellSize / 2;
+                var centreZ = baseFineZ + j * cellSize + cellSize / 2;
+                var cellBiome = TerrainGenerator.BiomeAt(centreX, centreZ);
+                biomeGrid[(i + 1) * heightGrid + (j + 1)] = cellBiome;
+
+                // A cell is sea only where the chunk mesher would actually flood it: an ocean, or
+                // a lake/river bed. maxOwn is the uneroded cell max, matching the beach sampling.
+                isSea[(i + 1) * heightGrid + (j + 1)] = TerrainGenerator.IsWaterColumn(centreX, centreZ, maxOwn);
                 seaFloor[(i + 1) * heightGrid + (j + 1)] = FloorMaterial(maxOwn);
 
-                beachTop[(i + 1) * heightGrid + (j + 1)] = TerrainGenerator.IsBeachHeight(maxOwn);
+                // Sand rings ocean shores and lake/river rims, not every column in the height band.
+                beachTop[(i + 1) * heightGrid + (j + 1)] = TerrainGenerator.IsBeachHeight(maxOwn)
+                    && (cellBiome == Biome.Ocean
+                        || (cellBiome == Biome.Forest && TerrainGenerator.SurfaceWaterWeight(centreX, centreZ) > 0f));
                 gravelTop[(i + 1) * heightGrid + (j + 1)] =
-                    beachTop[(i + 1) * heightGrid + (j + 1)] && TerrainGenerator.IsGravelPatch(
-                        baseFineX + i * cellSize + cellSize / 2, baseFineZ + j * cellSize + cellSize / 2);
-
-                // Biome read at the cell centre, like the gravel patch above: the coarse cell
-                // wears one material even where its footprint straddles a border.
-                biomeGrid[(i + 1) * heightGrid + (j + 1)] = TerrainGenerator.BiomeAt(
-                    baseFineX + i * cellSize + cellSize / 2, baseFineZ + j * cellSize + cellSize / 2);
+                    beachTop[(i + 1) * heightGrid + (j + 1)] && TerrainGenerator.IsGravelPatch(centreX, centreZ);
+                rockTop[(i + 1) * heightGrid + (j + 1)] =
+                    cellBiome == Biome.Forest && maxOwn >= WorldGenerationConfig.MountainRockHeight;
 
                 // Cell cy is solid iff cellSize * (cy + 1) <= eroded height
                 var ground = ((minHeight - spec.HeightBias) >> cellShift) - 1;
@@ -671,6 +681,7 @@ public class LodRegion : IDisposable
                 var beach = beachTop[gi * heightGrid + gj];
                 var cap = beach && gravelTop[gi * heightGrid + gj] ? gravel : sand;
                 var soil = beach ? sand : dirt;
+                var rock = rockTop[gi * heightGrid + gj];
                 var biome = biomeGrid[gi * heightGrid + gj];
                 var isSeaCell = isSea[gi * heightGrid + gj];
                 var floor = seaFloor[gi * heightGrid + gj];
@@ -679,6 +690,7 @@ public class LodRegion : IDisposable
                     top > ground ? leaves.FaceTiles[topFace]
                     : isSeaCell ? FloorTile(floor, topFace)   // seabed wears its depth band, not dirt
                     : beach ? cap.FaceTiles[topFace]
+                    : rock ? stone.FaceTiles[topFace]
                     : biome == Biome.Desert ? sand.FaceTiles[topFace]
                     : grass.FaceTiles[topFace], shades, lodLeaves: top > ground);
 
@@ -720,11 +732,12 @@ public class LodRegion : IDisposable
                         var tile = cy > ground ? leaves.FaceTiles[f]
                             : cy == top ? (isSeaCell ? FloorTile(floor, f)
                                 : beach ? cap.FaceTiles[f]
+                                : rock ? stone.FaceTiles[f]
                                 : biome == Biome.Desert ? sand.FaceTiles[f]
                                 : grass.FaceTiles[f])
                             : (ground - cy) * cellSize <= WorldGenerationConfig.NominalDirtDepth
                                 ? (biome == Biome.Desert ? sandstone.FaceTiles[f]
-                                    : isSeaCell ? stone.FaceTiles[f]
+                                    : isSeaCell || rock ? stone.FaceTiles[f]
                                     : soil.FaceTiles[f])
                                 : stone.FaceTiles[f];
                         AddQuad(vertices, indices, f, new Vector3(i * cellSize, cy * cellSize, j * cellSize), tile, shades, lodLeaves: cy > ground);
@@ -743,6 +756,7 @@ public class LodRegion : IDisposable
             ArrayPool<bool>.Shared.Return(isSea);
             ArrayPool<bool>.Shared.Return(beachTop);
             ArrayPool<bool>.Shared.Return(gravelTop);
+            ArrayPool<bool>.Shared.Return(rockTop);
             ArrayPool<Biome>.Shared.Return(biomeGrid);
             ArrayPool<byte>.Shared.Return(seaFloor);
             ArrayPool<int>.Shared.Return(fine);

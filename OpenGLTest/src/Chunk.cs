@@ -482,7 +482,7 @@ public class Chunk : IDisposable
         // pebbles, which skip submerged columns rather than growing underwater
         if (WorldGenerationConfig.WaterEnabled)
         {
-            FillWater(column, lowerBoundY);
+            FillWater(column, lowerBoundY, worldX0, worldZ0);
             StampMud(worldX0, lowerBoundY, worldZ0);
         }
 
@@ -556,13 +556,14 @@ public class Chunk : IDisposable
     }
 
     /// <summary>
-    /// Floods every air cell up to and including sea level in columns whose terrain sits below
-    /// it, so oceans, flooded ravines and sea-floor caves all fill. Generated water is always a
-    /// source (state 0), which is what an untouched state byte reads as, so nothing is written
-    /// to <c>_state</c> here. A pure per-column function of world position like the rest of
-    /// worldgen: neighbours agree at their borders with no shared state.
+    /// Floods every air cell up to and including sea level in a wet column — an ocean floor, or a
+    /// lake or river bed (see <see cref="TerrainGenerator.IsWaterColumn"/>) — so oceans, lakes,
+    /// rivers and sea-floor caves all fill while the dry land basins stay dry. Generated water is
+    /// always a source (state 0), which is what an untouched state byte reads as, so nothing is
+    /// written to <c>_state</c> here. A pure per-column function of world position like the rest
+    /// of worldgen: neighbours agree at their borders with no shared state.
     /// </summary>
-    private void FillWater(ColumnData column, int lowerBoundY)
+    private void FillWater(ColumnData column, int lowerBoundY, int worldX0, int worldZ0)
     {
         var top = Math.Min(WorldGenerationConfig.SeaLevel - lowerBoundY, Size - 1);
         if (top < 0) return;
@@ -570,7 +571,8 @@ public class Chunk : IDisposable
         for (var x = 0; x < Size; x++)
         for (var z = 0; z < Size; z++)
         {
-            if (column.Heights[(x << SizeShift) | z] >= WorldGenerationConfig.SeaLevel) continue;
+            if (!TerrainGenerator.IsWaterColumn(worldX0 + x, worldZ0 + z, column.Heights[(x << SizeShift) | z]))
+                continue;
 
             for (var y = 0; y <= top; y++)
             {
@@ -609,9 +611,10 @@ public class Chunk : IDisposable
     }
 
     /// <summary>
-    /// Whether any of the 26 cells around a chunk-local cell holds sea water: a direct block
-    /// read inside this chunk, or the height test <see cref="FillWater"/> itself is built on
-    /// (a below-sea-level column holds water in every air cell up to sea level) outside it.
+    /// Whether any of the 26 cells around a chunk-local cell holds water: a direct block read
+    /// inside this chunk, or the same <see cref="TerrainGenerator.IsWaterColumn"/> test
+    /// <see cref="FillWater"/> is built on outside it. (It was a plain height test before lakes
+    /// and rivers, when any below-waterline column held water; that is no longer true.)
     /// </summary>
     private bool TouchesSeaWater(int x, int y, int z, int worldX0, int lowerBoundY, int worldZ0, byte water)
     {
@@ -636,7 +639,7 @@ public class Chunk : IDisposable
             if (wy > WorldGenerationConfig.SeaLevel) continue;
             var height = GetColumnHeights(wx >> SizeShift, wz >> SizeShift)
                 [(wx & SizeMask) << SizeShift | (wz & SizeMask)];
-            if (height < WorldGenerationConfig.SeaLevel && wy > height) return true;
+            if (wy > height && TerrainGenerator.IsWaterColumn(wx, wz, height)) return true;
         }
 
         return false;
@@ -676,12 +679,15 @@ public class Chunk : IDisposable
     // Solid from the chunk floor up to the terrain height: grass on top, dirt for dirtDepth
     // blocks under it, stone below that. dirtDepth == 0 marks a bare stone column
     // (see ColumnData.DirtDepth) - deep ravine walls, where the top block is stone as well.
-    // A submerged column tops out in dirt instead: grass does not grow on a sea floor.
+    // A wet column tops out in dirt instead: grass does not grow on a sea, lake or river bed.
     // Shoreline columns (see TerrainGenerator.IsBeachHeight) build from sand instead, capped
     // with gravel where TerrainGenerator.IsGravelPatch holds.
     private void GenerateColumn(int x, int z, int terrainHeight, int dirtDepth, int lowerBoundY, Biome biome)
     {
-        var topBlock = TerrainGenerator.IsSubmerged(terrainHeight)
+        var worldX = (int)Position.X * Size + x;
+        var worldZ = (int)Position.Z * Size + z;
+
+        var topBlock = TerrainGenerator.IsWaterColumn(worldX, worldZ, terrainHeight)
             ? TerrainGenerator.SoilBlock
             : TerrainGenerator.SurfaceBlock;
         var soilBlock = TerrainGenerator.SoilBlock;
@@ -710,10 +716,12 @@ public class Chunk : IDisposable
                 break;
 
             default:
-                if (dirtDepth != 0 && TerrainGenerator.IsBeachHeight(terrainHeight))
+                // Sand and gravel ring actual water only: the height band plus a lake or river rim.
+                // Without the weight test a dry ravine floor in the band would wear sand in the
+                // middle of the forest, which is what made random patches before.
+                if (dirtDepth != 0 && TerrainGenerator.IsBeachHeight(terrainHeight)
+                    && TerrainGenerator.SurfaceWaterWeight(worldX, worldZ) > 0f)
                 {
-                    var worldX = (int)Position.X * Size + x;
-                    var worldZ = (int)Position.Z * Size + z;
                     topBlock = TerrainGenerator.IsGravelPatch(worldX, worldZ)
                         ? TerrainGenerator.GravelBlock
                         : TerrainGenerator.SandBlock;

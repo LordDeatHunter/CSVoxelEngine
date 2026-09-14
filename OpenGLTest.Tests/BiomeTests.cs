@@ -173,6 +173,129 @@ public sealed class BiomeTests
     }
 
     [Fact]
+    public void ForestIsMostlyDryLandWithScatteredWater()
+    {
+        // The forest floor sits above the waterline, so water appears only where a lake or river
+        // carved below it. The guard is that such water stays a small fraction of the forest: the
+        // old blanket flood covered about a quarter of the map.
+        var forest = 0;
+        var wet = 0;
+
+        for (var cx = -60; cx <= 60; cx++)
+        for (var cz = -60; cz <= 60; cz++)
+        {
+            if (TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8) != Biome.Forest)
+                continue;
+
+            var column = Chunk.GetColumnData(cx, cz);
+            for (var x = 0; x < Chunk.Size; x++)
+            for (var z = 0; z < Chunk.Size; z++)
+            {
+                var li = (x << Chunk.SizeShift) | z;
+                var worldX = cx * Chunk.Size + x;
+                var worldZ = cz * Chunk.Size + z;
+                if (TerrainGenerator.BiomeAt(worldX, worldZ) != Biome.Forest) continue;
+
+                forest++;
+                if (column.Heights[li] < WorldGenerationConfig.SeaLevel
+                    && TerrainGenerator.IsWaterColumn(worldX, worldZ, column.Heights[li]))
+                    wet++;
+            }
+        }
+
+        Assert.True(wet > 0, "no lake or river water anywhere in the forest");
+        Assert.True(wet * 4 < forest, $"forest water is not scattered: {wet} wet of {forest} forest columns");
+    }
+
+    [Fact]
+    public void ForestSurfaceWaterClosesBeforeTheDesert()
+    {
+        // The carve and the flood test are gated toward a desert (TerrainGenerator.SurfaceWaterGate),
+        // so a pond closes on its own forest rim instead of ending in a wall where the hard biome
+        // flips. The invariant: no non-ocean water column is 4-adjacent to a desert column.
+        var waterColumns = 0;
+        const int radius = 48;
+
+        for (var cx = -radius; cx <= radius; cx++)
+        for (var cz = -radius; cz <= radius; cz++)
+        {
+            var column = Chunk.GetColumnData(cx, cz);
+            for (var x = 0; x < Chunk.Size; x++)
+            for (var z = 0; z < Chunk.Size; z++)
+            {
+                var height = column.Heights[(x << Chunk.SizeShift) | z];
+                if (height >= WorldGenerationConfig.SeaLevel) continue;
+
+                var worldX = cx * Chunk.Size + x;
+                var worldZ = cz * Chunk.Size + z;
+                if (!TerrainGenerator.IsWaterColumn(worldX, worldZ, height)) continue;
+                if (TerrainGenerator.BiomeAt(worldX, worldZ) == Biome.Ocean) continue;
+
+                waterColumns++;
+                Assert.NotEqual(Biome.Desert, TerrainGenerator.BiomeAt(worldX + 1, worldZ));
+                Assert.NotEqual(Biome.Desert, TerrainGenerator.BiomeAt(worldX - 1, worldZ));
+                Assert.NotEqual(Biome.Desert, TerrainGenerator.BiomeAt(worldX, worldZ + 1));
+                Assert.NotEqual(Biome.Desert, TerrainGenerator.BiomeAt(worldX, worldZ - 1));
+            }
+        }
+
+        Assert.True(waterColumns > 0, "no surface water found within the scan to check");
+    }
+
+    [Fact]
+    public void ForestMountainsAreRareButPresent()
+    {
+        // A mountain lifts a forest column well above anything the hill field alone can reach
+        // (ForestBaseHeight + swell + HillAmplitude + rough tops out near 53 blocks). Ranges must
+        // exist, and stay a small share of the forest so they read as occasional.
+        const int mountainHeight = 56;
+        var forestColumns = 0;
+        var mountainColumns = 0;
+
+        for (var cx = -100; cx <= 100; cx += 2)
+        for (var cz = -100; cz <= 100; cz += 2)
+        {
+            if (TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8) != Biome.Forest)
+                continue;
+
+            forestColumns++;
+            if (Chunk.GetColumnData(cx, cz).MaxHeight > mountainHeight) mountainColumns++;
+        }
+
+        Assert.True(mountainColumns > 0,
+            $"no forest column rises above {mountainHeight} blocks in the scanned area");
+        Assert.True(mountainColumns * 5 < forestColumns,
+            $"mountains are not occasional: {mountainColumns} of {forestColumns} forest columns above {mountainHeight}");
+    }
+
+    [Fact]
+    public void ForestHasBothOpenAndWoodedRegions()
+    {
+        // The openness mask gives the forest a sub-biome: open grass regions and woodland. Both
+        // must cover a meaningful share, or the variety is not real.
+        var total = 0;
+        var open = 0;
+        var wooded = 0;
+
+        for (var cx = -64; cx <= 64; cx++)
+        for (var cz = -64; cz <= 64; cz++)
+        {
+            var worldX = cx * Chunk.Size + 8;
+            var worldZ = cz * Chunk.Size + 8;
+            if (TerrainGenerator.BiomeAt(worldX, worldZ) != Biome.Forest) continue;
+
+            total++;
+            var openness = TerrainGenerator.ForestOpenness(worldX, worldZ);
+            if (openness > 0.7f) open++;
+            else if (openness < 0.2f) wooded++;
+        }
+
+        Assert.True(total > 0);
+        Assert.True(open * 10 > total, $"open forest regions are negligible: {open} of {total} forest columns");
+        Assert.True(wooded * 10 > total, $"woodland is negligible: {wooded} of {total} forest columns");
+    }
+
+    [Fact]
     public void DesertsGrowNoTreesAndForestsGrowNoCacti()
     {
         var desert = FindDesertChunk();
