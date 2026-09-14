@@ -225,4 +225,140 @@ public sealed class PlayerModelTests
         for (var i = 0; i < PlayerModel.PaletteCols * PlayerModel.PaletteRows; i++)
             Assert.Equal(255, pixels[i * 4 + 3]);
     }
+
+    [Fact]
+    public void SliceSwingFinishesAfterItsDuration()
+    {
+        var player = new PlayerModel();
+        player.StartSlice(1);
+        Assert.True(player.IsSlicing);
+        Assert.Equal(0f, player.SliceProgress, 3);
+
+        for (var i = 0; i < 60; i++)
+            player.Update(1f / 60f, 0f);
+
+        Assert.False(player.IsSlicing);
+        Assert.Equal(1f, player.SliceProgress, 3);
+    }
+
+    [Fact]
+    public void SliceSweepWindsUpStrikesLeftAndSettles()
+    {
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++)
+            player.Update(1f / 60f, 0f);
+
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+        float HandX() => Vector3.Transform(Vector3.Zero, player.GetHandAnchorMatrix(eye, -90f)).X;
+
+        player.StartSlice(1);
+        var rest = HandX();
+
+        player.Update(PlayerModel.SliceDuration * 0.15f, 0f); // peak of the wind-up
+        var windup = HandX();
+
+        player.Update(PlayerModel.SliceDuration * 0.45f, 0f); // end of the strike
+        var followThrough = HandX();
+
+        player.Update(PlayerModel.SliceDuration * 0.4f, 0f);  // settled back to the idle pose
+        var settled = HandX();
+
+        // Right-to-left, against the body centre: wound up to the player's right, struck to the left.
+        Assert.True(windup > eye.X);
+        Assert.True(followThrough < eye.X);
+        Assert.True(windup > followThrough);
+        // No teleport: the swing ends at the pose it started from.
+        Assert.True(MathF.Abs(settled - rest) < 0.05f);
+    }
+
+    [Fact]
+    public void SliceReturnMirrorsTheSweep()
+    {
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++)
+            player.Update(1f / 60f, 0f);
+
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+        float HandX() => Vector3.Transform(Vector3.Zero, player.GetHandAnchorMatrix(eye, -90f)).X;
+
+        player.StartSlice(-1);
+        player.Update(PlayerModel.SliceDuration * 0.15f, 0f);
+        var windup = HandX();
+
+        player.Update(PlayerModel.SliceDuration * 0.45f, 0f);
+        var followThrough = HandX();
+
+        // The return mirrors the first swing: wound up to the left, struck through to the right.
+        Assert.True(windup < eye.X);
+        Assert.True(followThrough > eye.X);
+    }
+
+    [Fact]
+    public void SliceRollsTheBladeFlatAndFlipsItForTheReturn()
+    {
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++)
+            player.Update(1f / 60f, 0f);
+
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+
+        // The blade's up axis measured on the body's right axis: 0 upright at rest, rolling out
+        // to the side as the wrist lays it flat.
+        float BladeOutward() =>
+            Vector3.TransformNormal(Vector3.UnitY, player.GetHandAnchorMatrix(eye, -90f)).X;
+
+        player.StartSlice(1);
+        var rest = BladeOutward();
+        player.Update(PlayerModel.SliceDuration * PlayerModel.SliceImpactProgress, 0f);
+        var rightToLeft = BladeOutward();
+
+        // The return rolls the other way, so the blade lays out on the opposite side.
+        player.StartSlice(-1);
+        player.Update(PlayerModel.SliceDuration * PlayerModel.SliceImpactProgress, 0f);
+        var leftToRight = BladeOutward();
+
+        Assert.True(rest < 0.3f);
+        Assert.True(rightToLeft > 0.7f);
+        Assert.True(leftToRight < -0.7f);
+    }
+
+    [Fact]
+    public void SliceLowersTheHandToChestAtTheStrike()
+    {
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++)
+            player.Update(1f / 60f, 0f);
+
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+        float HandY() => Vector3.Transform(Vector3.Zero, player.GetHandAnchorMatrix(eye, -90f)).Y;
+
+        player.StartSlice(1);
+        var rest = HandY();
+        player.Update(PlayerModel.SliceDuration * PlayerModel.SliceImpactProgress, 0f);
+        var strike = HandY();
+
+        // The drop brings the strike down off the eye line, back near the idle holding height.
+        Assert.True(strike < eye.Y - 0.25f);
+        Assert.True(MathF.Abs(strike - rest) < 0.12f);
+    }
+
+    [Fact]
+    public void SliceKeepsTheShoulderAnchored()
+    {
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++)
+            player.Update(1f / 60f, 0f);
+
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+        float ShoulderY() => player.GetPartMatrix("UpperArmR", eye, -90f, 0f).Translation.Y;
+
+        player.StartSlice(1);
+        var rest = ShoulderY();
+        player.Update(PlayerModel.SliceDuration * PlayerModel.SliceImpactProgress, 0f);
+        var strike = ShoulderY();
+
+        // The hand is lowered by re-posing the arm, so the shoulder joint itself never moves and
+        // stays attached to the torso.
+        Assert.Equal(rest, strike, 4);
+    }
 }

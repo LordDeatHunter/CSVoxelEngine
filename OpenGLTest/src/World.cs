@@ -76,6 +76,13 @@ public class World : IItemUseWorld
     // like the break timer's seeded first hit.
     private float _punchTimer = float.PositiveInfinity;
     private float _punchGap = Mining.DefaultHitGapMs / 1000f;
+
+    // Slice attack (AttackPattern.Slice): the two-phase combo, one click-buffered return swing,
+    // and the per-swing latch that lands its damage once at the impact frame.
+    private readonly SliceCombo _sliceCombo = new();
+    private bool _sliceImpactDone;
+    // Previous frame's left-click state, so the slice combo can see a fresh press.
+    private bool _attackWasPressed;
     public Camera Camera { get; }
 
     /// <summary>The blocky player body: walk-swung limbs, mine-pumping right arm.</summary>
@@ -584,6 +591,26 @@ public class World : IItemUseWorld
     /// </summary>
     public void UpdateBlockBreaking(double deltaTime, bool isHolding)
     {
+        var justPressed = isHolding && !_attackWasPressed;
+        _attackWasPressed = isHolding;
+
+        var held = HeldItem();
+
+        // A slice weapon owns the left-click outright: every press swings the blade (and buffers
+        // the return while one plays), so it never mines.
+        if (held is { Attack: AttackPattern.Slice })
+        {
+            Camera.NotifyPlayerAction();
+            UpdateSlice((float)deltaTime, justPressed);
+            StopBreaking();
+            return;
+        }
+
+        // Switching away from a slice weapon abandons any in-flight combo; its animation still
+        // finishes, it just no longer lands a hit.
+        _sliceCombo.Reset();
+        _sliceImpactDone = false;
+
         if (!isHolding)
         {
             StopBreaking();
@@ -626,7 +653,6 @@ public class World : IItemUseWorld
         }
 
         var heldId = Inventory.SelectedBlockId;
-        var held = HeldItem();
 
         // A new target or a different held item restarts the break: the gate, damage and pace
         // all belong to that pairing, so carrying progress over would apply the wrong numbers
@@ -792,6 +818,99 @@ public class World : IItemUseWorld
 
         target = best;
         return true;
+    }
+
+    /// <summary>
+    /// Advances the blade's two-phase combo against the player's clicks. A fresh press starts a
+    /// right-to-left swing; a press while one plays buffers the left-to-right return, which
+    /// starts (at half power) once the current swing finishes. Damage lands once per swing at
+    /// the impact frame (<see cref="PlayerModel.SliceImpactProgress"/>), so targets must still be
+    /// in the hemisphere then. The swing animation itself lives in <see cref="PlayerModel"/>.
+    /// </summary>
+    private void UpdateSlice(double deltaTime, bool justPressed)
+    {
+        if (justPressed && _sliceCombo.Press())
+        {
+            Player.StartSlice(_sliceCombo.Direction);
+            _sliceImpactDone = false;
+        }
+
+        if (!_sliceCombo.Active)
+            return;
+
+        if (!_sliceImpactDone && Player.SliceProgress >= PlayerModel.SliceImpactProgress)
+        {
+            _sliceImpactDone = true;
+            ApplySliceDamage(_sliceCombo.ReturnSwing);
+        }
+
+        if (Player.IsSlicing)
+            return;
+
+        if (_sliceCombo.Advance())
+        {
+            Player.StartSlice(_sliceCombo.Direction);
+            _sliceImpactDone = false;
+        }
+    }
+
+    /// <summary>
+    /// Lands one slice swing: the nearest two slimes inside the forward hemisphere with an
+    /// unobstructed line of sight each take the swing's damage and a knockback shove. The return
+    /// swing is at half power (<paramref name="returnSwing"/>).
+    /// </summary>
+    private void ApplySliceDamage(bool returnSwing)
+    {
+        if (_slimes == null)
+            return;
+
+        var slimes = _slimes.Slimes;
+        if (slimes.Count == 0)
+            return;
+
+        var origin = Camera.Position;
+        var direction = Camera.ViewDirection;
+        var damage = Combat.SliceDamage(HeldItem(), returnSwing);
+
+        Slime? first = null;
+        Slime? second = null;
+        var firstDistance = float.PositiveInfinity;
+        var secondDistance = float.PositiveInfinity;
+
+        for (var i = 0; i < slimes.Count; i++)
+        {
+            var slime = slimes[i];
+            if (!Combat.InFrontHemisphere(origin, direction, slime.Position, out var distance))
+                continue;
+            if (Camera.SegmentHitsBlock(origin, slime.Position, _chunkManager))
+                continue;
+
+            // Keep the two closest, shifting the old nearest down when a closer one arrives.
+            if (distance < firstDistance)
+            {
+                second = first;
+                secondDistance = firstDistance;
+                first = slime;
+                firstDistance = distance;
+            }
+            else if (distance < secondDistance)
+            {
+                second = slime;
+                secondDistance = distance;
+            }
+        }
+
+        StrikeSliceTarget(first, damage);
+        StrikeSliceTarget(second, damage);
+    }
+
+    private void StrikeSliceTarget(Slime? slime, int damage)
+    {
+        if (slime == null) return;
+        slime.TakeDamage(damage);
+        var away = new Vector3(
+            slime.Position.X - Camera.Position.X, 0f, slime.Position.Z - Camera.Position.Z);
+        slime.Shove(away, WorldGenerationConfig.SlimePunchShoveSpeed);
     }
 
     /// <summary>

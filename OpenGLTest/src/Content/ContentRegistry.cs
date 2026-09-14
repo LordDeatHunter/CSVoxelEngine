@@ -352,6 +352,15 @@ public static class ContentRegistry
                 throw new InvalidOperationException(
                     $"Item '{path}' has tool.hitDelayMs {tool?.HitDelayMs}; expected 1..60000 milliseconds.");
 
+            var attack = definition.Attack?.Trim().ToLowerInvariant() switch
+            {
+                null or "" => AttackPattern.Punch,
+                "punch" => AttackPattern.Punch,
+                "slice" => AttackPattern.Slice,
+                _ => throw new InvalidOperationException(
+                    $"Item '{path}' has unknown attack '{definition.Attack}'; expected punch or slice."),
+            };
+
             var blockDamage = definition.BlockDamage ?? Mining.DefaultBlockDamage;
             if (!float.IsFinite(blockDamage) || blockDamage <= 0f || blockDamage > 1000f)
                 throw new InvalidOperationException(
@@ -370,7 +379,7 @@ public static class ContentRegistry
                 chance, durability, useDelay,
                 sheet.Cols, sheet.Rows, sheet.Frames, sheet.Mode, sheet.Fps,
                 display.Rotation, display.Translation, display.Scale,
-                tool != null, power, hitDelay, blockDamage, entityDamage, name));
+                tool != null, power, hitDelay, attack, blockDamage, entityDamage, name));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ItemIds, StringComparer.Ordinal));

@@ -26,6 +26,12 @@ public sealed class ItemDefinition
     public float? EntityDamage { get; set; }
 
     /// <summary>
+    /// Attack behaviour the left-click drives: <c>punch</c> (default) or <c>slice</c>. See
+    /// <see cref="AttackPattern"/>.
+    /// </summary>
+    public string? Attack { get; set; }
+
+    /// <summary>
     /// Optional tool block: writing it marks the item as a mining tool and carries the numbers
     /// the mining gate reads. <c>power</c> is the item's <em>tier</em> — the number a block's
     /// <c>tools</c> requirement compares against — not its damage, which is

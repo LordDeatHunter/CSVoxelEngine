@@ -36,6 +36,7 @@ public static class ItemFactory
         bool IsTool,
         float ToolPower,
         float HitDelayMs,
+        AttackPattern Attack,
         float BlockDamage,
         float EntityDamage,
         string SourceName);

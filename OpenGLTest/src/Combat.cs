@@ -39,4 +39,24 @@ public static class Combat
     /// <c>entityDamage</c>, or the bare-hand baseline when nothing is held.</summary>
     public static int PunchDamage(Item? held) =>
         (int)MathF.Round(Mining.EntityDamage(held), MidpointRounding.AwayFromZero);
+
+    /// <summary>
+    /// Whether a body at <paramref name="target"/> sits inside the forward hemisphere from
+    /// <paramref name="origin"/> facing <paramref name="direction"/>: within the punch reach
+    /// (<see cref="PunchReach"/>) and anywhere in front of the aim. The blade's wide sweep uses
+    /// this instead of the narrow punch cone. Reports the distance for nearest-target selection.
+    /// </summary>
+    public static bool InFrontHemisphere(Vector3 origin, Vector3 direction, Vector3 target, out float distance)
+    {
+        var to = target - origin;
+        distance = to.Length();
+        if (distance < 1e-4f || distance > PunchReach) return false;
+        return Vector3.Dot(direction, to) > 0f;
+    }
+
+    /// <summary>Damage one slice swing deals to each enemy it hits: the item's
+    /// <c>entityDamage</c>, halved on the combo's return swing. Rounded to whole hit points.</summary>
+    public static int SliceDamage(Item? held, bool returnSwing) =>
+        (int)MathF.Round(Mining.EntityDamage(held) * (returnSwing ? 0.5f : 1f),
+            MidpointRounding.AwayFromZero);
 }

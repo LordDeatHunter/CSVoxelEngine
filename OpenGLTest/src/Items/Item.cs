@@ -79,6 +79,9 @@ public abstract class Item
     /// <summary>Milliseconds between hits while mining; see <see cref="Mining"/>.</summary>
     public float HitDelayMs { get; internal init; } = Mining.DefaultHitGapMs;
 
+    /// <summary>Attack behaviour the left-click drives; see <see cref="AttackPattern"/>.</summary>
+    public AttackPattern Attack { get; internal init; } = AttackPattern.Punch;
+
     /// <summary>Damage one left-click hit removes from a block's hardness; the bare-hand
     /// baseline by default.</summary>
     public float BlockDamage { get; internal init; } = Mining.DefaultBlockDamage;
@@ -198,6 +201,7 @@ public abstract class Item
         IsTool = spec.IsTool;
         ToolPower = spec.ToolPower;
         HitDelayMs = spec.HitDelayMs;
+        Attack = spec.Attack;
         BlockDamage = spec.BlockDamage;
         EntityDamage = spec.EntityDamage;
     }

@@ -90,6 +90,32 @@ public class PlayerModel
     private const float SprintJumpTorso = 0.30f;
     public const float MineDuration = 0.25f;
 
+    // Slice attack (items with AttackPattern.Slice). One swing lasts SliceDuration and is a
+    // wind-up, a strike and a recovery, all eased so the pose equals the idle hold at both ends
+    // (no snap). The strike sweeps the raised right arm from the wind-up side through the aim to
+    // the far side, while the blade rolls from upright to horizontal-outward.
+    // SliceImpactProgress is where the sweep crosses the aim, which is also where the swing's
+    // damage lands.
+    public const float SliceDuration = 0.7f;
+
+    /// <summary>Progress through a slice swing at which it crosses the aim and the damage lands.</summary>
+    public const float SliceImpactProgress = 0.375f;
+
+    // The wind-up cocks the arm further out than the strike carries it back, so the swing reads
+    // as a wide arc; SliceSweepRadians is the follow-through past the aim.
+    private const float SliceWindupRadians = 1.55f;
+    private const float SliceSweepRadians = 1.25f;
+    private const float SliceLiftRadians = 0.7f;
+    private const float SliceRollRadians = 1.6f;
+    // The forward lift would carry the hand up to eye height; the hand is solved this many blocks
+    // lower at the strike (via SolveArm, which keeps the shoulder anchored) so the slice reads at
+    // chest height instead.
+    private const float SliceDropBlocks = 0.35f;
+    // Wind-up (0..WindupEnd) reaches the start side; the strike (..StrikeEnd) crosses to the far
+    // side; the rest is the recovery back to the idle pose.
+    private const float SliceWindupEnd = 0.15f;
+    private const float SliceStrikeEnd = 0.6f;
+
     // First-person framing: straight-hanging arms sit ~66 degrees below the view centre,
     // invisible until you pitch well down, and hide behind the chest when you do. Resting
     // them slightly forward with bent elbows and a touch of inward yaw parks the hands in
@@ -111,6 +137,8 @@ public class PlayerModel
     private float _airRun;
     private float _airVelocity;
     private float _mineT = 1f;
+    private float _sliceT = 1f;
+    private int _sliceDir;
     private float _time;
     private float _holdBlend;
 
@@ -125,6 +153,12 @@ public class PlayerModel
 
     /// <summary>0 when a mine hit just landed, 1 when the hand is back at rest.</summary>
     public float MineT => _mineT;
+
+    /// <summary>Whether a slice swing is currently playing.</summary>
+    public bool IsSlicing => _sliceT < 1f;
+
+    /// <summary>Progress of the active slice swing: 0 at the wind-up, 1 when it has finished.</summary>
+    public float SliceProgress => _sliceT;
 
     /// <summary>Smoothed 0..1 movement amount driving the swing amplitude.</summary>
     public float MoveBlend => _moveBlend;
@@ -166,10 +200,88 @@ public class PlayerModel
 
         if (_mineT < 1f)
             _mineT = Math.Min(1f, _mineT + deltaTime / MineDuration);
+
+        if (_sliceT < 1f)
+            _sliceT = Math.Min(1f, _sliceT + deltaTime / SliceDuration);
     }
 
     /// <summary>Starts one hand swing (a mining hit just landed).</summary>
     public void Punch() => _mineT = 0f;
+
+    /// <summary>
+    /// Starts a slice swing: <paramref name="direction"/> is +1 for right-to-left and -1 for the
+    /// left-to-right return. The arm's sweep and lift and the blade roll ride
+    /// <see cref="SliceProgress"/>.
+    /// </summary>
+    public void StartSlice(int direction)
+    {
+        _sliceDir = direction;
+        _sliceT = 0f;
+    }
+
+    // Signed yaw the right arm sweeps through: 0 at rest, out to the swing's start side on the
+    // wind-up, across the aim to the far side on the strike, then eased back to 0 on the recovery
+    // so the arm never snaps back to its idle pose. The sign follows the swing's direction, so
+    // the return mirrors the first swing.
+    private float SliceSweep()
+    {
+        var p = MathUtils.Clamp01(_sliceT);
+        if (p <= 0f || p >= 1f) return 0f;
+
+        var startSide = -SliceWindupRadians * _sliceDir;
+        var farSide = SliceSweepRadians * _sliceDir;
+        if (p < SliceWindupEnd)
+            return MathUtils.Lerp(0f, startSide, MathUtils.SmoothStep(p / SliceWindupEnd));
+        if (p < SliceStrikeEnd)
+            return MathUtils.Lerp(startSide, farSide,
+                MathUtils.SmoothStep((p - SliceWindupEnd) / (SliceStrikeEnd - SliceWindupEnd)));
+        return MathUtils.Lerp(farSide, 0f,
+            MathUtils.SmoothStep((p - SliceStrikeEnd) / (1f - SliceStrikeEnd)));
+    }
+
+    // One-shot 0 -> 1 -> 0 across the swing, peaking at the strike: it drives the arm lift and
+    // the blade roll, and settles both back to the carrying pose by the end. It is 0 at both
+    // ends, so the swing never jumps when it starts or finishes.
+    private float SliceStroke() => MathUtils.Pulse(_sliceT, SliceImpactProgress);
+
+    private float SliceLift() => SliceLiftRadians * SliceStroke();
+
+    // Downward Y translation applied to the right arm at the strike, tied to the same 0->1->0
+    // stroke so the arm is back at its idle height by the end (no snap).
+    private float SliceDrop() => -SliceDropBlocks * SliceStroke();
+
+    // Hand offset from the shoulder in the arm's bend plane (y, z), before the sweep yaw, for a
+    // given shoulder pitch and elbow. Matches GetPartMatrix's arm chain exactly, so the two-bone
+    // solve below can invert it.
+    private static void ArmHandOffset(float shoulder, float elbow, out float y, out float z)
+    {
+        var a = ForearmLength * MathF.Cos(elbow) + UpperArmLength;
+        var b = ForearmLength * MathF.Sin(elbow);
+        y = -a * MathF.Cos(shoulder) + b * MathF.Sin(shoulder);
+        z = -(a * MathF.Sin(shoulder) + b * MathF.Cos(shoulder));
+    }
+
+    // Two-bone solve: the shoulder pitch and elbow that reach a hand offset (y, z) with the
+    // shoulder itself fixed. Lets the slice drop the hand by re-posing the arm instead of
+    // translating it, which would detach the shoulder from the torso (visible in third person).
+    private static (float Shoulder, float Elbow) SolveArm(float y, float z)
+    {
+        var span = UpperArmLength + ForearmLength;
+        var reach = MathF.Min(MathF.Sqrt(y * y + z * z), span - 1e-4f);
+        var elbow = 2f * MathF.Acos(Math.Clamp(reach / span, 0f, 1f));
+        var a = ForearmLength * MathF.Cos(elbow) + UpperArmLength;
+        var b = ForearmLength * MathF.Sin(elbow);
+        var det = a * a + b * b;
+        return (MathF.Atan2((b * y - a * z) / det, -(a * y + b * z) / det), elbow);
+    }
+
+    // Wrist twist: rolls the blade from standing upright at rest to laying flat (a touch past
+    // horizontal) at the strike. The direction flips with the swing, so the return rolls the
+    // blade 180 degrees the other way and the same edge leads both ways. The negative sign is
+    // because the body's -Z rotation tips +Y toward -X; combined with the direction it lays the
+    // blade outward on the swing's own side. Applied in model space, before the body yaw, so the
+    // roll stays fixed to the body whichever way the player faces.
+    private float SliceRoll() => -SliceRollRadians * _sliceDir * SliceStroke();
 
     /// <summary>Joint angles in radians plus the vertical bob, for this frame.</summary>
     public readonly struct Pose
@@ -313,13 +425,16 @@ public class PlayerModel
             Matrix4x4.CreateFromAxisAngle(swingAxis, pitchDeg * MathF.PI / 180f * 0.8f)
             * Matrix4x4.CreateTranslation(Pivot("Head")) * root;
 
-        Matrix4x4 UpperArm(Vector3 pivot, float shoulder)
+        Matrix4x4 UpperArm(Vector3 pivot, float shoulder, float sweep)
         {
             // Drift the hands toward the view centre so they read at the bottom of the
             // frame instead of out at the edges. Right arm (+X) yaws one way, left the other.
+            // The slice sweep rides that same yaw but is applied after the forward pitch
+            // (System.Numerics is row-vector, so the leftmost factor runs first), carrying the
+            // raised arm through a horizontal arc instead of twisting a hanging one.
             var inward = (pivot.X > 0f ? 1f : -1f) * ArmInwardYaw;
             return Matrix4x4.CreateFromAxisAngle(swingAxis, shoulder)
-                * Matrix4x4.CreateFromAxisAngle(Vector3.UnitY, inward)
+                * Matrix4x4.CreateFromAxisAngle(Vector3.UnitY, inward + sweep)
                 * Matrix4x4.CreateTranslation(pivot) * root;
         }
 
@@ -327,20 +442,34 @@ public class PlayerModel
             Matrix4x4.CreateFromAxisAngle(swingAxis, hip)
             * Matrix4x4.CreateTranslation(pivot) * root;
 
+        var sliceSweep = SliceSweep();
+        var rightShoulder = pose.RightShoulder + SliceLift();
+        var rightElbow = pose.RightElbow;
+
+        // Lowering the slice by translating the arm would detach the shoulder from the torso
+        // (only visible in third person), so instead keep the shoulder fixed and re-solve the
+        // shoulder pitch and elbow that land the hand at the same lowered spot.
+        var sliceDrop = SliceDrop();
+        if (sliceDrop != 0f)
+        {
+            ArmHandOffset(rightShoulder, rightElbow, out var handY, out var handZ);
+            (rightShoulder, rightElbow) = SolveArm(handY + sliceDrop, handZ);
+        }
+
         // Child joints ride their parent: the elbow offset is the file's forearm pivot minus
         // its upper-arm pivot, so reshaped limbs keep working.
         return part switch
         {
             "Torso" => Torso(),
             "Head" => Head(),
-            "UpperArmL" => UpperArm(Pivot("UpperArmL"), pose.LeftShoulder),
-            "UpperArmR" => UpperArm(Pivot("UpperArmR"), pose.RightShoulder),
+            "UpperArmL" => UpperArm(Pivot("UpperArmL"), pose.LeftShoulder, 0f),
+            "UpperArmR" => UpperArm(Pivot("UpperArmR"), rightShoulder, sliceSweep),
             "ForearmL" => Matrix4x4.CreateFromAxisAngle(swingAxis, pose.LeftElbow)
                 * Matrix4x4.CreateTranslation(Pivot("ForearmL") - Pivot("UpperArmL"))
-                * UpperArm(Pivot("UpperArmL"), pose.LeftShoulder),
-            "ForearmR" => Matrix4x4.CreateFromAxisAngle(swingAxis, pose.RightElbow)
+                * UpperArm(Pivot("UpperArmL"), pose.LeftShoulder, 0f),
+            "ForearmR" => Matrix4x4.CreateFromAxisAngle(swingAxis, rightElbow)
                 * Matrix4x4.CreateTranslation(Pivot("ForearmR") - Pivot("UpperArmR"))
-                * UpperArm(Pivot("UpperArmR"), pose.RightShoulder),
+                * UpperArm(Pivot("UpperArmR"), rightShoulder, sliceSweep),
             "ThighL" => Thigh(Pivot("ThighL"), pose.LeftHip),
             "ThighR" => Thigh(Pivot("ThighR"), pose.RightHip),
             "ShinL" => Matrix4x4.CreateFromAxisAngle(swingAxis, pose.LeftKnee)
@@ -376,7 +505,13 @@ public class PlayerModel
         var fist = Vector3.Transform(new Vector3(0f, HandDepth(), 0f),
             GetPartMatrix("ForearmR", eyePos, yawDeg, 0f, backOffset));
         var yawRad = -(yawDeg + 90f) * MathF.PI / 180f;
-        return Matrix4x4.CreateRotationY(yawRad) * Matrix4x4.CreateTranslation(fist);
+        // The slice sweep and blade roll ride the anchor as well as the fist position, so the held
+        // blade turns through the arc and rolls from upright to horizontal instead of only sliding
+        // along it. The roll is applied first (model space), then the body yaw and sweep, so its
+        // axis stays fixed to the body.
+        return Matrix4x4.CreateRotationZ(SliceRoll())
+            * Matrix4x4.CreateRotationY(yawRad + SliceSweep())
+            * Matrix4x4.CreateTranslation(fist);
     }
 
     /// <summary>Mesh name per draw; arms/legs draw one mesh twice (left + right matrices).</summary>

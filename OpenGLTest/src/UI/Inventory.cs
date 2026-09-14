@@ -591,6 +591,8 @@ public class Inventory
         // sits on the hotbar for the compass.
         if (ItemRegistry.FindByName("Compass") is { } compass)
             _misc[compass.Id] = _misc.GetValueOrDefault(compass.Id) + 1;
+        if (ItemRegistry.FindByName("Obsidian Blade") is { } obsidianBlade)
+            _misc[obsidianBlade.Id] = _misc.GetValueOrDefault(obsidianBlade.Id) + 1;
     }
 
     /// <summary>One stackable list row: icon, name and the pool count for that id.</summary>
