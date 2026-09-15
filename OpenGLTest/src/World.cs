@@ -481,6 +481,7 @@ public class World : IItemUseWorld
         renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
         renderManager.RenderFallingBlocks(Camera, _falling.Falling);
         renderManager.RenderSlimes(Camera, Slimes);
+        renderManager.RenderEntityHealthbars(Camera, Slimes);
         renderManager.RenderBlockDebris(Camera, _debris.Debris);
         foreach (var tree in _toppling)
             renderManager.RenderTopplingTree(Camera, tree);

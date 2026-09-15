@@ -95,6 +95,10 @@ public class RenderManager : IDisposable
     private FireParticleRenderer? _fire;
     private BubbleParticleRenderer? _bubbles;
 
+    // Entity healthbars: one five-heart billboard row above every live slime.
+    // Null until LoadResources builds it.
+    private EntityHealthbarRenderer? _healthbars;
+
     // Directional sun shadows: RenderShadows fills _shadowDepthTex (a depth-only FBO
     // attachment, sampled as a comparison sampler on unit 1) through _lightViewProj, and
     // every world draw hands both to test-fragment.glsl's SampleShadow.
@@ -421,6 +425,7 @@ public class RenderManager : IDisposable
         _leaves = new LeafParticleRenderer(gl);
         _fire = new FireParticleRenderer(gl);
         _bubbles = new BubbleParticleRenderer(gl);
+        _healthbars = new EntityHealthbarRenderer(gl);
 
         blockCubes = new BlockCubeCache(gl);
         itemMeshes = new ItemMeshCache(gl);
@@ -2173,6 +2178,20 @@ public class RenderManager : IDisposable
             slime.Position.X, slime.Position.Y - Slime.HalfExtent, slime.Position.Z);
 
     /// <summary>
+    /// Draws the five-heart healthbar above every live slime (see
+    /// <see cref="EntityHealthbarRenderer"/>), right after the bodies so the row tracks them.
+    /// </summary>
+    public void RenderEntityHealthbars(Camera camera, IReadOnlyList<Slime> slimes)
+    {
+        if (camera == null || slimes.Count == 0 || _healthbars == null) return;
+
+        _healthbars.Render(slimes, camera.GetViewProjection(), camera.RenderEye, camera.ViewDirection,
+            _fogColor, _fogNear, _fogFar);
+        // The healthbar renderer binds its own heart sprites to unit 0.
+        InvalidateTextureUnits();
+    }
+
+    /// <summary>
     /// Draws every live falling leaf in one batched billboard draw. Leaves are too small to
     /// cast shadows, so they skip the shadow pass; their own shader carries the frame light
     /// and fog, which is final by the time the entity pass runs.
@@ -2655,6 +2674,7 @@ public class RenderManager : IDisposable
         _leaves?.Dispose();
         _fire?.Dispose();
         _bubbles?.Dispose();
+        _healthbars?.Dispose();
         _sunQuad.Dispose();
         gl.DeleteTexture(_sunTexture);
         gl.DeleteTexture(_breakProgressTexture);

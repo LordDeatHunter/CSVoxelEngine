@@ -776,4 +776,14 @@ public static class WorldGenerationConfig
     // upward pop so the hit reads even on flat ground.
     public const float SlimeKnockbackSpeed = 6f;
     public const float SlimeKnockbackLift = 4.5f;
+
+    // --- Entity healthbars (EntityHealthbarRenderer) ---
+    // Five hearts float above every live slime, billboarded to face the camera, using the same
+    // heart sprites as the player HUD. The pool is drawn proportionally across the row (each
+    // heart is MaxHealth / Hearts HP), so any entity kind reads correctly whatever its pool is.
+    public const int EntityHealthbarHearts = 5;
+    // Width (and height) of one heart in blocks; neighbours sit edge to edge like the HUD row.
+    public const float EntityHeartSizeBlocks = 0.2f;
+    // How far above the slime's head (Position + HalfExtent * VerticalScale) the row's centre floats.
+    public const float EntityHealthbarLiftBlocks = 0.22f;
 }
