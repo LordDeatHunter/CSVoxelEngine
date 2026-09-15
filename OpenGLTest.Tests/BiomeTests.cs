@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Xunit;
 
@@ -356,24 +357,81 @@ public sealed class BiomeTests
     }
 
     [Fact]
-    public void CactusBlocksFormAThreeStepFamily()
+    public void CactusTaperStepsGetNarrowerTowardTheTip()
     {
-        var stem = ContentRegistry.RequireBlock("cactus");
-        var arm = ContentRegistry.RequireBlock("cactus_arm");
-        var tip = ContentRegistry.RequireBlock("cactus_tip");
+        var levels = new[] { "cactus", "cactus_arm", "cactus_prong", "cactus_tip" }
+            .Select(ContentRegistry.RequireBlock)
+            .OrderBy(b => b.WoodTaperLevel)
+            .ToArray();
 
-        Assert.Equal(0, stem.WoodTaperLevel);
-        Assert.Equal(1, arm.WoodTaperLevel);
-        Assert.Equal(2, tip.WoodTaperLevel);
+        foreach (var level in levels)
+            Assert.Equal(BlockType.CactusWoodFamily, BlockType.WoodFamilyOf(level.Id));
 
-        // The stem is the thickest size but still a column, not a full cube
-        Assert.True(stem.HalfWidth < 0.5f, $"stem half-width {stem.HalfWidth}");
-        Assert.True(stem.HalfWidth > arm.HalfWidth && arm.HalfWidth > tip.HalfWidth);
+        Assert.True(levels[0].HalfWidth < 0.5f, $"stem half-width {levels[0].HalfWidth}");
+        for (var i = 1; i < levels.Length; i++)
+            Assert.True(levels[i].HalfWidth < levels[i - 1].HalfWidth,
+                $"{levels[i].Name} is not thinner than {levels[i - 1].Name}");
 
-        Assert.Equal(BlockType.CactusWoodFamily, BlockType.WoodFamilyOf(stem.Id));
-        Assert.Equal(BlockType.CactusWoodFamily, BlockType.WoodFamilyOf(arm.Id));
-        Assert.Equal(BlockType.CactusWoodFamily, BlockType.WoodFamilyOf(tip.Id));
         Assert.Equal(BlockType.TreeWoodFamily, BlockType.WoodFamilyOf(ContentRegistry.RequireBlock("log").Id));
+    }
+
+    [Fact]
+    public void OnlyTheCactusArmBaseWeldsToTheStem()
+    {
+        var stem = ContentRegistry.RequireBlock("cactus").Id;
+        var arm = ContentRegistry.RequireBlock("cactus_arm").Id;
+        var prong = ContentRegistry.RequireBlock("cactus_prong").Id;
+        var tip = ContentRegistry.RequireBlock("cactus_tip").Id;
+
+        Assert.True(WoodShape.ConnectsHorizontal(arm, stem));
+
+        Assert.False(WoodShape.ConnectsHorizontal(prong, stem));
+        Assert.False(WoodShape.ConnectsHorizontal(tip, stem));
+
+        Assert.True(WoodShape.ConnectsVertical(prong, arm));
+        Assert.True(WoodShape.ConnectsVertical(tip, prong));
+    }
+
+    [Fact]
+    public void GeneratedCactusBranchesWeldOnlyAtTheBase()
+    {
+        List<(int X, int Y, int Z, byte Id)>? cells = null;
+        for (var cx = 0; cx <= 64 && cells == null; cx++)
+        for (var cz = -64; cz <= 64 && cells == null; cz++)
+        {
+            if (TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8) != Biome.Desert)
+                continue;
+
+            for (var x = 0; x < Chunk.Size && cells == null; x++)
+            for (var z = 0; z < Chunk.Size && cells == null; z++)
+            {
+                if (!CactusGenerator.TryGetCactus(cx * Chunk.Size + x, cz * Chunk.Size + z, out _, out var shape))
+                    continue;
+                if (shape.Wood.Any(c => WoodShape.WoodLevel(c.Id) == 1))
+                    cells = shape.Wood;
+            }
+        }
+
+        Assert.NotNull(cells);
+        var byPos = new Dictionary<(int X, int Y, int Z), byte>();
+        foreach (var (x, y, z, id) in cells)
+            byPos.TryAdd((x, y, z), id);
+
+        var weldCount = 0;
+        foreach (var ((x, y, z), id) in byPos)
+        foreach (var (dx, dz) in new[] { (1, 0), (0, 1) })
+        {
+            var other = byPos.GetValueOrDefault((x + dx, y, z + dz), BlockType.Air);
+            if (!WoodShape.ConnectsHorizontal(id, other)) continue;
+
+            var a = WoodShape.WoodLevel(id);
+            var b = WoodShape.WoodLevel(other);
+            Assert.Equal(0, Math.Min(a, b));
+            Assert.Equal(1, Math.Max(a, b));
+            weldCount++;
+        }
+
+        Assert.True(weldCount > 0, "generated cactus had no base branch-off weld");
     }
 
     [Fact]

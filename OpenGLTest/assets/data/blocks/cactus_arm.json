@@ -7,7 +7,7 @@
   "hardness": 1.6,
   "renderer": "tapered_wood",
   "sfx": "hit_wood",
-  "wood": { "taperLevel": 1, "halfWidth": 0.28, "family": "cactus" },
+  "wood": { "taperLevel": 1, "halfWidth": 0.30, "family": "cactus" },
   "hasItem": false,
   "occludes": false,
   "castsAO": false,

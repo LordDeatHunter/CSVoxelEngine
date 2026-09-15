@@ -36,7 +36,7 @@ public sealed record BlockType
     /// <summary>Family id of the tree wood set: log (0) down to twig (5).</summary>
     public const byte TreeWoodFamily = 0;
 
-    /// <summary>Family id of the cactus wood set: stem (0) down to tip (2).</summary>
+    /// <summary>Family id of the cactus wood set: stem (0) down to tip (3).</summary>
     public const byte CactusWoodFamily = 1;
 
     /// <summary>Family id of the spruce wood set: the full-cube trunk only (level 0).</summary>

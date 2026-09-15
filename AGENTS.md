@@ -258,9 +258,9 @@ trailing commas.
 | `light.emission` | 0 | 0..15 (`LightEmission`) |
 | `light.passes` | `!fullCube` | whether voxel light travels through the cell (`PassesLight`) |
 | `renderer` | `"model"` | `model` (baked quads), `tapered_wood`, `pebbles`, `branch_pile`, `snow_layers` or `fluid` (procedural emitters); a fluid's or layer block's model only supplies its tile |
-| `wood.taperLevel` | none | 0 = the family's base, each step up narrows toward its tip; each family's levels must be covered contiguously from 0 (tree 0..5, cactus 0..2, spruce 0) |
+| `wood.taperLevel` | none | 0 = the family's base, each step up narrows toward its tip; each family's levels must be covered contiguously from 0 (tree 0..5, cactus 0..3, spruce 0) |
 | `wood.halfWidth` | 0.5 | half edge length of the tapered box, in blocks (`HalfWidth`) |
-| `wood.family` | `"tree"` | which taper family this level belongs to; wood of two families never welds. `"cactus"` is the 3-level saguaro set, `"spruce"` the taiga conifer's single full-cube trunk |
+| `wood.family` | `"tree"` | which taper family this level belongs to; wood of two families never welds. `"cactus"` is the 4-level saguaro set, `"spruce"` the taiga conifer's single full-cube trunk |
 | `stackMax` | 0 | units that stack in one cell (pebble piles 3, branch piles 4, snow layers 16): the count lives in the chunk state byte, 0 = untouched worldgen (the generator's own default), 1..`stackMax` an explicit stack. 2..16 |
 | `stackSolidAt` | 0 | stack count at which a stack block turns solid, for a block whose partial stacks are walked through (layered snow at 16). Only legal from 1..`stackMax` on a `solid: false` stack block |
 | `hasItem` | true | enters the blocks pool and can be hotbarred; false for taper wood and pebbles |
@@ -453,11 +453,13 @@ prongs, no leaves; the frozen plains grow nothing. Slime spawning already asks
 
 Spruce is a third **wood family**: a block's JSON may set `wood.family` (default `"tree"`), and
 `ContentRegistry.BuildWoodLevels` validates each family's levels contiguously from 0 (tree 6,
-cactus 3, spruce 1 — the full-cube trunk). Wood of two families never welds (`WoodShape` checks the
+cactus 4, spruce 1 — the full-cube trunk). Wood of two families never welds (`WoodShape` checks the
 family), which is what lets a cactus or spruce reuse the tapered-wood mesh, its shape-accurate
 hitboxes and tree felling (`TopplingTree` floods any wood family). The cactus blocks are `cactus`
-(stem, level 0), `cactus_arm` (1) and `cactus_tip` (2), with generated `cactus_side`/`cactus_top` tiles
-and `sandstone`; see `tools/generate-biome-textures.ps1` for the placeholder art.
+(stem, level 0), `cactus_arm` (the base branch-off, 1), `cactus_prong` (2) and `cactus_tip` (3),
+all strictly one level thinner than the cell below so only the base arm welds to the stem; they
+wear generated `cactus_side`/`cactus_top` tiles and `sandstone`; see
+`tools/generate-biome-textures.ps1` for the placeholder art.
 
 ## Entities
 

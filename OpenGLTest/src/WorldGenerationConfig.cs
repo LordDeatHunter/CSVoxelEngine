@@ -645,7 +645,7 @@ public static class WorldGenerationConfig
 
     // --- Cacti (CactusGenerator) ---
     // Desert saguaros: a tapered stem throws a few arms that bend upward into prongs like a
-    // pitchfork. Three taper sizes (wood.family "cactus", levels 0..2) and no leaves.
+    // pitchfork. Four taper sizes (wood.family "cactus", levels 0..3) and no leaves.
     public const bool CactusEnabled = true;
     // A desert column grows a candidate with this probability; spacing (below) thins it
     public const float CactusDensity = 0.010f;

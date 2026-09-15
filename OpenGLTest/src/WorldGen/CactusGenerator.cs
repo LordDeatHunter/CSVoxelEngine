@@ -8,7 +8,7 @@ namespace silkgltriangle;
 /// Desert saguaros: a tapered stem that throws a few arms which bend upward into prongs, like a
 /// pitchfork. Same growth rules as <see cref="TreeGenerator"/> in every way that matters — a pure
 /// function of the stem's (x, z), cached, wood ids taken from the <c>"cactus"</c> wood family —
-/// but with no leaves and only three taper sizes (stem, prong, tip). Only desert columns qualify,
+/// but with no leaves and four taper sizes (stem, arm, prong, tip). Only desert columns qualify,
 /// so a cactus never grows in the forest or on a sea floor.
 /// </summary>
 public static class CactusGenerator
@@ -28,7 +28,7 @@ public static class CactusGenerator
         WoodFamily = ContentRegistry.RequireWoodFamily("cactus");
     }
 
-    /// <summary>Taper level to cactus block: 0 is the stem, 1 the prong, 2 the tip.</summary>
+    /// <summary>Taper level to cactus block: 0 is the stem, 1 the base arm, 2 the prong, 3 the tip.</summary>
     public static byte WoodId(int level) => BlockType.WoodBlock(WoodFamily, level);
 
     /// <summary>
@@ -149,9 +149,10 @@ public static class CactusGenerator
         for (var y = 0; y < stemH; y++)
             wood.Add((x, baseY + y, z, WoodId(0)));
 
-        // Arms leave the upper stem sideways, then bend straight up into a prong. A one-cell
-        // arm keeps the strict taper: the arm is one step thinner than the stem it leaves, and
-        // every prong cell above it stays at that level until the tip.
+        // The taper steps down every cell (base arm -> prong -> tip), so each child is strictly
+        // thinner than its parent. Only the base branch-off lands one level from the level-0
+        // stem and welds; a prong is two levels away, so the vertical run beside the stem never
+        // reconnects to its ancestor trunk the way a flat, same-level prong used to.
         var arms = rng.NextInt(WorldGenerationConfig.CactusMaxArms + 1);
         for (var a = 0; a < arms; a++)
         {
@@ -172,7 +173,7 @@ public static class CactusGenerator
                 py++;
                 if (py <= HeightAt(px, pz))
                     break;
-                wood.Add((px, py, pz, WoodId(step == rise ? 2 : 1)));
+                wood.Add((px, py, pz, WoodId(step == rise ? 3 : 2)));
             }
         }
 
