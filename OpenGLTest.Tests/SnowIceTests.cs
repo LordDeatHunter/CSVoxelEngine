@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Xunit;
 
@@ -75,6 +76,50 @@ public sealed class SnowIceTests
         }
 
         Assert.Fail("no spruce found in any taiga chunk");
+    }
+
+    [Fact]
+    public void LodSpruceCanopyWearsSpruceNeedles()
+    {
+        var trunkX = 0;
+        var trunkZ = 0;
+        var found = false;
+        for (var cx = -48; cx <= 48 && !found; cx++)
+        for (var cz = -48; cz <= 48 && !found; cz++)
+        {
+            if (TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8) != Biome.Taiga)
+                continue;
+            for (var x = 0; x < Chunk.Size && !found; x++)
+            for (var z = 0; z < Chunk.Size && !found; z++)
+            {
+                var wx = cx * Chunk.Size + x;
+                var wz = cz * Chunk.Size + z;
+                if (!TreeGenerator.TryGetTrunk(wx, wz, out _, out var shape))
+                    continue;
+                if (shape.LeafBlock != TreeGenerator.SpruceLeavesBlock)
+                    continue;
+                foreach (var (lx, ly, lz) in TreeGenerator.CanopyCells(shape))
+                {
+                    if (!TreeGenerator.TryGetCanopy(lx, lz, out var top, out var leaf) || top < ly)
+                        continue;
+                    if (leaf != TreeGenerator.SpruceLeavesBlock)
+                        continue;
+                    trunkX = lx;
+                    trunkZ = lz;
+                    found = true;
+                    break;
+                }
+            }
+        }
+        Assert.True(found);
+
+        var spec = LodRegion.Levels[0];
+        static int DivFloor(int a, int b) => a >= 0 ? a / b : (a - b + 1) / b;
+        var mesh = LodRegion.BuildMeshData(0, DivFloor(trunkX, spec.RegionBlocks), DivFloor(trunkZ, spec.RegionBlocks));
+        var spruce = BlockType.ById[TreeGenerator.SpruceLeavesBlock]!;
+        var spruceTiles = new HashSet<ushort>(spruce.FaceTiles);
+        Assert.Contains(mesh.Vertices,
+            v => (v.PackedColor >> 24) == 253u && spruceTiles.Contains(v.Layer));
     }
 
     [Fact]

@@ -365,6 +365,7 @@ public class LodRegion : IDisposable
         var rockTop = ArrayPool<bool>.Shared.Rent(gridSize);
         var biomeGrid = ArrayPool<Biome>.Shared.Rent(gridSize);
         var seaFloor = ArrayPool<byte>.Shared.Rent(gridSize);
+        var canopyLeaf = ArrayPool<byte>.Shared.Rent(gridSize);
         // Item C1: the fine heights every cell window reads (index fx * fineSpan + fz), and one row
         // of the separable min's horizontal half, rebuilt per cell row and reused by every column.
         // Level 2 is the largest at 81796 ints, well inside ArrayPool<int>.Shared's largest bucket.
@@ -512,16 +513,23 @@ public class LodRegion : IDisposable
                 // negative terrain and pave lowlands with phantom leaf pillars.
                 var top = ground;
                 var canopyMax = 0;
+                byte canopyId = 0;
                 for (var dx = 0; dx < cellSize; dx++)
                 for (var dz = 0; dz < cellSize; dz++)
                 {
-                    var t = TreeGenerator.CanopyTop(baseFineX + i * cellSize + dx, baseFineZ + j * cellSize + dz);
-                    if (t > canopyMax) canopyMax = t;
+                    if (!TreeGenerator.TryGetCanopy(baseFineX + i * cellSize + dx, baseFineZ + j * cellSize + dz, out var t, out var leaf))
+                        continue;
+                    if (t > canopyMax)
+                    {
+                        canopyMax = t;
+                        canopyId = leaf;
+                    }
                 }
 
                 if (canopyMax > 0)
                     top = Math.Max(top, ((canopyMax - spec.HeightBias) >> cellShift) - 1);
                 topCell[(i + 1) * heightGrid + (j + 1)] = top;
+                canopyLeaf[(i + 1) * heightGrid + (j + 1)] = canopyId;
             }
         }
 
@@ -573,9 +581,12 @@ public class LodRegion : IDisposable
         var sand = BlockType.ById[TerrainGenerator.SandBlock]!;
         var gravel = BlockType.ById[TerrainGenerator.GravelBlock]!;
         var sandstone = BlockType.ById[TerrainGenerator.SandstoneBlock]!;
-        var leaves = BlockType.ById[TreeGenerator.LeavesBlock]!;
+        var fallbackLeaves = BlockType.ById[TreeGenerator.LeavesBlock]!;
         var snow = BlockType.ById[TerrainGenerator.SnowBlock]!;
         var ice = BlockType.ById[TerrainGenerator.IceBlock]!;
+
+        ushort CanopyTile(byte leafId, int face) =>
+            (leafId != 0 ? BlockType.ById[leafId] : null)?.FaceTiles[face] ?? fallbackLeaves.FaceTiles[face];
 
         // Ocean floor tile by the depth band the chunk mesher's GenerateColumn would pick for the
         // same height (0 sand, 1 gravel, 2 stone), so far seabed matches near seabed.
@@ -700,7 +711,7 @@ public class LodRegion : IDisposable
                 var floor = seaFloor[gi * heightGrid + gj];
 
                 AddQuad(vertices, indices, topFace, new Vector3(i * cellSize, top * cellSize, j * cellSize),
-                    top > ground ? leaves.FaceTiles[topFace]
+                    top > ground ? CanopyTile(canopyLeaf[gi * heightGrid + gj], topFace)
                     : isSeaCell ? FloorTile(floor, topFace)   // seabed wears its depth band, not dirt
                     : beach ? cap.FaceTiles[topFace]
                     : rock ? stone.FaceTiles[topFace]
@@ -745,7 +756,7 @@ public class LodRegion : IDisposable
                         // Canopy airspace wears leaves; at and below the eroded surface the
                         // grass/dirt/stone rule applies, measured from the ground (not the bump),
                         // with the biome's own top material and soil band beneath it
-                        var tile = cy > ground ? leaves.FaceTiles[f]
+                        var tile = cy > ground ? CanopyTile(canopyLeaf[gi * heightGrid + gj], f)
                             : cy == top ? (isSeaCell ? FloorTile(floor, f)
                                 : beach ? cap.FaceTiles[f]
                                 : rock ? stone.FaceTiles[f]
@@ -778,6 +789,7 @@ public class LodRegion : IDisposable
             ArrayPool<bool>.Shared.Return(rockTop);
             ArrayPool<Biome>.Shared.Return(biomeGrid);
             ArrayPool<byte>.Shared.Return(seaFloor);
+            ArrayPool<byte>.Shared.Return(canopyLeaf);
             ArrayPool<int>.Shared.Return(fine);
             ArrayPool<int>.Shared.Return(xMin);
         }

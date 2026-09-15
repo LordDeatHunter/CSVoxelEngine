@@ -383,10 +383,17 @@ public static class TreeGenerator
     }
 
     // Canopy tops per chunk column (index (x & mask) << shift | (z & mask)): the highest leaf
-    // cell over each ground column, 0 where the sky is clear. The far LOD reads this instead
-    // of block data so distant forests show. Same growth cap + wholesale clear as the other
-    // worldgen caches; entries are deterministic so a reset is harmless.
-    private static readonly ConcurrentDictionary<(int X, int Z), int[]> CanopyCache = new();
+    // cell over each ground column, 0 where the sky is clear, plus the leaf block that owns
+    // that top cell (broadleaf vs spruce). The far LOD reads both instead of block data so
+    // distant forests show in the right foliage. Same growth cap + wholesale clear as the other
+    // worldgen caches; entries are deterministic so a reset is harmless. A new canopy species
+    // only needs its LeafBlock stored here; the LOD then picks it up via CanopyLeafBlock.
+    internal sealed class CanopyColumns(int[] tops, byte[] leafBlocks)
+    {
+        public readonly int[] Tops = tops;
+        public readonly byte[] LeafBlocks = leafBlocks;
+    }
+    private static readonly ConcurrentDictionary<(int X, int Z), CanopyColumns> CanopyCache = new();
     private const int CanopyCacheLimit = 4096;
 
     // Fine columns whose canopy was edited by the player (mined wood/leaves, blasts, fells).
@@ -409,6 +416,31 @@ public static class TreeGenerator
             [((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
     }
 
+    public static byte CanopyLeafBlock(int x, int z)
+    {
+        if (CanopyDisturbed.ContainsKey((x, z)))
+            return BlockType.Air;
+
+        TryGetCanopy(x, z, out _, out var leaf);
+        return leaf;
+    }
+
+    public static bool TryGetCanopy(int x, int z, out int top, out byte leaf)
+    {
+        top = 0;
+        leaf = BlockType.Air;
+        if (CanopyDisturbed.ContainsKey((x, z)))
+            return false;
+
+        var entry = GetCanopyColumns(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+        var i = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
+        top = entry.Tops[i];
+        if (top <= 0)
+            return false;
+        leaf = entry.LeafBlocks[i];
+        return true;
+    }
+
     /// <summary>
     /// Marks canopy columns around a player edit as disturbed (see <see cref="CanopyTop"/>).
     /// Call for every mined/placed/blasted wood or leaf block; felling covers its whole
@@ -427,29 +459,32 @@ public static class TreeGenerator
         }
     }
 
-    internal static int[] GetCanopyTops(int chunkX, int chunkZ)
+    internal static int[] GetCanopyTops(int chunkX, int chunkZ) => GetCanopyColumns(chunkX, chunkZ).Tops;
+
+    internal static CanopyColumns GetCanopyColumns(int chunkX, int chunkZ)
     {
         var key = (chunkX, chunkZ);
         if (CanopyCache.TryGetValue(key, out var cached))
             return cached;
 
-        var tops = BuildCanopyTops(chunkX, chunkZ);
+        var built = BuildCanopyTops(chunkX, chunkZ);
 
         if (CanopyCache.Count >= CanopyCacheLimit)
             CanopyCache.Clear();
 
-        CanopyCache[key] = tops;
-        return tops;
+        CanopyCache[key] = built;
+        return built;
     }
 
     // Raises each ground column under a nearby trunk's canopy cells to the highest leaf cell
     // above it. Trunks up to TreeReachBlocks outside the chunk still overhang it.
-    private static int[] BuildCanopyTops(int chunkX, int chunkZ)
+    private static CanopyColumns BuildCanopyTops(int chunkX, int chunkZ)
     {
         const int R = WorldGenerationConfig.TreeReachBlocks;
         var x0 = chunkX * Chunk.Size;
         var z0 = chunkZ * Chunk.Size;
         var tops = new int[Chunk.Size * Chunk.Size];
+        var leaves = new byte[Chunk.Size * Chunk.Size];
 
         for (var tx = x0 - R; tx < x0 + Chunk.Size + R; tx++)
         for (var tz = z0 - R; tz < z0 + Chunk.Size + R; tz++)
@@ -466,10 +501,13 @@ public static class TreeGenerator
 
                 var i = (lx << Chunk.SizeShift) | lz;
                 if (y > tops[i])
+                {
                     tops[i] = y;
+                    leaves[i] = shape.LeafBlock;
+                }
             }
         }
 
-        return tops;
+        return new CanopyColumns(tops, leaves);
     }
 }
