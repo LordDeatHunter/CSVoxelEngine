@@ -326,11 +326,29 @@ public static class WorldGenerationConfig
     public const float RiverLowStart = 14f;    // at or below: full channel carve
     public const float RiverLowEnd = 30f;      // at or above: no carve (dry wash)
 
+    // --- Snow and ice ---
+    // Cold columns freeze their surface water into a walkable ice sheet and lay snow on dry ground.
+    // Both read TerrainGenerator.ColdWeight (a biome-generation input), so the snow line and the
+    // freeze line fade in as a column cools instead of snapping at a biome border.
+    public const bool SnowAndIceEnabled = true;
+    public const float SnowColdThreshold = 0.55f;   // ColdWeight above which snow starts to settle
+    public const float FreezeColdThreshold = 0.72f; // ColdWeight above which surface water freezes
+    public const float SnowFrequency = 1f / 140f;   // drift noise: where snow piles deeper
+    public const int SnowMaxDepth = 8;              // deepest natural drift, in layers (block holds 16)
+
+    // Ice spikes: rare tall ice columns standing on the barren frozen plains.
+    public const float IceSpikeChance = 0.0005f;    // per candidate column
+    public const int IceSpikeSpacingRadius = 3;     // lowest-hash spacing, like trees
+    public const int IceSpikeMinHeight = 4;
+    public const int IceSpikeMaxHeight = 9;
+    public const int IceSpikeReachBlocks = 6;       // chunk border margin, like the other generators
+
     // --- Biomes ---
-    // Biome is a pure function of (x, z): continentalness (low = ocean) splits ocean from land,
-    // aridity splits desert from forest on land. Both feed smooth 0..1 weights, so the height
-    // profile lerps across a border instead of stepping, and a per-column hash breaks the
-    // grass/sand material line into a ragged patchwork.
+    // Biome is a pure function of (x, z): continentalness (low = ocean) splits ocean from land; on
+    // land temperature and humidity form a 2D climate grid (warm+wet forest, warm+dry desert,
+    // cold+wet taiga, cold+dry barren frozen). Every field is a smooth 0..1 weight, so the height
+    // profile blends across a border instead of stepping, and a per-column hash breaks the
+    // forest/desert material line into a ragged patchwork.
     public const bool BiomesEnabled = true;
 
     // Continentalness: a ~2800-block wavelength keeps ocean basins 1-2k blocks across.
@@ -338,10 +356,24 @@ public static class WorldGenerationConfig
     public const float ContinentOceanStart = -0.30f;   // at or below: full ocean
     public const float ContinentOceanEnd = -0.04f;     // at or above: full land
 
-    // Aridity: desert where it runs high, on land only (1-2k-block patches).
-    public const float AridityFrequency = 1f / 1800f;
-    public const float DesertStart = 0.10f;
-    public const float DesertEnd = 0.32f;
+    // Temperature: cold where the noise runs low. Cold land is taiga (with humidity) or the barren
+    // frozen biome (without it). Temperature and humidity are read only while choosing a biome and
+    // the worldgen features that follow from it, so nothing else in the game sees them.
+    public const float TemperatureFrequency = 1f / 2300f;
+    public const float TemperatureColdStart = -0.35f;  // at or below: fully cold
+    public const float TemperatureColdEnd = -0.05f;    // at or above: fully warm
+
+    // Humidity: dry where the noise runs low. Dry land is desert (warm) or barren frozen (cold).
+    public const float HumidityFrequency = 1f / 1700f;
+    public const float HumidityDryStart = -0.35f;      // at or below: fully dry
+    public const float HumidityDryEnd = -0.05f;        // at or above: fully wet
+
+    // Temperate buffer between hot and cold biomes: desert needs firmly warm air and the
+    // taiga/frozen need firmly cold air, so the ColdWeight band in between always classifies
+    // as forest. Without it the warm/cold isoline puts dunes directly against snow whenever
+    // the humidity stays dry across the temperature line.
+    public const float DesertMaxCold = 0.30f;   // above: too cold for desert, forest instead
+    public const float ColdBiomeMinCold = 0.70f; // below: too warm for taiga/frozen, forest instead
 
     // Ocean depth ramp: the shelf sits just over the waterline and the basin falls to the floor.
     public const float OceanShoreHeight = 3f;       // blocks, the shallowest shelf
@@ -597,6 +629,19 @@ public static class WorldGenerationConfig
     // No trunk roots this close (Chebyshev) to the origin column, so the surface spawn the
     // camera picks there is always in the open
     public const int TreeSpawnClearRadius = 3;
+
+    // --- Spruce (TreeGenerator's taiga conifer) ---
+    // The taiga grows a cone: a full-cube spruce trunk with needle blobs stacked every level from
+    // SpruceCrownStart up to the tip, their radius tapering from SpruceMaxRadius to one. Placement
+    // (density, spacing, ground rules) is shared with the broadleaf tree above.
+    public const int SpruceMinHeight = 7;
+    public const int SpruceMaxHeight = 12;
+    public const int SpruceCrownStart = 2;   // blocks of bare trunk before the canopy begins
+    public const int SpruceMaxRadius = 3;    // widest blob radius, at the crown base
+    // Taiga keeps more trees than the openness mask alone would leave, so a cold forest still
+    // reads as wooded rather than as bare snow.
+    public const float SpruceDensity = 0.03f;
+    public const float SpruceOpennessRelief = 0.5f;
 
     // --- Cacti (CactusGenerator) ---
     // Desert saguaros: a tapered stem throws a few arms that bend upward into prongs like a

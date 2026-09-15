@@ -126,7 +126,7 @@ public class TntManager
             if (TreeGenerator.IsTreeBlock(removed))
                 TreeGenerator.PoisonCanopy(x, z);
 
-            if (leaves != null && removed == TreeGenerator.LeavesBlock)
+            if (leaves != null && TreeGenerator.IsLeaf(removed))
             {
                 blastedLeaves ??= new List<Vector3>();
                 blastedLeaves.Add(new Vector3(x, y, z));

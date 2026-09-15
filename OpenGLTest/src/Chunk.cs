@@ -497,6 +497,15 @@ public class Chunk : IDisposable
         if (WorldGenerationConfig.CactusEnabled)
             CactusGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
 
+        // Frozen-only ice spikes go down before the snow, so a spike keeps its base cell
+        if (WorldGenerationConfig.SnowAndIceEnabled)
+            IceSpikeGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
+
+        // Last of the cold features: freezes cold surface water to ice, then lays snow on the dry
+        // ground and the ice sheet that is left
+        if (WorldGenerationConfig.SnowAndIceEnabled)
+            SnowGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
+
         if (WorldGenerationConfig.PebblesEnabled)
             PebbleGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
@@ -712,6 +721,14 @@ public class Chunk : IDisposable
                         : terrainHeight >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanGravelDepth
                             ? (TerrainGenerator.GravelBlock, TerrainGenerator.GravelBlock)
                             : (TerrainGenerator.RockBlock, TerrainGenerator.RockBlock);
+                soilDepth = 2;
+                break;
+
+            case Biome.Frozen:
+                // Barren rock rather than grass: the snow pass lays a drift on top, so the plains
+                // read as rock-and-snow instead of a white field over soil.
+                topBlock = TerrainGenerator.RockBlock;
+                soilBlock = TerrainGenerator.RockBlock;
                 soilDepth = 2;
                 break;
 
@@ -1171,6 +1188,14 @@ public class Chunk : IDisposable
             if (type.Renderer == BlockRenderer.BranchPile)
             {
                 EmitBranchPile(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
+                    x, y, z, type, basePos);
+                continue;
+            }
+
+            // Layered snow renders as one box whose height is its stack depth; see EmitSnowLayers
+            if (type.Renderer == BlockRenderer.SnowLayers)
+            {
+                EmitSnowLayers(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
                     x, y, z, type, basePos);
                 continue;
             }
@@ -1902,6 +1927,49 @@ public class Chunk : IDisposable
                     CropUv(face, p0), CropUv(face, p1), CropUv(face, p2), CropUv(face, p3), tile,
                     ShadeLut[(face << 2) | 3], sunF[face], blockF[face]);
             }
+        }
+    }
+
+    /// <summary>
+    /// Emits a snow layer cell as one box from the floor up to its depth (see
+    /// <see cref="SnowShape"/>): the state byte holds 1..StackMax layers and the box is that
+    /// fraction of a block tall, so a full stack is a full cube. The bottom face is skipped unless
+    /// the cell below cannot occlude, since a layer normally rests on ground that draws its own top.
+    /// </summary>
+    private void EmitSnowLayers(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+        int x, int y, int z, BlockType type, Vector3 basePos)
+    {
+        var worldX = (int)Position.X * Size + x;
+        var worldZ = (int)Position.Z * Size + z;
+        var maxCount = type.StackMax >= 2 ? type.StackMax : 16;
+        var count = SnowShape.CountWithState(worldX, worldZ, paddedState[pIdx], maxCount);
+        var height = SnowShape.Height(count, maxCount);
+
+        Span<float> sunF = stackalloc float[6];
+        Span<float> blockF = stackalloc float[6];
+        var lightBase = LightIdx(x, y, z);
+        for (var i = 0; i < 6; i++)
+        {
+            var lightCell = BlockType.Occludes(padded[pIdx + FaceNeighborDelta[i]])
+                ? lightBase
+                : lightBase + LightFaceDelta[i];
+            sunF[i] = sunLight[lightCell] / 15f;
+            blockF[i] = blockLight[lightCell] / 15f;
+        }
+
+        var drawBottom = count >= maxCount && !BlockType.Occludes(padded[pIdx + FaceNeighborDelta[5]]);
+        var min = new Vector3(0f, 0f, 0f);
+        var max = new Vector3(1f, height, 1f);
+        for (var face = 0; face < 6; face++)
+        {
+            if (face == 5 && !drawBottom) continue;
+            var tile = face == 4 ? type.Top : face == 5 ? type.Bottom : type.Side;
+            BoxFaceCorners(min, max, face, out var p0, out var p1, out var p2, out var p3);
+            EmitQuad(vertices, indices, ref indexOffset, basePos, p0, p1, p2, p3,
+                CubeFaces[face].normal,
+                CropUv(face, p0), CropUv(face, p1), CropUv(face, p2), CropUv(face, p3), tile,
+                ShadeLut[(face << 2) | 3], sunF[face], blockF[face]);
         }
     }
 

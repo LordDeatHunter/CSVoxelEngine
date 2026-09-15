@@ -84,6 +84,13 @@ public sealed class BlockDefinition
     /// </summary>
     public int? StackMax { get; set; }
 
+    /// <summary>
+    /// Stack count at which a stack block turns solid (layered snow is walked through until a full
+    /// stack). Only legal on a stack block that is not already solid; 0 or omitted means the block's
+    /// solidity never depends on its stack.
+    /// </summary>
+    public int? StackSolidAt { get; set; }
+
     /// <summary>"drop" | "prime_tnt".</summary>
     public string? OnBreak { get; set; }
 

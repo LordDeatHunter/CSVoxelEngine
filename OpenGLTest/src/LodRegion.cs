@@ -356,6 +356,10 @@ public class LodRegion : IDisposable
         // gravel with one noise eval at the cell centre per cell.
         var beachTop = ArrayPool<bool>.Shared.Rent(gridSize);
         var gravelTop = ArrayPool<bool>.Shared.Rent(gridSize);
+        // Cold cells: snow covers their land surface, and the coldest freeze the sea sheet on top
+        // of the sea. Both read ColdWeight so the far snow and ice lines match the near chunks.
+        var snowTop = ArrayPool<bool>.Shared.Rent(gridSize);
+        var iceTop = ArrayPool<bool>.Shared.Rent(gridSize);
         // Bare-rock mountain tops, matching the chunk mesher's rock line, so a distant peak
         // shows the same stone cap the near chunks do.
         var rockTop = ArrayPool<bool>.Shared.Rent(gridSize);
@@ -484,13 +488,19 @@ public class LodRegion : IDisposable
                 seaFloor[(i + 1) * heightGrid + (j + 1)] = FloorMaterial(maxOwn);
 
                 // Sand rings ocean shores and lake/river rims, not every column in the height band.
+                // Taiga shores wear sand like forest ones; frozen rock keeps its own material.
                 beachTop[(i + 1) * heightGrid + (j + 1)] = TerrainGenerator.IsBeachHeight(maxOwn)
                     && (cellBiome == Biome.Ocean
-                        || (cellBiome == Biome.Forest && TerrainGenerator.SurfaceWaterWeight(centreX, centreZ) > 0f));
+                        || ((cellBiome == Biome.Forest || cellBiome == Biome.Taiga)
+                            && TerrainGenerator.SurfaceWaterWeight(centreX, centreZ) > 0f));
                 gravelTop[(i + 1) * heightGrid + (j + 1)] =
                     beachTop[(i + 1) * heightGrid + (j + 1)] && TerrainGenerator.IsGravelPatch(centreX, centreZ);
                 rockTop[(i + 1) * heightGrid + (j + 1)] =
                     cellBiome == Biome.Forest && maxOwn >= WorldGenerationConfig.MountainRockHeight;
+
+                var cold = TerrainGenerator.ColdWeight(centreX, centreZ);
+                snowTop[(i + 1) * heightGrid + (j + 1)] = cold > WorldGenerationConfig.SnowColdThreshold;
+                iceTop[(i + 1) * heightGrid + (j + 1)] = cold > WorldGenerationConfig.FreezeColdThreshold;
 
                 // Cell cy is solid iff cellSize * (cy + 1) <= eroded height
                 var ground = ((minHeight - spec.HeightBias) >> cellShift) - 1;
@@ -564,6 +574,8 @@ public class LodRegion : IDisposable
         var gravel = BlockType.ById[TerrainGenerator.GravelBlock]!;
         var sandstone = BlockType.ById[TerrainGenerator.SandstoneBlock]!;
         var leaves = BlockType.ById[TreeGenerator.LeavesBlock]!;
+        var snow = BlockType.ById[TerrainGenerator.SnowBlock]!;
+        var ice = BlockType.ById[TerrainGenerator.IceBlock]!;
 
         // Ocean floor tile by the depth band the chunk mesher's GenerateColumn would pick for the
         // same height (0 sand, 1 gravel, 2 stone), so far seabed matches near seabed.
@@ -682,6 +694,7 @@ public class LodRegion : IDisposable
                 var cap = beach && gravelTop[gi * heightGrid + gj] ? gravel : sand;
                 var soil = beach ? sand : dirt;
                 var rock = rockTop[gi * heightGrid + gj];
+                var snowCell = snowTop[gi * heightGrid + gj];
                 var biome = biomeGrid[gi * heightGrid + gj];
                 var isSeaCell = isSea[gi * heightGrid + gj];
                 var floor = seaFloor[gi * heightGrid + gj];
@@ -691,14 +704,17 @@ public class LodRegion : IDisposable
                     : isSeaCell ? FloorTile(floor, topFace)   // seabed wears its depth band, not dirt
                     : beach ? cap.FaceTiles[topFace]
                     : rock ? stone.FaceTiles[topFace]
+                    : snowCell ? snow.FaceTiles[topFace]
                     : biome == Biome.Desert ? sand.FaceTiles[topFace]
                     : grass.FaceTiles[topFace], shades, lodLeaves: top > ground);
 
                 // AddQuad places a +Y face one cell above its origin, so the origin sits a
-                // cell below the sheet
+                // cell below the sheet. A frozen cell shows the ice sheet instead of open water.
                 if (isSeaCell)
                     AddQuad(waterVertices, waterIndices, topFace,
-                        new Vector3(i * cellSize, sheetY - cellSize, j * cellSize), waterTile, waterShades, true);
+                        new Vector3(i * cellSize, sheetY - cellSize, j * cellSize),
+                        iceTop[gi * heightGrid + gj] ? ice.FaceTiles[topFace] : waterTile,
+                        waterShades, true);
 
                 foreach (var f in sideFaces)
                 {
@@ -733,11 +749,12 @@ public class LodRegion : IDisposable
                             : cy == top ? (isSeaCell ? FloorTile(floor, f)
                                 : beach ? cap.FaceTiles[f]
                                 : rock ? stone.FaceTiles[f]
+                                : snowCell ? snow.FaceTiles[f]
                                 : biome == Biome.Desert ? sand.FaceTiles[f]
                                 : grass.FaceTiles[f])
                             : (ground - cy) * cellSize <= WorldGenerationConfig.NominalDirtDepth
                                 ? (biome == Biome.Desert ? sandstone.FaceTiles[f]
-                                    : isSeaCell || rock ? stone.FaceTiles[f]
+                                    : isSeaCell || rock || biome == Biome.Frozen ? stone.FaceTiles[f]
                                     : soil.FaceTiles[f])
                                 : stone.FaceTiles[f];
                         AddQuad(vertices, indices, f, new Vector3(i * cellSize, cy * cellSize, j * cellSize), tile, shades, lodLeaves: cy > ground);
@@ -756,6 +773,8 @@ public class LodRegion : IDisposable
             ArrayPool<bool>.Shared.Return(isSea);
             ArrayPool<bool>.Shared.Return(beachTop);
             ArrayPool<bool>.Shared.Return(gravelTop);
+            ArrayPool<bool>.Shared.Return(snowTop);
+            ArrayPool<bool>.Shared.Return(iceTop);
             ArrayPool<bool>.Shared.Return(rockTop);
             ArrayPool<Biome>.Shared.Return(biomeGrid);
             ArrayPool<byte>.Shared.Return(seaFloor);

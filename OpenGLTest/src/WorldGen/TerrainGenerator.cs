@@ -24,7 +24,8 @@ public static class TerrainGenerator
     private static readonly FastNoiseLite IntensityNoise;
     private static readonly FastNoiseLite GravelNoise;
     private static readonly FastNoiseLite ContinentNoise;
-    private static readonly FastNoiseLite AridityNoise;
+    private static readonly FastNoiseLite TemperatureNoise;
+    private static readonly FastNoiseLite HumidityNoise;
     private static readonly FastNoiseLite DuneNoise;
     private static readonly FastNoiseLite TrenchMask;
     private static readonly FastNoiseLite TrenchRidge;
@@ -65,6 +66,12 @@ public static class TerrainGenerator
     /// <summary>Block a desert column's soil band is made of, under its surface sand.</summary>
     public static readonly byte SandstoneBlock;
 
+    /// <summary>Frozen water surface and the frozen biome's ice; the ice-sheet block.</summary>
+    public static readonly byte IceBlock;
+
+    /// <summary>Layered snow block; the snow accumulation pass stamps it.</summary>
+    public static readonly byte SnowBlock;
+
     static TerrainGenerator()
     {
         SurfaceBlock = ContentRegistry.RequireBlock("grass").Id;
@@ -75,6 +82,8 @@ public static class TerrainGenerator
         SandBlock = ContentRegistry.RequireBlock("sand").Id;
         GravelBlock = ContentRegistry.RequireBlock("gravel").Id;
         SandstoneBlock = ContentRegistry.RequireBlock("sandstone").Id;
+        IceBlock = ContentRegistry.RequireBlock("ice").Id;
+        SnowBlock = ContentRegistry.RequireBlock("snow").Id;
 
         // The rolling base keeps the original seed and settings exactly, so natural terrain
         // is unchanged wherever the flat mask stays at zero. The mask is rare and
@@ -98,7 +107,8 @@ public static class TerrainGenerator
         IntensityNoise = MakeNoise(41, WorldGenerationConfig.CaveIntensityFrequency);
         GravelNoise = MakeNoise(61, WorldGenerationConfig.GravelFrequency);
         ContinentNoise = MakeNoise(70, WorldGenerationConfig.ContinentFrequency, octaves: 2);
-        AridityNoise = MakeNoise(71, WorldGenerationConfig.AridityFrequency, octaves: 2);
+        TemperatureNoise = MakeNoise(71, WorldGenerationConfig.TemperatureFrequency, octaves: 2);
+        HumidityNoise = MakeNoise(88, WorldGenerationConfig.HumidityFrequency, octaves: 2);
         DuneNoise = MakeNoise(72, WorldGenerationConfig.DuneFrequency, octaves: 3);
         TrenchMask = MakeNoise(73, WorldGenerationConfig.TrenchMaskFrequency);
         TrenchRidge = MakeNoise(74, WorldGenerationConfig.TrenchFrequency);
@@ -159,39 +169,52 @@ public static class TerrainGenerator
     public static Biome BiomeAt(float x, float z) => BiomeWeights(x, z, out _, out _);
 
     /// <summary>
-    /// 0..1 weights of the two climate biomes, plus the biome they classify to. Ocean takes the
-    /// share of continentalness that falls low; desert takes the dry share of what is left, so a
-    /// coastal blend never grows a desert out over the water. Both weights are smooth, which is
-    /// what lets <see cref="Compute"/> lerp the height across a border instead of stepping.
+    /// 0..1 weights of the two land profiles <see cref="Compute"/> needs, plus the biome they
+    /// classify to. Ocean takes the share of continentalness that falls low; desert takes the
+    /// warm+dry share of what is left, so a coastal blend never grows a desert out over the water.
+    /// Desert needs firmly warm air (<see cref="WorldGenerationConfig.DesertMaxCold"/>) and the
+    /// cold biomes firmly cold air (<see cref="WorldGenerationConfig.ColdBiomeMinCold"/>), so the
+    /// band between them is always temperate forest and dunes never touch snow. The cold biomes
+    /// ride the forest's height profile, so they need no weight of their own here. Every weight is
+    /// smooth, which is what lets <see cref="Compute"/> lerp the height across a border instead of
+    /// stepping.
     /// </summary>
     public static Biome BiomeWeights(float x, float z, out float oceanWeight, out float desertWeight)
     {
         // Not "if (!enabled) return": the flag is a compile-time const, and a dead branch would
         // read as unreachable. Zeroing the weights keeps the toggle a real expression.
+        var gate = WorldGenerationConfig.BiomesEnabled ? 1f : 0f;
         var continent = ContinentNoise.GetNoise(x, z);
-        oceanWeight = WorldGenerationConfig.BiomesEnabled
-            ? 1f - MathUtils.SmoothStep(WorldGenerationConfig.ContinentOceanStart,
-                WorldGenerationConfig.ContinentOceanEnd, continent)
-            : 0f;
+        oceanWeight = (1f - MathUtils.SmoothStep(WorldGenerationConfig.ContinentOceanStart,
+            WorldGenerationConfig.ContinentOceanEnd, continent)) * gate;
 
-        var aridity = AridityNoise.GetNoise(x, z);
-        desertWeight = WorldGenerationConfig.BiomesEnabled
-            ? MathUtils.SmoothStep(WorldGenerationConfig.DesertStart,
-                WorldGenerationConfig.DesertEnd, aridity) * (1f - oceanWeight)
-            : 0f;
+        var cold = 1f - MathUtils.SmoothStep(WorldGenerationConfig.TemperatureColdStart,
+            WorldGenerationConfig.TemperatureColdEnd, TemperatureNoise.GetNoise(x, z));
+        var dry = 1f - MathUtils.SmoothStep(WorldGenerationConfig.HumidityDryStart,
+            WorldGenerationConfig.HumidityDryEnd, HumidityNoise.GetNoise(x, z));
+        desertWeight = (1f - cold) * dry * (1f - oceanWeight) * gate;
 
-        return oceanWeight >= 0.5f ? Biome.Ocean
-            : desertWeight >= 0.5f ? Biome.Desert
+        var biome = oceanWeight >= 0.5f ? Biome.Ocean
+            : cold >= WorldGenerationConfig.ColdBiomeMinCold ? dry >= 0.5f ? Biome.Frozen : Biome.Taiga
+            : cold <= WorldGenerationConfig.DesertMaxCold && dry >= 0.5f ? Biome.Desert
             : Biome.Forest;
+        return gate < 0.5f ? Biome.Forest : biome;
     }
+
+    /// <summary>0..1 how cold (x, z) is: 1 in the taiga/frozen band, 0 in the warm band. A
+    /// biome-generation input, read by the snow and freezing passes to place their features.</summary>
+    public static float ColdWeight(float x, float z) =>
+        1f - MathUtils.SmoothStep(WorldGenerationConfig.TemperatureColdStart,
+            WorldGenerationConfig.TemperatureColdEnd, TemperatureNoise.GetNoise(x, z));
 
     /// <summary>Whether world column (x, z) is forest; vegetation and spawn rules ask here.</summary>
     public static bool IsForest(int x, int z) => BiomeAt(x, z) == Biome.Forest;
 
     /// <summary>
     /// Whether the column (x, z) at this height is wet: an ocean floor, or a lake or river bed
-    /// carved below the waterline. Every other below-waterline forest column stays dry, which is
-    /// what keeps the land from being flooded wholesale now that the oceans carry the big water.
+    /// carved below the waterline. Every other below-waterline land column stays dry, which is what
+    /// keeps the land from being flooded wholesale now that the oceans carry the big water — a hot
+    /// desert stays dry, and a cold lake or river freezes over (see the freezing pass).
     /// <see cref="Compute"/> carves with these same weights, so the wet set and the carved set agree.
     /// </summary>
     public static bool IsWaterColumn(int x, int z, int height)
@@ -201,7 +224,7 @@ public static class TerrainGenerator
 
         var biome = BiomeWeights(x, z, out _, out var desertWeight);
         if (biome == Biome.Ocean) return true;
-        if (!WorldGenerationConfig.LakesAndRiversEnabled || biome != Biome.Forest)
+        if (!WorldGenerationConfig.LakesAndRiversEnabled || biome == Biome.Desert)
             return false;
 
         var gate = SurfaceWaterGate(desertWeight);
@@ -365,6 +388,11 @@ public static class TerrainGenerator
         if (biome is not (Biome.Forest or Biome.Desert)) return biome;
         if (MathF.Abs(desertWeight - 0.5f) >= WorldGenerationConfig.BiomeBorderDither) return biome;
 
+        // The dither only raggeds the material line; it must not push sand past the temperate
+        // buffer into the cold band, or dunes would again sit against snow.
+        if (biome == Biome.Forest && ColdWeight(x, z) > WorldGenerationConfig.DesertMaxCold)
+            return biome;
+
         var h = SplitMix64.Hash((int)x, (int)z, WorldGenerationConfig.Seed ^ 0x5B10);
         var unit = (SplitMix64.Mix(h + 0x9E3779B97F4A7C15UL) >> 40) * (1f / (1 << 24));
         if (unit >= 0.5f) return biome;
@@ -451,18 +479,21 @@ public static class TerrainGenerator
                     heightF = MathUtils.Lerp(heightF, oceanHeight, oceanWeight);
                 }
 
-                // Keep forest land above the waterline: the ocean blend dips the coast toward sea
-                // level, and a dry dip would read as a pit. Lakes and rivers are cut after this,
-                // so they still reach below the waterline.
-                if (biome == Biome.Forest)
+                // Keep forest, taiga and frozen land above the waterline: the ocean blend dips the
+                // coast toward sea level, and a dry dip would read as a pit. Lakes and rivers are
+                // cut after this, so they still reach below the waterline. (A desert keeps its own
+                // dry profile, which the ocean blend already handles at the coast.)
+                if (biome is Biome.Forest or Biome.Taiga or Biome.Frozen)
                     heightF = MathF.Max(heightF, WorldGenerationConfig.SeaLevel + 1f);
 
                 // Surface water: a lake is a bowl and a river a channel, each cut below the
                 // waterline and each returning to un-carved land (> sea level) at its edge, so the
                 // water is enclosed. A river also fades out as the local land climbs, so it dries
-                // into a wash uphill instead of gorging a hillside. Forest only, and gated toward a
-                // desert so the bowl closes before the biome line instead of ending in a wall.
-                if (WorldGenerationConfig.LakesAndRiversEnabled && biome == Biome.Forest)
+                // into a wash uphill instead of gorging a hillside. Every land biome but the desert,
+                // gated toward a desert so the bowl closes before the biome line instead of ending
+                // in a wall.
+                if (WorldGenerationConfig.LakesAndRiversEnabled
+                    && biome is Biome.Forest or Biome.Taiga or Biome.Frozen)
                 {
                     var gate = SurfaceWaterGate(desertWeight);
                     var lakeWeight = LakeWeight(worldX, worldZ) * gate;

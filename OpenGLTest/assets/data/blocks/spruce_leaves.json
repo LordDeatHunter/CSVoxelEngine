@@ -1,0 +1,12 @@
+{
+  "name": "Spruce Leaves",
+  "model": { "parent": "block/cube_all", "textures": { "all": "spruce_leaves" } },
+  "hardness": 1,
+  "movementSpeed": 0.5,
+  "cutout": true,
+  "sway": true,
+  "occludes": false,
+  "castsAO": false,
+  "light": { "passes": true },
+  "loot": "none"
+}

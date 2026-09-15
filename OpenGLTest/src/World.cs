@@ -929,13 +929,19 @@ public class World : IItemUseWorld
 
     /// <summary>
     /// Hitboxes for the outline, break overlay and mining pop. Tapered wood resolves
-    /// its drawn shape from the live neighbourhood (see <see cref="WoodShape"/>);
-    /// everything else uses its registered boxes.
+    /// its drawn shape from the live neighbourhood (see <see cref="WoodShape"/>) and layered
+    /// snow from its stack depth (see <see cref="SnowShape"/>); everything else uses its
+    /// registered boxes.
     /// </summary>
     private BlockHitbox[] HitboxesAt(Vector3 blockPos, byte blockId)
     {
+        var type = BlockType.ById[blockId];
+        if (type?.Renderer == BlockRenderer.SnowLayers)
+            return SnowShape.GetBoxes((int)blockPos.X, (int)blockPos.Z,
+                _chunkManager.GetStateGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z),
+                type.StackMax);
         if (!WoodShape.IsTapered(blockId))
-            return BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
+            return type?.Hitboxes ?? [BlockHitbox.FullCube];
         return WoodShape.GetBoxesAt(blockId, _chunkManager.GetBlockGlobal,
             (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
     }
@@ -1088,7 +1094,8 @@ public class World : IItemUseWorld
         // The whole canopy came down above the caps: disturb it once at the break (its reach
         // covers the crown) and rebuild every touched column so no ghost lingers at range. A
         // cactus has no canopy, so it only needs the column rebuild.
-        if (BlockType.WoodFamilyOf(brokenId) == BlockType.TreeWoodFamily)
+        var brokenFamily = BlockType.WoodFamilyOf(brokenId);
+        if (brokenFamily == BlockType.TreeWoodFamily || brokenFamily == BlockType.SpruceWoodFamily)
             TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z);
         foreach (var ((lx, lz), _) in lowestY)
             _lodManager.MarkEditedColumn(lx, lz);
@@ -1096,7 +1103,7 @@ public class World : IItemUseWorld
         List<Vector3>? felledLeaves = null;
         foreach (var block in collected)
         {
-            if (block.Id != TreeGenerator.LeavesBlock) continue;
+            if (!TreeGenerator.IsLeaf(block.Id)) continue;
             felledLeaves ??= new List<Vector3>();
             felledLeaves.Add(block.Cell);
         }
@@ -1251,9 +1258,12 @@ public class World : IItemUseWorld
         var pile = BlockType.ById[blockId];
         if (pile == null)
             return 0;
-        return pile.Renderer == BlockRenderer.BranchPile
-            ? BranchPileGenerator.CountWithState(state, pile.StackMax)
-            : PebbleGenerator.CountWithState(x, z, state, pile.StackMax);
+        return pile.Renderer switch
+        {
+            BlockRenderer.BranchPile => BranchPileGenerator.CountWithState(state, pile.StackMax),
+            BlockRenderer.SnowLayers => SnowShape.CountWithState(x, z, state, pile.StackMax),
+            _ => PebbleGenerator.CountWithState(x, z, state, pile.StackMax),
+        };
     }
 
     bool IItemUseWorld.SetPileCount(Vector3 pos, byte count)

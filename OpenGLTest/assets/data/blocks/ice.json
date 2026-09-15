@@ -1,0 +1,11 @@
+{
+  "name": "Ice",
+  "model": { "parent": "block/cube_all", "textures": { "all": "ice" } },
+  "hardness": 3,
+  "sfx": "hit_rock",
+  "translucent": true,
+  "cullSelf": true,
+  "occludes": false,
+  "castsAO": false,
+  "light": { "passes": true }
+}

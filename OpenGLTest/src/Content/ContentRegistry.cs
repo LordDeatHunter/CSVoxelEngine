@@ -716,10 +716,11 @@ public static class ContentRegistry
                 "tapered_wood" => BlockRenderer.TaperedWood,
                 "pebbles" => BlockRenderer.Pebbles,
                 "branch_pile" => BlockRenderer.BranchPile,
+                "snow_layers" => BlockRenderer.SnowLayers,
                 "fluid" => BlockRenderer.Fluid,
                 "quern" => BlockRenderer.Quern,
                 _ => throw new InvalidOperationException(
-                    $"Block '{path}' has unknown renderer '{definition.Renderer}'; expected model, tapered_wood, pebbles, branch_pile, fluid or quern."),
+                    $"Block '{path}' has unknown renderer '{definition.Renderer}'; expected model, tapered_wood, pebbles, branch_pile, snow_layers, fluid or quern."),
             };
 
             var onBreak = definition.OnBreak switch
@@ -762,20 +763,27 @@ public static class ContentRegistry
                 throw new InvalidOperationException(
                     $"Block '{path}' sets both fluid and falls: a fluid cell has no block to topple.");
             var stackMax = definition.StackMax ?? 0;
-            if (definition.StackMax.HasValue && (stackMax < 2 || stackMax > 8))
+            if (definition.StackMax.HasValue && (stackMax < 2 || stackMax > 16))
                 throw new InvalidOperationException(
-                    $"Block '{path}' has stackMax {stackMax}; expected 2..8.");
+                    $"Block '{path}' has stackMax {stackMax}; expected 2..16.");
             if (stackMax >= 2 && fluid)
                 throw new InvalidOperationException(
                     $"Block '{path}' sets stackMax on a fluid: the state byte already holds its levels.");
             if (stackMax >= 2 && falls)
                 throw new InvalidOperationException(
                     $"Block '{path}' sets stackMax with falls: a toppled pile would lose its count.");
+            var stackSolidAt = definition.StackSolidAt ?? 0;
+            if (definition.StackSolidAt.HasValue && (stackMax < 2 || stackSolidAt < 1 || stackSolidAt > stackMax))
+                throw new InvalidOperationException(
+                    $"Block '{path}' has stackSolidAt {stackSolidAt}; expected 1..stackMax on a stack block.");
             var needsSupport = !fluid && (definition.NeedsSupport ?? false);
             if (falls && needsSupport)
                 throw new InvalidOperationException(
                     $"Block '{path}' sets both falls and needsSupport: a falling block topples instead of popping.");
             var solid = !fluid && (definition.Solid ?? true);
+            if (stackSolidAt > 0 && solid)
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets stackSolidAt on a solid block; state-dependent solidity needs solid: false.");
 
             var movementSpeed = definition.MovementSpeed ?? 0f;
             if (!float.IsFinite(movementSpeed) || movementSpeed < 0f || movementSpeed > 1f)
@@ -858,6 +866,7 @@ public static class ContentRegistry
             BlockType.ById[id] = type;
             BlockType.Emission[id] = type.LightEmission;
             BlockType.SolidById[id] = type.Solid;
+            BlockType.StackSolidStateById[id] = (byte)stackSolidAt;
             BlockType.MovementSpeedById[id] = type.MovementSpeed;
             BlockType.CastsAoById[id] = type.CastsAmbientOcclusion;
             BlockType.FluidById[id] = type.Fluid;
@@ -899,8 +908,9 @@ public static class ContentRegistry
         {
             ["tree"] = BlockType.TreeWoodFamily,
             ["cactus"] = BlockType.CactusWoodFamily,
+            ["spruce"] = BlockType.SpruceWoodFamily,
         };
-        byte nextFamily = BlockType.CactusWoodFamily + 1;
+        byte nextFamily = BlockType.SpruceWoodFamily + 1;
 
         var byFamily = new Dictionary<string, Dictionary<int, byte>>(StringComparer.Ordinal);
         foreach (var (id, family) in families)

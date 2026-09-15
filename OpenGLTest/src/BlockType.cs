@@ -38,6 +38,9 @@ public sealed record BlockType
     /// <summary>Family id of the cactus wood set: stem (0) down to tip (2).</summary>
     public const byte CactusWoodFamily = 1;
 
+    /// <summary>Family id of the spruce wood set: the full-cube trunk only (level 0).</summary>
+    public const byte SpruceWoodFamily = 2;
+
     /// <summary>Family of a block that is not tapered wood at all.</summary>
     public const byte NoWoodFamily = 255;
 
@@ -61,6 +64,10 @@ public sealed record BlockType
     internal static readonly bool[] SolidById = new bool[256];
     internal static readonly bool[] OccludesById = new bool[256];
     internal static readonly bool[] CastsAoById = new bool[256];
+
+    // Stack blocks whose solidity depends on their state byte (snow layers): the state at which
+    // they become solid, or 0 when solidity is state-independent like every other block.
+    internal static readonly byte[] StackSolidStateById = new byte[256];
 
     // How fast the player moves through each block while inside it; 0 is a solid collider.
     internal static readonly float[] MovementSpeedById = new float[256];
@@ -241,6 +248,16 @@ public sealed record BlockType
     /// (it hits any non-air cell), so this only gates movement and drop physics.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsSolid(byte blockId) => SolidById[blockId];
+
+    /// <summary>
+    /// Whether a cell collides with bodies, honouring a stack block whose partial stacks are
+    /// walked through: a layered-snow cell is solid once its state reaches
+    /// <see cref="StackSolidStateById"/>, and every other block answers exactly as
+    /// <see cref="IsSolid"/>. Callers that only have an id still use <see cref="IsSolid"/>.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsSolidCell(byte blockId, byte state) =>
+        StackSolidStateById[blockId] != 0 ? state >= StackSolidStateById[blockId] : SolidById[blockId];
 
     /// <summary>
     /// Speed the player moves through a block while inside it, 0 for a solid collider. A

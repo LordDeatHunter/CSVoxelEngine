@@ -156,6 +156,7 @@ OpenGLTest/
       ModelBaker.cs, BakedModel.cs, BakedQuad.cs   # elements -> atlas-ready quads + full-cube flags
       LootTable.cs, LootContext.cs          # compiled loot tables and the world cell they roll at
       BlockRenderer.cs, BlockBreakAction.cs, AttackPattern.cs, ItemUseAction.cs  # geometry/break/attack/use enums
+      WoodShape.cs, SnowShape.cs            # state/neighbour-aware hitbox shapes (tapered wood, layered snow)
     Systems/
       WindowManager.cs         # Silk.NET window setup
       InputManager.cs          # keyboard/mouse context
@@ -183,9 +184,11 @@ OpenGLTest/
       FluidManager.cs          # the fluid tick: scheduled cells, level recompute + spread, batched remeshes
     WorldGen/
       TerrainGenerator.cs      # the 2D half: owns every 2D noise channel and the biome split; Compute -> ColumnData
-      Biome.cs                 # the Forest / Desert / Ocean enum
+      Biome.cs                 # the Forest / Desert / Ocean / Taiga / Frozen enum
       ColumnData.cs            # per-chunk-column arrays: Heights, DirtDepth, EntranceWeight, CaveIntensity, Biomes
       CactusGenerator.cs       # desert saguaros: tapered stem + pitchfork arms, no leaves (wood.family "cactus")
+      SnowGenerator.cs         # cold weather: freezes surface water to ice, lays one layered-snow cell per cold column
+      IceSpikeGenerator.cs     # rare single-column ice spikes on the barren frozen plains
       NoiseCaves.cs            # 3D-noise caves (cheese rooms, wide/narrow spaghetti, deep caverns) on a strided lattice
       WormCarver.cs            # worm-carved tunnels: per-XZ-cell deterministic paths, cached, carved sphere by sphere
       LavaGenerator.cs         # deep lava pockets: cave floors at/below LavaMaxY pond over inside patch mask + pool roll
@@ -253,10 +256,12 @@ trailing commas.
 | `sway` | false | leaf-wind sway in the vertex shader |
 | `light.emission` | 0 | 0..15 (`LightEmission`) |
 | `light.passes` | `!fullCube` | whether voxel light travels through the cell (`PassesLight`) |
-| `renderer` | `"model"` | `model` (baked quads), `tapered_wood`, `pebbles` or `fluid` (procedural emitters); a fluid's model only supplies its tile |
-| `wood.taperLevel` | none | 0 = the family's base, each step up narrows toward its tip; each family's levels must be covered contiguously from 0 (tree 0..5, cactus 0..2) |
+| `renderer` | `"model"` | `model` (baked quads), `tapered_wood`, `pebbles`, `branch_pile`, `snow_layers` or `fluid` (procedural emitters); a fluid's or layer block's model only supplies its tile |
+| `wood.taperLevel` | none | 0 = the family's base, each step up narrows toward its tip; each family's levels must be covered contiguously from 0 (tree 0..5, cactus 0..2, spruce 0) |
 | `wood.halfWidth` | 0.5 | half edge length of the tapered box, in blocks (`HalfWidth`) |
-| `wood.family` | `"tree"` | which taper family this level belongs to; wood of two families never welds. `"cactus"` is the 3-level saguaro set |
+| `wood.family` | `"tree"` | which taper family this level belongs to; wood of two families never welds. `"cactus"` is the 3-level saguaro set, `"spruce"` the taiga conifer's single full-cube trunk |
+| `stackMax` | 0 | units that stack in one cell (pebble piles 3, branch piles 4, snow layers 16): the count lives in the chunk state byte, 0 = untouched worldgen (the generator's own default), 1..`stackMax` an explicit stack. 2..16 |
+| `stackSolidAt` | 0 | stack count at which a stack block turns solid, for a block whose partial stacks are walked through (layered snow at 16). Only legal from 1..`stackMax` on a `solid: false` stack block |
 | `hasItem` | true | enters the blocks pool and can be hotbarred; false for taper wood and pebbles |
 | `needsSupport` | false | pops, rolling its loot, when the block below is removed; also makes the block replaceable, so a flow washes it away |
 | `falls` | false | gravity-affected (sand, gravel): topples into a `FallingBlock` entity when the cell below stops being solid, sinks through water, slides off lone supports; never combines with `fluid`/`needsSupport` |
@@ -382,7 +387,7 @@ Other invariants:
 - Worldgen must stay deterministic and thread-safe (`FastNoiseLite.GetNoise` is read-only after setup; noise instances are configured once in static constructors and never re-tuned per call). All noise seeds derive from `WorldGenerationConfig.Seed` plus fixed per-channel offsets (`TerrainGenerator.MakeNoise`). Before player edits, terrain obeys:
   - **Nothing generated is ever solid above `height(x,z)`** — heights come from `Chunk.GetColumnData(...).Heights` (or the `GetColumnHeights` wrapper) and already include ravines, which are cut into the heightmap so the far LOD sees them too. The block at `height` is solid unless a cave or entrance carved it.
   - Both carvers only ever **remove** blocks: `Chunk.GenerateBlockData` fills the columns (grass at depth 0, dirt down to `DirtDepth`, stone below), then `NoiseCaves.Carve` and `WormCarver.Carve` clear air out of the result and `_solidCount` is recounted.
-  - **Water** fills every air cell at `y <= SeaLevel` in a **wet** column, in `Chunk.FillWater` after both carvers and before trees and pebbles: an ocean floor, or a forest lake/river bed, where a hashed lake bowl or a warped river ridge channel carves the above-sea forest floor below the waterline (`TerrainGenerator.IsWaterColumn`; the carve in `Compute` and the fill read the same weights, so they agree, and the far LOD's sea sheet uses it too). Every other below-waterline basin is left **dry** — the forest is not flooded wholesale now that ocean carries the bulk of the water — and a desert stays dry; sand and gravel ring actual water only (`TerrainGenerator.SurfaceWaterWeight` gates the height band), never a dry ravine floor in the band. Both the carve and the flood test are scaled by `TerrainGenerator.SurfaceWaterGate` (`WaterDesertFadeStart`/`WaterDesertFadeEnd`), which fades the body out over the last stretch before the desert, so a pond closes on its own forest rim instead of ending in a vertical wall where the hard forest/desert classification flips, while lakes away from a desert keep their full depth. Sea-floor caves still flood, nothing grows in water (wet columns top out in dirt instead of grass), and `IsSubmerged(height)` is now only the height test — a below-waterline column is not necessarily wet. Generated water is always a **source** (state `0`). `WaterEnabled = false` turns the water off; `LakesAndRiversEnabled = false` leaves oceans only.
+  - **Water** fills every air cell at `y <= SeaLevel` in a **wet** column, in `Chunk.FillWater` after both carvers and before trees and pebbles: an ocean floor, or a forest lake/river bed, where a hashed lake bowl or a warped river ridge channel carves the above-sea forest floor below the waterline (`TerrainGenerator.IsWaterColumn`; the carve in `Compute` and the fill read the same weights, so they agree, and the far LOD's sea sheet uses it too). Every other below-waterline basin is left **dry** — the forest is not flooded wholesale now that ocean carries the bulk of the water — and a desert stays dry; sand and gravel ring actual water only (`TerrainGenerator.SurfaceWaterWeight` gates the height band), never a dry ravine floor in the band. Both the carve and the flood test are scaled by `TerrainGenerator.SurfaceWaterGate` (`WaterDesertFadeStart`/`WaterDesertFadeEnd`), which fades the body out over the last stretch before the desert, so a pond closes on its own forest rim instead of ending in a vertical wall where the hard forest/desert classification flips, while lakes away from a desert keep their full depth. Sea-floor caves still flood, nothing grows in water (wet columns top out in dirt instead of grass), and `IsSubmerged(height)` is now only the height test — a below-waterline column is not necessarily wet. Generated water is always a **source** (state `0`). A cold column's top water cell is then replaced by `ice` in `SnowGenerator.Stamp` (see Biomes), so a cold ocean or lake freezes into a walkable sheet. `WaterEnabled = false` turns the water off; `LakesAndRiversEnabled = false` leaves oceans only.
   - **Lava pockets** pond over dry cave floors at/below `LavaMaxY` (`LavaGenerator.Stamp`, after the sea so flooded caves stay water): a patch mask plus a per-cell roll, buried under the terrain so ravines and entrances stay dry. Generated lava is likewise all sources; set `LavaEnabled = false` to turn it off.
   - Caves fade out within ~`CaveSurfaceFadeEnd` blocks of the surface (`WormSurfaceMargin` for worms), except inside entrance zones — sparse patches where `ColumnData.EntranceWeight` lifts the fade and caves reach the sky.
   - Worldgen is a **pure function of world position**: each chunk generates its own blocks with no cross-chunk writes, so neighbours agree at their borders without shared state. Worm paths are cached per 64-block XZ cell in `WormCarver` exactly the way column data is cached per chunk column in `Chunk.GetColumnData` (compute-then-overwrite, wholesale `Clear` at the size limit — entries are deterministic, so a race yields identical values).
@@ -391,44 +396,59 @@ Other invariants:
 
 ## Biomes
 
-Three biomes: **forest** (smooth rolling grass hills with flat valleys between them; the floor sits
-above sea level, so carved water is always enclosed), **desert** (dunes of
-sand over sandstone) and **ocean** (a flooded basin ramping from a sandy shore down to bare stone).
-Selection is a pure function of (x, z) from two low-frequency noise fields — continentalness
-(low = ocean) and aridity (high = desert, on land only) — in `TerrainGenerator.BiomeWeights`;
-`TerrainGenerator.BiomeAt` classifies the result. Both weights are smooth 0..1 and
-`TerrainGenerator.Compute` lerps the height between the forest, desert-dune and ocean-ramp profiles
-by them, so a border is a slope, never a cliff; a per-column hash (`DitherBiome`) also breaks the
-grass/sand material line into a ragged patchwork. The ocean ramp falls to `OceanFloorHeight` with
-rare warped **trenches** cut in, and its floor wears sand, gravel or stone by depth
-(`OceanSandDepth`/`OceanGravelDepth`). The forest floor is a broad swell plus a positive-only hill
-field gated by a hill-region mask (`Hill*`/`ForestBaseHeight`), so hills rise in patches with flats
-between them. A rare warped **mountain** ridge (`Mountain*`, gated by a low-frequency mask and
+Five biomes. **Ocean** is a flooded basin ramping from a sandy shore down to bare stone.
+The four land biomes sit on a temperature x humidity grid: **forest** (warm+wet; smooth rolling
+grass hills with flat valleys), **desert** (warm+dry; dunes of sand over sandstone), **taiga**
+(cold+wet; a snowy spruce wood) and **frozen** (cold+dry; a barren snow plain of bare rock and
+occasional ice). Selection is a pure function of (x, z) from low-frequency noise — continentalness
+(low = ocean) plus temperature and humidity, which are read **only** while choosing a biome and the
+worldgen features that follow from it — in `TerrainGenerator.BiomeWeights`; `TerrainGenerator.BiomeAt`
+classifies the result. Desert needs firmly warm air (`DesertMaxCold`) and taiga/frozen firmly cold
+air (`ColdBiomeMinCold`), so the band between them is always temperate forest and dunes never spawn
+against snow. The weights are smooth 0..1 and `TerrainGenerator.Compute` lerps the height
+between the forest, desert-dune and ocean-ramp profiles by them, so a border is a slope, never a
+cliff; the cold biomes ride the forest profile (only their surface differs), and a per-column hash
+(`DitherBiome`) breaks the grass/sand material line into a ragged patchwork. The ocean ramp falls to
+`OceanFloorHeight` with rare warped **trenches** cut in, and its floor wears sand, gravel or stone by
+depth (`OceanSandDepth`/`OceanGravelDepth`). The forest floor is a broad swell plus a positive-only
+hill field gated by a hill-region mask (`Hill*`/`ForestBaseHeight`), so hills rise in patches with
+flats between them. A rare warped **mountain** ridge (`Mountain*`, gated by a low-frequency mask and
 faded out near the origin) lifts an occasional range well above the hills; a crest above
 `MountainRockHeight` is bare stone (`Chunk.GenerateColumn` reads the stripped soil, the far LOD a
 matching rock cap), so it reads as rock rather than another wooded hill. A low-frequency
 **openness** mask (`Openness*`) flattens the hills a little and thins the trees toward none, so the
 forest alternates between rolling woodland and open grass instead of one uniform canopy
-(`TreeGenerator.TryGetTrunk` reads `TerrainGenerator.ForestOpenness`). On land a hashed lake bowl
-and a warped river ridge carve below the waterline and flood only those (forest only; a desert
-stays dry; both fade out toward a desert so a pond closes on its own rim) — see the Water invariant
-below.
-A desert column is sand over `SandstoneDepth` sandstone blocks, then stone; a ravined
-(bare-stone) column keeps that rule.
+(`TreeGenerator.TryGetTrunk` reads `TerrainGenerator.ForestOpenness`, and a taiga keeps more of its
+spruce via `SpruceOpennessRelief`). On land a hashed lake bowl and a warped river ridge carve below
+the waterline and flood only those (every land biome but the desert; both fade out toward a desert
+so a pond closes on its own rim) — see the Water invariant below.
+A desert column is sand over `SandstoneDepth` sandstone blocks, then stone; a frozen column is bare
+rock (the snow pass covers it); a ravined (bare-stone) column keeps those rules.
+
+**Cold weather** (`WorldGen/SnowGenerator.cs`) runs last of the surface features and reads
+`TerrainGenerator.ColdWeight` (a biome-generation input) so the snow and freeze lines fade in as a
+column cools rather than snapping at a biome border. It freezes a cold column's surface water into a
+walkable ice sheet (the sea-level cell becomes `ice`) and lays one **layered snow** cell above the
+solid ground (or the ice). A snow cell's depth is drawn from `SnowGenerator.DepthAt` when its state
+byte is 0 and from the state byte when a player stacks it (`SnowShape`); each layer is 1/16 of a
+block, so a full stack is solid and partial layers are walked through (`BlockType.IsSolidCell`).
+`WorldGen/IceSpikeGenerator.cs` grows occasional single-column ice spikes on the frozen plains.
 
 `ColumnData.Biomes` carries the per-column classification for the chunk mesher and the far LOD
-(`Chunk.GetColumnBiomes`); the LOD samples it per cell and wears the matching tile, so a distant
-desert and sea floor agree with the near chunks. Vegetation is biome-gated: trees (`TreeGenerator`)
-and flowers (`FlowerGenerator`) are forest-only, and the desert grows **cacti**
-(`CactusGenerator`) — a tapered stem that throws a few arms which bend upward into prongs, no
-leaves. Slime spawning already asks `TerrainGenerator.IsForest(x, z)`, which is now a real test.
+(`Chunk.GetColumnBiomes`); the LOD samples it per cell and wears the matching tile (snow for a cold
+cell, ice for a frozen sea sheet), so a distant desert and sea floor agree with the near chunks.
+Vegetation is biome-gated: broadleaf trees (`TreeGenerator`, forest), **spruce** conifers
+(`TreeGenerator.BuildSpruceShape`, taiga) and flowers (`FlowerGenerator`, forest), and the desert
+grows **cacti** (`CactusGenerator`) — a tapered stem that throws a few arms which bend upward into
+prongs, no leaves; the frozen plains grow nothing. Slime spawning already asks
+`TerrainGenerator.IsForest(x, z)`, which is now a real test.
 
-Cactus wood is a second **wood family**: a block's JSON may set `wood.family` (default `"tree"`),
-and `ContentRegistry.BuildWoodLevels` validates each family's levels contiguously from 0 (tree 6,
-cactus 3). Wood of two families never welds (`WoodShape` checks the family), which is what lets a
-cactus reuse the tapered-wood mesh, its shape-accurate hitboxes and tree felling (`TopplingTree`
-floods any wood family) without a trunk and a cactus joining. The three blocks are `cactus` (stem,
-level 0), `cactus_arm` (1) and `cactus_tip` (2), with generated `cactus_side`/`cactus_top` tiles
+Spruce is a third **wood family**: a block's JSON may set `wood.family` (default `"tree"`), and
+`ContentRegistry.BuildWoodLevels` validates each family's levels contiguously from 0 (tree 6,
+cactus 3, spruce 1 — the full-cube trunk). Wood of two families never welds (`WoodShape` checks the
+family), which is what lets a cactus or spruce reuse the tapered-wood mesh, its shape-accurate
+hitboxes and tree felling (`TopplingTree` floods any wood family). The cactus blocks are `cactus`
+(stem, level 0), `cactus_arm` (1) and `cactus_tip` (2), with generated `cactus_side`/`cactus_top` tiles
 and `sandstone`; see `tools/generate-biome-textures.ps1` for the placeholder art.
 
 ## Entities

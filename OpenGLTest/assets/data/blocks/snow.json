@@ -1,0 +1,15 @@
+{
+  "name": "Snow",
+  "model": { "parent": "block/cube_all", "textures": { "all": "snow" } },
+  "hardness": 1,
+  "renderer": "snow_layers",
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "light": { "passes": true },
+  "hasItem": false,
+  "needsSupport": true,
+  "stackMax": 16,
+  "stackSolidAt": 16,
+  "loot": "snow"
+}

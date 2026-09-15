@@ -1,0 +1,31 @@
+{
+  // Cold-biome check: run from OpenGLTest/ with
+  //   VOXEL_TIME=30 VOXEL_SCRIPT=visual-examples/cold.json
+  // Shots land in visual/cold/. Vantage points from a headless probe:
+  //   interior taiga with spruce at (-56, 13, -40)
+  //   deeply cold frozen plain at (-136, 7, 152), deeply cold deep ocean at (8, -20, 936)
+  // The aerial shots teleport up and screenshot with no wait (a teleport + screenshot pair ticks
+  // no physics, so the pose is held); the ground shots wait to land first. Pitches stay shallow
+  // enough to keep the first-person hand out of frame.
+  "steps": [
+    { "op": "teleport", "pos": [-56.5, 45.5, -40.5], "yaw": 0, "pitch": -32 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-56.5, 45.5, -40.5], "yaw": 0, "pitch": -32 },
+    { "op": "screenshot", "name": "taiga_aerial", "hideHud": true },
+    { "op": "teleport", "pos": [-56.5, 24.5, -40.5], "yaw": 0, "pitch": -6 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "taiga_ground", "hideHud": true },
+
+    { "op": "teleport", "pos": [-136.5, 35.5, 152.5], "yaw": 0, "pitch": -28 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-136.5, 35.5, 152.5], "yaw": 0, "pitch": -28 },
+    { "op": "screenshot", "name": "frozen_aerial", "hideHud": true },
+    { "op": "teleport", "pos": [-136.5, 20.5, 152.5], "yaw": 0, "pitch": -5 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "frozen_ground", "hideHud": true },
+
+    { "op": "teleport", "pos": [8.5, 6.5, 936.5], "yaw": 0, "pitch": -18 },
+    { "op": "wait", "seconds": 16 },
+    { "op": "screenshot", "name": "frozen_ocean", "hideHud": true }
+  ]
+}

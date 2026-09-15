@@ -226,7 +226,14 @@ public sealed class WorldgenTests
                         [((nx & Chunk.SizeMask) << Chunk.SizeShift) | (nz & Chunk.SizeMask)];
                     if (!TerrainGenerator.IsBeachHeight(nh)) allBeach = false;
                 }
-                if (allBeach && TerrainGenerator.IsGravelPatch(x0 + 1, z0 + 1))
+                var beachBiome = TerrainGenerator.BiomeAt(x0 + 1, z0 + 1);
+                if (allBeach && TerrainGenerator.IsGravelPatch(x0 + 1, z0 + 1)
+                    // Only ocean and the two sand-shored land biomes wear gravel in the LOD;
+                    // desert and frozen rock keep their own materials.
+                    && beachBiome is Biome.Ocean or Biome.Forest or Biome.Taiga
+                    // A wooded column's canopy is the LOD's top face, which hides the beach cap.
+                    && TreeGenerator.CanopyTop(x0, z0) == 0 && TreeGenerator.CanopyTop(x0 + 1, z0) == 0
+                    && TreeGenerator.CanopyTop(x0, z0 + 1) == 0 && TreeGenerator.CanopyTop(x0 + 1, z0 + 1) == 0)
                 {
                     rx = wx / 64;
                     rz = wz / 64;
@@ -331,5 +338,52 @@ public sealed class WorldgenTests
         for (var z = 0; z < Chunk.Size && !flooded; z++)
             flooded = a.GetLocalBlock(x, y, z) == water;
         Assert.True(flooded, $"submerged chunk ({cx},0,{cz}) holds no water");
+    }
+
+    [Fact]
+    public void DesertNeverTouchesSnowBiomes()
+    {
+        // The temperate buffer: desert needs firmly warm air and taiga/frozen firmly cold air,
+        // so a desert column must never be 8-adjacent to a taiga or frozen column. Scans the
+        // dithered column biomes (what the mesher and LOD actually wear), not just BiomeAt.
+        const int radius = 1024;
+        const int step = 4;
+        var size = radius * 2 / step + 1;
+        var biomes = new Biome[size * size];
+        var foundDesert = false;
+        var foundCold = false;
+        for (var gz = 0; gz < size; gz++)
+        for (var gx = 0; gx < size; gx++)
+        {
+            var cx = (gx * step - radius) >> Chunk.SizeShift;
+            var cz = (gz * step - radius) >> Chunk.SizeShift;
+            var lx = (gx * step - radius) & Chunk.SizeMask;
+            var lz = (gz * step - radius) & Chunk.SizeMask;
+            var biome = Chunk.GetColumnData(cx, cz).Biomes[(lx << Chunk.SizeShift) | lz];
+            biomes[gz * size + gx] = biome;
+            foundDesert |= biome == Biome.Desert;
+            foundCold |= biome is Biome.Taiga or Biome.Frozen;
+        }
+
+        Assert.True(foundDesert, "scan area holds no desert");
+        Assert.True(foundCold, "scan area holds no taiga/frozen");
+
+        for (var gz = 0; gz < size; gz++)
+        for (var gx = 0; gx < size; gx++)
+        {
+            if (biomes[gz * size + gx] != Biome.Desert) continue;
+            for (var dz = -1; dz <= 1; dz++)
+            for (var dx = -1; dx <= 1; dx++)
+            {
+                if (dx == 0 && dz == 0) continue;
+                var nx = gx + dx;
+                var nz = gz + dz;
+                if ((uint)nx >= (uint)size || (uint)nz >= (uint)size) continue;
+                var neighbour = biomes[nz * size + nx];
+                Assert.False(neighbour is Biome.Taiga or Biome.Frozen,
+                    $"desert at ({gx * step - radius},{gz * step - radius}) touches {neighbour} " +
+                    $"at ({nx * step - radius},{nz * step - radius})");
+            }
+        }
     }
 }

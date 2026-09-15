@@ -988,7 +988,9 @@ public class Camera
         for (var z = minZ; z <= maxZ; z++)
         {
             var blockId = chunkManager.GetBlockGlobal(x, y, z);
-            if (!BlockType.IsSolid(blockId)) continue;
+            // A layered-snow cell only collides once its stack fills the cell; every other
+            // block answers as before. See BlockType.IsSolidCell.
+            if (!BlockType.IsSolidCell(blockId, chunkManager.GetStateGlobal(x, y, z))) continue;
             // A pass-through block (leaves) never blocks the body; it only scales the walk
             // while the body overlaps it (see BlockMoveFactor).
             if (BlockType.MovementSpeedOf(blockId) > 0f) continue;
@@ -1406,10 +1408,14 @@ public class Camera
             {
                 // Tapered wood aims at its drawn shape, not the static full-height column:
                 // the node's vertical extent and side arms follow the parent/child
-                // neighbours, so the boxes are resolved from the live neighbourhood.
+                // neighbours, so the boxes are resolved from the live neighbourhood. Layered
+                // snow aims at the box its stack depth actually draws.
+                var cellType = BlockType.ById[cellId];
                 var boxes = WoodShape.IsTapered(cellId)
                     ? WoodShape.GetBoxesAt(cellId, chunkManager.GetBlockGlobal, cellX, cellY, cellZ)
-                    : BlockType.ById[cellId]?.Hitboxes;
+                    : cellType?.Renderer == BlockRenderer.SnowLayers
+                        ? SnowShape.GetBoxes(cellX, cellZ, chunkManager.GetStateGlobal(cellX, cellY, cellZ), cellType.StackMax)
+                        : cellType?.Hitboxes;
                 if (boxes == null || boxes.Length == 0)
                 {
                     hitPosition = currentPosition;

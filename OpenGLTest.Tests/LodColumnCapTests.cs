@@ -35,20 +35,25 @@ public sealed class LodColumnCapTests
     public void MinedColumnCapsPropagateIntoARebuiltRegion()
     {
         // ColumnCaps is process-global with no reset hook and xUnit runs test classes in
-        // parallel, so this region sits far away from every other test's regions: level 1
-        // region (777, 777) covers fine ~99456, while the rest of the suite stays near the
-        // origin (region index ~5).
+        // parallel, so this region sits far away from every other test's regions: region index
+        // 777+ covers fine ~49728, while the rest of the suite stays near the origin (region
+        // index ~5). The climate rework moved the biomes around, so the region is chosen as the
+        // first far frozen one rather than a fixed index: frozen land carries no canopy, and a
+        // canopy would bury the ground the cap lowers, leaving the drawn shell unchanged.
         var spec = LodRegion.Levels[1];
-        const int Rx = 777, Rz = 777;
-        var baseFineX = Rx * spec.RegionBlocks;
-        var baseFineZ = Rz * spec.RegionBlocks;
+        var rx = 777;
+        var rz = 777;
+        while (TerrainGenerator.BiomeAt(rx * spec.RegionBlocks + 64, rz * spec.RegionBlocks + 64) != Biome.Frozen)
+            rx++;
+        var baseFineX = rx * spec.RegionBlocks;
+        var baseFineZ = rz * spec.RegionBlocks;
         var fx = baseFineX + 64;   // chunk column (4, 4) of this region (regionChunkSpan 8)
         var fz = baseFineZ + 64;
 
         var h = Chunk.GetColumnHeights(fx >> Chunk.SizeShift, fz >> Chunk.SizeShift)
             [((fx & Chunk.SizeMask) << Chunk.SizeShift) | (fz & Chunk.SizeMask)];
 
-        var before = LodRegion.BuildMeshData(1, Rx, Rz);
+        var before = LodRegion.BuildMeshData(1, rx, rz);
 
         // Above the terrain (e.g. a player-placed block): nothing to lower, no rebuild needed.
         Assert.False(LodRegion.LowerColumnBelow(fx, h + 5, fz));
@@ -56,14 +61,14 @@ public sealed class LodColumnCapTests
         // Derived from a measured floor rather than guessed as a relative offset, so the stored
         // cap (floor - 33) is strictly below every other sample in the region and is therefore
         // guaranteed to win every window minimum that covers this column.
-        var floor = RegionFloor(1, Rx, Rz);
+        var floor = RegionFloor(1, rx, rz);
         Assert.True(LodRegion.LowerColumnBelow(fx, floor - 32, fz));
 
         // The C9 write/read round trip: floor - 20 > floor - 33, so this must be refused — which
         // is only true if the previous call's bucket element write is visible to this read.
         Assert.False(LodRegion.LowerColumnBelow(fx, floor - 20, fz));
 
-        var after = LodRegion.BuildMeshData(1, Rx, Rz);
+        var after = LodRegion.BuildMeshData(1, rx, rz);
 
         // The cap sits 33 below the region floor, so groundTop for every cell covering this
         // column drops by at least 33 >> cellShift (cellSize 4) = 8 cells, i.e. yLo =

@@ -25,14 +25,22 @@ public static class TreeGenerator
     private static readonly ConcurrentDictionary<(int X, int Z), (int BaseY, TreeShape Shape)> ShapeCache = new();
     private const int ShapeCacheLimit = 16384;
 
-    /// <summary>Block the canopy is made of; the wood ids come from <see cref="WoodId"/>.</summary>
+    /// <summary>Block the broadleaf canopy is made of; the wood ids come from <see cref="WoodId"/>.</summary>
     public static readonly byte LeavesBlock;
+
+    /// <summary>Leaf and trunk blocks of the taiga conifer (see <see cref="BuildSpruceShape"/>).</summary>
+    public static readonly byte SpruceLeavesBlock;
+
+    /// <summary>Full-cube trunk block of the conifer, the spruce family's only taper level.</summary>
+    public static readonly byte SpruceLogBlock;
 
     // Explicit so the lookup happens the first time anything touches this class (after
     // ContentRegistry.Load), not at whatever point beforefieldinit would allow
     static TreeGenerator()
     {
         LeavesBlock = ContentRegistry.RequireBlock("leaves").Id;
+        SpruceLeavesBlock = ContentRegistry.RequireBlock("spruce_leaves").Id;
+        SpruceLogBlock = ContentRegistry.RequireBlock("spruce_log").Id;
     }
 
     /// <summary>
@@ -82,18 +90,25 @@ public static class TreeGenerator
             && Math.Abs(z) <= WorldGenerationConfig.TreeSpawnClearRadius)
             return false;
 
-        // Forest only: desert grows cacti and the ocean floor is bare (see CactusGenerator)
-        if (!TerrainGenerator.IsForest(x, z))
+        // Forest grows the broadleaf silhouette and taiga the conifer; a desert grows cacti and the
+        // frozen plains and ocean floor stay bare (see CactusGenerator).
+        var biome = TerrainGenerator.BiomeAt(x, z);
+        if (biome is not (Biome.Forest or Biome.Taiga))
             return false;
 
         var own = PlacementHash(x, z);
-        if (own >= WorldGenerationConfig.TreeDensity)
+        var density = biome == Biome.Taiga
+            ? WorldGenerationConfig.SpruceDensity
+            : WorldGenerationConfig.TreeDensity;
+        if (own >= density)
             return false;
 
-        // Open forest regions thin the trees to nothing (see TerrainGenerator.ForestOpenness). The
-        // mask is read only for the few columns that already pass the raw density, so the common
-        // case never pays for the extra noise.
-        if (own >= WorldGenerationConfig.TreeDensity * (1f - TerrainGenerator.ForestOpenness(x, z)))
+        // Open regions thin the trees (see TerrainGenerator.ForestOpenness), but a taiga keeps more
+        // of its spruce so a cold forest still reads as wooded. The mask is read only for the few
+        // columns that already pass the raw density, so the common case never pays for the noise.
+        var openness = TerrainGenerator.ForestOpenness(x, z);
+        if (biome == Biome.Taiga) openness *= WorldGenerationConfig.SpruceOpennessRelief;
+        if (own >= density * (1f - openness))
             return false;
 
         var s = WorldGenerationConfig.TreeSpacingRadius;
@@ -138,7 +153,7 @@ public static class TreeGenerator
         if (ShapeCache.Count >= ShapeCacheLimit)
             ShapeCache.Clear();
 
-        shape = BuildShape(x, z, baseY);
+        shape = biome == Biome.Taiga ? BuildSpruceShape(x, z, baseY) : BuildShape(x, z, baseY);
         ShapeCache[skey] = (baseY, shape);
         return true;
     }
@@ -167,25 +182,35 @@ public static class TreeGenerator
     /// <summary>Level of a wood block id, inverse of <see cref="WoodId"/> (leaves: -1).</summary>
     public static int WoodLevel(byte blockId) => BlockType.ById[blockId]?.WoodTaperLevel ?? -1;
 
-    /// <summary>Tree wood of any taper, or leaves: the blocks whose removal disturbs the far-LOD
-    /// canopy. Cactus wood is excluded because it has no canopy.</summary>
-    public static bool IsTreeBlock(byte blockId) =>
-        blockId == LeavesBlock
-        || (WoodLevel(blockId) >= 0 && BlockType.WoodFamilyOf(blockId) == BlockType.TreeWoodFamily);
+    /// <summary>Whether a block id is canopy leaves of either silhouette (broadleaf or spruce).</summary>
+    public static bool IsLeaf(byte blockId) => blockId == LeavesBlock || blockId == SpruceLeavesBlock;
 
-    /// <summary>A trunk's wood cells plus the leaf-blob centres; world coordinates.</summary>
+    /// <summary>Wood of either canopy family, or their leaves: the blocks whose removal disturbs
+    /// the far-LOD canopy. Cactus wood is excluded because it has no canopy.</summary>
+    public static bool IsTreeBlock(byte blockId)
+    {
+        if (IsLeaf(blockId)) return true;
+        if (WoodLevel(blockId) < 0) return false;
+        var family = BlockType.WoodFamilyOf(blockId);
+        return family == BlockType.TreeWoodFamily || family == BlockType.SpruceWoodFamily;
+    }
+
+    /// <summary>A trunk's wood cells, its leaf-blob centres (each with its own radius), and the
+    /// leaf block they fill with; world coordinates.</summary>
     public record struct TreeShape(
         int TrunkX,
         int TrunkBaseY,
         int TrunkZ,
         List<(int X, int Y, int Z, byte Id)> Wood,
-        List<(int X, int Y, int Z)> LeafBlobs);
+        List<(int X, int Y, int Z, int R)> LeafBlobs,
+        byte LeafBlock);
 
     private static TreeShape BuildShape(int x, int z, int baseY)
     {
         var rng = new SplitMix64(SplitMix64.Hash(x, z, WorldGenerationConfig.Seed ^ ShapeSalt));
         var wood = new List<(int, int, int, byte)>(64);
-        var blobs = new List<(int, int, int)>(8);
+        var r = WorldGenerationConfig.TreeCrownRadius;
+        var blobs = new List<(int, int, int, int)>(8);
 
         var trunkH = rng.NextInt(WorldGenerationConfig.TreeMinHeight, WorldGenerationConfig.TreeMaxHeight + 1);
         var logH = Math.Min(WorldGenerationConfig.TreeLogHeight, trunkH - 1);
@@ -196,7 +221,7 @@ public static class TreeGenerator
 
         var topY = baseY + trunkH;
         wood.Add((x, topY, z, WoodId(TrunkLevel(topY - 1) + 1))); // leader spike into the crown
-        blobs.Add((x, topY, z));
+        blobs.Add((x, topY, z, r));
 
         // Limbs leave the upper trunk already one level thinner than the cell they grow from,
         // and narrow one more level every step along (bends included), so each cell has a
@@ -224,7 +249,7 @@ public static class TreeGenerator
                 var tip = step == steps;
                 wood.Add((px, py, pz, WoodId(TrunkLevel(startY) + step)));
                 if (tip)
-                    blobs.Add((px, py, pz));
+                    blobs.Add((px, py, pz, r));
 
                 if (step < steps)
                 {
@@ -239,7 +264,38 @@ public static class TreeGenerator
             }
         }
 
-        return new TreeShape(x, baseY, z, wood, blobs);
+        return new TreeShape(x, baseY, z, wood, blobs, LeavesBlock);
+    }
+
+    /// <summary>
+    /// A taiga conifer: a full-cube spruce trunk with a cone of needle blobs, widest at the base
+    /// and narrowing to a single-cell tip. Blobs are stacked every level with a radius that steps
+    /// down with height, so the union reads as a soft conical crown instead of distinct tiers. No
+    /// limbs: the trunk is never tapered, so there is nothing to weld.
+    /// </summary>
+    private static TreeShape BuildSpruceShape(int x, int z, int baseY)
+    {
+        var rng = new SplitMix64(SplitMix64.Hash(x, z, WorldGenerationConfig.Seed ^ ShapeSalt));
+        var wood = new List<(int, int, int, byte)>(16);
+        var blobs = new List<(int, int, int, int)>(16);
+
+        var trunkH = rng.NextInt(WorldGenerationConfig.SpruceMinHeight, WorldGenerationConfig.SpruceMaxHeight + 1);
+        for (var y = 0; y < trunkH; y++)
+            wood.Add((x, baseY + y, z, SpruceLogBlock));
+
+        // Crown starts a couple of blocks up and tapers to the tip. The radius is rounded so a
+        // small tree still gets a one-block tip instead of a bare spike.
+        var crownBase = baseY + WorldGenerationConfig.SpruceCrownStart;
+        var topY = baseY + trunkH;
+        for (var y = crownBase; y <= topY; y++)
+        {
+            var t = topY <= crownBase ? 1f : (y - crownBase) / (float)(topY - crownBase);
+            var radius = (int)MathF.Round(WorldGenerationConfig.SpruceMaxRadius * (1f - t));
+            if (radius < 1) radius = 1;
+            blobs.Add((x, y, z, radius));
+        }
+
+        return new TreeShape(x, baseY, z, wood, blobs, SpruceLeavesBlock);
     }
 
     private static void StampWood(byte[] blocks, int worldX0, int worldY0, int worldZ0, TreeShape shape)
@@ -254,7 +310,7 @@ public static class TreeGenerator
 
             var i = Chunk.Idx(lx, ly, lz);
             var current = blocks[i];
-            if (current == BlockType.Air || current == LeavesBlock)
+            if (current == BlockType.Air || IsLeaf(current))
                 blocks[i] = id;
         }
 
@@ -265,6 +321,7 @@ public static class TreeGenerator
         var rootZ = shape.TrunkZ - worldZ0;
         if ((uint)rootX >= Chunk.Size || (uint)rootZ >= Chunk.Size)
             return;
+        var trunkId = shape.Wood.Count > 0 ? shape.Wood[0].Id : WoodId(0);
         for (var d = 1; d <= WorldGenerationConfig.TreeRootDepth; d++)
         {
             var ly = shape.TrunkBaseY - d - worldY0;
@@ -273,7 +330,7 @@ public static class TreeGenerator
 
             var i = Chunk.Idx(rootX, ly, rootZ);
             if (blocks[i] != BlockType.Air) break;
-            blocks[i] = WoodId(0);
+            blocks[i] = trunkId;
         }
     }
 
@@ -289,19 +346,18 @@ public static class TreeGenerator
 
             var i = Chunk.Idx(lx, ly, lz);
             if (blocks[i] == BlockType.Air)
-                blocks[i] = LeavesBlock;
+                blocks[i] = shape.LeafBlock;
         }
     }
 
     /// <summary>
-    /// Every world cell a trunk's canopy can place leaves into: the crown blob plus one blob
-    /// per limb tip, with the ragged shell edge. Chunk bounds and air checks are the caller's
-    /// job; shared by the stamper and the canopy-top cache so they can never disagree.
+    /// Every world cell a trunk's canopy can place leaves into: each blob expanded to its own
+    /// radius, with the ragged shell edge. Chunk bounds and air checks are the caller's job;
+    /// shared by the stamper and the canopy-top cache so they can never disagree.
     /// </summary>
     internal static IEnumerable<(int X, int Y, int Z)> CanopyCells(TreeShape shape)
     {
-        var r = WorldGenerationConfig.TreeCrownRadius;
-        foreach (var (cx, cy, cz) in shape.LeafBlobs)
+        foreach (var (cx, cy, cz, r) in shape.LeafBlobs)
         {
             for (var dx = -r; dx <= r; dx++)
             for (var dy = -r; dy <= r; dy++)
