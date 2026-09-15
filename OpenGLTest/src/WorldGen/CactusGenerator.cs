@@ -154,9 +154,16 @@ public static class CactusGenerator
         // stem and welds; a prong is two levels away, so the vertical run beside the stem never
         // reconnects to its ancestor trunk the way a flat, same-level prong used to.
         var arms = rng.NextInt(WorldGenerationConfig.CactusMaxArms + 1);
+        // One arm per cardinal direction: two arms sharing a column would stack a fresh base
+        // above the previous arm's finished tip and widen the silhouette as it climbs.
+        Span<int> order = stackalloc int[Directions.Length];
+        for (var i = 0; i < Directions.Length; i++)
+            order[i] = i;
         for (var a = 0; a < arms; a++)
         {
-            var dir = Directions[rng.NextInt(Directions.Length)];
+            var pick = a + rng.NextInt(Directions.Length - a);
+            (order[a], order[pick]) = (order[pick], order[a]);
+            var dir = Directions[order[a]];
             var startY = baseY + rng.NextInt(Math.Max(1, stemH - 2), stemH);
 
             var px = x + dir.Dx;

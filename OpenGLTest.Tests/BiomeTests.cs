@@ -392,36 +392,44 @@ public sealed class BiomeTests
         Assert.True(WoodShape.ConnectsVertical(tip, prong));
     }
 
-    [Fact]
-    public void GeneratedCactusBranchesWeldOnlyAtTheBase()
+    private static List<Dictionary<(int X, int Y, int Z), byte>> FindStampedCacti(int max)
     {
-        List<(int X, int Y, int Z, byte Id)>? cells = null;
-        for (var cx = 0; cx <= 64 && cells == null; cx++)
-        for (var cz = -64; cz <= 64 && cells == null; cz++)
+        var cacti = new List<Dictionary<(int X, int Y, int Z), byte>>();
+        for (var cx = 0; cx <= 64 && cacti.Count < max; cx++)
+        for (var cz = -64; cz <= 64 && cacti.Count < max; cz++)
         {
             if (TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8) != Biome.Desert)
                 continue;
 
-            for (var x = 0; x < Chunk.Size && cells == null; x++)
-            for (var z = 0; z < Chunk.Size && cells == null; z++)
+            for (var x = 0; x < Chunk.Size && cacti.Count < max; x++)
+            for (var z = 0; z < Chunk.Size && cacti.Count < max; z++)
             {
                 if (!CactusGenerator.TryGetCactus(cx * Chunk.Size + x, cz * Chunk.Size + z, out _, out var shape))
                     continue;
-                if (shape.Wood.Any(c => WoodShape.WoodLevel(c.Id) == 1))
-                    cells = shape.Wood;
+                if (!shape.Wood.Any(c => WoodShape.WoodLevel(c.Id) == 1))
+                    continue;
+
+                var stamped = new Dictionary<(int X, int Y, int Z), byte>();
+                foreach (var (wx, wy, wz, id) in shape.Wood)
+                    stamped.TryAdd((wx, wy, wz), id);
+                cacti.Add(stamped);
             }
         }
+        return cacti;
+    }
 
-        Assert.NotNull(cells);
-        var byPos = new Dictionary<(int X, int Y, int Z), byte>();
-        foreach (var (x, y, z, id) in cells)
-            byPos.TryAdd((x, y, z), id);
+    [Fact]
+    public void GeneratedCactusBranchesWeldOnlyAtTheBase()
+    {
+        var cacti = FindStampedCacti(8);
+        Assert.NotEmpty(cacti);
 
         var weldCount = 0;
-        foreach (var ((x, y, z), id) in byPos)
+        foreach (var cells in cacti)
+        foreach (var ((x, y, z), id) in cells)
         foreach (var (dx, dz) in new[] { (1, 0), (0, 1) })
         {
-            var other = byPos.GetValueOrDefault((x + dx, y, z + dz), BlockType.Air);
+            var other = cells.GetValueOrDefault((x + dx, y, z + dz), BlockType.Air);
             if (!WoodShape.ConnectsHorizontal(id, other)) continue;
 
             var a = WoodShape.WoodLevel(id);
@@ -432,6 +440,22 @@ public sealed class BiomeTests
         }
 
         Assert.True(weldCount > 0, "generated cactus had no base branch-off weld");
+    }
+
+    [Fact]
+    public void GeneratedCactusNarrowsMonotonicallyUpward()
+    {
+        var cacti = FindStampedCacti(8);
+        Assert.NotEmpty(cacti);
+
+        foreach (var cells in cacti)
+        foreach (var column in cells.GroupBy(c => (c.Key.X, c.Key.Z)))
+        {
+            var widths = column.OrderBy(c => c.Key.Y).Select(c => BlockType.ById[c.Value]!.HalfWidth).ToArray();
+            for (var i = 1; i < widths.Length; i++)
+                Assert.True(widths[i] <= widths[i - 1],
+                    $"cactus column widened from {widths[i - 1]} to {widths[i]} climbing upward");
+        }
     }
 
     [Fact]
