@@ -792,6 +792,6 @@ public static class WorldGenerationConfig
     // at a tap to full at a full charge, and the launch speed scales the same way.
     public const float ThrowChargeSeconds = 0.9f;
     public const float ThrowMinCharge = 0.5f;
-    public const float ThrowSpeed = 20f;
+    public const float ThrowSpeed = 40f;
     public const float ThrowLifetimeSeconds = 5f;
 }

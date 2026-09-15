@@ -116,6 +116,21 @@ public class PlayerModel
     private const float SliceWindupEnd = 0.15f;
     private const float SliceStrikeEnd = 0.6f;
 
+    // Charged throw (right-click in the air with a throwable). While held, the right arm
+    // rises forward-up overhead into a cocked pre-throw with the elbow extending on the
+    // way up, eased by the charge amount so the raise reads as slow. The cock goes the
+    // forward way (never backward): swinging back would drag the hand down past the leg
+    // and leave it hanging behind the back. Absolute joint targets (not deltas) so the
+    // pose is the same held or empty-handed. On release the arm strikes fast from the
+    // exact release pose through a follow-through, then settles slowly back to rest —
+    // one direction change, which reads as follow-through rather than a bounce.
+    public const float ThrowDuration = 0.55f;
+    private const float ThrowCockedShoulder = 2.6f;
+    private const float ThrowCockedElbow = 0.35f;
+    private const float ThrowFollowShoulder = 1.6f;
+    private const float ThrowFollowElbow = 0.5f;
+    private const float ThrowStrikeEnd = 0.3f;
+
     // First-person framing: straight-hanging arms sit ~66 degrees below the view centre,
     // invisible until you pitch well down, and hide behind the chest when you do. Resting
     // them slightly forward with bent elbows and a touch of inward yaw parks the hands in
@@ -139,6 +154,9 @@ public class PlayerModel
     private float _mineT = 1f;
     private float _sliceT = 1f;
     private int _sliceDir;
+    private float _throwT = 1f;
+    private float? _throwCharge01;
+    private float _throwReleaseCharge;
     private float _time;
     private float _holdBlend;
 
@@ -156,6 +174,15 @@ public class PlayerModel
 
     /// <summary>Whether a slice swing is currently playing.</summary>
     public bool IsSlicing => _sliceT < 1f;
+
+    /// <summary>Whether a throw swing is currently playing.</summary>
+    public bool IsThrowing => _throwT < 1f;
+
+    /// <summary>Progress of the active throw swing: 0 at release, 1 when it has finished.</summary>
+    public float ThrowProgress => _throwT;
+
+    /// <summary>Charge the arm is cocked to, or null when no throw is being aimed.</summary>
+    public float? ThrowCharge => _throwCharge01;
 
     /// <summary>Progress of the active slice swing: 0 at the wind-up, 1 when it has finished.</summary>
     public float SliceProgress => _sliceT;
@@ -203,6 +230,9 @@ public class PlayerModel
 
         if (_sliceT < 1f)
             _sliceT = Math.Min(1f, _sliceT + deltaTime / SliceDuration);
+
+        if (_throwT < 1f)
+            _throwT = Math.Min(1f, _throwT + deltaTime / ThrowDuration);
     }
 
     /// <summary>Starts one hand swing (a mining hit just landed).</summary>
@@ -217,6 +247,23 @@ public class PlayerModel
     {
         _sliceDir = direction;
         _sliceT = 0f;
+    }
+
+    public void StartThrowCharge() => _throwCharge01 = 0f;
+
+    public void UpdateThrowCharge(float charge01)
+    {
+        if (_throwCharge01.HasValue)
+            _throwCharge01 = MathUtils.Clamp01(charge01);
+    }
+
+    public void CancelThrowCharge() => _throwCharge01 = null;
+
+    public void ReleaseThrow(float charge01)
+    {
+        _throwReleaseCharge = MathUtils.Clamp01(charge01);
+        _throwCharge01 = null;
+        _throwT = 0f;
     }
 
     // Signed yaw the right arm sweeps through: 0 at rest, out to the swing's start side on the
@@ -347,7 +394,7 @@ public class PlayerModel
             leftShoulder, rightShoulder, leftElbow, rightElbow, torsoPitch, bob);
 
         if (_airBlend <= 0.001f)
-            return WithMinePump(ground, pump);
+            return WithThrow(WithMinePump(ground, pump));
 
         var rise = MathUtils.Clamp01(_airVelocity / 11f);
         var fall = MathUtils.Clamp01(-_airVelocity / 12f);
@@ -380,7 +427,42 @@ public class PlayerModel
             MathUtils.Lerp(ground.RightElbow, air.RightElbow, t),
             MathUtils.Lerp(ground.TorsoPitch, air.TorsoPitch, t),
             MathUtils.Lerp(ground.Bob, 0f, t));
-        return WithMinePump(blended, pump);
+        return WithThrow(WithMinePump(blended, pump));
+    }
+
+    private Pose WithThrow(in Pose pose)
+    {
+        var cocked = 0f;
+        if (_throwCharge01.HasValue)
+            cocked = MathUtils.SmoothStep(_throwCharge01.Value);
+        else if (_throwT < 1f)
+            cocked = MathUtils.SmoothStep(_throwReleaseCharge);
+        if (cocked <= 0f)
+            return pose;
+        var fromShoulder = MathUtils.Lerp(pose.RightShoulder, ThrowCockedShoulder, cocked);
+        var fromElbow = MathUtils.Lerp(pose.RightElbow, ThrowCockedElbow, cocked);
+        if (_throwCharge01.HasValue || _throwT >= 1f)
+            return new Pose(pose.LeftHip, pose.RightHip, pose.LeftKnee, pose.RightKnee,
+                pose.LeftShoulder, fromShoulder, pose.LeftElbow, fromElbow,
+                pose.TorsoPitch, pose.Bob);
+        float swingShoulder, swingElbow;
+        if (_throwT < ThrowStrikeEnd)
+        {
+            var u = _throwT / ThrowStrikeEnd;
+            var strike = u * u;
+            swingShoulder = MathUtils.Lerp(fromShoulder, ThrowFollowShoulder, strike);
+            swingElbow = MathUtils.Lerp(fromElbow, ThrowFollowElbow, strike);
+        }
+        else
+        {
+            var u = (_throwT - ThrowStrikeEnd) / (1f - ThrowStrikeEnd);
+            var settle = 1f - (1f - u) * (1f - u);
+            swingShoulder = MathUtils.Lerp(ThrowFollowShoulder, pose.RightShoulder, settle);
+            swingElbow = MathUtils.Lerp(ThrowFollowElbow, pose.RightElbow, settle);
+        }
+        return new Pose(pose.LeftHip, pose.RightHip, pose.LeftKnee, pose.RightKnee,
+            pose.LeftShoulder, swingShoulder, pose.LeftElbow, swingElbow,
+            pose.TorsoPitch, pose.Bob);
     }
 
     private static Pose WithMinePump(in Pose pose, float pump)

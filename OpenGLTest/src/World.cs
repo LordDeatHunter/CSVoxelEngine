@@ -1221,6 +1221,7 @@ public class World : IItemUseWorld
         _throwChargeSeconds = 0f;
         _throwItemId = id;
         _throwBaseDamage = item.ThrowDamage ?? 0f;
+        Player.StartThrowCharge();
         return true;
     }
 
@@ -1229,10 +1230,19 @@ public class World : IItemUseWorld
         if (!_throwCharging) return;
         _throwChargeSeconds = Math.Min(_throwChargeSeconds + Math.Max(0f, deltaTime), WorldGenerationConfig.ThrowChargeSeconds);
         if (Inventory.SelectedBlockId != _throwItemId || Inventory.SelectedCount <= 0)
+        {
             _throwCharging = false;
+            Player.CancelThrowCharge();
+            return;
+        }
+        Player.UpdateThrowCharge(ThrowCharge01);
     }
 
-    public void CancelThrowCharge() => _throwCharging = false;
+    public void CancelThrowCharge()
+    {
+        _throwCharging = false;
+        Player.CancelThrowCharge();
+    }
 
     public bool ReleaseThrow()
     {
@@ -1240,13 +1250,21 @@ public class World : IItemUseWorld
         _throwCharging = false;
         var charge01 = MathUtils.Clamp01(_throwChargeSeconds / WorldGenerationConfig.ThrowChargeSeconds);
         var id = _throwItemId;
-        if (id == 0 || Inventory.SelectedBlockId != id || Inventory.SelectedCount <= 0) return false;
-        if (!Camera.IsCreative && !Inventory.ConsumeSelected()) return false;
+        if (id == 0 || Inventory.SelectedBlockId != id || Inventory.SelectedCount <= 0)
+        {
+            Player.CancelThrowCharge();
+            return false;
+        }
+        if (!Camera.IsCreative && !Inventory.ConsumeSelected())
+        {
+            Player.CancelThrowCharge();
+            return false;
+        }
         var origin = Camera.Position + Camera.ViewDirection * 0.6f;
         var velocity = ThrownProjectile.LaunchVelocity(Camera.ViewDirection, charge01);
         _thrown.Add(new ThrownProjectile(id, origin, velocity, _throwBaseDamage, charge01));
         Camera.NotifyPlayerAction();
-        Player.Punch();
+        Player.ReleaseThrow(charge01);
         return true;
     }
 

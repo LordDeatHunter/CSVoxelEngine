@@ -361,4 +361,99 @@ public sealed class PlayerModelTests
         // stays attached to the torso.
         Assert.Equal(rest, strike, 4);
     }
+
+    [Fact]
+    public void ThrowChargeRaisesTheRightArmOverheadProgressively()
+    {
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++)
+            player.Update(1f / 60f, 0f);
+        var rest = player.GetPose().RightShoulder;
+        var restElbow = player.GetPose().RightElbow;
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+        float HandY() => Vector3.Transform(Vector3.Zero, player.GetHandAnchorMatrix(eye, -90f)).Y;
+        var restHand = HandY();
+
+        player.StartThrowCharge();
+        player.UpdateThrowCharge(0f);
+        var tapped = player.GetPose().RightShoulder;
+        var midHand = 0f;
+        player.UpdateThrowCharge(0.5f);
+        var half = player.GetPose().RightShoulder;
+        midHand = HandY();
+        player.UpdateThrowCharge(1f);
+        var full = player.GetPose().RightShoulder;
+
+        Assert.True(tapped >= rest);
+        Assert.True(half > tapped);
+        Assert.True(full > half);
+        Assert.True(full > rest + 0.5f);
+        Assert.True(player.GetPose().RightElbow < restElbow);
+        Assert.True(midHand > restHand);
+        Assert.True(HandY() > restHand + 0.15f);
+    }
+
+    [Fact]
+    public void ThrowReleaseFallsToRestWithoutBouncing()
+    {
+        var player = new PlayerModel();
+        player.Update(1f / 60f, 0f);
+        var rest = player.GetPose().RightShoulder;
+
+        player.StartThrowCharge();
+        player.UpdateThrowCharge(1f);
+        var cocked = player.GetPose().RightShoulder;
+        player.ReleaseThrow(1f);
+        Assert.True(player.IsThrowing);
+        Assert.Equal(0f, player.ThrowProgress, 3);
+        Assert.Equal(cocked, player.GetPose().RightShoulder, 4);
+
+        var last = cocked;
+        for (var i = 1; i <= 4; i++)
+        {
+            player.Update(PlayerModel.ThrowDuration / 4f, 0f);
+            var sampled = player.GetPose().RightShoulder;
+            Assert.True(sampled < last - 0.05f);
+            last = sampled;
+        }
+
+        for (var i = 0; i < 60; i++)
+            player.Update(1f / 60f, 0f);
+        Assert.False(player.IsThrowing);
+        Assert.True(MathF.Abs(player.GetPose().RightShoulder - rest) < 0.05f);
+    }
+
+    [Fact]
+    public void ThrowCancelDropsTheCockedArm()
+    {
+        var player = new PlayerModel();
+        player.Update(1f / 60f, 0f);
+        var rest = player.GetPose().RightShoulder;
+
+        player.StartThrowCharge();
+        player.UpdateThrowCharge(1f);
+        Assert.True(player.GetPose().RightShoulder > rest + 0.5f);
+
+        player.CancelThrowCharge();
+        Assert.True(MathF.Abs(player.GetPose().RightShoulder - rest) < 0.05f);
+        Assert.False(player.IsThrowing);
+    }
+
+    [Fact]
+    public void ThrowReleaseCarriesItsChargeExplicitly()
+    {
+        var player = new PlayerModel();
+        player.Update(1f / 60f, 0f);
+        var rest = player.GetPose().RightShoulder;
+
+        player.StartThrowCharge();
+        player.UpdateThrowCharge(1f);
+        var cocked = player.GetPose().RightShoulder;
+        player.CancelThrowCharge();
+        player.ReleaseThrow(1f);
+
+        Assert.True(player.IsThrowing);
+        Assert.Equal(cocked, player.GetPose().RightShoulder, 4);
+        Assert.True(player.GetPose().RightShoulder > rest + 0.5f);
+    }
 }
