@@ -46,6 +46,78 @@ public sealed class BlockMovementTests
     }
 
     [Fact]
+    public void FrictionDefaultsToPointNineNineAndIceIsLower()
+    {
+        Assert.Equal(0.99f, BlockType.DefaultFriction);
+        Assert.Equal(0.99f, ContentRegistry.RequireBlock("stone").Friction);
+        var ice = ContentRegistry.RequireBlock("ice");
+        Assert.True(ice.Friction < BlockType.DefaultFriction, $"ice friction {ice.Friction} is not below default");
+        Assert.Equal(ice.Friction, BlockType.FrictionOf(ice.Id));
+    }
+
+    [Fact]
+    public void GroundAccelRateIsSlowerOnIce()
+    {
+        var stone = Camera.GroundAccelRate(BlockType.DefaultFriction);
+        var ice = Camera.GroundAccelRate(ContentRegistry.RequireBlock("ice").Friction);
+        Assert.True(ice < stone, $"ice rate {ice} should be below stone rate {stone}");
+    }
+
+    [Fact]
+    public void WalkAcceleratesGraduallyFromRest()
+    {
+        var manager = Field(BlockType.Air, out var camera);
+        var idle = new ScriptedKeyboard();
+        camera.Update(Dt, idle, manager);
+        camera.Update(Dt, idle, manager);
+
+        var keys = new ScriptedKeyboard();
+        keys.Press([Key.W]);
+        var before = camera.Position.X;
+        camera.Update(Dt, keys, manager);
+        keys.ReleaseAll();
+
+        var instantStep = 8f * Dt;
+        var firstStep = camera.Position.X - before;
+        Assert.True(firstStep > 0f, "no movement on the first input frame");
+        Assert.True(firstStep < instantStep, $"first step {firstStep} did not ramp (instant is {instantStep})");
+        Assert.InRange(camera.HorizontalVelocity.Length(), 0.01f, 8f);
+    }
+
+    [Fact]
+    public void IceGlidesFurtherThanStoneAfterRelease()
+    {
+        static float GlideAfterRelease(byte floorId)
+        {
+            var manager = new ChunkManager(null!);
+            var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);
+            chunk.IsBlockDataReady = true;
+            for (var x = 0; x < Chunk.Size; x++)
+            for (var z = 0; z < Chunk.Size; z++)
+                chunk.SetBlockRaw(x, 0, z, floorId, 0);
+            manager.Chunks[Vector3.Zero] = chunk;
+
+            var camera = new Camera(null, null);
+            camera.TestTeleport(new Vector3(2.5f, 1f + Camera.EyeHeight, 8.5f), yaw: 0f, pitch: 0f);
+            var keys = new ScriptedKeyboard();
+            keys.Press([Key.W]);
+            for (var i = 0; i < Frames; i++)
+                camera.Update(Dt, keys, manager);
+            keys.ReleaseAll();
+            var releaseX = camera.Position.X;
+            var idle = new ScriptedKeyboard();
+            for (var i = 0; i < Frames; i++)
+                camera.Update(Dt, idle, manager);
+            return camera.Position.X - releaseX;
+        }
+
+        var stoneGlide = GlideAfterRelease(ContentRegistry.RequireBlock("stone").Id);
+        var iceGlide = GlideAfterRelease(ContentRegistry.RequireBlock("ice").Id);
+        Assert.True(stoneGlide > 0f, "stone did not glide at all");
+        Assert.True(iceGlide > stoneGlide + 0.5f, $"ice glide {iceGlide} not clearly beyond stone {stoneGlide}");
+    }
+
+    [Fact]
     public void LeavesDeclareThreeQuarterMovementSpeed()
     {
         var leaves = ContentRegistry.RequireBlock("leaves");

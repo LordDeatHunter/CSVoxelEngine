@@ -22,6 +22,7 @@ public sealed record BlockType
     /// <summary>Damage a block takes before it breaks; one hit deals the held tool's power.
     /// See <see cref="Mining"/>.</summary>
     public const float DefaultHardness = 5f;
+    public const float DefaultFriction = 0.999f;
 
     /// <summary>Every registered block by id; null where no block owns that id.</summary>
     public static readonly BlockType?[] ById = new BlockType?[256];
@@ -71,6 +72,7 @@ public sealed record BlockType
 
     // How fast the player moves through each block while inside it; 0 is a solid collider.
     internal static readonly float[] MovementSpeedById = new float[256];
+    internal static readonly float[] FrictionById = new float[256];
 
     // Whether tapered wood may grow a tube or arm into each block id (members of the
     // tree_branch_connectable tag: leaves, never terrain). Flat like the other mesher flags.
@@ -135,6 +137,7 @@ public sealed record BlockType
     /// the body overlaps it (leaves <c>0.75</c>), with <c>1</c> passable at full speed.
     /// </summary>
     public float MovementSpeed { get; init; }
+    public float Friction { get; init; } = DefaultFriction;
 
     /// <summary>Whether the block hides a neighbouring full cube's face. Defaults to "the baked
     /// model is a full cube and it is not cutout", so it is only known after baking.</summary>
@@ -265,6 +268,8 @@ public sealed record BlockType
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float MovementSpeedOf(byte blockId) => MovementSpeedById[blockId];
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float FrictionOf(byte blockId) => FrictionById[blockId];
 
     /// <summary>Whether a block fully hides a neighbouring full cube's face.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

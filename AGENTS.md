@@ -248,6 +248,7 @@ trailing commas.
 | `tools` | none | tag name to minimum tool power, e.g. `{"pickaxe": 1.0}` admits any item listed in the `pickaxe` tag (`assets/data/tags/pickaxe.json`) whose `tool.power` is at least 1.0; `0` admits any member. Only read while `requiresTool` is true; a tag no item provides warns yellow at startup |
 | `solid` | true | collides with bodies (`BlockType.IsSolid`) |
 | `movementSpeed` | 0 | how fast the player moves through the block, 0..1: `0` (default) is a solid collider, a positive value makes it non-blocking for the player and scales their speed while the body overlaps it (`1` = full speed), so leaves at `0.75` are waded through at 75% speed; never set on fluids |
+| `friction` | 0.99 | grip of the block's top face, 0..1: `1` is instant response, lower slides more (ground response time grows with `1 - friction`); ice sets `0.95`. Only read from the solid block under the feet |
 | `occludes` | full cube && !cutout | hides a neighbouring full cube's face (`OccludesNeighbours`) |
 | `cullSelf` | false | also cull faces against a neighbour of the same block (glass) |
 | `castsAO` | `solid` | darkens neighbouring faces (`CastsAmbientOcclusion`) |

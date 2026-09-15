@@ -292,6 +292,8 @@ public static class ContentRegistry
         Array.Clear(BlockType.BranchConnectableById);
         Array.Clear(BlockType.SolidById);
         Array.Clear(BlockType.MovementSpeedById);
+        Array.Clear(BlockType.FrictionById);
+        Array.Fill(BlockType.FrictionById, BlockType.DefaultFriction);
         Array.Clear(BlockType.OccludesById);
         Array.Clear(BlockType.CastsAoById);
         Array.Clear(BlockType.FluidById);
@@ -793,6 +795,11 @@ public static class ContentRegistry
                 throw new InvalidOperationException(
                     $"Block '{path}' sets movementSpeed on a fluid: swimming handles how fast a body moves through it.");
 
+            var friction = definition.Friction ?? BlockType.DefaultFriction;
+            if (!float.IsFinite(friction) || friction < 0f || friction > 1f)
+                throw new InvalidOperationException(
+                    $"Block '{path}' has friction {definition.Friction}; expected 0..1.");
+
             var hardness = definition.Hardness ?? BlockType.DefaultHardness;
             if (!float.IsFinite(hardness) || hardness < 0f)
                 throw new InvalidOperationException(
@@ -828,6 +835,7 @@ public static class ContentRegistry
                 Tools = tools,
                 Solid = solid,
                 MovementSpeed = movementSpeed,
+                Friction = friction,
                 CullSelf = definition.CullSelf ?? false,
                 CastsAmbientOcclusion = !fluid && (definition.CastsAO ?? solid),
                 Cutout = definition.Cutout ?? false,
@@ -868,6 +876,7 @@ public static class ContentRegistry
             BlockType.SolidById[id] = type.Solid;
             BlockType.StackSolidStateById[id] = (byte)stackSolidAt;
             BlockType.MovementSpeedById[id] = type.MovementSpeed;
+            BlockType.FrictionById[id] = type.Friction;
             BlockType.CastsAoById[id] = type.CastsAmbientOcclusion;
             BlockType.FluidById[id] = type.Fluid;
             BlockType.FluidTickDivisorById[id] = type.FluidTickDivisor;

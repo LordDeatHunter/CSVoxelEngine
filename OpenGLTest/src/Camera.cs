@@ -81,6 +81,8 @@ public class Camera
     /// a walker standing in a block with no movement speed.
     /// </summary>
     public float MovementFactor { get; private set; } = 1f;
+    public float GroundFriction { get; private set; } = BlockType.DefaultFriction;
+    public Vector2 HorizontalVelocity => _horizontalVelocity;
 
     /// <summary>
     /// Whether the player is deep enough in a fluid to swim: some cell of the body's footprint
@@ -133,6 +135,11 @@ public class Camera
     private const float CollisionStepSize = 0.05f;
     // How fast a mob knockback shove decays; larger stops the slide sooner.
     private const float KnockbackDamping = 6f;
+    private const float GroundMinResponse = 0.02f;
+    private const float GroundSlideScale = 10f;
+    private const float AirAccelRate = 6f;
+    private const float SwimAccelRate = 4.5f;
+    private const float FlyAccelRate = 6f;
 
     // Auto-step heights: sprinting runs up a full block, plain walking only half a block,
     // so a one-block terrain step still has to be jumped (or run at) on foot. StepClearance
@@ -232,6 +239,7 @@ public class Camera
 
     // Decaying horizontal shove from a mob hit, integrated into the walk each frame
     private Vector3 _knockback;
+    private Vector2 _horizontalVelocity;
 
     // Damage shake: trauma 0..1, fed by AddShake and decayed in Update. The view offset
     // and roll ride trauma-squared, so small hits tremble and big hits lurch.
@@ -351,6 +359,7 @@ public class Camera
         // speed it built up before the jump and plummets through the frame it wanted
         _verticalVelocity = 0f;
         _knockback = Vector3.Zero;
+        _horizontalVelocity = Vector2.Zero;
         _shoulderOffset = Vector3.Zero;
         _shoulderViewDir = Vector3.Zero;
         _shoulderBlendT = IsShoulderSurf ? 1f : 0f;
@@ -551,11 +560,29 @@ public class Camera
         // Pass-through blocks scale the walk instead of blocking it; flight is noclip.
         MovementFactor = BlockMoveFactor(chunkManager);
         if (!IsFlying) moveSpeed *= MovementFactor;
-        var intendedSpeed = moving ? moveSpeed * moveInput.Length() : 0f;
+        var wish = new Vector2(moveInput.X * moveSpeed, moveInput.Z * moveSpeed);
+        float accelRate;
+        if (IsFlying)
+            accelRate = FlyAccelRate;
+        else if (swimming)
+            accelRate = SwimAccelRate;
+        else if (IsGrounded)
+        {
+            GroundFriction = SampleGroundFriction(chunkManager);
+            accelRate = GroundAccelRate(GroundFriction);
+        }
+        else
+        {
+            accelRate = AirAccelRate;
+        }
+        _horizontalVelocity.X = MathUtils.Damp(_horizontalVelocity.X, wish.X, accelRate, deltaTime);
+        _horizontalVelocity.Y = MathUtils.Damp(_horizontalVelocity.Y, wish.Y, accelRate, deltaTime);
+
+        var intendedSpeed = _horizontalVelocity.Length();
         UpdateHeadMotion(deltaTime, intendedSpeed, moving, swimming);
         UpdateShake(deltaTime);
 
-        var frameMovement = moveInput * moveSpeed * deltaTime;
+        var frameMovement = new Vector3(_horizontalVelocity.X * deltaTime, 0f, _horizontalVelocity.Y * deltaTime);
 
         // Mob knockback rides the walk like the water flow below: a decaying horizontal shove that
         // the same axis moves still stop against a wall. Flight clears it (it cannot be hit).
@@ -629,11 +656,18 @@ public class Camera
         // Auto-step: on foot and grounded, a low ledge is climbed instead of stopping the
         // move — sprinting clears a full block, walking only half. The raised attempt replays
         // the frame's horizontal move from the pre-move spot, so the climb never overshoots.
+        var steppedThisFrame = false;
         if (!swimming && IsGrounded && (collidedX || collidedZ)
             && TryStepUp(horizontalStart, frameMovement,
                 IsSprinting ? SprintStepHeight : WalkStepHeight, chunkManager) is { } stepped)
         {
             Position = stepped;
+            steppedThisFrame = true;
+        }
+        if (!steppedThisFrame)
+        {
+            if (collidedX) _horizontalVelocity.X = 0f;
+            if (collidedZ) _horizontalVelocity.Y = 0f;
         }
 
         // Swimming into a wall while holding Space climbs it. The boost is applied before the
@@ -1002,6 +1036,39 @@ public class Camera
         }
 
         return factor;
+    }
+
+    internal static float GroundAccelRate(float friction)
+    {
+        var clamped = Math.Clamp(friction, 0f, 1f);
+        var tau = GroundMinResponse + (1f - clamped) * GroundSlideScale;
+        tau = Math.Clamp(tau, GroundMinResponse, GroundSlideScale);
+        return Math.Clamp(1f / tau, 0.1f, 50f);
+    }
+
+    private float SampleGroundFriction(ChunkManager chunkManager)
+    {
+        var feetY = Position.Y - EyeHeight;
+        var groundY = MathUtils.FloorToInt(feetY - 0.02f);
+        var minX = MathUtils.FloorToInt(Position.X - PlayerRadius);
+        var maxX = MathUtils.FloorToInt(Position.X + PlayerRadius);
+        var minZ = MathUtils.FloorToInt(Position.Z - PlayerRadius);
+        var maxZ = MathUtils.FloorToInt(Position.Z + PlayerRadius);
+
+        var friction = BlockType.DefaultFriction;
+        var found = false;
+        for (var x = minX; x <= maxX; x++)
+        for (var z = minZ; z <= maxZ; z++)
+        {
+            var id = chunkManager.GetBlockGlobal(x, groundY, z);
+            if (!BlockType.IsSolidCell(id, chunkManager.GetStateGlobal(x, groundY, z))) continue;
+            var candidate = BlockType.FrictionOf(id);
+            if (!found || candidate < friction)
+                friction = candidate;
+            found = true;
+        }
+
+        return found ? friction : BlockType.DefaultFriction;
     }
 
     /// <summary>

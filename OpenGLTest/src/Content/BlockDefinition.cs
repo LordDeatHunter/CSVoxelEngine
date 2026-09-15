@@ -45,6 +45,13 @@ public sealed class BlockDefinition
     /// </summary>
     public float? MovementSpeed { get; set; }
 
+    /// <summary>
+    /// Grip of the block's top face, 0..1. <c>1</c> is instant response, lower slides more
+    /// (the ground response time grows with <c>1 - friction</c>). Default 0.99; ice sets
+    /// this lower so stops and turns glide. Only read from the solid block under the feet.
+    /// </summary>
+    public float? Friction { get; set; }
+
     public bool? Occludes { get; set; }
     public bool? CullSelf { get; set; }
     public bool? CastsAO { get; set; }
