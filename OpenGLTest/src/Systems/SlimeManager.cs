@@ -88,10 +88,8 @@ public sealed class SlimeManager
         if (_type.LootTable == null) return;
 
         _loot.Clear();
-        _type.LootTable.Roll(new LootContext(
-            (int)MathF.Floor(slime.Position.X),
-            (int)MathF.Floor(slime.Position.Y),
-            (int)MathF.Floor(slime.Position.Z), 0), _loot);
+        var (lootX, lootY, lootZ) = slime.Position.BlockCell();
+        _type.LootTable.Roll(new LootContext(lootX, lootY, lootZ, 0), _loot);
 
         foreach (var id in _loot)
             drops.SpawnAt(id, slime.Position);
@@ -116,14 +114,14 @@ public sealed class SlimeManager
             var angle = Random.Shared.NextSingle() * MathF.Tau;
             var radius = MathUtils.Lerp(WorldGenerationConfig.SlimeSpawnMinRadiusBlocks,
                 WorldGenerationConfig.SlimeSpawnMaxRadiusBlocks, Random.Shared.NextSingle());
-            var x = (int)MathF.Floor(playerPosition.X + MathF.Cos(angle) * radius);
-            var z = (int)MathF.Floor(playerPosition.Z + MathF.Sin(angle) * radius);
+            var x = MathUtils.FloorToInt(playerPosition.X + MathF.Cos(angle) * radius);
+            var z = MathUtils.FloorToInt(playerPosition.Z + MathF.Sin(angle) * radius);
 
-            var chunkX = x >> Chunk.SizeShift;
-            var chunkZ = z >> Chunk.SizeShift;
-            var localX = x & Chunk.SizeMask;
-            var localZ = z & Chunk.SizeMask;
-            var height = Chunk.GetColumnHeights(chunkX, chunkZ)[(localX << Chunk.SizeShift) | localZ];
+            var chunkX = VoxelCoords.WorldToChunk(x);
+            var chunkZ = VoxelCoords.WorldToChunk(z);
+            var localX = VoxelCoords.WorldToLocal(x);
+            var localZ = VoxelCoords.WorldToLocal(z);
+            var height = Chunk.GetColumnHeights(chunkX, chunkZ)[VoxelCoords.ColumnIndex(localX, localZ)];
 
             // Surface spawns only: dry forest ground with two clear cells above, all of them in
             // loaded chunks (TryGetCell reports unloaded as absent, not as air).

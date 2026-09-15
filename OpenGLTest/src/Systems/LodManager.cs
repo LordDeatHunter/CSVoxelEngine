@@ -418,7 +418,7 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
     {
         var pos = _camera!.Position;
         var size = LodRegion.Levels[level].RegionBlocks;
-        return ((int)MathF.Floor(pos.X / size), (int)MathF.Floor(pos.Z / size));
+        return (MathUtils.FloorToInt(pos.X / size), MathUtils.FloorToInt(pos.Z / size));
     }
 
     public void Update(ChunkManager chunkManager)

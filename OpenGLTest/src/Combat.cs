@@ -19,7 +19,7 @@ public static class Combat
 
     /// <summary>Cosine of <see cref="PunchHalfAngleDegrees"/>: a target is in the cone when the
     /// view direction's dot with the unit direction to it is at least this.</summary>
-    public static readonly float PunchMinDot = MathF.Cos(PunchHalfAngleDegrees * (MathF.PI / 180f));
+    public static readonly float PunchMinDot = MathUtils.CosDeg(PunchHalfAngleDegrees);
 
     /// <summary>
     /// Whether a body at <paramref name="target"/> sits inside the forward punch cone from

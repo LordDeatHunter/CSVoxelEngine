@@ -208,17 +208,17 @@ public static class WormCarver
 
     private static int SurfaceHeight(float x, float z)
     {
-        var bx = (int)MathF.Floor(x);
-        var bz = (int)MathF.Floor(z);
-        return Chunk.GetColumnData(bx >> Chunk.SizeShift, bz >> Chunk.SizeShift)
-            .Heights[((bx & Chunk.SizeMask) << Chunk.SizeShift) | (bz & Chunk.SizeMask)];
+        var bx = MathUtils.FloorToInt(x);
+        var bz = MathUtils.FloorToInt(z);
+        return Chunk.GetColumnData(VoxelCoords.WorldToChunk(bx), VoxelCoords.WorldToChunk(bz))
+            .Heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(bx), VoxelCoords.WorldToLocal(bz))];
     }
 
     private static float EntranceWeight(float x, float z)
     {
-        var bx = (int)MathF.Floor(x);
-        var bz = (int)MathF.Floor(z);
-        return Chunk.GetColumnData(bx >> Chunk.SizeShift, bz >> Chunk.SizeShift)
-            .EntranceWeight[((bx & Chunk.SizeMask) << Chunk.SizeShift) | (bz & Chunk.SizeMask)];
+        var bx = MathUtils.FloorToInt(x);
+        var bz = MathUtils.FloorToInt(z);
+        return Chunk.GetColumnData(VoxelCoords.WorldToChunk(bx), VoxelCoords.WorldToChunk(bz))
+            .EntranceWeight[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(bx), VoxelCoords.WorldToLocal(bz))];
     }
 }

@@ -6,7 +6,7 @@ namespace silkgltriangle;
 /// <summary>Durability component: uses left out of the item's maximum.</summary>
 public record struct DurabilityComponent(int UsesLeft, int MaxUses)
 {
-    public float Fraction => MaxUses > 0 ? Math.Clamp(UsesLeft / (float)MaxUses, 0f, 1f) : 1f;
+    public float Fraction => MaxUses > 0 ? MathUtils.Clamp01(UsesLeft / (float)MaxUses) : 1f;
     public bool IsBroken => MaxUses > 0 && UsesLeft <= 0;
 }
 

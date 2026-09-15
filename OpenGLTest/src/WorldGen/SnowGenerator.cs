@@ -59,7 +59,7 @@ public static class SnowGenerator
             var cold = TerrainGenerator.ColdWeight(worldX, worldZ);
             if (cold <= WorldGenerationConfig.SnowColdThreshold) continue;
 
-            var height = column.Heights[(x << Chunk.SizeShift) | z];
+            var height = column.Heights[VoxelCoords.ColumnIndex(x, z)];
             int surfaceLy;
             if (TerrainGenerator.IsWaterColumn(worldX, worldZ, height))
             {

@@ -50,7 +50,7 @@ internal static class CloudCopies
     /// The field multiple at or below <paramref name="coord"/>. Floor, not truncation: at negative
     /// coordinates truncation would round towards zero and snap the grid a whole field out of place.
     /// </summary>
-    internal static float Snap(float coord, float field) => MathF.Floor(coord / field) * field;
+    internal static float Snap(float coord, float field) => MathUtils.Snap(coord, field);
 
     /// <summary>
     /// Fills <paramref name="offsets"/> with the world-space (x, z) origin of every copy of the 3x3

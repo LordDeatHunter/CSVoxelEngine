@@ -49,7 +49,7 @@ public class PrimedTnt
         get
         {
             // Blink rate ramps from 4 to ~16 Hz as the fuse burns down
-            var progress = 1f - Math.Clamp(FuseRemaining / FuseDuration, 0f, 1f);
+            var progress = 1f - MathUtils.Clamp01(FuseRemaining / FuseDuration);
             var rate = MathUtils.Lerp(4f, 16f, progress);
             return ((int)(_age * rate) & 1) == 0 ? 1f : 0f;
         }
@@ -60,7 +60,7 @@ public class PrimedTnt
     {
         get
         {
-            var progress = 1f - Math.Clamp(FuseRemaining / FuseDuration, 0f, 1f);
+            var progress = 1f - MathUtils.Clamp01(FuseRemaining / FuseDuration);
             return 1f + 0.1f * progress * (WhiteFlash == 1f ? 1f : 0f);
         }
     }
@@ -98,8 +98,8 @@ public class PrimedTnt
     {
         if (deltaTime <= 0f || chunks == null) return;
 
-        var submerged = Position.Y < chunks.GetFluidSurfaceGlobal(
-            (int)MathF.Floor(Position.X), (int)MathF.Floor(Position.Y), (int)MathF.Floor(Position.Z));
+        var (fluidX, fluidY, fluidZ) = Position.BlockCell();
+        var submerged = Position.Y < chunks.GetFluidSurfaceGlobal(fluidX, fluidY, fluidZ);
 
         if (submerged)
             _velocity.Y = MathUtils.Damp(_velocity.Y, WaterSinkSpeed, WaterDrag, deltaTime);
@@ -152,7 +152,7 @@ public class PrimedTnt
 
         while (MathF.Abs(remaining) > float.Epsilon)
         {
-            var step = Math.Clamp(remaining, -CollisionStepSize, CollisionStepSize);
+            var step = MathUtils.ClampStep(remaining, CollisionStepSize);
             var candidate = OffsetAxis(position, axis, step);
 
             if (IsColliding(candidate, chunks))
@@ -181,12 +181,7 @@ public class PrimedTnt
 
     private static bool IsColliding(Vector3 center, ChunkManager chunks)
     {
-        var minX = (int)MathF.Floor(center.X - HalfExtent);
-        var minY = (int)MathF.Floor(center.Y - HalfExtent);
-        var minZ = (int)MathF.Floor(center.Z - HalfExtent);
-        var maxX = (int)MathF.Floor(center.X + HalfExtent);
-        var maxY = (int)MathF.Floor(center.Y + HalfExtent);
-        var maxZ = (int)MathF.Floor(center.Z + HalfExtent);
+        VoxelCoords.CellRange(center, HalfExtent, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
 
         for (var x = minX; x <= maxX; x++)
         for (var y = minY; y <= maxY; y++)

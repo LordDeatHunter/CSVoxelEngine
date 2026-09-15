@@ -584,8 +584,8 @@ public static class CloudField
     /// <summary>Bilinear value noise over the wrapped lattice, result 0..1.</summary>
     private static float ValueNoise(float x, float z, int period, int seed)
     {
-        var ix = (int)MathF.Floor(x);
-        var iz = (int)MathF.Floor(z);
+        var ix = MathUtils.FloorToInt(x);
+        var iz = MathUtils.FloorToInt(z);
         var u = Fade(x - ix);
         var v = Fade(z - iz);
 

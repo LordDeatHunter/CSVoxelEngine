@@ -68,6 +68,20 @@ public struct Vertex
     {
     }
 
+    /// <summary>Atlas geometry with a packed <see cref="Rgba"/> colour.</summary>
+    public Vertex(Vector3 position, Rgba color, Vector2 uv, ushort layer,
+        float sun = 1f, float block = 0f, Vector3? normal = null, float sway = 0f, bool submerged = false)
+        : this(position, color.R, color.G, color.B, color.A, uv, layer, sun, block, normal, sway, submerged)
+    {
+    }
+
+    /// <summary>Single-slice texture with a packed <see cref="Rgba"/> colour.</summary>
+    public Vertex(Vector3 position, Rgba color, Vector2 uv,
+        float sun = 1f, float block = 0f, Vector3? normal = null, float sway = 0f, bool submerged = false)
+        : this(position, color.R, color.G, color.B, color.A, uv, 0, sun, block, normal, sway, submerged)
+    {
+    }
+
     /// <summary>The UV as stored (tests, debugging).</summary>
     public readonly Vector2 UV => Uv;
 
@@ -75,7 +89,7 @@ public struct Vertex
 
     // Light arrives as one of 16 flood-fill levels (level/15), so a byte holds it exactly.
     private static byte EncodeLight(float v) =>
-        (byte)(Math.Clamp(v, 0f, 1f) * 255f + 0.5f);
+        (byte)(MathUtils.Clamp01(v) * 255f + 0.5f);
 
     internal static byte EncodeNormal(Vector3 n)
     {

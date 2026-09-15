@@ -232,7 +232,7 @@ public static class SettingsLayout
     public static float SliderFraction(float x, int tabRow, Vector2 screenSize)
     {
         var (centre, size) = TrackRect(tabRow, screenSize);
-        return Math.Clamp((x - (centre.X - size.X * 0.5f)) / size.X, 0f, 1f);
+        return MathUtils.Clamp01((x - (centre.X - size.X * 0.5f)) / size.X);
     }
 
     public static float SliderValue(SliderRow row, float fraction) =>

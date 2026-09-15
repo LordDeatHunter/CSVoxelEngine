@@ -26,7 +26,7 @@ internal static class ReflectionReuse
 
     // Comparing dot products avoids an acos per frame; the threshold is a constant, so is the cosine.
     private static readonly float CosMaxAngle =
-        MathF.Cos(WorldGenerationConfig.ReflectionReuseMaxDegrees * MathF.PI / 180f);
+        MathUtils.CosDeg(WorldGenerationConfig.ReflectionReuseMaxDegrees);
 
     /// <summary>
     /// True when the mirror has to be re-rendered this frame; false when the cached texture and its

@@ -605,7 +605,7 @@ public class RenderManager : IDisposable
     {
         // The window clock is the only time source this pass has; clamp the step so a hitch
         // (or the very first frame) cannot jump the fade
-        var dt = (float)Math.Clamp(time - _prevTime, 0.0, 0.25);
+        var dt = (float)MathUtils.Clamp(time - _prevTime, 0.0, 0.25);
         _prevTime = time;
 
         _time = (float)time;
@@ -636,7 +636,7 @@ public class RenderManager : IDisposable
 
         var dayness = Smooth01((elevation + 0.08f) / 0.33f);
         _dayness = dayness;
-        var duskAmount = Math.Clamp(1f - MathF.Abs(elevation) * 5f, 0f, 1f);
+        var duskAmount = MathUtils.Clamp01(1f - MathF.Abs(elevation) * 5f);
 
         _sunColor = Mix(new Vector3(0.3f, 0.4f, 0.7f), new Vector3(1f, 0.96f, 0.88f), dayness);
         _sunColor = Mix(_sunColor, new Vector3(1f, 0.5f, 0.25f), duskAmount * 0.55f);
@@ -1273,13 +1273,9 @@ public class RenderManager : IDisposable
         _reflReusedLastFrame = false;
     }
 
-    private static float Smooth01(float t)
-    {
-        t = Math.Clamp(t, 0f, 1f);
-        return t * t * (3f - 2f * t);
-    }
+    private static float Smooth01(float t) => MathUtils.SmoothStep(t);
 
-    private static Vector3 Mix(Vector3 a, Vector3 b, float t) => a + (b - a) * Math.Clamp(t, 0f, 1f);
+    private static Vector3 Mix(Vector3 a, Vector3 b, float t) => a.Lerp(b, t);
 
     /// <summary>
     /// Clears to the sky colour, paints the sun into it, and leaves the GL state the world
@@ -1629,7 +1625,7 @@ public class RenderManager : IDisposable
         // time is _window.Time; the first frame has no previous stamp, so it falls back to one
         // 60 Hz step. The clamp keeps a hitch (or a debugger break) from advancing every
         // streaming chunk straight to full alpha.
-        var dt = _lastWorldTime > 0 ? Math.Clamp(time - _lastWorldTime, 0.0, 0.1) : 1.0 / 60.0;
+        var dt = _lastWorldTime > 0 ? MathUtils.Clamp(time - _lastWorldTime, 0.0, 0.1) : 1.0 / 60.0;
         _lastWorldTime = time;
 
         chunkShader.Use();

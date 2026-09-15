@@ -193,13 +193,13 @@ public class World : IItemUseWorld
             return;
         }
 
-        var sx = (int)MathF.Floor(_spawnX);
-        var sz = (int)MathF.Floor(_spawnZ);
-        var cx = (int)MathF.Floor(sx / (float)Chunk.Size);
-        var cz = (int)MathF.Floor(sz / (float)Chunk.Size);
-        var lx = sx - cx * Chunk.Size;
-        var lz = sz - cz * Chunk.Size;
-        var heightmap = Chunk.GetColumnHeights(cx, cz)[(lx << Chunk.SizeShift) | lz];
+        var sx = MathUtils.FloorToInt(_spawnX);
+        var sz = MathUtils.FloorToInt(_spawnZ);
+        var cx = VoxelCoords.WorldToChunk(sx);
+        var cz = VoxelCoords.WorldToChunk(sz);
+        var lx = VoxelCoords.WorldToLocal(sx);
+        var lz = VoxelCoords.WorldToLocal(sz);
+        var heightmap = Chunk.GetColumnHeights(cx, cz)[VoxelCoords.ColumnIndex(lx, lz)];
         var estimate = Math.Max(heightmap, WorldGenerationConfig.SeaLevel);
         const float spawnLift = 0.02f;
         var holdEye = estimate + 1 + Camera.EyeHeight + spawnLift;
@@ -949,11 +949,7 @@ public class World : IItemUseWorld
 
     private void RemoveBlock(Vector3 blockPos)
     {
-        var chunkPos = new Vector3(
-            MathF.Floor(blockPos.X / Chunk.Size),
-            MathF.Floor(blockPos.Y / Chunk.Size),
-            MathF.Floor(blockPos.Z / Chunk.Size)
-        );
+        var chunkPos = VoxelCoords.ChunkPosOf(blockPos);
 
         if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk)) return;
 
@@ -1057,11 +1053,7 @@ public class World : IItemUseWorld
         var lowestY = new Dictionary<(int X, int Z), int>();
         foreach (var block in collected)
         {
-            var chunkPos = new Vector3(
-                MathF.Floor(block.Cell.X / Chunk.Size),
-                MathF.Floor(block.Cell.Y / Chunk.Size),
-                MathF.Floor(block.Cell.Z / Chunk.Size)
-            );
+            var chunkPos = VoxelCoords.ChunkPosOf(block.Cell);
             if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var target)) continue;
             if (target.ClearBlockAt(block.Cell) == 0) continue;
 
@@ -1420,11 +1412,7 @@ public class World : IItemUseWorld
     private bool PlaceBlockAtFace(Vector3 hitPos, Vector3 hitNormal, byte blockId, byte state)
     {
         var placePos = hitPos + hitNormal;
-        var chunkPos = new Vector3(
-            MathF.Floor(placePos.X / Chunk.Size),
-            MathF.Floor(placePos.Y / Chunk.Size),
-            MathF.Floor(placePos.Z / Chunk.Size)
-        );
+        var chunkPos = VoxelCoords.ChunkPosOf(placePos);
 
         if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk)) return false;
 

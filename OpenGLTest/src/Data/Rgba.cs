@@ -28,6 +28,13 @@ public readonly record struct Rgba(byte R, byte G, byte B, byte A = 255)
 
     public Rgba WithAlpha(float alpha) => this with { A = ToByte(alpha) };
 
+    /// <summary>Pack to the uint <see cref="Vertex"/> stores (R in the low byte).</summary>
+    public readonly uint Pack() => (uint)(R | (G << 8) | (B << 16) | (A << 24));
+
+    /// <summary>Unpack a <see cref="Pack"/>ed value.</summary>
+    public static Rgba FromPacked(uint packed) =>
+        new((byte)packed, (byte)(packed >> 8), (byte)(packed >> 16), (byte)(packed >> 24));
+
     /// <summary>0..1 components, for shader uniforms.</summary>
     public Vector4 ToVector4() => new(R / 255f, G / 255f, B / 255f, A / 255f);
 

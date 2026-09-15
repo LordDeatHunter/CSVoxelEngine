@@ -105,10 +105,7 @@ public class TntManager
             // dry crater under the sea would flood from every side at once
             if (BlockType.IsFluid(existing)) continue;
 
-            var chunkPos = new Vector3(
-                MathF.Floor(x / (float)Chunk.Size),
-                MathF.Floor(y / (float)Chunk.Size),
-                MathF.Floor(z / (float)Chunk.Size));
+            var chunkPos = VoxelCoords.ChunkPosOf(x, y, z);
             if (!chunks.Chunks.TryGetValue(chunkPos, out var chunk)) continue;
 
             // The blast clears the state byte with the block, so a player-built pile's
@@ -163,17 +160,11 @@ public class TntManager
                 if (BlockType.ById[standing]?.NeedsSupport != true) continue;
 
                 // Support in an unloaded chunk reads as air: leave those alone.
-                var belowChunkPos = new Vector3(
-                    MathF.Floor(x / (float)Chunk.Size),
-                    MathF.Floor((y - 1) / (float)Chunk.Size),
-                    MathF.Floor(z / (float)Chunk.Size));
+                var belowChunkPos = VoxelCoords.ChunkPosOf(x, y - 1, z);
                 if (!chunks.Chunks.TryGetValue(belowChunkPos, out _)) continue;
                 if (chunks.GetBlockGlobal(x, y - 1, z) != 0) continue;
 
-                var pebbleChunkPos = new Vector3(
-                    MathF.Floor(x / (float)Chunk.Size),
-                    MathF.Floor(y / (float)Chunk.Size),
-                    MathF.Floor(z / (float)Chunk.Size));
+                var pebbleChunkPos = VoxelCoords.ChunkPosOf(x, y, z);
                 if (!chunks.Chunks.TryGetValue(pebbleChunkPos, out var pebbleChunk)) continue;
                 var standingState = chunks.GetStateGlobal(x, y, z);
                 if (pebbleChunk.ClearBlockAt(new Vector3(x, y, z)) == 0) continue;

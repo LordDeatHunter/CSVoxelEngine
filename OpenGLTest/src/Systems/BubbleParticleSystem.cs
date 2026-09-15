@@ -29,7 +29,7 @@ public sealed class BubbleParticleSystem
 
         if (underwater)
         {
-            var f = forward.LengthSquared() > 1e-6f ? Vector3.Normalize(forward) : -Vector3.UnitZ;
+            var f = forward.NormalizeSafeOr(-Vector3.UnitZ);
             var mouth = eyePos + f * 0.3f - Vector3.UnitY * 0.18f;
             _spawnDebt += deltaTime * WorldGenerationConfig.BubblePerSecond;
             while (_spawnDebt >= 1f)

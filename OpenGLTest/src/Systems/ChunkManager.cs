@@ -618,12 +618,14 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     public void MarkAreaDirty(Vector3 min, Vector3 max, int radiusBlocks, Vector3? skip = null)
     {
-        var x0 = (int)MathF.Floor((min.X - radiusBlocks) / Chunk.Size);
-        var y0 = (int)MathF.Floor((min.Y - radiusBlocks) / Chunk.Size);
-        var z0 = (int)MathF.Floor((min.Z - radiusBlocks) / Chunk.Size);
-        var x1 = (int)MathF.Floor((max.X + radiusBlocks) / Chunk.Size);
-        var y1 = (int)MathF.Floor((max.Y + radiusBlocks) / Chunk.Size);
-        var z1 = (int)MathF.Floor((max.Z + radiusBlocks) / Chunk.Size);
+        var low = VoxelCoords.ChunkPosOf(min - new Vector3(radiusBlocks));
+        var high = VoxelCoords.ChunkPosOf(max + new Vector3(radiusBlocks));
+        var x0 = (int)low.X;
+        var y0 = (int)low.Y;
+        var z0 = (int)low.Z;
+        var x1 = (int)high.X;
+        var y1 = (int)high.Y;
+        var z1 = (int)high.Z;
 
         for (var x = x0; x <= x1; x++)
         for (var y = y0; y <= y1; y++)
@@ -804,7 +806,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             flow += new Vector3(dx, 0f, dz) * (ownHeight - neighbourHeight);
         }
 
-        return flow.LengthSquared() > 1e-6f ? Vector3.Normalize(flow) : Vector3.Zero;
+        return flow.NormalizeSafe();
     }
 
     /// <summary>

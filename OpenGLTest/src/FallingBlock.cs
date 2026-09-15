@@ -106,8 +106,8 @@ public class FallingBlock
     {
         if (deltaTime <= 0f || chunks == null) return;
 
-        var submerged = Position.Y < chunks.GetFluidSurfaceGlobal(
-            (int)MathF.Floor(Position.X), (int)MathF.Floor(Position.Y), (int)MathF.Floor(Position.Z));
+        var (fluidX, fluidY, fluidZ) = Position.BlockCell();
+        var submerged = Position.Y < chunks.GetFluidSurfaceGlobal(fluidX, fluidY, fluidZ);
 
         if (submerged)
             _velocity.Y = MathUtils.Damp(_velocity.Y, WaterSinkSpeed, WaterDrag, deltaTime);
@@ -179,9 +179,7 @@ public class FallingBlock
         // a coasting cube tests the support under its centre instead.
         if (_sliding && !hitY)
         {
-            var cx = (int)MathF.Floor(Position.X);
-            var cy = (int)MathF.Floor(Position.Y);
-            var cz = (int)MathF.Floor(Position.Z);
+            var (cx, cy, cz) = Position.BlockCell();
             if (!chunks.TryGetCell(cx, cy - 1, cz, out var under, out _)
                 || !BlockType.IsSolid(under))
             {
@@ -208,9 +206,7 @@ public class FallingBlock
     /// </summary>
     private void RollSlide(ChunkManager chunks)
     {
-        var rx = (int)MathF.Floor(Position.X);
-        var ry = (int)MathF.Floor(Position.Y);
-        var rz = (int)MathF.Floor(Position.Z);
+        var (rx, ry, rz) = Position.BlockCell();
         var sy = ry - 1;
 
         if (!chunks.TryGetCell(rx, sy, rz, out var support, out _) || !BlockType.IsSolid(support))
@@ -319,7 +315,7 @@ public class FallingBlock
 
         while (MathF.Abs(remaining) > float.Epsilon)
         {
-            var step = Math.Clamp(remaining, -CollisionStepSize, CollisionStepSize);
+            var step = MathUtils.ClampStep(remaining, CollisionStepSize);
             var candidate = OffsetAxis(position, axis, step);
 
             if (IsColliding(candidate, chunks))
@@ -348,12 +344,7 @@ public class FallingBlock
 
     private static bool IsColliding(Vector3 center, ChunkManager chunks)
     {
-        var minX = (int)MathF.Floor(center.X - HalfExtent);
-        var minY = (int)MathF.Floor(center.Y - HalfExtent);
-        var minZ = (int)MathF.Floor(center.Z - HalfExtent);
-        var maxX = (int)MathF.Floor(center.X + HalfExtent);
-        var maxY = (int)MathF.Floor(center.Y + HalfExtent);
-        var maxZ = (int)MathF.Floor(center.Z + HalfExtent);
+        VoxelCoords.CellRange(center, HalfExtent, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
 
         for (var x = minX; x <= maxX; x++)
         for (var y = minY; y <= maxY; y++)

@@ -1283,7 +1283,7 @@ public class UIRenderer : IDisposable
             var barW = CraftInnerWidth - IngPad * 2f;
             DrawRect(new Vector2(cardLeft + DetailPad + IngPad + barW * 0.5f, barY + IngBarH * 0.5f),
                 new Vector2(barW, IngBarH), SlotBackground);
-            var fill = Math.Clamp(need > 0 ? fed.Count / (float)need : 1f, 0f, 1f);
+            var fill = MathUtils.Clamp01(need > 0 ? fed.Count / (float)need : 1f);
             if (fill > 0f)
                 DrawRect(new Vector2(cardLeft + DetailPad + IngPad + barW * fill * 0.5f, barY + IngBarH * 0.5f),
                     new Vector2(barW * fill, IngBarH), fill >= 1f ? ReadyGreen : AccentGold);

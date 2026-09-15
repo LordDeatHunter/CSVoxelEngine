@@ -151,8 +151,8 @@ public class ItemDrop
         // The bottom of the cube decides: a drop resting on the sea floor with its top out of
         // the water should not still be pushed up
         var bottomY = Position.Y - HalfExtent;
-        var surfaceY = chunks.GetFluidSurfaceGlobal(
-            (int)MathF.Floor(Position.X), (int)MathF.Floor(bottomY), (int)MathF.Floor(Position.Z));
+        var bottomCell = new Vector3(Position.X, bottomY, Position.Z).BlockCell();
+        var surfaceY = chunks.GetFluidSurfaceGlobal(bottomCell.X, bottomCell.Y, bottomCell.Z);
         var floating = bottomY < surfaceY;
 
         if (floating)
@@ -162,8 +162,7 @@ public class ItemDrop
 
             // Flowing water carries the drop downstream. Applied before the damping below, which
             // then caps the drift instead of letting it build up indefinitely.
-            var flow = chunks.GetFluidFlowGlobal(
-                (int)MathF.Floor(Position.X), (int)MathF.Floor(bottomY), (int)MathF.Floor(Position.Z));
+            var flow = chunks.GetFluidFlowGlobal(bottomCell.X, bottomCell.Y, bottomCell.Z);
             _velocity.X += flow.X * FlowPushAccel * deltaTime;
             _velocity.Z += flow.Z * FlowPushAccel * deltaTime;
 
@@ -229,7 +228,7 @@ public class ItemDrop
 
         while (MathF.Abs(remaining) > float.Epsilon)
         {
-            var step = Math.Clamp(remaining, -CollisionStepSize, CollisionStepSize);
+            var step = MathUtils.ClampStep(remaining, CollisionStepSize);
             var candidate = OffsetAxis(position, axis, step);
 
             if (IsColliding(candidate, chunks))
@@ -258,12 +257,7 @@ public class ItemDrop
 
     private static bool IsColliding(Vector3 center, ChunkManager chunks)
     {
-        var minX = (int)MathF.Floor(center.X - HalfExtent);
-        var minY = (int)MathF.Floor(center.Y - HalfExtent);
-        var minZ = (int)MathF.Floor(center.Z - HalfExtent);
-        var maxX = (int)MathF.Floor(center.X + HalfExtent);
-        var maxY = (int)MathF.Floor(center.Y + HalfExtent);
-        var maxZ = (int)MathF.Floor(center.Z + HalfExtent);
+        VoxelCoords.CellRange(center, HalfExtent, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
 
         for (var x = minX; x <= maxX; x++)
         for (var y = minY; y <= maxY; y++)

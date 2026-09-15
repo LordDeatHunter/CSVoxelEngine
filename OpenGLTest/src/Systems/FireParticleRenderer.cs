@@ -75,10 +75,7 @@ public sealed class FireParticleRenderer : IDisposable
         var count = Math.Min(particles.Count, _max);
         if (count == 0) return;
 
-        var f = forward.LengthSquared() > 1e-6f ? Vector3.Normalize(forward) : -Vector3.UnitZ;
-        var right = Vector3.Cross(f, Vector3.UnitY);
-        right = right.LengthSquared() > 1e-6f ? Vector3.Normalize(right) : Vector3.UnitX;
-        var up = Vector3.Cross(right, f);
+        forward.BillboardBasis(out var right, out var up);
 
         for (var i = 0; i < count; i++)
         {

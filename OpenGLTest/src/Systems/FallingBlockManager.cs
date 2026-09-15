@@ -48,10 +48,7 @@ public class FallingBlockManager
             if (!block.IsSettled && block.IsStuck)
             {
                 _falling.RemoveAt(i);
-                var cell = new Vector3(
-                    MathF.Floor(block.Position.X),
-                    MathF.Floor(block.Position.Y),
-                    MathF.Floor(block.Position.Z));
+                var cell = block.Position.Floor();
                 drops.SpawnLoot(block.BlockId, cell);
                 continue;
             }

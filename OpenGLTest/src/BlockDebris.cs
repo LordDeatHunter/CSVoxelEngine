@@ -120,8 +120,8 @@ public class BlockDebris
             return true;
         }
 
-        var submerged = Position.Y < chunks.GetFluidSurfaceGlobal(
-            (int)MathF.Floor(Position.X), (int)MathF.Floor(Position.Y), (int)MathF.Floor(Position.Z));
+        var (fluidX, fluidY, fluidZ) = Position.BlockCell();
+        var submerged = Position.Y < chunks.GetFluidSurfaceGlobal(fluidX, fluidY, fluidZ);
 
         if (submerged)
             _velocity.Y = MathUtils.Damp(_velocity.Y, WaterSinkSpeed, WaterDrag, deltaTime);
@@ -179,7 +179,7 @@ public class BlockDebris
 
         while (MathF.Abs(remaining) > float.Epsilon)
         {
-            var step = Math.Clamp(remaining, -CollisionStepSize, CollisionStepSize);
+            var step = MathUtils.ClampStep(remaining, CollisionStepSize);
             var candidate = OffsetAxis(position, axis, step);
 
             if (IsColliding(candidate, chunks))
@@ -209,12 +209,7 @@ public class BlockDebris
     private bool IsColliding(Vector3 center, ChunkManager chunks)
     {
         var half = HalfExtent;
-        var minX = (int)MathF.Floor(center.X - half);
-        var minY = (int)MathF.Floor(center.Y - half);
-        var minZ = (int)MathF.Floor(center.Z - half);
-        var maxX = (int)MathF.Floor(center.X + half);
-        var maxY = (int)MathF.Floor(center.Y + half);
-        var maxZ = (int)MathF.Floor(center.Z + half);
+        VoxelCoords.CellRange(center, half, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
 
         for (var x = minX; x <= maxX; x++)
         for (var y = minY; y <= maxY; y++)

@@ -164,7 +164,7 @@ public abstract class Item
     public static int LoopFrame(float timeSeconds, float fps, int frameCount)
     {
         if (frameCount <= 0 || fps <= 0f || !float.IsFinite(timeSeconds)) return 0;
-        return ((int)MathF.Floor(timeSeconds * fps) % frameCount + frameCount) % frameCount;
+        return MathUtils.Mod(MathUtils.FloorToInt(timeSeconds * fps), frameCount);
     }
 
     /// <summary>Minimal member for synthetic items (see <see cref="BlockItem"/>).</summary>

@@ -197,7 +197,7 @@ public class Chunk : IDisposable
     private static int PaddedDelta(Vector3 offset) =>
         (int)offset.X * PaddedSq + (int)offset.Y * Padded + (int)offset.Z;
 
-    private static int FloorDiv(int a, int b) => a >= 0 ? a / b : -((-a + b - 1) / b);
+    private static int FloorDiv(int a, int b) => MathUtils.FloorDiv(a, b);
 
     /// <summary>
     /// Per-axis map from a light-volume coordinate (0..LightSize-1) to the neighbourhood chunk

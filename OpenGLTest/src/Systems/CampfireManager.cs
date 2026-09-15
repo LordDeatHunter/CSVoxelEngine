@@ -124,7 +124,7 @@ public sealed class CampfireManager
                 var slot = slots[i];
                 var shown = slot.IsDone ? slot.OutputId : slot.InputId;
                 var progress = slot.TotalTime > 0f
-                    ? 1f - Math.Clamp(slot.TimeLeft / slot.TotalTime, 0f, 1f)
+                    ? 1f - MathUtils.Clamp01(slot.TimeLeft / slot.TotalTime)
                     : 1f;
                 yield return (cell, i, shown, slot.IsDone, progress);
             }

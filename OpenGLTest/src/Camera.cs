@@ -69,9 +69,7 @@ public class Camera
     /// shoulder-surf it tilts from the offset camera back onto the crosshair aim point,
     /// which is also the direction <see cref="Raycast"/> fires.
     /// </summary>
-    public Vector3 ViewDirection => _shoulderViewDir.LengthSquared() > 1e-8f
-        ? Vector3.Normalize(_shoulderViewDir)
-        : GetForwardVector();
+    public Vector3 ViewDirection => _shoulderViewDir.NormalizeSafeOr(GetForwardVector(), 1e-8f);
     [Obsolete("Renamed to IsCreative.")]
     public bool IsNoclip => IsCreative;
     public float VerticalVelocity => _verticalVelocity;
@@ -320,7 +318,7 @@ public class Camera
             return false;
 
         // Same clamp the mouse look uses, so an override can never start the view past vertical
-        look = new Vector2(yaw, Math.Clamp(pitch, -89f, 89f));
+        look = new Vector2(yaw, MathUtils.ClampPitch(pitch));
         return true;
     }
 
@@ -348,7 +346,7 @@ public class Camera
     {
         Position = position;
         Yaw = yaw;
-        Pitch = Math.Clamp(pitch, -89f, 89f);
+        Pitch = MathUtils.ClampPitch(pitch);
         // A teleport is not a fall: without this a scenario dropped at altitude keeps the
         // speed it built up before the jump and plummets through the frame it wanted
         _verticalVelocity = 0f;
@@ -368,7 +366,7 @@ public class Camera
     public void TestSetCameraLook(float yaw, float pitch)
     {
         Yaw = yaw;
-        Pitch = Math.Clamp(pitch, -89f, 89f);
+        Pitch = MathUtils.ClampPitch(pitch);
     }
 
     /// <summary>
@@ -458,13 +456,6 @@ public class Camera
         _shakeRoll = MathF.Sin(time * 47.7f + 0.7f) * ShakeMaxRoll * t;
     }
 
-    private static float DampAngle(float current, float target, float rate, float deltaTime)
-    {
-        var delta = target - current;
-        delta -= MathF.Round(delta / 360f) * 360f;
-        return current + delta * (1f - MathF.Exp(-rate * Math.Max(0f, deltaTime)));
-    }
-
     /// <summary>
     /// While set, mouse movement no longer turns the view (the [E] panel owns the cursor).
     /// Position still updates so reopening the game never jumps the look.
@@ -492,7 +483,7 @@ public class Camera
         Yaw += delta.X * MouseSensitivity;
         Pitch -= delta.Y * MouseSensitivity;
 
-        Pitch = Math.Clamp(Pitch, -89f, 89f);
+        Pitch = MathUtils.ClampPitch(Pitch);
     }
 
     public void Update(float deltaTime, IKeyboard? keyboard, ChunkManager chunkManager)
@@ -535,12 +526,12 @@ public class Camera
         {
             if (moving)
             {
-                var motionYaw = MathF.Atan2(moveInput.Z, moveInput.X) * 180f / MathF.PI;
-                _orbitPlayerYaw = DampAngle(_orbitPlayerYaw, motionYaw, OrbitTurnRate, deltaTime);
+                var motionYaw = MathUtils.ToDegrees(MathF.Atan2(moveInput.Z, moveInput.X));
+                _orbitPlayerYaw = MathUtils.DampAngle(_orbitPlayerYaw, motionYaw, OrbitTurnRate, deltaTime);
             }
             else if (_hasActionTarget)
             {
-                _orbitPlayerYaw = DampAngle(_orbitPlayerYaw, _actionYaw, OrbitTurnRate, deltaTime);
+                _orbitPlayerYaw = MathUtils.DampAngle(_orbitPlayerYaw, _actionYaw, OrbitTurnRate, deltaTime);
                 var remaining = _actionYaw - _orbitPlayerYaw;
                 remaining -= MathF.Round(remaining / 360f) * 360f;
                 if (Math.Abs(remaining) < 0.5f)
@@ -682,12 +673,9 @@ public class Camera
     {
         var feetY = Position.Y - EyeHeight;
 
-        var minX = (int)MathF.Floor(Position.X - PlayerRadius);
-        var maxX = (int)MathF.Floor(Position.X + PlayerRadius);
-        var minZ = (int)MathF.Floor(Position.Z - PlayerRadius);
-        var maxZ = (int)MathF.Floor(Position.Z + PlayerRadius);
-        var minY = (int)MathF.Floor(feetY);
-        var maxY = (int)MathF.Floor(feetY + SwimDepth);
+        var swimMin = new Vector3(Position.X - PlayerRadius, feetY, Position.Z - PlayerRadius);
+        var swimMax = new Vector3(Position.X + PlayerRadius, feetY + SwimDepth, Position.Z + PlayerRadius);
+        VoxelCoords.CellRange(swimMin, swimMax, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
 
         // One pass over the footprint answers both questions: whether any cell is deep enough
         // to swim in, and which way the ones that are actually flow
@@ -711,9 +699,7 @@ public class Camera
 
         _waterFlow = flowCells > 0 ? flowSum / flowCells : Vector3.Zero;
         IsInWater = inWater;
-        var eyeX = (int)MathF.Floor(Position.X);
-        var eyeY = (int)MathF.Floor(Position.Y);
-        var eyeZ = (int)MathF.Floor(Position.Z);
+        var (eyeX, eyeY, eyeZ) = Position.BlockCell();
         IsEyeInWater = Position.Y < chunkManager.GetFluidSurfaceGlobal(eyeX, eyeY, eyeZ);
         IsEyeInLava = false;
         if (IsEyeInWater && chunkManager.TryGetCell(eyeX, eyeY, eyeZ, out var eyeId, out _)
@@ -725,12 +711,9 @@ public class Camera
         // Lava burns on body contact, not just eye contact: a wade through a shallow pool
         // keeps the eye dry but still has to hurt.
         var lava = false;
-        var bodyMinX = (int)MathF.Floor(Position.X - PlayerRadius);
-        var bodyMaxX = (int)MathF.Floor(Position.X + PlayerRadius);
-        var bodyMinY = (int)MathF.Floor(feetY);
-        var bodyMaxY = (int)MathF.Floor(feetY + PlayerHeight);
-        var bodyMinZ = (int)MathF.Floor(Position.Z - PlayerRadius);
-        var bodyMaxZ = (int)MathF.Floor(Position.Z + PlayerRadius);
+        var lavaMin = new Vector3(Position.X - PlayerRadius, feetY, Position.Z - PlayerRadius);
+        var lavaMax = new Vector3(Position.X + PlayerRadius, feetY + PlayerHeight, Position.Z + PlayerRadius);
+        VoxelCoords.CellRange(lavaMin, lavaMax, out var bodyMinX, out var bodyMinY, out var bodyMinZ, out var bodyMaxX, out var bodyMaxY, out var bodyMaxZ);
         for (var x = bodyMinX; x <= bodyMaxX && !lava; x++)
         for (var y = bodyMinY; y <= bodyMaxY && !lava; y++)
         for (var z = bodyMinZ; z <= bodyMaxZ && !lava; z++)
@@ -861,15 +844,13 @@ public class Camera
         var effective = resolved * ShoulderBlend;
         _shoulderOffset = effective;
         var viewDir = forward * ShoulderAimDistance - effective;
-        _shoulderViewDir = viewDir.LengthSquared() < 1e-8f ? forward : Vector3.Normalize(viewDir);
+        _shoulderViewDir = viewDir.NormalizeSafeOr(forward, 1e-8f);
     }
 
     private static bool IsCameraBlocked(Vector3 point, ChunkManager chunkManager)
     {
-        var id = chunkManager.GetBlockGlobal(
-            (int)MathF.Floor(point.X),
-            (int)MathF.Floor(point.Y),
-            (int)MathF.Floor(point.Z));
+        var (pointX, pointY, pointZ) = point.BlockCell();
+        var id = chunkManager.GetBlockGlobal(pointX, pointY, pointZ);
         return BlockType.IsSolid(id) && BlockType.MovementSpeedOf(id) <= 0f;
     }
 
@@ -879,9 +860,7 @@ public class Camera
             return;
 
         var eye = Position + _shoulderOffset;
-        var eyeX = (int)MathF.Floor(eye.X);
-        var eyeY = (int)MathF.Floor(eye.Y);
-        var eyeZ = (int)MathF.Floor(eye.Z);
+        var (eyeX, eyeY, eyeZ) = eye.BlockCell();
         IsEyeInWater = eye.Y < chunkManager.GetFluidSurfaceGlobal(eyeX, eyeY, eyeZ);
         IsEyeInLava = false;
         if (IsEyeInWater && chunkManager.TryGetCell(eyeX, eyeY, eyeZ, out var eyeId, out _)
@@ -938,7 +917,7 @@ public class Camera
 
         while (MathF.Abs(remaining) > float.Epsilon)
         {
-            var step = Math.Clamp(remaining, -CollisionStepSize, CollisionStepSize);
+            var step = MathUtils.ClampStep(remaining, CollisionStepSize);
             var candidate = OffsetAxis(position, axis, step);
 
             if (IsColliding(candidate, chunkManager))
@@ -976,12 +955,7 @@ public class Camera
             eyePosition.Y - EyeHeight + PlayerHeight,
             eyePosition.Z + PlayerRadius);
 
-        var minX = (int)MathF.Floor(min.X);
-        var minY = (int)MathF.Floor(min.Y);
-        var minZ = (int)MathF.Floor(min.Z);
-        var maxX = (int)MathF.Floor(max.X);
-        var maxY = (int)MathF.Floor(max.Y);
-        var maxZ = (int)MathF.Floor(max.Z);
+        VoxelCoords.CellRange(min, max, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
 
         for (var x = minX; x <= maxX; x++)
         for (var y = minY; y <= maxY; y++)
@@ -1013,12 +987,9 @@ public class Camera
     /// </summary>
     private float BlockMoveFactor(ChunkManager chunkManager)
     {
-        var minX = (int)MathF.Floor(Position.X - PlayerRadius);
-        var maxX = (int)MathF.Floor(Position.X + PlayerRadius);
-        var minY = (int)MathF.Floor(Position.Y - EyeHeight);
-        var maxY = (int)MathF.Floor(Position.Y - EyeHeight + PlayerHeight);
-        var minZ = (int)MathF.Floor(Position.Z - PlayerRadius);
-        var maxZ = (int)MathF.Floor(Position.Z + PlayerRadius);
+        var min = new Vector3(Position.X - PlayerRadius, Position.Y - EyeHeight, Position.Z - PlayerRadius);
+        var max = new Vector3(Position.X + PlayerRadius, Position.Y - EyeHeight + PlayerHeight, Position.Z + PlayerRadius);
+        VoxelCoords.CellRange(min, max, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
 
         var factor = 1f;
         for (var x = minX; x <= maxX; x++)
@@ -1048,10 +1019,7 @@ public class Camera
             Position.X + PlayerRadius,
             Position.Y - EyeHeight + PlayerHeight,
             Position.Z + PlayerRadius);
-        var cellMin = new Vector3(
-            MathF.Floor(blockPos.X),
-            MathF.Floor(blockPos.Y),
-            MathF.Floor(blockPos.Z));
+        var cellMin = blockPos.Floor();
         var cellMax = cellMin + Vector3.One;
 
         return cellMin.X < max.X && cellMax.X > min.X
@@ -1150,7 +1118,7 @@ public class Camera
     }
 
     public Matrix4x4 GetProjectionMatrix() =>
-        Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI * _currentFov / 180f, _aspectRatio, NearPlane, FarPlane);
+        Matrix4x4.CreatePerspectiveFieldOfView(MathUtils.ToRadians(_currentFov), _aspectRatio, NearPlane, FarPlane);
 
     /// <summary>
     /// View * projection, cached per distinct camera pose (PERF_TODO R7). Twenty-two call
@@ -1270,17 +1238,7 @@ public class Camera
     /// <summary>View direction, for aiming the shadow camera ahead of the player.</summary>
     public Vector3 Forward => GetForwardVector();
 
-    private Vector3 GetForwardVector()
-    {
-        var yawRad = MathF.PI * Yaw / 180f;
-        var pitchRad = MathF.PI * Pitch / 180f;
-
-        return Vector3.Normalize(new Vector3(
-            MathF.Cos(pitchRad) * MathF.Cos(yawRad),
-            MathF.Sin(pitchRad),
-            MathF.Cos(pitchRad) * MathF.Sin(yawRad)
-        ));
-    }
+    private Vector3 GetForwardVector() => Vector3Utils.FromYawPitch(Yaw, Pitch);
 
     /// <summary>
     /// Walks the view ray cell by cell (DDA) and reports the first cell it can target. The ray

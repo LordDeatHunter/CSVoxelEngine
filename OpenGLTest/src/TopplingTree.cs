@@ -41,10 +41,7 @@ public class TopplingTree : IDisposable
         _pivot = pivot;
         _drops = drops;
 
-        var flat = new Vector3(fallDirection.X, 0f, fallDirection.Z);
-        if (flat.LengthSquared() < 1e-6f)
-            flat = Vector3.UnitX;
-        flat = Vector3.Normalize(flat);
+        var flat = fallDirection.NormalizeHorizontalOr(Vector3.UnitX);
         // Tipping the +Y axis toward the fall direction rotates around Y x fallDir
         _axis = Vector3.Normalize(Vector3.Cross(Vector3.UnitY, flat));
 
@@ -275,7 +272,7 @@ public class TopplingTree : IDisposable
         foreach (var block in _blocks)
         {
             var rest = _pivot + Vector3.Transform(block.Cell + new Vector3(0.5f) - _pivot, landed);
-            var cell = new Vector3(MathF.Floor(rest.X), MathF.Floor(rest.Y), MathF.Floor(rest.Z));
+            var cell = rest.Floor();
 
             // The resting cell is the loot context too, so position-dependent rolls see where
             // the block landed rather than where it grew

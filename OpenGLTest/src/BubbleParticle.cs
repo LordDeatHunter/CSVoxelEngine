@@ -82,10 +82,8 @@ public sealed class BubbleParticle
             MathF.Cos(_age * _wobbleFreq * 0.8f + _wobblePhase) * _wobbleAmp * deltaTime);
         Size += _grow * deltaTime;
 
-        var surface = chunks.GetFluidSurfaceGlobal(
-            (int)MathF.Floor(Position.X),
-            (int)MathF.Floor(Position.Y),
-            (int)MathF.Floor(Position.Z));
+        var (cellX, cellY, cellZ) = Position.BlockCell();
+        var surface = chunks.GetFluidSurfaceGlobal(cellX, cellY, cellZ);
         if (Position.Y >= surface)
         {
             IsAlive = false;

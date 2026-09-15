@@ -41,6 +41,21 @@ public static class Vector3Directions
         Backward
     ];
 
+    /// <summary>
+    /// Normal for a <see cref="Chunk"/> cube face index in CubeFaces order
+    /// (0:-Z, 1:+Z, 2:-X, 3:+X, 4:+Y, 5:-Y). Kept here so gameplay code never
+    /// confuses it with <see cref="CardinalDirections"/> order (Up, Down, ...).
+    /// </summary>
+    public static Vector3 FromCubeFace(int face) => face switch
+    {
+        0 => Backward,
+        1 => Forward,
+        2 => Left,
+        3 => Right,
+        4 => Up,
+        _ => Down,
+    };
+
     public static readonly Vector3[] EdgeDirections =
     [
         UpRight,

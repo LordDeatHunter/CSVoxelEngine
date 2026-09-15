@@ -33,7 +33,7 @@ internal sealed class SfxMixer : IWaveProvider, IDisposable
     public float Volume
     {
         get => _volume;
-        set => _volume = Math.Clamp(value, 0f, 1f);
+        set => _volume = MathUtils.Clamp01(value);
     }
 
     public void Play(short[] samples)

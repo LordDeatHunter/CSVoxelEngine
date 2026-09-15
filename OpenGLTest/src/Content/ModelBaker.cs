@@ -209,7 +209,7 @@ public static class ModelBaker
     private static Vector3 FaceNormal(Vector3[] positions)
     {
         var normal = Vector3.Cross(positions[1] - positions[0], positions[2] - positions[0]);
-        return normal.LengthSquared() > 0f ? Vector3.Normalize(normal) : Vector3.UnitY;
+        return normal.NormalizeSafeOr(Vector3.UnitY, 0f);
     }
 
     private static int DominantFace(Vector3 normal)

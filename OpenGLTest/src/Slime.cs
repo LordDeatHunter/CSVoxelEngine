@@ -178,8 +178,8 @@ public sealed class Slime
     private void ApplyPhysics(float deltaTime, ChunkManager chunks)
     {
         var feetY = Position.Y - HalfExtent;
-        var surfaceY = chunks.GetFluidSurfaceGlobal(
-            (int)MathF.Floor(Position.X), (int)MathF.Floor(feetY), (int)MathF.Floor(Position.Z));
+        var feetCell = new Vector3(Position.X, feetY, Position.Z).BlockCell();
+        var surfaceY = chunks.GetFluidSurfaceGlobal(feetCell.X, feetCell.Y, feetCell.Z);
         var floating = feetY < surfaceY;
         _inWater = floating;
 
@@ -246,7 +246,7 @@ public sealed class Slime
 
         while (MathF.Abs(remaining) > float.Epsilon)
         {
-            var step = Math.Clamp(remaining, -CollisionStepSize, CollisionStepSize);
+            var step = MathUtils.ClampStep(remaining, CollisionStepSize);
             var candidate = OffsetAxis(position, axis, step);
 
             if (IsColliding(candidate, chunks))
@@ -275,12 +275,7 @@ public sealed class Slime
 
     private static bool IsColliding(Vector3 center, ChunkManager chunks)
     {
-        var minX = (int)MathF.Floor(center.X - HalfExtent);
-        var minY = (int)MathF.Floor(center.Y - HalfExtent);
-        var minZ = (int)MathF.Floor(center.Z - HalfExtent);
-        var maxX = (int)MathF.Floor(center.X + HalfExtent);
-        var maxY = (int)MathF.Floor(center.Y + HalfExtent);
-        var maxZ = (int)MathF.Floor(center.Z + HalfExtent);
+        VoxelCoords.CellRange(center, HalfExtent, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
 
         for (var x = minX; x <= maxX; x++)
         for (var y = minY; y <= maxY; y++)

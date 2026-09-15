@@ -103,9 +103,7 @@ public class LeafParticle
             return true;
         }
 
-        var cellX = (int)MathF.Floor(Position.X);
-        var cellY = (int)MathF.Floor(Position.Y);
-        var cellZ = (int)MathF.Floor(Position.Z);
+        var (cellX, cellY, cellZ) = Position.BlockCell();
         if (Position.Y < chunks.GetFluidSurfaceGlobal(cellX, cellY, cellZ))
         {
             IsAlive = false;
@@ -124,7 +122,7 @@ public class LeafParticle
         Rotation += _spin * deltaTime;
 
         var footY = Position.Y - Size * 0.5f;
-        if (BlockType.IsSolid(chunks.GetBlockGlobal(cellX, (int)MathF.Floor(footY), cellZ)))
+        if (BlockType.IsSolid(chunks.GetBlockGlobal(cellX, MathUtils.FloorToInt(footY), cellZ)))
         {
             IsLanded = true;
             _landAge = 0f;

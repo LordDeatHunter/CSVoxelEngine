@@ -70,7 +70,7 @@ public sealed class EntityModel
                 {
                     var p = positions[corner];
                     vertices.Add(new Vertex(
-                        min + new Vector3(p.X * size.X, p.Y * size.Y, p.Z * size.Z),
+                        min + p.Scale(size),
                         255, 255, 255, 255, corners[corner], 0, 1f, 0f, normal));
                 }
                 indices.AddRange([(ushort)quadBase, (ushort)(quadBase + 1), (ushort)(quadBase + 2),

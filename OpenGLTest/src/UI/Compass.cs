@@ -49,6 +49,6 @@ public static class Compass
     {
         if (frameCount <= 0) return 0;
         var relative = (WrapDelta(-headingDegrees) + 360f) % 360f;
-        return (int)MathF.Floor(relative / 360f * frameCount + 0.5f) % frameCount;
+        return MathUtils.Mod(MathUtils.FloorToInt(relative / 360f * frameCount + 0.5f), frameCount);
     }
 }

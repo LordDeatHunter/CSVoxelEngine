@@ -254,8 +254,8 @@ public static class TerrainGenerator
     private static float LakeWeight(float x, float z)
     {
         const int cell = WorldGenerationConfig.LakeCellBlocks;
-        var gx0 = (int)MathF.Floor(x / cell);
-        var gz0 = (int)MathF.Floor(z / cell);
+        var gx0 = MathUtils.FloorToInt(x / cell);
+        var gz0 = MathUtils.FloorToInt(z / cell);
         var best = 0f;
 
         for (var dx = -1; dx <= 1; dx++)
