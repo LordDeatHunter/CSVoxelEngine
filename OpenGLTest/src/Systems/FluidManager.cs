@@ -632,7 +632,8 @@ public class FluidManager
         if (previous != 0)
         {
             drops.SpawnLoot(previous, new Vector3(x, y, z),
-                DropManager.PileCount(previous, x, z, previousState));
+                DropManager.PileCount(previous, x, z, previousState),
+                DropManager.PileSecondary(previous, x, z, previousState));
             _chunks.UnmarkPlayerPlaced(x, y, z);
         }
 

@@ -738,6 +738,8 @@ public static class WorldGenerationConfig
     // Edge length of one stone, in whole texels (footprint and height alike)
     public const int PebbleMinSizeTexels = 4;
     public const int PebbleMaxSizeTexels = 8;
+    // Fraction of natural pebble stones that are obsidian instead of flint (~1% per rock)
+    public const float PebbleObsidianChance = 0.01f;
 
     // --- Flowers (FlowerGenerator) ---
     // Meadow cross-blocks in low-frequency patches on dry grass; a density roll thins inside them

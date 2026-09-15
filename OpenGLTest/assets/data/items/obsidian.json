@@ -1,1 +1,3 @@
-{ "name": "Obsidian", "texture": "assets/textures/items/obsidian.png", "throwDamage": 3 }
+{ "name": "Obsidian", "texture": "assets/textures/items/obsidian.png",
+  "throwDamage": 3,
+  "use": { "action": "place_stack", "block": "block/pebble" } }

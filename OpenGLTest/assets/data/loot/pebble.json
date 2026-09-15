@@ -1,8 +1,12 @@
 {
   "pools": [
     {
-      "rolls": { "provider": "pebble_count" },
+      "rolls": { "provider": "pebble_flint_count" },
       "entries": [ { "item": "item/flint" } ]
+    },
+    {
+      "rolls": { "provider": "pebble_obsidian_count" },
+      "entries": [ { "item": "item/obsidian" } ]
     }
   ]
 }

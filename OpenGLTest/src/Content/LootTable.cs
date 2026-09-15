@@ -54,6 +54,8 @@ public sealed class LootTable
     {
         Fixed,
         PebbleCount,
+        PebbleFlintCount,
+        PebbleObsidianCount,
         PileCount,
     }
 
@@ -78,6 +80,13 @@ public sealed class LootTable
             RollProvider.PebbleCount => context.Count > 0
                 ? context.Count
                 : PebbleGenerator.CountAt(context.X, context.Z),
+            RollProvider.PebbleFlintCount => context.Count > 0
+                ? context.Count - context.Secondary
+                : PebbleGenerator.CountAt(context.X, context.Z)
+                    - PebbleGenerator.ObsidianCountWithState(context.X, context.Z, 0, 3),
+            RollProvider.PebbleObsidianCount => context.Count > 0
+                ? context.Secondary
+                : PebbleGenerator.ObsidianCountWithState(context.X, context.Z, 0, 3),
             // Player-only piles never read the world: a bare block is one unit.
             RollProvider.PileCount => context.Count > 0 ? context.Count : 1,
             _ => RollRange.Sample(),

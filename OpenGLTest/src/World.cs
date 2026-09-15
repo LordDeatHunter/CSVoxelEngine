@@ -987,7 +987,8 @@ public class World : IItemUseWorld
         {
             if (!creative)
                 _dropManager.SpawnLoot(brokenId, blockPos,
-                    DropManager.PileCount(brokenId, (int)blockPos.X, (int)blockPos.Z, brokenState));
+                    DropManager.PileCount(brokenId, (int)blockPos.X, (int)blockPos.Z, brokenState),
+                    DropManager.PileSecondary(brokenId, (int)blockPos.X, (int)blockPos.Z, brokenState));
             if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.BranchPile)
                 _campfires.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, _dropManager);
             if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.Quern)
@@ -1366,6 +1367,25 @@ public class World : IItemUseWorld
     {
         var chunk = _chunkManager.ChunkAt((int)pos.X, (int)pos.Y, (int)pos.Z);
         return chunk != null && chunk.SetStateAt(pos, count, _chunkManager);
+    }
+
+    int IItemUseWorld.PileSecondaryFor(byte blockId, int x, int y, int z, byte state)
+    {
+        var pile = BlockType.ById[blockId];
+        if (pile?.Renderer != BlockRenderer.Pebbles)
+            return 0;
+        return PebbleGenerator.ObsidianCountWithState(x, z, state, pile.StackMax);
+    }
+
+    bool IItemUseWorld.SetPileComposition(Vector3 pos, byte blockId, int total, int secondary)
+    {
+        var chunk = _chunkManager.ChunkAt((int)pos.X, (int)pos.Y, (int)pos.Z);
+        if (chunk == null)
+            return false;
+        byte state = BlockType.ById[blockId]?.Renderer == BlockRenderer.Pebbles
+            ? PebbleGenerator.StateFor(total, secondary)
+            : (byte)total;
+        return chunk.SetStateAt(pos, state, _chunkManager);
     }
 
     void IItemUseWorld.UnmarkPlayerPlaced(int x, int y, int z) =>

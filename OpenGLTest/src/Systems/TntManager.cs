@@ -139,7 +139,8 @@ public class TntManager
             {
                 // Same loot a mined block would leave (stone drops cobblestone)
                 drops.SpawnLoot(removed, new Vector3(x, y, z),
-                    DropManager.PileCount(removed, x, z, removedState));
+                    DropManager.PileCount(removed, x, z, removedState),
+                    DropManager.PileSecondary(removed, x, z, removedState));
             }
 
             // The cell is air now either way, so the buried LOD must duck below it
@@ -171,7 +172,8 @@ public class TntManager
                 touchedChunks.Add(pebbleChunkPos);
 
                 drops.SpawnLoot(standing, new Vector3(x, y, z),
-                    DropManager.PileCount(standing, x, z, standingState));
+                    DropManager.PileCount(standing, x, z, standingState),
+                    DropManager.PileSecondary(standing, x, z, standingState));
             }
         }
 

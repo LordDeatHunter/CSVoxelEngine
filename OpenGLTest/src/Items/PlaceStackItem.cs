@@ -1,9 +1,9 @@
 namespace silkgltriangle;
 
 /// <summary>
-/// Builds up a multi-state block (flint on a pebble pile): augments the targeted pile or grounds
-/// a fresh one, spending one unit from its own stack instead of morphing, so it stays a plain
-/// misc pickup.
+/// Builds up a multi-state block (flint or obsidian on a pebble pile): augments the targeted
+/// pile or grounds a fresh one, spending one unit from its own stack instead of morphing, so
+/// it stays a plain misc pickup. Pebble piles mix both rocks and drop exactly what they hold.
 /// </summary>
 public class PlaceStackItem : Item
 {
@@ -29,7 +29,10 @@ public class PlaceStackItem : Item
             var count = world.PileCountFor(UseBlockId, hx, hy, hz, hitState);
             if (count < pile.StackMax)
             {
-                if (!world.SetPileCount(hit, (byte)(count + 1)))
+                var secondary = world.PileSecondaryFor(UseBlockId, hx, hy, hz, hitState);
+                if (PebbleGenerator.IsObsidianItem(Id))
+                    secondary++;
+                if (!world.SetPileComposition(hit, UseBlockId, count + 1, secondary))
                     return ItemUseResult.Ignored;
                 if (!world.IsCreative)
                     world.ConsumeSelected();
@@ -37,7 +40,13 @@ public class PlaceStackItem : Item
             }
         }
 
-        if (!world.PlaceBlockAtFace(hit, normal, UseBlockId, state: 1))
+        var freshSecondary = PebbleGenerator.IsObsidianItem(Id) ? 1 : 0;
+        if (pile.Renderer == BlockRenderer.Pebbles)
+        {
+            if (!world.PlaceBlockAtFace(hit, normal, UseBlockId, PebbleGenerator.StateFor(1, freshSecondary)))
+                return ItemUseResult.Ignored;
+        }
+        else if (!world.PlaceBlockAtFace(hit, normal, UseBlockId, state: 1))
             return ItemUseResult.Ignored;
         if (!world.IsCreative)
             world.ConsumeSelected();

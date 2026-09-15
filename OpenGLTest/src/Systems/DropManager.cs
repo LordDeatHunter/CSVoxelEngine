@@ -74,14 +74,15 @@ public class DropManager
     /// <summary>
     /// Rolls a destroyed block's loot and drops every rolled id at the centre of the cell the
     /// block occupied. The cell doubles as the loot context, so position-dependent rolls (the
-    /// pebble's flint count) see where the block stood. <paramref name="count"/> carries an
+    /// pebble's yield) see where the block stood. <paramref name="count"/> carries an
     /// explicit pile size for a player-built stack (see <see cref="PileCount"/>); 0 derives it.
+    /// <paramref name="secondary"/> carries the obsidian share of a player-built pebble pile.
     /// </summary>
-    public void SpawnLoot(byte blockId, Vector3 blockPosition, int count = 0)
+    public void SpawnLoot(byte blockId, Vector3 blockPosition, int count = 0, int secondary = 0)
     {
         _loot.Clear();
         RollLoot(blockId,
-            new LootContext((int)blockPosition.X, (int)blockPosition.Y, (int)blockPosition.Z, count),
+            new LootContext((int)blockPosition.X, (int)blockPosition.Y, (int)blockPosition.Z, count, secondary),
             _loot);
 
         foreach (var id in _loot)
@@ -96,7 +97,21 @@ public class DropManager
     public static int PileCount(byte blockId, int x, int z, byte state)
     {
         var max = BlockType.ById[blockId]?.StackMax ?? 0;
+        if (BlockType.ById[blockId]?.Renderer == BlockRenderer.Pebbles)
+            return PebbleGenerator.TryDecode(state, max, out var total, out _) ? total : 0;
         return max >= 2 && state >= 1 && state <= max ? state : 0;
+    }
+
+    /// <summary>
+    /// Obsidian share for a destroyed pebble pile: the packed count for a player pile, else 0
+    /// meaning "derive it from the world hash". Other blocks always read 0.
+    /// </summary>
+    public static int PileSecondary(byte blockId, int x, int z, byte state)
+    {
+        if (BlockType.ById[blockId]?.Renderer != BlockRenderer.Pebbles)
+            return 0;
+        var max = BlockType.ById[blockId]?.StackMax ?? 0;
+        return PebbleGenerator.TryDecode(state, max, out _, out var obsidian) ? obsidian : 0;
     }
 
     /// <summary>

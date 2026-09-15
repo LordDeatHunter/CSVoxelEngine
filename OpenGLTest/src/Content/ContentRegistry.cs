@@ -1204,6 +1204,8 @@ public static class ContentRegistry
             pool.Provider = providerName switch
             {
                 "pebble_count" => LootTable.RollProvider.PebbleCount,
+                "pebble_flint_count" => LootTable.RollProvider.PebbleFlintCount,
+                "pebble_obsidian_count" => LootTable.RollProvider.PebbleObsidianCount,
                 "pile_count" => LootTable.RollProvider.PileCount,
                 _ => throw new InvalidOperationException(
                     $"Loot table '{path}' uses unknown roll provider '{providerName}'."),

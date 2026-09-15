@@ -46,8 +46,14 @@ public interface IItemUseWorld
     /// in the worldgen hash).</summary>
     int PileCountFor(byte blockId, int x, int y, int z, byte state);
 
+    /// <summary>Obsidian share of a pebble pile cell; 0 for every other pile.</summary>
+    int PileSecondaryFor(byte blockId, int x, int y, int z, byte state);
+
     /// <summary>Writes a pile cell's unit count.</summary>
     bool SetPileCount(Vector3 pos, byte count);
+
+    /// <summary>Writes a pebble pile cell's total and obsidian share; other piles ignore the share.</summary>
+    bool SetPileComposition(Vector3 pos, byte blockId, int total, int secondary);
 
     /// <summary>Drops nothing check for a pour that displaces a fragile block.</summary>
     void UnmarkPlayerPlaced(int x, int y, int z);

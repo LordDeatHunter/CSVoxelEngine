@@ -16,6 +16,7 @@ public static class PebbleGenerator
     private const int VariantSalt = 0x6E8B22;
     private const int SizeSalt = 0x6E8B23;
     private const int AngleSalt = 0x6E8B24;
+    private const int ObsidianSalt = 0x6E8B25;
 
     // True texels per block edge: block textures are 32x32 (see TextureAtlas).
     private const int TexelsPerBlock = 32;
@@ -25,10 +26,18 @@ public static class PebbleGenerator
     /// <summary>Block this generator stamps; resolved once, like the noise.</summary>
     public static readonly byte PebbleBlock;
 
+    /// <summary>Obsidian block whose tile tints obsidian stones; resolved once.</summary>
+    public static readonly byte ObsidianBlock;
+
+    /// <summary>Obsidian shard item that grounds and grows obsidian-bearing piles.</summary>
+    public static readonly byte ObsidianItem;
+
     static PebbleGenerator()
     {
         PatchNoise = TerrainGenerator.MakeNoise(61, WorldGenerationConfig.PebblePatchFrequency);
         PebbleBlock = ContentRegistry.RequireBlock("pebble").Id;
+        ObsidianBlock = ContentRegistry.RequireBlock("obsidian").Id;
+        ObsidianItem = ContentRegistry.RequireItem("obsidian").Id;
     }
 
     /// <summary>
@@ -48,12 +57,45 @@ public static class PebbleGenerator
     public static int CountAt(int x, int z) => 1 + (int)(UnitHash(x, z, CountSalt) * 3f);
 
     /// <summary>
-    /// Stones rendered (and flints dropped) for a pebble cell carrying this state byte: an
-    /// explicit player-built pile (1..<paramref name="max"/>) reads back directly, while 0 —
-    /// untouched worldgen, which never writes state — keeps the position-hash default above.
+    /// Stones rendered for a pebble cell carrying this state byte: an explicit player-built
+    /// pile reads back its packed total, while 0 — untouched worldgen, which never writes
+    /// state — keeps the position-hash default above.
     /// </summary>
     public static int CountWithState(int x, int z, byte state, int max) =>
-        state >= 1 && state <= max ? state : CountAt(x, z);
+        TryDecode(state, max, out var total, out _) ? total : CountAt(x, z);
+
+    /// <summary>
+    /// Obsidian stones in the cell: the packed count for a player pile, or the ~1% hash roll
+    /// per stone for untouched worldgen. Flint is always the total minus this.
+    /// </summary>
+    public static int ObsidianCountWithState(int x, int z, byte state, int max)
+    {
+        if (TryDecode(state, max, out var total, out var obsidian))
+            return obsidian;
+        var count = 0;
+        var natural = CountAt(x, z);
+        for (var i = 0; i < natural; i++)
+            if (IsObsidianAt(x, z, i)) count++;
+        return count;
+    }
+
+    /// <summary>Whether this stone of a natural pile is obsidian (~1% per rock).</summary>
+    public static bool IsObsidianAt(int x, int z, int i) =>
+        UnitHash(x, z, ObsidianSalt, i) < WorldGenerationConfig.PebbleObsidianChance;
+
+    /// <summary>Whether the held item builds obsidian-bearing piles.</summary>
+    public static bool IsObsidianItem(byte itemId) => itemId == ObsidianItem;
+
+    /// <summary>Packs a player pile: total stones with that many obsidian among them.</summary>
+    public static byte StateFor(int total, int obsidian) => (byte)(total + (obsidian << 2));
+
+    /// <summary>Unpacks a player-pile state; false for worldgen 0 and malformed values.</summary>
+    public static bool TryDecode(byte state, int max, out int total, out int obsidian)
+    {
+        total = state & 3;
+        obsidian = state >> 2;
+        return total >= 1 && total <= max && obsidian >= 0 && obsidian <= total;
+    }
 
     /// <summary>Layout rotation (0-3 quarter turns) so same-count neighbours don't look identical.</summary>
     public static int VariantAt(int x, int z) => (int)(UnitHash(x, z, VariantSalt) * 4f);

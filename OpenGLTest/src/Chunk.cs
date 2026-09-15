@@ -1830,6 +1830,9 @@ public class Chunk : IDisposable
         var worldZ = (int)Position.Z * Size + z;
         var maxCount = type.StackMax >= 2 ? type.StackMax : 3;
         var count = PebbleGenerator.CountWithState(worldX, worldZ, paddedState[pIdx], maxCount);
+        var obsidian = PebbleGenerator.ObsidianCountWithState(worldX, worldZ, paddedState[pIdx], maxCount);
+        var explicitPile = PebbleGenerator.TryDecode(paddedState[pIdx], maxCount, out _, out _);
+        var obsidianType = BlockType.ById[PebbleGenerator.ObsidianBlock];
         var variant = PebbleGenerator.VariantAt(worldX, worldZ);
 
         Span<float> sunF = stackalloc float[6];
@@ -1860,7 +1863,10 @@ public class Chunk : IDisposable
             for (var face = 0; face < 6; face++)
             {
                 if (face == 5) continue;
-                var tile = face == 4 ? type.Top : type.Side;
+                var isObsidian = explicitPile ? b < obsidian : PebbleGenerator.IsObsidianAt(worldX, worldZ, b);
+                var tile = face == 4
+                    ? (isObsidian ? obsidianType?.Top ?? type.Top : type.Top)
+                    : (isObsidian ? obsidianType?.Side ?? type.Side : type.Side);
                 BoxFaceCorners(min, max, face, out var p0, out var p1, out var p2, out var p3);
                 var normal = CubeFaces[face].normal;
                 EmitQuad(vertices, indices, ref indexOffset, basePos,
