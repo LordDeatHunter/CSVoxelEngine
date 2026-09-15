@@ -786,4 +786,12 @@ public static class WorldGenerationConfig
     public const float EntityHeartSizeBlocks = 0.2f;
     // How far above the slime's head (Position + HalfExtent * VerticalScale) the row's centre floats.
     public const float EntityHealthbarLiftBlocks = 0.22f;
+
+    // --- Charged throws (ThrownProjectile) ---
+    // Right-click in the air charges a throwable, release throws it. Damage scales from half
+    // at a tap to full at a full charge, and the launch speed scales the same way.
+    public const float ThrowChargeSeconds = 0.9f;
+    public const float ThrowMinCharge = 0.5f;
+    public const float ThrowSpeed = 20f;
+    public const float ThrowLifetimeSeconds = 5f;
 }

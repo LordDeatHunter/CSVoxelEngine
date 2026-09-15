@@ -1986,6 +1986,46 @@ public class RenderManager : IDisposable
         }
     }
 
+    public void RenderThrown(Camera camera, IReadOnlyList<ThrownProjectile> thrown)
+    {
+        if (camera == null || thrown.Count == 0) return;
+
+        worldShader.Use();
+        BindWorldTextures();
+
+        var viewProj = camera.GetViewProjection();
+        var atlasBound = true;
+
+        foreach (var projectile in thrown)
+        {
+            Mesh? mesh;
+            if (ItemRegistry.IsItem(projectile.ItemId))
+            {
+                if (!itemMeshes.TryGet(projectile.ItemId, out mesh, out var itemTexture)) continue;
+                BindUnit(0, TextureTarget.Texture2DArray, itemTexture);
+                atlasBound = false;
+            }
+            else
+            {
+                if (!atlasBound)
+                {
+                    BindWorldTextures();
+                    atlasBound = true;
+                }
+
+                mesh = blockCubes.Get(projectile.ItemId);
+                if (mesh == null) continue;
+            }
+
+            var model = Matrix4x4.CreateScale(projectile.Scale)
+                        * Matrix4x4.CreateRotationY(projectile.Spin)
+                        * Matrix4x4.CreateTranslation(projectile.Position);
+
+            SetDrawUniforms(model, model * viewProj, 1f);
+            mesh.Render();
+        }
+    }
+
     /// <summary>
     /// The quern's spinning top as a standalone mesh: the plate and handle quads above the
     /// air gap of its baked model (see <see cref="QuernRenderer"/>), centred on the origin

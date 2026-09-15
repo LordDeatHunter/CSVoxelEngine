@@ -381,6 +381,14 @@ public static class ContentRegistry
             if (!float.IsFinite(entityDamage) || entityDamage < 0f || entityDamage > 1000f)
                 throw new InvalidOperationException(
                     $"Item '{path}' has entityDamage {definition.EntityDamage}; expected 0..1000.");
+            float? throwDamage = null;
+            if (definition.ThrowDamage.HasValue)
+            {
+                throwDamage = definition.ThrowDamage.Value;
+                if (!float.IsFinite(throwDamage.Value) || throwDamage.Value < 0f || throwDamage.Value > 1000f)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has throwDamage {definition.ThrowDamage}; expected 0..1000.");
+            }
 
             types[id] = ItemFactory.Create(name, new ItemFactory.ItemSpec(
                 id, definition.Name ?? name, definition.Texture,
@@ -391,7 +399,7 @@ public static class ContentRegistry
                 chance, durability, useDelay,
                 sheet.Cols, sheet.Rows, sheet.Frames, sheet.Mode, sheet.Fps,
                 display.Rotation, display.Translation, display.Scale,
-                tool != null, power, hitDelay, attack, blockDamage, entityDamage, name));
+                tool != null, power, hitDelay, attack, blockDamage, entityDamage, throwDamage, name));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ItemIds, StringComparer.Ordinal));

@@ -83,6 +83,11 @@ public class World : IItemUseWorld
     private bool _sliceImpactDone;
     // Previous frame's left-click state, so the slice combo can see a fresh press.
     private bool _attackWasPressed;
+    private readonly List<ThrownProjectile> _thrown = [];
+    private bool _throwCharging;
+    private float _throwChargeSeconds;
+    private byte _throwItemId;
+    private float _throwBaseDamage;
     public Camera Camera { get; }
 
     /// <summary>The blocky player body: walk-swung limbs, mine-pumping right arm.</summary>
@@ -149,6 +154,10 @@ public class World : IItemUseWorld
 
     /// <summary>Live exhaled bubbles, feeding the bubble billboard pass.</summary>
     public IReadOnlyList<BubbleParticle> Bubbles => _bubbles.Particles;
+
+    public IReadOnlyList<ThrownProjectile> Thrown => _thrown;
+    public bool IsThrowCharging => _throwCharging;
+    public float ThrowCharge01 => MathUtils.Clamp01(_throwChargeSeconds / WorldGenerationConfig.ThrowChargeSeconds);
 
     // Break overlay strength. Quantized to whole hits, so it steps with the damage dealt
     // instead of sweeping continuously.
@@ -337,6 +346,7 @@ public class World : IItemUseWorld
         }
 
         UpdateToppling((float)deltaTime);
+        UpdateThrown((float)deltaTime);
         FrameProfiler.End(ProfileSection.Entities);
 
         // Chunks that streamed in this frame hand over their water/air frontier, so a sea a
@@ -476,6 +486,7 @@ public class World : IItemUseWorld
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.BeginGpuPass(ProfileSection.EntityPass);
         renderManager.RenderItemDrops(Camera, _dropManager.Drops);
+        renderManager.RenderThrown(Camera, _thrown);
         renderManager.RenderCampfireCooking(Camera, _campfires);
         renderManager.RenderQuerns(Camera, _querns);
         renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
@@ -1169,6 +1180,7 @@ public class World : IItemUseWorld
     /// </summary>
     public void TryUseSelected(float maxDistance)
     {
+        if (_throwCharging) return;
         Camera.NotifyPlayerAction();
         if (TryCookOrCollect(maxDistance))
         {
@@ -1188,6 +1200,79 @@ public class World : IItemUseWorld
             return;
         }
         DispatchUse(item, maxDistance);
+    }
+
+    public bool ShouldChargeThrow()
+    {
+        var id = Inventory.SelectedBlockId;
+        if (id == 0 || Inventory.SelectedCount <= 0) return false;
+        if (ItemRegistry.TryGet(id) is not { IsThrowable: true } item) return false;
+        if (item.UseAction == ItemUseAction.None) return true;
+        return !Camera.Raycast(InteractionReach, _chunkManager, out _, out _);
+    }
+
+    public bool TryBeginThrowCharge()
+    {
+        if (_throwCharging) return true;
+        var id = Inventory.SelectedBlockId;
+        if (id == 0 || Inventory.SelectedCount <= 0) return false;
+        if (ItemRegistry.TryGet(id) is not { IsThrowable: true } item) return false;
+        _throwCharging = true;
+        _throwChargeSeconds = 0f;
+        _throwItemId = id;
+        _throwBaseDamage = item.ThrowDamage ?? 0f;
+        return true;
+    }
+
+    public void UpdateThrowCharge(float deltaTime)
+    {
+        if (!_throwCharging) return;
+        _throwChargeSeconds = Math.Min(_throwChargeSeconds + Math.Max(0f, deltaTime), WorldGenerationConfig.ThrowChargeSeconds);
+        if (Inventory.SelectedBlockId != _throwItemId || Inventory.SelectedCount <= 0)
+            _throwCharging = false;
+    }
+
+    public void CancelThrowCharge() => _throwCharging = false;
+
+    public bool ReleaseThrow()
+    {
+        if (!_throwCharging) return false;
+        _throwCharging = false;
+        var charge01 = MathUtils.Clamp01(_throwChargeSeconds / WorldGenerationConfig.ThrowChargeSeconds);
+        var id = _throwItemId;
+        if (id == 0 || Inventory.SelectedBlockId != id || Inventory.SelectedCount <= 0) return false;
+        if (!Camera.IsCreative && !Inventory.ConsumeSelected()) return false;
+        var origin = Camera.Position + Camera.ViewDirection * 0.6f;
+        var velocity = ThrownProjectile.LaunchVelocity(Camera.ViewDirection, charge01);
+        _thrown.Add(new ThrownProjectile(id, origin, velocity, _throwBaseDamage, charge01));
+        Camera.NotifyPlayerAction();
+        Player.Punch();
+        return true;
+    }
+
+    private void UpdateThrown(float deltaTime)
+    {
+        if (_thrown.Count == 0) return;
+        var slimes = _slimes?.Slimes ?? (IReadOnlyList<Slime>)Array.Empty<Slime>();
+        for (var i = _thrown.Count - 1; i >= 0; i--)
+        {
+            var projectile = _thrown[i];
+            var alive = projectile.Update(deltaTime, _chunkManager, slimes, out var hit);
+            if (hit != null)
+            {
+                hit.TakeDamage(projectile.Damage);
+                var away = new Vector3(
+                    hit.Position.X - Camera.Position.X, 0f, hit.Position.Z - Camera.Position.Z);
+                hit.Shove(away, WorldGenerationConfig.SlimePunchShoveSpeed);
+                _thrown.RemoveAt(i);
+                continue;
+            }
+            if (!alive)
+            {
+                _dropManager.SpawnAt(projectile.ItemId, projectile.Position);
+                _thrown.RemoveAt(i);
+            }
+        }
     }
 
     /// <summary>

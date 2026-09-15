@@ -1,1 +1,1 @@
-{ "name": "Obsidian", "texture": "assets/textures/items/obsidian.png" }
+{ "name": "Obsidian", "texture": "assets/textures/items/obsidian.png", "throwDamage": 3 }

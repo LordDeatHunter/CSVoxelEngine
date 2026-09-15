@@ -1,2 +1,3 @@
-{ "name": "Snow", "texture": "assets/textures/items/snow.png",
+{ "name": "Snowball", "texture": "assets/textures/items/snow.png",
+  "throwDamage": 0,
   "use": { "action": "place_stack", "block": "block/snow" } }

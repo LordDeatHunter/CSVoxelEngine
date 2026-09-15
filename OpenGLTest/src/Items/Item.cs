@@ -89,6 +89,12 @@ public abstract class Item
     /// <summary>Damage one punch deals to an enemy; the bare-hand baseline by default.</summary>
     public float EntityDamage { get; internal init; } = Mining.DefaultEntityDamage;
 
+    /// <summary>Damage a full-charge throw deals; null when this item cannot be thrown.</summary>
+    public float? ThrowDamage { get; internal init; }
+
+    /// <summary>Whether right-click in the air can charge and release this item as a projectile.</summary>
+    public bool IsThrowable => ThrowDamage.HasValue;
+
     /// <summary>Seconds between uses of this item; 0 means the global click rate applies.</summary>
     public float UseDelaySeconds { get; internal init; }
 
@@ -204,5 +210,6 @@ public abstract class Item
         Attack = spec.Attack;
         BlockDamage = spec.BlockDamage;
         EntityDamage = spec.EntityDamage;
+        ThrowDamage = spec.ThrowDamage;
     }
 }

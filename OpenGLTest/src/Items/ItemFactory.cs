@@ -39,6 +39,7 @@ public static class ItemFactory
         AttackPattern Attack,
         float BlockDamage,
         float EntityDamage,
+        float? ThrowDamage,
         string SourceName);
 
     /// <summary>

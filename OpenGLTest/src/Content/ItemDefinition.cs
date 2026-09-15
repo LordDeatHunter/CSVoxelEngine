@@ -26,6 +26,14 @@ public sealed class ItemDefinition
     public float? EntityDamage { get; set; }
 
     /// <summary>
+    /// Damage a charged throw deals to an enemy at full charge; half that at minimal charge.
+    /// Omitted for a non-throwable item, 0 for a harmless one (snowball, mudball). Punch
+    /// damage (<see cref="EntityDamage"/>) stays independent, so a throwable can still punch
+    /// at the baseline while its throw hits softer or harder.
+    /// </summary>
+    public float? ThrowDamage { get; set; }
+
+    /// <summary>
     /// Attack behaviour the left-click drives: <c>punch</c> (default) or <c>slice</c>. See
     /// <see cref="AttackPattern"/>.
     /// </summary>
