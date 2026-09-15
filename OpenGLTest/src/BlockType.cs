@@ -74,6 +74,10 @@ public sealed record BlockType
     internal static readonly float[] MovementSpeedById = new float[256];
     internal static readonly float[] FrictionById = new float[256];
 
+    // Natural pebble scatter density multiplier of each block as an exposed surface: 0 means
+    // this surface never grows pebbles. See PebbleGenerator.
+    internal static readonly float[] PebbleWeightById = new float[256];
+
     // Whether tapered wood may grow a tube or arm into each block id (members of the
     // tree_branch_connectable tag: leaves, never terrain). Flat like the other mesher flags.
     internal static readonly bool[] BranchConnectableById = new bool[256];
@@ -138,6 +142,13 @@ public sealed record BlockType
     /// </summary>
     public float MovementSpeed { get; init; }
     public float Friction { get; init; } = DefaultFriction;
+
+    /// <summary>
+    /// Density multiplier (0..1) for the natural pebble scatter when this block is the exposed
+    /// surface under the pebble cell; <c>0</c> means this surface never grows pebbles. See
+    /// <see cref="PebbleGenerator"/>.
+    /// </summary>
+    public float PebbleWeight { get; init; }
 
     /// <summary>Whether the block hides a neighbouring full cube's face. Defaults to "the baked
     /// model is a full cube and it is not cutout", so it is only known after baking.</summary>
@@ -270,6 +281,11 @@ public sealed record BlockType
     public static float MovementSpeedOf(byte blockId) => MovementSpeedById[blockId];
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float FrictionOf(byte blockId) => FrictionById[blockId];
+
+    /// <summary>Natural pebble scatter density multiplier of the block as an exposed surface;
+    /// <c>0</c> means the surface never grows pebbles. See <see cref="PebbleGenerator"/>.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float PebbleWeightOf(byte blockId) => PebbleWeightById[blockId];
 
     /// <summary>Whether a block fully hides a neighbouring full cube's face.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

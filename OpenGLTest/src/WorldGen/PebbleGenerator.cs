@@ -42,13 +42,17 @@ public static class PebbleGenerator
 
     /// <summary>
     /// Whether the surface column (x, z) grows pebbles, and how many stones share its cell.
-    /// Rare low-frequency patches gate, then a density roll thins inside them.
+    /// Rare low-frequency patches gate, then a density roll thins inside them;
+    /// <paramref name="surfaceWeight"/> (the exposed surface's
+    /// <see cref="BlockType.PebbleWeight"/>) scales that roll, so rock and gravel keep the
+    /// patch's full density, grass gets a thinner scatter and sand none.
     /// </summary>
-    public static bool TryGetPebble(int x, int z, out int count)
+    public static bool TryGetPebble(int x, int z, float surfaceWeight, out int count)
     {
         count = 0;
+        if (surfaceWeight <= 0f) return false;
         if (PatchNoise.GetNoise(x, z) <= WorldGenerationConfig.PebblePatchThreshold) return false;
-        if (UnitHash(x, z, DensitySalt) >= WorldGenerationConfig.PebbleDensity) return false;
+        if (UnitHash(x, z, DensitySalt) >= WorldGenerationConfig.PebbleDensity * surfaceWeight) return false;
         count = CountAt(x, z);
         return true;
     }
@@ -102,8 +106,9 @@ public static class PebbleGenerator
 
     /// <summary>
     /// Stamps pebbles onto the surface: one block above the heightmap, into air only, and only
-    /// over solid ground inside this chunk (a carve below leaves the cell empty instead of
-    /// floating). Runs on a generation worker thread, after the trees.
+    /// over an exposed surface whose <see cref="BlockType.PebbleWeight"/> admits them (a carve
+    /// below leaves the cell empty instead of floating). Runs on a generation worker thread,
+    /// after the trees.
     /// </summary>
     public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
@@ -115,11 +120,14 @@ public static class PebbleGenerator
             if (TerrainGenerator.IsWaterColumn(worldX0 + x, worldZ0 + z, height)) continue;
             var ly = height + 1 - worldY0;
             if ((uint)ly >= Chunk.Size) continue;
-            if (!TryGetPebble(worldX0 + x, worldZ0 + z, out _)) continue;
+            // ly == 0 puts the ground in the chunk below, out of reach of a pure per-chunk
+            // stamp; skip it like FlowerGenerator rather than guess the surface material
+            if (ly == 0) continue;
 
             var i = Chunk.Idx(x, ly, z);
             if (blocks[i] != BlockType.Air) continue;
-            if (ly > 0 && blocks[Chunk.Idx(x, ly - 1, z)] == BlockType.Air) continue;
+            var weight = BlockType.PebbleWeightOf(blocks[Chunk.Idx(x, ly - 1, z)]);
+            if (!TryGetPebble(worldX0 + x, worldZ0 + z, weight, out _)) continue;
             blocks[i] = PebbleBlock;
         }
     }

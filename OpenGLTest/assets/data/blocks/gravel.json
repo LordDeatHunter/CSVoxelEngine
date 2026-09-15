@@ -2,6 +2,7 @@
   "name": "Gravel",
   "model": { "parent": "block/cube_all", "textures": { "all": "gravel" } },
   "sfx": "hit_rock",
+  "pebbleWeight": 1,
   "hardness": 3,
   "falls": true
 }

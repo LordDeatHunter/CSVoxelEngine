@@ -2,6 +2,7 @@
   "name": "Stone",
   "model": { "parent": "block/cube_all", "textures": { "all": "stone" } },
   "sfx": "hit_rock",
+  "pebbleWeight": 1,
   "requiresTool": true,
   "tools": { "pickaxe": 1 },
   "loot": "stone"

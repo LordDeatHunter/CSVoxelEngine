@@ -52,6 +52,14 @@ public sealed class BlockDefinition
     /// </summary>
     public float? Friction { get; set; }
 
+    /// <summary>
+    /// Density multiplier (0..1) for the natural pebble scatter (see <see cref="PebbleGenerator"/>)
+    /// when this block is the exposed surface under the pebble cell. Rock and gravel keep the
+    /// patch's full density, grass a thinner share, and sand nothing. <c>0</c> (the default) means
+    /// this surface never grows pebbles.
+    /// </summary>
+    public float? PebbleWeight { get; set; }
+
     public bool? Occludes { get; set; }
     public bool? CullSelf { get; set; }
     public bool? CastsAO { get; set; }

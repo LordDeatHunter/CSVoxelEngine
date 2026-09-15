@@ -1,6 +1,7 @@
 {
   "name": "Sand",
   "model": { "parent": "block/cube_all", "textures": { "all": "sand" } },
+  "pebbleWeight": 0,
   "hardness": 3,
   "falls": true
 }
