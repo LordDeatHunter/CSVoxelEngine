@@ -215,12 +215,13 @@ public class RenderManager : IDisposable
     private int _pointCount;
 
     // World-shader uniform locations, resolved once in LoadResources. The first four are the
-    // only uniforms a world draw still touches, so the per-draw cost is three (four for TNT)
-    // glUniform calls with no dictionary lookup in between; the arrays feed ApplyFrameUniforms.
+    // only uniforms a world draw still touches, so the per-draw cost is three (four for TNT,
+    // five for a flashing slime) glUniform calls with no dictionary lookup in between; the arrays feed ApplyFrameUniforms.
     private int _locModel;
     private int _locMvp;
     private int _locAlpha;
     private int _locFlash;
+    private int _locHitFlash;
     private int _locAlphaCutoff;
     private int[] _locPointPos = [];
     private int[] _locPointColor = [];
@@ -347,6 +348,7 @@ public class RenderManager : IDisposable
         // chunk program; the cutout default matches BeginFrame's. Both are set once because
         // nothing else on this program ever writes them.
         chunkShader.SetUniform("uFlash", 0f);
+        chunkShader.SetUniform("uHitFlash", 0f);
         chunkShader.SetUniform("uAlphaCutoff", 0.5f);
         CreateReflectionTarget();
         CreateSceneCopy();
@@ -357,6 +359,7 @@ public class RenderManager : IDisposable
         _locMvp = worldShader.GetUniformLocation("uMVP");
         _locAlpha = worldShader.GetUniformLocation("uAlpha");
         _locFlash = worldShader.GetUniformLocation("uFlash");
+        _locHitFlash = worldShader.GetUniformLocation("uHitFlash");
         _locAlphaCutoff = worldShader.GetUniformLocation("uAlphaCutoff");
         _locPointPos = worldShader.GetUniformArrayLocations("uPointPos", WorldGenerationConfig.MaxPointLights);
         _locPointColor = worldShader.GetUniformArrayLocations("uPointColor", WorldGenerationConfig.MaxPointLights);
@@ -1474,7 +1477,8 @@ public class RenderManager : IDisposable
     /// these and every later world pass in the frame inherits them. Everything it reads is final
     /// by then: <see cref="SetLighting"/> (including <c>_lightViewProj</c>) runs before
     /// <see cref="BeginFrame"/>, and nothing in a world pass writes these fields.
-    /// <c>uFlash</c> is entity-only (primed TNT), so it is reset on the plain program alone.
+    /// <c>uFlash</c>/<c>uHitFlash</c> are entity-only (primed TNT / hurt slimes), so they are
+    /// reset on the plain program alone.
     /// Leaves <c>worldShader</c> bound, which is what every caller assumes.
     /// </summary>
     private void ApplyFrameUniforms()
@@ -1484,6 +1488,7 @@ public class RenderManager : IDisposable
         worldShader.Use();
         ApplyFrameUniformsTo(worldShader, _locPointPos, _locPointColor);
         worldShader.SetUniform(_locFlash, 0f);
+        worldShader.SetUniform(_locHitFlash, 0f);
     }
 
     /// <summary>The body of <see cref="ApplyFrameUniforms"/>, run once per world program.
@@ -2141,12 +2146,20 @@ public class RenderManager : IDisposable
         BindUnit(0, TextureTarget.Texture2DArray, _slimeTexture);
 
         var viewProj = camera.GetViewProjection();
+        var drewFlash = false;
+
         foreach (var slime in slimes)
         {
             var model = SlimeTransform(slime);
             SetDrawUniforms(model, model * viewProj, 1f);
+            worldShader.SetUniform(_locHitFlash, slime.HitFlash);
             _slimeMesh.Render();
+            drewFlash = true;
         }
+
+        // uHitFlash is a per-slime value, so put it back rather than tinting whatever draws next.
+        if (drewFlash)
+            worldShader.SetUniform(_locHitFlash, 0f);
 
         BindWorldTextures();
     }

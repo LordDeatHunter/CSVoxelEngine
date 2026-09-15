@@ -190,6 +190,7 @@ public sealed class DebugSceneRenderer : IDisposable
         _world.SetUniform("uReflValid", 0f);
         _world.SetUniform("uReflViewProj", Matrix4x4.Identity);
         _world.SetUniform("uFlash", 0f);
+        _world.SetUniform("uHitFlash", 0f);
         _world.SetUniform(_locAlphaCutoff, 0.5f);
         _world.SetUniform("uLodLeafColor", new Vector3(0.17f, 0.29f, 0.07f));
         _world.SetUniform("uLavaLayer", _lavaLayer);

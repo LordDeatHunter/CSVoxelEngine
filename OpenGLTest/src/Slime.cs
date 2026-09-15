@@ -44,11 +44,16 @@ public sealed class Slime
 
     private const float ContactDamageCooldownSeconds = 0.6f;
 
+    // Hit flash: snapped to full on TakeDamage, then fades linearly back to unflashed over
+    // this long. Read by the entity pass as a per-slime uHitFlash tint (non-emissive red).
+    private const float HitFlashSeconds = 0.25f;
+
     private Vector3 _velocity;
     private float _hopTimer;
     private float _landPulse;
     private float _airBlend;
     private float _damageCooldown;
+    private float _hitFlash;
     private float _nextHop;
     private bool _inWater;
 
@@ -89,11 +94,16 @@ public sealed class Slime
     /// <see cref="VerticalScale"/>.</summary>
     public float HorizontalScale => 1f - (VerticalScale - 1f) * 0.5f;
 
+    /// <summary>Hit flash amount, 1 right after <see cref="TakeDamage"/> fading to 0 over
+    /// <c>HitFlashSeconds</c>. The entity pass tints the skin red by this (non-emissive).</summary>
+    public float HitFlash => _hitFlash;
+
     /// <summary>Applies a hit; the owner drops the loot and removes the slime once dead.</summary>
     public void TakeDamage(int amount)
     {
         if (amount <= 0) return;
         Health = Math.Max(0, Health - amount);
+        _hitFlash = 1f;
     }
 
     /// <summary>Records that contact damage just landed, starting the per-hop cooldown.</summary>
@@ -118,6 +128,7 @@ public sealed class Slime
 
         _airBlend = MathUtils.Damp(_airBlend, IsGrounded ? 0f : 1f, 10f, deltaTime);
         _landPulse = MathF.Max(0f, _landPulse - deltaTime / LandSquashSeconds);
+        _hitFlash = MathF.Max(0f, _hitFlash - deltaTime / HitFlashSeconds);
         _damageCooldown = MathF.Max(0f, _damageCooldown - deltaTime);
 
         ApplyPhysics(deltaTime, chunks);

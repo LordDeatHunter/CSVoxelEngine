@@ -25,6 +25,7 @@ flat in float fAlpha; // per-draw fade from the vertex stage: a uniform cannot v
 // One slice per block tile; UVs are tile-local and REPEAT across merged quads.
 uniform sampler2DArray uTextureAtlas;
 uniform float uFlash;
+uniform float uHitFlash;
 uniform float uAlphaCutoff;
 uniform float uTime;
 uniform vec3 uSunDir;
@@ -178,6 +179,9 @@ void main() {
         texColor = vec4(leafRgb, 1.0);
     } else if (texColor.a < uAlphaCutoff) discard;
     vec3 albedo = texColor.rgb * fColor.rgb;
+    // Hit flash tints the albedo before lighting, so it goes dark with the scene instead of
+    // glowing like the emissive uFlash mix at the end.
+    albedo = mix(albedo, vec3(1.0, 0.0, 0.0), uHitFlash * 0.6);
     vec3 N = normalize(fNormal);
     float ndl = max(dot(N, uSunDir), 0.0);
     float shadow = SampleShadow(fWorldPos, N, ndl, uShadowStrength);

@@ -113,6 +113,25 @@ public sealed class SlimeTests
     }
 
     [Fact]
+    public void TakeDamageSnapsTheHitFlashWhichThenFades()
+    {
+        var chunks = FloorWorld(ContentRegistry.RequireBlock("stone").Id);
+        var slime = new Slime(EntityRegistry.Require("slime"), GroundBody(2.5f, 2.5f));
+        var player = new Vector3(2.5f, 1.62f, 2.5f);
+
+        Assert.Equal(0f, slime.HitFlash);
+        slime.TakeDamage(1);
+        Assert.Equal(1f, slime.HitFlash);
+
+        slime.Update(Dt, chunks, player);
+        Assert.InRange(slime.HitFlash, 0f, 1f);
+
+        for (var i = 0; i < 60; i++)
+            slime.Update(Dt, chunks, player);
+        Assert.Equal(0f, slime.HitFlash);
+    }
+
+    [Fact]
     public void SpawnRingPlacesSlimesOnDryLoadedSurface()
     {
         var chunks = SurfaceWorld();
