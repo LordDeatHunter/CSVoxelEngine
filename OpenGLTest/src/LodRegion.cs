@@ -720,12 +720,18 @@ public class LodRegion : IDisposable
                     : grass.FaceTiles[topFace], shades, lodLeaves: top > ground);
 
                 // AddQuad places a +Y face one cell above its origin, so the origin sits a
-                // cell below the sheet. A frozen cell shows the ice sheet instead of open water.
+                // cell below the sheet. A frozen cell shows snow-covered ice instead of open
+                // water, and is not flagged water: the flag selects the fragment-shader water
+                // model regardless of tile, so flagging ice would shade it as water.
                 if (isSeaCell)
+                {
+                    var frozen = iceTop[gi * heightGrid + gj];
+                    var snowCovered = snowTop[gi * heightGrid + gj];
                     AddQuad(waterVertices, waterIndices, topFace,
                         new Vector3(i * cellSize, sheetY - cellSize, j * cellSize),
-                        iceTop[gi * heightGrid + gj] ? ice.FaceTiles[topFace] : waterTile,
-                        waterShades, true);
+                        frozen ? (snowCovered ? snow.FaceTiles[topFace] : ice.FaceTiles[topFace]) : waterTile,
+                        waterShades, isWater: !frozen);
+                }
 
                 foreach (var f in sideFaces)
                 {

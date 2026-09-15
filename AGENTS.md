@@ -442,7 +442,9 @@ block, so a full stack is solid and partial layers are walked through (`BlockTyp
 
 `ColumnData.Biomes` carries the per-column classification for the chunk mesher and the far LOD
 (`Chunk.GetColumnBiomes`); the LOD samples it per cell and wears the matching tile (snow for a cold
-cell, ice for a frozen sea sheet), so a distant desert and sea floor agree with the near chunks.
+cell, snow-covered ice for a frozen sea sheet — snow tile when snow-covered, else ice, and never
+flagged water, since the flag alone selects the fragment-shader water model whatever the tile), so a
+distant desert and sea floor agree with the near chunks.
 Vegetation is biome-gated: broadleaf trees (`TreeGenerator`, forest), **spruce** conifers
 (`TreeGenerator.BuildSpruceShape`, taiga) and flowers (`FlowerGenerator`, forest), and the desert
 grows **cacti** (`CactusGenerator`) — a tapered stem that throws a few arms which bend upward into

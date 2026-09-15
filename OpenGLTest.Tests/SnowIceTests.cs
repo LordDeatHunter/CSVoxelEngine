@@ -123,6 +123,27 @@ public sealed class SnowIceTests
     }
 
     [Fact]
+    public void LodFrozenSeaSheetShowsSnowCoveredIce()
+    {
+        Assert.True(TryFindColumn(
+            (x, z) => TerrainGenerator.BiomeAt(x, z) == Biome.Ocean
+                      && TerrainGenerator.ColdWeight(x, z) > WorldGenerationConfig.FreezeColdThreshold,
+            out var iceX, out var iceZ));
+
+        var spec = LodRegion.Levels[0];
+        var mesh = LodRegion.BuildMeshData(0,
+            (int)Math.Floor(iceX / (float)spec.RegionBlocks),
+            (int)Math.Floor(iceZ / (float)spec.RegionBlocks));
+        var ice = BlockType.ById[TerrainGenerator.IceBlock]!;
+        var snow = BlockType.ById[TerrainGenerator.SnowBlock]!;
+        var frozenTiles = new HashSet<ushort>(ice.FaceTiles);
+        foreach (var tile in snow.FaceTiles)
+            frozenTiles.Add(tile);
+        Assert.Contains(mesh.WaterVertices,
+            v => (v.PackedColor >> 24) != 254u && frozenTiles.Contains(v.Layer));
+    }
+
+    [Fact]
     public void FrozenPlainsGrowNoTrees()
     {
         for (var cx = -48; cx <= 48; cx++)
