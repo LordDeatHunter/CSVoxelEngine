@@ -2476,16 +2476,24 @@ public class RenderManager : IDisposable
         BindUnit(0, TextureTarget.Texture2DArray, _breakProgressTexture);
 
         gl.BindVertexArray(faceVao);
-        // Inflated slightly past the grown box so the overlay never z-fights the block
+        // Inflated slightly past the grown box so the overlay never z-fights the block.
+        // UVs are cropped to the face's cell-space footprint so thin boxes sample a strip
+        // of the crack sprite at full-texel density instead of a squashed whole frame.
         var pad = new Vector3(0.004f + grow);
+        var viewProj = camera.GetViewProjection();
         foreach (var box in boxes)
         {
             var model = Matrix4x4.CreateTranslation(new Vector3(-0.5f))
                         * Matrix4x4.CreateScale(box.Size + pad)
                         * Matrix4x4.CreateTranslation(blockPosition + box.Center);
-            breakShader.SetUniform("uMVP", model * camera.GetViewProjection());
+            breakShader.SetUniform("uMVP", model * viewProj);
             for (var face = 0; face < 6; face++)
+            {
+                var (offset, scale) = BreakOverlayUv.ForFace(face, box);
+                breakShader.SetUniform("uUvOffset", offset);
+                breakShader.SetUniform("uUvScale", scale);
                 gl.DrawArrays(GLEnum.TriangleFan, face * 4, 4);
+            }
         }
 
         gl.BindVertexArray(0);
@@ -2531,8 +2539,9 @@ public class RenderManager : IDisposable
         Span<float> faceVertices =
         [
             // Cube faces in Chunk.CubeFaces order, each a 4-vertex triangle fan, interleaved as
-            // position.xyz + face-local uv. The two in-plane axes carry uv 0..1 so every face
-            // samples the whole break sprite frame.
+            // position.xyz + face-local uv. The two in-plane axes carry uv 0..1; the break
+            // shader crops them to the hitbox face via uUvOffset/uUvScale, so a full cube
+            // samples the whole sprite frame and a thin box a strip of it.
             0f, 0f, 0f, 0f, 0f,   1f, 0f, 0f, 1f, 0f,
             1f, 1f, 0f, 1f, 1f,   0f, 1f, 0f, 0f, 1f,
             1f, 0f, 1f, 1f, 0f,   0f, 0f, 1f, 0f, 0f,
