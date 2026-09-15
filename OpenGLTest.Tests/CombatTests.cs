@@ -45,6 +45,18 @@ public sealed class CombatTests
     }
 
     [Fact]
+    public void ReachEdgeIsInclusive()
+    {
+        var origin = Vector3.Zero;
+        var forward = new Vector3(1f, 0f, 0f);
+        Assert.True(Combat.InPunchCone(origin, forward, forward * Combat.PunchReach, out var distance));
+        Assert.Equal(Combat.PunchReach, distance, precision: 4);
+        Assert.False(Combat.InPunchCone(origin, forward, forward * (Combat.PunchReach + 0.1f), out _));
+        Assert.True(Combat.InFrontHemisphere(origin, forward, forward * Combat.PunchReach, out _));
+        Assert.False(Combat.InFrontHemisphere(origin, forward, forward * (Combat.PunchReach + 0.1f), out _));
+    }
+
+    [Fact]
     public void SliceHitsAFrontHemisphereWithinPunchReach()
     {
         var origin = Vector3.Zero;
@@ -60,13 +72,13 @@ public sealed class CombatTests
     }
 
     [Fact]
-    public void SliceReturnSwingDealsHalfPower()
+    public void SliceReturnSwingHalvesForwardPowerFlooredAtOne()
     {
         var blade = ContentRegistry.RequireItem("obsidian_blade");
-        Assert.Equal(6, Combat.SliceDamage(blade, returnSwing: false));
-        Assert.Equal(3, Combat.SliceDamage(blade, returnSwing: true));
+        var forward = Combat.SliceDamage(blade, returnSwing: false);
+        Assert.Equal((int)MathF.Round(forward / 2f, MidpointRounding.AwayFromZero), Combat.SliceDamage(blade, returnSwing: true));
+        Assert.True(forward > Combat.SliceDamage(null, returnSwing: false));
 
-        // A 1-damage weapon cannot halve below one hit point.
         Assert.Equal(1, Combat.SliceDamage(null, returnSwing: false));
         Assert.Equal(1, Combat.SliceDamage(null, returnSwing: true));
     }

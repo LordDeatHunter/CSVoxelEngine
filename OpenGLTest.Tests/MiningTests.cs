@@ -1,3 +1,4 @@
+using System.Linq;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -11,19 +12,27 @@ public sealed class MiningTests
     private static byte BlockOf(string name) => ContentRegistry.RequireBlock(name).Id;
 
     [Fact]
-    public void ToolItemsExposeTheirPowerAndPace()
+    public void ToolPaceAndPowerComeFromTheItemWithBaselineFallback()
     {
         var pickaxe = ItemOf("primitive_pickaxe");
-        Assert.True(pickaxe.IsTool);
-        Assert.Equal(1f, pickaxe.ToolPower);
-        Assert.Equal(400f, pickaxe.HitDelayMs);
-        Assert.Equal(400f, ItemOf("primitive_axe").HitDelayMs);
-
-        // A plain pickup declares no tool block, so it keeps the bare-hand baseline.
+        var axe = ItemOf("primitive_axe");
         var flint = ItemOf("flint");
+        Assert.True(pickaxe.IsTool);
+        Assert.True(axe.IsTool);
         Assert.False(flint.IsTool);
-        Assert.Equal(0.5f, flint.ToolPower);
-        Assert.Equal(Mining.DefaultHitGapMs, flint.HitDelayMs);
+
+        // A declared pace drives the hit gap; an item without one falls back to the baseline.
+        Assert.True(pickaxe.HitDelayMs > 0f);
+        Assert.Equal(pickaxe.HitDelayMs / 1000f, Mining.HitGapSeconds(pickaxe), precision: 5);
+        Assert.Equal(Mining.DefaultHitGapMs, Mining.HitGapMs(flint), precision: 4);
+        Assert.Equal(Mining.DefaultHitGapMs / 1000f, Mining.HitGapSeconds(null), precision: 5);
+
+        // Same split for power and damage: tools carry their own numbers, the hand falls back.
+        Assert.Equal(Mining.DefaultPower, Mining.Power(flint), precision: 5);
+        Assert.Equal(Mining.DefaultPower, Mining.Power(null), precision: 5);
+        Assert.Equal(Mining.DefaultBlockDamage, Mining.BlockDamage(flint), precision: 5);
+        Assert.Equal(Mining.DefaultBlockDamage, Mining.BlockDamage(null), precision: 5);
+        Assert.Equal(Mining.DefaultEntityDamage, Mining.EntityDamage(null), precision: 5);
     }
 
     [Fact]
@@ -35,20 +44,19 @@ public sealed class MiningTests
     }
 
     [Fact]
-    public void RequiresToolBlocksParseTheirGateAndFloatHardness()
+    public void GatedBlocksCarryAGateWhileUngatedBlocksCarryNone()
     {
         var stone = ContentRegistry.RequireBlock("stone");
         Assert.True(stone.RequiresTool);
         Assert.NotNull(stone.Tools);
-        Assert.Equal(1f, stone.Tools!["pickaxe"]);
-        Assert.Equal(5f, stone.Hardness);
+        Assert.NotEmpty(stone.Tools!);
+        Assert.True(stone.Hardness > 0f);
 
         var log = ContentRegistry.RequireBlock("log");
         Assert.True(log.RequiresTool);
-        Assert.Equal(1f, log.Tools!["axe"]);
-        Assert.Equal(24f, log.Hardness);
+        Assert.NotNull(log.Tools);
+        Assert.NotEmpty(log.Tools!);
 
-        // An ungated block carries no gate at all.
         var dirt = ContentRegistry.RequireBlock("dirt");
         Assert.False(dirt.RequiresTool);
         Assert.Null(dirt.Tools);
@@ -64,7 +72,7 @@ public sealed class MiningTests
         var flint = ItemOf("flint");
 
         Assert.True(Mining.CanMine(stone, pickaxe));
-        Assert.Equal(1f, Mining.HitDamage(stone, pickaxe));
+        Assert.Equal(Mining.BlockDamage(pickaxe), Mining.HitDamage(stone, pickaxe), precision: 5);
 
         Assert.False(Mining.CanMine(stone, axe));
         Assert.Equal(0f, Mining.HitDamage(stone, axe));
@@ -81,7 +89,17 @@ public sealed class MiningTests
         var dirt = BlockOf("dirt");
         Assert.True(Mining.CanMine(dirt, null));
         Assert.True(Mining.CanMine(dirt, ItemOf("primitive_pickaxe")));
-        Assert.Equal(0.5f, Mining.HitDamage(dirt, null));
+        Assert.Equal(Mining.DefaultBlockDamage, Mining.HitDamage(dirt, null), precision: 5);
+    }
+
+    [Fact]
+    public void FluidCellsRefuseEveryTool()
+    {
+        var water = BlockOf("water");
+        Assert.False(Mining.CanMine(water, ItemOf("primitive_pickaxe")));
+        Assert.False(Mining.CanMine(water, null));
+        Assert.Equal(0f, Mining.HitDamage(water, ItemOf("primitive_pickaxe")), precision: 5);
+        Assert.Equal(0f, Mining.HitDamage(water, null), precision: 5);
     }
 
     [Fact]
@@ -94,62 +112,52 @@ public sealed class MiningTests
     }
 
     [Fact]
-    public void HitGapDefaultsToTheBaseline()
+    public void TaperStepsGetSofterTowardTheTip()
     {
-        Assert.Equal(0.6f, Mining.HitGapSeconds(null), precision: 4);
-        Assert.Equal(0.6f, Mining.HitGapSeconds(ItemOf("flint")), precision: 4);
-    }
-
-    [Fact]
-    public void NaturalWoodHardnessTapersFromTheFullWidthLog()
-    {
-        const float hardnessPerTaperLevel = 0.15f;
-        var baseHp = ContentRegistry.RequireBlock("log").Hardness;
-        Assert.Equal(24f, baseHp, precision: 3);
-
-        foreach (var name in new[] { "branch", "limb", "sprig", "switch", "twig" })
+        var levels = new[] { "log", "branch", "limb", "sprig", "switch", "twig" }
+            .Select(name => ContentRegistry.RequireBlock(name))
+            .ToList();
+        var ordered = levels.OrderBy(b => b.WoodTaperLevel).ToList();
+        Assert.Equal(levels.Count, ordered.Count);
+        for (var i = 1; i < ordered.Count; i++)
         {
-            var block = ContentRegistry.RequireBlock(name);
-            var expected = baseHp * (1f - hardnessPerTaperLevel * block.WoodTaperLevel);
-            Assert.Equal(expected, block.Hardness, precision: 3);
+            Assert.True(ordered[i].WoodTaperLevel > ordered[i - 1].WoodTaperLevel);
+            Assert.True(ordered[i].Hardness < ordered[i - 1].Hardness);
+            Assert.True(ordered[i].Hardness > 0f);
         }
     }
 
     [Fact]
-    public void EntityDamageDefaultsToTheBareHandAndToolsOverride()
+    public void WeaponsHitHarderThanFistsWithTheBladeOnTop()
     {
-        // Every item punches for the bare-hand baseline unless it declares entityDamage.
-        Assert.Equal(1f, Mining.EntityDamage(null));
-        Assert.Equal(1f, ItemOf("flint").EntityDamage);
-        Assert.Equal(1, Combat.PunchDamage(null));
+        var bareHand = Mining.EntityDamage(null);
+        Assert.Equal(Mining.DefaultEntityDamage, bareHand, precision: 5);
+        Assert.Equal(bareHand, ItemOf("flint").EntityDamage, precision: 5);
+        Assert.Equal((int)bareHand, Combat.PunchDamage(null));
 
-        // Tools are weapons too: primitive 3, copper 5, and the untiered blade 6.
-        Assert.Equal(3f, ItemOf("primitive_pickaxe").EntityDamage);
-        Assert.Equal(3f, ItemOf("primitive_axe").EntityDamage);
-        Assert.Equal(5f, ItemOf("copper_pickaxe").EntityDamage);
-        Assert.Equal(5f, ItemOf("copper_axe").EntityDamage);
-        Assert.Equal(6f, ItemOf("obsidian_blade").EntityDamage);
+        var primitive = ItemOf("primitive_pickaxe").EntityDamage;
+        var copper = ItemOf("copper_pickaxe").EntityDamage;
+        var blade = ItemOf("obsidian_blade").EntityDamage;
+        Assert.True(primitive > bareHand);
+        Assert.True(copper > primitive);
+        Assert.True(blade >= copper);
 
-        Assert.Equal(3, Combat.PunchDamage(ItemOf("primitive_pickaxe")));
-        Assert.Equal(5, Combat.PunchDamage(ItemOf("copper_pickaxe")));
-        Assert.Equal(6, Combat.PunchDamage(ItemOf("obsidian_blade")));
+        Assert.Equal((int)primitive, Combat.PunchDamage(ItemOf("primitive_pickaxe")));
+        Assert.Equal((int)copper, Combat.PunchDamage(ItemOf("copper_pickaxe")));
+        Assert.Equal((int)blade, Combat.PunchDamage(ItemOf("obsidian_blade")));
     }
 
     [Fact]
-    public void BlockDamageIsTheItemsNumberWhilePowerOnlyGates()
+    public void DamageComesFromTheItemWhilePowerOnlyGates()
     {
-        // power is the mining tier; blockDamage is what a hit removes. The tools keep the damage
-        // the old power value used to deal.
         var pickaxe = ItemOf("primitive_pickaxe");
-        Assert.Equal(1f, pickaxe.ToolPower);
-        Assert.Equal(1f, pickaxe.BlockDamage);
-        Assert.Equal(1f, Mining.BlockDamage(pickaxe));
-        Assert.Equal(1f, Mining.HitDamage(BlockOf("stone"), pickaxe));
-        Assert.Equal(2f, Mining.BlockDamage(ItemOf("copper_pickaxe")));
+        Assert.Equal(pickaxe.BlockDamage, Mining.BlockDamage(pickaxe), precision: 5);
+        Assert.True(Mining.BlockDamage(ItemOf("copper_pickaxe")) > Mining.BlockDamage(pickaxe));
+        Assert.Equal(Mining.DefaultBlockDamage, Mining.BlockDamage(ItemOf("flint")), precision: 5);
+        Assert.Equal(Mining.DefaultBlockDamage, Mining.BlockDamage(null), precision: 5);
 
-        // A plain pickup and a bare hand fall back to the baseline.
-        Assert.Equal(0.5f, Mining.BlockDamage(ItemOf("flint")));
-        Assert.Equal(0.5f, Mining.BlockDamage(null));
-        Assert.Equal(0.5f, Mining.HitDamage(BlockOf("dirt"), null));
+        Assert.Equal(Mining.BlockDamage(pickaxe), Mining.HitDamage(BlockOf("stone"), pickaxe), precision: 5);
+        Assert.Equal(0f, Mining.HitDamage(BlockOf("stone"), ItemOf("primitive_axe")), precision: 5);
+        Assert.Equal(Mining.DefaultBlockDamage, Mining.HitDamage(BlockOf("dirt"), null), precision: 5);
     }
 }

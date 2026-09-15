@@ -104,6 +104,24 @@ public sealed class FluidTests
     }
 
     [Fact]
+    public void TwoAdjacentSourcesBirthANewSource()
+    {
+        var manager = FullFloorBasin(out var water);
+        var fluids = new FluidManager();
+        var drops = new DropManager();
+        manager.Chunks[Vector3.Zero].SetBlockRaw(2, 1, 8, water, FluidState.Source);
+        manager.Chunks[Vector3.Zero].SetBlockRaw(4, 1, 8, water, FluidState.Source);
+        fluids.ScheduleAround(2, 1, 8);
+        fluids.ScheduleAround(4, 1, 8);
+
+        fluids.Update(1f, manager, drops);
+
+        Assert.True(manager.TryGetCell(3, 1, 8, out var middle, out var middleState));
+        Assert.Equal(water, middle);
+        Assert.True(FluidState.IsSource(middleState));
+    }
+
+    [Fact]
     public void WakeLoadedChunksHonoursThePerFrameCap()
     {
         var manager = new ChunkManager(null!);
