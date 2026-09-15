@@ -150,4 +150,57 @@ public sealed class InventoryTests
         Assert.Equal(InventoryCategory.Blocks, Inventory.CategoryOf(stone));
         Assert.False(new Inventory().CanAccept(water));
     }
+
+    [Fact]
+    public void PickBlockSelectsHotbarSlotHoldingTarget()
+    {
+        var inventory = new Inventory();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var dirt = ContentRegistry.RequireBlock("dirt").Id;
+        inventory.EquipStackable(0, stone);
+        inventory.EquipStackable(5, dirt);
+
+        inventory.Select(0);
+        Assert.True(inventory.PickBlock(dirt));
+        Assert.Equal(5, inventory.SelectedIndex);
+
+        Assert.True(inventory.PickBlock(stone));
+        Assert.Equal(0, inventory.SelectedIndex);
+    }
+
+    [Fact]
+    public void PickBlockEquipsTargetFromPoolIntoSelectedSlot()
+    {
+        var inventory = new Inventory();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var dirt = ContentRegistry.RequireBlock("dirt").Id;
+        inventory.EquipStackable(0, stone);
+        inventory.Select(0);
+
+        Assert.True(inventory.PickBlock(dirt));
+        Assert.Equal(0, inventory.SelectedIndex);
+        Assert.Equal(dirt, inventory.IdAt(0));
+    }
+
+    [Fact]
+    public void PickBlockDoesNothingWhenTargetInNeitherPoolNorHotbar()
+    {
+        var inventory = new Inventory();
+        var water = ContentRegistry.RequireBlock("water").Id;
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        inventory.EquipStackable(0, stone);
+        inventory.Select(0);
+
+        Assert.False(inventory.PickBlock(water));
+        Assert.Equal(0, inventory.SelectedIndex);
+        Assert.Equal(stone, inventory.IdAt(0));
+    }
+
+    [Fact]
+    public void PickBlockDoesNothingForAir()
+    {
+        var inventory = new Inventory();
+        Assert.False(inventory.PickBlock(0));
+        Assert.Equal(0, inventory.SelectedIndex);
+    }
 }

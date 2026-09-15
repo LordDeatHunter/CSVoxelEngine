@@ -1487,6 +1487,14 @@ public class World : IItemUseWorld
             Inventory.ConsumeSelected();
     }
 
+    public bool TryPickTargetedBlock()
+    {
+        if (!_hasSelectedBlock) return false;
+        var id = BlockIdAt(_selectedBlockPosition);
+        if (id == 0) return false;
+        return Inventory.PickBlock(id);
+    }
+
     /// <summary>Places a block against the targeted face. Returns whether one was placed.</summary>
     public bool TryPlaceBlockFromRaycast(float maxDistance, byte blockId)
     {

@@ -300,6 +300,29 @@ public class Inventory
         return false;
     }
 
+    public bool PickBlock(byte id)
+    {
+        if (id == 0) return false;
+        for (var i = 0; i < SlotCount; i++)
+        {
+            if (IdAt(i) != id) continue;
+            Select(i);
+            return true;
+        }
+        if (CountFor(id) <= 0) return false;
+        if (CategoryOf(id) == InventoryCategory.Tools)
+        {
+            var instance = _tools.FirstOrDefault(t => t.DefinitionId == id);
+            if (instance == null) return false;
+            if (ToolInstanceAt(SelectedIndex) == instance.InstanceId) return true;
+            EquipTool(SelectedIndex, instance.InstanceId);
+            return true;
+        }
+        if (IdAt(SelectedIndex) == id) return true;
+        EquipStackable(SelectedIndex, id);
+        return true;
+    }
+
     /// <summary>Pool total for a stackable id, or the live-instance count for a tool id.</summary>
     public int CountFor(byte id)
     {

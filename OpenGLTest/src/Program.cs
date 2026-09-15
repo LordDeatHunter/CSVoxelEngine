@@ -20,6 +20,7 @@ public static class Program
     private static bool debugEnabled;
     private static bool xWasPressed;
     private static bool qWasPressed;
+    private static bool middleWasPressed;
     private static bool eWasPressed;
     private static bool escWasPressed;
     private static readonly InventoryView inventoryView = new();
@@ -345,6 +346,16 @@ public static class Program
             world.UpdateBlockBreaking(deltaTime,
                 !inventoryView.IsOpen && inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true);
             FrameProfiler.End(ProfileSection.Breaking);
+
+            var middlePressed = !inventoryView.IsOpen
+                && inputManager.Mouse?.IsButtonPressed(MouseButton.Middle) == true;
+            if (middlePressed && !middleWasPressed)
+                world.TryPickTargetedBlock();
+            middleWasPressed = middlePressed;
+        }
+        else
+        {
+            middleWasPressed = false;
         }
 
         FrameProfiler.Begin(ProfileSection.DebugLog);
