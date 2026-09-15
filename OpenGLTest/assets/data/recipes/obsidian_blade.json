@@ -2,7 +2,7 @@
   "result": "item/obsidian_blade",
   "count": 1,
   "ingredients": [
-    { "item": "item/obsidian", "count": 1 },
+    { "item": "item/obsidian", "count": 2 },
     { "item": "item/branch", "count": 1 },
     { "item": "item/vine", "count": 2 }
   ]
