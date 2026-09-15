@@ -5,8 +5,10 @@ using Silk.NET.OpenGL;
 namespace silkgltriangle;
 
 /// <summary>
-/// Lazily built cube meshes, one per block type. The mining pop, item drops and inventory icons
-/// all draw the same geometry, so they share one cache instead of each keeping a copy.
+/// Lazily built cube meshes, one per block type. Item drops, held items and inventory
+/// icons all draw the same geometry, so they share one cache instead of each keeping a copy.
+/// (The mining pop used to share it too; it now draws the hitboxes as tile-cropped boxes
+/// via PopBoxEmitter so partial blocks keep their texel density.)
 /// </summary>
 public class BlockCubeCache : IDisposable
 {

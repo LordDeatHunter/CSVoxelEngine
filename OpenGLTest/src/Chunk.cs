@@ -2108,7 +2108,7 @@ public class Chunk : IDisposable
     }
 
     /// <summary>Corners of one axis-aligned face of the [min, max] box (cell-local).</summary>
-    private static void BoxFaceCorners(Vector3 min, Vector3 max, int face,
+    internal static void BoxFaceCorners(Vector3 min, Vector3 max, int face,
         out Vector3 a, out Vector3 b, out Vector3 c, out Vector3 d)
     {
         (a, b, c, d) = face switch
@@ -2160,7 +2160,7 @@ public class Chunk : IDisposable
     }
 
     /// <summary>Tile-local UV under a cell-local point of a sub-cell box (see <see cref="TiledUv"/>).</summary>
-    private static Vector2 CropUv(int face, Vector3 local) => TiledUv(face, local, Vector3.One);
+    internal static Vector2 CropUv(int face, Vector3 local) => TiledUv(face, local, Vector3.One);
 
     /// <summary>
     /// Uploads a finished mesh into the shared chunk geometry pools, releasing whatever this

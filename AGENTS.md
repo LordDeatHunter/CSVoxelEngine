@@ -277,6 +277,11 @@ Two traps worth repeating: a **model that is not a full cube needs `light.passes
 is its default) or its own cell stays dark and the interior quads render black; and a **cutout
 block must not occlude**, which the registry enforces rather than trusting the file.
 
+Partial-block textures are **cropped, never stretched**: the chunk mesher samples `FaceTiles`
+crops (`Chunk.TiledUv`/`CropUv`), and the mining pop draws the hitboxes the same way
+(`PopBoxEmitter`), so a new partial block needs no pop work as long as its `FaceTiles` are
+sensible (the baker falls back to the first quad's tile).
+
 ### Item schema (`assets/data/items/<name>.json`)
 
 ```json

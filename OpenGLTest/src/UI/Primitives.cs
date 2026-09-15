@@ -106,9 +106,10 @@ public static class Primitives
     }
 
     /// <summary>
-    /// A block's baked model as a standalone mesh, centred on the origin, so drops, the mining
-    /// pop, primed TNT and inventory icons all show the same shape the world does. Faces are
+    /// A block's baked model as a standalone mesh, centred on the origin, so drops,
+    /// primed TNT and inventory icons all show the same shape the world does. Faces are
     /// shaded as fully unoccluded (AO 3) — nothing stands beside a floating copy of a block.
+    /// (The mining pop draws tile-cropped hitbox boxes instead; see PopBoxEmitter.)
     /// </summary>
     public static Mesh CreateBlockModel(GL gl, BakedModel model, float size = 1f) =>
         CreateBlockModel(gl, model.Quads, size);

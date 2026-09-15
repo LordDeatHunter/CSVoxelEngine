@@ -70,6 +70,18 @@ public class RenderManager : IDisposable
     private uint faceVao;
     private uint faceVbo;
 
+    // The mining pop's streaming box batch (see PopBoxEmitter): one reusable VAO/VBO with a
+    // static index prefix per box, refilled while a block is being mined. Tapered wood tops
+    // out at five boxes (column plus four arms), so eight leaves headroom and the buffers
+    // grow if a future block ever brings more.
+    private const int MaxPopBoxes = 8;
+    private uint _popVao;
+    private uint _popVbo;
+    private uint _popEbo;
+    private int _popBoxCapacity = MaxPopBoxes;
+    private readonly List<Vertex> _popVerts = new(MaxPopBoxes * 24);
+    private readonly List<ushort> _popIndices = new(MaxPopBoxes * 36);
+
     // The sun disc: one shared unit quad plus its sprite, oriented around _sunDir every frame
     // by RenderSun. _sunVisibility fades it out below the horizon and underwater.
     private uint _sunTexture;
@@ -454,6 +466,7 @@ public class RenderManager : IDisposable
         }
         ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes);
         CreateSelectionGeometry();
+        CreatePopGeometry();
         // Everything above binds raw - the atlas build, the loader, the sun's filter tweak and
         // the three render targets - so nothing the cache thinks it knows survives load.
         InvalidateTextureUnits();
@@ -1877,31 +1890,51 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Draws the block's own mesh once per hitbox, fitted into the grown box so the mining pop
-    /// starts from the block's real size: at grow 0 the cube sits exactly inside its outline, and
-    /// a hit grows every axis by the same absolute amount, so tiny blocks jump as visibly as full
-    /// cubes. Used for the mining pop: grown, the mesh encloses the block baked into the chunk
-    /// mesh, so the block appears to jump out of the terrain.
+    /// Draws each of the block's hitboxes as a box sampling its crop of the block's face
+    /// tiles (see <see cref="PopBoxEmitter"/>), so the mining pop starts from the block's real
+    /// shape with the chunk mesh's texel density: at grow 0 the boxes sit exactly inside their
+    /// outlines, and a hit grows every axis by the same absolute amount, so tiny blocks jump
+    /// as visibly as full cubes. Grown, the boxes enclose the block baked into the chunk mesh,
+    /// so the block appears to jump out of the terrain.
     /// </summary>
     public void RenderBlockPop(Camera camera, Vector3 blockPosition, byte blockId, float grow,
         BlockHitbox[]? boxes = null)
     {
-        var mesh = blockCubes.Get(blockId);
-        if (mesh == null) return;
+        var type = BlockType.ById[blockId];
+        if (type == null) return;
+
+        boxes ??= BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
+        if (boxes.Length > _popBoxCapacity)
+            GrowPopBuffers(boxes.Length);
+
+        _popVerts.Clear();
+        _popIndices.Clear();
+        ushort indexOffset = 0;
+        var grownVec = new Vector3(grow);
+        foreach (var box in boxes)
+        {
+            var half = (box.Size + grownVec) * 0.5f;
+            var grown = new BlockHitbox(box.Center - half, box.Center + half);
+            PopBoxEmitter.EmitBox(_popVerts, _popIndices, ref indexOffset,
+                grown, box, blockPosition, type.FaceTiles);
+        }
+        if (_popVerts.Count == 0) return;
 
         worldShader.Use();
         BindWorldTextures();
 
-        // The mesh is centred on its own origin, so scaling happens about each box's centre
-        boxes ??= BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
-        var grown = new Vector3(grow);
-        foreach (var box in boxes)
+        gl.BindVertexArray(_popVao);
+        gl.BindBuffer(BufferTargetARB.ArrayBuffer, _popVbo);
+        gl.BufferSubData<Vertex>(BufferTargetARB.ArrayBuffer, 0,
+            System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_popVerts));
+        var matrix = Matrix4x4.Identity;
+        SetDrawUniforms(matrix, matrix * camera.GetViewProjection(), 1f);
+        unsafe
         {
-            var model = Matrix4x4.CreateScale(box.Size + grown)
-                        * Matrix4x4.CreateTranslation(blockPosition + box.Center);
-            SetDrawUniforms(model, model * camera.GetViewProjection(), 1f);
-            mesh.Render();
+            gl.DrawElements(PrimitiveType.Triangles, (uint)_popIndices.Count,
+                DrawElementsType.UnsignedShort, null);
         }
+        gl.BindVertexArray(0);
     }
 
     /// <summary>
@@ -2572,6 +2605,50 @@ public class RenderManager : IDisposable
         gl.BindVertexArray(0);
     }
 
+    /// <summary>
+    /// The mining pop's streaming buffers: a dynamic VBO refilled with the hitbox boxes every
+    /// frame while mining, and a static EBO holding the box-quad index pattern (every box emits
+    /// the same six quads, so any box count draws as a prefix). The pattern is generated by
+    /// running the real emitter over dummy boxes, so it can never drift from what
+    /// <see cref="RenderBlockPop"/> streams.
+    /// </summary>
+    private void CreatePopGeometry()
+    {
+        _popVao = gl.GenVertexArray();
+        _popVbo = gl.GenBuffer();
+        _popEbo = gl.GenBuffer();
+
+        gl.BindVertexArray(_popVao);
+        gl.BindBuffer(BufferTargetARB.ArrayBuffer, _popVbo);
+        gl.BufferData<Vertex>(BufferTargetARB.ArrayBuffer,
+            (nuint)(_popBoxCapacity * 24 * Vertex.Size),
+            new Vertex[_popBoxCapacity * 24], BufferUsageARB.DynamicDraw);
+
+        var dummyVerts = new List<Vertex>(_popBoxCapacity * 24);
+        var dummyIndices = new List<ushort>(_popBoxCapacity * 36);
+        ushort offset = 0;
+        for (var i = 0; i < _popBoxCapacity; i++)
+            PopBoxEmitter.EmitBox(dummyVerts, dummyIndices, ref offset,
+                BlockHitbox.FullCube, BlockHitbox.FullCube, Vector3.Zero, new ushort[6]);
+        gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _popEbo);
+        gl.BufferData<ushort>(BufferTargetARB.ElementArrayBuffer,
+            (nuint)(dummyIndices.Count * sizeof(ushort)),
+            System.Runtime.InteropServices.CollectionsMarshal.AsSpan(dummyIndices),
+            BufferUsageARB.StaticDraw);
+
+        Mesh.ConfigureVertexAttribs(gl);
+        gl.BindVertexArray(0);
+    }
+
+    private void GrowPopBuffers(int boxes)
+    {
+        gl.DeleteBuffer(_popVbo);
+        gl.DeleteBuffer(_popEbo);
+        gl.DeleteVertexArray(_popVao);
+        _popBoxCapacity = boxes * 2;
+        CreatePopGeometry();
+    }
+
     private static int FaceIndexFromNormal(Vector3 normal)
     {
         if (normal == new Vector3(0, 0, -1)) return 0;
@@ -2693,6 +2770,9 @@ public class RenderManager : IDisposable
         gl.DeleteVertexArray(outlineVao);
         gl.DeleteBuffer(faceVbo);
         gl.DeleteVertexArray(faceVao);
+        gl.DeleteBuffer(_popVbo);
+        gl.DeleteBuffer(_popEbo);
+        gl.DeleteVertexArray(_popVao);
         foreach (var query in _gpuPassQueries)
             gl.DeleteQuery(query);
         // The chunks and LOD regions that hold slices in these pools are gone by now (the world
