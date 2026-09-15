@@ -12,7 +12,7 @@ namespace silkgltriangle;
 public static class Combat
 {
     /// <summary>How far ahead the punch connects, in blocks (eye to body centre).</summary>
-    public const float PunchReach = 3f;
+    public const float PunchReach = 7f;
 
     /// <summary>Half the punch cone's opening angle, in degrees.</summary>
     public const float PunchHalfAngleDegrees = 30f;

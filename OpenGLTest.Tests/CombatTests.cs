@@ -17,7 +17,7 @@ public sealed class CombatTests
         Assert.True(Combat.InPunchCone(origin, forward, new Vector3(2f, 0f, 0f), out var distance));
         Assert.Equal(2f, distance, precision: 4);
         Assert.False(Combat.InPunchCone(origin, forward, new Vector3(-1f, 0f, 0f), out _));
-        Assert.False(Combat.InPunchCone(origin, forward, new Vector3(4f, 0f, 0f), out _));
+        Assert.False(Combat.InPunchCone(origin, forward, forward * (Combat.PunchReach + 1f), out _));
         Assert.False(Combat.InPunchCone(origin, forward, origin, out _));
     }
 
@@ -66,7 +66,7 @@ public sealed class CombatTests
         Assert.Equal(2f, distance, precision: 4);
         Assert.True(Combat.InFrontHemisphere(origin, forward, new Vector3(0.1f, 0f, 2f), out _));
         Assert.False(Combat.InFrontHemisphere(origin, forward, new Vector3(-1f, 0f, 0f), out _));
-        Assert.False(Combat.InFrontHemisphere(origin, forward, new Vector3(4f, 0f, 0f), out _));
+        Assert.False(Combat.InFrontHemisphere(origin, forward, forward * (Combat.PunchReach + 1f), out _));
         Assert.False(Combat.InFrontHemisphere(origin, forward, new Vector3(0f, 0f, 2f), out _));
         Assert.False(Combat.InFrontHemisphere(origin, forward, origin, out _));
     }
