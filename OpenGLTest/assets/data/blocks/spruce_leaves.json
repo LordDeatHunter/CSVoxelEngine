@@ -8,5 +8,5 @@
   "occludes": false,
   "castsAO": false,
   "light": { "passes": true },
-  "loot": "none"
+  "loot": "leaves"
 }
