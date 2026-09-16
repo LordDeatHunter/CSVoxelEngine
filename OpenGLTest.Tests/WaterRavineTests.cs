@@ -95,6 +95,31 @@ public sealed class WaterRavineTests
     }
 
     [Fact]
+    public void ARavineNeverCutsABankBelowItsWaterBodysLevel()
+    {
+        var leaks = 0;
+        var firstLeak = "";
+        for (var x = -1024; x < 1024; x += 2)
+        for (var z = -1024; z < 1024; z += 2)
+        {
+            var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+            var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
+            var level = column.WaterLevel[local];
+            if (level == TerrainGenerator.NoWater) continue;
+            if (column.Biomes[local] == Biome.Ocean) continue;
+            if (column.Bed[local] < level) continue;
+            if (column.Heights[local] >= level) continue;
+
+            leaks++;
+            if (leaks == 1)
+                firstLeak = $"({x},{z}) bed={column.Bed[local]} h={column.Heights[local]} level={level}";
+        }
+
+        Assert.True(leaks == 0,
+            $"{leaks} pond or river banks are cut below their own water level; first {firstLeak}");
+    }
+
+    [Fact]
     public void WakeOnlyEntersCarvedCavities()
     {
         var air = BlockType.Air;

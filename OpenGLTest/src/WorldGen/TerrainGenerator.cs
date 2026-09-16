@@ -226,7 +226,7 @@ public static class TerrainGenerator
     /// Callers measuring a column's own terrain must pass <see cref="ColumnData.Bed"/>, not
     /// <see cref="ColumnData.Heights"/>: the bed is the profile before a ravine cut it, so a ravine
     /// that merely deepens an otherwise-dry column stays dry instead of flooding as a narrow spike,
-    /// while a ravine under a real water body only deepens that body.
+    /// while a ravine breaching a lake or river is prevented outright by <see cref="RavineCutFade"/>.
     /// </summary>
     public static int WaterLevelAt(float x, float z)
     {
@@ -647,13 +647,10 @@ public static class TerrainGenerator
                 var height = (int)heightF;
 
                 // Sampled once and reused: the same value cuts the ravine into the heightmap and
-                // decides how much soil is left on the column. The cut fades out across the shore
-                // band — a ravine is a land feature, and one running into the sea used to leave a
-                // dry trench slicing the water's edge, making the ocean look cut off (the ocean's
-                // own gashes are trenches, not ravines).
+                // decides how much soil is left on the column.
                 var ravineDepth = WorldGenerationConfig.RavinesEnabled
-                    ? (int)(RavineDepthAt(worldX, worldZ) * (1f - MathUtils.SmoothStep(
-                        WorldGenerationConfig.OceanShoreWeight, 0.5f, oceanWeight)))
+                    ? (int)(RavineDepthAt(worldX, worldZ) * RavineCutFade(oceanWeight,
+                        MathF.Max(lakeWeight, riverWeight) * gate))
                     : 0;
 
                 bed[i] = height;
@@ -721,4 +718,19 @@ public static class TerrainGenerator
         var t = ridge / WorldGenerationConfig.RavineWidth;
         return (int)(WorldGenerationConfig.RavineDepth * mask * (1f - t * t));
     }
+
+    /// <summary>
+    /// 0..1 share of a ravine's cut that survives at a column. A ravine is a land feature, and one
+    /// running into water used to leave a dry trench slicing the water's edge, because the flood
+    /// only reaches columns whose own bed already sits below the level: full cut on dry land, gone
+    /// under the ocean (<see cref="WorldGenerationConfig.OceanShoreWeight"/>) and gone across any
+    /// lake's or river's footprint (<see cref="WorldGenerationConfig.WaterBodyThreshold"/>), so a
+    /// body's bank is never carved out from under its own surface. A column only holds a surface
+    /// water level above that threshold, so the second fade leaves every lake and river uncut by
+    /// construction while the ocean keeps its own gashes as trenches.
+    /// </summary>
+    private static float RavineCutFade(float oceanWeight, float surfaceWaterWeight) =>
+        (1f - MathUtils.SmoothStep(WorldGenerationConfig.OceanShoreWeight, 0.5f, oceanWeight))
+        * (1f - MathUtils.SmoothStep(0f, WorldGenerationConfig.WaterBodyThreshold,
+            surfaceWaterWeight));
 }

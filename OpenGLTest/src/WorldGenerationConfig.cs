@@ -533,8 +533,9 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float OpennessHillReduction = 0.5f;       // fraction of hill height an open region drops
 
     // --- Ravines (2D, cut into the heightmap so the far LOD shows them too) ---
-    // The cut fades out across the shore band (OceanShoreWeight..0.5), so a ravine never slices
-    // the ocean's edge; the ocean's own gashes are trenches.
+    // The cut fades out across the shore band (OceanShoreWeight..0.5) and across every lake's and
+    // river's footprint (TerrainGenerator.RavineCutFade), so a ravine never slices the edge of any
+    // water body, sea or pond; the ocean's own gashes are trenches.
     public const bool RavinesEnabled = true;
     public const float RavineRidgeFrequency = 1f / 900f;   // spacing of candidate canyon lines
     public const float RavineWarpFrequency = 1f / 150f;    // how tightly the lines wind

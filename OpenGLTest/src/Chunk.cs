@@ -585,8 +585,10 @@ public class Chunk : IDisposable
     /// — so oceans, lakes, rivers and sea-floor caves all fill while the dry land basins stay dry.
     /// A lake's level is its own surface, so the pond rests in the ground it was dug into instead of
     /// reaching sea level. Wetness reads the column's <see cref="ColumnData.Bed"/>: a ravine that
-    /// merely cut a dry column below its level holds no water, while a ravine under a real water body
-    /// just deepens it. Generated water is always a source (state 0), which is what an untouched
+    /// merely cut a dry column below its level holds no water, while a ravine under the ocean just
+    /// deepens it (the cut is faded out across every other water body, see
+    /// <c>TerrainGenerator.RavineCutFade</c>). Generated water is always a source (state 0), which
+    /// is what an untouched
     /// state byte reads as, so nothing is written to <c>_state</c> here. A pure per-column function
     /// of world position like the rest of worldgen: neighbours agree at their borders with no shared
     /// state. Returns whether any cell was flooded, which is what decides if this chunk can have a
