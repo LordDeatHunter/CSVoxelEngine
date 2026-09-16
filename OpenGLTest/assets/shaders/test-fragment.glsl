@@ -239,8 +239,14 @@ void main() {
     if (isLava) {
         // Molten rock glows on its own instead of refracting: albedo-tinted emission with
         // a slow pulse, flat in shadow and at night. Fog still closes in below.
+        // Only the molten part of the tile glows: the additive floor is a saturated orange
+        // constant, so applying it to every texel lifted the dark rock blobs in the lava
+        // tile into a pale salmon (their near-neutral albedo plus the orange floor adds a
+        // near-equal amount to all three channels). Weigh it by how orange the texel is -
+        // rock stays near-neutral, so it keeps its own dark colour and only magma glows.
+        float molten = clamp((albedo.r - max(albedo.g, albedo.b)) * 4.0, 0.0, 1.0);
         float pulse = 0.9 + 0.1 * sin(uTime * 2.0 + fWorldPos.x * 1.3 + fWorldPos.z * 1.7);
-        col = (albedo * 2.0 + vec3(0.55, 0.13, 0.01)) * pulse;
+        col = mix(albedo, albedo * 2.0 + vec3(0.55, 0.13, 0.01), molten) * pulse;
     } else if (isWater) {
         // Far water skips the wave/reflection/refraction model below: past the full-detail
         // ring each pixel covers metres of surface, so a geometric-normal fresnel between
