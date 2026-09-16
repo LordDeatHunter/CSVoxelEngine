@@ -90,7 +90,7 @@ public class World : IItemUseWorld
     private float _throwBaseDamage;
     public Camera Camera { get; }
 
-    /// <summary>The blocky player body: walk-swung limbs, mine-pumping right arm.</summary>
+    /// <summary>The blocky player body: walk-swung limbs, jabbing right arm.</summary>
     public PlayerModel Player { get; } = new();
 
     private Vector3 _prevCamPos;

@@ -113,15 +113,15 @@ public sealed class DebugSceneRenderer : IDisposable
         if (!firstPerson)
             DrawPart("Head", viewProj, eyePos, bodyYaw, bodyPitch, player, backOffset);
 
-        DrawHeldItem(viewProj, eyePos, bodyYaw, player, editor, time, backOffset);
+        DrawHeldItem(viewProj, eyePos, bodyYaw, bodyPitch, player, editor, time, backOffset);
     }
 
-    private void DrawHeldItem(Matrix4x4 viewProj, Vector3 eyePos, float bodyYaw, PlayerModel player,
-        ItemDisplayEditor editor, float time, float backOffset)
+    private void DrawHeldItem(Matrix4x4 viewProj, Vector3 eyePos, float bodyYaw, float bodyPitch,
+        PlayerModel player, ItemDisplayEditor editor, float time, float backOffset)
     {
         if (!editor.HasSelection) return;
 
-        var hand = player.GetHandAnchorMatrix(eyePos, bodyYaw, backOffset);
+        var hand = player.GetHandAnchorMatrix(eyePos, bodyYaw, backOffset, bodyPitch);
 
         if (editor.IsPureItem && ItemRegistry.TryGet(editor.SelectedId) is { } type)
         {

@@ -2408,7 +2408,7 @@ public class RenderManager : IDisposable
     /// Draws the selected hotbar slot in the right hand: a block as its 3D cube, a pure
     /// item as its sprite posed by the item's display transform (canted tools by default,
     /// the compass facing back up at the holder). Positioned at the fist through the hand
-    /// anchor, so it rides the carrying pose, the walk swing and the mine pump.
+    /// anchor, so it rides the carrying pose, the walk swing and the punch.
     /// </summary>
     public void RenderHeldItem(Camera camera, PlayerModel player, byte selectedId, bool hasHeld,
         float timeSeconds, float headingDegrees)
@@ -2416,7 +2416,8 @@ public class RenderManager : IDisposable
         if (camera == null || player == null || selectedId == 0 || !hasHeld) return;
 
         var backOffset = PlayerModel.FirstPersonBodyBack * (1f - camera.ShoulderBlend);
-        var hand = player.GetHandAnchorMatrix(camera.Position, camera.PlayerYaw, backOffset);
+        var hand = player.GetHandAnchorMatrix(camera.Position, camera.PlayerYaw, backOffset,
+            camera.Pitch);
         var viewProj = camera.GetViewProjection();
 
         worldShader.Use();

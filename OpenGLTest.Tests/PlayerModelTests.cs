@@ -145,6 +145,91 @@ public sealed class PlayerModelTests
     }
 
     [Fact]
+    public void PunchDrivesTheFistOntoTheAim()
+    {
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++)
+            player.Update(1f / 60f, 0f);
+
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+        var aim = new Vector3(0f, 0f, -1f);
+        // The first-person framing the jab is solved for; the shadow pass draws the same joints
+        // from the true feet instead.
+        var draw = PlayerModel.FirstPersonBodyBack;
+        Vector3 Fist() => Vector3.Transform(Vector3.Zero, player.GetHandAnchorMatrix(eye, -90f, draw));
+        // Angle between the aim and the direction to the fist: 0 is dead on the crosshair.
+        float OffAim() => MathF.Acos(Vector3.Dot(Vector3.Normalize(Fist() - eye), aim));
+
+        player.Punch();
+        player.Update(PlayerModel.MineDuration * 0.22f, 0f);
+        var chamberOffAim = OffAim();
+        var chamberElbow = player.GetPose().RightElbow;
+        player.Update(PlayerModel.MineDuration * 0.33f, 0f);
+        var strikeOffAim = OffAim();
+        var strikeElbow = player.GetPose().RightElbow;
+
+        // The jab closes most of the angle the chambered fist sits off the crosshair instead of
+        // staying out on the shoulder's line, and it gets there by straightening the elbow.
+        Assert.True(chamberOffAim > 0.3f);
+        Assert.True(strikeOffAim < chamberOffAim * 0.5f);
+        Assert.True(strikeElbow < chamberElbow - 1f);
+        Assert.True(Fist().Y <= eye.Y);
+    }
+
+    [Fact]
+    public void PunchRisesToTheAimLineWithoutPassingAboveIt()
+    {
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++)
+            player.Update(1f / 60f, 0f);
+
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+        float FistAboveEye() => Vector3.Transform(Vector3.Zero,
+            player.GetHandAnchorMatrix(eye, -90f, PlayerModel.FirstPersonBodyBack)).Y - eye.Y;
+
+        player.Punch();
+        var highest = FistAboveEye();
+        for (var i = 0; i < 25; i++)
+        {
+            player.Update(PlayerModel.MineDuration / 25f, 0f);
+            highest = MathF.Max(highest, FistAboveEye());
+        }
+
+        // An upward swing rode the fist over the face; the jab tops out on the aim line, which
+        // keeps the crosshair itself clear.
+        Assert.True(highest <= 0f);
+    }
+
+    [Fact]
+    public void PunchFollowsTheAimWhenLookingUp()
+    {
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++)
+            player.Update(1f / 60f, 0f);
+
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+        // Angle between the aim and the direction to the fist at the impact, for a look pitch.
+        float OffAimAtImpact(float pitchDeg)
+        {
+            player.Punch();
+            player.Update(PlayerModel.MineDuration * 0.55f, 0f);
+            var fist = Vector3.Transform(Vector3.Zero,
+                player.GetHandAnchorMatrix(eye, -90f, PlayerModel.FirstPersonBodyBack, pitchDeg));
+            var p = pitchDeg * MathF.PI / 180f;
+            return MathF.Acos(Vector3.Dot(Vector3.Normalize(fist - eye),
+                new Vector3(0f, MathF.Sin(p), -MathF.Cos(p))));
+        }
+
+        var level = OffAimAtImpact(0f);
+        var overhead = OffAimAtImpact(85f);
+
+        // The jab is solved against the view, not the body, so looking up sends the fist up
+        // along the new aim instead of leaving it punching out where the body faces.
+        Assert.True(level < 0.4f, $"level off-aim {level}");
+        Assert.True(MathF.Abs(overhead - level) < 0.15f, $"level {level} overhead {overhead}");
+    }
+
+    [Fact]
     public void BodyRootedAtFeetBelowTheEyeFacingCameraYaw()
     {
         var player = new PlayerModel();
