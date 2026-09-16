@@ -191,6 +191,10 @@ public class RenderManager : IDisposable
     /// <summary>0 at night, 1 in full day; drives the ambience crossfade.</summary>
     public float Dayness => _dayness;
     private Matrix4x4 _lightViewProj = Matrix4x4.Identity;
+    // The shadow box centre carried frame to frame by StepShadowCentre; invalid until the first
+    // frame with shadows, which seeds it on the camera instead of stepping from a stale point.
+    private Vector3 _shadowCentre;
+    private bool _shadowCentreValid;
 
     // Inverse of the current view-projection, for the shaders that reconstruct a world
     // position out of the depth texture (see the depth-convention note in test-fragment.glsl)
@@ -734,9 +738,8 @@ public class RenderManager : IDisposable
     /// Builds the light-space matrix for this frame: an orthographic box of half-extent
     /// <see cref="WorldGenerationConfig.ShadowRadiusBlocks"/> centred a little ahead of the
     /// camera (most of what the player looks at is in front of them) and looking down the sun
-    /// direction. The box centre is snapped to whole shadow texels in light space by
-    /// <see cref="SnapShadowTarget"/>, or the sub-texel drift as the player walks makes every
-    /// shadow edge crawl and shimmer.
+    /// direction. <see cref="StepShadowCentre"/> carries that centre forward in whole shadow
+    /// texels, or the sub-texel drift as the player walks makes every shadow edge crawl.
     /// </summary>
     private void UpdateShadowCamera(Camera? camera)
     {
@@ -745,9 +748,12 @@ public class RenderManager : IDisposable
         const float r = WorldGenerationConfig.ShadowRadiusBlocks;
         const float d = 2.5f * r;
         var target = camera.RenderEye + camera.ViewDirection * (r * 0.35f);
-        var snappedTarget = SnapShadowTarget(target, _sunDir, r, WorldGenerationConfig.ShadowMapSize);
+        _shadowCentre = _shadowCentreValid
+            ? StepShadowCentre(_shadowCentre, target, _sunDir, r, WorldGenerationConfig.ShadowMapSize)
+            : target;
+        _shadowCentreValid = true;
 
-        var lightView = Matrix4x4.CreateLookAt(snappedTarget + _sunDir * d, snappedTarget, Vector3.UnitY);
+        var lightView = Matrix4x4.CreateLookAt(_shadowCentre + _sunDir * d, _shadowCentre, Vector3.UnitY);
         // The sun's 0.35 Z tilt keeps it more than 19 degrees off vertical, so UnitY is
         // never parallel to the view direction and the look-at stays well defined
         var lightProj = Matrix4x4.CreateOrthographic(2f * r, 2f * r, d - 2f * r, d + 2f * r);
@@ -755,23 +761,37 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Quantizes a shadow box centre onto the light-space texel lattice, so the map's texels stay
-    /// pinned to the world as the player walks: the light view is then rebuilt around the snapped
-    /// point and every shadow edge stops crawling. The measurement uses the light <em>rotation</em>
-    /// alone, never the view the pass will draw with - that view is anchored on the very point
-    /// being measured, so it reports (0, 0, -d) for it wherever the player stands and the snap
-    /// degenerates into a silent no-op.
+    /// Advances a shadow box centre towards the point this frame wants to centre on, so the light
+    /// view can be rebuilt around it. The centre is a running value rather than a fresh function of
+    /// the desired point, and that is the whole point: it follows the desired point in whole
+    /// shadow-texel steps along the light's lateral axes and tracks its depth exactly.
+    /// <para>
+    /// Quantizing the movement (not the position) is what keeps the map still. Whole-texel lateral
+    /// steps are invisible - geometry and lookup shift by the same integer count of texels - while
+    /// anything with a fractional texel in it resamples the map and shimmers. Deriving the snapped
+    /// centre from scratch each frame instead compares the point against a lattice that rotates
+    /// with the sun, so the "nearest" lattice vertex hops by a fractional texel every frame and
+    /// every shadow edge twitches at the frame rate; the further the camera sits from the world
+    /// origin, the faster the lattice sweeps past it and the worse it gets. Measuring the move from
+    /// the previous centre sidesteps that entirely: a camera that has not moved asks for a zero
+    /// move, so the projection is identical and nothing twitches, however the sun turns.
+    /// </para>
     /// </summary>
-    internal static Vector3 SnapShadowTarget(Vector3 target, Vector3 sunDir, float radiusBlocks, int mapSize)
+    internal static Vector3 StepShadowCentre(Vector3 previous, Vector3 desired, Vector3 sunDir,
+        float radiusBlocks, int mapSize)
     {
         var texel = 2f * radiusBlocks / mapSize;
-        var lightRotation = Matrix4x4.CreateLookAt(Vector3.Zero, -sunDir, Vector3.UnitY);
-        var inLight = Vector3.Transform(target, lightRotation);
-        inLight.X = MathF.Round(inLight.X / texel) * texel;
-        inLight.Y = MathF.Round(inLight.Y / texel) * texel;
-        return Matrix4x4.Invert(lightRotation, out var inverseRotation)
-            ? Vector3.Transform(inLight, inverseRotation)
-            : target;
+        var delta = desired - previous;
+        var along = Vector3.Dot(delta, sunDir);
+        var lateral = delta - sunDir * along;
+        // Columns, not rows: Vector3.Transform treats a matrix as row-vector form, so the camera's
+        // basis vectors in world space are the columns of the view rotation.
+        var rotation = Matrix4x4.CreateLookAt(Vector3.Zero, -sunDir, Vector3.UnitY);
+        var right = new Vector3(rotation.M11, rotation.M21, rotation.M31);
+        var up = new Vector3(rotation.M12, rotation.M22, rotation.M32);
+        var stepsRight = MathF.Round(Vector3.Dot(lateral, right) / texel);
+        var stepsUp = MathF.Round(Vector3.Dot(lateral, up) / texel);
+        return previous + sunDir * along + right * (stepsRight * texel) + up * (stepsUp * texel);
     }
 
     /// <summary>
