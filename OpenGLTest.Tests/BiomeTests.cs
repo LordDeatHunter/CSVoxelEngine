@@ -65,8 +65,9 @@ public sealed class BiomeTests
         var sand = ContentRegistry.RequireBlock("sand").Id;
         var gravel = ContentRegistry.RequireBlock("gravel").Id;
         var rock = ContentRegistry.RequireBlock("stone").Id;
-        // The ore pass replaces deep stone at any depth, so a stone-band floor may read as ore
+        // The ore passes replace deep stone at any depth, so a stone-band floor may read as ore
         var ore = ContentRegistry.RequireBlock("malachite_ore").Id;
+        var coalOre = ContentRegistry.RequireBlock("coal_ore").Id;
 
         var sawSand = false;
         var sawGravel = false;
@@ -97,7 +98,7 @@ public sealed class BiomeTests
                     : height >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanGravelDepth
                         ? gravel
                         : rock;
-                Assert.True(id == expected || (expected == rock && id == ore),
+                Assert.True(id == expected || (expected == rock && (id == ore || id == coalOre)),
                     $"ocean floor at ({worldX},{height},{worldZ}) is block {id}, expected {expected}");
                 sawSand |= expected == sand;
                 sawGravel |= expected == gravel;

@@ -1,0 +1,9 @@
+{
+  "name": "Coal Ore",
+  "model": { "parent": "block/cube_all", "textures": { "all": "coal_ore" } },
+  "sfx": "hit_rock",
+  "hardness": 8,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  "loot": "coal_ore"
+}

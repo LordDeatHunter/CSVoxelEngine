@@ -482,6 +482,10 @@ public class Chunk : IDisposable
         if (WorldGenerationConfig.MalachiteEnabled)
             MalachiteGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
 
+        // Same pass, same reason; coal's two host rocks let it also fill desert sandstone.
+        if (WorldGenerationConfig.CoalEnabled)
+            CoalGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
+
         // After the carvers (so caves under the sea floor flood) and before the trees and
         // pebbles, which skip submerged columns rather than growing underwater
         var hasWater = false;
