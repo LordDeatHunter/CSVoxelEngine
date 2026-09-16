@@ -25,8 +25,7 @@ public sealed class BlockItem : Item
         var world = ctx.World;
         if (!world.RaycastSolid(ctx.MaxDistance, out var hit, out var normal))
             return ItemUseResult.Ignored;
-        var placePos = hit + normal;
-        if (!world.PlaceBlockAtFace(hit, normal, Id, state: 0))
+        if (!world.PlaceBlockAtFace(hit, normal, Id, state: 0, out var placePos))
             return ItemUseResult.Ignored;
         world.AfterPlaced(placePos);
         if (!world.IsCreative)

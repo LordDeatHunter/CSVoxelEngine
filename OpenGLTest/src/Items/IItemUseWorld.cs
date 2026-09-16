@@ -36,8 +36,9 @@ public interface IItemUseWorld
     bool PourFluidCell(Vector3 pos, byte fluidId);
 
     /// <summary>Grounds one block against a raycast hit face; state rides into the state byte
-    /// (a fresh rock pile starts at 1).</summary>
-    bool PlaceBlockAtFace(Vector3 hit, Vector3 normal, byte blockId, byte state);
+    /// (a fresh rock pile starts at 1) and <paramref name="placedCell"/> reports the cell that was
+    /// filled, which is the hit cell itself when it held a stack the placement took over.</summary>
+    bool PlaceBlockAtFace(Vector3 hit, Vector3 normal, byte blockId, byte state, out Vector3 placedCell);
 
     /// <summary>Runs after a block went down (sand topples when placed into thin air).</summary>
     void AfterPlaced(Vector3 pos);

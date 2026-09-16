@@ -874,10 +874,11 @@ public class Chunk : IDisposable
         var localZ = (int)(worldPos.Z - Position.Z * Size);
 
         if (!InBounds(localX, localY, localZ)) return false;
-        // Water is displaced by a placement instead of blocking it; anything else occupies
-        // the cell and the placement fails, so the caller keeps its item
+        // Water is displaced by a placement instead of blocking it, and a stack a placement may
+        // take over (layered snow) is overwritten too; anything else occupies the cell and the
+        // placement fails, so the caller keeps its item
         var existing = _blocks[Idx(localX, localY, localZ)];
-        if (existing != 0 && !BlockType.IsFluid(existing)) return false;
+        if (!Placement.CanOccupy(existing, GetLocalState(localX, localY, localZ))) return false;
 
         // One write does id, count and state together: SetBlockRaw moves _solidCount only
         // on air <-> non-air transitions, so displacing water keeps the count.

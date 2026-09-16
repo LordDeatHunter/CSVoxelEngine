@@ -92,6 +92,10 @@ public sealed record BlockType
     internal static readonly bool[] FluidById = new bool[256];
     internal static readonly bool[] ReplaceableById = new bool[256];
 
+    // Whether a placement takes this block's own cell over instead of filling the neighbour
+    // across the hit face (layered snow); only ever fires on a non-solid state.
+    internal static readonly bool[] ReplaceableByPlacementById = new bool[256];
+
     // Per-fluid simulation tuning (see BlockDefinition.FlowDefinition): ticks between updates,
     // sideways spread range, and whether adjacent sources multiply. Water's defaults.
     internal static readonly byte[] FluidTickDivisorById = new byte[256];
@@ -201,6 +205,11 @@ public sealed record BlockType
 
     /// <summary>Whether the block pops (with its loot) when the block below is removed.</summary>
     public bool NeedsSupport { get; init; }
+
+    /// <summary>Whether a placement aimed at this block fills its own cell and discards it
+    /// (layered snow) instead of filling the cell across the hit face. Only a non-solid state can
+    /// be taken over; see <see cref="IsReplaceableByPlacement"/>.</summary>
+    public bool ReplaceableByPlacement { get; init; }
 
     /// <summary>Whether the block is gravity-affected: it topples into a falling entity when
     /// the cell below it stops being solid, and a placed one falls immediately.</summary>
@@ -326,6 +335,16 @@ public sealed record BlockType
     /// write — but every caller that displaces water tests <see cref="IsFluid(byte)"/> too.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsReplaceable(byte blockId) => ReplaceableById[blockId];
+
+    /// <summary>Whether a placement aimed at this block fills the block's own cell and discards it,
+    /// instead of filling the neighbour across the hit face. Opted into with the block's
+    /// <c>replaceableByPlacement</c> JSON, and only while the cell is not solid: a partial
+    /// layered-snow drift is taken over, a full stack is a real block (see
+    /// <see cref="IsSolidCell"/>). Independent of <see cref="IsReplaceable"/>, which is the fluid
+    /// flow and bucket pour path.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsReplaceableByPlacement(byte blockId, byte state) =>
+        ReplaceableByPlacementById[blockId] && !IsSolidCell(blockId, state);
 
     /// <summary>Whether a block id is gravity-affected; see <see cref="Falls"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

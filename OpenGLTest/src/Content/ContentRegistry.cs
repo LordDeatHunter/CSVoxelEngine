@@ -304,6 +304,7 @@ public static class ContentRegistry
         Array.Clear(BlockType.HardensToById);
         Array.Clear(BlockType.HardensTouchingById);
         Array.Clear(BlockType.ReplaceableById);
+        Array.Clear(BlockType.ReplaceableByPlacementById);
         Array.Clear(BlockType.FallsById);
         Array.Fill(BlockType.WoodFamilyById, BlockType.NoWoodFamily);
         BlockType.WoodByLevelByFamily.Clear();
@@ -796,6 +797,14 @@ public static class ContentRegistry
                 throw new InvalidOperationException(
                     $"Block '{path}' sets stackSolidAt on a solid block; state-dependent solidity needs solid: false.");
 
+            // A placement only takes over a non-solid cell, so an always-solid block could never
+            // honour the flag: the author's intent cannot work, so it is a content error rather
+            // than an inert extra
+            var replaceableByPlacement = !fluid && (definition.ReplaceableByPlacement ?? false);
+            if (replaceableByPlacement && solid)
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets replaceableByPlacement but is always solid; a placement only takes over a non-solid cell, so the flag needs solid: false.");
+
             var movementSpeed = definition.MovementSpeed ?? 0f;
             if (!float.IsFinite(movementSpeed) || movementSpeed < 0f || movementSpeed > 1f)
                 throw new InvalidOperationException(
@@ -865,6 +874,7 @@ public static class ContentRegistry
                 HalfWidth = definition.Wood == null ? -1f : definition.Wood.HalfWidth ?? 0.5f,
                 HasItem = !fluid && (definition.HasItem ?? true),
                 NeedsSupport = needsSupport,
+                ReplaceableByPlacement = replaceableByPlacement,
                 Falls = falls,
                 Fluid = fluid,
                 FluidTickDivisor = (byte)tickDivisor,
@@ -905,6 +915,8 @@ public static class ContentRegistry
             BlockType.FallsById[id] = type.Falls;
             // Fragile blocks are washed away by a flow instead of stopping it
             BlockType.ReplaceableById[id] = type.NeedsSupport;
+            // A flagged block is taken over in place by a placement aimed at it
+            BlockType.ReplaceableByPlacementById[id] = type.ReplaceableByPlacement;
         }
 
         // Contact targets resolve here, not inline: files load alphabetically, so lava's

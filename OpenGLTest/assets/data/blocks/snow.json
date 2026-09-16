@@ -9,6 +9,7 @@
   "light": { "passes": true },
   "hasItem": false,
   "needsSupport": true,
+  "replaceableByPlacement": true,
   "stackMax": 16,
   "stackSolidAt": 16,
   "loot": "snow"

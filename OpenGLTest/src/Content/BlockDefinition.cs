@@ -69,6 +69,16 @@ public sealed class BlockDefinition
     public bool? HasItem { get; set; }
     public bool? NeedsSupport { get; set; }
 
+    /// <summary>
+    /// Whether a block placement aimed at this block fills the block's own cell instead of the
+    /// cell across the hit face, discarding whatever it held (layered snow: a block placed against
+    /// a partial drift replaces it rather than hovering a layer above the ground). Only fires while
+    /// the cell is not solid, so a full snow stack behaves like an ordinary block, and the
+    /// displaced block drops nothing. Independent of <see cref="NeedsSupport"/>, which is what a
+    /// fluid flow and a bucket pour may overwrite.
+    /// </summary>
+    public bool? ReplaceableByPlacement { get; set; }
+
     /// <summary>Marks the block as gravity-affected (sand, gravel): it topples into a falling
     /// entity when the cell below it stops being solid. Never combines with
     /// <see cref="Fluid"/> or <see cref="NeedsSupport"/>.</summary>

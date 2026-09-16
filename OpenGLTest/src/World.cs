@@ -1343,8 +1343,9 @@ public class World : IItemUseWorld
     bool IItemUseWorld.PourFluidCell(Vector3 pos, byte fluidId) =>
         _fluidManager.SetCellImmediate(pos, fluidId, FluidState.Source, _chunkManager);
 
-    bool IItemUseWorld.PlaceBlockAtFace(Vector3 hit, Vector3 normal, byte blockId, byte state) =>
-        PlaceBlockAtFace(hit, normal, blockId, state);
+    bool IItemUseWorld.PlaceBlockAtFace(Vector3 hit, Vector3 normal, byte blockId, byte state,
+        out Vector3 placedCell) =>
+        PlaceBlockAtFace(hit, normal, blockId, state, out placedCell);
 
     void IItemUseWorld.AfterPlaced(Vector3 pos) =>
         _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
@@ -1523,12 +1524,11 @@ public class World : IItemUseWorld
         if (!Camera.Raycast(maxDistance, _chunkManager, out var hitPos, out var hitNormal))
             return false;
 
-        if (!PlaceBlockAtFace(hitPos, hitNormal, blockId, state: 0)) return false;
+        if (!PlaceBlockAtFace(hitPos, hitNormal, blockId, state: 0, out var placePos)) return false;
 
         Player.Punch();
         // Sand placed into thin air falls at once instead of hovering (stackable piles never
         // fall — the registry forbids the combination — so only the block path topples)
-        var placePos = hitPos + hitNormal;
         _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
             (int)placePos.X, (int)placePos.Y, (int)placePos.Z);
         return true;
@@ -1537,12 +1537,18 @@ public class World : IItemUseWorld
     /// <summary>
     /// Guards and grounds one block against a raycast hit face: live cubes and the player's
     /// body refuse solid entries, fragile blocks need solid ground, and a placement into
-    /// water displaces it. <paramref name="state"/> rides into the state byte (a fresh rock
-    /// pile starts at 1). Returns whether one was placed, without spending anything.
+    /// water displaces it. The filled cell is the neighbour across the hit face, or the hit
+    /// cell itself when it holds a stack a placement may take over (layered snow), which it
+    /// overwrites in place. <paramref name="state"/> rides into the state byte (a fresh rock
+    /// pile starts at 1) and <paramref name="placedCell"/> reports the cell that was filled.
+    /// Returns whether one was placed, without spending anything.
     /// </summary>
-    private bool PlaceBlockAtFace(Vector3 hitPos, Vector3 hitNormal, byte blockId, byte state)
+    private bool PlaceBlockAtFace(Vector3 hitPos, Vector3 hitNormal, byte blockId, byte state,
+        out Vector3 placedCell)
     {
-        var placePos = hitPos + hitNormal;
+        placedCell = Placement.TargetCell(hitPos, hitNormal, BlockIdAt(hitPos),
+            _chunkManager.GetStateGlobal((int)hitPos.X, (int)hitPos.Y, (int)hitPos.Z));
+        var placePos = placedCell;
         var chunkPos = VoxelCoords.ChunkPosOf(placePos);
 
         if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk)) return false;
