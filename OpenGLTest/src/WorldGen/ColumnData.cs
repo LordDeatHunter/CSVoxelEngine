@@ -27,17 +27,26 @@ public sealed class ColumnData
     /// which surface materials <see cref="Chunk.GenerateBlockData"/> lays down.</summary>
     public readonly Biome[] Biomes;
 
+    /// <summary>
+    /// The column's terrain height with ravines NOT cut in: the water body's own bed. It decides
+    /// whether the column is wet (see <see cref="TerrainGenerator.IsWaterColumn"/>), so a ravine
+    /// that merely deepens an otherwise dry column can never create water — only a bed that
+    /// already sits below sea level can. <see cref="Heights"/> is this minus the ravine cut.
+    /// </summary>
+    public readonly int[] Bed;
+
     public readonly int MinHeight;
     public readonly int MaxHeight;
 
     public ColumnData(int[] heights, byte[] dirtDepth, float[] entranceWeight, float[] caveIntensity,
-        Biome[]? biomes = null)
+        Biome[]? biomes = null, int[]? bed = null)
     {
         Heights = heights;
         DirtDepth = dirtDepth;
         EntranceWeight = entranceWeight;
         CaveIntensity = caveIntensity;
         Biomes = biomes ?? ForestBiomes(heights.Length);
+        Bed = bed ?? heights;
 
         var min = int.MaxValue;
         var max = int.MinValue;

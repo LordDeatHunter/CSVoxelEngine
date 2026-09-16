@@ -76,6 +76,12 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 Advance();
                 break;
 
+            case "fly":
+                world.Camera.TestSetFlight(step.On);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} fly {(step.On ? "on" : "off")}");
+                Advance();
+                break;
+
             case "give":
                 var id = ContentRegistry.Require(step.Block!);
                 world.Inventory.Add(id, step.Count);

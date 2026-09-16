@@ -76,6 +76,18 @@ public sealed class VisualScenarioTests
         Assert.False(keyboard.IsKeyPressed(Key.W));
     }
 
+    [Fact]
+    public void FlyStepDefaultsOnAndCanBeTurnedOff()
+    {
+        var on = VisualScenario.Parse("""{ "steps": [{ "op": "fly" }] }""", "tour");
+        Assert.Equal("fly", on.Steps[0].Op);
+        Assert.True(on.Steps[0].On);
+
+        var off = VisualScenario.Parse("""{ "steps": [{ "op": "fly", "on": false }] }""", "tour");
+        Assert.Equal("fly", off.Steps[0].Op);
+        Assert.False(off.Steps[0].On);
+    }
+
     [Theory]
     [InlineData("""{ "steps": [{ "op": "dance" }] }""", "dance")]
     [InlineData("""{ "steps": [{ "op": "teleport", "pos": [1, 2] }] }""", "exactly 3")]

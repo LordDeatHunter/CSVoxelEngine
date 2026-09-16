@@ -16,10 +16,12 @@ namespace silkgltriangle;
 /// water beside the edit will not notice it.
 ///
 /// Worldgen water gets the same treatment from <see cref="WakeLoadedChunks"/>: when a chunk
-/// streams in, its whole water/air frontier is scheduled — the interior found by the generation
-/// worker (<see cref="Chunk.FluidFrontier"/>), the borders scanned here once both chunks are
-/// loaded — so a sea that a cave or an entrance breached pours into it instead of standing
-/// there as a wall. Once that has settled it costs nothing again.
+/// streams in, the frontier of its water against a carved cavity is scheduled — the interior
+/// found by the generation worker (<see cref="Chunk.FluidFrontier"/>), the borders scanned here
+/// once both chunks are loaded — so a sea that a cave or an entrance breached pours into it
+/// instead of standing there as a wall. Open air above the terrain is deliberately not woken,
+/// so generated water stays static across ravines, beaches and hillsides. Once that has settled
+/// it costs nothing again.
 ///
 /// Cells are read through <see cref="TryGetCell"/> and never through
 /// <c>GetBlockGlobal</c>: the latter reports unloaded chunks as air, which would let water
@@ -126,12 +128,14 @@ public class FluidManager
     }
 
     /// <summary>
-    /// Schedules the water/air frontier of every chunk that finished generating since the last
-    /// call, so a sea breached by a cave or an entrance starts pouring in the moment it loads
-    /// instead of standing there as a wall. Interior frontiers were found on the generation
-    /// worker (<see cref="Chunk.FluidFrontier"/>); the borders need both chunks loaded, so they
-    /// are scanned here. At most <see cref="WorldGenerationConfig.MaxWakeChunksPerFrame"/>
-    /// chunks are woken per call; the rest wait in the queue for the next frame.
+    /// Schedules the frontier of every chunk that finished generating since the last call, so a
+    /// sea breached by a cave or an entrance starts pouring in the moment it loads instead of
+    /// standing there as a wall. Only flow targets at or below their column's terrain top count,
+    /// so open air above the terrain is never woken (see <see cref="IsCarvedFlowTarget"/>).
+    /// Interior frontiers were found on the generation worker (<see cref="Chunk.FluidFrontier"/>);
+    /// the borders need both chunks loaded, so they are scanned here. At most
+    /// <see cref="WorldGenerationConfig.MaxWakeChunksPerFrame"/> chunks are woken per call; the
+    /// rest wait in the queue for the next frame.
     ///
     /// Main thread, called once a frame right before <see cref="Update"/> so the cells it
     /// schedules ride the same tick as this frame's block edits.
@@ -175,14 +179,18 @@ public class FluidManager
     }
 
     /// <summary>
-    /// Schedules the fluid side of every fluid/flowable pair across the faces this chunk shares
-    /// with its loaded neighbours, in whichever chunk the fluid actually lives. Blocks are read
-    /// straight off both chunks (they are loaded, so their arrays are there) rather than through
-    /// <c>GetBlockGlobal</c>, which would call an unloaded chunk air.
+    /// Schedules the fluid side of every fluid/carved-cavity pair across the faces this chunk
+    /// shares with its loaded neighbours, in whichever chunk the fluid actually lives. Only a
+    /// neighbour at or below its column's terrain top counts (see
+    /// <see cref="IsCarvedFlowTarget"/>), so a generated sea does not wake into open air above a
+    /// ravine, beach or hillside. Blocks are read straight off both chunks (they are loaded, so
+    /// their arrays are there) rather than through <c>GetBlockGlobal</c>, which would call an
+    /// unloaded chunk air.
     /// </summary>
     private void WakeBorders(Chunk chunk, ChunkManager chunks)
     {
         var pos = chunk.Position;
+        var ownHeights = Chunk.GetColumnHeights((int)pos.X, (int)pos.Z);
 
         foreach (var (dx, _, dz) in Horizontals)
         {
@@ -192,21 +200,29 @@ public class FluidManager
             // axis the face cuts, the neighbour's directly across at `far`
             var near = dx + dz > 0 ? Chunk.SizeMask : 0;
             var far = Chunk.SizeMask - near;
+            var neighbourHeights = Chunk.GetColumnHeights((int)neighbour.Position.X, (int)neighbour.Position.Z);
 
             for (var ly = 0; ly < Chunk.Size; ly++)
-            for (var t = 0; t < Chunk.Size; t++)
             {
-                // t sweeps the horizontal axis the face does not cut
-                var hx = dx != 0 ? near : t;
-                var hz = dx != 0 ? t : near;
-                var nx = dx != 0 ? far : t;
-                var nz = dx != 0 ? t : far;
+                var worldY = chunk.LowerBoundY + ly;
+                for (var t = 0; t < Chunk.Size; t++)
+                {
+                    // t sweeps the horizontal axis the face does not cut
+                    var hx = dx != 0 ? near : t;
+                    var hz = dx != 0 ? t : near;
+                    var nx = dx != 0 ? far : t;
+                    var nz = dx != 0 ? t : far;
 
-                var here = chunk.GetLocalBlock(hx, ly, hz);
-                var there = neighbour.GetLocalBlock(nx, ly, nz);
+                    var here = chunk.GetLocalBlock(hx, ly, hz);
+                    var there = neighbour.GetLocalBlock(nx, ly, nz);
 
-                if (BlockType.IsFluid(here) && IsFlowTarget(there)) ScheduleLocal(chunk, hx, ly, hz);
-                else if (BlockType.IsFluid(there) && IsFlowTarget(here)) ScheduleLocal(neighbour, nx, ly, nz);
+                    if (BlockType.IsFluid(here)
+                        && IsCarvedFlowTarget(there, worldY, neighbourHeights[(nx << Chunk.SizeShift) | nz]))
+                        ScheduleLocal(chunk, hx, ly, hz);
+                    else if (BlockType.IsFluid(there)
+                        && IsCarvedFlowTarget(here, worldY, ownHeights[(hx << Chunk.SizeShift) | hz]))
+                        ScheduleLocal(neighbour, nx, ly, nz);
+                }
             }
         }
 
@@ -218,7 +234,8 @@ public class FluidManager
             for (var lz = 0; lz < Chunk.Size; lz++)
             {
                 if (BlockType.IsFluid(chunk.GetLocalBlock(lx, 0, lz))
-                    && IsFlowTarget(below.GetLocalBlock(lx, Chunk.SizeMask, lz)))
+                    && IsCarvedFlowTarget(below.GetLocalBlock(lx, Chunk.SizeMask, lz),
+                        chunk.LowerBoundY - 1, ownHeights[(lx << Chunk.SizeShift) | lz]))
                     ScheduleLocal(chunk, lx, 0, lz);
             }
         }
@@ -229,7 +246,8 @@ public class FluidManager
             for (var lz = 0; lz < Chunk.Size; lz++)
             {
                 if (BlockType.IsFluid(above.GetLocalBlock(lx, 0, lz))
-                    && IsFlowTarget(chunk.GetLocalBlock(lx, Chunk.SizeMask, lz)))
+                    && IsCarvedFlowTarget(chunk.GetLocalBlock(lx, Chunk.SizeMask, lz),
+                        chunk.LowerBoundY + Chunk.SizeMask, ownHeights[(lx << Chunk.SizeShift) | lz]))
                     ScheduleLocal(above, lx, 0, lz);
             }
         }
@@ -719,6 +737,17 @@ public class FluidManager
     /// agree with <see cref="CanFlowInto"/> on what counts as somewhere to go.
     /// </summary>
     internal static bool IsFlowTarget(byte id) => !BlockType.IsFluid(id) && BlockType.IsReplaceable(id);
+
+    /// <summary>
+    /// Whether a generated fluid may wake into a cell: a flow target at or below its column's
+    /// natural terrain top, i.e. a carver opened it (a cave, an entrance, a breach). Open air
+    /// above the terrain — a ravine, a beach, a hillside — is not one, so a generated sea stays
+    /// static across them exactly like Minecraft's and only floods the caves that breach it.
+    /// Shared with <see cref="Chunk.FluidFrontier"/>'s worker-thread scan so both halves of the
+    /// wake agree on where generated water may go.
+    /// </summary>
+    internal static bool IsCarvedFlowTarget(byte id, int worldY, int columnHeight) =>
+        IsFlowTarget(id) && worldY <= columnHeight;
 
     /// <summary>Whether a cell would let fluid drain into it: replaceable, or already the same
     /// fluid. What the slope search calls a "hole".</summary>

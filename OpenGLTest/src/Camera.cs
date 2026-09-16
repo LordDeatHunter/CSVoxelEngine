@@ -346,6 +346,17 @@ public class Camera
     }
 
     /// <summary>
+    /// Test seam: turns creative flight on or off directly, rather than scripting the C and
+    /// double-Space keystrokes, so a visual scenario can hover over a spot instead of falling.
+    /// Turning flight off leaves creative on, matching the in-game order.
+    /// </summary>
+    public void TestSetFlight(bool flying)
+    {
+        if (flying) IsCreative = true;
+        IsFlying = flying;
+    }
+
+    /// <summary>
     /// Test seam: drops the eye at an exact spot facing an exact direction, so headless tests
     /// can aim the raycast and place the body without a window or input. Pitch is clamped
     /// exactly like the mouse look.

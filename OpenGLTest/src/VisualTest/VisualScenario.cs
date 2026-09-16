@@ -23,6 +23,7 @@ public sealed class VisualStep
     public bool HideHud { get; init; }
     public string? Block { get; init; }
     public int Count { get; init; } = 1;
+    public bool On { get; init; } = true;
 }
 
 /// <summary>
@@ -129,6 +130,11 @@ public sealed class VisualScenario
             },
             "mine" => new VisualStep { Op = "mine", Seconds = ReadSeconds(element, index) },
             "place" => new VisualStep { Op = "place" },
+            "fly" => new VisualStep
+            {
+                Op = "fly",
+                On = !element.TryGetProperty("on", out var on) || on.GetBoolean(),
+            },
             "give" => new VisualStep
             {
                 Op = "give",
@@ -142,7 +148,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, give or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, fly, give or screenshot."),
         };
     }
 

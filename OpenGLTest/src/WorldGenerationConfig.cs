@@ -356,6 +356,11 @@ public static class WorldGenerationConfig
     public const float ContinentOceanStart = -0.30f;   // at or below: full ocean
     public const float ContinentOceanEnd = -0.04f;     // at or above: full land
 
+    // Ocean weight at which the ocean biome, its water and its shore materials begin. The land
+    // clamp fades out across [OceanShoreWeight, 0.5], so the coast is a continuous slope into the
+    // water instead of a cliff where the hard biome flip used to be.
+    public const float OceanShoreWeight = 0.35f;
+
     // Temperature: cold where the noise runs low. Cold land is taiga (with humidity) or the barren
     // frozen biome (without it). Temperature and humidity are read only while choosing a biome and
     // the worldgen features that follow from it, so nothing else in the game sees them.
@@ -403,6 +408,9 @@ public static class WorldGenerationConfig
     public const int SandstoneDepth = 4;
     // Width of the grass/desert blend band where the surface material dithers, 0 disables it.
     public const float BiomeBorderDither = 0.16f;
+    // Wavelength of the coherent border dither, in blocks. The material flip follows this noise,
+    // so the grass/sand line is ragged in whole patches instead of a per-column checkerboard.
+    public const float BiomeDitherFrequency = 1f / 28f;
 
     // Fluid simulation: one tick every FluidTickSeconds, at most MaxFluidTicksPerFrame of them
     // in a frame so a hitch never turns into a spiral of catch-up ticks
@@ -516,6 +524,8 @@ public static class WorldGenerationConfig
     public const float OpennessHillReduction = 0.5f;       // fraction of hill height an open region drops
 
     // --- Ravines (2D, cut into the heightmap so the far LOD shows them too) ---
+    // The cut fades out across the shore band (OceanShoreWeight..0.5), so a ravine never slices
+    // the ocean's edge; the ocean's own gashes are trenches.
     public const bool RavinesEnabled = true;
     public const float RavineRidgeFrequency = 1f / 900f;   // spacing of candidate canyon lines
     public const float RavineWarpFrequency = 1f / 150f;    // how tightly the lines wind
@@ -537,6 +547,9 @@ public static class WorldGenerationConfig
     public const float EntranceFrequency = 1f / 128f;
     public const float EntranceStart = 0.5f;
     public const float EntranceEnd = 0.6f;
+    // Entrances fade out over this width of ocean weight before the shore band, so a cave never
+    // breaches a beach or the sea floor into a water-filled hole.
+    public const float EntranceShoreFade = 0.1f;
     // Slow 2D variation added to the cave thresholds: riddled regions vs nearly solid ones
     public const float CaveIntensityFrequency = 1f / 512f;
     public const float CaveIntensityRange = 0.1f;

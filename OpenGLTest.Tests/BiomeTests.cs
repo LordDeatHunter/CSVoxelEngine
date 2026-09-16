@@ -495,4 +495,83 @@ public sealed class BiomeTests
 
         Assert.Fail("no desert chunk found for the LOD check");
     }
+
+    [Fact]
+    public void OceanShoreBandSlopesBelowTheWaterlineInsteadOfStepping()
+    {
+        // The old hard ocean classification clamped every land column to sea level + 1, so the
+        // coast met the water as a step. The blended band must now be ocean biome and may sit
+        // below the waterline (which is what makes it a slope).
+        var wetBand = 0;
+        for (var cx = -64; cx <= 64 && wetBand < 8; cx++)
+        for (var cz = -64; cz <= 64 && wetBand < 8; cz++)
+        {
+            var column = Chunk.GetColumnData(cx, cz);
+            for (var i = 0; i < column.Heights.Length && wetBand < 8; i++)
+            {
+                var x = cx * Chunk.Size + (i >> Chunk.SizeShift);
+                var z = cz * Chunk.Size + (i & Chunk.SizeMask);
+                TerrainGenerator.BiomeWeights(x, z, out var oceanWeight, out _);
+                if (oceanWeight < WorldGenerationConfig.OceanShoreWeight || oceanWeight >= 0.5f) continue;
+
+                Assert.Equal(Biome.Ocean, TerrainGenerator.BiomeAt(x, z));
+                if (column.Bed[i] >= WorldGenerationConfig.SeaLevel) continue;
+
+                Assert.True(TerrainGenerator.IsWaterColumn(x, z, column.Bed[i]));
+                wetBand++;
+            }
+        }
+
+        Assert.True(wetBand > 0, "the blended shore band never dips below the waterline");
+    }
+
+    [Fact]
+    public void OceanShoreHasNoSurfaceCaveEntrances()
+    {
+        // An entrance on a beach let a cave breach the sand into a water-filled hole.
+        var oceanColumns = 0;
+        for (var x = -1024; x <= 1024; x += 8)
+        for (var z = -1024; z <= 1024; z += 8)
+        {
+            TerrainGenerator.BiomeWeights(x, z, out var oceanWeight, out _);
+            if (oceanWeight < WorldGenerationConfig.OceanShoreWeight) continue;
+
+            var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+            var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
+            Assert.Equal(0f, column.EntranceWeight[local]);
+            oceanColumns++;
+        }
+
+        Assert.True(oceanColumns > 0, "no ocean columns found in the scanned area");
+    }
+
+    [Fact]
+    public void BiomeBorderDitherFlipsCoherentPatchesNotSingleColumns()
+    {
+        var band = 0;
+        var differingNeighbour = 0;
+        const int step = 4;
+
+        for (var x = -2048; x < 2048; x += step)
+        for (var z = -2048; z < 2048; z += step)
+        {
+            TerrainGenerator.BiomeWeights(x, z, out _, out var desertWeight);
+            if (MathF.Abs(desertWeight - 0.5f) >= WorldGenerationConfig.BiomeBorderDither) continue;
+
+            var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+            var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
+            var here = column.Biomes[local];
+            if (here is not (Biome.Forest or Biome.Desert)) continue;
+            band++;
+
+            var nx = x + step;
+            var neighbour = Chunk.GetColumnData(nx >> Chunk.SizeShift, z >> Chunk.SizeShift);
+            var neighbourLocal = ((nx & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
+            if (neighbour.Biomes[neighbourLocal] != here) differingNeighbour++;
+        }
+
+        Assert.True(band > 0, "no forest/desert dither band found in the scanned area");
+        Assert.True(differingNeighbour * 3 < band,
+            $"the dither flips single columns: {differingNeighbour} of {band} samples differ from a neighbour");
+    }
 }

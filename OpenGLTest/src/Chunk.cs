@@ -147,13 +147,16 @@ public class Chunk : IDisposable
     public int SurfaceMinY { get; private set; } = int.MinValue;
 
     /// <summary>
-    /// The fluid cells inside this chunk that already sit against somewhere they could flow
-    /// (local block indices as <see cref="Idx"/> produces them), or <c>null</c> when there are
-    /// none. Generated sea water is static source blocks, so a cave carved into the sea floor
-    /// leaves water standing against worldgen air that nothing would ever schedule; this is the
-    /// list <see cref="FluidManager.WakeLoadedChunks"/> uses to make it pour in the moment the
-    /// chunk loads. Written once by the generation worker before <see cref="IsBlockDataReady"/>
-    /// goes true and read once on the main thread afterwards, so it needs no locking.
+    /// The fluid cells inside this chunk that already sit against a carved cavity they could
+    /// flow into (local block indices as <see cref="Idx"/> produces them), or <c>null</c> when
+    /// there are none. Generated sea water is static source blocks, so a cave carved into the
+    /// sea floor leaves water standing against worldgen air that nothing would ever schedule;
+    /// this is the list <see cref="FluidManager.WakeLoadedChunks"/> uses to make it pour in the
+    /// moment the chunk loads. Open air above the terrain is not a cavity (see
+    /// <see cref="FluidManager.IsCarvedFlowTarget"/>), so a ravine, beach or hillside never
+    /// wakes the sea. Written once by the generation worker before
+    /// <see cref="IsBlockDataReady"/> goes true and read once on the main thread afterwards, so
+    /// it needs no locking.
     /// </summary>
     internal ushort[]? FluidFrontier { get; private set; }
 
@@ -451,7 +454,8 @@ public class Chunk : IDisposable
             for (var z = 0; z < Size; z++)
             {
                 var i = (x << SizeShift) | z;
-                GenerateColumn(x, z, column.Heights[i], column.DirtDepth[i], lowerBoundY, column.Biomes[i]);
+                GenerateColumn(x, z, column.Heights[i], column.Bed[i], column.DirtDepth[i],
+                    lowerBoundY, column.Biomes[i]);
             }
         }
 
@@ -522,16 +526,21 @@ public class Chunk : IDisposable
         // Only a chunk that actually got flooded can have a frontier to report, plus any
         // chunk low enough to hold lava pockets (the scan itself is fluid-generic)
         if (needsWater || (WorldGenerationConfig.LavaEnabled && lowerBoundY <= WorldGenerationConfig.LavaMaxY))
-            ScanFluidFrontier();
+            ScanFluidFrontier(column, lowerBoundY);
 
         IsBlockDataReady = true;
     }
 
     /// <summary>
-    /// Collects the cells where this chunk's water already touches space it could flow into,
-    /// into <see cref="FluidFrontier"/>. The sea is generated as static sources, so without
-    /// this a cave or entrance that breached it would leave a wall of water standing beside
+    /// Collects the cells where this chunk's water already touches a carved cavity it could flow
+    /// into, into <see cref="FluidFrontier"/>. The sea is generated as static sources, so without
+    /// this a cave or an entrance that breached it would leave a wall of water standing beside
     /// worldgen air forever — nothing schedules those cells, since only block edits do.
+    ///
+    /// Only cells at or below their column's natural terrain top count (see
+    /// <see cref="FluidManager.IsCarvedFlowTarget"/>): that is what a carver opened, and open air
+    /// above the terrain is deliberately excluded so a generated sea never wakes across a ravine,
+    /// a beach or a hillside. Minecraft's generated water is static the same way.
     ///
     /// +Y is deliberately not tested: every sea-surface cell has air above it and water never
     /// flows upward, so including it would report a useless 256 cells per surface chunk.
@@ -539,7 +548,7 @@ public class Chunk : IDisposable
     /// both chunks are loaded, so this only ever reads this chunk's own blocks and stays as
     /// thread-safe as the rest of worldgen.
     /// </summary>
-    private void ScanFluidFrontier()
+    private void ScanFluidFrontier(ColumnData column, int lowerBoundY)
     {
         List<ushort>? frontier = null;
 
@@ -550,11 +559,11 @@ public class Chunk : IDisposable
             var i = Idx(x, y, z);
             if (!BlockType.IsFluid(_blocks[i])) continue;
 
-            var exposed = (x > 0 && FluidManager.IsFlowTarget(_blocks[Idx(x - 1, y, z)]))
-                          || (x < SizeMask && FluidManager.IsFlowTarget(_blocks[Idx(x + 1, y, z)]))
-                          || (z > 0 && FluidManager.IsFlowTarget(_blocks[Idx(x, y, z - 1)]))
-                          || (z < SizeMask && FluidManager.IsFlowTarget(_blocks[Idx(x, y, z + 1)]))
-                          || (y > 0 && FluidManager.IsFlowTarget(_blocks[Idx(x, y - 1, z)]));
+            var exposed = (x > 0 && IsCarvedFlowTarget(column, lowerBoundY, x - 1, y, z))
+                          || (x < SizeMask && IsCarvedFlowTarget(column, lowerBoundY, x + 1, y, z))
+                          || (z > 0 && IsCarvedFlowTarget(column, lowerBoundY, x, y, z - 1))
+                          || (z < SizeMask && IsCarvedFlowTarget(column, lowerBoundY, x, y, z + 1))
+                          || (y > 0 && IsCarvedFlowTarget(column, lowerBoundY, x, y - 1, z));
             if (!exposed) continue;
 
             frontier ??= [];
@@ -564,13 +573,20 @@ public class Chunk : IDisposable
         FluidFrontier = frontier?.ToArray();
     }
 
+    /// <summary>Whether a chunk-local neighbour is a carved cavity the fluid may wake into.</summary>
+    private bool IsCarvedFlowTarget(ColumnData column, int lowerBoundY, int x, int y, int z) =>
+        FluidManager.IsCarvedFlowTarget(_blocks[Idx(x, y, z)], lowerBoundY + y,
+            column.Heights[(x << SizeShift) | z]);
+
     /// <summary>
     /// Floods every air cell up to and including sea level in a wet column — an ocean floor, or a
     /// lake or river bed (see <see cref="TerrainGenerator.IsWaterColumn"/>) — so oceans, lakes,
-    /// rivers and sea-floor caves all fill while the dry land basins stay dry. Generated water is
-    /// always a source (state 0), which is what an untouched state byte reads as, so nothing is
-    /// written to <c>_state</c> here. A pure per-column function of world position like the rest
-    /// of worldgen: neighbours agree at their borders with no shared state.
+    /// rivers and sea-floor caves all fill while the dry land basins stay dry. Wetness reads the
+    /// column's <see cref="ColumnData.Bed"/>: a ravine that merely cut a dry column below sea
+    /// level holds no water, while a ravine under a real water body just deepens it. Generated
+    /// water is always a source (state 0), which is what an untouched state byte reads as, so
+    /// nothing is written to <c>_state</c> here. A pure per-column function of world position like
+    /// the rest of worldgen: neighbours agree at their borders with no shared state.
     /// </summary>
     private void FillWater(ColumnData column, int lowerBoundY, int worldX0, int worldZ0)
     {
@@ -580,7 +596,8 @@ public class Chunk : IDisposable
         for (var x = 0; x < Size; x++)
         for (var z = 0; z < Size; z++)
         {
-            if (!TerrainGenerator.IsWaterColumn(worldX0 + x, worldZ0 + z, column.Heights[(x << SizeShift) | z]))
+            var local = (x << SizeShift) | z;
+            if (!TerrainGenerator.IsWaterColumn(worldX0 + x, worldZ0 + z, column.Bed[local]))
                 continue;
 
             for (var y = 0; y <= top; y++)
@@ -646,9 +663,11 @@ public class Chunk : IDisposable
             var wy = lowerBoundY + y + dy;
             var wz = worldZ0 + z + dz;
             if (wy > WorldGenerationConfig.SeaLevel) continue;
-            var height = GetColumnHeights(wx >> SizeShift, wz >> SizeShift)
-                [(wx & SizeMask) << SizeShift | (wz & SizeMask)];
-            if (wy > height && TerrainGenerator.IsWaterColumn(wx, wz, height)) return true;
+            var neighbour = GetColumnData(wx >> SizeShift, wz >> SizeShift);
+            var local = ((wx & SizeMask) << SizeShift) | (wz & SizeMask);
+            if (wy > neighbour.Heights[local]
+                && TerrainGenerator.IsWaterColumn(wx, wz, neighbour.Bed[local]))
+                return true;
         }
 
         return false;
@@ -690,13 +709,15 @@ public class Chunk : IDisposable
     // (see ColumnData.DirtDepth) - deep ravine walls, where the top block is stone as well.
     // A wet column tops out in dirt instead: grass does not grow on a sea, lake or river bed.
     // Shoreline columns (see TerrainGenerator.IsBeachHeight) build from sand instead, capped
-    // with gravel where TerrainGenerator.IsGravelPatch holds.
-    private void GenerateColumn(int x, int z, int terrainHeight, int dirtDepth, int lowerBoundY, Biome biome)
+    // with gravel where TerrainGenerator.IsGravelPatch holds. `terrainHeight` (ravines cut in)
+    // decides how deep to fill; `bed` (ravines not cut) decides whether the column is water.
+    private void GenerateColumn(int x, int z, int terrainHeight, int bed, int dirtDepth, int lowerBoundY,
+        Biome biome)
     {
         var worldX = (int)Position.X * Size + x;
         var worldZ = (int)Position.Z * Size + z;
 
-        var topBlock = TerrainGenerator.IsWaterColumn(worldX, worldZ, terrainHeight)
+        var topBlock = TerrainGenerator.IsWaterColumn(worldX, worldZ, bed)
             ? TerrainGenerator.SoilBlock
             : TerrainGenerator.SurfaceBlock;
         var soilBlock = TerrainGenerator.SoilBlock;

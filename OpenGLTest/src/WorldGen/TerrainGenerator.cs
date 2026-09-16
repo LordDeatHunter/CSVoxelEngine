@@ -37,6 +37,7 @@ public static class TerrainGenerator
     private static readonly FastNoiseLite MountainNoise;
     private static readonly FastNoiseLite MountainWarp;
     private static readonly FastNoiseLite OpennessNoise;
+    private static readonly FastNoiseLite BiomeDitherNoise;
 
     // The terrain palette: the generator owns the choice of which blocks natural ground is made
     // of, and Chunk only fills its columns with them. Resolved once here so the per-voxel fill
@@ -138,6 +139,7 @@ public static class TerrainGenerator
         MountainMask = MakeNoise(84, WorldGenerationConfig.MountainMaskFrequency, octaves: 2);
         MountainNoise = MakeNoise(85, WorldGenerationConfig.MountainFrequency, octaves: 3);
         OpennessNoise = MakeNoise(86, WorldGenerationConfig.OpennessFrequency, octaves: 2);
+        BiomeDitherNoise = MakeNoise(89, WorldGenerationConfig.BiomeDitherFrequency);
 
         // Mountains wind like ravines and rivers, so a range snakes instead of tracking a contour
         MountainWarp = new FastNoiseLite(WorldGenerationConfig.Seed + 87);
@@ -194,7 +196,7 @@ public static class TerrainGenerator
             WorldGenerationConfig.HumidityDryEnd, HumidityNoise.GetNoise(x, z));
         desertWeight = (1f - cold) * dry * (1f - oceanWeight) * gate;
 
-        var biome = oceanWeight >= 0.5f ? Biome.Ocean
+        var biome = oceanWeight >= WorldGenerationConfig.OceanShoreWeight ? Biome.Ocean
             : cold >= WorldGenerationConfig.ColdBiomeMinCold ? dry >= 0.5f ? Biome.Frozen : Biome.Taiga
             : cold <= WorldGenerationConfig.DesertMaxCold && dry >= 0.5f ? Biome.Desert
             : Biome.Forest;
@@ -216,6 +218,11 @@ public static class TerrainGenerator
     /// keeps the land from being flooded wholesale now that the oceans carry the big water — a hot
     /// desert stays dry, and a cold lake or river freezes over (see the freezing pass).
     /// <see cref="Compute"/> carves with these same weights, so the wet set and the carved set agree.
+    ///
+    /// Callers must pass the column's <see cref="ColumnData.Bed"/>, not its <see cref="ColumnData.Heights"/>:
+    /// the bed is the profile before a ravine cut it, so a ravine that merely deepens an
+    /// otherwise-dry column is dry instead of flooding as a narrow spike. A ravine under an
+    /// existing water body only deepens that body.
     /// </summary>
     public static bool IsWaterColumn(int x, int z, int height)
     {
@@ -393,9 +400,9 @@ public static class TerrainGenerator
         if (biome == Biome.Forest && ColdWeight(x, z) > WorldGenerationConfig.DesertMaxCold)
             return biome;
 
-        var h = SplitMix64.Hash((int)x, (int)z, WorldGenerationConfig.Seed ^ 0x5B10);
-        var unit = (SplitMix64.Mix(h + 0x9E3779B97F4A7C15UL) >> 40) * (1f / (1 << 24));
-        if (unit >= 0.5f) return biome;
+        // A coherent field, so whole patches flip: a per-column hash turned the line into a
+        // checkerboard instead of a ragged edge.
+        if (BiomeDitherNoise.GetNoise(x, z) <= 0f) return biome;
         return biome == Biome.Forest ? Biome.Desert : Biome.Forest;
     }
 
@@ -420,6 +427,7 @@ public static class TerrainGenerator
     {
         const int count = Chunk.Size * Chunk.Size;
         var heights = new int[count];
+        var bed = new int[count];
         var dirtDepth = new byte[count];
         var entrance = new float[count];
         var intensity = new float[count];
@@ -479,12 +487,15 @@ public static class TerrainGenerator
                     heightF = MathUtils.Lerp(heightF, oceanHeight, oceanWeight);
                 }
 
-                // Keep forest, taiga and frozen land above the waterline: the ocean blend dips the
-                // coast toward sea level, and a dry dip would read as a pit. Lakes and rivers are
-                // cut after this, so they still reach below the waterline. (A desert keeps its own
-                // dry profile, which the ocean blend already handles at the coast.)
-                if (biome is Biome.Forest or Biome.Taiga or Biome.Frozen)
-                    heightF = MathF.Max(heightF, WorldGenerationConfig.SeaLevel + 1f);
+                // Keep the land above the waterline, but ease the clamp out as the ocean blend
+                // takes over. Clamping only while the biome was land put a hard step at the ocean
+                // line, because the ocean side never clamped; fading it makes the coast a slope.
+                // Lakes and rivers are cut after this, so they still reach below the waterline.
+                var shoreClamp = 1f - MathUtils.SmoothStep(WorldGenerationConfig.OceanShoreWeight,
+                    0.5f, oceanWeight);
+                if (shoreClamp > 0f)
+                    heightF = MathUtils.Lerp(heightF,
+                        MathF.Max(heightF, WorldGenerationConfig.SeaLevel + 1f), shoreClamp);
 
                 // Surface water: a lake is a bowl and a river a channel, each cut below the
                 // waterline and each returning to un-carved land (> sea level) at its edge, so the
@@ -516,9 +527,16 @@ public static class TerrainGenerator
                 var height = (int)heightF;
 
                 // Sampled once and reused: the same value cuts the ravine into the heightmap and
-                // decides how much soil is left on the column
-                var ravineDepth = WorldGenerationConfig.RavinesEnabled ? RavineDepthAt(worldX, worldZ) : 0;
+                // decides how much soil is left on the column. The cut fades out across the shore
+                // band — a ravine is a land feature, and one running into the sea used to leave a
+                // dry trench slicing the water's edge, making the ocean look cut off (the ocean's
+                // own gashes are trenches, not ravines).
+                var ravineDepth = WorldGenerationConfig.RavinesEnabled
+                    ? (int)(RavineDepthAt(worldX, worldZ) * (1f - MathUtils.SmoothStep(
+                        WorldGenerationConfig.OceanShoreWeight, 0.5f, oceanWeight)))
+                    : 0;
 
+                bed[i] = height;
                 heights[i] = height - ravineDepth;
 
                 var dirt = WorldGenerationConfig.DirtDepthBase
@@ -542,17 +560,22 @@ public static class TerrainGenerator
 
                 dirtDepth[i] = (byte)soil;
 
+                // Surface cave entrances fade out before the shore band too: an entrance on a beach
+                // let a cave breach the sand into a water-filled hole (see the ravine fade above).
+                var entranceShore = 1f - MathUtils.SmoothStep(
+                    WorldGenerationConfig.OceanShoreWeight - WorldGenerationConfig.EntranceShoreFade,
+                    WorldGenerationConfig.OceanShoreWeight, oceanWeight);
                 entrance[i] = MathUtils.SmoothStep(
                     WorldGenerationConfig.EntranceStart,
                     WorldGenerationConfig.EntranceEnd,
-                    EntranceNoise.GetNoise(worldX, worldZ));
+                    EntranceNoise.GetNoise(worldX, worldZ)) * entranceShore;
 
                 intensity[i] = IntensityNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.CaveIntensityRange;
                 biomes[i] = DitherBiome(worldX, worldZ, biome, desertWeight);
             }
         }
 
-        return new ColumnData(heights, dirtDepth, entrance, intensity, biomes);
+        return new ColumnData(heights, dirtDepth, entrance, intensity, biomes, bed);
     }
 
     /// <summary>
