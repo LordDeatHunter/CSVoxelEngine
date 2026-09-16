@@ -106,6 +106,13 @@ public static class WorldGenerationConfig
     // texels — kills the self-shadowing acne on grazing-lit voxel faces
     public const float ShadowNormalOffsetTexels = 1.5f;
 
+    // Constant part of the depth bias, in shadow texels, added on top of the slope-scaled
+    // term the shader derives from the fragment's own normal. It only has to cover the
+    // float error of a receiver that faces the sun square on, so it stays small: a bias big
+    // enough to stand in for the slope at every sun angle is what lifted shadows off their
+    // casters once the sun climbed.
+    public const float ShadowBiasTexels = 0.5f;
+
     // Dynamic point lights in the world shader (primed TNT strobes); lamp glow is baked
     public const int MaxPointLights = 8;
 

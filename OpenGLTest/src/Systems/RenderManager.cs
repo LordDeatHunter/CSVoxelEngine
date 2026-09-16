@@ -734,8 +734,9 @@ public class RenderManager : IDisposable
     /// Builds the light-space matrix for this frame: an orthographic box of half-extent
     /// <see cref="WorldGenerationConfig.ShadowRadiusBlocks"/> centred a little ahead of the
     /// camera (most of what the player looks at is in front of them) and looking down the sun
-    /// direction. The box centre is snapped to whole shadow texels in light space, or the
-    /// sub-texel drift as the player walks makes every shadow edge crawl and shimmer.
+    /// direction. The box centre is snapped to whole shadow texels in light space by
+    /// <see cref="SnapShadowTarget"/>, or the sub-texel drift as the player walks makes every
+    /// shadow edge crawl and shimmer.
     /// </summary>
     private void UpdateShadowCamera(Camera? camera)
     {
@@ -744,23 +745,33 @@ public class RenderManager : IDisposable
         const float r = WorldGenerationConfig.ShadowRadiusBlocks;
         const float d = 2.5f * r;
         var target = camera.RenderEye + camera.ViewDirection * (r * 0.35f);
+        var snappedTarget = SnapShadowTarget(target, _sunDir, r, WorldGenerationConfig.ShadowMapSize);
 
-        // Snap in the provisional light space, then bring the snapped point back to world
-        // space and rebuild the view around it
-        var lightView = Matrix4x4.CreateLookAt(target + _sunDir * d, target, Vector3.UnitY);
-        var texel = 2f * r / WorldGenerationConfig.ShadowMapSize;
-        var inLight = Vector3.Transform(target, lightView);
-        inLight.X = MathF.Round(inLight.X / texel) * texel;
-        inLight.Y = MathF.Round(inLight.Y / texel) * texel;
-        var snappedTarget = Matrix4x4.Invert(lightView, out var inverseView)
-            ? Vector3.Transform(inLight, inverseView)
-            : target;
-
-        lightView = Matrix4x4.CreateLookAt(snappedTarget + _sunDir * d, snappedTarget, Vector3.UnitY);
+        var lightView = Matrix4x4.CreateLookAt(snappedTarget + _sunDir * d, snappedTarget, Vector3.UnitY);
         // The sun's 0.35 Z tilt keeps it more than 19 degrees off vertical, so UnitY is
         // never parallel to the view direction and the look-at stays well defined
         var lightProj = Matrix4x4.CreateOrthographic(2f * r, 2f * r, d - 2f * r, d + 2f * r);
         _lightViewProj = lightView * lightProj;
+    }
+
+    /// <summary>
+    /// Quantizes a shadow box centre onto the light-space texel lattice, so the map's texels stay
+    /// pinned to the world as the player walks: the light view is then rebuilt around the snapped
+    /// point and every shadow edge stops crawling. The measurement uses the light <em>rotation</em>
+    /// alone, never the view the pass will draw with - that view is anchored on the very point
+    /// being measured, so it reports (0, 0, -d) for it wherever the player stands and the snap
+    /// degenerates into a silent no-op.
+    /// </summary>
+    internal static Vector3 SnapShadowTarget(Vector3 target, Vector3 sunDir, float radiusBlocks, int mapSize)
+    {
+        var texel = 2f * radiusBlocks / mapSize;
+        var lightRotation = Matrix4x4.CreateLookAt(Vector3.Zero, -sunDir, Vector3.UnitY);
+        var inLight = Vector3.Transform(target, lightRotation);
+        inLight.X = MathF.Round(inLight.X / texel) * texel;
+        inLight.Y = MathF.Round(inLight.Y / texel) * texel;
+        return Matrix4x4.Invert(lightRotation, out var inverseRotation)
+            ? Vector3.Transform(inLight, inverseRotation)
+            : target;
     }
 
     /// <summary>
@@ -1535,6 +1546,10 @@ public class RenderManager : IDisposable
             2f * WorldGenerationConfig.ShadowRadiusBlocks / WorldGenerationConfig.ShadowMapSize);
         program.SetUniform("uShadowSoftness", WorldGenerationConfig.ShadowSoftnessTexels);
         program.SetUniform("uShadowNormalOffset", WorldGenerationConfig.ShadowNormalOffsetTexels);
+        program.SetUniform("uShadowBiasTexels", WorldGenerationConfig.ShadowBiasTexels);
+        // World blocks -> uvz.z: the ortho box's 4r-block depth range is halved into 0.5 of the
+        // uvz range, so one whole uvz unit is 8r blocks.
+        program.SetUniform("uShadowBiasScale", 1f / (8f * WorldGenerationConfig.ShadowRadiusBlocks));
         program.SetUniform("uClipY", _clipY);
         // The water pass reads the scene copies by screen uv and unprojects their depth; both
         // describe the real eye, so the reflection pass (which draws no water) can ignore them.

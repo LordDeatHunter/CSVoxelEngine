@@ -53,6 +53,8 @@ uniform float uShadowTexel;
 uniform float uShadowWorldTexel;
 uniform float uShadowSoftness;
 uniform float uShadowNormalOffset;
+uniform float uShadowBiasTexels;
+uniform float uShadowBiasScale;
 
 // The frame as it stood just before the water pass: colour to refract, depth to measure the
 // water's thickness with. Plain samplers, no compare mode - uSceneDepth is read for its value.
@@ -94,7 +96,15 @@ float SampleShadow(vec3 wp, vec3 N, float ndl, float strength) {
     float edge = max(abs(ndc.x), abs(ndc.y));
     float fade = 1.0 - smoothstep(0.85, 1.0, edge);   // soften the ortho-box boundary
     if (fade <= 0.0 || uvz.z > 1.0) return 1.0;
-    uvz.z -= 0.0008;
+    // Slope-scaled depth bias. One shadow texel spans texel*cot(theta) of depth on a receiver
+    // whose normal sits theta off the light axis, and anything less than that makes the
+    // surface shadow itself. Deriving it from the fragment's own normal is what keeps the
+    // bias honest: a single constant large enough for a grazing sun also pushed every shadow
+    // a whole block clear of its caster once the sun climbed, so shadows read as detached and
+    // their edges wandered across the terrain's own block steps. theta is clamped at 16
+    // texels (about 4 degrees off the light) - past that the fade above owns the result.
+    float cot = sqrt(max(1.0 - ndl * ndl, 0.0)) / max(ndl, 0.0625);
+    uvz.z -= (cot + uShadowBiasTexels) * uShadowWorldTexel * uShadowBiasScale;
     if (uShadowSoftness <= 0.0) return mix(1.0, texture(uShadowMap, uvz), fade * strength);
     // Four taps on the diagonals, half a texel out. The sampler filters linearly, so each
     // fetch is already a hardware 2x2 comparison and the four overlap into a smooth ~3x3
