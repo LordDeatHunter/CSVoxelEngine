@@ -152,15 +152,25 @@ public sealed class MudTests
             var column = Chunk.GetColumnData(cx, cz);
             for (var i = 0; i < column.Heights.Length && !found; i++)
             {
+                var lx = i >> Chunk.SizeShift;
+                var lz = i & Chunk.SizeMask;
+                var x = cx * Chunk.Size + lx;
+                var z = cz * Chunk.Size + lz;
                 var h = column.Heights[i];
-                if (h < WorldGenerationConfig.SeaLevel - WorldGenerationConfig.BeachBelowSeaLevel
-                    && column.DirtDepth[i] > 0)
-                {
-                    found = true;
-                    centerX = cx;
-                    centerY = h >> Chunk.SizeShift;
-                    centerZ = cz;
-                }
+
+                // A wet floor that is actually dirt: a lake or river bed in a forest. An ocean
+                // floor wears sand and gravel instead, so it never turns to mud, and the bed has to
+                // keep its water cell in the same chunk for the in-chunk neighbour test to see it.
+                if ((h & Chunk.SizeMask) == Chunk.SizeMask) continue;
+                if (column.DirtDepth[i] == 0) continue;
+                if (column.Biomes[i] is not (Biome.Forest or Biome.Taiga)) continue;
+                if (TerrainGenerator.IsBeachHeight(h)) continue;
+                if (!TerrainGenerator.IsWaterColumn(x, z, column.Bed[i])) continue;
+
+                found = true;
+                centerX = cx;
+                centerY = h >> Chunk.SizeShift;
+                centerZ = cz;
             }
         }
         Assert.True(found, "No muddy sea floor near the origin.");
@@ -172,7 +182,11 @@ public sealed class MudTests
         return manager;
     }
 
-    private static int CountWaterAround(ChunkManager manager, int x, int y, int z, byte water)
+    /// <summary>
+    /// How many of the 26 neighbours hold water. Ice counts: the snow pass runs after the mud pass,
+    /// so a cold pond's single surface cell was water when the mud was stamped and only froze later.
+    /// </summary>
+    private static int CountWaterAround(ChunkManager manager, int x, int y, int z, byte water, byte ice)
     {
         var count = 0;
         for (var dx = -1; dx <= 1; dx++)
@@ -180,7 +194,8 @@ public sealed class MudTests
         for (var dz = -1; dz <= 1; dz++)
         {
             if (dx == 0 && dy == 0 && dz == 0) continue;
-            if (manager.GetBlockGlobal(x + dx, y + dy, z + dz) == water) count++;
+            var id = manager.GetBlockGlobal(x + dx, y + dy, z + dz);
+            if (id == water || id == ice) count++;
         }
         return count;
     }
@@ -204,7 +219,7 @@ public sealed class MudTests
             {
                 mudCount++;
                 if (y > 0 && y < Chunk.Size - 1)
-                    Assert.True(CountWaterAround(manager, wx, wy, wz, water) > 0);
+                    Assert.True(CountWaterAround(manager, wx, wy, wz, water, TerrainGenerator.IceBlock) > 0);
             }
             else if (id == dirt)
             {
@@ -226,7 +241,8 @@ public sealed class MudTests
         {
             if (chunk.GetLocalBlock(x, y, z) != dirt) continue;
             Assert.Equal(0, CountWaterAround(manager,
-                cx * Chunk.Size + x, cy * Chunk.Size + y, cz * Chunk.Size + z, water));
+                cx * Chunk.Size + x, cy * Chunk.Size + y, cz * Chunk.Size + z, water,
+                TerrainGenerator.IceBlock));
         }
     }
 }

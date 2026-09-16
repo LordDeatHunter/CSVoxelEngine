@@ -69,9 +69,13 @@ public sealed class WorldgenTests
         var rock = ContentRegistry.RequireBlock("stone").Id;
         var checkedColumns = 0;
 
-        for (var cx = -8; cx <= 8 && checkedColumns < 4; cx++)
-        for (var cz = -8; cz <= 8 && checkedColumns < 4; cz++)
+        // Ring outward from the origin to the shore: a pond now sits at its own surface instead of
+        // being dug down to the waterline, so the beach band only occurs where the sea meets land.
+        for (var r = 0; r <= 32 && checkedColumns < 4; r++)
+        for (var cx = -r; cx <= r && checkedColumns < 4; cx++)
+        for (var cz = -r; cz <= r && checkedColumns < 4; cz++)
         {
+            if (r > 0 && cx != -r && cx != r && cz != -r && cz != r) continue;
             var heights = Chunk.GetColumnHeights(cx, cz);
             for (var i = 0; i < heights.Length && checkedColumns < 4; i++)
             {

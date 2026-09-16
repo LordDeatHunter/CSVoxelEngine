@@ -124,8 +124,9 @@ public sealed class SlimeManager
             var height = Chunk.GetColumnHeights(chunkX, chunkZ)[VoxelCoords.ColumnIndex(localX, localZ)];
 
             // Surface spawns only: dry forest ground with two clear cells above, all of them in
-            // loaded chunks (TryGetCell reports unloaded as absent, not as air).
-            if (height < WorldGenerationConfig.SeaLevel) continue;
+            // loaded chunks (TryGetCell reports unloaded as absent, not as air). A lake bed counts
+            // as wet even where it sits above sea level, so a slime never spawns inside a pond.
+            if (TerrainGenerator.IsWaterColumn(x, z, height)) continue;
             if (!TerrainGenerator.IsForest(x, z)) continue;
             if (!chunks.TryGetCell(x, height, z, out var ground, out _) || !BlockType.IsSolid(ground)) continue;
             if (!chunks.TryGetCell(x, height + 1, z, out var above1, out _) || BlockType.IsSolid(above1)) continue;

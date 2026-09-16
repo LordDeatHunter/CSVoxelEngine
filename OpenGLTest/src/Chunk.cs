@@ -438,11 +438,11 @@ public class Chunk : IDisposable
             maxHeight += WorldGenerationConfig.TreeMaxHeightBlocks;
         }
 
-        // A chunk above the terrain still has water to fill when it holds part of the sea:
-        // it must reach sea level or below, and some column under it must be flooded
+        // A chunk above the terrain still has water to fill when a body's surface reaches into it:
+        // the sea reaches sea level, a lake its own level. A column that holds no water reports
+        // NoWater, which no y is at or below.
         var needsWater = WorldGenerationConfig.WaterEnabled
-                         && lowerBoundY <= WorldGenerationConfig.SeaLevel
-                         && column.MinHeight < WorldGenerationConfig.SeaLevel;
+                         && lowerBoundY <= column.MaxWaterLevel;
         if (lowerBoundY > maxHeight + 1 && !needsWater)
         {
             IsBlockDataReady = true;
@@ -484,10 +484,11 @@ public class Chunk : IDisposable
 
         // After the carvers (so caves under the sea floor flood) and before the trees and
         // pebbles, which skip submerged columns rather than growing underwater
+        var hasWater = false;
         if (WorldGenerationConfig.WaterEnabled)
         {
-            FillWater(column, lowerBoundY, worldX0, worldZ0);
-            StampMud(worldX0, lowerBoundY, worldZ0);
+            hasWater = FillWater(column, lowerBoundY, worldX0, worldZ0);
+            StampMud(column, worldX0, lowerBoundY, worldZ0);
         }
 
         // After the sea: flooded cells are water, not air, so only dry cave floors pond lava
@@ -525,7 +526,7 @@ public class Chunk : IDisposable
 
         // Only a chunk that actually got flooded can have a frontier to report, plus any
         // chunk low enough to hold lava pockets (the scan itself is fluid-generic)
-        if (needsWater || (WorldGenerationConfig.LavaEnabled && lowerBoundY <= WorldGenerationConfig.LavaMaxY))
+        if (hasWater || (WorldGenerationConfig.LavaEnabled && lowerBoundY <= WorldGenerationConfig.LavaMaxY))
             ScanFluidFrontier(column, lowerBoundY);
 
         IsBlockDataReady = true;
@@ -579,33 +580,42 @@ public class Chunk : IDisposable
             column.Heights[(x << SizeShift) | z]);
 
     /// <summary>
-    /// Floods every air cell up to and including sea level in a wet column — an ocean floor, or a
-    /// lake or river bed (see <see cref="TerrainGenerator.IsWaterColumn"/>) — so oceans, lakes,
-    /// rivers and sea-floor caves all fill while the dry land basins stay dry. Wetness reads the
-    /// column's <see cref="ColumnData.Bed"/>: a ravine that merely cut a dry column below sea
-    /// level holds no water, while a ravine under a real water body just deepens it. Generated
-    /// water is always a source (state 0), which is what an untouched state byte reads as, so
-    /// nothing is written to <c>_state</c> here. A pure per-column function of world position like
-    /// the rest of worldgen: neighbours agree at their borders with no shared state.
+    /// Floods every air cell up to each column's own water level (see
+    /// <see cref="ColumnData.WaterLevel"/>) in a wet column — an ocean floor, or a lake or river bed
+    /// — so oceans, lakes, rivers and sea-floor caves all fill while the dry land basins stay dry.
+    /// A lake's level is its own surface, so the pond rests in the ground it was dug into instead of
+    /// reaching sea level. Wetness reads the column's <see cref="ColumnData.Bed"/>: a ravine that
+    /// merely cut a dry column below its level holds no water, while a ravine under a real water body
+    /// just deepens it. Generated water is always a source (state 0), which is what an untouched
+    /// state byte reads as, so nothing is written to <c>_state</c> here. A pure per-column function
+    /// of world position like the rest of worldgen: neighbours agree at their borders with no shared
+    /// state. Returns whether any cell was flooded, which is what decides if this chunk can have a
+    /// fluid frontier to report.
     /// </summary>
-    private void FillWater(ColumnData column, int lowerBoundY, int worldX0, int worldZ0)
+    private bool FillWater(ColumnData column, int lowerBoundY, int worldX0, int worldZ0)
     {
-        var top = Math.Min(WorldGenerationConfig.SeaLevel - lowerBoundY, Size - 1);
-        if (top < 0) return;
+        var filled = false;
 
         for (var x = 0; x < Size; x++)
         for (var z = 0; z < Size; z++)
         {
             var local = (x << SizeShift) | z;
-            if (!TerrainGenerator.IsWaterColumn(worldX0 + x, worldZ0 + z, column.Bed[local]))
-                continue;
+            var level = column.WaterLevel[local];
+            if (column.Bed[local] >= level) continue;
+
+            var top = Math.Min(level - lowerBoundY, Size - 1);
+            if (top < 0) continue;
 
             for (var y = 0; y <= top; y++)
             {
                 var i = Idx(x, y, z);
-                if (_blocks[i] == BlockType.Air) _blocks[i] = TerrainGenerator.SeaBlock;
+                if (_blocks[i] != BlockType.Air) continue;
+                _blocks[i] = TerrainGenerator.SeaBlock;
+                filled = true;
             }
         }
+
+        return filled;
     }
 
     /// <summary>
@@ -616,11 +626,11 @@ public class Chunk : IDisposable
     /// across a border is left to the fluid tick, the same split <see cref="ScanFluidFrontier"/>
     /// uses: worldgen stays a pure per-chunk function with no cross-chunk block reads.
     /// </summary>
-    private void StampMud(int worldX0, int lowerBoundY, int worldZ0)
+    private void StampMud(ColumnData column, int worldX0, int lowerBoundY, int worldZ0)
     {
-        // Water only ever sits at or below sea level, so a chunk starting above it can
-        // neither hold water nor touch any within one cell
-        if (lowerBoundY > WorldGenerationConfig.SeaLevel + 1) return;
+        // A chunk starting above every level this column can hold water at can neither hold any
+        // nor touch any within one cell
+        if (lowerBoundY > Math.Max(column.MaxWaterLevel, WorldGenerationConfig.SeaLevel) + 1) return;
 
         var dirt = TerrainGenerator.SoilBlock;
         var water = TerrainGenerator.SeaBlock;
@@ -662,11 +672,9 @@ public class Chunk : IDisposable
             var wx = worldX0 + x + dx;
             var wy = lowerBoundY + y + dy;
             var wz = worldZ0 + z + dz;
-            if (wy > WorldGenerationConfig.SeaLevel) continue;
             var neighbour = GetColumnData(wx >> SizeShift, wz >> SizeShift);
             var local = ((wx & SizeMask) << SizeShift) | (wz & SizeMask);
-            if (wy > neighbour.Heights[local]
-                && TerrainGenerator.IsWaterColumn(wx, wz, neighbour.Bed[local]))
+            if (wy > neighbour.Heights[local] && wy <= neighbour.WaterLevel[local])
                 return true;
         }
 

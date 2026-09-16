@@ -167,12 +167,15 @@ public class FluidManager
                 }
             }
 
-            // Generated water never sits above sea level, and a chunk that just streamed in
-            // holds nothing but generated blocks, so a chunk entirely above it can neither hold
-            // water nor border any — the block edit paths cover player-placed water up there.
+            // Generated water never sits above its column's own level, and a chunk that just
+            // streamed in holds nothing but generated blocks, so a chunk entirely above every
+            // level it could share can neither hold water nor border any — the block edit paths
+            // cover player-placed water up there.
             // Note this is not the same test as an empty frontier: a chunk can be solid water
             // inside and still face air across a border.
-            if (chunk.LowerBoundY > WorldGenerationConfig.SeaLevel) continue;
+            var column = Chunk.GetColumnData((int)chunk.Position.X, (int)chunk.Position.Z);
+            if (chunk.LowerBoundY > Math.Max(column.MaxWaterLevel, WorldGenerationConfig.SeaLevel))
+                continue;
 
             WakeBorders(chunk, chunks);
         }

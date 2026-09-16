@@ -302,15 +302,24 @@ public static class WorldGenerationConfig
     public const float WaterDesertFadeStart = 0.3f;
     public const float WaterDesertFadeEnd = 0.5f;
 
-    // Lakes: one hashed candidate per cell, which keeps them small and scattered instead of the
-    // broad sheets a raw noise threshold carves. The bed sits LakeDepth below sea level at the
-    // centre and the bowl returns to the un-carved land at the rim, so a lake is always closed.
-    public const int LakeCellBlocks = 192;      // candidate grid, one possible lake per cell
-    public const float LakeChance = 0.35f;      // fraction of cells that grow a lake
-    public const float LakeMinRadius = 18f;
-    public const float LakeMaxRadius = 34f;
-    public const float LakeDepth = 5f;
-    public const int LakeSpawnClearRadius = 72; // no lake this close to the origin spawn
+// Lakes: one hashed candidate per cell, which keeps them small and scattered instead of the
+// broad sheets a raw noise threshold carves. Each candidate chooses its own water surface from
+// the ground it stands on - LakeBankDepth under the lowest point of its rim - so a pond sits in
+// the landscape that holds it instead of at the bottom of a crater dug to one global sea level,
+// and its size, depth and outline all vary. A site whose rim climbs more than LakeSiteFlatness is
+// a hillside and grows no lake, which is what keeps ponds out of the slopes.
+public const float LakeMinDepth = 3f;       // a small pond is a shallow scrape...
+public const float LakeMaxDepth = 13f;      // ...a broad lake is a real basin
+public const float LakeRadiusSkew = 2.2f;   // exponent on the size roll: many puddles, rare broad lakes
+public const float LakeBankDepth = 2f;      // the water surface sits this far under the lowest rim
+public const float LakeSiteFlatness = 7f;   // reject a site whose rim climbs more than this
+public const float LakeShapeFrequency = 1f / 26f; // shoreline wobble: a few lobes across a lake
+public const float LakeShapeAmplitude = 0.3f;     // fraction of the radius the wobble moves
+public const int LakeCellBlocks = 192;      // candidate grid, one possible lake per cell
+public const float LakeChance = 0.35f;      // fraction of cells that grow a lake
+public const float LakeMinRadius = 11f;
+public const float LakeMaxRadius = 46f;
+public const int LakeSpawnClearRadius = 72; // no lake this close to the origin spawn
 
     // Rivers: warped ridge lines (|noise| near zero) gated by a rarity mask. The channel is cut
     // RiverBedDepth below the waterline, then faded out as the local land climbs above RiverLowEnd,

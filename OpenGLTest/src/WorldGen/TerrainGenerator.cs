@@ -38,6 +38,7 @@ public static class TerrainGenerator
     private static readonly FastNoiseLite MountainWarp;
     private static readonly FastNoiseLite OpennessNoise;
     private static readonly FastNoiseLite BiomeDitherNoise;
+    private static readonly FastNoiseLite LakeShapeNoise;
 
     // The terrain palette: the generator owns the choice of which blocks natural ground is made
     // of, and Chunk only fills its columns with them. Resolved once here so the per-voxel fill
@@ -140,6 +141,7 @@ public static class TerrainGenerator
         MountainNoise = MakeNoise(85, WorldGenerationConfig.MountainFrequency, octaves: 3);
         OpennessNoise = MakeNoise(86, WorldGenerationConfig.OpennessFrequency, octaves: 2);
         BiomeDitherNoise = MakeNoise(89, WorldGenerationConfig.BiomeDitherFrequency);
+        LakeShapeNoise = MakeNoise(90, WorldGenerationConfig.LakeShapeFrequency);
 
         // Mountains wind like ravines and rivers, so a range snakes instead of tracking a contour
         MountainWarp = new FastNoiseLite(WorldGenerationConfig.Seed + 87);
@@ -212,31 +214,67 @@ public static class TerrainGenerator
     /// <summary>Whether world column (x, z) is forest; vegetation and spawn rules ask here.</summary>
     public static bool IsForest(int x, int z) => BiomeAt(x, z) == Biome.Forest;
 
+    /// <summary>Water level of a column that holds no water at all.</summary>
+    public const int NoWater = int.MinValue;
+
     /// <summary>
-    /// Whether the column (x, z) at this height is wet: an ocean floor, or a lake or river bed
-    /// carved below the waterline. Every other below-waterline land column stays dry, which is what
-    /// keeps the land from being flooded wholesale now that the oceans carry the big water — a hot
-    /// desert stays dry, and a cold lake or river freezes over (see the freezing pass).
-    /// <see cref="Compute"/> carves with these same weights, so the wet set and the carved set agree.
+    /// The y water in column (x, z) rises to: <see cref="WorldGenerationConfig.SeaLevel"/> for the
+    /// ocean and for rivers, the lake's own surface for a lake, and <see cref="NoWater"/> where the
+    /// column holds none. This is the one definition of where water sits, and it is what lets a pond
+    /// rest on the ground it was dug into instead of on one global sea level.
     ///
-    /// Callers must pass the column's <see cref="ColumnData.Bed"/>, not its <see cref="ColumnData.Heights"/>:
-    /// the bed is the profile before a ravine cut it, so a ravine that merely deepens an
-    /// otherwise-dry column is dry instead of flooding as a narrow spike. A ravine under an
-    /// existing water body only deepens that body.
+    /// Callers measuring a column's own terrain must pass <see cref="ColumnData.Bed"/>, not
+    /// <see cref="ColumnData.Heights"/>: the bed is the profile before a ravine cut it, so a ravine
+    /// that merely deepens an otherwise-dry column stays dry instead of flooding as a narrow spike,
+    /// while a ravine under a real water body only deepens that body.
     /// </summary>
-    public static bool IsWaterColumn(int x, int z, int height)
+    public static int WaterLevelAt(float x, float z)
     {
-        if (!WorldGenerationConfig.WaterEnabled || height >= WorldGenerationConfig.SeaLevel)
-            return false;
-
         var biome = BiomeWeights(x, z, out _, out var desertWeight);
-        if (biome == Biome.Ocean) return true;
-        if (!WorldGenerationConfig.LakesAndRiversEnabled || biome == Biome.Desert)
-            return false;
-
         var gate = SurfaceWaterGate(desertWeight);
-        return MathF.Max(LakeWeight(x, z), RiverWeight(x, z)) * gate > WorldGenerationConfig.WaterBodyThreshold;
+        var lakeWeight = 0f;
+        var lakeSurface = NoWater;
+        var riverWeight = 0f;
+        if (CanHoldSurfaceWater(biome))
+        {
+            lakeWeight = LakeSample(x, z, out lakeSurface, out _);
+            riverWeight = RiverWeight(x, z);
+        }
+
+        return WaterLevelFor(biome, gate, riverWeight, lakeWeight, lakeSurface);
     }
+
+    /// <summary>Whether a biome is one a lake or a river may stand in.</summary>
+    private static bool CanHoldSurfaceWater(Biome biome) =>
+        WorldGenerationConfig.LakesAndRiversEnabled && biome is Biome.Forest or Biome.Taiga or Biome.Frozen;
+
+    /// <summary>
+    /// The level a column with these surface-water weights floods to. Shared by
+    /// <see cref="WaterLevelAt"/> and by <see cref="Compute"/>, which evaluates the same weights
+    /// itself and stores the result per column, so a stored level is by construction the level the
+    /// carve that made the bowl was working toward.
+    /// </summary>
+    private static int WaterLevelFor(Biome biome, float gate, float riverWeight, float lakeWeight,
+        int lakeSurface)
+    {
+        // The master water toggle is a compile-time const, so it is folded into these runtime
+        // tests: a branch of its own would read as unreachable code (see BiomeWeights).
+        if (biome == Biome.Ocean)
+            return WorldGenerationConfig.WaterEnabled ? WorldGenerationConfig.SeaLevel : NoWater;
+        if (!WorldGenerationConfig.WaterEnabled || !CanHoldSurfaceWater(biome)) return NoWater;
+
+        var level = NoWater;
+        if (riverWeight * gate > WorldGenerationConfig.WaterBodyThreshold)
+            level = WorldGenerationConfig.SeaLevel;
+        if (lakeWeight * gate > WorldGenerationConfig.WaterBodyThreshold && lakeSurface > level)
+            level = lakeSurface;
+        return level;
+    }
+
+    /// <summary>Whether the column (x, z) at this height is wet: it sits below the level
+    /// <see cref="WaterLevelAt"/> reports. A hot desert stays dry, and a cold lake or river freezes
+    /// over instead (see the freezing pass), both because their level is <see cref="NoWater"/>.</summary>
+    public static bool IsWaterColumn(int x, int z, int height) => height < WaterLevelAt(x, z);
 
     /// <summary>
     /// 0..1 multiplicative gate on a surface water body at (x, z): 1 away from a desert, fading to
@@ -252,18 +290,22 @@ public static class TerrainGenerator
     private const int LakeSalt = 0x4C414B45;
 
     /// <summary>
-    /// 0..1 lake bowl: one hashed candidate per <see cref="WorldGenerationConfig.LakeCellBlocks"/>
-    /// cell, offset inside the cell and given a radius, so lakes stay small instead of the broad
-    /// sheets a raw noise threshold carves. The bowl falls from 1 at the centre to 0 at the rim,
-    /// so the carve blends back to the surrounding land, which is the dry rim. Candidates near the
-    /// origin are skipped so the spawn is always on dry land.
+    /// 0..1 lake bowl at (x, z), plus the water level and floor of the lake that reaches the column.
+    /// One hashed candidate per <see cref="WorldGenerationConfig.LakeCellBlocks"/> cell, offset inside
+    /// the cell and sized by a skewed roll, so the world is mostly little ponds with the occasional
+    /// broad lake rather than one uniform size. The bowl falls from 1 at the centre to 0 at the rim,
+    /// so the carve blends back into the ground it was dug from, and the shoreline is the candidate's
+    /// radius wobbled by <see cref="LakeShapeNoise"/> so it is ragged rather than a circle.
+    /// Candidates near the origin are skipped so the spawn is always on dry land.
     /// </summary>
-    private static float LakeWeight(float x, float z)
+    private static float LakeSample(float x, float z, out int surface, out int floor)
     {
         const int cell = WorldGenerationConfig.LakeCellBlocks;
         var gx0 = MathUtils.FloorToInt(x / cell);
         var gz0 = MathUtils.FloorToInt(z / cell);
         var best = 0f;
+        surface = NoWater;
+        floor = 0;
 
         for (var dx = -1; dx <= 1; dx++)
         for (var dz = -1; dz <= 1; dz++)
@@ -279,18 +321,67 @@ public static class TerrainGenerator
                 && MathF.Abs(centreZ) < WorldGenerationConfig.LakeSpawnClearRadius)
                 continue;
 
-            var radius = MathUtils.Lerp(WorldGenerationConfig.LakeMinRadius,
-                WorldGenerationConfig.LakeMaxRadius, Unit(h, 3));
+            var size = MathF.Pow(Unit(h, 3), WorldGenerationConfig.LakeRadiusSkew);
+            var nominal = MathUtils.Lerp(WorldGenerationConfig.LakeMinRadius,
+                WorldGenerationConfig.LakeMaxRadius, size);
             var ox = x - centreX;
             var oz = z - centreZ;
             var d2 = ox * ox + oz * oz;
+
+            // The wobble below only ever pulls the shoreline inside `nominal`, so a column past it
+            // is out without paying for the rim samples that choosing a water level costs.
+            if (d2 >= nominal * nominal) continue;
+            if (!TryLakeSite(centreX, centreZ, nominal, size, out var siteSurface, out var siteFloor))
+                continue;
+
+            var radius = nominal * (1f + WorldGenerationConfig.LakeShapeAmplitude
+                * LakeShapeNoise.GetNoise(x, z));
             if (d2 >= radius * radius) continue;
 
             var w = MathUtils.SmoothStep(1f - MathF.Sqrt(d2) / radius);
-            if (w > best) best = w;
+            if (w > best)
+            {
+                best = w;
+                surface = siteSurface;
+                floor = siteFloor;
+            }
         }
 
         return best;
+    }
+
+    /// <summary>
+    /// Where a lake candidate of this radius puts its water and its floor, or false when the ground
+    /// it would stand on is too uneven to hold a pond. Sampling the rim is what keeps the water
+    /// enclosed: the surface sits <see cref="WorldGenerationConfig.LakeBankDepth"/> under the lowest
+    /// ground on the rim, so every bank is above the water, and the floor is a drop below that which
+    /// grows with the lake. A rim that climbs more than
+    /// <see cref="WorldGenerationConfig.LakeSiteFlatness"/> is a hillside, and a pond there would
+    /// tower over its downhill side, so the candidate is dropped and the terrain keeps the slope.
+    /// </summary>
+    private static bool TryLakeSite(float centreX, float centreZ, float radius, float size,
+        out int surface, out int floor)
+    {
+        var rimMin = LandHeight(centreX, centreZ, out _, out _, out _, out _);
+        var rimMax = rimMin;
+        for (var k = 0; k < 8; k++)
+        {
+            var angle = k * (MathF.Tau / 8f);
+            var land = LandHeight(centreX + MathF.Cos(angle) * radius,
+                centreZ + MathF.Sin(angle) * radius, out _, out _, out _, out _);
+            if (land < rimMin) rimMin = land;
+            if (land > rimMax) rimMax = land;
+        }
+
+        surface = 0;
+        floor = 0;
+        if (rimMax - rimMin > WorldGenerationConfig.LakeSiteFlatness) return false;
+
+        var depth = MathUtils.Lerp(WorldGenerationConfig.LakeMinDepth,
+            WorldGenerationConfig.LakeMaxDepth, size * size);
+        surface = (int)MathF.Round(rimMin - WorldGenerationConfig.LakeBankDepth);
+        floor = (int)MathF.Round(surface - depth);
+        return true;
     }
 
     /// <summary>One 0..1 hash value for a candidate, re-mixed by <paramref name="index"/>.</summary>
@@ -323,7 +414,8 @@ public static class TerrainGenerator
     public static float SurfaceWaterWeight(float x, float z)
     {
         BiomeWeights(x, z, out _, out var desertWeight);
-        return MathF.Max(LakeWeight(x, z), RiverWeight(x, z)) * SurfaceWaterGate(desertWeight);
+        return MathF.Max(LakeSample(x, z, out _, out _), RiverWeight(x, z))
+               * SurfaceWaterGate(desertWeight);
     }
 
     /// <summary>
@@ -422,6 +514,72 @@ public static class TerrainGenerator
         return noise;
     }
 
+    /// <summary>
+    /// One column's land height before any water or ravine is cut into it: the forest, desert-dune
+    /// and ocean-ramp profiles blended by the biome weights and clamped above the waterline. A lake
+    /// measures this at its own rim to choose where its water sits, so it must stay the exact value
+    /// <see cref="Compute"/> carves into. <paramref name="forestHeight"/> is the pre-blend forest
+    /// profile, which the river carve reads to dry out as the land climbs.
+    /// </summary>
+    private static float LandHeight(float worldX, float worldZ, out Biome biome,
+        out float oceanWeight, out float desertWeight, out float forestHeight)
+    {
+        // Forest floor: a broad swell plus a hill mass (a positive-only field gated by the
+        // hill mask) so hills rise in patches and open flat valleys run between them. Open
+        // regions (see ForestOpenness) flatten the hills and drop their trees, so the
+        // forest alternates between rolling woodland and open grass instead of one mass.
+        // An occasional mountain range lifts the floor well above the hills. The floor
+        // stays above sea level, which is what makes a carved lake or river enclosed.
+        var swell = ForestSwellNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.ForestSwellAmplitude;
+        var hillMask = MathUtils.SmoothStep(WorldGenerationConfig.HillMaskStart,
+            WorldGenerationConfig.HillMaskEnd, HillMaskNoise.GetNoise(worldX, worldZ));
+        var warpedX = worldX;
+        var warpedZ = worldZ;
+        HillWarp.DomainWarp(ref warpedX, ref warpedZ);
+        var hill = 0.5f + 0.5f * HillNoise.GetNoise(warpedX, warpedZ);
+        var rough = ValleyRoughNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.ValleyRoughAmplitude;
+        var openness = ForestOpenness(worldX, worldZ);
+        var hillScale = 1f - WorldGenerationConfig.OpennessHillReduction * openness;
+        forestHeight = WorldGenerationConfig.ForestBaseHeight + swell
+            + hill * WorldGenerationConfig.HillAmplitude * hillMask * hillScale
+            + rough
+            + MountainHeight(worldX, worldZ);
+        var heightF = forestHeight;
+
+        // Biome blend: dunes lift the desert share of the land, then the ocean ramp empties
+        // the basins. Both are weighted 0..1, so a border lerps between the profiles and
+        // comes out as a slope, never a cliff.
+        biome = BiomeWeights(worldX, worldZ, out oceanWeight, out desertWeight);
+        if (desertWeight > 0f)
+        {
+            // Smooth dunes on the swell, not the forest hills: a desert is its own profile
+            var dune = WorldGenerationConfig.ForestBaseHeight + swell
+                + DuneNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.DuneAmplitude;
+            heightF = MathUtils.Lerp(heightF, dune, desertWeight);
+        }
+
+        if (oceanWeight > 0f)
+        {
+            var depth = MathF.Pow(oceanWeight, WorldGenerationConfig.OceanDepthExponent);
+            var oceanHeight = MathUtils.Lerp(WorldGenerationConfig.OceanShoreHeight,
+                WorldGenerationConfig.OceanFloorHeight, depth);
+            oceanHeight -= TrenchDepthAt(worldX, worldZ) * oceanWeight;
+            heightF = MathUtils.Lerp(heightF, oceanHeight, oceanWeight);
+        }
+
+        // Keep the land above the waterline, but ease the clamp out as the ocean blend
+        // takes over. Clamping only while the biome was land put a hard step at the ocean
+        // line, because the ocean side never clamped; fading it makes the coast a slope.
+        // Lakes and rivers are cut after this, so they still reach below the waterline.
+        var shoreClamp = 1f - MathUtils.SmoothStep(WorldGenerationConfig.OceanShoreWeight,
+            0.5f, oceanWeight);
+        if (shoreClamp > 0f)
+            heightF = MathUtils.Lerp(heightF,
+                MathF.Max(heightF, WorldGenerationConfig.SeaLevel + 1f), shoreClamp);
+
+        return heightF;
+    }
+
     /// <summary>Computes every 2D input for the chunk column at (chunkX, chunkZ).</summary>
     public static ColumnData Compute(int chunkX, int chunkZ)
     {
@@ -432,6 +590,7 @@ public static class TerrainGenerator
         var entrance = new float[count];
         var intensity = new float[count];
         var biomes = new Biome[count];
+        var waterLevel = new int[count];
 
         var baseX = (float)chunkX * Chunk.Size;
         var baseZ = (float)chunkZ * Chunk.Size;
@@ -444,85 +603,46 @@ public static class TerrainGenerator
                 var worldZ = z + baseZ;
                 var i = (x << Chunk.SizeShift) | z;
 
-                // Forest floor: a broad swell plus a hill mass (a positive-only field gated by the
-                // hill mask) so hills rise in patches and open flat valleys run between them. Open
-                // regions (see ForestOpenness) flatten the hills and drop their trees, so the
-                // forest alternates between rolling woodland and open grass instead of one mass.
-                // An occasional mountain range lifts the floor well above the hills. The floor
-                // stays above sea level, which is what makes a carved lake or river enclosed.
-                var swell = ForestSwellNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.ForestSwellAmplitude;
-                var hillMask = MathUtils.SmoothStep(WorldGenerationConfig.HillMaskStart,
-                    WorldGenerationConfig.HillMaskEnd, HillMaskNoise.GetNoise(worldX, worldZ));
-                var warpedX = worldX;
-                var warpedZ = worldZ;
-                HillWarp.DomainWarp(ref warpedX, ref warpedZ);
-                var hill = 0.5f + 0.5f * HillNoise.GetNoise(warpedX, warpedZ);
-                var rough = ValleyRoughNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.ValleyRoughAmplitude;
-                var openness = ForestOpenness(worldX, worldZ);
-                var hillScale = 1f - WorldGenerationConfig.OpennessHillReduction * openness;
-                var forestHeight = WorldGenerationConfig.ForestBaseHeight + swell
-                    + hill * WorldGenerationConfig.HillAmplitude * hillMask * hillScale
-                    + rough
-                    + MountainHeight(worldX, worldZ);
-                var heightF = forestHeight;
+                var heightF = LandHeight(worldX, worldZ, out var biome, out var oceanWeight,
+                    out var desertWeight, out var forestHeight);
 
-                // Biome blend: dunes lift the desert share of the land, then the ocean ramp empties
-                // the basins. Both are weighted 0..1, so a border lerps between the profiles and
-                // comes out as a slope, never a cliff.
-                var biome = BiomeWeights(worldX, worldZ, out var oceanWeight, out var desertWeight);
-                if (desertWeight > 0f)
+                // Surface water: a lake is a bowl around its own water level and a river a channel
+                // down to the waterline, each returning to un-carved ground at its edge, so the
+                // water is enclosed by its own banks. A river also fades out as the local land
+                // climbs, so it dries into a wash uphill instead of gorging a hillside. Every land
+                // biome but the desert, gated toward a desert so a body closes before the biome
+                // line instead of ending in a wall.
+                var gate = SurfaceWaterGate(desertWeight);
+                var lakeWeight = 0f;
+                var lakeSurface = NoWater;
+                var lakeFloor = 0;
+                var riverWeight = 0f;
+                if (CanHoldSurfaceWater(biome))
                 {
-                    // Smooth dunes on the swell, not the forest hills: a desert is its own profile
-                    var dune = WorldGenerationConfig.ForestBaseHeight + swell
-                        + DuneNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.DuneAmplitude;
-                    heightF = MathUtils.Lerp(heightF, dune, desertWeight);
+                    lakeWeight = LakeSample(worldX, worldZ, out lakeSurface, out lakeFloor);
+                    riverWeight = RiverWeight(worldX, worldZ);
                 }
 
-                if (oceanWeight > 0f)
+                if (lakeWeight > 0f)
                 {
-                    var depth = MathF.Pow(oceanWeight, WorldGenerationConfig.OceanDepthExponent);
-                    var oceanHeight = MathUtils.Lerp(WorldGenerationConfig.OceanShoreHeight,
-                        WorldGenerationConfig.OceanFloorHeight, depth);
-                    oceanHeight -= TrenchDepthAt(worldX, worldZ) * oceanWeight;
-                    heightF = MathUtils.Lerp(heightF, oceanHeight, oceanWeight);
+                    // Never fills ground the lake already sits below: on a slope the bowl only
+                    // ever digs, and where the land is lower the water simply covers it, the
+                    // same way an ocean would.
+                    var target = MathF.Min(lakeFloor, heightF);
+                    heightF = MathUtils.Lerp(heightF, target, lakeWeight * gate);
                 }
 
-                // Keep the land above the waterline, but ease the clamp out as the ocean blend
-                // takes over. Clamping only while the biome was land put a hard step at the ocean
-                // line, because the ocean side never clamped; fading it makes the coast a slope.
-                // Lakes and rivers are cut after this, so they still reach below the waterline.
-                var shoreClamp = 1f - MathUtils.SmoothStep(WorldGenerationConfig.OceanShoreWeight,
-                    0.5f, oceanWeight);
-                if (shoreClamp > 0f)
-                    heightF = MathUtils.Lerp(heightF,
-                        MathF.Max(heightF, WorldGenerationConfig.SeaLevel + 1f), shoreClamp);
-
-                // Surface water: a lake is a bowl and a river a channel, each cut below the
-                // waterline and each returning to un-carved land (> sea level) at its edge, so the
-                // water is enclosed. A river also fades out as the local land climbs, so it dries
-                // into a wash uphill instead of gorging a hillside. Every land biome but the desert,
-                // gated toward a desert so the bowl closes before the biome line instead of ending
-                // in a wall.
-                if (WorldGenerationConfig.LakesAndRiversEnabled
-                    && biome is Biome.Forest or Biome.Taiga or Biome.Frozen)
+                if (riverWeight > 0f)
                 {
-                    var gate = SurfaceWaterGate(desertWeight);
-                    var lakeWeight = LakeWeight(worldX, worldZ) * gate;
-                    if (lakeWeight > 0f)
+                    var lowland = 1f - MathUtils.SmoothStep(WorldGenerationConfig.RiverLowStart,
+                        WorldGenerationConfig.RiverLowEnd, forestHeight);
+                    var river = riverWeight * gate * lowland;
+                    if (river > 0f)
                         heightF = MathUtils.Lerp(heightF,
-                            WorldGenerationConfig.SeaLevel - WorldGenerationConfig.LakeDepth, lakeWeight);
-
-                    var riverWeight = RiverWeight(worldX, worldZ) * gate;
-                    if (riverWeight > 0f)
-                    {
-                        var lowland = 1f - MathUtils.SmoothStep(WorldGenerationConfig.RiverLowStart,
-                            WorldGenerationConfig.RiverLowEnd, forestHeight);
-                        var river = riverWeight * lowland;
-                        if (river > 0f)
-                            heightF = MathUtils.Lerp(heightF,
-                                WorldGenerationConfig.SeaLevel - WorldGenerationConfig.RiverBedDepth, river);
-                    }
+                            WorldGenerationConfig.SeaLevel - WorldGenerationConfig.RiverBedDepth, river);
                 }
+
+                waterLevel[i] = WaterLevelFor(biome, gate, riverWeight, lakeWeight, lakeSurface);
 
                 var height = (int)heightF;
 
@@ -575,7 +695,7 @@ public static class TerrainGenerator
             }
         }
 
-        return new ColumnData(heights, dirtDepth, entrance, intensity, biomes, bed);
+        return new ColumnData(heights, dirtDepth, entrance, intensity, biomes, bed, waterLevel);
     }
 
     /// <summary>

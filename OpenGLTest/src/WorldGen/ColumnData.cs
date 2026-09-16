@@ -35,11 +35,27 @@ public sealed class ColumnData
     /// </summary>
     public readonly int[] Bed;
 
+    /// <summary>
+    /// The y each column's water rises to (<see cref="TerrainGenerator.WaterLevelAt"/>), or
+    /// <see cref="TerrainGenerator.NoWater"/> where the column holds none. A lake carries its own
+    /// level here, which is what lets a pond sit in the ground it was dug into instead of on sea
+    /// level. Stored rather than re-derived so the fill, the freezing pass and the far LOD read it
+    /// without evaluating 2D noise again.
+    /// </summary>
+    public readonly int[] WaterLevel;
+
+    /// <summary>
+    /// The highest level in <see cref="WaterLevel"/>, or <see cref="TerrainGenerator.NoWater"/> when
+    /// this chunk column holds no water at all. A chunk whose floor is above it has no water to
+    /// fill, freeze or mesh and can skip the work.
+    /// </summary>
+    public readonly int MaxWaterLevel;
+
     public readonly int MinHeight;
     public readonly int MaxHeight;
 
     public ColumnData(int[] heights, byte[] dirtDepth, float[] entranceWeight, float[] caveIntensity,
-        Biome[]? biomes = null, int[]? bed = null)
+        Biome[]? biomes = null, int[]? bed = null, int[]? waterLevel = null)
     {
         Heights = heights;
         DirtDepth = dirtDepth;
@@ -47,6 +63,12 @@ public sealed class ColumnData
         CaveIntensity = caveIntensity;
         Biomes = biomes ?? ForestBiomes(heights.Length);
         Bed = bed ?? heights;
+        WaterLevel = waterLevel ?? NoWaterLevels(heights.Length);
+
+        var maxWater = TerrainGenerator.NoWater;
+        foreach (var level in WaterLevel)
+            if (level > maxWater) maxWater = level;
+        MaxWaterLevel = maxWater;
 
         var min = int.MaxValue;
         var max = int.MinValue;
@@ -58,6 +80,14 @@ public sealed class ColumnData
 
         MinHeight = min;
         MaxHeight = max;
+    }
+
+    private static int[] NoWaterLevels(int length)
+    {
+        var levels = new int[length];
+        for (var i = 0; i < length; i++)
+            levels[i] = TerrainGenerator.NoWater;
+        return levels;
     }
 
     private static Biome[] ForestBiomes(int length)

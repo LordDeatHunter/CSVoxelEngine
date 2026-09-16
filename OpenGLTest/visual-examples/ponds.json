@@ -1,0 +1,17 @@
+{
+  // Pond check: run with VOXEL_SCRIPT=visual-examples/ponds.json (working directory OpenGLTest/).
+  // Shots land in visual/ponds/. Coordinates are ponds the lake scan in LakeTests found: a broad
+  // cold one near (-320, 460) whose surface holds at y=4 with its shore ground at y=4-8, so the
+  // water is flush with the land instead of sitting at the bottom of a pit dug to sea level, as
+  // every pond used to be. Flight is on so the camera holds each pose while the chunks stream in.
+  // Size, shape, depth and enclosure are pinned headlessly instead, in LakeTests.
+  "steps": [
+    { "op": "fly" },
+    { "op": "teleport", "pos": [-320.5, 45.5, 520.5], "yaw": -90, "pitch": -28 },
+    { "op": "wait", "seconds": 15 },
+    { "op": "screenshot", "name": "lake_high" },
+    { "op": "teleport", "pos": [-320.5, 9.5, 486.5], "yaw": -90, "pitch": -8 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "lake_across", "hideHud": true }
+  ]
+}

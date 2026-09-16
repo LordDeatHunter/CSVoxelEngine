@@ -348,10 +348,12 @@ public class LodRegion : IDisposable
         var gridSize = heightGrid * heightGrid;
         var groundTop = ArrayPool<int>.Shared.Rent(gridSize);
         var topCell = ArrayPool<int>.Shared.Rent(gridSize);
-        // Which cells the sea covers. Measured as the max over the cell's OWN footprint, with
+        // The level each cell's water sits at (TerrainGenerator.NoWater where it holds none), read
+        // at the cell centre. Wetness is measured as the max over the cell's OWN footprint, with
         // no erosion margin: the eroded minimum would paint water across every beach whose
-        // neighbourhood dips below sea level.
-        var isSea = ArrayPool<bool>.Shared.Rent(gridSize);
+        // neighbourhood dips below the waterline. A level rather than a flag, because a lake's
+        // sheet sits at the lake's own surface instead of at sea level.
+        var waterLevels = ArrayPool<int>.Shared.Rent(gridSize);
         // Beaches and gravel caps read from the same uneroded max for the same reason, the
         // gravel with one noise eval at the cell centre per cell.
         var beachTop = ArrayPool<bool>.Shared.Rent(gridSize);
@@ -483,10 +485,12 @@ public class LodRegion : IDisposable
                 var cellBiome = TerrainGenerator.BiomeAt(centreX, centreZ);
                 biomeGrid[(i + 1) * heightGrid + (j + 1)] = cellBiome;
 
-                // A cell is sea only where the chunk mesher would actually flood it: an ocean, or
-                // a lake/river bed. maxOwn is the uneroded cell max, matching the beach sampling.
-                isSea[(i + 1) * heightGrid + (j + 1)] = TerrainGenerator.IsWaterColumn(centreX, centreZ, maxOwn);
-                seaFloor[(i + 1) * heightGrid + (j + 1)] = FloorMaterial(maxOwn);
+                // A cell holds water only where the chunk mesher would actually flood it: an ocean,
+                // or a lake/river bed. maxOwn is the uneroded cell max, matching the beach sampling.
+                var cellLevel = TerrainGenerator.WaterLevelAt(centreX, centreZ);
+                if (maxOwn >= cellLevel) cellLevel = TerrainGenerator.NoWater;
+                waterLevels[(i + 1) * heightGrid + (j + 1)] = cellLevel;
+                seaFloor[(i + 1) * heightGrid + (j + 1)] = FloorMaterial(maxOwn, cellLevel, cellBiome);
 
                 // Sand rings ocean shores and lake/river rims, not every column in the height band.
                 // Taiga shores wear sand like forest ones; frozen rock keeps its own material.
@@ -560,16 +564,19 @@ public class LodRegion : IDisposable
                 foreach (var h in heightmaps[(ci + 1) * chunkSpan + (cj + 1)])
                     if (h > maxHeight) maxHeight = h;
 
-                // A sea cell hides this shell only once the chunk holding the water surface
-                // is meshed too, or the sheet would vanish before the chunk water appears
-                var hasSea = false;
-                for (var i = ci * cellsPerChunk; i < (ci + 1) * cellsPerChunk && !hasSea; i++)
-                for (var j = cj * cellsPerChunk; j < (cj + 1) * cellsPerChunk && !hasSea; j++)
-                    hasSea = isSea[(i + 1) * heightGrid + (j + 1)];
+                // A water cell hides this shell only once the chunk holding its surface is meshed
+                // too, or the sheet would vanish before the chunk water appears
+                var maxWater = TerrainGenerator.NoWater;
+                for (var i = ci * cellsPerChunk; i < (ci + 1) * cellsPerChunk; i++)
+                for (var j = cj * cellsPerChunk; j < (cj + 1) * cellsPerChunk; j++)
+                {
+                    var cellLevel = waterLevels[(i + 1) * heightGrid + (j + 1)];
+                    if (cellLevel > maxWater) maxWater = cellLevel;
+                }
 
                 var yLo = cellSize * (minTop + 1);
                 var yHi = Math.Max(cellSize * (maxTop + 1), maxHeight + 1);
-                if (hasSea) yHi = Math.Max(yHi, WorldGenerationConfig.SeaLevel + 1);
+                if (maxWater > TerrainGenerator.NoWater) yHi = Math.Max(yHi, maxWater + 1);
                 columnCyMin[ci * regionChunkSpan + cj] = yLo >> Chunk.SizeShift;
                 columnCyMax[ci * regionChunkSpan + cj] = (yHi - 1) >> Chunk.SizeShift;
             }
@@ -589,18 +596,23 @@ public class LodRegion : IDisposable
             (leafId != 0 ? BlockType.ById[leafId] : null)?.FaceTiles[face] ?? fallbackLeaves.FaceTiles[face];
 
         // Ocean floor tile by the depth band the chunk mesher's GenerateColumn would pick for the
-        // same height (0 sand, 1 gravel, 2 stone), so far seabed matches near seabed.
+        // same height (0 sand, 1 gravel, 2 stone), so far seabed matches near seabed. A land biome's
+        // lake or river bed keeps the soil the column wears under water instead (3), which is dirt.
         ushort FloorTile(byte material, int face) => material switch
         {
             0 => sand.FaceTiles[face],
             1 => gravel.FaceTiles[face],
+            3 => dirt.FaceTiles[face],
             _ => stone.FaceTiles[face],
         };
 
-        byte FloorMaterial(int height) =>
-            height >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanSandDepth ? (byte)0
-            : height >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanGravelDepth ? (byte)1
-            : (byte)2;
+        byte FloorMaterial(int height, int level, Biome biome) =>
+            biome == Biome.Frozen ? (byte)2
+            : biome == Biome.Ocean || level <= WorldGenerationConfig.SeaLevel
+                ? height >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanSandDepth ? (byte)0
+                : height >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanGravelDepth ? (byte)1
+                : (byte)2
+            : (byte)3;
 
         // Rented, not allocated: LodManager returns them on the main thread once the region is on
         // the GPU, or when a finished build is dropped out of range — never here, on the LodGen
@@ -660,14 +672,14 @@ public class LodRegion : IDisposable
             targetIndices.Add((ushort)(indexOffset + 3));
         }
 
-        // The sea reads as one flat sheet at range, so it is a single +Y quad per sea cell at
-        // the chunk water surface minus this level's height bias (the terrain shells are
-        // lowered the same way) and a further LodWaterSink, which keeps level 0 just under the
-        // real chunk water it meets at the full-detail ring instead of z-fighting it.
+        // The water reads as one flat sheet at range, so it is a single +Y quad per wet cell at that
+        // cell's own level minus this level's height bias (the terrain shells are lowered the same
+        // way) and a further LodWaterSink, which keeps level 0 just under the real chunk water it
+        // meets at the full-detail ring instead of z-fighting it. A lake carries its own level, so
+        // each cell adds its surface rather than one sea plane.
         var water = BlockType.ById[TerrainGenerator.SeaBlock]!;
         var waterTile = water.FaceTiles[topFace];
-        var sheetY = WorldGenerationConfig.SeaLevel + FluidState.SourceHeight
-                     - spec.HeightBias - WorldGenerationConfig.LodWaterSink;
+        var sheetDrop = FluidState.SourceHeight - spec.HeightBias - WorldGenerationConfig.LodWaterSink;
         Span<byte> waterShades = [
             Chunk.ShadeLut[(topFace << 2) | 3], Chunk.ShadeLut[(topFace << 2) | 3],
             Chunk.ShadeLut[(topFace << 2) | 3], Chunk.ShadeLut[(topFace << 2) | 3]
@@ -707,7 +719,9 @@ public class LodRegion : IDisposable
                 var rock = rockTop[gi * heightGrid + gj];
                 var snowCell = snowTop[gi * heightGrid + gj];
                 var biome = biomeGrid[gi * heightGrid + gj];
-                var isSeaCell = isSea[gi * heightGrid + gj];
+                var cellLevel = waterLevels[gi * heightGrid + gj];
+                var isSeaCell = cellLevel > TerrainGenerator.NoWater;
+                var sheetY = isSeaCell ? cellLevel + sheetDrop : 0f;
                 var floor = seaFloor[gi * heightGrid + gj];
 
                 AddQuad(vertices, indices, topFace, new Vector3(i * cellSize, top * cellSize, j * cellSize),
@@ -787,7 +801,7 @@ public class LodRegion : IDisposable
         {
             ArrayPool<int>.Shared.Return(groundTop);
             ArrayPool<int>.Shared.Return(topCell);
-            ArrayPool<bool>.Shared.Return(isSea);
+            ArrayPool<int>.Shared.Return(waterLevels);
             ArrayPool<bool>.Shared.Return(beachTop);
             ArrayPool<bool>.Shared.Return(gravelTop);
             ArrayPool<bool>.Shared.Return(snowTop);

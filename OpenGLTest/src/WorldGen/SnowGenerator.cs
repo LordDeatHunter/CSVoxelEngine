@@ -49,7 +49,6 @@ public static class SnowGenerator
         var seaBlock = TerrainGenerator.SeaBlock;
         var iceBlock = TerrainGenerator.IceBlock;
         var snowBlock = TerrainGenerator.SnowBlock;
-        var seaLy = WorldGenerationConfig.SeaLevel - worldY0;
 
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
@@ -59,12 +58,15 @@ public static class SnowGenerator
             var cold = TerrainGenerator.ColdWeight(worldX, worldZ);
             if (cold <= WorldGenerationConfig.SnowColdThreshold) continue;
 
-            var height = column.Heights[VoxelCoords.ColumnIndex(x, z)];
+            var local = VoxelCoords.ColumnIndex(x, z);
+            var height = column.Heights[local];
+            var level = column.WaterLevel[local];
             int surfaceLy;
-            if (TerrainGenerator.IsWaterColumn(worldX, worldZ, height))
+            if (height < level)
             {
                 // Open water only freezes below the freeze line; a merely cold lake keeps its surface.
                 if (cold <= WorldGenerationConfig.FreezeColdThreshold) continue;
+                var seaLy = level - worldY0;
                 if ((uint)seaLy >= Chunk.Size) continue;
                 var wi = Chunk.Idx(x, seaLy, z);
                 if (blocks[wi] != seaBlock) continue;
