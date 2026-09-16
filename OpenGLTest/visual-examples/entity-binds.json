@@ -1,7 +1,7 @@
 {
-  // Scripted visual test: run with VOXEL_TIME=60 VOXEL_SCRIPT=visual-examples/entity-binds.json
+  // Scripted visual test: run with VOXEL_TIME=120 VOXEL_SCRIPT=visual-examples/entity-binds.json
   // (working directory OpenGLTest/, e.g. via dotnet run). Shots land in visual/entity-binds/.
-  // VOXEL_TIME=60 is the standard measurement setting and must be fixed when this scenario is
+  // VOXEL_TIME=120 is the standard measurement setting and must be fixed when this scenario is
   // used as a cross-tree pixel gate: the sun angle is wall-clock driven, so an unset VOXEL_TIME
   // lights the two trees differently and the comparison reads a difference that is not there.
   // Ops: teleport {pos, yaw?, pitch?}, look {yaw?, pitch?}, wait {seconds},

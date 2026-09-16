@@ -7,11 +7,11 @@
 // mirror/sky disagreement inside ONE image rather than across two. It ends with a grounded,
 // dry hold long enough to read a cloudPass figure off the profiler.
 //
-// Run from OpenGLTest/: VOXEL_TIME=60 VOXEL_SCRIPT=visual-examples/clouds-mirror.json
+// Run from OpenGLTest/: VOXEL_TIME=120 VOXEL_SCRIPT=visual-examples/clouds-mirror.json
 // Add VOXEL_DEBUG=1 for the profiler lines the closing hold exists to produce.
-// VOXEL_TIME=60 is the standard measurement setting and, here, a requirement: the sun is
-// wall-clock driven (angle = (Window.Time + VOXEL_TIME)/600*tau + 0.8, RenderManager.cs:551),
-// and the mirror wants daylight. At 60 this ~25 s run sits in high sun for all of it.
+// VOXEL_TIME=120 is the standard measurement setting and, here, a requirement: the sun is
+// wall-clock driven (angle = (Window.Time + VOXEL_TIME)/1200*tau + 0.8, RenderManager.cs:639),
+// and the mirror wants daylight. At 120 this ~25 s run sits in high sun for all of it.
 //
 // THE TWO TRAPS. Both were hit while building this file, not theorised:
 //

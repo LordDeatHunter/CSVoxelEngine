@@ -69,8 +69,11 @@ public static class WorldGenerationConfig
     public const int GenerationDelayIdleMs = 200;
 
     // --- Lighting ---
-    // Full day/night cycle length in seconds (sun orbit + sky + light modulation)
-    public const float DayLengthSeconds = 600f;
+// Full day/night cycle length in seconds (sun orbit + sky + light modulation). Matches
+// Minecraft's 20 real minutes for the whole cycle, so the sun crosses the sky at the same
+// 0.3 degrees per second.
+public const float DayLengthSeconds = 1200f;
+
 
     // --- Ambience ---
     // Looping day/night ambience, crossfaded by the lighting pass's dayness (0 at night,

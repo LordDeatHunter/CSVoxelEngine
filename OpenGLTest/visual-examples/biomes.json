@@ -1,7 +1,7 @@
 {
   // Biome check: run from OpenGLTest/ with
-  //   VOXEL_TIME=30 VOXEL_SCRIPT=visual-examples/biomes.json
-  // Shots land in visual/biomes/. VOXEL_TIME=30 puts the sun in the morning, bright enough to
+  //   VOXEL_TIME=60 VOXEL_SCRIPT=visual-examples/biomes.json
+  // Shots land in visual/biomes/. VOXEL_TIME=60 puts the sun in the morning, bright enough to
   // read the sand and the sea without the low-sun underwater shafts of water.json.
   //
   // The vantage points were found by a headless probe:

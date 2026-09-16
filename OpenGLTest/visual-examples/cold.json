@@ -1,6 +1,6 @@
 {
   // Cold-biome check: run from OpenGLTest/ with
-  //   VOXEL_TIME=30 VOXEL_SCRIPT=visual-examples/cold.json
+  //   VOXEL_TIME=60 VOXEL_SCRIPT=visual-examples/cold.json
   // Shots land in visual/cold/. Vantage points from a headless probe:
   //   interior taiga with spruce at (-56, 13, -40)
   //   deeply cold frozen plain at (-136, 7, 152), deeply cold deep ocean at (8, -20, 936)

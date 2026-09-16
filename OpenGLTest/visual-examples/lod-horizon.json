@@ -29,14 +29,14 @@
 // Pitch -10 centres the band: from summit A the terrain 256 blocks out sits ~18 deg below the
 // eye and 2048 blocks out ~2 deg below, so that span brackets the middle of the frame.
 //
-// Timing is part of the framing. RenderManager.cs:551 drives the sun from wall-clock elapsed
-// time plus VOXEL_TIME over a 600 s cycle (angle = t/600*tau + 0.8), so sunset falls at clock
-// t = 224 s and a longer script simply walks off the end of the day - an earlier draft with
+// Timing is part of the framing. RenderManager.cs:639 drives the sun from wall-clock elapsed
+// time plus VOXEL_TIME over a 1200 s cycle (angle = t/1200*tau + 0.8), so sunset falls at clock
+// t = 447 s and a longer script simply walks off the end of the day - an earlier draft with
 // 55/45/45/45 s waits shot its fourth frame in the dark. The waits below put all four shots at
-// clock t = 52/92/132/172 s with VOXEL_TIME=10, i.e. sun elevation 76..31 degrees, well clear
-// of both the dawn and the dusk ramp.
+// clock t = 52/92/132/172 s with VOXEL_TIME=20, i.e. sun elevation 61 to 70 degrees and back to
+// 67, well clear of both the dawn and the dusk ramp.
 //
-// Run from OpenGLTest/: VOXEL_TIME=10 VOXEL_SCRIPT=visual-examples/lod-horizon.json
+// Run from OpenGLTest/: VOXEL_TIME=20 VOXEL_SCRIPT=visual-examples/lod-horizon.json
 {
   "steps": [
     { "op": "teleport", "pos": [-191.5, 113.5, -147.5], "yaw": 90, "pitch": -10 },

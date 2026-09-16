@@ -1,8 +1,8 @@
 {
-  // Water check: run with VOXEL_TIME=180 VOXEL_SCRIPT=visual-examples/water.json
+  // Water check: run with VOXEL_TIME=360 VOXEL_SCRIPT=visual-examples/water.json
   // (working directory OpenGLTest/). Shots land in visual/water/.
-  // VOXEL_TIME=180 puts the sun low behind the shore, which is what makes the underwater
-  // shafts visible; nearer 70 the sun is almost overhead and the last four shots show barely
+  // VOXEL_TIME=360 puts the sun low behind the shore, which is what makes the underwater
+  // shafts visible; nearer 140 the sun is almost overhead and the last four shots show barely
   // any shaft structure. The inline note further down says the same thing.
   // The two Space taps below do NOT engage flight - the director drives them as ordinary
   // walk steps and they never register as a double-tap, so every shot in this file is taken
@@ -37,7 +37,7 @@
     { "op": "teleport", "pos": [243.5, -2.5, -143.5], "yaw": 20, "pitch": 5 },
     { "op": "wait", "seconds": 0.5 },
     { "op": "screenshot", "name": "water_under_shore", "hideHud": true },
-    // Shafts want shadow in the water: at VOXEL_TIME=180 the low sun sits behind this shore
+    // Shafts want shadow in the water: at VOXEL_TIME=360 the low sun sits behind this shore
     { "op": "teleport", "pos": [212.5, -1.5, -140.5], "yaw": 180, "pitch": 25 },
     { "op": "wait", "seconds": 0.5 },
     { "op": "screenshot", "name": "water_under_shafts", "hideHud": true }

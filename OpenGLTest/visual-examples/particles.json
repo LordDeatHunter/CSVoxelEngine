@@ -4,8 +4,8 @@
 // particle at all, so before this file a change to particle storage or particle draw order
 // had no visual coverage whatsoever.
 //
-// Run from OpenGLTest/: VOXEL_TIME=60 VOXEL_SCRIPT=visual-examples/particles.json
-// Shots land in visual/particles/. VOXEL_TIME is pinned at 60 (the standard measurement
+// Run from OpenGLTest/: VOXEL_TIME=120 VOXEL_SCRIPT=visual-examples/particles.json
+// Shots land in visual/particles/. VOXEL_TIME is pinned at 120 (the standard measurement
 // setting shared with entity-binds and clouds-mirror) only so two runs are lit the same
 // way; see the exclusion note below for why this file is still not a pixel instrument.
 //

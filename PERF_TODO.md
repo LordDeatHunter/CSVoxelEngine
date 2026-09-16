@@ -1201,7 +1201,7 @@ unbinds unit 1 and leaves it unbound until the next `BindWorldTextures` is **rep
 an implementer who "corrects" it breaks output preservation. And the negative-control lesson:
 deleting the UI pass's invalidation entry alone gave **zero** mismatches, as did deleting
 `BeginFrame`'s hard reset alone, as did deleting *both* on a daytime run — only both gone **and** a
-night run (`VOXEL_TIME=300`) fired the check, because `RenderSun` early-returns before its unit-0
+night run (`VOXEL_TIME=300`; the day cycle has since doubled to 1200 s, which puts night at 600) fired the check, because `RenderSun` early-returns before its unit-0
 bind at night. **A single-entry deletion is not a sufficient control, and a daytime-only sweep misses
 a real state divide.**
 

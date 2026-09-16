@@ -5,15 +5,15 @@
 // scenario frames all three, and ends with a submerged hold long enough to read a raysPass
 // GPU figure off the profiler.
 //
-// Run from OpenGLTest/: VOXEL_TIME=180 VOXEL_SCRIPT=visual-examples/rays-halfres.json
+// Run from OpenGLTest/: VOXEL_TIME=360 VOXEL_SCRIPT=visual-examples/rays-halfres.json
 // Add VOXEL_DEBUG=1 for the profiler lines the closing hold exists to produce.
-// VOXEL_TIME=180 is not a free choice: the pass is gated off entirely when
+// VOXEL_TIME=360 is not a free choice: the pass is gated off entirely when
 // wet * shadowStrength * dayness * WaterSunShafts <= 0.0005 (RenderManager.RenderUnderwaterRays),
-// and the sun angle is wall-clock driven (angle = (Window.Time + VOXEL_TIME)/600*tau + 0.8,
-// RenderManager.cs:551). At 180 the sun sits low behind the shore for this whole ~30 s run -
-// elevation 0.42 falling to 0.18, strength ~0.08, i.e. 140x the gate - which is what makes the
-// shafts bright and well separated. A near-overhead sun (VOXEL_TIME=70) renders almost no
-// shaft structure at all, and past ~210 dayness collapses and the pass gates off mid-run.
+// and the sun angle is wall-clock driven (angle = (Window.Time + VOXEL_TIME)/1200*tau + 0.8,
+// RenderManager.cs:639). At 360 the sun sits low behind the shore for this whole ~30 s run -
+// elevation 0.38 falling to 0.24, strength ~0.08, i.e. 140x the gate - which is what makes the
+// shafts bright and well separated. A near-overhead sun (VOXEL_TIME=140) renders almost no
+// shaft structure at all, and past ~440 dayness collapses and the pass gates off mid-run.
 //
 // WHY THE BURSTS CARRY NO WAITS. This is the mechanism the whole scenario is built on and it
 // is not obvious: teleport, look and screenshot never call world.Update (VisualDirector.cs:36-48,

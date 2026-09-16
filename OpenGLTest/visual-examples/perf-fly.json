@@ -1,6 +1,6 @@
 {
   // Perf fly-around: settle, then teleport legs + sustained sprint walks to force streaming.
-  // Run: VOXEL_DEBUG=1 VOXEL_TIME=60 VOXEL_SCRIPT=visual-examples/perf-fly.json
+  // Run: VOXEL_DEBUG=1 VOXEL_TIME=120 VOXEL_SCRIPT=visual-examples/perf-fly.json
   "steps": [
     { "op": "wait", "seconds": 10 },
     { "op": "screenshot", "name": "perf_spawn" },
