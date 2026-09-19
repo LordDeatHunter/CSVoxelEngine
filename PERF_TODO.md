@@ -207,9 +207,11 @@ protocol above before trusting it. The entries below the passes repeat nothing f
   stress width is deliberately fixed at 3 and NOT read from the shipped constant, or lowering the
   constant would have silently defused them), so raising the constant is a one-token experiment —
   but the capture is already done, so **do not re-propose "a bigger pool"**. The shape the mechanism
-  points at instead is cutting the *work*: **D2** (`Chunk.ColumnCache`'s wholesale `Clear()` and its
-  16384-entry cap against a level-2 ring of roughly 51k distinct columns), which is why this round
-  promoted it.
+  points at instead was cutting the *work*: **D2** (`Chunk.ColumnCache`'s eviction against a level-2
+  ring of roughly 51k distinct columns), which is why this round promoted it — and **D2 has since
+  landed**: the 16384-entry cap is unchanged but the wholesale `Clear()` is gone, so a sweep now ages
+  out only the oldest generation (see "Measurement: D2"). That does **not** reopen the pool question;
+  this capture stands.
   **Impact: measured, small and paid for · risk med · effort already spent; the remaining decision
   is S.**
 - [ ] **C6 · `_playerPlaced.RemoveWhere` scans the whole set per unload** —
@@ -226,22 +228,51 @@ protocol above before trusting it. The entries below the passes repeat nothing f
   already packs a `long` to avoid exactly this (`FluidManager.cs:32-35,898-899`).
   **Impact med · risk med · effort L** (broad but mechanical). `LodManager` is
   already keyed by integer tuples, so this is chunk-side only.
-- [ ] **D2 · Cache eviction is a wholesale `Clear()`** — `Chunk.ColumnCache`
-  (`Chunk.cs:646-648`) and `WormCarver.CellCache` (`WormCarver.cs:111-112`) drop
-  everything at their cap, so a far teleport recomputes (part of the teleport
-  hitch). LRU / generation-stamped eviction would keep reuse across a move.
-  `LodRegion.ColumnCaps` (`LodRegion.cs:130`) also grows unbounded over a long
-  editing session: since C9 it holds one dense `Chunk.Size * Chunk.Size` cap bucket
-  per *edited chunk column*, never evicted — cheaper than the old per-fine-column
-  entries once a column is heavily mined, more expensive for a single isolated
-  block. **C5 raised the pressure here and made it measurable rather than hypothetical:** every
-  LOD region build prefetches 36 / 100 / 324 chunk columns at levels 0 / 1 / 2 and generates on
-  the spot any column missing from `ColumnCache`, so a level-2 ring (197 regions,
-  `RegionRadius = 8`, 16 chunk columns across a 256-block region — a disc of radius 128 columns,
-  on the order of **51k distinct columns**) sweeps roughly three times the cache's 16384-entry cap
-  in one pass, and N LodGen builders multiply both the aggregate working set and the `Clear()`
-  rate. C5's capture measured chunk generation slowing *disjointly* at three builders, which is
-  the same channel seen from the chunk side. **Impact med · risk low-med · effort M.**
+- [ ] **D2b · `LodRegion.ColumnCaps` grows unbounded, and it must NOT take D2's scheme** —
+  `LodRegion.ColumnCaps` (`LodRegion.cs:130`) is a process-global `ConcurrentDictionary` holding one
+  dense `Chunk.Size * Chunk.Size` `int[]` — **~1 KB — per *edited chunk column***, written by
+  `LowerColumnBelow` (`:147-172`) whenever a removal would expose buried LOD, and **never removed by
+  anything**. Over a long editing session it only grows. This is the third part of the old D2 bullet
+  and it was deliberately left behind when D2 landed, because it is a **different problem: growth,
+  not eviction**, and the fix D2 shipped is actively wrong here.
+  - **It cannot go on `GenerationalCache`.** A cap entry encodes an *irreproducible player edit*; no
+    generator can rebuild one from its key. Evicting a cap while its column is still LOD-relevant
+    makes mined terrain **pop back** in the far rings — a visible correctness bug, not a recompute.
+    `GenerationalCache`'s invariant 10 names this site explicitly as one that must never be stored
+    there, and AGENTS.md carries the same standing rule.
+  - **Nor can eviction ride chunk unload.** LOD regions cover terrain far outside the loaded chunk
+    sphere (`ChunkRadius` 16 chunks vs rings out to 2048 blocks), so a cap must **outlive** its
+    chunk. "Drop the cap when the chunk unloads" is the obvious fix and it is wrong.
+  - **Whatever is done must preserve `LowerColumnBelow`'s publish ordering** (`LodRegion.cs:165-172`):
+    the bucket is published into the `ConcurrentDictionary` first and the value written with
+    `Volatile.Write` after, which the code's own comment records as load-bearing for a future
+    multi-threaded LodGen. A fix that replaces the container must carry that ordering across.
+  - **A real fix needs caps re-derivable from stored block data** — i.e. it is entangled with save/load
+    (`TODO.md` `M-1`), because only persisted edits let a cap be dropped and recomputed on demand.
+    That makes this a **correctness item waiting on a design**, not a perf item, and larger than it
+    looks. **Observed cost today, not hypothetical:** because `ColumnCaps` is global with no reset
+    hook and `BuildMeshData` gates on `hasCaps = !ColumnCaps.IsEmpty` (`:302`, read at `:312`), any
+    test class that mines or drops a block near the origin flips a *later* build of the same region,
+    which is what makes `LodBuildPoolTests.RegionBuildsAreIdenticalWhicheverThreadRunsThem` and
+    `LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel` intermittent in
+    full-suite runs (reproduced on pristine HEAD, so not a D2 regression — see "Measurement: D2").
+    `LodColumnCapTests.cs:37` and `LodHeightSamplingTests.cs:123` already dodge it with far
+    coordinates and say so in comments; those two classes do not.
+  **Impact low (memory) / med (correctness) · risk med · effort L, and blocked on a design.**
+- [ ] **D6 · Three more deterministic worldgen caches still `Clear()` wholesale** —
+  `TreeGenerator.ShapeCache` (`TreeGenerator.cs:25-26`, limit 16384),
+  `TreeGenerator.CanopyCache` (`:396-397`, limit 4096) and `CactusGenerator.ShapeCache`
+  (`CactusGenerator.cs`, limit 16384) all still carry the pre-D2 pattern: an
+  `if (Count >= limit) Clear()` on the miss path, which both throws the whole working set away and
+  evaluates `ConcurrentDictionary.Count` — an all-locks barrier — on every miss. All three hold
+  values that are a **pure function of the key**, so each is a **one-line conversion** to
+  `GenerationalCache` now that the type exists. `GenerationalCache` deliberately carries **no
+  `where TValue : class` constraint** precisely so the two `ShapeCache`s, whose values are
+  `(int BaseY, record struct Shape)` *value* tuples, convert exactly as directly as `CanopyCache`'s
+  reference type does. Do this as a batch with one shared eviction fact, not three rounds.
+  **`TreeGenerator.CanopyDisturbed` is NOT one of them** — it is player-edit state, not a cache, and
+  moving it onto this type would turn a growth bug into data loss; it is tracked as `TODO.md` `M-10`.
+  **Impact low · risk low · effort S.**
 - [ ] **D5 · The geometry free list is a flat linearly-scanned list** —
   `GeometryAllocator` keeps free blocks in one offset-sorted `List<(int, int)>`
   (`GeometryAllocator.cs:24`); `TryAllocate` first-fits by walking it from the front
@@ -368,6 +399,36 @@ needs, not the history.
 
 ### What landed
 
+- **D2 · Both deterministic worldgen caches evict generationally instead of clearing wholesale.**
+  `Chunk.ColumnCache` and `WormCarver.CellCache` were `ConcurrentDictionary` plus
+  `if (Count >= limit) Clear()` on the miss path. Both now run on
+  `GenerationalCache<TKey, TValue>` (`WorldGen/GenerationalCache.cs`): G generation dictionaries
+  published as **one immutable node swapped by `Interlocked.CompareExchange`** — structurally the
+  same protocol as C3's `ChunkScanFrontier.Node` and C5's TryAdd `_building` claim — where a read
+  probes the newest map and returns, a miss computes into the newest, and when the newest fills its
+  `capacity / G` insert budget the node rotates and the **oldest** generation is dropped. Nothing is
+  ever cleared wholesale. **Capacities are unchanged** (16384 columns, 4096 cells), so peak
+  residency does not move; the knobs moved into `WorldGenerationConfig` (`ColumnCacheCapacity` /
+  `ColumnCacheGenerations`, `CellCacheCapacity` / `CellCacheGenerations`), which removes a standing
+  deviation from AGENTS.md's "tuning knobs live in `WorldGenerationConfig`" rule rather than adding
+  one. Ships at **G = 4**.
+- **D2 · Promotion is restricted to the oldest generation, and that is the design's load-bearing
+  decision.** A hit in the newest or any middle generation is a **pure read with no write** — which
+  is what `GetColumnData` is today, and it is called from the main thread as well as five background
+  threads, so per-hit LRU bookkeeping would have put a bucket-lock write on the frame budget and on
+  the exact path this round exists to decontend. Only a hit in the *oldest* generation — the one the
+  next rotation drops — is promoted forward (a second chance). Measured promotion rate at G = 4:
+  **11.31 % of accesses** on the mixed burst, **0 %** on chunk generation alone. The safety argument
+  rests on one invariant, stated as 10 numbered points in the type's doc comment: **values are a
+  pure deterministic function of their key and immutable after publication**, so an evicted, stale
+  or duplicated entry can only ever cost a recompute and can never surface as a *wrong* value.
+- **D2 · What it bought, and what it did not.** Chunk generation's own misses while a LOD ring sweep
+  runs fall **1219 -> 733 (-40 %)**; avoidable recomputes overall fall **5473 -> 3413 (-38 %)**. The
+  `CellCache` half bought **uniformity, not hit rate** — its 4096-cell cap sits one to two orders of
+  magnitude above its ~150-cell working set and its `Clear()` essentially never fired in play. The
+  third part of the old D2 bullet, `LodRegion.ColumnCaps`, was **deliberately not taken**: its
+  entries are irreproducible player edits, so eviction there is data loss, not a recompute. It is
+  now its own item (`D2b`). Full write-up, gate and table: **"Measurement: D2"**.
 - **R10 · LOD regions no longer own GL objects; all three ring walks are one multi-draw each.**
   `LodRegion` had a `Mesh` (VAO + VBO + EBO) for its terrain shell and a second `Mesh` for its sea
   sheet. Both are gone. A region now holds `OpaqueSlice` / `WaterSlice` — two `GeometrySlice?`s in
@@ -713,6 +774,286 @@ is the specific "simplification" those facts exist to catch.
 branches at all, and `LodManagerTests.ALostDirtyClaimIsReDirtiedNotDropped` points at it by name in
 its doc comment — if it is renamed, that reference must move with it.
 
+### Measurement: D2 — the win is exact and counted, not timed
+
+**(a) The premise was re-verified before anything was built, and only qualitatively.** D2 inherited
+its case from C5's "a LOD build is terrain generation in disguise". That was re-checked against the
+current tree two ways. Structurally: `LodRegion.BuildMeshData` (`:295-314`) still computes
+`chunkSpan = spec.RegionBlocks / Chunk.Size + 2` and prefetches `chunkSpan^2` heightmaps, i.e.
+**36 / 100 / 324** columns at levels 0 / 1 / 2, verbatim, and all three levels still mesh the same
+32x32 cell grid. Empirically: `LodBuildCostProbe.RegionBuildCostPerLevel` still shows level 2
+materially the most expensive of the three while levels 0 and 1 sit close together, so the per-level
+spread still tracks the *column count* and not the mesh — and its near-zero rows are still present,
+which is the cache-hit signature the probe's own doc predicts. **Premise holds.**
+**No percentage and no per-column rate is quoted from that probe, deliberately.**
+`LodBuildCostProbe.cs:20-38` states that nothing in it asserts a timing, that its numbers are biased
+in both directions and that it is an order-of-magnitude go/no-go reading rather than a rate to
+quote; and this file's own gate traps forbid comparing a fresh run against a stored capture from an
+earlier session. So C5's stored 17.7 / 17.6 / 65.3 ms medians were **not** compared against the new
+run, and no cross-tree cost claim is made from it. Every wall-clock figure in this round was measured
+directly in the step that spent it.
+
+**(b) The mechanism is sharper than the old bullet said, and the correction matters.** The old
+bullet framed the defect as "a far teleport recomputes". That is true but secondary. Chunk
+generation's own working set is *small* — `ChunkRadius = 16` is a disc of **933 distinct columns**
+once each build's 3x3 heightmap neighbourhood is counted (`Chunk.FillLightColumnHeights`,
+`Chunk.cs:246-251`) — while **one level-2 ring sweep is ~51k distinct columns**. Against a
+16384-entry cap the sweep tripped the wholesale `Clear()` **three times in a single pass**
+(measured, see (f)), and each trip threw away chunk generation's permanently-hot 933 columns along
+with the sweep's own one-shot ones. The defect was the LOD sweep repeatedly evicting the chunk-gen
+hot set — which is C5's "chunk generation slows *disjointly* at three builders", seen from the
+victim's side.
+
+**(c) The memory arithmetic was wrong in the tree and is corrected; this is why the cap did not
+rise.** `Chunk.cs`'s old comment claimed 16384 entries was "~40 MB". A `ColumnData` is seven
+256-element arrays plus scalars (`int[]` Heights / Bed / WaterLevel, `float[]` EntranceWeight /
+CaveIntensity, `byte[]` DirtDepth, byte-backed `Biome[]`) — about **5.9 KB**, so the real ceiling at
+16384 is roughly **96 MB**. The "~40 MB" figure predated Bed, WaterLevel and Biomes. A bigger cache
+was therefore never the cheap option, and **capacity is unchanged at 16384**: the fix is *more
+generations at the same capacity*, so peak residency does not move. The corrected arithmetic now
+lives in `WorldGenerationConfig.cs` beside the constants.
+
+**(d) A second, separate cost was removed on the same path.** Both old sites tested
+`if (Cache.Count >= limit) Cache.Clear();` on **every miss**. `ConcurrentDictionary.Count` acquires
+*every lock in the table*, and the miss path is exactly the path four chunk-gen threads and the LOD
+builder share. `GenerationalCache` counts its own successful inserts with a single
+`Interlocked.Increment` instead and never calls `Count` outside test-only diagnostics.
+
+**(e) Promotion is restricted to the oldest generation, on purpose, and the reason is the hot
+path.** A true LRU needs a shared write per hit. `Chunk.GetColumnData` is a pure `TryGetValue` read
+today and is called from the **main thread** as well as the five background threads
+(`FluidManager`, `SlimeManager`, `World`, `Camera`), so per-hit bookkeeping would land in the frame
+budget and would put a bucket-lock write on the common case *under a sweep* — the exact contention
+this round exists to reduce. So `GenerationalCache.GetOrAdd` probes the newest map and returns; a
+hit in any middle generation returns **without writing**; only a hit in the **oldest** generation —
+the one the next rotation drops — is promoted forward. That is a second-chance policy: an entry hot
+enough to matter is certainly touched during the 1/G window before its eviction, while every other
+hit stays write-free. The cost this adds is counted exactly rather than assumed — see the promotion
+column in (f). `GenerationalCacheTests.AHitInTheNewestGenerationNeverCallsTheFactoryAndNeverWrites`
+is the fact that fails if a later round widens promotion back to every non-newest hit.
+
+**(f) The round's number is an exact replay, not a frame-time window.** `ColumnCacheReplayProbe`
+replays the real key sequences — the radius-16 chunk-gen disc with each build's 3x3 neighbourhood,
+each LOD ring's prefetch keys in `BuildMeshData`'s own emission order, and the two interleaved —
+against both policies with a factory that does no work, so it generates no terrain, runs in ~0.9 s
+and is **deterministic** (two runs produced byte-identical tables). The `Clear()`-at-cap policy is
+reimplemented in the probe as a reference oracle. The printed table, verbatim:
+
+```
+[probe] capacity=16384 chunkDiscRadius=16 lodRegionRadius=8 chunkGenPasses=3 mixedRatio=1 chunk-gen key per 8 lod keys
+[probe] factory is identity: this measures the eviction POLICY, not terrain.
+
+[probe] sequence=chunk-gen accesses=21519 distinctKeys=933 chunkGenAccesses=21519
+[probe]   clear-at-cap(cap=16384): misses=933 (4.34%) wholesaleClears=0 chunkGenMisses=933
+[probe]   generational(cap=16384,G=2): misses=933 (4.34%) vs clear-at-cap 0.00%  newestHits=20586 olderGenHits=0 promotions=0 (0.00% of accesses) rotations=0 (predicted 0) chunkGenMisses=933
+[probe]   generational(cap=16384,G=4): misses=933 (4.34%) vs clear-at-cap 0.00%  newestHits=20586 olderGenHits=0 promotions=0 (0.00% of accesses) rotations=0 (predicted 0) chunkGenMisses=933
+[probe]   generational(cap=16384,G=8): misses=933 (4.34%) vs clear-at-cap 0.00%  newestHits=20586 olderGenHits=0 promotions=0 (0.00% of accesses) rotations=0 (predicted 0) chunkGenMisses=933
+
+[probe] sequence=lod-ring-L0 accesses=7092 distinctKeys=3428 chunkGenAccesses=0
+[probe]   clear-at-cap(cap=16384): misses=3428 (48.34%) wholesaleClears=0 chunkGenMisses=0
+[probe]   generational(cap=16384,G=2): misses=3428 (48.34%) vs clear-at-cap 0.00%  newestHits=3664 olderGenHits=0 promotions=0 (0.00% of accesses) rotations=0 (predicted 0) chunkGenMisses=0
+[probe]   generational(cap=16384,G=4): misses=3428 (48.34%) vs clear-at-cap 0.00%  newestHits=3664 olderGenHits=0 promotions=0 (0.00% of accesses) rotations=0 (predicted 0) chunkGenMisses=0
+[probe]   generational(cap=16384,G=8): misses=3428 (48.34%) vs clear-at-cap 0.00%  newestHits=3012 olderGenHits=652 promotions=0 (0.00% of accesses) rotations=1 (predicted 1) chunkGenMisses=0
+
+[probe] sequence=lod-ring-L1 accesses=19700 distinctKeys=13156 chunkGenAccesses=0
+[probe]   clear-at-cap(cap=16384): misses=13156 (66.78%) wholesaleClears=0 chunkGenMisses=0
+[probe]   generational(cap=16384,G=2): misses=13156 (66.78%) vs clear-at-cap 0.00%  newestHits=5694 olderGenHits=0 promotions=850 (4.31% of accesses) rotations=1 (predicted 1) chunkGenMisses=0
+[probe]   generational(cap=16384,G=4): misses=13156 (66.78%) vs clear-at-cap 0.00%  newestHits=4372 olderGenHits=2172 promotions=0 (0.00% of accesses) rotations=3 (predicted 3) chunkGenMisses=0
+[probe]   generational(cap=16384,G=8): misses=13156 (66.78%) vs clear-at-cap 0.00%  newestHits=2328 olderGenHits=4216 promotions=0 (0.00% of accesses) rotations=6 (predicted 6) chunkGenMisses=0
+
+[probe] sequence=lod-ring-L2 accesses=63828 distinctKeys=51524 chunkGenAccesses=0
+[probe]   clear-at-cap(cap=16384): misses=55550 (87.03%) wholesaleClears=3 chunkGenMisses=0
+[probe]   generational(cap=16384,G=2): misses=52592 (82.40%) vs clear-at-cap -5.32%  newestHits=4858 olderGenHits=0 promotions=6378 (9.99% of accesses) rotations=7 (predicted 7) chunkGenMisses=0
+[probe]   generational(cap=16384,G=4): misses=51718 (81.03%) vs clear-at-cap -6.90%  newestHits=2540 olderGenHits=8460 promotions=1110 (1.74% of accesses) rotations=12 (predicted 12) chunkGenMisses=0
+[probe]   generational(cap=16384,G=8): misses=51588 (80.82%) vs clear-at-cap -7.13%  newestHits=636 olderGenHits=11434 promotions=170 (0.27% of accesses) rotations=25 (predicted 25) chunkGenMisses=0
+
+[probe] sequence=MIXED accesses=101947 distinctKeys=51524 chunkGenAccesses=11327
+[probe]   clear-at-cap(cap=16384): misses=56997 (55.91%) wholesaleClears=3 chunkGenMisses=1219
+[probe]   generational(cap=16384,G=2): misses=61715 (60.54%) vs clear-at-cap +8.28%  newestHits=26321 olderGenHits=0 promotions=13911 (13.65% of accesses) rotations=9 (predicted 9) chunkGenMisses=848
+[probe]   generational(cap=16384,G=4): misses=54937 (53.89%) vs clear-at-cap -3.61%  newestHits=17137 olderGenHits=18347 promotions=11526 (11.31% of accesses) rotations=16 (predicted 16) chunkGenMisses=733
+[probe]   generational(cap=16384,G=8): misses=52345 (51.35%) vs clear-at-cap -8.16%  newestHits=7910 olderGenHits=41230 promotions=462 (0.45% of accesses) rotations=25 (predicted 25) chunkGenMisses=757
+```
+
+What that table establishes, at the shipped `ColumnCacheGenerations = 4`:
+
+- **The headline is the chunk-gen row of MIXED, not the total.** Chunk generation's own misses while
+  the LOD sweep runs fall **1219 -> 733, a 40 % cut in recomputes of the hot set**. That is exactly
+  the defect (b) names, measured from the victim's side.
+- **Quote the total only with its framing.** Total misses go 56997 -> 54937, **-3.61 %** — but 51524
+  of those misses are the *unavoidable distinct-key floor* that no cache can remove. Expressed as
+  avoidable work, **avoidable recomputes fall 5473 -> 3413, a 38 % cut**. Do not quote -3.61 % on
+  its own; it understates the effect by folding in work no policy could avoid.
+- **The wholesale `Clear()` fires 3 times in one level-2 pass** (`wholesaleClears=3`), confirming the
+  old bullet's "roughly three times over" arithmetic against a replayed key sequence rather than an
+  estimate.
+- **The promotion cost, exact: 11.31 % of accesses on MIXED** (11526 shared `TryAdd` writes in
+  101947 accesses), 1.74 % on the level-2 sweep alone, and **0.00 % on chunk-gen alone and on levels
+  0 and 1**. That is higher than the design assumed. It is a *write rate*, not a contention
+  measurement — it does not price lock convoy. If a future capture ever shows the `chunkDirty` row
+  regressing, promotion is the first mechanism to check, and disabling it entirely (pure segmented
+  eviction, no second chance) is the fallback that costs only hit rate.
+- **The predicted level-1 loss did NOT occur, and the prediction is retracted.** The design's stated
+  risk was a cyclically revisited working set sitting between the retention band and capacity —
+  level 1's ~13.2k distinct columns against a 16384 cap. The replay shows **every ring sweep taken
+  alone misses exactly once per distinct key under both policies at every G**: nothing is evicted
+  before its last use, because a ring is swept closest-first and neighbouring regions share border
+  columns, so reuse is *local in the sequence*. The band is real arithmetic that this workload never
+  sits in. Record the measurement, not the prediction.
+- **`G = 2` is genuinely WORSE than the old wholesale clear** (+8.28 % misses on MIXED, stable across
+  interleave ratios 2 / 8 / 32). Two generations put the promotable window at half the cache:
+  promotions run at 13.65 % of accesses and buy a retention band too coarse to hold anything.
+  **`ColumnCacheGenerations` has a real lower edge and must never be set to 2.**
+- **`G = 8` was considered and deliberately not taken.** It is better on MIXED totals (-8.16 %) and
+  cuts promotions 25x (0.45 %), but it is **worse on the one sub-metric that is D2's own stated
+  defect** — chunk-gen misses 757 vs 733 — because at eight generations the second-chance window is
+  an eighth of the cache and a hot column is less likely to be touched inside it. The two candidates
+  save *different work* (a chunk-gen miss on a generator thread vs a LodGen miss on the builder) and
+  this probe uses a free factory, so it has **no cost weighting with which to trade them**. It is a
+  one-token re-pricing for a later round with a real capture; it was not taken blind.
+- **The sequences and the table are pinned constants, not live reads**, per the
+  `LodBuildPoolTests.StressWorkers` precedent. If a later round retunes `LodRegion.Levels`,
+  `ChunkRadius` or `ColumnCacheCapacity`, the probe will keep replaying the 2026-09-19 shape and its
+  table will silently stop describing production. Each constant names its source in its comment.
+  The MIXED interleave ratio has no source constant at all, so it was **sensitivity-checked**: the
+  ordering is identical at ratios 2, 8 and 32 (G=2 +7.62 / +8.28 / +7.83 %, G=4 -6.46 / -3.61 /
+  -3.29 %, G=8 -10.17 / -8.16 / -7.83 %) and only magnitudes move.
+
+**Retention, stated correctly.** Two separate claims, because only the first is unconditional.
+*Memory ceiling:* each map accepts exactly `capacity / G` successful inserts during its tenure as
+the newest, so total entries are bounded by `capacity` **at all times, whatever the promotion
+rate** — that is the claim the ~96 MB arithmetic above rests on, and it is pinned by
+`GenerationalCacheTests.ResidencyNeverExceedsCapacityUnderPromotions`. *Retention:* an entry read at
+least once while it sits in the oldest generation is carried forward; one never read there is
+dropped when that generation rotates out. **Distinct-key residency is strictly *below*
+`capacity * (G-1)/G` whenever promotions occur**, because a promotion consumes an insert slot and
+briefly occupies two dictionary nodes. Do **not** restate a flat `capacity * (G-1)/G` retention
+floor — it is false under any workload with revisits, which is the real workload. (Observed peak
+residency between calls is `capacity - 1`, not `capacity`: the insert that would reach the ceiling
+is by construction the one that fills the newest generation's budget and therefore rotates, dropping
+a full oldest map before the caller returns.)
+
+**(g) `WormCarver.CellCache` was converted for uniformity, and that half of D2 was NOT a win.** D2
+assumed the two sites were symmetric. They are not. Cells are 64 blocks (`CarverCellShift = 6`),
+`Carve` asks a `(2 * WormReachCells + 1)^2` = 25-cell window per chunk, and the whole
+`ChunkRadius = 16` load sphere spans **on the order of 150 cells** against a 4096-cell cap — one to
+two orders of magnitude of headroom — and **the LOD builder never touches this cache at all** (it
+reads heightmaps only). Its `Clear()` essentially never fired in play. It was converted anyway
+because AGENTS.md documents the two sites as one deliberate pattern and a silent divergence is worse
+than the conversion, and because it removes the all-locks `Count` from the miss path — **not** for
+hit rate. The measurable half of D2 is `Chunk.ColumnCache` alone. There is deliberately **no
+dedicated eviction test** for `CellCache`: forcing its 4096-cell cap means carving across 256x256
+chunk columns, ~65k column generations, an order of magnitude beyond what the suite should spend.
+Its policy coverage is `GenerationalCacheTests`; its output coverage is the whole-chunk half of
+`ColumnCacheEvictionTests`, which runs `Carve`.
+
+**(h) The gate. The hash is the authority, and it passed cross-tree.** The rule, fixed before any
+comparison and reproduced verbatim from `ColumnCacheEvictionTests`' class doc:
+
+> *D2 is output-preserving by construction — a cache is a cache, so the same column must generate
+> the same blocks whether it was served as a hit, a miss or an eviction. The gate looks for ZERO
+> difference: the hash must be bit-identical in-run on each tree AND identical between the pristine
+> baseline and the work tree. Any difference is a bug to diagnose, not noise to accept.*
+
+`ColumnCacheEvictionTests.WorldgenAndLodSurviveForcedCacheEviction` folds one FNV-1a 64 hash over a
+64-column lattice of full `ColumnData`, the 4096 block bytes of two generated surface chunks (the
+composed path, including `WormCarver.Carve`, the carvers, water fill and trees) and all three
+`LodRegion.BuildMeshData` levels over the same area, before and after a **32768-column, 4-thread
+sweep** — 2x the capacity, which trips the baseline's `Clear()` at least twice and ages the probe
+out on the work tree for any `G >= 2`. The file uses only API present on **both** trees, so it was
+copied unchanged into a pristine `git archive HEAD` export (never a stash, never a mutated working
+tree) and run there.
+
+  work tree: `[hash] pre=0x6d4eba16cb182624 post=0x6d4eba16cb182624 sweep=32768 threads=4 elapsed=1681ms`
+  pristine:  `[hash] pre=0x6d4eba16cb182624 post=0x6d4eba16cb182624 sweep=32768 threads=4 elapsed=1885ms`
+
+`pre == post` within each run **and** the two trees agree bit-for-bit. **Anti-vacuity is not
+assumed:** the fact first asserts the probe column is not flat and the probe chunk holds at least
+two distinct block ids, then asserts `!ReferenceEquals` on the probe `ColumnData` across the sweep —
+which proves the eviction actually happened on *both* policies without needing any work-tree-only
+counter. That guard is load-bearing and was seen to fire: at `SweepColumns = 4096` the probe
+survived and the fact failed. **Do not shrink the sweep below `2 * 16384`** or the gate goes vacuous
+on one tree or the other. Negative control: a pristine export overlaid with the work tree's D2 files
+and one generated block perturbed moves the hash to `0x54e783e4d4909d81`. The prescribed "offset one
+height by a constant" control **cannot** fail this gate — a deterministic offset moves pre and post
+identically — so the control used was *stateful* (a counter bumping `Heights[0]` on every
+computation), which is what actually models "the generator returns different bytes on recompute".
+Sweep cost, measured not predicted: 267 ms for 4096 columns cold, 1681-1970 ms for 32768 isolated,
+3.9-4.9 s inside the parallel suite; whole-suite wall clock moved 13-14 s -> 14-16 s.
+
+**The `lod-horizon` pixel run is a smoke check on top of that, and it passed — by a stronger route
+than its own fallback allowed.** Rule pre-registered before any image was opened: counterbalanced
+work/head/work/head/work/head at `VOXEL_TIME=20` with a cold discarded run per tree, clustered luma
+statistic (delta >= 24 and >= 5 of the 25 pixels in a 5x5) on a crop fixed once by eye, counts
+scraped off `[visual] N/M screenshot ->`. **"Zero structural change" was explicitly NOT the
+criterion**, and that was decided in advance: `wait` ticks physics once per *rendered* frame and
+regions fade in on the wall clock, so a round that changes streaming speed by construction — as D2
+does — lands at a different camera depth and fade phase, and a naive pixel gate reads that as a
+regression. *Result 1:* cross-tree clustered counts lie **inside** the same-build control range on
+every shot (`03-lod_a` control area 7.72-19.93 % vs cross 8.30-20.80 %; `09-lod_c` control
+9.23-21.91 % vs cross 12.22-25.15 %) — the ~8-22 % same-build floor is the sun-phase-through-shadow-
+map effect this file already records. *Result 2:* R10's within-tree-constant instrument gives a
+non-zero residue (309 / 2728 / 140 / 82 px on lod_a-d), which **cannot be read on its own here**
+because only 14-32 % of pixels are run-constant at all, so accidental 3-run agreement is common. So
+the null was computed exactly: of the `C(6,3)/2 = 10` distinct 3-vs-3 splits of the same six runs,
+exactly one is the real tree split, and it ranks **6th / 2nd / 4th / 10th (p = 0.60 / 0.20 / 0.40 /
+1.00)** — on `12-lod_d` the real split is the *smallest* residue of all ten, and arbitrary
+relabellings reach 1039 / 3077 / 1469 / 1372 px. **Tree identity explains nothing**, so no
+streaming-depth diagnosis was even needed, and nothing reads as localised geometry change. All five
+checked-in pose-stable instruments still run against the current tree and none was dropped
+(rays-halfres 10 shots, clouds-mirror 7, entity-binds 6, particles 3, lod-horizon 4).
+
+**New reusable machinery, and it belongs in the gate-traps list: R10's constant instrument needs an
+exact permutation null.** This file records that instrument as standing machinery for any
+output-preserving round but gives it no null. On a scenario where 70-85 % of pixels vary run to run,
+a bare residue count is unreadable — it would have looked like a finding here. With 3 runs per tree
+there are 10 distinct 3-vs-3 relabellings of the same six runs, exactly one of which is real, so
+`p = rank / 10` costs nothing beyond the runs already budgeted. **Always compute it before reading a
+residue off that instrument.**
+
+**(i) The perf capture isolated NOTHING, and nothing from it is quoted.** Rule pre-registered before
+the first run: `perf-fly.json`, `VOXEL_DEBUG=1 VOXEL_TIME=60`, one cold discarded run per tree then
+5 kept per tree interleaved in one session, five fixed fields, and a field quotable **only** if the
+two trees' 5-run sets are disjoint. `regions_built` was chosen as the LodGen-throughput field
+precisely because this file already forbids sizing builder work off a `lod` row. Every field
+overlapped — `regions_built` 909-913 vs 907-913, `chunks_loaded` 17077 vs 17077 (identical),
+`chunkDirty` med 0.134 vs 0.136, `lod` med 0.450 vs 0.443, `frame_max` med 16.190 vs 15.960 — so by
+the rule no number is quoted and no permutation test was run. **Why, as an instrument finding rather
+than a shrug: `perf-fly` SATURATES inside its 60 s window on both trees.** All ten kept runs end at
+the *identical* `chunks 17077` and at `regions <built>/645` with built 907-913, so both trees finish
+essentially all the work the scenario offers before the shutter and every end-state field measures
+the **scenario's ceiling, not either tree's rate**. This is the same trap already recorded for the
+chunk ring ("never reuse C3's net loaded-chunk rule on a window in which the chunk ring saturates"),
+now shown to apply to the LOD ring as well. A future round wanting a frame-time number from D2's
+family needs a **time-to-N rule on a non-saturating window, pre-registered before the capture**;
+deriving one from these logs after the fact is exactly what this series' methodology forbids, so it
+was not done. **The round's number is (f), not this capture** — exact, deterministic, reproducible,
+and independent of any window isolating anything. The profile table at the top of this file is
+untouched by this round.
+
+**Suite.** 752 / 748 passed / 4 failed at the round's start; **763 / 759 / 4** at its end — the four
+pre-existing failures and no others, with 11 new facts added (9 `GenerationalCacheTests`, 1
+`ColumnCacheEvictionTests`, 1 `ColumnCacheReplayProbe`). The four, by name, all unrelated to caching:
+`ContentTests.DisplayMatrixPosesSpritesAsConfigured`,
+`BlockMovementTests.FrictionDefaultsToPointNineNineAndIceIsLower`,
+`BlockMovementTests.LeavesDeclareThreeQuarterMovementSpeed`,
+`FallingBlockTests.SevenTowerChainRebuildsFullyWithNoDrops`.
+**A pre-existing intermittent family was found and proven not to be D2's**:
+`LodBuildPoolTests.RegionBuildsAreIdenticalWhicheverThreadRunsThem` and
+`LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel` each fail in roughly 1
+full-suite run in 4-6, never in isolation — **reproduced on a pristine `git archive HEAD` build
+carrying zero D2 code** (2/12 and 1/5 runs there). Both build regions at the origin, and the cause
+is `LodRegion.ColumnCaps` being process-global with no reset hook, so a parallel test class mining
+near the origin legitimately changes a later build. Do not chase either as a D2 bug; the item is
+tracked as `D2b` above.
+
+**Tooling notes for the next round.** `dotnet test -l normal` **silently drops**
+`ITestOutputHelper` output — use `--logger "console;verbosity=detailed"` for `LodBuildCostProbe`,
+the `[hash]` line and the replay table. `Copy-Item` restoring a file from a backup sets its
+`LastWriteTime` from the *source*, so MSBuild reports "Build succeeded" while doing nothing and the
+suite runs the stale binary — touch the file after any restore. And numpy 2 removed value-based
+casting, so `587 * a[:,:,1]` on an `int16` image array silently overflows; widen to `int32` before
+the multiply or a luma-delta table comes out plausible and wrong.
+
 ### Measurement: R10 — a disjoint submission-side win, and a churn claim that SPLIT
 
 **The rule, written down and fixed in the scratchpad before the first working-tree run, and
@@ -933,7 +1274,8 @@ reading.** On that evidence the shipped constant was set to **1** — both pool 
 claim protocol kept; the reasoning and what it cost are in C5's bullet above.
 
 **Mechanistically, why three builders buy 1.31x and not 3x** — the reusable finding, and the reason
-the answer is D2 rather than a bigger pool: a LOD build is **terrain generation in disguise**.
+the answer is D2 — since landed, see "Measurement: D2" — rather than a bigger pool: a LOD build is
+**terrain generation in disguise**.
 `BuildMeshData` prefetches 36 / 100 / 324 chunk columns and **generates on the spot** any that miss
 `Chunk.ColumnCache` — the same work, on the same cache, that the four chunk-gen threads are
 saturating. LodGen workers do not add throughput to an idle resource. The frame-rate cost has two
@@ -1291,54 +1633,75 @@ catch is a *new* `Camera` field wired into `GetViewMatrix` tomorrow with no matc
   every shot at its stock 40/35/35/35 waits. `clouds-mirror` is still not settled at its stock 8 s
   opening wait (regions 302-342 across runs on *both* trees) and still needs the control.
 
-Next: **R10 landed and the render side is now out of structural items.** LOD was the last subsystem
-on the old per-object draw path; everything that draws terrain — chunks, shadows, the mirror, LOD
-and its sea sheets — now goes through one `ChunkDrawBatch` and one `glMultiDrawElementsIndirect` per
-pass. What remains open on the GPU side is **R3** (parked, read its bullet before re-opening) and
-**R6** (reserved for a human — it is a *trade-off*, not a win, and must not be taken autonomously).
-So the next round is a CPU round, and it should be, because R10's own measurement said so twice: the
-credited wins were all CPU-side submission cost, and the departure/teleport `lod` row — the one thing
-that would have pointed at more render work — did not move in either direction.
+### Suggested first pass
 
-**Take D2 first.** It is now the most interesting CPU item in the file and two independent rounds
-have pointed at it. C5 measured that **a LOD build is terrain generation in disguise**:
-`LodRegion.BuildMeshData` prefetches 36 / 100 / 324 chunk columns at levels 0 / 1 / 2 and *generates
-on the spot* any column missing from `Chunk.ColumnCache`, so the LOD builder and the four chunk-gen
-threads contend on one 16384-entry cache that a single level-2 ring sweeps roughly three times over
-before dropping **everything** at its cap. With C5's thread pool declined, cutting that work is the
-**only** lever left on that contention, and the same wholesale `Clear()` is a named part of the
-teleport hitch. Its bullet already carries the arithmetic and the second site
-(`WormCarver.CellCache`). Effort M, risk low-med, and unlike R10 it has a plausible path to the
-`lod`/`chunkDirty` rows the hitch ranking's item 1 is about.
+Start here. The accumulated gate machinery — every trap a scenario-based comparison has fallen into
+in this series — is the **"Gate traps that still apply to any scenario-based comparison"** list
+immediately above; read it before designing any capture, and read the bullet of whatever item you
+take before touching its code. What follows is the hand-off: what just landed, and what to take next
+and why.
 
-**Then C6**, the cheapest remaining item — but **re-read the standing obligation on C3's chunk-scan
-frontier in Carried forward *before* touching `UnloadDistantChunks`**, not after. C6 shares that
-method with the removal counter, and it is the one place in the tree where a careless edit can starve
-a chunk permanently; the bump's position after the unload loop and its `removed > 0` gate are both
-load-bearing and both killed by named facts.
+Next: **D2 landed, and it landed as a counted win rather than a timed one.** Both deterministic
+worldgen caches (`Chunk.ColumnCache`, `WormCarver.CellCache`) now evict generationally through
+`GenerationalCache` instead of clearing wholesale at their cap, at unchanged capacity. The exact
+replay in **"Measurement: D2"** is the number: chunk generation's own misses while a LOD ring sweep
+runs fall **1219 -> 733 (-40 %)** and avoidable recomputes overall fall **5473 -> 3413 (-38 %)**,
+with the old wholesale `Clear()` confirmed firing **3 times in a single level-2 pass**. Four things
+from that round change what the next one should believe:
+
+1. **The `perf-fly` 60 s window is saturated for LOD as well as chunks.** All ten counterbalanced
+   runs ended at the identical `chunks 17077` and `regions 907-913/645`, so every end-state
+   throughput field measures the scenario's ceiling and **nothing isolated; nothing was quoted**.
+   Any future frame-time claim on this family needs a **time-to-N rule on a non-saturating window,
+   pre-registered before the capture**. Do not try to rescue a number out of the existing logs.
+2. **R10's within-tree-constant pixel instrument needs an exact permutation null** — with 3 runs per
+   tree, `p = rank/10` over the 10 distinct 3-vs-3 relabellings. Without it the raw residue on
+   `lod-horizon` looked like a finding and was not (the real split ranked 6th/2nd/4th/10th).
+3. **`ColumnCaps` already costs something today.** Two output-determinism facts
+   (`LodBuildPoolTests.RegionBuildsAreIdenticalWhicheverThreadRunsThem`,
+   `LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel`) are intermittent in
+   full-suite runs because it is process-global with no reset hook — **reproduced on pristine HEAD,
+   so not a regression**, but expect them and do not chase them as someone else's bug.
+4. **`ColumnCacheGenerations` is a one-token re-pricing lever with a measured lower edge**: G = 2 is
+   *worse* than the old wholesale clear, and G = 8 wins on totals while losing on chunk-gen's own
+   misses. Re-price it only against a real capture, never blind.
+
+**Then C6**, still the cheapest remaining item — but **re-read the standing obligation on C3's
+chunk-scan frontier in Carried forward *before* touching `UnloadDistantChunks`**, not after. C6
+shares that method with the removal counter, and it is the one place in the tree where a careless
+edit can starve a chunk permanently; the bump's position **after** the unload loop and its
+`removed > 0` gate are both load-bearing and both killed by named facts. D2 did not touch
+`UnloadDistantChunks` at all, so that obligation is exactly as it was.
 
 **D1** (packed chunk keys) is a broad-but-mechanical L and is best taken entirely on its own, with
 nothing else in the round; it would also make the frontier's per-probe `NeedsChunk` cheaper. Note
-that `LodManager` is already keyed by integer tuples, so D1 is chunk-side only and R10 changed
-nothing about that.
+that `LodManager` is already keyed by integer tuples, so D1 is chunk-side only and neither R10 nor
+D2 changed that.
 
-**D5 is measurement only, and R10 made it more interesting without fixing it.** There are now
-**three** pools on one allocator and the third is a much higher-churn client: LOD churn is **paired**
-(up to 2 `TryAllocate` per arrival, 2 `Free` per departure) and its unload path is **unbounded per
-frame**, unlike the chunk side's 32-per-frame cap. R10 pinned the pathological free-list length
-(**380** blocks mid-teleport at the resident ceiling) *and* measured the realistic one (the largest
-real burst in a 60 s fly is 148 regions in one frame, <= 296 `Free`s, with departures geographically
-clustered so the list coalesces as it drains). It also proved the coalescing is sound — nothing leaks
-across a full stream-in/stream-out cycle — so **D5's defect is scan cost, not fragmentation**. Take
-the measurement its bullet asks for (log `FreeBlockCount` on the pool-growth line, capture it
-mid-stream and just after a teleport, now on **three** pools), not the rewrite; and price the "fuse a
-region's shell and sheet into one paired allocation" remedy recorded there against the data-structure
-change, since it may be the cheaper half.
+**D5 is measurement only**, and its bullet already says what to capture: log `FreeBlockCount` on the
+pool-growth line and read it mid-stream and just after a teleport, on **three** pools, before
+committing to any rewrite. R10 proved the coalescing sound and pinned both the pathological
+(380 blocks mid-teleport) and the realistic (<= 296 `Free`s in the largest real burst) list lengths,
+so **D5's defect is scan cost, not fragmentation** — price the "fuse a region's shell and sheet into
+one paired allocation" remedy recorded there against the data-structure change, since it may be the
+cheaper half.
+
+**Where the two new bullets sit in that ordering.** **`D2b`** (`LodRegion.ColumnCaps` grows
+unbounded) is **not a perf item and should not be taken as one**: its entries are irreproducible
+player edits, so it is a *correctness* item waiting on a design, it cannot use D2's scheme or ride
+chunk unload, and a real fix needs caps re-derivable from stored block data — i.e. it is entangled
+with save/load (`TODO.md` `M-1`). Leave it until that design exists. **`D6`** (the three remaining
+`Clear()`-at-cap worldgen caches) is the opposite: **near-free now that `GenerationalCache` exists**,
+three one-line conversions plus one shared eviction fact, and worth folding into whatever round has
+spare budget rather than taking alone. Its sibling `TreeGenerator.CanopyDisturbed` is *not* part of
+it — that one is edit state whose wholesale `Clear()` is a live data-loss bug, filed as `TODO.md`
+`M-10`, and it must never be "fixed" by moving it onto `GenerationalCache`.
 
 **R3** stays parked; read its bullet rather than the one-line summary. **C5's pool size is decided
 and closed** — `MaxConcurrentLodGenerations` ships at **1**, both larger pools were measured and
-declined, and the capture is above: do not re-propose "a bigger pool". **R6 stays reserved for a
-human.**
+declined, and the capture is above: do not re-propose "a bigger pool". (D2 *was* the lever that
+capture pointed at, and it has now been taken; that does not reopen the pool question.) **R6 stays
+reserved for a human** — it is a *trade-off*, not a win, and must not be taken autonomously.
 
 ## Ruled out (do not retry without new evidence)
 

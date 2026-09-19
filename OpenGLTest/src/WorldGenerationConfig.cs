@@ -49,8 +49,14 @@ public static class WorldGenerationConfig
     // build, tracking the column count, not the mesh). The four chunk-gen threads are doing that
     // same work on that same cache at that same moment, so LodGen workers do not add throughput to
     // an idle resource -- they contend for the one the burst already saturates. The lever the
-    // measurement points at is cutting the work (item D2, ColumnCache's wholesale Clear() and its
-    // 16384-entry cap against a level-2 ring of roughly 51k distinct columns), not more threads.
+    // measurement pointed at was cutting the work, not more threads, and that lever HAS NOW BEEN
+    // TAKEN (item D2, landed): the cap is unchanged at 16384 entries, but the eviction is no
+    // longer a wholesale Clear(). ColumnCache runs on GenerationalCache, so a level-2 ring sweep
+    // (roughly 51k distinct columns) can only age out the OLDEST generation at a time instead of
+    // dropping chunk generation's hot working set along with its own one-shot columns (that set is
+    // a radius-16 disc: ~800 columns, 933 once each build's 3x3 heightmap neighbourhood is counted).
+    // Measured on the replayed key sequences: chunk-gen's own misses during the mixed burst fell
+    // 1219 -> 733. See PERF_TODO's "Measurement: D2".
     //
     // Everything the pool needed is still here and still correct at N = 1 -- the TryAdd-gated
     // _building claim with both rollbacks, MaxLodBuildsInFlight, the Idle/Throttled split and the
@@ -213,6 +219,26 @@ public const float DayLengthSeconds = 1200f;
     // --- Terrain ---
     // Every noise channel derives its seed from this one (TerrainGenerator, NoiseCaves, WormCarver)
     public const int Seed = 1337;
+
+    // --- Deterministic worldgen caches (GenerationalCache) ---
+    // Chunk.GetColumnData's cache. Column data depends only on (x, z), so one entry serves the whole
+    // vertical chunk stack and the far LOD alike.
+    //
+    // CAPACITY is unchanged from the wholesale-Clear() era on purpose: the residency ceiling does not
+    // move, only the eviction policy does. A ColumnData is seven 256-element arrays plus scalars
+    // (int[] Heights/Bed/WaterLevel, float[] EntranceWeight/CaveIntensity, byte[] DirtDepth,
+    // byte-backed Biome[]), which is about 5.9 KB, so 16384 entries is roughly 96 MB -- NOT the
+    // "~40 MB" the old Chunk.cs comment claimed, a figure that predated Bed, WaterLevel and Biomes.
+    // That arithmetic is exactly why item D2's fix is more GENERATIONS at the same capacity rather
+    // than a bigger cache.
+    //
+    // GENERATIONS is the one-token re-pricing lever a later round can move: at G the sweep can age
+    // out only the oldest 1/G of the cache at a time, and anything read while it sits in that oldest
+    // generation is promoted forward instead of dropped. Higher G retains more of the hot set but
+    // narrows each generation's insert budget; see GenerationalCache's numbered invariants (7a/7b)
+    // and PERF_TODO's D2 measurement table.
+    public const int ColumnCacheCapacity = 16384;
+    public const int ColumnCacheGenerations = 4;
 
     // Blocks of dirt under the grass: DirtDepthBase +- DirtDepthVariation, varying slowly over the map
     public const float DirtDepthBase = 3f;
@@ -639,6 +665,18 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int WormStartDepthMax = 60;
     public const float WormSurfaceMargin = 6f;              // stay this far under the surface outside entrances
     public const float WormBranchChance = 0.1f;             // per 20 nodes
+
+    // WormCarver.GetCellWorms' cache, on the same GenerationalCache as the column cache above.
+    // CAPACITY is unchanged from the wholesale-Clear() era and sits one to two orders of magnitude
+    // ABOVE this cache's working set: cells are 64 blocks (CarverCellShift = 6), Carve asks for a
+    // (2 * WormReachCells + 1)^2 = 25-cell window per chunk, and the whole chunk load sphere
+    // (ChunkRadius = 16 chunks = 256 blocks) spans only on the order of 150 cells. The LOD builder
+    // never touches this cache at all -- it reads heightmaps only. So the old Clear() essentially
+    // never fired in play and this conversion buys UNIFORMITY plus removal of the all-locks
+    // ConcurrentDictionary.Count from the miss path, not a hit rate; the measurable half of item D2
+    // is Chunk.ColumnCache. GENERATIONS matches the column cache so the two sites read alike.
+    public const int CellCacheCapacity = 4096;
+    public const int CellCacheGenerations = 4;
 
     // --- Trees (TreeGenerator) ---
     public const bool TreesEnabled = true;

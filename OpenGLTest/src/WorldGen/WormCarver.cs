@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
 
@@ -21,9 +20,29 @@ public static class WormCarver
 
     private static readonly Worm[] NoWorms = [];
 
-    // Same growth cap + wholesale clear as Chunk's column cache; entries are deterministic
-    private static readonly ConcurrentDictionary<(int X, int Z), Worm[]> CellCache = new();
-    private const int CellCacheLimit = 4096;
+    // Cell worms are a pure deterministic function of (cellX, cellZ) and the world seed, and a
+    // Worm[] -- along with every CaveNode inside it -- is written once in BuildCell and never
+    // mutated after publication. That is what lets this share Chunk.ColumnCache's GenerationalCache
+    // and its numbered invariants: an eviction, a race or a duplicate entry can only ever cost a
+    // recompute, never yield a wrong value.
+    //
+    // HONEST FINDING (item D2 assumed the two sites were symmetric; they are not). Cells are 64
+    // blocks (CarverCellShift = 6), Carve asks for a (2 * WormReachCells + 1)^2 = 25-cell window per
+    // chunk, and the whole chunk load sphere (ChunkRadius = 16 chunks = 256 blocks) spans only on the
+    // order of 150 cells -- so the 4096-cell capacity is one to two orders of magnitude above the
+    // working set and the old wholesale Clear() essentially never fired in play. The LOD builder
+    // never touches this cache either; it reads heightmaps only. So this conversion buys UNIFORMITY
+    // (AGENTS.md documents the two caches as one deliberate pattern, and a silent divergence would be
+    // worse than either policy) plus removal of the all-locks ConcurrentDictionary.Count from the
+    // miss path -- and NOT a hit-rate win. The measurable half of D2 is Chunk.ColumnCache.
+    //
+    // Sizing knobs live in WorldGenerationConfig; the safety argument lives in GenerationalCache.
+    private static readonly GenerationalCache<(int X, int Z), Worm[]> CellCache =
+        new(WorldGenerationConfig.CellCacheCapacity, WorldGenerationConfig.CellCacheGenerations);
+
+    // Static delegate, not a lambda at the call site: a closure would be a per-miss allocation on
+    // every chunk-generation thread.
+    private static readonly Func<(int X, int Z), Worm[]> BuildCellFor = static key => BuildCell(key.X, key.Z);
 
     /// <summary>
     /// Carves every worm from the cells within reach through this chunk. Only <paramref name="blocks"/>
@@ -100,20 +119,7 @@ public static class WormCarver
         }
     }
 
-    private static Worm[] GetCellWorms(int cellX, int cellZ)
-    {
-        var key = (cellX, cellZ);
-        if (CellCache.TryGetValue(key, out var cached))
-            return cached;
-
-        var worms = BuildCell(cellX, cellZ);
-
-        if (CellCache.Count >= CellCacheLimit)
-            CellCache.Clear();
-
-        CellCache[key] = worms;
-        return worms;
-    }
+    private static Worm[] GetCellWorms(int cellX, int cellZ) => CellCache.GetOrAdd((cellX, cellZ), BuildCellFor);
 
     private static Worm[] BuildCell(int cellX, int cellZ)
     {

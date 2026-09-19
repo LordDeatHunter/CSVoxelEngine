@@ -1,6 +1,5 @@
 using System;
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Silk.NET.OpenGL;
 using System.Numerics;
@@ -160,12 +159,30 @@ public class Chunk : IDisposable
     /// </summary>
     internal ushort[]? FluidFrontier { get; private set; }
 
-    // Column data only depends on (x, z), so vertical chunk stacks share one entry.
-    // The outermost LOD ring touches more columns than this (they're computed once per region
-    // build and rarely revisited), so occasional Clear + recompute is cheaper than a bigger
-    // cache. 16k entries is ~40 MB.
-    private static readonly ConcurrentDictionary<(int X, int Z), ColumnData> ColumnCache = new();
-    private const int ColumnCacheLimit = 16384;
+    // Column data only depends on (x, z), so vertical chunk stacks share one entry. Sizing (capacity,
+    // generations and the memory arithmetic behind both) lives in WorldGenerationConfig; the safety
+    // argument - why an eviction, a race or a duplicate can only ever cost a recompute - is the
+    // numbered invariant list on GenerationalCache. Neither is restated here.
+    //
+    // What the old wholesale Clear()-at-the-cap actually cost (item D2): chunk generation's own
+    // working set is small - ChunkRadius = 16 is a disc of roughly 800 distinct columns, re-asked
+    // constantly by the vertical stack - while ONE level-2 LOD ring sweeps roughly 51k columns
+    // through LodRegion.BuildMeshData's 324-column prefetch. So the sweep tripped the 16384 cap
+    // about three times per pass, and every trip threw away chunk-gen's permanently-hot columns
+    // along with the sweep's one-shot ones. With four generations the sweep can only age out the
+    // oldest quarter at a time, and anything read while it sits in that oldest quarter is carried
+    // forward instead of dropped.
+    //
+    // Second, separate cost removed: the cap test was `ColumnCache.Count >= limit`, and
+    // ConcurrentDictionary.Count acquires EVERY lock in the table. It was evaluated on every single
+    // miss - i.e. on the exact path the four chunk-gen threads and the LOD builder share.
+    // GenerationalCache counts its own inserts with Interlocked instead.
+    private static readonly GenerationalCache<(int X, int Z), ColumnData> ColumnCache =
+        new(WorldGenerationConfig.ColumnCacheCapacity, WorldGenerationConfig.ColumnCacheGenerations);
+
+    // Static, so a miss on any of the four chunk-gen threads does not allocate a closure per call
+    private static readonly Func<(int X, int Z), ColumnData> ComputeColumn =
+        static key => TerrainGenerator.Compute(key.X, key.Z);
 
     // Meshing lookup tables, flattened from CubeFaces/AONeighbors into padded-snapshot index deltas
     private static readonly int[] FaceNeighborDelta = new int[6];
@@ -692,21 +709,8 @@ public class Chunk : IDisposable
     /// above Heights[x, z]; the block at that height is solid unless a cave or entrance carved
     /// it. Cached, deterministic, and safe to call from any thread.
     /// </summary>
-    public static ColumnData GetColumnData(int chunkX, int chunkZ)
-    {
-        var key = (chunkX, chunkZ);
-        if (ColumnCache.TryGetValue(key, out var cached))
-            return cached;
-
-        var column = TerrainGenerator.Compute(chunkX, chunkZ);
-
-        // Crude growth cap; entries are deterministic so a full reset is harmless
-        if (ColumnCache.Count >= ColumnCacheLimit)
-            ColumnCache.Clear();
-
-        ColumnCache[key] = column;
-        return column;
-    }
+    public static ColumnData GetColumnData(int chunkX, int chunkZ) =>
+        ColumnCache.GetOrAdd((chunkX, chunkZ), ComputeColumn);
 
     /// <summary>
     /// The terrain heightmap for a chunk column, indexed by (x &lt;&lt; SizeShift) | z. Ravines

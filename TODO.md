@@ -286,6 +286,24 @@ same world, and a player can move between them freely — neither arc gates the 
   old TODO.
 - [ ] **`M-9` · Mod / data-pack behavior hooks** — P3, XL.
   Data packs already exist; consider a scripting/behavior hook.
+- [ ] **`M-10` · Fix: `TreeGenerator.CanopyDisturbed` loses felled-canopy markers at its cap** —
+  P2, S. **It is edit state, not a cache.** `TreeGenerator.PoisonCanopy` (`TreeGenerator.cs:449-460`)
+  records that a player cleared canopy so the far LOD stops drawing a bump there, writing
+  `(2 * TreeCanopyPoisonRadius + 1)^2` = **289 entries per edited wood/leaf block**
+  (`TreeCanopyPoisonRadius = 8`) and wholesale-`Clear()`ing the whole dictionary at 16384 entries.
+  So after roughly **57 felled trees** every marker is thrown away at once and the LOD starts
+  drawing canopy bumps back over ground the player has already cleared — a visible correctness bug,
+  not a cost. There is a second, smaller defect in the same method: the `Count >= limit` test sits
+  **inside** the 289-iteration loop, so every mined leaf block evaluates
+  `ConcurrentDictionary.Count` — which acquires *every lock in the table* — 289 times, on the main
+  thread, during mining. **This must NOT be "fixed" by moving it onto `GenerationalCache`** (the
+  type introduced by PERF_TODO item D2): that type is for values which are a pure function of their
+  key, where an eviction costs only a recompute. Here nothing can regenerate a marker from the key,
+  so any eviction is data loss. The real fix derives the disturbed set from stored block data, and
+  is therefore entangled with `M-1` (save/load); the cheap interim is to stop the unbounded growth
+  at the source (store one entry per edited chunk column rather than 289 per block) and to hoist
+  the `Count` test out of the loop. The same argument applies to `LodRegion.ColumnCaps`, tracked
+  separately in PERF_TODO's "Open (next round)".
 
 ---
 
