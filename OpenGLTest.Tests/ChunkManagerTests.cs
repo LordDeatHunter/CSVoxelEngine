@@ -138,4 +138,118 @@ public sealed class ChunkManagerTests
         // Fails if the increment is ever moved ahead of the _queuedChunkPositions.TryRemove.
         Assert.True(manager.NeedsChunk(Vector3.Zero));
     }
+
+    /// <summary>
+    /// An unload forgets exactly the placements inside the chunk that left, and nothing else
+    /// (PERF_TODO C6: the flat set scanned per unload became one bucket per chunk position).
+    /// <para>
+    /// The ordering below is load-bearing, because the fact would pass vacuously if no unload
+    /// ever happened: both chunks are registered and every placement is marked BEFORE the camera
+    /// is teleported, and only then does a single Update run. That first Update really does run
+    /// the unload scan — _lastUnloadCamChunk starts null (ChunkManager.cs:96), the same reason
+    /// the removal-version fact above carries this comment — and the two guard assertions on
+    /// Chunks prove the pass actually dropped the far chunk before any placement is probed.
+    /// </para>
+    /// <para>
+    /// The probes straddle the bucket key from both sides. (640,0,0) and (655,15,15) are the
+    /// dropped chunk's inclusive corners, so an off-by-one in the key leaves one of them behind.
+    /// (639,0,0) is one block outside it, in a chunk that was never registered and so can never
+    /// be unloaded, and (0,0,640) is the axis-swapped image of the dropped chunk: a bucket keyed
+    /// on the wrong axis either keeps a corner alive or forgets one of these two.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void UnloadForgetsPlacementsOnlyInsideTheUnloadedChunk()
+    {
+        var manager = new ChunkManager(null!);
+        var farPos = new Vector3(40f, 0f, 0f);
+        foreach (var pos in new[] { Vector3.Zero, farPos })
+        {
+            var chunk = new Chunk(null!, pos, generateBlockData: false);
+            chunk.IsBlockDataReady = true;
+            manager.Chunks[pos] = chunk;
+        }
+
+        // Marked while both chunks are still loaded, so the unload pass below is the only thing
+        // that can drop any of them.
+        var nearCells = new (int X, int Y, int Z)[] { (0, 0, 0), (7, 3, 9), (15, 15, 15) };
+        var farCells = new (int X, int Y, int Z)[] { (640, 0, 0), (655, 15, 15), (647, 8, 4) };
+        var neverLoadedCells = new (int X, int Y, int Z)[] { (639, 0, 0), (0, 0, 640) };
+        foreach (var (x, y, z) in nearCells) manager.MarkPlayerPlaced(x, y, z);
+        foreach (var (x, y, z) in farCells) manager.MarkPlayerPlaced(x, y, z);
+        foreach (var (x, y, z) in neverLoadedCells) manager.MarkPlayerPlaced(x, y, z);
+
+        var camera = new Camera(null, null);
+        camera.TestTeleport(Vector3.Zero, yaw: 0f, pitch: 0f);
+        manager.Update(camera);
+
+        // Guard first: chunk (40,0,0) is 40 chunks out, far past ChunkRadius, while the origin
+        // chunk sits under the camera. Without these the placement assertions could pass on a
+        // manager that never unloaded anything at all.
+        Assert.False(manager.Chunks.ContainsKey(farPos));
+        Assert.True(manager.Chunks.ContainsKey(Vector3.Zero));
+
+        foreach (var (x, y, z) in farCells)
+            Assert.False(manager.IsPlayerPlaced(x, y, z),
+                $"cell ({x},{y},{z}) is inside the unloaded chunk and should have been forgotten");
+        foreach (var (x, y, z) in nearCells)
+            Assert.True(manager.IsPlayerPlaced(x, y, z),
+                $"cell ({x},{y},{z}) is in the chunk that stayed loaded");
+        foreach (var (x, y, z) in neverLoadedCells)
+            Assert.True(manager.IsPlayerPlaced(x, y, z),
+                $"cell ({x},{y},{z}) is in a chunk that was never loaded, so nothing can unload it");
+    }
+
+    /// <summary>
+    /// Buckets are keyed by the floored chunk position, not a truncated one. The code C6 replaced
+    /// derived its bounds with (int)pos.X * Chunk.Size — a truncation that was safe only because
+    /// it read Chunks' own integral keys. The accessors need the floor: block (-1,-1,-1) belongs
+    /// to chunk (-1,-1,-1), and truncation would file it with (0,0,0) in one shared bucket, where
+    /// unloading either chunk would silently take both.
+    /// </summary>
+    [Fact]
+    public void PlacementBucketsAreKeyedByFlooredChunkPosition()
+    {
+        var manager = new ChunkManager(null!);
+        manager.MarkPlayerPlaced(-1, -1, -1);
+        manager.MarkPlayerPlaced(0, 0, 0);
+
+        Assert.True(manager.IsPlayerPlaced(-1, -1, -1));
+        Assert.True(manager.IsPlayerPlaced(0, 0, 0));
+        Assert.Equal(2, manager.PlayerPlacedChunkCount);
+
+        manager.UnmarkPlayerPlaced(0, 0, 0);
+        Assert.False(manager.IsPlayerPlaced(0, 0, 0));
+        Assert.True(manager.IsPlayerPlaced(-1, -1, -1));
+        Assert.Equal(1, manager.PlayerPlacedChunkCount);
+    }
+
+    /// <summary>
+    /// The anti-leak invariant C6 introduces: a bucket is dropped the moment it empties. Without
+    /// it the index keeps one permanent entry per chunk ever edited, which trades the old
+    /// per-unload scan for a slow leak instead of removing a cost. The first assertion also pins
+    /// that the index is bucketed at all — two cells in one chunk are one bucket, so a flat set
+    /// reporting its element count fails here.
+    /// </summary>
+    [Fact]
+    public void UnmarkingTheLastCellDropsItsBucket()
+    {
+        var manager = new ChunkManager(null!);
+        manager.MarkPlayerPlaced(5, 6, 7);
+        manager.MarkPlayerPlaced(5, 6, 8);
+        Assert.Equal(1, manager.PlayerPlacedChunkCount);
+
+        manager.UnmarkPlayerPlaced(5, 6, 7);
+        // Still one cell left, so the bucket stays.
+        Assert.Equal(1, manager.PlayerPlacedChunkCount);
+
+        manager.UnmarkPlayerPlaced(5, 6, 8);
+        Assert.Equal(0, manager.PlayerPlacedChunkCount);
+
+        // FluidManager and TntManager unmark unconditionally on any block removal, so the miss
+        // path must not conjure a bucket to remove a cell from.
+        manager.UnmarkPlayerPlaced(100, 100, 100);
+        Assert.Equal(0, manager.PlayerPlacedChunkCount);
+        Assert.False(manager.IsPlayerPlaced(100, 100, 100));
+    }
 }

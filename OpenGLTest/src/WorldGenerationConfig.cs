@@ -711,6 +711,35 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // camera picks there is always in the open
     public const int TreeSpawnClearRadius = 3;
 
+    // TreeGenerator.ShapeCache and TreeGenerator.CanopyCache, both on the same GenerationalCache as
+    // the column and worm-path caches above (item D6).
+    //
+    // CAPACITY is unchanged from the wholesale-Clear() era on purpose for both: the residency
+    // ceiling does not move, only the eviction policy does.
+    //
+    // The SHAPE cache holds (baseY, TreeShape) per accepted trunk column, keyed by (x, z). It is
+    // genuinely shared: TreeGenerator.Stamp asks it on the four generation workers, and
+    // BuildCanopyTops asks it once per column of a trunk's (2 * TreeReachBlocks + 16)^2 footprint,
+    // which the far-LOD canopy sweep drives.
+    //
+    // The CANOPY cache holds one CanopyColumns (the 16x16 tops and leaf blocks of a chunk column).
+    // Its single engine caller is LodRegion.BuildMeshData (LodRegion.cs:524), which asks
+    // TryGetCanopy for every FINE column of a region -- that is what makes the 4096 cap bite. The
+    // radius-8 region disc LodManager.BuildSortedOffsets builds is 197 regions, and this round's
+    // capture (OpenGLTest.Tests/WorldgenShapeCacheReplayProbe.cs) counted its distinct chunk
+    // columns per level: 3152 at level 0 (under the cap), 12608 at level 1 and 50432 at level 2,
+    // so it is the outer rings rather than the near one that outrun this cache.
+    //
+    // GENERATIONS is 4 at both sites, matching ColumnCacheGenerations and CellCacheGenerations so
+    // all five GenerationalCache sites read alike. G is the one-token re-pricing lever, and
+    // PERF_TODO's lesson 4 allows moving it only against a real capture -- the probe named above is
+    // this round's, and its interleaved rows never showed G = 4 missing more than the old wholesale
+    // Clear() for either cache, so neither value was re-priced.
+    public const int TreeShapeCacheCapacity = 16384;
+    public const int TreeShapeCacheGenerations = 4;
+    public const int TreeCanopyCacheCapacity = 4096;
+    public const int TreeCanopyCacheGenerations = 4;
+
     // --- Spruce (TreeGenerator's taiga conifer) ---
     // The taiga grows a cone: a full-cube spruce trunk with needle blobs stacked every level from
     // SpruceCrownStart up to the tip, their radius tapering from SpruceMaxRadius to one. Placement
@@ -745,6 +774,22 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Chunk border margin: how far a stem outside this chunk can still reach into it
     public const int CactusReachBlocks = 6;
     public const int CactusMaxHeightBlocks = 12;
+
+    // CactusGenerator.ShapeCache, on the same GenerationalCache as the worldgen caches above
+    // (item D6). It holds (baseY, CactusShape) per accepted stem column, keyed by (x, z).
+    //
+    // CAPACITY is unchanged from the wholesale-Clear() era on purpose: the residency ceiling does
+    // not move, only the eviction policy does. This is the quietest of the three D6 caches --
+    // CactusGenerator.Stamp on the generation workers is its only caller, and nothing sweeps it, so
+    // only a long traverse across desert can outrun it.
+    //
+    // GENERATIONS matches ColumnCacheGenerations and CellCacheGenerations so all five
+    // GenerationalCache sites read alike. G is the one-token re-pricing lever, and PERF_TODO's
+    // lesson 4 allows moving it only against a real capture -- this round's is
+    // OpenGLTest.Tests/WorldgenShapeCacheReplayProbe.cs, whose interleaved rows never showed G = 4
+    // missing more than the old wholesale Clear() at any swept key cardinality, so 4 stands.
+    public const int CactusShapeCacheCapacity = 16384;
+    public const int CactusShapeCacheGenerations = 4;
 
     // --- Canopy wind (leaf-wave vertex shader) ---
     // Master strength of the leaf sway, 0 disables it; wavelengths and gusts live in

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 
 namespace silkgltriangle;
@@ -18,8 +17,31 @@ public static class CactusGenerator
 
     // Stems are a pure function of (x, z) but every chunk in reach rebuilds each one, so the
     // shapes are cached exactly like tree trunks: deterministic, read-only after build.
-    private static readonly ConcurrentDictionary<(int X, int Z), (int BaseY, CactusShape Shape)> ShapeCache = new();
-    private const int ShapeCacheLimit = 16384;
+    //
+    // The old policy was `if (Count >= 16384) Clear()` on the miss path, which threw the whole
+    // working set away at the cap AND evaluated the concurrent dictionary's Count -- a barrier that
+    // takes EVERY lock in the table -- on every single miss (the same cost Chunk.ColumnCache shed
+    // in D2). Unlike tree shapes this cache has exactly one caller, Stamp on the generation
+    // workers: nothing sweeps it, so only a traverse across desert can outrun its capacity.
+    // Residency is unchanged; only the eviction policy moved.
+    // Sizing knobs live in WorldGenerationConfig; the safety argument lives in GenerationalCache.
+    private static readonly GenerationalCache<(int X, int Z), (int BaseY, CactusShape Shape)> ShapeCache =
+        new(WorldGenerationConfig.CactusShapeCacheCapacity, WorldGenerationConfig.CactusShapeCacheGenerations);
+
+    // Static delegate, not a lambda at the call site. GetOrAdd's factory takes the key alone, and
+    // TryGetCactus has baseY in hand by the time it reaches the cache -- but capturing it would
+    // allocate a closure on EVERY call, hits included, on the four chunk-gen threads. Recomputing
+    // it from the key costs one cache-backed lookup on a MISS only (HeightAt is pure and reads the
+    // same deterministic column data TryGetCactus just read), so the trade is per-miss work for
+    // zero per-call garbage -- the same reason Chunk.ComputeColumn and WormCarver.BuildCellFor are
+    // static fields. No biome branch is needed here: TryGetCactus has already proved the column is
+    // Desert before it ever reaches the cache, and BuildShape takes no biome. The identity
+    // `baseY == HeightAt(x, z) + 1` is pinned by a test, not asserted here.
+    private static readonly Func<(int X, int Z), (int BaseY, CactusShape Shape)> BuildShapeFor = static key =>
+    {
+        var baseY = HeightAt(key.X, key.Z) + 1;
+        return (baseY, BuildShape(key.X, key.Z, baseY));
+    };
 
     private static readonly byte WoodFamily;
 
@@ -101,20 +123,9 @@ public static class CactusGenerator
             || Math.Abs(HeightAt(x, z - 1) - height) > slope)
             return false;
 
-        baseY = height + 1;
-        var skey = (x, z);
-        if (ShapeCache.TryGetValue(skey, out var cached))
-        {
-            baseY = cached.BaseY;
-            shape = cached.Shape;
-            return true;
-        }
-
-        if (ShapeCache.Count >= ShapeCacheLimit)
-            ShapeCache.Clear();
-
-        shape = BuildShape(x, z, baseY);
-        ShapeCache[skey] = (baseY, shape);
+        var entry = ShapeCache.GetOrAdd((x, z), BuildShapeFor);
+        baseY = entry.BaseY;
+        shape = entry.Shape;
         return true;
     }
 

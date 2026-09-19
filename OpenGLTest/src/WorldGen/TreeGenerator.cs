@@ -22,8 +22,34 @@ public static class TreeGenerator
     // one (plus the canopy-top pass does it again), so shapes dominate worldgen garbage.
     // Cached exactly like worm paths: deterministic, read-only after build (callers only
     // enumerate the lists), safe to share across the generation workers.
-    private static readonly ConcurrentDictionary<(int X, int Z), (int BaseY, TreeShape Shape)> ShapeCache = new();
-    private const int ShapeCacheLimit = 16384;
+    //
+    // The old policy was `if (Count >= 16384) Clear()` on the miss path, which threw the whole
+    // working set away at the cap AND evaluated the concurrent dictionary's Count -- a barrier that
+    // takes EVERY lock in the table -- on every single miss, on the four generation workers and the
+    // LOD builder alike (the same cost Chunk.ColumnCache shed in D2). This cache is genuinely
+    // shared between Stamp (generation workers) and BuildCanopyTops (the far-LOD canopy sweep,
+    // which scans a (2 * TreeReachBlocks + 16)^2 footprint per chunk column), so the two streams
+    // used to evict each other wholesale. Residency is unchanged; only the eviction policy moved.
+    // Sizing knobs live in WorldGenerationConfig; the safety argument lives in GenerationalCache.
+    private static readonly GenerationalCache<(int X, int Z), (int BaseY, TreeShape Shape)> ShapeCache =
+        new(WorldGenerationConfig.TreeShapeCacheCapacity, WorldGenerationConfig.TreeShapeCacheGenerations);
+
+    // Static delegate, not a lambda at the call site. GetOrAdd's factory takes the key alone, and
+    // TryGetTrunk has baseY and the biome in hand by the time it reaches the cache -- but capturing
+    // them would allocate a closure on EVERY call, hits included, on the four chunk-gen threads and
+    // the LOD builder. Recomputing both from the key costs two cache-backed lookups on a MISS only
+    // (HeightAt and BiomeAt are pure and read the same deterministic column data TryGetTrunk just
+    // read), so the trade is per-miss work for zero per-call garbage -- the same reason
+    // Chunk.ComputeColumn and WormCarver.BuildCellFor are static fields. The identity
+    // `baseY == HeightAt(x, z) + 1` is pinned by a test, not asserted here.
+    private static readonly Func<(int X, int Z), (int BaseY, TreeShape Shape)> BuildShapeFor = static key =>
+    {
+        var baseY = HeightAt(key.X, key.Z) + 1;
+        var shape = TerrainGenerator.BiomeAt(key.X, key.Z) == Biome.Taiga
+            ? BuildSpruceShape(key.X, key.Z, baseY)
+            : BuildShape(key.X, key.Z, baseY);
+        return (baseY, shape);
+    };
 
     /// <summary>Block the broadleaf canopy is made of; the wood ids come from <see cref="WoodId"/>.</summary>
     public static readonly byte LeavesBlock;
@@ -140,21 +166,9 @@ public static class TreeGenerator
             || Math.Abs(HeightAt(x, z - 1) - height) > slope)
             return false;
 
-        baseY = height + 1;
-        var skey = (x, z);
-        if (ShapeCache.TryGetValue(skey, out var cached))
-        {
-            baseY = cached.BaseY;
-            shape = cached.Shape;
-            return true;
-        }
-
-        // Crude growth cap like the column and worm caches; a full reset just rebuilds.
-        if (ShapeCache.Count >= ShapeCacheLimit)
-            ShapeCache.Clear();
-
-        shape = biome == Biome.Taiga ? BuildSpruceShape(x, z, baseY) : BuildShape(x, z, baseY);
-        ShapeCache[skey] = (baseY, shape);
+        var entry = ShapeCache.GetOrAdd((x, z), BuildShapeFor);
+        baseY = entry.BaseY;
+        shape = entry.Shape;
         return true;
     }
 
@@ -385,16 +399,30 @@ public static class TreeGenerator
     // Canopy tops per chunk column (index (x & mask) << shift | (z & mask)): the highest leaf
     // cell over each ground column, 0 where the sky is clear, plus the leaf block that owns
     // that top cell (broadleaf vs spruce). The far LOD reads both instead of block data so
-    // distant forests show in the right foliage. Same growth cap + wholesale clear as the other
-    // worldgen caches; entries are deterministic so a reset is harmless. A new canopy species
-    // only needs its LeafBlock stored here; the LOD then picks it up via CanopyLeafBlock.
+    // distant forests show in the right foliage. Entries are a pure function of the chunk column
+    // (BuildCanopyTops reads only TryGetTrunk), so eviction is always safe -- edits never enter
+    // here, they live in CanopyDisturbed, which the CALLERS consult. A new canopy species only
+    // needs its LeafBlock stored here; the LOD then picks it up via CanopyLeafBlock.
     internal sealed class CanopyColumns(int[] tops, byte[] leafBlocks)
     {
         public readonly int[] Tops = tops;
         public readonly byte[] LeafBlocks = leafBlocks;
     }
-    private static readonly ConcurrentDictionary<(int X, int Z), CanopyColumns> CanopyCache = new();
-    private const int CanopyCacheLimit = 4096;
+
+    // Was `if (Count >= 4096) Clear()` on the miss path, with the concurrent dictionary's Count --
+    // a barrier that takes every lock in the table -- evaluated on every miss. Its one engine
+    // caller is the far LOD: LodRegion.BuildMeshData asks TryGetCanopy once per FINE column of a
+    // region, so a ring sweep walks far more distinct chunk columns than the cap holds, and used to
+    // wipe the whole set each time it ran past it. Residency is unchanged; only the eviction policy
+    // moved. Sizing knobs live in WorldGenerationConfig; the safety argument lives in
+    // GenerationalCache.
+    private static readonly GenerationalCache<(int X, int Z), CanopyColumns> CanopyCache =
+        new(WorldGenerationConfig.TreeCanopyCacheCapacity, WorldGenerationConfig.TreeCanopyCacheGenerations);
+
+    // Static delegate, not a lambda at the call site: a closure would allocate on every call, hits
+    // included, on the LOD builder thread (see BuildShapeFor).
+    private static readonly Func<(int X, int Z), CanopyColumns> BuildCanopyFor =
+        static key => BuildCanopyTops(key.X, key.Z);
 
     // Fine columns whose canopy was edited by the player (mined wood/leaves, blasts, fells).
     // The static canopy above knows nothing of edits, so lookups here read 0 (no bump) rather
@@ -461,20 +489,8 @@ public static class TreeGenerator
 
     internal static int[] GetCanopyTops(int chunkX, int chunkZ) => GetCanopyColumns(chunkX, chunkZ).Tops;
 
-    internal static CanopyColumns GetCanopyColumns(int chunkX, int chunkZ)
-    {
-        var key = (chunkX, chunkZ);
-        if (CanopyCache.TryGetValue(key, out var cached))
-            return cached;
-
-        var built = BuildCanopyTops(chunkX, chunkZ);
-
-        if (CanopyCache.Count >= CanopyCacheLimit)
-            CanopyCache.Clear();
-
-        CanopyCache[key] = built;
-        return built;
-    }
+    internal static CanopyColumns GetCanopyColumns(int chunkX, int chunkZ) =>
+        CanopyCache.GetOrAdd((chunkX, chunkZ), BuildCanopyFor);
 
     // Raises each ground column under a nearby trunk's canopy cells to the highest leaf cell
     // above it. Trunks up to TreeReachBlocks outside the chunk still overhang it.

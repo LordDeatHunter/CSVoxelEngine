@@ -144,19 +144,54 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     }
 
     // World cells the player built (integer coords): breaking one never fells a tree, it just
-    // drops as-is with no toppling entity. Main thread only, like every other block edit.
+    // drops as-is with no toppling entity. Main thread only, like every other block edit, so
+    // this stays a plain Dictionary/HashSet pair — AGENTS.md reserves the concurrent
+    // collections for genuinely shared state, and nothing off the main thread reads this.
     // Unloaded chunks regenerate from worldgen (edits don't persist), so their entries are
-    // purged on unload to keep the set — and the felling decision — truthful.
-    private readonly HashSet<(int X, int Y, int Z)> _playerPlaced = new();
+    // purged on unload to keep the index — and the felling decision — truthful. Bucketing by
+    // chunk position is what makes that purge cheap: the unload drops one bucket instead of
+    // scanning every placement in the world, which was O(unloads x placements) per unload pass
+    // (PERF_TODO C6). The key is the same Vector3 chunk position Chunks is keyed on, so the
+    // unload site already holds it. A bucket is removed as soon as it empties; without that
+    // the index would grow one permanent entry per chunk ever edited, trading the scan for a
+    // slow leak.
+    private readonly Dictionary<Vector3, HashSet<(int X, int Y, int Z)>> _playerPlacedByChunk = new();
 
     /// <summary>Whether the world cell was built by the player rather than generated.</summary>
-    public bool IsPlayerPlaced(int x, int y, int z) => _playerPlaced.Contains((x, y, z));
+    public bool IsPlayerPlaced(int x, int y, int z) =>
+        _playerPlacedByChunk.TryGetValue(VoxelCoords.ChunkPosOf(x, y, z), out var cells) &&
+        cells.Contains((x, y, z));
 
     /// <summary>Records a player placement (called by <see cref="Chunk.PlaceBlockAt"/>).</summary>
-    public void MarkPlayerPlaced(int x, int y, int z) => _playerPlaced.Add((x, y, z));
+    public void MarkPlayerPlaced(int x, int y, int z)
+    {
+        var chunkPos = VoxelCoords.ChunkPosOf(x, y, z);
+        if (!_playerPlacedByChunk.TryGetValue(chunkPos, out var cells))
+        {
+            cells = new HashSet<(int X, int Y, int Z)>();
+            _playerPlacedByChunk[chunkPos] = cells;
+        }
+
+        cells.Add((x, y, z));
+    }
 
     /// <summary>Forgets a placement once its block is gone (mined, felled or blasted).</summary>
-    public void UnmarkPlayerPlaced(int x, int y, int z) => _playerPlaced.Remove((x, y, z));
+    public void UnmarkPlayerPlaced(int x, int y, int z)
+    {
+        // Most callers unmark unconditionally on any block removal, so the miss path has to
+        // stay a lookup that allocates nothing.
+        var chunkPos = VoxelCoords.ChunkPosOf(x, y, z);
+        if (!_playerPlacedByChunk.TryGetValue(chunkPos, out var cells)) return;
+
+        cells.Remove((x, y, z));
+        if (cells.Count == 0) _playerPlacedByChunk.Remove(chunkPos);
+    }
+
+    /// <summary>
+    /// How many chunks currently hold at least one player placement. Diagnostics and tests
+    /// only: it exists so the empty-bucket invariant above is pinnable.
+    /// </summary>
+    internal int PlayerPlacedChunkCount => _playerPlacedByChunk.Count;
 
     public void Update(Camera camera)
     {
@@ -212,14 +247,9 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             _dirtyChunks.TryRemove(pos, out _);
 
             // Edits don't survive an unload (the chunk regenerates from worldgen), so
-            // placements inside it stop being player-placed too
-            var x0 = (int)pos.X * Chunk.Size;
-            var y0 = (int)pos.Y * Chunk.Size;
-            var z0 = (int)pos.Z * Chunk.Size;
-            _playerPlaced.RemoveWhere(cell =>
-                cell.X >= x0 && cell.X < x0 + Chunk.Size &&
-                cell.Y >= y0 && cell.Y < y0 + Chunk.Size &&
-                cell.Z >= z0 && cell.Z < z0 + Chunk.Size);
+            // placements inside it stop being player-placed too. The bucket IS the chunk, so
+            // that is now one dictionary removal instead of a scan of every placement.
+            _playerPlacedByChunk.Remove(pos);
         }
 
         // After the loop, not inside it: the position only becomes needed once it has left

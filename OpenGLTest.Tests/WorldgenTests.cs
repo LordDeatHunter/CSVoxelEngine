@@ -5,6 +5,10 @@ using Xunit;
 
 namespace silkgltriangle.Tests;
 
+// Shares a collection with WorldgenShapeCacheEvictionTests so its forced shape-cache eviction
+// never lands between TrunkShapeIsCachedAcrossChunks' two adjacent TryGetTrunk calls - that
+// assertion compares the shape's lists by reference. See WorldgenShapeCacheCollection.
+[Collection("Worldgen shape cache")]
 public sealed class WorldgenTests
 {
     public WorldgenTests() => TestContent.EnsureLoaded();
