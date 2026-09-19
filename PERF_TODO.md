@@ -248,65 +248,6 @@ protocol above before trusting it. The entries below the passes repeat nothing f
     `LodColumnCapTests.cs:37` and `LodHeightSamplingTests.cs:123` already dodge it with far
     coordinates and say so in comments; those two classes do not.
   **Impact low (memory) / med (correctness) · risk med · effort L, and blocked on a design.**
-- [ ] **D5 · The geometry free list is a flat linearly-scanned list** —
-  `GeometryAllocator` keeps free blocks in one offset-sorted `List<(int, int)>`
-  (`GeometryAllocator.cs:24`); `TryAllocate` first-fits by walking it from the front
-  (`:61-80`) and `Free` walks it again for the insertion point (`:95-107`) before an
-  O(n) `List.Insert` (`:109`) and the coalesce (`:113-130`). Both run on the render
-  thread from `ChunkGeometryPool.Upload` / `Free` (`ChunkGeometryPool.cs:144-167`,
-  `:171`) — up to 32 uploads a frame (`WorldGenerationConfig.MaxMeshUploadsPerFrame`,
-  `WorldGenerationConfig.cs:16`) and one free per
-  disposed chunk, which is what the teleport unload storm (17077 -> 4991 chunks)
-  turns into a burst. A size-bucketed free list, or an offset-keyed sorted structure
-  beside a largest-block index, makes both O(log n). **Measure first:**
-  `FreeBlockCount` exists (`GeometryAllocator.cs:42`) but is never logged, so add it
-  to the pool-growth log line and capture it mid-stream and just after a teleport
-  before committing — the pool's own comment reports 93 % steady-state utilisation
-  (`ChunkGeometryPool.cs:57-61`, unchanged by R10), which implies a short list and possibly no win at
-  all. The class is GL-free with exhaustive headless coverage
-  (`OpenGLTest.Tests/GeometryAllocatorTests.cs`), so the invariants are already
-  pinned. Distinct from hitch #3 (*geometry pool doubling mid-stream*): that is the
-  GL buffer reallocation and copy on the rare grow, this is the CPU-side
-  first-fit/coalesce scan that runs on every upload and free whether or not the pool
-  grows.
-  **R10 changed the shape of this item without fixing it, and the new client is the interesting
-  one.** There are now **three** pools on this allocator, and the third — `lod`
-  (`ChunkGeometryPool.LodInitialUnits`) — is a much higher-churn client than either chunk pool.
-  LOD churn is **paired**: a region's shell and its sea sheet are two separate `GeometrySlice`s in
-  one pool, so an arrival costs up to **2 `TryAllocate`** and a departure up to **2 `Free`**. And
-  unlike the chunk side, which is capped at 32 uploads a frame, the LOD **unload** path
-  (`LodManager.Update`'s retention loop) is **unbounded per frame**: a far teleport can hand the
-  whole departing resident set to `Free` inside one frame. That makes the free-list scan a **named
-  counter-mechanism to R10's own churn claim**, not merely a latent cost — R10 removed per-region
-  `glDelete*` and put these scans in their place, which is why R10's measurement tested the `lod`
-  row in both directions.
-  **What the round pinned, so the next measurement starts from numbers rather than estimates.**
-  At the 759-region resident ceiling, with every other region departed, the LOD free list peaks at
-  **exactly 380 blocks** (each departed region's shell and sheet coalesce into one 128-unit block;
-  every survivor separates two holes), `LargestFreeBlock` 128 and `UsedUnits` 48512 —
-  `GeometryAllocatorTests.MidTeleportFragmentationPeaksAtAKnownBlockCount`. Every remaining `Free`
-  in such a storm linearly scans that list from the front and `List.Insert`s into it.
-  **But fragmentation is not the defect — scan cost is.**
-  `GeometryAllocatorTests.AFullStreamInAndOutCycleCoalescesBackToOneBlock` frees 1518 slices in a
-  deterministic shuffle and still ends at `FreeBlockCount` 1 with `LargestFreeBlock == Capacity`,
-  so the coalescing is sound and nothing leaks across a stream-in/stream-out cycle. A future round
-  must chase the scan, not a leak.
-  **And the realistic case is well short of the pinned worst case.** R10's `perf-fly` capture found
-  only **5 frames in a 60 s fly with any departure at all**, the largest being **148 regions in one
-  frame** (660 -> 512 resident), i.e. <= 296 `Free` calls — not the 1518 the ceiling allows, because
-  perf-fly's 424-block teleport only clears level 0 and part of level 1 (the three levels reach
-  512 / 1024 / 2048 blocks). Departures are geographically clustered — whole rings vacate together —
-  so the list coalesces aggressively as it drains. R10 also measured the other end: the publish
-  window containing that 148-region unload reported `lod 0.19~0.49` on the **baseline** tree, so the
-  whole of HEAD's per-region GL deletion burst cost at most 0.49 ms, and the free-list scans that
-  replaced it were not separable from it in either direction.
-  **A prepared remedy R10 deliberately did not take:** fusing a region's shell and sheet into one
-  paired allocation would halve LOD's allocator traffic outright (one `TryAllocate` and one `Free`
-  per region). It was rejected for R10 because it needs a new pool API — `Upload` allocates exactly
-  one slice — and because a rebuild that gains or loses its sheet resizes the pair, which the
-  current free-then-upload order handles only by accident. If D5 is ever taken, price this against
-  the data-structure change; it may be the cheaper half.
-  **Impact unknown (measure) · risk low · effort M.**
 
 ### Not chasing (recorded so it is not re-proposed)
 
@@ -377,6 +318,108 @@ needs, not the history.
 
 ### What landed
 
+- **D5 · The geometry free list is an offset-keyed, max-augmented treap, and exact first fit survived
+  the rewrite.** `GeometryAllocator`'s offset-sorted `List<(int, int)>` is gone; free blocks are now
+  nodes in a treap keyed on `Offset`, each carrying `MaxCount`, the largest free `Count` over its
+  subtree (`GeometryAllocator.cs:51-64`). That augmentation is the whole trick: `TryAllocate`
+  (`:132-154`) is a **leftmost descent** — `AllocateFrom` (`:161-197`) goes left whenever the left
+  subtree still holds a block large enough, else takes this node if it fits, else goes right — which
+  is the **lowest-offset block that fits, by construction**, in O(log n). `Free` (`:206-281`) is one
+  neighbour descent that finds predecessor and successor together, then either widens a neighbour in
+  place or inserts one node, with the both-sides merge additionally removing the successor.
+  `LargestFreeBlock` (`:125`) is now an O(1) read of the root's `MaxCount` where it was an O(n) walk,
+  and `FreeBlockCount` (`:94`) is a maintained counter. The **public surface did not change** —
+  `TryAllocate`, `Free`, `Grow`, `Capacity`, `UsedUnits`, `FreeBlockCount`, `LargestFreeBlock` plus
+  this round's three counters — so `ChunkGeometryPool` was not touched by the rewrite at all.
+- **D5 · The bullet's own first suggestion — a size-bucketed free list — was ruled out by the tests,
+  not by taste.** A bucketed list hands back a best fit out of a bucket.
+  `GeometryAllocatorTests.AllocatesFirstFitDeterministically`, `FreeIsReusedFirstFit`,
+  `ASameSizeReallocationAfterAFreeReusesTheSameOffset` and
+  `MidTeleportFragmentationPeaksAtAKnownBlockCount` pin **exact first-fit offsets**, so any structure
+  that ships must reproduce them. That is what forced the offset-ordered, subtree-max-augmented shape
+  and made this **effort L, not the bullet's M**. All ten pre-existing allocator facts are green and
+  **unedited** (the test file's diff is pure insertion); exactly two of the round's own instrument
+  facts were re-valued, each with its new number derived in a rewritten comment. Two facts were added:
+  `TheFreeListDescentVisitsLogarithmicallyManyNodes` (at the pinned 380-block peak a partial fit costs
+  exactly 5 node visits, an exact fit 5, and a request nothing can satisfy exactly **1** — the root's
+  subtree maximum — against a bound of `2 * ceil(log2(380))` = 18) and
+  `EveryOffsetTheFlatListProducedIsReproduced`, which steps the treap and a **verbatim copy of the old
+  flat first fit** in lockstep through four thousand interleaved allocations, frees and six doubling
+  growths, comparing every offset, every success/failure verdict, and used units / block count /
+  largest block after each one. That last fact is the general claim; the ten pinned facts are only a
+  handful of fixed sequences.
+- **D5 · Two implementation choices that are load-bearing and must not be "cleaned up".** A partial fit
+  shaves the front off its node **in place**, raising the key and leaving the priority alone, so an
+  allocation is **one** descent; delete-plus-reinsert would have made it three and broken the
+  logarithmic bound the new fact asserts. The mutation is safe because coalesced blocks are never
+  adjacent, so a raised key can never pass its successor. Priorities are SplitMix64 over the offset
+  with ties broken by offset, so the tree's shape depends on no insertion history and the exact-valued
+  facts stay exact. Nodes are recycled through a private spare list, so steady-state churn allocates
+  nothing on the render thread — without it every insert would have traded the scan win for a GC
+  regression in exactly the mass-unload frames this item is about. The treap is **not concurrent and
+  must not become so**: `GeometryAllocator` is render-thread-only by design.
+- **D5 · What it bought, priced honestly, and what it did not buy.** One GATE-A re-run at the identical
+  setting against the three scored before runs: worst-frame scan steps **7,289,632 / 7,268,352 /
+  7,338,750 -> 340,457** (21.4x), of which opaque **6,341,025 -> 257,702** (24.6x) and lod
+  **7,701 -> 3,288** (2.3x); max `S_sec` **59,205.6 -> 2,327.1** steps/frame (25.4x). **The step counts
+  are not comparable at one price and this file does not quote them as if they were** — a flat-list
+  step is one 8-byte tuple read out of a contiguous prefetched array (measured **1.1468 ns**), a treap
+  step is a pointer chase through a 48-byte instance (measured **3.33 ns/node at 380 nodes**, **5.12
+  at the 2,177-node opaque peak** in churned layout). At the pessimistic **5.1218 ns/node** the worst
+  frame goes **8.335 ms -> 1.744 ms (4.8x)** and `S_sec` **0.06790 -> 0.01192 ms (5.7x)**. Headless, on
+  the pinned LOD storm, **144,400 steps became 8,372** (17.2x). **1.744 ms still clears this round's
+  own 0.20 ms BURST bar, so the allocator cost was not eliminated — the QUADRATIC term was.** The flat
+  list charged O(list length) per free while the length itself grew with the unload; the treap charges
+  O(log length). What remains is proportional to how many chunks one frame disposes, which is
+  `UnloadDistantChunks`' unbounded batch — a separate item nobody has opened. The full tables,
+  including the confirmation microbenchmarks, are in **"Measurement: D5"**.
+- **D5 · The premise the bullet was written on is measured false, and this is the round's most
+  transferable finding.** The bullet framed the item around the **LOD** pool's paired, uncapped churn
+  and cited the pool's 93 % steady-state utilisation as evidence of a short list. Both are wrong.
+  **High utilisation says how full the buffer is, not how many holes the occupancy is threaded
+  through.** The `lod` pool is not the problem at all: its free list peaks at **74-83 blocks**, about
+  21 % of R10's pinned 380-block ceiling, and its worst frame cost **7,913 steps** — 5.5 % of the
+  144,400-step / 0.289 ms arithmetic ceiling that "Measurement: D5" derives for it. What actually fired
+  was the **opaque** pool at **2,264-2,295** free blocks, six times the LOD pool's pinned worst case,
+  contributing **87-90 %** of every fired frame while `lod` contributed **0.014-0.114 %**. Anyone who
+  reopens this path measures the opaque pool first.
+- **D5 · The scouts' open correction, confirmed: the chunk side has no per-frame FREE cap either.**
+  `ChunkManager.UnloadDistantChunks` (`ChunkManager.cs:228-267`) walks the whole `Chunks.Packed` table
+  and disposes **every** out-of-range chunk in one frame; only the **upload** paths are capped
+  (`WorldGenerationConfig.MaxMeshUploadsPerFrame`, 32). So the bullet's "one free per disposed chunk"
+  was an **unbounded burst on the chunk pools exactly as on the LOD pool**, and the 17077 -> 4991
+  teleport figure is what one frame can hand to `Free`. The two sides also differ in a way that
+  matters: chunks arrive in `ConcurrentDictionary` **hash order**, which bears no relation to
+  allocation offset, so under the old flat list those frees stopped roughly **halfway** down the list
+  instead of falling through it — which is how 6.35 million steps came out of a single frame at a list
+  length of ~2,200. LOD's ascending-offset storm fell through instead, giving the clean
+  `Sum(2k+1), k=0..379 = 380^2 = 144,400` steps / 0.289 ms ceiling recorded in "Measurement: D5"; that
+  derivation is written down there so no future round re-derives it.
+- **D5 · The prepared remedy was left unused, and the reason is not the one the file expected.**
+  Fusing a region's shell and sheet into **one** paired allocation (R10's prepared remedy, which the
+  bullet said "may be the cheaper half") was **not taken**. It failed the pre-registered selection
+  rule's **first** condition, not its fragmentation precondition: the rule required the `lod` pool to
+  contribute **>= 60 %** of the fired frame's scan steps and it contributed **0.1 %** — a miss by a
+  factor of ~550 — so the precondition was **never reached and is recorded as not-evaluated rather
+  than untested**. **The hazard it guards against is real and no test encodes it, so it is carried
+  here in prose:** a fused pair is 176-181 units (`ChunkGeometryPool.cs:72`) where its halves floor at
+  64 each, so a fused request fits **strictly fewer holes** than its two halves — and at the pinned
+  380-block peak, where `LargestFreeBlock == 128`, it fits **none at all**, turning two allocations
+  that each succeed on the first hole into one full scan, a failure and a pool grow. Halving the call
+  count is not halving the work. Do not re-propose fusing without measuring that.
+- **D5 · The instrument stays, and it is the standing free-list instrument from here on.**
+  `GeometryAllocator` carries three counters — `ScanSteps` (`:104`), `AllocatorCalls` (`:110`) and
+  `PeakFreeBlockCount` (`:119`, updated inside `Free` **and** inside `Grow`, because both unload paths
+  are unbounded per frame and an end-of-frame sample reads the drained list). `ChunkGeometryPool`
+  passes four of them through (`:128-142`) and the growth log line (last statement of `Grow`,
+  `:277-278`) now reports `free blocks` and `largest`, which is what D5's bullet literally asked for —
+  though it is **not** the capture instrument, because it fires only on a doubling and **no pool grew
+  once in any of the seven scored `perf-fly`/teleport runs this round**. The capture instrument is the
+  per-second `geo` token on `FrameProfiler`'s **console** line (fed from `World.cs` beside the existing
+  `SetCounts` call, render thread only). They ship unconditionally: Release is the only configuration
+  measured or shipped here, an `#if`-guarded counter would be untestable headlessly, and each is one
+  integer add or compare per **call**. The token is documented for a cold reader in the hand-off at the
+  end of this file.
 - **D1 · The chunk tables are keyed on a packed `long`, and `Vector3` stayed the outward key.**
   `ChunkManager.Chunks` is now a `ChunkMap` (`Systems/ChunkMap.cs`) over a private
   `ConcurrentDictionary<long, Chunk>` (`ChunkManager.cs:22`), and `_dirtyChunks` /
@@ -2284,15 +2327,488 @@ catch is a *new* `Camera` field wired into `GetViewMatrix` tomorrow with no matc
   its diagnosis are at the end of **"Measurement: C6 + D6"**, and `rays-halfres` with a raised settle
   wait is the instrument that works today.
 
+### Measurement: D5 — the decision rule, written before the instrument existed
+
+**The rule below was written in final wording before the instrument was built and before a single
+number was read** — the D6 precedent, restated by D1 — and it is reproduced verbatim here so the
+branch that fired can be checked against it by a reader who has only this file. D5's own bullet is
+emphatic that the item is measure-first and doubts there is a win at all; the rule exists precisely
+so that a marginal number cannot be talked into a win after the fact, and so that the decline branch
+is as pre-authorised as the two implementation branches.
+
+**The ceiling the bars are set against, derived before they were chosen.**
+`GeometryAllocatorTests.MidTeleportFragmentationPeaksAtAKnownBlockCount` frees in **ascending offset
+order**, and `GeometryAllocator.Free`'s insertion loop (`GeometryAllocator.cs:94-107`) breaks only
+when `block.Offset > offset` — so every free in that storm arrives above every block already in the
+list, never breaks, and scans the whole list. Per departed region *k* the two frees cost *k* and
+*k + 1* steps (the shell's free finds the list *k* long; the sheet's finds it *k + 1* long and then
+coalesces backwards onto the shell, so the count ends at *k + 1*), and the storm therefore totals
+Sum(2k + 1) for k = 0..379 = 380^2 = **144,400 scan steps**, i.e. **0.289 ms** at the rule's
+2.0 ns/step. That is the `lod` pool's provable, **already-pinned reachable ceiling** — what the
+759-region resident ceiling can actually produce, not an estimate. (The absolute arithmetic ceiling,
+every other 64-unit *slice* departing independently, would be 759^2 = **576,081** steps / 1.15 ms,
+but it is unreachable by construction: one `LodRegion.Dispose` frees both of a region's slices, so
+holes are always region-sized.) Every bar in the rule is chosen **against this derivation, not above
+it** — except the one that is deliberately above it, which says so and says why.
+
+> **Instruments.** `GeometryAllocator.ScanSteps` (cumulative free-list entries examined by
+> `TryAllocate` and `Free`, accumulated **once per call from the loop index**, never once per
+> iteration), `GeometryAllocator.PeakFreeBlockCount` (lifetime high-water `FreeBlockCount`, updated
+> inside `Free` and inside `Grow`'s non-coalescing branch, so an intra-frame peak cannot be missed by
+> an end-of-frame sample), a **per-window `FreeBlockCount` max**, and `FreeBlockCount` itself — all
+> three pools, published once a second on the `perf` console line as the `geo` token, which also
+> carries the window's **raw frame count**. `S_worst` is the largest per-frame total scan-step count
+> across the three pools inside a published window; `S_sec` is that window's total divided by its raw
+> frame count (never by the rounded `fps` field).
+>
+> **Pricing constant, fixed here and not revisable after a capture: 2.0 ns per scan step.** One step
+> is one 8-byte `(int, int)` read from a contiguous `List<>` backing array plus one or two integer
+> compares — about 8 cycles at 4 GHz, for a loop a sequential prefetch keeps at roughly one element
+> per cycle. 2.0 ns is several times the real cost, **deliberately**, so the DECLINE branch can only
+> be conservative. The converse does not hold, which is why every FIRE branch carries a confirmation
+> obligation.
+>
+> **Windows.** GATE-A: three `perf-fly.json` runs at `VOXEL_DEBUG=1 VOXEL_TIME=60` — the harness
+> setting this file's Method block pins and every recorded number in this file was taken at,
+> notwithstanding the scenario file's own header comment saying 120. This is the sustained sprint
+> streaming and the 424-block teleport R10 characterised: **the largest allocator traffic a player
+> actually produces**. GATE-B: three runs of the scratchpad `d5-teleport.json` scenario at
+> `VOXEL_TIME=120` (its waits total 70 s, so 60 would truncate the return leg) — settle, 6000-block
+> teleport, settle, teleport back — which evicts every chunk and all three LOD levels in a single
+> frame. That is **the synthetic ceiling, not a player action**.
+>
+> - FIRE iff ANY of:
+>   - BURST: `S_worst * 2.0 ns >= 0.20 ms` on GATE-A in at least 2 of the 3 runs. This bar sits
+>     **below** the `lod` pool's 0.289 ms reachable ceiling derived above, so LOD traffic can fire it
+>     and branch (b) is genuinely selectable.
+>   - SUSTAINED: `S_sec * 2.0 ns >= 0.10 ms` in at least one published second, in at least 2 of the 3
+>     GATE-A runs.
+>   - TELEPORT: `S_worst * 2.0 ns >= 0.50 ms` on GATE-B in at least 2 of the 3 runs. **This bar sits
+>     ABOVE the `lod` pool's 0.289 ms reachable ceiling, on purpose and with the consequence stated:**
+>     GATE-B exists to price the **chunk** pools, whose free list has no comparable pinned ceiling,
+>     whose unload is likewise uncapped (`ChunkManager.UnloadDistantChunks` disposes every
+>     out-of-range chunk in one frame) and whose departures arrive in `ConcurrentDictionary` hash
+>     order rather than offset order, so the insertion scan averages half the list instead of falling
+>     through. A GATE-B fire therefore **always selects branch (a)**; branch (b) can only be selected
+>     by a GATE-A fire. **A GATE-B miss is not evidence about LOD.**
+> - BRANCH SELECTION, applied to the frame or second that fired: take **(b) the paired shell+sheet
+>   allocation** iff BOTH (i) the `lod` pool contributed **>= 60 %** of that quantity's scan steps,
+>   AND (ii) the **fragmentation precondition** holds — the `lod` pool's `LargestFreeBlock` at its
+>   observed peak `FreeBlockCount` is at least the largest fused pair size in play (176-181 units
+>   typical, up to ~362 worst). Precondition (ii) is not hypothetical:
+>   `MidTeleportFragmentationPeaksAtAKnownBlockCount` pins `LargestFreeBlock == 128` at the 380-block
+>   peak, where a 176-unit fused request fits **no** hole, scans all 380 blocks, fails, and grows the
+>   pool — **strictly worse** than two 64-90-unit requests that each succeed on the first hole. If (i)
+>   holds and (ii) fails, take **(a)**; if (i) holds, (ii) fails and the only trigger was LOD-only,
+>   **DECLINE** and record that fusing was ruled out **by the precondition**, not left untested.
+>   Otherwise take **(a) the O(log n) free list**. If a GATE-A trigger and the GATE-B trigger disagree
+>   on the branch, **GATE-A wins**: the realistic window decides what ships.
+> - CONFIRMATION OBLIGATION ON ANY FIRE: before landing code, price one scan step with an off-engine
+>   microbenchmark in D1's harness shape (scratchpad net9.0 Release console project, the exact loop
+>   over a `List<(int, int)>` of the measured length, median of 5 sweeps). If the measured ns/step
+>   puts the fired quantity back under its bar, the fire is **withdrawn**, the round takes the DECLINE
+>   branch, and both numbers are recorded.
+> - DECLINE (c) iff no trigger fires. Nothing is implemented beyond the instrument; D5 leaves
+>   "Open (next round)" and is rewritten as **measured-and-declined** on the R3 / C5 / D1-no-go
+>   precedent. The instrument is KEPT iff it is O(1) per allocator call, allocates nothing, and never
+>   touches `FrameProfiler._lines` — all three true by construction, so keeping it is the expected
+>   outcome, and the console token is what lets a future reader re-derive the number without
+>   rebuilding the harness.
+> - `FreeBlockCount` and the two peaks **are diagnostics, not gates**. They explain `S_worst` and say
+>   how far the real list sits from the pinned 380-block ceiling. A high peak with a low `S_worst`
+>   still lands nothing.
+> - If a GATE-B run shows **no mass-unload frame at all** (no frame in which any pool's per-window
+>   `FreeBlockCount` max rises above its settled value), the capture **FAILED** and is re-run. A
+>   settled number is never read as if it were the storm.
+> - WHATEVER the numbers, **no frame-time claim is quoted from any `perf-fly` throughput field**, and
+>   no `lod` or `chunkUnld` profiler row is quoted as this item's cost — the 60 s window is saturated
+>   (lesson 1), and those rows hold the work the scan sits beside, not the scan.
+> - **What the output gate can and cannot see, fixed here too.** The cross-tree replay hash gates
+>   branches (a) and (c). It **cannot** gate branch (b): `GeometryAllocator` is untouched by (b) and
+>   `LodRegion.BuildMeshData` is a static pure builder, so both hashes are byte-identical under (b)
+>   **by construction**, and the seam (b) changes — `ChunkGeometryPool.Upload` — needs a GL context
+>   and cannot be replayed headlessly. Under (b) the gate is instead the new exact-equality facts over
+>   `GeometrySlice`'s derived draw parameters plus the `entity-binds` pixel check, and this round says
+>   so rather than claiming a gate it does not have.
+
+**The GATE-B scenario, so it is reproducible without being checked in.** It lives in the scratchpad
+rather than in `visual-examples/`, because it is a synthetic allocator stressor and not a visual
+instrument — it takes no screenshot at all. `VisualScenario.Load` reads its path with
+`File.ReadAllText` (`VisualScenario.cs:53-58`), so it is run from `OpenGLTest/` by **absolute** path.
+Body verbatim:
+
+```json
+{
+  "steps": [
+    { "op": "wait", "seconds": 20 },
+    { "op": "teleport", "pos": [6000.5, 90.5, 6000.5], "yaw": -90, "pitch": -10 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [0.5, 90.5, 0.5], "yaw": -90, "pitch": -10 },
+    { "op": "wait", "seconds": 25 }
+  ]
+}
+```
+
+Six thousand blocks clears **every** retention set with room to spare, which is the point: chunk
+retention is 256 blocks (`WorldGenerationConfig.ChunkRadius` 16 chunks), and LOD retention is
+`RegionRadius + 1` = 9 regions at each level (`LodRegion.Levels`, all three specs at
+`RegionRadius: 8`), so even level 2 with its 256-block regions reaches only 2304 blocks. Both legs
+therefore evict the whole resident set in one frame on the chunk side and on all three LOD levels,
+which is the only way to observe a free list at a length no player will produce.
+
+**GATE-A result.**
+
+Three scored `perf-fly.json` runs at `VOXEL_DEBUG=1 VOXEL_TIME=60`, one cold run discarded first, all
+six off one Release build. Every figure below is scraped from the `geo` console token; the logs are
+`d5-gateA-cold.log` and `d5-gateA-run{1,2,3}.log` and the maxima re-derive from them with a grep.
+
+| run | `S_worst` (steps in one frame) | split opaque / translucent / **lod** | lod share | `S_worst` @ 2.0 ns | max `f` o/t/l | max `pkw` o/t/l | lifetime `pk` o/t/l | max `S_sec` | `S_sec` @ 2.0 ns |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 7,289,632 | 6,354,047 / 927,672 / **7,913** | 0.109 % | **14.579 ms** | 1965 / 473 / 74 | 2138 / 606 / 74 | 2274 / 784 / 81 | 58,496.7 | **0.11699 ms** |
+| 2 | 7,268,352 | 6,341,025 / 919,626 / **7,701** | 0.106 % | **14.537 ms** | 1956 / 417 / 74 | 2228 / 623 / 79 | 2295 / 781 / 82 | 59,205.6 | **0.11841 ms** |
+| 3 | 7,338,750 | 6,409,592 / 920,785 / **8,373** | 0.114 % | **14.678 ms** | 1954 / 442 / 74 | 2183 / 633 / 78 | 2264 / 790 / 83 | 59,685.6 | **0.11937 ms** |
+
+Source lines, verbatim. Run 1's worst frame, in published window 47 —
+`geo f 36/19/69 pkw 685/106/73 pk 2274/784/81 scan 6403231/932491/8498 worst 7289632=6354047/927672/7913 frames 149` —
+and run 1's `S_sec` maximum, in window 23, where the opaque list is at its longest settled length —
+`geo f 1965/473/29 pkw 2138/606/29 pk 2237/631/29 scan 3601151/317150/975 worst 3306671=3071585/234977/109 frames 67`,
+i.e. (3,601,151 + 317,150 + 975) / 67 frames = 58,496.7 steps per frame. `S_sec` is divided by the
+token's raw `frames` field, never by the line's rounded `fps`, exactly as the rule requires.
+
+Two fields the table cannot carry, said plainly rather than estimated. **Steps per allocator call is
+not derivable from this capture**: `GeometryAllocator.AllocatorCalls` exists and is pinned headlessly,
+but it was not among the fields `FrameProfiler.SetGeometryCounts` publishes, so the `geo` token carries
+steps and list lengths but not call counts. Nothing in this write-up depends on it, and no per-call
+figure is quoted. **`LargestFreeBlock` was never logged**, because the growth log line that carries it
+fires only on a pool doubling and `grep -c 'grew to'` returns **0 in all six scored logs** — none of the
+three pools grew once in six runs. That is a result in its own right: it confirms R10's finding that
+these pools are sized where they settle, and it means the scan cost measured here is the cost of walking
+a free list inside a pool that never had to expand.
+
+**GATE-B result.**
+
+Three scored runs of the scratchpad `d5-teleport.json` at `VOXEL_DEBUG=1 VOXEL_TIME=120`, one cold run
+discarded first, same Release build. Logs `d5-gateB-cold.log` and `d5-gateB-run{1,2,3}.log`.
+
+**Validity condition first, before any number is read from these runs.** The rule voids a GATE-B capture
+that shows "no mass-unload frame at all". All three runs show one unmistakably. In run 1 the outbound
+teleport lands in published window 20 —
+`geo f 1/1/1 pkw 727/200/1 pk 2177/720/2 scan 5727148/632029/1026 worst 6358578=5725853/631816/909 frames 288` —
+where the opaque pool's settled `f` collapses from 727 to **1** (every chunk evicted, the whole list
+coalesced back to one block) while the lifetime `pk` jumps from 728 to **2177** inside that single frame.
+Runs 2 and 3 do the same in windows 19 and 20 (`pk` 703 -> 2179 and 776 -> 2193). The peak is intra-frame
+and invisible to the end-of-frame `f` and `pkw` samples, which is precisely why the rule required the
+high-water mark to live inside `Free` and `Grow` rather than in an end-of-frame read; had the instrument
+been an end-of-frame sample it would have reported a free list of length 1 for the largest allocator event
+in the engine. The return leg shows a second, smaller storm (run 1 window 45, worst frame 2,445,072 steps).
+
+| run | `S_worst` (steps in one frame) | split opaque / translucent / **lod** | lod share | `S_worst` @ 2.0 ns | max `f` o/t/l | max `pkw` o/t/l | lifetime `pk` o/t/l | max `S_sec` | `S_sec` @ 2.0 ns |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 6,358,578 | 5,725,853 / 631,816 / **909** | 0.014 % | **12.717 ms** | 1242 / 257 / 14 | 1259 / 336 / 14 | 2177 / 720 / 14 | 32,622.9 | 0.06525 ms |
+| 2 | 6,446,725 | 5,816,046 / 629,740 / **939** | 0.015 % | **12.893 ms** | 1306 / 370 / 23 | 1310 / 374 / 23 | 2179 / 707 / 23 | 34,759.5 | 0.06952 ms |
+| 3 | 6,452,386 | 5,825,939 / 625,540 / **907** | 0.014 % | **12.905 ms** | 1268 / 251 / 11 | 1294 / 330 / 11 | 2193 / 718 / 11 | 35,099.8 | 0.07020 ms |
+
+GATE-B's worst frame is *smaller* than GATE-A's, which is not a paradox and is worth stating so a future
+reader does not read it as one: the 6000-block teleport evicts a resident set that had only ~20 s to build
+at spawn, whereas `perf-fly`'s legs teleport out of a set that a full sustained sprint has already grown to
+its ceiling. The synthetic ceiling scenario is not the larger event; the player-produced one is.
+
+**Which branch the rule names.**
+
+Each trigger against its bar, in the rule's own order and wording.
+
+- **BURST** — "`S_worst * 2.0 ns >= 0.20 ms` on GATE-A in at least 2 of the 3 runs." Measured
+  **14.579 / 14.537 / 14.678 ms** in runs 1 / 2 / 3. **FIRES, 3 of 3, by a factor of ~73.**
+- **SUSTAINED** — "`S_sec * 2.0 ns >= 0.10 ms` in at least one published second, in at least 2 of the 3
+  GATE-A runs." Measured **0.11699 / 0.11841 / 0.11937 ms**. **FIRES, 3 of 3**, but by only ~1.19x, which
+  matters below.
+- **TELEPORT** — "`S_worst * 2.0 ns >= 0.50 ms` on GATE-B in at least 2 of the 3 runs." Measured
+  **12.717 / 12.893 / 12.905 ms**. **FIRES, 3 of 3, by a factor of ~26.**
+
+**Confirmation obligation, discharged before any branch is named.** The rule: "before landing code, price
+one scan step with an off-engine microbenchmark in D1's harness shape... If the measured ns/step puts the
+fired quantity back under its bar, the fire is withdrawn." Scratchpad `d5bench`, net9.0 Release console
+project, `Free`'s insertion-scan loop verbatim over a `List<(int, int)>` in the fall-through case, median
+of 5 sweeps after a discarded warm-up, at the three lengths this capture actually produced:
+
+```
+[d5bench] length=380  iterations=105263 sweeps=5 median=1.5207 ns/step min=1.1494 max=1.9911
+[d5bench] length=1000 iterations=40000  sweeps=5 median=1.1526 ns/step min=1.1412 max=1.2491
+[d5bench] length=2177 iterations=18373  sweeps=5 median=1.1468 ns/step min=1.1287 max=1.1573
+```
+
+**1.1468 ns/step** at the measured opaque peak length of 2177 — the rule's 2.0 ns was conservative by
+1.74x, as it was designed to be. Re-applying each fired trigger at the measured price:
+
+- BURST: 7,289,632 x 1.1468 ns = **8.360 ms** (runs 2, 3: 8.335, 8.416 ms) vs a 0.20 ms bar. **Stands.**
+- TELEPORT: 6,358,578 x 1.1468 ns = **7.292 ms** (runs 2, 3: 7.393, 7.400 ms) vs a 0.50 ms bar. **Stands.**
+- SUSTAINED: 58,496.7 x 1.1468 ns = **0.06708 ms** (runs 2, 3: 0.06790, 0.06845 ms) vs a 0.10 ms bar.
+  **WITHDRAWN.** It cleared the bar only at the deliberately pessimistic constant and does not clear it at
+  the real one, so the rule's own clause applies and both numbers are recorded. This is the confirmation
+  obligation doing exactly the job it was written for, and it is recorded as a withdrawal rather than
+  quietly dropped.
+
+Two triggers survive confirmation with three and one and a half orders of magnitude of margin. **The rule
+FIRES.**
+
+**Branch selection**, applied to the frames that fired. The rule: take (b) the paired shell+sheet
+allocation "iff BOTH (i) the `lod` pool contributed >= 60 % of that quantity's scan steps, AND (ii) the
+fragmentation precondition holds".
+
+Condition (i) **fails, and not marginally.** In GATE-A's worst frames the `lod` pool contributed
+**7,913 / 7,701 / 8,373** steps out of 7.27-7.34 million — **0.106 % to 0.114 %**, roughly one part in
+nine hundred. In GATE-B's it contributed 907-939 out of ~6.4 million, **0.014 %**. The opaque pool alone
+is **87 % (GATE-A) to 90 % (GATE-B)** of every fired frame and the two chunk pools together are **99.89 %**. Condition (i) required
+60 % from `lod`; the measurement is off by a factor of 550. Condition (ii) is therefore not reached, and
+is not evaluated: the rule only asks for it once (i) holds, and fusing cannot be justified by a pool that
+contributes a tenth of a percent of the cost whatever its fragmentation looks like. The paired allocation
+remains prepared and unused, and remains carrying the hazard the rule pinned — a fused 176-181-unit request
+fits strictly fewer holes than its two halves — so it must not be re-proposed on call-count arithmetic.
+
+The rule's other clause points the same way: "A GATE-B fire therefore **always selects branch (a)**;
+branch (b) can only be selected by a GATE-A fire." GATE-B fired; GATE-A fired and named the chunk pools;
+the two gates agree, so the tie-break ("if a GATE-A trigger and the GATE-B trigger disagree on the branch,
+GATE-A wins") is not needed.
+
+> **The rule names branch (a): the O(log n) free list.**
+
+And it names it for a reason the bullet did not anticipate. D5's own text frames the defect around the LOD
+pool's paired, uncapped churn; the measurement says the LOD pool is **not the problem at all** — its traffic
+is real but three orders of magnitude below the chunk pools'. What fires is
+`ChunkManager.UnloadDistantChunks` disposing every out-of-range chunk in one frame, in
+`ConcurrentDictionary` hash order rather than offset order, against an opaque free list that sits at
+~1950-2270 blocks. That is the scan worth making logarithmic, and it is the *opaque* pool's, so any
+implementation of (a) must be measured on the opaque pool and not on the LOD one.
+
+Note also what this does **not** claim. 8.36 ms is the cost of the scan in the single worst frame of a run,
+not a steady-state frame-time cost: the SUSTAINED trigger was withdrawn precisely because the per-frame
+average does not clear a 0.10 ms bar at the real price. The honest statement is that the free-list scan is
+a **stall amplifier on mass-unload frames** — frames that are already the worst in the run — and is noise
+the rest of the time. No `perf-fly` throughput field and no profiler row is quoted anywhere above.
+
+**What the numbers say about the list length.**
+
+The bullet's premise was that "the pool's own comment reports 93 % steady-state utilisation, which implies
+a short list". **The premise is false, and this is the round's most transferable finding.** High utilisation
+says how much of the buffer is occupied; it says nothing about how many holes the occupancy is threaded
+through. Measured:
+
+- The `lod` pool behaves exactly as R10 predicted and as the bullet assumed. Its free list peaked at
+  **74 blocks settled / 81-83 lifetime** on GATE-A and **11-23** on GATE-B, against the **380-block**
+  ceiling `MidTeleportFragmentationPeaksAtAKnownBlockCount` pins. Real LOD churn reaches **~21 %** of its
+  own pinned ceiling, because departures are geographically clustered and the list coalesces as it drains.
+  Its worst-frame scan cost, **7,913 steps**, is **5.5 %** of the **144,400-step / 0.289 ms** arithmetic
+  ceiling derived at the top of this section — and 0.009 ms at the measured price. The derivation was
+  correct and the pool never comes near it.
+- The **opaque chunk pool** is where the assumption breaks. Settled `f` reaches **1954-1965** blocks in a
+  sustained sprint and the intra-frame lifetime peak reaches **2264-2295** on GATE-A and **2177-2193** on
+  GATE-B — **six times** the LOD pool's pinned worst case and **twenty-six times** its own real LOD
+  counterpart. The translucent pool sits at 417-473 settled and 781-790 peak, itself above the LOD ceiling.
+- So the item's arithmetic was right and its subject was wrong. The 380-block figure was a genuine ceiling
+  for the pool it was derived from; nobody had ever measured the pool that actually matters. The chunk
+  pools have no pinned ceiling, no per-frame free cap (`ChunkManager.UnloadDistantChunks`,
+  `ChunkManager.cs:228-267`, disposes every out-of-range chunk in one frame), and an unload order unrelated
+  to offset, so their frees do not fall through the insertion loop — they stop about halfway, which is why
+  6.35 million steps come out of one frame.
+
+For a future reader deciding whether to re-open this: the quantity to watch is the **opaque** pool's `f`
+and `pk` on the `geo` token, not `lod`'s, and the event to watch is a mass unload, not steady streaming.
+
+
+**What branch (a) cost and bought, measured the same way.**
+
+The rewrite that landed: `GeometryAllocator`'s offset-sorted `List<(int, int)>` became an offset-keyed
+treap whose every node carries the maximum free `Count` over its subtree. That augmentation is what keeps
+EXACT first fit while making the search logarithmic — descend left whenever the left subtree still holds a
+block large enough, else take this node if it fits, else go right, which is the lowest-offset block that
+fits by construction. The bullet's own first suggestion, a size-bucketed free list, could not be used: it
+yields a best fit out of a bucket, and `AllocatesFirstFitDeterministically`, `FreeIsReusedFirstFit`,
+`ASameSizeReallocationAfterAFreeReusesTheSameOffset` and `MidTeleportFragmentationPeaksAtAKnownBlockCount`
+pin exact first-fit offsets. All ten stand unedited.
+
+**A step is no longer the same machine operation, so the two counts are not comparable at one price.** The
+flat list's step was one 8-byte tuple read out of a contiguous backing array, which `d5bench` priced at
+**1.1468 ns**. A treap step is a pointer chase through a 48-byte class instance. A companion microbenchmark
+(`d5treapbench`, the same harness shape — Release console, median of 5 sweeps after a discarded warm-up,
+running `Free`'s neighbour descent verbatim against a real treap) prices it at **3.33 ns/node at 380 nodes**
+and **3.84 (key-order) / 5.12 (churned) ns/node at 2,177 nodes**, the measured opaque peak. Every figure
+below is priced at the **pessimistic 5.1218 ns/node**: the allocator recycles nodes through a spare list, so
+after a few minutes of churn its heap layout is the churned one, not the freshly built one.
+
+One re-run of GATE-A at the identical setting (`VOXEL_DEBUG=1 VOXEL_TIME=60`,
+`VOXEL_SCRIPT=visual-examples/perf-fly.json`, one cold run discarded first), against the three scored runs
+recorded above:
+
+| | steps before (3 runs) | steps after | priced before | priced after |
+|---|---|---|---|---|
+| `S_worst` (worst single frame, all pools) | 7,289,632 / 7,268,352 / 7,338,750 | **340,457** | 8.360 / 8.335 / 8.416 ms | **1.744 ms** |
+| — of which opaque | 6,354,047 / 6,341,025 / 6,409,592 | 257,702 | | |
+| — of which translucent | 927,672 / 919,626 / 920,785 | 79,467 | | |
+| — of which lod | 7,913 / 7,701 / 8,373 | 3,288 | | |
+| max `S_sec` (per-frame mean in a published second) | 58,496.7 / 59,205.6 / 59,685.6 | **2,327.1** | 0.06708 / 0.06790 / 0.06845 ms | **0.01192 ms** |
+
+**21.4x fewer steps in the worst frame, 4.8x less time once the steps are priced honestly** (25.4x and
+5.7x on `S_sec`). The opaque pool, which was 87 % of the cost, falls 24.6x on its own.
+
+It is the same workload, not a lighter one: the after run's free-list lengths are within noise of the three
+before runs — settled `f` 1901/439/70 against 1954-1965/417-473/74, per-window `pkw` 2185/648/74 against
+2138-2228/606-633/74-79, lifetime `pk` 2254/771/80 against 2264-2295/781-790/81-83. No pool grew in the
+after run either (`grep -c 'grew to'` returns 0), so the comparison is not confounded by a doubling.
+
+**What that does and does not settle.** The fired triggers were `S_worst * price >= 0.20 ms` (BURST) and the
+GATE-B teleport bar; 1.744 ms still clears the BURST bar, so the worst mass-unload frame still pays a
+measurable allocator cost. What the rewrite removed is the QUADRATIC term, not the cost: the flat list
+charged O(list length) per free with the length itself growing with the unload, and the treap charges
+O(log length). `ScanStepsAtTheMidTeleportPeakArePinned` pins the same change headlessly on the LOD storm —
+**144,400 steps became 8,372**, a 17.2x reduction, and the new figure is derivable rather than measured
+(four right-spine descents per departed region, so about 4 * Sum(H_k) for k = 1..380 = 8,415). A failing
+allocation now costs exactly **1** step, the root's subtree maximum, where the flat list walked all 380
+blocks to prove the same thing, and `LargestFreeBlock` became an O(1) read of the root instead of an O(n)
+walk — which is what the growth log line calls, though it fires only on a doubling.
+
+**What the gate could see.** The cross-tree replay probe's `[d5hash-layout]` and `[d5hash-draw]` are
+byte-identical across the rewrite, and so is `[d5offsets]` — which under branch (a) is the load-bearing one,
+because first fit is preserved and a moved offset would be a defect rather than a policy change. Beyond the
+hashes, `EveryOffsetTheFlatListProducedIsReproduced` steps the treap and a verbatim copy of the old flat
+first fit through four thousand interleaved allocations, frees and growths in lockstep and compares every
+offset, every success/failure verdict, and the used units, block count and largest block after each one.
+That is the general claim; the ten pinned facts are only a handful of fixed sequences.
+
+#### The visual gate: D5 is output-preserving, and the exact cross-tree hash is what says so
+
+**The baseline is a pristine export, never a stash.** `git archive HEAD | tar -x` into the scratchpad at
+commit **9b7a244** (`9b7a24485c22d831bc443a47d58696a85b1d0835`, "Key chunk dictionaries by a packed long"),
+built there with `~/.dotnet/dotnet.exe build OpenGLTest.sln -c Release` (0 warnings, 0 errors). The real
+working tree was never mutated to make the baseline and nothing was stashed: the three stashes `git stash
+list` reports all sit on `5124d26`, three commits before HEAD, and predate this round entirely — a future
+round checking "no stash" should confirm the count is still **3**, not that it is zero, and must not tidy
+away someone else's parked work to make a literal check pass.
+
+**The authority is the exact cross-tree replay hash, and it was written before the first production edit.**
+`GeometryLayoutReplayProbe` (step 2 of this round, authored against HEAD's API alone and copied *unchanged*
+into the export) drives a **real** `GeometryAllocator` through a 759-region paired stream-in, a clustered
+departure phase, an in-place rebuild phase, a shuffled full drain and a re-stream, and separately drives
+`LodRegion.BuildMeshData` across all three LOD levels. All three lines are **byte-identical** between the
+pristine export and the work tree:
+
+        pristine 9b7a244 export                                 work tree (branch (a) landed)
+    [d5hash-layout] hash=0xd5d14e2ba2e58664                 [d5hash-layout] hash=0xd5d14e2ba2e58664
+        regions=759 departed=255 rebuilt=72 drained=1008        regions=759 departed=255 rebuilt=72 drained=1008
+        restreamed=253 live=506 used=45177 capacity=163840      restreamed=253 live=506 used=45177 capacity=163840
+    [d5offsets]     hash=0xd39df70fecc23f61                 [d5offsets]     hash=0xd39df70fecc23f61
+        freeBlocks=1 largest=118663                             freeBlocks=1 largest=118663
+    [d5hash-draw]   hash=0x730e80860e9f62c3                 [d5hash-draw]   hash=0x730e80860e9f62c3
+        regions=6 wetLevels=3 dryLevels=3                       regions=6 wetLevels=3 dryLevels=3
+        verts=40692 waterVerts=4128                             verts=40692 waterVerts=4128
+
+**Why those two hashes and not the offsets — the D1 reasoning, restated.** `[d5hash-layout]` folds only
+*policy-independent* state: the live `(clientId, unitCount)` pairs in sorted client order, `UsedUnits`, and
+`Capacity`. `[d5hash-draw]` folds the drawn geometry — `Vertices.Count`, `Indices.Count`,
+`WaterVertices.Count`, `WaterIndices.Count` and `ChunkGeometryPool.UnitsFor` per side — which is what
+`firstIndex` / `baseVertex` / `count` derive from and therefore what actually reaches the screen. Slice
+*offsets* are a placement detail: an allocator policy may legitimately move them while drawing the identical
+image, so hashing them as a gate would fail a correct change. That is the same reasoning D1 recorded when
+per-frame enumeration order moved and a mid-stream pixel difference had to be pre-registered as expected
+rather than bisected. `Capacity` *is* folded into `[d5hash-layout]` deliberately, because a policy that
+grows the pool more often is an observable regression even though it moves no pixel; it did not grow (163840
+on both trees).
+
+**`[d5offsets]` did not move, and under branch (a) that is a result rather than a formality.** It is reported,
+not asserted — but the branch that landed preserves exact first fit, so a moved offset here would be a
+**defect**, not a legitimate policy change. It is the inverse of the D1 situation: there, a moved enumeration
+order was expected; here, a moved offset would mean the leftmost descent is not reproducing first fit. It
+matched byte-for-byte over a workload of 1008 paired allocations, 255 clustered departures, 72 in-place
+rebuilds, a shuffled full drain and a 253-region re-stream — placement the ten pinned facts never exercise.
+
+**The gate's limit, stated in one line because the branch that landed is (a).** The rule pre-registered in
+this section warned that no cross-tree hash could have gated branch **(b)** — `GeometryAllocator` is untouched
+by (b), `LodRegion.BuildMeshData` is a static pure builder, so neither sits on either hash's code path, and
+the seam (b) changes (`ChunkGeometryPool.Upload`) needs a GL context and cannot be replayed headlessly. That
+caveat is **moot here**: (b) was not taken, the allocator *is* on both hashes' code path, and the gate is a
+real one. It is recorded only so a future round proposing (b) knows a matching hash would prove nothing
+about it.
+
+**Pixels are a smoke check, and this round followed the file's own instrument record rather than the task
+brief's.** The brief named five pose-stable checked-in scenarios (`rays-halfres`, `clouds-mirror`,
+`lod-horizon`, `entity-binds`, `particles`). **That is wrong for this machine and the correction is already
+in this file** — see the carried-forward defect list above: `lod-horizon` free-falls and respawns 44-111
+times a run so three of its four shots photograph the spawn point, and `clouds-mirror` and `rays-halfres`
+photograph different camera poses run-to-run *within the same tree* at their stock waits. Only
+`entity-binds` was scored. Following the brief instead of the file would have burned the whole gate budget
+rediscovering two known defects.
+
+Method: scratchpad copies of `entity-binds.json` by absolute path, each carrying an `output` override
+pointing at a per-run scratchpad directory — so **neither tree's `visual/` was written at all** and the gate
+mutated nothing anywhere. Fixed `VOXEL_TIME=120` (its own header requires it: the sun angle is wall-clock
+driven, so an unset clock lights the two trees differently and the comparison reads a difference that is not
+there). One cold discarded run per tree, then scored runs interleaved work/head in a single session. Scored
+with R10's within-tree-constant instrument — a pixel counts only where every run of one tree agrees exactly,
+every run of the other agrees exactly, and the two constants differ — against the exact permutation null over
+all balanced relabellings of the same runs.
+
+**Result: zero. And the run count did its job again, exactly as D1 recorded it would.**
+
+| `entity-binds` shot | 3+3 residue | 5+5 residue | 7+7 residue | 5+5 null max (126 splits) |
+| --- | --- | --- | --- | --- |
+| `07-held_block`   | 29 px | **1 px** | **0 px** | 2013 px |
+| `11-held_item`    | 31 px | 0 px | **0 px** | 559 px |
+| `12-bind_still_0` | 35 px | 0 px | **0 px** | 1560 px |
+| `13-bind_still_1` | 29 px | 0 px | **0 px** | 257 px |
+| `14-bind_still_2` | 29 px | 0 px | **0 px** | 970 px |
+| `19-drops`        |  0 px | 0 px | **0 px** | 140 px |
+| **total** | **153 px** | **1 px** | **0 px** | — |
+
+At **3+3** the residue was 29-35 px on five of six shots — and it was already visibly *not* a finding, because
+against the exact null over the 10 balanced relabellings of those same six runs the real split ranked
+**4th to 7th of 10** (p = 0.4-0.7), with arbitrary relabellings reaching **140-7659 px**, two orders of
+magnitude above the real value. Per D1's standing lesson — *a nonzero residue at any fixed run count is a
+hypothesis, not a finding, until more runs fail to remove it* — two more runs per tree were added. At **5+5**
+the total collapsed to a single pixel (`07-held_block`, x=93 y=202), a **single-LSB difference on one
+channel** (work R=17, head R=16; G, B and A identical) sitting on a **strong local luma edge** (3x3 luma range
+97.0, the boundary between a ~13-luma shadow and a ~110-luma lit face), ranking 28/126 against null maxima up
+to 2013 px. Two further runs per tree took it to **7+7**, where the residue is **exactly 0 px on all six
+shots**. 153 -> 1 -> 0: the accidental-agreement collapse, reproduced at two successive run counts.
+
+The mechanism is visible in the data and is worth carrying forward: `entity-binds` is **pose**-stable but not
+**pixel**-stable. Only 91-98 % of each frame is constant across a tree's own runs, and two runs of the *same*
+tree differ on 945-75,155 raw pixels from animated content (foliage sway, drifting clouds, particle phase).
+That is precisely why the raw cross-tree diff is useless here and the within-tree-constant instrument is
+necessary — and why the "constant" shrinks as runs are added, so an accidental agreement collapses while a
+real effect could not.
+
+**Eyeball-only, entering no statistic: `particles` and `lod-horizon`, one run per tree.** Both were opened and
+compared by eye and are structurally identical — same terrain, same LOD horizon and shell boundaries, same
+cloud layout, same canopy; the only visible differences are animation phase (a falling leaf present in one
+shot and not the other) and, on `lod-horizon`, a small camera-height offset from the known free-fall. Their
+raw single-run cross-tree diffs are large (`particles` 8.3 %, 10.9 % and 83.5 % of the frame; `lod-horizon`
+60-78 %) and mean **nothing**: a single run of an unstable instrument has no within-tree constant to subtract,
+which is the whole reason these two are eyeball-only.
+
+**Instrument defects re-confirmed, not merely inherited.** `lod-horizon` logged **exactly 44 respawns per
+run, identically on both trees** — reproducing the figure this file already records for its stock 40/35/35/35
+waits, on a third independent occasion. It remains unusable as a scored instrument and the reason is not
+tree-dependent. `particles` logged one respawn per run on both trees (the scripted descent, not a defect).
+`entity-binds` remains the only checked-in scenario that is pose-stable on this machine, and this round
+sharpens that record: it is pose-stable and *pixel-noisy*, usable only with the within-tree-constant
+instrument and only at a run count high enough that the constant has stopped shrinking — **7+7 here, where
+3+3 would have reported 153 spurious pixels.**
+
 ### Suggested first pass
 
 Start here. The accumulated gate machinery — every trap a scenario-based comparison has fallen into
 in this series — is the **"Gate traps that still apply to any scenario-based comparison"** list
 immediately above; read it before designing any capture, and read the bullet of whatever item you
-take before touching its code. What follows is the hand-off: what just landed, and what to take next
-and why.
+take before touching its code. What follows is the **terminal** hand-off: what just landed, what
+remains, and why none of what remains can be taken without a human.
 
-Next: **D1 landed, taken entirely on its own as the last round said to.** `ChunkManager.Chunks` is
+**This round took D5, alone, as the closing paragraph then said to — and D5 turned out to be an
+implementation after all.** The measurement its bullet demanded was taken first, the pre-registered
+rule fired on it, and `GeometryAllocator`'s flat free list became an offset-keyed treap augmented
+with a subtree maximum, preserving exact first fit at O(log n). The rule, both captures, the
+confirmation microbenchmarks, the before/after table and the cross-tree gate are in
+**"Measurement: D5"**; what changed, what it bought, the premise it disproved and the remedy it left
+unused are the D5 bullets under **"What landed"**. **The round before it took D1, entirely on its own
+as the round before that said to.** `ChunkManager.Chunks` is
 now a `ChunkMap` over a `ConcurrentDictionary<long, Chunk>`, `_dirtyChunks`, `_queuedChunkPositions`,
 `_generatingMeshes` and C6's `_playerPlacedByChunk` hold packed `long` keys, and **`Vector3` stayed
 the outward key**, so zero call sites were edited to keep the tree compiling. The isolated per-shape
@@ -2300,8 +2816,8 @@ probe table, the pre-registered decision rule and the cross-tree gate are in **"
 the design decision, the C3 obligation, the enumeration-order consequence, the rejected alternatives
 and the sites deliberately left alone are the D1 bullets under **"What landed"**. Read the
 enumeration-order bullet before designing any gate on this path. The round before it took C6 and D6,
-both counted rather than timed. **Five things now govern what the next round should believe — D1
-confirmed the first four and added the fifth:**
+both counted rather than timed. **Six things now govern what a future round should believe — D1
+confirmed the first four and added the fifth, and D5 added the sixth:**
 
 1. **The `perf-fly` 60 s window is saturated for LOD as well as chunks.** All ten counterbalanced
    runs ended at the identical `chunks 17077` and `regions 907-913/645`, so every end-state
@@ -2349,44 +2865,124 @@ confirmed the first four and added the fifth:**
    **order-independent converged hash** can settle output preservation for a change of this shape —
    which is why D1's authority was a sorted-state cross-tree hash written before the first
    production edit, with pixels demoted to a settled-state smoke check.
+6. **A count is only a time once you have priced its step, and two data structures do not share a
+   price.** D5's rewrite cut worst-frame scan steps **21.4x**, and quoting that as a 21.4x time win
+   would have been false: a flat-list step is one 8-byte tuple read out of a prefetched array
+   (**1.1468 ns** measured) and a treap step is a pointer chase through a 48-byte instance
+   (**5.12 ns** measured at the same list length), so the honest figure is **4.8x**. The same
+   discipline cuts the other way and did: D5's rule fixed a deliberately conservative **2.0 ns/step**
+   before any capture so that a *decline* could only be conservative, and made every *fire* carry a
+   confirmation obligation — which duly **withdrew** one of the three triggers when the real price
+   came in 1.74x cheaper. **D5's other half is a premise correction worth carrying: high buffer
+   utilisation does not imply a short free list.** The pool's 93 % steady-state utilisation was cited
+   in D5's own bullet as evidence the scan was cheap and probably not worth touching; the opaque
+   pool's free list peaks at **2,264-2,295 blocks** at that very utilisation, because utilisation says how full the buffer is, not how many holes
+   the occupancy is threaded through.
 
-**What is left, and how much of it can be taken autonomously: very little.** After D1 the open list
-is **D5**, **D2b**, **R3**, **C5** and **R6**, and of those **only D5 is takeable without a human** —
-and D5 is **a measurement, not an implementation**. Everything else is blocked on a decision or a
-design.
+**The autonomous backlog is exhausted.** D5 was the last item on this list takeable without a human,
+and this round took it: the measurement the bullet demanded was made, the pre-registered rule fired,
+and branch (a) — the O(log n) free list — landed. Nothing below this line can be started by an agent
+on its own. **This is a hand-off, not a suggestion for the next round.** Read it before opening
+anything here, because three of the four remaining entries are *not* work items at all and the fourth
+is blocked on a design that does not exist yet.
 
-**D5 is measurement only**, and is now the only remaining autonomous item. Its bullet already says
-what to capture: log `FreeBlockCount` on the pool-growth line and read it mid-stream and just after
-a teleport, on **three** pools, before
-committing to any rewrite. R10 proved the coalescing sound and pinned both the pathological
-(380 blocks mid-teleport) and the realistic (<= 296 `Free`s in the largest real burst) list lengths,
-so **D5's defect is scan cost, not fragmentation** — price the "fuse a region's shell and sheet into
-one paired allocation" remedy recorded there against the data-structure change, since it may be the
-cheaper half. Note that lesson 1 applies here too: a `FreeBlockCount` reading is a **count**, which is
-exactly the shape that has produced every usable number in the last three rounds — do not turn D5 into
-a frame-time claim on a saturated window.
+**R3 — parked against the code, and only a human can unpark it.** Read its bullet rather than this
+summary. It was resolved three ways and none of them is a defect: the depth copy cannot move, the
+shader claim holds, and the ceiling is an **already-gated 0.09 ms pass**. What is left is not a
+measurement — it is whether the perceptual cost of downsampling that pass is acceptable in this game.
+No capture can answer that, and an agent that takes R3 on measured grounds will be answering a
+question nobody asked. **A human decides, or it stays parked.**
 
-**R3 stays parked**; read its bullet rather than this one-line summary — it was resolved against the
-code three ways (the depth copy cannot move, the shader claim holds, the ceiling is an already-gated
-0.09 ms pass) and parked, not disproven. **`D2b`** (`LodRegion.ColumnCaps` grows unbounded) is still
-**deferred and still not a perf item**: its entries are irreproducible player edits, so it is a
-*correctness* item waiting on a design, it **must not** take D2's or D6's scheme (evicting a cap is
-data loss, not a recompute — `GenerationalCache` invariant 10 names the site), it cannot ride chunk
-unload, and a real fix needs caps re-derivable from stored block data, i.e. it is entangled with
-save/load (`TODO.md` `M-1`). D6 explicitly left it alone, as it must. **C5's pool size is decided and
-closed** — `MaxConcurrentLodGenerations` ships at **1**, both larger pools were measured and declined,
-and the capture is above: do not re-propose "a bigger pool". (D2 was the lever that capture pointed at
-and has been taken; D6 extends the same lever to three more caches. Neither reopens the pool
-question.) **R6 stays reserved for a human** — it is a *trade-off*, not a win, and must not be taken
-autonomously. **So, plainly: the autonomous backlog after D1 is D5's capture and nothing else.**
-R6 needs a human decision, D2b needs a design (and is entangled with save/load, `TODO.md` `M-1`),
-R3 is parked against the code, and C5's pool size is closed. If D5's capture comes back saying the
-free list is short in practice — which the pool's own 93 % steady-state utilisation note predicts —
-then the honest outcome is a fourth well-evidenced no-go on the R3/C5/A'-precedent, and the file
-should say so rather than manufacture a rewrite.
+**R6 — a trade-off, not a win, and explicitly reserved for a human decision.** It does not become
+takeable because a number comes back favourable; the number was never the obstacle. **Must not be
+taken autonomously.**
 
-**Before the next visual gate, read the two instrument defects recorded at the end of
-"Measurement: C6 + D6".** `lod-horizon` cannot currently resolve anything on this machine — its
+**C5 — closed, not open.** `MaxConcurrentLodGenerations` ships at **1**. Both larger pools were
+measured and declined, and the capture is above under "Measurement: C5". It is listed here only so a
+cold reader does not mistake it for backlog and re-propose "a bigger pool". (D2 was the lever that
+capture pointed at and has been taken; D6 extended the same lever to three more caches. Neither
+reopens the pool question.)
+
+**D2b — a correctness item entangled with save/load, not a perf item.** `LodRegion.ColumnCaps` grows
+unbounded, but its entries are **irreproducible player edits**, so it **must not** take D2's or D6's
+cache/eviction scheme: evicting a cap is **data loss, not a recompute**, and `GenerationalCache`
+invariant 10 names this exact site as one that must never be stored there. It cannot ride chunk unload
+either — LOD regions cover terrain far outside the loaded chunk sphere, so a cap must **outlive** its
+chunk. A real fix needs caps **re-derivable from stored block data**, i.e. it is entangled with
+save/load (`TODO.md` `M-1`), which is a design nobody has written. Until then the cost is paid and
+visible: because `ColumnCaps` is process-global with no reset hook,
+`LodBuildPoolTests.RegionBuildsAreIdenticalWhicheverThreadRunsThem` and
+`LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel` are **intermittent in
+full-suite runs** — reproduced on pristine HEAD, so expect them and never "fix" them by touching
+`ColumnCaps`.
+
+**What a cold reader needs.**
+
+- **Build and test.** The system `dotnet` has **no SDK**; use `~/.dotnet/dotnet.exe`.
+  Build: `~/.dotnet/dotnet.exe build OpenGLTest.sln -c Release` (Release only — it is the sole
+  configuration measured or shipped here). Tests:
+  `DOTNET_ROLL_FORWARD=LatestMajor ~/.dotnet/dotnet.exe test OpenGLTest.Tests/silkgltriangle.Tests.csproj -c Release`.
+  All code lives in the `silkgltriangle` namespace even though the solution is `OpenGLTest.sln`.
+- **The suite baseline, and how this round moved it.** **790 total / 786 passed / 4 failed** at the
+  round's HEAD (9b7a244), rising to **792/788/4** with the cross-tree replay probe, **795/791/4** with
+  the three allocator counter facts, and **797/793/4** with branch (a)'s two. The **four standing
+  failures** are pre-existing and are not this series' to fix:
+  `ContentTests.DisplayMatrixPosesSpritesAsConfigured`,
+  `BlockMovementTests.FrictionDefaultsToPointNineNineAndIceIsLower`,
+  `BlockMovementTests.LeavesDeclareThreeQuarterMovementSpeed` and
+  `FallingBlockTests.SevenTowerChainRebuildsFullyWithNoDrops`. On top of those, the **two `ColumnCaps`
+  intermittents** named in the D2b paragraph fire occasionally in full-suite runs. **Expect them; do
+  not chase them.**
+- **Measurement here is counted, never timed.** The `perf-fly` 60 s window is **saturated** for both
+  chunks and LOD (lesson 1 above), so every end-state throughput field measures the scenario's ceiling
+  and isolates nothing. Any frame-time claim needs a **time-to-N rule on a non-saturating window,
+  pre-registered before the capture**. Counted instruments have produced every usable number in the
+  last four rounds (D2, C6, D1, D5); timings have produced none.
+- **Decision rules are written in final wording before a number is read.** D6 set the pattern, D1 and
+  D5 followed it. D5's rule is reproduced verbatim under "Measurement: D5" — with its bars, its fixed
+  pricing constant, its branch-selection test and its **confirmation obligation**, which is what
+  withdrew D5's SUSTAINED trigger after the real ns/step turned out to be 1.74x cheaper than the
+  conservative constant the rule priced at. A rule that cannot withdraw a fire is not a rule.
+- **Harness settings.** `VOXEL_DEBUG=1 VOXEL_TIME=60` for `perf-fly` — that is what this file's Method
+  block pins and what every recorded number was taken at, **notwithstanding `perf-fly.json`'s own
+  header comment saying 120**. `VOXEL_TIME=120` for `entity-binds`, whose sun angle is wall-clock
+  driven. `VOXEL_SCRIPT` takes an absolute path (`VisualScenario.Load` uses `File.ReadAllText`), and a
+  scenario's `output` key redirects its shots — which is the cheap way to run a cross-tree pixel gate
+  without either tree's `visual/` being written at all.
+- **Baselines come from `git archive HEAD` into a scratchpad, built there — never from a stash and
+  never by mutating the working tree.** Note the trap: this repo carries **three pre-existing stashes**
+  on `5124d26`, unrelated to this series. A "no stash" check must verify the count is **unchanged**,
+  not that it is zero, and must never drop them to make a literal check pass.
+- **The `geo` console token is the standing free-list instrument.** It is published once a second on
+  `FrameProfiler`'s **console** line only (never `_lines`, never the HUD overlay — every gate
+  screenshot passes `hideHud:true` and `perf-fly` bakes the HUD in, so a console-only token cannot move
+  a gate pixel). Its shape is
+  `geo f o/t/l pkw o/t/l pk o/t/l scan w0/w1/w2 worst SUM=d0/d1/d2 frames N`, index order fixed
+  **0 = opaque, 1 = translucent, 2 = lod**: `f` is the end-of-frame `FreeBlockCount`, `pkw` the
+  per-window maximum of it, `pk` the **lifetime** high-water mark (updated inside `Free` and `Grow`, so
+  it is the only field that can see an intra-frame teleport storm), `scan` the per-window `ScanSteps`
+  delta, `worst` the largest single-frame total with its three-way split, and `frames` the **raw**
+  window frame count. Divide by `frames`, never by the line's `fps` — `fps` is
+  `(int)Math.Round(frames / seconds)`, a rounded rate. The token does **not** carry `AllocatorCalls`;
+  a future round wanting steps-per-call must add it to `FrameProfiler.SetGeometryCounts`.
+- **Instrument defects, which cost two rounds to find and will cost a third if skipped.**
+  `lod-horizon` is **unusable** as a scored instrument on this machine: its camera free-falls and
+  respawns **44 times a run** at stock waits (reconfirmed identically on both trees in D5's gate, a
+  third independent occasion), so three of its four shots photograph the spawn point.
+  `clouds-mirror` and `rays-halfres` photograph **different camera poses run to run within the same
+  tree**, so at those two the same file name is not the same view. **Of the checked-in scenarios only
+  `entity-binds` is pose-stable here** — and the task briefs that claim five are pose-stable are wrong
+  against this file. **New in D5: `entity-binds` is pose-stable but not pixel-stable.** Only 91-98 % of
+  each frame is constant across a single tree's own runs, and two runs of the *same* tree differ on
+  945-75,155 raw pixels from animated content. A raw cross-tree diff on it is therefore meaningless;
+  the within-tree-constant instrument is mandatory, and **3+3 runs is not enough** — D5's gate reported
+  153 spurious pixels at 3+3, 1 at 5+5 and **0 at 7+7**, the same accidental-agreement collapse D1 saw
+  twice.
+
+**Before the next visual gate, read the accumulated instrument defects — the two at the end of
+"Measurement: C6 + D6", the two D1 added, and the one D5 added in "The visual gate: D5" above
+(`entity-binds` is pose-stable but *not* pixel-stable, so 3+3 runs reports residue that is gone by
+7+7).** `lod-horizon` cannot currently resolve anything on this machine — its
 camera free-falls and respawns 44 times a run at stock waits and 111 at raised waits, identically on
 pristine HEAD, so three of its four shots photograph the spawn point rather than their scored
 vantages — and `rays-halfres` is only usable with its settle wait raised from 6 s to 30 s, at which

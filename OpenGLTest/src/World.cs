@@ -483,6 +483,20 @@ public class World : IItemUseWorld
         FrameProfiler.SetCounts(_chunkManager.LoadedChunkCount, renderManager.LastVisibleChunkCount,
             _lodManager.CompletedBuildCount, _lodManager.RegionList.Count);
 
+        // Free-list instrument for item D5, in the fixed order opaque/translucent/lod. Same call
+        // site and same frame position as the counts above: the pools are render-thread-only and
+        // this is where they already live.
+        FrameProfiler.SetGeometryCounts(
+            renderManager.OpaqueChunkGeometry.FreeBlockCount,
+            renderManager.TranslucentChunkGeometry.FreeBlockCount,
+            renderManager.LodGeometry.FreeBlockCount,
+            renderManager.OpaqueChunkGeometry.PeakFreeBlockCount,
+            renderManager.TranslucentChunkGeometry.PeakFreeBlockCount,
+            renderManager.LodGeometry.PeakFreeBlockCount,
+            renderManager.OpaqueChunkGeometry.ScanSteps,
+            renderManager.TranslucentChunkGeometry.ScanSteps,
+            renderManager.LodGeometry.ScanSteps);
+
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.BeginGpuPass(ProfileSection.EntityPass);
         renderManager.RenderItemDrops(Camera, _dropManager.Drops);

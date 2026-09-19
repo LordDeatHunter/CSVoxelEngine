@@ -125,6 +125,22 @@ public sealed unsafe class ChunkGeometryPool : IDisposable
     /// <summary>Units currently handed out to chunks (diagnostics).</summary>
     public int UsedUnits => _allocator.UsedUnits;
 
+    /// <summary>Free blocks in the allocator's list right now (diagnostics; see
+    /// <see cref="GeometryAllocator.FreeBlockCount"/>).</summary>
+    public int FreeBlockCount => _allocator.FreeBlockCount;
+
+    /// <summary>Lifetime high-water free-block count (diagnostics; see
+    /// <see cref="GeometryAllocator.PeakFreeBlockCount"/>).</summary>
+    public int PeakFreeBlockCount => _allocator.PeakFreeBlockCount;
+
+    /// <summary>Free-list entries the allocator's scans have examined since construction
+    /// (diagnostics; see <see cref="GeometryAllocator.ScanSteps"/>).</summary>
+    public long ScanSteps => _allocator.ScanSteps;
+
+    /// <summary>Allocate plus free calls since construction (diagnostics; see
+    /// <see cref="GeometryAllocator.AllocatorCalls"/>).</summary>
+    public long AllocatorCalls => _allocator.AllocatorCalls;
+
     /// <summary>
     /// Units a mesh of this size occupies: the larger of the two ceilings, since one unit covers
     /// <see cref="VerticesPerUnit"/> vertices AND <see cref="IndicesPerUnit"/> indices at the same
@@ -254,6 +270,11 @@ public sealed unsafe class ChunkGeometryPool : IDisposable
         _allocator.Grow(newUnits);
 
         var megabytes = VertexBytes(newUnits) / (1024 * 1024);
-        Log.WriteLine($"Chunk geometry pool '{_name}' grew to {newUnits} units ({megabytes} MB vertices)");
+        // Free-list shape on the growth line is what item D5 literally asks for. It fires only on a
+        // doubling — OpaqueInitialUnits already sits where the opaque pool settled, and R10 records
+        // the lod pool growing in none of 12 perf-fly runs — so this is NOT the capture instrument;
+        // the per-second `geo` token on FrameProfiler's console line is.
+        Log.WriteLine($"Chunk geometry pool '{_name}' grew to {newUnits} units ({megabytes} MB vertices), " +
+                      $"free blocks {_allocator.FreeBlockCount}, largest {_allocator.LargestFreeBlock}");
     }
 }

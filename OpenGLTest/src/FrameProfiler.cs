@@ -105,6 +105,24 @@ public static class FrameProfiler
     private static long _lodBuildCount;
     private static int _lodRegionCount;
 
+    // Geometry free-list instrument (item D5), index order fixed 0=opaque, 1=translucent, 2=lod.
+    // _geoFree/_geoPeak/_geoScanCum are the pools' own values as pushed by SetGeometryCounts;
+    // the rest are derived here. _geoFreeWindowMax is a per-window maximum because the allocator's
+    // lifetime peak is set during stream-in and then never moves, so it alone cannot answer
+    // "mid-stream AND just after a teleport". _geoWorstFrameSplit keeps the worst frame's
+    // three-way split so the LOD share of that frame reads straight off the log line.
+    private static readonly int[] _geoFree = new int[3];
+    private static readonly int[] _geoPeak = new int[3];
+    private static readonly int[] _geoFreeWindowMax = new int[3];
+    private static readonly long[] _geoScanCum = new long[3];
+    private static readonly long[] _geoScanPrev = new long[3];
+    private static readonly long[] _geoScanWindow = new long[3];
+    private static long _geoWorstFrameSteps;
+    private static readonly long[] _geoWorstFrameSplit = new long[3];
+
+    // Scratch for the current frame's three deltas, static so EndFrame allocates nothing.
+    private static readonly long[] _geoFrameSteps = new long[3];
+
     private static readonly List<string> _lines = [];
     private static string _consoleLine = string.Empty;
     private static bool _consolePending;
@@ -145,6 +163,30 @@ public static class FrameProfiler
         _visibleChunkCount = visible;
         _lodBuildCount = lodBuilds;
         _lodRegionCount = lodRegions;
+    }
+
+    /// <summary>
+    /// Geometry free-list counts, pushed by the system that owns the three pools (cheap stores).
+    /// Parameters arrive in the fixed order opaque, translucent, lod for each of the three
+    /// quantities: current free-block count, lifetime peak free-block count, and cumulative
+    /// allocator scan steps. Like <see cref="SetCounts"/> these reach the console line ONLY and
+    /// never the HUD overlay: see <see cref="Publish"/>. <c>LargestFreeBlock</c> is deliberately
+    /// absent — it is an O(n) getter and this runs every frame.
+    /// </summary>
+    public static void SetGeometryCounts(
+        int freeOpaque, int freeTranslucent, int freeLod,
+        int peakOpaque, int peakTranslucent, int peakLod,
+        long scanOpaque, long scanTranslucent, long scanLod)
+    {
+        _geoFree[0] = freeOpaque;
+        _geoFree[1] = freeTranslucent;
+        _geoFree[2] = freeLod;
+        _geoPeak[0] = peakOpaque;
+        _geoPeak[1] = peakTranslucent;
+        _geoPeak[2] = peakLod;
+        _geoScanCum[0] = scanOpaque;
+        _geoScanCum[1] = scanTranslucent;
+        _geoScanCum[2] = scanLod;
     }
 
     /// <summary>
@@ -209,6 +251,28 @@ public static class FrameProfiler
         _accumOtherTicks += other;
         if (other > _maxOtherTicks) _maxOtherTicks = other;
         _frames++;
+
+        // Geometry free-list instrument: per-frame scan-step deltas off the pools' cumulative
+        // counters, plus the window's worst frame with its three-way split and the window's
+        // largest free-block count. Both unload paths (LodManager's retention loop and
+        // ChunkManager.UnloadDistantChunks) are unbounded per frame, so a storm lives inside one
+        // frame and an end-of-window sample would read the already-drained list.
+        long geoFrameSteps = 0;
+        for (var i = 0; i < 3; i++)
+        {
+            var delta = _geoScanCum[i] - _geoScanPrev[i];
+            _geoScanPrev[i] = _geoScanCum[i];
+            _geoScanWindow[i] += delta;
+            _geoFrameSteps[i] = delta;
+            geoFrameSteps += delta;
+            if (_geoFree[i] > _geoFreeWindowMax[i]) _geoFreeWindowMax[i] = _geoFree[i];
+        }
+
+        if (geoFrameSteps > _geoWorstFrameSteps)
+        {
+            _geoWorstFrameSteps = geoFrameSteps;
+            Array.Copy(_geoFrameSteps, _geoWorstFrameSplit, 3);
+        }
 
         if (_accumWallTicks >= PublishIntervalTicks)
         {
@@ -285,7 +349,22 @@ public static class FrameProfiler
             // perf-fly bakes the HUD in, so keeping this off _lines guarantees it cannot move a
             // gate pixel. The token is `regions`, never `lod`: `lod` is already a ProfileSection
             // label inside JoinSections and a scraper keyed on it would match the wrong field.
-            $"regions {_lodBuildCount}/{_lodRegionCount} | " +
+            $"regions {_lodBuildCount}/{_lodRegionCount} " +
+            // Geometry free-list instrument (item D5), opaque/translucent/lod throughout: current
+            // free blocks, this window's largest free-block count, the lifetime peak, this window's
+            // scan steps, and the window's worst single frame with its three-way split. The raw
+            // frame count is mandatory and not redundant with fps: fps is a rounded rate, and
+            // _frames is zeroed below, so this is the only exact denominator for steps-per-frame.
+            // Console line ONLY, for the same reason the `regions` token above is: the overlay rows
+            // are fixed-width and perf-fly bakes the HUD into every gate screenshot, so a token that
+            // never reaches _lines cannot move a gate pixel. The name `geo` collides with no Labels
+            // entry, so a scraper keyed on it cannot match a JoinSections field.
+            $"geo f {_geoFree[0]}/{_geoFree[1]}/{_geoFree[2]} " +
+            $"pkw {_geoFreeWindowMax[0]}/{_geoFreeWindowMax[1]}/{_geoFreeWindowMax[2]} " +
+            $"pk {_geoPeak[0]}/{_geoPeak[1]}/{_geoPeak[2]} " +
+            $"scan {_geoScanWindow[0]}/{_geoScanWindow[1]}/{_geoScanWindow[2]} " +
+            $"worst {_geoWorstFrameSteps}={_geoWorstFrameSplit[0]}/{_geoWorstFrameSplit[1]}/{_geoWorstFrameSplit[2]} " +
+            $"frames {frames} | " +
             $"{JoinSections(frames, gpuAvgMs, gpuMaxMs, gpuSamples)}";
         _consolePending = true;
 
@@ -302,6 +381,14 @@ public static class FrameProfiler
         Array.Clear(_gpuAccumNs);
         Array.Clear(_gpuMaxNs);
         Array.Clear(_gpuSamples);
+        // Window-scoped geometry state only. _geoScanPrev is NOT cleared — it tracks the pools'
+        // cumulative counters across windows, and zeroing it would report every step ever taken as
+        // one frame's delta. _geoPeak is NOT cleared either: the allocator owns that lifetime
+        // high-water mark and simply re-pushes it every frame.
+        Array.Clear(_geoScanWindow);
+        Array.Clear(_geoFreeWindowMax);
+        _geoWorstFrameSteps = 0;
+        Array.Clear(_geoWorstFrameSplit);
     }
 
     // "label     avg   max   gpu" — 29 characters, inside DrawText's 32-glyph budget
