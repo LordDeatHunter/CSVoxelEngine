@@ -195,9 +195,16 @@ public class FluidManager
         var pos = chunk.Position;
         var ownHeights = Chunk.GetColumnHeights((int)pos.X, (int)pos.Z);
 
+        // Floored once for the six chunk-map probes below. Every one of them is a distinct key,
+        // so ChunkMap's int overload packs straight from these, where its Vector3 overload would
+        // floor and pack again per probe.
+        var cx = MathUtils.FloorToInt(pos.X);
+        var cy = MathUtils.FloorToInt(pos.Y);
+        var cz = MathUtils.FloorToInt(pos.Z);
+
         foreach (var (dx, _, dz) in Horizontals)
         {
-            if (!TryGetLoadedNeighbour(chunks, pos, dx, 0, dz, out var neighbour)) continue;
+            if (!TryGetLoadedNeighbour(chunks, cx, cy, cz, dx, 0, dz, out var neighbour)) continue;
 
             // The two 16x16 planes that touch: this chunk's face cells sit at `near` on the
             // axis the face cuts, the neighbour's directly across at `far`
@@ -231,7 +238,7 @@ public class FluidManager
 
         // Water only ever falls through a vertical face, so each of these schedules one side:
         // the fluid sitting over the hole, never the air sitting over the fluid.
-        if (TryGetLoadedNeighbour(chunks, pos, 0, -1, 0, out var below))
+        if (TryGetLoadedNeighbour(chunks, cx, cy, cz, 0, -1, 0, out var below))
         {
             for (var lx = 0; lx < Chunk.Size; lx++)
             for (var lz = 0; lz < Chunk.Size; lz++)
@@ -243,7 +250,7 @@ public class FluidManager
             }
         }
 
-        if (TryGetLoadedNeighbour(chunks, pos, 0, 1, 0, out var above))
+        if (TryGetLoadedNeighbour(chunks, cx, cy, cz, 0, 1, 0, out var above))
         {
             for (var lx = 0; lx < Chunk.Size; lx++)
             for (var lz = 0; lz < Chunk.Size; lz++)
@@ -257,10 +264,10 @@ public class FluidManager
     }
 
     /// <summary>The face neighbour at the offset, when it exists and its blocks are generated.</summary>
-    private static bool TryGetLoadedNeighbour(ChunkManager chunks, Vector3 pos, int dx, int dy, int dz,
-        out Chunk neighbour)
+    private static bool TryGetLoadedNeighbour(ChunkManager chunks, int cx, int cy, int cz,
+        int dx, int dy, int dz, out Chunk neighbour)
     {
-        return chunks.Chunks.TryGetValue(pos + new Vector3(dx, dy, dz), out neighbour)
+        return chunks.Chunks.TryGetValue(cx + dx, cy + dy, cz + dz, out neighbour)
                && neighbour.IsBlockDataReady;
     }
 

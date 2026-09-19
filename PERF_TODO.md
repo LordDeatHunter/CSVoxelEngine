@@ -217,13 +217,6 @@ protocol above before trusting it. The entries below the passes repeat nothing f
 
 ### Data structures / caching
 
-- [ ] **D1 · Packed chunk keys** — `ChunkManager.Chunks` / `_dirtyChunks` /
-  `_queuedChunkPositions` / `_generatingMeshes` are keyed by `Vector3`
-  (`ChunkManager.cs:23,82-83,92`), paying a 3-float hash on every probe (neighbour
-  checks, the dirty scan, `TryResolveNeighbors`, entity lookups). `FluidManager`
-  already packs a `long` to avoid exactly this (`FluidManager.cs:32-35,898-899`).
-  **Impact med · risk med · effort L** (broad but mechanical). `LodManager` is
-  already keyed by integer tuples, so this is chunk-side only.
 - [ ] **D2b · `LodRegion.ColumnCaps` grows unbounded, and it must NOT take D2's scheme** —
   `LodRegion.ColumnCaps` (`LodRegion.cs:130`) is a process-global `ConcurrentDictionary` holding one
   dense `Chunk.Size * Chunk.Size` `int[]` — **~1 KB — per *edited chunk column***, written by
@@ -361,8 +354,11 @@ protocol above before trusting it. The entries below the passes repeat nothing f
 - `TntManager`, `CampfireManager`, `QuernManager`, `DropManager`,
   `FallingBlockManager`, `TopplingTree`, `AmbienceManager`, `TextureAtlas`,
   `Camera` — walked in an earlier round; no allocation, redundancy or algorithmic
-  finding above the noise floor. `Camera`'s per-frame collision scans are additional
-  evidence for D1's impact rather than a separate entry. (R7 and R11 have since landed
+  finding above the noise floor. `Camera`'s per-frame collision scans were recorded
+  here as additional evidence for D1's impact rather than as a separate entry; **D1 has since
+  landed**, and those scans reach the table through `ChunkManager.GetBlockGlobal`
+  (`ChunkManager.cs:759`), which now shifts straight into `ChunkMap`'s `int` overload with no
+  intermediate `Vector3`. (R7 and R11 have since landed
   *in* `Camera` — the view-projection and view-frustum caches — but they were their own
   bullets, not findings from that walk, so this entry still stands.)
 
@@ -381,15 +377,145 @@ needs, not the history.
 
 ### What landed
 
+- **D1 · The chunk tables are keyed on a packed `long`, and `Vector3` stayed the outward key.**
+  `ChunkManager.Chunks` is now a `ChunkMap` (`Systems/ChunkMap.cs`) over a private
+  `ConcurrentDictionary<long, Chunk>` (`ChunkManager.cs:22`), and `_dirtyChunks` /
+  `_queuedChunkPositions` (`:115-116`), `_generatingMeshes` (`:125`) and C6's `_playerPlacedByChunk`
+  (`:163`) hold packed keys directly. **The key type does not change outward.** `Chunks` still takes
+  and returns `Vector3` on its indexer, `TryGetValue`, `ContainsKey` and `TryRemove`, so **zero call
+  sites were edited to make the tree compile** — the wrapper type is the whole of D1's
+  public-surface change, across a surface roughly 136 call sites wide. The member audit that made
+  that possible ran over `OpenGLTest`, `OpenGLTest.Tests` and `OpenGLTest.ItemDebugger` **before**
+  the wrapper was written and found the used surface to be exactly indexer / `TryGetValue` /
+  `ContainsKey` / `TryRemove` / `Values` / `Count` plus one internal `foreach`: no `Keys`,
+  `GetOrAdd`, `AddOrUpdate` or `TryAdd` anywhere. `ChunkMap` deliberately has **no `GetEnumerator`**
+  — nothing needed one after the round, and its absence turns a future `foreach (var kvp in Chunks)`
+  into a compile error that forces an explicit choice between `.Values` and the internal `.Packed`.
+  It stays a `ConcurrentDictionary`, never a `Dictionary` behind a lock: chunk-gen workers write it
+  and mesh-build pool workers read it.
+- **D1 · `ChunkMap.TryRemove` is a plain passthrough, on purpose.** It bumps nothing and has no
+  side effect, so `MeshingTests.cs:49`'s direct removal behaves exactly as it did at HEAD and
+  `ChunkScanFrontier`'s doc point 10 — "`Chunks` is public and MeshingTests.cs:49 already removes
+  through it, so the single-removal-site property is a convention, not something the type system
+  enforces" — stays **literally true and unedited**. Making the wrapper bump `ChunkRemovalVersion`
+  would have looked like a strengthening and would in fact have changed C3's contract while
+  invalidating the sentence that records it. Do not do it later either.
+- **D1 · The packer is `ChunkKey` (`src/ChunkKey.cs`), 21 bits an axis, reusing `FluidManager`'s
+  budget line for line.** `Pack(cx, cy, cz)` is
+  `((cx & PackMask) << 42) | ((cy & PackMask) << 21) | (cz & PackMask)` (`ChunkKey.cs:31-37`)
+  against `FluidManager`'s identical expression (`FluidManager.cs:36-37,938-939`), and `SignExtend`
+  is a literal copy (`ChunkKey.cs:70` / `FluidManager.cs:952`). The two are **not** collapsed onto
+  one helper — `FluidManager`'s packer is block-scale, `ChunkKey`'s is chunk-scale — and copying the
+  constant rather than sizing a new one keeps them readable side by side. It is a shared
+  `internal static class` rather than private helpers because it has two genuine consumers in
+  different files (`ChunkManager` and `ChunkMap`), which `FluidManager`'s packer does not.
+  **The representable range is asymmetric, and that asymmetry is the contract, not a bug:**
+  **-1,048,576..+1,048,575 chunks = -16,777,216..+16,777,215 blocks**, because 21 bits signed is not
+  +/-2^20 — `Pack(1 << 20, 0, 0)` keeps bit 20, which *is* the sign bit, so it unpacks to
+  `-(1 << 20)`. `ChunkKeyTests.OnePastThePositiveEdgeDeliberatelyWrapsToTheNegativeEdge` pins that
+  wrap deliberately, so nobody later "fixes" the asymmetry by writing a `+2^20` round-trip fact this
+  packer cannot pass. Every path in **floors, never truncates** — `Pack(Vector3)` through
+  `MathUtils.FloorToInt`, `PackBlock` through an arithmetic shift — which is exactly
+  `VoxelCoords.ChunkPosOf`'s convention and the trap C6's
+  `PlacementBucketsAreKeyedByFlooredChunkPosition` already guards. One deliberate behaviour
+  difference follows, recorded rather than hidden: a **fractional or non-finite** chunk position
+  matched no key at HEAD and now floors into one (`(int)float.NaN` is 0, so a NaN centre would probe
+  chunk `(0,0,0)`). An audit of every `Chunks[` and every probe caller found none that can produce
+  one; `ChunkScanFrontier`'s point 7 contemplates a NaN centre and is unaffected, because that path
+  never reaches a dictionary.
+- **D1 · `UnloadDistantChunks` kept its shape, so C3's standing obligation survives intact.**
+  The method is a key-type substitution in place and nothing else: the bump is still **after** the
+  loop and still gated on `removed > 0` (`ChunkManager.cs:266`), `removed` is bit-identical at every
+  iteration, and the false-to-true transition for `NeedsChunk` still lands at the
+  `_queuedChunkPositions` removal (`:253`), **not** at the `Chunks` removal (`:243`). What changed is
+  that the loop enumerates `Chunks.Packed` and hands `kvp.Key` straight to all four removals plus
+  `_playerPlacedByChunk.Remove`, instead of packing the position back up once per unloaded chunk;
+  `pos` comes from `ChunkKey.ToVector3(key)`, which is exact and independent of `Chunk.Position`.
+  The three named guard facts are **green and unedited** —
+  `ChunkManagerTests.UnloadBumpsChunkRemovalVersionOnlyWhenAChunkLeaves`,
+  `ChunkScanFrontierTests.FrontierTrustsThePrefixUntilTheRemovalVersionMoves`,
+  `ChunkScanFrontierTests.TheScanCostIsAmortisedNotPerCall` — and `ChunkScanFrontierTests` was not
+  touched at all. `ChunkScanFrontier`'s doc points 2 and 4 were refreshed (prose only) to quote the
+  post-D1 `NeedsChunk` and to cite lines that resolve.
+- **D1 · Rekeying changes dictionary enumeration order, three sites observe it, and all three
+  are order-insensitive at convergence — so a per-frame output comparison is the WRONG gate.** This
+  is the paragraph a later round needs so it does not rediscover an inherent consequence. Bucket
+  layout changes by construction when the key type changes, and (1) `ProcessDirtyChunks` caps its
+  scan at `WorldGenerationConfig.MaxDirtyScanPerFrame` (1024) over `foreach (var kvp in
+  _dirtyChunks)`, so *which* dirty chunks a frame even considers is a function of bucket order;
+  (2) the over-budget branch sorts `_dirtyCandidates` with an **unstable** `List.Sort` on `distSq`
+  alone and takes the first `MaxDirtyChunksPerFrame` (64), and distance ties are everywhere on a
+  chunk lattice, so ties break by insertion order; (3) `UnloadDistantChunks`'s
+  `foreach (var kvp in Chunks.Packed)` (`ChunkManager.cs:236`) feeds `RemoveRenderable`'s
+  swap-remove, setting `Renderable` / `TranslucentRenderable` order, which `RenderManager`'s
+  **unstable** back-to-front translucent sort (`RenderManager.cs:1781`) then observes for
+  equidistant chunks. Each is order-insensitive in its *converged* result — nothing is lost, only
+  deferred: out-of-range and unloaded dirty entries are dropped on sight, and missing-neighbour ones
+  are re-added by `QueueChunk` when the neighbour arrives. So **D1 is output-preserving at
+  convergence, not per frame**; a mid-stream pixel difference is expected rather than a regression,
+  and the round's authority was an order-independent sorted cross-tree hash with pixels demoted to a
+  settled-state smoke check.
+- **D1 · Rejected alternatives, each priced rather than asserted.** *(a) Comparer-only* —
+  keeping `Vector3` keys and passing a packing `IEqualityComparer<Vector3>` — was **measured, not
+  dismissed**: arm A' below is a ~1 ns improvement on settled probes and a **pessimisation** on
+  mixed hit/miss (19.8 ns against HEAD's 18.0), and it never approaches a real `long` key. Its
+  bucket layout is bucket-for-bucket identical to the `long` table, which makes it a clean layout
+  control: with distribution held identical, `Vector3` keys still cost ~6 ns more per probe, so the
+  residue is the key *type* — a 12-byte key, `Vector3` equality on every node visit, a wider node,
+  and the non-inlinable interface call a custom comparer forces — not hash arithmetic and not bucket
+  luck. *(b) Changing the key type outward* to `long` or a struct would have rippled through ~136
+  call sites for no win over the wrapper. *(c) Converting `ChunkScanFrontier.FindNext` and
+  `ChunkGenerationWorker`'s sorted offsets to integer offsets*, where **the largest remaining win on
+  this path actually sits**, was blocked this round for a stated reason: it forces edits to
+  `ChunkScanFrontierTests`, and `FrontierTrustsThePrefixUntilTheRemovalVersionMoves` and
+  `TheScanCostIsAmortisedNotPerCall` had to stay green **and unedited**. Recorded as a prepared
+  remedy, the way D5 records the paired-allocation one; a future round that takes it owes those two
+  facts a careful re-derivation rather than a rewrite.
+- **D1 · Sites deliberately left on the `Vector3` overload, each for a named reason, and none of
+  them pays for it.** `World.cs:965`, `:1069`, `:1084`, `:1554` — one probe per player action (break,
+  fell, place), and `:1069`/`:1084` need the `Vector3` for their `HashSet<Vector3> touchedChunks`
+  anyway; there is deliberately **no `World` step** in this round because it would have been empty.
+  `TntManager.cs:108-109` and `:168-169` — both locals feed `touchedChunks.Add`, so the `Vector3` is
+  needed regardless, and `:182` iterates that same set. `FluidManager.cs:154` — compares the probe
+  result against `chunk.Position`, one probe per newly-loaded chunk.
+  `ChunkManager.ApplyCompletedMeshes` — holds a `Vector3` from the completed-mesh queue tuple for
+  the `DistanceSquared` gate on the same line, and drains at most a few entries a frame. **None pays
+  a penalty:** arm H1 below measured the `Vector3` overload *through* `ChunkMap` at **41-47 %
+  cheaper** than HEAD's `Vector3`-keyed probe, nowhere near the 1.05x threshold the pre-registered
+  rule set for calling it a cost. They simply forgo the further ~2.4 ns/probe the int-in-hand path
+  buys.
+- **D1 · What took the `int` fast path, and why those sites and not others.** Every site that
+  probes a **distinct key per operation** took it, because those are the sites with no pack to
+  amortise: `Chunk.TryResolveNeighbors` (`Chunk.cs:1060`, **26 probes per mesh build**, on pool
+  threads), `LodManager.cs:731` (the column prefetch C5 measured at **36 / 100 / 324 chunk columns
+  per region build**, on the LodGen thread), `ChunkManager.HasAllNeighbors` (`:892`),
+  `GetBlockGlobal` / `ChunkAt` (`:759`, `:772`, whose intermediate `Vector3` was built from the same
+  shifts and is simply gone), `QueueChunk`'s six-neighbour fan-out, `MarkAreaDirty`'s triple loop,
+  `FluidManager.WakeBorders`' six border probes, and `TntManager` / `FallingBlockManager`'s
+  shift-derived lookups. The six cardinal offsets now come from one shared
+  `Vector3Directions.CardinalOffsets` array rather than hand-transcribed literals, pinned equal to
+  `CardinalDirections` by a fact so a reorder of one cannot silently diverge from the other.
+- **D1 · 20 new facts, no existing test edited, suite 770 -> 790.** **+11 `ChunkKeyTests`**
+  (positive and negative round trips per axis, the sign boundary, both representable edges, the
+  deliberate wrap one past the positive edge, axis independence, a 531441-key collision sweep over
+  -40..40 per axis, `Pack(Vector3)` agreeing with `Pack(int,int,int)`, `PackBlock` agreeing with
+  `VoxelCoords.ChunkPosOf`, `ToVector3` inverting `Pack`, and `CardinalOffsets` matching
+  `CardinalDirections`), each mutation-checked against the specific defect it names. **+7
+  `ChunkMapTests`** pinning the wrapper's contract rather than its internals. **+2
+  `ChunkRekeyReplayProbe`**, the cross-tree gate, written **before the first production edit** and
+  unchanged since — which is why it compiles on a pristine HEAD export and is the round's authority.
+
 - **C6 · Player placements are bucketed by chunk, so an unload drops a bucket instead of scanning
   the world.** `ChunkManager._playerPlaced` was one flat `HashSet<(int X, int Y, int Z)>` holding
   every cell the player has ever built, and `UnloadDistantChunks` called `RemoveWhere` on it **once
   per unloaded chunk** — O(unloads x placements), with the whole set walked whether or not any of it
-  lay in the dropped chunk. It is now
-  `Dictionary<Vector3, HashSet<(int X, int Y, int Z)>> _playerPlacedByChunk`, keyed by
-  `VoxelCoords.ChunkPosOf(x, y, z)` — the **same `Vector3` chunk position `Chunks` is keyed on**, so
-  the unload site's key is the `pos` it already holds and **D1 is untouched and un-pre-empted by this
-  round**. The structure stays **plain and non-concurrent** on purpose: all nine call sites are
+  lay in the dropped chunk. It is now `_playerPlacedByChunk`, keyed by the **same chunk key `Chunks`
+  is keyed on**, so the unload site's key is the one it already holds. C6 shipped it as
+  `Dictionary<Vector3, HashSet<(int X, int Y, int Z)>>` keyed by `VoxelCoords.ChunkPosOf(x, y, z)`
+  and left D1 un-pre-empted; **D1 has since taken it with the rest**, so it is now
+  `Dictionary<long, HashSet<(int X, int Y, int Z)>>` (`ChunkManager.cs:163`) keyed by
+  `ChunkKey.PackBlock(x, y, z)` — identical flooring, so C6's own facts did not move.
+  The structure stays **plain and non-concurrent** on purpose: all nine call sites are
   main-thread (`Chunk.cs`, `BucketPlaceItem.cs`, `FluidManager.cs`, `TntManager.cs`, `World.cs`),
   nothing enumerates the set, and AGENTS.md reserves the concurrent collections for genuinely shared
   state. The three accessor signatures (`IsPlayerPlaced` / `MarkPlayerPlaced` /
@@ -860,6 +986,210 @@ is the specific "simplification" those facts exist to catch.
 `LodBuildPoolTests.cs` is also the **only** file in the tree that can execute the `TryAdd` loser
 branches at all, and `LodManagerTests.ALostDirtyClaimIsReDirtiedNotDropped` points at it by name in
 its doc comment — if it is renamed, that reference must move with it.
+
+### Measurement: D1 — the only instrument that can resolve a rekeying is an isolated probe cost
+
+**Say first which instrument can and cannot resolve this item, because most of them cannot.**
+*Can*: an isolated **off-engine microbenchmark of the probe itself, in nanoseconds, per call-site
+shape** — probe cost is the only quantity D1 changes. *Cannot*: any `perf-fly` field (the 60 s
+window is saturated for both chunks and LOD, lesson 1, so every end-state throughput field measures
+the scenario ceiling); any counted replay in D2's or C6's style (**D1 changes probe cost, not probe
+count** — the counts are bit-identical by construction, which is exactly what the cross-tree hash
+exists to prove); any in-engine frame-time row (single-digit nanoseconds against a ~9 ms frame
+holding ~10^5 other operations). **No engine-level or frame-time number is quoted anywhere in this
+round**, and none may be derived from these figures later.
+
+**The decision rule was written in final wording before the harness existed and before a single
+number was read** (the D6 precedent), and it is reproduced verbatim so the branch that fired can be
+checked against it:
+
+> - FULL D1 iff `median(B) <= 0.85 * median(A)` AND `median(C) <= 0.85 * median(H0)`, each on
+>   SETTLED, in at least 4 of the 5 scored sweeps, with an absolute saving of at least 1 ns.
+> - REDUCED D1 if B is within +/-15 % of A but C clears its bar: the conversions still all run, and
+>   the bullet records plainly that `NeedsChunk` and the frontier are NEUTRAL and the win is bought
+>   entirely on the int-in-hand paths. This is a landing, not a no-go.
+> - INVERTED case: if C clears but B is MORE than 15 % worse than A, land the reduced form and
+>   additionally record that the frontier's probe got dearer, and state the prepared remedy
+>   (integer offsets in `ChunkScanFrontier`, blocked this round because it forces edits to
+>   `ChunkScanFrontierTests` and the two named facts must stay unedited).
+> - H1 IS A DIAGNOSTIC, NOT A SEQUENCING GATE. Its job is to price the sites the round deliberately
+>   leaves on the `Vector3` overload. If `median(H1) > 1.05 * median(H0)`, the bullet must state the
+>   per-probe cost those sites pay and bound it by their probe counts, rather than claiming the
+>   change is free everywhere.
+> - If neither B nor C clears its bar, LAND NOTHING and rewrite D1's bullet with the finding, on the
+>   R3/C5 precedent.
+> - A' is reported for the record. Comparer-only is taken only if A' beats BOTH B and C, which would
+>   contradict the `EqualityComparer<TKey>.Default` devirtualisation argument and would itself be
+>   the round's finding.
+> - WHATEVER the numbers, no engine-level or frame-time claim is quoted anywhere.
+
+Tie-break wording, also fixed before the capture: "within +/-15 % of A" means
+`0.85*median(A) <= median(B) <= 1.15*median(A)`; the 1 ns floor applies per probe-group as reported;
+and if C fails its bar the round lands nothing whatever B does.
+
+**The harness.** A self-contained scratchpad console project (net9.0, Release, workstation
+concurrent GC, `TieredPGO`, matching `silkgltriangle.csproj`) referencing **nothing** from the
+engine. It rebuilds the workload locally: the radius-16 closest-first offset ring (17077 offsets —
+the exact count `ChunkGenerationWorker.BuildSortedOffsets` produces at `ChunkRadius` 16), plus local
+copies of the `ChunkKey` pack expression and of `MathUtils.FloorToInt`. 6.83 M probe-groups per
+measurement, 1 warm-up + **5 interleaved scored sweeps** per workload, arms rotated run for run so
+no arm owns a position, a consumed checksum so nothing is dead-code-eliminated, and **four separate
+process launches**. It asserts nothing.
+
+**The arms are call-site SHAPES, not implementations**, because packing amortises across the
+dictionary operations a site performs per key, and the source pins the reuse counts exactly.
+*Shape N* (`NeedsChunk`): one key, up to two `ContainsKey` probes. *Shape H*
+(`HasAllNeighbors`, `GetBlockGlobal`/`ChunkAt`, `Chunk.TryResolveNeighbors`, `LodManager.cs:731`):
+one distinct key per probe, no reuse at all.
+
+| arm | shape | what it is | SETTLED median ns (4 runs) | STREAMING median ns |
+| --- | --- | --- | --- | --- |
+| A | N | `Vector3` keys — HEAD | 17.76 / 16.49 / 15.81 / 16.05 | 17.95 / 17.92 / 18.36 / 18.04 |
+| A' | N | `Vector3` keys + packing `IEqualityComparer` | 15.24 / 15.37 / 15.08 / 15.05 | 19.82 / 19.84 / 19.88 / 19.76 |
+| B | N | `long` keys, pack once from the `Vector3` — D1 | 9.21 / 9.33 / 9.22 / 9.25 | 12.84 / 12.65 / 12.67 / 12.35 |
+| H0 | H | `Vector3` keys — HEAD | 18.12 / 16.91 / 16.36 / 16.34 | 13.54 / 13.26 / 13.56 / 13.38 |
+| H1 | H | `long` keys, pack per probe from a `Vector3` | 9.64 / 9.66 / 9.74 / 9.55 | 10.67 / 10.67 / 10.81 / 10.66 |
+| C | H | `long` keys, pack per probe from ints in hand | 6.98 / 7.17 / 7.03 / 7.17 | 7.34 / 7.44 / 7.50 / 7.47 |
+
+Units are ns **per probe-group** — per key for shape N, per probe for shape H. SETTLED fills the
+dictionaries with all 17077 ring keys (the frontier's worst case, a full scan finding nothing);
+STREAMING fills half and mixes hit and miss.
+
+**The branch that fired: FULL D1**, on both pre-registered SETTLED comparisons, in **5 of 5** scored
+sweeps in **each of four independent process launches**:
+
+- `B` vs `A`: ratio **0.518 / 0.566 / 0.583 / 0.576**, saving **8.55 / 7.16 / 6.59 / 6.80 ns**.
+- `C` vs `H0`: ratio **0.385 / 0.424 / 0.430 / 0.439**, saving **11.14 / 9.73 / 9.33 / 9.17 ns**.
+
+**The two arms are reported separately on purpose, and an arm-C number must never be read as the
+frontier's win.** Arm B *is* `NeedsChunk` and therefore the C3 frontier: it wins **on its own**, by
+6.6-8.6 ns per key, so this is the FULL branch and not the REDUCED one — the frontier is **not**
+neutral. Arm C is the int-in-hand paths (`TryResolveNeighbors`, the LOD column prefetch,
+`HasAllNeighbors`, `GetBlockGlobal`): a separate and larger win, 9.2-11.1 ns per probe, on sites
+that probe a distinct key every time. An extra diagnostic that feeds no branch, SETTLED-QUEUED — the
+only settled case where `NeedsChunk` actually performs **two** probes, absent from `Chunks` but
+present in `_queuedChunkPositions` — has `B/A` at **0.41-0.47** (A 22.55-25.32, B 10.49-10.85),
+because amortising one pack over two probes is worth more still. Note the shape of the SETTLED
+workload when reading arm B: the `&&` short-circuits, so on SETTLED `NeedsChunk` performs **one**
+probe, and arm B's single pack amortises over that one probe and still wins outright.
+
+**H1's verdict on the deliberately untaken sites: they pay nothing.** The rule's threshold was
+`median(H1) > 1.05 * median(H0)`; measured `H1/H0` is **0.532 / 0.571 / 0.595 / 0.585** — the
+`Vector3` overload *through* `ChunkMap` is **41-47 % cheaper** than HEAD's `Vector3`-keyed probe.
+So `World.cs:965/1069/1084/1554`, `TntManager.cs:108-109/168-169/182`, `FluidManager.cs:154` and
+`ApplyCompletedMeshes` come out cheaper than HEAD anyway and merely forgo arm C's further ~2.4 ns.
+There is no per-probe cost to state against them.
+
+**This corrects a planning assumption, and the correction is recorded rather than buried.** The plan
+asserted that a `Vector3` probe *through* `ChunkMap` must be strictly more work than at HEAD (three
+floors, three converts, a pack and a `long` hash against one `Vector3.GetHashCode`). Measured, that
+holds only for the key **derivation**, and derivation is not what dominates. The attribution
+diagnostics, run after the scored sweeps and report-only, say where the gap actually lives:
+
+1. **Key derivation with the dictionary removed** (ns per key, median of 5, three runs):
+   `Vector3.GetHashCode` **5.20 / 5.25 / 5.09**; pack-from-`Vector3` then `long` hash
+   **5.34 / 5.35 / 5.44**; pack-from-ints then `long` hash **2.59 / 2.57 / 2.55**. So floor + pack +
+   `long` hash costs the **same** as `Vector3.GetHashCode` to within +0.15..+0.35 ns, and packing
+   from ints already in hand saves ~2.6 ns. Derivation explains the arm C edge over B and H1 almost
+   exactly, and explains **none** of the `long`-versus-`Vector3` gap.
+2. **Bucket layout** of three dictionaries holding the same 17077 positions: `Vector3` + default
+   comparer `buckets=75431 used=15279-15320 maxChain=4-5 mean=1.115`; `Vector3` + packing comparer
+   `used=16988 maxChain=2 mean=1.005`; `long` `used=16988 maxChain=2 mean=1.005`. The packing-
+   comparer table is bucket-for-bucket identical to the `long` one, which makes arm A' a clean
+   **layout control**: with distribution held identical, `Vector3` keys still cost ~15.1 ns against
+   the `long` table's ~9.2 ns. That ~6 ns residue is the key **type** — a 12-byte key, `Vector3`
+   equality on every node visit, a wider node, and the interface call a custom comparer forces — not
+   hash arithmetic and not bucket luck. (One run's default-comparer table happened to sit at 36353
+   buckets with `maxChain=5` and timed the same, so table size is not driving the result either.)
+
+**Honest limits of this instrument.** Single-threaded, off-engine, one hot 17077-key working set,
+measuring isolated probe cost in nanoseconds and nothing else. **It says nothing about frame time,
+and no frame-time claim is made from it.** The engine-level effect of D1 was **not isolated**, and
+the round says so plainly rather than implying a win nothing measured: `perf-fly` cannot see it
+(saturated window), a counted replay cannot see it (the counts are identical by construction), and
+an in-engine frame-time row cannot see single-digit nanoseconds against a ~9 ms frame.
+
+#### The visual gate: D1 is output-preserving at convergence, and only a converged hash can say so
+
+**The authority is an exact cross-tree hash, and it was written before the first production edit.**
+`ChunkRekeyReplayProbe` drives a **real** `ChunkManager` through a real load / unload /
+neighbour-resolution sequence and folds the resulting state into two FNV-1a 64 hashes. It names only
+API present on **both** trees — no `ChunkMap`, no `ChunkKey`, no `Packed`, no `int` overload — and it
+never enumerates `Chunks` itself, so it compiles **unchanged** on a pristine HEAD export. Both lines
+reproduced byte-identically after every production step and on both trees:
+
+    [d1hash-a] hash=0x5c85567614c237ee registered=243 afterPass1=75 left=48 placements=167
+               unmarked=24 survivingPlacements=45 probes=64 verts=48 idx=72 removalVersion=2
+               loaded=-195 placedChunks=27
+    [d1hash-b] hash=0xa6d87257e5de3dbf meshed=9 chunks=75 loaded=0 dirty=0 generating=0
+
+Fact A stays entirely on the **synchronous** path (chunks registered through the indexer, so
+`ProcessDirtyChunks` returns at its `IsEmpty` guard and dispatches nothing) and asserts the three
+dispatch counters are zero after every `Update`, as a guard that the fact stayed there rather than
+folding a race as data — `DirtyCount` and `GeneratingMeshCount` are genuinely nondeterministic at an
+arbitrary fold point, because `BuildMeshFor` removes from `_generatingMeshes` on a pool thread. Fact
+B covers the **async** dirty path by spinning `Update` to quiescence under a **bounded and asserted**
+iteration count and folding only the converged meshed set. Both folds are over **sorted** state, so
+both are order-independent by construction — which is what keeps them valid once per-frame
+enumeration order is known to change. Negative controls confirm they are not vacuous: a truncating
+placement key (the floor-versus-truncate trap) leaves every structural assertion passing and moves
+`[d1hash-a]` to `0xe92875e5f826e389`; dirtying six neighbours in `MarkDirty` breaks fact B alone.
+
+**The enumeration-order change was pre-registered before the gate ran**, per the What-landed bullet
+above: a mid-stream pixel difference is an expected consequence of reordered per-frame mesh
+selection, not a bug, and the round did not bisect one. Pixels were therefore demoted to a
+**settled-state smoke check** on `clouds-mirror`, `entity-binds` and `rays-halfres` (settle wait
+raised 6 s -> 30 s), run from a scratchpad copy by absolute path against the pristine export, with a
+cold discarded run per tree and **5 scored runs per tree per scenario**, interleaved in one session.
+`lod-horizon` and `particles` were eyeball-only and entered no statistic.
+
+**Result: zero structural change, and at the final run count the residue is exactly zero
+everywhere.** Under R10's within-tree-constant instrument (a pixel counts only where all runs of one
+tree agree exactly, all runs of the other agree exactly, and the two constants differ), the **5+5**
+work/head residue over 23 scored shots was **0 px on 18 of them and 1, 1, 2, 3, 3 px on the other
+five** — at most **0.00033 %** of a 921600-px frame and **10 pixels in total across the whole gate**,
+nine of the ten a single-LSB difference on one channel. The exact permutation null over all 126
+balanced relabellings of the same ten runs was already decisive at that point: arbitrary relabellings
+reach **12083, 45668 and 1862 px** on the same shots, three to four orders of magnitude above any
+real split, and no real split carrying a nonzero residue ranked better than **10th of 126** (every
+better rank belongs to a shot whose real residue is zero, where 92-125 splits sit tied at that same
+value). The one non-LSB survivor, opened, was one pixel of a 2-px foliage speckle whose own
+per-frame count varies 47-105 **within** each tree (HEAD 47/79/73/58/65, work 59/69/105/75/66).
+
+**Those ten pixels were accidental five-run agreement, and adding runs removed them.** The gate was
+re-run in a second session against the current binaries — a cold discarded run plus 2 more scored
+runs per tree for `entity-binds` and `rays-halfres`, re-scored at **7+7** by an independent
+implementation of the same instrument against the exact null over all C(14,7)/2 = **1716** balanced
+relabellings. The real residue is **0 px on all six `entity-binds` shots** (was 1 and 3) and **0 px
+on all ten `rays-halfres` shots** (was 2, 1 and 3), against null maxima of 617-9947 px and up to
+2090 px respectively; `clouds-mirror` was already 0 px on all seven of its shots at 5+5 and was not
+re-shot. **So across all 23 scored shots the cross-tree residue is zero.** The mechanism is visible
+in the data: the fresh runs differ from each tree's own stored 5-run constant on 0.1-10 % of that
+constant's pixels, so the "within-tree constant" shrinks as runs are added and an accidental
+agreement collapses while a real effect could not.
+
+**And the instrument's own trap fired twice, at two different run counts, which is worth carrying
+forward.** At 3+3, `entity-binds/07-held_block` looked like a finding: 1094 px, rank 1 of 10,
+p = 0.10; at 5+5 the same shot's residue is **exactly 0**. Then the ten surviving pixels at 5+5 went
+the same way at 7+7. Both were accidental agreement within a tree, one level apart. A real tree
+effect can only survive extra runs; an accident collapses — so **the run count is part of the
+instrument, and a nonzero residue at any fixed count is a hypothesis, not a finding, until more runs
+fail to remove it.**
+
+**Two more instrument defects were observed and are recorded so the next round does not rediscover
+them:** `clouds-mirror` and `rays-halfres`
+photograph **different camera poses run to run within the same tree** at these wait settings
+(`clouds-mirror/08-mirror_still_0` sits at z -135.50 / -160.50 / -106.50 across HEAD's own runs), so
+at those two the same file name is not the same view — the `lod-horizon` defect, appearing on two
+more scenarios, identically on pristine HEAD. Only `entity-binds` is pose-stable. Separately, the
+raised-wait control never reports equal streaming counts: `scrape.py` labels every shot
+tree-disjoint, but that is a **4-tuple artefact** — with five distinct values per tree, four noisy
+fields rarely repeat a whole tuple. Per **field**, all **92** shot-fields (23 shots x `chunks N`,
+`chunks V`, `regions built`, `regions live`) overlap and **86 of 92** have the work tree's whole
+range **inside** HEAD's, so **no count separates the trees**. The six that are not inside are
+`chunks N` and `chunks V` on `rays-halfres`'s three `*_still_*` shots, where both trees straddle the
+same streaming transition and the ranges still overlap. **No wall clock is quoted from any of these
+runs.**
 
 ### Measurement: C6 + D6 — both items are counting-shaped, so both are counted
 
@@ -1962,14 +2292,16 @@ immediately above; read it before designing any capture, and read the bullet of 
 take before touching its code. What follows is the hand-off: what just landed, and what to take next
 and why.
 
-Next: **C6 and D6 both landed, and both landed as counted results rather than timed ones.** C6
-replaced `ChunkManager`'s one flat `_playerPlaced` set with per-chunk buckets keyed by
-`VoxelCoords.ChunkPosOf`, so `UnloadDistantChunks` drops a bucket instead of scanning every placement
-in the world; D6 moved the last three `Clear()`-at-cap worldgen caches
-(`TreeGenerator.ShapeCache`, `TreeGenerator.CanopyCache`, `CactusGenerator.ShapeCache`) onto
-`GenerationalCache` at unchanged capacity. The tables, the two cross-tree hashes and the visual gate
-are in **"Measurement: C6 + D6"**. Four things from the D2 round still govern what the next one
-should believe, and this round confirmed rather than changed them:
+Next: **D1 landed, taken entirely on its own as the last round said to.** `ChunkManager.Chunks` is
+now a `ChunkMap` over a `ConcurrentDictionary<long, Chunk>`, `_dirtyChunks`, `_queuedChunkPositions`,
+`_generatingMeshes` and C6's `_playerPlacedByChunk` hold packed `long` keys, and **`Vector3` stayed
+the outward key**, so zero call sites were edited to keep the tree compiling. The isolated per-shape
+probe table, the pre-registered decision rule and the cross-tree gate are in **"Measurement: D1"**;
+the design decision, the C3 obligation, the enumeration-order consequence, the rejected alternatives
+and the sites deliberately left alone are the D1 bullets under **"What landed"**. Read the
+enumeration-order bullet before designing any gate on this path. The round before it took C6 and D6,
+both counted rather than timed. **Five things now govern what the next round should believe — D1
+confirmed the first four and added the fifth:**
 
 1. **The `perf-fly` 60 s window is saturated for LOD as well as chunks.** All ten counterbalanced
    runs ended at the identical `chunks 17077` and `regions 907-913/645`, so every end-state
@@ -1983,7 +2315,11 @@ should believe, and this round confirmed rather than changed them:
    `lod-horizon` looked like a finding and was not (the real split ranked 6th/2nd/4th/10th). C6 + D6's
    one converged `lod-horizon` shot separated perfectly at `p = 0.1` and still turned out to be
    bubble sprites plus a smooth sunset dimming; after the high-pass normalisation that instrument's
-   own header mandates, `p = 0.5`.
+   own header mandates, `p = 0.5`. **D1 added the other half: the run count is part of the
+   instrument.** Its gate saw the same accidental-agreement collapse twice, one level apart — a
+   1094 px "finding" at 3+3 that is 0 px at 5+5, and the 10 px surviving at 5+5 that are 0 px at
+   7+7 across all 23 scored shots. A nonzero residue at any fixed run count is a hypothesis until
+   more runs fail to remove it, because a tree's "constant" pixels shrink as runs are added.
 3. **`ColumnCaps` already costs something today.** Two output-determinism facts
    (`LodBuildPoolTests.RegionBuildsAreIdenticalWhicheverThreadRunsThem`,
    `LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel`) are intermittent in
@@ -2001,19 +2337,27 @@ should believe, and this round confirmed rather than changed them:
    `CactusGenerator.ShapeCache` — and **none of them ships at a G derived from a capture**; four is
    simply the value every capture so far has failed to beat. The next editor who wants a different G
    owes a capture of their own, per cache.
+5. **A rekeying's win is per-call-site SHAPE, and a rekeying changes enumeration order.** Both
+   halves are D1's, and both generalise. *Shape*: the win is decided by how many dictionary
+   operations reuse one packed key, so a single aggregate probe number would have misled — D1's
+   capture had to price `NeedsChunk` (one key, up to two probes) separately from the
+   distinct-key-per-probe sites, and the two came out at 0.52-0.58x and 0.39-0.44x of HEAD
+   respectively. Price shapes, not implementations, and never quote the better arm as if it were the
+   other one's result. *Order*: repacking a key changes hash-bucket layout and therefore dictionary
+   enumeration order, which three sites in this engine observe, so **a per-frame output comparison
+   is the wrong gate** and mid-stream pixel differences are expected rather than evidence. Only an
+   **order-independent converged hash** can settle output preservation for a change of this shape —
+   which is why D1's authority was a sorted-state cross-tree hash written before the first
+   production edit, with pixels demoted to a settled-state smoke check.
 
-**D1** (packed chunk keys) is the natural next item, and it should be taken **entirely on its own**,
-with nothing else in the round: it is a broad-but-mechanical **L** touching `ChunkManager.Chunks`,
-`_dirtyChunks`, `_queuedChunkPositions` and `_generatingMeshes`, and it would also make the
-frontier's per-probe `NeedsChunk` cheaper. **C6 deliberately kept `Vector3` keying** — the placement
-buckets are keyed by the same `Vector3` chunk position `Chunks` already uses, so the unload site
-passes the `pos` it already holds and D1 is neither pre-empted nor complicated by this round; when D1
-packs the chunk key, `_playerPlacedByChunk` packs with it as one more dictionary in the same sweep.
-`LodManager` is already keyed by integer tuples, so D1 stays chunk-side only, and neither R10, D2 nor
-this round changed that.
+**What is left, and how much of it can be taken autonomously: very little.** After D1 the open list
+is **D5**, **D2b**, **R3**, **C5** and **R6**, and of those **only D5 is takeable without a human** —
+and D5 is **a measurement, not an implementation**. Everything else is blocked on a decision or a
+design.
 
-**D5 is measurement only**, and its bullet already says what to capture: log `FreeBlockCount` on the
-pool-growth line and read it mid-stream and just after a teleport, on **three** pools, before
+**D5 is measurement only**, and is now the only remaining autonomous item. Its bullet already says
+what to capture: log `FreeBlockCount` on the pool-growth line and read it mid-stream and just after
+a teleport, on **three** pools, before
 committing to any rewrite. R10 proved the coalescing sound and pinned both the pathological
 (380 blocks mid-teleport) and the realistic (<= 296 `Free`s in the largest real burst) list lengths,
 so **D5's defect is scan cost, not fragmentation** — price the "fuse a region's shell and sheet into
@@ -2034,7 +2378,12 @@ closed** — `MaxConcurrentLodGenerations` ships at **1**, both larger pools wer
 and the capture is above: do not re-propose "a bigger pool". (D2 was the lever that capture pointed at
 and has been taken; D6 extends the same lever to three more caches. Neither reopens the pool
 question.) **R6 stays reserved for a human** — it is a *trade-off*, not a win, and must not be taken
-autonomously.
+autonomously. **So, plainly: the autonomous backlog after D1 is D5's capture and nothing else.**
+R6 needs a human decision, D2b needs a design (and is entangled with save/load, `TODO.md` `M-1`),
+R3 is parked against the code, and C5's pool size is closed. If D5's capture comes back saying the
+free list is short in practice — which the pool's own 93 % steady-state utilisation note predicts —
+then the honest outcome is a fourth well-evidenced no-go on the R3/C5/A'-precedent, and the file
+should say so rather than manufacture a rewrite.
 
 **Before the next visual gate, read the two instrument defects recorded at the end of
 "Measurement: C6 + D6".** `lod-horizon` cannot currently resolve anything on this machine — its
@@ -2042,7 +2391,14 @@ camera free-falls and respawns 44 times a run at stock waits and 111 at raised w
 pristine HEAD, so three of its four shots photograph the spawn point rather than their scored
 vantages — and `rays-halfres` is only usable with its settle wait raised from 6 s to 30 s, at which
 point same-build control ranges collapse to exactly `[0,0]` on several shots. A round that skips this
-will burn its gate budget rediscovering both.
+will burn its gate budget rediscovering both. **D1 added a third and a fourth defect to that list,
+recorded in "The visual gate: D1" above:** at these wait settings `clouds-mirror` and `rays-halfres`
+photograph **different camera poses run to run within the same tree**, identically on pristine HEAD,
+so at those two the same file name is not the same view — of the checked-in scenarios only
+`entity-binds` is pose-stable here; and the raised-wait control never reports equal streaming counts
+on any of them, but per **field** the two trees' ranges overlap on all **92** shot-fields (23 shots
+x 4 fields) with the work tree inside HEAD's on **86**, so a tree-disjoint label on a 4-tuple of four
+noisy fields is an artefact, not a separation. Compare fields, not tuples.
 
 ## Ruled out (do not retry without new evidence)
 

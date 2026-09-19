@@ -728,7 +728,7 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
             var c = ci * span + cj;
             for (var cy = region.ColumnCyMin[c]; cy <= region.ColumnCyMax[c]; cy++)
             {
-                if (!chunkManager.Chunks.TryGetValue(new Vector3(baseCx + ci, cy, baseCz + cj), out var chunk)
+                if (!chunkManager.Chunks.TryGetValue(baseCx + ci, cy, baseCz + cj, out var chunk)
                     || !chunk.IsMeshed)
                     return false;
             }

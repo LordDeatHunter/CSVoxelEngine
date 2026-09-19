@@ -19,7 +19,7 @@ namespace silkgltriangle;
 public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     ChunkGeometryPool? translucentGeometry = null)
 {
-    public readonly ConcurrentDictionary<Vector3, Chunk> Chunks = new();
+    public readonly ChunkMap Chunks = new();
 
     /// <summary>
     /// Every loaded chunk that currently has an opaque or a translucent mesh. The render
@@ -107,8 +107,13 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     // apply them newest-first and leave the stale mesh on screen.
     private readonly ConcurrentQueue<(Vector3 pos, Chunk chunk, ChunkMeshData meshData, long seq)> _completedMeshQueue = new();
     private long _meshSequence;
-    private readonly ConcurrentDictionary<Vector3, byte> _dirtyChunks = new();
-    private readonly ConcurrentDictionary<Vector3, byte> _queuedChunkPositions = new();
+    // Keyed on ChunkKey.Pack rather than the Vector3 chunk position: every probe here sits on a
+    // hot path (the dirty scan, QueueChunk's six-neighbour fan-out, NeedsChunk on the generation
+    // workers' scan frontier) and a packed long hashes once where a Vector3 hashes three floats
+    // and compares twelve bytes per node visit (PERF_TODO D1). FluidManager's cell keys are the
+    // in-repo precedent; ChunkKey deliberately reuses its 21-bit budget at chunk scale.
+    private readonly ConcurrentDictionary<long, byte> _dirtyChunks = new();
+    private readonly ConcurrentDictionary<long, byte> _queuedChunkPositions = new();
 
     // Chunks whose block data was just generated, handed to the main thread so the fluid tick
     // can wake the water they brought in (FluidManager.WakeLoadedChunks). Filled by the
@@ -116,8 +121,8 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     // consumer re-checks that the chunk is still the live one at its position.
     private readonly ConcurrentQueue<Chunk> _loadedChunks = new();
 
-    // Track active mesh generation to avoid duplicates
-    private readonly ConcurrentDictionary<Vector3, byte> _generatingMeshes = new();
+    // Track active mesh generation to avoid duplicates. Packed keys, like _dirtyChunks above.
+    private readonly ConcurrentDictionary<long, byte> _generatingMeshes = new();
 
     // Mesh builds are dispatched as plain thread-pool work items rather than one
     // Task.Run(async ...) per chunk: at up to MaxDirtyChunksPerFrame starts a frame, the closure +
@@ -151,25 +156,25 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     // purged on unload to keep the index — and the felling decision — truthful. Bucketing by
     // chunk position is what makes that purge cheap: the unload drops one bucket instead of
     // scanning every placement in the world, which was O(unloads x placements) per unload pass
-    // (PERF_TODO C6). The key is the same Vector3 chunk position Chunks is keyed on, so the
-    // unload site already holds it. A bucket is removed as soon as it empties; without that
-    // the index would grow one permanent entry per chunk ever edited, trading the scan for a
-    // slow leak.
-    private readonly Dictionary<Vector3, HashSet<(int X, int Y, int Z)>> _playerPlacedByChunk = new();
+    // (PERF_TODO C6). The key is the same packed chunk key Chunks is keyed on (ChunkKey, see
+    // _dirtyChunks above), so the unload site already holds it. A bucket is removed as soon as
+    // it empties; without that the index would grow one permanent entry per chunk ever edited,
+    // trading the scan for a slow leak.
+    private readonly Dictionary<long, HashSet<(int X, int Y, int Z)>> _playerPlacedByChunk = new();
 
     /// <summary>Whether the world cell was built by the player rather than generated.</summary>
     public bool IsPlayerPlaced(int x, int y, int z) =>
-        _playerPlacedByChunk.TryGetValue(VoxelCoords.ChunkPosOf(x, y, z), out var cells) &&
+        _playerPlacedByChunk.TryGetValue(ChunkKey.PackBlock(x, y, z), out var cells) &&
         cells.Contains((x, y, z));
 
     /// <summary>Records a player placement (called by <see cref="Chunk.PlaceBlockAt"/>).</summary>
     public void MarkPlayerPlaced(int x, int y, int z)
     {
-        var chunkPos = VoxelCoords.ChunkPosOf(x, y, z);
-        if (!_playerPlacedByChunk.TryGetValue(chunkPos, out var cells))
+        var chunkKey = ChunkKey.PackBlock(x, y, z);
+        if (!_playerPlacedByChunk.TryGetValue(chunkKey, out var cells))
         {
             cells = new HashSet<(int X, int Y, int Z)>();
-            _playerPlacedByChunk[chunkPos] = cells;
+            _playerPlacedByChunk[chunkKey] = cells;
         }
 
         cells.Add((x, y, z));
@@ -180,11 +185,11 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     {
         // Most callers unmark unconditionally on any block removal, so the miss path has to
         // stay a lookup that allocates nothing.
-        var chunkPos = VoxelCoords.ChunkPosOf(x, y, z);
-        if (!_playerPlacedByChunk.TryGetValue(chunkPos, out var cells)) return;
+        var chunkKey = ChunkKey.PackBlock(x, y, z);
+        if (!_playerPlacedByChunk.TryGetValue(chunkKey, out var cells)) return;
 
         cells.Remove((x, y, z));
-        if (cells.Count == 0) _playerPlacedByChunk.Remove(chunkPos);
+        if (cells.Count == 0) _playerPlacedByChunk.Remove(chunkKey);
     }
 
     /// <summary>
@@ -225,14 +230,17 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         var removed = 0;
 
         // The ConcurrentDictionary enumerator is lock-free and copies nothing (unlike Keys),
-        // and removing entries through it while enumerating is explicitly supported.
-        foreach (var kvp in Chunks)
+        // and removing entries through it while enumerating is explicitly supported. Enumerating
+        // the PACKED table hands the key straight to the four dictionary removals below instead
+        // of packing the position back up once per unloaded chunk.
+        foreach (var kvp in Chunks.Packed)
         {
-            var pos = kvp.Key;
+            var key = kvp.Key;
+            var pos = ChunkKey.ToVector3(key);
             if (Vector3.DistanceSquared(pos, camChunk) <= WorldGenerationConfig.ChunkRadiusSq)
                 continue;
 
-            if (!Chunks.TryRemove(pos, out var chunk)) continue;
+            if (!Chunks.TryRemovePacked(key, out var chunk)) continue;
 
             removed++;
 
@@ -242,14 +250,14 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             MeshVersion++;
             chunk.Dispose();
             Interlocked.Decrement(ref _loadedChunkCount);
-            _queuedChunkPositions.TryRemove(pos, out _);
-            _generatingMeshes.TryRemove(pos, out _);
-            _dirtyChunks.TryRemove(pos, out _);
+            _queuedChunkPositions.TryRemove(key, out _);
+            _generatingMeshes.TryRemove(key, out _);
+            _dirtyChunks.TryRemove(key, out _);
 
             // Edits don't survive an unload (the chunk regenerates from worldgen), so
             // placements inside it stop being player-placed too. The bucket IS the chunk, so
             // that is now one dictionary removal instead of a scan of every placement.
-            _playerPlacedByChunk.Remove(pos);
+            _playerPlacedByChunk.Remove(key);
         }
 
         // After the loop, not inside it: the position only becomes needed once it has left
@@ -319,7 +327,9 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     // Reused across frames: the dirty entries eligible to mesh this frame, with the distance
     // the per-frame budget sorts on. Cleared after every pass so it holds no chunk references
     // at rest.
-    private readonly List<(Vector3 pos, Chunk chunk, float distSq)> _dirtyCandidates = new(256);
+    // The packed key travels with the candidate so the over-budget re-add below reuses the one
+    // the scan already computed instead of re-packing on the frame the budget is saturated.
+    private readonly List<(long key, Vector3 pos, Chunk chunk, float distSq)> _dirtyCandidates = new(256);
 
     // Reused across frames: finished mesh builds waiting for upload, with the distance the
     // upload budget sorts on. Same clear-after-pass contract as _dirtyCandidates.
@@ -344,19 +354,24 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             if (++scanned > WorldGenerationConfig.MaxDirtyScanPerFrame)
                 break;
 
-            var pos = kvp.Key;
+            var key = kvp.Key;
+            // Unpacked once per entry and reused by everything below that still speaks Vector3:
+            // the distance test, HasAllNeighbors and StartMeshGeneration. The Chunks probe takes
+            // the packed key directly - it is the same key this entry is stored under.
+            ChunkKey.Unpack(key, out var cx, out var cy, out var cz);
+            var pos = new Vector3(cx, cy, cz);
             var distSq = Vector3.DistanceSquared(pos, camChunk);
 
             // Out of range, or unloaded — just drop the entry
-            if (distSq > WorldGenerationConfig.ChunkRadiusSq || !Chunks.TryGetValue(pos, out var chunk))
+            if (distSq > WorldGenerationConfig.ChunkRadiusSq || !Chunks.TryGetPacked(key, out var chunk))
             {
-                _dirtyChunks.TryRemove(pos, out _);
+                _dirtyChunks.TryRemove(key, out _);
                 continue;
             }
 
             // A build is already in flight for this chunk. The entry stays: it was added after
             // that build took its snapshot, so the chunk has to mesh again once it finishes.
-            if (_generatingMeshes.ContainsKey(pos))
+            if (_generatingMeshes.ContainsKey(key))
                 continue;
 
             // Block data is always ready for a chunk in Chunks (QueueChunk generates before
@@ -372,13 +387,13 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             // because this entry still existed. This is what lets _dirtyChunks reach empty at
             // rest: the rim chunks of the load sphere never get their outer neighbour until
             // the camera moves, and used to be rescanned every single frame.
-            if (!_dirtyChunks.TryRemove(pos, out _))
+            if (!_dirtyChunks.TryRemove(key, out _))
                 continue;
 
             if (!HasAllNeighbors(pos))
                 continue;
 
-            _dirtyCandidates.Add((pos, chunk, distSq));
+            _dirtyCandidates.Add((key, pos, chunk, distSq));
         }
 
         if (_dirtyCandidates.Count > WorldGenerationConfig.MaxDirtyChunksPerFrame)
@@ -387,16 +402,16 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             _dirtyCandidates.Sort((a, b) => a.distSq.CompareTo(b.distSq));
 
             for (var i = 0; i < WorldGenerationConfig.MaxDirtyChunksPerFrame; i++)
-                StartMeshGeneration(_dirtyCandidates[i].pos, _dirtyCandidates[i].chunk);
+                StartMeshGeneration(_dirtyCandidates[i].key, _dirtyCandidates[i].pos, _dirtyCandidates[i].chunk);
 
             // Everything past the budget goes back in the dirty set for next frame
             for (var i = WorldGenerationConfig.MaxDirtyChunksPerFrame; i < _dirtyCandidates.Count; i++)
-                _dirtyChunks.TryAdd(_dirtyCandidates[i].pos, 0);
+                _dirtyChunks.TryAdd(_dirtyCandidates[i].key, 0);
         }
         else
         {
             for (var i = 0; i < _dirtyCandidates.Count; i++)
-                StartMeshGeneration(_dirtyCandidates[i].pos, _dirtyCandidates[i].chunk);
+                StartMeshGeneration(_dirtyCandidates[i].key, _dirtyCandidates[i].pos, _dirtyCandidates[i].chunk);
         }
 
         // Don't keep the chunk references alive between frames
@@ -506,9 +521,13 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         MeshVersion++;
     }
 
-    private void StartMeshGeneration(Vector3 pos, Chunk chunk)
+    /// <summary>
+    /// Claims the dedupe slot and queues the build. Takes the packed key alongside the position
+    /// because both callers (ProcessDirtyChunks' two budget branches) already hold it.
+    /// </summary>
+    private void StartMeshGeneration(long key, Vector3 pos, Chunk chunk)
     {
-        if (!_generatingMeshes.TryAdd(pos, 0))
+        if (!_generatingMeshes.TryAdd(key, 0))
             return;
 
         _pendingMeshWork.Enqueue((pos, chunk));
@@ -568,9 +587,13 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     private void BuildMeshFor(Vector3 pos, Chunk chunk)
     {
+        // One pack for the whole call: the re-dirty on a vanished neighbour and the finally's
+        // dedupe release both take it. The work queue carries the position, not the key.
+        var key = ChunkKey.Pack(pos);
+
         try
         {
-            if (!Chunks.ContainsKey(pos))
+            if (!Chunks.ContainsPacked(key))
                 return;
 
             var meshData = chunk.GenerateMeshData(this);
@@ -579,7 +602,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
                 // A face neighbour was unloaded between the scheduling check and this
                 // snapshot; meshing across that hole would bake border artifacts, so the
                 // build is dropped and the chunk retried once the world settles
-                _dirtyChunks.TryAdd(pos, 0);
+                _dirtyChunks.TryAdd(key, 0);
                 return;
             }
 
@@ -591,7 +614,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         }
         finally
         {
-            _generatingMeshes.TryRemove(pos, out _);
+            _generatingMeshes.TryRemove(key, out _);
         }
     }
 
@@ -601,25 +624,33 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     public void QueueChunk(Vector3 pos)
     {
-        if (Chunks.ContainsKey(pos) || !_queuedChunkPositions.TryAdd(pos, 0))
+        var key = ChunkKey.Pack(pos);
+        if (Chunks.ContainsPacked(key) || !_queuedChunkPositions.TryAdd(key, 0))
             return;
 
         // Create chunk AND generate block data right here.
         // This is called from the generation worker's background thread,
         // which already processes closest chunks first.
         var chunk = new Chunk(gl, pos, generateBlockData: true);
-        Chunks[pos] = chunk;
+        Chunks.SetPacked(key, chunk);
         Interlocked.Increment(ref _loadedChunkCount);
         _loadedChunks.Enqueue(chunk);
 
         // Mark this chunk and neighbors dirty for meshing
-        _dirtyChunks.TryAdd(pos, 0);
+        _dirtyChunks.TryAdd(key, 0);
         
-        foreach (var offset in Vector3Directions.CardinalDirections)
+        // CardinalOffsets is the integer companion to CardinalDirections, in the same order, so
+        // the six neighbour keys come from ints in hand instead of six Vector3 additions
+        var px = MathUtils.FloorToInt(pos.X);
+        var py = MathUtils.FloorToInt(pos.Y);
+        var pz = MathUtils.FloorToInt(pos.Z);
+        foreach (var d in Vector3Directions.CardinalOffsets)
         {
-            var neighborPos = pos + offset;
-            if (Chunks.ContainsKey(neighborPos))
-                _dirtyChunks.TryAdd(neighborPos, 0);
+            var nx = px + d.X;
+            var ny = py + d.Y;
+            var nz = pz + d.Z;
+            if (Chunks.ContainsKey(nx, ny, nz))
+                _dirtyChunks.TryAdd(ChunkKey.Pack(nx, ny, nz), 0);
         }
     }
 
@@ -635,7 +666,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     public void MarkDirty(Vector3 pos)
     {
-        _dirtyChunks.TryAdd(pos, 0);
+        _dirtyChunks.TryAdd(ChunkKey.Pack(pos), 0);
     }
 
     /// <summary>
@@ -663,8 +694,8 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         {
             var pos = new Vector3(x, y, z);
             if (skip.HasValue && pos == skip.Value) continue;
-            if (Chunks.ContainsKey(pos))
-                _dirtyChunks.TryAdd(pos, 0);
+            if (Chunks.ContainsKey(x, y, z))
+                _dirtyChunks.TryAdd(ChunkKey.Pack(x, y, z), 0);
         }
     }
 
@@ -673,7 +704,12 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     public void ImmediateRemesh(Vector3 pos)
     {
-        if (!Chunks.TryGetValue(pos, out var chunk)) return;
+        // One pack for the whole call: the lookup, the _generatingMeshes probe and both dirty
+        // re-adds below all take it, where the Vector3 spelling packed once for the lookup and
+        // again below.
+        var key = ChunkKey.Pack(pos);
+
+        if (!Chunks.TryGetPacked(key, out var chunk)) return;
         if (!chunk.IsBlockDataReady) return;
         if (!HasAllNeighbors(pos)) return;
 
@@ -681,7 +717,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         if (meshData == null)
         {
             // Lost a face neighbour to an unload mid-call: retry rather than bake a hole in
-            _dirtyChunks.TryAdd(pos, 0);
+            _dirtyChunks.TryAdd(key, 0);
             return;
         }
 
@@ -690,8 +726,8 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         // A build that started before this edit can still finish afterwards with its pre-edit
         // snapshot and overwrite this fresh mesh; leaving a dirty entry guarantees the
         // post-edit rebuild wins in the end.
-        if (_generatingMeshes.ContainsKey(pos))
-            _dirtyChunks.TryAdd(pos, 0);
+        if (_generatingMeshes.ContainsKey(key))
+            _dirtyChunks.TryAdd(key, 0);
     }
 
     /// <summary>
@@ -722,8 +758,8 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     public byte GetBlockGlobal(int x, int y, int z)
     {
-        var chunkPos = new Vector3(x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift);
-        return Chunks.TryGetValue(chunkPos, out var chunk)
+        return Chunks.TryGetValue(x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift,
+            out var chunk)
             ? chunk.GetLocalBlock(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask)
             : (byte)0;
     }
@@ -735,8 +771,8 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     public Chunk? ChunkAt(int x, int y, int z)
     {
-        var chunkPos = new Vector3(x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift);
-        return Chunks.TryGetValue(chunkPos, out var chunk) && chunk.IsBlockDataReady ? chunk : null;
+        return Chunks.TryGetValue(x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift,
+            out var chunk) && chunk.IsBlockDataReady ? chunk : null;
     }
 
     /// <summary>
@@ -844,7 +880,10 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     public bool NeedsChunk(Vector3 pos)
     {
-        return !Chunks.ContainsKey(pos) && !_queuedChunkPositions.ContainsKey(pos);
+        // One pack for both probes. The && still short-circuits, so a position already loaded
+        // costs exactly one probe, as it did before.
+        var key = ChunkKey.Pack(pos);
+        return !Chunks.ContainsPacked(key) && !_queuedChunkPositions.ContainsKey(key);
     }
     
     /// <summary>
@@ -852,9 +891,15 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     private bool HasAllNeighbors(Vector3 pos)
     {
-        foreach (var offset in Vector3Directions.CardinalDirections)
+        // Hoisted once, then six probes from ints in hand. CardinalOffsets is in the same order
+        // as CardinalDirections, so the early return still fires on the same neighbour.
+        var cx = MathUtils.FloorToInt(pos.X);
+        var cy = MathUtils.FloorToInt(pos.Y);
+        var cz = MathUtils.FloorToInt(pos.Z);
+        foreach (var d in Vector3Directions.CardinalOffsets)
         {
-            if (!Chunks.TryGetValue(pos + offset, out var neighbor) || !neighbor.IsBlockDataReady)
+            if (!Chunks.TryGetValue(cx + d.X, cy + d.Y, cz + d.Z, out var neighbor)
+                || !neighbor.IsBlockDataReady)
                 return false;
         }
         return true;

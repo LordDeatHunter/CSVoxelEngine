@@ -18,14 +18,19 @@ namespace silkgltriangle;
 /// pair matches the node's; on any mismatch it scans from index 0.</para>
 ///
 /// <para><b>2. Why the trusted prefix is still valid.</b> <see cref="ChunkManager.NeedsChunk"/> is
-/// <c>!Chunks.ContainsKey(p) &amp;&amp; !_queuedChunkPositions.ContainsKey(p)</c>, so it can only go
+/// <c>var key = ChunkKey.Pack(p); !Chunks.ContainsPacked(key) &amp;&amp;
+/// !_queuedChunkPositions.ContainsKey(key)</c>, so it can only go
 /// false-to-true for a position once that position has left BOTH dictionaries. Adding to either
 /// only makes a position less needed, which is the safe direction. ChunkManager.UnloadDistantChunks
-/// is the only place in the tree that removes from either (ChunkManager.cs:200 and :210), and it
+/// is the only place in the tree that removes from either (ChunkManager.cs:243 and :253), and it
 /// bumps <see cref="ChunkManager.ChunkRemovalVersion"/> AFTER the loop, once every dropped position
 /// has left both. So between one bump and the next, the only positions that can turn needed belong
 /// to an unload pass currently in flight - and that pass's own bump necessarily follows, which
-/// invalidates every node still carrying the pre-bump version.</para>
+/// invalidates every node still carrying the pre-bump version. PERF_TODO D1 repacked both
+/// dictionaries from <c>Vector3</c> to a packed <c>long</c> (<see cref="ChunkKey"/>); the invariant
+/// above is unchanged and the representation change is invisible to it, because a chunk position
+/// and its packed key are in exact bijection and the removals still happen in the same place, in
+/// the same order, under the same <c>removed &gt; 0</c> gate.</para>
 ///
 /// <para><b>3. The bounded imprecision - a cost, not a hazard.</b> A call that sampled the pre-bump
 /// version can therefore skip a position that turned needed mid-pass. It is skipped by that one
@@ -40,7 +45,7 @@ namespace silkgltriangle;
 /// C', is closed by the version and not by the centre: the unload pass at C' bumped the version, so
 /// the node is discarded even though the centre reads equal again. That also demotes the
 /// coincidence that generation (ChunkGenerationWorker.BuildSortedOffsets) and unload
-/// (ChunkManager.cs:197) share <see cref="WorldGenerationConfig.ChunkRadiusSq"/> from a correctness
+/// (ChunkManager.cs:240) share <see cref="WorldGenerationConfig.ChunkRadiusSq"/> from a correctness
 /// premise to a performance one: the shared radius is now only why the frontier SURVIVES a still
 /// camera, not why it is safe.</para>
 ///

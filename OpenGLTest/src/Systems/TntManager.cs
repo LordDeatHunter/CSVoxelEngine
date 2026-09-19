@@ -161,8 +161,8 @@ public class TntManager
                 if (BlockType.ById[standing]?.NeedsSupport != true) continue;
 
                 // Support in an unloaded chunk reads as air: leave those alone.
-                var belowChunkPos = VoxelCoords.ChunkPosOf(x, y - 1, z);
-                if (!chunks.Chunks.TryGetValue(belowChunkPos, out _)) continue;
+                if (!chunks.Chunks.TryGetValue(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(y - 1),
+                        VoxelCoords.WorldToChunk(z), out _)) continue;
                 if (chunks.GetBlockGlobal(x, y - 1, z) != 0) continue;
 
                 var pebbleChunkPos = VoxelCoords.ChunkPosOf(x, y, z);

@@ -90,8 +90,8 @@ public class FallingBlockManager
                 break;
 
             var cell = new Vector3(x, cy, z);
-            var chunkPos = new Vector3(x >> Chunk.SizeShift, cy >> Chunk.SizeShift, z >> Chunk.SizeShift);
-            if (!chunks.Chunks.TryGetValue(chunkPos, out var chunk)) break;
+            if (!chunks.Chunks.TryGetValue(x >> Chunk.SizeShift, cy >> Chunk.SizeShift, z >> Chunk.SizeShift,
+                    out var chunk)) break;
             if (!chunk.RemoveBlockAt(cell, chunks)) break;
 
             batch ??= [];

@@ -1059,6 +1059,12 @@ public class Chunk : IDisposable
     /// </summary>
     private bool TryResolveNeighbors(ChunkManager chunkManager, Chunk?[] neighbors, byte[]?[] neighborStates)
     {
+        // Hoisted out of the 26 probes below, and FLOORED rather than truncated so this path
+        // into the chunk key matches VoxelCoords.ChunkPosOf's convention on the negative side
+        var px = MathUtils.FloorToInt(Position.X);
+        var py = MathUtils.FloorToInt(Position.Y);
+        var pz = MathUtils.FloorToInt(Position.Z);
+
         for (var cx = 0; cx < 3; cx++)
         for (var cy = 0; cy < 3; cy++)
         for (var cz = 0; cz < 3; cz++)
@@ -1071,10 +1077,10 @@ public class Chunk : IDisposable
                 continue;
             }
 
-            var pos = Position + new Vector3(cx - 1, cy - 1, cz - 1);
             // Each neighbour's state array is read once into the array: the field is volatile
             // and may be allocated by a main-thread fluid edit while the snapshot is filled
-            if (chunkManager.Chunks.TryGetValue(pos, out var neighbor) && neighbor.IsBlockDataReady)
+            if (chunkManager.Chunks.TryGetValue(px + cx - 1, py + cy - 1, pz + cz - 1, out var neighbor)
+                && neighbor.IsBlockDataReady)
             {
                 neighbors[ni] = neighbor;
                 neighborStates[ni] = neighbor._state;
