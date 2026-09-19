@@ -1,9 +1,11 @@
 # Performance TODO
 
-The **Open (next round)** section is the live backlog. Everything from earlier
-revisions of this file is **done** — per-item history lives in git
-(`git log --oneline -- PERF_TODO.md FLUID_PERF.md`). The measurement protocol, the
-last profile snapshot and the do-not-retry **Ruled out** list below are unchanged.
+The **Open (next round)** section is **empty**: this file carries no live backlog any more. Every item
+it ever held is now closed — implemented (**What landed**), ruled out (**Ruled out**), or relocated to
+`TODO.md` because it was never a perf item. Per-item history lives in git
+(`git log --oneline -- PERF_TODO.md FLUID_PERF.md`). What the file is *for* from here on is the
+measurement protocol, the last profile snapshot, the accumulated gate machinery and the do-not-retry
+**Ruled out** list; read the terminal hand-off at the end before opening anything.
 
 Machine for every number below: Release, Quadro T1000 (GL 4.6, driver 597.06),
 12 CPUs, `SustainedLowLatency`, `VOXEL_TIME=60`, `VOXEL_DEBUG=1`.
@@ -115,139 +117,22 @@ stream-in (visible in the `~max` half since the console line grew max columns).
 
 ## Open (next round)
 
-Not implemented yet, with one exception called out in its own bullet: **C5's code did land**
-but its measurement did not support the *pool*, so the pool was declined (it ships at one worker)
-and C5 stays here pointing at the different shape the mechanism calls for. Impact / risk / effort are estimates; validate each with the `perf-fly`
-protocol above before trusting it. The entries below the passes repeat nothing from
-**Ruled out** — overlaps are called out inline.
+**Nothing is open. This section is empty**, and it is kept only so that a reader who arrives looking
+for the backlog finds the disposition rather than a dangling list. The four entries that stood here
+were all closed on **2026-09-20**, under an explicit human instruction to finish or dispose of every
+remaining bullet, and none of them is backlog any more.
 
-### GPU / render passes
-
-- [ ] **R3 · Half-res scene copies for water — resolved and PARKED, not implemented** —
-  `CopyScene` (`RenderManager.cs:1046-1056`), called with colour+depth at `:1734` and
-  depth-only at `:1550`. The condition R2 left on this bullet was resolved against the code
-  rather than implemented, and it settles three ways.
-  **(a) The depth copy cannot move.** `CopyScene(bool colour)` copies depth
-  *unconditionally* — only the colour half is gated by the parameter — and both call sites
-  write the same `_sceneDepthTex`, which R2's depth-aware upsample pins at full res. So the
-  `:1734` call keeps paying a full-res `DepthComponent24` `CopyTexSubImage2D` whatever R3
-  does, and a second, half-res depth used only by the water pass is the same *additive* cost
-  (an extra texture plus an extra reduction, on top of a full-res copy that still has to
-  happen) that R2 already rejected on the rays side. Only the RGBA8 colour copy is left.
-  **(b) The shader claim holds.** `test-fragment.glsl`'s refraction really is
-  resolution-independent: `uv = gl_FragCoord.xy * uInvViewport` (`:267`) against
-  `uInvViewport = 1/_viewportSize` (`RenderManager.cs:1483-1484`), bilinear `texture()` fetches
-  (`:270-272`), a `uInvViewProj` unprojection (`:276`) — no `texelFetch` and no pixel indices
-  anywhere in the file. The shader would need zero changes.
-  **(c) But the ceiling is tiny and the change is not "sample less".** The colour copy is
-  gated behind `if (_nearWaterVisible)` and sits inside a `waterPass` measured at **0.09 ms
-  GPU total** (the compute-frustum-cull capture under **Ruled out** below) — a figure that
-  also contains every translucent chunk draw and every LOD water sheet. That capture
-  demonstrably *included* the colour copy: the same line reports `reflect 0.83 ms`, and
-  `RenderReflection` early-returns unless `_nearWaterVisible`
-  (`RenderManager.cs:1081-1082`) — the very flag that gates the copy — so near water was on
-  screen when it was taken. 0.09 ms is therefore a real ceiling for the whole pass, not a
-  figure that might have excluded the work. And `CopyTexSubImage2D` cannot downscale, so this
-  is not a sampling change but new plumbing: an FBO, a texture, sizing and teardown across
-  `CreateSceneCopy` / `DeleteSceneCopy` / `SetViewport` / `Dispose`, and a
-  `glBlitFramebuffer` that still *reads* the full-res framebuffer and saves only the write
-  side (arithmetic off the format, no timing claim: 3.69 MB -> 0.92 MB of RGBA8 writes per
-  frame at 1280x720). Its cost is blurring everything seen through water — a perceptual
-  change, which drags R2's full perceptual gate along with it.
-  **Parked, not disproven:** effort M *plus* a perceptual gate, for an unmeasurable slice of
-  an already-gated 0.09 ms pass. Revisit only if a capture ever isolates the colour copy as
-  its own row. **Impact low · risk low-med · effort M + perceptual gate.**
-- [ ] **R6 · Gate GPU timing queries behind the debug flag** — `BeginGpuPass` /
-  `EndGpuPass` (`RenderManager.cs:274-290`) and `BeginGpuFrame` (`:247-265`) issue
-  ~40-70 GL query calls a frame regardless of the overlay. Gating on `X` gives up
-  "the first second after X already has data" (a deliberate property) — decide the
-  trade. Different from the ruled-out *GL debug context*.
-  **Impact low-med · risk low · effort S.**
-
-### CPU / streaming
-
-- [ ] **C5 · Parallelise / cap LOD region builds — MEASURED, and it NEEDS A DIFFERENT SHAPE** —
-  the R3 precedent: the work was built, pinned and priced, and the price does not support it as
-  specified. The concurrency design landed and is sound (see **The C5 concurrency argument**
-  below); what did not survive the capture is the premise that a *thread pool* is the right lever.
-  **Gate 1 (is the builder even the limiter?) cleared decisively.** Arrivals are hard-capped by the
-  main thread at `MaxLodUploadsPerFrame` x fps in `ApplyCompletedMeshes`; measured baseline
-  throughput is **53-55 regions/s** against a drain ceiling of **~433 regions/s** (4 x the measured
-  mean baseline fps of 108.2), i.e. **7.8-8.2x headroom**. The upload cap is *not* what holds LOD
-  back, so more builder throughput was genuinely available to buy.
-  **Gate 2 (does buying it cost more than it is worth?) failed at both pool sizes tried.** Three
-  BelowNormal workers reach a fixed region count **1.31x** sooner, two reach it **1.26x** sooner
-  (disjoint, counterbalanced, p = 0.0143 at each of three region counts) — but three workers slow
-  chunk generation *disjointly* (chunks loaded at the 4th `perf` line, 11156-12485 baseline against
-  8427-10253; seconds to the full 17077-chunk ring 5.0 -> 6.1 median) and cost **30 %** of burst
-  frame rate (median 108.0 -> 75.3 fps); two workers clear the chunk-gen and GC guards but still
-  cost **18 %** (110.3 -> 90.7 fps). Full tables under **Measurement**.
-  **Why it is so far below linear, and this is the reusable finding:** a LOD build is *terrain
-  generation in disguise*. `LodRegion.BuildMeshData` opens by prefetching **36 / 100 / 324** chunk
-  columns at levels 0 / 1 / 2 through `Chunk.GetColumnHeights`, and a column that misses
-  `Chunk.ColumnCache` is **generated on the spot** — measured medians 17.7 / 17.6 / 65.3 ms per
-  build, with the cost tracking the column count, not the mesh (all three levels mesh the same
-  32x32 cell grid). The four chunk-gen threads are doing the same work on the same cache at the
-  same moment, so LodGen workers do not add throughput to an idle resource; they contend for the
-  one the burst is already saturating. `ThreadPriority.BelowNormal` bounded *preemption* and did
-  its job; it does not bound shared last-level cache, memory bandwidth or GC.
-  **The decision, taken rather than deferred: the pool ships at one worker.**
-  `WorldGenerationConfig.MaxConcurrentLodGenerations = 1`. Gate 2's branch 4 is the letter of the
-  capture — neither 3 nor 2 clears it — and three in particular is the **one configuration that
-  fails on every reading**, the only one that disjointly slows chunk generation, costing 30 % of
-  burst fps for 4 % more LOD throughput than two workers buy. Two workers were the only defensible
-  pool (they clear the chunk-gen and GC guards) and were declined too: 18 % of burst frame rate is a
-  real cost to the exact phase this item targets, paid on every run, for 1.26x on a quantity that
-  was never the limiter — the drain has 7.8-8.2x headroom, so regions were not arriving slowly
-  because the builder was saturated. Trading frames for a faster horizon fill-in during the one
-  phase that already drops frames is the wrong direction. **What stays in the tree is everything
-  except the extra threads**: the TryAdd-gated `_building` claim with both rollbacks, the in-flight
-  cap, the Idle/Throttled split, the `CompletedBuildCount` instrument, the raised retention ceilings
-  and all of their facts. All are correct at any N and pinned at 3 by `LodBuildPoolTests` (whose
-  stress width is deliberately fixed at 3 and NOT read from the shipped constant, or lowering the
-  constant would have silently defused them), so raising the constant is a one-token experiment —
-  but the capture is already done, so **do not re-propose "a bigger pool"**. The shape the mechanism
-  points at instead was cutting the *work*: **D2** (`Chunk.ColumnCache`'s eviction against a level-2
-  ring of roughly 51k distinct columns), which is why this round promoted it — and **D2 has since
-  landed**: the 16384-entry cap is unchanged but the wholesale `Clear()` is gone, so a sweep now ages
-  out only the oldest generation (see "Measurement: D2"). That does **not** reopen the pool question;
-  this capture stands.
-  **Impact: measured, small and paid for · risk med · effort already spent; the remaining decision
-  is S.**
-
-### Data structures / caching
-
-- [ ] **D2b · `LodRegion.ColumnCaps` grows unbounded, and it must NOT take D2's scheme** —
-  `LodRegion.ColumnCaps` (`LodRegion.cs:130`) is a process-global `ConcurrentDictionary` holding one
-  dense `Chunk.Size * Chunk.Size` `int[]` — **~1 KB — per *edited chunk column***, written by
-  `LowerColumnBelow` (`:147-172`) whenever a removal would expose buried LOD, and **never removed by
-  anything**. Over a long editing session it only grows. This is the third part of the old D2 bullet
-  and it was deliberately left behind when D2 landed, because it is a **different problem: growth,
-  not eviction**, and the fix D2 shipped is actively wrong here.
-  - **It cannot go on `GenerationalCache`.** A cap entry encodes an *irreproducible player edit*; no
-    generator can rebuild one from its key. Evicting a cap while its column is still LOD-relevant
-    makes mined terrain **pop back** in the far rings — a visible correctness bug, not a recompute.
-    `GenerationalCache`'s invariant 10 names this site explicitly as one that must never be stored
-    there, and AGENTS.md carries the same standing rule.
-  - **Nor can eviction ride chunk unload.** LOD regions cover terrain far outside the loaded chunk
-    sphere (`ChunkRadius` 16 chunks vs rings out to 2048 blocks), so a cap must **outlive** its
-    chunk. "Drop the cap when the chunk unloads" is the obvious fix and it is wrong.
-  - **Whatever is done must preserve `LowerColumnBelow`'s publish ordering** (`LodRegion.cs:165-172`):
-    the bucket is published into the `ConcurrentDictionary` first and the value written with
-    `Volatile.Write` after, which the code's own comment records as load-bearing for a future
-    multi-threaded LodGen. A fix that replaces the container must carry that ordering across.
-  - **A real fix needs caps re-derivable from stored block data** — i.e. it is entangled with save/load
-    (`TODO.md` `M-1`), because only persisted edits let a cap be dropped and recomputed on demand.
-    That makes this a **correctness item waiting on a design**, not a perf item, and larger than it
-    looks. **Observed cost today, not hypothetical:** because `ColumnCaps` is global with no reset
-    hook and `BuildMeshData` gates on `hasCaps = !ColumnCaps.IsEmpty` (`:302`, read at `:312`), any
-    test class that mines or drops a block near the origin flips a *later* build of the same region,
-    which is what makes `LodBuildPoolTests.RegionBuildsAreIdenticalWhicheverThreadRunsThem` and
-    `LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel` intermittent in
-    full-suite runs (reproduced on pristine HEAD, so not a D2 regression — see "Measurement: D2").
-    `LodColumnCapTests.cs:37` and `LodHeightSamplingTests.cs:123` already dodge it with far
-    coordinates and say so in comments; those two classes do not.
-  **Impact low (memory) / med (correctness) · risk med · effort L, and blocked on a design.**
+**R6 was implemented** — GPU timer queries now run every frame while the `X` overlay is up and on one
+frame in `WorldGenerationConfig.GpuTimingIdleInterval` while it is down; its entries under **What
+landed** record what shipped, what it measured and what the gate gives up. **R3 moved to Ruled out
+(do not retry without new evidence)** with findings (a)/(b)/(c) intact: it had been resolved against
+the code and parked in an earlier round, it was not re-litigated here, and the human closing this
+round chose to stop carrying it rather than unpark it. **C5 was split** — the mechanism that shipped
+is under **What landed**, the *pool-size lever alone* is under **Ruled out** with the capture that
+killed it, and `WorldGenerationConfig.MaxConcurrentLodGenerations` ships at **1**. **D2b was
+relocated to `TODO.md` `M-11`**, because its entries are irreproducible player edits, which makes it
+a correctness item entangled with save/load (`M-1`) rather than a perf item; the one-line pointer
+under **Not chasing** below keeps the part that still costs this file something.
 
 ### Not chasing (recorded so it is not re-proposed)
 
@@ -255,9 +140,9 @@ protocol above before trusting it. The entries below the passes repeat nothing f
   cull+sort+fill at ~2%; revisit only if CPU cull+sort exceeds ~1 ms.
 - Shader ALU cuts (the caustic Voronoi net, 8 point lights, 4-tap PCF) — ruled out;
   the half-res route is the allowed lever. R2 has landed on that route (the underwater
-  rays march). R3 was the other half of it and has since been **repriced down to parked** —
-  read its bullet above rather than treating it as a live lever: the rays composite pins the
-  scene *depth* copy at full res, leaving only a colour copy inside a pass whose entire
+  rays march). R3 was the other half of it and was **repriced down to parked and then closed** —
+  read its entry under **Ruled out** below rather than treating it as a live lever: the rays
+  composite pins the scene *depth* copy at full res, leaving only a colour copy inside a pass whose entire
   measured GPU cost is 0.09 ms, and downsampling that copy would cost a perceptual gate.
   The ruling itself is unchanged, and R2 respected it: the march's step count, sample
   count and per-sample formula are
@@ -303,6 +188,21 @@ protocol above before trusting it. The entries below the passes repeat nothing f
   *in* `Camera` — the view-projection and view-frustum caches — but they were their own
   bullets, not findings from that walk, so this entry still stands.)
 
+- **`LodRegion.ColumnCaps` unbounded growth — moved out of this file to `TODO.md` `M-11`** (it was
+  **D2b** here). Its entries are *irreproducible player edits*, so dropping one is **data loss, not a
+  recompute**: that makes it a **correctness** item entangled with save/load (`TODO.md` `M-1`), not a
+  perf item, and the full reasoning travelled with it — why it cannot go on `GenerationalCache`, why
+  eviction cannot ride chunk unload, `LowerColumnBelow`'s load-bearing publish ordering, and the
+  ~1 KB-per-edited-chunk-column arithmetic. **What stays here is the cost it imposes on this file's
+  own instruments:** because `ColumnCaps` is process-global with no reset hook and `BuildMeshData`
+  gates on `hasCaps = !ColumnCaps.IsEmpty` (`LodRegion.cs:302`, read at `:312`), any test class that
+  mines near the origin flips a *later* build of the same region, which makes
+  `LodBuildPoolTests.RegionBuildsAreIdenticalWhicheverThreadRunsThem` and
+  `LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel` **intermittent in full-suite
+  runs** — reproduced on pristine HEAD, and seen again during the R6 round on a tree whose only
+  functional addition was a GL-free static class no test reaches. Expect them, re-run once to confirm
+  the failing name **moves**, and **never "fix" them by touching `ColumnCaps`**.
+
 **This round took R10, alone, as the file's closing paragraph said to.** It is the largest
 structural change of the series and it **landed**: LOD regions no longer own GL objects, and the
 three per-region ring walks are one `glMultiDrawElementsIndirect` each. The round was priced
@@ -318,6 +218,148 @@ needs, not the history.
 
 ### What landed
 
+- **R6 · GPU timer queries are gated with an idle keep-alive, and the either/or the bullet framed was
+  not forced.** The bullet said gating on `X` gives up "the first second after X already has data" and
+  told a reader to decide that trade. Read against the code it mis-stated its own cost **twice**.
+  First, `GpuRingSize = 3` (`RenderManager.cs:220`), so a query issued on the frame `X` is pressed
+  drains **three frames later, not a second later**. Second, and this is the one that matters, the
+  property the overlay actually delivers is **not sample recency**: `FrameProfiler.Publish`
+  (`FrameProfiler.cs:297`) rebuilds `_lines` and `_consoleLine` only **once a second** and clears the
+  GPU accumulators there, so what a player sees the instant `X` is pressed is the **last published
+  snapshot**. The property is therefore "the once-a-second snapshot standing when `X` is pressed
+  already carries GPU figures instead of `--`", and a fixed duty cycle preserves it **by
+  construction**. **What shipped:** `GpuTimingGate.ShouldTime(bool overlayOn, long frameIndex)`
+  (`src/Systems/GpuTimingGate.cs:52`) — GL-free and unit-tested on the `ReflectionReuse` precedent,
+  because `RenderManager` needs a live GL context and **no test in this suite has one**;
+  `WorldGenerationConfig.GpuTimingIdleInterval = 8` (`:291`), which keeps
+  `ceil(fps / GpuTimingIdleInterval)` samples per always-run pass in every publish window (~12 at
+  100 fps); the gate **latched once per frame** in `RenderManager.BeginGpuFrame(bool overlayOn)`
+  (`:308`) and read by `BeginGpuPass` (`:355`) and `EndGpuPass` (`:371`). The single call site is
+  `Program.cs:571`, passing the live `debugEnabled` X-toggle state on the render thread — no new
+  cross-thread mechanism. The interval is **chosen, not measured**: it is a one-token lever, and by
+  this file's own rule (`Generations`, C5's pool size) moving it owes a counted capture, which is said
+  where the constant is declared.
+- **R6 · the two structural rules that must not be "cleaned up".** **(1) The latch is per frame and is
+  never re-read mid-frame.** `EndGpuPass` advances `_gpuPassSegUsed[s]`, so a toggle landing between a
+  `BeginGpuPass` and its `EndGpuPass` would open a `TIME_ELAPSED` range that nothing closes and desync
+  pass pairing for the rest of the frame — hence one read in `BeginGpuFrame`, held in a field for the
+  whole frame. **(2) The drain loop stays unconditional.** A `_gpuPassPending` entry written while the
+  gate was open must still be cleared after it closes, or that ring slot is re-used with a stale
+  pending flag forever. `EndGpuFrame` is untouched for the same family of reason: the ring must keep
+  advancing every frame or the three-frame drain latency breaks. The consequence of (2) is the shape
+  of the saving and is worth stating: **the drain frame is not free** — with `GpuRingSize == 3` the
+  queries issued on timed frame k are drained on frame **k+3**, which is itself a gate-closed frame.
+- **R6 · what it costs, MEASURED as a count and not as a time.** R6's quantity is countable, so it was
+  counted. `RenderManager.Dispose` (`:2863`) logs one cumulative line before any GL teardown —
+  `GPU timer queries: N GL calls over F frames, T timed (X per frame)` — which prints in **every** run
+  (see the instrument note in the hand-off for why it is a shutdown line and not a console token).
+  Same scenario both times (`entity-binds`, `VOXEL_TIME=120`, run from `OpenGLTest/`, scenario copies
+  by absolute path with an `output` override so neither tree's `visual/` was written):
+  **with `VOXEL_DEBUG=1`** — the gate is open on every frame and that path is byte-identical to HEAD,
+  so this figure **is** the always-on cost — **92,690 GL calls over 2,453 frames, 2,453 timed = 37.8
+  per frame**; **without `VOXEL_DEBUG`** — the gated path — **12,140 calls over 2,801 frames, 351
+  timed = 4.3 per frame**, an **8.7x** reduction, with `351 = ceil(2801 / 8)` exactly. A second
+  scenario corroborates the always-on figure: `perf-fly` under `VOXEL_DEBUG=1` read **222,364 calls
+  over 5,938 frames = 37.5 per frame**. So the always-on cost on this machine is **37.5-37.8 calls a
+  frame** — just *below* the bullet's estimated "~40-70", so **quote the measurement, not the
+  estimate**. Structural ceiling for context: 12 bracket sites (11 sections, `EntityPass` twice) = at
+  most 24 `BeginQuery`/`EndQuery` plus at most 24 `GetQueryObject` = 48, and 37.8 implies about 9.4 of
+  the 12 ranges opening on an average frame, which is what the conditional passes predict.
+  **Per-cycle shape, also measured:** 12,140 / 351 = **34.6 calls per 8-frame cycle** — about one
+  always-on frame's worth per cycle, split so that frame k issues the `BeginQuery`/`EndQuery` brackets
+  and frame k+3 issues the `GetQueryObject` drain for exactly those, with the other six issuing none;
+  it sits slightly under the always-on per-frame figure because the drain loop skips slots with
+  nothing pending. All seven scored gate runs reproduced the duty cycle independently (timed frames
+  331/2645, 353/2824, 347/2769, 346/2763, 329/2627, 330/2639, 321/2568 — `ceil(frames/8)` in every
+  one). **No time win is claimed anywhere**, deliberately: no test has a GL context, the `perf-fly`
+  60 s window is saturated and isolates nothing, the two counted runs differ in frame count (2,453 vs
+  2,801) because the scenario is wall-clock driven so any fps comparison between them would read
+  scheduler noise, and **lesson 6 in the hand-off is explicit that an unpriced count is not a time**.
+- **R6 · what is given up, all three parts, and the alternative if the third is ever judged too
+  expensive.** (i) Idle-window averages are built from about `fps / GpuTimingIdleInterval` samples per
+  always-run pass instead of one per frame, so they are **thinner**. (ii) The `~` worst-frame column
+  **under-samples** while the overlay is down, so a max recorded during an idle period can survive
+  into the first window after `X`. (iii) The one that bites: a pass that does **not run every frame**
+  can collect no samples at all across a publish window and read `--` where an always-on build showed
+  a figure. `SelectPass` is the live example — it is bracketed inside `if (_hasSelectedBlock)`
+  (`World.cs:525-548`), so with the gate closed the chance of a frame both entering it *and* being a
+  timed frame falls 8x. **(iii) is a reasoned prediction, not an observed fact**: confirming it needs
+  someone to start without `VOXEL_DEBUG`, press `X` and read the GPU column, and no headless run can
+  do that (the transition has no run coverage at all — see below), so it was not confirmed and is not
+  written here as if it had been. If it is ever judged unacceptable, the named alternative is an
+  **arming window** — force a few fully-timed frames on the off->on transition instead of running a
+  fixed duty cycle — which keeps almost all of the saving on long idle periods.
+- **R6 · a measured finding that materially softens the headline trade, taken on the ALWAYS-ON path.**
+  HEAD already leaves the later passes out of the standing snapshot much of the time. `entity-binds`
+  under `VOXEL_DEBUG=1` (20 publish windows) carried GPU figures for
+  `lighting`/`shadows`/`reflect`/`lodPass` in **20/20** windows, but `worldPass`, `entityPass` and
+  `waterPass` in only **11/20**, `cloudPass` and `raysPass` in **10/20**, `uiPass` in **8/20** and
+  `selectPass` in **5/20**; `perf-fly` reproduces the same gradient on **both** trees (work 58 windows
+  vs head 59: `lighting` 58/58 vs 59/59, `lodPass` 57/58 vs 57/59, `worldPass` 27 vs 26, `waterPass`
+  24 vs 24, `selectPass` 16 vs 11). So the property R6's bullet framed as being sacrificed is, for
+  passes after `lodPass`, **already only about half reliable on HEAD** on this machine, and about a
+  quarter reliable for `selectPass`. The gate magnifies a pre-existing condition rather than creating
+  a new class of defect. The mechanism was **not diagnosed** — out of scope — and the behaviour is
+  identical on both trees, so it is HEAD behaviour and **not a regression**: do not file it as a new
+  bug without evidence.
+- **R6 · how it is covered, and the one case that has no run coverage and cannot get any.**
+  `GpuTimingGateTests` adds three facts: the gate times **every** frame while the overlay is on; over
+  a frame count deliberately **not** a multiple of the interval it fires `ceil(N / interval)` times;
+  and the **min and max gap** between timed frames are **both exactly** `GpuTimingIdleInterval`, with
+  frame 0 timed. Every magnitude is expressed as a multiple of the config constant and never as an
+  arithmetic literal over it, per `ReflectionReuseTests`' stated rule, so a retune cannot turn into a
+  spurious failure. The **off-to-on transition has no run coverage and cannot get any**:
+  `VisualDirector` dispatches exactly eight ops — teleport, look, wait, walk, mine, place, give,
+  screenshot (`VisualDirector.cs:34-94`) — and **none of them is a key press**, so no scripted
+  scenario can press `X`. The third test is what stands in for it, and it is a test of the **policy**,
+  not of the running renderer. The wiring itself (`BeginGpuFrame` / `BeginGpuPass` / `EndGpuPass`)
+  stays unit-uncovered because nothing in the suite constructs a GL context; that gap is real and is
+  not papered over. What did verify the wiring is a `VOXEL_DEBUG=1` scripted run whose `perf` line
+  still printed non-`--` GPU figures for every pass, and the shutdown line's own counts.
+- **R6 · the visual gate saw zero, and it could not have seen the surface that matters.** Timer
+  queries write no pixels, so the gate looked for **zero structural change**: `entity-binds`, 7 runs
+  per tree interleaved in one session after a cold discarded run each, both trees run **without**
+  `VOXEL_DEBUG` — the only configuration in which the work tree executes the new gated path, and all
+  seven work runs logged 4.3 calls/frame, proving they did — against a pristine `git archive HEAD`
+  (8b743c7) build in a scratchpad, never a stash. Residue **0 px on all six shots at 7+7, and already
+  0 at 5+5**, with the documented accidental-agreement collapse reproducing (14 px at 3+3 -> 0 -> 0).
+  The exact null over the 126 balanced relabellings at 5+5 gave null maxima of 289 / 444 / 289 / 659 /
+  1,848 / 5,699 px with a null median of 0 and the real split ranking 126/126 on every shot, so the
+  instrument had ample power and found nothing. Within-tree constants were 89.9-96.9 %, reproducing
+  this file's recorded 91-98 %. **Now the part that zero does not prove:** all six `entity-binds`
+  screenshots pass `hideHud: true` (verified 6/6), so an **overlay** change is *structurally
+  invisible* to the scored gate — the zero is a gross-breakage check, not evidence about the overlay.
+  `perf-fly` is the only HUD-baking scenario, and the run made on it was `VOXEL_DEBUG=1` on **both**
+  trees, which is **tautological**: with `VOXEL_DEBUG=1` the gate is open every frame (5,938/5,938
+  timed) and the path is identical to HEAD. It is labelled that way rather than offered as evidence
+  about the gated path. (Its per-section GPU-column populations were compared anyway and are
+  indistinguishable; the `perf` console line and the overlay rows are built in the same `Publish()`
+  from the same accumulators, so the console line is a faithful proxy for the overlay's GPU column.)
+- **R6 · the reservation this file placed on it was lifted deliberately, and two documents were
+  corrected because the gate falsified them.** The hand-off said R6 "must not be taken autonomously";
+  it was taken on **2026-09-20** under an explicit human instruction to finish or dispose of every
+  remaining open bullet. The reservation text is **kept** in the hand-off rather than deleted, so a
+  later reader can see that it was lifted on purpose and what was decided under it.
+  `AGENTS.md:55-62` said "Timings are collected every frame whether or not the overlay is up, so the
+  first second after pressing `X` already has data" — false for the GPU half the moment the gate
+  landed — and now states the CPU/GPU split, names `GpuTimingGate.ShouldTime` and
+  `RenderManager.BeginGpuFrame`, and carries the `selectPass` caveat. `FrameProfiler`'s class doc
+  opened "always collected"; it now splits the same claim and records the sampling-rate consequence.
+  **This is NOT the ruled-out *GL debug context* item**, which is a different entry under **Ruled
+  out**.
+- **C5 · closed: the mechanism is what landed, and the pool is ruled out.** Recorded here because C5
+  sat in the open list long after its decision was taken, which made a closed item look like backlog.
+  **What shipped and stays:** the TryAdd-gated `_building` claim with both rollbacks,
+  `MaxLodBuildsInFlight = 8` checked before any claim, `LodBuildThrottleDelayMs = 1` and the
+  Idle/Throttled split, the `CompletedBuildCount` throughput instrument (`regions {built}/{live}` on
+  the `VOXEL_DEBUG=1` console line) and `LodManager.MeshBuffers`' retention ceilings raised to 16 —
+  all **correct at any N**, and pinned at 3 by `LodBuildPoolTests`, whose stress width is deliberately
+  fixed at 3 and **not** read from the shipped constant (or lowering the constant would have silently
+  defused them). The detail is in the three C5 bullets further down this section and in **The C5
+  concurrency argument**. **What did not ship is the pool itself:**
+  `WorldGenerationConfig.MaxConcurrentLodGenerations` ships at **1**, the pool-size lever alone is
+  under **Ruled out**, and its capture stands under **"Measurement: C5"**, untouched. Do not
+  re-propose "a bigger pool".
 - **D5 · The geometry free list is an offset-keyed, max-augmented treap, and exact first fit survived
   the rewrite.** `GeometryAllocator`'s offset-sorted `List<(int, int)>` is gone; free blocks are now
   nodes in a treap keyed on `Offset`, each carrying `MaxCount`, the largest free `Count` over its
@@ -654,7 +696,7 @@ needs, not the history.
   cold, on a hit, and again after a forced eviction. **`TreeGenerator.CanopyDisturbed` was not
   touched** — player-edit state, `TODO.md` `M-10`, `GenerationalCache` invariant 10 — so
   `using System.Collections.Concurrent;` stays in `TreeGenerator.cs` for it alone, and
-  `LodRegion.ColumnCaps` (`D2b`) was likewise left entirely alone.
+  `LodRegion.ColumnCaps` (then `D2b` here, now `TODO.md` `M-11`) was likewise left entirely alone.
 - **D2 · Both deterministic worldgen caches evict generationally instead of clearing wholesale.**
   `Chunk.ColumnCache` and `WormCarver.CellCache` were `ConcurrentDictionary` plus
   `if (Count >= limit) Clear()` on the miss path. Both now run on
@@ -684,7 +726,8 @@ needs, not the history.
   magnitude above its ~150-cell working set and its `Clear()` essentially never fired in play. The
   third part of the old D2 bullet, `LodRegion.ColumnCaps`, was **deliberately not taken**: its
   entries are irreproducible player edits, so eviction there is data loss, not a recompute. It is
-  now its own item (`D2b`). Full write-up, gate and table: **"Measurement: D2"**.
+  now its own item — it was `D2b` here and is now `TODO.md` `M-11`, having turned out to be a
+  correctness item rather than a perf one. Full write-up, gate and table: **"Measurement: D2"**.
 - **R10 · LOD regions no longer own GL objects; all three ring walks are one multi-draw each.**
   `LodRegion` had a `Mesh` (VAO + VBO + EBO) for its terrain shell and a second `Mesh` for its sea
   sheet. Both are gone. A region now holds `OpaqueSlice` / `WaterSlice` — two `GeometrySlice?`s in
@@ -837,7 +880,8 @@ needs, not the history.
   `MaxConcurrentBlockDataGenerations` (4 dedicated BelowNormal chunk-gen threads) = **3**.
   **That arithmetic is not what the measurement said to ship, and the measurement won.** The
   constant is **1** in the tree; the derivation above is kept in its comment as the thing the capture
-  refuted, not as the thing to restore. See C5's bullet for the decision and what it cost to take.
+  refuted, not as the thing to restore. The decision and what it cost to take are in the C5 closeout
+  at the head of this section and in the pool-size entry under **Ruled out**.
   Everything else in this section is written for N workers and is correct at any N — the pool size is
   the only token that changed.
 - **C5 · the claim protocol, the in-flight cap and the retention ceilings.** `_building` (a
@@ -1397,9 +1441,9 @@ four reproduced on the pristine export. The round ends at **770 / 766 / 4** with
 full-suite runs at the end of the round all came back 770 / 766 / 4 and **neither** documented
 `ColumnCaps` intermittent fired in any of them. It was observed live **once in three runs on an
 unmodified tree** at the start of the round (`LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel`,
-expected 6112 / actual 6080), which is the pre-existing behaviour `D2b` describes — so the round's new
-4-thread sweeps are **not** recorded here as having made the suite flakier; the evidence across the
-final runs is that they did not.
+expected 6112 / actual 6080), which is the pre-existing behaviour `D2b` (now `TODO.md` `M-11`)
+describes — so the round's new 4-thread sweeps are **not** recorded here as having made the suite
+flakier; the evidence across the final runs is that they did not.
 
 **(f) The visual gate: zero structural change, and both flags discharged as per-run confounds.**
 Pre-registered in writing before any capture, and the crop fixed by eye off a shot **predating** this
@@ -1724,8 +1768,8 @@ pre-existing failures and no others, with 11 new facts added (9 `GenerationalCac
 full-suite run in 4-6, never in isolation — **reproduced on a pristine `git archive HEAD` build
 carrying zero D2 code** (2/12 and 1/5 runs there). Both build regions at the origin, and the cause
 is `LodRegion.ColumnCaps` being process-global with no reset hook, so a parallel test class mining
-near the origin legitimately changes a later build. Do not chase either as a D2 bug; the item is
-tracked as `D2b` above.
+near the origin legitimately changes a later build. Do not chase either as a D2 bug; the item was
+tracked as `D2b` here and is now `TODO.md` `M-11`, with the pointer under **Not chasing**.
 
 **Tooling notes for the next round.** `dotnet test -l normal` **silently drops**
 `ITestOutputHelper` output — use `--logger "console;verbosity=detailed"` for `LodBuildCostProbe`,
@@ -1952,7 +1996,8 @@ the two captures can be read against each other, not only each against its own b
 throughput rise without harming chunk generation or GC? — N = 2 passes**, failing only the statistic
 shown to be confounded plus the fps guard added in the pre-registration. **N = 3 fails on every
 reading.** On that evidence the shipped constant was set to **1** — both pool sizes declined, the
-claim protocol kept; the reasoning and what it cost are in C5's bullet above.
+claim protocol kept; the reasoning and what it cost are in the C5 closeout under **What landed** and
+in the pool-size entry under **Ruled out**.
 
 **Mechanistically, why three builders buy 1.31x and not 3x** — the reusable finding, and the reason
 the answer is D2 — since landed, see "Measurement: D2" — rather than a bigger pool: a LOD build is
@@ -2793,13 +2838,25 @@ sharpens that record: it is pose-stable and *pixel-noisy*, usable only with the 
 instrument and only at a run count high enough that the constant has stopped shrinking — **7+7 here, where
 3+3 would have reported 153 spurious pixels.**
 
-### Suggested first pass
+### Terminal hand-off — nothing is open
 
 Start here. The accumulated gate machinery — every trap a scenario-based comparison has fallen into
 in this series — is the **"Gate traps that still apply to any scenario-based comparison"** list
-immediately above; read it before designing any capture, and read the bullet of whatever item you
-take before touching its code. What follows is the **terminal** hand-off: what just landed, what
-remains, and why none of what remains can be taken without a human.
+immediately above; read it before designing any capture, and read the entry of whatever item you are
+about to touch before touching its code. What follows is the **terminal** hand-off: what landed across
+the whole series, what was ruled out and why, what was relocated and where, and what debt is carried
+forward. The backlog itself is **empty** — see `## Open (next round)` at the top of this file.
+
+**This round closed the file.** It took the last entry with code in it — **R6** — and disposed of the
+other three by decision rather than by code: **R3** to **Ruled out** carrying its findings intact,
+**C5** split between **What landed** (the mechanism) and **Ruled out** (the pool-size lever alone),
+**D2b** relocated to `TODO.md` `M-11` because it is a correctness item entangled with save/load and
+never belonged in a perf file. R6 shipped a **per-frame-latched gate with an idle keep-alive**
+(`GpuTimingGate.ShouldTime`, `WorldGenerationConfig.GpuTimingIdleInterval = 8`), measured at
+**37.8 -> 4.3 GL query calls a frame** on the same scenario — counted, never timed — with a
+zero-residue cross-tree pixel gate that, as its own entry says plainly, **could not have seen the only
+surface this change can touch**. The full account is the R6 bullets under **What landed**. The rounds
+below are the earlier ones, newest first.
 
 **This round took D5, alone, as the closing paragraph then said to — and D5 turned out to be an
 implementation after all.** The measurement its bullet demanded was taken first, the pre-registered
@@ -2879,42 +2936,54 @@ confirmed the first four and added the fifth, and D5 added the sixth:**
    pool's free list peaks at **2,264-2,295 blocks** at that very utilisation, because utilisation says how full the buffer is, not how many holes
    the occupancy is threaded through.
 
-**The autonomous backlog is exhausted.** D5 was the last item on this list takeable without a human,
-and this round took it: the measurement the bullet demanded was made, the pre-registered rule fired,
-and branch (a) — the O(log n) free list — landed. Nothing below this line can be started by an agent
-on its own. **This is a hand-off, not a suggestion for the next round.** Read it before opening
-anything here, because three of the four remaining entries are *not* work items at all and the fourth
-is blocked on a design that does not exist yet.
+**The backlog is closed, not merely exhausted.** D5 was the last item on this list takeable without a
+human and the round before this one took it. This round was authorised by a human to finish or dispose
+of everything that was left, and did: **R6 implemented, R3 ruled out, C5 filed as closed, D2b
+relocated to `TODO.md` `M-11`.** `## Open (next round)` is now **empty and says so in words**. **This
+is a terminal hand-off, not a suggestion for a next round.** There is nothing here to pick up. What
+follows is what a cold reader needs in order to measure anything in this engine without repeating four
+rounds of instrument mistakes, the disposition of each of the four entries that used to stand open,
+and the two pieces of carried debt that outlive the series.
 
-**R3 — parked against the code, and only a human can unpark it.** Read its bullet rather than this
-summary. It was resolved three ways and none of them is a defect: the depth copy cannot move, the
-shader claim holds, and the ceiling is an **already-gated 0.09 ms pass**. What is left is not a
-measurement — it is whether the perceptual cost of downsampling that pass is acceptable in this game.
-No capture can answer that, and an agent that takes R3 on measured grounds will be answering a
-question nobody asked. **A human decides, or it stays parked.**
+**R3 — closed: moved to Ruled out, not unparked.** It was resolved against the code in the R2 round
+and parked, never disproven — the depth copy cannot move, the shader claim holds, and the ceiling is an
+**already-gated 0.09 ms pass**. This hand-off used to say only a human could unpark it, and that was
+right: what was left was never a measurement but a perceptual judgement no capture can answer. The
+human closing this round chose to **stop carrying it** rather than unpark it, so it now sits under
+**Ruled out** with findings (a)/(b)/(c) intact. Retry only on new evidence — a capture that isolates
+the colour copy as its own row.
 
-**R6 — a trade-off, not a win, and explicitly reserved for a human decision.** It does not become
-takeable because a number comes back favourable; the number was never the obstacle. **Must not be
-taken autonomously.**
+**R6 — closed: implemented, under a reservation that was lifted on purpose.** This hand-off used to
+say R6 "must not be taken autonomously", and that sentence is kept here rather than deleted because it
+was correct: the number was never the obstacle, the trade was. It was lifted on **2026-09-20** by an
+explicit human instruction to finish or dispose of every remaining open bullet, and the trade was then
+**decided rather than deferred** — and turned out not to be the either/or the bullet framed. A
+per-frame latched gate with an idle keep-alive keeps the property the bullet said would be sacrificed
+(the once-a-second snapshot standing when `X` is pressed already carries GPU figures) and costs
+**37.8 -> 4.3 GL query calls a frame**, measured on the same scenario, counted and never timed. What is
+genuinely given up — including the one part that bites, a conditionally-bracketed pass reading `--` —
+is in the R6 bullets under **What landed**, along with the finding that the always-on snapshot on HEAD
+is *already* only about half reliable for passes after `lodPass` on this machine.
 
-**C5 — closed, not open.** `MaxConcurrentLodGenerations` ships at **1**. Both larger pools were
-measured and declined, and the capture is above under "Measurement: C5". It is listed here only so a
-cold reader does not mistake it for backlog and re-propose "a bigger pool". (D2 was the lever that
-capture pointed at and has been taken; D6 extended the same lever to three more caches. Neither
-reopens the pool question.)
+**C5 — closed, and now filed as closed rather than listed as open.**
+`WorldGenerationConfig.MaxConcurrentLodGenerations` ships at **1**. The mechanism landed and stays —
+the TryAdd-gated claim protocol, the in-flight cap, the Idle/Throttled split, `CompletedBuildCount` and
+the raised retention ceilings, all correct at any N — and it is under **What landed**; the **pool-size
+lever alone** is under **Ruled out**, with its capture under **"Measurement: C5"**. It sat in the open
+list only so a cold reader would not re-propose a bigger pool, and the Ruled-out entry now does that
+job properly. (D2 was the lever that capture pointed at and has been taken; D6 extended it to three
+more caches. Neither reopens the pool question.)
 
-**D2b — a correctness item entangled with save/load, not a perf item.** `LodRegion.ColumnCaps` grows
-unbounded, but its entries are **irreproducible player edits**, so it **must not** take D2's or D6's
-cache/eviction scheme: evicting a cap is **data loss, not a recompute**, and `GenerationalCache`
-invariant 10 names this exact site as one that must never be stored there. It cannot ride chunk unload
-either — LOD regions cover terrain far outside the loaded chunk sphere, so a cap must **outlive** its
-chunk. A real fix needs caps **re-derivable from stored block data**, i.e. it is entangled with
-save/load (`TODO.md` `M-1`), which is a design nobody has written. Until then the cost is paid and
-visible: because `ColumnCaps` is process-global with no reset hook,
-`LodBuildPoolTests.RegionBuildsAreIdenticalWhicheverThreadRunsThem` and
-`LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel` are **intermittent in
-full-suite runs** — reproduced on pristine HEAD, so expect them and never "fix" them by touching
-`ColumnCaps`.
+**D2b — relocated, not fixed: it is `TODO.md` `M-11` now.** `LodRegion.ColumnCaps` grows unbounded,
+but its entries are **irreproducible player edits**, so it must not take D2's or D6's cache/eviction
+scheme — evicting a cap is **data loss, not a recompute**, and `GenerationalCache` invariant 10 names
+this exact site — and it cannot ride chunk unload either, because LOD regions cover terrain far outside
+the loaded chunk sphere so a cap must **outlive** its chunk. A real fix needs caps **re-derivable from
+stored block data**, i.e. it is entangled with save/load (`TODO.md` `M-1`): a **correctness item
+waiting on a design**, which is why it left this file entirely. Its four sub-points, its
+~1 KB-per-edited-column arithmetic and `LowerColumnBelow`'s load-bearing publish ordering travelled
+with it to `M-11`, beside `M-10`, its sibling data-loss bug. What stays here is the cost it imposes on
+this file's own instruments — see the carried-debt bullet below.
 
 **What a cold reader needs.**
 
@@ -2923,16 +2992,29 @@ full-suite runs** — reproduced on pristine HEAD, so expect them and never "fix
   configuration measured or shipped here). Tests:
   `DOTNET_ROLL_FORWARD=LatestMajor ~/.dotnet/dotnet.exe test OpenGLTest.Tests/silkgltriangle.Tests.csproj -c Release`.
   All code lives in the `silkgltriangle` namespace even though the solution is `OpenGLTest.sln`.
-- **The suite baseline, and how this round moved it.** **790 total / 786 passed / 4 failed** at the
-  round's HEAD (9b7a244), rising to **792/788/4** with the cross-tree replay probe, **795/791/4** with
-  the three allocator counter facts, and **797/793/4** with branch (a)'s two. The **four standing
-  failures** are pre-existing and are not this series' to fix:
+- **The suite baseline, and how the series moved it.** **790 total / 786 passed / 4 failed** at
+  9b7a244, rising to **797 / 793 / 4** by the D5 round's HEAD (8b743c7) — which is exactly what this
+  round re-measured before touching anything. R6's three `GpuTimingGateTests` facts take it to
+  **800 / 796 / 4**, with the same four failures and no others. Those four are **standing failures that
+  predate this series**; they and the two `ColumnCaps` intermittents are the carried debt named in the
+  next bullet. **Expect them; do not chase them.**
+- **Two pieces of carried debt outlive this work, and neither is anybody's regression.**
+  **(i) Four standing test failures.** They were failing at 9b7a244 before a line of this series was
+  written, they are unrelated to everything in it, and no round here has touched the code they cover:
   `ContentTests.DisplayMatrixPosesSpritesAsConfigured`,
   `BlockMovementTests.FrictionDefaultsToPointNineNineAndIceIsLower`,
   `BlockMovementTests.LeavesDeclareThreeQuarterMovementSpeed` and
-  `FallingBlockTests.SevenTowerChainRebuildsFullyWithNoDrops`. On top of those, the **two `ColumnCaps`
-  intermittents** named in the D2b paragraph fire occasionally in full-suite runs. **Expect them; do
-  not chase them.**
+  `FallingBlockTests.SevenTowerChainRebuildsFullyWithNoDrops`. They are real failures and somebody
+  should fix them — it is simply not this file's work, and a round that sees exactly these four has
+  seen a clean run. **(ii) `LodRegion.ColumnCaps` is process-global with no reset hook**, so any test
+  class that mines near the origin flips a *later* build of the same region, which makes
+  `LodBuildPoolTests.RegionBuildsAreIdenticalWhicheverThreadRunsThem` and
+  `LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel` **intermittent in full-suite
+  runs**. Both reproduce on pristine HEAD; during this round one or the other fired on several runs of
+  a tree whose only functional addition was a GL-free static class no test reaches, and the failing
+  name **moved between runs**, which is the signature. Re-run once to confirm it moves, record it, and
+  **never silence it by touching `ColumnCaps`**. The underlying unbounded growth is now tracked as
+  `TODO.md` `M-11`.
 - **Measurement here is counted, never timed.** The `perf-fly` 60 s window is **saturated** for both
   chunks and LOD (lesson 1 above), so every end-state throughput field measures the scenario's ceiling
   and isolates nothing. Any frame-time claim needs a **time-to-N rule on a non-saturating window,
@@ -2965,6 +3047,17 @@ full-suite runs** — reproduced on pristine HEAD, so expect them and never "fix
   window frame count. Divide by `frames`, never by the line's `fps` — `fps` is
   `(int)Math.Round(frames / seconds)`, a rounded rate. The token does **not** carry `AllocatorCalls`;
   a future round wanting steps-per-call must add it to `FrameProfiler.SetGeometryCounts`.
+- **The `GPU timer queries:` shutdown line is R6's standing instrument, and it is a *shutdown* line on
+  purpose.** `RenderManager.Dispose` (`RenderManager.cs:2863`) logs
+  `GPU timer queries: {calls} GL calls over {frames} frames, {timed} timed ({perFrame} per frame)`
+  before any GL teardown, and `Program.OnClosing` disposes the render manager before `Log.Shutdown()`,
+  so it is drained in **every** run — scripted or interactive, with `VOXEL_DEBUG` or without. It is
+  deliberately **not** a `FrameProfiler` console token, because a console token **structurally cannot**
+  report the gated configuration: `Program.LogDebugLine` (`Program.cs:194`) opens
+  `if (!debugEnabled) return;` (`:196`) — the same flag the gate reads — so a token would print only
+  when the gate is open on every frame, i.e. it could only ever re-measure the always-on path. Scrape
+  it from the tail of a run log. It reaches no pixel surface, but a scraper that parses the end of a
+  log must tolerate one extra line.
 - **Instrument defects, which cost two rounds to find and will cost a third if skipped.**
   `lod-horizon` is **unusable** as a scored instrument on this machine: its camera free-falls and
   respawns **44 times a run** at stock waits (reconfirmed identically on both trees in D5's gate, a
@@ -3026,3 +3119,59 @@ noisy fields is an artefact, not a separation. Compare fields, not tuples.
   change aimed at that scan, not this),
   shader ALU (4-tap PCF, 8 point lights), uniform location lookups, indexed mesh
   upload — all audited, not the problem.
+
+- **R3 · Half-res scene copies for water — resolved, PARKED, and closed rather than unparked** —
+  `CopyScene` (`RenderManager.cs:1046-1056`), called with colour+depth at `:1734` and
+  depth-only at `:1550`. The condition R2 left on this bullet was resolved against the code
+  rather than implemented, and it settles three ways.
+  **(a) The depth copy cannot move.** `CopyScene(bool colour)` copies depth
+  *unconditionally* — only the colour half is gated by the parameter — and both call sites
+  write the same `_sceneDepthTex`, which R2's depth-aware upsample pins at full res. So the
+  `:1734` call keeps paying a full-res `DepthComponent24` `CopyTexSubImage2D` whatever R3
+  does, and a second, half-res depth used only by the water pass is the same *additive* cost
+  (an extra texture plus an extra reduction, on top of a full-res copy that still has to
+  happen) that R2 already rejected on the rays side. Only the RGBA8 colour copy is left.
+  **(b) The shader claim holds.** `test-fragment.glsl`'s refraction really is
+  resolution-independent: `uv = gl_FragCoord.xy * uInvViewport` (`:267`) against
+  `uInvViewport = 1/_viewportSize` (`RenderManager.cs:1483-1484`), bilinear `texture()` fetches
+  (`:270-272`), a `uInvViewProj` unprojection (`:276`) — no `texelFetch` and no pixel indices
+  anywhere in the file. The shader would need zero changes.
+  **(c) But the ceiling is tiny and the change is not "sample less".** The colour copy is
+  gated behind `if (_nearWaterVisible)` and sits inside a `waterPass` measured at **0.09 ms
+  GPU total** (the compute-frustum-cull capture in this same section, above) — a figure that
+  also contains every translucent chunk draw and every LOD water sheet. That capture
+  demonstrably *included* the colour copy: the same line reports `reflect 0.83 ms`, and
+  `RenderReflection` early-returns unless `_nearWaterVisible`
+  (`RenderManager.cs:1081-1082`) — the very flag that gates the copy — so near water was on
+  screen when it was taken. 0.09 ms is therefore a real ceiling for the whole pass, not a
+  figure that might have excluded the work. And `CopyTexSubImage2D` cannot downscale, so this
+  is not a sampling change but new plumbing: an FBO, a texture, sizing and teardown across
+  `CreateSceneCopy` / `DeleteSceneCopy` / `SetViewport` / `Dispose`, and a
+  `glBlitFramebuffer` that still *reads* the full-res framebuffer and saves only the write
+  side (arithmetic off the format, no timing claim: 3.69 MB -> 0.92 MB of RGBA8 writes per
+  frame at 1280x720). Its cost is blurring everything seen through water — a perceptual
+  change, which drags R2's full perceptual gate along with it.
+  **Parked, not disproven:** effort M *plus* a perceptual gate, for an unmeasurable slice of
+  an already-gated 0.09 ms pass. Revisit only if a capture ever isolates the colour copy as
+  its own row. **Impact low · risk low-med · effort M + perceptual gate.**
+  **Closed on 2026-09-20, and moved here rather than unparked.** It was parked against the code and
+  never disproven; what is left is not a measurement but a perceptual judgement — whether blurring
+  everything seen through water is acceptable in this game — and no capture can answer that. The human
+  closing this round chose to stop carrying it rather than unpark it. It lives here because this
+  section's job is to stop items being re-proposed, so its reasoning travels with it. Retry only on
+  new evidence, which here means a capture that isolates the colour copy as its own row.
+- **C5's pool-size lever — "a bigger LodGen pool".** Measured at two sizes and declined at both, on a
+  quantity that was never the limiter. Three `BelowNormal` workers reach a fixed region count **1.31x**
+  sooner and two reach it **1.26x** sooner (disjoint, counterbalanced, p = 0.0143 at each of three
+  region counts) — but three also slow chunk generation **disjointly** (seconds to the full
+  17077-chunk ring 5.0 -> 6.1 median) and cost **30 %** of burst frame rate (median 108.0 -> 75.3 fps),
+  while two, which do clear the chunk-gen and GC guards, still cost **18 %** (110.3 -> 90.7 fps) — paid
+  on every run, in the exact phase this item targets, for 1.26x on a quantity with **7.8-8.2x of drain
+  headroom** (53-55 regions/s measured against a ~433 regions/s drain ceiling). Why it is so far below
+  linear is the reusable half: a LOD build is **terrain generation in disguise** (36 / 100 / 324 column
+  prefetches at levels 0 / 1 / 2, each miss generated on the spot through `Chunk.ColumnCache`), so
+  LodGen workers do not add throughput to an idle resource — they contend with the four chunk-gen
+  threads for the one the burst is already saturating. `WorldGenerationConfig.MaxConcurrentLodGenerations`
+  ships at **1**. The capture is under **"Measurement: C5"** and the argument under **"The C5
+  concurrency argument"**; **everything except the extra threads landed and stays** (see **What
+  landed**). Only the pool size is ruled out, and re-proposing it needs a capture that answers this one.

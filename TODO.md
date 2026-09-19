@@ -287,7 +287,7 @@ same world, and a player can move between them freely — neither arc gates the 
 - [ ] **`M-9` · Mod / data-pack behavior hooks** — P3, XL.
   Data packs already exist; consider a scripting/behavior hook.
 - [ ] **`M-10` · Fix: `TreeGenerator.CanopyDisturbed` loses felled-canopy markers at its cap** —
-  P2, S. **It is edit state, not a cache.** `TreeGenerator.PoisonCanopy` (`TreeGenerator.cs:449-460`)
+  P2, S. **It is edit state, not a cache.** `TreeGenerator.PoisonCanopy` (`TreeGenerator.cs:477-488`)
   records that a player cleared canopy so the far LOD stops drawing a bump there, writing
   `(2 * TreeCanopyPoisonRadius + 1)^2` = **289 entries per edited wood/leaf block**
   (`TreeCanopyPoisonRadius = 8`) and wholesale-`Clear()`ing the whole dictionary at 16384 entries.
@@ -303,7 +303,42 @@ same world, and a player can move between them freely — neither arc gates the 
   is therefore entangled with `M-1` (save/load); the cheap interim is to stop the unbounded growth
   at the source (store one entry per edited chunk column rather than 289 per block) and to hoist
   the `Count` test out of the loop. The same argument applies to `LodRegion.ColumnCaps`, tracked
-  separately in PERF_TODO's "Open (next round)".
+  below as `M-11`.
+- [ ] **`M-11` · `LodRegion.ColumnCaps` grows unbounded, and it must NOT take D2's scheme** —
+  P2, L, blocked on a design. **It is edit state, not a cache**, and it is the sibling of `M-10`
+  above. `LodRegion.ColumnCaps` (`LodRegion.cs:130`) is a **process-global** `ConcurrentDictionary`
+  holding one dense `Chunk.Size * Chunk.Size` `int[]` — 256 ints, **~1 KB, per *edited chunk
+  column*** with `Chunk.Size = 16` — written by `LowerColumnBelow` (`:147-172`) whenever a removal
+  would expose buried LOD, and **never removed by anything**. Over a long editing session it only
+  grows. The fix PERF_TODO's `D2` shipped for the worldgen caches (`GenerationalCache`) is actively
+  wrong here, because this is a **different problem: growth, not eviction**.
+  - **It cannot go on `GenerationalCache`.** A cap entry encodes an *irreproducible player edit*; no
+    generator can rebuild one from its key. Evicting a cap while its column is still LOD-relevant
+    makes mined terrain **pop back** in the far rings — a visible correctness bug, not a recompute.
+    `GenerationalCache`'s invariant 10 names this site explicitly as one that must never be stored
+    there, and AGENTS.md carries the same standing rule.
+  - **Nor can eviction ride chunk unload.** LOD regions cover terrain far outside the loaded chunk
+    sphere (`ChunkRadius` 16 chunks vs rings out to 2048 blocks), so a cap must **outlive** its
+    chunk. "Drop the cap when the chunk unloads" is the obvious fix and it is wrong.
+  - **Whatever is done must preserve `LowerColumnBelow`'s publish ordering** (`LodRegion.cs:165-172`):
+    the bucket is published into the `ConcurrentDictionary` first and the value written with
+    `Volatile.Write` after, which the code's own comment records as load-bearing for a future
+    multi-threaded LodGen. A fix that replaces the container must carry that ordering across.
+  - **A real fix needs caps re-derivable from stored block data** — i.e. it is entangled with
+    save/load (`M-1` above), because only persisted edits let a cap be dropped and recomputed on
+    demand. That makes this a **correctness item waiting on a design**, not a perf item, and larger
+    than it looks.
+  **Observed cost today, not hypothetical:** because `ColumnCaps` is global with no reset hook and
+  `BuildMeshData` gates on `hasCaps = !ColumnCaps.IsEmpty` (`:302`, read at `:312`), any test class
+  that mines or drops a block near the origin flips a *later* build of the same region, which is what
+  makes `LodBuildPoolTests.RegionBuildsAreIdenticalWhicheverThreadRunsThem` and
+  `LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel` **intermittent in
+  full-suite runs** (reproduced on pristine HEAD, so not a regression from any perf round — see
+  PERF_TODO's "Measurement: D2"). `LodColumnCapTests.cs` and `LodHeightSamplingTests.cs` already dodge
+  it with far region coordinates ((777, 777) and (555, -555)) and say so in comments; those two
+  classes do not. **Expect the two intermittents; never "fix" them by touching `ColumnCaps`.**
+  Arrived here from PERF_TODO's `D2b` when that file was closed out: its entries are irreproducible
+  player edits, which makes it a **correctness** item entangled with save/load, not a perf item.
 
 ---
 

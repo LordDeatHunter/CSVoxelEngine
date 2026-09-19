@@ -52,11 +52,16 @@ and the `rendShell`/`screenshot`/`publish` frame shell —
 with its average and worst millisecond cost over the last second; `other` is the wall time no
 section claimed (buffer swap, window pump, OS/GC jitter). The header carries the frame time and FPS, the CPU
 sum against the GPU's own `TIME_ELAPSED` measurement of the whole frame (`--` until the first
-query comes back), GC collections per second and the loaded/visible chunk counts. Timings are
-collected every frame whether or not the overlay is up, so the first second after pressing `X`
-already has data; the overlay's own glyph draws land in `uiPass`, so compare that row with `X`
-on and off before reading it as a baseline. `Program.OnLoad` and the `RenderManager` constructor
-each print one startup line — build configuration, debugger, GC mode and CPU count, then the GL
+query comes back), GC collections per second and the loaded/visible chunk counts. CPU timings are
+collected every frame; per-pass GPU timing is gated (`GpuTimingGate.ShouldTime`, latched once per
+frame in `RenderManager.BeginGpuFrame`) — every frame while the overlay is up, and one frame in
+`WorldGenerationConfig.GpuTimingIdleInterval` while it is down, which keeps enough samples in each
+once-a-second window that the snapshot standing when `X` is pressed already carries GPU figures.
+The caveat is that a pass which does not run every frame (`selectPass`) can collect no samples at
+all across an overlay-down window and read `--` in that first snapshot. The overlay's own glyph
+draws land in `uiPass`, so compare that row with `X` on and off before reading it as a baseline.
+`Program.OnLoad` and the `RenderManager` constructor each print one startup line — build
+configuration, debugger, GC mode and CPU count, then the GL
 renderer, vendor and version (which must report a 4.6 core context) — so a measurement always
 records which build and which GPU produced it. Timing lives in `OpenGLTest/src/FrameProfiler.cs`;
 wrap new work in `FrameProfiler.Begin`/`End` (main thread only) rather than adding another ad-hoc

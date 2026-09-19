@@ -563,9 +563,12 @@ public static class Program
 
     private static void OnRender(double deltaTime)
     {
-        // One TIME_ELAPSED query wraps the whole frame, so it has to open before any draw
+        // Prepares this frame's GPU timers and latches the timing gate before any draw: no query is
+        // opened here (each pass brackets its own), and the header's gpu figure is the sum of the
+        // per-pass averages. debugEnabled is the live X-overlay state and this is the render thread,
+        // so the gate reads it directly.
         FrameProfiler.Begin(ProfileSection.RenderShell);
-        renderManager.BeginGpuFrame();
+        renderManager.BeginGpuFrame(debugEnabled);
         FrameProfiler.End(ProfileSection.RenderShell);
 
         FrameProfiler.Begin(ProfileSection.Lighting);

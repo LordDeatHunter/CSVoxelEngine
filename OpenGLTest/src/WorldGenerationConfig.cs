@@ -283,6 +283,13 @@ public const float DayLengthSeconds = 1200f;
     // same reflection texture size, so the FBO-recreation trigger alone does not cover it.
     public const float ReflectionReuseMaxAspect = 0.001f;
 
+    // --- GPU timer queries (RenderManager.BeginGpuFrame / BeginGpuPass, item R6) ---
+    // One frame in this many still issues its TIME_ELAPSED queries while the X overlay is down,
+    // so the once-a-second snapshot standing when X is pressed already carries GPU figures
+    // instead of "--". Chosen, not measured: ~12 samples per publish window at 100 fps for an
+    // eighth of the always-on GL query traffic. Moving it owes a counted capture, not a guess.
+    public const int GpuTimingIdleInterval = 8;
+
     // Wave normal steepness multiplier for the water shading (geometry moves less than it looks)
     public const float WaterNormalScale = 2.0f;
     // Screen-space refraction offset at the camera, in uv units; shrinks with distance in the shader

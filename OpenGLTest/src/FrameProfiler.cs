@@ -46,8 +46,10 @@ public enum ProfileSection
 }
 
 /// <summary>
-/// Per-frame CPU (and per-pass GPU) timing, always collected so the overlay has data the
-/// moment it is switched on. Main thread only: <see cref="Begin"/>/<see cref="End"/> just read
+/// Per-frame CPU timing, collected on every frame, plus per-pass GPU timing, which is gated by
+/// <see cref="GpuTimingGate"/>: it runs every frame while the overlay is up and on a keep-alive
+/// frame while it is down, so the once-a-second snapshot standing when the overlay is switched on
+/// already has data. Main thread only: <see cref="Begin"/>/<see cref="End"/> just read
 /// <see cref="Stopwatch.GetTimestamp"/> into a flat array, and the only formatting — and so the
 /// only allocation — happens on the once-a-second publish.
 ///
@@ -56,7 +58,15 @@ public enum ProfileSection
 ///
 /// GPU time arrives per render pass from <see cref="RenderManager"/>'s consecutive
 /// TIME_ELAPSED ranges (one query object per pass, drained a few frames late so it never
-/// stalls). Update-side sections never get GPU samples and show "--" in that column.
+/// stalls). Update-side sections never get GPU samples and show "--" in that column. That timing
+/// is gated: <see cref="RenderManager.BeginGpuFrame"/> latches
+/// <see cref="GpuTimingGate.ShouldTime"/> once per frame, so while the overlay is down only one
+/// frame in <see cref="WorldGenerationConfig.GpuTimingIdleInterval"/> issues its queries and each
+/// always-run pass contributes about fps / GpuTimingIdleInterval samples to the window instead of
+/// one per frame. Averages over an overlay-down window are therefore thinner and the worst-frame
+/// column under-samples, and a pass that is not entered every frame (selectPass, bracketed by
+/// World's <c>_hasSelectedBlock</c> test) can collect no samples at all across such a window and
+/// read "--" in the first snapshot after the overlay comes up.
 /// </summary>
 public static class FrameProfiler
 {
