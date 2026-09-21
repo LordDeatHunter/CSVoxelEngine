@@ -40,7 +40,9 @@ public static class ItemFactory
         float BlockDamage,
         float EntityDamage,
         float? ThrowDamage,
-        string SourceName);
+        string SourceName,
+        // Appended with a default so the positional construction in the tests keeps compiling
+        float FuelSeconds = 0f);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,
@@ -67,6 +69,7 @@ public static class ItemFactory
             ItemUseAction.PlaceFluid => new BucketPlaceItem(spec),
             ItemUseAction.PlaceStack => new PlaceStackItem(spec),
             ItemUseAction.IgniteCampfire => new IgniteItem(spec),
+            ItemUseAction.ConvertMultiblock => new ConvertMultiblockItem(spec),
             _ => new PlainItem(spec),
         };
     }

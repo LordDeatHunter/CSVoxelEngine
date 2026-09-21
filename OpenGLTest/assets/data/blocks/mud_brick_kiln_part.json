@@ -1,0 +1,18 @@
+{
+  // One of the seven non-anchor cells of a mud brick kiln's 2x2x2 volume. It is never meshed
+  // (the anchor's model covers the whole volume), so its model only supplies tiles; it is a
+  // solid, occluding cell so the structure collides, raycasts and hides its neighbours, and
+  // mining it reverts the rest of the kiln exactly like mining the anchor does.
+  "name": "Mud Brick Kiln",
+  "model": { "parent": "block/cube_all", "textures": { "all": "mud_bricks" } },
+  "renderer": "multiblock_part",
+  "hasItem": false,
+  "hardness": 5,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  "sfx": "hit_rock",
+  "loot": "mud_brick_kiln",
+  "occludes": true,
+  "castsAO": true,
+  "light": { "passes": true }
+}

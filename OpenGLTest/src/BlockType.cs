@@ -194,6 +194,28 @@ public sealed record BlockType
     /// <summary>Which geometry emitter turns this block into chunk vertices.</summary>
     public BlockRenderer Renderer { get; init; } = BlockRenderer.Model;
 
+    /// <summary>Block filling the seven non-anchor cells of this multiblock's 2x2x2 volume, or
+    /// 0 when the block is not a <see cref="BlockRenderer.Multiblock"/> anchor. Resolved after
+    /// every block is loaded, since the part's own file may come later alphabetically.</summary>
+    public byte MultiblockPartId { get; internal set; }
+
+    /// <summary>Plain block this multiblock is built from and reverts to (mud bricks for the
+    /// kiln), or 0 when the block is not a multiblock anchor.</summary>
+    public byte MultiblockSourceId { get; internal set; }
+
+    /// <summary>Whether this multiblock anchor is a kiln: it holds fuel, can be lit and is
+    /// swept for structural damage. Only ever set on a <see cref="BlockRenderer.Multiblock"/>
+    /// block.</summary>
+    public bool Kiln { get; init; }
+
+    /// <summary>
+    /// The anchor's baked model pre-rotated to each of the four horizontal facings, indexed by
+    /// facing 0..3 (<c>[0]</c> is <see cref="BakedModel"/> itself, the authored north-facing
+    /// bake). Null for every block but a <see cref="BlockRenderer.Multiblock"/> anchor; see
+    /// <see cref="MultiblockShape.Rotate"/>.
+    /// </summary>
+    public BakedModel[]? RotatedModels { get; internal set; }
+
     /// <summary>
     /// How many units of this block stack in one cell, candle-style (pebbles hold up to 3,
     /// branch piles up to 4);

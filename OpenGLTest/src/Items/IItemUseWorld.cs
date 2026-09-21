@@ -68,6 +68,23 @@ public interface IItemUseWorld
     /// <summary>Lights the campfire entity; false when there is none to light.</summary>
     bool IgniteCampfire(int x, int y, int z);
 
+    /// <summary>Whether this cell belongs to a kiln structure that is unlit and holds fuel, so a
+    /// strike would light it. Any of the structure's eight cells answers for the whole.</summary>
+    bool CanIgniteKiln(int x, int y, int z);
+
+    /// <summary>Lights the kiln this cell belongs to, spending its first unit of fuel; false when
+    /// there is no kiln to light or it holds none.</summary>
+    bool IgniteKiln(int x, int y, int z);
+
+    /// <summary>
+    /// Turns the 2x2x2 volume of <paramref name="sourceId"/> that the clicked face belongs to
+    /// into the <paramref name="anchorId"/> multiblock, with its opening pointed back at the
+    /// player. The world picks the volume from its own camera (see
+    /// <see cref="MultiblockPlacement.TryFindVolume"/>), so item code passes only the hit.
+    /// False when no candidate volume is whole.
+    /// </summary>
+    bool TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, byte sourceId, byte anchorId);
+
     /// <summary>Whether this block id primes into TNT instead of dropping.</summary>
     bool IsPrimedTntBlock(byte id);
 

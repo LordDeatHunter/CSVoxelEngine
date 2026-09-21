@@ -30,4 +30,11 @@ public enum ItemUseAction
     /// <see cref="Item.UseBlockId"/> and <see cref="Item.UseChance"/>.
     /// </summary>
     IgniteCampfire,
+
+    /// <summary>
+    /// Right-clicks a <see cref="Item.UseBlockId"/> cell to turn the 2x2x2 volume it belongs to
+    /// into the <see cref="Item.UseResultId"/> anchor block (see <see cref="Multiblock"/>).
+    /// The tool is never consumed and never morphs — the converter is an endless misc item.
+    /// </summary>
+    ConvertMultiblock,
 }

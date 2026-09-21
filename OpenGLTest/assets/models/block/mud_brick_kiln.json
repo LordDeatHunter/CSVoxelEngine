@@ -1,0 +1,89 @@
+{
+  // Mud brick kiln: the anchor model of a 2x2x2 multiblock, so it is authored in 0..32 model
+  // units (two cells on every axis, the anchor cell's origin at 0) with the opening on the
+  // NORTH (-Z) face. ContentRegistry pre-rotates the bake to the other three facings
+  // (MultiblockShape.Rotate), so this file is the only orientation ever written by hand.
+  //
+  // Two rules the bake validation enforces: no face may carry a "cullface" (a multiblock's
+  // cell neighbours are its own part cells, so a cullface would test the wrong thing), and no
+  // face may cover a whole cell face (a rotated quad's corners leave Chunk.CubeFaces order, so
+  // every multiblock quad has to shade flat).
+  //
+  // No face declares "uv": the baker's defaults span two tile units across a two-cell box and
+  // the sampler's REPEAT tiles the bricks once per cell.
+  //
+  // The opening is x 8..24, y 2..18, z 0..12 - cell space [0.5,1.5] x [0.125,1.125] x [0,0.75],
+  // the numbers KilnRenderer mirrors. Every face omitted below is buried inside another element.
+  "textures": {
+    "brick": "mud_bricks",
+    "hearth": "fired_mud"
+  },
+  "elements": [
+    // Back body: the solid rear half. Its north side is hidden by the two piers, the lintel,
+    // the hearth floor and the hearth's back wall.
+    {
+      "from": [0, 0, 12],
+      "to": [32, 32, 32],
+      "faces": {
+        "south": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "up": { "texture": "#brick" },
+        "down": { "texture": "#brick" }
+      }
+    },
+    // Hearth back wall: the single north-facing quad seen through the opening, fired by the
+    // fire in front of it.
+    {
+      "from": [8, 2, 12],
+      "to": [24, 18, 13],
+      "faces": {
+        "north": { "texture": "#hearth" }
+      }
+    },
+    // Left pier, west of the opening; its inner (east) side is fired.
+    {
+      "from": [0, 0, 0],
+      "to": [8, 32, 12],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#hearth" },
+        "up": { "texture": "#brick" },
+        "down": { "texture": "#brick" }
+      }
+    },
+    // Right pier, east of the opening; its inner (west) side is fired.
+    {
+      "from": [24, 0, 0],
+      "to": [32, 32, 12],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "west": { "texture": "#hearth" },
+        "up": { "texture": "#brick" },
+        "down": { "texture": "#brick" }
+      }
+    },
+    // Lintel over the opening; its underside is fired.
+    {
+      "from": [8, 18, 0],
+      "to": [24, 32, 12],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "up": { "texture": "#brick" },
+        "down": { "texture": "#hearth" }
+      }
+    },
+    // Hearth floor: the ledge the fire, the fuel and (later) the crucible sit on.
+    {
+      "from": [8, 0, 0],
+      "to": [24, 2, 12],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "up": { "texture": "#hearth" },
+        "down": { "texture": "#brick" }
+      }
+    }
+  ]
+}

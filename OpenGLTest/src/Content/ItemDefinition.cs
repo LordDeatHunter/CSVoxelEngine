@@ -52,6 +52,18 @@ public sealed class ItemDefinition
     /// <summary>Uses before a durability item breaks; omitted (0) for endless items.</summary>
     public int? Durability { get; set; }
 
+    /// <summary>
+    /// Marks the item as a fuel a kiln burns. Omitted for everything that is not fuel.
+    /// </summary>
+    public FuelDefinition? Fuel { get; set; }
+
+    /// <summary>How long one unit of this fuel burns.</summary>
+    public sealed class FuelDefinition
+    {
+        /// <summary>Seconds one unit keeps a kiln lit (coal 60); 1..3600.</summary>
+        public float? BurnSeconds { get; set; }
+    }
+
     /// <summary>Seconds between uses of this item; omitted for the global click rate.</summary>
     public float? UseDelay { get; set; }
 
@@ -123,10 +135,13 @@ public sealed class ItemDefinition
     /// <summary>The <c>use</c> object: the action plus the block and item it works with.</summary>
     public sealed class UseDefinition
     {
-        /// <summary><c>pickup_fluid</c>, <c>place_fluid</c>, <c>place_stack</c> or <c>ignite_campfire</c>.</summary>
+        /// <summary><c>pickup_fluid</c>, <c>place_fluid</c>, <c>place_stack</c>,
+        /// <c>ignite_campfire</c> or <c>convert_multiblock</c>.</summary>
         public string? Action { get; set; }
 
-        /// <summary>Item the use swaps this one for, e.g. <c>item/water_bucket</c>.</summary>
+        /// <summary>Item the use swaps this one for, e.g. <c>item/water_bucket</c>. For
+        /// <c>convert_multiblock</c> it is the multiblock <em>anchor block</em> the volume
+        /// becomes instead, e.g. <c>block/mud_brick_kiln</c>.</summary>
         public string? Result { get; set; }
 
         /// <summary>Fluid block the action picks up or places, e.g. <c>block/water</c>.</summary>
@@ -136,7 +151,9 @@ public sealed class ItemDefinition
         /// Stackable block a <c>place_stack</c> action builds up, e.g. <c>block/pebble</c>
         /// for flint. Right-clicking the block adds one unit, right-clicking anything else
         /// grounds a fresh pile of one. For <c>ignite_campfire</c> it names the firepit
-        /// block (a max-count branch pile) the spark can light.
+        /// block (a max-count branch pile) the spark can light, and for
+        /// <c>convert_multiblock</c> the <em>source block</em> the 2x2x2 volume must be
+        /// built from, e.g. <c>block/mud_bricks</c>.
         /// </summary>
         public string? Block { get; set; }
 

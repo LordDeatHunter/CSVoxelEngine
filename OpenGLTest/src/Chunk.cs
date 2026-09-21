@@ -1256,7 +1256,15 @@ public class Chunk : IDisposable
                 continue;
             }
 
-            var model = type.BakedModel;
+            // A multiblock part is a solid, occluding cell that draws nothing: the anchor's
+            // model already covers the whole 2x2x2 volume it belongs to.
+            if (type.Renderer == BlockRenderer.MultiblockPart) continue;
+
+            // ...and the anchor draws that whole model, pre-rotated to the facing its state
+            // byte's low two bits carry (see MultiblockShape).
+            var model = type.Renderer == BlockRenderer.Multiblock && type.RotatedModels != null
+                ? type.RotatedModels[paddedState[pIdx] & 3]
+                : type.BakedModel;
             if (model == null) continue;
 
             // Canopy leaves ride the wind in the vertex shader; everything else stays planted

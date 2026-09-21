@@ -49,7 +49,9 @@ public abstract class Item
     public ItemUseAction UseAction { get; internal init; }
 
     /// <summary>Item id this one becomes after a successful use (a bucket becomes a water
-    /// bucket); 0 when the item declares no use.</summary>
+    /// bucket); for <see cref="ItemUseAction.ConvertMultiblock"/> the <em>anchor block</em> id
+    /// the volume becomes, and the item itself never morphs; 0 when the item declares no
+    /// use.</summary>
     public byte UseResultId { get; internal init; }
 
     /// <summary>Fluid block id the use picks up or places; 0 when the item declares no use.</summary>
@@ -57,7 +59,9 @@ public abstract class Item
 
     /// <summary>
     /// Stackable block id an ignite/place_stack use works on (firepit block for
-    /// <see cref="ItemUseAction.IgniteCampfire"/>); 0 for every other action.
+    /// <see cref="ItemUseAction.IgniteCampfire"/>), or the <em>source block</em> a
+    /// <see cref="ItemUseAction.ConvertMultiblock"/> volume is built from; 0 for every other
+    /// action.
     /// </summary>
     public byte UseBlockId { get; internal init; }
 
@@ -66,6 +70,9 @@ public abstract class Item
 
     /// <summary>Uses before this item breaks (10 for a firestarter); 0 means endless.</summary>
     public int MaxDurability { get; internal init; }
+
+    /// <summary>Seconds one unit of this item keeps a kiln lit (coal 60); 0 = not a fuel.</summary>
+    public float FuelSeconds { get; internal init; }
 
     /// <summary>Whether the item declares a <c>tool</c> block and therefore mines as a tool
     /// rather than at the bare-hand baseline. Membership in tool tags comes from the tag
@@ -195,6 +202,7 @@ public abstract class Item
         UseBlockId = spec.BlockId;
         UseChance = spec.Chance;
         MaxDurability = spec.Durability;
+        FuelSeconds = spec.FuelSeconds;
         UseDelaySeconds = spec.UseDelay;
         SpriteCols = spec.SpriteCols;
         SpriteRows = spec.SpriteRows;

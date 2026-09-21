@@ -1,0 +1,8 @@
+{
+  // Every mined cell of a kiln yields the one mud brick block it was built from; the other
+  // seven cells revert to mud_bricks in place. The "block/" prefix pins the block over the
+  // mud_brick item, which shares the stem.
+  "pools": [
+    { "rolls": 1, "entries": [ { "item": "block/mud_bricks" } ] }
+  ]
+}

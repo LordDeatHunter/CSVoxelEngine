@@ -99,8 +99,18 @@ public sealed class BlockDefinition
     /// water behaviour: every tick, full 7-block range, infinite sources, never hardens.</summary>
     public FlowDefinition? Flow { get; set; }
 
-    /// <summary>"model" | "tapered_wood" | "pebbles" | "branch_pile" | "fluid" | "quern".</summary>
+    /// <summary>"model" | "tapered_wood" | "pebbles" | "branch_pile" | "snow_layers" | "fluid" |
+    /// "quern" | "multiblock" | "multiblock_part".</summary>
     public string? Renderer { get; set; }
+
+    /// <summary>The structure an anchor block stands for; required on (and only legal with) the
+    /// <c>"multiblock"</c> renderer.</summary>
+    public MultiblockDefinition? Multiblock { get; set; }
+
+    /// <summary>Marks a multiblock anchor as a kiln, which is what gives it fuel, ignition and
+    /// the integrity sweep of the kiln manager. Only legal on the <c>"multiblock"</c>
+    /// renderer.</summary>
+    public bool? Kiln { get; set; }
 
     /// <summary>
     /// How many units of this block stack in one cell, candle-style (pebble piles hold up to
@@ -170,6 +180,21 @@ public sealed class BlockDefinition
         /// <summary>Multiplier on the normal map's relief, 0..4. Default 1, which uses the map as
         /// generated; this is the knob for retuning a surface without regenerating its art.</summary>
         public float? NormalStrength { get; set; }
+    }
+
+    /// <summary>
+    /// The two other blocks a multiblock anchor is tied to: the invisible cells that fill the
+    /// rest of its 2x2x2 volume, and the plain block the structure is built from and reverts to.
+    /// </summary>
+    public sealed class MultiblockDefinition
+    {
+        /// <summary>Block filling the seven non-anchor cells; must use the
+        /// <c>"multiblock_part"</c> renderer.</summary>
+        public string? Part { get; set; }
+
+        /// <summary>Plain block the 2x2x2 volume is built from, and what each cell turns back
+        /// into when the structure is broken, e.g. <c>"block/mud_bricks"</c>.</summary>
+        public string? Source { get; set; }
     }
 
     /// <summary>Voxel light behaviour of a block.</summary>

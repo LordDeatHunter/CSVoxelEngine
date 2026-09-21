@@ -10,6 +10,15 @@ namespace silkgltriangle;
 /// </summary>
 public sealed class FireParticleSystem
 {
+    /// <summary>
+    /// Where the flame of a lit cell sits inside it: centred, a little above the floor. A caller
+    /// whose flame is not at a cell's own origin (the kiln, whose fire burns inside its hearth)
+    /// subtracts this from the point it wants so the particles rise from exactly there.
+    /// Deliberately not the same as <see cref="RenderManager.FireLightOffset"/>, which lifts the
+    /// point light well above the flame.
+    /// </summary>
+    public static readonly Vector3 SpawnOffset = new(0.5f, 0.35f, 0.5f);
+
     private readonly ParticleRing<FireParticle> _particles = new(WorldGenerationConfig.FireParticleMax);
     private float _emberDebt;
     private float _smokeDebt;
@@ -30,7 +39,7 @@ public sealed class FireParticleSystem
                 continue;
             _emberDebt += deltaTime * WorldGenerationConfig.FireEmberPerSecond;
             _smokeDebt += deltaTime * WorldGenerationConfig.FireSmokePerSecond;
-            var origin = cell + new Vector3(0.5f, 0.35f, 0.5f);
+            var origin = cell + SpawnOffset;
             while (_emberDebt >= 1f)
             {
                 _emberDebt -= 1f;

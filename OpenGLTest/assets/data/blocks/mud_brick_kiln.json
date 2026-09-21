@@ -1,0 +1,26 @@
+{
+  // Mud brick kiln, the first multiblock: a 2x2x2 volume of mud_bricks converted in place by
+  // the multiblock converter. Only this cell - the volume's minimum corner on every axis - is
+  // the anchor, and it carries the WHOLE 2x2x2 model (authored in 0..32 model units with the
+  // opening on north), rotated to the facing its state byte's low two bits hold. The other
+  // seven cells hold mud_brick_kiln_part, which is solid and occludes but draws nothing.
+  // Mining any of the eight cells drops one mud_bricks and reverts the other seven.
+  "name": "Mud Brick Kiln",
+  "model": "block/mud_brick_kiln",
+  "renderer": "multiblock",
+  "multiblock": { "part": "block/mud_brick_kiln_part", "source": "block/mud_bricks" },
+  "kiln": true,
+  // A structure is built from its source block, never held in the inventory.
+  "hasItem": false,
+  "hardness": 5,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  "sfx": "hit_rock",
+  "loot": "mud_brick_kiln",
+  // The anchor's surface really does cover its neighbours, so it occludes and casts AO like a
+  // full cube - but its quads carry no cullface and are lit from the anchor cell itself, so
+  // light has to reach that cell or the whole structure renders black.
+  "occludes": true,
+  "castsAO": true,
+  "light": { "passes": true }
+}

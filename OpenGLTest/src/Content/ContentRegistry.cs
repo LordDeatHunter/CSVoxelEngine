@@ -161,6 +161,30 @@ public static class ContentRegistry
                 type.PassesLight = true;
             }
 
+            // A multiblock cell's model says nothing about the cell it sits in: the anchor holds
+            // the whole 2x2x2 structure (so its bake is never a full cube of its own cell) and a
+            // part draws nothing at all. The surface of the structure really does cover its
+            // neighbours, so it occludes by default; and its quads carry no cullface, so they
+            // are lit from the anchor's own cell, which means light has to reach that cell.
+            // Explicit JSON still wins, and the cutout/translucent guard above is kept.
+            if (type.Renderer is BlockRenderer.Multiblock or BlockRenderer.MultiblockPart)
+            {
+                type.OccludesNeighbours = !type.Cutout && !type.Translucent && (definition.Occludes ?? true);
+                type.PassesLight = definition.Light?.Passes ?? true;
+            }
+
+            if (type.Renderer == BlockRenderer.Multiblock)
+            {
+                ValidateMultiblockBake(type, baked);
+                type.RotatedModels =
+                [
+                    baked,
+                    MultiblockShape.Rotate(baked, 1),
+                    MultiblockShape.Rotate(baked, 2),
+                    MultiblockShape.Rotate(baked, 3),
+                ];
+            }
+
             BlockType.OccludesById[id] = type.OccludesNeighbours;
             BlockType.PassesLightById[id] = type.PassesLight;
             BlockType.GreedyById[id] = type.Renderer == BlockRenderer.Model && !type.Fluid && BakesGreedy(baked);
@@ -170,6 +194,33 @@ public static class ContentRegistry
         TileMaterials.Build(TextureAtlas.LayerCount, BlockType.Types.Values);
 
         SelfCheckBuiltInParents();
+    }
+
+    /// <summary>
+    /// Checks that a multiblock anchor's model can actually be drawn as a structure: it must stay
+    /// inside its 2x2x2 volume, cull against nothing (a cullface tests the anchor's world
+    /// neighbour, which is the structure's own part cell) and carry no full-cell face (the
+    /// per-corner AO path indexes its neighbour deltas by <see cref="Chunk.CubeFaces"/> corner
+    /// order, which rotation breaks, so a multiblock shades flat on every facing).
+    /// </summary>
+    private static void ValidateMultiblockBake(BlockType type, BakedModel baked)
+    {
+        const float slack = 1e-4f;
+        foreach (var quad in baked.Quads)
+        {
+            if (quad.CullFace >= 0)
+                throw new InvalidOperationException(
+                    $"The model of multiblock '{type.Name}' has a face with a cullface; a multiblock's faces are culled against nothing, since the anchor's neighbours are its own part cells.");
+            if (quad.IsFullFace)
+                throw new InvalidOperationException(
+                    $"The model of multiblock '{type.Name}' has a face covering a whole cell face; a multiblock must shade flat on every facing, so no face may sit on a cell plane spanning the full cell.");
+            foreach (var position in quad.Positions)
+                if (position.X < -slack || position.X > MultiblockShape.Size + slack ||
+                    position.Y < -slack || position.Y > MultiblockShape.Size + slack ||
+                    position.Z < -slack || position.Z > MultiblockShape.Size + slack)
+                    throw new InvalidOperationException(
+                        $"The model of multiblock '{type.Name}' has a corner at {position}, outside its {MultiblockShape.Size}x{MultiblockShape.Size}x{MultiblockShape.Size} volume (0..{MultiblockShape.Size * 16} in model units).");
+        }
     }
 
     /// <summary>
@@ -367,8 +418,9 @@ public static class ContentRegistry
                 "place_fluid" => ItemUseAction.PlaceFluid,
                 "place_stack" => ItemUseAction.PlaceStack,
                 "ignite_campfire" => ItemUseAction.IgniteCampfire,
+                "convert_multiblock" => ItemUseAction.ConvertMultiblock,
                 _ => throw new InvalidOperationException(
-                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack or ignite_campfire."),
+                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire or convert_multiblock."),
             };
 
             var durability = definition.Durability ?? 0;
@@ -383,6 +435,16 @@ public static class ContentRegistry
             if (!float.IsFinite(chance) || chance <= 0f || chance > 1f)
                 throw new InvalidOperationException(
                     $"Item '{path}' has use.chance {use?.Chance}; expected 0..1 exclusive of 0.");
+
+            // A fuel item is anything declaring how long one unit burns; a kiln reads nothing else
+            var fuelSeconds = 0f;
+            if (definition.Fuel is { } fuel)
+            {
+                fuelSeconds = fuel.BurnSeconds ?? 0f;
+                if (!float.IsFinite(fuelSeconds) || fuelSeconds < 1f || fuelSeconds > 3600f)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has fuel.burnSeconds {fuel.BurnSeconds}; expected 1..3600 seconds.");
+            }
 
             var id = ItemIds[name];
             var sheet = ParseSpritesheet(definition.Spritesheet, path);
@@ -433,7 +495,8 @@ public static class ContentRegistry
                 chance, durability, useDelay,
                 sheet.Cols, sheet.Rows, sheet.Frames, sheet.Mode, sheet.Fps,
                 display.Rotation, display.Translation, display.Scale,
-                tool != null, power, hitDelay, attack, blockDamage, entityDamage, throwDamage, name));
+                tool != null, power, hitDelay, attack, blockDamage, entityDamage, throwDamage, name,
+                FuelSeconds: fuelSeconds));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ItemIds, StringComparer.Ordinal));
@@ -527,6 +590,40 @@ public static class ContentRegistry
     }
 
     /// <summary>
+    /// Resolves a multiblock anchor's <c>multiblock.part</c>: the block that fills the seven
+    /// non-anchor cells, which must itself use the part renderer (nothing else draws nothing).
+    /// </summary>
+    private static byte ResolveMultiblockPart(string? name, string path)
+    {
+        if (name == null)
+            throw new InvalidOperationException($"Block '{path}' names no multiblock.part.");
+        if (!TryResolve(name, out var id) || id == BlockType.Air || ItemRegistry.IsItem(id))
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in multiblock.part, which is not a registered block.");
+        if (BlockType.ById[id]!.Renderer != BlockRenderer.MultiblockPart)
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in multiblock.part, which does not use renderer \"multiblock_part\".");
+        return id;
+    }
+
+    /// <summary>
+    /// Resolves a multiblock anchor's <c>multiblock.source</c>: the plain block the structure is
+    /// built from and reverts to, which must not itself be part of a multiblock.
+    /// </summary>
+    private static byte ResolveMultiblockSource(string? name, string path, byte ownerId)
+    {
+        if (name == null)
+            throw new InvalidOperationException($"Block '{path}' names no multiblock.source.");
+        if (!TryResolve(name, out var id) || id == BlockType.Air || ItemRegistry.IsItem(id))
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in multiblock.source, which is not a registered block.");
+        if (id == ownerId || BlockType.ById[id]!.Renderer is BlockRenderer.Multiblock or BlockRenderer.MultiblockPart)
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in multiblock.source, which is itself a multiblock cell; a structure is built from a plain block.");
+        return id;
+    }
+
+    /// <summary>
     /// Checks each item's declared use against the finished tables: a fluid action needs a real
     /// fluid block to work on and an item to turn into (the hotbar swaps one for the other),
     /// while a stack action needs a real stackable block and no result (it spends from its
@@ -579,6 +676,28 @@ public static class ContentRegistry
                 if (item.MaxDurability < 1)
                     throw new InvalidOperationException(
                         $"Item '{path}' has use.action 'ignite_campfire' without durability: ignite items must declare uses before breaking.");
+                continue;
+            }
+
+            if (item.UseAction == ItemUseAction.ConvertMultiblock)
+            {
+                var source = BlockType.ById[item.UseBlockId];
+                if (source == null)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'convert_multiblock' but its use.block is not a block.");
+                var anchor = BlockType.ById[item.UseResultId];
+                if (anchor == null)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'convert_multiblock' but its use.result is not a block.");
+                if (anchor.Renderer != BlockRenderer.Multiblock)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'convert_multiblock' but block '{anchor.Name}' is not a multiblock anchor.");
+                if (anchor.MultiblockSourceId != item.UseBlockId)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'convert_multiblock' naming '{source.Name}' in use.block, but '{anchor.Name}' is built from '{BlockType.ById[anchor.MultiblockSourceId]?.Name}'.");
+                if (item.UseFluidId != 0)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'convert_multiblock' with a use.fluid: that field belongs to the bucket actions.");
                 continue;
             }
 
@@ -747,6 +866,7 @@ public static class ContentRegistry
     {
         var types = new Dictionary<byte, BlockType>();
         var hardenPending = new List<(byte Id, string? To, string? Touching, string Path)>();
+        var multiblockPending = new List<(byte Id, string? Part, string? Source, string Path)>();
         var woodFamilies = new Dictionary<byte, string>();
 
         foreach (var (name, path) in files)
@@ -763,9 +883,33 @@ public static class ContentRegistry
                 "snow_layers" => BlockRenderer.SnowLayers,
                 "fluid" => BlockRenderer.Fluid,
                 "quern" => BlockRenderer.Quern,
+                "multiblock" => BlockRenderer.Multiblock,
+                "multiblock_part" => BlockRenderer.MultiblockPart,
                 _ => throw new InvalidOperationException(
-                    $"Block '{path}' has unknown renderer '{definition.Renderer}'; expected model, tapered_wood, pebbles, branch_pile, snow_layers, fluid or quern."),
+                    $"Block '{path}' has unknown renderer '{definition.Renderer}'; expected model, tapered_wood, pebbles, branch_pile, snow_layers, fluid, quern, multiblock or multiblock_part."),
             };
+
+            // A multiblock is a structure built out of eight cells: the anchor names the part
+            // that fills the other seven and the plain block it is built from and reverts to,
+            // and only an anchor can be a kiln. Both halves are ordinary solid full cells to
+            // everything but the mesher, so the anchor's surface really does cover its
+            // neighbours - which cutout, translucent and fluid would all break.
+            var isMultiblock = renderer is BlockRenderer.Multiblock or BlockRenderer.MultiblockPart;
+            if ((renderer == BlockRenderer.Multiblock) != (definition.Multiblock != null))
+                throw new InvalidOperationException(
+                    $"Block '{path}' {(definition.Multiblock != null ? "declares multiblock.* without renderer: \"multiblock\"" : "uses renderer \"multiblock\" without a multiblock object naming its part and source")}.");
+            if ((definition.Kiln ?? false) && renderer != BlockRenderer.Multiblock)
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets kiln: true without renderer \"multiblock\"; only a multiblock anchor can be a kiln.");
+            if (isMultiblock)
+            {
+                if (definition.HasItem ?? true)
+                    throw new InvalidOperationException(
+                        $"Block '{path}' uses a multiblock renderer without hasItem: false; a structure is built from its source block, never held.");
+                if ((definition.Cutout ?? false) || (definition.Translucent ?? false) || (definition.Fluid ?? false))
+                    throw new InvalidOperationException(
+                        $"Block '{path}' uses a multiblock renderer with cutout, translucent or fluid; a multiblock cell must be an opaque solid so the structure occludes its neighbours.");
+            }
 
             var onBreak = definition.OnBreak switch
             {
@@ -907,6 +1051,7 @@ public static class ContentRegistry
                 Material = material,
                 LightEmission = emission,
                 Renderer = renderer,
+                Kiln = definition.Kiln ?? false,
                 StackMax = (byte)stackMax,
                 WoodTaperLevel = taperLevel,
                 HalfWidth = definition.Wood == null ? -1f : definition.Wood.HalfWidth ?? 0.5f,
@@ -929,6 +1074,8 @@ public static class ContentRegistry
                 throw new InvalidOperationException(
                     $"Block '{path}' sets only one of flow.hardensTo / flow.hardensTouching; hardening needs both.");
             hardenPending.Add((id, flow?.HardensTo, flow?.HardensTouching, path));
+            if (definition.Multiblock != null)
+                multiblockPending.Add((id, definition.Multiblock.Part, definition.Multiblock.Source, path));
 
             BlockModels[id] = ResolveModel(definition.Model, path);
             BlockDefinitions[id] = definition;
@@ -968,6 +1115,15 @@ public static class ContentRegistry
             type.HardensTouchingId = ResolveHardenTarget(touching, "flow.hardensTouching", pendingPath, requireFluid: true, ownerId: pendingId);
             BlockType.HardensToById[pendingId] = type.HardensToId;
             BlockType.HardensTouchingById[pendingId] = type.HardensTouchingId;
+        }
+
+        // Same reason as the hardening targets above: files load alphabetically, so an anchor's
+        // part and source blocks may not exist yet while the anchor's own file is read.
+        foreach (var (pendingId, part, source, pendingPath) in multiblockPending)
+        {
+            var type = types[pendingId];
+            type.MultiblockPartId = ResolveMultiblockPart(part, pendingPath);
+            type.MultiblockSourceId = ResolveMultiblockSource(source, pendingPath, pendingId);
         }
 
         BlockType.Types = types;

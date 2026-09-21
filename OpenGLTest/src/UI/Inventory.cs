@@ -33,7 +33,8 @@ public readonly record struct HotbarSlot(bool IsTool, byte Id, int ToolInstance)
 ///
 /// Pickups go through <see cref="Add"/>, which refuses what does not fit — the caller must
 /// leave a refused drop on the ground (see <see cref="CanAccept"/>). The player spawns with
-/// a test stock of 50 of every block plus one bucket, one axe and one compass.
+/// a test stock of 50 of every block plus one bucket, one axe, one compass, one obsidian
+/// blade and one multiblock converter.
 /// </summary>
 public class Inventory
 {
@@ -598,7 +599,8 @@ public class Inventory
     public Inventory()
     {
         // Test stock: 50 of every placeable block, so placing and the category caps can
-        // be tried without mining first; one each of the starting bucket, axe and compass.
+        // be tried without mining first; one each of the starting bucket, axe, compass,
+        // obsidian blade and multiblock converter.
         foreach (var type in BlockType.Types.Values)
             if (type.HasItem && !type.Fluid)
                 _blocks[type.Id] = StartingStock;
@@ -616,6 +618,8 @@ public class Inventory
             _misc[compass.Id] = _misc.GetValueOrDefault(compass.Id) + 1;
         if (ItemRegistry.FindByName("Obsidian Blade") is { } obsidianBlade)
             _misc[obsidianBlade.Id] = _misc.GetValueOrDefault(obsidianBlade.Id) + 1;
+        if (ItemRegistry.FindByName("Multiblock Converter") is { } converter)
+            _misc[converter.Id] = _misc.GetValueOrDefault(converter.Id) + 1;
     }
 
     /// <summary>One stackable list row: icon, name and the pool count for that id.</summary>

@@ -43,7 +43,12 @@ public class World : IItemUseWorld
     private readonly BlockDebrisSystem _debris = new();
     private readonly CampfireManager _campfires = new();
     private readonly QuernManager _querns = new();
+    private readonly KilnManager _kilns = new();
     private readonly FireParticleSystem _fire = new();
+
+    // Every cell whose flame the particle system and the point lights draw: campfires plus kilns,
+    // rebuilt once per update so both consumers read one list
+    private readonly List<Vector3> _fireCells = [];
     private readonly BubbleParticleSystem _bubbles = new();
     private readonly SfxManager? _sfx;
 
@@ -148,6 +153,13 @@ public class World : IItemUseWorld
 
     /// <summary>Quern block entities: waiting inputs and spinning tops.</summary>
     public QuernManager Querns => _querns;
+
+    /// <summary>Kiln structures: stored fuel and burn state.</summary>
+    public KilnManager Kilns => _kilns;
+
+    /// <summary>Every burning cell this frame (campfires and lit kilns), feeding both the fire
+    /// particles and the warm point lights.</summary>
+    public IReadOnlyList<Vector3> FireCells => _fireCells;
 
     /// <summary>Live campfire embers and smoke, feeding the fire billboard pass.</summary>
     public IReadOnlyList<FireParticle> FireParticles => _fire.Particles;
@@ -325,7 +337,11 @@ public class World : IItemUseWorld
         _debris.Update((float)deltaTime, _chunkManager);
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
         _querns.Update((float)deltaTime, _chunkManager, _dropManager);
-        _fire.Update((float)deltaTime, _campfires.LitCells, Camera.RenderEye);
+        _kilns.Update((float)deltaTime, _chunkManager, _dropManager);
+        _fireCells.Clear();
+        _fireCells.AddRange(_campfires.LitCells);
+        _fireCells.AddRange(_kilns.LitCells);
+        _fire.Update((float)deltaTime, _fireCells, Camera.RenderEye);
         _bubbles.Update((float)deltaTime, Camera.RenderEye, Camera.ViewDirection, Camera.IsEyeInWater, _chunkManager);
 
         // Falling cubes shove the player aside instead of landing inside them; strictly
@@ -996,6 +1012,10 @@ public class World : IItemUseWorld
         // block (see FellWood): a trunk cut drops the crown, a branch cut only its children
         if (TreeGenerator.WoodLevel(brokenId) >= 0)
             FellWood(blockPos, brokenId, chunk, creative);
+        // Mining any cell of a multiblock takes the whole structure apart instead of leaving
+        // invisible part cells standing (see RevertMultiblock)
+        else if (Multiblock.IsMultiblockCell(brokenId))
+            RevertMultiblock(blockPos, brokenId, chunk, creative);
         // Everything else rolls its loot table, but only once a block was actually cleared
         else if (chunk.RemoveBlockAt(blockPos, _chunkManager))
         {
@@ -1137,6 +1157,90 @@ public class World : IItemUseWorld
             new Vector3(blockPos.X + 0.5f, blockPos.Y, blockPos.Z + 0.5f), away, drops: !creative));
     }
 
+    /// <summary>
+    /// Converts the 2x2x2 volume of <paramref name="sourceId"/> that the clicked face belongs
+    /// to into the <paramref name="anchorId"/> multiblock, opening toward the player
+    /// (see <see cref="MultiblockPlacement.TryFindVolume"/>). The clicked cell's chunk remeshes
+    /// synchronously so the click frame already shows the structure; the rest of the touched
+    /// chunks rebuild asynchronously, exactly as a felled tree's do. Returns whether a volume
+    /// was converted.
+    /// </summary>
+    private bool TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, byte sourceId, byte anchorId)
+    {
+        if (BlockType.ById[anchorId] is not { } anchorType) return false;
+        if (!MultiblockPlacement.TryFindVolume(_chunkManager.GetBlockGlobal, sourceId, hitCell,
+                hitNormal, Camera.ViewDirection, out var anchor, out var facing))
+            return false;
+
+        // A live falling cube owns its cell: never bury one inside the structure
+        foreach (var (dx, dy, dz) in Multiblock.Offsets)
+        {
+            if (_falling.OverlapsAny((int)anchor.X + dx, (int)anchor.Y + dy, (int)anchor.Z + dz))
+                return false;
+        }
+
+        var touchedChunks = new HashSet<Vector3>();
+        Multiblock.Convert(_chunkManager, anchor, facing, anchorType, touchedChunks);
+
+        _chunkManager.ImmediateRemeshWithBorders(VoxelCoords.ChunkPosOf(hitCell), hitCell);
+        foreach (var chunkPos in touchedChunks)
+        {
+            if (_chunkManager.Chunks.TryGetValue(chunkPos, out var touched))
+                touched.RemeshAfterBatchEdit(_chunkManager);
+        }
+
+        OnMultiblockConverted(anchor, facing, anchorType);
+        return true;
+    }
+
+    /// <summary>
+    /// Mining any cell of a multiblock takes the whole structure down: the other seven cells go
+    /// back to the source block in one batch and the mined cell rolls the structure's loot. An
+    /// orphaned cell (its anchor already blasted away) just pops on its own.
+    /// </summary>
+    private void RevertMultiblock(Vector3 blockPos, byte brokenId, Chunk chunk, bool creative)
+    {
+        if (!Multiblock.TryResolveAnchor(_chunkManager, (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z,
+                out var anchor, out _, out var anchorType) || anchorType == null)
+        {
+            if (chunk.RemoveBlockAt(blockPos, _chunkManager) && !creative)
+                _dropManager.SpawnLoot(brokenId, blockPos);
+            return;
+        }
+
+        var touchedChunks = new HashSet<Vector3>();
+        Multiblock.Revert(_chunkManager, anchor, anchorType, blockPos, touchedChunks);
+
+        _chunkManager.ImmediateRemeshWithBorders(VoxelCoords.ChunkPosOf(blockPos), blockPos);
+        foreach (var chunkPos in touchedChunks)
+        {
+            if (_chunkManager.Chunks.TryGetValue(chunkPos, out var touched))
+                touched.RemeshAfterBatchEdit(_chunkManager);
+        }
+
+        if (!creative)
+            _dropManager.SpawnLoot(brokenId, blockPos);
+
+        OnMultiblockBroken(anchor, anchorType, blockPos);
+    }
+
+    /// <summary>Runs right after a structure went up, so the managers that own its behaviour
+    /// can start tracking it.</summary>
+    private void OnMultiblockConverted(Vector3 anchor, int facing, BlockType anchorType)
+    {
+        if (anchorType.Kiln)
+            _kilns.Ensure(anchor, facing, anchorType.Id);
+    }
+
+    /// <summary>Runs right after a structure came down, so the managers that owned it can hand
+    /// back whatever it held. <paramref name="blockPos"/> is the mined cell, which is where its
+    /// contents drop.</summary>
+    private void OnMultiblockBroken(Vector3 anchor, BlockType anchorType, Vector3 blockPos)
+    {
+        if (anchorType.Kiln)
+            _kilns.NotifyBlockRemoved(anchor, blockPos, _dropManager);
+    }
+
     /// <summary>Swings falling trees, then pops their wood out as item drops once rested.</summary>
     private void UpdateToppling(float deltaTime)
     {
@@ -1203,6 +1307,11 @@ public class World : IItemUseWorld
             return;
         }
         if (TryQuernInteract(maxDistance))
+        {
+            Player.Punch();
+            return;
+        }
+        if (TryKilnInteract(maxDistance))
         {
             Player.Punch();
             return;
@@ -1413,6 +1522,15 @@ public class World : IItemUseWorld
 
     bool IItemUseWorld.IgniteCampfire(int x, int y, int z) => _campfires.Ignite(x, y, z);
 
+    bool IItemUseWorld.CanIgniteKiln(int x, int y, int z) =>
+        TryTrackKilnAt(x, y, z, out var anchor) && _kilns.CanIgnite(anchor);
+
+    bool IItemUseWorld.IgniteKiln(int x, int y, int z) =>
+        TryTrackKilnAt(x, y, z, out var anchor) && _kilns.Ignite(anchor);
+
+    bool IItemUseWorld.TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, byte sourceId, byte anchorId) =>
+        TryConvertMultiblock(hitCell, hitNormal, sourceId, anchorId);
+
     bool IItemUseWorld.IsPrimedTntBlock(byte id) =>
         BlockType.ById[id]?.OnBreak == BlockBreakAction.PrimeTnt;
 
@@ -1506,6 +1624,57 @@ public class World : IItemUseWorld
 
         _querns.StartSpin(hx, hy, hz);
         return true;
+    }
+
+    /// <summary>
+    /// Resolves the kiln structure a cell belongs to and makes sure it is tracked, so any of its
+    /// eight cells answers for the whole. False when the cell is not part of a kiln.
+    /// </summary>
+    private bool TryTrackKilnAt(int x, int y, int z, out Vector3 anchor)
+    {
+        anchor = Vector3.Zero;
+        if (!Multiblock.TryResolveAnchor(_chunkManager, x, y, z, out var resolved, out var facing, out var anchorType)
+            || anchorType is not { Kiln: true })
+            return false;
+
+        _kilns.Ensure(resolved, facing, anchorType.Id);
+        anchor = resolved;
+        return true;
+    }
+
+    /// <summary>
+    /// Right-click on a kiln: fuel in hand goes into the hearth (up to
+    /// <see cref="KilnManager.MaxFuel"/> units of one kind), a firestarter is passed through to
+    /// its own <see cref="Item.OnUse"/> so it can strike, and a block in hand falls through to
+    /// placement against the structure. Any other click on a kiln is spent. Returns whether the
+    /// click belonged to the kiln.
+    /// </summary>
+    private bool TryKilnInteract(float maxDistance)
+    {
+        if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        var hx = (int)hit.X;
+        var hy = (int)hit.Y;
+        var hz = (int)hit.Z;
+        if (!_chunkManager.TryGetCell(hx, hy, hz, out var hitId, out _)) return false;
+        if (!Multiblock.IsMultiblockCell(hitId)) return false;
+        if (!TryTrackKilnAt(hx, hy, hz, out var anchor)) return false;
+
+        var held = HeldItem();
+
+        // The firestarter lights the kiln from its own OnUse, which also spends its durability
+        if (held is { UseAction: ItemUseAction.IgniteCampfire }) return false;
+
+        // Casting run: empty-hand crucible take, crucible place and melt-input insert go here,
+        // before fuel
+
+        if (held is { FuelSeconds: > 0f } && _kilns.TryAddFuel(anchor, held))
+        {
+            if (!Camera.IsCreative)
+                Inventory.ConsumeSelected();
+            return true;
+        }
+
+        return held is not BlockItem;
     }
 
     /// <summary>

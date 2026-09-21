@@ -1,0 +1,9 @@
+{
+  // A branch bound with two mud bricks: the tool that presses a built cube into a structure.
+  "result": "item/multiblock_converter",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/branch", "count": 1 },
+    { "item": "item/mud_brick", "count": 2 }
+  ]
+}

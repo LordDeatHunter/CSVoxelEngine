@@ -700,6 +700,14 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
+    /// Where a fire cell's warm point light sits inside it: a block above the cell origin, so a
+    /// campfire lights what stands around it rather than only its own pile. Deliberately higher
+    /// than <see cref="FireParticleSystem.SpawnOffset"/>, which is where the flame itself is —
+    /// a caller passing an off-cell flame (the kiln) gets its light that same 0.65 higher.
+    /// </summary>
+    public static readonly Vector3 FireLightOffset = new(0.5f, 1.0f, 0.5f);
+
+    /// <summary>
     /// Advances the day/night cycle and pushes the resulting sun, sky and point-light
     /// state into the per-frame fields. Called once per frame before <see cref="BeginFrame"/>,
     /// which uploads the result to the world shader through <see cref="ApplyFrameUniforms"/>.
@@ -777,7 +785,7 @@ public class RenderManager : IDisposable
             foreach (var cell in campfires)
             {
                 if (_pointCount >= WorldGenerationConfig.MaxPointLights) break;
-                _pointPos[_pointCount] = cell + new Vector3(0.5f, 1.0f, 0.5f);
+                _pointPos[_pointCount] = cell + FireLightOffset;
                 _pointColors[_pointCount] = new Vector3(1f, 0.5f, 0.15f) * (1.6f * flicker);
                 _pointCount++;
             }

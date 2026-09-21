@@ -1,1 +1,6 @@
-{ "name": "Coal", "texture": "assets/textures/items/coal.png" }
+{
+  "name": "Coal",
+  "texture": "assets/textures/items/coal.png",
+  // One lump keeps a kiln lit for a minute (KilnManager burns them one at a time)
+  "fuel": { "burnSeconds": 60 }
+}

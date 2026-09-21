@@ -212,7 +212,10 @@ public static class ModelBaker
         return normal.NormalizeSafeOr(Vector3.UnitY, 0f);
     }
 
-    private static int DominantFace(Vector3 normal)
+    /// <summary>Engine face index a normal points along: its dominant axis, signed.
+    /// Internal because <see cref="MultiblockShape.Rotate"/> has to recompute it for a quad
+    /// whose normal it just turned.</summary>
+    internal static int DominantFace(Vector3 normal)
     {
         var ax = MathF.Abs(normal.X);
         var ay = MathF.Abs(normal.Y);
