@@ -1,0 +1,332 @@
+{
+  "textures": {
+    "mold": "fired_mud"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 0],
+      "to": [16, 4, 2],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "north": { "texture": "#mold", "cullface": "north" },
+        "south": { "texture": "#mold" },
+        "west": { "texture": "#mold", "cullface": "west" },
+        "east": { "texture": "#mold", "cullface": "east" }
+      }
+    },
+    {
+      "from": [0, 0, 2],
+      "to": [6, 4, 3],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "south": { "texture": "#mold" },
+        "west": { "texture": "#mold", "cullface": "west" },
+        "east": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [11, 0, 2],
+      "to": [16, 4, 3],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "south": { "texture": "#mold" },
+        "west": { "texture": "#mold" },
+        "east": { "texture": "#mold", "cullface": "east" }
+      }
+    },
+    {
+      "from": [0, 0, 3],
+      "to": [5, 4, 10],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "south": { "texture": "#mold" },
+        "west": { "texture": "#mold", "cullface": "west" },
+        "east": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [14, 0, 3],
+      "to": [16, 4, 16],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "south": { "texture": "#mold", "cullface": "south" },
+        "west": { "texture": "#mold" },
+        "east": { "texture": "#mold", "cullface": "east" }
+      }
+    },
+    {
+      "from": [13, 0, 5],
+      "to": [14, 4, 16],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "north": { "texture": "#mold" },
+        "south": { "texture": "#mold", "cullface": "south" },
+        "west": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [5, 0, 6],
+      "to": [8, 4, 7],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "north": { "texture": "#mold" },
+        "south": { "texture": "#mold" },
+        "east": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [12, 0, 6],
+      "to": [13, 4, 16],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "north": { "texture": "#mold" },
+        "south": { "texture": "#mold", "cullface": "south" },
+        "west": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [5, 0, 7],
+      "to": [7, 4, 8],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "south": { "texture": "#mold" },
+        "east": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [11, 0, 7],
+      "to": [12, 4, 16],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "north": { "texture": "#mold" },
+        "south": { "texture": "#mold", "cullface": "south" },
+        "west": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [5, 0, 8],
+      "to": [6, 4, 9],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "south": { "texture": "#mold" },
+        "east": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [10, 0, 8],
+      "to": [11, 4, 16],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "north": { "texture": "#mold" },
+        "south": { "texture": "#mold", "cullface": "south" },
+        "west": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [9, 0, 9],
+      "to": [10, 4, 16],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "north": { "texture": "#mold" },
+        "south": { "texture": "#mold", "cullface": "south" },
+        "west": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [0, 0, 10],
+      "to": [4, 4, 11],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "south": { "texture": "#mold" },
+        "west": { "texture": "#mold", "cullface": "west" },
+        "east": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [8, 0, 10],
+      "to": [9, 4, 16],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "north": { "texture": "#mold" },
+        "south": { "texture": "#mold", "cullface": "south" },
+        "west": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [0, 0, 11],
+      "to": [3, 4, 12],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "south": { "texture": "#mold" },
+        "west": { "texture": "#mold", "cullface": "west" },
+        "east": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [7, 0, 11],
+      "to": [8, 4, 16],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "north": { "texture": "#mold" },
+        "south": { "texture": "#mold", "cullface": "south" },
+        "west": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [0, 0, 12],
+      "to": [2, 4, 16],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "south": { "texture": "#mold", "cullface": "south" },
+        "west": { "texture": "#mold", "cullface": "west" },
+        "east": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [6, 0, 12],
+      "to": [7, 4, 16],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "north": { "texture": "#mold" },
+        "south": { "texture": "#mold", "cullface": "south" },
+        "west": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [5, 0, 13],
+      "to": [6, 4, 16],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "north": { "texture": "#mold" },
+        "south": { "texture": "#mold", "cullface": "south" },
+        "west": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [2, 0, 14],
+      "to": [5, 4, 16],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" },
+        "north": { "texture": "#mold" },
+        "south": { "texture": "#mold", "cullface": "south" }
+      }
+    },
+    {
+      "from": [6, 0, 2],
+      "to": [11, 2, 6],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [5, 0, 3],
+      "to": [6, 2, 6],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [11, 0, 3],
+      "to": [14, 2, 5],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [11, 0, 5],
+      "to": [13, 2, 6],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [8, 0, 6],
+      "to": [12, 2, 7],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [7, 0, 7],
+      "to": [11, 2, 8],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [6, 0, 8],
+      "to": [10, 2, 9],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [5, 0, 9],
+      "to": [9, 2, 10],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [4, 0, 10],
+      "to": [8, 2, 11],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [3, 0, 11],
+      "to": [7, 2, 12],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [2, 0, 12],
+      "to": [6, 2, 13],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" }
+      }
+    },
+    {
+      "from": [2, 0, 13],
+      "to": [5, 2, 14],
+      "faces": {
+        "down": { "texture": "#mold", "cullface": "down" },
+        "up": { "texture": "#mold" }
+      }
+    }
+  ]
+}

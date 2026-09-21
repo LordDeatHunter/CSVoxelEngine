@@ -1,0 +1,9 @@
+{
+  // The reverse of mold_axe.json; see mudball_from_mold_pickaxe.json for the
+  // <result>_from_<ingredient> naming. Fired molds have no such recipe.
+  "result": "item/mudball",
+  "count": 3,
+  "ingredients": [
+    { "item": "block/mold_axe", "count": 1 }
+  ]
+}

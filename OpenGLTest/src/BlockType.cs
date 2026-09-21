@@ -63,6 +63,7 @@ public sealed record BlockType
 
     // bool[256] mirrors of the per-block flags the mesher asks about by neighbour id
     internal static readonly bool[] SolidById = new bool[256];
+    internal static readonly bool[] CollidesByHitboxById = new bool[256];
     internal static readonly bool[] OccludesById = new bool[256];
     internal static readonly bool[] CastsAoById = new bool[256];
 
@@ -255,6 +256,11 @@ public sealed record BlockType
     /// </summary>
     public BlockHitbox[] Hitboxes { get; init; } = [BlockHitbox.FullCube];
 
+    /// <summary>Whether body collision tests this block's <see cref="Hitboxes"/> rather than the
+    /// full cell, the way tapered wood tests its drawn shape; see
+    /// <see cref="WoodShape.OverlapsShape"/>.</summary>
+    public bool CollidesByHitbox { get; init; }
+
     /// <summary>Loot rolled on break. Null means "drop yourself";
     /// <see cref="silkgltriangle.LootTable.None"/> means "drop nothing".</summary>
     public LootTable? LootTable { get; init; }
@@ -279,6 +285,12 @@ public sealed record BlockType
     /// (it hits any non-air cell), so this only gates movement and drop physics.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsSolid(byte blockId) => SolidById[blockId];
+
+    /// <summary>Whether the body collides with the block's <see cref="Hitboxes"/> instead of the
+    /// whole cell (a mold slab). Named <c>...Of</c> because a static method may not share the
+    /// instance property's name; mirrors <see cref="MovementSpeedOf"/>.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool CollidesByHitboxOf(byte blockId) => CollidesByHitboxById[blockId];
 
     /// <summary>
     /// Whether a cell collides with bodies, honouring a stack block whose partial stacks are

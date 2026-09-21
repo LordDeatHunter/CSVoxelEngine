@@ -1,3 +1,4 @@
+using System.Linq;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -10,13 +11,14 @@ public sealed class CraftingTests
     public void TryCraftConsumesIngredientsAndAddsPickaxe()
     {
         var inventory = new Inventory();
+        var baseline = inventory.Craftable();
         var flint = ContentRegistry.RequireItem("flint").Id;
         var branch = ContentRegistry.RequireItem("branch").Id;
         var vine = ContentRegistry.RequireItem("vine").Id;
         var pickaxe = ContentRegistry.RequireItem("primitive_pickaxe").Id;
         var recipe = ContentRegistry.RecipeForResult(pickaxe)!;
 
-        Assert.Empty(inventory.Craftable());
+        Assert.Equal(baseline, inventory.Craftable());
         Assert.False(inventory.TryCraft(recipe));
 
         Assert.True(inventory.Add(flint));
@@ -25,14 +27,14 @@ public sealed class CraftingTests
         var firestarter = ContentRegistry.RecipeForResult(ContentRegistry.RequireItem("firestarter").Id)!;
         var axe = ContentRegistry.RecipeForResult(ContentRegistry.RequireItem("primitive_axe").Id)!;
         var quern = ContentRegistry.RecipeByName("quern")!;
-        Assert.Equal([firestarter, axe, recipe, quern], inventory.Craftable());
+        Assert.Equal([firestarter, axe, recipe, quern], inventory.Craftable().Except(baseline).ToArray());
 
         Assert.True(inventory.TryCraft(recipe));
         Assert.Equal(0, inventory.CountFor(flint));
         Assert.Equal(0, inventory.CountFor(branch));
         Assert.Equal(0, inventory.CountFor(vine));
         Assert.Equal(1, inventory.CountFor(pickaxe));
-        Assert.Empty(inventory.Craftable());
+        Assert.Equal(baseline, inventory.Craftable());
     }
 
     [Fact]
@@ -107,6 +109,7 @@ public sealed class CraftingTests
     public void BatchCraftRefusesAPickWithoutStock()
     {
         var inventory = new Inventory();
+        var baseline = inventory.Craftable();
         var flint = ContentRegistry.RequireItem("flint").Id;
         var branch = ContentRegistry.RequireItem("branch").Id;
         var vine = ContentRegistry.RequireItem("vine").Id;
@@ -120,7 +123,7 @@ public sealed class CraftingTests
         // Only one set on hand: a batch of two fails and consumes nothing.
         Assert.False(inventory.TryCraft(recipe, 2, (index, ingredient) => ingredient.Id));
         Assert.Equal(1, inventory.CountFor(flint));
-        Assert.Equal(4, inventory.Craftable().Count);
+        Assert.Equal(baseline.Count + 4, inventory.Craftable().Count);
         Assert.Equal(0, inventory.CountFor(pickaxe));
     }
 

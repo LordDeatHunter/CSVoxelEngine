@@ -1,0 +1,8 @@
+{
+  // A raw mold baked on a lit campfire hardens into its fired form; 12 s fits inside one
+  // 30 s branch burn, like mudball.json.
+  "input": "block/mold_pickaxe",
+  "result": "block/fired_mold_pickaxe",
+  "count": 1,
+  "cookSeconds": 12
+}

@@ -130,6 +130,14 @@ public sealed class BlockDefinition
     /// </summary>
     public JsonElement Hitbox { get; set; }
 
+    /// <summary>
+    /// Whether bodies collide with the declared <c>hitbox</c> boxes instead of the whole cell,
+    /// the way tapered wood collides with its drawn shape, so a low slab is stepped onto and
+    /// stood on rather than walling its cell off. Requires <c>hitbox</c>, <c>solid: true</c>,
+    /// no <c>stackMax</c> and not a fluid. Omitted means false.
+    /// </summary>
+    public bool? CollidesByHitbox { get; set; }
+
     /// <summary>Loot table name, or "none" for nothing. Omitted: the table sharing this
     /// block's name if one exists, otherwise the block drops itself.</summary>
     public string? Loot { get; set; }

@@ -321,6 +321,7 @@ public static class ContentRegistry
         Array.Clear(BlockType.PassesLightById);
         Array.Clear(BlockType.BranchConnectableById);
         Array.Clear(BlockType.SolidById);
+        Array.Clear(BlockType.CollidesByHitboxById);
         Array.Clear(BlockType.MovementSpeedById);
         Array.Clear(BlockType.FrictionById);
         Array.Fill(BlockType.FrictionById, BlockType.DefaultFriction);
@@ -882,6 +883,9 @@ public static class ContentRegistry
             if (requiresTool && tools == null)
                 Log.Warn($"Block '{path}' sets requiresTool but lists no tools; the gate is inert and any tool mines it.");
 
+            var hitboxes = ParseHitboxes(definition.Hitbox, path);
+            var collidesByHitbox = ResolveCollidesByHitbox(definition, hitboxes, solid, fluid, stackMax, path);
+
             var type = new BlockType
             {
                 Name = name,
@@ -916,8 +920,8 @@ public static class ContentRegistry
                 FluidInfinite = flow?.Infinite ?? true,
                 OnBreak = onBreak,
                 LootTable = fluid ? LootTable.None : ResolveLoot(name, definition.Loot, path),
-                Hitboxes = ParseHitboxes(definition.Hitbox, path)
-                    ?? DefaultWoodHitbox(taperLevel, definition.Wood?.HalfWidth ?? 0.5f),
+                Hitboxes = hitboxes ?? DefaultWoodHitbox(taperLevel, definition.Wood?.HalfWidth ?? 0.5f),
+                CollidesByHitbox = collidesByHitbox,
             };
             type.HardensToId = 0;
             type.HardensTouchingId = 0;
@@ -935,6 +939,7 @@ public static class ContentRegistry
             BlockType.ById[id] = type;
             BlockType.Emission[id] = type.LightEmission;
             BlockType.SolidById[id] = type.Solid;
+            BlockType.CollidesByHitboxById[id] = type.CollidesByHitbox;
             BlockType.StackSolidStateById[id] = (byte)stackSolidAt;
             BlockType.MovementSpeedById[id] = type.MovementSpeed;
             BlockType.FrictionById[id] = type.Friction;
@@ -1111,6 +1116,28 @@ public static class ContentRegistry
         if (taperLevel < 0) return [BlockHitbox.FullCube];
         var hw = Math.Clamp(halfWidth, 0f, 0.5f);
         return [new BlockHitbox(new Vector3(0.5f - hw, 0f, 0.5f - hw), new Vector3(0.5f + hw, 1f, 0.5f + hw))];
+    }
+
+    /// <summary>Settles <c>collidesByHitbox</c>: only a solid, non-fluid, non-stack block that declares
+    /// a hitbox may collide by shape, because <see cref="Camera"/>'s collision reads exactly those
+    /// boxes; anything else throws naming the file.</summary>
+    internal static bool ResolveCollidesByHitbox(BlockDefinition definition, BlockHitbox[]? declaredHitboxes,
+        bool solid, bool fluid, int stackMax, string path)
+    {
+        if (!(definition.CollidesByHitbox ?? false)) return false;
+        if (declaredHitboxes == null)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets collidesByHitbox without a hitbox; declare the boxes the body should collide with.");
+        if (fluid)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets collidesByHitbox on a fluid; nothing collides with a fluid.");
+        if (stackMax > 0)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets collidesByHitbox on a stack block; a stack's solidity is state-driven (see stackSolidAt).");
+        if (!solid)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets collidesByHitbox with solid: false; a non-solid block never collides.");
+        return true;
     }
 
     private static BlockHitbox[]? ParseHitboxes(JsonElement hitbox, string path)

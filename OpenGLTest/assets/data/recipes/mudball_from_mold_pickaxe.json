@@ -1,0 +1,11 @@
+{
+  // The reverse of mold_pickaxe.json: an unfired mold is still wet clay, so squashing it
+  // gives the three mudballs back. Craft recipes are named by their result, so a reverse
+  // recipe carries its ingredient in the name (<result>_from_<ingredient>) rather than
+  // colliding with a future mudball.json. Fired molds have no such recipe.
+  "result": "item/mudball",
+  "count": 3,
+  "ingredients": [
+    { "item": "block/mold_pickaxe", "count": 1 }
+  ]
+}

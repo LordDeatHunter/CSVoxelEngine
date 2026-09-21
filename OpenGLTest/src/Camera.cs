@@ -1013,10 +1013,11 @@ public class Camera
             // A pass-through block (leaves) never blocks the body; it only scales the walk
             // while the body overlaps it (see BlockMoveFactor).
             if (BlockType.MovementSpeedOf(blockId) > 0f) continue;
-            // Tapered wood collides with its drawn node-and-arms shape instead of the
-            // whole cell, so the body slips past thin limbs and under high arms; every
-            // other solid block keeps the full-cube test it always had.
-            if (!WoodShape.IsTapered(blockId)) return true;
+            // Tapered wood collides with its drawn node-and-arms shape and a collidesByHitbox
+            // block (a mold slab) with its declared hitboxes, so the body slips past thin limbs,
+            // under high arms and onto a low slab; every other solid block keeps the full-cube
+            // test it always had.
+            if (!WoodShape.IsTapered(blockId) && !BlockType.CollidesByHitboxOf(blockId)) return true;
             if (WoodShape.OverlapsShape(blockId, chunkManager.GetBlockGlobal, x, y, z, min, max))
                 return true;
         }
