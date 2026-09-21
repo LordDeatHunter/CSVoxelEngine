@@ -32,6 +32,10 @@ flat out uint fLayer;
 out float fSun;
 out float fBlock;
 out vec3 fNormal;
+// The tile's u and v directions in world space, for the reflective tiles' normal maps. Flat
+// because they are constant per face, like the normal they complete.
+flat out vec3 fTangent;
+flat out vec3 fBitangent;
 out vec3 fWorldPos;
 out float fSubmerged;
 flat out float fAlpha;
@@ -104,9 +108,26 @@ void main() {
         : face == 2 ? vec3(-1.0, 0.0, 0.0)
         : face == 3 ? vec3(1.0, 0.0, 0.0)
         : face == 4 ? vec3(0.0, 1.0, 0.0) : vec3(0.0, -1.0, 0.0);
+    // The tangent frame a normal map is read in has to agree with the UVs the mesher wrote, or
+    // the relief comes out rotated or mirrored per face. Chunk.TiledUv is the one definition of
+    // that orientation: u runs along X on -Z/+Z (mirrored on +Z) and along Z on -X/+X (mirrored
+    // on -X), and along X on both caps; v runs bottom-to-top on every side, and along Z on the
+    // caps. Same nested-ternary shape as the normal above, for the same reason.
+    vec3 vTangent = face == 0 ? vec3(1.0, 0.0, 0.0)
+        : face == 1 ? vec3(-1.0, 0.0, 0.0)
+        : face == 2 ? vec3(0.0, 0.0, -1.0)
+        : face == 3 ? vec3(0.0, 0.0, 1.0)
+        : vec3(1.0, 0.0, 0.0);
+    vec3 vBitangent = face == 4 ? vec3(0.0, 0.0, -1.0)
+        : face == 5 ? vec3(0.0, 0.0, 1.0)
+        : vec3(0.0, -1.0, 0.0);
 #ifdef CHUNK_DRAW
     fNormal = vNormal;
+    fTangent = vTangent;
+    fBitangent = vBitangent;
 #else
     fNormal = mat3(uModel) * vNormal;
+    fTangent = mat3(uModel) * vTangent;
+    fBitangent = mat3(uModel) * vBitangent;
 #endif
 }

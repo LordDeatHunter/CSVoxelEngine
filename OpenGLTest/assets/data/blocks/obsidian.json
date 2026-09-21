@@ -1,6 +1,7 @@
 {
   "name": "Obsidian",
   "model": { "parent": "block/cube_all", "textures": { "all": "obsidian" } },
+  "material": { "metallic": 0.95, "roughness": 0.06, "normalStrength": 1.0 },
   "sfx": "hit_rock",
   "requiresTool": true,
   "tools": { "pickaxe": 2 },

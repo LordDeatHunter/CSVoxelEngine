@@ -91,6 +91,10 @@ public sealed class BlockDefinition
     public LightDefinition? Light { get; set; }
     public WoodDefinition? Wood { get; set; }
 
+    /// <summary>Reflective surface tuning; omitted means a plain non-metallic block, which is
+    /// every block but the ores.</summary>
+    public MaterialDefinition? Material { get; set; }
+
     /// <summary>Fluid tuning; only legal on a block with <see cref="Fluid"/>. Omitted means
     /// water behaviour: every tick, full 7-block range, infinite sources, never hardens.</summary>
     public FlowDefinition? Flow { get; set; }
@@ -136,6 +140,29 @@ public sealed class BlockDefinition
     /// <c>assets/sfx</c>, falls back to <see cref="SfxLibrary.DefaultGroup"/> with a warning.
     /// </summary>
     public string? Sfx { get; set; }
+
+    /// <summary>
+    /// How reflective the block's surface is. Omitting the whole object (every block but the
+    /// ores) leaves it perfectly diffuse and costs nothing at render time: the fragment shader
+    /// branches on metallic being positive, and that branch is uniform across a quad.
+    /// The <em>shape</em> of the surface is not here - it comes from the matching tangent-space
+    /// normal map in <c>assets/textures/blocks_material/</c>, keyed by the same texture name.
+    /// </summary>
+    public sealed class MaterialDefinition
+    {
+        /// <summary>How metallic the surface reads, 0..1. 0 (the default) is an ordinary diffuse
+        /// block. Higher values trade diffuse albedo for an albedo-tinted specular, which is what
+        /// makes metal read as metal without HDR headroom: a dark body with a bright highlight.</summary>
+        public float? Metallic { get; set; }
+
+        /// <summary>Surface roughness, 0..1: lower is a tighter, sharper highlight. Default 1
+        /// (fully rough). Obsidian's polished glass sits near 0.06, coal's dull rock near 0.55.</summary>
+        public float? Roughness { get; set; }
+
+        /// <summary>Multiplier on the normal map's relief, 0..4. Default 1, which uses the map as
+        /// generated; this is the knob for retuning a surface without regenerating its art.</summary>
+        public float? NormalStrength { get; set; }
+    }
 
     /// <summary>Voxel light behaviour of a block.</summary>
     public sealed class LightDefinition

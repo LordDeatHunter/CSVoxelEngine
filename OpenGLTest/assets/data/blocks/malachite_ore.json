@@ -1,6 +1,7 @@
 {
   "name": "Malachite Ore",
   "model": { "parent": "block/cube_all", "textures": { "all": "malachite_ore" } },
+  "material": { "metallic": 0.55, "roughness": 0.28, "normalStrength": 1.0 },
   "sfx": "hit_rock",
   "hardness": 8,
   "requiresTool": true,

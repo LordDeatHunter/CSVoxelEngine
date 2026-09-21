@@ -166,6 +166,9 @@ public static class ContentRegistry
             BlockType.GreedyById[id] = type.Renderer == BlockRenderer.Model && !type.Fluid && BakesGreedy(baked);
         }
 
+        // Only now do the blocks know their FaceTiles, which is what the material table is keyed by.
+        TileMaterials.Build(TextureAtlas.LayerCount, BlockType.Types.Values);
+
         SelfCheckBuiltInParents();
     }
 
@@ -178,6 +181,33 @@ public static class ContentRegistry
     /// Cutout (leaves) and translucent (glass) cubes qualify: their culling rule is the same
     /// one, and the mesher picks the destination list per block type.
     /// </summary>
+    /// <summary>
+    /// Reads a block's <c>material</c> object, or null when it declared none. Every field is
+    /// range-checked here rather than clamped in the shader, so a typo names its file at startup
+    /// instead of quietly rendering wrong.
+    /// </summary>
+    private static TileMaterial? ParseMaterial(BlockDefinition.MaterialDefinition? definition, string path)
+    {
+        if (definition == null) return null;
+
+        var metallic = definition.Metallic ?? 0f;
+        if (!float.IsFinite(metallic) || metallic < 0f || metallic > 1f)
+            throw new InvalidOperationException(
+                $"Block '{path}' has material.metallic {definition.Metallic}; expected 0..1.");
+
+        var roughness = definition.Roughness ?? 1f;
+        if (!float.IsFinite(roughness) || roughness <= 0f || roughness > 1f)
+            throw new InvalidOperationException(
+                $"Block '{path}' has material.roughness {definition.Roughness}; expected a positive value up to 1.");
+
+        var normalStrength = definition.NormalStrength ?? 1f;
+        if (!float.IsFinite(normalStrength) || normalStrength < 0f || normalStrength > 4f)
+            throw new InvalidOperationException(
+                $"Block '{path}' has material.normalStrength {definition.NormalStrength}; expected 0..4.");
+
+        return new TileMaterial(metallic, roughness, normalStrength);
+    }
+
     internal static bool BakesGreedy(BakedModel baked)
     {
         if (!baked.IsFullCube || baked.Quads.Length != 6) return false;
@@ -295,6 +325,7 @@ public static class ContentRegistry
         Array.Clear(BlockType.FrictionById);
         Array.Fill(BlockType.FrictionById, BlockType.DefaultFriction);
         Array.Clear(BlockType.PebbleWeightById);
+        TileMaterials.Reset();
         Array.Clear(BlockType.OccludesById);
         Array.Clear(BlockType.CastsAoById);
         Array.Clear(BlockType.FluidById);
@@ -825,6 +856,8 @@ public static class ContentRegistry
             // A fluid is never the ground beneath a pebble cell, like its other forced-off traits
             if (fluid) pebbleWeight = 0f;
 
+            var material = ParseMaterial(definition.Material, path);
+
             var hardness = definition.Hardness ?? BlockType.DefaultHardness;
             if (!float.IsFinite(hardness) || hardness < 0f)
                 throw new InvalidOperationException(
@@ -867,6 +900,7 @@ public static class ContentRegistry
                 Cutout = definition.Cutout ?? false,
                 Translucent = definition.Translucent ?? false,
                 Sway = definition.Sway ?? false,
+                Material = material,
                 LightEmission = emission,
                 Renderer = renderer,
                 StackMax = (byte)stackMax,

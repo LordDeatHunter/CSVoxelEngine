@@ -30,6 +30,10 @@ public static class TextureAtlas
     public static int TileWidth { get; private set; }
     public static int TileHeight { get; private set; }
 
+    /// <summary>Tile names in slice order, so a parallel array texture (see
+    /// <see cref="BuildMaterial"/>) can be built against the exact same layout.</summary>
+    public static IReadOnlyList<string> TileNames { get; private set; } = [];
+
     private static readonly Dictionary<string, ushort> Tiles = new();
 
     /// <summary>
@@ -81,10 +85,61 @@ public static class TextureAtlas
             Tiles[name] = (ushort)i;
         }
 
+        TileNames = images.ConvertAll(i => i.Name);
         LayerCount = layers.Count;
         TileWidth = tileWidth;
         TileHeight = tileHeight;
         return (layers, tileWidth, tileHeight);
+    }
+
+    /// <summary>
+    /// Builds the material array that sits index-parallel to the block atlas: slice <c>i</c>
+    /// describes the same tile as atlas slice <c>i</c>, so the world shader's existing
+    /// <c>fLayer</c> addresses both and no per-block plumbing is needed to find it.
+    ///
+    /// A tile is described by <c>&lt;folder&gt;/&lt;tile name&gt;.png</c> when that file exists and by a
+    /// flat default otherwise, which is why only the handful of reflective tiles need art.
+    /// RGB is a tangent-space normal and A is a metallic multiplier, so the default
+    /// <c>(128, 128, 255, 255)</c> means "flat, and take the block's metallic as written".
+    ///
+    /// Must run after <see cref="Build"/>, whose slice order and tile size it mirrors.
+    /// </summary>
+    /// <returns>The uploaded GL texture handle.</returns>
+    public static uint BuildMaterial(GL gl, string folder)
+    {
+        if (LayerCount == 0)
+            throw new InvalidOperationException("Build the block atlas before its material array.");
+
+        var sliceBytes = TileWidth * TileHeight * 4;
+        var layers = new List<byte[]>(LayerCount);
+
+        foreach (var name in TileNames)
+        {
+            var path = Path.Combine(folder, name + ".png");
+            if (!File.Exists(path))
+            {
+                var flat = new byte[sliceBytes];
+                for (var i = 0; i < sliceBytes; i += 4)
+                {
+                    flat[i] = 128;       // +X of the tangent-space normal, i.e. none
+                    flat[i + 1] = 128;   // +Y, none
+                    flat[i + 2] = 255;   // +Z, straight out of the face
+                    flat[i + 3] = 255;   // full metallic multiplier
+                }
+                layers.Add(flat);
+                continue;
+            }
+
+            using var stream = File.OpenRead(path);
+            var image = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
+            if (image.Width != TileWidth || image.Height != TileHeight)
+                throw new InvalidOperationException(
+                    $"Material texture '{name}.png' is {image.Width}x{image.Height}, expected " +
+                    $"{TileWidth}x{TileHeight}: it must match the block tile it describes.");
+            layers.Add(image.Data);
+        }
+
+        return TextureLoader.UploadArray(gl, layers, TileWidth, TileHeight);
     }
 
     /// <summary>Slice of a block texture, by file name without extension.</summary>

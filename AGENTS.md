@@ -89,6 +89,29 @@ quads (`BakedQuad.Uvs` + `.Tile`) and every procedural emitter go through `Chunk
 local, extent)`, the single definition of per-face texture orientation; `CropUv` is its
 extent-1 case. Bind these textures with `TextureTarget.Texture2DArray`.
 
+**The material atlas.** `assets/textures/blocks_material/` holds a second `TEXTURE_2D_ARRAY`
+(`TextureAtlas.BuildMaterial`, texture unit 6) that is *index-parallel* to the block atlas: slice
+`i` describes the same tile as atlas slice `i`, so the world shader's existing `fLayer` addresses
+both and nothing new rides the vertex. RGB is a tangent-space normal and A a metallic multiplier;
+a tile with no file there gets a flat `(128, 128, 255, 255)` default, which is why only the three
+reflective ores need art. **Put normal maps in that sibling folder, never in
+`assets/textures/blocks/`** - `TextureAtlas.Load` globs `*.png` unfiltered, so a file dropped in
+there becomes an extra atlas slice and renumbers every tile after it.
+
+How reflective each slice is comes from the owning block's `material` JSON, gathered by
+`TileMaterials.Build` during `ContentRegistry.BakeModels` into one `vec4` per slice and uploaded as
+an SSBO at binding 1 (binding 0 is `ChunkDrawBatch`'s `ChunkInfo`). Material is keyed by tile rather
+than by block precisely so the feature stays off the vertex - no new attribute, no wider `Vertex`,
+no change to the greedy merge key - at the cost that two blocks sharing a texture share its
+material, which `TileMaterials.Build` warns about instead of silently resolving. `uMaterialCount`
+is the switch for the whole path and stays 0 wherever the buffer is not bound (the ItemDebugger
+loads the same shaders), so an unbound buffer is never read. `test-vertex.glsl` emits the `fTangent`
+/ `fBitangent` frame the normal map is read in, and it has to agree with `Chunk.TiledUv`'s per-face
+UV orientation or the relief comes out rotated or mirrored per face. Regenerate the art with
+`tools/generate-ore-materials.ps1` (deterministic, byte-identical re-runs);
+`visual-examples/ores.json` is the screenshot check, and wants a `VOXEL_TIME` since the highlight
+tracks the sun.
+
 **Chunk meshing.** `Chunk.GenerateMeshDataFromSnapshot` runs two passes over the padded 18³
 block snapshot. The binary greedy pass (`EmitGreedyFaces`, scratch in the `[ThreadStatic]`
 `MeshScratch`) takes every block flagged `BlockType.IsGreedy`: a `Model`-renderer block whose
@@ -265,6 +288,7 @@ trailing commas.
 | `cutout` | false | alpha-tested texture; forces `occludes` off whatever the file says |
 | `translucent` | false | drawn blended in the sorted translucent pass with the fluids (glass); forces occludes off; never casts a shadow |
 | `sway` | false | leaf-wind sway in the vertex shader |
+| `material` | none | reflective surface tuning for the ores: `metallic` (0..1, default 0 - an ordinary diffuse block), `roughness` (0..1, default 1, lower being a tighter highlight) and `normalStrength` (0..4, default 1, scaling the tile's normal map). Omitting the object costs nothing at render time. Keyed by *texture*, not by block - see the material atlas below |
 | `light.emission` | 0 | 0..15 (`LightEmission`) |
 | `light.passes` | `!fullCube` | whether voxel light travels through the cell (`PassesLight`) |
 | `renderer` | `"model"` | `model` (baked quads), `tapered_wood`, `pebbles`, `branch_pile`, `snow_layers` or `fluid` (procedural emitters); a fluid's or layer block's model only supplies its tile |

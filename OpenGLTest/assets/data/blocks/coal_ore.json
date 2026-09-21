@@ -1,6 +1,7 @@
 {
   "name": "Coal Ore",
   "model": { "parent": "block/cube_all", "textures": { "all": "coal_ore" } },
+  "material": { "metallic": 0.08, "roughness": 0.40, "normalStrength": 1.0 },
   "sfx": "hit_rock",
   "hardness": 8,
   "requiresTool": true,

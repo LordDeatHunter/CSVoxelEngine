@@ -1,0 +1,51 @@
+{
+  // Reflective-ore check: run with VOXEL_SCRIPT=visual-examples/ores.json.
+  // Pair it with VOXEL_TIME to move the sun, since the whole point is a highlight that tracks
+  // it: ~147 noon, ~447 sunset, ~800 night. Shots land in visual/ores/.
+  //
+  // Lays the three ores out in a row on the ground - coal, malachite, obsidian, left to right -
+  // so all three sit under identical light and can be compared directly. The player stays on
+  // foot while building rather than flying: standing on the ground is what keeps the target
+  // inside the 10-block interaction reach without having to know the terrain height, and a walk between
+  // placements is far steadier than stacking, where the growing column outruns the look angle.
+  // Only the two viewing shots fly, and they look down on the row from behind: spawn is wooded,
+  // so a ground-level camera spends most framings behind a trunk or a grass lip.
+  // A plain dirt block is equipped at the end only to get the held ore out of the first-person view.
+  //
+  // Two framings, because one would misread the result: obsidian is nearly black head-on and
+  // only reveals its sheen off-normal, so "obsidian is broken" and "obsidian is working" look
+  // the same from straight ahead.
+  "steps": [
+    { "op": "wait", "seconds": 7 },
+    { "op": "look", "yaw": -90, "pitch": -40 },
+    { "op": "wait", "seconds": 2 },
+
+    { "op": "give", "block": "coal_ore", "count": 4 },
+    { "op": "place" },
+    { "op": "walk", "keys": ["D"], "seconds": 0.45 },
+    { "op": "wait", "seconds": 0.6 },
+
+    { "op": "give", "block": "malachite_ore", "count": 4 },
+    { "op": "place" },
+    { "op": "walk", "keys": ["D"], "seconds": 0.45 },
+    { "op": "wait", "seconds": 0.6 },
+
+    { "op": "give", "block": "obsidian", "count": 4 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "give", "block": "dirt", "count": 1 },
+
+    { "op": "fly", "on": true },
+    { "op": "walk", "keys": ["Space"], "seconds": 0.55 },
+    { "op": "walk", "keys": ["S"], "seconds": 0.5 },
+    { "op": "walk", "keys": ["A"], "seconds": 0.3 },
+    { "op": "look", "yaw": -90, "pitch": -48 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "row", "hideHud": true },
+
+    { "op": "walk", "keys": ["Space"], "seconds": 0.25 },
+    { "op": "look", "yaw": -62, "pitch": -30 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "row-graze", "hideHud": true }
+  ]
+}

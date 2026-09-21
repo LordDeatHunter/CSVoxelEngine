@@ -22,6 +22,13 @@ public class RenderManager : IDisposable
     // Every chunk pass runs through these; entities, LOD, drops, TNT and block pops keep the
     // plain programs and SetDrawUniforms.
     private const string ChunkDrawDefines = "#define CHUNK_DRAW";
+
+    /// <summary>SSBO binding of the tile-material table. Binding 0 is ChunkDrawBatch's ChunkInfo.</summary>
+    private const int MaterialSsboBinding = 1;
+
+    /// <summary>Texture unit of <see cref="materialAtlas"/>. Units 0-4 are the world shader's
+    /// existing samplers and 5 is the rays upsample's transient bind.</summary>
+    private const int MaterialUnit = 6;
     private Shader chunkShader;
     private Shader chunkShadowShader;
 
@@ -64,6 +71,11 @@ public class RenderManager : IDisposable
     /// <summary>The player shape being drawn: the Blockbench file when it loads, built-in Steve otherwise.</summary>
     public PlayerModel.PlayerRig PlayerRig { get; private set; } = PlayerModel.PlayerRig.BuiltIn();
     private uint textureAtlas;
+    /// <summary>Index-parallel to <see cref="textureAtlas"/>: per-tile normal + metallic mask.</summary>
+    private uint materialAtlas;
+    /// <summary>Per-tile (metallic, roughness, normalStrength) for the world shader, at
+    /// <see cref="MaterialSsboBinding"/>. Zero while no tile is reflective.</summary>
+    private uint materialSsbo;
     private uint outlineVao;
     private uint outlineVbo;
     private uint outlineEbo;
@@ -404,6 +416,9 @@ public class RenderManager : IDisposable
         textureAtlas = TextureAtlas.Build(gl, "assets/textures/blocks");
         _lodLeafColor = LoadOpaqueAverage("assets/textures/blocks/leaves.png", _lodLeafColor);
         ContentRegistry.BakeModels();
+        // After the bake, because the material table is keyed by the tiles the bake resolves.
+        materialAtlas = TextureAtlas.BuildMaterial(gl, "assets/textures/blocks_material");
+        CreateMaterialBuffer();
 
         worldShader = new Shader(gl, vs, fs);
         // The same two sources again, with the chunk-draw variant switched on: everything a
@@ -524,6 +539,29 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
+    /// Uploads the per-tile material table (see <see cref="TileMaterials"/>) as an immutable SSBO
+    /// the world fragment shader indexes by its existing <c>fLayer</c>. Nothing is created when no
+    /// tile is reflective, which leaves <c>uMaterialCount</c> at 0 and switches the path off.
+    /// </summary>
+    private unsafe void CreateMaterialBuffer()
+    {
+        if (!TileMaterials.AnyReflective) return;
+
+        var data = TileMaterials.ToBufferData();
+        materialSsbo = gl.GenBuffer();
+        gl.BindBuffer(BufferTargetARB.ShaderStorageBuffer, materialSsbo);
+        fixed (float* ptr = data)
+        {
+            gl.BufferStorage(BufferStorageTarget.ShaderStorageBuffer,
+                (nuint)(data.Length * sizeof(float)), ptr, BufferStorageMask.None);
+        }
+        // The table never changes after load, so one bind here holds for every pass and both
+        // world programs; nothing else in the frame touches this binding point.
+        gl.BindBufferBase(BufferTargetARB.ShaderStorageBuffer, MaterialSsboBinding, materialSsbo);
+        gl.BindBuffer(BufferTargetARB.ShaderStorageBuffer, 0);
+    }
+
+    /// <summary>
     /// The world-program state that is settled once at load: the five sampler units, the sea
     /// surface, the initial reflection validity and the water model's tuning constants. Both
     /// world programs (the plain one and the CHUNK_DRAW variant) need every one of them,
@@ -539,6 +577,11 @@ public class RenderManager : IDisposable
         program.SetUniform("uReflectionMap", 2);
         program.SetUniform("uSceneColor", 3);
         program.SetUniform("uSceneDepth", 4);
+        program.SetUniform("uMaterialAtlas", MaterialUnit);
+        // Doubles as the switch for the whole reflective path: left at 0 the shader never reads
+        // the material buffer, which is what keeps the ItemDebugger (same shaders, no buffer)
+        // and a world with no reflective tiles safe.
+        program.SetUniform("uMaterialCount", materialSsbo != 0 ? TileMaterials.ByLayer.Length : 0);
         program.SetUniform("uWaterPlaneY", WaterPlaneY);
         program.SetUniform("uReflValid", 0f);
         // The water model's tuning constants never change at runtime, so they go up once here
@@ -1557,6 +1600,7 @@ public class RenderManager : IDisposable
         BindLazy(3, TextureTarget.Texture2D, _sceneColorTex);
         BindLazy(4, TextureTarget.Texture2D, _sceneDepthTex);
         BindLazy(0, TextureTarget.Texture2DArray, textureAtlas);
+        BindLazy(MaterialUnit, TextureTarget.Texture2DArray, materialAtlas);
         ActiveUnit(0);
     }
 
@@ -2768,6 +2812,7 @@ public class RenderManager : IDisposable
         gl.DeleteBuffer(_popVbo);
         gl.DeleteBuffer(_popEbo);
         gl.DeleteVertexArray(_popVao);
+        if (materialSsbo != 0) gl.DeleteBuffer(materialSsbo);
         _popBoxCapacity = boxes * 2;
         CreatePopGeometry();
     }

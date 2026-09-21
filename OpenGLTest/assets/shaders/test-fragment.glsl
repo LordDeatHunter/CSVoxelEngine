@@ -18,12 +18,24 @@ flat in uint fLayer;
 in float fSun;
 in float fBlock;
 in vec3 fNormal;
+flat in vec3 fTangent;
+flat in vec3 fBitangent;
 in vec3 fWorldPos;
 in float fSubmerged;
 flat in float fAlpha; // per-draw fade from the vertex stage: a uniform cannot vary inside one multi-draw
 
 // One slice per block tile; UVs are tile-local and REPEAT across merged quads.
 uniform sampler2DArray uTextureAtlas;
+// Index-parallel to uTextureAtlas: RGB a tangent-space normal, A a metallic multiplier. Only
+// the reflective tiles have real art here; every other slice is flat and fully permissive.
+uniform sampler2DArray uMaterialAtlas;
+// Entries in the tile-material buffer below, and the switch for the whole reflective path:
+// it stays 0 wherever that buffer is not bound (the item debugger), so the buffer is never read.
+uniform int uMaterialCount;
+// How reflective each atlas slice is: (metallic, roughness, normalStrength, unused). Keyed by
+// tile rather than by block, which is what keeps this feature off the vertex entirely - fLayer
+// already rides every vertex. See TileMaterials.
+layout (std430, binding = 1) readonly buffer TileMaterialBuffer { vec4 uTileMaterials[]; };
 uniform float uFlash;
 uniform float uHitFlash;
 uniform float uAlphaCutoff;
@@ -217,6 +229,65 @@ void main() {
     vec3 col = albedo * light;
     // Wanted by the caustics and the refraction below as well as by the fog at the end
     float dist = distance(fWorldPos, uCameraPos);
+
+    // Reflective surfaces: the ores. fLayer is a flat varying, so this branch resolves the same
+    // way for every fragment of a quad and the diffuse tiles never pay for the texture fetch.
+    if (!isWater && uMaterialCount > 0 && int(fLayer) < uMaterialCount) {
+        vec4 tileMat = uTileMaterials[fLayer];
+        // Highlights on a 32px tile alias hard once a texel goes subpixel, so the whole path
+        // fades out with distance instead of sparkling along the horizon and through the LOD.
+        float nearFade = 1.0 - smoothstep(48.0, 112.0, dist);
+        if (tileMat.x > 0.0 && nearFade > 0.0) {
+            vec4 matSample = texture(uMaterialAtlas, vec3(fTexCoord, float(fLayer)));
+            float metallic = tileMat.x * matSample.a;
+            float roughness = clamp(tileMat.y, 0.02, 1.0);
+
+            // Tangent-space normal. T and B are Chunk.TiledUv's u and v directions, which is
+            // the convention the generator writes against (+G = +v).
+            vec3 tn = matSample.rgb * 2.0 - 1.0;
+            tn.xy *= tileMat.z;
+            vec3 Nm = normalize(fTangent * tn.x + fBitangent * tn.y + N * tn.z);
+            vec3 Vm = normalize(uCameraPos - fWorldPos);
+
+            // Blinn-Phong exponent from roughness. The textbook 2/r^4 - 2 puts polished obsidian
+            // past 150000, where only texels aimed exactly at the half vector light up and the
+            // highlight shatters into single-pixel sparkle; squaring lands it near 550, right
+            // alongside the water glitter's own pow(ndh, 300).
+            float shine = 2.0 / (roughness * roughness) - 2.0;
+            vec3 Hm = normalize(Vm + uSunDir);
+            // Gated by skylight and the shadow exactly as the water glitter is, or the highlight
+            // shines through solid rock into sealed caves.
+            // Scaled by metallic like the sky term below, and for the same reason: a rough
+            // surface's lobe is broad enough to cover most of a face, so an unscaled one adds a
+            // near-flat wash instead of a highlight - it turned coal into bright silver.
+            float spec = pow(max(dot(Nm, Hm), 0.0), shine) * metallic * fSun * shadow
+                       * smoothstep(0.0, 0.2, uSunIntensity);
+
+            // Metals tint what they reflect. Taking the albedo's hue at full brightness rather
+            // than the albedo itself matters here: these ores are very dark (obsidian's luma sits
+            // near 0.1), so tinting by the raw colour would extinguish the highlight it is meant
+            // to colour.
+            float peak = max(max(albedo.r, albedo.g), max(albedo.b, 0.001));
+            vec3 tint = mix(vec3(1.0), albedo / peak, metallic);
+
+            // Grazing-weighted Schlick, the same one the water surface uses. An F0 derived from
+            // metallic would instead mirror the flat sky colour at full strength head-on and
+            // flatten obsidian into a pale slab with no material left in it. Dimmed by skylight
+            // so there is no sky to reflect underground.
+            float F = 0.06 + 0.94 * pow(1.0 - max(dot(Vm, Nm), 0.0), 5.0);
+            vec3 skyColor = uFogColor * clamp(0.12 + 0.88 * fSun, 0.0, 1.0);
+
+            // There is no HDR headroom to add into, so the diffuse pays for the highlight:
+            // metal is a dark body with a bright specular, which is how obsidian already reads.
+            col *= 1.0 - metallic * 0.6 * nearFade;
+            // The sky is mixed in, not added. A reflection replaces what the surface would
+            // otherwise show, and adding it instead piled a whole extra sky on top of the albedo
+            // at grazing angles, where F approaches 1 - obsidian came out pale blue rather than
+            // black glass catching the sky. Capped below a full mirror so it keeps its own colour.
+            col = mix(col, skyColor, F * metallic * 0.65 * nearFade);
+            col += uSunColor * (spec * uSunIntensity) * tint * nearFade;
+        }
+    }
 
     if (fSubmerged > 0.5 && !isWater && dist < 96.0) {
         // Where on the surface did this sunlight come through? Follow the sun back up to the

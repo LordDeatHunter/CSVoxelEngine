@@ -176,6 +176,14 @@ public sealed record BlockType
     /// <summary>Whether the vertex shader gives this block the leaf-wind sway.</summary>
     public bool Sway { get; init; }
 
+    /// <summary>
+    /// How reflective the block's surface is, or null for the ordinary diffuse blocks (all but
+    /// the ores). The renderer never reads this per block: <see cref="TileMaterials"/> spreads it
+    /// across the block's <see cref="FaceTiles"/> at bake time and the shader looks it up by
+    /// atlas slice, which is what keeps the feature off the vertex entirely.
+    /// </summary>
+    public TileMaterial? Material { get; init; }
+
     /// <summary>Light this block emits, 0-15.</summary>
     public byte LightEmission { get; init; }
 
