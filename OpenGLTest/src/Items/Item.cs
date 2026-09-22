@@ -74,6 +74,17 @@ public abstract class Item
     /// <summary>Seconds one unit of this item keeps a kiln lit (coal 60); 0 = not a fuel.</summary>
     public float FuelSeconds { get; internal init; }
 
+    /// <summary>Millilitres of molten metal one vessel holds, melted and pending together;
+    /// 0 = not a crucible. See <see cref="CrucibleItem"/>.</summary>
+    public int CrucibleCapacityMl { get; internal init; }
+
+    /// <summary>
+    /// Baked geometry for an item that declares a <c>model</c>, so a station can draw it as
+    /// real 3D (a crucible in a kiln's hearth) rather than as its flat sprite. Null for every
+    /// item that names none; filled by <see cref="ContentRegistry.BakeModels"/>.
+    /// </summary>
+    public BakedModel? BakedModel { get; internal set; }
+
     /// <summary>Whether the item declares a <c>tool</c> block and therefore mines as a tool
     /// rather than at the bare-hand baseline. Membership in tool tags comes from the tag
     /// files, not from this flag.</summary>
@@ -203,6 +214,7 @@ public abstract class Item
         UseChance = spec.Chance;
         MaxDurability = spec.Durability;
         FuelSeconds = spec.FuelSeconds;
+        CrucibleCapacityMl = spec.CrucibleCapacityMl;
         UseDelaySeconds = spec.UseDelay;
         SpriteCols = spec.SpriteCols;
         SpriteRows = spec.SpriteRows;

@@ -35,6 +35,10 @@ explicit `-c Release`, and Rider's run configuration follows the solution config
 dropdown, which must be set to `Release | Any CPU`. Use `-c Debug` only when you need
 breakpoints. The startup line `Build: Release | debugger ...` confirms which one is running.
 
+Both csprojs target **net9.0**. On a machine that only has the .NET 10 SDK installed, prefix every
+`dotnet` command with `DOTNET_ROLL_FORWARD=LatestMajor` (and use the SDK's own launcher, e.g.
+`~/.dotnet/dotnet.exe`) or the build and the tests refuse to run at all.
+
 Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit (one full cycle is `WorldGenerationConfig.DayLengthSeconds`, 1200 s like Minecraft's 20 minutes, with the sun starting mid-morning, so noon is about 147 and sunset about 447). All three parse once at startup and ignore garbage with a console warning. Setting `VOXEL_SCRIPT` to a scenario JSON path (see `OpenGLTest/visual-examples/basic.json`) runs a scripted visual test instead of playing: `teleport`/`look`/`wait`/`walk`/`mine`/`place`/`fly`/`give`/`screenshot` steps drive the real update functions through a scripted keyboard and save numbered PNGs to `visual/<name>/` (`screenshot` takes an optional `hideHud`), then the window closes. `fly` turns creative flight on (or off with `"on": false`, `Camera.TestSetFlight`) so a scripted camera can hover over a spot instead of falling. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
 
 The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, `C` to toggle creative mode (placing costs nothing, breaking drops nothing; double-tap Space toggles flight, but only while creative — flight is noclip and Space/Left Ctrl move up/down while flying), Left Shift to sprint (1.5x on foot, 10x while flying), hold left-click to punch first, then mine: a slime inside the forward punch cone (3 blocks, 30° half-angle, line of sight required; only the nearest is hit) takes the held item's `entityDamage` (1 bare-hand, 3 for the primitive tools, 5 for the copper tools, 6 for the obsidian blade) and a knockback shove instead of being mined through (an item declaring `attack: "slice"` — the obsidian blade — instead swings a two-phase blade sweep: each click hits the nearest two slimes in the forward hemisphere of the same reach, the buffered return swing lands at half power, and the arm and blade are carried across the front), while a clear cone mines the targeted block (hit-based: one hit per the held item's `tool.hitDelayMs`, deals the item's `blockDamage`, 0.5 bare-hand, against the block's float `hardness`, declared in its JSON - 5 for most blocks, 8 for malachite ore, 24 for the full-width log, with each thinner taper step down to the twig shaving 15% of that log's base off its hardness, 2 for leaves, and `0` means it pops on first contact like a pebble; a block with `requiresTool` and a `tools` dict needs a listed tool tag at or above its required tier, and the wrong tool whiffs for 0 damage and no progress; damage resets if you release, switch target or switch tool; instant while creative, which ignores the gate; a click with no block under the crosshair still swings the fist); a stepped crack-sprite overlay drawn on the block's faces via `break-*.glsl` from `assets/textures/environment/break_progress.png` (8 stacked 32x32 frames, the top one blank); each hit pops the block out and back via `RenderManager.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), 1-10 to pick one of the 10 hotbar slots, `E` for the list inventory (blocks/tools/misc tabs with shared caps of 2048/8/2048; click a row to preview, click a hotbar slot to equip, same item again to unequip; the world keeps running and `E`/Escape closes it), `X` to toggle debug logging (FPS/position/water state to console), Escape to quit.
@@ -173,6 +177,11 @@ OpenGLTest/
     Placement.cs               # GL-free placement rules: which cell a right-click fills (a stack
                                #   flagged replaceableByPlacement, layered snow, is taken over in
                                #   place) and what a placement may write over
+    Multiblock.cs              # GL-free multiblock structure rules: the eight cells of the 2x2x2
+                               #   volume, the state byte (facing + offset from the anchor),
+                               #   anchor resolution, the integrity check, Convert and Revert
+    MultiblockPlacement.cs     # which 2x2x2 volume a right-click meant: the right-down/right-up/
+                               #   left-down/left-up search and the facing the opening takes
     ItemType.cs                # pure items (vine, branch, flint): ids handed out after the blocks;
                                #   never placed or meshed, only drops and inventory slots
     WorldGenerationConfig.cs   # all tuning constants (view radius, per-frame budgets, thread counts) and every worldgen knob (seed, ravine, cave, carver)
@@ -188,6 +197,20 @@ OpenGLTest/
       LootTable.cs, LootContext.cs          # compiled loot tables and the world cell they roll at
       BlockRenderer.cs, BlockBreakAction.cs, AttackPattern.cs, ItemUseAction.cs  # geometry/break/attack/use enums
       WoodShape.cs, SnowShape.cs            # state/neighbour-aware hitbox shapes (tapered wood, layered snow)
+      MultiblockShape.cs                    # the 2x2x2 volume's geometry: rotating a point, a
+                                            #   direction or a whole baked model to a facing
+      KilnRenderer.cs, QuernRenderer.cs, CastingRenderer.cs  # GL-free placement/animation
+                                            #   constants tying a station's render pass to its
+                                            #   authored model (the kiln opening and its bowl,
+                                            #   fire and fuel spots; the mold pocket levels and
+                                            #   the cooling dissolve curves)
+      MoltenMaterial.cs, MoltenMaterialDefinition.cs  # a molten metal: id, tile, tint
+      MeltRecipe.cs, MeltRecipeDefinition.cs          # block/item -> (material, ml)
+      CastRecipe.cs, CastRecipeDefinition.cs          # (fired mold, material) -> result + cooling
+    Items/                     # the Item class hierarchy ItemFactory hands out per use action
+      CrucibleItem.cs          # a vessel whose molten contents ride on its own ItemStack
+      CrucibleInventory.cs     # GL-free helper that adds a crucible and hands back its stack
+      ConvertMultiblockItem.cs # the converter's right-click: find the volume, convert in place
     Systems/
       WindowManager.cs         # Silk.NET window setup
       InputManager.cs          # keyboard/mouse context
@@ -203,6 +226,9 @@ OpenGLTest/
                                #   owns the two ChunkGeometryPools, the ChunkDrawBatch and the
                                #   CHUNK_DRAW variants of the world/shadow programs; the four
                                #   chunk passes are one MultiDrawElementsIndirect each
+                               #   the station passes ride inside entityPass: RenderQuerns,
+                               #   RenderKilns (crucible mesh, molten pool, stored fuel) and
+                               #   RenderCastings (the pouring liquid dissolving into the cast)
       UnderwaterRaysRenderer.cs # additive full-screen sun shafts while the eye is submerged
       ChunkGeometryPool.cs     # the two shared chunk vertex/index buffers (opaque, translucent):
                                #   BufferStorage VBO+EBO+VAO, NamedBufferSubData uploads, grow by copy
@@ -213,6 +239,9 @@ OpenGLTest/
       ChunkManager.cs          # chunk lifecycle: load/unload, dirty tracking, mesh scheduling
       LodManager.cs            # LOD region lifecycle: worker thread builds, main thread uploads/unloads, burial flags
       FluidManager.cs          # the fluid tick: scheduled cells, level recompute + spread, batched remeshes
+      KilnManager.cs           # kiln block entities keyed by anchor: fuel, ignition, the crucible
+                               #   slot and its melt loop, plus the multiblock integrity sweep
+      CastingManager.cs        # one cast per mold cell: pour from a held crucible, cool, collect
     WorldGen/
       TerrainGenerator.cs      # the 2D half: owns every 2D noise channel and the biome split; Compute -> ColumnData
       Biome.cs                 # the Forest / Desert / Ocean / Taiga / Frozen enum
@@ -232,6 +261,9 @@ OpenGLTest/
   assets/data/blocks/<name>.json      # one file per block; the file name is its string id
   assets/data/items/<name>.json       # vine, branch, flint, bucket, water_bucket, lava_bucket
   assets/data/loot/<name>.json        # stone, wood, leaves, pebble
+  assets/data/molten/<name>.json      # molten materials (copper): tile + tint the liquid is drawn with
+  assets/data/recipes/melt/<in>.json  # what a block or item melts into, and how many ml
+  assets/data/recipes/cast/<out>.json # (fired mold + material) -> result, amount and cooling time
   assets/models/block/<name>.json     # Minecraft Java block models, incl. the built-in parents
                                       #   cube, cube_all, cube_column, cube_bottom_top
 ```
@@ -291,7 +323,9 @@ trailing commas.
 | `material` | none | reflective surface tuning for the ores: `metallic` (0..1, default 0 - an ordinary diffuse block), `roughness` (0..1, default 1, lower being a tighter highlight) and `normalStrength` (0..4, default 1, scaling the tile's normal map). Omitting the object costs nothing at render time. Keyed by *texture*, not by block - see the material atlas below |
 | `light.emission` | 0 | 0..15 (`LightEmission`) |
 | `light.passes` | `!fullCube` | whether voxel light travels through the cell (`PassesLight`) |
-| `renderer` | `"model"` | `model` (baked quads), `tapered_wood`, `pebbles`, `branch_pile`, `snow_layers` or `fluid` (procedural emitters); a fluid's or layer block's model only supplies its tile |
+| `renderer` | `"model"` | `model` (baked quads), `tapered_wood`, `pebbles`, `branch_pile`, `snow_layers`, `fluid` or `quern` (procedural emitters), `multiblock` (the anchor cell of a structure, carrying the whole volume's pre-rotated model) or `multiblock_part` (one of its other cells, solid and occluding but never meshed); a fluid's or layer block's model only supplies its tile |
+| `multiblock` | none | required on, and only legal with, `renderer: "multiblock"`: `{"part": "block/<name>", "source": "block/<name>"}` — the block filling the other seven cells (which must use `multiblock_part`) and the plain block the volume is built from and reverts to. The anchor and its part must both set `hasItem: false` (a structure is built, never held), and `cutout`/`translucent`/`fluid` are rejected, since both halves are ordinary opaque solids to everything but the mesher. Both default `occludes` and `light.passes` to **true**: the structure's surface really does cover its neighbours, and its quads carry no cullface and are lit from the anchor's own cell, so light has to reach that cell or the whole thing renders black. The model is authored in 0..32 model units (the 2x2x2 volume) with the opening on **north**, no `cullface` on any face and no face covering a whole cell plane — see `### Multiblocks` below |
+| `kiln` | false | marks a multiblock anchor as a kiln, which is what gives it `KilnManager`'s fuel, ignition, crucible slot and integrity sweep. Only legal on the `multiblock` renderer |
 | `wood.taperLevel` | none | 0 = the family's base, each step up narrows toward its tip; each family's levels must be covered contiguously from 0 (tree 0..5, cactus 0..3, spruce 0) |
 | `wood.halfWidth` | 0.5 | half edge length of the tapered box, in blocks (`HalfWidth`) |
 | `wood.family` | `"tree"` | which taper family this level belongs to; wood of two families never welds. `"cactus"` is the 4-level saguaro set, `"spruce"` the taiga conifer's single full-cube trunk |
@@ -318,6 +352,59 @@ crops (`Chunk.TiledUv`/`CropUv`), and the mining pop draws the hitboxes the same
 (`PopBoxEmitter`), so a new partial block needs no pop work as long as its `FaceTiles` are
 sensible (the baker falls back to the first quad's tile).
 
+### Multiblocks
+
+A multiblock is a **2x2x2 volume of ordinary blocks** (`Multiblock.Size`, defined once by
+`MultiblockShape.Size`), not an entity: the **anchor** — always the volume's minimum corner on
+every axis — holds the `multiblock` block and draws the whole structure, and the other seven
+cells hold its `multiblock_part`, which collides, occludes and raycasts but is never meshed.
+Everything else in the engine keeps seeing eight plain solid cells.
+
+The structure lives in the **per-block state byte**: `Multiblock.EncodeState(facing, dx, dy, dz)`
+packs `facing | dx<<2 | dy<<3 | dz<<4`, so the facing sits in the low two bits of *every* cell
+(the anchor's offset is 0,0,0, leaving just the facing) and one state read resolves any cell to
+its anchor — `Multiblock.TryResolveAnchor` subtracts the offset and then checks the candidate
+really is an anchor that owns this part id and agrees on the facing, so an orphaned part left by
+a blast reports false instead of pointing at a stranger. `facing` is the engine face index of the
+opening's outward normal (north -Z = 0, south +Z = 1, west -X = 2, east +X = 3), and the anchor's
+model is baked **four times** at startup into `BlockType.RotatedModels` (`MultiblockShape.Rotate`,
+a quarter turn about the vertical axis through `(1, y, 1)`, which maps the volume onto itself),
+so the mesher picks a pre-rotated model instead of rotating anything per frame. That rotation is
+also why a multiblock face may carry no `cullface` and may not cover a whole cell plane
+(`ContentRegistry.ValidateMultiblockBake`): its quads are culled against nothing and the
+per-corner AO path indexes neighbour deltas by `Chunk.CubeFaces` corner order, which rotation
+breaks, so a multiblock shades flat on every facing.
+
+**Conversion** is a right-click with an item whose `use.action` is `convert_multiblock`
+(`ConvertMultiblockItem` -> `World.TryConvertMultiblock` -> `MultiblockPlacement.TryFindVolume`).
+The clicked cell is one corner and the volume always extends **into** the face that was hit, away
+from the player; which of the four volumes containing that corner is taken is decided in screen
+terms in the order **right-down, right-up, left-down, left-up** (`CandidateOrder`), where
+`right = Cross(screenUp, hitNormal)`. The first candidate whose eight cells are all the source
+block wins, so building a neat cube and clicking any of its front cells converts that cube. The
+opening ends up facing the player: on a side face that is the hit normal itself, and on a top or
+bottom face (where the normal says nothing about where the player stands) it is the player's own
+horizontal view direction, reversed.
+
+**Mining any of the eight cells** reverts the rest (`World.RemoveBlock` -> `RevertMultiblock` ->
+`Multiblock.Revert`): the mined cell is cleared and rolls the structure's own loot table (the
+kiln's yields the one `mud_bricks` that cell was built from), and every other cell still holding
+the anchor or part id becomes the source block again with a **zeroed** state byte.
+Both `Convert` and `Revert` write through `Chunk.SetBlockRaw` and only collect the chunk
+positions they touched, because the remesh follows the `FellWood` batch idiom — one
+`ChunkManager.ImmediateRemeshWithBorders` on the clicked or mined cell's chunk so the click frame
+already shows the change, and `Chunk.RemeshAfterBatchEdit` (the asynchronous `MarkAreaDirty`
+rebuild a felled tree and a TNT crater already use) on the rest — never a loop of eight immediate
+remeshes.
+
+Nothing but mining goes through `RemoveBlock`, so a **blast** would otherwise leave the rest of a
+structure standing as invisible solid blocks. `KilnManager.Update` doubles as the integrity sweep
+for that: it re-checks `Multiblock.IsIntact` every frame, freezes while any cell is in an unloaded
+chunk (`anyUnloaded`, so a half-loaded structure is never mangled) and otherwise reverts,
+including when the *anchor* cell itself is gone — which is what `KilnState.AnchorId` remembers.
+**Only kilns get that sweep**: a future multiblock that is not a kiln needs its own registry, or a
+generic one.
+
 ### Item schema (`assets/data/items/<name>.json`)
 
 ```json
@@ -334,12 +421,17 @@ right-click behaviour (`World.TryUseSelected` -> `TryUseItem`):
 
 | field | meaning |
 |---|---|
-| `use.action` | `pickup_fluid` (scoop the targeted fluid source into the item) or `place_fluid` (pour one into the targeted cell) |
+| `use.action` | `pickup_fluid` (scoop the targeted fluid source into the item), `place_fluid` (pour one into the targeted cell), `place_stack` (build a stack block up), `ignite_campfire` (strike a branch pile, or a kiln that has fuel) or `convert_multiblock` (turn a 2x2x2 volume into a structure) |
+| `use.block` | for `convert_multiblock`, the **source** block the volume must be built from (`block/mud_bricks`); for `place_stack`, the stack block it builds |
+| `use.result` (`convert_multiblock`) | the multiblock **anchor** block the volume becomes (`block/mud_brick_kiln`). The registry checks at startup that the anchor really is a `multiblock` renderer built from that very source, so a mismatched pair names its file instead of failing in play. The converter itself is spent by nothing and never morphs |
 | `use.fluid` | the fluid block the action works on; must be a block with `fluid: true` || `use.result` | the item this one becomes on success; must be an item, and the two normally point at each other |
 | `display` | how the item sits in the right hand: `rotation` as `[pitch, yaw, roll]` degrees (composed yaw, then pitch, then roll), `translation` in blocks of hand space, `scale` as a multiplier; omitted means `{"rotation": [-30, 10, 0]}`, i.e. upright over the hand with a slight sideways cant — the pickaxe yaws to 60 so a tip faces forward, the compass uses rotation `[-60, 0, 0]`, scale `0.67` and a lift to face back up at the holder |
 | `blockDamage` | damage one left-click hit removes from a block's `hardness`; default 0.5 (the bare-hand baseline). Independent of `tool`, which only gates *whether* the block may be mined |
 | `entityDamage` | damage one punch deals to an enemy (a slime); default 1 (the bare-hand baseline). A weapon raises it without needing a `tool` block (the obsidian blade is `6`) |
 | `attack` | left-click attack behaviour, an `AttackPattern`: `punch` (default; forward cone, hits the nearest one) or `slice` (forward hemisphere, hits the nearest two, two-phase swing — the obsidian blade). See `Combat`/`SliceCombo` |
+| `fuel.burnSeconds` | seconds one unit of this item keeps a kiln lit (coal 60; 1..3600). Writing the object is what makes an item kiln fuel — a kiln takes up to `KilnManager.MaxFuel` units of **one** kind at a time |
+| `crucible.capacityMl` | marks the item a **crucible**: a vessel holding this many millilitres of metal, melted and pending together (100..10000). A crucible stores in the **Tools** pool, one instance at a time, because its contents ride on that instance's `ItemStack` as a `CrucibleComponent(MaterialId, MoltenMl, PendingMl)`; while the vessel stands in a kiln the same struct lives in `KilnState` instead, and taking it out writes it back onto a fresh instance (`CrucibleInventory.Add`). The stack carries no melt timer, so putting a crucible back into a kiln restarts the partial chunk it was melting |
+| `model` | optional `block/<name>` model under `assets/models/`, baked into `Item.BakedModel` so the item can be drawn as real 3D geometry while it sits inside a station (the crucible standing in a kiln's hearth). The sprite stays the inventory icon; this only adds a mesh |
 | `tool` | optional mining numbers: `power` (the item's mining *tier* — the number a block's `tools` requirement is compared against, default 0.5, the bare-hand baseline; it is **not** a damage number, damage is `blockDamage`) and `hitDelayMs` (milliseconds between hits). Writing the object marks the item as a tool; which block `tools` tags it satisfies comes from the tag files, not the item — `assets/data/tags/pickaxe.json` listing `item/primitive_pickaxe` is what makes a block gating on `"pickaxe"` accept it (`Mining.CanMine`). Bare hand and non-tool items mine at the defaults, and creative ignores the gate |
 
 Both names resolve like a loot entry (`block/` / `item/` prefixes pin the namespace).
@@ -400,13 +492,14 @@ works unchanged: `cube` (six faces, `#north #south #east #west #up #down`), `cub
 `#bottom`, `#side`). `ContentRegistry.BakeModels` self-checks at startup that all four still bake
 to six full faces.
 
-### Recipes and cast molds
+### Recipes, cast molds and metalworks
 
 Crafting recipes live in `assets/data/recipes/<name>.json` as `{ "result", "count", "ingredients":
 [ { "item" | "tag", "count" } ] }` (DTO `RecipeDefinition.cs`, compiled by
 `ContentRegistry.CompileRecipe` into a `CraftingRecipe`), campfire recipes in
 `recipes/cook/<name>.json` as `{ "input", "result", "count", "cookSeconds" }`
-(`CookRecipeDefinition.cs` -> `CookRecipe`, one recipe per input, enforced). Every name resolves
+(`CookRecipeDefinition.cs` -> `CookRecipe`, one recipe per input, enforced) and quern recipes in
+`recipes/crush/<name>.json` (`CrushRecipe`, likewise one per input). Every name resolves
 like a loot entry, with `block/` and `item/` prefixes pinning the namespace (`TryResolve`), so
 blocks and items are interchangeable as ingredients, results, inputs and outputs. Craft files are
 named by their result, cook files by their input, and a reverse recipe by
@@ -416,8 +509,8 @@ named by their result, cook files by their input, and a reverse recipe by
 (`recipes/mold_pickaxe.json`, `mold_axe.json`), uncraft back into three
 (`recipes/mudball_from_mold_*.json`) and fire into `fired_mold_pickaxe` / `fired_mold_axe` by
 right-clicking a lit branch pile with the mold hotbarred (`World.TryCookOrCollect` ->
-`CampfireManager.TryPlaceFood`, `recipes/cook/mold_*.json`); the fired pair never uncrafts. All four
-are `hasItem` slab blocks whose models under `assets/models/block/` are generated by
+`CampfireManager.TryPlaceFood`, `recipes/cook/mold_*.json`); a fired mold never uncrafts. They are all
+`hasItem` slab blocks whose models under `assets/models/block/` are generated by
 `tools/generate-mold-models.ps1` and never hand-edited: the script reads each sprite's alpha
 silhouette (`assets/textures/items/mold_*.png`, copies of the copper tools — silhouette input only,
 referenced by no JSON, since a block's icon comes from its baked model via `BlockCubeCache`), maps
@@ -429,6 +522,64 @@ file, and re-running is byte-identical until the real sprites arrive. The blocks
 `collidesByHitbox` with a `0..0.25` slab hitbox whose height must equal `$SlabHeight/16` (`MoldTests`
 pins that tie, and the quad budget at 300); raw molds wear the `mud` tile, fired ones `fired_mud` —
 a `stone.png` placeholder that lives in `assets/textures/blocks/`, never `blocks_material/`.
+There are **six** of them now — pickaxe, axe and ingot, raw and fired — and the ingot pair is
+generated by the same script from the same constants.
+
+**Molten metal is content, not a fluid.** It never enters `FluidManager`, never occupies a cell
+and has no block: `assets/data/molten/<name>.json` declares a `MoltenMaterial` as
+`{ "name", "texture", "color": [r, g, b] }`, where `texture` is an atlas tile (copper reuses
+`lava_still`) and the colour tints it. Ids are handed out **1-based in file-name order** (0 means
+"no material"), and the tile is resolved in `BakeModels`, so `MoltenMaterial.Tile` is 0 until
+then. `ContentRegistry.MoltenMaterialByName` / `MoltenMaterialById` are the lookups.
+
+Two recipe kinds hang off that. `recipes/melt/<input>.json` is
+`{ "input", "fluid", "amountMl" }` — what a block or item melts into and how much, one recipe per
+input (`MeltRecipe`, `ContentRegistry.MeltRecipeForInput`). `recipes/cast/<result>.json` is the
+metalworks recipe proper, `{ "mold", "fluid", "amountMl", "coolSeconds", "result", "count" }`,
+keyed by the **(fired mold block, material)** pair, which must be unique (`CastRecipe`,
+`CastRecipeFor(moldId, materialId)`, and `IsCastMold(id)` for "is this cell a mold at all").
+Every shipped copper form — the malachite chunk, crushed copper, the ingot and both tool heads —
+has a melt recipe, so **a cast melts back into exactly what it took**: `MetalworksRecipeTests`
+asserts that conservation as a relation rather than pinning any ml figure.
+
+**The kiln** (`Systems/KilnManager.cs`, keyed by the structure's anchor cell) is the furnace half.
+Right-clicking it with an item declaring `fuel.burnSeconds` stores a unit, up to
+`KilnManager.MaxFuel` of **one** kind; a firestarter only lights a kiln that has fuel
+(`CanIgnite`), and igniting spends the first unit at once, so four coal burn for four minutes and
+then go out. A crucible (crafted from mud bricks) right-clicked in stands in the hearth, and
+anything with a melt recipe right-clicked after that
+charges the vessel with **pending** metal — gated by `KilnManager.CanAccept`,
+which needs room and either an empty vessel or the same material, and needs no fire. A lit kiln
+then turns `MeltChunkMl` of that pending charge molten every `MeltSeconds`. Melting **pauses**
+rather than resets when the fire dies or the vessel is lifted out: `KilnState.MeltLeft` simply
+stops ticking, so relighting resumes the partial chunk. `MeltProgress01` and `DisplayMoltenMl` are
+what the render pass reads and neither depends on `Lit`, which is what keeps the drawn pool rising
+smoothly between chunks and stops it dropping the instant the last unit burns out. Breaking the
+structure drops the stored fuel and the crucible at the mined cell — the metal inside is lost.
+
+**Casting** (`Systems/CastingManager.cs`, one `CastState` per mold cell) is the other half.
+Right-clicking a fired mold with a crucible binds that tool instance and pours at
+`CastingManager.PourMlPerSecond`, draining the stack a little every frame; the pour **pauses**
+(losing nothing) when the crucible is deselected, carried out of `World.InteractionReach`, emptied
+or found holding the wrong material, and another right-click resumes it. The frame that completes
+the fill starts the cooling instead of cooling in the same frame, so the two phases are never
+ambiguous; `Cool01` then runs 0..1 over the recipe's `coolSeconds` and the liquid dissolves into
+the result through `CastingRenderer.LiquidAlpha` / `ResultAlpha`, a complementary `MathUtils.SmoothStep`
+pair that always sums to 1 (no hard cut at the end of the pour). A finished cast is picked up with
+another right-click, and breaking the mold — **creative included** — drops a finished cast and only
+a finished cast; metal still cooling is lost. Like the campfire, quern and kiln registries, cast
+progress is in-memory only: it does not survive a restart, and an unloaded mold cell freezes
+rather than being forgotten.
+
+The right-click chain in `World.TryUseSelected` runs `TryCookOrCollect` -> `TryQuernInteract` ->
+`TryKilnInteract` -> `TryCastInteract` -> the item's own `use` action or block placement, and the
+first one that claims the click wins. On a kiln: an empty hand lifts the crucible out (and puts it
+straight back when the tools pool is full), a crucible stands one in, a melt input charges it, fuel
+goes into the hearth, a **firestarter falls through** to its own `Item.OnUse` so it can strike and
+spend durability, and a **block in hand falls through** to placement against the structure — any
+other click on a kiln is spent. On a mold: a crucible click is spent either way, so a refused pour
+never places anything, while a block in hand still falls through and molds can be stacked against
+each other.
 
 ## Architecture: threading model (the most important thing to preserve)
 
@@ -451,7 +602,8 @@ Other invariants:
 
 - World/chunk coordinates: `Chunk.Position` is in chunk units; world pos = chunk pos × `Chunk.Size` (16). Chunks are cubic and stacked vertically too (3D chunk grid, not 2D columns).
 - Blocks are `byte` IDs; `0` is air. Everything else about a block comes from `assets/data/blocks/<name>.json` through `ContentRegistry` (see "Content" above), never from a new `switch` on the id. Hot paths read the flat mirrors (`BlockType.IsSolid/Occludes/CastsAO`, `BlockType.Emission`, `BlockType.PassesLightById`) rather than `BlockType.ById[...]`, so keep new per-id flags in that shape.
-- **Per-block state byte**: alongside `Chunk._blocks` each chunk has a lazily allocated `volatile byte[]? _state` (null = all zero), read through `Chunk.GetLocalState` / `ChunkManager.GetStateGlobal` / `TryGetCell` and written only by `Chunk.SetBlockRaw` (no remesh, no scheduling — the fluid tick batches those). Today only fluids use it: `FluidState` decodes it as source (`0`), falling (`8`) or flowing level `1..7`. **Every write that is not a fluid write zeroes it** (`RemoveBlockAt`, `PlaceBlockAt` — which also treats a fluid cell as replaceable — and `ClearBlockAt`), so a stale level can never outlive the water that owned it. Meshing gets it as a second padded snapshot from `FillPaddedSnapshot(padded, paddedState, neighbors, neighborStates)`, filled from the neighbourhood `TryResolveNeighbors` resolved for the build; the fluid simulation must read cells through `TryGetCell`/`ChunkAt`, never `GetBlockGlobal`, which reports unloaded chunks as air.
+- **Per-block state byte**: alongside `Chunk._blocks` each chunk has a lazily allocated `volatile byte[]? _state` (null = all zero), read through `Chunk.GetLocalState` / `ChunkManager.GetStateGlobal` / `TryGetCell` and written only by `Chunk.SetBlockRaw` (no remesh, no scheduling — the fluid tick batches those). Three features share it, one per block: **fluid levels** (`FluidState` decodes it as source `0`, falling `8` or flowing level `1..7`), **stack counts** (a `stackMax` block's 0 = untouched worldgen, 1..`stackMax` an explicit pile) and a **multiblock's facing and offset** (`Multiblock.EncodeState`, `facing | dx<<2 | dy<<3 | dz<<4`, written by `Multiblock.Convert` through `SetBlockRaw`). Which meaning a byte carries is decided entirely by the block id that owns the cell, so a new user must pick a block kind, never a spare bit. **Every write that is not one of those zeroes it** (`RemoveBlockAt`, `PlaceBlockAt` — which also treats a fluid cell as replaceable — and `ClearBlockAt`), and `Multiblock.Revert` likewise writes its source block with an explicit `0`, so a stale level, count or offset can never outlive the block that owned it. Meshing gets it as a second padded snapshot from `FillPaddedSnapshot(padded, paddedState, neighbors, neighborStates)`, filled from the neighbourhood `TryResolveNeighbors` resolved for the build; the fluid simulation must read cells through `TryGetCell`/`ChunkAt`, never `GetBlockGlobal`, which reports unloaded chunks as air.
+- **Station block entities**: `CampfireManager`, `QuernManager`, `KilnManager` and `CastingManager` are all owned by `World`, all **main thread only** and all in-memory only — a lit campfire, a spinning quern, a kiln's fuel and crucible and a mold's cast progress do not survive a restart or a chunk reload. Each is keyed by the cell (the kiln by its structure's anchor), each is ticked from `World.Update` and each has a `NotifyBlockRemoved` that `World.RemoveBlock` calls so a broken station drops what it held. `World.FireCells` gathers every burning cell (campfires and lit kilns) once a frame and feeds both the fire billboards (`FireParticleSystem.SpawnOffset`) and the warm point lights (`RenderManager.FireLightOffset`), so a new fire source only has to appear in that list. Their render passes — `RenderQuerns`, `RenderKilns`, `RenderCastings` — sit inside the existing `entityPass` profiler span rather than adding sections of their own.
 - **Fluid tick**: `Systems/FluidManager.cs` (owned by `World`, main thread only) is a *scheduled-cell* simulation, not a scan. `World.Update` calls it once per frame after `UpdateToppling`; it runs whole ticks every `WorldGenerationConfig.FluidTickSeconds` (0.25 s), at most `MaxFluidTicksPerFrame` of them per frame, and drops the leftover time so a hitch never leaves it spiralling. Each tick takes the set of cells scheduled by the previous one (packed as `long`, 21 bits per axis — the same budget `ChunkKey` (`src/ChunkKey.cs`) uses to pack a **chunk** position for `ChunkMap` and for `ChunkManager`'s dirty/queued/generating/placement dictionaries; `FluidManager`'s packer is block-scale, `ChunkKey`'s is chunk-scale, and neither floors nor truncates differently from `VoxelCoords.ChunkPosOf`), recomputes every **non-source** fluid cell from its neighbours (Minecraft's `getNewLiquid`: two adjacent sources over ground that cannot drain become a source themselves, fluid directly above means falling, otherwise one level thinner than the fullest neighbour, and nothing left means the cell drains to air), then spreads it downwards, or sideways toward the nearest hole within `FluidSlopeSearchDistance` (ties spread evenly). The level rules are per-fluid data (`flow.*` on the block: lava updates every other tick, spreads 3 instead of 7 and never forms new sources). Contact hardening runs before all of it: a fluid cell touching its `hardensTouching` fluid becomes `hardensTo` (lava beside water becomes cobblestone), and a flow settling against a fluid that hardens on its touch crusts over the same way, so water reaching lava also yields cobblestone whichever side ticks first. Spreading only ever writes into non-fluid `IsReplaceable` cells, popping the fragile block it washes away through `DropManager.SpawnLoot`; a cell that already holds fluid recomputes itself on its own tick. Writes go through `Chunk.SetBlockRaw` and dirty only the cell's own chunk plus the face-adjacent chunk on each axis where the cell sits on a border, batched into `MarkDirty` at the end of the tick — not `ImmediateRemesh`, and never `MarkAreaDirty`, because a fluid passes light and casts no AO. A cell reschedules itself and its neighbourhood exactly when it changed or wrote into a neighbour, so settled water costs nothing.
 - **Waking worldgen water**: the sea is generated as static source cells, so a cave or entrance carved into a land column beside it would leave a wall of water standing against worldgen air that nothing ever schedules. `FluidManager.WakeLoadedChunks(chunks)` — called from `World.Update` each frame, immediately before the fluid tick — fixes that by scheduling the frontier of its water against a carved cavity when it loads, so the sea pours into whatever breached it exactly like Minecraft water does when you dig into an ocean. Only cells at or below their column's natural terrain top count (`FluidManager.IsCarvedFlowTarget`), so open air above the terrain — a ravine, a beach, a hillside — is never woken and generated water stays static across it. It has two halves: the **interior**, collected on the generation worker at the end of `Chunk.GenerateBlockData` into `Chunk.FluidFrontier` (local block indices of every fluid cell with a `FluidManager.IsCarvedFlowTarget` neighbour in -X/+X/-Z/+Z/-Y — never +Y, since water does not flow upward and every sea-surface cell has air above it; only its own `_blocks` are read, so worldgen stays a pure per-chunk function), and the **borders**, which need both chunks loaded and are therefore scanned on the main thread over the shared 16x16 plane of each face neighbour, scheduling whichever side holds the fluid when the other side is a carved cavity (the vertical faces only ever schedule the fluid above the hole). Chunks entirely above every level they could share with a neighbour (`ColumnData.MaxWaterLevel`, never below `SeaLevel`) skip the border scan — generated water cannot reach them, and player-placed water is woken by the edit paths. The queue of newly generated chunks is `ChunkManager.TryDequeueLoaded`; a consumer must re-check that the chunk is still the live one at its position, because an unload can race the queue. Once the frontier has settled, it costs nothing again. Deep lava pockets wake through the same path: the frontier scan is fluid-generic, and chunks at or below `LavaMaxY` report theirs even when they never held sea water.
 - **Every block edit path must call `FluidManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the water beside the edit will never notice it: `World.RemoveBlock`, `World.FellWood` (per cleared cell, and in both single-block branches), `World.TryPlaceBlockFromRaycast`, `TntManager.Detonate` (`ScheduleBox` over the blast box grown by one; the blast also **skips fluid cells**, since a dry crater under water would just refill from every side) and bucket edits through `FluidManager.SetCellImmediate`, which is the only fluid write that remeshes synchronously. Mining never takes a fluid out: `RemoveBlock` returns early on `BlockType.IsFluid`, so only a bucket removes fluids.

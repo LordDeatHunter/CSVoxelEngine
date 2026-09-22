@@ -1,0 +1,2 @@
+// TODO: placeholder art — reuses the copper pickaxe sprite until a cast head gets its own texture.
+{ "name": "Copper Pickaxe Head", "texture": "assets/textures/items/copper_pickaxe_head.png" }

@@ -1,0 +1,7 @@
+{
+  // Crushing an ore chunk does not change how much metal is in it, so crushed copper melts
+  // into the same amount as the chunk it came from.
+  "input": "item/crushed_copper",
+  "fluid": "copper",
+  "amountMl": 100
+}

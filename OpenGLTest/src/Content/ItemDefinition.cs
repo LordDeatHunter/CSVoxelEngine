@@ -64,6 +64,28 @@ public sealed class ItemDefinition
         public float? BurnSeconds { get; set; }
     }
 
+    /// <summary>
+    /// Marks the item as a crucible: a vessel whose molten contents ride on its own
+    /// <see cref="ItemStack"/> (a <c>CrucibleComponent</c>), which is why a crucible stores into
+    /// the Tools pool one instance at a time. Omitted for everything that is not one.
+    /// </summary>
+    public CrucibleDefinition? Crucible { get; set; }
+
+    /// <summary>The <c>crucible</c> object: how much molten metal one vessel holds.</summary>
+    public sealed class CrucibleDefinition
+    {
+        /// <summary>Millilitres the vessel holds, melted and pending together; 100..10000.</summary>
+        public int? CapacityMl { get; set; }
+    }
+
+    /// <summary>
+    /// Optional <c>block/&lt;name&gt;</c> model under <c>assets/models</c>, baked into
+    /// <see cref="Item.BakedModel"/> so the item can be drawn as real 3D geometry while it
+    /// sits inside a station (a crucible standing in a kiln's hearth). The sprite stays the
+    /// inventory icon; this only adds a mesh.
+    /// </summary>
+    public string? Model { get; set; }
+
     /// <summary>Seconds between uses of this item; omitted for the global click rate.</summary>
     public float? UseDelay { get; set; }
 

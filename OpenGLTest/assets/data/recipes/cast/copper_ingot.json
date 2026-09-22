@@ -1,0 +1,11 @@
+{
+  // Pouring molten copper into a fired ingot mold. Cast files are named by their result and a
+  // recipe is keyed by (mold, fluid), so the same mold casts a different metal into a different
+  // result once another molten material exists.
+  "mold": "block/fired_mold_ingot",
+  "fluid": "copper",
+  "amountMl": 200,
+  "coolSeconds": 2,
+  "result": "item/copper_ingot",
+  "count": 1
+}

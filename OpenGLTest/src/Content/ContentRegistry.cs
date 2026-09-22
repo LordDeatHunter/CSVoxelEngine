@@ -46,10 +46,17 @@ public static class ContentRegistry
     private static readonly Dictionary<string, LootTable> LootTables = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, HashSet<byte>> Tags = new(StringComparer.Ordinal);
     private static readonly Dictionary<byte, BlockModel> BlockModels = new();
+
+    // Items that declare a "model": flattened at load like a block's, baked in BakeModels so a
+    // station can draw the item as real geometry (the crucible standing in a kiln's hearth).
+    private static readonly Dictionary<byte, BlockModel> ItemModels = new();
     private static readonly Dictionary<byte, BlockDefinition> BlockDefinitions = new();
     private static readonly List<CraftingRecipe> Recipes = [];
     private static readonly List<CookRecipe> CookRecipes = [];
     private static readonly List<CrushRecipe> CrushRecipes = [];
+    private static readonly List<MoltenMaterial> MoltenMaterialsList = [];
+    private static readonly List<MeltRecipe> MeltRecipes = [];
+    private static readonly List<CastRecipe> CastRecipes = [];
 
     private static string _assetsRoot = "assets";
     private static ModelLoader? _models;
@@ -99,6 +106,9 @@ public static class ContentRegistry
         LoadRecipes(Path.Combine(assetsRoot, "data", "recipes"));
         LoadCookRecipes(Path.Combine(assetsRoot, "data", "recipes", "cook"));
         LoadCrushRecipes(Path.Combine(assetsRoot, "data", "recipes", "crush"));
+        LoadMoltenMaterials(Path.Combine(assetsRoot, "data", "molten"));
+        LoadMeltRecipes(Path.Combine(assetsRoot, "data", "recipes", "melt"));
+        LoadCastRecipes(Path.Combine(assetsRoot, "data", "recipes", "cast"));
         LoadEntities(assetsRoot);
         ValidateItemUses(itemFiles);
     }
@@ -188,6 +198,38 @@ public static class ContentRegistry
             BlockType.OccludesById[id] = type.OccludesNeighbours;
             BlockType.PassesLightById[id] = type.PassesLight;
             BlockType.GreedyById[id] = type.Renderer == BlockRenderer.Model && !type.Fluid && BakesGreedy(baked);
+        }
+
+        // An item that declares a model bakes exactly like a block's, minus every cell-shaped
+        // conclusion (occlusion, light, greedy): it is drawn as an entity mesh, never as a cell.
+        foreach (var (id, model) in ItemModels)
+        {
+            var item = ItemRegistry.TryGet(id)
+                ?? throw new InvalidOperationException(
+                    $"Item id {id} declares model '{model.Source}' but no item with that id is registered.");
+            try
+            {
+                item.BakedModel = ModelBaker.Bake(model);
+            }
+            catch (Exception e) when (e is not InvalidOperationException)
+            {
+                throw new InvalidOperationException(
+                    $"Failed to bake the model of item '{item.Name}' ('{model.Source}'): {e.Message}", e);
+            }
+        }
+
+        // A molten pool is drawn as one tinted atlas tile, so its slice resolves with the blocks'.
+        foreach (var material in MoltenMaterialsList)
+        {
+            try
+            {
+                material.Tile = TextureAtlas.TileOf(material.TextureName);
+            }
+            catch (KeyNotFoundException e)
+            {
+                throw new InvalidOperationException(
+                    $"Molten material 'data/molten/{material.Name}.json' names texture '{material.TextureName}', which is not an atlas tile.", e);
+            }
         }
 
         // Only now do the blocks know their FaceTiles, which is what the material table is keyed by.
@@ -346,6 +388,35 @@ public static class ContentRegistry
     public static CrushRecipe? CrushRecipeForInput(byte id) =>
         CrushRecipes.FirstOrDefault(r => r.InputId == id);
 
+    /// <summary>Every molten material, in file-name order; ids are 1-based positions in it.</summary>
+    public static IReadOnlyList<MoltenMaterial> MoltenMaterials => MoltenMaterialsList;
+
+    /// <summary>Molten material by file name, or null when there is none.</summary>
+    public static MoltenMaterial? MoltenMaterialByName(string name) =>
+        MoltenMaterialsList.FirstOrDefault(m => m.Name.Equals(name, StringComparison.Ordinal));
+
+    /// <summary>Molten material by id, or null for 0 ("no material") and anything out of range.</summary>
+    public static MoltenMaterial? MoltenMaterialById(byte id) =>
+        id >= 1 && id <= MoltenMaterialsList.Count ? MoltenMaterialsList[id - 1] : null;
+
+    /// <summary>Every compiled melt recipe, in file-name order.</summary>
+    public static IReadOnlyList<MeltRecipe> MeltRecipesList => MeltRecipes;
+
+    /// <summary>The melt recipe taking this id, or null when it does not melt.</summary>
+    public static MeltRecipe? MeltRecipeForInput(byte id) =>
+        MeltRecipes.FirstOrDefault(r => r.InputId == id);
+
+    /// <summary>Every compiled metalworks recipe, in file-name order.</summary>
+    public static IReadOnlyList<CastRecipe> CastRecipesList => CastRecipes;
+
+    /// <summary>The cast recipe for this mold and molten material, or null when the pair casts nothing.</summary>
+    public static CastRecipe? CastRecipeFor(byte moldId, byte materialId) =>
+        CastRecipes.FirstOrDefault(r => r.MoldId == moldId && r.MaterialId == materialId);
+
+    /// <summary>Whether any cast recipe pours into this block, i.e. whether it is a usable mold.</summary>
+    public static bool IsCastMold(byte id) =>
+        id != BlockType.Air && CastRecipes.Any(r => r.MoldId == id);
+
     /// <summary>Member ids of a loaded tag, sorted ascending, or null when there is no such tag.</summary>
     public static byte[]? TagMembers(string tag) =>
         Tags.TryGetValue(tag, out var members)
@@ -361,7 +432,11 @@ public static class ContentRegistry
         Recipes.Clear();
         CookRecipes.Clear();
         CrushRecipes.Clear();
+        MoltenMaterialsList.Clear();
+        MeltRecipes.Clear();
+        CastRecipes.Clear();
         BlockModels.Clear();
+        ItemModels.Clear();
         BlockDefinitions.Clear();
         _sfxGroups = new Dictionary<string, IReadOnlyList<string>>();
         ItemRegistry.Reset();
@@ -446,7 +521,31 @@ public static class ContentRegistry
                         $"Item '{path}' has fuel.burnSeconds {fuel.BurnSeconds}; expected 1..3600 seconds.");
             }
 
+            // A vessel whose contents ride on its stack; the capacity is what the melt gate reads
+            var crucibleCapacity = 0;
+            if (definition.Crucible is { } crucible)
+            {
+                crucibleCapacity = crucible.CapacityMl ?? 0;
+                if (crucibleCapacity < 100 || crucibleCapacity > 10000)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has crucible.capacityMl {crucible.CapacityMl}; expected 100..10000 millilitres.");
+            }
+
             var id = ItemIds[name];
+
+            // A 3D model for station display; the sprite above stays the inventory icon
+            if (!string.IsNullOrWhiteSpace(definition.Model))
+            {
+                try
+                {
+                    ItemModels[id] = _models!.Resolve(definition.Model);
+                }
+                catch (Exception e) when (e is not InvalidOperationException)
+                {
+                    throw new InvalidOperationException($"Item '{path}': {e.Message}", e);
+                }
+            }
+
             var sheet = ParseSpritesheet(definition.Spritesheet, path);
             var display = ParseDisplay(definition.Display, path);
 
@@ -496,7 +595,8 @@ public static class ContentRegistry
                 sheet.Cols, sheet.Rows, sheet.Frames, sheet.Mode, sheet.Fps,
                 display.Rotation, display.Translation, display.Scale,
                 tool != null, power, hitDelay, attack, blockDamage, entityDamage, throwDamage, name,
-                FuelSeconds: fuelSeconds));
+                FuelSeconds: fuelSeconds,
+                CrucibleCapacityMl: crucibleCapacity));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ItemIds, StringComparer.Ordinal));
@@ -785,6 +885,99 @@ public static class ContentRegistry
         foreach (var (name, path) in JsonFilesIn(folder))
             CrushRecipes.Add(CompileCrushRecipe(name, ReadJson<CrushRecipeDefinition>(path), path));
     }
+
+    private static void LoadMoltenMaterials(string folder)
+    {
+        if (!Directory.Exists(folder)) return;
+        foreach (var (name, path) in JsonFilesIn(folder))
+            MoltenMaterialsList.Add(CompileMoltenMaterial(name, ReadJson<MoltenMaterialDefinition>(path), path));
+    }
+
+    private static void LoadMeltRecipes(string folder)
+    {
+        if (!Directory.Exists(folder)) return;
+        foreach (var (name, path) in JsonFilesIn(folder))
+            MeltRecipes.Add(CompileMeltRecipe(name, ReadJson<MeltRecipeDefinition>(path), path));
+    }
+
+    private static void LoadCastRecipes(string folder)
+    {
+        if (!Directory.Exists(folder)) return;
+        foreach (var (name, path) in JsonFilesIn(folder))
+            CastRecipes.Add(CompileCastRecipe(name, ReadJson<CastRecipeDefinition>(path), path));
+    }
+
+    private static MoltenMaterial CompileMoltenMaterial(string name, MoltenMaterialDefinition definition, string path)
+    {
+        // Ids are 1-based positions in file-name order, so 0 stays free as "no material".
+        if (MoltenMaterialsList.Count >= 255)
+            throw new InvalidOperationException(
+                $"Molten material '{path}' exceeds the 255 ids a molten material id can hold.");
+        if (string.IsNullOrWhiteSpace(definition.Texture))
+            throw new InvalidOperationException($"Molten material '{path}' names no texture; one atlas tile is required.");
+        if (definition.Color is not { Length: 3 })
+            throw new InvalidOperationException(
+                $"Molten material '{path}' has {definition.Color?.Length ?? 0} colour components; expected exactly 3 (r, g, b in 0..255).");
+        foreach (var component in definition.Color)
+            if (!float.IsFinite(component) || component < 0f || component > 255f)
+                throw new InvalidOperationException(
+                    $"Molten material '{path}' has colour component {component}; expected 0..255.");
+
+        var color = new Rgba((byte)definition.Color[0], (byte)definition.Color[1], (byte)definition.Color[2]);
+        return new MoltenMaterial(
+            (byte)(MoltenMaterialsList.Count + 1), name, definition.Name ?? name, definition.Texture!, color);
+    }
+
+    private static MeltRecipe CompileMeltRecipe(string name, MeltRecipeDefinition definition, string path)
+    {
+        if (definition.Input == null || !TryResolve(definition.Input, out var inputId))
+            throw new InvalidOperationException(
+                $"Melt recipe '{path}' names input '{definition.Input}', which is not a registered block or item.");
+        var material = definition.Fluid == null ? null : MoltenMaterialByName(definition.Fluid);
+        if (material == null)
+            throw new InvalidOperationException(
+                $"Melt recipe '{path}' names fluid '{definition.Fluid}', which is not a molten material; known materials: {KnownMoltenMaterials()}.");
+        var amountMl = definition.AmountMl ?? 0;
+        if (amountMl < 1 || amountMl > 10000)
+            throw new InvalidOperationException(
+                $"Melt recipe '{path}' has amountMl {definition.AmountMl}; expected 1..10000.");
+        if (MeltRecipes.Any(r => r.InputId == inputId))
+            throw new InvalidOperationException(
+                $"Melt recipe '{path}' duplicates the input of '{MeltRecipes.First(r => r.InputId == inputId).Name}': one melt recipe per input.");
+        return new MeltRecipe(name, inputId, material.Id, amountMl);
+    }
+
+    private static CastRecipe CompileCastRecipe(string name, CastRecipeDefinition definition, string path)
+    {
+        if (definition.Mold == null || !TryResolve(definition.Mold, out var moldId) || BlockType.ById[moldId] == null)
+            throw new InvalidOperationException(
+                $"Cast recipe '{path}' names mold '{definition.Mold}', which is not a registered block.");
+        var material = definition.Fluid == null ? null : MoltenMaterialByName(definition.Fluid);
+        if (material == null)
+            throw new InvalidOperationException(
+                $"Cast recipe '{path}' names fluid '{definition.Fluid}', which is not a molten material; known materials: {KnownMoltenMaterials()}.");
+        var amountMl = definition.AmountMl ?? 0;
+        if (amountMl < 1 || amountMl > 10000)
+            throw new InvalidOperationException(
+                $"Cast recipe '{path}' has amountMl {definition.AmountMl}; expected 1..10000.");
+        var coolSeconds = definition.CoolSeconds ?? 0f;
+        if (!float.IsFinite(coolSeconds) || coolSeconds <= 0f || coolSeconds > 600f)
+            throw new InvalidOperationException(
+                $"Cast recipe '{path}' has coolSeconds {definition.CoolSeconds}; expected 0..600 exclusive of 0.");
+        if (definition.Result == null || !TryResolve(definition.Result, out var resultId))
+            throw new InvalidOperationException(
+                $"Cast recipe '{path}' names result '{definition.Result}', which is not a registered block or item.");
+        var resultCount = definition.Count ?? 1;
+        if (resultCount <= 0)
+            throw new InvalidOperationException($"Cast recipe '{path}' has count {resultCount}; expected 1 or more.");
+        if (CastRecipes.Any(r => r.MoldId == moldId && r.MaterialId == material.Id))
+            throw new InvalidOperationException(
+                $"Cast recipe '{path}' duplicates the mold and fluid of '{CastRecipes.First(r => r.MoldId == moldId && r.MaterialId == material.Id).Name}': one cast recipe per mold and molten material.");
+        return new CastRecipe(name, moldId, material.Id, amountMl, coolSeconds, resultId, resultCount);
+    }
+
+    private static string KnownMoltenMaterials() =>
+        MoltenMaterialsList.Count == 0 ? "(none)" : string.Join(", ", MoltenMaterialsList.Select(m => m.Name));
 
     private static CookRecipe CompileCookRecipe(string name, CookRecipeDefinition definition, string path)
     {

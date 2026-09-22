@@ -1,0 +1,7 @@
+{
+  // Mass conservation: a cast melts back into exactly what it took, so an ingot returns the
+  // 200 ml that recipes/cast/copper_ingot.json poured into the mold.
+  "input": "item/copper_ingot",
+  "fluid": "copper",
+  "amountMl": 200
+}

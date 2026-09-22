@@ -106,6 +106,31 @@ public static class Primitives
     }
 
     /// <summary>
+    /// A unit square lying flat in the XZ plane at y = 0, facing +Y and centred on the origin —
+    /// the surface of a liquid in a vessel, scaled and lifted by the caller's model matrix.
+    /// Tinted by <paramref name="color"/> and lit as fully sun- and block-lit, so a molten pool
+    /// reads as self-lit at night instead of going black inside a kiln.
+    /// </summary>
+    public static Mesh CreateFlatQuad(GL gl, Rgba color, UvRect uv)
+    {
+        Span<Vector2> corners = stackalloc Vector2[CornersPerFace];
+        uv.CornersTo(corners);
+
+        // The +Y face of the unit cube, recentred on the origin and flattened onto y = 0
+        var positions = Chunk.CubeFaces[4].face;
+        var vertices = new Vertex[CornersPerFace];
+        for (var corner = 0; corner < CornersPerFace; corner++)
+        {
+            var p = positions[corner];
+            vertices[corner] = new Vertex(new Vector3(p.X - 0.5f, 0f, p.Z - 0.5f), color,
+                corners[corner], uv.Layer, sun: 1f, block: 1f, normal: Vector3.UnitY);
+        }
+
+        Span<ushort> indices = [0, 1, 2, 0, 2, 3];
+        return new Mesh(gl, vertices, indices);
+    }
+
+    /// <summary>
     /// A block's baked model as a standalone mesh, centred on the origin, so drops,
     /// primed TNT and inventory icons all show the same shape the world does. Faces are
     /// shaded as fully unoccluded (AO 3) — nothing stands beside a floating copy of a block.

@@ -1,0 +1,9 @@
+{
+  // Three mudballs pressed into a raw ingot cast mold. Uncrafts back through
+  // mudball_from_mold_ingot.json, and fires on a lit campfire via cook/mold_ingot.json.
+  "result": "block/mold_ingot",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/mudball", "count": 3 }
+  ]
+}

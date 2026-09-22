@@ -8,19 +8,27 @@ namespace silkgltriangle.Tests;
 
 /// <summary>
 /// The cast-mold pipeline end to end, asserted through the baked tables rather than the JSON:
-/// the four slab blocks bake to non-occluding quarter-height shapes inside their declared
+/// the six slab blocks bake to non-occluding quarter-height shapes inside their declared
 /// hitbox, their tops carry a rim and a sunken pocket, their only cullfaces sit on the cell
-/// boundary (so the pocket walls always draw), the raw pair crafts from and uncrafts to three
+/// boundary (so the pocket walls always draw), each raw mold crafts from and uncrafts to three
 /// mudballs, and a raw mold fires into its cooked twin on a lit campfire.
 /// </summary>
 public sealed class MoldTests
 {
     public MoldTests() => TestContent.EnsureLoaded();
 
-    private static readonly string[] All = ["mold_pickaxe", "mold_axe", "fired_mold_pickaxe", "fired_mold_axe"];
+    private static readonly string[] All =
+    [
+        "mold_pickaxe", "mold_axe", "mold_ingot",
+        "fired_mold_pickaxe", "fired_mold_axe", "fired_mold_ingot",
+    ];
 
     private static readonly (string Raw, string Fired)[] Pairs =
-        [("mold_pickaxe", "fired_mold_pickaxe"), ("mold_axe", "fired_mold_axe")];
+    [
+        ("mold_pickaxe", "fired_mold_pickaxe"),
+        ("mold_axe", "fired_mold_axe"),
+        ("mold_ingot", "fired_mold_ingot"),
+    ];
 
     public static IEnumerable<object[]> AllMolds => All.Select(name => new object[] { name });
 

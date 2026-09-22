@@ -1,0 +1,10 @@
+{
+  // Pouring molten copper into a fired axe mold; the head melts back into the same 200 ml
+  // (recipes/melt/copper_axe_head.json).
+  "mold": "block/fired_mold_axe",
+  "fluid": "copper",
+  "amountMl": 200,
+  "coolSeconds": 2,
+  "result": "item/copper_axe_head",
+  "count": 1
+}

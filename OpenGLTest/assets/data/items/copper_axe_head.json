@@ -1,0 +1,2 @@
+// TODO: placeholder art — reuses the copper axe sprite until a cast head gets its own texture.
+{ "name": "Copper Axe Head", "texture": "assets/textures/items/copper_axe_head.png" }

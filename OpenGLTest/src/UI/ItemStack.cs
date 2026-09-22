@@ -10,6 +10,21 @@ public record struct DurabilityComponent(int UsesLeft, int MaxUses)
     public bool IsBroken => MaxUses > 0 && UsesLeft <= 0;
 }
 
+/// <summary>
+/// Crucible component: what one vessel holds. <paramref name="MoltenMl"/> is metal that has
+/// already melted and can be poured; <paramref name="PendingMl"/> is solid charge still waiting
+/// on a fire. Both are the same material, so a crucible only ever accepts a melt input whose
+/// material matches — or anything at all while it is empty.
+/// </summary>
+public record struct CrucibleComponent(byte MaterialId, int MoltenMl, int PendingMl)
+{
+    /// <summary>Everything in the vessel, for the capacity check.</summary>
+    public int TotalMl => MoltenMl + PendingMl;
+
+    /// <summary>Whether the vessel holds nothing, whatever material id it still remembers.</summary>
+    public bool IsEmpty => TotalMl == 0;
+}
+
 /// <summary>Cooldown component: earliest scene time the item may be used again.</summary>
 public record struct CooldownComponent(double NextUseAt)
 {

@@ -1,0 +1,77 @@
+{
+  // Crucible bowl: an ITEM model (assets/data/items/crucible.json names it), baked into
+  // Item.BakedModel and drawn as an entity mesh wherever a crucible is standing in a station.
+  // It is never a block in the world, so it never goes through MultiblockShape.Rotate and the
+  // multiblock bake rules do not apply - but it carries no "cullface" all the same, because an
+  // entity mesh has no cell neighbours to cull against.
+  //
+  // Authored in the usual 0..16 model units, centred on x/z 8 and 8 units tall, so the bowl is
+  // a 8x8x8 box hugging the middle of its cell. KilnRenderer mirrors those numbers:
+  //   CrucibleOuterHalf = 4/16   (half the outer footprint)
+  //   CrucibleFloorY    = 2/16   (top of the floor slab, where the liquid starts)
+  //   CrucibleTopY      = 8/16   (rim)
+  //   CrucibleInnerMin  = 5/16   CrucibleInnerMax = 11/16 (inside the walls; the liquid quad's width)
+  "textures": {
+    "clay": "fired_mud"
+  },
+  "elements": [
+    // Floor slab. It carries all six faces: the walls hide the outer ring of its top and its
+    // sides, but the inner 6x6 of the top face is the visible bowl floor the metal pools on.
+    {
+      "from": [4, 0, 4],
+      "to": [12, 2, 12],
+      "faces": {
+        "down": { "texture": "#clay" },
+        "up": { "texture": "#clay" },
+        "north": { "texture": "#clay" },
+        "south": { "texture": "#clay" },
+        "west": { "texture": "#clay" },
+        "east": { "texture": "#clay" }
+      }
+    },
+    // North wall (-Z), one unit thick, from the floor slab up to the rim.
+    {
+      "from": [4, 2, 4],
+      "to": [12, 8, 5],
+      "faces": {
+        "north": { "texture": "#clay" },
+        "south": { "texture": "#clay" },
+        "up": { "texture": "#clay" },
+        "west": { "texture": "#clay" },
+        "east": { "texture": "#clay" }
+      }
+    },
+    // South wall (+Z).
+    {
+      "from": [4, 2, 11],
+      "to": [12, 8, 12],
+      "faces": {
+        "north": { "texture": "#clay" },
+        "south": { "texture": "#clay" },
+        "up": { "texture": "#clay" },
+        "west": { "texture": "#clay" },
+        "east": { "texture": "#clay" }
+      }
+    },
+    // West wall (-X), sitting between the two end walls so the corners are not doubled.
+    {
+      "from": [4, 2, 5],
+      "to": [5, 8, 11],
+      "faces": {
+        "west": { "texture": "#clay" },
+        "east": { "texture": "#clay" },
+        "up": { "texture": "#clay" }
+      }
+    },
+    // East wall (+X).
+    {
+      "from": [11, 2, 5],
+      "to": [12, 8, 11],
+      "faces": {
+        "west": { "texture": "#clay" },
+        "east": { "texture": "#clay" },
+        "up": { "texture": "#clay" }
+      }
+    }
+  ]
+}

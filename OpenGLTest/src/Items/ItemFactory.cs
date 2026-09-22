@@ -42,7 +42,8 @@ public static class ItemFactory
         float? ThrowDamage,
         string SourceName,
         // Appended with a default so the positional construction in the tests keeps compiling
-        float FuelSeconds = 0f);
+        float FuelSeconds = 0f,
+        int CrucibleCapacityMl = 0);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,
@@ -63,6 +64,10 @@ public static class ItemFactory
     {
         if (CustomCreators.TryGetValue(fileName, out var custom))
             return custom(spec);
+        // A vessel is a family of its own: its contents live on the stack, so it needs the
+        // Tools pool whatever use action (usually none) its JSON declares.
+        if (spec.CrucibleCapacityMl > 0)
+            return new CrucibleItem(spec);
         return spec.Action switch
         {
             ItemUseAction.PickupFluid => new BucketPickupItem(spec),

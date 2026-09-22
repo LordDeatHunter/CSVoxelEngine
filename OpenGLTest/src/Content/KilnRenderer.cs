@@ -31,9 +31,34 @@ public static class KilnRenderer
     /// structure's front face at z = 0.</summary>
     public const float OpeningDepthZ = 12f / 16f;
 
-    /// <summary>Where a crucible rests inside the hearth, on the floor toward the front so it
-    /// can be reached. Consumed by the casting run.</summary>
-    public static readonly Vector3 CrucibleLocal = new(1f, OpeningFloorY, 0.375f);
+    /// <summary>Centre of the bowl a crucible rests on inside the hearth: on the floor and
+    /// toward the front so it can be reached. The bowl spans z 0.03..0.53 around this, which
+    /// leaves <see cref="FireLocal"/>'s flame at 0.55 standing just behind its back wall.</summary>
+    public static readonly Vector3 CrucibleLocal = new(1f, OpeningFloorY, 0.28f);
+
+    /// <summary>Half the crucible bowl's outer footprint (model x/z 4..12 of 16).</summary>
+    public const float CrucibleOuterHalf = 4f / 16f;
+
+    /// <summary>Top of the bowl's floor slab, where a molten pool starts (model y = 2).</summary>
+    public const float CrucibleFloorY = 2f / 16f;
+
+    /// <summary>The bowl's rim (model y = 8).</summary>
+    public const float CrucibleTopY = 8f / 16f;
+
+    /// <summary>Inside face of the bowl's west/north walls (model x/z = 5), in cell space.</summary>
+    public const float CrucibleInnerMin = 5f / 16f;
+
+    /// <summary>Inside face of the bowl's east/south walls (model x/z = 11), in cell space.</summary>
+    public const float CrucibleInnerMax = 11f / 16f;
+
+    /// <summary>
+    /// Height above the crucible's base at which its molten surface is drawn, so a pool rises
+    /// smoothly from just over the bowl floor to just under its rim as it fills. Clamps past
+    /// full, and reads as empty for a capacity of 0 (an item that is not a crucible).
+    /// </summary>
+    public static float LiquidHeight(float ml, int capacityMl) =>
+        MathUtils.Lerp(CrucibleFloorY + 0.03f, CrucibleTopY - 0.03f,
+            capacityMl > 0 ? MathUtils.Clamp01(ml / capacityMl) : 0f);
 
     /// <summary>Where the kiln's flame burns: centred between the piers, just above the hearth
     /// floor and behind the crucible.</summary>

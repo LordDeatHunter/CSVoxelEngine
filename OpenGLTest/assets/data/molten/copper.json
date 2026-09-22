@@ -1,0 +1,9 @@
+{
+  // Molten copper. Molten material is content, not a FluidManager fluid: it only ever lives in
+  // a crucible or in a mold that is filling, so it needs an id, a tile and a tint and nothing
+  // else. The lava tile is reused and tinted per material rather than drawing new art for each
+  // metal; the tint below is what makes copper read as copper.
+  "name": "Molten Copper",
+  "texture": "lava_still",
+  "color": [235, 130, 60]
+}

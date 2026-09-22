@@ -620,6 +620,12 @@ public class Inventory
             _misc[obsidianBlade.Id] = _misc.GetValueOrDefault(obsidianBlade.Id) + 1;
         if (ItemRegistry.FindByName("Multiblock Converter") is { } converter)
             _misc[converter.Id] = _misc.GetValueOrDefault(converter.Id) + 1;
+        if (ItemRegistry.FindByName("Mud Brick") is { } brick)
+            _misc[brick.Id] = _misc.GetValueOrDefault(brick.Id) + 50;
+        if (ItemRegistry.FindByName("Coal") is { } coal)
+            _misc[coal.Id] = _misc.GetValueOrDefault(coal.Id) + 50;
+        if (ItemRegistry.FindByName("Crushed Copper") is { } crushedCopper)
+            _misc[crushedCopper.Id] = _misc.GetValueOrDefault(crushedCopper.Id) + 50;
     }
 
     /// <summary>One stackable list row: icon, name and the pool count for that id.</summary>

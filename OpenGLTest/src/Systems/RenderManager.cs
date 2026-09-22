@@ -57,6 +57,14 @@ public class RenderManager : IDisposable
     // The quern's spinning plate and handle, built from the top quads of its baked model
     // (see QuernRenderer): the chunk only meshes the base, so this entity completes it.
     private Mesh? _quernTop;
+
+    // The crucible bowl standing in a kiln's opening, built from the crucible item's baked model
+    // (see CrucibleItem): it is an item, so nothing meshes it into a chunk.
+    private Mesh? _crucibleMesh;
+
+    // One flat liquid quad per molten material, tinted with the material's colour and built on
+    // first sight. Both the crucible's pool and a mold's fill draw it, scaled and lifted.
+    private readonly Dictionary<byte, Mesh> _moltenQuads = new();
     private uint _playerPaletteTex;
     private Dictionary<string, Mesh> _playerMeshes = new();
 
@@ -512,6 +520,7 @@ public class RenderManager : IDisposable
         // so one hook covers both callers.
         itemMeshes.GlStateChanged = InvalidateTextureUnits;
         _quernTop = BuildQuernTopMesh();
+        _crucibleMesh = BuildCrucibleMesh();
         try
         {
             PlayerRig = PlayerModel.PlayerRig.FromBbmodel(BbmodelLoader.Load(PlayerModelPath));
@@ -2280,6 +2289,168 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
+    /// The crucible bowl a kiln holds, as a standalone mesh: the chunk meshes only the kiln's
+    /// brickwork, so the vessel standing in its opening is an entity draw like the quern's top.
+    /// </summary>
+    private Mesh BuildCrucibleMesh()
+    {
+        var model = ContentRegistry.RequireItem("crucible").BakedModel
+            ?? throw new InvalidOperationException(
+                "Item 'crucible' has no baked model; its JSON must name one under model.");
+        return Primitives.CreateBlockModel(gl, model);
+    }
+
+    /// <summary>
+    /// The flat liquid quad of one molten material, built on first sight and kept for the run.
+    /// Every pool of that material — in a crucible or in a mold — draws this one mesh.
+    /// </summary>
+    private Mesh MoltenQuad(MoltenMaterial material)
+    {
+        if (_moltenQuads.TryGetValue(material.Id, out var mesh)) return mesh;
+        mesh = Primitives.CreateFlatQuad(gl, material.Color, UvRect.Tile(material.Tile));
+        _moltenQuads[material.Id] = mesh;
+        return mesh;
+    }
+
+    /// <summary>
+    /// Draws what a kiln holds inside its opening: the crucible bowl, the molten pool rising in
+    /// it and the stored fuel. The pool's height comes from
+    /// <see cref="KilnManager.DisplayMoltenMl"/>, which carries the fraction of the melt tick in
+    /// flight, so the surface rises smoothly instead of stepping once per chunk melted.
+    /// </summary>
+    public void RenderKilns(Camera camera, KilnManager kilns)
+    {
+        if (camera == null || kilns == null || !kilns.HasAny || _crucibleMesh == null) return;
+
+        worldShader.Use();
+        BindWorldTextures();
+
+        var viewProj = camera.GetViewProjection();
+        var atlasBound = true;
+
+        foreach (var (anchor, facing, state) in kilns.KilnView())
+        {
+            if (!atlasBound)
+            {
+                BindWorldTextures();
+                atlasBound = true;
+            }
+
+            if (state.HasCrucible)
+            {
+                // CreateBlockModel centres a cell's model on the origin, so lift by half a block
+                // to put the bowl's floor back on the hearth. The bowl is symmetric: no yaw.
+                var bowl = KilnRenderer.ToWorld(anchor, facing, KilnRenderer.CrucibleLocal);
+                var model = Matrix4x4.CreateTranslation(bowl + new Vector3(0f, 0.5f, 0f));
+                SetDrawUniforms(model, model * viewProj, 1f);
+                _crucibleMesh.Render();
+
+                var ml = KilnManager.DisplayMoltenMl(state);
+                if (ml > 0f && ContentRegistry.MoltenMaterialById(state.Contents.MaterialId) is { } material)
+                {
+                    var liquid = Matrix4x4.CreateScale(KilnRenderer.CrucibleInnerMax - KilnRenderer.CrucibleInnerMin)
+                                * Matrix4x4.CreateTranslation(bowl + new Vector3(0f,
+                                    KilnRenderer.LiquidHeight(ml, KilnManager.CrucibleCapacityOf(state)), 0f));
+                    SetDrawUniforms(liquid, liquid * viewProj, 1f);
+                    MoltenQuad(material).Render();
+                }
+            }
+
+            if (state.Fuel <= 0 || state.FuelItemId == 0) continue;
+
+            Mesh? fuelMesh;
+            if (ItemRegistry.IsItem(state.FuelItemId))
+            {
+                if (!itemMeshes.TryGet(state.FuelItemId, out fuelMesh, out var fuelTexture)) continue;
+                BindUnit(0, TextureTarget.Texture2DArray, fuelTexture);
+                atlasBound = false;
+            }
+            else
+            {
+                if (!atlasBound)
+                {
+                    BindWorldTextures();
+                    atlasBound = true;
+                }
+                fuelMesh = blockCubes.Get(state.FuelItemId);
+                if (fuelMesh == null) continue;
+            }
+
+            // Spread the stored units across the back of the hearth, facing out of the opening
+            var along = MultiblockShape.RotateDirection(Vector3.UnitX, facing);
+            var front = MultiblockShape.FrontNormal(facing);
+            var yaw = MathF.Atan2(front.X, front.Z);
+            var basePos = KilnRenderer.ToWorld(anchor, facing, KilnRenderer.FuelLocal)
+                        + new Vector3(0f, ItemDrop.Size * 0.5f, 0f);
+            for (var i = 0; i < state.Fuel; i++)
+            {
+                var placed = Matrix4x4.CreateScale(ItemDrop.Size)
+                            * Matrix4x4.CreateRotationY(yaw)
+                            * Matrix4x4.CreateTranslation(
+                                basePos + along * ((i - (state.Fuel - 1) * 0.5f) * 0.18f));
+                SetDrawUniforms(placed, placed * viewProj, 1f);
+                fuelMesh.Render();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Draws what sits in a mold's pocket: the molten pool rising as it is poured, then
+    /// dissolving into the finished cast's sprite as it cools. The two alphas come from
+    /// <see cref="CastingRenderer"/> and always sum to 1, so the cross-fade reads as one
+    /// dissolve over the whole cooling time rather than a cut. The liquid is drawn after the
+    /// sprite because it lies above it.
+    /// </summary>
+    public void RenderCastings(Camera camera, CastingManager castings)
+    {
+        if (camera == null || castings == null || !castings.HasAny) return;
+
+        worldShader.Use();
+        BindWorldTextures();
+
+        var viewProj = camera.GetViewProjection();
+
+        foreach (var (cell, materialId, fill01, cool01, done, resultId) in castings.CastingView())
+        {
+            if (done || cool01 > 0f)
+            {
+                Mesh? mesh;
+                if (ItemRegistry.IsItem(resultId))
+                {
+                    if (!itemMeshes.TryGet(resultId, out mesh, out var resultTexture)) continue;
+                    BindUnit(0, TextureTarget.Texture2DArray, resultTexture);
+                }
+                else
+                {
+                    mesh = blockCubes.Get(resultId);
+                    if (mesh == null) continue;
+                }
+
+                // The sprite lies flat in the pocket, just over its floor
+                var sprite = Matrix4x4.CreateScale(ItemDrop.Size * 1.5f)
+                            * Matrix4x4.CreateRotationX(-MathF.PI / 2f)
+                            * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f,
+                                CastingRenderer.PocketFloorY + 0.012f, 0.5f));
+                SetDrawUniforms(sprite, sprite * viewProj, done ? 1f : CastingRenderer.ResultAlpha(cool01));
+                mesh.Render();
+                BindWorldTextures();
+            }
+
+            if (done || fill01 <= 0f) continue;
+            if (ContentRegistry.MoltenMaterialById(materialId) is not { } material) continue;
+
+            var liquid = Matrix4x4.CreateScale(1f - 2f * CastingRenderer.PocketInset)
+                        * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f,
+                            CastingRenderer.LiquidHeight(fill01), 0.5f));
+            SetDrawUniforms(liquid, liquid * viewProj, CastingRenderer.LiquidAlpha(cool01));
+            MoltenQuad(material).Render();
+        }
+
+        // Leave the shared alpha uniform where every other entity pass expects it
+        worldShader.SetUniform(_locAlpha, 1f);
+    }
+
+    /// <summary>
     /// Draws the primed TNT cubes at full block size, strobing white through uFlash as their
     /// fuses burn down. Leaves uFlash at 0 so the other world draws stay textured.
     /// </summary>
@@ -2920,6 +3091,10 @@ public class RenderManager : IDisposable
         blockCubes.Dispose();
         itemMeshes.Dispose();
         _quernTop?.Dispose();
+        _crucibleMesh?.Dispose();
+        foreach (var quad in _moltenQuads.Values)
+            quad.Dispose();
+        _moltenQuads.Clear();
         foreach (var mesh in _playerMeshes.Values)
             mesh.Dispose();
         _playerMeshes.Clear();

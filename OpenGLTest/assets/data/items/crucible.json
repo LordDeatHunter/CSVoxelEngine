@@ -1,0 +1,15 @@
+{
+  // A fired clay bowl that holds molten metal. Its contents ride on the ItemStack
+  // (CrucibleComponent), so every crucible instance is its own vessel - which is why it stores
+  // into the Tools pool. Dropped into a kiln it melts ore, and poured over a fired cast mold it
+  // fills the mold.
+  //
+  // "model" is what the station renderer draws: the sprite below stays the inventory icon, but
+  // KilnManager's render pass shows the baked bowl sitting in the hearth.
+  //
+  // TODO: placeholder art - crucible.png is a byte copy of bucket.png until the real sprite lands.
+  "name": "Crucible",
+  "texture": "assets/textures/items/crucible.png",
+  "model": "block/crucible",
+  "crucible": { "capacityMl": 400 }
+}

@@ -44,6 +44,7 @@ public class World : IItemUseWorld
     private readonly CampfireManager _campfires = new();
     private readonly QuernManager _querns = new();
     private readonly KilnManager _kilns = new();
+    private readonly CastingManager _casting = new();
     private readonly FireParticleSystem _fire = new();
 
     // Every cell whose flame the particle system and the point lights draw: campfires plus kilns,
@@ -156,6 +157,9 @@ public class World : IItemUseWorld
 
     /// <summary>Kiln structures: stored fuel and burn state.</summary>
     public KilnManager Kilns => _kilns;
+
+    /// <summary>Cast molds: molten metal being poured, cooling and waiting to be collected.</summary>
+    public CastingManager Castings => _casting;
 
     /// <summary>Every burning cell this frame (campfires and lit kilns), feeding both the fire
     /// particles and the warm point lights.</summary>
@@ -338,6 +342,8 @@ public class World : IItemUseWorld
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
         _querns.Update((float)deltaTime, _chunkManager, _dropManager);
         _kilns.Update((float)deltaTime, _chunkManager, _dropManager);
+        _casting.Update((float)deltaTime, _chunkManager, _dropManager, Inventory,
+            Inventory.SelectedToolInstance, Camera.Position, InteractionReach);
         _fireCells.Clear();
         _fireCells.AddRange(_campfires.LitCells);
         _fireCells.AddRange(_kilns.LitCells);
@@ -519,6 +525,8 @@ public class World : IItemUseWorld
         renderManager.RenderThrown(Camera, _thrown);
         renderManager.RenderCampfireCooking(Camera, _campfires);
         renderManager.RenderQuerns(Camera, _querns);
+        renderManager.RenderKilns(Camera, _kilns);
+        renderManager.RenderCastings(Camera, _casting);
         renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
         renderManager.RenderFallingBlocks(Camera, _falling.Falling);
         renderManager.RenderSlimes(Camera, Slimes);
@@ -1027,6 +1035,10 @@ public class World : IItemUseWorld
                 _campfires.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, _dropManager);
             if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.Quern)
                 _querns.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, _dropManager);
+            // A mined mold throws out a cast that had already set, even in creative — the mold
+            // block itself is what creative withholds, not the metal someone poured into it
+            if (ContentRegistry.IsCastMold(brokenId))
+                _casting.NotifyBlockRemoved(blockPos, _dropManager);
         }
 
         // Water beside or above the hole pours into it on the next fluid tick
@@ -1312,6 +1324,11 @@ public class World : IItemUseWorld
             return;
         }
         if (TryKilnInteract(maxDistance))
+        {
+            Player.Punch();
+            return;
+        }
+        if (TryCastInteract(maxDistance))
         {
             Player.Punch();
             return;
@@ -1643,7 +1660,9 @@ public class World : IItemUseWorld
     }
 
     /// <summary>
-    /// Right-click on a kiln: fuel in hand goes into the hearth (up to
+    /// Right-click on a kiln: an empty hand lifts the crucible out of the hearth (contents and
+    /// all), a crucible in hand stands one in, anything with a melt recipe is charged into the
+    /// crucible already standing there, fuel goes into the hearth (up to
     /// <see cref="KilnManager.MaxFuel"/> units of one kind), a firestarter is passed through to
     /// its own <see cref="Item.OnUse"/> so it can strike, and a block in hand falls through to
     /// placement against the structure. Any other click on a kiln is spent. Returns whether the
@@ -1664,8 +1683,32 @@ public class World : IItemUseWorld
         // The firestarter lights the kiln from its own OnUse, which also spends its durability
         if (held is { UseAction: ItemUseAction.IgniteCampfire }) return false;
 
-        // Casting run: empty-hand crucible take, crucible place and melt-input insert go here,
-        // before fuel
+        // An empty hand lifts the crucible out; a full tools pool puts it straight back
+        if (held == null)
+        {
+            if (_kilns.TryTakeCrucible(anchor, out var takenId, out var takenContents)
+                && CrucibleInventory.Add(Inventory, takenId, takenContents) == null)
+                _kilns.TryPlaceCrucible(anchor, takenId, takenContents);
+            return true;
+        }
+
+        // A crucible in hand stands in the hearth, carrying whatever that instance held
+        if (held is CrucibleItem crucible)
+        {
+            var instance = Inventory.SelectedToolInstance;
+            var stack = instance > 0 ? Inventory.GetToolStack(instance) : null;
+            if (stack != null && _kilns.TryPlaceCrucible(anchor, crucible.Id, stack.Get<CrucibleComponent>()))
+                Inventory.RemoveTool(instance);
+            return true;
+        }
+
+        // Ore (or anything else that melts) charges the crucible standing inside
+        if (ContentRegistry.MeltRecipeForInput(held.Id) != null && _kilns.TryInsertMelt(anchor, held.Id))
+        {
+            if (!Camera.IsCreative)
+                Inventory.ConsumeSelected();
+            return true;
+        }
 
         if (held is { FuelSeconds: > 0f } && _kilns.TryAddFuel(anchor, held))
         {
@@ -1675,6 +1718,44 @@ public class World : IItemUseWorld
         }
 
         return held is not BlockItem;
+    }
+
+    /// <summary>
+    /// Right-click on a cast mold: a cooled cast is collected into the inventory (or thrown out
+    /// when there is no room), otherwise a crucible in hand starts or resumes pouring its molten
+    /// metal into the pocket. A crucible click is spent either way, so a refused pour never falls
+    /// through to placing anything; a block in hand does fall through, so molds can still be
+    /// stacked against each other. Returns whether the click belonged to the mold.
+    /// </summary>
+    private bool TryCastInteract(float maxDistance)
+    {
+        if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        var hx = (int)hit.X;
+        var hy = (int)hit.Y;
+        var hz = (int)hit.Z;
+        if (!_chunkManager.TryGetCell(hx, hy, hz, out var hitId, out _)) return false;
+        if (!ContentRegistry.IsCastMold(hitId)) return false;
+
+        var cell = new Vector3(hx, hy, hz);
+        var finished = _casting.Collect(cell);
+        if (finished.Count > 0)
+        {
+            foreach (var id in finished)
+                if (!Inventory.Add(id))
+                    _dropManager.Spawn(id, cell);
+            return true;
+        }
+
+        if (HeldItem() is CrucibleItem)
+        {
+            var instance = Inventory.SelectedToolInstance;
+            var stack = instance > 0 ? Inventory.GetToolStack(instance) : null;
+            if (stack != null)
+                _casting.TryStartPour(cell, hitId, stack);
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>

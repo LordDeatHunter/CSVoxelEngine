@@ -1,0 +1,7 @@
+{
+  // Mass conservation: a cast melts back into exactly what it took (see
+  // recipes/cast/copper_axe_head.json).
+  "input": "item/copper_axe_head",
+  "fluid": "copper",
+  "amountMl": 200
+}

@@ -1,0 +1,7 @@
+{
+  // A raw malachite chunk melts into copper. Melt files are named by their input and there is
+  // at most one per input, so MeltRecipeForInput is also the "is this meltable" test.
+  "input": "item/malachite_ore",
+  "fluid": "copper",
+  "amountMl": 100
+}

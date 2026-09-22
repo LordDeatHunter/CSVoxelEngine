@@ -1,0 +1,9 @@
+{
+  // Four mud bricks folded into a bowl. The result is a Tools-pool item, so each craft is its
+  // own vessel with its own contents.
+  "result": "item/crucible",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/mud_brick", "count": 4 }
+  ]
+}
