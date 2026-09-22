@@ -204,6 +204,9 @@ OpenGLTest/
                                             #   authored model (the kiln opening and its bowl,
                                             #   fire and fuel spots; the mold pocket levels and
                                             #   the cooling dissolve curves)
+      SpritePose.cs                         # the face-up pose and size-dependent resting lift
+                                            #   shared by every item sprite lying on a station
+                                            #   (the cooled cast, kiln fuel)
       MoltenMaterial.cs, MoltenMaterialDefinition.cs  # a molten metal: id, tile, tint
       MeltRecipe.cs, MeltRecipeDefinition.cs          # block/item -> (material, ml)
       CastRecipe.cs, CastRecipeDefinition.cs          # (fired mold, material) -> result + cooling
@@ -227,8 +230,11 @@ OpenGLTest/
                                #   CHUNK_DRAW variants of the world/shadow programs; the four
                                #   chunk passes are one MultiDrawElementsIndirect each
                                #   the station passes ride inside entityPass: RenderQuerns,
-                               #   RenderKilns (crucible mesh, molten pool, stored fuel) and
-                               #   RenderCastings (the pouring liquid dissolving into the cast)
+                               #   RenderKilns (crucible mesh, molten pool, the last charged
+                               #   input hovering over the rim and shrinking into it, stored
+                               #   fuel lying flat) and RenderCastings (the pouring liquid
+                               #   dissolving into the cast, drawn at CastingRenderer.ResultSize
+                               #   — the pocket's width — not drop size)
       UnderwaterRaysRenderer.cs # additive full-screen sun shafts while the eye is submerged
       ChunkGeometryPool.cs     # the two shared chunk vertex/index buffers (opaque, translucent):
                                #   BufferStorage VBO+EBO+VAO, NamedBufferSubData uploads, grow by copy
@@ -430,7 +436,7 @@ right-click behaviour (`World.TryUseSelected` -> `TryUseItem`):
 | `entityDamage` | damage one punch deals to an enemy (a slime); default 1 (the bare-hand baseline). A weapon raises it without needing a `tool` block (the obsidian blade is `6`) |
 | `attack` | left-click attack behaviour, an `AttackPattern`: `punch` (default; forward cone, hits the nearest one) or `slice` (forward hemisphere, hits the nearest two, two-phase swing — the obsidian blade). See `Combat`/`SliceCombo` |
 | `fuel.burnSeconds` | seconds one unit of this item keeps a kiln lit (coal 60; 1..3600). Writing the object is what makes an item kiln fuel — a kiln takes up to `KilnManager.MaxFuel` units of **one** kind at a time |
-| `crucible.capacityMl` | marks the item a **crucible**: a vessel holding this many millilitres of metal, melted and pending together (100..10000). A crucible stores in the **Tools** pool, one instance at a time, because its contents ride on that instance's `ItemStack` as a `CrucibleComponent(MaterialId, MoltenMl, PendingMl)`; while the vessel stands in a kiln the same struct lives in `KilnState` instead, and taking it out writes it back onto a fresh instance (`CrucibleInventory.Add`). The stack carries no melt timer, so putting a crucible back into a kiln restarts the partial chunk it was melting |
+| `crucible.capacityMl` | marks the item a **crucible**: a vessel holding this many millilitres of metal, melted and pending together (100..10000). A crucible stores in the **Tools** pool, one instance at a time, because its contents ride on that instance's `ItemStack` as a `CrucibleComponent(MaterialId, MoltenMl, PendingMl, PendingInputId)` — the last field is display-only, the last melt input charged in, so the kiln can draw what is waiting to melt; while the vessel stands in a kiln the same struct lives in `KilnState` instead, and taking it out writes it back onto a fresh instance (`CrucibleInventory.Add`). The stack carries no melt timer, so putting a crucible back into a kiln restarts the partial chunk it was melting |
 | `model` | optional `block/<name>` model under `assets/models/`, baked into `Item.BakedModel` so the item can be drawn as real 3D geometry while it sits inside a station (the crucible standing in a kiln's hearth). The sprite stays the inventory icon; this only adds a mesh |
 | `tool` | optional mining numbers: `power` (the item's mining *tier* — the number a block's `tools` requirement is compared against, default 0.5, the bare-hand baseline; it is **not** a damage number, damage is `blockDamage`) and `hitDelayMs` (milliseconds between hits). Writing the object marks the item as a tool; which block `tools` tags it satisfies comes from the tag files, not the item — `assets/data/tags/pickaxe.json` listing `item/primitive_pickaxe` is what makes a block gating on `"pickaxe"` accept it (`Mining.CanMine`). Bare hand and non-tool items mine at the defaults, and creative ignores the gate |
 
@@ -554,8 +560,13 @@ then turns `MeltChunkMl` of that pending charge molten every `MeltSeconds`. Melt
 rather than resets when the fire dies or the vessel is lifted out: `KilnState.MeltLeft` simply
 stops ticking, so relighting resumes the partial chunk. `MeltProgress01` and `DisplayMoltenMl` are
 what the render pass reads and neither depends on `Lit`, which is what keeps the drawn pool rising
-smoothly between chunks and stops it dropping the instant the last unit burns out. Breaking the
-structure drops the stored fuel and the crucible at the mined cell — the metal inside is lost.
+smoothly between chunks and stops it dropping the instant the last unit burns out.
+`DisplayPendingMl` is their conservation complement (drawn pending + drawn molten = `TotalMl`),
+and `KilnRenderer.PendingScale01` turns it into the lump of the last input
+(`CrucibleComponent.PendingInputId`) hovering over the rim, full-size while a whole unit is solid
+and shrinking to nothing as the last unit melts — so the charge is never invisible and never cuts
+out. Breaking the structure drops the stored fuel and the crucible at the mined cell — the metal
+inside is lost.
 
 **Casting** (`Systems/CastingManager.cs`, one `CastState` per mold cell) is the other half.
 Right-clicking a fired mold with a crucible binds that tool instance and pours at

@@ -15,8 +15,18 @@ public record struct DurabilityComponent(int UsesLeft, int MaxUses)
 /// already melted and can be poured; <paramref name="PendingMl"/> is solid charge still waiting
 /// on a fire. Both are the same material, so a crucible only ever accepts a melt input whose
 /// material matches — or anything at all while it is empty.
+///
+/// <para>
+/// <paramref name="PendingInputId"/> is the block/item id of the <em>last</em> melt input charged
+/// in (0 = none recorded). It is display-only — the kiln's render pass draws that item as the
+/// lump waiting over the pool — and only meaningful while <paramref name="PendingMl"/> is above
+/// zero; it takes no part in <see cref="KilnManager.CanAccept"/>, capacity or melting. Its
+/// default keeps every three-argument construction (<c>new CrucibleComponent(copper, ml, ml)</c>,
+/// <c>default</c>) valid and equal to what it was before the field existed.
+/// </para>
 /// </summary>
-public record struct CrucibleComponent(byte MaterialId, int MoltenMl, int PendingMl)
+public record struct CrucibleComponent(byte MaterialId, int MoltenMl, int PendingMl,
+    byte PendingInputId = 0)
 {
     /// <summary>Everything in the vessel, for the capacity check.</summary>
     public int TotalMl => MoltenMl + PendingMl;

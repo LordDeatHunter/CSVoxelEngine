@@ -174,6 +174,24 @@ public sealed class KilnManager
         + MeltProgress01(state) * Math.Min(MeltChunkMl, state.Contents.PendingMl);
 
     /// <summary>
+    /// Millilitres of solid charge the render pass should still show waiting over the pool: the
+    /// exact complement of <see cref="DisplayMoltenMl"/>, so drawn pending plus drawn molten
+    /// always equals <see cref="CrucibleComponent.TotalMl"/> and the lump shrinks by precisely
+    /// what the pool gains.
+    /// </summary>
+    public static float DisplayPendingMl(KilnState state) =>
+        state.Contents.PendingMl
+        - MeltProgress01(state) * Math.Min(MeltChunkMl, state.Contents.PendingMl);
+
+    /// <summary>
+    /// Millilitres one unit of the last charged input is worth — the size at which the drawn lump
+    /// reads as one whole piece. Falls back to a single melt chunk when no input was recorded, so
+    /// the lump's scale stays finite whatever the vessel remembers.
+    /// </summary>
+    public static int PendingUnitMl(KilnState state) =>
+        ContentRegistry.MeltRecipeForInput(state.Contents.PendingInputId)?.AmountMl ?? MeltChunkMl;
+
+    /// <summary>
     /// Stands a crucible in the hearth, with whatever the vessel was carrying. Refuses an
     /// untracked kiln and one that already holds a crucible. The melt timer restarts here: the
     /// item's stack carries no timer of its own, so taking a vessel out mid-chunk and putting it
@@ -222,6 +240,7 @@ public sealed class KilnManager
         {
             MaterialId = recipe.MaterialId,
             PendingMl = state.Contents.PendingMl + recipe.AmountMl,
+            PendingInputId = inputId,
         };
         return true;
     }

@@ -265,6 +265,91 @@ public sealed class CrucibleTests
         Assert.True(KilnManager.MeltProgress01(state2) > 0f);
     }
 
+    /// <summary>
+    /// The vessel remembers what was last charged into it, because the render pass has to draw
+    /// <em>something</em> for the solid charge and the aggregate (material, molten, pending) does
+    /// not say which item it came from. The rule is that the hint rides inside the component, so
+    /// it survives a take and a place into another kiln exactly like the millilitres do — and
+    /// that a component written without it is still the component it always was.
+    /// </summary>
+    [Fact]
+    public void PendingChargeRemembersItsLastInputAcrossATakeAndPlace()
+    {
+        var anchor = new Vector3(2, 2, 2);
+        var (_, kilns, _) = ConvertedKiln(anchor);
+        var ore = MeltOf("malachite_ore");
+        var crushed = MeltOf("crushed_copper");
+
+        Assert.True(kilns.TryPlaceCrucible(anchor, Crucible.Id, default));
+        var state = kilns.StateAt(2, 2, 2)!;
+
+        Assert.True(kilns.TryInsertMelt(anchor, ore.InputId));
+        Assert.Equal(ore.InputId, state.Contents.PendingInputId);
+
+        // A second input of the same material: the hint follows the last thing put in
+        Assert.True(kilns.TryInsertMelt(anchor, crushed.InputId));
+        Assert.Equal(crushed.InputId, state.Contents.PendingInputId);
+        Assert.Equal(Copper, state.Contents.MaterialId);
+        Assert.Equal(ore.AmountMl + crushed.AmountMl, state.Contents.PendingMl);
+
+        Assert.True(kilns.TryTakeCrucible(anchor, out _, out var taken));
+        Assert.Equal(crushed.InputId, taken.PendingInputId);
+
+        var (_, otherKilns, _) = ConvertedKiln(anchor);
+        Assert.True(otherKilns.TryPlaceCrucible(anchor, Crucible.Id, taken));
+        Assert.Equal(crushed.InputId, otherKilns.StateAt(2, 2, 2)!.Contents.PendingInputId);
+
+        // A component written the way every older caller writes it is unchanged by the new field
+        Assert.Equal<byte>(0, default(CrucibleComponent).PendingInputId);
+        Assert.Equal(new CrucibleComponent(Copper, 1, 2), new CrucibleComponent(Copper, 1, 2, 0));
+    }
+
+    /// <summary>
+    /// Conservation between the two drawn quantities: whatever the melt is part-way through, the
+    /// lump the render pass still shows plus the pool it shows add up to what is actually in the
+    /// vessel, and the lump only ever shrinks. That is what lets the charge dissolve into the
+    /// pool with no cut at either end.
+    /// </summary>
+    [Fact]
+    public void DisplayedPendingAndMoltenAlwaysSumToTheChargeAndThePendingOnlyFalls()
+    {
+        var anchor = new Vector3(2, 2, 2);
+        var (manager, kilns, drops) = ConvertedKiln(anchor);
+        var ore = MeltOf("malachite_ore");
+
+        Assert.True(kilns.TryPlaceCrucible(anchor, Crucible.Id, default));
+        var state = kilns.StateAt(2, 2, 2)!;
+        while (state.Contents.PendingMl < 2 * KilnManager.MeltChunkMl)
+            Assert.True(kilns.TryInsertMelt(anchor, ore.InputId));
+
+        // One unit of the charged input is what the lump is drawn as while it is whole
+        Assert.Equal(ore.AmountMl, KilnManager.PendingUnitMl(state));
+
+        Assert.True(kilns.TryAddFuel(anchor, Coal));
+        // Cold: every millilitre charged is still solid
+        Assert.Equal((float)state.Contents.PendingMl, KilnManager.DisplayPendingMl(state));
+
+        Assert.True(kilns.Ignite(anchor));
+
+        var dt = KilnManager.MeltSeconds / 20f;
+        var previous = KilnManager.DisplayPendingMl(state);
+        for (var i = 0; i < 25; i++)
+        {
+            kilns.Update(dt, manager, drops);
+            var pending = KilnManager.DisplayPendingMl(state);
+            Assert.Equal((float)state.Contents.TotalMl,
+                KilnManager.DisplayMoltenMl(state) + pending, precision: 3);
+            Assert.True(pending <= previous, $"step {i}: {pending} > {previous}");
+            previous = pending;
+        }
+
+        // A vessel that remembers no input still reports a finite unit, so the lump's scale is
+        // never a division by zero
+        var (_, bare, _) = ConvertedKiln(anchor);
+        Assert.True(bare.TryPlaceCrucible(anchor, Crucible.Id, default));
+        Assert.True(KilnManager.PendingUnitMl(bare.StateAt(2, 2, 2)!) > 0);
+    }
+
     [Fact]
     public void BreakingTheKilnDropsTheCrucibleAndFuelButNotTheMetal()
     {

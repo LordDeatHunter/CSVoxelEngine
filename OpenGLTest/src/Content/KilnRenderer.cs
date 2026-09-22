@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 
 namespace silkgltriangle;
@@ -64,9 +65,55 @@ public static class KilnRenderer
     /// floor and behind the crucible.</summary>
     public static readonly Vector3 FireLocal = new(1f, 0.25f, 0.55f);
 
-    /// <summary>Where the stored fuel sits, at the back of the hearth. Consumed by the casting
-    /// run's render pass.</summary>
-    public static readonly Vector3 FuelLocal = new(1f, OpeningFloorY, 0.65f);
+    /// <summary>Centre of the fuel row at the back of the hearth: far enough forward that a unit
+    /// lying flat (<see cref="FuelSize"/> across) stays clear of the back wall at
+    /// <see cref="OpeningDepthZ"/>, and still behind the flame. Consumed by the casting run's
+    /// render pass.</summary>
+    public static readonly Vector3 FuelLocal = new(1f, OpeningFloorY, 0.62f);
+
+    /// <summary>Edge length one stored unit of fuel is drawn at: a lump the size of a dropped
+    /// item.</summary>
+    public const float FuelSize = ItemDrop.Size;
+
+    /// <summary>Centre-to-centre distance between stored units along the opening. Never less
+    /// than a unit's own width, so two sprites lying flat never overlap coplanarly and
+    /// z-fight.</summary>
+    public const float FuelSpacing = FuelSize;
+
+    /// <summary>Clearance between the bowl's rim and the underside of the lump waiting to
+    /// melt.</summary>
+    public const float PendingGap = 0.02f;
+
+    /// <summary>Edge length the lump of solid charge waiting to melt is drawn at, at full size:
+    /// wider than the bowl's mouth (<see cref="CrucibleInnerMin"/>..<see cref="CrucibleInnerMax"/>)
+    /// so it reads as resting across the rim rather than having fallen in, and narrower than the
+    /// bowl itself.</summary>
+    public const float PendingSize = 2f * CrucibleOuterHalf * 0.8f;
+
+    /// <summary>Bottom-centre of that lump in the volume's local frame: over the bowl, just above
+    /// its rim. The render pass lifts by half the drawn size to centre the mesh on it.</summary>
+    public static readonly Vector3 PendingLocal =
+        new(CrucibleLocal.X, OpeningFloorY + CrucibleTopY + PendingGap, CrucibleLocal.Z);
+
+    /// <summary>
+    /// How big the waiting lump is drawn, as a fraction 0..1 of <see cref="PendingSize"/>: full
+    /// while a whole unit or more is still solid, then shrinking linearly to nothing as the last
+    /// unit melts, so it vanishes exactly when the charge does instead of cutting out - the
+    /// continuity <see cref="KilnManager.DisplayMoltenMl"/> gives the pool below it. A unit size
+    /// of 0 (no melt recipe recorded) still reads as a whole lump while anything is pending.
+    /// </summary>
+    public static float PendingScale01(float displayPendingMl, int unitMl) =>
+        unitMl > 0
+            ? MathUtils.Clamp01(displayPendingMl / unitMl)
+            : displayPendingMl > 0f ? 1f : 0f;
+
+    /// <summary>The yaw that turns a prop's local +Z - an upright sprite's front face - out of
+    /// the kiln's opening.</summary>
+    public static float OpeningYaw(int facing)
+    {
+        var front = MultiblockShape.FrontNormal(facing);
+        return MathF.Atan2(front.X, front.Z);
+    }
 
     /// <summary>Turns a local point of the volume into a world position for a kiln whose anchor
     /// cell (the volume's minimum corner) is <paramref name="anchor"/> and which faces

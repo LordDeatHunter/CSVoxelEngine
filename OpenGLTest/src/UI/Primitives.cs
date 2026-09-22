@@ -187,7 +187,7 @@ public static class Primitives
     public static Mesh CreateExtrudedSprite(GL gl, byte[] rgba, int width, int height, float size = 1f)
     {
         var half = size * 0.5f;
-        var depth = size / width * 2f;
+        var depth = 2f * SpritePose.HalfThickness(size, width);
         var zFront = depth * 0.5f;
         var zBack = -zFront;
 

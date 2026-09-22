@@ -2314,9 +2314,12 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// Draws what a kiln holds inside its opening: the crucible bowl, the molten pool rising in
-    /// it and the stored fuel. The pool's height comes from
+    /// it, the lump of solid charge still waiting to melt over its rim, and the stored fuel
+    /// lying on the hearth. The pool's height comes from
     /// <see cref="KilnManager.DisplayMoltenMl"/>, which carries the fraction of the melt tick in
-    /// flight, so the surface rises smoothly instead of stepping once per chunk melted.
+    /// flight, so the surface rises smoothly instead of stepping once per chunk melted; the lump
+    /// is its complement (<see cref="KilnManager.DisplayPendingMl"/> through
+    /// <see cref="KilnRenderer.PendingScale01"/>), so what the pool gains the lump loses.
     /// </summary>
     public void RenderKilns(Camera camera, KilnManager kilns)
     {
@@ -2354,12 +2357,52 @@ public class RenderManager : IDisposable
                     SetDrawUniforms(liquid, liquid * viewProj, 1f);
                     MoltenQuad(material).Render();
                 }
+
+                var pendingMl = KilnManager.DisplayPendingMl(state);
+                var inputId = state.Contents.PendingInputId;
+                if (pendingMl > 0f && inputId != 0)
+                {
+                    Mesh? lump;
+                    if (ItemRegistry.IsItem(inputId))
+                    {
+                        if (itemMeshes.TryGet(inputId, out lump, out var lumpTexture))
+                        {
+                            BindUnit(0, TextureTarget.Texture2DArray, lumpTexture);
+                            atlasBound = false;
+                        }
+                    }
+                    else
+                    {
+                        if (!atlasBound)
+                        {
+                            BindWorldTextures();
+                            atlasBound = true;
+                        }
+
+                        lump = blockCubes.Get(inputId);
+                    }
+
+                    if (lump != null)
+                    {
+                        // One piece of the last thing charged in, resting over the rim and facing
+                        // the opening; it shrinks as its last unit melts into the pool below
+                        var size = KilnRenderer.PendingSize
+                                 * KilnRenderer.PendingScale01(pendingMl, KilnManager.PendingUnitMl(state));
+                        var foot = KilnRenderer.ToWorld(anchor, facing, KilnRenderer.PendingLocal);
+                        var placed = Matrix4x4.CreateScale(size)
+                                    * Matrix4x4.CreateRotationY(KilnRenderer.OpeningYaw(facing))
+                                    * Matrix4x4.CreateTranslation(foot + new Vector3(0f, size * 0.5f, 0f));
+                        SetDrawUniforms(placed, placed * viewProj, 1f);
+                        lump.Render();
+                    }
+                }
             }
 
             if (state.Fuel <= 0 || state.FuelItemId == 0) continue;
 
+            var fuelIsItem = ItemRegistry.IsItem(state.FuelItemId);
             Mesh? fuelMesh;
-            if (ItemRegistry.IsItem(state.FuelItemId))
+            if (fuelIsItem)
             {
                 if (!itemMeshes.TryGet(state.FuelItemId, out fuelMesh, out var fuelTexture)) continue;
                 BindUnit(0, TextureTarget.Texture2DArray, fuelTexture);
@@ -2376,18 +2419,24 @@ public class RenderManager : IDisposable
                 if (fuelMesh == null) continue;
             }
 
-            // Spread the stored units across the back of the hearth, facing out of the opening
+            // Spread the stored units across the back of the hearth; sprites lie face-up on the
+            // floor, cubes stand on it, both turned to the opening.
             var along = MultiblockShape.RotateDirection(Vector3.UnitX, facing);
-            var front = MultiblockShape.FrontNormal(facing);
-            var yaw = MathF.Atan2(front.X, front.Z);
+            var yaw = KilnRenderer.OpeningYaw(facing);
+            var orient = fuelIsItem
+                ? SpritePose.LyingFaceUp(yaw)
+                : Matrix4x4.CreateRotationY(yaw);
+            var lift = fuelIsItem
+                ? SpritePose.RestingLift(KilnRenderer.FuelSize)
+                : KilnRenderer.FuelSize * 0.5f;
             var basePos = KilnRenderer.ToWorld(anchor, facing, KilnRenderer.FuelLocal)
-                        + new Vector3(0f, ItemDrop.Size * 0.5f, 0f);
+                        + new Vector3(0f, lift, 0f);
             for (var i = 0; i < state.Fuel; i++)
             {
-                var placed = Matrix4x4.CreateScale(ItemDrop.Size)
-                            * Matrix4x4.CreateRotationY(yaw)
+                var placed = Matrix4x4.CreateScale(KilnRenderer.FuelSize)
+                            * orient
                             * Matrix4x4.CreateTranslation(
-                                basePos + along * ((i - (state.Fuel - 1) * 0.5f) * 0.18f));
+                                basePos + along * ((i - (state.Fuel - 1) * 0.5f) * KilnRenderer.FuelSpacing));
                 SetDrawUniforms(placed, placed * viewProj, 1f);
                 fuelMesh.Render();
             }
@@ -2415,22 +2464,29 @@ public class RenderManager : IDisposable
             if (done || cool01 > 0f)
             {
                 Mesh? mesh;
+                Matrix4x4 sprite;
                 if (ItemRegistry.IsItem(resultId))
                 {
                     if (!itemMeshes.TryGet(resultId, out mesh, out var resultTexture)) continue;
                     BindUnit(0, TextureTarget.Texture2DArray, resultTexture);
+
+                    // The cast lies face-up in the pocket, filling it
+                    sprite = Matrix4x4.CreateScale(CastingRenderer.ResultSize)
+                            * SpritePose.LyingFaceUp(0f)
+                            * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f,
+                                CastingRenderer.ResultY, 0.5f));
                 }
                 else
                 {
                     mesh = blockCubes.Get(resultId);
                     if (mesh == null) continue;
+
+                    // A block result is a cube fitted to the pocket's depth
+                    sprite = Matrix4x4.CreateScale(CastingRenderer.ResultCubeSize)
+                            * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f,
+                                CastingRenderer.ResultCubeY, 0.5f));
                 }
 
-                // The sprite lies flat in the pocket, just over its floor
-                var sprite = Matrix4x4.CreateScale(ItemDrop.Size * 1.5f)
-                            * Matrix4x4.CreateRotationX(-MathF.PI / 2f)
-                            * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f,
-                                CastingRenderer.PocketFloorY + 0.012f, 0.5f));
                 SetDrawUniforms(sprite, sprite * viewProj, done ? 1f : CastingRenderer.ResultAlpha(cool01));
                 mesh.Render();
                 BindWorldTextures();
@@ -2439,7 +2495,7 @@ public class RenderManager : IDisposable
             if (done || fill01 <= 0f) continue;
             if (ContentRegistry.MoltenMaterialById(materialId) is not { } material) continue;
 
-            var liquid = Matrix4x4.CreateScale(1f - 2f * CastingRenderer.PocketInset)
+            var liquid = Matrix4x4.CreateScale(CastingRenderer.PocketWidth)
                         * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f,
                             CastingRenderer.LiquidHeight(fill01), 0.5f));
             SetDrawUniforms(liquid, liquid * viewProj, CastingRenderer.LiquidAlpha(cool01));

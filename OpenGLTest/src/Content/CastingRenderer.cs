@@ -23,6 +23,32 @@ public static class CastingRenderer
     /// <summary>Width of the rim around the pocket, in cell space (model 2 of 16 per side).</summary>
     public const float PocketInset = 2f / 16f;
 
+    /// <summary>Inner width of the pocket in cell space - the whole cell less a rim on each
+    /// side - which is what the molten sheet is scaled to.</summary>
+    public const float PocketWidth = 1f - 2f * PocketInset;
+
+    /// <summary>How far the finished cast's edge stays inside the pocket wall on each side, so
+    /// the sprite's extruded side walls never touch or z-fight that wall.</summary>
+    public const float ResultClearance = 0.01f;
+
+    /// <summary>Edge length an item result is drawn at: the metal that filled the pocket
+    /// solidified in place, so it spans the pocket less <see cref="ResultClearance"/> a side
+    /// rather than reading as a ground-drop icon dropped into the slab.</summary>
+    public const float ResultSize = PocketWidth - 2f * ResultClearance;
+
+    /// <summary>Height of that sprite's centre: lying face-up on the pocket floor with its back
+    /// face just clear of it (<see cref="SpritePose.RestingLift"/>), under the molten sheet that
+    /// dissolves into it.</summary>
+    public static readonly float ResultY = PocketFloorY + SpritePose.RestingLift(ResultSize);
+
+    /// <summary>Edge length a <em>block</em> result is drawn at - none of the cast recipes
+    /// yields one today, but the render pass handles the branch - fitted to the pocket's depth,
+    /// since a pocket-wide cube would stand straight through the slab.</summary>
+    public const float ResultCubeSize = PocketTopY - PocketFloorY;
+
+    /// <summary>Height of that cube's centre: resting on the pocket floor.</summary>
+    public const float ResultCubeY = PocketFloorY + ResultCubeSize * 0.5f;
+
     /// <summary>
     /// Height at which the pour's molten surface is drawn inside the mold's cell, rising smoothly
     /// from just over the pocket floor to just under the rim as <paramref name="fill01"/> goes
