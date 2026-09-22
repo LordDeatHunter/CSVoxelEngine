@@ -1304,52 +1304,43 @@ public class World : IItemUseWorld
     }
 
     /// <summary>
-    /// Right-click: uses the selected slot's item through its own <see cref="Item.OnUse"/>
-    /// (a bucket scoops or pours, flint grounds a pile, a firestarter strikes), otherwise places
-    /// the selected block. A successful tool use morphs the instance in place, so every hotbar
-    /// slot holding that bucket flips with it and scooping and pouring alternate on one button.
+    /// Right-click: runs the first thing that claims the click — a campfire, quern, kiln or cast
+    /// mold interaction, then the selected slot's own <see cref="Item.OnUse"/> (a bucket scoops
+    /// or pours, flint grounds a pile, a firestarter strikes), otherwise places the selected
+    /// block. A successful tool use morphs the instance in place, so every hotbar slot holding
+    /// that bucket flips with it and scooping and pouring alternate on one button. Returns
+    /// whether the click was claimed, so a plain throwable only starts charging when nothing
+    /// here owned it — a mudball aimed at a lit campfire cooks instead of being thrown.
     /// </summary>
-    public void TryUseSelected(float maxDistance)
+    public bool TryUseSelected(float maxDistance)
     {
-        if (_throwCharging) return;
+        if (_throwCharging) return false;
         Camera.NotifyPlayerAction();
         if (TryCookOrCollect(maxDistance))
         {
             Player.Punch();
-            return;
+            return true;
         }
         if (TryQuernInteract(maxDistance))
         {
             Player.Punch();
-            return;
+            return true;
         }
         if (TryKilnInteract(maxDistance))
         {
             Player.Punch();
-            return;
+            return true;
         }
         if (TryCastInteract(maxDistance))
         {
             Player.Punch();
-            return;
+            return true;
         }
         var id = Inventory.SelectedBlockId;
         var item = id != 0 && Inventory.SelectedCount > 0 ? ItemRegistry.TryGet(id) : null;
         if (item == null || item is BlockItem || item.UseAction == ItemUseAction.None)
-        {
-            TryPlaceSelectedBlock(maxDistance);
-            return;
-        }
-        DispatchUse(item, maxDistance);
-    }
-
-    public bool ShouldChargeThrow()
-    {
-        var id = Inventory.SelectedBlockId;
-        if (id == 0 || Inventory.SelectedCount <= 0) return false;
-        if (ItemRegistry.TryGet(id) is not { IsThrowable: true } item) return false;
-        if (item.UseAction == ItemUseAction.None) return true;
-        return !Camera.Raycast(InteractionReach, _chunkManager, out _, out _);
+            return TryPlaceSelectedBlock(maxDistance);
+        return DispatchUse(item, maxDistance);
     }
 
     public bool TryBeginThrowCharge()
@@ -1437,9 +1428,9 @@ public class World : IItemUseWorld
     /// <summary>
     /// Runs one item's <see cref="Item.OnUse"/> and applies its outcome: morph the tool instance
     /// in place (only when the use took effect) and punch. Durability, cooldowns and stack
-    /// spending already happened inside the override.
+    /// spending already happened inside the override. Returns whether the use took effect.
     /// </summary>
-    private void DispatchUse(Item item, float maxDistance)
+    private bool DispatchUse(Item item, float maxDistance)
     {
         var instance = Inventory.SelectedToolInstance;
         _activeToolInstance = instance;
@@ -1451,6 +1442,7 @@ public class World : IItemUseWorld
                 Inventory.MorphTool(instance, result.MorphToId.Value);
             if (result.Punch)
                 Player.Punch();
+            return result.Applied;
         }
         finally
         {
@@ -1761,15 +1753,17 @@ public class World : IItemUseWorld
     /// <summary>
     /// Places the hotbar's selected block against the face the player is looking at and spends
     /// one from that slot — except in creative mode, where placing is free. Does nothing
-    /// when the slot is empty or holds no blocks.
+    /// when the slot is empty or holds no blocks. Returns whether one was placed.
     /// </summary>
-    public void TryPlaceSelectedBlock(float maxDistance)
+    public bool TryPlaceSelectedBlock(float maxDistance)
     {
-        if (!Inventory.CanPlaceSelected) return;
+        if (!Inventory.CanPlaceSelected) return false;
 
         // Only spend a block if one actually went down (and never in creative)
-        if (TryPlaceBlockFromRaycast(maxDistance, Inventory.SelectedBlockId) && !Camera.IsCreative)
+        if (!TryPlaceBlockFromRaycast(maxDistance, Inventory.SelectedBlockId)) return false;
+        if (!Camera.IsCreative)
             Inventory.ConsumeSelected();
+        return true;
     }
 
     public bool TryPickTargetedBlock()

@@ -20,6 +20,7 @@ public static class Program
     private static bool debugEnabled;
     private static bool xWasPressed;
     private static bool qWasPressed;
+    private static bool rightWasDown;
     private static bool middleWasPressed;
     private static bool eWasPressed;
     private static bool escWasPressed;
@@ -307,23 +308,25 @@ public static class Program
 
         // Right-click use/place does real work (raycast plus a synchronous remesh on bucket
         // pours and single-block placements), so it gets its own span instead of hiding in
-        // the input shell. A throwable aimed at air charges instead: hold to charge, release to throw.
-        var rightHeld = !inventoryView.IsOpen && !pauseMenuView.IsOpen
-            && inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true;
+        // the input shell. The block interaction always runs first, on the press edge and then
+        // on the repeat timer; a throwable only starts charging when nothing claimed the click,
+        // so a mudball cooks on a lit campfire instead of sailing over it. Hold to charge,
+        // release to throw.
+        var rightDown = inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true;
+        var rightHeld = rightDown && !inventoryView.IsOpen && !pauseMenuView.IsOpen;
+        var rightPressed = rightHeld && !rightWasDown;
         if (rightHeld && world.IsThrowCharging)
         {
             world.UpdateThrowCharge((float)deltaTime);
         }
-        else if (rightHeld && world.ShouldChargeThrow())
+        else if (rightHeld && (rightPressed || placeTimer >= MAX_PLACE_TIMER))
         {
-            world.TryBeginThrowCharge();
-        }
-        else if (rightHeld && placeTimer >= MAX_PLACE_TIMER)
-        {
-            FrameProfiler.Begin(ProfileSection.UsePlace);
             placeTimer = 0;
-            world.TryUseSelected(World.InteractionReach);
+            FrameProfiler.Begin(ProfileSection.UsePlace);
+            var claimed = world.TryUseSelected(World.InteractionReach);
             FrameProfiler.End(ProfileSection.UsePlace);
+            if (!claimed)
+                world.TryBeginThrowCharge();
         }
         else if (!rightHeld && world.IsThrowCharging)
         {
@@ -332,6 +335,7 @@ public static class Program
             placeTimer = 0;
             FrameProfiler.End(ProfileSection.UsePlace);
         }
+        rightWasDown = rightDown;
         if (!rightHeld && (inventoryView.IsOpen || pauseMenuView.IsOpen) && world.IsThrowCharging)
             world.CancelThrowCharge();
 
