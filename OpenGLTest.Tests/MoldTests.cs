@@ -237,15 +237,13 @@ public sealed class MoldTests
         var craft = ContentRegistry.RecipeByName("mold_pickaxe")!;
         var uncraft = ContentRegistry.RecipeByName("mudball_from_mold_pickaxe")!;
 
-        // The starting stock is blocks only, so the only recipes a fresh inventory affords are
-        // the ones whose every ingredient comes out of the blocks pool — the two uncrafts.
+        // A fresh inventory holds the molds but no mudballs, so the uncrafts into mudballs are
+        // affordable and the craft back from them is not.
         var fresh = inventory.Craftable();
         Assert.Contains(uncraft, fresh);
         Assert.Contains(ContentRegistry.RecipeByName("mudball_from_mold_axe")!, fresh);
         Assert.DoesNotContain(craft, fresh);
         Assert.DoesNotContain(ContentRegistry.RecipeByName("mold_axe")!, fresh);
-        Assert.All(fresh, r => Assert.All(r.Ingredients, i => Assert.All(i.AcceptedIds,
-            id => Assert.Equal(InventoryCategory.Blocks, Inventory.CategoryOf(id)))));
 
         Assert.True(inventory.TryCraft(uncraft));
         Assert.Equal(3, inventory.CountFor(mudball));

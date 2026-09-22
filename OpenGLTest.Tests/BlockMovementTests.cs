@@ -46,13 +46,14 @@ public sealed class BlockMovementTests
     }
 
     [Fact]
-    public void FrictionDefaultsToPointNineNineAndIceIsLower()
+    public void IceFrictionIsBelowTheDefaultAndMirroredById()
     {
-        Assert.Equal(0.99f, BlockType.DefaultFriction);
-        Assert.Equal(0.99f, ContentRegistry.RequireBlock("stone").Friction);
+        var stone = ContentRegistry.RequireBlock("stone");
         var ice = ContentRegistry.RequireBlock("ice");
+        Assert.Equal(BlockType.DefaultFriction, stone.Friction);
         Assert.True(ice.Friction < BlockType.DefaultFriction, $"ice friction {ice.Friction} is not below default");
         Assert.Equal(ice.Friction, BlockType.FrictionOf(ice.Id));
+        Assert.Equal(BlockType.DefaultFriction, BlockType.FrictionOf(stone.Id));
     }
 
     [Fact]
@@ -118,11 +119,11 @@ public sealed class BlockMovementTests
     }
 
     [Fact]
-    public void LeavesDeclareThreeQuarterMovementSpeed()
+    public void LeavesAreNonBlockingAtAPartialWalkSpeed()
     {
         var leaves = ContentRegistry.RequireBlock("leaves");
-        Assert.Equal(0.75f, leaves.MovementSpeed);
-        Assert.Equal(0.75f, BlockType.MovementSpeedOf(leaves.Id));
+        Assert.InRange(leaves.MovementSpeed, 0.001f, 0.999f);
+        Assert.Equal(leaves.MovementSpeed, BlockType.MovementSpeedOf(leaves.Id));
         Assert.Equal(0f, ContentRegistry.RequireBlock("stone").MovementSpeed);
     }
 

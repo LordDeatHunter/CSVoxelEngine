@@ -38,7 +38,11 @@ public class FallingBlockManager
 
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, FluidManager fluids)
     {
-        for (var i = _falling.Count - 1; i >= 0; i--)
+        // Ascending, because a toppled column is stored bottom-up: the lowest cube is written
+        // back as a block before the one above it moves for this frame, so each cube lands on
+        // a real support. Iterating top-first let every cube fall a frame into the cell below,
+        // which sank a tall column until the top cube popped out as a drop.
+        for (var i = 0; i < _falling.Count; i++)
         {
             var block = _falling[i];
             block.Update(deltaTime, chunks);
@@ -50,6 +54,7 @@ public class FallingBlockManager
                 _falling.RemoveAt(i);
                 var cell = block.Position.Floor();
                 drops.SpawnLoot(block.BlockId, cell);
+                i--; // the cube after this one shifted down into its slot
                 continue;
             }
 
@@ -57,6 +62,7 @@ public class FallingBlockManager
 
             _falling.RemoveAt(i);
             Settle(block, chunks, drops, fluids);
+            i--; // the cube after this one shifted down into its slot
         }
     }
 

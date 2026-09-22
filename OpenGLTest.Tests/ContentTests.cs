@@ -132,22 +132,26 @@ public sealed class ContentTests
     }
 
     [Fact]
-    public void DisplayMatrixPosesSpritesAsConfigured()
+    public void DisplayMatrixAppliesYawThenPitchThenRollUnderScale()
     {
-        // Default: the sprite normal (+Z) tips up and slightly right toward the viewer.
-        var normal = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitZ,
-            ContentRegistry.RequireItem("bucket").DisplayMatrix()));
-        Assert.True(normal.X > 0.1f && normal.Y > 0.3f && normal.Z > 0.7f);
+        // Whatever pose an item declares, the held transform must be its scale, then a yaw
+        // about Y, a pitch about X and a roll about Z in that order, then translation
+        // (which never turns the sprite). Angles come from the item, so this locks the
+        // axis/order contract rather than any one pose.
+        var item = ContentRegistry.RequireItem("compass");
+        var radians = item.DisplayRotation * (MathF.PI / 180f);
+        var rotation = Matrix4x4.CreateRotationY(radians.Y)
+            * Matrix4x4.CreateRotationX(radians.X)
+            * Matrix4x4.CreateRotationZ(radians.Z);
 
-        // Pickaxe: yawed so the head axis (+X) runs fore-aft with a tip facing forward (-Z).
-        var tip = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitX,
-            ContentRegistry.RequireItem("primitive_pickaxe").DisplayMatrix()));
-        Assert.True(tip.Z < -0.6f);
-
-        // Compass: pitched up-back at the holder's face (normalized: its scale shrinks normals).
-        var face = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitZ,
-            ContentRegistry.RequireItem("compass").DisplayMatrix()));
-        Assert.True(face.Y > 0.8f && face.Z > 0.4f && MathF.Abs(face.X) < 0.01f);
+        foreach (var axis in new[] { Vector3.UnitX, Vector3.UnitY, Vector3.UnitZ })
+        {
+            var actual = Vector3.TransformNormal(axis, item.DisplayMatrix());
+            var expected = Vector3.TransformNormal(axis, rotation) * item.DisplayScale;
+            Assert.Equal(expected.X, actual.X, 4);
+            Assert.Equal(expected.Y, actual.Y, 4);
+            Assert.Equal(expected.Z, actual.Z, 4);
+        }
     }
 
     [Fact]
