@@ -186,6 +186,17 @@ float BlockFlicker(vec3 p) {
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
+// Scales a screen-space tap offset down to nothing as its base point nears the screen edge, so a
+// refracted or reflected lookup fades back to the straight sample instead of clamping onto the
+// border texel and smearing it into a streak. The fade is sized from the offset actually applied
+// rather than a fixed margin, which keeps the tap on screen at any refraction slider value: the
+// move stays under 0.75 * e until the edge distance e reaches 1.5 * |off|, and past that
+// |off| <= e anyway.
+vec2 FadeTapOffset(vec2 base, vec2 off) {
+    float e = min(min(base.x, base.y), min(1.0 - base.x, 1.0 - base.y));
+    return off * smoothstep(0.0, max(length(off), 1e-4) * 1.5, e);
+}
+
 // Distance from the second-nearest to the nearest animated Voronoi centre: small along the
 // cell borders, which is where refracted sunlight piles up into the bright caustic net.
 float VoronoiEdge(vec2 p, float t) {
@@ -416,8 +427,11 @@ void main() {
         // behind the water, so fall back to the straight-down sample.
         vec2 uv = gl_FragCoord.xy * uInvViewport;
         float refractStrength = uWaterRefractStrength * (fromBehind ? uWaterWindowRefract : 1.0);
-        vec2 ruv = uv + nW.xz * (refractStrength / (1.0 + dist * 0.15));
-        ruv = clamp(ruv, vec2(0.001), vec2(0.999));
+        vec2 off = nW.xz * (refractStrength / (1.0 + dist * 0.15));
+        vec2 ruv = uv + FadeTapOffset(uv, off);
+        // Safety net only: the edge fade above is what keeps the tap off the border texel (and
+        // with it the stretched-edge streak); this narrow clamp never engages in practice.
+        ruv = clamp(ruv, vec2(0.0005), vec2(0.9995));
         float refrDepth = texture(uSceneDepth, ruv).r;
         if (refrDepth < gl_FragCoord.z) { ruv = uv; refrDepth = texture(uSceneDepth, uv).r; }
         vec3 behind = texture(uSceneColor, ruv).rgb;
@@ -444,8 +458,10 @@ void main() {
         vec3 refl = uFogColor;
         if (uReflValid > 0.5 && !fromBehind) {
             vec4 rp = uReflViewProj * vec4(fWorldPos, 1.0);
-            vec2 rr = rp.xy / rp.w * 0.5 + 0.5 + nW.xz * 0.08;
-            refl = texture(uReflectionMap, clamp(rr, 0.001, 0.999)).rgb;
+            vec2 rbase = rp.xy / rp.w * 0.5 + 0.5;
+            vec2 rr = rbase + FadeTapOffset(rbase, nW.xz * 0.08);
+            // Same safety net as the refraction tap; the fade is what prevents the streak.
+            refl = texture(uReflectionMap, clamp(rr, 0.0005, 0.9995)).rgb;
         }
         // No sky to mirror underground: dim the reflection (fallback or stale mirror
         // alike) by the voxel skylight, or sealed caves glow sky-blue in daytime.
