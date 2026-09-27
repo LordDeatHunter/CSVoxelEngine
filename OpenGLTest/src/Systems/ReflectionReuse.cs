@@ -74,4 +74,14 @@ internal static class ReflectionReuse
         // clamps lookups outside it, so a turn past the threshold smears the texture's screen edge.
         return Vector3.Dot(Vector3.Normalize(cached.Forward), Vector3.Normalize(current.Forward)) < CosMaxAngle;
     }
+
+    /// <summary>
+    /// The eye-side gate in front of the mirror: a planar reflection across the sea plane is only
+    /// meaningful with the eye above that plane AND in air. A submerged eye that is still above the
+    /// plane (a pond standing above sea level) would otherwise get a mirror built across a plane far
+    /// below the pond's own surface, which the water projected into a smeared streak; from under the
+    /// surface the shader shows the Snell window instead and never samples the mirror.
+    /// </summary>
+    internal static bool MirrorApplies(float eyeY, float planeY, bool eyeInWater)
+        => !eyeInWater && eyeY >= planeY;
 }

@@ -229,6 +229,10 @@ public class RenderManager : IDisposable
     private double _prevTime;
     private float _underwaterT;
     private bool _eyeInLava;
+    // Eases the lava-only fades (sky clear colour, sun disc) exactly as _underwaterT eases the
+    // water ones: _eyeInLava is a hard flag that drops the frame the eye leaves lava while
+    // _underwaterT is still fading out, which would otherwise pop the sky back in one frame.
+    private float _lavaT;
 
     // Per-pass GPU time: every render pass gets its own TIME_ELAPSED query object per
     // ring slot (see BeginGpuPass). GL forbids nesting TIME_ELAPSED, but consecutive
@@ -597,6 +601,7 @@ public class RenderManager : IDisposable
         // instead of riding ApplyFrameUniforms every frame.
         program.SetUniform("uWaterNormalScale", WorldGenerationConfig.WaterNormalScale);
         program.SetUniform("uWaterRefractStrength", WorldGenerationConfig.WaterRefractStrength);
+        program.SetUniform("uWaterWindowRefract", WorldGenerationConfig.WaterWindowRefractScale);
         program.SetUniform("uWaterAbsorb", WorldGenerationConfig.WaterAbsorb);
         program.SetUniform("uWaterScatter", WorldGenerationConfig.WaterScatter);
         program.SetUniform("uWaterCausticStrength", WorldGenerationConfig.WaterCausticStrength);
@@ -805,14 +810,18 @@ public class RenderManager : IDisposable
             _pointColors[i] = Vector3.Zero;
         }
 
-        // Underwater the fog closes in to a few blocks, the sky and fog go blue-green and the
-        // light dims and cools, so a submerged view reads as being inside the water rather
-        // than looking at a blue filter. Scaled by dayness so night water stays dark.
-        // Lava keeps the same fade but glows red instead, staying bright at night.
+        // Underwater the fog closes in to a few blocks and goes blue-green and the light dims
+        // and cools, so a submerged view reads as being inside the water rather than looking
+        // at a blue filter. Scaled by dayness so night water stays dark. The clear colour and
+        // the sun disc stay dry in water: they are what the surface's Snell window shows from
+        // below, so only the fog closes in. Lava is an opaque glow, so it still fades both to
+        // red (eased through _lavaT) and stays bright at night.
         _eyeInLava = eyeInLava && underwater;
         _underwaterT = MathUtils.Clamp01(
             _underwaterT + (underwater ? dt : -dt) / WorldGenerationConfig.UnderwaterFadeSeconds);
         var wet = MathUtils.SmoothStep(_underwaterT);
+        _lavaT = MathUtils.Clamp01(_lavaT + (_eyeInLava ? dt : -dt) / WorldGenerationConfig.UnderwaterFadeSeconds);
+        var lavaWet = wet * MathUtils.SmoothStep(_lavaT);
 
         // Underwater the sun is a diffuse glow, so the crisp shadow edges go with the tint.
         // This has to run before the early return below, or a submerged view would keep them.
@@ -821,8 +830,9 @@ public class RenderManager : IDisposable
         // to still be rendered and sampled while the world diffuse fades.
         _shadowStrengthDry = _shadowStrength;
         _shadowStrength *= 1f - wet;
-        // Same reason the disc goes with them: from under the surface there is no sun to see
-        _sunVisibility *= 1f - wet;
+        // The disc stays in water: the surface's Snell window shows it refracted from below
+        // (the scene copy captures it). Only lava, an opaque glow, still hides it.
+        _sunVisibility *= 1f - lavaWet;
         UpdateShadowCamera(camera);
 
         _fogNear = MathUtils.Lerp(WorldGenerationConfig.FogNearBlocks,
@@ -836,7 +846,9 @@ public class RenderManager : IDisposable
             ? LavaFogColor * (0.6f + 0.4f * dayness)
             : UnderwaterFogColor * (0.15f + 0.85f * dayness);
         _fogColor = Mix(_fogColor, underwaterColor, wet);
-        _skyColor = Mix(_skyColor, underwaterColor, wet);
+        // _fogColor was copied from the dry _skyColor earlier, so this leaves the fog tint alone;
+        // afterwards _skyColor only feeds the clear colour, which the window shows from below.
+        _skyColor = Mix(_skyColor, underwaterColor, lavaWet);
         _ambient = Mix(_ambient, _ambient * (_eyeInLava ? LavaAmbientTint : UnderwaterAmbientTint), wet);
         _sunIntensity = MathUtils.Lerp(_sunIntensity, _sunIntensity * 0.5f, wet);
     }
@@ -1256,8 +1268,9 @@ public class RenderManager : IDisposable
     /// mirrored across the sea surface into the reflection texture, which the water in
     /// <see cref="RenderWorldTranslucent"/> then samples projectively. Below-plane
     /// geometry is clipped via <c>uClipY</c> so the seabed never shows up in the mirror.
-    /// Skipped (leaving <c>uReflValid</c> at 0) when there is no water to reflect in or
-    /// the eye itself is below the surface. Runs after <see cref="RenderShadows"/> so the
+    /// Skipped (leaving <c>uReflValid</c> at 0) when there is no water to reflect in, or
+    /// when the eye is below the sea plane or submerged in any water
+    /// (<see cref="ReflectionReuse.MirrorApplies"/>). Runs after <see cref="RenderShadows"/> so the
     /// shadow map it samples is already filled.
     /// The mirror is re-rendered at most every other frame: a reused frame issues no GL work
     /// at all and simply re-pushes the cached <c>_reflViewProj</c> that produced the texture,
@@ -1275,7 +1288,8 @@ public class RenderManager : IDisposable
         // mirrored render rather than filling a texture nothing will sample. Far-only water
         // draws through the cheap shader path, which never samples the mirror either.
         if (!WorldGenerationConfig.WaterEnabled || !GameSettings.WaterReflections || camera == null || !_waterVisible
-            || !_nearWaterVisible || camera.RenderEye.Y < WaterPlaneY || _reflFbo == 0)
+            || !_nearWaterVisible || !ReflectionReuse.MirrorApplies(camera.RenderEye.Y, WaterPlaneY, camera.IsEyeInWater)
+            || _reflFbo == 0)
         {
             // A frame that fell through here must never be reused from: however old the
             // texture is, it no longer stands in any known relation to the current camera.

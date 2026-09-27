@@ -294,6 +294,11 @@ public const float DayLengthSeconds = 1200f;
     public const float WaterNormalScale = 2.0f;
     // Screen-space refraction offset at the camera, in uv units; shrinks with distance in the shader
     public const float WaterRefractStrength = 0.06f;
+    // Seen from below, the surface is a Snell window: the whole sky above is squeezed into a
+    // ~97 degree cone, so the same wave tilt swings the view through it further than it does
+    // looking down. Multiplies WaterRefractStrength (and the WaterRefraction slider) for
+    // fragments whose face is viewed from behind.
+    public const float WaterWindowRefractScale = 1.75f;
     // Beer-Lambert absorption per block of water, per channel (red dies first, so depth reads teal)
     public static readonly Vector3 WaterAbsorb = new(0.20f, 0.07f, 0.04f);
     // In-scattered water colour that replaces the seabed as the water thickens

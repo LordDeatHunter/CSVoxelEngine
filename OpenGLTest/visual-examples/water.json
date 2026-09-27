@@ -9,8 +9,14 @@
   // while the camera is falling (Fly False, Vy about -2.0 once underwater). Each 0.5 s wait
   // therefore drops the eye roughly a block below its teleport height and two runs frame
   // slightly differently; if you need a pose held exactly, drop the wait - teleport and
-  // screenshot tick no physics at all.
-  // The bay at x~230, z~-140 has a beach, trees and water deep enough to swim in at x~250.
+  // screenshot tick no physics at all. The exception is the last shots: a `fly` step before
+  // the pond turns flight on, so those hold their pose.
+  // The file also frames the surface from below (the Snell window), both in the sea and in a
+  // pond whose surface stands above sea level; water_under_window is the before/after anchor
+  // for the window.
+  // The bay at x~230, z~-140 had a beach, trees and water deep enough to swim in at x~250;
+  // under the current worldgen those columns are dry forest (heights 17..27), so the first
+  // eight shots frame terrain, not water, until they are re-anchored on a real coast.
   "steps": [
     { "op": "wait", "seconds": 5 },
     { "op": "walk", "keys": ["Space"], "seconds": 0.05 },
@@ -40,6 +46,31 @@
     // Shafts want shadow in the water: at VOXEL_TIME=360 the low sun sits behind this shore
     { "op": "teleport", "pos": [212.5, -1.5, -140.5], "yaw": 180, "pitch": 25 },
     { "op": "wait", "seconds": 0.5 },
-    { "op": "screenshot", "name": "water_under_shafts", "hideHud": true }
+    { "op": "screenshot", "name": "water_under_shafts", "hideHud": true },
+    // The surface seen from below. The bay anchors above no longer sit in water under the
+    // current worldgen, so these use a real ocean column instead: (360, 136) floors at -8,
+    // so an eye at -3.5 is well under the sea-level surface. Near-vertical: the Snell window
+    // shows the refracted sky (and, at VOXEL_TIME=360, the low sun disc near its edge).
+    { "op": "teleport", "pos": [360.5, -3.5, 136.5], "yaw": 90, "pitch": 80 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "water_under_window", "hideHud": true },
+    // Grazing toward the shallower bank at -X: the bank through the window, and past the
+    // critical angle the total-internal-reflection band fading to the underwater fog colour.
+    { "op": "teleport", "pos": [360.5, -2.5, 136.5], "yaw": 180, "pitch": 20 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "water_under_graze", "hideHud": true },
+    // A pond whose surface stands above sea level - the case whose underside used to show a
+    // smeared sea-plane mirror. A throwaway probe over +-40 chunks found this one as the
+    // largest liquid elevated pond: 928 cells at level 4, centroid cell (-305, 474), bed -3,
+    // ColdWeight 0.65 - below the freeze line, so its lid is water, not ice.
+    // From here on flight holds the pose (as ponds.json does), so the camera no longer falls
+    // while the far chunks stream in.
+    { "op": "fly" },
+    { "op": "teleport", "pos": [-304.5, 3.2, 474.5], "yaw": -90, "pitch": 70 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "water_pond_window", "hideHud": true },
+    { "op": "teleport", "pos": [-304.5, 3.2, 474.5], "yaw": -90, "pitch": 15 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "water_pond_graze", "hideHud": true }
   ]
 }

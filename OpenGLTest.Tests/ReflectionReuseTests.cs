@@ -9,7 +9,9 @@ namespace silkgltriangle.Tests;
 /// whether a frame re-renders the reflection or reuses the cached texture and the view-projection
 /// that produced it. The GL half of that pass can only be verified by eye and by the perf-fly
 /// protocol in PERF_TODO.md, so every <em>decision</em> the pass makes is pinned here instead —
-/// no <c>Camera</c>, no <c>ChunkManager</c>, no window and no GL anywhere in this file.
+/// no <c>Camera</c>, no <c>ChunkManager</c>, no window and no GL anywhere in this file. The
+/// eye-side gate (<c>MirrorApplies</c>: no mirror below the plane or with the eye in water) is
+/// pinned here too.
 ///
 /// Every magnitude below is expressed as a multiple of the <c>WorldGenerationConfig</c> threshold
 /// it exercises, so retuning a constant cannot silently turn a test into a tautology.
@@ -151,6 +153,16 @@ public sealed class ReflectionReuseTests
 
         Assert.True(ReflectionReuse.ShouldRefresh(cached, current,
             hasCachedMirror: true, targetRecreated: false, reusedLastFrame: false));
+    }
+
+    [Theory]
+    [InlineData(+5f, false, true)]
+    // The pond-above-sea-level case: the eye is submerged yet numerically above the sea plane.
+    [InlineData(+5f, true, false)]
+    [InlineData(-5f, false, false)]
+    public void MirrorOnlyAppliesToADryEyeAboveThePlane(float eyeOffset, bool eyeInWater, bool expected)
+    {
+        Assert.Equal(expected, ReflectionReuse.MirrorApplies(0.875f + eyeOffset, 0.875f, eyeInWater));
     }
 
     [Fact]

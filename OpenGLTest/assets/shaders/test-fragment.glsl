@@ -12,6 +12,11 @@
 // reflection is mixed in by a Schlick fresnel, so the surface is transparent underfoot and a
 // mirror at a graze. Opaque faces that look into water (bit 3 of the packed normal) get the
 // caustic net on top, projected back up the sun direction to the sea plane.
+// Seen from below (a per-fragment side test against the face normal, not the sea plane, since
+// a pond stands above sea level) the surface is a Snell window: the scene copy is shown through
+// it distorted by the wave normal, the inside fresnel goes to total internal reflection past the
+// critical angle, and that band fades to the underwater fog colour instead of sampling the
+// sea-level mirror, which is never valid from that side.
 in vec4 fColor;
 in vec2 fTexCoord;
 flat in uint fLayer;
@@ -80,6 +85,12 @@ uniform float uShadowStrengthDry;
 uniform float uUnderwater;
 uniform float uWaterNormalScale;
 uniform float uWaterRefractStrength;
+// Multiplies the refraction offset for a face seen from behind: the Snell window squeezes the
+// whole sky into ~97 degrees, so the same wave tilt swings the view through it further.
+uniform float uWaterWindowRefract;
+// Water's index of refraction over air's. The window's critical angle and the total internal
+// reflection past it both follow from it; it is physics, not tuning, hence not a uniform.
+const float WaterEta = 1.333;
 uniform vec3 uWaterAbsorb;
 uniform vec3 uWaterScatter;
 uniform float uWaterCausticStrength;
@@ -342,21 +353,39 @@ void main() {
         // Tops keep the wave normal; sides keep their geometric normal and borrow only
         // the wave tilt, so a fall viewed head-on mostly refracts instead of mirroring.
         vec3 geomN = normalize(fNormal);
+        vec3 V = normalize(uCameraPos - fWorldPos);
+        // Which side of this face the eye is on, per fragment rather than against the sea plane:
+        // a pond stands above sea level, and one frame can hold several bodies at different heights.
+        bool fromBehind = dot(geomN, V) < 0.0;
         vec3 nWup = WaveNormal(fWorldPos.xz, uTime, uWaterNormalScale);
         nWup = normalize(nWup + vec3(wob1 * 0.09, 0.0, wob2 * 0.09));   // fine glitter on top of the swell
         vec2 tilt = nWup.xz / max(nWup.y, 0.2);
         vec3 nW = geomN.y > 0.5
             ? nWup
             : normalize(geomN + vec3(tilt.x, 0.0, tilt.y) * 0.35 + vec3(wob1 * 0.03, 0.0, wob2 * 0.03));
-        vec3 V = normalize(uCameraPos - fWorldPos);
+        // Seen from behind the wave normal has to face the eye as well, or V.N pins at 0 and the
+        // fresnel saturates into a full mirror - which from under the sea was a flat sheet of fog.
+        if (fromBehind) nW = -nW;
         float cosT = max(dot(V, nW), 0.0);
-        float F = 0.06 + 0.94 * pow(1.0 - cosT, 5.0);
+        float F;
+        if (fromBehind) {
+            // Inside looking out: Snell's window. Past the critical angle (sin > 1/eta, ~48.6
+            // degrees off the normal) nothing gets through and the underside is a mirror of the
+            // water below; inside it, Schlick on the TRANSMITTED angle, which is what a
+            // dense-to-thin interface reflects by. The rise to 1 is steep but continuous, and
+            // the wave normal ripples its edge.
+            float sinT2 = WaterEta * WaterEta * (1.0 - cosT * cosT);
+            F = sinT2 >= 1.0 ? 1.0 : 0.06 + 0.94 * pow(1.0 - sqrt(1.0 - sinT2), 5.0);
+        } else {
+            F = 0.06 + 0.94 * pow(1.0 - cosT, 5.0);
+        }
 
         // Refraction: look up the scene copy a little off to the side of this pixel, along the
         // wave normal. If that spot is in front of the surface (a post, the shore) it is not
         // behind the water, so fall back to the straight-down sample.
         vec2 uv = gl_FragCoord.xy * uInvViewport;
-        vec2 ruv = uv + nW.xz * (uWaterRefractStrength / (1.0 + dist * 0.15));
+        float refractStrength = uWaterRefractStrength * (fromBehind ? uWaterWindowRefract : 1.0);
+        vec2 ruv = uv + nW.xz * (refractStrength / (1.0 + dist * 0.15));
         ruv = clamp(ruv, vec2(0.001), vec2(0.999));
         float refrDepth = texture(uSceneDepth, ruv).r;
         if (refrDepth < gl_FragCoord.z) { ruv = uv; refrDepth = texture(uSceneDepth, uv).r; }
@@ -367,15 +396,22 @@ void main() {
         // the depth (Direct3D 0..1 style from System.Numerics), so no near/far formula is needed.
         vec4 hp = uInvViewProj * vec4(ruv * 2.0 - 1.0, refrDepth * 2.0 - 1.0, 1.0);
         vec3 scenePos = hp.xyz / hp.w;
-        float thickness = distance(scenePos, fWorldPos) * (1.0 - uUnderwater);
+        // From behind, the scene copy beyond the surface is air: there is no water to absorb
+        // through. The water between the eye and the surface is what the underwater fog
+        // (uFogNear/uFogFar) already charges for.
+        float thickness = fromBehind ? 0.0 : distance(scenePos, fWorldPos) * (1.0 - uUnderwater);
 
         vec3 waterLight = uAmbient * (0.12 + 0.88 * fSun) + uSunColor * (uSunIntensity * fSun * shadow * 0.6)
                           + (torch + pl) * 0.6;
         vec3 refr = behind * exp(-uWaterAbsorb * thickness)
                   + uWaterScatter * waterLight * (1.0 - exp(-0.1 * thickness));
 
+        // From behind, this fallback IS the look: past the critical angle the underside mirrors
+        // the water body below, and the underwater fog colour (already blended to the tint by
+        // SetLighting, dimmed by skylight just below) stands in for that scene. The sea-level
+        // mirror is only valid for a face seen from above, whatever height the eye is at.
         vec3 refl = uFogColor;
-        if (uReflValid > 0.5 && uCameraPos.y > uWaterPlaneY) {
+        if (uReflValid > 0.5 && !fromBehind) {
             vec4 rp = uReflViewProj * vec4(fWorldPos, 1.0);
             vec2 rr = rp.xy / rp.w * 0.5 + 0.5 + nW.xz * 0.08;
             refl = texture(uReflectionMap, clamp(rr, 0.001, 0.999)).rgb;
@@ -388,7 +424,9 @@ void main() {
         vec3 H = normalize(V + uSunDir);
         float ndh = max(dot(nW, H), 0.0);
         // Sun glitter needs skylight to exist: without the fSun gate it shines through rock.
-        waterSpec = (pow(ndh, 300.0) * 0.45 + pow(ndh, 24.0) * 0.05) * shadow * fSun;
+        // From below the sun is seen refracted through the window (it is in the scene copy),
+        // not mirrored off it, so there is no glitter on that side.
+        waterSpec = fromBehind ? 0.0 : (pow(ndh, 300.0) * 0.45 + pow(ndh, 24.0) * 0.05) * shadow * fSun;
         col = mix(cheap, fancyCol, fancy);
         waterSpec *= fancy;
         col += uSunColor * (waterSpec * uSunIntensity);
