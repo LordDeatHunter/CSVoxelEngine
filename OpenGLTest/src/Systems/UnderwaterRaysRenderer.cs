@@ -82,10 +82,12 @@ public sealed class UnderwaterRaysRenderer : IDisposable
     /// framebuffer at <paramref name="viewportSize"/>. Both shaders must unproject with the SAME
     /// matrix in the same frame - the composite weighs each tap by comparing marched distances,
     /// and that comparison is only meaningful because both sides computed them the same way.
+    /// <paramref name="waterAbsorb"/> is the per-channel absorption per block of depth below
+    /// <paramref name="waterPlaneY"/>, the same coefficient the world shader tints water with.
     /// </summary>
     public void Render(uint halfResFbo, uint halfResTex, Vector2D<int> halfResSize,
         Vector2D<int> viewportSize, Matrix4x4 invViewProj, Vector3 cameraPos, Vector3 sunDir,
-        Vector3 sunColor, float strength, float waterPlaneY, Matrix4x4 lightViewProj, float time)
+        Vector3 sunColor, float strength, float waterPlaneY, Vector3 waterAbsorb, Matrix4x4 lightViewProj, float time)
     {
         _gl.Disable(EnableCap.DepthTest);      // full-screen: nothing to test against
         _gl.DepthMask(false);
@@ -105,6 +107,7 @@ public sealed class UnderwaterRaysRenderer : IDisposable
         _shader.SetUniform("uSunColor", sunColor);
         _shader.SetUniform("uStrength", strength);
         _shader.SetUniform("uWaterPlaneY", waterPlaneY);
+        _shader.SetUniform("uWaterAbsorb", waterAbsorb);
         _shader.SetUniform("uMaxDistance", WorldGenerationConfig.WaterRayMaxDistance);
         _shader.SetUniform("uSteps", WorldGenerationConfig.WaterRaySteps);
         _shader.SetUniform("uTime", time);

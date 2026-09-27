@@ -1771,7 +1771,7 @@ public class RenderManager : IDisposable
         BindUnit(4, TextureTarget.Texture2D, _sceneDepthTex);
         ActiveUnit(0);
         _rays.Render(_raysFbo, _raysTex, _raysSize, _viewportSize, _invViewProj, _cameraPos, _sunDir,
-            _sunColor, strength, WaterPlaneY, _lightViewProj, _time);
+            _sunColor, strength, WaterPlaneY, WorldGenerationConfig.WaterAbsorb, _lightViewProj, _time);
         // UnderwaterRaysRenderer selects unit 5 for the upsample and puts unit 0 back. Unit 5 is
         // untracked so the records happen to survive, but the renderer does not promise that.
         InvalidateTextureUnits();

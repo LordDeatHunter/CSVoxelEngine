@@ -3,7 +3,9 @@
 // scene depth says how far the eye can see through the water, and the shader marches that
 // segment in uSteps jittered samples, adding the sunlight that actually reaches each point
 // (the same shadow map the world shader uses) attenuated by how deep it sits and how far it
-// has travelled. The depth is turned back into a world position through uInvViewProj, the
+// has travelled. The depth term is per channel (uWaterAbsorb, the world shader's own
+// Beer-Lambert coefficient), so a shaft shifts toward teal with depth exactly as the water
+// it passes through does; the distance term stays a scalar haze. The depth is turned back into a world position through uInvViewProj, the
 // inverse of the very matrix that wrote it, so the projection's clip-depth convention cancels
 // out - the C# System.Numerics projection is Direct3D-style 0..1, and no near/far
 // linearization would be correct here.
@@ -23,6 +25,9 @@ uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 uniform float uStrength;
 uniform float uWaterPlaneY;
+// Per-channel absorption per block of water depth: the same WorldGenerationConfig.WaterAbsorb
+// the world shader's water fragment uses, so shafts and water agree on the tint.
+uniform vec3 uWaterAbsorb;
 uniform float uMaxDistance;
 uniform int uSteps;
 uniform float uTime;
@@ -48,18 +53,18 @@ void main() {
     // Interleaved gradient noise: a per-pixel start offset turns 20 steps of banding into grain
     float jitter = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
     float stepLen = len / float(uSteps);
-    float accum = 0.0;
+    vec3 accum = vec3(0.0);
     for (int i = 0; i < uSteps; i++) {
         float t = (float(i) + jitter) * stepLen;
         vec3 p = uCameraPos + dir * t;
         float below = uWaterPlaneY - p.y;
         if (below <= 0.0) continue;                 // above the surface there is air, no shaft
-        accum += Lit(p) * exp(-0.08 * below) * exp(-0.03 * t) * stepLen;
+        accum += Lit(p) * exp(-uWaterAbsorb * below) * exp(-0.03 * t) * stepLen;
     }
     // Brighter looking toward the sun (forward scattering), never zero looking away
     float phase = 0.2 + 0.8 * pow(max(dot(dir, uSunDir), 0.0), 4.0);
     // Alpha carries the world-space distance in blocks this pixel marched (len, computed
     // above and capped at uMaxDistance) so the upsample can reject half-res taps that came
-    // from the other side of a silhouette. The rgb term is unchanged.
-    FragColor = vec4(uSunColor * (accum * uStrength * phase), len);
+    // from the other side of a silhouette.
+    FragColor = vec4(uSunColor * accum * (uStrength * phase), len);
 }
