@@ -41,6 +41,14 @@ public sealed class InventoryView
     }
 
     /// <summary>
+    /// Canvas pixels the crafting card's content is scrolled by. Both the draw and the hit-test
+    /// clamp on read through <see cref="CraftCardLayout.ClampScroll"/> with that frame's layout, so
+    /// a card that shrinks below its viewport simply reads as 0. <see cref="Program"/> resets it to
+    /// 0 when another recipe is opened; <see cref="UIRenderer"/> never writes it.
+    /// </summary>
+    public float CraftScrollOffset { get; set; }
+
+    /// <summary>
     /// Canvas-Y distance from the scrollbar thumb's top edge to the cursor when the thumb was
     /// grabbed; null while no thumb drag is live.
     /// </summary>

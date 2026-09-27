@@ -156,6 +156,12 @@ public static class Program
                             - wheel.Y * InventoryPanelLayout.WheelStepRows * InventoryPanelLayout.RowHeight,
                         rowCount, screen);
                 }
+                else if (inventoryView.Tab == InventoryCategory.Crafting
+                         && renderManager.UiIsOverCraftCard(inputManager.Mouse.Position))
+                {
+                    inventoryView.CraftScrollOffset = renderManager.UiClampCraftScroll(
+                        inventoryView.CraftScrollOffset - wheel.Y * CraftCardLayout.WheelStep);
+                }
             }
         };
 
@@ -591,6 +597,8 @@ public static class Program
             else if (inventoryView.Tab == InventoryCategory.Crafting)
             {
                 inventoryView.Craft.Select(ContentRegistry.CraftingRecipes[row.Value]);
+                // A newly opened recipe starts at the top of its card.
+                inventoryView.CraftScrollOffset = 0f;
             }
             else
             {

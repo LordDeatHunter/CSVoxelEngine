@@ -31,7 +31,8 @@ public sealed class BitmapFont : IDisposable
     private const float BakePixelHeight = 32f;
     private const int MinAtlasSide = 512;
     private const int MaxAtlasSide = 2048;
-    private const int MaxLayoutChars = 64;
+    // The longest run one DrawText/Layout call can draw; TextWrap caps its lines at it.
+    public const int MaxLayoutChars = 64;
 
     private readonly GL _gl;
     private readonly StbTrueType.stbtt_bakedchar[] _baked = new StbTrueType.stbtt_bakedchar[NumChars];

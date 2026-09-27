@@ -3115,6 +3115,8 @@ public class RenderManager : IDisposable
     public int? UiPanelRowAt(Vector2 point, float scrollOffset, int rowCount) =>
         ui.PanelRowAt(point, scrollOffset, rowCount);
     public CraftHit UiCraftHitAt(Vector2 point, InventoryView view) => ui.CraftHitAt(point, view);
+    public bool UiIsOverCraftCard(Vector2 point) => ui.IsOverCraftCard(point);
+    public float UiClampCraftScroll(float offset) => ui.ClampCraftScroll(offset);
     public PauseMenuHit UiPauseMenuHitAt(Vector2 point, PauseMenuView menu) => ui.PauseMenuHitAt(point, menu);
     public SettingsHit UiSettingsHitAt(Vector2 point, SettingsMenuView settings) => ui.SettingsHitAt(point, settings);
 

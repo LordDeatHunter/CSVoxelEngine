@@ -7,21 +7,6 @@ using Silk.NET.OpenGL;
 
 namespace silkgltriangle;
 
-/// <summary>What part of the crafting detail card a click landed on.</summary>
-public enum CraftHitKind
-{
-    None,
-    BatchMinus,
-    BatchPlus,
-    CraftButton,
-    IngMinus,
-    IngPlus,
-    MemberChip,
-}
-
-/// <summary>One hit-test result inside the crafting detail card.</summary>
-public readonly record struct CraftHit(CraftHitKind Kind, int IngredientIndex = -1, byte MemberId = 0);
-
 /// <summary>
 /// Draws screen-space UI through an orthographic projection measured in canvas units, with the
 /// origin at the top-left corner. The canvas is the window divided by a uniform scale the caller
@@ -75,18 +60,11 @@ public class UIRenderer : IDisposable
     private const float FpsTop = 10f;
 
     // [E] inventory panel, in pixels: a Skyrim-style list on the left, preview on the right
-    // Aliases of InventoryPanelLayout, which owns the panel geometry; they keep the crafting
-    // card and the detail column (out of the layout class for now) reading the same numbers.
+    // Aliases of InventoryPanelLayout, which owns the panel geometry; they serve the list, its
+    // rows and the non-crafting preview only. The crafting card reads CraftCardLayout.
     private const float PanelLeft = InventoryPanelLayout.PanelLeft;
     private const float PanelTop = InventoryPanelLayout.PanelTop;
-    private const float PanelGap = InventoryPanelLayout.PanelGap;
-    private const float PanelRightMargin = InventoryPanelLayout.PanelRightMargin;
-    private const float DetailWidthMin = 300f;
-    private const float DetailWidthMax = 480f;
     private float PanelWidth => InventoryPanelLayout.PanelWidth(_screenSize);
-    private float DetailWidth =>
-        Math.Clamp(_screenSize.X - PanelLeft - PanelWidth - PanelGap - PanelRightMargin,
-            DetailWidthMin, DetailWidthMax);
     private const float PanelPad = InventoryPanelLayout.PanelPad;
     private const float TabHeight = InventoryPanelLayout.TabHeight;
     private const float RowHeight = InventoryPanelLayout.RowHeight;
@@ -109,22 +87,6 @@ public class UIRenderer : IDisposable
     private static readonly Rgba ButtonDisabled = Rgba.Grey(0.12f, 0.9f);
     private static readonly Rgba ButtonTextReady = new(30, 26, 20);
     private static readonly Rgba ButtonTextDisabled = Rgba.Grey(0.45f, 1f);
-
-    // Crafting detail card, in pixels: floats right where the preview sits
-    private const float DetailPad = 14f;
-    private const float DetailHeaderH = 84f;
-    private const float StepBox = 24f;
-    private const float BatchCountW = 34f;
-    private const float BatchGap = 8f;
-    private const float IngPad = 10f;
-    private const float IngTitleH = 20f;
-    private const float IngBarH = 6f;
-    private const float IngFedH = 40f;
-    private const float IngStepBox = 26f;
-    private const float ChipSize = 36f;
-    private const float ChipGap = 6f;
-    private const float CraftButtonH = 46f;
-    private const float StatusH = 22f;
 
     // Durability bar under a tool icon: fraction of the slot width, a few px tall.
     private const float DurabilityHeight = 5f;
@@ -208,11 +170,21 @@ public class UIRenderer : IDisposable
     // every frame (PERF_TODO R8).
     private readonly UITextCache _textCache = new();
 
+    // Crafting card text measures, bound once in the constructor so neither the cache nor a
+    // frame ever allocates a delegate; the "Batch" label is measured once for the same reason.
+    private readonly TextMeasure _measureHead;
+    private readonly TextMeasure _measureBody;
+    private readonly float _batchLabelWidth;
+    // The crafting card's wrapped layout, rebuilt only when its screen, recipe or status changes;
+    // its Current is also what CraftHitAt hits, so a click reads the geometry that was drawn.
+    private readonly CraftCardLayoutCache _craftLayouts;
+
     // Longest run DrawText draws. BitmapFont.Layout clamps its output to the scratch span it
     // is handed, so this single constant bounds all three text buffers at once — the glyph
     // scratch, the vertex scratch and the static index buffer — and a longer string is
     // truncated by layout rather than overrunning any of them.
-    private const int MaxTextGlyphs = 64;
+    // Must agree with BitmapFont.MaxLayoutChars (layout stops there anyway), so it is defined from it.
+    private const int MaxTextGlyphs = BitmapFont.MaxLayoutChars;
 
     // Scratch for one DrawText call; reused so text layout allocates nothing per frame.
     // Safe to share: all UI drawing happens on the main thread.
@@ -281,6 +253,23 @@ public class UIRenderer : IDisposable
         {
             Log.WriteLine($"Warning: count font '{CountFontPath}' not loaded ({e.Message}); hotbar counts hidden.");
         }
+
+        if (_font is { } font)
+        {
+            var headScale = _headScale;
+            var countScale = _countScale;
+            _measureHead = s => font.MeasureSize(s, headScale).X;
+            _measureBody = s => font.MeasureSize(s, countScale).X;
+            _batchLabelWidth = font.MeasureSize("Batch".AsSpan(), countScale).X;
+        }
+        else
+        {
+            // No font: everything lays out as one line, and DrawText draws nothing anyway.
+            _measureHead = static _ => 0f;
+            _measureBody = static _ => 0f;
+            _batchLabelWidth = 44f;
+        }
+        _craftLayouts = new CraftCardLayoutCache(_measureHead, _measureBody, _batchLabelWidth);
 
         // Text batch buffers: a dynamic VBO refilled per run (DrawTextBatch) and a static EBO
         // whose indices never change — quad q always draws vertices [4q, 4q+4) — exactly the
@@ -1136,138 +1125,41 @@ public class UIRenderer : IDisposable
             centre.Y + PreviewSize * 0.5f + 58f, _countScale, TextDim);
     }
 
-    private float CraftInnerWidth => DetailWidth - DetailPad * 2f;
-
-    private int CraftChipsPerRow =>
-        Math.Max(1, (int)((CraftInnerWidth - IngPad * 2f + ChipGap) / (ChipSize + ChipGap)));
-
-    private static float CraftIngCardHeight(int memberCount, int chipsPerRow)
+    /// <summary>
+    /// This frame's crafting card layout, or null (and the cache cleared, so a stale layout is
+    /// never hit-tested) when no recipe is open.
+    /// </summary>
+    private CraftCardLayout? CraftLayoutFor(Inventory inventory, InventoryView view)
     {
-        var rows = Math.Max(1, (memberCount + chipsPerRow - 1) / chipsPerRow);
-        return IngPad + IngTitleH + IngBarH + 6f + IngFedH + 6f
-            + rows * (ChipSize + ChipGap) - ChipGap + IngPad;
+        if (view.Craft.Recipe is not { } recipe)
+        {
+            _craftLayouts.Clear();
+            return null;
+        }
+        return _craftLayouts.Get(_screenSize, recipe, view.Craft.StatusLine(inventory));
     }
 
-    private float CraftCardHeight(InventoryView view)
-    {
-        if (view.Craft.Recipe == null) return DetailPad * 2f + 90f;
-        var height = DetailPad + DetailHeaderH + 10f;
-        var chipsPerRow = CraftChipsPerRow;
-        foreach (var ingredient in view.Craft.Recipe.Ingredients)
-            height += CraftIngCardHeight(ingredient.AcceptedIds.Length, chipsPerRow) + 8f;
-        return height + StatusH + 8f + CraftButtonH + DetailPad;
-    }
-
-    private Vector2 CraftCardCentre(InventoryView view) =>
-        new(_screenSize.X - PreviewRight, PanelTop + CraftCardHeight(view) * 0.5f);
-
-    private Vector2 CraftBatchMinusCentre(InventoryView view)
-    {
-        var cardLeft = _screenSize.X - PreviewRight - DetailWidth * 0.5f;
-        var x = cardLeft + DetailPad + 76f + CraftBatchLabelW() + BatchGap + StepBox * 0.5f;
-        return new Vector2(x, CraftBatchCentreY(view));
-    }
-
-    private float CraftBatchLabelW() =>
-        _font?.MeasureSize("Batch".AsSpan(), _countScale).X ?? 44f;
-
-    private Vector2 CraftBatchCountCentre(InventoryView view)
-    {
-        var minus = CraftBatchMinusCentre(view);
-        return new Vector2(minus.X + StepBox * 0.5f + BatchGap + BatchCountW * 0.5f, minus.Y);
-    }
-
-    private Vector2 CraftBatchPlusCentre(InventoryView view)
-    {
-        var count = CraftBatchCountCentre(view);
-        return new Vector2(count.X + BatchCountW * 0.5f + BatchGap + StepBox * 0.5f, count.Y);
-    }
-
-    private float CraftBatchMaxX(InventoryView view) =>
-        CraftBatchPlusCentre(view).X + StepBox * 0.5f + BatchGap;
-
-    private float CraftBatchCentreY(InventoryView view)
-    {
-        _ = view;
-        return PanelTop + DetailPad + 56f + 8f;
-    }
-
-    private float CraftIngCardTop(InventoryView view, int index)
-    {
-        var y = PanelTop + DetailPad + DetailHeaderH + 10f;
-        var chipsPerRow = CraftChipsPerRow;
-        var ingredients = view.Craft.Recipe!.Ingredients;
-        for (var i = 0; i < index; i++)
-            y += CraftIngCardHeight(ingredients[i].AcceptedIds.Length, chipsPerRow) + 8f;
-        return y;
-    }
-
-    private Vector2 CraftIngMinusCentre(InventoryView view, int index)
-    {
-        var cardLeft = _screenSize.X - PreviewRight - DetailWidth * 0.5f;
-        var cardRight = cardLeft + DetailWidth - DetailPad;
-        var top = CraftIngCardTop(view, index);
-        var fedY = top + IngPad + IngTitleH + IngBarH + 6f;
-        var plusX = cardRight - IngPad - IngStepBox * 0.5f;
-        return new Vector2(plusX - IngStepBox - 8f, fedY + IngFedH * 0.5f);
-    }
-
-    private Vector2 CraftIngPlusCentre(InventoryView view, int index)
-    {
-        var minus = CraftIngMinusCentre(view, index);
-        return minus with { X = minus.X + IngStepBox + 8f };
-    }
-
-    private Vector2 CraftChipCentre(InventoryView view, int ingredientIndex, int chipPos)
-    {
-        var cardLeft = _screenSize.X - PreviewRight - DetailWidth * 0.5f;
-        var top = CraftIngCardTop(view, ingredientIndex);
-        var chipsY = top + IngPad + IngTitleH + IngBarH + 6f + IngFedH + 6f;
-        var chipsPerRow = CraftChipsPerRow;
-        var row = chipPos / chipsPerRow;
-        var col = chipPos % chipsPerRow;
-        return new Vector2(
-            cardLeft + DetailPad + IngPad + ChipSize * 0.5f + col * (ChipSize + ChipGap),
-            chipsY + ChipSize * 0.5f + row * (ChipSize + ChipGap));
-    }
-
-    private Vector2 CraftButtonCentre(InventoryView view)
-    {
-        var height = CraftCardHeight(view);
-        return new Vector2(_screenSize.X - PreviewRight,
-            PanelTop + height - DetailPad - CraftButtonH * 0.5f);
-    }
-
-    private static bool InBox(Vector2 point, Vector2 centre, Vector2 size) =>
-        MathF.Abs(point.X - centre.X) <= size.X * 0.5f
-        && MathF.Abs(point.Y - centre.Y) <= size.Y * 0.5f;
-
-    /// <summary>Which crafting control sits under a window-pixel point, if any.</summary>
+    /// <summary>
+    /// Which crafting control sits under a window-pixel point, if any. Hits the layout that was
+    /// last drawn, so a click can never disagree with the pixels; a layout that no longer matches
+    /// the open recipe or the canvas size hits nothing.
+    /// </summary>
     public CraftHit CraftHitAt(Vector2 point, InventoryView view)
     {
         point = ToCanvas(point);
-        if (view.Craft.Recipe == null) return new CraftHit(CraftHitKind.None);
-        if (InBox(point, CraftButtonCentre(view), new Vector2(CraftInnerWidth, CraftButtonH)))
-            return new CraftHit(CraftHitKind.CraftButton);
-        if (InBox(point, CraftBatchMinusCentre(view), new Vector2(StepBox)))
-            return new CraftHit(CraftHitKind.BatchMinus);
-        if (InBox(point, CraftBatchPlusCentre(view), new Vector2(StepBox)))
-            return new CraftHit(CraftHitKind.BatchPlus);
-
-        var ingredients = view.Craft.Recipe.Ingredients;
-        for (var i = 0; i < ingredients.Length; i++)
-        {
-            if (InBox(point, CraftIngMinusCentre(view, i), new Vector2(IngStepBox)))
-                return new CraftHit(CraftHitKind.IngMinus, i);
-            if (InBox(point, CraftIngPlusCentre(view, i), new Vector2(IngStepBox)))
-                return new CraftHit(CraftHitKind.IngPlus, i);
-            var members = ingredients[i].AcceptedIds;
-            for (var c = 0; c < members.Length; c++)
-                if (InBox(point, CraftChipCentre(view, i, c), new Vector2(ChipSize)))
-                    return new CraftHit(CraftHitKind.MemberChip, i, members[c]);
-        }
-        return new CraftHit(CraftHitKind.None);
+        var layout = _craftLayouts.Current;
+        if (layout == null || view.Craft.Recipe == null
+            || !ReferenceEquals(layout.Recipe, view.Craft.Recipe) || layout.Screen != _screenSize)
+            return new CraftHit(CraftHitKind.None);
+        return layout.HitAt(point, layout.ClampScroll(view.CraftScrollOffset));
     }
+
+    /// <summary>Whether a window-pixel point lies on the last drawn crafting card.</summary>
+    public bool IsOverCraftCard(Vector2 windowPoint) =>
+        _craftLayouts.Current?.Contains(ToCanvas(windowPoint)) ?? false;
+
+    /// <summary>Clamps a crafting card scroll offset against the last drawn layout (0 without one).</summary>
+    public float ClampCraftScroll(float offset) => _craftLayouts.Current?.ClampScroll(offset) ?? 0f;
 
     private void DrawBoxButton(Vector2 centre, float size, string label, Rgba bg, Rgba border, Rgba text)
     {
@@ -1286,113 +1178,160 @@ public class UIRenderer : IDisposable
 
     private void DrawCraftDetail(Inventory inventory, InventoryView view, float time, float headingDegrees)
     {
-        var session = view.Craft;
-        var cardCentre = CraftCardCentre(view);
-        var cardSize = new Vector2(DetailWidth, CraftCardHeight(view));
-        DrawRect(cardCentre, cardSize, PanelBackground);
-        DrawBorder(cardCentre, cardSize, SlotBorder, SlotBorderColor);
-        var cardLeft = cardCentre.X - DetailWidth * 0.5f;
-        DrawRect(new Vector2(cardCentre.X, PanelTop + 3f),
-            new Vector2(DetailWidth - 4f, 2f), AccentGold);
-
-        if (session.Recipe == null)
+        const float top = CraftCardLayout.Top;
+        var layout = CraftLayoutFor(inventory, view);
+        if (layout == null)
         {
-            DrawTextCentredFitted("Crafting", cardCentre.X, PanelTop + DetailPad, _headScale, Rgba.White,
-                CraftInnerWidth - 8f);
-            DrawTextCentredFitted("Pick a recipe on the left", cardCentre.X,
-                PanelTop + DetailPad + 34f, _countScale, TextDim, CraftInnerWidth - 8f);
-            DrawTextCentredFitted("then feed it items and hit CRAFT", cardCentre.X,
-                PanelTop + DetailPad + 54f, _countScale, TextDim, CraftInnerWidth - 8f);
+            var width = CraftCardLayout.WidthFor(_screenSize);
+            var centre = new Vector2(CraftCardLayout.LeftFor(_screenSize) + width * 0.5f,
+                top + CraftCardLayout.EmptyHeight * 0.5f);
+            var size = new Vector2(width, CraftCardLayout.EmptyHeight);
+            DrawRect(centre, size, PanelBackground);
+            DrawBorder(centre, size, SlotBorder, SlotBorderColor);
+            DrawRect(new Vector2(centre.X, top + 3f), new Vector2(width - 4f, 2f), AccentGold);
+            var avail = CraftCardLayout.InnerWidthFor(_screenSize) - 8f;
+            DrawTextCentredFitted("Crafting", centre.X, top + CraftCardLayout.Pad, _headScale, Rgba.White, avail);
+            DrawTextCentredFitted("Pick a recipe on the left", centre.X,
+                top + CraftCardLayout.Pad + 34f, _countScale, TextDim, avail);
+            DrawTextCentredFitted("then feed it items and hit CRAFT", centre.X,
+                top + CraftCardLayout.Pad + 54f, _countScale, TextDim, avail);
             return;
         }
 
-        var recipe = session.Recipe;
-        var ready = session.IsReady(inventory);
-        var y = PanelTop + DetailPad;
+        var scroll = layout.ClampScroll(view.CraftScrollOffset);
+        DrawRect(layout.CardCentre, layout.CardSize, PanelBackground);
+        DrawBorder(layout.CardCentre, layout.CardSize, SlotBorder, SlotBorderColor);
+        DrawRect(new Vector2(layout.CardCentre.X, top + 3f), new Vector2(layout.Width - 4f, 2f), AccentGold);
 
-        var iconCentre = new Vector2(cardLeft + DetailPad + 32f, y + 38f);
+        if (layout.Overflows)
+        {
+            // Same idiom as DrawInventoryPanel's row loop: DrawInventoryPanel already ran
+            // EnsureDepthCleared before its own list scissor, so the spinning icons' latched
+            // depth clear never happens under this scissor. Nothing may return from inside.
+            var (sx, sy, sw, sh) = UiCanvas.ScissorRect(
+                new Vector2(layout.Left, top + 2f), new Vector2(layout.Width, layout.ViewHeight - 4f),
+                _scale, _windowSize, _framebufferSize);
+            _gl.Enable(EnableCap.ScissorTest);
+            _gl.Scissor(sx, sy, (uint)sw, (uint)sh);
+        }
+        try
+        {
+            DrawCraftContent(inventory, view, layout, scroll, time, headingDegrees);
+        }
+        finally
+        {
+            if (layout.Overflows) _gl.Disable(EnableCap.ScissorTest);
+        }
+
+        if (layout.Overflows)
+        {
+            var track = layout.TrackRect();
+            DrawRect(track.Centre, track.Size, SlotBackground);
+            var thumb = layout.ThumbRect(scroll);
+            DrawRect(thumb.Centre, thumb.Size, SlotBorderColor);
+        }
+    }
+
+    /// <summary>The crafting card's content, every Y read from the layout and offset by the scroll.</summary>
+    private void DrawCraftContent(Inventory inventory, InventoryView view, CraftCardLayout layout,
+        float scroll, float time, float headingDegrees)
+    {
+        const float pad = CraftCardLayout.Pad;
+        const float ingPad = CraftCardLayout.IngPad;
+        var session = view.Craft;
+        var recipe = layout.Recipe;
+        var ready = session.IsReady(inventory);
+        var cardCentreX = layout.CardCentre.X;
+        var innerWidth = layout.InnerWidth;
+
+        var iconCentre = layout.IconCentre(scroll);
         var spin = time * 0.9f;
         if (ItemRegistry.IsItem(recipe.ResultId))
             DrawItemIcon(iconCentre, 56f, recipe.ResultId, spin);
         else
             DrawBlockIconSpinning(iconCentre, 60f, recipe.ResultId, spin);
 
-        var textX = cardLeft + DetailPad + 76f;
-        var headAvail = DetailWidth - DetailPad * 2f - 76f;
-        var title = Inventory.DisplayName(recipe.ResultId);
-        var titleScale = FitScale(title, _headScale, headAvail);
-        DrawText(FitText(title, titleScale, headAvail), new Vector2(textX, y + 4f), titleScale, Rgba.White);
-        DrawText(FitText($"Makes {recipe.ResultCount} per craft", _countScale, headAvail),
-            new Vector2(textX, y + 32f), _countScale, TextDim);
+        var textX = layout.TextX;
+        var titleY = layout.ContentY(layout.TitleY, scroll);
+        for (var k = 0; k < layout.TitleLines.Length; k++)
+            DrawText(layout.TitleLines[k], new Vector2(textX, titleY + k * CraftCardLayout.TitleLineH),
+                _headScale, Rgba.White);
+        var makesY = layout.ContentY(layout.MakesY, scroll);
+        for (var k = 0; k < layout.MakesLines.Length; k++)
+            DrawText(layout.MakesLines[k], new Vector2(textX, makesY + k * CraftCardLayout.BodyLineH),
+                _countScale, TextDim);
 
-        DrawText("Batch", new Vector2(textX, y + 56f), _countScale, TextDim);
-        var batchMinus = CraftBatchMinusCentre(view);
-        var batchPlus = CraftBatchPlusCentre(view);
-        DrawBoxButton(batchMinus, StepBox, "-", ChipBackground, SlotBorderColor, Rgba.White);
-        DrawTextCentred(session.Batch.ToString(), CraftBatchCountCentre(view).X,
+        var batchTextY = layout.ContentY(layout.BatchTextY, scroll);
+        DrawText("Batch", new Vector2(textX, batchTextY), _countScale, TextDim);
+        var batchMinus = layout.BatchMinusCentre(scroll);
+        var batchPlus = layout.BatchPlusCentre(scroll);
+        DrawBoxButton(batchMinus, CraftCardLayout.StepBox, "-", ChipBackground, SlotBorderColor, Rgba.White);
+        DrawTextCentred(session.Batch.ToString(), layout.BatchCountCentre(scroll).X,
             batchMinus.Y - 8f, _countScale, Rgba.White);
-        DrawBoxButton(batchPlus, StepBox, "+", ChipBackground, SlotBorderColor, Rgba.White);
+        DrawBoxButton(batchPlus, CraftCardLayout.StepBox, "+", ChipBackground, SlotBorderColor, Rgba.White);
         var maxBatch = session.MaxAffordable(inventory);
-        var maxX = CraftBatchMaxX(view);
-        var maxRight = cardLeft + DetailWidth - DetailPad;
+        var maxX = layout.BatchMaxX(scroll);
+        var maxRight = layout.Left + layout.Width - pad;
         DrawText(FitText($"max {maxBatch}", _countScale, Math.Max(20f, maxRight - maxX)),
-            new Vector2(maxX, y + 56f),
+            new Vector2(maxX, batchTextY),
             _countScale, maxBatch >= session.Batch ? ReadyGreen : DangerRed);
 
-        y += DetailHeaderH + 10f;
-        DrawRect(new Vector2(cardCentre.X, y - 5f), new Vector2(CraftInnerWidth, 1.5f), SlotBorderColor);
+        var separatorY = layout.ContentY(pad + layout.HeaderHeight + CraftCardLayout.HeaderGap - 5f, scroll);
+        DrawRect(new Vector2(cardCentreX, separatorY), new Vector2(innerWidth, 1.5f), SlotBorderColor);
 
+        var ingLeft = layout.Left + pad + ingPad;
         for (var i = 0; i < recipe.Ingredients.Length; i++)
         {
-            var ingredient = recipe.Ingredients[i];
-            var cardTop = CraftIngCardTop(view, i);
-            var cardH = CraftIngCardHeight(ingredient.AcceptedIds.Length, CraftChipsPerRow);
-            var ingCentre = new Vector2(cardCentre.X, cardTop + cardH * 0.5f);
-            DrawRect(ingCentre, new Vector2(CraftInnerWidth, cardH), CardBackground);
+            var ing = layout.Ingredients[i];
+            var cardTop = layout.ContentY(ing.Top, scroll);
+            DrawRect(new Vector2(cardCentreX, cardTop + ing.Height * 0.5f),
+                new Vector2(innerWidth, ing.Height), CardBackground);
 
             var need = session.NeedAt(i);
             var fed = session.FedAt(i);
-            var label = ingredient.IsTag ? $"Any {ingredient.Tag}" : Inventory.DisplayName(ingredient.Id);
-            var ingTitleAvail = CraftInnerWidth - IngPad * 2f;
-            DrawText(FitText($"{i + 1}. {label}  x{ingredient.Count}/craft", _countScale, ingTitleAvail),
-                new Vector2(cardLeft + DetailPad + IngPad, cardTop + IngPad), _countScale, Rgba.White);
+            var ingTitleY = layout.ContentY(ing.TitleY, scroll);
+            var titleLines = layout.IngredientTitleLines[i];
+            for (var k = 0; k < titleLines.Length; k++)
+                DrawText(titleLines[k], new Vector2(ingLeft, ingTitleY + k * CraftCardLayout.IngTitleLineH),
+                    _countScale, Rgba.White);
 
-            var barY = cardTop + IngPad + IngTitleH;
-            var barW = CraftInnerWidth - IngPad * 2f;
-            DrawRect(new Vector2(cardLeft + DetailPad + IngPad + barW * 0.5f, barY + IngBarH * 0.5f),
-                new Vector2(barW, IngBarH), SlotBackground);
+            var barY = layout.ContentY(ing.BarY, scroll);
+            var barW = innerWidth - ingPad * 2f;
+            DrawRect(new Vector2(ingLeft + barW * 0.5f, barY + CraftCardLayout.IngBarH * 0.5f),
+                new Vector2(barW, CraftCardLayout.IngBarH), SlotBackground);
             var fill = MathUtils.Clamp01(need > 0 ? fed.Count / (float)need : 1f);
             if (fill > 0f)
-                DrawRect(new Vector2(cardLeft + DetailPad + IngPad + barW * fill * 0.5f, barY + IngBarH * 0.5f),
-                    new Vector2(barW * fill, IngBarH), fill >= 1f ? ReadyGreen : AccentGold);
+                DrawRect(new Vector2(ingLeft + barW * fill * 0.5f, barY + CraftCardLayout.IngBarH * 0.5f),
+                    new Vector2(barW * fill, CraftCardLayout.IngBarH), fill >= 1f ? ReadyGreen : AccentGold);
 
-            var fedY = barY + IngBarH + 6f;
-            var fedCx = cardLeft + DetailPad + IngPad + 16f;
-            var fedCy = fedY + IngFedH * 0.5f;
+            var fedY = layout.ContentY(ing.FedY, scroll);
+            var fedCx = ingLeft + 16f;
+            var fedCy = fedY + CraftCardLayout.IngFedH * 0.5f;
             if (fed.MemberId != 0)
                 DrawIdIcon(new Vector2(fedCx, fedCy), 30f, fed.MemberId, headingDegrees, time);
             else
                 DrawTextCentred("?", fedCx, fedCy - 8f, _countScale, TextDim);
 
-            var minus = CraftIngMinusCentre(view, i);
-            var plus = CraftIngPlusCentre(view, i);
+            var minus = layout.IngMinusCentre(i, scroll);
+            var plus = layout.IngPlusCentre(i, scroll);
             var fedText = $"{fed.Count} / {need} fed";
-            var fedAvail = minus.X - IngStepBox * 0.5f - (fedCx + 24f) - 8f;
+            var fedAvail = minus.X - CraftCardLayout.IngStepBox * 0.5f - (fedCx + 24f) - 8f;
             DrawText(FitText(fedText, _countScale, Math.Max(20f, fedAvail)),
                 new Vector2(fedCx + 24f, fedCy - 8f), _countScale,
                 fed.Count >= need ? ReadyGreen : Rgba.White);
-            DrawBoxButton(minus, IngStepBox, "-", ChipBackground, SlotBorderColor, Rgba.White);
-            DrawBoxButton(plus, IngStepBox, "+", ChipBackground, SlotBorderColor, Rgba.White);
+            DrawBoxButton(minus, CraftCardLayout.IngStepBox, "-", ChipBackground, SlotBorderColor, Rgba.White);
+            DrawBoxButton(plus, CraftCardLayout.IngStepBox, "+", ChipBackground, SlotBorderColor, Rgba.White);
 
-            var members = ingredient.AcceptedIds;
+            var members = recipe.Ingredients[i].AcceptedIds;
             var picked = fed.MemberId;
-            for (var c = 0; c < members.Length; c++)
+            const float chipSize = CraftCardLayout.ChipSize;
+            for (var c = 0; c < ing.MemberCount; c++)
             {
-                var chipC = CraftChipCentre(view, i, c);
+                var chipC = layout.ChipCentre(i, c, scroll);
                 var owned = inventory.CountFor(members[c]);
                 var isPicked = picked != 0 && picked == members[c];
-                DrawRect(chipC, new Vector2(ChipSize), owned > 0 ? ChipBackground : SlotBackground);
-                DrawBorder(chipC, new Vector2(ChipSize), isPicked ? 2.5f : 1.5f,
+                DrawRect(chipC, new Vector2(chipSize), owned > 0 ? ChipBackground : SlotBackground);
+                DrawBorder(chipC, new Vector2(chipSize), isPicked ? 2.5f : 1.5f,
                     isPicked ? AccentGold : SlotBorderColor);
                 DrawIdIcon(chipC with { Y = chipC.Y - 3f }, 26f, members[c], headingDegrees, time);
                 var ownedText = owned.ToString();
@@ -1400,19 +1339,21 @@ public class UIRenderer : IDisposable
                 {
                     var size = _font.MeasureSize(ownedText.AsSpan(), _countScale);
                     DrawText(ownedText,
-                        new Vector2(chipC.X + ChipSize * 0.5f - 3f - size.X,
-                            chipC.Y + ChipSize * 0.5f - 3f - size.Y),
+                        new Vector2(chipC.X + chipSize * 0.5f - 3f - size.X,
+                            chipC.Y + chipSize * 0.5f - 3f - size.Y),
                         _countScale, owned > 0 ? Rgba.White : TextDim);
                 }
             }
         }
 
-        var statusY = PanelTop + CraftCardHeight(view) - DetailPad - CraftButtonH - 8f - StatusH;
-        DrawTextCentredFitted(session.StatusLine(inventory), cardCentre.X, statusY,
-            _countScale, ready ? ReadyGreen : AccentGold, CraftInnerWidth - 8f);
+        var statusY = layout.ContentY(layout.StatusY, scroll);
+        var statusColor = ready ? ReadyGreen : AccentGold;
+        for (var k = 0; k < layout.StatusLines.Length; k++)
+            DrawTextCentred(layout.StatusLines[k], cardCentreX, statusY + k * CraftCardLayout.StatusLineH,
+                _countScale, statusColor);
 
-        var buttonC = CraftButtonCentre(view);
-        var buttonS = new Vector2(CraftInnerWidth, CraftButtonH);
+        var buttonC = layout.ButtonCentre(scroll);
+        var buttonS = layout.ButtonSize;
         var total = recipe.ResultCount * session.Batch;
         DrawRect(buttonC, buttonS, ready ? ButtonReady : ButtonDisabled);
         DrawBorder(buttonC, buttonS, 2f, ready ? Rgba.White : SlotBorderColor);
