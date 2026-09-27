@@ -20,7 +20,13 @@ void main() {
     vec3 col = fTint.rgb * mix(0.6, 1.0 + 1.6 * core, fEmissive);
 
     float f = clamp((fDist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
-    col = mix(col, uFogColor, f * f);
+    if (fEmissive > 0.5) {
+        // Embers are drawn additively: added light cannot blend toward the fog colour, so
+        // fade the contribution out with distance instead.
+        alpha *= 1.0 - f * f;
+    } else {
+        col = mix(col, uFogColor, f * f);
+    }
 
     FragColor = vec4(col, alpha);
 }

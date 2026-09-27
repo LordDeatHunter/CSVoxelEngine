@@ -134,6 +134,19 @@ public const float DayLengthSeconds = 1200f;
     // Dynamic point lights in the world shader (primed TNT strobes); lamp glow is baked
     public const int MaxPointLights = 8;
 
+    // Radius in blocks of the smooth window on fire point lights (campfires, lit kilns): about a
+    // lamp's flood-fill reach. It stands in for occlusion until fires bake their light (SH-2).
+    public const float FireLightRange = 8f;
+
+    /// <summary>
+    /// Selection outline beam thickness per block of camera distance, so the outline keeps a
+    /// roughly constant on-screen width (about 2 px at 1080p with the default FOV).
+    /// </summary>
+    public const float SelectionOutlinePixelScale = 0.0025f;
+
+    /// <summary>Floor on the selection outline beam thickness, in blocks, for a box right at the eye.</summary>
+    public const float SelectionOutlineMinThickness = 0.002f;
+
     // Distance fog that blends far terrain into the sky (also hides the LOD edge at night)
     public const float FogNearBlocks = 200f;
     public const float FogFarBlocks = 1800f;

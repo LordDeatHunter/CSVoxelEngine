@@ -87,6 +87,8 @@ public class RenderManager : IDisposable
     private uint outlineVao;
     private uint outlineVbo;
     private uint outlineEbo;
+    /// <summary>Reused world-space corners of the outline beams, rebuilt per hitbox.</summary>
+    private readonly Vector3[] _outlineVertices = new Vector3[SelectionOutlineMesh.VertexCount];
     private uint faceVao;
     private uint faceVbo;
 
@@ -268,6 +270,8 @@ public class RenderManager : IDisposable
     private readonly Vector3[] _pointPos = new Vector3[WorldGenerationConfig.MaxPointLights];
     private readonly Vector3[] _pointColors = new Vector3[WorldGenerationConfig.MaxPointLights];
     private int _pointCount;
+    /// <summary>Index of the first fire point light; the TNT strobes fill the slots before it.</summary>
+    private int _fireLightStart;
 
     // World-shader uniform locations, resolved once in LoadResources. The first four are the
     // only uniforms a world draw still touches, so the per-draw cost is three (four for TNT,
@@ -797,6 +801,7 @@ public class RenderManager : IDisposable
         }
         // Lit campfires each add a warm flickering point light above the pile, each on its own
         // phase hashed from its cell so neighbouring fires do not pulse in unison
+        _fireLightStart = _pointCount;
         if (campfires != null)
         {
             foreach (var cell in campfires)
@@ -1678,6 +1683,8 @@ public class RenderManager : IDisposable
         program.SetUniform("uFogFar", _fogFar);
         program.SetUniform("uCameraPos", _cameraPos);
         program.SetUniform("uNumPointLights", _pointCount);
+        program.SetUniform("uFireLightStart", _fireLightStart);
+        program.SetUniform("uFireLightRange", WorldGenerationConfig.FireLightRange);
         program.SetUniformArray3(locPointPos, _pointPos);
         program.SetUniformArray3(locPointColor, _pointColors);
         program.SetUniform("uSwayStrength", GameSettings.LeafSway);
@@ -2873,16 +2880,27 @@ public class RenderManager : IDisposable
         selectionShader.SetUniform("uColor", new Vector3(0.8f, 0.8f, 0.85f));
         selectionShader.SetUniform("uOpacity", 0.95f);
 
-        gl.LineWidth(2f);
+        // The outline is twelve edge beams (SelectionOutlineMesh) rather than GL lines, since
+        // LineWidth is unreliable in a core profile. The vertices are already in world space.
         gl.BindVertexArray(outlineVao);
+        gl.BindBuffer(BufferTargetARB.ArrayBuffer, outlineVbo);
+        selectionShader.SetUniform("uMVP", viewProj);
         // The outline inflates a hair past the grown box so it never z-fights the block
         var outlinePad = new Vector3(0.01f + grow);
         foreach (var box in boxes)
         {
-            var boxCenter = blockPosition + box.Center;
-            var outlineModel = Matrix4x4.CreateScale(box.Size + outlinePad) * Matrix4x4.CreateTranslation(boxCenter);
-            selectionShader.SetUniform("uMVP", outlineModel * viewProj);
-            unsafe { gl.DrawElements(PrimitiveType.Lines, 24, DrawElementsType.UnsignedInt, null); }
+            var half = (box.Size + outlinePad) * 0.5f;
+            var center = blockPosition + box.Center;
+            // Thickness grows with distance so the beam keeps roughly the same on-screen width
+            var thickness = MathF.Max(WorldGenerationConfig.SelectionOutlineMinThickness,
+                WorldGenerationConfig.SelectionOutlinePixelScale * Vector3.Distance(camera.Position, center));
+            SelectionOutlineMesh.BuildVertices(center - half, center + half, thickness, _outlineVertices);
+            gl.BufferSubData<Vector3>(BufferTargetARB.ArrayBuffer, 0, _outlineVertices);
+            unsafe
+            {
+                gl.DrawElements(PrimitiveType.Triangles, SelectionOutlineMesh.IndexCount,
+                    DrawElementsType.UnsignedInt, null);
+            }
         }
 
         var hitBox = boxes[Math.Clamp(hitBoxIndex, 0, boxes.Length - 1)];
@@ -2955,24 +2973,9 @@ public class RenderManager : IDisposable
 
     private void CreateSelectionGeometry()
     {
-        Span<float> outlineVertices =
-        [
-            -0.5f, -0.5f, -0.5f,
-            0.5f, -0.5f, -0.5f,
-            0.5f, 0.5f, -0.5f,
-            -0.5f, 0.5f, -0.5f,
-            -0.5f, -0.5f, 0.5f,
-            0.5f, -0.5f, 0.5f,
-            0.5f, 0.5f, 0.5f,
-            -0.5f, 0.5f, 0.5f
-        ];
-
-        Span<uint> outlineIndices =
-        [
-            0, 1, 1, 2, 2, 3, 3, 0,
-            4, 5, 5, 6, 6, 7, 7, 4,
-            0, 4, 1, 5, 2, 6, 3, 7
-        ];
+        // The outline's vertices are rewritten per hitbox each frame; its indices never change.
+        Span<uint> outlineIndices = stackalloc uint[SelectionOutlineMesh.IndexCount];
+        SelectionOutlineMesh.BuildIndices(outlineIndices);
 
         outlineVao = gl.GenVertexArray();
         outlineVbo = gl.GenBuffer();
@@ -2980,7 +2983,11 @@ public class RenderManager : IDisposable
 
         gl.BindVertexArray(outlineVao);
         gl.BindBuffer(BufferTargetARB.ArrayBuffer, outlineVbo);
-        gl.BufferData<float>(BufferTargetARB.ArrayBuffer, outlineVertices, BufferUsageARB.StaticDraw);
+        unsafe
+        {
+            gl.BufferData(BufferTargetARB.ArrayBuffer,
+                (nuint)(SelectionOutlineMesh.VertexCount * 3 * sizeof(float)), null, BufferUsageARB.DynamicDraw);
+        }
         gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, outlineEbo);
         gl.BufferData<uint>(BufferTargetARB.ElementArrayBuffer, outlineIndices, BufferUsageARB.StaticDraw);
         unsafe

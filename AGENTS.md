@@ -172,6 +172,7 @@ OpenGLTest/
     MeshScratch.cs             # per-thread scratch buffers of the binary greedy mesh pass
     CutoutMipmap.cs            # GL-free coverage-preserving mip chain for cutout tiles (alpha rescaled per level)
     LightFlicker.cs            # GL-free per-cell flicker phase + curve for the campfire point lights
+    SelectionOutlineMesh.cs    # GL-free selection outline: the 12 box edges as thin beams (no glLineWidth)
     ChunkGenerationWorker.cs   # background threads creating chunks around the camera
     Camera.cs                  # FPS camera, physics (gravity/jump/collision), DDA raycast
     LodRegion.cs               # far-terrain LOD: region columns meshed at reduced resolution from heightmaps; per-column chunk-Y ranges for burial

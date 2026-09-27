@@ -58,6 +58,10 @@ uniform vec3 uCameraPos;
 uniform int uNumPointLights;
 uniform vec3 uPointPos[8];
 uniform vec3 uPointColor[8];
+// Point lights from index uFireLightStart on are fires (campfires, lit kilns) and get a
+// bounded range window; 0 range (a program that never sets it) leaves every light unwindowed.
+uniform int uFireLightStart;
+uniform float uFireLightRange;
 uniform sampler2DShadow uShadowMap;
 uniform mat4 uLightViewProj;
 uniform sampler2D uReflectionMap;
@@ -271,7 +275,17 @@ void main() {
         vec3 L = uPointPos[i] - fWorldPos;
         float pd = length(L);
         float att = 1.0 / (1.0 + 0.09 * pd + 0.032 * pd * pd);
-        pl += uPointColor[i] * att;
+        // Fires get a range window instead of a literal fBlock gate: a lit campfire or kiln
+        // bakes no emission (its lit state is block-entity state), so fBlock is 0 around it
+        // and a gate would switch the light off. The window bounds how far a fire leaks
+        // through walls, and the half-Lambert facing term darkens a wall's back face while
+        // keeping the floor pool bright. TNT strobes (below uFireLightStart) are untouched.
+        float w = 1.0;
+        if (i >= uFireLightStart && uFireLightRange > 0.0) {
+            float r = clamp(1.0 - pd * pd / (uFireLightRange * uFireLightRange), 0.0, 1.0);
+            w = r * r * clamp(dot(N, L / max(pd, 1e-4)) * 0.5 + 0.5, 0.0, 1.0);
+        }
+        pl += uPointColor[i] * (att * w);
     }
     // Ambient is skylight bounce, so it only reaches fragments the sky reaches (fSun).
     // Without this every sealed cave renders at full ambient brightness in daytime.
