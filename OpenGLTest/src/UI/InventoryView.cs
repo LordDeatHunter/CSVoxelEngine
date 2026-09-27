@@ -23,9 +23,44 @@ public sealed class InventoryView
     /// </summary>
     public CraftingSession Craft { get; } = new();
 
+    // One scroll offset per tab, indexed by (int)InventoryCategory, which is 0..3 contiguous
+    // (Inventory.cs). If a tab is added, size this from Enum.GetValues instead.
+    private readonly float[] _scroll = new float[4];
+
+    /// <summary>
+    /// Canvas pixels the active tab's list is scrolled by. The input handlers clamp on write,
+    /// and both the draw and the hit-test clamp on read through
+    /// <see cref="InventoryPanelLayout.ClampedOffset"/> with that frame's row count, so the two
+    /// always agree. A list that shrinks without input keeps the stored number and resumes it
+    /// if it grows back. <see cref="UIRenderer"/> never writes it.
+    /// </summary>
+    public float ScrollOffset
+    {
+        get => _scroll[(int)Tab];
+        set => _scroll[(int)Tab] = value;
+    }
+
+    /// <summary>
+    /// Canvas-Y distance from the scrollbar thumb's top edge to the cursor when the thumb was
+    /// grabbed; null while no thumb drag is live.
+    /// </summary>
+    public float? ThumbDragGrab { get; set; }
+
+    /// <summary>
+    /// Row count latched when the thumb was grabbed, so the per-frame drag never re-runs
+    /// <see cref="Inventory.StackEntries"/>.
+    /// </summary>
+    public int ThumbDragRowCount { get; set; }
+
+    /// <summary>Drops the selection picks; the per-tab scroll offsets are kept.</summary>
     public void ClearSelection()
     {
         SelectedId = 0;
         SelectedToolInstance = 0;
+    }
+
+    public void EndThumbDrag()
+    {
+        ThumbDragGrab = null;
     }
 }

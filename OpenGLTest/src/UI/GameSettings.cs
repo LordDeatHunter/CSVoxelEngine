@@ -15,6 +15,8 @@ public static class GameSettings
     // Display
     public static bool VSync { get; set; }
     public static int ResolutionIndex { get; set; }
+    /// <summary>The GUI Scale row's pick: 0 = Auto, 1.. index <see cref="GuiScales"/> (1-based).</summary>
+    public static int GuiScaleIndex { get; set; }
     public static int MaxFpsIndex { get; set; }
 
     // Graphics
@@ -44,6 +46,15 @@ public static class GameSettings
     public static readonly (int W, int H)[] Resolutions =
         [(1280, 720), (1600, 900), (1920, 1080), (2560, 1440)];
 
+    /// <summary>Absolute multipliers of <see cref="UiCanvas.ReferenceSize"/> offered by the GUI Scale
+    /// row, after its Auto entry.</summary>
+    public static readonly float[] GuiScales = [0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f];
+
+    /// <summary>The fixed GUI scale the player picked, or null for Auto (see
+    /// <see cref="UiCanvas.EffectiveScale"/> for the fit cap).</summary>
+    public static float? RequestedGuiScale =>
+        GuiScaleIndex <= 0 ? null : GuiScales[Math.Clamp(GuiScaleIndex - 1, 0, GuiScales.Length - 1)];
+
     /// <summary>Frame-rate caps offered by the max-FPS option row; 0 means uncapped.</summary>
     public static readonly int[] MaxFpsOptions = [0, 30, 60, 120, 144, 240];
 
@@ -54,6 +65,7 @@ public static class GameSettings
     {
         VSync = false;
         ResolutionIndex = 2;
+        GuiScaleIndex = 0;
         MaxFpsIndex = 0;
         Shadows = WorldGenerationConfig.ShadowsEnabled;
         LeafSway = WorldGenerationConfig.LeafSwayStrength;
@@ -95,6 +107,8 @@ public static class GameSettings
 
         if (dto.VSync is { } vSync) VSync = vSync;
         if (dto.ResolutionIndex is { } resolution) ResolutionIndex = Math.Clamp(resolution, 0, Resolutions.Length - 1);
+        // Length, not Length - 1: index 0 is Auto and the fixed entries are 1..Length.
+        if (dto.GuiScaleIndex is { } guiScale) GuiScaleIndex = Math.Clamp(guiScale, 0, GuiScales.Length);
         if (dto.MaxFpsIndex is { } maxFps) MaxFpsIndex = Math.Clamp(maxFps, 0, MaxFpsOptions.Length - 1);
         if (dto.Shadows is { } shadows) Shadows = shadows;
         if (dto.LeafSway is { } leafSway) LeafSway = Math.Clamp(leafSway, 0f, SettingsRows.LeafSwayMax);
@@ -120,6 +134,7 @@ public static class GameSettings
         {
             VSync = VSync,
             ResolutionIndex = ResolutionIndex,
+            GuiScaleIndex = GuiScaleIndex,
             MaxFpsIndex = MaxFpsIndex,
             Shadows = Shadows,
             LeafSway = LeafSway,
@@ -154,6 +169,7 @@ public static class GameSettings
     {
         public bool? VSync { get; set; }
         public int? ResolutionIndex { get; set; }
+        public int? GuiScaleIndex { get; set; }
         public int? MaxFpsIndex { get; set; }
         public bool? Shadows { get; set; }
         public float? LeafSway { get; set; }

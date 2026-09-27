@@ -18,6 +18,7 @@ public sealed class GameSettingsTests
             GameSettings.ResolutionIndex = 0;
             GameSettings.MouseSensitivity = 0.42f;
             GameSettings.SfxVolume = 0.31f;
+            GameSettings.GuiScaleIndex = 3;
             GameSettings.Save(path);
 
             GameSettings.ResetToDefaults();
@@ -30,6 +31,7 @@ public sealed class GameSettingsTests
             Assert.Equal(0, GameSettings.ResolutionIndex);
             Assert.Equal(0.42f, GameSettings.MouseSensitivity);
             Assert.Equal(0.31f, GameSettings.SfxVolume);
+            Assert.Equal(3, GameSettings.GuiScaleIndex);
         }
         finally
         {
@@ -70,6 +72,7 @@ public sealed class GameSettingsTests
             GameSettings.SunSize = -1000f;
             GameSettings.WaterCaustics = 1e9f;
             GameSettings.ResolutionIndex = 99;
+            GameSettings.GuiScaleIndex = 99;
             GameSettings.Save(path);
 
             GameSettings.ResetToDefaults();
@@ -78,6 +81,16 @@ public sealed class GameSettingsTests
             Assert.Equal(SettingsRows.SunSizeMin, GameSettings.SunSize);
             Assert.Equal(SettingsRows.WaterCausticsMax, GameSettings.WaterCaustics);
             Assert.Equal(GameSettings.Resolutions.Length - 1, GameSettings.ResolutionIndex);
+            // Index 0 is Auto, so the last fixed entry is GuiScales.Length, not Length - 1.
+            Assert.Equal(GameSettings.GuiScales.Length, GameSettings.GuiScaleIndex);
+            Assert.Equal(GameSettings.GuiScales[^1], GameSettings.RequestedGuiScale);
+
+            GameSettings.GuiScaleIndex = -5;
+            GameSettings.Save(path);
+            GameSettings.ResetToDefaults();
+            GameSettings.GuiScaleIndex = 2;
+            GameSettings.Load(path);
+            Assert.Equal(0, GameSettings.GuiScaleIndex);
         }
         finally
         {

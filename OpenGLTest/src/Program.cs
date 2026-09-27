@@ -109,11 +109,26 @@ public static class Program
             }
             if (button == MouseButton.Right) placeTimer = MAX_PLACE_TIMER;
             if (button == MouseButton.Left && inventoryView.IsOpen && inputManager.Mouse != null)
+            {
+                // Releasing a thumb drag ends it here and nowhere else while the panel is
+                // open, so the release never equips or picks whatever is under the cursor.
+                if (inventoryView.ThumbDragGrab.HasValue)
+                {
+                    inventoryView.EndThumbDrag();
+                    return;
+                }
                 HandleInventoryClick(inputManager.Mouse.Position);
+            }
         };
 
         inputManager.Mouse?.MouseDown += (_, button) =>
         {
+            if (inventoryView.IsOpen && !pauseMenuView.IsOpen && button == MouseButton.Left
+                && inputManager.Mouse != null)
+            {
+                HandleInventoryScrollbarPress(inputManager.Mouse.Position);
+                return;
+            }
             if (!pauseMenuView.IsOpen || pauseMenuView.Page != PauseMenuPage.Settings
                 || button != MouseButton.Left || inputManager.Mouse == null)
                 return;
@@ -128,6 +143,20 @@ public static class Program
         inputManager.Mouse?.Scroll += (_, wheel) =>
         {
             if (!inventoryView.IsOpen && !pauseMenuView.IsOpen) world.Inventory.Scroll(wheel.Y);
+            else if (inventoryView.IsOpen && !pauseMenuView.IsOpen && inputManager.Mouse != null)
+            {
+                // The wheel scrolls the list only while hovering it; wheel.Y > 0 is toward the top.
+                var screen = renderManager.UiCanvasSize;
+                var p = renderManager.UiToCanvas(inputManager.Mouse.Position);
+                if (InventoryPanelLayout.IsOverList(p, screen))
+                {
+                    var rowCount = RowCountFor(inventoryView.Tab);
+                    inventoryView.ScrollOffset = InventoryPanelLayout.ClampedOffset(
+                        inventoryView.ScrollOffset
+                            - wheel.Y * InventoryPanelLayout.WheelStepRows * InventoryPanelLayout.RowHeight,
+                        rowCount, screen);
+                }
+            }
         };
 
         ambience = new AmbienceManager();
@@ -274,11 +303,20 @@ public static class Program
             }
             else
             {
-                var screen = new System.Numerics.Vector2(
-                    windowManager.Window.Size.X, windowManager.Window.Size.Y);
+                var screen = renderManager.UiCanvasSize;
                 drag.Set(SettingsLayout.SliderValue(drag,
-                    SettingsLayout.SliderFraction(inputManager.Mouse.Position.X, tabRow, screen)));
+                    SettingsLayout.SliderFraction(renderManager.UiToCanvas(inputManager.Mouse.Position).X, tabRow, screen)));
             }
+        }
+
+        // A scrollbar thumb drag tracks the cursor every frame; only MouseUp (or closing the
+        // panel) ends it, so there is deliberately no button-released branch here.
+        if (inventoryView.IsOpen && inventoryView.ThumbDragGrab is { } grab && inputManager.Mouse != null)
+        {
+            var screen = renderManager.UiCanvasSize;
+            var p = renderManager.UiToCanvas(inputManager.Mouse.Position);
+            inventoryView.ScrollOffset = InventoryPanelLayout.OffsetForThumbTop(
+                p.Y - grab, inventoryView.ThumbDragRowCount, screen);
         }
 
         // The [E] panel owns the mouse: clicks equip, hotbar keys rest, and the world runs on
@@ -378,6 +416,7 @@ public static class Program
         {
             inventoryView.ClearSelection();
             inventoryView.Craft.Clear();
+            inventoryView.EndThumbDrag();
         }
         world.Camera.SuppressLook = open;
         if (inputManager.Mouse != null)
@@ -479,6 +518,43 @@ public static class Program
         }
     }
 
+    /// <summary>Number of list rows the given panel tab shows this frame.</summary>
+    private static int RowCountFor(InventoryCategory tab) => tab switch
+    {
+        InventoryCategory.Tools => world.Inventory.ToolEntries().Count,
+        InventoryCategory.Crafting => ContentRegistry.CraftingRecipes.Count,
+        _ => world.Inventory.StackEntries(tab).Count,
+    };
+
+    /// <summary>
+    /// A left press on the open panel's scrollbar: the thumb starts a drag (the grab offset
+    /// and row count are latched so the per-frame drag never re-sorts the list), the track
+    /// above or below it pages by one viewport.
+    /// </summary>
+    private static void HandleInventoryScrollbarPress(System.Numerics.Vector2 position)
+    {
+        var screen = renderManager.UiCanvasSize;
+        var p = renderManager.UiToCanvas(position);
+        var rowCount = RowCountFor(inventoryView.Tab);
+        var offset = InventoryPanelLayout.ClampedOffset(inventoryView.ScrollOffset, rowCount, screen);
+        switch (InventoryPanelLayout.ScrollbarHitAt(p, screen, offset, rowCount))
+        {
+            case ScrollbarHit.Thumb:
+                var thumb = InventoryPanelLayout.ThumbRect(screen, offset, rowCount);
+                inventoryView.ThumbDragGrab = p.Y - (thumb.Centre.Y - thumb.Size.Y / 2f);
+                inventoryView.ThumbDragRowCount = rowCount;
+                break;
+            case ScrollbarHit.TrackAbove:
+                inventoryView.ScrollOffset = InventoryPanelLayout.ClampedOffset(
+                    offset - InventoryPanelLayout.ListHeight(screen), rowCount, screen);
+                break;
+            case ScrollbarHit.TrackBelow:
+                inventoryView.ScrollOffset = InventoryPanelLayout.ClampedOffset(
+                    offset + InventoryPanelLayout.ListHeight(screen), rowCount, screen);
+                break;
+        }
+    }
+
     /// <summary>
     /// Routes one left-click inside the open panel: tabs switch, rows pick for preview,
     /// crafting controls feed the open recipe, and hotbar slots equip the pick (clicking
@@ -496,13 +572,15 @@ public static class Program
             return;
         }
 
-        var rowCount = inventoryView.Tab switch
-        {
-            InventoryCategory.Tools => inventory.ToolEntries().Count,
-            InventoryCategory.Crafting => ContentRegistry.CraftingRecipes.Count,
-            _ => inventory.StackEntries(inventoryView.Tab).Count,
-        };
-        var row = renderManager.UiPanelRowAt(position, rowCount);
+        var rowCount = RowCountFor(inventoryView.Tab);
+        var offset = InventoryPanelLayout.ClampedOffset(
+            inventoryView.ScrollOffset, rowCount, renderManager.UiCanvasSize);
+        // The scrollbar is handled on press; its release must not fall through to the
+        // crafting card or hotbar tests below.
+        if (InventoryPanelLayout.ScrollbarHitAt(renderManager.UiToCanvas(position),
+                renderManager.UiCanvasSize, offset, rowCount) != ScrollbarHit.None)
+            return;
+        var row = renderManager.UiPanelRowAt(position, offset, rowCount);
         if (row.HasValue)
         {
             if (inventoryView.Tab == InventoryCategory.Tools)

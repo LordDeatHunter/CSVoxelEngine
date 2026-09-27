@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Numerics;
 
 namespace silkgltriangle;
@@ -29,7 +30,8 @@ public sealed record OptionsRow(string Section, string Label, string[] Options,
 /// The settings page's rows: section, label, widget kind and the getter/setter into
 /// <see cref="GameSettings"/>. Setters only mutate + save (via <see cref="Program"/>); the
 /// engine reads the values live, and window-level ones are synced per frame, so no row
-/// needs its own apply hook.
+/// needs its own apply hook. The GUI Scale row is read by <c>RenderManager.RenderUI</c> every
+/// frame through <see cref="GameSettings.RequestedGuiScale"/>.
 /// </summary>
 public static class SettingsRows
 {
@@ -48,6 +50,15 @@ public static class SettingsRows
 
     public static readonly string[] Tabs = ["Display", "Graphics", "Water", "Audio", "Controls"];
 
+    /// <summary>The GUI Scale row's labels: Auto, then every <see cref="GameSettings.GuiScales"/> entry
+    /// through <see cref="UiCanvas.FormatScale"/>, so the length is always 1 + GuiScales.Length.</summary>
+    public static readonly string[] GuiScaleOptions = ["Auto", .. GameSettings.GuiScales.Select(UiCanvas.FormatScale)];
+
+    /// <summary>A single static instance: the settings page recognises it by reference to show the
+    /// effective scale while the pick is capped.</summary>
+    public static readonly OptionsRow GuiScaleRow = new("Display", "GUI Scale", GuiScaleOptions,
+        () => GameSettings.GuiScaleIndex, v => GameSettings.GuiScaleIndex = v);
+
     public static readonly SettingsRow[] All =
     [
         new ToggleRow("Display", "VSync",
@@ -55,6 +66,7 @@ public static class SettingsRows
         new OptionsRow("Display", "Resolution",
             ["1280x720", "1600x900", "1920x1080", "2560x1440"],
             () => GameSettings.ResolutionIndex, v => GameSettings.ResolutionIndex = v),
+        GuiScaleRow,
         new OptionsRow("Display", "Max FPS",
             ["Unlimited", "30", "60", "120", "144", "240"],
             () => GameSettings.MaxFpsIndex, v => GameSettings.MaxFpsIndex = v),

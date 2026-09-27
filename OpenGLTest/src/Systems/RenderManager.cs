@@ -3068,7 +3068,8 @@ public class RenderManager : IDisposable
         PauseMenuView? menu = null, SettingsMenuView? settings = null,
         int health = PlayerHealth.MaxHealth, float damageFlash = 0f)
     {
-        ui.Begin(window.Size);
+        var windowSize = new Vector2(window.Size.X, window.Size.Y);
+        ui.Begin(window.Size, window.FramebufferSize, UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
 
         // Cheap underwater wash over the whole view: the world fog alone leaves nearby
         // geometry untinted, and this is what sells "the camera is in the water"
@@ -3077,7 +3078,7 @@ public class RenderManager : IDisposable
             var wet = MathUtils.SmoothStep(_underwaterT);
             var tint = _eyeInLava ? LavaFogColor : UnderwaterFogColor;
             var alpha = (_eyeInLava ? 0.35f : 0.18f) * wet;
-            ui.DrawRect(ui.ScreenCentre, new Vector2(window.Size.X, window.Size.Y),
+            ui.DrawRect(ui.ScreenCentre, ui.ScreenSize,
                 Rgba.FromFloat(tint.X, tint.Y, tint.Z, alpha));
         }
 
@@ -3106,8 +3107,13 @@ public class RenderManager : IDisposable
 
     /// <summary>Delegates click hit-testing to the UI pass (valid after a frame has begun).</summary>
     public int? UiHotbarSlotAt(Vector2 point) => ui.HotbarSlotAt(point);
+    /// <summary>Window pixels -> UI canvas units (the space every UI layout is measured in).</summary>
+    public Vector2 UiToCanvas(Vector2 windowPoint) => ui.ToCanvas(windowPoint);
+    /// <summary>The UI canvas size of the last UI pass, in canvas units.</summary>
+    public Vector2 UiCanvasSize => ui.ScreenSize;
     public InventoryCategory? UiPanelTabAt(Vector2 point) => ui.PanelTabAt(point);
-    public int? UiPanelRowAt(Vector2 point, int rowCount) => ui.PanelRowAt(point, rowCount);
+    public int? UiPanelRowAt(Vector2 point, float scrollOffset, int rowCount) =>
+        ui.PanelRowAt(point, scrollOffset, rowCount);
     public CraftHit UiCraftHitAt(Vector2 point, InventoryView view) => ui.CraftHitAt(point, view);
     public PauseMenuHit UiPauseMenuHitAt(Vector2 point, PauseMenuView menu) => ui.PauseMenuHitAt(point, menu);
     public SettingsHit UiSettingsHitAt(Vector2 point, SettingsMenuView settings) => ui.SettingsHitAt(point, settings);

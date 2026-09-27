@@ -23,8 +23,13 @@ public enum CraftHitKind
 public readonly record struct CraftHit(CraftHitKind Kind, int IngredientIndex = -1, byte MemberId = 0);
 
 /// <summary>
-/// Draws screen-space UI through an orthographic projection measured in pixels, with the origin
-/// at the top-left corner. Shapes come from <see cref="Primitives"/> in their own Y-up space and
+/// Draws screen-space UI through an orthographic projection measured in canvas units, with the
+/// origin at the top-left corner. The canvas is the window divided by a uniform scale the caller
+/// picks (see <see cref="UiCanvas"/>), so every layout constant here is laid out against a
+/// 1920x1080-ish reference and scales with the window; at scale 1 canvas units are window pixels.
+/// One rule keeps input honest: public <c>*At</c> hit-test methods take a <b>window-pixel</b>
+/// point and convert it once through <see cref="ToCanvas"/>; everything else (draws, private
+/// geometry, <see cref="ScreenSize"/>) works in canvas units. Shapes come from <see cref="Primitives"/> in their own Y-up space and
 /// are flipped into that Y-down frame by the model matrix, so the same geometry works here and
 /// in the world.
 ///
@@ -48,9 +53,10 @@ public class UIRenderer : IDisposable
     private const float HeartGap = 10f;
 
     // Hotbar metrics, in pixels
-    private const float SlotSize = 56f;
-    private const float SlotGap = 6f;
-    private const float BottomMargin = 14f;
+    // Aliases of the shared hotbar geometry (HotbarLayout), so the HUD draws read short names.
+    private const float SlotSize = HotbarLayout.SlotSize;
+    private const float SlotGap = HotbarLayout.SlotGap;
+    private const float BottomMargin = HotbarLayout.BottomMargin;
     private const float SlotBorder = 2f;
     private const float SelectedBorder = 3f;
 
@@ -69,23 +75,21 @@ public class UIRenderer : IDisposable
     private const float FpsTop = 10f;
 
     // [E] inventory panel, in pixels: a Skyrim-style list on the left, preview on the right
-    private const float PanelLeft = 40f;
-    private const float PanelTop = 80f;
-    private const float PanelGap = 16f;
-    private const float PanelRightMargin = 24f;
-    private const float PanelWidthMin = 480f;
-    private const float PanelWidthMax = 660f;
+    // Aliases of InventoryPanelLayout, which owns the panel geometry; they keep the crafting
+    // card and the detail column (out of the layout class for now) reading the same numbers.
+    private const float PanelLeft = InventoryPanelLayout.PanelLeft;
+    private const float PanelTop = InventoryPanelLayout.PanelTop;
+    private const float PanelGap = InventoryPanelLayout.PanelGap;
+    private const float PanelRightMargin = InventoryPanelLayout.PanelRightMargin;
     private const float DetailWidthMin = 300f;
     private const float DetailWidthMax = 480f;
-    private float PanelWidth =>
-        Math.Clamp((_screenSize.X - PanelLeft - PanelGap - PanelRightMargin) * 0.58f,
-            PanelWidthMin, PanelWidthMax);
+    private float PanelWidth => InventoryPanelLayout.PanelWidth(_screenSize);
     private float DetailWidth =>
         Math.Clamp(_screenSize.X - PanelLeft - PanelWidth - PanelGap - PanelRightMargin,
             DetailWidthMin, DetailWidthMax);
-    private const float PanelPad = 10f;
-    private const float TabHeight = 60f;
-    private const float RowHeight = 42f;
+    private const float PanelPad = InventoryPanelLayout.PanelPad;
+    private const float TabHeight = InventoryPanelLayout.TabHeight;
+    private const float RowHeight = InventoryPanelLayout.RowHeight;
     private const float RowIcon = 30f;
     private const float PreviewSize = 190f;
     private const float PreviewRight = 300f;
@@ -224,7 +228,11 @@ public class UIRenderer : IDisposable
     private readonly uint _textVao, _textVbo, _textEbo;
 
     private Matrix4x4 _projection;
+    // The canvas size (window / _scale): what every draw and layout constant is measured in.
     private Vector2 _screenSize;
+    private Vector2 _windowSize;
+    private Vector2 _framebufferSize;
+    private float _scale = 1f;
     private bool _depthCleared;
 
     public UIRenderer(GL gl, uint atlasTexture, BlockCubeCache blockCubes, ItemMeshCache itemMeshes)
@@ -297,13 +305,28 @@ public class UIRenderer : IDisposable
         _gl.BindVertexArray(0);
     }
 
-    /// <summary>Starts a UI pass sized to the window. Must be paired with <see cref="End"/>.</summary>
-    public void Begin(Vector2D<int> screenSize)
+    /// <summary>Starts a UI pass at scale 1, the canvas being the window itself. Must be paired
+    /// with <see cref="End"/>.</summary>
+    public void Begin(Vector2D<int> screenSize) => Begin(screenSize, screenSize, 1f);
+
+    /// <summary>
+    /// Starts a UI pass on a virtual canvas of <c>windowSize / scale</c>. <paramref name="scale"/>
+    /// is window pixels per canvas unit — the caller decides the policy (see
+    /// <see cref="UiCanvas.ScaleFor"/>); a non-positive scale is treated as 1. The GL viewport is
+    /// left alone (the full window); only the projection changes. Must be paired with
+    /// <see cref="End"/>.
+    /// </summary>
+    public void Begin(Vector2D<int> windowSize, Vector2D<int> framebufferSize, float scale)
     {
-        _screenSize = new Vector2(screenSize.X, screenSize.Y);
+        _windowSize = new Vector2(windowSize.X, windowSize.Y);
+        _framebufferSize = new Vector2(framebufferSize.X, framebufferSize.Y);
+        _scale = scale > 0f ? scale : 1f;
+        _screenSize = UiCanvas.CanvasSizeFor(_windowSize, _scale);
         _projection = Matrix4x4.CreateOrthographicOffCenter(
             0f, _screenSize.X, _screenSize.Y, 0f, -DepthRange, DepthRange);
 
+        // Safety: the pass never starts scissored, whatever a previous pass left behind.
+        _gl.Disable(EnableCap.ScissorTest);
         _gl.Disable(EnableCap.DepthTest);
         _gl.Enable(EnableCap.Blend);
         _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
@@ -320,6 +343,16 @@ public class UIRenderer : IDisposable
     }
 
     public Vector2 ScreenCentre => _screenSize * 0.5f;
+
+    /// <summary>The canvas size of the current (or last) pass, in canvas units.</summary>
+    public Vector2 ScreenSize => _screenSize;
+
+    /// <summary>Window pixels per canvas unit of the current (or last) pass.</summary>
+    public float Scale => _scale;
+
+    /// <summary>Window pixels -> the canvas every layout constant is measured in; valid after the
+    /// first <see cref="Begin(Vector2D{int}, Vector2D{int}, float)"/>.</summary>
+    public Vector2 ToCanvas(Vector2 windowPoint) => UiCanvas.WindowToCanvas(windowPoint, _scale);
 
     /// <summary>Solid-colour rectangle centred on <paramref name="centre"/>.</summary>
     public void DrawRect(Vector2 centre, Vector2 size, Rgba color) =>
@@ -361,6 +394,18 @@ public class UIRenderer : IDisposable
     }
 
     /// <summary>
+    /// Clears the depth buffer once per UI pass, the first time a 3D icon needs it. A glClear
+    /// honours the scissor, so this must never first run while the list scissor is on — the
+    /// inventory panel calls it before enabling the scissor for exactly that reason.
+    /// </summary>
+    private void EnsureDepthCleared()
+    {
+        if (_depthCleared) return;
+        _gl.Clear(ClearBufferMask.DepthBufferBit);
+        _depthCleared = true;
+    }
+
+    /// <summary>
     /// A block drawn as a rotated 3D cube. Air (id 0) and unknown ids draw nothing.
     /// </summary>
     /// <param name="size">
@@ -376,11 +421,7 @@ public class UIRenderer : IDisposable
         // sorting. Flat shapes draw with the depth test off, which also stops them writing
         // depth, so nothing else in the pass can invalidate this.
         _gl.Enable(EnableCap.DepthTest);
-        if (!_depthCleared)
-        {
-            _gl.Clear(ClearBufferMask.DepthBufferBit);
-            _depthCleared = true;
-        }
+        EnsureDepthCleared();
 
         var model = Matrix4x4.CreateScale(size / IconExtent)
                     * IconRotation
@@ -660,9 +701,8 @@ public class UIRenderer : IDisposable
     public void DrawHotbar(Inventory inventory, float headingDegrees, float timeSeconds)
     {
         var stride = SlotSize + SlotGap;
-        var rowWidth = Inventory.SlotCount * SlotSize + (Inventory.SlotCount - 1) * SlotGap;
-        var firstCentreX = (_screenSize.X - rowWidth) * 0.5f + SlotSize * 0.5f;
-        var centreY = _screenSize.Y - BottomMargin - SlotSize * 0.5f;
+        var firstCentreX = HotbarLayout.FirstCentreX(_screenSize);
+        var centreY = HotbarLayout.CentreY(_screenSize);
         var slotSize = new Vector2(SlotSize);
 
         for (var i = 0; i < Inventory.SlotCount; i++)
@@ -730,17 +770,15 @@ public class UIRenderer : IDisposable
         float headingDegrees)
     {
         var top = PanelTop;
-        var bottom = _screenSize.Y - BottomMargin - (SlotSize + 14f);
-        var height = Math.Max(RowHeight * 2f, bottom - top);
+        var height = InventoryPanelLayout.PanelHeight(_screenSize);
         var panel = new Vector2(PanelLeft + PanelWidth * 0.5f, top + height * 0.5f);
         DrawRect(panel, new Vector2(PanelWidth, height), PanelBackground);
 
-        var tabs = new[] { InventoryCategory.Blocks, InventoryCategory.Tools, InventoryCategory.Misc, InventoryCategory.Crafting };
-        var tabWidth = (PanelWidth - PanelPad * 2f) / tabs.Length;
+        var tabs = InventoryPanelLayout.Tabs;
+        var tabWidth = InventoryPanelLayout.TabWidth(_screenSize);
         for (var t = 0; t < tabs.Length; t++)
         {
-            var centre = new Vector2(
-                PanelLeft + PanelPad + tabWidth * (t + 0.5f), top + PanelPad + TabHeight * 0.5f);
+            var centre = InventoryPanelLayout.TabCentre(t, _screenSize);
             var active = view.Tab == tabs[t];
             DrawRect(centre, new Vector2(tabWidth - 4f, TabHeight),
                 active ? SelectedBackground : SlotBackground);
@@ -752,37 +790,85 @@ public class UIRenderer : IDisposable
                 centre.X, top + PanelPad + 30f, _countScale, Rgba.White, tabWidth - 8f);
         }
 
-        var listTop = top + PanelPad * 2f + TabHeight;
+        // One list per frame for the active tab (never re-query StackEntries/ToolEntries for
+        // the visible range: that would double the LINQ sort).
+        IReadOnlyList<Inventory.ToolRow>? tools = null;
+        IReadOnlyList<CraftingRecipe>? recipes = null;
+        IReadOnlyList<Inventory.StackRow>? rows = null;
+        int rowCount;
         if (view.Tab == InventoryCategory.Tools)
-        {
-            var tools = inventory.ToolEntries();
-            for (var i = 0; i < tools.Count; i++)
-            {
-                var selected = view.SelectedToolInstance == tools[i].InstanceId;
-                DrawEntryRow(i, listTop, tools[i].ItemId, tools[i].Name, "1", selected, false, headingDegrees, time,
-                    null, inventory.ToolDurabilityFraction(tools[i].InstanceId));
-            }
-        }
+            rowCount = (tools = inventory.ToolEntries()).Count;
         else if (view.Tab == InventoryCategory.Crafting)
+            rowCount = (recipes = ContentRegistry.CraftingRecipes).Count;
+        else
+            rowCount = (rows = inventory.StackEntries(view.Tab)).Count;
+
+        // Clamp the tab's stored offset with this frame's row count, exactly as
+        // Program.HandleInventoryClick does, so the drawn list and the click always agree.
+        var offset = InventoryPanelLayout.ClampedOffset(view.ScrollOffset, rowCount, _screenSize);
+        var listHeight = InventoryPanelLayout.ListHeight(_screenSize);
+        var (first, end) = ScrollList.VisibleRange(offset, RowHeight, rowCount, listHeight);
+
+        // A glClear honours the scissor, so the pass's one full-screen depth clear must happen
+        // before the scissor goes on; otherwise the latch would record a clear that covered only
+        // the list, and the preview and crafting-card icons would z-fight the world's depth.
+        EnsureDepthCleared();
+
+        // glScissor takes framebuffer pixels with a bottom-left origin, hence the conversion
+        // from the canvas rect. Nothing but the row loops may run while it is enabled (the
+        // preview, crafting card, pause menu and later passes all assume it off, and Begin
+        // disables it as a belt-and-braces), and nothing may return from inside this block.
+        var (sx, sy, sw, sh) = UiCanvas.ScissorRect(
+            new Vector2(InventoryPanelLayout.PanelLeft, InventoryPanelLayout.ListTop),
+            new Vector2(InventoryPanelLayout.PanelWidth(_screenSize), listHeight),
+            _scale, _windowSize, _framebufferSize);
+        _gl.Enable(EnableCap.ScissorTest);
+        _gl.Scissor(sx, sy, (uint)sw, (uint)sh);
+        try
         {
-            var recipes = ContentRegistry.CraftingRecipes;
-            for (var i = 0; i < recipes.Count; i++)
+            if (tools != null)
             {
-                var ready = inventory.CanCraft(recipes[i]);
-                DrawEntryRow(i, listTop, recipes[i].ResultId,
-                    Inventory.DisplayName(recipes[i].ResultId),
-                    $"x{recipes[i].ResultCount}",
-                    view.Craft.Recipe != null && view.Craft.Recipe.Name == recipes[i].Name,
-                    !ready, headingDegrees, time,
-                    ready ? ReadyGreen : null);
+                for (var i = first; i < end; i++)
+                {
+                    var selected = view.SelectedToolInstance == tools[i].InstanceId;
+                    DrawEntryRow(i, offset, tools[i].ItemId, tools[i].Name, "1", selected, false, headingDegrees,
+                        time, null, inventory.ToolDurabilityFraction(tools[i].InstanceId));
+                }
+            }
+            else if (recipes != null)
+            {
+                for (var i = first; i < end; i++)
+                {
+                    var ready = inventory.CanCraft(recipes[i]);
+                    DrawEntryRow(i, offset, recipes[i].ResultId,
+                        Inventory.DisplayName(recipes[i].ResultId),
+                        $"x{recipes[i].ResultCount}",
+                        view.Craft.Recipe != null && view.Craft.Recipe.Name == recipes[i].Name,
+                        !ready, headingDegrees, time,
+                        ready ? ReadyGreen : null);
+                }
+            }
+            else if (rows != null)
+            {
+                for (var i = first; i < end; i++)
+                    DrawEntryRow(i, offset, rows[i].Id, rows[i].Name, rows[i].Count.ToString(),
+                        view.SelectedId == rows[i].Id, false, headingDegrees, time);
             }
         }
-        else
+        finally
         {
-            var rows = inventory.StackEntries(view.Tab);
-            for (var i = 0; i < rows.Count; i++)
-                DrawEntryRow(i, listTop, rows[i].Id, rows[i].Name, rows[i].Count.ToString(),
-                    view.SelectedId == rows[i].Id, false, headingDegrees, time);
+            _gl.Disable(EnableCap.ScissorTest);
+        }
+
+        // The scrollbar sits in the panel's right padding and only exists while the list
+        // overflows; the thumb is highlighted while it is being dragged.
+        if (ScrollList.Overflows(InventoryPanelLayout.ContentHeight(rowCount), listHeight))
+        {
+            var track = InventoryPanelLayout.TrackRect(_screenSize);
+            DrawRect(track.Centre, track.Size, SlotBackground);
+            var thumb = InventoryPanelLayout.ThumbRect(_screenSize, offset, rowCount);
+            DrawRect(thumb.Centre, thumb.Size,
+                view.ThumbDragGrab.HasValue ? SelectedBorderColor : SlotBorderColor);
         }
 
         DrawPreview(inventory, view, time, headingDegrees);
@@ -856,8 +942,12 @@ public class UIRenderer : IDisposable
                     DrawSlider(r, screen, s, view.DragRow == rows[r]);
                     DrawValueRight(centre.Y, SettingsRows.FormatValue(row), screen);
                     break;
-                case OptionsRow o:
-                    DrawTextCentred($"< {SettingsRows.FormatValue(row)} >",
+                case OptionsRow:
+                    // The GUI Scale row names the effective scale (this frame's Begin scale) while capped.
+                    var value = ReferenceEquals(row, SettingsRows.GuiScaleRow)
+                        ? UiCanvas.ScaleLabel(GameSettings.RequestedGuiScale, _scale)
+                        : SettingsRows.FormatValue(row);
+                    DrawTextCentred($"< {value} >",
                         SettingsLayout.TrackRect(r, screen).Centre.X,
                         centre.Y - 8f, _countScale, Rgba.White);
                     break;
@@ -867,9 +957,12 @@ public class UIRenderer : IDisposable
         DrawMenuButton(SettingsLayout.BackCentre(screen), "BACK");
     }
 
-    /// <summary>Settings widget under a screen point (pixels, top-left origin), if any.</summary>
-    public SettingsHit SettingsHitAt(Vector2 point, SettingsMenuView view) =>
-        SettingsLayout.HitAt(point, view.Tab, _screenSize);
+    /// <summary>Settings widget under a window-pixel point (top-left origin), if any.</summary>
+    public SettingsHit SettingsHitAt(Vector2 point, SettingsMenuView view)
+    {
+        point = ToCanvas(point);
+        return SettingsLayout.HitAt(point, view.Tab, _screenSize);
+    }
 
     private void DrawValueRight(float centreY, string text, Vector2 screen)
     {
@@ -902,9 +995,12 @@ public class UIRenderer : IDisposable
             14f, active ? Rgba.White : SelectedBorderColor);
     }
 
-    /// <summary>Menu button or BACK under a screen point (pixels, top-left origin), if any.</summary>
-    public PauseMenuHit PauseMenuHitAt(Vector2 point, PauseMenuView view) =>
-        PauseMenuLayout.HitAt(point, _screenSize, view.Page);
+    /// <summary>Menu button or BACK under a window-pixel point (top-left origin), if any.</summary>
+    public PauseMenuHit PauseMenuHitAt(Vector2 point, PauseMenuView view)
+    {
+        point = ToCanvas(point);
+        return PauseMenuLayout.HitAt(point, _screenSize, view.Page);
+    }
 
     private void DrawMenuButton(Vector2 centre, string label)
     {
@@ -913,48 +1009,29 @@ public class UIRenderer : IDisposable
         DrawTextCentred(label, centre.X, centre.Y - 9f, _countScale, Rgba.White);
     }
 
-    /// <summary>Hotbar slot under a screen point (pixels, top-left origin), if any.</summary>
+    /// <summary>Hotbar slot under a window-pixel point (top-left origin), if any.</summary>
     public int? HotbarSlotAt(Vector2 point)
     {
-        var stride = SlotSize + SlotGap;
-        var rowWidth = Inventory.SlotCount * SlotSize + (Inventory.SlotCount - 1) * SlotGap;
-        var firstCentreX = (_screenSize.X - rowWidth) * 0.5f + SlotSize * 0.5f;
-        var centreY = _screenSize.Y - BottomMargin - SlotSize * 0.5f;
-
-        for (var i = 0; i < Inventory.SlotCount; i++)
-        {
-            var centre = new Vector2(firstCentreX + i * stride, centreY);
-            if (MathF.Abs(point.X - centre.X) <= SlotSize * 0.5f
-                && MathF.Abs(point.Y - centre.Y) <= SlotSize * 0.5f)
-                return i;
-        }
-        return null;
+        point = ToCanvas(point);
+        return HotbarLayout.SlotAt(point, _screenSize);
     }
 
-    /// <summary>Panel tab under a screen point, if any.</summary>
+    /// <summary>Panel tab under a window-pixel point, if any.</summary>
     public InventoryCategory? PanelTabAt(Vector2 point)
     {
-        var tabs = new[] { InventoryCategory.Blocks, InventoryCategory.Tools, InventoryCategory.Misc, InventoryCategory.Crafting };
-        var tabWidth = (PanelWidth - PanelPad * 2f) / tabs.Length;
-
-        if (point.X < PanelLeft || point.X > PanelLeft + PanelWidth) return null;
-        if (point.Y < PanelTop + PanelPad || point.Y > PanelTop + PanelPad + TabHeight) return null;
-
-        var t = (int)((point.X - PanelLeft - PanelPad) / tabWidth);
-        return t >= 0 && t < tabs.Length ? tabs[t] : null;
+        point = ToCanvas(point);
+        return InventoryPanelLayout.TabAt(point, _screenSize);
     }
 
-    /// <summary>List row index under a screen point for a tab holding this many rows, if any.</summary>
-    public int? PanelRowAt(Vector2 point, int rowCount)
+    /// <summary>
+    /// List row index under a window-pixel point for a tab holding this many rows, scrolled by
+    /// <paramref name="scrollOffset"/> canvas pixels, if any. Only the row rectangle hits; the
+    /// panel's right padding is reserved for the scrollbar.
+    /// </summary>
+    public int? PanelRowAt(Vector2 point, float scrollOffset, int rowCount)
     {
-        if (point.X < PanelLeft || point.X > PanelLeft + PanelWidth) return null;
-
-        var listTop = PanelTop + PanelPad * 2f + TabHeight;
-        var y = point.Y - listTop;
-        if (y < 0) return null;
-
-        var row = (int)(y / RowHeight);
-        return row >= 0 && row < rowCount ? row : null;
+        point = ToCanvas(point);
+        return InventoryPanelLayout.RowAt(point, _screenSize, scrollOffset, rowCount);
     }
 
     private static string TabTitle(InventoryCategory tab) => tab switch
@@ -970,10 +1047,10 @@ public class UIRenderer : IDisposable
             ? $"{inventory.Craftable().Count}/{ContentRegistry.CraftingRecipes.Count}"
             : $"{inventory.UsedOf(tab)}/{Inventory.CapacityOf(tab)}";
 
-    private void DrawEntryRow(int row, float listTop, byte id, string name, string count, bool selected,
+    private void DrawEntryRow(int row, float offset, byte id, string name, string count, bool selected,
         bool dim, float headingDegrees, float timeSeconds, Rgba? accent = null, float? durability = null)
     {
-        var centreY = listTop + row * RowHeight + RowHeight * 0.5f;
+        var centreY = InventoryPanelLayout.RowCentreY(row, offset, _screenSize);
         var centre = new Vector2(PanelLeft + PanelWidth * 0.5f, centreY);
         DrawRect(centre, new Vector2(PanelWidth - PanelPad * 2f, RowHeight - 4f),
             selected ? RowSelected : SlotBackground);
@@ -1165,9 +1242,10 @@ public class UIRenderer : IDisposable
         MathF.Abs(point.X - centre.X) <= size.X * 0.5f
         && MathF.Abs(point.Y - centre.Y) <= size.Y * 0.5f;
 
-    /// <summary>Which crafting control sits under a screen point, if any.</summary>
+    /// <summary>Which crafting control sits under a window-pixel point, if any.</summary>
     public CraftHit CraftHitAt(Vector2 point, InventoryView view)
     {
+        point = ToCanvas(point);
         if (view.Craft.Recipe == null) return new CraftHit(CraftHitKind.None);
         if (InBox(point, CraftButtonCentre(view), new Vector2(CraftInnerWidth, CraftButtonH)))
             return new CraftHit(CraftHitKind.CraftButton);
@@ -1383,11 +1461,7 @@ public class UIRenderer : IDisposable
         if (!_itemMeshes.TryGet(itemId, out var mesh, out var texture)) return;
 
         _gl.Enable(EnableCap.DepthTest);
-        if (!_depthCleared)
-        {
-            _gl.Clear(ClearBufferMask.DepthBufferBit);
-            _depthCleared = true;
-        }
+        EnsureDepthCleared();
 
         var rotation = Matrix4x4.CreateRotationY(yaw) * Matrix4x4.CreateRotationX(IconPitch);
         var model = Matrix4x4.CreateScale(size)
@@ -1412,11 +1486,7 @@ public class UIRenderer : IDisposable
         if (mesh == null) return;
 
         _gl.Enable(EnableCap.DepthTest);
-        if (!_depthCleared)
-        {
-            _gl.Clear(ClearBufferMask.DepthBufferBit);
-            _depthCleared = true;
-        }
+        EnsureDepthCleared();
 
         var rotation = Matrix4x4.CreateRotationY(yaw) * Matrix4x4.CreateRotationX(IconPitch);
         var model = Matrix4x4.CreateScale(size / IconExtent)
