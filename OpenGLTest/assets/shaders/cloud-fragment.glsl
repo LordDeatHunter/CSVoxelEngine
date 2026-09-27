@@ -19,6 +19,14 @@ uniform float uOpacity;
 
 out vec4 FragColor;
 
+// Cheap static value hash (vignette-fragment.glsl's Hash) for the output dither.
+float Hash12(vec2 p)
+{
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+
 void main() {
     vec3 N = normalize(fNormal);
     float ndl = dot(N, uSunDir) * 0.5 + 0.5;
@@ -28,5 +36,7 @@ void main() {
     float dist = distance(fWorldPos, uCameraPos);
     float f = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
     col = mix(col, uFogColor, f * f);
+    // Half-LSB dither against banding in the soft fog blend; static per pixel, never crawls.
+    col += (Hash12(gl_FragCoord.xy) - 0.5) / 255.0;
     FragColor = vec4(col, uOpacity * (1.0 - f * f * f));
 }

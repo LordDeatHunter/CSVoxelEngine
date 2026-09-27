@@ -497,5 +497,9 @@ void main() {
 #endif
     float alpha = texAlpha * fAlpha;
     if (isWater) alpha = fAlpha;
-    FragColor = vec4(mix(col, vec3(1.0), uFlash), alpha);
+    vec3 outCol = mix(col, vec3(1.0), uFlash);
+    // Half-LSB dither before the 8-bit write, so the long fog and lighting gradients break up
+    // instead of banding. Static per pixel (a gl_FragCoord hash, no time term) so it never crawls.
+    outCol += (Hash12(gl_FragCoord.xy) - 0.5) / 255.0;
+    FragColor = vec4(outCol, alpha);
 }
