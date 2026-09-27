@@ -795,13 +795,14 @@ public class RenderManager : IDisposable
                 _pointCount++;
             }
         }
-        // Lit campfires each add a warm flickering point light above the pile
+        // Lit campfires each add a warm flickering point light above the pile, each on its own
+        // phase hashed from its cell so neighbouring fires do not pulse in unison
         if (campfires != null)
         {
-            var flicker = 0.9f + 0.25f * MathF.Sin(_time * 11f) * MathF.Sin(_time * 5.3f + 1.7f);
             foreach (var cell in campfires)
             {
                 if (_pointCount >= WorldGenerationConfig.MaxPointLights) break;
+                var flicker = LightFlicker.Campfire(_time, LightFlicker.CellPhase(cell));
                 _pointPos[_pointCount] = cell + FireLightOffset;
                 _pointColors[_pointCount] = new Vector3(1f, 0.5f, 0.15f) * (1.6f * flicker);
                 _pointCount++;

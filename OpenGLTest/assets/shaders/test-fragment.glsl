@@ -157,6 +157,35 @@ vec2 Hash2(vec2 p) {
     return fract((q.xx + q.yz) * q.zy);
 }
 
+float Hash12(vec2 p) {
+    vec3 q = fract(vec3(p.xyx) * 0.1031);
+    q += dot(q, q.yzx + 33.33);
+    return fract((q.x + q.y) * q.z);
+}
+
+// Block-light flicker, desynchronised by position. Each corner of a coarse xz lattice
+// (FlickerCell blocks apart) flickers on its own hashed phase and the four corner VALUES are
+// blended bilinearly. Blending the phase instead would turn the flicker into a wave sweeping
+// across a wall (the phase gradient reads as motion) and would wrap around at 2*pi midway
+// between corners; a per-cell step with no blend would put a seam on every cell edge.
+const float FlickerCell = 6.0;
+
+float FlickAt(vec2 c) {
+    float ph = Hash12(c) * 6.2831853;
+    return 0.9 + 0.1 * sin(uTime * 9.0 + ph) * sin(uTime * 7.3 + 1.7 + ph * 1.7);
+}
+
+float BlockFlicker(vec3 p) {
+    vec2 q = p.xz / FlickerCell;
+    vec2 i = floor(q);
+    vec2 f = smoothstep(0.0, 1.0, fract(q));
+    float a = FlickAt(i);
+    float b = FlickAt(i + vec2(1.0, 0.0));
+    float c = FlickAt(i + vec2(0.0, 1.0));
+    float d = FlickAt(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
 // Distance from the second-nearest to the nearest animated Voronoi centre: small along the
 // cell borders, which is where refracted sunlight piles up into the bright caustic net.
 float VoronoiEdge(vec2 p, float t) {
@@ -221,7 +250,9 @@ void main() {
     // Blend between flat and directional so sides stay readable while the sun orbits;
     // the shadow term only ever dims the direct sun, never the ambient below
     vec3 sun = uSunColor * (fSun * uSunIntensity * (0.35 + 0.65 * ndl) * shadow);
-    float flick = 0.9 + 0.1 * sin(uTime * 9.0) * sin(uTime * 7.3 + 1.7);
+    // Gated so unlit fragments (and the LOD horizon, which carries no block light) skip the
+    // four-corner flicker lookup entirely
+    float flick = fBlock > 0.0 ? BlockFlicker(fWorldPos) : 1.0;
     vec3 torch = uTorchColor * (fBlock * uTorchIntensity * flick);
     vec3 pl = vec3(0.0);
     for (int i = 0; i < 8; i++) {

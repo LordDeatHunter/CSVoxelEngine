@@ -1,0 +1,43 @@
+{
+  // Block-light flicker check: run with VOXEL_TIME=700 (night) and
+  // VOXEL_SCRIPT=visual-examples/night-lights.json. Shots land in visual/night-lights/.
+  //
+  // Starts on the open dunes east of the taiga at (-62, 118) - spawn is wooded and a trunk
+  // swallows the placements there - lays three lamps along a row on the ground about ten
+  // blocks apart, then flies up behind them and takes two shots 0.3 s apart. The lamp pools
+  // should brighten and dim independently between the shots (each sits under its own flicker
+  // lattice corners), with no block-sized seams and no bright band sweeping across the ground.
+  // Like ores.json the lamps are placed on foot, which keeps the ground inside reach without
+  // knowing the terrain height. The player hovers (flight on) until the far chunks stream in,
+  // since a teleport this far out would otherwise fall through unloaded ground, and hops while
+  // walking so a dune step does not stall the row. A dirt block is equipped at the end to
+  // swap the held lamp out of the first-person view.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-62.5, 60.5, 118.5], "yaw": -90, "pitch": -40 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "fly", "on": false },
+    { "op": "wait", "seconds": 6 },
+
+    { "op": "give", "block": "lamp", "count": 3 },
+    { "op": "place" },
+    { "op": "walk", "keys": ["D", "Space"], "seconds": 1.4 },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "place" },
+    { "op": "walk", "keys": ["D", "Space"], "seconds": 1.4 },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "give", "block": "dirt", "count": 1 },
+
+    { "op": "fly", "on": true },
+    { "op": "walk", "keys": ["Space"], "seconds": 2.0 },
+    { "op": "walk", "keys": ["S"], "seconds": 2.0 },
+    { "op": "walk", "keys": ["A"], "seconds": 1.2 },
+    { "op": "look", "yaw": -90, "pitch": -45 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "lamps-a", "hideHud": true },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "lamps-b", "hideHud": true }
+  ]
+}
