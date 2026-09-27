@@ -428,6 +428,9 @@ public class RenderManager : IDisposable
         textureAtlas = TextureAtlas.Build(gl, "assets/textures/blocks");
         _lodLeafColor = LoadOpaqueAverage("assets/textures/blocks/leaves.png", _lodLeafColor);
         ContentRegistry.BakeModels();
+        // After the bake, the first point that knows which tiles cutout blocks wear: their
+        // box-filtered mips would average leaf alpha under the cutoff and thin canopies out.
+        TextureAtlas.ApplyCutoutMips(gl, textureAtlas, BlockType.CutoutTiles(), WorldGenerationConfig.AlphaCutoff);
         // After the bake, because the material table is keyed by the tiles the bake resolves.
         materialAtlas = TextureAtlas.BuildMaterial(gl, "assets/textures/blocks_material");
         CreateMaterialBuffer();
@@ -443,7 +446,7 @@ public class RenderManager : IDisposable
         // nothing else on this program ever writes them.
         chunkShader.SetUniform("uFlash", 0f);
         chunkShader.SetUniform("uHitFlash", 0f);
-        chunkShader.SetUniform("uAlphaCutoff", 0.5f);
+        chunkShader.SetUniform("uAlphaCutoff", WorldGenerationConfig.AlphaCutoff);
         CreateReflectionTarget();
         CreateSceneCopy();
         CreateRaysTarget();
@@ -1465,9 +1468,9 @@ public class RenderManager : IDisposable
 
         chunkShader.Use();
         // Opaque default: punch the leaf tiles' holes; the translucent pass lowers it.
-        chunkShader.SetUniform(_locChunkAlphaCutoff, 0.5f);
+        chunkShader.SetUniform(_locChunkAlphaCutoff, WorldGenerationConfig.AlphaCutoff);
         worldShader.Use();
-        worldShader.SetUniform(_locAlphaCutoff, 0.5f);
+        worldShader.SetUniform(_locAlphaCutoff, WorldGenerationConfig.AlphaCutoff);
         ApplyFrameUniforms();
         gl.Enable(EnableCap.Blend);
         // The world passes rely on straight alpha blending for the fluid mesh and the chunk
@@ -1980,7 +1983,7 @@ public class RenderManager : IDisposable
         _chunkDraws.Draw(LodGeometry.Vao, chunkShader, _locChunkDrawBase);
 
         // Later chunk passes reuse this program and need the cutout behaviour back.
-        chunkShader.SetUniform(_locChunkAlphaCutoff, 0.5f);
+        chunkShader.SetUniform(_locChunkAlphaCutoff, WorldGenerationConfig.AlphaCutoff);
     }
 
     private readonly List<(LodRegion region, float distSq)> _visibleRegions = new(256);

@@ -36,6 +36,10 @@ public static class TextureAtlas
 
     private static readonly Dictionary<string, ushort> Tiles = new();
 
+    /// <summary>The decoded level-0 tiles of the last <see cref="Build"/>, kept only until
+    /// <see cref="ApplyCutoutMips"/> has rebuilt the cutout tiles' mip chains from them.</summary>
+    private static List<byte[]>? _levelZero;
+
     /// <summary>
     /// Builds the atlas from every <c>*.png</c> in <paramref name="folder"/>, uploads it,
     /// and records each file's slice under its name without extension.
@@ -44,7 +48,48 @@ public static class TextureAtlas
     public static uint Build(GL gl, string folder)
     {
         var (layers, width, height) = Load(folder);
-        return TextureLoader.UploadArray(gl, layers, width, height);
+        _levelZero = layers;
+        return TextureLoader.UploadArray(gl, layers, width, height, sampleMips: true);
+    }
+
+    /// <summary>
+    /// Overwrites mip levels 1..n of each slice in <paramref name="slices"/> with a
+    /// <see cref="CutoutMipmap"/> chain, whose alpha is rescaled per level so the fraction of
+    /// texels passing <paramref name="cutoff"/> matches level 0. The box-filtered chain
+    /// <c>GenerateMipmap</c> wrote averages leaf alpha below the cutoff, which thins canopies
+    /// out with distance now that the atlas samples its mips.
+    ///
+    /// Main thread only (GL upload); must run after <see cref="Build"/>, and releases the
+    /// level-0 copies it kept, so it runs once.
+    /// </summary>
+    public static void ApplyCutoutMips(GL gl, uint texture, IReadOnlyList<ushort> slices, float cutoff)
+    {
+        if (_levelZero == null)
+            throw new InvalidOperationException("Build the block atlas (once) before applying its cutout mips.");
+
+        gl.BindTexture(TextureTarget.Texture2DArray, texture);
+        gl.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
+        foreach (var slice in slices)
+        {
+            var chain = CutoutMipmap.BuildChain(_levelZero[slice], TileWidth, TileHeight, cutoff);
+            for (var i = 0; i < chain.Length; i++)
+            {
+                var level = i + 1;
+                var w = Math.Max(1, TileWidth >> level);
+                var h = Math.Max(1, TileHeight >> level);
+                unsafe
+                {
+                    fixed (byte* ptr = chain[i])
+                    {
+                        gl.TexSubImage3D(TextureTarget.Texture2DArray, level, 0, 0, slice,
+                            (uint)w, (uint)h, 1, PixelFormat.Rgba, PixelType.UnsignedByte, ptr);
+                    }
+                }
+            }
+        }
+        gl.PixelStore(PixelStoreParameter.UnpackAlignment, 4); // GL's default, for every later upload
+        gl.BindTexture(TextureTarget.Texture2DArray, 0);
+        _levelZero = null;
     }
 
     /// <summary>
@@ -139,7 +184,7 @@ public static class TextureAtlas
             layers.Add(image.Data);
         }
 
-        return TextureLoader.UploadArray(gl, layers, TileWidth, TileHeight);
+        return TextureLoader.UploadArray(gl, layers, TileWidth, TileHeight, sampleMips: true);
     }
 
     /// <summary>Slice of a block texture, by file name without extension.</summary>

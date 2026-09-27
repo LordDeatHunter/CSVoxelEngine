@@ -8,6 +8,15 @@ namespace silkgltriangle;
 /// </summary>
 public static class WorldGenerationConfig
 {
+    // Alpha-test threshold of cutout blocks (leaves, flowers): the world pass's uAlphaCutoff and
+    // the target CutoutMipmap preserves coverage at. Must match the `.a < 0.5` literals in
+    // shadow-fragment.glsl and the lodLeaves test in test-fragment.glsl.
+    public const float AlphaCutoff = 0.5f;
+
+    // Anisotropic filtering of the block and material atlases, which sample their mip chains
+    // (TextureLoader.UploadArray's sampleMips). Clamped to the driver's maximum at upload.
+    public const float AtlasAnisotropy = 8f;
+
     // View distance
     public const int ChunkRadius = 16;
     public const int ChunkRadiusSq = ChunkRadius * ChunkRadius;

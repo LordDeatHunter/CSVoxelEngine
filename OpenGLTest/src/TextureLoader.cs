@@ -72,8 +72,15 @@ public static class TextureLoader
     /// top-first RGBA buffer of <paramref name="width"/> × <paramref name="height"/>), slice
     /// <c>i</c> being <c>layers[i]</c>. Mipmaps are generated per slice, so neighbouring tiles
     /// never bleed into each other at any level.
+    ///
+    /// With <paramref name="sampleMips"/> false (every sprite, the font, the UI) minification
+    /// stays plain <c>Nearest</c>, so the generated chain is never read. The block and material
+    /// atlases pass true: minification picks the nearest texel from the two nearest levels and
+    /// blends them (<c>NearestMipmapLinear</c>) with anisotropic filtering on top, which stops
+    /// distant ground from sparkling while magnification stays <c>Nearest</c> and close blocks
+    /// keep their crisp pixels.
     /// </summary>
-    public static uint UploadArray(GL gl, IReadOnlyList<byte[]> layers, int width, int height)
+    public static uint UploadArray(GL gl, IReadOnlyList<byte[]> layers, int width, int height, bool sampleMips = false)
     {
         if (layers.Count == 0)
             throw new ArgumentException("An array texture needs at least one slice.", nameof(layers));
@@ -109,8 +116,16 @@ public static class TextureLoader
 
         gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureWrapS, (int)GLEnum.Repeat);
         gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureWrapT, (int)GLEnum.Repeat);
-        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
+        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMinFilter,
+            sampleMips ? (int)GLEnum.NearestMipmapLinear : (int)GLEnum.Nearest);
         gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
+        if (sampleMips)
+        {
+            // Core since GL 4.6, so no extension check; clamp to what the driver supports.
+            gl.GetFloat(GLEnum.MaxTextureMaxAnisotropy, out float maxAniso);
+            gl.TexParameter(TextureTarget.Texture2DArray, (TextureParameterName)GLEnum.TextureMaxAnisotropy,
+                MathF.Min(WorldGenerationConfig.AtlasAnisotropy, maxAniso));
+        }
 
         gl.GenerateMipmap(TextureTarget.Texture2DArray);
         gl.BindTexture(TextureTarget.Texture2DArray, 0);

@@ -294,6 +294,25 @@ public sealed record BlockType
     /// Empty until the models are baked.</summary>
     public ushort[] FaceTiles { get; internal set; } = [];
 
+    /// <summary>
+    /// Every atlas slice a <see cref="Cutout"/> block samples (its baked quads' tiles plus its
+    /// <see cref="FaceTiles"/>), distinct and ascending: the slices whose mips
+    /// <see cref="CutoutMipmap"/> rebuilds so alpha-tested coverage survives minification.
+    /// Must be called after <c>ContentRegistry.BakeModels</c>, which is what fills the tiles.
+    /// </summary>
+    public static IReadOnlyList<ushort> CutoutTiles()
+    {
+        var tiles = new SortedSet<ushort>();
+        foreach (var type in ById)
+        {
+            if (type is not { Cutout: true }) continue;
+            if (type.BakedModel is { } model)
+                foreach (var quad in model.Quads) tiles.Add(quad.Tile);
+            foreach (var tile in type.FaceTiles) tiles.Add(tile);
+        }
+        return [.. tiles];
+    }
+
     /// <summary>Tile of the +Y face; shorthand the procedural emitters read.</summary>
     public ushort Top { get; internal set; }
 

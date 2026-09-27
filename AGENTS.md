@@ -92,6 +92,13 @@ sampler's REPEAT tiles it, so UVs are never atlas-absolute), sun/block/normal/sw
 quads (`BakedQuad.Uvs` + `.Tile`) and every procedural emitter go through `Chunk.TiledUv(face,
 local, extent)`, the single definition of per-face texture orientation; `CropUv` is its
 extent-1 case. Bind these textures with `TextureTarget.Texture2DArray`.
+The block and material atlases sample their mip chains (`TextureLoader.UploadArray(...,
+sampleMips: true)`: min filter `NearestMipmapLinear` plus `AtlasAnisotropy`, mag stays `Nearest`,
+so close blocks keep crisp pixels while distant ground stops sparkling); every other texture stays
+plain `Nearest`. Right after `ContentRegistry.BakeModels`, `TextureAtlas.ApplyCutoutMips`
+overwrites levels 1..n of every tile a cutout block wears (`BlockType.CutoutTiles`) with a
+`CutoutMipmap` chain whose alpha is rescaled per level to keep the coverage at
+`WorldGenerationConfig.AlphaCutoff` that level 0 has, so leaf canopies do not thin with distance.
 
 **The material atlas.** `assets/textures/blocks_material/` holds a second `TEXTURE_2D_ARRAY`
 (`TextureAtlas.BuildMaterial`, texture unit 6) that is *index-parallel* to the block atlas: slice
@@ -163,6 +170,7 @@ OpenGLTest/
     World.cs                   # owns Camera, ChunkManager, ChunkGenerationWorker, LodManager; raycast block edit API
     Chunk.cs                   # 16^3 block storage (byte IDs), block/column fill + cave carving via WorldGen/, mesh data generation (greedy pass + per-quad emitters) + AO
     MeshScratch.cs             # per-thread scratch buffers of the binary greedy mesh pass
+    CutoutMipmap.cs            # GL-free coverage-preserving mip chain for cutout tiles (alpha rescaled per level)
     ChunkGenerationWorker.cs   # background threads creating chunks around the camera
     Camera.cs                  # FPS camera, physics (gravity/jump/collision), DDA raycast
     LodRegion.cs               # far-terrain LOD: region columns meshed at reduced resolution from heightmaps; per-column chunk-Y ranges for burial

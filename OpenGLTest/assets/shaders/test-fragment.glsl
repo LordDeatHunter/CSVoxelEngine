@@ -440,7 +440,15 @@ void main() {
     // opaque pass, while the translucent pass keeps every faint texel.
     // Water composited the refracted scene itself, so nothing is left for the blender to
     // show through: its only alpha is the chunk's stream-in fade.
-    float alpha = texColor.a * fAlpha;
+    float texAlpha = texColor.a;
+#ifdef CHUNK_DRAW
+    // The atlas samples its mips, so a leaf texel that survived the cutoff can still carry a
+    // filtered alpha below 1; blended as-is the sky would tint the canopy through it. In the
+    // alpha-tested opaque chunk pass a surviving fragment is opaque. Only the chunk program:
+    // the plain one also draws the kiln's molten pool, whose tile alpha is meant to blend.
+    if (uAlphaCutoff > 0.0) texAlpha = 1.0;
+#endif
+    float alpha = texAlpha * fAlpha;
     if (isWater) alpha = fAlpha;
     FragColor = vec4(mix(col, vec3(1.0), uFlash), alpha);
 }
