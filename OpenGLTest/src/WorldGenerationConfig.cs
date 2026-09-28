@@ -164,6 +164,31 @@ public const float DayLengthSeconds = 1200f;
     /// instead of clipping; see Tonemap.Shoulder for the curve.</summary>
     public const float TonemapKnee = 0.8f;
 
+    /// <summary>FXAA's floor on the edge-direction reduction (post-fragment.glsl's
+    /// uFxaaReduceMin): keeps the direction from blowing up on near-flat luma, so faint
+    /// gradients are not smeared across <see cref="FxaaSpanMax"/> pixels.</summary>
+    public const float FxaaReduceMin = 1f / 128f;
+
+    /// <summary>FXAA's luma-proportional direction reduction (uFxaaReduceMul): brighter
+    /// neighbourhoods shorten the search span a little, which keeps high-contrast texture detail
+    /// (ore specks, leaf cutouts) from being blurred along a false edge.</summary>
+    public const float FxaaReduceMul = 1f / 8f;
+
+    /// <summary>FXAA's longest blur span in pixels along the detected edge (uFxaaSpanMax); the
+    /// classic 8 smooths long near-horizontal block silhouettes without reaching across
+    /// unrelated geometry.</summary>
+    public const float FxaaSpanMax = 8f;
+
+    /// <summary>FXAA's relative contrast gate (uFxaaEdgeThreshold, FXAA 3.11's "quality"
+    /// value): a pixel whose 3x3 luma range is below this fraction of its brightest neighbour is
+    /// left as it is. Skipping those flat pixels is most of the pass's cost saving.</summary>
+    public const float FxaaEdgeThreshold = 0.125f;
+
+    /// <summary>FXAA's absolute contrast floor (uFxaaEdgeThresholdMin, FXAA 3.11's default):
+    /// dark neighbourhoods need at least this luma range before they are smoothed, so noise in
+    /// caves and at night is not smeared.</summary>
+    public const float FxaaEdgeThresholdMin = 0.0312f;
+
     // Sunlight and lamp light spread through air losing one level per block from a max
     // of 15, so one edited block can change light up to this far away. Block edits must
     // remesh every chunk in this radius, not just face-adjacent ones.

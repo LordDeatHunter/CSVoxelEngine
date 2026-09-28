@@ -7,11 +7,20 @@
 // only highlights roll off toward 1 (C1 at the knee). At the default knee 0.8 it maps
 // 0.05 -> 0.05, 0.2 -> 0.2, 0.5 -> 0.5 and 1.0 -> 0.9, and never reaches 1.
 // C# twin: Tonemap.cs (Tonemap.Apply / Tonemap.Shoulder); keep the two in step.
+// FXAA (SH-9) runs unconditionally between the tonemap and the dither, on display values:
+// every tap goes through ToDisplay first, so the edge search and the blend see the image the
+// way it will be shown.
 in vec2 fUv;
 
 uniform sampler2D uScene;
 uniform float uExposure;
 uniform float uKnee;
+uniform vec2 uResolution;      // scene texture size in pixels; taps clamp to it
+uniform float uFxaaReduceMin;  // WorldGenerationConfig.FxaaReduceMin
+uniform float uFxaaReduceMul;  // WorldGenerationConfig.FxaaReduceMul
+uniform float uFxaaSpanMax;    // WorldGenerationConfig.FxaaSpanMax, in pixels
+uniform float uFxaaEdgeThreshold;     // WorldGenerationConfig.FxaaEdgeThreshold
+uniform float uFxaaEdgeThresholdMin;  // WorldGenerationConfig.FxaaEdgeThresholdMin
 
 out vec4 FragColor;
 
@@ -50,11 +59,90 @@ float Hash12(vec2 p)
     return fract(p.x * p.y);
 }
 
+// One scene texel, tonemapped and encoded; out-of-range taps clamp to the edge texel.
+vec3 DisplayAt(ivec2 p)
+{
+    return ToDisplay(texelFetch(uScene, clamp(p, ivec2(0), ivec2(uResolution) - 1), 0).rgb);
+}
+
+// Manual bilinear filter at pixelPos (pixel units, texel centres at .5). Each of the four texels
+// is converted to display space before they are mixed, so a filtered tap is an average of
+// tonemapped, encoded values. A hardware bilinear sample of the HDR buffer would instead average
+// a highlight far above 1 with its dark neighbours before the tonemap, and the shoulder would
+// turn that mix into a bright halo around the sun disc, lava and ore highlights.
+vec3 DisplayBilinear(vec2 pixelPos)
+{
+    vec2 p = pixelPos - 0.5;
+    vec2 i = floor(p);
+    vec2 f = p - i;
+    ivec2 b = ivec2(i);
+    vec3 c00 = DisplayAt(b);
+    vec3 c10 = DisplayAt(b + ivec2(1, 0));
+    vec3 c01 = DisplayAt(b + ivec2(0, 1));
+    vec3 c11 = DisplayAt(b + ivec2(1, 1));
+    return mix(mix(c00, c10, f.x), mix(c01, c11, f.x), f.y);
+}
+
+float Luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+
+// Classic single-pass FXAA (Lottes, PC/console variant) in pixel units, with FXAA 3.11's
+// contrast early-out: the four half-pixel
+// corner taps are 2x2 averages that find the local edge direction, then the pixel is blended
+// along it from two (rgbA) or four (rgbB) filtered taps, falling back to the narrower blend
+// when the wider one overshoots the neighbourhood's luma range (it crossed another edge).
+vec3 Fxaa(vec2 pos)
+{
+    // The four corner taps DisplayBilinear(pos +- 0.5) land exactly between texel centres, so
+    // each is the plain mean of a 2x2 block, and together they cover just the 3x3 neighbourhood:
+    // fetch those nine once instead of sixteen times (same result, fewer ToDisplay calls).
+    ivec2 c = ivec2(pos);
+    vec3 t00 = DisplayAt(c + ivec2(-1, -1)), t10 = DisplayAt(c + ivec2(0, -1)), t20 = DisplayAt(c + ivec2(1, -1));
+    vec3 t01 = DisplayAt(c + ivec2(-1,  0)), rgbM = DisplayAt(c),              t21 = DisplayAt(c + ivec2(1,  0));
+    vec3 t02 = DisplayAt(c + ivec2(-1,  1)), t12 = DisplayAt(c + ivec2(0,  1)), t22 = DisplayAt(c + ivec2(1,  1));
+    vec3 rgbNW = 0.25 * (t00 + t10 + t01 + rgbM);
+    vec3 rgbNE = 0.25 * (t10 + t20 + rgbM + t21);
+    vec3 rgbSW = 0.25 * (t01 + rgbM + t02 + t12);
+    vec3 rgbSE = 0.25 * (rgbM + t21 + t12 + t22);
+
+    float lumaNW = Luma(rgbNW);
+    float lumaNE = Luma(rgbNE);
+    float lumaSW = Luma(rgbSW);
+    float lumaSE = Luma(rgbSE);
+    float lumaM  = Luma(rgbM);
+    float lumaMin = min(lumaM, min(min(lumaNW, lumaNE), min(lumaSW, lumaSE)));
+    float lumaMax = max(lumaM, max(max(lumaNW, lumaNE), max(lumaSW, lumaSE)));
+
+    // FXAA 3.11's local-contrast early-out: a neighbourhood whose luma range is below the
+    // threshold holds no edge worth smoothing, so it keeps its own pixel and skips the sixteen
+    // direction-tap fetches. Most of a frame (sky, flat faces, fog) takes this branch, which is
+    // what keeps the pass near a millisecond at 1080p; it also stops low-contrast texture
+    // detail from being blurred along a false edge.
+    if (lumaMax - lumaMin < max(uFxaaEdgeThresholdMin, lumaMax * uFxaaEdgeThreshold))
+        return rgbM;
+
+    vec2 dir;
+    dir.x = -((lumaNW + lumaNE) - (lumaSW + lumaSE));
+    dir.y =  ((lumaNW + lumaSW) - (lumaNE + lumaSE));
+
+    float dirReduce = max((lumaNW + lumaNE + lumaSW + lumaSE) * (0.25 * uFxaaReduceMul),
+                          uFxaaReduceMin);
+    float rcpDirMin = 1.0 / (min(abs(dir.x), abs(dir.y)) + dirReduce);
+    dir = clamp(dir * rcpDirMin, vec2(-uFxaaSpanMax), vec2(uFxaaSpanMax));
+
+    vec3 rgbA = 0.5 * (DisplayBilinear(pos + dir * (1.0 / 3.0 - 0.5)) +
+                       DisplayBilinear(pos + dir * (2.0 / 3.0 - 0.5)));
+    vec3 rgbB = rgbA * 0.5 + 0.25 * (DisplayBilinear(pos + dir * -0.5) +
+                                     DisplayBilinear(pos + dir * 0.5));
+    float lumaB = Luma(rgbB);
+    return (lumaB < lumaMin || lumaB > lumaMax) ? rgbA : rgbB;
+}
+
 void main()
 {
-    vec3 c = ToDisplay(texelFetch(uScene, ivec2(gl_FragCoord.xy), 0).rgb);
+    vec3 c = Fxaa(gl_FragCoord.xy);
     // Half-LSB dither before the 8-bit write, so long fog, sky and lighting gradients break up
-    // instead of banding. Static per pixel (no time term), so it never crawls.
+    // instead of banding. Static per pixel (no time term), so it never crawls. It runs after
+    // FXAA so the blur never smooths the dither away.
     c += (Hash12(gl_FragCoord.xy) - 0.5) / 255.0;
     FragColor = vec4(c, 1.0);
 }

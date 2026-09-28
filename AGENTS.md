@@ -95,7 +95,9 @@ section calls `RenderManager.RenderPostProcess`, which binds framebuffer 0 and r
 `PostProcessRenderer` (`post-fragment.glsl`): exposure (`WorldGenerationConfig.TonemapExposure`),
 a max-channel, hue-preserving Reinhard shoulder that is the identity below
 `TonemapKnee` (`Tonemap.cs` is its tested C# twin), the exact sRGB encode, and the frame's one
-half-LSB dither. The UI draws
+half-LSB dither. FXAA (SH-9) runs unconditionally inside the same pass, on display-space
+(tonemapped, encoded) taps filtered by hand from `texelFetch`, before the dither (knobs
+`WorldGenerationConfig.Fxaa*`; its contrast early-out keeps it near 1 ms at 1080p). The UI draws
 after it, straight into the gamma default framebuffer, so text and icons stay crisp and HUD
 colours stay display-space; the two textures it shares with the world (the atlas and the item
 meshes) are re-encoded in `ui-fragment.glsl` behind `uSrgbTex` (`UIRenderer`'s `atlasIsSrgb`

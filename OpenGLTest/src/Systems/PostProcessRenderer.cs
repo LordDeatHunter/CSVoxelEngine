@@ -1,4 +1,5 @@
 using System;
+using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 
 namespace silkgltriangle;
@@ -6,7 +7,7 @@ namespace silkgltriangle;
 /// <summary>
 /// The frame's final full-screen pass: one oversized triangle (the shape <see cref="SkyRenderer"/>
 /// draws) shaded by post-fragment.glsl, which reads the linear HDR scene target and writes the
-/// tonemapped, sRGB-encoded, dithered image. It binds no framebuffer and no texture - the caller
+/// tonemapped, sRGB-encoded, FXAA-smoothed, dithered image. It binds no framebuffer and no texture - the caller
 /// (<see cref="RenderManager.RenderPostProcess"/>) binds the destination and puts the scene
 /// texture on unit 0 - so <see cref="RenderManager"/>'s texture-unit cache stays its own business.
 /// </summary>
@@ -30,6 +31,11 @@ public sealed class PostProcessRenderer : IDisposable
         _shader.SetUniform("uScene", 0);
         _shader.SetUniform("uExposure", WorldGenerationConfig.TonemapExposure);
         _shader.SetUniform("uKnee", WorldGenerationConfig.TonemapKnee);
+        _shader.SetUniform("uFxaaReduceMin", WorldGenerationConfig.FxaaReduceMin);
+        _shader.SetUniform("uFxaaReduceMul", WorldGenerationConfig.FxaaReduceMul);
+        _shader.SetUniform("uFxaaSpanMax", WorldGenerationConfig.FxaaSpanMax);
+        _shader.SetUniform("uFxaaEdgeThreshold", WorldGenerationConfig.FxaaEdgeThreshold);
+        _shader.SetUniform("uFxaaEdgeThresholdMin", WorldGenerationConfig.FxaaEdgeThresholdMin);
 
         // One triangle covering NDC: the two off-screen corners keep the visible area seamless
         Span<float> vertices = [-1f, -1f, 3f, -1f, -1f, 3f];
@@ -50,15 +56,17 @@ public sealed class PostProcessRenderer : IDisposable
     /// <summary>
     /// Resolves the scene texture bound on unit 0 into the currently bound framebuffer, covering
     /// every pixel with blending and the depth test off, then restores the state the UI pass
-    /// expects (depth on and writable, SrcAlpha/OneMinusSrcAlpha blending).
+    /// expects (depth on and writable, SrcAlpha/OneMinusSrcAlpha blending). <paramref name="viewport"/>
+    /// is the scene texture's size in pixels, which FXAA clamps its taps to.
     /// </summary>
-    public void Render()
+    public void Render(Vector2D<int> viewport)
     {
         _gl.Disable(EnableCap.DepthTest);
         _gl.DepthMask(false);
         _gl.Disable(EnableCap.Blend);
 
         _shader.Use();
+        _shader.SetUniform("uResolution", new System.Numerics.Vector2(viewport.X, viewport.Y));
         _gl.BindVertexArray(_vao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         _gl.BindVertexArray(0);

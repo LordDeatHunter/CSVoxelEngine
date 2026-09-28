@@ -1444,7 +1444,7 @@ public class RenderManager : IDisposable
         gl.Viewport(_viewportSize);
         BindUnit(0, TextureTarget.Texture2D, _hdrColorTex);
         ActiveUnit(0);
-        _post.Render();
+        _post.Render(_viewportSize);
         BindUnit(0, TextureTarget.Texture2D, 0);
     }
 
