@@ -724,6 +724,9 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterFallScroll", WorldGenerationConfig.WaterFallScrollSpeed);
         program.SetUniform("uWaterFallStreak", WorldGenerationConfig.WaterFallStreakStrength);
         program.SetUniform("uLavaLayer", (float)ContentRegistry.RequireBlock("lava").Top);
+        program.SetUniform("uLavaNormalScale", WorldGenerationConfig.LavaNormalScale);
+        program.SetUniform("uLavaCatchLight", WorldGenerationConfig.LavaCatchLightStrength);
+        program.SetUniform("uLavaCatchPower", WorldGenerationConfig.LavaCatchLightPower);
         program.SetUniform("uLodLeafColor", _lodLeafColor);
     }
 

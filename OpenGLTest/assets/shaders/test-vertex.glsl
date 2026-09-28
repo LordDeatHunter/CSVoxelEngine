@@ -30,6 +30,8 @@ uniform float uEntityBlock;
 uniform float uTime;
 uniform float uSwayStrength;
 uniform vec3 uCameraPos;
+// Atlas slice of the lava tile (RenderManager.InitWorldProgram): picks lava's own swell.
+uniform float uLavaLayer;
 
 out vec4 fColor;
 out vec2 fTexCoord;
@@ -60,6 +62,16 @@ float WaveHeight(vec2 p, float t) {
          + 0.010 * sin(dot(p, vec2(-0.8, -0.6)) * 4.1 + t * 3.7);
 }
 
+// Lava's swell: broader, lower-frequency and slower than water's so molten rock heaves in thick
+// blobs instead of rippling. The amplitudes sum to 0.088, under the same 0.09 ceiling as
+// WaveHeight. Its derivative is duplicated verbatim in test-fragment.glsl's LavaWaveSlope.
+float LavaWaveHeight(vec2 p, float t) {
+    return 0.040 * sin(dot(p, vec2(0.8, 0.6)) * 0.35 + t * 0.35)
+         + 0.025 * sin(dot(p, vec2(-0.6, 0.8)) * 0.55 + t * 0.5)
+         + 0.015 * sin(dot(p, vec2(0.2, -0.98)) * 0.9 + t * 0.7)
+         + 0.008 * sin(dot(p, vec2(-0.9, -0.4)) * 1.5 + t * 0.9);
+}
+
 void main() {
 #ifdef CHUNK_DRAW
     vec4 chunkDraw = draws[uDrawBase + gl_DrawID].originAndAlpha;
@@ -75,6 +87,7 @@ void main() {
     vec3 displaced = vPosition;
     // ponytail: water flag rides in vColor.a (254 = water, 255 = everything else); fColor.a is unused otherwise.
     bool isWater = vColor.a < 0.998;
+    bool isLava = isWater && abs(float(vLayer) - uLavaLayer) < 0.5;
     // Only true surface vertices move: skirt bottoms, the tops of stacked columns and the
     // integer-height tops of falling water all sit at whole numbers, and displacing those
     // would crack the skin against the floor and against the cell above.
@@ -85,7 +98,7 @@ void main() {
         // displacement there would seam against the chunk water and between LOD levels.
         vec3 anchorW = TO_WORLD(vPosition);
         float wFade = 1.0 - smoothstep(64.0, 160.0, distance(anchorW, uCameraPos));
-        displaced.y += WaveHeight(anchorW.xz, uTime) * wFade;
+        displaced.y += (isLava ? LavaWaveHeight(anchorW.xz, uTime) : WaveHeight(anchorW.xz, uTime)) * wFade;
     }
     if (vSway > 0.001 && uSwayStrength > 0.001) {
         vec3 anchor = TO_WORLD(vPosition);

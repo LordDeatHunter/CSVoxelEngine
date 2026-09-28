@@ -397,6 +397,14 @@ public const float DayLengthSeconds = 1200f;
 
     // Wave normal steepness multiplier for the water shading (geometry moves less than it looks)
     public const float WaterNormalScale = 2.0f;
+    // Lava swell normal steepness: LavaWaveHeight's slopes are gentle (broad, low-frequency
+    // blobs), so the gain is higher than water's to keep the catch-light visibly riding the heave
+    public const float LavaNormalScale = 6f;
+    // Strength of the point-light (fire, kiln, TNT) catch-light and sky sheen on the lava crust;
+    // backed off over the molten texels, which already glow past it
+    public const float LavaCatchLightStrength = 0.6f;
+    // Blinn exponent of that catch-light: high, so a nearby fire reads as a small glint
+    public const float LavaCatchLightPower = 48f;
     // Screen-space refraction offset at the camera, in uv units; shrinks with distance in the shader
     public const float WaterRefractStrength = 0.06f;
     // Seen from below, the surface is a Snell window: the whole sky above is squeezed into a
@@ -992,6 +1000,20 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float FireEmberPerSecond = 36f;
     public const float FireSmokePerSecond = 8f;
     public const float FireParticleRadius = 48f;
+
+    // --- Lava embers and smoke (a second FireParticleSystem instance in World) ---
+    // Exposed lava cells ("hot fluid vents", recorded per chunk by the mesher) emit sparse
+    // embers and smoke. Their own instance keeps them from competing with campfires.
+    /// <summary>Embers per second from each lava vent in range; a pool has many vents, so this is far sparser than a campfire.</summary>
+    public const float LavaEmberPerSecond = 0.6f;
+    /// <summary>Smoke puffs per second from each lava vent in range.</summary>
+    public const float LavaSmokePerSecond = 0.25f;
+    /// <summary>Ring capacity of the lava particle instance; the oldest particle is evicted past it.</summary>
+    public const int LavaParticleMax = 256;
+    /// <summary>Only vents within this distance (blocks) of the eye emit.</summary>
+    public const float LavaVentRadius = 32f;
+    /// <summary>Cap on emitting vents per frame, filled nearest chunk first so the pool beside the player always wins.</summary>
+    public const int LavaVentMaxEmitters = 96;
 
     // --- Exhaled bubbles (BubbleParticleSystem + BubbleParticleRenderer) ---
     // Small billboards rising off the player's mouth while the eye is submerged, popping

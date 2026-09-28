@@ -488,6 +488,19 @@ public class Chunk : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static int Idx(int x, int y, int z) => (x << (2 * SizeShift)) | (y << SizeShift) | z;
 
+    /// <summary>The inverse of <see cref="Idx"/>: the cell-local position a local block index names.</summary>
+    internal static Vector3 LocalOfIdx(int idx) =>
+        new(idx >> (2 * SizeShift), (idx >> SizeShift) & (Size - 1), idx & (Size - 1));
+
+    /// <summary>
+    /// Whether a fluid cell is a hot fluid open to the air above it — an ember and smoke spawn
+    /// point. "Hot" is keyed off the block's <c>light.emission</c>, never its name, so any
+    /// glowing fluid qualifies; the cell above must be neither fluid, solid nor occluding.
+    /// </summary>
+    internal static bool IsHotFluidVent(byte id, byte above) =>
+        BlockType.IsFluid(id) && BlockType.Emission[id] > 0
+        && !BlockType.IsFluid(above) && !BlockType.IsSolid(above) && !BlockType.Occludes(above);
+
     // gl is retained for signature stability only: every call site (and the headless tests)
     // still constructs a chunk with the context, but a chunk owns no GL object any more —
     // its geometry lives in the render manager's ChunkGeometryPools.
@@ -1305,6 +1318,9 @@ public class Chunk : IDisposable
         // the reflection and scene-copy passes need the narrower answer.
         var hasWater = false;
 
+        // Exposed hot-fluid cells (lava open to the air), allocated only when one turns up
+        List<ushort>? vents = null;
+
         // World origin of this chunk, for resolving a submerged face's water surface when its
         // column leaves the padded snapshot (SubmergedSurfaceCode)
         var chunkBaseY = LowerBoundY;
@@ -1370,6 +1386,8 @@ public class Chunk : IDisposable
                 EmitFluid(tVertices, tIndices, ref tIndexOffset, padded, paddedState, pIdx,
                     sunLight, blockLight, x, y, z, type, basePos);
                 hasWater = true;
+                if (IsHotFluidVent(padded[pIdx], padded[pIdx + FaceNeighborDelta[4]]))
+                    (vents ??= []).Add((ushort)Idx(x, y, z));
                 continue;
             }
 
@@ -1513,7 +1531,8 @@ public class Chunk : IDisposable
             }
         }
 
-        return new ChunkMeshData(vertices, indices, tVertices, tIndices, hasWater);
+        return new ChunkMeshData(vertices, indices, tVertices, tIndices, hasWater)
+            { HotFluidVents = vents?.ToArray() };
     }
 
     // Two-regime 7-bit code of a submerged face's water surface (SubmergedSurfaceCode):
@@ -2556,6 +2575,12 @@ public class Chunk : IDisposable
     internal static Vector2 CropUv(int face, Vector3 local) => TiledUv(face, local, Vector3.One);
 
     /// <summary>
+    /// Local <see cref="Idx"/> indices of the exposed hot-fluid cells of the last applied mesh
+    /// (ember/smoke spawn points), or null when there are none. Main thread only.
+    /// </summary>
+    public ushort[]? HotFluidVents { get; private set; }
+
+    /// <summary>
     /// Uploads a finished mesh into the shared chunk geometry pools, releasing whatever this
     /// chunk held before. The upload is a synchronous <c>glBufferSubData</c>, so the caller may
     /// recycle <paramref name="meshData"/>'s lists the moment this returns. An empty list never
@@ -2586,6 +2611,7 @@ public class Chunk : IDisposable
         }
 
         HasWaterMesh = meshData.HasWater && meshData.TranslucentVertices.Count > 0;
+        HotFluidVents = meshData.HotFluidVents;
     }
 
     /// <summary>
@@ -2689,4 +2715,10 @@ public record ChunkMeshData(List<Vertex> Vertices, List<ushort> Indices,
     /// when the build skipped the light flood (all-air or fully enclosed).
     /// </summary>
     public byte[]? Light { get; init; }
+
+    /// <summary>
+    /// Local <see cref="Chunk.Idx"/> indices of the chunk's exposed hot-fluid cells
+    /// (<see cref="Chunk.IsHotFluidVent"/>), or null when there are none.
+    /// </summary>
+    public ushort[]? HotFluidVents { get; init; }
 }

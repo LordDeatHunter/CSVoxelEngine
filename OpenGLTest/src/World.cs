@@ -46,6 +46,15 @@ public class World : IItemUseWorld
     private readonly KilnManager _kilns = new();
     private readonly CastingManager _casting = new();
     private readonly FireParticleSystem _fire = new();
+    // Embers and smoke over exposed lava: a separately tuned instance so a lava lake never
+    // competes with campfires for spawn rate or ring slots
+    private readonly FireParticleSystem _lavaFire = new(WorldGenerationConfig.LavaEmberPerSecond,
+        WorldGenerationConfig.LavaSmokePerSecond, WorldGenerationConfig.LavaParticleMax,
+        new Vector3(0.5f, FluidState.SourceHeight, 0.5f));
+    private readonly List<Vector3> _lavaVents = [];
+    private readonly List<(float dist2, Chunk chunk)> _lavaVentChunks = [];
+    private static readonly Comparison<(float dist2, Chunk chunk)> NearestVentChunkFirst =
+        static (a, b) => a.dist2.CompareTo(b.dist2);
 
     // Every cell whose flame the particle system and the point lights draw: campfires plus kilns,
     // rebuilt once per update so both consumers read one list
@@ -348,6 +357,8 @@ public class World : IItemUseWorld
         _fireCells.AddRange(_campfires.LitCells);
         _fireCells.AddRange(_kilns.LitCells);
         _fire.Update((float)deltaTime, _fireCells, Camera.RenderEye);
+        GatherLavaVents(Camera.RenderEye);
+        _lavaFire.Update((float)deltaTime, _lavaVents, Camera.RenderEye);
         _bubbles.Update((float)deltaTime, Camera.RenderEye, Camera.ViewDirection, Camera.IsEyeInWater, _chunkManager);
 
         // Falling cubes shove the player aside instead of landing inside them; strictly
@@ -395,6 +406,67 @@ public class World : IItemUseWorld
             out _selectedBlockPosition, out _selectedFaceNormal, out _selectedBoxIndex,
             includeFluids: ItemRegistry.TryGet(Inventory.SelectedBlockId)?.TargetsFluids ?? false);
         FrameProfiler.End(ProfileSection.Raycast);
+    }
+
+    /// <summary>
+    /// Fills <see cref="_lavaVents"/> with the world cells of the exposed hot-fluid vents
+    /// (<see cref="Chunk.HotFluidVents"/>) within <see cref="WorldGenerationConfig.LavaVentRadius"/>
+    /// of <paramref name="eye"/>, at most <see cref="WorldGenerationConfig.LavaVentMaxEmitters"/>
+    /// of them. Chunks are walked nearest-first so a hard cap is spent on the pool beside the
+    /// player, and when a lake offers more vents than the cap the set is thinned by a stable
+    /// per-cell hash rather than truncated: truncating hands every emitter to the one chunk
+    /// nearest the eye, which may lie entirely behind the camera.
+    /// </summary>
+    private void GatherLavaVents(Vector3 eye)
+    {
+        _lavaVents.Clear();
+        _lavaVentChunks.Clear();
+        const float radius = WorldGenerationConfig.LavaVentRadius;
+        const float chunkReach = radius + Chunk.Size;
+        const float half = Chunk.Size * 0.5f;
+        foreach (var chunk in _chunkManager.TranslucentRenderable)
+        {
+            if (chunk.HotFluidVents is null) continue;
+            var d2 = Vector3.DistanceSquared(chunk.Position * Chunk.Size + new Vector3(half), eye);
+            if (d2 > chunkReach * chunkReach) continue;
+            _lavaVentChunks.Add((d2, chunk));
+        }
+        if (_lavaVentChunks.Count == 0) return;
+        _lavaVentChunks.Sort(NearestVentChunkFirst);
+
+        // Pass 1 counts the candidates, so pass 2 can keep each with probability cap / count
+        var candidates = 0;
+        foreach (var (_, chunk) in _lavaVentChunks)
+        {
+            var origin = chunk.Position * Chunk.Size;
+            foreach (var idx in chunk.HotFluidVents!)
+                if (Vector3.DistanceSquared(origin + Chunk.LocalOfIdx(idx), eye) <= radius * radius)
+                    candidates++;
+        }
+        if (candidates == 0) return;
+        var keep = MathF.Min(1f, WorldGenerationConfig.LavaVentMaxEmitters / (float)candidates);
+        foreach (var (_, chunk) in _lavaVentChunks)
+        {
+            var origin = chunk.Position * Chunk.Size;
+            foreach (var idx in chunk.HotFluidVents!)
+            {
+                var cell = origin + Chunk.LocalOfIdx(idx);
+                if (Vector3.DistanceSquared(cell, eye) > radius * radius) continue;
+                if (keep < 1f && VentHash01(cell) >= keep) continue;
+                _lavaVents.Add(cell);
+                if (_lavaVents.Count >= WorldGenerationConfig.LavaVentMaxEmitters) return;
+            }
+        }
+    }
+
+    /// <summary>A stable 0..1 hash of a cell, so the thinned vent set does not flicker frame to frame.</summary>
+    private static float VentHash01(Vector3 cell)
+    {
+        var h = (uint)(int)cell.X * 73856093u ^ (uint)(int)cell.Y * 19349663u ^ (uint)(int)cell.Z * 83492791u;
+        h ^= h >> 13;
+        h *= 0x5bd1e995u;
+        h ^= h >> 15;
+        return (h & 0xFFFFFF) / 16777216f;
     }
 
     /// <summary>
@@ -600,6 +672,10 @@ public class World : IItemUseWorld
         renderManager.BeginGpuPass(ProfileSection.EntityPass);
         renderManager.RenderLeafParticles(Camera, _leaves.Particles);
         renderManager.RenderFireParticles(Camera, _fire.Particles);
+        // Lava embers are a second batch; the renderer re-uploads with BufferSubData, so two
+        // calls a frame are safe. The batches are not depth-sorted against each other, which
+        // only matters where campfire and lava smoke overlap (cosmetic).
+        renderManager.RenderFireParticles(Camera, _lavaFire.Particles);
         renderManager.RenderBubbleParticles(Camera, _bubbles.Particles);
         renderManager.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);

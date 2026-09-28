@@ -133,6 +133,9 @@ uniform float uWaterFallStreak;   // tangent tilt of the falling streaks; 0 turn
 uniform vec3 uLodLeafColor;
 // Atlas slice of the lava tile: fluid fragments on this layer glow instead of refracting.
 uniform float uLavaLayer;
+uniform float uLavaNormalScale;  // slope-to-normal gain of the lava swell (WorldGenerationConfig.LavaNormalScale)
+uniform float uLavaCatchLight;   // strength of the point-light catch-light on lava
+uniform float uLavaCatchPower;   // Blinn exponent of that catch-light
 
 out vec4 FragColor;
 
@@ -233,6 +236,17 @@ vec2 WaveSlope(vec2 p, float t) {
     g += 0.025 * 1.4 * cos(dot(p, vec2(-0.5, 0.85)) * 1.4 + t * 2.1) * vec2(-0.5, 0.85);
     g += 0.015 * 2.6 * cos(dot(p, vec2(0.3, -0.95)) * 2.6 + t * 2.9) * vec2(0.3, -0.95);
     g += 0.010 * 4.1 * cos(dot(p, vec2(-0.8, -0.6)) * 4.1 + t * 3.7) * vec2(-0.8, -0.6);
+    return g;
+}
+
+// Analytic slope of test-vertex.glsl's LavaWaveHeight (same terms, differentiated). Must change in
+// lockstep with it, or the lava's shading disagrees with its swell.
+vec2 LavaWaveSlope(vec2 p, float t) {
+    vec2 g = vec2(0.0);
+    g += 0.040 * 0.35 * cos(dot(p, vec2(0.8, 0.6)) * 0.35 + t * 0.35) * vec2(0.8, 0.6);
+    g += 0.025 * 0.55 * cos(dot(p, vec2(-0.6, 0.8)) * 0.55 + t * 0.5) * vec2(-0.6, 0.8);
+    g += 0.015 * 0.9 * cos(dot(p, vec2(0.2, -0.98)) * 0.9 + t * 0.7) * vec2(0.2, -0.98);
+    g += 0.008 * 1.5 * cos(dot(p, vec2(-0.9, -0.4)) * 1.5 + t * 0.9) * vec2(-0.9, -0.4);
     return g;
 }
 
@@ -505,6 +519,29 @@ void main() {
         float pulse = 0.9 + 0.1 * sin(uTime * 2.0 + fWorldPos.x * 1.3 + fWorldPos.z * 1.7);
         // The floor is the old sRGB orange (0.55, 0.13, 0.01) decoded to linear light
         col = mix(albedo, albedo * 2.0 + vec3(0.263, 0.0152, 0.00077), molten) * pulse;
+        // A glossy crust catches the nearby fires, kilns and TNT as small highlights riding the
+        // swell, plus a faint fresnel sheen of the sky. The torch/block channel is excluded:
+        // lava's own emission saturates fBlock on every lava fragment, so it carries no direction.
+        vec2 lg = LavaWaveSlope(fWorldPos.xz, uTime);
+        vec3 nL = N.y > 0.5 ? normalize(vec3(-lg.x * uLavaNormalScale, 1.0, -lg.y * uLavaNormalScale)) : N;
+        vec3 Vl = normalize(uCameraPos - fWorldPos);
+        vec3 spec = vec3(0.0);
+        for (int i = 0; i < 8; i++) {
+            if (i >= uNumPointLights) break;
+            vec3 L = uPointPos[i] - fWorldPos;
+            float pd = length(L);
+            vec3 Ld = L / max(pd, 1e-4);
+            float att = 1.0 / (1.0 + 0.09 * pd + 0.032 * pd * pd);
+            // Same fire range window as the diffuse point-light loop above.
+            float w = 1.0;
+            if (i >= uFireLightStart && uFireLightRange > 0.0) {
+                float r = clamp(1.0 - pd * pd / (uFireLightRange * uFireLightRange), 0.0, 1.0);
+                w = r * r * clamp(dot(nL, Ld) * 0.5 + 0.5, 0.0, 1.0);
+            }
+            spec += uPointColor[i] * (att * w) * pow(max(dot(nL, normalize(Ld + Vl)), 0.0), uLavaCatchPower);
+        }
+        spec += uAmbient * fSun * (0.04 + 0.96 * pow(1.0 - max(dot(nL, Vl), 0.0), 5.0)) * 0.25;
+        col += spec * uLavaCatchLight * (1.0 - 0.6 * molten);
     } else if (isWater) {
         // Far water skips the wave/reflection/refraction model below: past the full-detail
         // ring each pixel covers metres of surface, so a geometric-normal fresnel between

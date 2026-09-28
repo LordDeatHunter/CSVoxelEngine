@@ -1,13 +1,21 @@
 {
   // Lava pockets: run with VOXEL_SCRIPT=visual-examples/lava.json
   // (working directory OpenGLTest/, e.g. via dotnet run). Shots land in visual/lava/.
-  // Teleports into a cave above a generated lava pool at (-42,-54,79) and frames it.
+  // Hovers over a generated lava lake around (-65,-45,70) and frames it (the old pool at
+  // (-42,-54,79) no longer generates open to the air).
+  // Flight holds the camera over the pool; without it the player drops into the lava.
   "steps": [
-    { "op": "teleport", "pos": [-41.5, -51.5, 79.5], "yaw": -90, "pitch": -60 },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-64.5, -41.5, 74.5], "yaw": -90, "pitch": -40 },
     { "op": "wait", "seconds": 10 },
     { "op": "screenshot", "name": "pocket" },
-    { "op": "look", "yaw": -45, "pitch": -45 },
+    { "op": "look", "yaw": 0, "pitch": -40 },
     { "op": "wait", "seconds": 2 },
-    { "op": "screenshot", "name": "pocket-wide", "hideHud": true }
+    { "op": "screenshot", "name": "pocket-wide", "hideHud": true },
+    // Embers and smoke rising off the exposed pool (the lava FireParticleSystem instance)
+    // (a shallower look, so the smoke reads against the cave behind the pool)
+    { "op": "look", "yaw": 0, "pitch": -12 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "embers", "hideHud": true }
   ]
 }

@@ -69,4 +69,67 @@ public sealed class FireParticleTests
         Assert.NotSame(filled[max - 1], system.Particles[max - 1]);
         Assert.Equal(FireParticleKind.Ember, system.Particles[max - 1].Kind);
     }
+    private static List<Vector3> LitRow(int count)
+    {
+        var cells = new List<Vector3>(count);
+        for (var i = 0; i < count; i++) cells.Add(new Vector3(i, 0f, 0f));
+        return cells;
+    }
+
+    /// <summary>A system tuned to zero rates never spawns, however many lit cells feed it.</summary>
+    [Fact]
+    public void ZeroRateSystemSpawnsNothing()
+    {
+        var system = new FireParticleSystem(0f, 0f, WorldGenerationConfig.FireParticleMax, FireParticleSystem.SpawnOffset);
+        var cells = LitRow(8);
+        var rng = new Random(3);
+        for (var i = 0; i < 60; i++)
+            system.Update(0.1f, cells, Vector3.Zero, rng);
+        Assert.Empty(system.Particles);
+    }
+
+    /// <summary>
+    /// Over the same cells and steps, a lower-rate instance never holds more particles than the
+    /// default campfire instance (both caps equal, so only the rates differ).
+    /// </summary>
+    [Fact]
+    public void LowerRateSpawnsNoMore()
+    {
+        var campfire = new FireParticleSystem();
+        var sparse = new FireParticleSystem(WorldGenerationConfig.FireEmberPerSecond * 0.25f,
+            WorldGenerationConfig.FireSmokePerSecond * 0.25f, WorldGenerationConfig.FireParticleMax,
+            FireParticleSystem.SpawnOffset);
+        var cells = LitRow(2);
+        var rngA = new Random(9);
+        var rngB = new Random(9);
+        for (var i = 0; i < 20; i++)
+        {
+            campfire.Update(0.05f, cells, Vector3.Zero, rngA);
+            sparse.Update(0.05f, cells, Vector3.Zero, rngB);
+            Assert.True(sparse.Particles.Count <= campfire.Particles.Count,
+                $"step {i}: sparse {sparse.Particles.Count} > campfire {campfire.Particles.Count}");
+        }
+        // Anti-vacuity: the sparse instance really spawned something, so the bound is not 0 <= n.
+        Assert.NotEmpty(sparse.Particles);
+    }
+
+    /// <summary>An instance's own cap bounds it, not the campfire's, however long it is fed.</summary>
+    [Fact]
+    public void InstanceCapIsRespected()
+    {
+        var cap = WorldGenerationConfig.FireParticleMax / 8;
+        var system = new FireParticleSystem(WorldGenerationConfig.FireEmberPerSecond,
+            WorldGenerationConfig.FireSmokePerSecond, cap, FireParticleSystem.SpawnOffset);
+        var cells = LitRow(32);
+        var rng = new Random(21);
+        var peak = 0;
+        for (var i = 0; i < 200; i++)
+        {
+            system.Update(0.05f, cells, Vector3.Zero, rng);
+            Assert.True(system.Particles.Count <= cap, $"step {i}: {system.Particles.Count} > cap {cap}");
+            peak = Math.Max(peak, system.Particles.Count);
+        }
+        // Anti-vacuity: the feed really drove the ring to its cap.
+        Assert.Equal(cap, peak);
+    }
 }
