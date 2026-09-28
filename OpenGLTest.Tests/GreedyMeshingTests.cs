@@ -173,6 +173,31 @@ public sealed class GreedyMeshingTests
     }
 
     [Fact]
+    public void LampLitFloorMergesOnlyWhereLightIsConstant()
+    {
+        var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
+        var stone = Block("stone");
+        for (var x = 0; x < Chunk.Size; x++)
+        for (var z = 0; z < Chunk.Size; z++)
+            center.SetBlockRaw(x, 0, z, stone, 0);
+        // Hung above the floor's AO neighbourhood (the y = 1 row), so only light varies
+        center.SetBlockRaw(8, 3, 8, Block("lamp"), 0);
+
+        AssertGreedyMatchesPerQuad(manager, center);
+
+        var mesh = center.GenerateMeshData(manager, greedy: true);
+        Assert.NotNull(mesh);
+        var floorTop = Quads(mesh.Vertices, mesh.Indices)
+            .Where(q => (q[0].Normal & 7) == 4 && q.All(v => v.Position.Y == 1f)).ToList();
+
+        // AO is uniform over the whole floor, so any split comes from the lamp's light
+        var shade = floorTop[0][0].PackedColor & 0xFF;
+        Assert.All(floorTop, q => Assert.All(q, v => Assert.Equal(shade, v.PackedColor & 0xFF)));
+        Assert.True(floorTop.Count > 1, $"{floorTop.Count} top quads");
+        Assert.Contains(floorTop, q => q.Any(v => v.Block != q[0].Block));
+    }
+
+    [Fact]
     public void StripBesideAWallMergesAlongTheWall()
     {
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
@@ -233,10 +258,10 @@ public sealed class GreedyMeshingTests
     // ---------------------------------------------------------------- differential equivalence
 
     /// <summary>What one unit cell face looks like once rendered, independent of how many
-    /// quads it was drawn with: attributes plus the shade and UV interpolated at its four
-    /// corners.</summary>
-    private sealed record CellFace(int Face, int Alpha, int Layer, int Sun, int Block, int Sway, int WaterSurface, int List,
-        float[] Shade, float[] U, float[] V);
+    /// quads it was drawn with: attributes plus the shade, sun and lamp light and UV
+    /// interpolated at its four corners.</summary>
+    private sealed record CellFace(int Face, int Alpha, int Layer, int Sway, int WaterSurface, int List,
+        float[] Shade, float[] Sun, float[] Block, float[] U, float[] V);
 
     private static float Bilinear(float[,] c, float s, float t) =>
         c[0, 0] * (1 - s) * (1 - t) + c[1, 0] * s * (1 - t) + c[0, 1] * (1 - s) * t + c[1, 1] * s * t;
@@ -247,8 +272,8 @@ public sealed class GreedyMeshingTests
 
     /// <summary>
     /// Splits a mesh into unit cell faces. Every axis-aligned quad with integer corners is cut
-    /// into the 1x1 cells it covers (keyed by the voxel it belongs to and its face), with shade
-    /// and UV evaluated by bilinear interpolation at the cell's corners. Anything else (sub-cell
+    /// into the 1x1 cells it covers (keyed by the voxel it belongs to and its face), with shade,
+    /// light and UV evaluated by bilinear interpolation at the cell's corners. Anything else (sub-cell
     /// boxes, sloped fluid tops) is kept verbatim in <paramref name="raw"/>: the two paths emit
     /// those with the same code, so they must match byte for byte.
     /// </summary>
@@ -268,8 +293,6 @@ public sealed class GreedyMeshingTests
             {
                 Assert.Equal(v0.Normal, v.Normal);
                 Assert.Equal(v0.Layer, v.Layer);
-                Assert.Equal(v0.Sun, v.Sun);
-                Assert.Equal(v0.Block, v.Block);
                 Assert.Equal(v0.Sway, v.Sway);
                 Assert.Equal(v0.WaterSurface, v.WaterSurface);
                 Assert.Equal(v0.PackedColor >> 24, v.PackedColor >> 24);
@@ -299,6 +322,8 @@ public sealed class GreedyMeshingTests
             }
 
             var shade = new float[2, 2];
+            var sun = new float[2, 2];
+            var block = new float[2, 2];
             var us = new float[2, 2];
             var vs = new float[2, 2];
             var seen = new bool[2, 2];
@@ -309,6 +334,8 @@ public sealed class GreedyMeshingTests
                 Assert.True(s is 0f or 1f && t is 0f or 1f, $"corner not on the quad's rectangle: {v.Position}");
                 seen[(int)s, (int)t] = true;
                 shade[(int)s, (int)t] = v.PackedColor & 0xFF;
+                sun[(int)s, (int)t] = v.Sun;
+                block[(int)s, (int)t] = v.Block;
                 us[(int)s, (int)t] = v.Uv.X;
                 vs[(int)s, (int)t] = v.Uv.Y;
             }
@@ -326,6 +353,8 @@ public sealed class GreedyMeshingTests
                 cell[b] = (int)MathF.Round(Axis(min, b)) + j;
 
                 var cornerShade = new float[4];
+                var cornerSun = new float[4];
+                var cornerBlock = new float[4];
                 var cornerU = new float[4];
                 var cornerV = new float[4];
                 for (var c = 0; c < 4; c++)
@@ -333,14 +362,16 @@ public sealed class GreedyMeshingTests
                     var s = (i + (c & 1)) / (float)ea;
                     var t = (j + (c >> 1)) / (float)eb;
                     cornerShade[c] = Bilinear(shade, s, t);
+                    cornerSun[c] = Bilinear(sun, s, t);
+                    cornerBlock[c] = Bilinear(block, s, t);
                     cornerU[c] = Bilinear(us, s, t);
                     cornerV[c] = Bilinear(vs, s, t);
                 }
 
                 var key = (cell[0], cell[1], cell[2], face);
                 Assert.False(cells.ContainsKey(key), $"cell face {key} drawn twice");
-                cells[key] = new CellFace(face, (int)(v0.PackedColor >> 24), v0.Layer, v0.Sun, v0.Block, v0.Sway, v0.WaterSurface, list,
-                    cornerShade, cornerU, cornerV);
+                cells[key] = new CellFace(face, (int)(v0.PackedColor >> 24), v0.Layer, v0.Sway, v0.WaterSurface, list,
+                    cornerShade, cornerSun, cornerBlock, cornerU, cornerV);
             }
         }
     }
@@ -417,8 +448,6 @@ public sealed class GreedyMeshingTests
             Assert.Equal(expected.Face, actual!.Face);
             Assert.Equal(expected.Alpha, actual.Alpha);
             Assert.Equal(expected.Layer, actual.Layer);
-            Assert.Equal(expected.Sun, actual.Sun);
-            Assert.Equal(expected.Block, actual.Block);
             Assert.Equal(expected.Sway, actual.Sway);
             Assert.Equal(expected.WaterSurface, actual.WaterSurface);
             Assert.Equal(expected.List, actual.List);
@@ -426,6 +455,10 @@ public sealed class GreedyMeshingTests
             {
                 Assert.True(MathF.Abs(expected.Shade[c] - actual.Shade[c]) <= 1.01f,
                     $"cell face {key} corner {c}: shade {expected.Shade[c]} vs {actual.Shade[c]}");
+                Assert.True(MathF.Abs(expected.Sun[c] - actual.Sun[c]) <= 1.01f,
+                    $"cell face {key} corner {c}: sun {expected.Sun[c]} vs {actual.Sun[c]}");
+                Assert.True(MathF.Abs(expected.Block[c] - actual.Block[c]) <= 1.01f,
+                    $"cell face {key} corner {c}: block light {expected.Block[c]} vs {actual.Block[c]}");
                 // A merged quad's UV runs past 1, so the two agree modulo whole tiles
                 var du = actual.U[c] - expected.U[c];
                 var dv = actual.V[c] - expected.V[c];

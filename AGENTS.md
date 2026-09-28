@@ -166,16 +166,32 @@ baked model is exactly the six untransformed cube faces (`ContentRegistry.BakesG
 built-in parents qualify, so stone, dirt, grass, logs, TNT, lamps, leaves and glass all do). It
 builds per-axis bit columns of greedy and occluding cells, finds visible faces with one
 shift-and-mask per column (the halo bits cull border faces exactly like the neighbour read),
-keys each face by block id, the four corner AO values, sun and lamp light and the submerged
-flag, gathers each key's faces per depth slice into a 16×16 bit plane and merges rectangles —
-but only along an axis where the key's AO is constant, so the merged quad's interpolated shade
-equals the per-cell shade exactly. Merged quads carry UVs 0..W / 0..H in tile units (`TiledUv`)
-and the sampler's REPEAT tiles them. The per-voxel loop then skips greedy cells and emits
-everything else as before (tapered wood, pebbles, fluids, any model with cropped or rotated
-UVs). `GenerateMeshData(manager, greedy: false)` is the test seam; `GreedyMeshingTests`
-rasterises both outputs into unit cell faces and requires them to be equal. Because a merge
-never crosses a lighting or AO difference, this world's rough noise terrain and leaf canopies
-only give ~15-20 % fewer vertices (`PERF_TODO.md` item 11), not the 5-10× of flat worlds.
+keys each face by block id, the four corner AO values, the submerged flag and the four corner
+**smooth light** sums (Minecraft smooth lighting, `Chunk.SmoothCornerLight`): each corner's sun
+and lamp light is summed over the front cell plus the same side/side/corner cells AO reads (a
+side that blocks light, or a corner behind two blocked sides, is replaced by the front cell, so
+an occluder darkens only through AO and light never leaks round a sealed diagonal), one exact
+0..60 sum per channel, 12 bits a corner, travelling in a parallel 48-bit key
+(`MeshScratch.PlaneLightKeys`) beside the int key. Uniform light gives `4L/60 == L/15`, so a
+uniformly lit face is byte-identical to the old one-sample-per-face light. It gathers each key's
+faces per depth slice into a 16×16 bit plane and merges rectangles — but only along an axis
+where the key's AO and both corner lights are constant, so the merged quad's interpolated shade
+and light equal the per-cell values exactly. Merged quads carry UVs 0..W / 0..H in tile units
+(`TiledUv`) and the sampler's REPEAT tiles them. The per-voxel loop then skips greedy cells and
+emits everything else as before (tapered wood, pebbles, fluids, any model with cropped or rotated
+UVs); its full, shaded, culled cube faces use the same corner rule, and the procedural emitters
+(tapered wood, pebbles, branch piles, snow layers) bilinearly interpolate the smooth corner light
+of the cell face they sample (`FaceLight`, flat where that face's front neighbour occludes).
+Fluids average each corner over the same own/dx/dz/diagonal cells `CornerHeight` reads, with a
+blocked cell replaced by the brightest open one, an order-independent rule so neighbouring fluid
+cells agree at every shared corner. `GenerateMeshData(manager, greedy: false)` is the test seam;
+`GreedyMeshingTests` rasterises both outputs into unit cell faces and requires them to be equal
+(`SmoothLightTests` locks down the light rules themselves). Because a merge never crosses a
+lighting or AO difference, this world's rough noise terrain and leaf canopies only give ~15-20 %
+fewer vertices (`PERF_TODO.md` item 11), not the 5-10× of flat worlds; smooth light left that
+almost untouched (+0.2 % vertices over eight sampled surface and cave chunks, mesh-build time
+within noise), since generated terrain is mostly uniformly lit and only lamp and shadow
+gradients split merges.
 
 **Chunk drawing.** Chunks do not own `Mesh` objects. `Chunk.UpdateMesh` uploads its vertex and
 index lists into the two `ChunkGeometryPool`s owned by `RenderManager` (opaque and translucent:
@@ -208,6 +224,7 @@ OpenGLTest/
     World.cs                   # owns Camera, ChunkManager, ChunkGenerationWorker, LodManager; raycast block edit API
     Chunk.cs                   # 16^3 block storage (byte IDs), block/column fill + cave carving via WorldGen/, mesh data generation (greedy pass + per-quad emitters) + AO
     MeshScratch.cs             # per-thread scratch buffers of the binary greedy mesh pass
+    FaceLight.cs               # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters
     CutoutMipmap.cs            # GL-free coverage-preserving mip chain for cutout tiles (alpha rescaled per level)
     LightFlicker.cs            # GL-free per-cell flicker phase + curve for the campfire point lights
     SelectionOutlineMesh.cs    # GL-free selection outline: the 12 box edges as thin beams (no glLineWidth)

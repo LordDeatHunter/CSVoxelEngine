@@ -7,7 +7,8 @@ namespace silkgltriangle.Tests;
 
 /// <summary>
 /// The entity light query reads the snapshot a chunk publishes with its mesh, so an entity
-/// standing in a cell is lit exactly like the terrain face that looks into that cell.
+/// standing in a cell is lit within the smooth corner light the mesher bakes around that cell
+/// on the terrain face that looks into it.
 /// </summary>
 public class EntityLightTests
 {
@@ -46,7 +47,7 @@ public class EntityLightTests
         chunk.Position * Chunk.Size + new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
 
     [Fact]
-    public void SampleMatchesTheLightTheMesherBakesForTheSameCell()
+    public void SampleLiesWithinTheSmoothLightTheMesherBakesAroundTheCell()
     {
         var (manager, center) = Floor();
         center.SetBlockRaw(8, FloorY + 1, 8, _emitter, 0);
@@ -54,19 +55,23 @@ public class EntityLightTests
 
         // The stone top face under the air cell (6, FloorY + 1, 8), found by its quad centre.
         var verts = mesh.Vertices;
-        Vertex? top = null;
+        Vertex[]? top = null;
         for (var q = 0; q + 3 < verts.Count; q += 4)
         {
             if ((verts[q].Normal & 7) != 4) continue;
             var c = (verts[q].Position + verts[q + 1].Position + verts[q + 2].Position + verts[q + 3].Position) / 4f;
             if (MathF.Abs(c.X - 6.5f) < 0.01f && MathF.Abs(c.Z - 8.5f) < 0.01f && MathF.Abs(c.Y - (FloorY + 1)) < 0.01f)
-                top = verts[q];
+                top = [verts[q], verts[q + 1], verts[q + 2], verts[q + 3]];
         }
         Assert.NotNull(top);
 
         var sample = EntityLight.Sample(manager, WorldCentre(center, 6, FloorY + 1, 8));
-        Assert.Equal(top!.Value.Sun, (byte)MathF.Round(sample.Sun * 15f * 17f));
-        Assert.Equal(top.Value.Block, (byte)MathF.Round(sample.Block * 15f * 17f));
+        // Each corner averages the cell with its neighbours, so the cell's own level lies
+        // between the face's darkest and brightest corner
+        var sun = (byte)MathF.Round(sample.Sun * 15f * 17f);
+        var block = (byte)MathF.Round(sample.Block * 15f * 17f);
+        Assert.InRange(sun, top!.Min(v => v.Sun), top.Max(v => v.Sun));
+        Assert.InRange(block, top.Min(v => v.Block), top.Max(v => v.Block));
         Assert.True(sample.Block > 0f);
     }
 

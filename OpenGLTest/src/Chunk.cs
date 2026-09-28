@@ -196,6 +196,10 @@ public class Chunk : IDisposable
     // Same face normals as light-volume index deltas, for the air cell in front of a face
     private static readonly int[] LightFaceDelta = new int[6];
     private static readonly int[][] AODeltas = new int[6][]; // 12 per face: (side1, side2, corner) x 4 corners
+    // The same AO side/side/corner cells as light-volume index deltas (LightSize stride, not the
+    // padded one), read by SmoothCornerLight
+    private static readonly int[][] LightAODeltas = new int[6][];
+    private const float SmoothLightDivisor = 60f; // 4 samples x level 15
     internal static readonly float[] FaceBrightness = [0.85f, 0.95f, 0.8f, 0.9f, 1.0f, 0.75f]; // matches CubeFaces order
     internal static readonly byte[] ShadeLut = new byte[6 * 4]; // [face * 4 + ao]
 
@@ -204,17 +208,18 @@ public class Chunk : IDisposable
         for (var i = 0; i < 6; i++)
         {
             FaceNeighborDelta[i] = PaddedDelta(CubeFaces[i].normal);
-            var n = CubeFaces[i].normal;
-            LightFaceDelta[i] = (int)n.X * LightSq + (int)n.Y * LightSize + (int)n.Z;
+            LightFaceDelta[i] = LightDelta(CubeFaces[i].normal);
 
             var deltas = new int[12];
+            var lightDeltas = new int[12];
             for (var j = 0; j < 4; j++)
+            for (var k = 0; k < 3; k++)
             {
-                deltas[j * 3 + 0] = PaddedDelta(AONeighbors[i][j][0]);
-                deltas[j * 3 + 1] = PaddedDelta(AONeighbors[i][j][1]);
-                deltas[j * 3 + 2] = PaddedDelta(AONeighbors[i][j][2]);
+                deltas[j * 3 + k] = PaddedDelta(AONeighbors[i][j][k]);
+                lightDeltas[j * 3 + k] = LightDelta(AONeighbors[i][j][k]);
             }
             AODeltas[i] = deltas;
+            LightAODeltas[i] = lightDeltas;
 
             for (var ao = 0; ao <= 3; ao++)
                 ShadeLut[(i << 2) | ao] = (byte)(FaceBrightness[i] * ao * MathUtils.ONE_THIRD * 255);
@@ -224,7 +229,73 @@ public class Chunk : IDisposable
     private static int PaddedDelta(Vector3 offset) =>
         (int)offset.X * PaddedSq + (int)offset.Y * Padded + (int)offset.Z;
 
+    private static int LightDelta(Vector3 o) => (int)o.X * LightSq + (int)o.Y * LightSize + (int)o.Z;
+
     private static int FloorDiv(int a, int b) => MathUtils.FloorDiv(a, b);
+
+    /// <summary>
+    /// Minecraft-style smooth light of corner <paramref name="j"/> of face <paramref name="face"/>
+    /// of the cell at <paramref name="lightBase"/>: sun and lamp light each summed over four
+    /// samples - the air cell in front of the face and the side1, side2 and corner cells the AO
+    /// of that corner reads - returned as <c>sunSum | blockSum &lt;&lt; 6</c> (each sum 0..60,
+    /// so a vertex takes <c>sum / 60</c>, which equals <c>level / 15</c> exactly under uniform
+    /// light). A side sample that does not pass light is replaced by the front cell's value: a
+    /// blocked cell always stores 0, so counting it would darken the corner a second time on top
+    /// of the AO that cell already casts. The corner sample likewise counts only if it passes
+    /// light and at least one side is open, so light never leaks in through a sealed diagonal.
+    /// <paramref name="j"/> follows the <c>CubeFaces[face].face</c> corner order, the same
+    /// assumption the per-corner AO makes of a quad's positions.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static int SmoothCornerLight(int face, int j, byte[] sunLight, byte[] blockLight, int lightBase,
+        byte side1Id, byte side2Id, byte cornerId)
+    {
+        var front = lightBase + LightFaceDelta[face];
+        var d = LightAODeltas[face];
+        var passes = BlockType.PassesLightById;
+        var open1 = passes[side1Id];
+        var open2 = passes[side2Id];
+        var openC = passes[cornerId] && (open1 || open2);
+        var i1 = open1 ? lightBase + d[j * 3] : front;
+        var i2 = open2 ? lightBase + d[j * 3 + 1] : front;
+        var iC = openC ? lightBase + d[j * 3 + 2] : front;
+        var sun = sunLight[front] + sunLight[i1] + sunLight[i2] + sunLight[iC];
+        var block = blockLight[front] + blockLight[i1] + blockLight[i2] + blockLight[iC];
+        return sun | block << 6;
+    }
+
+    /// <summary>
+    /// The four <see cref="SmoothCornerLight"/> codes of face <paramref name="face"/> of the cell
+    /// at padded index <paramref name="pIdx"/> (light index <paramref name="lightBase"/>), for an
+    /// emitter to interpolate over the geometry it draws inside the cell (<see cref="FaceLight"/>).
+    /// </summary>
+    internal static FaceLight SmoothFaceLight(int face, byte[] padded, int pIdx, byte[] sunLight,
+        byte[] blockLight, int lightBase) =>
+        FaceLight.FromCorners(face,
+            SmoothCornerCode(face, 0, padded, pIdx, sunLight, blockLight, lightBase),
+            SmoothCornerCode(face, 1, padded, pIdx, sunLight, blockLight, lightBase),
+            SmoothCornerCode(face, 2, padded, pIdx, sunLight, blockLight, lightBase),
+            SmoothCornerCode(face, 3, padded, pIdx, sunLight, blockLight, lightBase));
+
+    private static int SmoothCornerCode(int face, int j, byte[] padded, int pIdx, byte[] sunLight,
+        byte[] blockLight, int lightBase)
+    {
+        var d = AODeltas[face];
+        return SmoothCornerLight(face, j, sunLight, blockLight, lightBase,
+            padded[pIdx + d[j * 3]], padded[pIdx + d[j * 3 + 1]], padded[pIdx + d[j * 3 + 2]]);
+    }
+
+    /// <summary>
+    /// An emitter's light for face <paramref name="face"/>: the cell face's smooth corner light
+    /// when the neighbour in front of it is open, otherwise the flat light of
+    /// <paramref name="fallbackCell"/> - a face backed against an occluder must not average the
+    /// occluder's zero light, or it renders black.
+    /// </summary>
+    private static FaceLight EmitterFaceLight(int face, byte[] padded, int pIdx, byte[] sunLight,
+        byte[] blockLight, int lightBase, int fallbackCell) =>
+        BlockType.Occludes(padded[pIdx + FaceNeighborDelta[face]])
+            ? FaceLight.Flat(sunLight[fallbackCell], blockLight[fallbackCell])
+            : SmoothFaceLight(face, padded, pIdx, sunLight, blockLight, lightBase);
 
     /// <summary>
     /// Per-axis map from a light-volume coordinate (0..LightSize-1) to the neighbourhood chunk
@@ -1351,7 +1422,8 @@ public class Chunk : IDisposable
                     if (BlockType.Occludes(neighbour) || (type.CullSelf && neighbour == blockId)) continue;
 
                     // Light of the air cell in front of the face, from the wide light volume
-                    // (so lamps across the chunk border still reach); AO still varies corners.
+                    // (so lamps across the chunk border still reach): the flat fallback for
+                    // quads that do not smooth; a full face averages per corner below.
                     // A neighbour that would read as black light is exactly one that occludes,
                     // and that face is already gone, so no fallback is needed here.
                     lightCell = lightBase + LightFaceDelta[cullFace];
@@ -1392,19 +1464,32 @@ public class Chunk : IDisposable
                 else if (quad.IsFullFace)
                 {
                     // Only a quad that fills its cube face has meaningful corner neighbours,
-                    // so per-corner AO applies exactly as it did for hand-written cubes
+                    // so per-corner AO applies exactly as it did for hand-written cubes. A face
+                    // that culls against its own side (exactly the set the greedy pass takes,
+                    // see ContentRegistry.BakesGreedy) also averages its light per corner.
                     var aoDeltas = AODeltas[face];
+                    var smooth = cullFace == face;
                     for (var j = 0; j < 4; j++)
                     {
-                        var side1 = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 0]]);
-                        var side2 = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 1]]);
-                        var corner = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 2]]);
+                        var side1Id = padded[pIdx + aoDeltas[j * 3 + 0]];
+                        var side2Id = padded[pIdx + aoDeltas[j * 3 + 1]];
+                        var cornerId = padded[pIdx + aoDeltas[j * 3 + 2]];
 
-                        var ao = VertexAO(side1, side2, corner);
+                        var ao = VertexAO(BlockType.OccludesAO(side1Id), BlockType.OccludesAO(side2Id),
+                            BlockType.OccludesAO(cornerId));
                         var shade = ShadeLut[(face << 2) | ao];
 
+                        var vSun = sun;
+                        var vBlock = block;
+                        if (smooth)
+                        {
+                            var code = SmoothCornerLight(face, j, sunLight, blockLight, lightBase, side1Id, side2Id, cornerId);
+                            vSun = (code & 63) / SmoothLightDivisor;
+                            vBlock = (code >> 6) / SmoothLightDivisor;
+                        }
+
                         dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j], quad.Tile,
-                            sun, block, normal, sway, submerged, waterSurface));
+                            vSun, vBlock, normal, sway, submerged, waterSurface));
                     }
                 }
                 else
@@ -1512,12 +1597,14 @@ public class Chunk : IDisposable
     /// bit columns (a cell shows a face when its greedy bit is set and the occluder bit one
     /// step along the face normal is not — the halo bits cull border faces exactly as the
     /// per-voxel neighbour read does), keyed by everything that would make two cells' quads
-    /// differ (block, the four corner AO values, sun and lamp light, the submerged flag and, for
-    /// a submerged face, its water surface code from <see cref="SubmergedSurfaceCode"/>),
+    /// differ (block, the four corner AO values, the four corner smooth sun/lamp light sums of
+    /// <see cref="SmoothCornerLight"/> in a parallel 48-bit key, the submerged flag and, for a
+    /// submerged face, its water surface code from <see cref="SubmergedSurfaceCode"/>),
     /// gathered per depth slice into one bit plane per key, and merged per plane into the widest,
     /// then tallest, rectangles. The output is pixel-identical
     /// to emitting each face on its own: a merge only happens along an axis where the key's AO
-    /// is constant, so the big quad's interpolated shade equals the per-cell quads' (see
+    /// and both lights are constant, so the big quad's interpolated shade and light equal the
+    /// per-cell quads' (see
     /// <see cref="EmitGreedyRun"/>), and the UVs run 0..W / 0..H in tile units so the sampler's
     /// REPEAT tiles the texture per cell.
     /// </summary>
@@ -1570,6 +1657,7 @@ public class Chunk : IDisposable
         var visible = scratch.Visible;
         var table = scratch.PlaneTable;
         var planeKeys = scratch.PlaneKeys;
+        var planeLightKeys = scratch.PlaneLightKeys;
         var planeRows = scratch.PlaneRows;
 
         for (var f = 0; f < 6; f++)
@@ -1579,7 +1667,6 @@ public class Chunk : IDisposable
             var g = greedyCols[axis];
             var o = occCols[axis];
             var faceDelta = FaceNeighborDelta[f];
-            var lightDelta = LightFaceDelta[f];
             var aoDeltas = AODeltas[f];
 
             // B. Face mask per column: a face shows where the cell is greedy and the cell one
@@ -1626,27 +1713,33 @@ public class Chunk : IDisposable
                     // mask already handled opaque neighbours)
                     if (neighbour == id && BlockType.ById[id]!.CullSelf) continue;
 
+                    var lightBase = LightIdx(x, y, z);
                     var ao = 0;
+                    var light = 0UL;
                     for (var j = 0; j < 4; j++)
                     {
-                        var side1 = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 0]]);
-                        var side2 = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 1]]);
-                        var corner = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 2]]);
-                        ao |= VertexAO(side1, side2, corner) << (2 * j);
+                        var side1Id = padded[pIdx + aoDeltas[j * 3 + 0]];
+                        var side2Id = padded[pIdx + aoDeltas[j * 3 + 1]];
+                        var cornerId = padded[pIdx + aoDeltas[j * 3 + 2]];
+                        ao |= VertexAO(BlockType.OccludesAO(side1Id), BlockType.OccludesAO(side2Id),
+                            BlockType.OccludesAO(cornerId)) << (2 * j);
+                        light |= (ulong)SmoothCornerLight(f, j, sunLight, blockLight, lightBase,
+                            side1Id, side2Id, cornerId) << (12 * j);
                     }
 
-                    var lightCell = LightIdx(x, y, z) + lightDelta;
-                    // Key: id 0-7, AO 8-15, sun 16-19, lamp 20-23, submerged 24, and for a
-                    // submerged face its 7-bit water surface code in 25-31. Bit 31 can make the
-                    // key negative; that is safe because the slot hash reads it as (uint)key
-                    // and an empty slot is table entry 0, never a key value.
-                    var key = id | ao << 8 | sunLight[lightCell] << 16 | blockLight[lightCell] << 20;
+                    // Key: id 0-7, AO 8-15, 16-23 unused, submerged 24, and for a submerged
+                    // face its 7-bit water surface code in 25-31. Bit 31 can make the key
+                    // negative; that is safe because the slot hash reads it as (uint)key and an
+                    // empty slot is table entry 0, never a key value. The light travels in a
+                    // parallel 48-bit key: four 12-bit SmoothCornerLight codes, corner j at 12j.
+                    var key = id | ao << 8;
                     if (BlockType.IsFluid(neighbour))
                         key |= 1 << 24 | SubmergedSurfaceCode(padded, paddedState, pIdx + faceDelta,
                             chunkBaseY, worldX0, worldZ0) << 25;
 
                     // Find or open the key's plane
-                    var slot = (int)((uint)key * 0x9E3779B1u >> 23);
+                    var h = ((ulong)(uint)key ^ light * 0x9E3779B97F4A7C15UL) * 0xBF58476D1CE4E5B9UL;
+                    var slot = (int)(h >> (64 - MeshScratch.PlaneTableBits));
                     int plane;
                     while (true)
                     {
@@ -1656,10 +1749,11 @@ public class Chunk : IDisposable
                             plane = planeCount++;
                             table[slot] = plane + 1;
                             planeKeys[plane] = key;
+                            planeLightKeys[plane] = light;
                             Array.Clear(planeRows, plane * Size, Size);
                             break;
                         }
-                        if (planeKeys[entry - 1] == key)
+                        if (planeKeys[entry - 1] == key && planeLightKeys[entry - 1] == light)
                         {
                             plane = entry - 1;
                             break;
@@ -1673,12 +1767,13 @@ public class Chunk : IDisposable
                 for (var plane = 0; plane < planeCount; plane++)
                 {
                     var key = planeKeys[plane];
+                    var light = planeLightKeys[plane];
                     var type = BlockType.ById[key & 0xFF]!;
                     var rows = planeRows.AsSpan(plane * Size, Size);
                     if (type.Translucent)
-                        EmitGreedyRun(f, axis, depth, chunkBaseY, key, type, rows, tVertices, tIndices, ref tIndexOffset);
+                        EmitGreedyRun(f, axis, depth, chunkBaseY, key, light, type, rows, tVertices, tIndices, ref tIndexOffset);
                     else
-                        EmitGreedyRun(f, axis, depth, chunkBaseY, key, type, rows, vertices, indices, ref indexOffset);
+                        EmitGreedyRun(f, axis, depth, chunkBaseY, key, light, type, rows, vertices, indices, ref indexOffset);
                 }
             }
         }
@@ -1686,30 +1781,31 @@ public class Chunk : IDisposable
 
     /// <summary>
     /// Merges one key's bit plane into rectangles and emits them. Every cell in the plane has the
-    /// same four corner AO values, but that alone does not make the shade continuous across two
-    /// cells: for ordinary occluders the shared-vertex geometry makes it so, while a neighbour
-    /// that casts AO without occluding (leaves, tapered wood) can leave a step at a shared edge.
-    /// So a run only grows along an axis where the key's AO is the same at both ends of that
-    /// axis — then the two cells' shared corners carry the same value, the shade inside every cell
-    /// is affine, and the merged quad interpolates to exactly the per-cell result. Uniform-AO
-    /// terrain merges both ways; a strip beside a wall merges along the wall.
+    /// same four corner AO values and the same four corner smooth sun/lamp light sums
+    /// (<paramref name="light"/>), but that alone does not make them continuous across two cells:
+    /// for ordinary occluders the shared-vertex geometry makes AO so, while a neighbour that
+    /// casts AO without occluding (leaves, tapered wood) can leave a step at a shared edge, and
+    /// light has a gradient wherever a lamp or a shadow edge is near. So a run only grows along an
+    /// axis where the key's per-corner code (AO and both lights together) is the same at both
+    /// ends of that axis — then the two cells' shared corners carry the same values, shade and
+    /// light inside every cell are affine along it, and the merged quad interpolates to exactly
+    /// the per-cell result. Uniformly lit terrain merges both ways; a strip beside a wall merges
+    /// along the wall.
     /// </summary>
-    private static void EmitGreedyRun(int f, int axis, int depth, int chunkBaseY, int key, BlockType type, Span<ushort> rows,
-        List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset)
+    private static void EmitGreedyRun(int f, int axis, int depth, int chunkBaseY, int key, ulong light, BlockType type,
+        Span<ushort> rows, List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset)
     {
         var ao = (key >> 8) & 0xFF;
-        var a0 = ao & 3;
-        var a1 = (ao >> 2) & 3;
-        var a2 = (ao >> 4) & 3;
-        var a3 = (ao >> 6) & 3;
+        // Per-corner code: AO in bits 0-1, the 12-bit smooth light code above it
+        Span<int> code = stackalloc int[4];
+        for (var j = 0; j < 4; j++)
+            code[j] = ((ao >> (2 * j)) & 3) | (int)((light >> (12 * j)) & 0xFFF) << 2;
         // Corner pairs that differ along the col axis: (c0,c1),(c3,c2) on Y faces (c0-c1 runs
         // along z there), (c0,c3),(c1,c2) on X and Z faces; the row axis takes the other pair.
         var yFace = axis == 1;
-        var alongCol = yFace ? a0 == a1 && a3 == a2 : a0 == a3 && a1 == a2;
-        var alongRow = yFace ? a0 == a3 && a1 == a2 : a0 == a1 && a3 == a2;
+        var alongCol = yFace ? code[0] == code[1] && code[3] == code[2] : code[0] == code[3] && code[1] == code[2];
+        var alongRow = yFace ? code[0] == code[3] && code[1] == code[2] : code[0] == code[1] && code[3] == code[2];
 
-        var sun = ((key >> 16) & 15) / 15f;
-        var block = ((key >> 20) & 15) / 15f;
         var submerged = ((key >> 24) & 1) != 0;
         var waterSurface = submerged
             ? Vertex.EncodeWaterSurface(DecodeSurfaceCode(chunkBaseY, (key >> 25) & 127))
@@ -1762,11 +1858,13 @@ public class Chunk : IDisposable
                 }
 
                 // Corner j of the merged quad sits where corner j of a cell quad would, scaled
-                // by the extent, so key AO corner j lands on the matching corner
+                // by the extent, so key AO and light corner j land on the matching corner
                 for (var j = 0; j < 4; j++)
                 {
                     var local = corners[j] * extent;
                     var shade = ShadeLut[(f << 2) | ((ao >> (2 * j)) & 3)];
+                    var sun = (int)((light >> (12 * j)) & 63) / SmoothLightDivisor;
+                    var block = (int)((light >> (12 * j + 6)) & 63) / SmoothLightDivisor;
                     vertices.Add(new Vertex(origin + local, shade, shade, shade, 255,
                         TiledUv(f, local, extent), layer, sun, block, normal, sway, submerged, waterSurface));
                 }
@@ -1793,11 +1891,23 @@ public class Chunk : IDisposable
         byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
         int x, int y, int z, BlockType type, Vector3 basePos)
     {
-        // Water passes light and casts no AO, so its own cell carries the light for every
-        // face and there is no per-corner shading to compute
+        // Smooth light per (X, Z) corner, averaged over the same 2x2 cells CornerHeight reads.
+        // That set is identical for every fluid cell meeting at the corner and the fill of a
+        // blocked sample is order-independent, so neighbours agree at shared corners exactly as
+        // their heights do and a shoreline shows no light step along a cell edge. (Full cube
+        // faces use SmoothCornerLight's asymmetric front-substitution rule instead.) Side and
+        // bottom vertices sit on integer X/Z, so they take the corner values unchanged.
         var lightBase = LightIdx(x, y, z);
-        var sun = sunLight[lightBase] / 15f;
-        var block = blockLight[lightBase] / 15f;
+        var l00 = FluidCornerLight(padded, pIdx, sunLight, blockLight, lightBase, 0, 0);
+        var l01 = FluidCornerLight(padded, pIdx, sunLight, blockLight, lightBase, 0, 1);
+        var l10 = FluidCornerLight(padded, pIdx, sunLight, blockLight, lightBase, 1, 0);
+        var l11 = FluidCornerLight(padded, pIdx, sunLight, blockLight, lightBase, 1, 1);
+        var topCorners = CubeFaces[4].face;
+        var light = FaceLight.FromCorners(4,
+            FluidCornerPick(topCorners[0], l00, l01, l10, l11),
+            FluidCornerPick(topCorners[1], l00, l01, l10, l11),
+            FluidCornerPick(topCorners[2], l00, l01, l10, l11),
+            FluidCornerPick(topCorners[3], l00, l01, l10, l11));
 
         // Corner heights indexed by the corner's own (X, Z) inside the cell: cornerX * 2 + cornerZ
         Span<float> corners = stackalloc float[4];
@@ -1844,8 +1954,46 @@ public class Chunk : IDisposable
             // ponytail: alpha 254 flags water for the shader (glass stays 255); fColor.a is unused otherwise.
             EmitQuad(vertices, indices, ref indexOffset, basePos, a, b, c, d, normal,
                 CropUv(face, a), CropUv(face, b), CropUv(face, c), CropUv(face, d), tile,
-                ShadeLut[(face << 2) | 3], sun, block, 254);
+                ShadeLut[(face << 2) | 3], light, 254);
         }
+    }
+
+    private static int FluidCornerPick(Vector3 corner, int l00, int l01, int l10, int l11) =>
+        corner.X == 0f ? (corner.Z == 0f ? l00 : l01) : (corner.Z == 0f ? l10 : l11);
+
+    /// <summary>
+    /// Smooth light code (<c>sunSum | blockSum &lt;&lt; 6</c>) of one top corner of a fluid cell,
+    /// summed over the own, dx, dz and diagonal cells at the fluid's height (the cells
+    /// <see cref="CornerHeight"/> reads). A cell that does not pass light stores 0, so it is
+    /// replaced by the brightest open sample, per channel; the own fluid cell always passes. The
+    /// rule never asks which of the four cells is the own one, so every fluid cell sharing the
+    /// corner computes the same code.
+    /// </summary>
+    private static int FluidCornerLight(byte[] padded, int pIdx, byte[] sunLight, byte[] blockLight,
+        int lightBase, int cx, int cz)
+    {
+        var pdx = cx == 0 ? -PaddedSq : PaddedSq;
+        var ldx = cx == 0 ? -LightSq : LightSq;
+        var dz = cz == 0 ? -1 : 1;
+        var passes = BlockType.PassesLightById;
+        var o1 = passes[padded[pIdx + pdx]];
+        var o2 = passes[padded[pIdx + dz]];
+        var o3 = passes[padded[pIdx + pdx + dz]];
+
+        int s0 = sunLight[lightBase], s1 = sunLight[lightBase + ldx],
+            s2 = sunLight[lightBase + dz], s3 = sunLight[lightBase + ldx + dz];
+        int b0 = blockLight[lightBase], b1 = blockLight[lightBase + ldx],
+            b2 = blockLight[lightBase + dz], b3 = blockLight[lightBase + ldx + dz];
+
+        var sMax = s0;
+        var bMax = b0;
+        if (o1) { sMax = Math.Max(sMax, s1); bMax = Math.Max(bMax, b1); }
+        if (o2) { sMax = Math.Max(sMax, s2); bMax = Math.Max(bMax, b2); }
+        if (o3) { sMax = Math.Max(sMax, s3); bMax = Math.Max(bMax, b3); }
+
+        var sun = s0 + (o1 ? s1 : sMax) + (o2 ? s2 : sMax) + (o3 ? s3 : sMax);
+        var block = b0 + (o1 ? b1 : bMax) + (o2 ? b2 : bMax) + (o3 ? b3 : bMax);
+        return sun | block << 6;
     }
 
     /// <summary>Drops a cube corner's top vertex to the fluid surface, so side faces crop to
@@ -1941,15 +2089,15 @@ public class Chunk : IDisposable
         var c = 0.5f;
 
         Span<byte> nb = stackalloc byte[6];
-        Span<float> sunF = stackalloc float[6];
-        Span<float> blockF = stackalloc float[6];
+        Span<FaceLight> lights = stackalloc FaceLight[6];
         var lightBase = LightIdx(x, y, z);
         for (var i = 0; i < 6; i++)
         {
             nb[i] = padded[pIdx + FaceNeighborDelta[i]];
-            var lightCell = lightBase + LightFaceDelta[i];
-            sunF[i] = sunLight[lightCell] / 15f;
-            blockF[i] = blockLight[lightCell] / 15f;
+            // Smooth per corner toward an open neighbour; backed against an occluder, the
+            // neighbour's own (flat) light as before
+            lights[i] = EmitterFaceLight(i, padded, pIdx, sunLight, blockLight, lightBase,
+                lightBase + LightFaceDelta[i]);
         }
 
         // Central node: every face draws, closing the tube mouths pressed against it
@@ -1959,7 +2107,7 @@ public class Chunk : IDisposable
         {
             var tile = i == 4 ? type.Top : i == 5 ? type.Bottom : type.Side;
             EmitBoxFace(vertices, indices, ref indexOffset, basePos, nodeMin, nodeMax, i,
-                tile, ShadeLut[(i << 2) | 3], sunF[i], blockF[i]);
+                tile, ShadeLut[(i << 2) | 3], lights[i]);
         }
 
         // Up-tube continues the taper into the parent/child wood stacked above or into a
@@ -1970,11 +2118,11 @@ public class Chunk : IDisposable
         var aboveWidth = WoodHalfWidth(nb[4]);
         if (WoodShape.ConnectsVertical(type.Id, nb[4]))
         {
-            EmitTubeSides(vertices, indices, ref indexOffset, basePos, sunF, blockF,
+            EmitTubeSides(vertices, indices, ref indexOffset, basePos, lights,
                 type.Side, c - w, c + w, c + w, 1f);
             if (aboveWidth >= 0f && aboveWidth < w)
                 EmitTubeCap(vertices, indices, ref indexOffset, padded, pIdx,
-                    sunF[4], blockF[4], type.Top, basePos, c, w, top: true);
+                    lights[4], type.Top, basePos, c, w, top: true);
         }
 
         // Down-tube continues into parent/child wood or a tag block below, or feet onto a
@@ -1983,11 +2131,11 @@ public class Chunk : IDisposable
         var connectsDown = WoodShape.ConnectsVertical(type.Id, nb[5]);
         if (connectsDown || WoodShape.HasFoot(nb[5]))
         {
-            EmitTubeSides(vertices, indices, ref indexOffset, basePos, sunF, blockF,
+            EmitTubeSides(vertices, indices, ref indexOffset, basePos, lights,
                 type.Side, c - w, c + w, 0f, c - w);
             if (connectsDown && belowWidth >= 0f && belowWidth < w)
                 EmitTubeCap(vertices, indices, ref indexOffset, padded, pIdx,
-                    sunF[5], blockF[5], type.Bottom, basePos, c, w, top: false);
+                    lights[5], type.Bottom, basePos, c, w, top: false);
         }
 
         // Horizontal arms weld this segment to its parent/child wood neighbours and to tag
@@ -1995,7 +2143,7 @@ public class Chunk : IDisposable
         for (var i = 0; i < 4; i++)
         {
             if (!WoodShape.ConnectsHorizontal(type.Id, nb[i])) continue;
-            EmitArm(vertices, indices, ref indexOffset, sunF, blockF, type, basePos, c, w, i, nb[i]);
+            EmitArm(vertices, indices, ref indexOffset, lights, type, basePos, c, w, i, nb[i]);
         }
     }
 
@@ -2019,19 +2167,14 @@ public class Chunk : IDisposable
         var obsidianType = BlockType.ById[PebbleGenerator.ObsidianBlock];
         var variant = PebbleGenerator.VariantAt(worldX, worldZ);
 
-        Span<float> sunF = stackalloc float[6];
-        Span<float> blockF = stackalloc float[6];
+        Span<FaceLight> lights = stackalloc FaceLight[6];
         var lightBase = LightIdx(x, y, z);
         for (var i = 0; i < 6; i++)
         {
             // A face backed against rock or wood (a slope, a trunk) must not sample the
             // neighbour's zero light, or it renders black: light it from the pebble's own
             // cell instead, which sits open to the sky above the ground it rests on.
-            var lightCell = BlockType.Occludes(padded[pIdx + FaceNeighborDelta[i]])
-                ? lightBase
-                : lightBase + LightFaceDelta[i];
-            sunF[i] = sunLight[lightCell] / 15f;
-            blockF[i] = blockLight[lightCell] / 15f;
+            lights[i] = EmitterFaceLight(i, padded, pIdx, sunLight, blockLight, lightBase, lightBase);
         }
 
         for (var b = 0; b < count; b++)
@@ -2058,7 +2201,7 @@ public class Chunk : IDisposable
                     SpinY(p2, cx, cz, cos, sin), SpinY(p3, cx, cz, cos, sin),
                     SpinY(normal, 0f, 0f, cos, sin),
                     CropUv(face, p0), CropUv(face, p1), CropUv(face, p2), CropUv(face, p3), tile,
-                    ShadeLut[(face << 2) | 3], sunF[face], blockF[face]);
+                    ShadeLut[(face << 2) | 3], lights[face]);
             }
         }
     }
@@ -2081,17 +2224,10 @@ public class Chunk : IDisposable
         var count = BranchPileGenerator.CountWithState(paddedState[pIdx], maxCount);
         var variant = BranchPileGenerator.VariantAt(worldX, worldZ);
 
-        Span<float> sunF = stackalloc float[6];
-        Span<float> blockF = stackalloc float[6];
+        Span<FaceLight> lights = stackalloc FaceLight[6];
         var lightBase = LightIdx(x, y, z);
         for (var i = 0; i < 6; i++)
-        {
-            var lightCell = BlockType.Occludes(padded[pIdx + FaceNeighborDelta[i]])
-                ? lightBase
-                : lightBase + LightFaceDelta[i];
-            sunF[i] = sunLight[lightCell] / 15f;
-            blockF[i] = blockLight[lightCell] / 15f;
-        }
+            lights[i] = EmitterFaceLight(i, padded, pIdx, sunLight, blockLight, lightBase, lightBase);
 
         for (var b = 0; b < count; b++)
         {
@@ -2115,7 +2251,7 @@ public class Chunk : IDisposable
                     SpinY(p2, cx, cz, cos, sin), SpinY(p3, cx, cz, cos, sin),
                     SpinY(normal, 0f, 0f, cos, sin),
                     CropUv(face, p0), CropUv(face, p1), CropUv(face, p2), CropUv(face, p3), tile,
-                    ShadeLut[(face << 2) | 3], sunF[face], blockF[face]);
+                    ShadeLut[(face << 2) | 3], lights[face]);
             }
         }
     }
@@ -2136,17 +2272,10 @@ public class Chunk : IDisposable
         var count = SnowShape.CountWithState(worldX, worldZ, paddedState[pIdx], maxCount);
         var height = SnowShape.Height(count, maxCount);
 
-        Span<float> sunF = stackalloc float[6];
-        Span<float> blockF = stackalloc float[6];
+        Span<FaceLight> lights = stackalloc FaceLight[6];
         var lightBase = LightIdx(x, y, z);
         for (var i = 0; i < 6; i++)
-        {
-            var lightCell = BlockType.Occludes(padded[pIdx + FaceNeighborDelta[i]])
-                ? lightBase
-                : lightBase + LightFaceDelta[i];
-            sunF[i] = sunLight[lightCell] / 15f;
-            blockF[i] = blockLight[lightCell] / 15f;
-        }
+            lights[i] = EmitterFaceLight(i, padded, pIdx, sunLight, blockLight, lightBase, lightBase);
 
         var drawBottom = count >= maxCount && !BlockType.Occludes(padded[pIdx + FaceNeighborDelta[5]]);
         var min = new Vector3(0f, 0f, 0f);
@@ -2159,7 +2288,7 @@ public class Chunk : IDisposable
             EmitQuad(vertices, indices, ref indexOffset, basePos, p0, p1, p2, p3,
                 CubeFaces[face].normal,
                 CropUv(face, p0), CropUv(face, p1), CropUv(face, p2), CropUv(face, p3), tile,
-                ShadeLut[(face << 2) | 3], sunF[face], blockF[face]);
+                ShadeLut[(face << 2) | 3], lights[face]);
         }
     }
 
@@ -2174,20 +2303,20 @@ public class Chunk : IDisposable
     /// <summary>The four vertical walls of a tapered tube with a square [lo, hi] cross-section
     /// running from <paramref name="y0"/> to <paramref name="y1"/> (cell-local).</summary>
     private static void EmitTubeSides(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        Vector3 basePos, Span<float> sunF, Span<float> blockF, ushort tile,
+        Vector3 basePos, Span<FaceLight> lights, ushort tile,
         float lo, float hi, float y0, float y1)
     {
         var min = new Vector3(lo, y0, lo);
         var max = new Vector3(hi, y1, hi);
         for (var i = 0; i < 4; i++)
             EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, i,
-                tile, ShadeLut[(i << 2) | 3], sunF[i], blockF[i]);
+                tile, ShadeLut[(i << 2) | 3], lights[i]);
     }
 
     /// <summary>Mouth cap of a vertical tube where it meets air or narrower wood; wider wood
     /// and full cubes already cover the joint, so capping there would z-fight them.</summary>
     private static void EmitTubeCap(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        byte[] padded, int pIdx, float sun, float block, ushort tile,
+        byte[] padded, int pIdx, in FaceLight light, ushort tile,
         Vector3 basePos, float c, float w, bool top)
     {
         var i = top ? 4 : 5;
@@ -2209,6 +2338,7 @@ public class Chunk : IDisposable
                 top ? 1f : 0f,
                 corner.Z == 0 ? c - w : c + w);
             var pos = basePos + local;
+            light.Sample(local, out var sun, out var block);
             vertices.Add(new Vertex(pos, shade, shade, shade, 255,
                 CropUv(i, local), tile, sun, block, CubeFaces[i].normal));
         }
@@ -2229,7 +2359,7 @@ public class Chunk : IDisposable
     /// equal or wider wood, tag blocks and full cubes already close the joint.
     /// </summary>
     private static void EmitArm(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        Span<float> sunF, Span<float> blockF, BlockType type,
+        Span<FaceLight> lights, BlockType type,
         Vector3 basePos, float c, float w, int dir, byte neighbourId)
     {
         var n = CubeFaces[dir].normal;
@@ -2247,46 +2377,51 @@ public class Chunk : IDisposable
 
         // Top, bottom and the two flanks always draw; the mouth cap only into narrower wood
         EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, 4,
-            type.Side, ShadeLut[(4 << 2) | 3], sunF[4], blockF[4]);
+            type.Side, ShadeLut[(4 << 2) | 3], lights[4]);
         EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, 5,
-            type.Side, ShadeLut[(5 << 2) | 3], sunF[5], blockF[5]);
+            type.Side, ShadeLut[(5 << 2) | 3], lights[5]);
 
         var flankA = dir is 0 or 1 ? 2 : 0;
         var flankB = dir is 0 or 1 ? 3 : 1;
         EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, flankA,
-            type.Side, ShadeLut[(flankA << 2) | 3], sunF[flankA], blockF[flankA]);
+            type.Side, ShadeLut[(flankA << 2) | 3], lights[flankA]);
         EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, flankB,
-            type.Side, ShadeLut[(flankB << 2) | 3], sunF[flankB], blockF[flankB]);
+            type.Side, ShadeLut[(flankB << 2) | 3], lights[flankB]);
 
         if (WoodShape.ConnectsHorizontal(type.Id, neighbourId)
             && WoodShape.IsWood(neighbourId) && WoodHalfWidth(neighbourId) < w)
             EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, dir,
-                type.Top, ShadeLut[(dir << 2) | 3], sunF[dir], blockF[dir]);
+                type.Top, ShadeLut[(dir << 2) | 3], lights[dir]);
     }
 
     /// <summary>One axis-aligned face of the [min, max] box (cell-local), with flat shading
     /// and cropped UVs (see <see cref="CropUv"/>).</summary>
     private static void EmitBoxFace(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         Vector3 basePos, Vector3 min, Vector3 max, int face,
-        ushort tile, byte shade, float sun, float block)
+        ushort tile, byte shade, in FaceLight light)
     {
         BoxFaceCorners(min, max, face, out var a, out var b, out var c, out var d);
         EmitQuad(vertices, indices, ref indexOffset, basePos, a, b, c, d, CubeFaces[face].normal,
             CropUv(face, a), CropUv(face, b), CropUv(face, c), CropUv(face, d), tile,
-            shade, sun, block);
+            shade, light);
     }
 
     /// <summary>One arbitrary quad: four cell-local corners, one normal, one tile-local UV per
-    /// corner, all on atlas slice <paramref name="tile"/>.</summary>
+    /// corner, all on atlas slice <paramref name="tile"/>; each corner's light is sampled from
+    /// <paramref name="light"/> at its cell-local position.</summary>
     private static void EmitQuad(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         Vector3 basePos, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 normal,
         Vector2 uva, Vector2 uvb, Vector2 uvc, Vector2 uvd, ushort tile,
-        byte shade, float sun, float block, byte alpha = 255)
+        byte shade, in FaceLight light, byte alpha = 255)
     {
-        vertices.Add(new Vertex(basePos + a, shade, shade, shade, alpha, uva, tile, sun, block, normal));
-        vertices.Add(new Vertex(basePos + b, shade, shade, shade, alpha, uvb, tile, sun, block, normal));
-        vertices.Add(new Vertex(basePos + c, shade, shade, shade, alpha, uvc, tile, sun, block, normal));
-        vertices.Add(new Vertex(basePos + d, shade, shade, shade, alpha, uvd, tile, sun, block, normal));
+        light.Sample(a, out var sa, out var ba);
+        light.Sample(b, out var sb, out var bb);
+        light.Sample(c, out var sc, out var bc);
+        light.Sample(d, out var sd, out var bd);
+        vertices.Add(new Vertex(basePos + a, shade, shade, shade, alpha, uva, tile, sa, ba, normal));
+        vertices.Add(new Vertex(basePos + b, shade, shade, shade, alpha, uvb, tile, sb, bb, normal));
+        vertices.Add(new Vertex(basePos + c, shade, shade, shade, alpha, uvc, tile, sc, bc, normal));
+        vertices.Add(new Vertex(basePos + d, shade, shade, shade, alpha, uvd, tile, sd, bd, normal));
 
         indices.Add((ushort)(indexOffset + 0));
         indices.Add((ushort)(indexOffset + 1));

@@ -4,7 +4,7 @@ namespace silkgltriangle;
 
 /// <summary>
 /// Per-thread scratch buffers for the binary greedy pass of <c>Chunk.GenerateMeshData</c>
-/// (~20 KB), so a mesh build allocates nothing beyond its output lists. One instance per
+/// (~22 KB), so a mesh build allocates nothing beyond its output lists. One instance per
 /// thread: the build never awaits, so the pool threads, an immediate remesh on the main thread
 /// and a toppling tree's scratch chunk each own theirs and never see another's writes.
 /// </summary>
@@ -29,11 +29,17 @@ internal sealed class MeshScratch
 
     /// <summary>Open-addressed key table for one depth slice: slot holds plane index + 1, 0 is
     /// empty. A slice has at most 16 x 16 faces, so at most 256 distinct keys.</summary>
-    internal const int PlaneTableSize = 512;
+    internal const int PlaneTableBits = 9;
+    internal const int PlaneTableSize = 1 << PlaneTableBits;
     internal readonly int[] PlaneTable = new int[PlaneTableSize];
 
     /// <summary>Key of each open plane in the current slice.</summary>
     internal readonly int[] PlaneKeys = new int[Chunk.Size * Chunk.Size];
+
+    /// <summary>Parallel 48-bit light key of each open plane: the four 12-bit smooth corner
+    /// light codes (<c>Chunk.SmoothCornerLight</c>), corner j at bit 12j. A plane matches a face
+    /// only when both this and <see cref="PlaneKeys"/> are equal.</summary>
+    internal readonly ulong[] PlaneLightKeys = new ulong[Chunk.Size * Chunk.Size];
 
     /// <summary>Bit planes of the current slice, 16 rows each: <c>PlaneRows[plane * 16 + row]</c>
     /// bit <c>col</c>.</summary>
