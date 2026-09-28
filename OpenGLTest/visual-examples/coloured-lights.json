@@ -1,0 +1,48 @@
+{
+  // Coloured block light check: run with VOXEL_TIME=700 (night) and
+  // VOXEL_SCRIPT=visual-examples/coloured-lights.json. Shots land in visual/coloured-lights/.
+  //
+  // Same start as night-lights.json (the open dunes at (-62, 118)): lays a warm lamp, a
+  // blue_lamp and another warm lamp along a row close enough that the pools overlap, then
+  // flies up behind them. `pools` should show a blue pool between two warm ones, meeting at
+  // soft borders with no block-sized seams (a red and a blue pool meet rather than add up to
+  // purple - each cell carries its dominant colour). `hand` is taken first, on foot beside the
+  // blue lamp with a copper pickaxe and the HUD on (on the ground, where the arm shows): the
+  // arm and the pickaxe should read blue-tinted (EntityLight's tint slot).
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-62.5, 60.5, 118.5], "yaw": -90, "pitch": -40 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "fly", "on": false },
+    { "op": "wait", "seconds": 6 },
+
+    { "op": "give", "block": "lamp", "count": 2 },
+    { "op": "place" },
+    { "op": "walk", "keys": ["D", "Space"], "seconds": 0.7 },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "give", "block": "blue_lamp", "count": 1 },
+    { "op": "place" },
+    { "op": "walk", "keys": ["D", "Space"], "seconds": 0.7 },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "give", "block": "lamp", "count": 1 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.6 },
+
+    { "op": "walk", "keys": ["A", "Space"], "seconds": 0.6 },
+    { "op": "give", "block": "item/copper_pickaxe", "count": 1 },
+    { "op": "look", "yaw": -90, "pitch": -25 },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "screenshot", "name": "hand" },
+
+    { "op": "give", "block": "dirt", "count": 1 },
+    { "op": "walk", "keys": ["D"], "seconds": 0.6 },
+
+    { "op": "fly", "on": true },
+    { "op": "walk", "keys": ["Space"], "seconds": 2.0 },
+    { "op": "walk", "keys": ["S"], "seconds": 2.0 },
+    { "op": "walk", "keys": ["A"], "seconds": 0.6 },
+    { "op": "look", "yaw": -90, "pitch": -45 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "pools", "hideHud": true }
+  ]
+}

@@ -45,7 +45,7 @@ public class Mesh : IDisposable
     internal static unsafe void ConfigureVertexAttribs(GL gl)
     {
         // Offsets follow the Vertex field order: position 0, colour 12, uv 16, sun 24,
-        // block 25, normal 26, sway 27, layer 28,
+        // block 25, normal bits + tint 26-27 (one ushort), layer 28,
         // water surface 30 (see Vertex for the semantics)
         gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, Vertex.Size, (void*)0);
         gl.EnableVertexAttribArray(0);
@@ -62,11 +62,10 @@ public class Mesh : IDisposable
         gl.VertexAttribPointer(4, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)25);
         gl.EnableVertexAttribArray(4);
 
-        gl.VertexAttribPointer(5, 1, VertexAttribPointerType.UnsignedByte, false, Vertex.Size, (void*)26);
+        // Vertex.Normal and Vertex.LightTint read together as one integer ushort: face 0-2,
+        // submerged 3, wet 4, sway 5, block-light tint code 6-15
+        gl.VertexAttribIPointer(5, 1, VertexAttribIType.UnsignedShort, Vertex.Size, (void*)26);
         gl.EnableVertexAttribArray(5);
-
-        gl.VertexAttribPointer(6, 1, VertexAttribPointerType.UnsignedByte, true, Vertex.Size, (void*)27);
-        gl.EnableVertexAttribArray(6);
 
         // The array-texture layer is an integer attribute: no float conversion, read as uint
         gl.VertexAttribIPointer(7, 1, VertexAttribIType.UnsignedShort, Vertex.Size, (void*)28);

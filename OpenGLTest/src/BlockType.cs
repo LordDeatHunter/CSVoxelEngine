@@ -30,6 +30,10 @@ public sealed record BlockType
     /// <summary>Light emitted by each block id (0-15), indexed like <see cref="ById"/>.</summary>
     public static readonly byte[] Emission = new byte[256];
 
+    /// <summary>Block-light palette slot of each block id's emitted colour (0 = the default
+    /// warm colour), indexed like <see cref="ById"/>; see <see cref="BlockLightPalette"/>.</summary>
+    public static readonly byte[] LightSlot = new byte[256];
+
     /// <summary>Whether voxel light travels through each block id; see Chunk's light passes.</summary>
     public static readonly bool[] PassesLightById = new bool[256];
 
@@ -187,6 +191,9 @@ public sealed record BlockType
 
     /// <summary>Light this block emits, 0-15.</summary>
     public byte LightEmission { get; init; }
+
+    /// <summary><see cref="BlockLightPalette"/> slot of the emitted light's colour; 0 is the default.</summary>
+    public byte LightColorSlot { get; init; }
 
     /// <summary>Whether voxel light travels through it; defaults to "not a full cube".</summary>
     public bool PassesLight { get; internal set; }

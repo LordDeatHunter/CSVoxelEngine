@@ -55,7 +55,8 @@ uniform float uSunIntensity;
 uniform vec3 uAmbient;
 // Ambient a downward face sees (RenderManager.GroundAmbientOf(uAmbient))
 uniform vec3 uGroundAmbient;
-uniform vec3 uTorchColor;
+// The block-light colour arrives per vertex (test-vertex.glsl, decoded from the palette)
+in vec3 fBlockTint;
 uniform float uTorchIntensity;
 uniform vec3 uFogColor;
 uniform float uFogNear;
@@ -485,7 +486,7 @@ void main() {
     float flick = fBlock > 0.0 ? BlockFlicker(fWorldPos) : 1.0;
     // The block-light ramp was tuned as a display-space gradient; raising it to ~2.2 in linear
     // light reproduces that falloff instead of letting every lamp pool spread twice as far.
-    vec3 torch = uTorchColor * pow(fBlock * uTorchIntensity * flick, 2.2);
+    vec3 torch = fBlockTint * pow(fBlock * uTorchIntensity * flick, 2.2);
     vec3 pl = vec3(0.0);
     for (int i = 0; i < 8; i++) {
         if (i >= uNumPointLights) break;

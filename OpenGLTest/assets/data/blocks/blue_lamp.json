@@ -1,0 +1,5 @@
+{
+  "name": "Blue Lamp",
+  "model": { "parent": "block/cube_all", "textures": { "all": "lantern_lit" } },
+  "light": { "emission": 15, "color": [110, 170, 255] }
+}

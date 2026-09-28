@@ -41,6 +41,11 @@ internal sealed class MeshScratch
     /// only when both this and <see cref="PlaneKeys"/> are equal.</summary>
     internal readonly ulong[] PlaneLightKeys = new ulong[Chunk.Size * Chunk.Size];
 
+    /// <summary>Colour key of each plane, parallel to <see cref="PlaneLightKeys"/>: the four
+    /// 10-bit <c>LightTint</c> corner codes, corner j at bit 10j. A plane matches a face only
+    /// when this matches too.</summary>
+    internal readonly ulong[] PlaneTintKeys = new ulong[Chunk.Size * Chunk.Size];
+
     /// <summary>Bit planes of the current slice, 16 rows each: <c>PlaneRows[plane * 16 + row]</c>
     /// bit <c>col</c>.</summary>
     internal readonly ushort[] PlaneRows = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];

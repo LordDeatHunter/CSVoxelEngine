@@ -243,8 +243,9 @@ public class RenderManager : IDisposable
     private Vector3 _sunColor = Vector3.One;
     private float _sunIntensity = 1f;
     private Vector3 _ambient = new(0.42f, 0.45f, 0.52f);
-    // The voxel block-light colour, authored in sRGB (1, 0.62, 0.25) and uploaded linear
-    private static readonly Vector3 TorchColorLinear = ColorSpace.SrgbToLinear(new Vector3(1f, 0.62f, 0.25f));
+    // The voxel block-light colours by palette slot, already linear: copied once from
+    // BlockLightPalette in LoadResources, after ContentRegistry.Load has settled it
+    private Vector3[] _blockLightPalette = [];
     private const float TorchIntensity = 1.2f;
     // Linear-light curve on the direct sun (SH-10): intensity = gain * (old ramp)^exponent. The
     // sun term was tuned in display space, where a sunlit top came out at ~1.6x albedo; linear
@@ -395,11 +396,13 @@ public class RenderManager : IDisposable
     private int _locAlpha;
     private int _locEntitySun;
     private int _locEntityBlock;
+    private int _locEntityTint;
     private int _locFlash;
     private int _locHitFlash;
     private int _locAlphaCutoff;
     private int[] _locPointPos = [];
     private int[] _locPointColor = [];
+    private int[] _locBlockLightPalette = [];
 
     // The same, on the CHUNK_DRAW variants. uModel/uMVP/uAlpha do not exist there (the vertex
     // stage takes them from the SSBO), so only the view-projection, the SSBO base index and the
@@ -416,6 +419,7 @@ public class RenderManager : IDisposable
     private int _locChunkShadowOpaque;
     private int[] _locChunkPointPos = [];
     private int[] _locChunkPointColor = [];
+    private int[] _locChunkBlockLightPalette = [];
 
     public RenderManager(IWindow window)
     {
@@ -585,17 +589,21 @@ public class RenderManager : IDisposable
         _locAlpha = worldShader.GetUniformLocation("uAlpha");
         _locEntitySun = worldShader.GetUniformLocation("uEntitySun");
         _locEntityBlock = worldShader.GetUniformLocation("uEntityBlock");
+        _locEntityTint = worldShader.GetUniformLocation("uEntityTint");
         _locFlash = worldShader.GetUniformLocation("uFlash");
         _locHitFlash = worldShader.GetUniformLocation("uHitFlash");
         _locAlphaCutoff = worldShader.GetUniformLocation("uAlphaCutoff");
         _locPointPos = worldShader.GetUniformArrayLocations("uPointPos", WorldGenerationConfig.MaxPointLights);
         _locPointColor = worldShader.GetUniformArrayLocations("uPointColor", WorldGenerationConfig.MaxPointLights);
+        _locBlockLightPalette = worldShader.GetUniformArrayLocations("uBlockLightPalette", BlockLightPalette.MaxSlots);
+        _blockLightPalette = BlockLightPalette.Linear.ToArray();
 
         _locChunkViewProj = chunkShader.GetUniformLocation("uViewProj");
         _locChunkDrawBase = chunkShader.GetUniformLocation("uDrawBase");
         _locChunkAlphaCutoff = chunkShader.GetUniformLocation("uAlphaCutoff");
         _locChunkPointPos = chunkShader.GetUniformArrayLocations("uPointPos", WorldGenerationConfig.MaxPointLights);
         _locChunkPointColor = chunkShader.GetUniformArrayLocations("uPointColor", WorldGenerationConfig.MaxPointLights);
+        _locChunkBlockLightPalette = chunkShader.GetUniformArrayLocations("uBlockLightPalette", BlockLightPalette.MaxSlots);
 
         selectionShader = new Shader(gl, selectionVs, selectionFs);
         breakShader = new Shader(gl, breakVs, breakFs);
@@ -2150,16 +2158,16 @@ public class RenderManager : IDisposable
     private void ApplyFrameUniforms()
     {
         chunkShader.Use();
-        ApplyFrameUniformsTo(chunkShader, _locChunkPointPos, _locChunkPointColor);
+        ApplyFrameUniformsTo(chunkShader, _locChunkPointPos, _locChunkPointColor, _locChunkBlockLightPalette);
         worldShader.Use();
-        ApplyFrameUniformsTo(worldShader, _locPointPos, _locPointColor);
+        ApplyFrameUniformsTo(worldShader, _locPointPos, _locPointColor, _locBlockLightPalette);
         worldShader.SetUniform(_locFlash, 0f);
         worldShader.SetUniform(_locHitFlash, 0f);
     }
 
     /// <summary>The body of <see cref="ApplyFrameUniforms"/>, run once per world program.
     /// <paramref name="program"/> must already be bound.</summary>
-    private void ApplyFrameUniformsTo(Shader program, int[] locPointPos, int[] locPointColor)
+    private void ApplyFrameUniformsTo(Shader program, int[] locPointPos, int[] locPointColor, int[] locBlockLightPalette)
     {
         program.SetUniform("uTime", _time);
         program.SetUniform("uSunDir", _sunDir);
@@ -2168,7 +2176,7 @@ public class RenderManager : IDisposable
         program.SetUniform("uAmbient", _ambient);
         // Derived here, not in SetLighting, which returns early on every dry frame
         program.SetUniform("uGroundAmbient", GroundAmbientOf(_ambient));
-        program.SetUniform("uTorchColor", TorchColorLinear);
+        program.SetUniformArray3(locBlockLightPalette, _blockLightPalette);
         program.SetUniform("uTorchIntensity", TorchIntensity);
         program.SetUniform("uFogColor", _fogColor);
         program.SetUniform("uFogNear", _fogNear);
@@ -2235,7 +2243,7 @@ public class RenderManager : IDisposable
     /// Entity draws only: chunks and LOD regions both go through <see cref="ChunkDrawBatch"/>,
     /// where a uniform could not vary between the sub-draws of one multi-draw anyway.
     /// <paramref name="light"/> is the world light the draw is lit by (the plain variant ignores
-    /// the vertices' baked sun/block). This is the only writer of <c>uEntitySun</c>/<c>uEntityBlock</c>,
+    /// the vertices' baked sun/block/tint). This is the only writer of <c>uEntitySun</c>/<c>uEntityBlock</c>/<c>uEntityTint</c>,
     /// so every plain-worldShader draw must go through it or it inherits the previous draw's light.
     /// </summary>
     private void SetDrawUniforms(in Matrix4x4 model, in Matrix4x4 mvp, float alpha, in EntityLightSample light)
@@ -2245,6 +2253,7 @@ public class RenderManager : IDisposable
         worldShader.SetUniform(_locAlpha, alpha);
         worldShader.SetUniform(_locEntitySun, light.Sun);
         worldShader.SetUniform(_locEntityBlock, light.Block);
+        worldShader.SetUniform(_locEntityTint, (int)light.Tint);
     }
 
     /// <summary>The world light at <paramref name="world"/>, read from <see cref="LightSource"/>.</summary>

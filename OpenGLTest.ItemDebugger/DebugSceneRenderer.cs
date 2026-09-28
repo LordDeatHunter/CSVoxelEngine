@@ -19,7 +19,6 @@ public sealed class DebugSceneRenderer : IDisposable
     private static readonly Vector3 SunColor = new(1f, 0.96f, 0.88f);
     private static readonly Vector3 Ambient = new(0.42f, 0.45f, 0.52f);
     private static readonly Vector3 FogColor = new(0.3f, 0.6f, 0.9f);
-    private static readonly Vector3 TorchColor = new(1f, 0.62f, 0.25f);
     private static readonly Vector3[] NoPoints = new Vector3[8];
 
     private readonly GL _gl;
@@ -78,6 +77,7 @@ public sealed class DebugSceneRenderer : IDisposable
         // i.e. night ambient.
         _world.SetUniform("uEntitySun", 1f);
         _world.SetUniform("uEntityBlock", 0f);
+        _world.SetUniform("uEntityTint", 0);
 
         _locModel = _world.GetUniformLocation("uModel");
         _locMvp = _world.GetUniformLocation("uMVP");
@@ -184,7 +184,8 @@ public sealed class DebugSceneRenderer : IDisposable
         _world.SetUniform("uSunIntensity", 1.2f);
         _world.SetUniform("uAmbient", Ambient);
         _world.SetUniform("uGroundAmbient", RenderManager.GroundAmbientOf(Ambient));
-        _world.SetUniform("uTorchColor", TorchColor);
+        _world.SetUniformArray3(_world.GetUniformArrayLocations("uBlockLightPalette", BlockLightPalette.MaxSlots),
+            BlockLightPalette.Linear);
         _world.SetUniform("uTorchIntensity", 1.2f);
         _world.SetUniform("uFogColor", FogColor);
         _world.SetUniform("uFogNear", 200f);

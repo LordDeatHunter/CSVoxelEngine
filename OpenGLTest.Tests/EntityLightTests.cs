@@ -21,8 +21,9 @@ public class EntityLightTests
     {
         TestContent.EnsureLoaded();
         _stone = ContentRegistry.RequireBlock("stone").Id;
-        _emitter = (byte)Enumerable.Range(1, 254)
-            .First(i => BlockType.Emission[i] > 0 && BlockType.IsSolid((byte)i) && BlockType.Occludes((byte)i));
+        // Pinned to the default-coloured lamp, so its light carries the default tint slot
+        _emitter = ContentRegistry.RequireBlock("lamp").Id;
+        Assert.True(BlockType.Emission[_emitter] > 0 && BlockType.IsSolid(_emitter) && BlockType.Occludes(_emitter));
     }
 
     /// <summary>A stone floor across the centre chunk, high above the terrain.</summary>
@@ -140,5 +141,46 @@ public class EntityLightTests
         var after = EntityLight.Sample(manager, cell);
 
         Assert.True(after.Block > before.Block);
+    }
+
+    [Fact]
+    public void AnEntityBesideAColouredLampSamplesItsSlot()
+    {
+        var blue = ContentRegistry.RequireBlock("blue_lamp").Id;
+        Assert.NotEqual(0, BlockType.LightSlot[blue]);
+
+        foreach (var lamp in new[] { blue, _emitter })
+        {
+            var (manager, center) = Floor();
+            center.SetBlockRaw(8, FloorY + 1, 8, lamp, 0);
+            Remesh(manager, center);
+
+            var beside = EntityLight.Sample(manager, WorldCentre(center, 7, FloorY + 1, 8));
+            Assert.True(beside.Block > 0f);
+            Assert.Equal(BlockType.LightSlot[lamp], beside.Tint);
+        }
+    }
+
+    [Fact]
+    public void OpaqueCellTakesTheSlotOfItsBrightestNeighbour()
+    {
+        var blue = ContentRegistry.RequireBlock("blue_lamp").Id;
+        var (manager, center) = Floor();
+        // A stone cell with the default lamp farther off on its west and the blue lamp nearer on its east
+        var (x, y, z) = (8, FloorY + 1, 8);
+        center.SetBlockRaw(x, y, z, _stone, 0);
+        center.SetBlockRaw(4, y, z, _emitter, 0);
+        center.SetBlockRaw(10, y, z, blue, 0);
+        Remesh(manager, center);
+
+        var west = EntityLight.Sample(manager, WorldCentre(center, x - 1, y, z));
+        var east = EntityLight.Sample(manager, WorldCentre(center, x + 1, y, z));
+        Assert.Equal(BlockType.LightSlot[_emitter], west.Tint);
+        Assert.Equal(BlockType.LightSlot[blue], east.Tint);
+        Assert.True(west.Block > 0f && east.Block > west.Block);
+
+        var inside = EntityLight.Sample(manager, WorldCentre(center, x, y, z));
+        Assert.Equal(east.Block, inside.Block);
+        Assert.Equal(BlockType.LightSlot[blue], inside.Tint);
     }
 }

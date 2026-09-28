@@ -13,7 +13,9 @@ public static class EntityLight
     /// Light at the cell holding <paramref name="world"/>. A cell that passes light answers with
     /// its own levels. An entity's anchor may sit inside a solid cell, though (a pop's own block,
     /// a part clipped into a wall), whose flood level is 0, so an opaque cell instead takes the
-    /// per-channel maximum over its six face neighbours that are loaded and pass light. Anything
+    /// per-channel maximum over its six face neighbours that are loaded and pass light, and the
+    /// colour slot of the neighbour with the most block light (the lowest slot on a tie, so the
+    /// answer does not depend on the order the neighbours are visited in). Anything
     /// unknown (no manager, unloaded chunk, no published snapshot) reads as
     /// <see cref="EntityLightSample.Default"/>, the light every entity drew with before.
     /// </summary>
@@ -30,6 +32,7 @@ public static class EntityLight
 
         var found = false;
         float sun = 0f, block = 0f;
+        byte slot = 0;
         foreach (var (dx, dy, dz) in Vector3Directions.CardinalOffsets)
         {
             int nx = x + dx, ny = y + dy, nz = z + dz;
@@ -45,16 +48,18 @@ public static class EntityLight
 
             var s = Read(owner, nx, ny, nz);
             sun = MathF.Max(sun, s.Sun);
+            if (s.Block > block || (s.Block == block && s.Tint < slot))
+                slot = s.Tint;
             block = MathF.Max(block, s.Block);
             found = true;
         }
 
-        return found ? new EntityLightSample(sun, block) : EntityLightSample.Default;
+        return found ? new EntityLightSample(sun, block, slot) : EntityLightSample.Default;
     }
 
     private static EntityLightSample Read(Chunk chunk, int x, int y, int z) =>
         chunk.TryGetLocalLight(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask,
-            out var sun, out var block)
-            ? new EntityLightSample(sun / 15f, block / 15f)
+            out var sun, out var block, out var slot)
+            ? new EntityLightSample(sun / 15f, block / 15f, slot)
             : EntityLightSample.Default;
 }

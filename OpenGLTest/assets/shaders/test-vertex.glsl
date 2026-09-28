@@ -4,8 +4,9 @@ layout (location = 1) in vec4 vColor;
 layout (location = 2) in vec2 vTexCoord;
 layout (location = 3) in float vSun;
 layout (location = 4) in float vBlock;
-layout (location = 5) in float vNormalIdx;
-layout (location = 6) in float vSway;
+// Vertex.Normal (low byte) + Vertex.LightTint (high byte) as one integer ushort: face in
+// bits 0-2, submerged 3, wet band 4, leaf sway 5, the 10-bit block-light tint code in 6-15.
+layout (location = 5) in uint vNormalBits;
 layout (location = 7) in uint vLayer; // array-texture slice (Vertex.Layer)
 layout (location = 8) in uint vWaterSurface; // Vertex.WaterSurface
 
@@ -25,6 +26,8 @@ uniform float uAlpha;
 // the vertices: RenderManager.SetDrawUniforms sets it per draw from EntityLight.Sample.
 uniform float uEntitySun;
 uniform float uEntityBlock;
+// Palette slot of the block light at the entity's cell (EntityLightSample.Tint).
+uniform int uEntityTint;
 #define TO_WORLD(p) ((uModel * vec4((p), 1.0)).xyz)
 #endif
 uniform float uTime;
@@ -34,12 +37,17 @@ uniform vec2 uWindOffset; // Wind.Offset(time, WindGustSpeed): how far the gusts
 uniform vec3 uCameraPos;
 // Atlas slice of the lava tile (RenderManager.InitWorldProgram): picks lava's own swell.
 uniform float uLavaLayer;
+// Linear block-light colours by palette slot (BlockLightPalette.Linear); slot 0 is the default
+// warm torch colour.
+uniform vec3 uBlockLightPalette[8];
 
 out vec4 fColor;
 out vec2 fTexCoord;
 flat out uint fLayer;
 out float fSun;
 out float fBlock;
+// Linear colour of the block light reaching this vertex (smooth: a corner blend of two slots).
+out vec3 fBlockTint;
 out vec3 fNormal;
 // The tile's u and v directions in world space, for the reflective tiles' normal maps. Flat
 // because they are constant per face, like the normal they complete.
@@ -78,6 +86,7 @@ float LavaWaveHeight(vec2 p, float t) {
 }
 
 void main() {
+    float vSway = (vNormalBits & 32u) != 0u ? 1.0 : 0.0;
 #ifdef CHUNK_DRAW
     vec4 chunkDraw = draws[uDrawBase + gl_DrawID].originAndAlpha;
     vec3 chunkOrigin = chunkDraw.xyz;
@@ -150,17 +159,22 @@ void main() {
 #ifdef CHUNK_DRAW
     fSun = vSun;
     fBlock = vBlock;
+    // Mirrors LightTint.Decode / LightTint.WeightDivisor (30): slot A in bits 0-2, slot B in
+    // 3-5 and B's share q/30 in 6-9 of the tint code.
+    uint tc = vNormalBits >> 6u;
+    fBlockTint = mix(uBlockLightPalette[tc & 7u], uBlockLightPalette[(tc >> 3u) & 7u], float(tc >> 6u) / 30.0);
 #else
     // Per-draw light sampled from the world at the entity's anchor (see uEntitySun above).
     fSun = uEntitySun;
     fBlock = uEntityBlock;
+    fBlockTint = uBlockLightPalette[uEntityTint];
 #endif
     // uModel is a pure translation for chunks/LOD, so the normal is unchanged.
     // The mesher packs the face as a 0..5 index (Chunk.CubeFaces order) in bits 0-2 and
     // "this face looks into water" in bit 3 and "this dry face sits just above a fluid surface"
-    // (the wet band) in bit 4; a nested ternary keeps the decode branchless without relying on
-    // dynamic array indexing.
-    int nIdx = int(vNormalIdx + 0.5);
+    // (the wet band) in bit 4 (bit 5 is sway, read above); a nested ternary keeps the decode
+    // branchless without relying on dynamic array indexing.
+    int nIdx = int(vNormalBits & 63u);
     int face = nIdx & 7;
     fSubmerged = (nIdx & 8) != 0 ? 1.0 : 0.0;
     fWet = (nIdx & 16) != 0 ? 1.0 : 0.0;

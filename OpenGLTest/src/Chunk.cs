@@ -237,12 +237,14 @@ public class Chunk : IDisposable
     /// Minecraft-style smooth light of corner <paramref name="j"/> of face <paramref name="face"/>
     /// of the cell at <paramref name="lightBase"/>: sun and lamp light each summed over four
     /// samples - the air cell in front of the face and the side1, side2 and corner cells the AO
-    /// of that corner reads - returned as <c>sunSum | blockSum &lt;&lt; 6</c> (each sum 0..60,
-    /// so a vertex takes <c>sum / 60</c>, which equals <c>level / 15</c> exactly under uniform
-    /// light). A side sample that does not pass light is replaced by the front cell's value: a
+    /// of that corner reads - returned as <c>sunSum | blockSum &lt;&lt; 6 | tint &lt;&lt; 12</c>
+    /// (each sum 0..60, so a vertex takes <c>sum / 60</c>, which equals <c>level / 15</c> exactly
+    /// under uniform light; <c>tint</c> is the 10-bit <see cref="LightTint"/> code of the same four
+    /// (level, slot) samples, so the low 12 bits alone are the light). A side sample that does not pass light is replaced by the front cell's value: a
     /// blocked cell always stores 0, so counting it would darken the corner a second time on top
     /// of the AO that cell already casts. The corner sample likewise counts only if it passes
-    /// light and at least one side is open, so light never leaks in through a sealed diagonal.
+    /// light and at least one side is open, so light never leaks in through a sealed diagonal. A
+    /// substituted sample counts with the front cell's colour slot as well as its level.
     /// <paramref name="j"/> follows the <c>CubeFaces[face].face</c> corner order, the same
     /// assumption the per-corner AO makes of a quad's positions.
     /// </summary>
@@ -260,8 +262,11 @@ public class Chunk : IDisposable
         var i2 = open2 ? lightBase + d[j * 3 + 1] : front;
         var iC = openC ? lightBase + d[j * 3 + 2] : front;
         var sun = sunLight[front] + sunLight[i1] + sunLight[i2] + sunLight[iC];
-        var block = blockLight[front] + blockLight[i1] + blockLight[i2] + blockLight[iC];
-        return sun | block << 6;
+        // blockLight holds level | slot << 4 (see ComputeLight)
+        int bF = blockLight[front], b1 = blockLight[i1], b2 = blockLight[i2], bC = blockLight[iC];
+        int lF = bF & BlockLevelMask, l1 = b1 & BlockLevelMask, l2 = b2 & BlockLevelMask, lC = bC & BlockLevelMask;
+        var tint = LightTint.FromSamples(lF, bF >> 4, l1, b1 >> 4, l2, b2 >> 4, lC, bC >> 4);
+        return sun | (lF + l1 + l2 + lC) << 6 | tint << 12;
     }
 
     /// <summary>
@@ -294,7 +299,8 @@ public class Chunk : IDisposable
     private static FaceLight EmitterFaceLight(int face, byte[] padded, int pIdx, byte[] sunLight,
         byte[] blockLight, int lightBase, int fallbackCell) =>
         BlockType.Occludes(padded[pIdx + FaceNeighborDelta[face]])
-            ? FaceLight.Flat(sunLight[fallbackCell], blockLight[fallbackCell])
+            ? FaceLight.Flat(sunLight[fallbackCell], (byte)(blockLight[fallbackCell] & BlockLevelMask),
+                (byte)(blockLight[fallbackCell] >> 4))
             : SmoothFaceLight(face, padded, pIdx, sunLight, blockLight, lightBase);
 
     /// <summary>
@@ -373,8 +379,15 @@ public class Chunk : IDisposable
     /// caller-sized queue never overflows.
     /// <paramref name="sun"/> and <paramref name="block"/> must be zeroed and hold at
     /// least LightCount entries each, as must <paramref name="queue"/>.
+    /// <para>
+    /// <paramref name="block"/> stores <c>level | slot &lt;&lt; 4</c>: the lamp level in bits 0-3
+    /// (<see cref="BlockLevelMask"/>) and the <see cref="BlockLightPalette"/> slot of the light's
+    /// colour in bits 4-6, so every read of a level must mask. <paramref name="sun"/> is plain
+    /// levels. Returns whether any lamp seed carries a non-default slot; when none does, every
+    /// slot is 0 and the byte is exactly the old level.
+    /// </para>
     /// </summary>
-    private void ComputeLight(byte[] light, byte[] sun, byte[] block, int[] queue)
+    private bool ComputeLight(byte[] light, byte[] sun, byte[] block, int[] queue)
     {
         var worldY0 = LowerBoundY - LightBorder;
 
@@ -422,18 +435,112 @@ public class Chunk : IDisposable
 
         SpreadLight(light, sun, queue, ref head, ref tail);
 
-        // Lamp seeds: emissive cells glow at full strength, then spread like sunlight.
+        // Lamp seeds: emissive cells glow at full strength, then spread like sunlight, each
+        // carrying its colour slot in bits 4-6.
         head = 0;
         tail = 0;
+        var anyTinted = false;
+        var emissionById = BlockType.Emission;
+        var slotById = BlockType.LightSlot;
         for (var i = 0; i < LightCount; i++)
         {
-            var emission = BlockType.Emission[light[i]];
+            var id = light[i];
+            var emission = emissionById[id];
             if (emission == 0) continue;
-            block[i] = emission;
+            var slot = slotById[id];
+            block[i] = (byte)(emission | slot << 4);
+            anyTinted |= slot != 0;
             queue[tail++] = i;
         }
 
-        SpreadLight(light, block, queue, ref head, ref tail);
+        // All-default light keeps the plain pass: the values (slot bits all 0) and the cost are
+        // exactly what they were before coloured light existed
+        if (anyTinted)
+            SpreadBlockLight(light, block, queue, ref head, ref tail);
+        else
+            SpreadLight(light, block, queue, ref head, ref tail);
+        return anyTinted;
+    }
+
+    /// <summary>Lamp level bits of a <c>blockLight</c> byte (see <see cref="ComputeLight"/>).</summary>
+    private const int BlockLevelMask = 15;
+
+    // Colour slot bits of a blockLight byte
+    private const int BlockSlotMask = 0x70;
+
+    /// <summary>
+    /// <see cref="SpreadLight"/> for lamp light that carries a colour slot (<c>level | slot
+    /// &lt;&lt; 4</c>). The dominant-colour rule: a cell takes the slot of whichever source reaches
+    /// it brightest, and at an equal level the lower slot wins. A tie re-enqueues the cell so the
+    /// lower slot keeps spreading; that terminates because at a fixed level a cell's slot only ever
+    /// decreases. Both rules are order-free, so the result is a function of the seed set alone -
+    /// not of BFS order or where the volume starts - and neighbouring chunks agree at their seams
+    /// wherever both volumes see the same seeds.
+    /// <para>
+    /// Because a cell can be enqueued more than once here, bit 7 of its byte marks "waiting in the
+    /// queue": a cell already waiting is updated in place rather than queued again, so at most
+    /// LightCount entries are ever live and the queue runs as a ring over its first LightCount
+    /// slots. Every entry clears its mark when it is dequeued, so all marks are gone on return.
+    /// </para>
+    /// </summary>
+    private static void SpreadBlockLight(byte[] light, byte[] levels, int[] queue, ref int head, ref int tail)
+    {
+        // The seeds are queued unmarked at [head, tail); mark them
+        for (var i = head; i < tail; i++) levels[queue[i]] |= QueuedMark;
+        var count = tail - head;
+        var h = head % LightCount;
+        var t = tail % LightCount;
+        while (count > 0)
+        {
+            var c = queue[h];
+            h = h + 1 == LightCount ? 0 : h + 1;
+            count--;
+            var value = (byte)(levels[c] & ~QueuedMark);
+            levels[c] = value;
+            var level = value & BlockLevelMask;
+            if (level <= 1) continue;
+            var next = level - 1;
+            var slotBits = value & BlockSlotMask;
+
+            var lx = c / LightSq;
+            var rem = c - lx * LightSq;
+            var ly = rem / LightSize;
+            var lz = rem - ly * LightSize;
+
+            if (lx > 0) RaiseTinted(light, levels, queue, ref t, ref count, c - LightSq, next, slotBits);
+            if (lx < LightSize - 1) RaiseTinted(light, levels, queue, ref t, ref count, c + LightSq, next, slotBits);
+            if (ly > 0) RaiseTinted(light, levels, queue, ref t, ref count, c - LightSize, next, slotBits);
+            if (ly < LightSize - 1) RaiseTinted(light, levels, queue, ref t, ref count, c + LightSize, next, slotBits);
+            if (lz > 0) RaiseTinted(light, levels, queue, ref t, ref count, c - 1, next, slotBits);
+            if (lz < LightSize - 1) RaiseTinted(light, levels, queue, ref t, ref count, c + 1, next, slotBits);
+        }
+        head = tail = 0;
+    }
+
+    // Bit 7 of a blockLight byte while SpreadBlockLight has the cell waiting in its queue
+    private const byte QueuedMark = 0x80;
+
+    /// <summary>One neighbour step of <see cref="SpreadBlockLight"/>: a dimmer neighbour, or an
+    /// equally lit one holding a higher slot, takes <c>next | slotBits</c>.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void RaiseTinted(byte[] light, byte[] levels, int[] queue, ref int tail, ref int count,
+        int n, int next, int slotBits)
+    {
+        if (!PassesLight(light[n])) return;
+        var ln = levels[n];
+        var nl = ln & BlockLevelMask;
+        // next > 0 always holds here (the caller's level is at least 2)
+        if (nl > next || (nl == next && slotBits >= (ln & BlockSlotMask))) return;
+        if ((ln & QueuedMark) != 0)
+        {
+            // Already waiting: its turn will spread the new value
+            levels[n] = (byte)(next | slotBits | QueuedMark);
+            return;
+        }
+        levels[n] = (byte)(next | slotBits | QueuedMark);
+        queue[tail] = n;
+        tail = tail + 1 == LightCount ? 0 : tail + 1;
+        count++;
     }
 
     /// <summary>Whether voxel light travels through a block: air, plus leaves, whose canopy
@@ -912,18 +1019,30 @@ public class Chunk : IDisposable
     /// Sun and block light (0..15) of a chunk-local cell from the snapshot the current mesh
     /// was baked with. False, with both levels 0, when no snapshot has been published.
     /// </summary>
-    public bool TryGetLocalLight(int x, int y, int z, out byte sun, out byte block)
+    public bool TryGetLocalLight(int x, int y, int z, out byte sun, out byte block) =>
+        TryGetLocalLight(x, y, z, out sun, out block, out _);
+
+    /// <summary>
+    /// <see cref="TryGetLocalLight(int, int, int, out byte, out byte)"/> plus the block light's
+    /// colour slot (<see cref="BlockLightPalette"/>). Only a chunk that had a tinted seed publishes
+    /// the slot half (the snapshot is then twice as long), so every other chunk answers slot 0.
+    /// </summary>
+    public bool TryGetLocalLight(int x, int y, int z, out byte sun, out byte block, out byte slot)
     {
+        // One read of the reference, so both halves come from the same published snapshot
         var light = _light;
         if (light == null)
         {
             sun = 0;
             block = 0;
+            slot = 0;
             return false;
         }
-        var packed = light[Idx(x, y, z)];
+        var i = Idx(x, y, z);
+        var packed = light[i];
         sun = (byte)(packed >> 4);
         block = (byte)(packed & 0xF);
+        slot = light.Length > BlockCount ? light[BlockCount + i] : (byte)0;
         return true;
     }
 
@@ -1143,16 +1262,19 @@ public class Chunk : IDisposable
             scratch.ClearNeighbors();
             Array.Clear(sunLight, 0, LightCount);
             Array.Clear(blockLight, 0, LightCount);
-            ComputeLight(lightBlocks, sunLight, blockLight, queue);
+            var anyTinted = ComputeLight(lightBlocks, sunLight, blockLight, queue);
             // Keep the chunk's own cells of the flood for entity lighting: a fresh array owned
-            // by this build alone, published by UpdateMesh with the mesh it belongs to.
-            var packed = new byte[BlockCount];
+            // by this build alone, published by UpdateMesh with the mesh it belongs to. A chunk
+            // lit by coloured light appends a second half holding each cell's colour slot.
+            var packed = new byte[anyTinted ? BlockCount * 2 : BlockCount];
             for (var x = 0; x < Size; x++)
             for (var y = 0; y < Size; y++)
             for (var z = 0; z < Size; z++)
             {
                 var li = LightIdx(x, y, z);
-                packed[Idx(x, y, z)] = (byte)(sunLight[li] << 4 | blockLight[li]);
+                var b = blockLight[li];
+                packed[Idx(x, y, z)] = (byte)(sunLight[li] << 4 | (b & BlockLevelMask));
+                if (anyTinted) packed[BlockCount + Idx(x, y, z)] = (byte)(b >> 4);
             }
             return GenerateMeshDataFromSnapshot(padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy)
                 with { Light = packed };
@@ -1477,7 +1599,9 @@ public class Chunk : IDisposable
                 if (dstVertices.Count > ushort.MaxValue - 3) continue;
 
                 var sun = sunLight[lightCell] / 15f;
-                var block = blockLight[lightCell] / 15f;
+                var cellBlock = blockLight[lightCell];
+                var block = (cellBlock & BlockLevelMask) / 15f;
+                var flatTint = (ushort)LightTint.Flat(cellBlock & BlockLevelMask, cellBlock >> 4);
                 var face = quad.Face;
                 var positions = quad.Positions;
                 var uvs = quad.Uvs;
@@ -1489,7 +1613,7 @@ public class Chunk : IDisposable
                     // brightness and no ambient occlusion
                     for (var j = 0; j < 4; j++)
                         dstVertices.Add(new Vertex(basePos + positions[j], 255, 255, 255, 255, uvs[j], quad.Tile,
-                            sun, block, normal, sway, submerged, waterSurface, wet));
+                            sun, block, normal, sway, submerged, waterSurface, wet, flatTint));
                 }
                 else if (quad.IsFullFace)
                 {
@@ -1511,15 +1635,17 @@ public class Chunk : IDisposable
 
                         var vSun = sun;
                         var vBlock = block;
+                        var vTint = flatTint;
                         if (smooth)
                         {
                             var code = SmoothCornerLight(face, j, sunLight, blockLight, lightBase, side1Id, side2Id, cornerId);
                             vSun = (code & 63) / SmoothLightDivisor;
-                            vBlock = (code >> 6) / SmoothLightDivisor;
+                            vBlock = ((code >> 6) & 63) / SmoothLightDivisor;
+                            vTint = (ushort)(code >> 12);
                         }
 
                         dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j], quad.Tile,
-                            vSun, vBlock, normal, sway, submerged, waterSurface, wet));
+                            vSun, vBlock, normal, sway, submerged, waterSurface, wet, vTint));
                     }
                 }
                 else
@@ -1529,7 +1655,7 @@ public class Chunk : IDisposable
                     var shade = ShadeLut[(face << 2) | 3];
                     for (var j = 0; j < 4; j++)
                         dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j], quad.Tile,
-                            sun, block, normal, sway, submerged, waterSurface, wet));
+                            sun, block, normal, sway, submerged, waterSurface, wet, flatTint));
                 }
 
                 dstIndices.Add((ushort)(dstOffset + 0));
@@ -1720,6 +1846,7 @@ public class Chunk : IDisposable
         var table = scratch.PlaneTable;
         var planeKeys = scratch.PlaneKeys;
         var planeLightKeys = scratch.PlaneLightKeys;
+        var planeTintKeys = scratch.PlaneTintKeys;
         var planeRows = scratch.PlaneRows;
 
         for (var f = 0; f < 6; f++)
@@ -1778,6 +1905,7 @@ public class Chunk : IDisposable
                     var lightBase = LightIdx(x, y, z);
                     var ao = 0;
                     var light = 0UL;
+                    var tint = 0UL;
                     for (var j = 0; j < 4; j++)
                     {
                         var side1Id = padded[pIdx + aoDeltas[j * 3 + 0]];
@@ -1785,8 +1913,10 @@ public class Chunk : IDisposable
                         var cornerId = padded[pIdx + aoDeltas[j * 3 + 2]];
                         ao |= VertexAO(BlockType.OccludesAO(side1Id), BlockType.OccludesAO(side2Id),
                             BlockType.OccludesAO(cornerId)) << (2 * j);
-                        light |= (ulong)SmoothCornerLight(f, j, sunLight, blockLight, lightBase,
-                            side1Id, side2Id, cornerId) << (12 * j);
+                        var code = SmoothCornerLight(f, j, sunLight, blockLight, lightBase,
+                            side1Id, side2Id, cornerId);
+                        light |= (ulong)(code & 0xFFF) << (12 * j);
+                        tint |= (ulong)(code >> 12) << (10 * j);
                     }
 
                     // Key: id 0-7, AO 8-15, wet 16, 17-23 unused, submerged 24, and for a
@@ -1794,7 +1924,9 @@ public class Chunk : IDisposable
                     // flags are exclusive, so they share it). Bit 31 can make the key
                     // negative; that is safe because the slot hash reads it as (uint)key and an
                     // empty slot is table entry 0, never a key value. The light travels in a
-                    // parallel 48-bit key: four 12-bit SmoothCornerLight codes, corner j at 12j.
+                    // parallel 48-bit key: four 12-bit SmoothCornerLight codes, corner j at 12j,
+                    // and the colour in a second parallel 40-bit key: the four 10-bit LightTint
+                    // codes, corner j at 10j (all zero wherever the lamp light is default-coloured).
                     var key = id | ao << 8;
                     if (BlockType.IsFluid(neighbour))
                         key |= 1 << 24 | SubmergedSurfaceCode(padded, paddedState, pIdx + faceDelta,
@@ -1808,7 +1940,8 @@ public class Chunk : IDisposable
                     }
 
                     // Find or open the key's plane
-                    var h = ((ulong)(uint)key ^ light * 0x9E3779B97F4A7C15UL) * 0xBF58476D1CE4E5B9UL;
+                    var h = ((ulong)(uint)key ^ light * 0x9E3779B97F4A7C15UL ^ tint * 0xC2B2AE3D27D4EB4FUL)
+                            * 0xBF58476D1CE4E5B9UL;
                     var slot = (int)(h >> (64 - MeshScratch.PlaneTableBits));
                     int plane;
                     while (true)
@@ -1820,10 +1953,12 @@ public class Chunk : IDisposable
                             table[slot] = plane + 1;
                             planeKeys[plane] = key;
                             planeLightKeys[plane] = light;
+                            planeTintKeys[plane] = tint;
                             Array.Clear(planeRows, plane * Size, Size);
                             break;
                         }
-                        if (planeKeys[entry - 1] == key && planeLightKeys[entry - 1] == light)
+                        if (planeKeys[entry - 1] == key && planeLightKeys[entry - 1] == light
+                            && planeTintKeys[entry - 1] == tint)
                         {
                             plane = entry - 1;
                             break;
@@ -1838,12 +1973,13 @@ public class Chunk : IDisposable
                 {
                     var key = planeKeys[plane];
                     var light = planeLightKeys[plane];
+                    var tint = planeTintKeys[plane];
                     var type = BlockType.ById[key & 0xFF]!;
                     var rows = planeRows.AsSpan(plane * Size, Size);
                     if (type.Translucent)
-                        EmitGreedyRun(f, axis, depth, chunkBaseY, key, light, type, rows, tVertices, tIndices, ref tIndexOffset);
+                        EmitGreedyRun(f, axis, depth, chunkBaseY, key, light, tint, type, rows, tVertices, tIndices, ref tIndexOffset);
                     else
-                        EmitGreedyRun(f, axis, depth, chunkBaseY, key, light, type, rows, vertices, indices, ref indexOffset);
+                        EmitGreedyRun(f, axis, depth, chunkBaseY, key, light, tint, type, rows, vertices, indices, ref indexOffset);
                 }
             }
         }
@@ -1860,16 +1996,21 @@ public class Chunk : IDisposable
     /// ends of that axis — then the two cells' shared corners carry the same values, shade and
     /// light inside every cell are affine along it, and the merged quad interpolates to exactly
     /// the per-cell result. Uniformly lit terrain merges both ways; a strip beside a wall merges
-    /// along the wall.
+    /// along the wall. The colour tint code (<paramref name="tint"/>) joins the per-corner code
+    /// too: the shader decodes each corner's code to an RGB tint and lerps that linearly across the
+    /// quad, so equal corner codes along a merged axis give the identical colour gradient.
     /// </summary>
-    private static void EmitGreedyRun(int f, int axis, int depth, int chunkBaseY, int key, ulong light, BlockType type,
+    private static void EmitGreedyRun(int f, int axis, int depth, int chunkBaseY, int key, ulong light, ulong tint,
+        BlockType type,
         Span<ushort> rows, List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset)
     {
         var ao = (key >> 8) & 0xFF;
-        // Per-corner code: AO in bits 0-1, the 12-bit smooth light code above it
+        // Per-corner code: AO in bits 0-1, the 12-bit smooth light code in 2-13, the 10-bit
+        // tint code in 14-23
         Span<int> code = stackalloc int[4];
         for (var j = 0; j < 4; j++)
-            code[j] = ((ao >> (2 * j)) & 3) | (int)((light >> (12 * j)) & 0xFFF) << 2;
+            code[j] = ((ao >> (2 * j)) & 3) | (int)((light >> (12 * j)) & 0xFFF) << 2
+                      | (int)((tint >> (10 * j)) & 0x3FF) << 14;
         // Corner pairs that differ along the col axis: (c0,c1),(c3,c2) on Y faces (c0-c1 runs
         // along z there), (c0,c3),(c1,c2) on X and Z faces; the row axis takes the other pair.
         var yFace = axis == 1;
@@ -1937,7 +2078,8 @@ public class Chunk : IDisposable
                     var sun = (int)((light >> (12 * j)) & 63) / SmoothLightDivisor;
                     var block = (int)((light >> (12 * j + 6)) & 63) / SmoothLightDivisor;
                     vertices.Add(new Vertex(origin + local, shade, shade, shade, 255,
-                        TiledUv(f, local, extent), layer, sun, block, normal, sway, submerged, waterSurface, wet));
+                        TiledUv(f, local, extent), layer, sun, block, normal, sway, submerged, waterSurface, wet,
+                        (ushort)((tint >> (10 * j)) & 0x3FF)));
                 }
 
                 indices.Add((ushort)(indexOffset + 0));
@@ -2101,7 +2243,8 @@ public class Chunk : IDisposable
         corner.X == 0f ? (corner.Z == 0f ? l00 : l01) : (corner.Z == 0f ? l10 : l11);
 
     /// <summary>
-    /// Smooth light code (<c>sunSum | blockSum &lt;&lt; 6</c>) of one top corner of a fluid cell,
+    /// Smooth light code (<c>sunSum | blockSum &lt;&lt; 6 | tint &lt;&lt; 12</c>, the tint a
+    /// <see cref="LightTint"/> code over the same four samples) of one top corner of a fluid cell,
     /// summed over the own, dx, dz and diagonal cells at the fluid's height (the cells
     /// <see cref="CornerHeight"/> reads). A cell that does not pass light stores 0, so it is
     /// replaced by the brightest open sample, per channel; the own fluid cell always passes. The
@@ -2121,8 +2264,11 @@ public class Chunk : IDisposable
 
         int s0 = sunLight[lightBase], s1 = sunLight[lightBase + ldx],
             s2 = sunLight[lightBase + dz], s3 = sunLight[lightBase + ldx + dz];
-        int b0 = blockLight[lightBase], b1 = blockLight[lightBase + ldx],
-            b2 = blockLight[lightBase + dz], b3 = blockLight[lightBase + ldx + dz];
+        // blockLight holds level | slot << 4 (see ComputeLight)
+        int r0 = blockLight[lightBase], r1 = blockLight[lightBase + ldx],
+            r2 = blockLight[lightBase + dz], r3 = blockLight[lightBase + ldx + dz];
+        int b0 = r0 & BlockLevelMask, b1 = r1 & BlockLevelMask,
+            b2 = r2 & BlockLevelMask, b3 = r3 & BlockLevelMask;
 
         var sMax = s0;
         var bMax = b0;
@@ -2132,7 +2278,21 @@ public class Chunk : IDisposable
 
         var sun = s0 + (o1 ? s1 : sMax) + (o2 ? s2 : sMax) + (o3 ? s3 : sMax);
         var block = b0 + (o1 ? b1 : bMax) + (o2 ? b2 : bMax) + (o3 ? b3 : bMax);
-        return sun | block << 6;
+
+        // A blocked sample takes the brightest open sample's colour too; on a level tie the
+        // lowest slot among the open samples at that level, so the fill never depends on which
+        // of the four cells is the own one and neighbouring fluid cells agree at the corner
+        int sl0 = (r0 >> 4) & 7, sl1 = (r1 >> 4) & 7, sl2 = (r2 >> 4) & 7, sl3 = (r3 >> 4) & 7;
+        var slMax = 7;
+        if (b0 == bMax) slMax = sl0;
+        if (o1 && b1 == bMax && sl1 < slMax) slMax = sl1;
+        if (o2 && b2 == bMax && sl2 < slMax) slMax = sl2;
+        if (o3 && b3 == bMax && sl3 < slMax) slMax = sl3;
+        var tint = LightTint.FromSamples(b0, sl0,
+            o1 ? b1 : bMax, o1 ? sl1 : slMax,
+            o2 ? b2 : bMax, o2 ? sl2 : slMax,
+            o3 ? b3 : bMax, o3 ? sl3 : slMax);
+        return sun | block << 6 | tint << 12;
     }
 
     /// <summary>Drops a cube corner's top vertex to the fluid surface, so side faces crop to
@@ -2477,9 +2637,9 @@ public class Chunk : IDisposable
                 top ? 1f : 0f,
                 corner.Z == 0 ? c - w : c + w);
             var pos = basePos + local;
-            light.Sample(local, out var sun, out var block);
+            light.Sample(local, out var sun, out var block, out var tint);
             vertices.Add(new Vertex(pos, shade, shade, shade, 255,
-                CropUv(i, local), tile, sun, block, CubeFaces[i].normal));
+                CropUv(i, local), tile, sun, block, CubeFaces[i].normal, tint: tint));
         }
 
         indices.Add((ushort)(indexOffset + 0));
@@ -2553,14 +2713,14 @@ public class Chunk : IDisposable
         Vector2 uva, Vector2 uvb, Vector2 uvc, Vector2 uvd, ushort tile,
         byte shade, in FaceLight light, byte alpha = 255)
     {
-        light.Sample(a, out var sa, out var ba);
-        light.Sample(b, out var sb, out var bb);
-        light.Sample(c, out var sc, out var bc);
-        light.Sample(d, out var sd, out var bd);
-        vertices.Add(new Vertex(basePos + a, shade, shade, shade, alpha, uva, tile, sa, ba, normal));
-        vertices.Add(new Vertex(basePos + b, shade, shade, shade, alpha, uvb, tile, sb, bb, normal));
-        vertices.Add(new Vertex(basePos + c, shade, shade, shade, alpha, uvc, tile, sc, bc, normal));
-        vertices.Add(new Vertex(basePos + d, shade, shade, shade, alpha, uvd, tile, sd, bd, normal));
+        light.Sample(a, out var sa, out var ba, out var ta);
+        light.Sample(b, out var sb, out var bb, out var tb);
+        light.Sample(c, out var sc, out var bc, out var tc);
+        light.Sample(d, out var sd, out var bd, out var td);
+        vertices.Add(new Vertex(basePos + a, shade, shade, shade, alpha, uva, tile, sa, ba, normal, tint: ta));
+        vertices.Add(new Vertex(basePos + b, shade, shade, shade, alpha, uvb, tile, sb, bb, normal, tint: tb));
+        vertices.Add(new Vertex(basePos + c, shade, shade, shade, alpha, uvc, tile, sc, bc, normal, tint: tc));
+        vertices.Add(new Vertex(basePos + d, shade, shade, shade, alpha, uvd, tile, sd, bd, normal, tint: td));
 
         indices.Add((ushort)(indexOffset + 0));
         indices.Add((ushort)(indexOffset + 1));

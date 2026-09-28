@@ -444,6 +444,8 @@ public static class ContentRegistry
 
         Array.Clear(BlockType.ById);
         Array.Clear(BlockType.Emission);
+        Array.Clear(BlockType.LightSlot);
+        BlockLightPalette.Reset();
         Array.Clear(BlockType.PassesLightById);
         Array.Clear(BlockType.BranchConnectableById);
         Array.Clear(BlockType.SolidById);
@@ -907,6 +909,31 @@ public static class ContentRegistry
             CastRecipes.Add(CompileCastRecipe(name, ReadJson<CastRecipeDefinition>(path), path));
     }
 
+    /// <summary>The <c>light.color</c> a block's JSON declared, or null when it declared none.</summary>
+    internal static float[]? DeclaredLightColor(byte id) =>
+        BlockDefinitions.TryGetValue(id, out var definition) ? definition.Light?.Color : null;
+
+    /// <summary>
+    /// The block-light palette slot of a block's <c>light.color</c>: 0 (the default warm
+    /// colour) when none is declared, else the colour's registered slot. Validated like a
+    /// molten material's colour; a colour on a block that emits nothing is an error.
+    /// </summary>
+    private static byte ResolveLightColor(float[]? color, int emission, string path)
+    {
+        if (color == null) return 0;
+        if (emission == 0)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets light.color but emits no light; light.color needs light.emission > 0.");
+        if (color.Length != 3)
+            throw new InvalidOperationException(
+                $"Block '{path}' has {color.Length} light.color components; expected exactly 3 (r, g, b in 0..255).");
+        foreach (var component in color)
+            if (!float.IsFinite(component) || component < 0f || component > 255f)
+                throw new InvalidOperationException(
+                    $"Block '{path}' has light.color component {component}; expected 0..255.");
+        return BlockLightPalette.Register(new Vector3(color[0], color[1], color[2]) / 255f, path);
+    }
+
     private static MoltenMaterial CompileMoltenMaterial(string name, MoltenMaterialDefinition definition, string path)
     {
         // Ids are 1-based positions in file-name order, so 0 stays free as "no material".
@@ -1120,6 +1147,7 @@ public static class ContentRegistry
             var emission = definition.Light?.Emission ?? 0;
             if (emission > 15)
                 throw new InvalidOperationException($"Block '{path}' has light.emission {emission}; expected 0..15.");
+            var lightColorSlot = ResolveLightColor(definition.Light?.Color, emission, path);
 
             var flow = definition.Flow;
             if (flow != null && !(definition.Fluid ?? false))
@@ -1243,6 +1271,7 @@ public static class ContentRegistry
                 Sway = definition.Sway ?? false,
                 Material = material,
                 LightEmission = emission,
+                LightColorSlot = lightColorSlot,
                 Renderer = renderer,
                 Kiln = definition.Kiln ?? false,
                 StackMax = (byte)stackMax,
@@ -1278,6 +1307,7 @@ public static class ContentRegistry
 
             BlockType.ById[id] = type;
             BlockType.Emission[id] = type.LightEmission;
+            BlockType.LightSlot[id] = type.LightColorSlot;
             BlockType.SolidById[id] = type.Solid;
             BlockType.CollidesByHitboxById[id] = type.CollidesByHitbox;
             BlockType.StackSolidStateById[id] = (byte)stackSolidAt;

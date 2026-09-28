@@ -203,6 +203,10 @@ public sealed class BlockDefinition
         /// <summary>Light this block emits, 0-15.</summary>
         public byte? Emission { get; set; }
 
+        /// <summary>Colour of the emitted light, sRGB [r, g, b] in 0..255; defaults to the warm
+        /// torch colour (<see cref="BlockLightPalette.DefaultSrgb"/>). Only legal with emission &gt; 0.</summary>
+        public float[]? Color { get; set; }
+
         /// <summary>Whether voxel light travels through it; defaults to "not a full cube".</summary>
         public bool? Passes { get; set; }
     }

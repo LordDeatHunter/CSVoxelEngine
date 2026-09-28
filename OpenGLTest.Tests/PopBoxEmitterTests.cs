@@ -157,7 +157,7 @@ public sealed class PopBoxEmitterTests
         {
             Assert.Equal(255, v.Sun);
             Assert.Equal(0, v.Block);
-            Assert.Equal(0, v.Sway);
+            Assert.False(v.IsSwaying);
             var r = (byte)(v.PackedColor & 0xFFu);
             var g = (byte)((v.PackedColor >> 8) & 0xFFu);
             var b = (byte)((v.PackedColor >> 16) & 0xFFu);

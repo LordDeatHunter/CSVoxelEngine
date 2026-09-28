@@ -1,7 +1,7 @@
 #version 460 core
 layout (location = 0) in vec3 vPosition;
 layout (location = 2) in vec2 vTexCoord;
-layout (location = 6) in float vSway;
+layout (location = 5) in uint vNormalBits; // Vertex.Normal + LightTint; sway is bit 5
 layout (location = 7) in uint vLayer; // array-texture slice (Vertex.Layer)
 
 #ifdef CHUNK_DRAW
@@ -26,6 +26,7 @@ out vec2 fTexCoord;
 flat out uint fLayer;
 
 void main() {
+    float vSway = (vNormalBits & 32u) != 0u ? 1.0 : 0.0;
 #ifdef CHUNK_DRAW
     vec3 chunkOrigin = draws[uDrawBase + gl_DrawID].originAndAlpha.xyz;
 #endif

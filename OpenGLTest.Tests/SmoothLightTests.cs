@@ -172,4 +172,180 @@ public sealed class SmoothLightTests
         Assert.Equal(2, nearer.Count);
         Assert.All(nearer, n => Assert.All(shared, s => Assert.NotEqual(s.Block, n.Block)));
     }
+
+    // ---------------------------------------------------------------- coloured lamp light
+
+    private static Vector3 Decode(Vertex v) => LightTint.Decode(v.BlockTint, BlockLightPalette.Linear);
+
+    private static Vector3 Colour(byte id) => BlockLightPalette.Linear[BlockType.LightSlot[id]];
+
+    /// <summary>The coloured proof lamp, with the preconditions the tests below lean on.</summary>
+    private static (byte Lamp, byte Blue) Lamps()
+    {
+        var lamp = Block("lamp");
+        var blue = Block("blue_lamp");
+        Assert.Equal(BlockType.Emission[lamp], BlockType.Emission[blue]);
+        Assert.NotEqual(BlockType.LightSlot[lamp], BlockType.LightSlot[blue]);
+        Assert.NotEqual(Colour(lamp), Colour(blue));
+        return (lamp, blue);
+    }
+
+    /// <summary>Vertices of +Y faces lying in the floor top (Y == 1) on the Z == <paramref name="z"/>
+    /// corner line, grouped by X.</summary>
+    private static ILookup<float, Vertex> FloorRow(ChunkMeshData mesh, int z) =>
+        Quads(mesh.Vertices, mesh.Indices)
+            .Where(q => (q[0].Normal & 7) == 4 && q.All(v => v.Position.Y == 1f))
+            .SelectMany(q => q)
+            .Where(v => v.Position.Z == z)
+            .ToLookup(v => v.Position.X);
+
+    [Fact]
+    public void AColouredLampLightsExactlyAsBrightlyAsTheDefaultLamp()
+    {
+        var (lamp, blue) = Lamps();
+        var (manager, center) = FloorWorld();
+        center.SetBlockRaw(8, 3, 8, lamp, 0);
+        var warm = Mesh(manager, center);
+        center.SetBlockRaw(8, 3, 8, blue, 0);
+        var cool = Mesh(manager, center);
+
+        Assert.Equal(warm.Vertices.Count, cool.Vertices.Count);
+        Assert.Contains(warm.Vertices, v => v.Block > 0);
+        for (var i = 0; i < warm.Vertices.Count; i++)
+        {
+            var w = warm.Vertices[i];
+            var c = cool.Vertices[i];
+            Assert.Equal(w.Position, c.Position);
+            Assert.Equal(w.Sun, c.Sun);
+            Assert.Equal(w.Block, c.Block);
+            if (w.Block > 0) Assert.NotEqual(Decode(w), Decode(c));
+        }
+    }
+
+    [Fact]
+    public void DefaultLampsBakeTheDefaultTint()
+    {
+        var (lamp, _) = Lamps();
+        var (manager, center) = FloorWorld();
+        center.SetBlockRaw(4, 3, 4, lamp, 0);
+        center.SetBlockRaw(11, 2, 10, lamp, 0);
+        foreach (var greedy in new[] { false, true })
+        {
+            var mesh = center.GenerateMeshData(manager, greedy);
+            Assert.NotNull(mesh);
+            Assert.Contains(mesh.Vertices, v => v.Block > 0);
+            Assert.All(mesh.Vertices, v => Assert.Equal(0, v.BlockTint));
+        }
+    }
+
+    [Fact]
+    public void TintShiftsTowardTheNearerLampColour()
+    {
+        var (lamp, blue) = Lamps();
+        var (manager, center) = FloorWorld();
+        center.SetBlockRaw(3, 3, 8, lamp, 0);
+        center.SetBlockRaw(12, 3, 8, blue, 0);
+        var row = FloorRow(Mesh(manager, center), 8);
+        var target = Colour(blue);
+
+        float Distance(Vertex v) => Vector3.Distance(Decode(v), target);
+        var previous = float.MaxValue;
+        for (var x = 3; x <= 13; x++)
+        {
+            var here = row[x].ToList();
+            Assert.NotEmpty(here);
+            Assert.All(here, v => Assert.True(Distance(v) <= previous + 1e-5f,
+                $"x {x}: tint {Decode(v)} moved away from the coloured lamp ({Distance(v)} > {previous})"));
+            previous = here.Max(Distance);
+        }
+
+        // Anti-vacuity: the row really goes from one colour to the other
+        Assert.True(row[3].Min(Distance) > row[13].Max(Distance) + 1e-3f);
+    }
+
+    [Fact]
+    public void ColourTiesDoNotDependOnPlacementOrder()
+    {
+        var (lamp, blue) = Lamps();
+        var lower = Math.Min(BlockType.LightSlot[lamp], BlockType.LightSlot[blue]);
+
+        // A default and a coloured lamp equidistant from column x = 8, then the same with the two
+        // swapped: world B is world A mirrored about that column, but the scan that seeds the
+        // flood meets the two lamps in the opposite order
+        ChunkMeshData Build(byte left, byte right)
+        {
+            var (manager, center) = FloorWorld();
+            center.SetBlockRaw(5, 3, 8, left, 0);
+            center.SetBlockRaw(11, 3, 8, right, 0);
+            return Mesh(manager, center);
+        }
+        var a = Build(lamp, blue);
+        var b = Build(blue, lamp);
+
+        // The published light snapshot carries each cell's slot in its second half
+        const int count = Chunk.Size * Chunk.Size * Chunk.Size;
+        Assert.NotNull(a.Light);
+        Assert.NotNull(b.Light);
+        Assert.Equal(2 * count, a.Light!.Length);
+        Assert.Equal(2 * count, b.Light!.Length);
+        int Slot(byte[] light, int x) => light[count + Chunk.Idx(x, 1, 8)];
+
+        // The equidistant cell takes the lower slot both ways, and every cell mirrors
+        Assert.Equal(lower, Slot(a.Light, 8));
+        Assert.Equal(lower, Slot(b.Light, 8));
+        for (var x = 5; x <= 11; x++)
+            Assert.Equal(Slot(a.Light, x), Slot(b.Light, 16 - x));
+        Assert.NotEqual(Slot(a.Light, 5), Slot(a.Light, 11));
+
+        // So does the baked tint: corner X samples cells X - 1 and X, the mirrored corner
+        // 17 - X the mirrored cells
+        var rowA = FloorRow(a, 8);
+        var rowB = FloorRow(b, 8);
+        for (var x = 5; x <= 12; x++)
+        {
+            var expected = rowA[x].Select(v => v.BlockTint).Distinct().Single();
+            Assert.All(rowB[17 - x], v => Assert.Equal(expected, v.BlockTint));
+        }
+    }
+
+    [Fact]
+    public void EmittersNearAColouredLampTakeItsTint()
+    {
+        var (lamp, blue) = Lamps();
+        var water = Block("water");
+        var snow = Block("snow");
+
+        // A snow layer and a pool beside the lamp under test; a warm lamp across the pool mixes
+        // a second colour into the far cells, so the emitters resolve real two-slot corners
+        (ChunkManager, Chunk) Build(byte near)
+        {
+            var (manager, center) = FloorWorld();
+            for (var x = 7; x <= 10; x++)
+            for (var z = 6; z <= 10; z++)
+                center.SetBlockRaw(x, 1, z, water, FluidState.Source);
+            center.SetBlockRaw(6, 1, 8, snow, 4);
+            center.SetBlockRaw(5, 1, 8, near, 0);
+            center.SetBlockRaw(12, 1, 8, lamp, 0);
+            return (manager, center);
+        }
+
+        var (bm, bc) = Build(blue);
+        var mesh = Mesh(bm, bc);
+        bool NearerBlue(Vertex v) =>
+            Vector3.Distance(Decode(v), Colour(blue)) < Vector3.Distance(Decode(v), Colour(lamp));
+
+        var snowTop = TopOver(mesh.Vertices, mesh.Indices, 6, 8, 1f, 1.99f);
+        Assert.All(snowTop, v => Assert.True(v.Block > 0 && NearerBlue(v), $"snow tint {v.BlockTint}"));
+        var waterTop = TopOver(mesh.TranslucentVertices, mesh.TranslucentIndices, 7, 8, 1f, 2f);
+        Assert.All(waterTop, v => Assert.True(v.Block > 0 && NearerBlue(v), $"water tint {v.BlockTint}"));
+        // The warm lamp really does reach the pool, so the far side mixes toward it
+        var farWater = TopOver(mesh.TranslucentVertices, mesh.TranslucentIndices, 10, 8, 1f, 2f);
+        Assert.Contains(farWater, v => !NearerBlue(v) || (v.BlockTint >> 6) > 0);
+
+        var (wm, wc) = Build(lamp);
+        var warm = Mesh(wm, wc);
+        Assert.Contains(warm.TranslucentVertices, v => v.Block > 0);
+        Assert.All(warm.Vertices, v => Assert.Equal(0, v.BlockTint));
+        Assert.All(warm.TranslucentVertices, v => Assert.Equal(0, v.BlockTint));
+    }
 }

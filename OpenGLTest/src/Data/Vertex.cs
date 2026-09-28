@@ -28,19 +28,24 @@ public struct Vertex
     /// <summary>Lamp light level 0..1, flood-filled from emissive blocks at mesh time.</summary>
     public byte Block;
 
-    /// <summary>Bits 0-2: face index in <see cref="Chunk.CubeFaces"/> order, reconstructed in
-    /// the vertex shader. Sloped fluid tops and spun pebbles snap to their dominant axis; both
-    /// sit within a few degrees of one, so the sun diffuse barely moves. Bit 3: the face looks
-    /// into water, which is what the fragment shader paints the caustic net onto. Bit 4: wet
-    /// band, a dry face just above a fluid surface (a bank wall one cell over the waterline, a
-    /// beach top level with the water); <see cref="WaterSurface"/> then carries that surface.
-    /// Bits 3 and 4 are mutually exclusive, which is what lets them share it. Bits 5-7 are
-    /// unused.</summary>
+    /// <summary>Low byte of the little-endian ushort the shaders read at attribute 5 (bytes 26-27,
+    /// with <see cref="LightTint"/> the high byte). Bits 0-2: face index in
+    /// <see cref="Chunk.CubeFaces"/> order, reconstructed in the vertex shader. Sloped fluid tops
+    /// and spun pebbles snap to their dominant axis; both sit within a few degrees of one, so the
+    /// sun diffuse barely moves. Bit 3: the face looks into water, which is what the fragment
+    /// shader paints the caustic net onto. Bit 4: wet band, a dry face just above a fluid surface
+    /// (a bank wall one cell over the waterline, a beach top level with the water);
+    /// <see cref="WaterSurface"/> then carries that surface. Bits 3 and 4 are mutually exclusive,
+    /// which is what lets them share it. Bit 5: leaf-wind sway (<see cref="IsSwaying"/>; chunk
+    /// meshes set it on canopy leaves, standalone cubes such as drops, icons and mining pops stay
+    /// planted). Bits 6-7: the low two bits of the 10-bit block-light tint code
+    /// (<see cref="BlockTint"/>).</summary>
     public byte Normal;
 
-    /// <summary>Wind weight for the leaf-wave shader (1 on canopy leaves, 0 elsewhere).
-    /// Chunk meshes set it; standalone cubes (drops, icons, mining pops) stay planted at 0.</summary>
-    public byte Sway;
+    /// <summary>High byte of the attribute-5 ushort: bits 2-9 of the 10-bit block-light tint code
+    /// (<see cref="BlockTint"/>, <see cref="silkgltriangle.LightTint"/> layout: slot A, slot B and
+    /// B's weight), which the world vertex shader decodes against the light palette.</summary>
+    public byte LightTint;
 
     /// <summary>Array-texture slice this vertex samples: the atlas tile for block geometry,
     /// 0 for every single-slice texture.</summary>
@@ -120,8 +125,10 @@ public struct Vertex
     /// <summary>Atlas geometry: a UV in tile units on <paramref name="layer"/>.</summary>
     public Vertex(Vector3 position, byte r, byte g, byte b, byte a, Vector2 uv, ushort layer,
         float sun = 1f, float block = 0f, Vector3? normal = null, float sway = 0f, bool submerged = false,
-        ushort waterSurface = 0, bool wet = false)
+        ushort waterSurface = 0, bool wet = false, ushort tint = 0)
     {
+        System.Diagnostics.Debug.Assert(tint <= TintMask, "block-light tint code exceeds 10 bits");
+        tint &= TintMask;
         Position = position;
         PackedColor = (uint)(r | (g << 8) | (b << 16) | (a << 24));
         Uv = uv;
@@ -129,8 +136,9 @@ public struct Vertex
         WaterSurface = waterSurface;
         Sun = EncodeLight(sun);
         Block = EncodeLight(block);
-        Normal = (byte)(EncodeNormal(normal ?? Vector3.UnitY) | (submerged ? SubmergedBit : 0) | (wet ? WetBit : 0));
-        Sway = sway >= 0.5f ? (byte)255 : (byte)0;
+        Normal = (byte)(EncodeNormal(normal ?? Vector3.UnitY) | (submerged ? SubmergedBit : 0) | (wet ? WetBit : 0)
+                        | (sway >= 0.5f ? SwayBit : 0) | ((tint & 3) << 6));
+        LightTint = (byte)(tint >> 2);
     }
 
     /// <summary>Single-slice texture: a plain 0..1 UV on layer 0 (sprites, font, sun, UI).</summary>
@@ -156,6 +164,8 @@ public struct Vertex
 
     private const int SubmergedBit = 1 << 3;
     private const int WetBit = 1 << 4;
+    private const int SwayBit = 1 << 5;
+    private const ushort TintMask = 0x3FF;
 
     /// <summary><see cref="Normal"/> bit 3: the face looks into a fluid.</summary>
     public readonly bool IsSubmerged => (Normal & SubmergedBit) != 0;
@@ -163,6 +173,13 @@ public struct Vertex
     /// <summary><see cref="Normal"/> bit 4: the face sits in the wet band just above a fluid
     /// surface.</summary>
     public readonly bool IsWet => (Normal & WetBit) != 0;
+
+    /// <summary><see cref="Normal"/> bit 5: the leaf-wave shader sways this vertex.</summary>
+    public readonly bool IsSwaying => (Normal & SwayBit) != 0;
+
+    /// <summary>The 10-bit block-light tint code (<see cref="silkgltriangle.LightTint"/>), split
+    /// across <see cref="Normal"/> bits 6-7 and <see cref="LightTint"/>.</summary>
+    public readonly int BlockTint => (Normal >> 6) | (LightTint << 2);
 
     /// <summary>The UV as stored (tests, debugging).</summary>
     public readonly Vector2 UV => Uv;

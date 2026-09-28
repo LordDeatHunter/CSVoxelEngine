@@ -256,8 +256,8 @@ public sealed class MeshingTests
         Assert.Equal(0.125f, sprite.UV.X);
         Assert.Equal(7f / 15f, v.Sun / 255f, 3);
         Assert.Equal(3f / 15f, v.Block / 255f, 3);
-        Assert.Equal(1, v.Normal);
-        Assert.Equal(255, v.Sway);
+        Assert.Equal(1, v.Normal & 7);
+        Assert.True(v.IsSwaying);
         foreach (var (normal, index) in new[]
                  {
                      (new Vector3(0, 0, -1), 0), (new Vector3(0, 0, 1), 1),
@@ -272,6 +272,19 @@ public sealed class MeshingTests
             Vector2.Zero, 1f, 0f, Vector3.UnitY, 0f, submerged: true);
         Assert.Equal(4 | 8, submerged.Normal);
         Assert.Equal(4, submerged.Normal & 7);
+
+        // The 10-bit block-light tint code shares the attribute-5 ushort with the face and flag
+        // bits: every code round-trips without disturbing them, and vice versa
+        for (var tint = 0; tint < 1024; tint++)
+        {
+            var t = new Vertex(Vector3.Zero, 255, 255, 255, 255, Vector2.Zero, 0, 1f, 0f,
+                -Vector3.UnitX, 1f, submerged: true, tint: (ushort)tint);
+            Assert.Equal(tint, t.BlockTint);
+            Assert.Equal(2, t.Normal & 7);
+            Assert.True(t.IsSubmerged);
+            Assert.False(t.IsWet);
+            Assert.True(t.IsSwaying);
+        }
 
         // The baked water surface survives its quarter-block quantisation
         foreach (var y in new[] { -44f, -0.25f, 0f, 8f / 9f, 12.75f, 200.5f })

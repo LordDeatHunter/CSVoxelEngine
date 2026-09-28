@@ -167,4 +167,45 @@ public sealed class ContentTests
         var rimOrigin = new Vector3(1.1f, 2f, 1.5f);
         Assert.False(Camera.RayIntersectsBox(rimOrigin, -Vector3.UnitY, min, max, 10f, out _, out _));
     }
+
+    private static Vector3? DeclaredSrgb(byte id) =>
+        ContentRegistry.DeclaredLightColor(id) is { } c ? new Vector3(c[0], c[1], c[2]) / 255f : null;
+
+    [Fact]
+    public void EmittersDeclaringNoColourTakeTheDefaultSlot()
+    {
+        var emitters = BlockType.Types.Keys.Where(id => BlockType.Emission[id] > 0 && DeclaredSrgb(id) == null).ToArray();
+        Assert.NotEmpty(emitters);
+        Assert.All(emitters, id => Assert.Equal(0, BlockType.LightSlot[id]));
+    }
+
+    [Fact]
+    public void DistinctDeclaredLightColoursGetDistinctSlots()
+    {
+        var declared = BlockType.Types.Keys.Where(id => DeclaredSrgb(id) != null).ToArray();
+        Assert.NotEmpty(declared);
+        foreach (var a in declared)
+        foreach (var b in declared)
+        {
+            var d = Vector3.Abs(DeclaredSrgb(a)!.Value - DeclaredSrgb(b)!.Value);
+            if (Math.Max(d.X, Math.Max(d.Y, d.Z)) > 0.5f / 255f)
+                Assert.NotEqual(BlockType.LightSlot[a], BlockType.LightSlot[b]);
+        }
+    }
+
+    [Fact]
+    public void ANonDefaultDeclaredColourLightsWithItsOwnPaletteColour()
+    {
+        var nonDefault = BlockType.Types.Keys
+            .Where(id => DeclaredSrgb(id) is { } c && Vector3.Distance(c, BlockLightPalette.DefaultSrgb) > 1f / 255f)
+            .ToArray();
+        Assert.NotEmpty(nonDefault);
+        foreach (var id in nonDefault)
+        {
+            var slot = BlockType.LightSlot[id];
+            Assert.NotEqual(BlockLightPalette.Linear[0], BlockLightPalette.Linear[slot]);
+            var d = Vector3.Abs(DeclaredSrgb(id)!.Value - BlockLightPalette.SrgbOf(slot));
+            Assert.True(Math.Max(d.X, Math.Max(d.Y, d.Z)) <= 0.5f / 255f + 1e-6f);
+        }
+    }
 }
