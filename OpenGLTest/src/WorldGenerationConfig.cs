@@ -504,6 +504,14 @@ public const float DayLengthSeconds = 1200f;
     // Blinn-Phong exponent of the wet band's sun glint: a thin water film is very smooth
     public const float WetShine = 120f;
 
+    // --- Surface rim (test-fragment.glsl, SH-23) ---
+    // Sky mix at a full graze on non-ore, non-wet tiles; keep it faint (never above ~0.08) or it reads as plastic
+    public const float RimStrength = 0.05f;
+    // Distance (blocks) where the rim starts fading out: flat ground turns grazing close to the camera
+    public const float RimFadeNear = 8f;
+    // Distance (blocks) past which the rim is gone, so no lighter ring travels with the camera
+    public const float RimFadeFar = 32f;
+
     // --- Surface water (lakes and rivers) ---
     // The forest floor sits above sea level, so an un-carved column is always the dry rim of any
     // carved water: a lake is a bowl and a river a channel, and water fills only the part cut

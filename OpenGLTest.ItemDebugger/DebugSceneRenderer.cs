@@ -70,6 +70,8 @@ public sealed class DebugSceneRenderer : IDisposable
         _world.SetUniform("uWetBand", WorldGenerationConfig.WetBandBlocks);
         _world.SetUniform("uWetReflect", WorldGenerationConfig.WetReflect);
         _world.SetUniform("uWetShine", WorldGenerationConfig.WetShine);
+        _world.SetUniform("uRimStrength", WorldGenerationConfig.RimStrength);
+        _world.SetUniform("uRimFade", new Vector2(WorldGenerationConfig.RimFadeNear, WorldGenerationConfig.RimFadeFar));
         // The plain vertex path lights meshes from these per-draw uniforms (the game samples the
         // world through RenderManager.SetDrawUniforms). The debugger has no world, so it lights
         // everything like the old vertex defaults: full sun, no block light. Unset they would be 0,

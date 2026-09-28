@@ -737,6 +737,8 @@ public class RenderManager : IDisposable
         program.SetUniform("uWetBand", WorldGenerationConfig.WetBandBlocks);
         program.SetUniform("uWetReflect", WorldGenerationConfig.WetReflect);
         program.SetUniform("uWetShine", WorldGenerationConfig.WetShine);
+        program.SetUniform("uRimStrength", WorldGenerationConfig.RimStrength);
+        program.SetUniform("uRimFade", new Vector2(WorldGenerationConfig.RimFadeNear, WorldGenerationConfig.RimFadeFar));
         program.SetUniform("uWaterFancyNear", WorldGenerationConfig.WaterFancyNearBlocks);
         program.SetUniform("uWaterFancyFar", WorldGenerationConfig.WaterFancyFarBlocks);
         program.SetUniform("uWaterFlowStretch", WorldGenerationConfig.WaterFlowStretch);

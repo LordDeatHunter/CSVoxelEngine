@@ -12,6 +12,11 @@
     { "op": "screenshot", "name": "walked", "hideHud": true },
     { "op": "teleport", "pos": [0.5, 60.5, 0.5], "yaw": -90, "pitch": -30 },
     { "op": "wait", "seconds": 3 },
-    { "op": "screenshot", "name": "overlook" }
+    { "op": "screenshot", "name": "overlook" },
+    // Flat ground from standing height, pitched slightly down: the surface turns grazing within a
+    // few tens of blocks, so this is where a view-dependent term (the SH-23 rim) would show a ring.
+    { "op": "teleport", "pos": [48.5, 90.5, 48.5], "yaw": -45, "pitch": -8 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "plain", "hideHud": true }
   ]
 }

@@ -161,7 +161,11 @@ loads the same shaders), so an unbound buffer is never read. `test-vertex.glsl` 
 UV orientation or the relief comes out rotated or mirrored per face. Regenerate the art with
 `tools/generate-ore-materials.ps1` (deterministic, byte-identical re-runs);
 `visual-examples/ores.json` is the screenshot check, and wants a `VOXEL_TIME` since the highlight
-tracks the sun.
+tracks the sun. Every other (non-ore, non-water) tile gets only a faint, near-camera grazing sky rim
+(SH-23: `uRimStrength`, a renormalised Schlick mixed toward the sky and faded out between
+`RimFadeNear` and `RimFadeFar`, twin `SurfaceFresnel.Rim`/`RimFade`; back faces, reflections
+that head down and sun-shadowed foliage get little or none), which is excluded on ores and wet
+faces, since those carry their own fresnel.
 
 **Chunk meshing.** `Chunk.GenerateMeshDataFromSnapshot` runs two passes over the padded 18³
 block snapshot. The binary greedy pass (`EmitGreedyFaces`, scratch in the `[ThreadStatic]`
