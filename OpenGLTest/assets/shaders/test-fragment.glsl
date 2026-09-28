@@ -56,6 +56,13 @@ uniform vec3 uFogColor;
 uniform float uFogNear;
 uniform float uFogFar;
 uniform vec3 uCameraPos;
+// The sky dome's palette (SkyPalette), for fog that matches the dome in the view direction.
+uniform vec3 uSkyZenith;
+uniform vec3 uSkyHorizon;
+uniform vec3 uSkyGlow;
+uniform vec4 uSkyShape;       // x horizon band, y haze width, z haze strength, w glow exponent
+// 0 dry, 1 fully underwater/in lava: blends the dome-sampled fog back to the flat uFogColor.
+uniform float uFogWet;
 uniform int uNumPointLights;
 uniform vec3 uPointPos[8];
 uniform vec3 uPointColor[8];
@@ -107,6 +114,18 @@ uniform vec3 uLodLeafColor;
 uniform float uLavaLayer;
 
 out vec4 FragColor;
+
+// Twin copies: sky-fragment.glsl, test-fragment.glsl, cloud-fragment.glsl; C# reference SkyPalette.Sample - change all four together
+vec3 SkySample(vec3 dir)
+{
+    float e = max(dir.y, 0.0);
+    float az = (dir.x * uSunDir.x + dir.z * uSunDir.z)
+             / sqrt(max((dir.x * dir.x + dir.z * dir.z) * (uSunDir.x * uSunDir.x + uSunDir.z * uSunDir.z), 1e-6));
+    float band = smoothstep(0.0, uSkyShape.x, e);
+    float lobe = pow(max(az, 0.0), uSkyShape.w) * (1.0 - band);
+    float haze = uSkyShape.z * (1.0 - smoothstep(0.0, uSkyShape.y, e));
+    return mix(uSkyHorizon * (1.0 + haze), uSkyZenith, band) + uSkyGlow * lobe;
+}
 
 // Directional sun shadows. RenderManager renders the casters depth-only through
 // uLightViewProj into uShadowMap, so a fragment's own light-space depth compared against
@@ -496,7 +515,18 @@ void main() {
     }
 
     float f = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
-    col = mix(col, uFogColor, f * f);
+    // Fog toward the dome's own colour in the view direction, so a fully fogged fragment is
+    // exactly the sky behind it (seamless LOD edge against the graded sky). The outer branch
+    // keeps the cost at zero inside FogNear; underwater (uFogWet ~1) the sample would be
+    // thrown away, so it is skipped. In the mirror pass uCameraPos is the mirrored eye.
+    if (f > 0.0) {
+        vec3 fogCol = uFogColor;
+        if (uFogWet < 0.999) {
+            vec3 fogDir = (fWorldPos - uCameraPos) / max(dist, 1e-4);
+            fogCol = mix(SkySample(fogDir), uFogColor, uFogWet);
+        }
+        col = mix(col, fogCol, f * f);
+    }
     // Tile alpha carries the translucent mesh's translucency; fAlpha is the chunk fade-in.
     // The discard above still removes the leaf tiles' fully transparent holes in the
     // opaque pass, while the translucent pass keeps every faint texel.

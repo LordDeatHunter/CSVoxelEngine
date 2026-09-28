@@ -86,11 +86,15 @@ public sealed class CloudRenderer : IDisposable
     /// every field, so the wrap is seamless). Nothing wraps per vertex, so a copy can never tear.
     /// Copies outside the frustum are skipped like every other pass, and the survivors go up as one
     /// instance stream, so each sweep is a single draw. The remaining uniforms mirror the world
-    /// shader's frame state, so clouds sit in the same day/night cycle and fog.
+    /// shader's frame state, so clouds sit in the same day/night cycle and fog: <paramref name="sky"/>
+    /// is the frame's dome palette, which the fog samples in the view direction (falling back to
+    /// the flat <paramref name="fogColor"/> by <paramref name="fogWet"/> underwater or in lava) and
+    /// whose dusk-scaled glow lights the sun-facing sides, and <paramref name="duskAmount"/> shifts
+    /// the light weights from ambient toward the sun term (<see cref="SkyPalette.CloudLightWeights"/>).
     /// </summary>
     public void Render(Matrix4x4 viewProj, Vector3 cameraPos, float time,
         Vector3 sunDir, Vector3 sunColor, float sunIntensity, Vector3 ambient,
-        Vector3 fogColor, float fogNear, float fogFar)
+        Vector3 fogColor, float fogNear, float fogFar, in SkyPalette sky, float duskAmount, float fogWet)
     {
         if (GameSettings.CloudOpacity <= 0f)
             return;
@@ -121,6 +125,12 @@ public sealed class CloudRenderer : IDisposable
         _shader.SetUniform("uFogNear", fogNear);
         _shader.SetUniform("uFogFar", fogFar);
         _shader.SetUniform("uOpacity", GameSettings.CloudOpacity);
+        _shader.SetUniform("uSkyZenith", sky.Zenith);
+        _shader.SetUniform("uSkyHorizon", sky.Horizon);
+        _shader.SetUniform("uSkyGlow", sky.Glow);
+        _shader.SetUniform("uSkyShape", SkyPalette.Shape);
+        _shader.SetUniform("uFogWet", fogWet);
+        _shader.SetUniform("uCloudLight", SkyPalette.CloudLightWeights(duskAmount));
 
         _gl.NamedBufferSubData(_instanceVbo, 0, offsets[..count]);
         _gl.BindVertexArray(_vao);

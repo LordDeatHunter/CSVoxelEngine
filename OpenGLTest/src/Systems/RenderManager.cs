@@ -119,6 +119,10 @@ public class RenderManager : IDisposable
     // Underwater sun shafts, one additive full-screen pass. Null until LoadResources builds it.
     private UnderwaterRaysRenderer? _rays;
 
+    // The sky dome, one full-screen pass drawn before the sun disc (RenderSky). Null until
+    // LoadResources builds it; the clear colour stands in for it until then.
+    private SkyRenderer? _skyDome;
+
     // Damage reddening: one full-screen radial-gradient pass, drawn first inside the UI pass.
     // Null until LoadResources builds it.
     private DamageVignetteRenderer? _vignette;
@@ -190,6 +194,14 @@ public class RenderManager : IDisposable
     private const float TorchIntensity = 1.2f;
     private Vector3 _fogColor = new(0.3f, 0.6f, 0.9f);
     private Vector3 _skyColor = new(0.3f, 0.6f, 0.9f);
+    // The sky dome's palette for this frame (SkyPalette), plus what the dome fades toward in
+    // lava (_skyTint by _skyTintAmount; it stays dry in water so the Snell window shows sky),
+    // the frame's dusk amount and how far the fog has closed in to the underwater tint.
+    private SkyPalette _sky = SkyPalette.Compute(1f, 0f);
+    private float _duskAmount;
+    private Vector3 _skyTint;
+    private float _skyTintAmount;
+    private float _fogWet;
     private float _fogNear = WorldGenerationConfig.FogNearBlocks;
     private float _fogFar = WorldGenerationConfig.FogFarBlocks;
     private Vector3 _cameraPos;
@@ -527,6 +539,7 @@ public class RenderManager : IDisposable
         gl.BindTexture(TextureTarget.Texture2DArray, 0);
         _sunQuad = Primitives.CreateSquare(gl, 1f);
         _clouds = new CloudRenderer(gl);
+        _skyDome = new SkyRenderer(gl);
         _rays = new UnderwaterRaysRenderer(gl);
         _vignette = new DamageVignetteRenderer(gl);
         _leaves = new LeafParticleRenderer(gl);
@@ -789,8 +802,10 @@ public class RenderManager : IDisposable
 
         _ambient = Mix(new Vector3(0.06f, 0.07f, 0.11f), new Vector3(0.42f, 0.45f, 0.52f), dayness);
 
-        _skyColor = Mix(new Vector3(0.012f, 0.018f, 0.045f), new Vector3(0.3f, 0.6f, 0.9f), dayness);
-        _skyColor = Mix(_skyColor, new Vector3(0.98f, 0.45f, 0.2f), duskAmount * 0.5f);
+        _duskAmount = duskAmount;
+        _sky = SkyPalette.Compute(dayness, duskAmount);
+        // The flat sky/fog colour is the dome's no-glow horizon sample
+        _skyColor = _sky.HazedHorizon;
         // Fog melts the far terrain (and the LOD edge) into the sky, day and night
         _fogColor = _skyColor;
 
@@ -858,11 +873,18 @@ public class RenderManager : IDisposable
         _fogFar = MathUtils.Lerp(WorldGenerationConfig.FogFarBlocks,
             WorldGenerationConfig.UnderwaterFogFarBlocks, wet);
 
+        // Reset before the dry early-out, or a tint would stick after leaving water or lava
+        _fogWet = wet;
+        _skyTint = Vector3.Zero;
+        _skyTintAmount = 0f;
+
         if (wet <= 0f) return;
 
         var underwaterColor = _eyeInLava
             ? LavaFogColor * (0.6f + 0.4f * dayness)
             : UnderwaterFogColor * (0.15f + 0.85f * dayness);
+        _skyTint = underwaterColor;
+        _skyTintAmount = lavaWet;
         _fogColor = Mix(_fogColor, underwaterColor, wet);
         // _fogColor was copied from the dry _skyColor earlier, so this leaves the fog tint alone;
         // afterwards _skyColor only feeds the clear colour, which the window shows from below.
@@ -1349,9 +1371,12 @@ public class RenderManager : IDisposable
         gl.Viewport(_reflSize);
         gl.ClearColor(_skyColor.X, _skyColor.Y, _skyColor.Z, 1f);
         gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-        // The sun belongs in the mirror for the same reason it does in the real frame: it is
-        // painted onto the bare sky before any terrain, and everything after occludes it.
-        RenderSun(mirroredFwd, camera.GetProjectionMatrix());
+        // The sky dome and the sun belong in the mirror for the same reason they do in the real
+        // frame: they are painted before any terrain, and everything after occludes them. The
+        // mirror's own look-at has no roll, and neither does its world view, so they agree.
+        var mirrorRot = view;
+        mirrorRot.M41 = mirrorRot.M42 = mirrorRot.M43 = 0f;
+        RenderSky(mirrorRot, camera.GetProjectionMatrix(), mirroredFwd);
         // RenderSun leaves its own program and its disc on unit 0; the mirrored world draws
         // below want ours and the atlas back.
         worldShader.Use();
@@ -1422,8 +1447,8 @@ public class RenderManager : IDisposable
 
         _chunkDraws.Draw(LodGeometry.Vao, chunkShader, _locChunkDrawBase);
 
-        // Clouds in the mirror are what makes the reflection readable on open water (the sky
-        // itself is a flat colour). The mirror flips triangle winding, so cull front faces
+        // Clouds in the mirror are what makes the reflection readable on open water (the dome
+        // alone is only a smooth gradient). The mirror flips triangle winding, so cull front faces
         // here to keep the same "nearest exterior surface wins" behaviour RenderClouds relies on.
         if (_clouds != null && savedCamPos.Y >= WaterPlaneY)
         {
@@ -1433,7 +1458,7 @@ public class RenderManager : IDisposable
             gl.Enable(EnableCap.CullFace);
             gl.CullFace(TriangleFace.Front);
             _clouds.Render(_reflViewProj, mirroredPos, _time, _sunDir, _sunColor, _sunIntensity, _ambient,
-                _fogColor, _fogNear, _fogFar);
+                _fogColor, _fogNear, _fogFar, _sky, _duskAmount, _fogWet);
             gl.CullFace(TriangleFace.Back);
             gl.Disable(EnableCap.CullFace);
             gl.DepthMask(true);
@@ -1461,9 +1486,10 @@ public class RenderManager : IDisposable
     private static Vector3 Mix(Vector3 a, Vector3 b, float t) => a.Lerp(b, t);
 
     /// <summary>
-    /// Clears to the sky colour, paints the sun into it, and leaves the GL state the world
-    /// passes expect. <paramref name="camera"/> only orients the sun quad; a null camera just
-    /// skips it.
+    /// Clears (colour to the flat sky fallback, and depth), paints the sky dome and the sun over
+    /// it (<see cref="RenderSky"/>), and leaves the GL state the world passes expect.
+    /// <paramref name="camera"/> only orients the dome and the sun quad; a null camera skips
+    /// both and leaves the flat clear colour.
     /// </summary>
     public void BeginFrame(Camera? camera)
     {
@@ -1473,9 +1499,15 @@ public class RenderManager : IDisposable
         gl.ClearColor(_skyColor.X, _skyColor.Y, _skyColor.Z, 1f);
         gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-        // Straight onto the fresh sky, before any terrain: see RenderSun
+        // Straight onto the cleared target, before any terrain: see RenderSky. The rotation is
+        // the camera's own view with the translation dropped, so it keeps the sprint and shake
+        // roll the world is drawn with and the dome's horizon stays level with the terrain's.
         if (camera != null)
-            RenderSun(camera.ViewDirection, camera.GetProjectionMatrix());
+        {
+            var rot = camera.GetViewMatrix();
+            rot.M41 = rot.M42 = rot.M43 = 0f;
+            RenderSky(rot, camera.GetProjectionMatrix(), camera.ViewDirection);
+        }
 
         // Exactly once a frame, before any pass appends to it: the ring rolls onto its next
         // slot and waits on the fence that says the GPU is done reading it.
@@ -1495,9 +1527,24 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
+    /// Draws the sky dome (<see cref="SkyRenderer"/>) and then the sun disc over it
+    /// (<see cref="RenderSun"/>). Follows RenderSun's parameter shape so the reflection pass can
+    /// pass its own mirrored view. <paramref name="viewRotation"/> must be translation-free and
+    /// keep the camera's roll, since the world is drawn with that roll too.
+    /// </summary>
+    private void RenderSky(Matrix4x4 viewRotation, Matrix4x4 projection, Vector3 forward)
+    {
+        if (!Matrix4x4.Invert(viewRotation * projection, out var inv))
+            inv = Matrix4x4.Identity;
+        _skyDome?.Render(inv, _sky, _sunDir, _skyTint, _skyTintAmount);
+        RenderSun(forward, projection);
+    }
+
+    /// <summary>
     /// Draws the sun: a textured disc surrounded by a radial glow, on one screen-facing quad.
     /// Three things make it cheap. It is drawn first, with the depth test and depth writes
-    /// off, so everything drawn afterwards occludes it for free and the sky needs no skybox.
+    /// off, so everything drawn afterwards occludes it for free; the dome under it is
+    /// <see cref="SkyRenderer"/>'s.
     /// The quad is placed 100 blocks along <see cref="_sunDir"/> under a view matrix with the
     /// translation removed, so it effectively sits at infinity and never parallaxes as the
     /// player walks. And it blends additively (One, One), so the shader's black background
@@ -1690,6 +1737,12 @@ public class RenderManager : IDisposable
         program.SetUniform("uFogColor", _fogColor);
         program.SetUniform("uFogNear", _fogNear);
         program.SetUniform("uFogFar", _fogFar);
+        // The dome's palette, so the fog samples the sky behind each fragment (SkySample).
+        program.SetUniform("uSkyZenith", _sky.Zenith);
+        program.SetUniform("uSkyHorizon", _sky.Horizon);
+        program.SetUniform("uSkyGlow", _sky.Glow);
+        program.SetUniform("uSkyShape", SkyPalette.Shape);
+        program.SetUniform("uFogWet", _fogWet);
         program.SetUniform("uCameraPos", _cameraPos);
         program.SetUniform("uNumPointLights", _pointCount);
         program.SetUniform("uFireLightStart", _fireLightStart);
@@ -1765,7 +1818,7 @@ public class RenderManager : IDisposable
         gl.Enable(EnableCap.CullFace);
         gl.CullFace(TriangleFace.Back);
         _clouds.Render(camera.GetViewProjection(), _cameraPos, _time,
-            _sunDir, _sunColor, _sunIntensity, _ambient, _fogColor, _fogNear, _fogFar);
+            _sunDir, _sunColor, _sunIntensity, _ambient, _fogColor, _fogNear, _fogFar, _sky, _duskAmount, _fogWet);
         gl.Disable(EnableCap.CullFace);
         gl.DepthMask(true);
     }
@@ -3230,6 +3283,7 @@ public class RenderManager : IDisposable
         chunkShadowShader.Dispose();
         sunShader.Dispose();
         _clouds?.Dispose();
+        _skyDome?.Dispose();
         _rays?.Dispose();
         _vignette?.Dispose();
         _leaves?.Dispose();

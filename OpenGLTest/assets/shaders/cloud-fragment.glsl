@@ -16,6 +16,24 @@ uniform float uFogNear;
 uniform float uFogFar;
 uniform vec3 uCameraPos;
 uniform float uOpacity;
+uniform vec3 uSkyZenith;
+uniform vec3 uSkyHorizon;
+uniform vec3 uSkyGlow;        // dusk-scaled on the CPU: zero at noon and at night
+uniform vec4 uSkyShape;       // x horizon band, y haze width, z haze strength, w glow exponent
+uniform float uFogWet;        // 1 underwater/in lava: fog falls back to the flat tinted uFogColor
+uniform vec3 uCloudLight;     // ambient weight, sun base, sun ndl (SkyPalette.CloudLightWeights)
+
+// Twin copies: sky-fragment.glsl, test-fragment.glsl, cloud-fragment.glsl; C# reference SkyPalette.Sample - change all four together
+vec3 SkySample(vec3 dir)
+{
+    float e = max(dir.y, 0.0);
+    float az = (dir.x * uSunDir.x + dir.z * uSunDir.z)
+             / sqrt(max((dir.x * dir.x + dir.z * dir.z) * (uSunDir.x * uSunDir.x + uSunDir.z * uSunDir.z), 1e-6));
+    float band = smoothstep(0.0, uSkyShape.x, e);
+    float lobe = pow(max(az, 0.0), uSkyShape.w) * (1.0 - band);
+    float haze = uSkyShape.z * (1.0 - smoothstep(0.0, uSkyShape.y, e));
+    return mix(uSkyHorizon * (1.0 + haze), uSkyZenith, band) + uSkyGlow * lobe;
+}
 
 out vec4 FragColor;
 
@@ -30,12 +48,17 @@ float Hash12(vec2 p)
 void main() {
     vec3 N = normalize(fNormal);
     float ndl = dot(N, uSunDir) * 0.5 + 0.5;
-    vec3 light = uAmbient * 1.2 + uSunColor * (uSunIntensity * (0.26 + 0.04 * ndl));
+    float dist = distance(fWorldPos, uCameraPos);
+    vec3 V = (fWorldPos - uCameraPos) / max(dist, 1e-4);
+    vec3 light = uAmbient * uCloudLight.x + uSunColor * (uSunIntensity * (uCloudLight.y + uCloudLight.z * ndl));
+    // Sunset rim: the dome's glow lobe toward the sun's azimuth. uSkyGlow is already dusk-scaled,
+    // so the rim fades exactly like the dome's lobe and needs no dusk factor of its own.
+    float az = dot(V.xz, uSunDir.xz) * inversesqrt(max(dot(V.xz, V.xz) * dot(uSunDir.xz, uSunDir.xz), 1e-6));
+    light += uSkyGlow * pow(max(az, 0.0), uSkyShape.w) * ndl;
     float up = smoothstep(-0.9, 0.15, N.y);
     vec3 col = light * mix(vec3(0.93, 0.94, 0.98), vec3(1.03), up);
-    float dist = distance(fWorldPos, uCameraPos);
     float f = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
-    col = mix(col, uFogColor, f * f);
+    col = mix(col, mix(SkySample(V), uFogColor, uFogWet), f * f);
     // Half-LSB dither against banding in the soft fog blend; static per pixel, never crawls.
     col += (Hash12(gl_FragCoord.xy) - 0.5) / 255.0;
     FragColor = vec4(col, uOpacity * (1.0 - f * f * f));

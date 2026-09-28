@@ -179,6 +179,37 @@ public const float DayLengthSeconds = 1200f;
     // Falloff exponent of the glow from the disc outwards; higher means a tighter halo
     public const float SunGlowExponent = 2.5f;
 
+    // --- Sky dome (SkyPalette, SkySample in the sky/world/cloud shaders) ---
+    /// <summary>Sine of the view elevation at which the zenith colour has fully taken over from the horizon.</summary>
+    public const float SkyHorizonBand = 0.35f;
+
+    /// <summary>Sine of the view elevation over which the brighter horizon haze band fades out.</summary>
+    public const float SkyHazeWidth = 0.08f;
+
+    /// <summary>How much brighter the haze band makes the horizon right at elevation 0 (0.2 = 20 %).</summary>
+    public const float SkyHazeStrength = 0.2f;
+
+    /// <summary>Azimuthal falloff exponent of the dusk glow toward the sun; higher is a narrower lobe.</summary>
+    public const float SkyGlowExponent = 4f;
+
+    /// <summary>Peak brightness the dusk glow adds on the horizon straight under the sun at full dusk.</summary>
+    public const float SkyGlowStrength = 0.6f;
+
+    /// <summary>How far the horizon colour moves toward the dusk orange at full dusk.</summary>
+    public const float SkyDuskHorizonMix = 0.6f;
+
+    /// <summary>How far the zenith colour moves toward the dusk violet at full dusk.</summary>
+    public const float SkyDuskZenithMix = 0.3f;
+
+    /// <summary>Cloud ambient-light weight at full dusk (1.2 at day); lowered so the sun term dominates.</summary>
+    public const float CloudDuskAmbientWeight = 0.7f;
+
+    /// <summary>Cloud sun-light base weight at full dusk (0.26 at day), so the orange sun tints every side.</summary>
+    public const float CloudDuskSunBase = 0.7f;
+
+    /// <summary>Cloud sun-light N·L weight at full dusk (0.04 at day), so the sun-facing sides warm more.</summary>
+    public const float CloudDuskSunNdl = 0.3f;
+
     // --- Clouds ---
     // One static field of CloudCellSize-block cells (CloudField) drawn 3x3 around the camera by
     // CloudRenderer. Cell levels come from periodic value noise, so the field tiles with no seam.

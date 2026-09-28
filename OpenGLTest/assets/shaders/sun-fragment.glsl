@@ -4,7 +4,7 @@
 // light here - there is no alpha to hide behind.
 // The glow is dithered before the 8-bit write so its falloff does not band, but only where the
 // quad already contributes light, since additive noise would otherwise speckle the whole quad.
-// The sky itself is still a flat glClearColor and cannot be dithered until it gets a pass (SH-11).
+// The sky itself is dithered in its own pass (sky-fragment.glsl), drawn just before this one.
 in vec2 fTexCoord;
 flat in uint fLayer;
 
