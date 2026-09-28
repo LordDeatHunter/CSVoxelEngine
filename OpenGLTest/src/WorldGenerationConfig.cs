@@ -547,6 +547,15 @@ public const float DayLengthSeconds = 1200f;
     public const float GravelFrequency = 1f / 48f;
     public const float GravelThreshold = 0.45f;
 
+    // --- Ore highlight (test-fragment.glsl) ---
+    /// <summary>
+    /// Scale on the ore sun highlight (uOreSpecScale). The highlight is added in linear light,
+    /// where the sRGB encode lifts a small add on the near-black ore body far more than the same
+    /// add did in display space before linear lighting; at full strength the broad lobe washed
+    /// coal's specks into grey. 0.1 matches the pre-linear look side by side.
+    /// </summary>
+    public const float OreSpecLinearScale = 0.1f;
+
     // --- Wet waterline (test-fragment.glsl, SH-22) ---
     // Albedo multiplier on a fully wet face (submerged, or at the waterline of the wet band)
     public const float WetDarken = 0.62f;

@@ -41,6 +41,7 @@ uniform sampler2DArray uMaterialAtlas;
 // Entries in the tile-material buffer below, and the switch for the whole reflective path:
 // it stays 0 wherever that buffer is not bound (the item debugger), so the buffer is never read.
 uniform int uMaterialCount;
+uniform float uOreSpecScale;  // WorldGenerationConfig.OreSpecLinearScale
 // How reflective each atlas slice is: (metallic, roughness, normalStrength, unused). Keyed by
 // tile rather than by block, which is what keeps this feature off the vertex entirely - fLayer
 // already rides every vertex. See TileMaterials.
@@ -577,16 +578,19 @@ void main() {
             float F = Schlick(max(dot(Vm, Nm), 0.0));
             vec3 skyColor = uFogColor * clamp(0.12 + 0.88 * fSun, 0.0, 1.0);
 
-            // Metal is a dark body with a bright specular. The HDR target now has headroom for
-            // the highlight to go past 1 and roll off through the tonemap shoulder, so the
-            // diffuse only darkens a little to keep the body reading as metal.
-            col *= 1.0 - metallic * 0.3 * nearFade;
+            // Metal is a dark body with a bright specular: the body pays for the highlight, so
+            // the diffuse darkens by the same 0.6 it did before linear lighting. Easing that off
+            // let the lifted body and the broad lobe below smear coal's specks into a grey wash.
+            col *= 1.0 - metallic * 0.6 * nearFade;
             // The sky is mixed in, not added. A reflection replaces what the surface would
             // otherwise show, and adding it instead piled a whole extra sky on top of the albedo
             // at grazing angles, where F approaches 1 - obsidian came out pale blue rather than
             // black glass catching the sky. Capped below a full mirror so it keeps its own colour.
             col = mix(col, skyColor, F * metallic * 0.65 * nearFade);
-            col += uSunColor * (spec * uSunIntensity) * tint * nearFade;
+            // Added in linear light, where the display encode lifts a small add on these
+            // near-black texels far more than the same add did in display space; uOreSpecScale
+            // (WorldGenerationConfig.OreSpecLinearScale) brings the lift back to the old look.
+            col += uSunColor * (spec * uSunIntensity * uOreSpecScale) * tint * nearFade;
         }
     }
 

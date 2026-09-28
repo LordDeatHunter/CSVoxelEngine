@@ -65,6 +65,7 @@ public sealed class DebugSceneRenderer : IDisposable
         // type clash fails the draw; unit 2 already holds a sampler2D. uCloudShadowStrength stays
         // at its default 0, which keeps the cloud-shadow path off here.
         _world.SetUniform("uCloudShadowMap", 2);
+        _world.SetUniform("uOreSpecScale", WorldGenerationConfig.OreSpecLinearScale);
         _world.SetUniform("uWetDarken", WorldGenerationConfig.WetDarken);
         _world.SetUniform("uWetBand", WorldGenerationConfig.WetBandBlocks);
         _world.SetUniform("uWetReflect", WorldGenerationConfig.WetReflect);

@@ -42,6 +42,10 @@ public class RenderManager : IDisposable
     /// binds it, so <see cref="BindWorldTextures"/> does not rebind it; any future pass that binds a
     /// texture here must restore it or the cloud shadow silently samples the wrong texture.</summary>
     private const int CloudShadowUnit = 8;
+
+    /// <summary>Transient unit the selection face highlight reads the HDR scene colour from
+    /// (<see cref="RenderBlockSelection"/>); bound only around that one draw and unbound again.</summary>
+    private const int SelectionSceneUnit = 9;
     private Shader chunkShader;
     private Shader chunkShadowShader;
 
@@ -340,7 +344,8 @@ public class RenderManager : IDisposable
     private static readonly Vector3 TntLightColor = ColorSpace.SrgbToLinear(new Vector3(1f, 0.45f, 0.15f));
     private static readonly Vector3 TntFlashColor = ColorSpace.SrgbToLinear(new Vector3(1f, 0.9f, 0.8f));
     private static readonly Vector3 SelectionOutlineColor = ColorSpace.SrgbToLinear(new Vector3(0.8f, 0.8f, 0.85f));
-    private static readonly Vector3 SelectionFaceColor = ColorSpace.SrgbToLinear(new Vector3(0.7f, 0.7f, 0.75f));
+    // Left sRGB: the face highlight is mixed in display space (see RenderBlockSelection)
+    private static readonly Vector3 SelectionFaceColorSrgb = new(0.7f, 0.7f, 0.75f);
     private static readonly Vector3 CampfireLightColor = ColorSpace.SrgbToLinear(new Vector3(1f, 0.5f, 0.15f));
     private double _prevTime;
     private float _underwaterT;
@@ -753,6 +758,7 @@ public class RenderManager : IDisposable
         // the material buffer, which is what keeps the ItemDebugger (same shaders, no buffer)
         // and a world with no reflective tiles safe.
         program.SetUniform("uMaterialCount", materialSsbo != 0 ? TileMaterials.ByLayer.Length : 0);
+        program.SetUniform("uOreSpecScale", WorldGenerationConfig.OreSpecLinearScale);
         program.SetUniform("uReflValid", 0f);
         // The water model's tuning constants never change at runtime, so they go up once here
         // instead of riding ApplyFrameUniforms every frame.
@@ -3462,6 +3468,7 @@ public class RenderManager : IDisposable
         // sRGB-authored outline colours, decoded: the selection draws into the linear HDR target
         selectionShader.SetUniform("uColor", SelectionOutlineColor);
         selectionShader.SetUniform("uOpacity", 0.95f);
+        selectionShader.SetUniform("uDisplayMix", 0);
 
         // The outline is twelve edge beams (SelectionOutlineMesh) rather than GL lines, since
         // LineWidth is unreliable in a core profile. The vertices are already in world space.
@@ -3495,11 +3502,24 @@ public class RenderManager : IDisposable
                             * Matrix4x4.CreateScale(hitBox.Size + new Vector3(grow))
                             * Matrix4x4.CreateTranslation(hitCenter + hitNormal * 0.003f);
             selectionShader.SetUniform("uMVP", faceModel * viewProj);
-            selectionShader.SetUniform("uColor", SelectionFaceColor);
+            // The face highlight mixes in display space (selection-fragment.glsl), so its colour
+            // stays sRGB and it reads the very target it writes: one quad touches each texel
+            // once, which is what glTextureBarrier makes legal. Blending is off for that draw.
+            selectionShader.SetUniform("uColor", SelectionFaceColorSrgb);
             selectionShader.SetUniform("uOpacity", 0.15f);
+            selectionShader.SetUniform("uDisplayMix", 1);
+            selectionShader.SetUniform("uScene", SelectionSceneUnit);
+            BindUnit(SelectionSceneUnit, TextureTarget.Texture2D, _hdrColorTex);
+            gl.TextureBarrier();
+            gl.Disable(EnableCap.Blend);
 
             gl.BindVertexArray(faceVao);
             gl.DrawArrays(GLEnum.TriangleFan, faceIndex * 4, 4);
+
+            gl.Enable(EnableCap.Blend);
+            // Never leave the render target sitting on a sampler unit
+            BindUnit(SelectionSceneUnit, TextureTarget.Texture2D, 0);
+            ActiveUnit(0);
         }
 
         gl.BindVertexArray(0);

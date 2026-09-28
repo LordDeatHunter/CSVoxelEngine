@@ -90,7 +90,10 @@ world healthbar hearts) so the sampler decodes them; the material/normal atlas i
 plain `Rgba`, and so do UI-only textures (font, crosshair, HUD hearts, `UIRenderer`'s own icons).
 CPU colours are authored in sRGB and go through `ColorSpace.SrgbToLinear` where they are computed
 or uploaded (the sun, ambient and sky palette in `SetLighting`, torch, point lights, water
-scatter, molten tints, selection outline); the block-light colours are the exception that is
+scatter, molten tints, selection outline); the selection *face* highlight is the one overlay
+mixed in display space instead (`selection-fragment.glsl`'s `uDisplayMix`: it reads the HDR target
+it draws into after a `glTextureBarrier`, blend off), since a linear 15% blend turned any dark
+targeted face into a flat grey; the block-light colours are the exception that is
 uploaded pre-linearised: `BlockLightPalette.Linear` goes up once per frame as the
 `uBlockLightPalette[8]` array, `test-vertex.glsl` decodes each chunk vertex's tint code into the
 smooth `fBlockTint` (mirroring `LightTint.Decode`), the plain (entity) path reads
@@ -207,7 +210,10 @@ loads the same shaders), so an unbound buffer is never read. `test-vertex.glsl` 
 UV orientation or the relief comes out rotated or mirrored per face. Regenerate the art with
 `tools/generate-ore-materials.ps1` (deterministic, byte-identical re-runs);
 `visual-examples/ores.json` is the screenshot check, and wants a `VOXEL_TIME` since the highlight
-tracks the sun. Every other (non-ore, non-water) tile gets only a faint, near-camera grazing sky rim
+tracks the sun. The ore body darkens by `metallic * 0.6` and the sun highlight, added in linear light,
+is scaled by `WorldGenerationConfig.OreSpecLinearScale` (`uOreSpecScale`), because the sRGB encode
+lifts an add on the near-black body far more than it did in display space and smeared coal's
+specks into grey. Every other (non-ore, non-water) tile gets only a faint, near-camera grazing sky rim
 (SH-23: `uRimStrength`, a renormalised Schlick mixed toward the sky and faded out between
 `RimFadeNear` and `RimFadeFar`, twin `SurfaceFresnel.Rim`/`RimFade`; back faces, reflections
 that head down and sun-shadowed foliage get little or none), which is excluded on ores and wet
