@@ -90,6 +90,8 @@ public static class Program
             renderManager.TranslucentChunkGeometry, renderManager.LodGeometry,
             windowManager.Window, inputManager.InputContext, sfx);
         world.Player.Rig = renderManager.PlayerRig;
+        // Entity draws sample their light from the live chunks from here on
+        renderManager.LightSource = world.GetChunkManager();
 
         inputManager.Mouse?.MouseUp += (_, button) =>
         {

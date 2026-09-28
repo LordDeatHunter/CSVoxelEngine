@@ -46,6 +46,13 @@ public class Chunk : IDisposable
     // treat null as zeros, the same tolerated race as _blocks (an edit's own remesh wins after).
     private volatile byte[]? _state;
 
+    // The light the current mesh was baked with, one byte per cell packed sun << 4 | block in
+    // Idx order (see ChunkMeshData.Light). Published on the main thread by UpdateMesh, read on
+    // the main thread by entity draws (EntityLight), never mutated after publish and swapped
+    // by reference, so a reader sees one whole snapshot. Null = no snapshot (not meshed yet,
+    // or an all-air/fully-enclosed chunk whose build skipped the light flood).
+    private volatile byte[]? _light;
+
     // Counts non-air cells, water included: its only consumer is the all-air mesh fast path,
     // and a chunk holding nothing but sea water still has a surface to draw.
     private int _solidCount;
@@ -814,6 +821,28 @@ public class Chunk : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public byte GetLocalState(int x, int y, int z) => _state?[Idx(x, y, z)] ?? 0;
 
+    /// <summary>Hands the light snapshot of the mesh just applied to entity queries (main thread).</summary>
+    internal void PublishLight(byte[]? packed) => _light = packed;
+
+    /// <summary>
+    /// Sun and block light (0..15) of a chunk-local cell from the snapshot the current mesh
+    /// was baked with. False, with both levels 0, when no snapshot has been published.
+    /// </summary>
+    public bool TryGetLocalLight(int x, int y, int z, out byte sun, out byte block)
+    {
+        var light = _light;
+        if (light == null)
+        {
+            sun = 0;
+            block = 0;
+            return false;
+        }
+        var packed = light[Idx(x, y, z)];
+        sun = (byte)(packed >> 4);
+        block = (byte)(packed & 0xF);
+        return true;
+    }
+
     /// <summary>
     /// Writes a block and its state with no remeshing, no player-placed bookkeeping and no
     /// scheduling, returning the previous id. The fluid simulation edits hundreds of cells per
@@ -1031,7 +1060,18 @@ public class Chunk : IDisposable
             Array.Clear(sunLight, 0, LightCount);
             Array.Clear(blockLight, 0, LightCount);
             ComputeLight(lightBlocks, sunLight, blockLight, queue);
-            return GenerateMeshDataFromSnapshot(padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy);
+            // Keep the chunk's own cells of the flood for entity lighting: a fresh array owned
+            // by this build alone, published by UpdateMesh with the mesh it belongs to.
+            var packed = new byte[BlockCount];
+            for (var x = 0; x < Size; x++)
+            for (var y = 0; y < Size; y++)
+            for (var z = 0; z < Size; z++)
+            {
+                var li = LightIdx(x, y, z);
+                packed[Idx(x, y, z)] = (byte)(sunLight[li] << 4 | blockLight[li]);
+            }
+            return GenerateMeshDataFromSnapshot(padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy)
+                with { Light = packed };
         }
         finally
         {
@@ -2233,6 +2273,7 @@ public class Chunk : IDisposable
         ChunkGeometryPool? translucentPool)
     {
         IsMeshed = true;
+        PublishLight(meshData.Light);
         ReleaseSlices();
 
         if (meshData.Vertices.Count > 0)
@@ -2347,4 +2388,12 @@ public class Chunk : IDisposable
 /// any of those translucent quads are fluid — glass lands in the same lists.
 /// </summary>
 public record ChunkMeshData(List<Vertex> Vertices, List<ushort> Indices,
-    List<Vertex> TranslucentVertices, List<ushort> TranslucentIndices, bool HasWater);
+    List<Vertex> TranslucentVertices, List<ushort> TranslucentIndices, bool HasWater)
+{
+    /// <summary>
+    /// The chunk's own 16^3 cells of the light flood this mesh was built with, packed
+    /// <c>sun &lt;&lt; 4 | block</c> (levels 0..15) in <see cref="Chunk.Idx"/> order, or null
+    /// when the build skipped the light flood (all-air or fully enclosed).
+    /// </summary>
+    public byte[]? Light { get; init; }
+}

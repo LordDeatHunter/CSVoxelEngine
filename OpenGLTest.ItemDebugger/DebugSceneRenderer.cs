@@ -59,6 +59,12 @@ public sealed class DebugSceneRenderer : IDisposable
         _world.SetUniform("uReflectionMap", 2);
         _world.SetUniform("uSceneColor", 3);
         _world.SetUniform("uSceneDepth", 4);
+        // The plain vertex path lights meshes from these per-draw uniforms (the game samples the
+        // world through RenderManager.SetDrawUniforms). The debugger has no world, so it lights
+        // everything like the old vertex defaults: full sun, no block light. Unset they would be 0,
+        // i.e. night ambient.
+        _world.SetUniform("uEntitySun", 1f);
+        _world.SetUniform("uEntityBlock", 0f);
 
         _locModel = _world.GetUniformLocation("uModel");
         _locMvp = _world.GetUniformLocation("uMVP");

@@ -807,6 +807,27 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     }
 
     /// <summary>
+    /// Reads a world cell's sun and block light (0..15) from the snapshot its chunk's current
+    /// mesh was baked with. Returns false when the chunk is unloaded or has not published a
+    /// snapshot (not meshed yet, or an all-air/fully-enclosed chunk).
+    /// </summary>
+    public bool TryGetLightGlobal(int x, int y, int z, out byte sun, out byte block)
+    {
+        var chunk = ChunkAt(x, y, z);
+        if (chunk == null)
+        {
+            sun = 0;
+            block = 0;
+            return false;
+        }
+
+        var lx = x & Chunk.SizeMask;
+        var ly = y & Chunk.SizeMask;
+        var lz = z & Chunk.SizeMask;
+        return chunk.TryGetLocalLight(lx, ly, lz, out sun, out block);
+    }
+
+    /// <summary>
     /// World Y of the fluid surface in the cell (x, y, z): <c>y + 1</c> when another fluid cell
     /// sits directly above (stacked water has no seam), otherwise <c>y</c> plus the cell's own
     /// <see cref="FluidState.SurfaceHeight"/>. Returns <see cref="float.NegativeInfinity"/>

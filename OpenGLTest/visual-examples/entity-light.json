@@ -1,0 +1,54 @@
+{
+  // Entity world-light check (SH-2): run with VOXEL_TIME=700 (night) and
+  // VOXEL_SCRIPT=visual-examples/entity-light.json. Shots land in visual/entity-light/.
+  //
+  // Entity draws take the sun/block light of the cell they stand in (EntityLight.Sample through
+  // RenderManager.SetDrawUniforms) instead of the vertex defaults of full sun, so at night the
+  // hand and the held item read dark rather than noon-bright, and whatever stands in a lamp's
+  // pool (the hand beside it, the mining pop and debris, a slime that wanders in) reads warm-lit.
+  //
+  // Same open dunes as night-lights.json. The player hovers until the chunks stream in, lands
+  // and takes the first shot holding a copper pickaxe in the dark (HUD on, so the hand and the
+  // held item show). It then places a lamp on the ground about five blocks ahead and takes the
+  // same view again: the hand and pickaxe now pick up the lamp's warm light. Next it mines the
+  // ground cell in front of the lamp and shoots mid-break, so the pop and the debris flying out
+  // of the hole are lit by the lamp. (A mined drop is not framed: at five blocks it is pulled
+  // into the inventory before it settles.) Finally it flies up out of the lamp's reach, shooting
+  // down at the lamp with a dirt block in hand, and turns round into dark open ground.
+  // A screenshot renders after the steps that follow it in the same frame, so every shot here
+  // comes straight after a wait or a mine rather than after a look.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-62.5, 60.5, 118.5], "yaw": -78, "pitch": -18 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "fly", "on": false },
+    { "op": "wait", "seconds": 6 },
+
+    { "op": "give", "block": "item/copper_pickaxe", "count": 1 },
+    { "op": "look", "yaw": -78, "pitch": -18 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "dark-hand" },
+
+    { "op": "give", "block": "lamp", "count": 1 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "place" },
+    { "op": "give", "block": "item/copper_pickaxe", "count": 1 },
+    { "op": "look", "yaw": -78, "pitch": -22 },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "screenshot", "name": "lamp-hand" },
+
+    { "op": "mine", "seconds": 0.55 },
+    { "op": "screenshot", "name": "lamp-debris" },
+
+    { "op": "give", "block": "dirt", "count": 1 },
+    { "op": "fly", "on": true },
+    { "op": "walk", "keys": ["S", "Space"], "seconds": 1.5 },
+    { "op": "look", "yaw": -78, "pitch": -45 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "above-lamp" },
+
+    { "op": "look", "yaw": 102, "pitch": -20 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "dark-ground" }
+  ]
+}

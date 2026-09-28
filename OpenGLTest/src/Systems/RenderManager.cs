@@ -212,6 +212,12 @@ public class RenderManager : IDisposable
     private float _dayness;
     /// <summary>0 at night, 1 in full day; drives the ambience crossfade.</summary>
     public float Dayness => _dayness;
+
+    /// <summary>
+    /// Where entity draws read their world light (<see cref="EntityLight.Sample"/>). Set once
+    /// after the World exists; null lights every draw at <see cref="EntityLightSample.Default"/>.
+    /// </summary>
+    public ChunkManager? LightSource { get; set; }
     private Matrix4x4 _lightViewProj = Matrix4x4.Identity;
     // The shadow box centre carried frame to frame by StepShadowCentre; invalid until the first
     // frame with shadows, which seeds it on the camera instead of stepping from a stale point.
@@ -279,6 +285,8 @@ public class RenderManager : IDisposable
     private int _locModel;
     private int _locMvp;
     private int _locAlpha;
+    private int _locEntitySun;
+    private int _locEntityBlock;
     private int _locFlash;
     private int _locHitFlash;
     private int _locAlphaCutoff;
@@ -459,6 +467,8 @@ public class RenderManager : IDisposable
         _locModel = worldShader.GetUniformLocation("uModel");
         _locMvp = worldShader.GetUniformLocation("uMVP");
         _locAlpha = worldShader.GetUniformLocation("uAlpha");
+        _locEntitySun = worldShader.GetUniformLocation("uEntitySun");
+        _locEntityBlock = worldShader.GetUniformLocation("uEntityBlock");
         _locFlash = worldShader.GetUniformLocation("uFlash");
         _locHitFlash = worldShader.GetUniformLocation("uHitFlash");
         _locAlphaCutoff = worldShader.GetUniformLocation("uAlphaCutoff");
@@ -1720,13 +1730,21 @@ public class RenderManager : IDisposable
     /// was uploaded once by <see cref="ApplyFrameUniforms"/>.
     /// Entity draws only: chunks and LOD regions both go through <see cref="ChunkDrawBatch"/>,
     /// where a uniform could not vary between the sub-draws of one multi-draw anyway.
+    /// <paramref name="light"/> is the world light the draw is lit by (the plain variant ignores
+    /// the vertices' baked sun/block). This is the only writer of <c>uEntitySun</c>/<c>uEntityBlock</c>,
+    /// so every plain-worldShader draw must go through it or it inherits the previous draw's light.
     /// </summary>
-    private void SetDrawUniforms(in Matrix4x4 model, in Matrix4x4 mvp, float alpha)
+    private void SetDrawUniforms(in Matrix4x4 model, in Matrix4x4 mvp, float alpha, in EntityLightSample light)
     {
         worldShader.SetUniform(_locModel, model);
         worldShader.SetUniform(_locMvp, mvp);
         worldShader.SetUniform(_locAlpha, alpha);
+        worldShader.SetUniform(_locEntitySun, light.Sun);
+        worldShader.SetUniform(_locEntityBlock, light.Block);
     }
+
+    /// <summary>The world light at <paramref name="world"/>, read from <see cref="LightSource"/>.</summary>
+    private EntityLightSample LightAt(Vector3 world) => EntityLight.Sample(LightSource, world);
 
     /// <summary>
     /// Draws the cloud field once, translucent, after every opaque pass and the water pass so the
@@ -2096,7 +2114,8 @@ public class RenderManager : IDisposable
         gl.BufferSubData<Vertex>(BufferTargetARB.ArrayBuffer, 0,
             System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_popVerts));
         var matrix = Matrix4x4.Identity;
-        SetDrawUniforms(matrix, matrix * camera.GetViewProjection(), 1f);
+        SetDrawUniforms(matrix, matrix * camera.GetViewProjection(), 1f,
+            LightAt(blockPosition + new Vector3(0.5f)));
         unsafe
         {
             gl.DrawElements(PrimitiveType.Triangles, (uint)_popIndices.Count,
@@ -2149,7 +2168,7 @@ public class RenderManager : IDisposable
                         * Matrix4x4.CreateRotationY(drop.Spin)
                         * Matrix4x4.CreateTranslation(drop.Position);
 
-            SetDrawUniforms(model, model * viewProj, 1f);
+            SetDrawUniforms(model, model * viewProj, 1f, LightAt(drop.Position));
             mesh.Render();
         }
     }
@@ -2189,7 +2208,7 @@ public class RenderManager : IDisposable
                         * Matrix4x4.CreateRotationY(projectile.Spin)
                         * Matrix4x4.CreateTranslation(projectile.Position);
 
-            SetDrawUniforms(model, model * viewProj, 1f);
+            SetDrawUniforms(model, model * viewProj, 1f, LightAt(projectile.Position));
             mesh.Render();
         }
     }
@@ -2254,7 +2273,7 @@ public class RenderManager : IDisposable
                         * Matrix4x4.CreateRotationY(slot * MathF.PI / 2f)
                         * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f, 0f, 0.5f) + offset);
 
-            SetDrawUniforms(placed, placed * viewProj, 1f);
+            SetDrawUniforms(placed, placed * viewProj, 1f, LightAt(cell + new Vector3(0.5f)));
             mesh.Render();
         }
     }
@@ -2281,7 +2300,9 @@ public class RenderManager : IDisposable
             // The top mesh is centred on its own origin, so it yaws in place
             var center = cell + new Vector3(0.5f, 0.5f, 0.5f);
             var model = Matrix4x4.CreateRotationY(angle) * Matrix4x4.CreateTranslation(center);
-            SetDrawUniforms(model, model * viewProj, 1f);
+            // One sample per quern, shared by the plate and the input hovering over it
+            var light = LightAt(center);
+            SetDrawUniforms(model, model * viewProj, 1f, light);
             _quernTop.Render();
 
             if (inputId == 0) continue;
@@ -2308,7 +2329,7 @@ public class RenderManager : IDisposable
             var scale = ItemDrop.Size * (ItemRegistry.IsItem(inputId) ? 1.5f : 1f);
             var placed = Matrix4x4.CreateScale(scale)
                         * Matrix4x4.CreateTranslation(cell + new Vector3(0.35f, 0.82f, 0.35f));
-            SetDrawUniforms(placed, placed * viewProj, 1f);
+            SetDrawUniforms(placed, placed * viewProj, 1f, light);
             mesh.Render();
         }
     }
@@ -2364,13 +2385,17 @@ public class RenderManager : IDisposable
                 atlasBound = true;
             }
 
+            // One sample per kiln, half a block outside its opening: every cell inside the
+            // structure is solid brickwork, so the light the hearth sees is the light at its mouth.
+            var light = LightAt(KilnRenderer.ToWorld(anchor, facing, new Vector3(1f, 0.5f, -0.5f)));
+
             if (state.HasCrucible)
             {
                 // CreateBlockModel centres a cell's model on the origin, so lift by half a block
                 // to put the bowl's floor back on the hearth. The bowl is symmetric: no yaw.
                 var bowl = KilnRenderer.ToWorld(anchor, facing, KilnRenderer.CrucibleLocal);
                 var model = Matrix4x4.CreateTranslation(bowl + new Vector3(0f, 0.5f, 0f));
-                SetDrawUniforms(model, model * viewProj, 1f);
+                SetDrawUniforms(model, model * viewProj, 1f, light);
                 _crucibleMesh.Render();
 
                 var ml = KilnManager.DisplayMoltenMl(state);
@@ -2379,7 +2404,8 @@ public class RenderManager : IDisposable
                     var liquid = Matrix4x4.CreateScale(KilnRenderer.CrucibleInnerMax - KilnRenderer.CrucibleInnerMin)
                                 * Matrix4x4.CreateTranslation(bowl + new Vector3(0f,
                                     KilnRenderer.LiquidHeight(ml, KilnManager.CrucibleCapacityOf(state)), 0f));
-                    SetDrawUniforms(liquid, liquid * viewProj, 1f);
+                    // The molten pool glows on its own, as the flat quad's baked light always meant
+                    SetDrawUniforms(liquid, liquid * viewProj, 1f, EntityLightSample.SelfLit);
                     MoltenQuad(material).Render();
                 }
 
@@ -2417,7 +2443,7 @@ public class RenderManager : IDisposable
                         var placed = Matrix4x4.CreateScale(size)
                                     * Matrix4x4.CreateRotationY(KilnRenderer.OpeningYaw(facing))
                                     * Matrix4x4.CreateTranslation(foot + new Vector3(0f, size * 0.5f, 0f));
-                        SetDrawUniforms(placed, placed * viewProj, 1f);
+                        SetDrawUniforms(placed, placed * viewProj, 1f, light);
                         lump.Render();
                     }
                 }
@@ -2462,7 +2488,7 @@ public class RenderManager : IDisposable
                             * orient
                             * Matrix4x4.CreateTranslation(
                                 basePos + along * ((i - (state.Fuel - 1) * 0.5f) * KilnRenderer.FuelSpacing));
-                SetDrawUniforms(placed, placed * viewProj, 1f);
+                SetDrawUniforms(placed, placed * viewProj, 1f, light);
                 fuelMesh.Render();
             }
         }
@@ -2512,7 +2538,8 @@ public class RenderManager : IDisposable
                                 CastingRenderer.ResultCubeY, 0.5f));
                 }
 
-                SetDrawUniforms(sprite, sprite * viewProj, done ? 1f : CastingRenderer.ResultAlpha(cool01));
+                SetDrawUniforms(sprite, sprite * viewProj, done ? 1f : CastingRenderer.ResultAlpha(cool01),
+                    LightAt(cell + new Vector3(0.5f)));
                 mesh.Render();
                 BindWorldTextures();
             }
@@ -2523,7 +2550,8 @@ public class RenderManager : IDisposable
             var liquid = Matrix4x4.CreateScale(CastingRenderer.PocketWidth)
                         * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f,
                             CastingRenderer.LiquidHeight(fill01), 0.5f));
-            SetDrawUniforms(liquid, liquid * viewProj, CastingRenderer.LiquidAlpha(cool01));
+            // Self-lit, like the kiln's pool: molten metal is its own light source
+            SetDrawUniforms(liquid, liquid * viewProj, CastingRenderer.LiquidAlpha(cool01), EntityLightSample.SelfLit);
             MoltenQuad(material).Render();
         }
 
@@ -2554,7 +2582,7 @@ public class RenderManager : IDisposable
             var model = Matrix4x4.CreateScale(tnt.Scale)
                         * Matrix4x4.CreateTranslation(tnt.Position);
 
-            SetDrawUniforms(model, model * viewProj, 1f);
+            SetDrawUniforms(model, model * viewProj, 1f, LightAt(tnt.Position));
             worldShader.SetUniform(_locFlash, tnt.WhiteFlash);
             mesh.Render();
             drewFlash = true;
@@ -2587,7 +2615,7 @@ public class RenderManager : IDisposable
             // The cube is centred on its own origin, like the primed TNT above
             var model = Matrix4x4.CreateTranslation(block.Position);
 
-            SetDrawUniforms(model, model * viewProj, 1f);
+            SetDrawUniforms(model, model * viewProj, 1f, LightAt(block.Position));
             mesh.Render();
         }
     }
@@ -2611,7 +2639,7 @@ public class RenderManager : IDisposable
         foreach (var slime in slimes)
         {
             var model = SlimeTransform(slime);
-            SetDrawUniforms(model, model * viewProj, 1f);
+            SetDrawUniforms(model, model * viewProj, 1f, LightAt(slime.Position));
             worldShader.SetUniform(_locHitFlash, slime.HitFlash);
             _slimeMesh.Render();
             drewFlash = true;
@@ -2705,7 +2733,7 @@ public class RenderManager : IDisposable
                         * Matrix4x4.CreateRotationY(cube.Spin)
                         * Matrix4x4.CreateTranslation(cube.Position);
 
-            SetDrawUniforms(model, model * viewProj, MathUtils.Clamp01(cube.Alpha));
+            SetDrawUniforms(model, model * viewProj, MathUtils.Clamp01(cube.Alpha), LightAt(cube.Position));
             mesh.Render();
         }
     }
@@ -2730,13 +2758,15 @@ public class RenderManager : IDisposable
         var blend = camera.ShoulderBlend;
         var viewProj = camera.GetViewProjection();
         var bodyYaw = camera.PlayerYaw;
+        // One sample for the whole body: every part is lit alike, so no seam opens between them
+        var light = LightAt(camera.Position);
         if (blend <= 0f)
         {
             foreach (var part in PlayerModel.FirstPersonParts)
             {
                 var model = player.GetPartMatrix(part, camera.Position, bodyYaw, camera.Pitch,
                     PlayerModel.FirstPersonBodyBack);
-                SetDrawUniforms(model, model * viewProj, 1f);
+                SetDrawUniforms(model, model * viewProj, 1f, light);
                 _playerMeshes[part].Render();
             }
         }
@@ -2745,11 +2775,11 @@ public class RenderManager : IDisposable
             foreach (var part in PlayerModel.BodyParts)
             {
                 var model = player.GetPartMatrix(part, camera.Position, bodyYaw, camera.Pitch);
-                SetDrawUniforms(model, model * viewProj, 1f);
+                SetDrawUniforms(model, model * viewProj, 1f, light);
                 _playerMeshes[part].Render();
             }
             var head = player.GetPartMatrix("Head", camera.Position, bodyYaw, camera.Pitch);
-            SetDrawUniforms(head, head * viewProj, 1f);
+            SetDrawUniforms(head, head * viewProj, 1f, light);
             _playerMeshes["Head"].Render();
         }
         else
@@ -2758,12 +2788,12 @@ public class RenderManager : IDisposable
             foreach (var part in PlayerModel.BodyParts)
             {
                 var model = player.GetPartMatrix(part, camera.Position, bodyYaw, camera.Pitch, back);
-                SetDrawUniforms(model, model * viewProj, 1f);
+                SetDrawUniforms(model, model * viewProj, 1f, light);
                 _playerMeshes[part].Render();
             }
             gl.DepthMask(false);
             var head = player.GetPartMatrix("Head", camera.Position, bodyYaw, camera.Pitch);
-            SetDrawUniforms(head, head * viewProj, blend);
+            SetDrawUniforms(head, head * viewProj, blend, light);
             _playerMeshes["Head"].Render();
             gl.DepthMask(true);
         }
@@ -2805,6 +2835,8 @@ public class RenderManager : IDisposable
         var hand = player.GetHandAnchorMatrix(camera.Position, camera.PlayerYaw, backOffset,
             camera.Pitch);
         var viewProj = camera.GetViewProjection();
+        // Lit like the body holding it (RenderPlayer samples the same point)
+        var light = LightAt(camera.Position);
 
         worldShader.Use();
         BindWorldTextures();
@@ -2817,7 +2849,7 @@ public class RenderManager : IDisposable
             if (!itemMeshes.TryGetFrame(selectedId, frame, out var mesh, out var texture)) return;
 
             var model = PoseHeldItem(hand, type.DisplayMatrix(), HeldItemScale, HeldItemGrip);
-            SetDrawUniforms(model, model * viewProj, 1f);
+            SetDrawUniforms(model, model * viewProj, 1f, light);
 
             BindUnit(0, TextureTarget.Texture2DArray, texture);
             mesh.Render();
@@ -2828,7 +2860,7 @@ public class RenderManager : IDisposable
         var cube = blockCubes.Get(selectedId);
         if (cube == null) return;
         var blockModel = PoseHeldItem(hand, Matrix4x4.Identity, HeldBlockScale, HeldBlockGrip);
-        SetDrawUniforms(blockModel, blockModel * viewProj, 1f);
+        SetDrawUniforms(blockModel, blockModel * viewProj, 1f, light);
         cube.Render();
     }
 
@@ -2856,7 +2888,7 @@ public class RenderManager : IDisposable
         BindWorldTextures();
 
         var model = tree.Model;
-        SetDrawUniforms(model, model * camera.GetViewProjection(), 1f);
+        SetDrawUniforms(model, model * camera.GetViewProjection(), 1f, LightAt(model.Translation));
 
         mesh.Render();
     }

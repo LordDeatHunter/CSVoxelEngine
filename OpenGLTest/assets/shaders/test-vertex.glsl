@@ -20,6 +20,10 @@ uniform int uDrawBase;
 uniform mat4 uMVP;
 uniform mat4 uModel;
 uniform float uAlpha;
+// Entity meshes are static meshes drawn at many positions, so their light cannot be baked into
+// the vertices: RenderManager.SetDrawUniforms sets it per draw from EntityLight.Sample.
+uniform float uEntitySun;
+uniform float uEntityBlock;
 #define TO_WORLD(p) ((uModel * vec4((p), 1.0)).xyz)
 #endif
 uniform float uTime;
@@ -94,8 +98,14 @@ void main() {
     fColor = vColor;
     fTexCoord = vTexCoord;
     fLayer = vLayer;
+#ifdef CHUNK_DRAW
     fSun = vSun;
     fBlock = vBlock;
+#else
+    // Per-draw light sampled from the world at the entity's anchor (see uEntitySun above).
+    fSun = uEntitySun;
+    fBlock = uEntityBlock;
+#endif
     // uModel is a pure translation for chunks/LOD, so the normal is unchanged.
     // The mesher packs the face as a 0..5 index (Chunk.CubeFaces order) in bits 0-2 and
     // "this face looks into water" in bit 3; a nested ternary keeps the decode branchless
