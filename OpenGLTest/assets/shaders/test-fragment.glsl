@@ -27,6 +27,7 @@ flat in vec3 fTangent;
 flat in vec3 fBitangent;
 in vec3 fWorldPos;
 in float fSubmerged;
+flat in float fWaterSurfaceY; // baked water surface over a submerged face (Vertex.WaterSurface)
 flat in float fAlpha; // per-draw fade from the vertex stage: a uniform cannot vary inside one multi-draw
 
 // One slice per block tile; UVs are tile-local and REPEAT across merged quads.
@@ -66,7 +67,6 @@ uniform sampler2DShadow uShadowMap;
 uniform mat4 uLightViewProj;
 uniform sampler2D uReflectionMap;
 uniform mat4 uReflViewProj;
-uniform float uWaterPlaneY;
 uniform float uReflValid;
 uniform float uClipY;
 uniform float uShadowStrength;
@@ -357,9 +357,10 @@ void main() {
     }
 
     if (fSubmerged > 0.5 && !isWater && dist < 96.0) {
-        // Where on the surface did this sunlight come through? Follow the sun back up to the
-        // sea plane so walls get the same pattern as the floor beside them.
-        float below = max(uWaterPlaneY - fWorldPos.y, 0.0);
+        // Where on the surface did this sunlight come through? Follow the sun back up to this
+        // face's own water surface (baked by the mesher), not the sea plane, so a pond above sea
+        // level gets its net too and walls match the floor beside them.
+        float below = max(fWaterSurfaceY - fWorldPos.y, 0.0);
         vec2 cp = fWorldPos.xz - uSunDir.xz / max(uSunDir.y, 0.2) * below;
         float causticShadow = SampleShadow(fWorldPos, N, ndl, uShadowStrengthDry);
         float fade = (1.0 - smoothstep(48.0, 96.0, dist)) * exp(-0.06 * below);

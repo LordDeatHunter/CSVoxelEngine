@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Xunit;
 
@@ -247,7 +249,7 @@ public sealed class MeshingTests
         Assert.Equal(13.5f, v.UV.X);
         Assert.Equal(0.25f, v.UV.Y);
         Assert.Equal(300, v.Layer);
-        Assert.Equal(0, v.Reserved);
+        Assert.Equal(0, v.WaterSurface);
         // The single-slice overload lands on layer 0 with the UV untouched
         var sprite = new Vertex(Vector3.Zero, 255, 255, 255, 255, new Vector2(0.125f, 0.875f));
         Assert.Equal(0, sprite.Layer);
@@ -270,6 +272,134 @@ public sealed class MeshingTests
             Vector2.Zero, 1f, 0f, Vector3.UnitY, 0f, submerged: true);
         Assert.Equal(4 | 8, submerged.Normal);
         Assert.Equal(4, submerged.Normal & 7);
+
+        // The baked water surface survives its quarter-block quantisation
+        foreach (var y in new[] { -44f, -0.25f, 0f, 8f / 9f, 12.75f, 200.5f })
+        {
+            var encoded = Vertex.EncodeWaterSurface(y);
+            Assert.NotEqual(0, encoded);
+            Assert.True(MathF.Abs(Vertex.DecodeWaterSurface(encoded) - y) <= 1f / 8f, $"{y}");
+        }
+
+        // Every surface code names a higher surface than the one before it
+        for (var code = 2; code <= 127; code++)
+            Assert.True(Chunk.DecodeSurfaceCode(-32, code) > Chunk.DecodeSurfaceCode(-32, code - 1), $"code {code}");
+    }
+
+    /// <summary>Decoded water surface of every submerged top face at world Y
+    /// <paramref name="faceY"/>; asserts every other vertex carries no surface.</summary>
+    private static List<float> SubmergedTopSurfaces(ChunkMeshData mesh, float faceY)
+    {
+        var surfaces = new List<float>();
+        foreach (var vertex in mesh.Vertices)
+        {
+            var submerged = (vertex.Normal & 8) != 0;
+            if (!submerged)
+            {
+                Assert.Equal(0, vertex.WaterSurface);
+                continue;
+            }
+            Assert.NotEqual(0, vertex.WaterSurface);
+            if ((vertex.Normal & 7) == 4 && vertex.Position.Y == faceY)
+                surfaces.Add(Vertex.DecodeWaterSurface(vertex.WaterSurface));
+        }
+        Assert.NotEmpty(surfaces);
+        return surfaces;
+    }
+
+    private static float StackedSurface(int stackHeight, byte topState)
+    {
+        var (manager, center) = MeshTestWorld.WalledArea();
+        var water = ContentRegistry.RequireBlock("water").Id;
+        center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
+        for (var y = 9; y < 9 + stackHeight; y++)
+            center.SetBlockRaw(8, y, 8, water, y == 8 + stackHeight ? topState : FluidState.Source);
+
+        var mesh = center.GenerateMeshData(manager);
+        Assert.NotNull(mesh);
+        var surfaces = SubmergedTopSurfaces(mesh, 9f);
+        Assert.All(surfaces, s => Assert.Equal(surfaces[0], s));
+        return surfaces[0];
+    }
+
+    [Fact]
+    public void SubmergedFaceCarriesItsOwnWaterSurface()
+    {
+        foreach (var state in new[] { FluidState.Source, FluidState.Flowing(3) })
+        {
+            // Three cells of water on the stone at y = 8: the top one is y = 11 in this chunk
+            var surface = StackedSurface(3, state);
+            Assert.True(MathF.Abs(surface - (11f + FluidState.SurfaceHeight(state))) <= 1f / 8f, $"{surface}");
+        }
+    }
+
+    [Fact]
+    public void DeeperColumnRaisesTheBakedSurface()
+    {
+        var shallow = StackedSurface(2, FluidState.Source);
+        var deep = StackedSurface(4, FluidState.Source);
+        Assert.True(MathF.Abs(deep - shallow - 2f) <= 1f / 8f, $"{shallow} -> {deep}");
+    }
+
+    /// <summary>A stone floor at local (8, 1, 8) of a chunk at <paramref name="position"/>
+    /// whose column is water all the way up and out of the padded snapshot's top row.</summary>
+    private static float SurfaceOfAColumnLeavingTheSnapshot(Vector3 position)
+    {
+        var (manager, center) = MeshTestWorld.WalledArea(position);
+        var water = ContentRegistry.RequireBlock("water").Id;
+        center.SetBlockRaw(8, 1, 8, ContentRegistry.RequireBlock("stone").Id, 0);
+        for (var y = 2; y < Chunk.Size; y++) center.SetBlockRaw(8, y, 8, water, FluidState.Source);
+        manager.Chunks[position + Vector3.UnitY].SetBlockRaw(8, 0, 8, water, FluidState.Source);
+
+        var mesh = center.GenerateMeshData(manager);
+        Assert.NotNull(mesh);
+        // Vertex positions are chunk-local; the baked surface is world Y
+        var surfaces = SubmergedTopSurfaces(mesh, 2f);
+        Assert.All(surfaces, s => Assert.Equal(surfaces[0], s));
+        return surfaces[0];
+    }
+
+    private static int WaterLevelOfColumn(int chunkX, int chunkZ) =>
+        Chunk.GetColumnData(chunkX, chunkZ).WaterLevel[(8 << Chunk.SizeShift) | 8];
+
+    [Fact]
+    public void ColumnLeavingTheSnapshotUsesTheGeneratedLevel()
+    {
+        // Any column near the origin with generated water, meshed a few chunks below its level
+        var (cx, cz, level) = FindWetColumn();
+        var chunkY = (int)MathF.Floor(level / (float)Chunk.Size) - 3;
+        var baseY = chunkY * Chunk.Size;
+        var snapshotTop = Chunk.DecodeSurfaceCode(baseY, 69);
+        Assert.True(level + FluidState.SourceHeight > snapshotTop + 1f);
+
+        var surface = SurfaceOfAColumnLeavingTheSnapshot(new Vector3(cx, chunkY, cz));
+        var expected = MathF.Min(level + FluidState.SourceHeight, Chunk.DecodeSurfaceCode(baseY, 127));
+        Assert.True(MathF.Abs(surface - expected) <= 0.5f, $"{surface} vs {expected}");
+        Assert.True(surface > snapshotTop);
+    }
+
+    [Fact]
+    public void ColumnLeavingTheSnapshotOverDryGroundCapsAtTheSnapshotTop()
+    {
+        // High above the terrain the generated level (if any) sits far below the snapshot
+        var position = MeshTestWorld.HighAbove;
+        var baseY = (int)position.Y * Chunk.Size;
+        var level = WaterLevelOfColumn((int)position.X, (int)position.Z);
+        Assert.True(level == TerrainGenerator.NoWater || level + FluidState.SourceHeight < Chunk.DecodeSurfaceCode(baseY, 69));
+
+        var surface = SurfaceOfAColumnLeavingTheSnapshot(position);
+        Assert.Equal(Chunk.DecodeSurfaceCode(baseY, 69), surface);
+    }
+
+    private static (int ChunkX, int ChunkZ, int Level) FindWetColumn()
+    {
+        for (var r = 0; r < 256; r += 4)
+        foreach (var (cx, cz) in new[] { (r, 0), (-r, 0), (0, r), (0, -r), (r, r), (-r, -r) })
+        {
+            var level = WaterLevelOfColumn(cx, cz);
+            if (level != TerrainGenerator.NoWater) return (cx, cz, level);
+        }
+        throw new InvalidOperationException("no generated water found near the origin");
     }
 
     [Fact]

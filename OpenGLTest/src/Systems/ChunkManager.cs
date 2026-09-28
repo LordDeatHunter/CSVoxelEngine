@@ -844,6 +844,52 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         return y + FluidState.SurfaceHeight(state);
     }
 
+    /// <summary>
+    /// World Y of the real surface of the fluid column the cell (x, y, z) belongs to, or
+    /// <see cref="float.NegativeInfinity"/> when the cell is not a loaded fluid cell.
+    /// <see cref="GetFluidSurfaceGlobal"/> only resolves one cell up; this walks the column to its
+    /// top (at most <see cref="WorldGenerationConfig.FluidSurfaceSearchCells"/> cells, reading the
+    /// cap's upper edge beyond that) and, when the walk ends under a solid ceiling (an overhang,
+    /// a placed block, a flooded sea cave), sees through it to the column's generated water
+    /// level, so the rays under a ledge still march against the sea or lake above it.
+    /// </summary>
+    public float GetFluidColumnTopGlobal(int x, int y, int z)
+    {
+        if (!TryGetCell(x, y, z, out var id, out _) || !BlockType.IsFluid(id))
+            return float.NegativeInfinity;
+
+        var top = y;
+        var hitCap = true;
+        var ceiling = false;
+        for (var step = 0; step < WorldGenerationConfig.FluidSurfaceSearchCells; step++)
+        {
+            if (TryGetCell(x, top + 1, z, out var above, out _))
+            {
+                if (BlockType.IsFluid(above))
+                {
+                    top++;
+                    continue;
+                }
+
+                ceiling = BlockType.IsSolid(above);
+            }
+
+            hitCap = false;
+            break;
+        }
+
+        var walked = hitCap ? top + 1f : GetFluidSurfaceGlobal(x, top, z);
+        if (!ceiling)
+            return walked;
+
+        var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+        var level = column.WaterLevel[((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
+        if (level == TerrainGenerator.NoWater)
+            return walked;
+
+        return MathF.Max(walked, level + FluidState.SourceHeight);
+    }
+
     // The four horizontal neighbours a flow can be pulled toward, as (dx, dz)
     private static readonly (int X, int Z)[] FlowNeighbours = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 

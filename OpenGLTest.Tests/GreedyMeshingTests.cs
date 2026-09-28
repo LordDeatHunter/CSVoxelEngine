@@ -235,7 +235,7 @@ public sealed class GreedyMeshingTests
     /// <summary>What one unit cell face looks like once rendered, independent of how many
     /// quads it was drawn with: attributes plus the shade and UV interpolated at its four
     /// corners.</summary>
-    private sealed record CellFace(int Face, int Alpha, int Layer, int Sun, int Block, int Sway, int List,
+    private sealed record CellFace(int Face, int Alpha, int Layer, int Sun, int Block, int Sway, int WaterSurface, int List,
         float[] Shade, float[] U, float[] V);
 
     private static float Bilinear(float[,] c, float s, float t) =>
@@ -271,6 +271,7 @@ public sealed class GreedyMeshingTests
                 Assert.Equal(v0.Sun, v.Sun);
                 Assert.Equal(v0.Block, v.Block);
                 Assert.Equal(v0.Sway, v.Sway);
+                Assert.Equal(v0.WaterSurface, v.WaterSurface);
                 Assert.Equal(v0.PackedColor >> 24, v.PackedColor >> 24);
             }
 
@@ -293,7 +294,7 @@ public sealed class GreedyMeshingTests
             if (!gridAligned)
             {
                 raw.Add(string.Join(" | ", quad.Select(v =>
-                    $"{v.Position} {v.PackedColor:X8} {v.Uv} {v.Sun} {v.Block} {v.Normal} {v.Sway} {v.Layer}")) + $" list {list}");
+                    $"{v.Position} {v.PackedColor:X8} {v.Uv} {v.Sun} {v.Block} {v.Normal} {v.Sway} {v.Layer} {v.WaterSurface}")) + $" list {list}");
                 continue;
             }
 
@@ -338,7 +339,7 @@ public sealed class GreedyMeshingTests
 
                 var key = (cell[0], cell[1], cell[2], face);
                 Assert.False(cells.ContainsKey(key), $"cell face {key} drawn twice");
-                cells[key] = new CellFace(face, (int)(v0.PackedColor >> 24), v0.Layer, v0.Sun, v0.Block, v0.Sway, list,
+                cells[key] = new CellFace(face, (int)(v0.PackedColor >> 24), v0.Layer, v0.Sun, v0.Block, v0.Sway, v0.WaterSurface, list,
                     cornerShade, cornerU, cornerV);
             }
         }
@@ -389,6 +390,13 @@ public sealed class GreedyMeshingTests
         foreach (var chunk in manager.Chunks.Values.OrderBy(c => c.Position.X).ThenBy(c => c.Position.Y).ThenBy(c => c.Position.Z))
             FillRandom(chunk, rng, palette, water);
 
+        AssertGreedyMatchesPerQuad(manager, center);
+    }
+
+    /// <summary>Meshes <paramref name="center"/> both ways and requires the two outputs to draw
+    /// the same unit cell faces with the same attributes. Returns the per-quad cells.</summary>
+    private static Dictionary<(int, int, int, int), CellFace> AssertGreedyMatchesPerQuad(ChunkManager manager, Chunk center)
+    {
         var greedy = center.GenerateMeshData(manager, greedy: true);
         var scalar = center.GenerateMeshData(manager, greedy: false);
         Assert.NotNull(greedy);
@@ -412,6 +420,7 @@ public sealed class GreedyMeshingTests
             Assert.Equal(expected.Sun, actual.Sun);
             Assert.Equal(expected.Block, actual.Block);
             Assert.Equal(expected.Sway, actual.Sway);
+            Assert.Equal(expected.WaterSurface, actual.WaterSurface);
             Assert.Equal(expected.List, actual.List);
             for (var c = 0; c < 4; c++)
             {
@@ -432,5 +441,30 @@ public sealed class GreedyMeshingTests
             $"opaque vertices greedy {greedy.Vertices.Count} vs per-quad {scalar.Vertices.Count}");
         Assert.True(greedy.TranslucentVertices.Count <= scalar.TranslucentVertices.Count,
             $"translucent vertices greedy {greedy.TranslucentVertices.Count} vs per-quad {scalar.TranslucentVertices.Count}");
+        return sCells;
+    }
+
+    [Fact]
+    public void MergesNeverCrossTwoWaterSurfaces()
+    {
+        // A stone floor under water one deep over the low-x half and three deep over the other:
+        // the two halves' faces agree on everything but the surface they sit under
+        var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
+        var stone = Block("stone");
+        var water = Block("water");
+        for (var x = 0; x < Chunk.Size; x++)
+        for (var z = 0; z < Chunk.Size; z++)
+        {
+            center.SetBlockRaw(x, 4, z, stone, 0);
+            var depth = x < Chunk.Size / 2 ? 1 : 3;
+            for (var y = 5; y < 5 + depth; y++) center.SetBlockRaw(x, y, z, water, FluidState.Source);
+        }
+
+        var cells = AssertGreedyMatchesPerQuad(manager, center);
+
+        var shallow = cells[(2, 4, 8, 4)].WaterSurface;
+        var deep = cells[(Chunk.Size - 3, 4, 8, 4)].WaterSurface;
+        Assert.NotEqual(0, shallow);
+        Assert.True(Vertex.DecodeWaterSurface((ushort)deep) > Vertex.DecodeWaterSurface((ushort)shallow));
     }
 }

@@ -7,6 +7,7 @@ layout (location = 4) in float vBlock;
 layout (location = 5) in float vNormalIdx;
 layout (location = 6) in float vSway;
 layout (location = 7) in uint vLayer; // array-texture slice (Vertex.Layer)
+layout (location = 8) in uint vWaterSurface; // Vertex.WaterSurface
 
 #ifdef CHUNK_DRAW
 // Pooled chunk draws: one glMultiDrawElementsIndirect per pass, per-draw data in the ChunkInfo
@@ -43,6 +44,8 @@ flat out vec3 fBitangent;
 out vec3 fWorldPos;
 out float fSubmerged;
 flat out float fAlpha;
+// World Y of the water surface above a submerged face (0 elsewhere, decoding far below any face).
+flat out float fWaterSurfaceY;
 
 // Four directional sines: the sum stays under 0.09 blocks so a full cell's surface (8/9) never
 // pokes out of its block. Duplicated verbatim in test-fragment.glsl for the analytic normal.
@@ -98,6 +101,10 @@ void main() {
     fColor = vColor;
     fTexCoord = vTexCoord;
     fLayer = vLayer;
+    // Mirrors Vertex.DecodeWaterSurface: must change with Vertex.WaterSurfaceStepsPerBlock and
+    // Vertex.WaterSurfaceOffset. Only chunk faces are ever submerged, so the entity path's
+    // value is never read.
+    fWaterSurfaceY = float(vWaterSurface) / 4.0 - 4096.0;
 #ifdef CHUNK_DRAW
     fSun = vSun;
     fBlock = vBlock;

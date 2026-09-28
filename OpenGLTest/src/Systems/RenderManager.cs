@@ -612,7 +612,6 @@ public class RenderManager : IDisposable
         // the material buffer, which is what keeps the ItemDebugger (same shaders, no buffer)
         // and a world with no reflective tiles safe.
         program.SetUniform("uMaterialCount", materialSsbo != 0 ? TileMaterials.ByLayer.Length : 0);
-        program.SetUniform("uWaterPlaneY", WaterPlaneY);
         program.SetUniform("uReflValid", 0f);
         // The water model's tuning constants never change at runtime, so they go up once here
         // instead of riding ApplyFrameUniforms every frame.
@@ -1796,7 +1795,7 @@ public class RenderManager : IDisposable
         BindUnit(4, TextureTarget.Texture2D, _sceneDepthTex);
         ActiveUnit(0);
         _rays.Render(_raysFbo, _raysTex, _raysSize, _viewportSize, _invViewProj, _cameraPos, _sunDir,
-            _sunColor, strength, WaterPlaneY, WorldGenerationConfig.WaterAbsorb, _lightViewProj, _time);
+            _sunColor, strength, camera.EyeWaterSurfaceY, WorldGenerationConfig.WaterAbsorb, _lightViewProj, _time);
         // UnderwaterRaysRenderer selects unit 5 for the upsample and puts unit 0 back. Unit 5 is
         // untracked so the records happen to survive, but the renderer does not promise that.
         InvalidateTextureUnits();

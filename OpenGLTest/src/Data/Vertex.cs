@@ -42,19 +42,40 @@ public struct Vertex
     /// 0 for every single-slice texture.</summary>
     public ushort Layer;
 
-    /// <summary>Unused; keeps the struct at 32 bytes so every float attribute stays 4-byte
-    /// aligned.</summary>
-    public ushort Reserved;
+    /// <summary>For a submerged face (<see cref="Normal"/> bit 3): the world Y of the water
+    /// surface above it, in quarter blocks offset by <see cref="WaterSurfaceOffset"/>
+    /// (<see cref="EncodeWaterSurface"/>); 0 everywhere else. The caustic net fades with depth
+    /// below this, so a pond above sea level measures from its own surface. Also keeps the
+    /// struct at 32 bytes.</summary>
+    public ushort WaterSurface;
+
+    /// <summary>Blocks added to a world Y before <see cref="WaterSurface"/> quantises it, so
+    /// every surface down to -4096 encodes as a positive ushort. The world vertex shader
+    /// mirrors this constant.</summary>
+    public const int WaterSurfaceOffset = 4096;
+
+    /// <summary>Quantisation steps per block of <see cref="WaterSurface"/> (quarter blocks).
+    /// The world vertex shader mirrors this constant.</summary>
+    public const int WaterSurfaceStepsPerBlock = 4;
+
+    /// <summary>Packs a world-space water surface Y into <see cref="WaterSurface"/>. Never
+    /// returns 0, which is reserved for "not submerged".</summary>
+    public static ushort EncodeWaterSurface(float worldY) =>
+        (ushort)Math.Clamp((int)MathF.Round((worldY + WaterSurfaceOffset) * WaterSurfaceStepsPerBlock), 1, ushort.MaxValue);
+
+    /// <summary>Inverse of <see cref="EncodeWaterSurface"/>.</summary>
+    public static float DecodeWaterSurface(ushort v) => v / (float)WaterSurfaceStepsPerBlock - WaterSurfaceOffset;
 
     /// <summary>Atlas geometry: a UV in tile units on <paramref name="layer"/>.</summary>
     public Vertex(Vector3 position, byte r, byte g, byte b, byte a, Vector2 uv, ushort layer,
-        float sun = 1f, float block = 0f, Vector3? normal = null, float sway = 0f, bool submerged = false)
+        float sun = 1f, float block = 0f, Vector3? normal = null, float sway = 0f, bool submerged = false,
+        ushort waterSurface = 0)
     {
         Position = position;
         PackedColor = (uint)(r | (g << 8) | (b << 16) | (a << 24));
         Uv = uv;
         Layer = layer;
-        Reserved = 0;
+        WaterSurface = waterSurface;
         Sun = EncodeLight(sun);
         Block = EncodeLight(block);
         Normal = (byte)(EncodeNormal(normal ?? Vector3.UnitY) | (submerged ? 8 : 0));

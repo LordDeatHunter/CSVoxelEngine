@@ -192,7 +192,6 @@ public sealed class DebugSceneRenderer : IDisposable
         _world.SetUniform("uInvViewport", new Vector2(1f / Math.Max(1, size.X), 1f / Math.Max(1, size.Y)));
         _world.SetUniform("uInvViewProj", Matrix4x4.Invert(viewProj, out var inv) ? inv : Matrix4x4.Identity);
         _world.SetUniform("uUnderwater", 0f);
-        _world.SetUniform("uWaterPlaneY", WorldGenerationConfig.SeaLevel + FluidState.SourceHeight);
         _world.SetUniform("uReflValid", 0f);
         _world.SetUniform("uReflViewProj", Matrix4x4.Identity);
         _world.SetUniform("uFlash", 0f);

@@ -1234,9 +1234,15 @@ public class Chunk : IDisposable
         // the reflection and scene-copy passes need the narrower answer.
         var hasWater = false;
 
+        // World origin of this chunk, for resolving a submerged face's water surface when its
+        // column leaves the padded snapshot (SubmergedSurfaceCode)
+        var chunkBaseY = LowerBoundY;
+        var worldX0 = (int)Position.X * Size;
+        var worldZ0 = (int)Position.Z * Size;
+
         if (greedy)
-            EmitGreedyFaces(MeshScratch.Current, padded, sunLight, blockLight,
-                vertices, indices, ref indexOffset, tVertices, tIndices, ref tIndexOffset);
+            EmitGreedyFaces(MeshScratch.Current, padded, paddedState, chunkBaseY, worldX0, worldZ0,
+                sunLight, blockLight, vertices, indices, ref indexOffset, tVertices, tIndices, ref tIndexOffset);
 
         for (var x = 0; x < Size; x++)
         for (var y = 0; y < Size; y++)
@@ -1330,6 +1336,7 @@ public class Chunk : IDisposable
                 // shader paints caustics on it. Interior sub-cell quads have no neighbour to
                 // look into and stay false.
                 var submerged = false;
+                ushort waterSurface = 0;
 
                 if (cullFace >= 0)
                 {
@@ -1349,6 +1356,11 @@ public class Chunk : IDisposable
                     // and that face is already gone, so no fallback is needed here.
                     lightCell = lightBase + LightFaceDelta[cullFace];
                     submerged = BlockType.IsFluid(neighbour);
+                    // The water surface the caustics measure depth from: this face's own body
+                    // of water, resolved exactly as the greedy pass keys it
+                    if (submerged)
+                        waterSurface = BakedWaterSurface(padded, paddedState, pIdx + FaceNeighborDelta[cullFace],
+                            chunkBaseY, worldX0, worldZ0);
                 }
                 else
                 {
@@ -1375,7 +1387,7 @@ public class Chunk : IDisposable
                     // brightness and no ambient occlusion
                     for (var j = 0; j < 4; j++)
                         dstVertices.Add(new Vertex(basePos + positions[j], 255, 255, 255, 255, uvs[j], quad.Tile,
-                            sun, block, normal, sway, submerged));
+                            sun, block, normal, sway, submerged, waterSurface));
                 }
                 else if (quad.IsFullFace)
                 {
@@ -1392,7 +1404,7 @@ public class Chunk : IDisposable
                         var shade = ShadeLut[(face << 2) | ao];
 
                         dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j], quad.Tile,
-                            sun, block, normal, sway, submerged));
+                            sun, block, normal, sway, submerged, waterSurface));
                     }
                 }
                 else
@@ -1402,7 +1414,7 @@ public class Chunk : IDisposable
                     var shade = ShadeLut[(face << 2) | 3];
                     for (var j = 0; j < 4; j++)
                         dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j], quad.Tile,
-                            sun, block, normal, sway, submerged));
+                            sun, block, normal, sway, submerged, waterSurface));
                 }
 
                 dstIndices.Add((ushort)(dstOffset + 0));
@@ -1419,6 +1431,73 @@ public class Chunk : IDisposable
         return new ChunkMeshData(vertices, indices, tVertices, tIndices, hasWater);
     }
 
+    // Two-regime 7-bit code of a submerged face's water surface (SubmergedSurfaceCode):
+    // 1..68 quarter blocks inside the padded snapshot, 69..127 whole blocks above its top.
+    private const int SurfaceCodeInsideMax = 68;
+    private const int SurfaceCodeAboveBase = 69;
+    private const int SurfaceCodeMax = 127;
+
+    /// <summary>
+    /// The water surface above a submerged face, as the 7-bit code that joins the greedy key
+    /// (bits 25-31), so a merge never crosses two different surfaces. It is the same surface
+    /// <see cref="ChunkManager.GetFluidColumnTopGlobal"/> finds, resolved from the padded snapshot
+    /// alone: the fluid column is walked up from <paramref name="fluidPIdx"/> (the fluid cell the
+    /// face looks into). A column that tops out inside the snapshot codes its surface in quarter
+    /// blocks (1..68). One that leaves the snapshot's top row still in fluid reads the generated
+    /// column's <c>WaterLevel</c> (pure and worker-safe) and codes whole blocks above the snapshot
+    /// top (69..127, clamped ~58 blocks above it, where the caustic fade is already ~0.01); a
+    /// column whose generated level is lower than that (a player-built tower) caps at the
+    /// snapshot top. <see cref="DecodeSurfaceCode"/> turns the code back into a world Y.
+    /// </summary>
+    internal static int SubmergedSurfaceCode(byte[] padded, byte[] paddedState, int fluidPIdx,
+        int chunkBaseY, int worldX0, int worldZ0)
+    {
+        // FillPaddedSnapshot's layout: px * PaddedSq + py * Padded + pz (z innermost)
+        var px = fluidPIdx / PaddedSq;
+        var py = fluidPIdx % PaddedSq / Padded;
+        var pz = fluidPIdx % Padded;
+
+        var top = fluidPIdx;
+        while (py < Padded - 1 && BlockType.IsFluid(padded[top + Padded]))
+        {
+            top += Padded;
+            py++;
+        }
+
+        if (py < Padded - 1)
+        {
+            // The column's top cell lies inside the snapshot: its surface in chunk-local Y
+            var ls = (py - 1) + FluidState.SurfaceHeight(paddedState[top]);
+            return Math.Clamp((int)MathF.Round((ls + 1f) * 4f), 1, SurfaceCodeInsideMax);
+        }
+
+        // Still fluid in the snapshot's top row: the surface lies above what this build sees
+        var wx = worldX0 + px - 1;
+        var wz = worldZ0 + pz - 1;
+        var level = GetColumnData(wx >> SizeShift, wz >> SizeShift)
+            .WaterLevel[((wx & SizeMask) << SizeShift) | (wz & SizeMask)];
+        var cap = chunkBaseY + Padded - 1;
+        var surface = level != TerrainGenerator.NoWater && level + FluidState.SourceHeight > cap
+            ? level + FluidState.SourceHeight
+            : cap;
+        return SurfaceCodeAboveBase
+               + Math.Clamp((int)MathF.Round(surface - cap), 0, SurfaceCodeMax - SurfaceCodeAboveBase);
+    }
+
+    /// <summary>World Y of the water surface a <see cref="SubmergedSurfaceCode"/> code stands
+    /// for, in a chunk whose lowest block row is <paramref name="chunkBaseY"/>.</summary>
+    internal static float DecodeSurfaceCode(int chunkBaseY, int code) =>
+        code <= SurfaceCodeInsideMax
+            ? chunkBaseY + code / 4f - 1f
+            : chunkBaseY + Padded - 1 + (code - SurfaceCodeAboveBase);
+
+    /// <summary>The baked <see cref="Vertex.WaterSurface"/> of a face looking into the fluid
+    /// cell at <paramref name="fluidPIdx"/>; the per-voxel twin of the greedy key's code.</summary>
+    private static ushort BakedWaterSurface(byte[] padded, byte[] paddedState, int fluidPIdx,
+        int chunkBaseY, int worldX0, int worldZ0) =>
+        Vertex.EncodeWaterSurface(DecodeSurfaceCode(chunkBaseY,
+            SubmergedSurfaceCode(padded, paddedState, fluidPIdx, chunkBaseY, worldX0, worldZ0)));
+
     // Axis each face's plane is perpendicular to (0 = X, 1 = Y, 2 = Z), in CubeFaces order,
     // and whether the face looks along +axis. Rows and columns of a face's bit plane are the two
     // other axes: X faces row = y, col = z; Y faces row = x, col = z; Z faces row = y, col = x.
@@ -1433,7 +1512,8 @@ public class Chunk : IDisposable
     /// bit columns (a cell shows a face when its greedy bit is set and the occluder bit one
     /// step along the face normal is not — the halo bits cull border faces exactly as the
     /// per-voxel neighbour read does), keyed by everything that would make two cells' quads
-    /// differ (block, the four corner AO values, sun and lamp light, the submerged flag),
+    /// differ (block, the four corner AO values, sun and lamp light, the submerged flag and, for
+    /// a submerged face, its water surface code from <see cref="SubmergedSurfaceCode"/>),
     /// gathered per depth slice into one bit plane per key, and merged per plane into the widest,
     /// then tallest, rectangles. The output is pixel-identical
     /// to emitting each face on its own: a merge only happens along an axis where the key's AO
@@ -1441,7 +1521,8 @@ public class Chunk : IDisposable
     /// <see cref="EmitGreedyRun"/>), and the UVs run 0..W / 0..H in tile units so the sampler's
     /// REPEAT tiles the texture per cell.
     /// </summary>
-    private static void EmitGreedyFaces(MeshScratch scratch, byte[] padded, byte[] sunLight, byte[] blockLight,
+    private static void EmitGreedyFaces(MeshScratch scratch, byte[] padded, byte[] paddedState,
+        int chunkBaseY, int worldX0, int worldZ0, byte[] sunLight, byte[] blockLight,
         List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         List<Vertex> tVertices, List<ushort> tIndices, ref ushort tIndexOffset)
     {
@@ -1555,8 +1636,14 @@ public class Chunk : IDisposable
                     }
 
                     var lightCell = LightIdx(x, y, z) + lightDelta;
-                    var key = id | ao << 8 | sunLight[lightCell] << 16 | blockLight[lightCell] << 20
-                              | (BlockType.IsFluid(neighbour) ? 1 << 24 : 0);
+                    // Key: id 0-7, AO 8-15, sun 16-19, lamp 20-23, submerged 24, and for a
+                    // submerged face its 7-bit water surface code in 25-31. Bit 31 can make the
+                    // key negative; that is safe because the slot hash reads it as (uint)key
+                    // and an empty slot is table entry 0, never a key value.
+                    var key = id | ao << 8 | sunLight[lightCell] << 16 | blockLight[lightCell] << 20;
+                    if (BlockType.IsFluid(neighbour))
+                        key |= 1 << 24 | SubmergedSurfaceCode(padded, paddedState, pIdx + faceDelta,
+                            chunkBaseY, worldX0, worldZ0) << 25;
 
                     // Find or open the key's plane
                     var slot = (int)((uint)key * 0x9E3779B1u >> 23);
@@ -1589,9 +1676,9 @@ public class Chunk : IDisposable
                     var type = BlockType.ById[key & 0xFF]!;
                     var rows = planeRows.AsSpan(plane * Size, Size);
                     if (type.Translucent)
-                        EmitGreedyRun(f, axis, depth, key, type, rows, tVertices, tIndices, ref tIndexOffset);
+                        EmitGreedyRun(f, axis, depth, chunkBaseY, key, type, rows, tVertices, tIndices, ref tIndexOffset);
                     else
-                        EmitGreedyRun(f, axis, depth, key, type, rows, vertices, indices, ref indexOffset);
+                        EmitGreedyRun(f, axis, depth, chunkBaseY, key, type, rows, vertices, indices, ref indexOffset);
                 }
             }
         }
@@ -1607,7 +1694,7 @@ public class Chunk : IDisposable
     /// is affine, and the merged quad interpolates to exactly the per-cell result. Uniform-AO
     /// terrain merges both ways; a strip beside a wall merges along the wall.
     /// </summary>
-    private static void EmitGreedyRun(int f, int axis, int depth, int key, BlockType type, Span<ushort> rows,
+    private static void EmitGreedyRun(int f, int axis, int depth, int chunkBaseY, int key, BlockType type, Span<ushort> rows,
         List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset)
     {
         var ao = (key >> 8) & 0xFF;
@@ -1624,6 +1711,9 @@ public class Chunk : IDisposable
         var sun = ((key >> 16) & 15) / 15f;
         var block = ((key >> 20) & 15) / 15f;
         var submerged = ((key >> 24) & 1) != 0;
+        var waterSurface = submerged
+            ? Vertex.EncodeWaterSurface(DecodeSurfaceCode(chunkBaseY, (key >> 25) & 127))
+            : (ushort)0;
         var layer = type.FaceTiles[f];
         var sway = type.Sway ? 1f : 0f;
         var normal = CubeFaces[f].normal;
@@ -1678,7 +1768,7 @@ public class Chunk : IDisposable
                     var local = corners[j] * extent;
                     var shade = ShadeLut[(f << 2) | ((ao >> (2 * j)) & 3)];
                     vertices.Add(new Vertex(origin + local, shade, shade, shade, 255,
-                        TiledUv(f, local, extent), layer, sun, block, normal, sway, submerged));
+                        TiledUv(f, local, extent), layer, sun, block, normal, sway, submerged, waterSurface));
                 }
 
                 indices.Add((ushort)(indexOffset + 0));

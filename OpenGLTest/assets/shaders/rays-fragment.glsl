@@ -24,7 +24,9 @@ uniform vec3 uCameraPos;
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 uniform float uStrength;
-uniform float uWaterPlaneY;
+// World Y of the water surface over the eye (Camera.EyeWaterSurfaceY): the eye's own body of
+// water, not the sea plane, so a lake above sea level gets shafts too.
+uniform float uSurfaceY;
 // Per-channel absorption per block of water depth: the same WorldGenerationConfig.WaterAbsorb
 // the world shader's water fragment uses, so shafts and water agree on the tint.
 uniform vec3 uWaterAbsorb;
@@ -57,7 +59,7 @@ void main() {
     for (int i = 0; i < uSteps; i++) {
         float t = (float(i) + jitter) * stepLen;
         vec3 p = uCameraPos + dir * t;
-        float below = uWaterPlaneY - p.y;
+        float below = uSurfaceY - p.y;          // depth under the eye's own water surface
         if (below <= 0.0) continue;                 // above the surface there is air, no shaft
         accum += Lit(p) * exp(-uWaterAbsorb * below) * exp(-0.03 * t) * stepLen;
     }

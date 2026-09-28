@@ -45,7 +45,8 @@ public class Mesh : IDisposable
     internal static unsafe void ConfigureVertexAttribs(GL gl)
     {
         // Offsets follow the Vertex field order: position 0, colour 12, uv 16, sun 24,
-        // block 25, normal 26, sway 27, layer 28 (see Vertex for the semantics)
+        // block 25, normal 26, sway 27, layer 28,
+        // water surface 30 (see Vertex for the semantics)
         gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, Vertex.Size, (void*)0);
         gl.EnableVertexAttribArray(0);
 
@@ -70,6 +71,11 @@ public class Mesh : IDisposable
         // The array-texture layer is an integer attribute: no float conversion, read as uint
         gl.VertexAttribIPointer(7, 1, VertexAttribIType.UnsignedShort, Vertex.Size, (void*)28);
         gl.EnableVertexAttribArray(7);
+
+        // The baked water surface of a submerged face (Vertex.WaterSurface), likewise an
+        // integer attribute; programs that do not declare location 8 simply ignore it
+        gl.VertexAttribIPointer(8, 1, VertexAttribIType.UnsignedShort, Vertex.Size, (void*)30);
+        gl.EnableVertexAttribArray(8);
     }
 
     public void Render()

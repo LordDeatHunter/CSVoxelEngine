@@ -100,6 +100,12 @@ public class Camera
     /// emissive fluid gets the lava treatment without naming it here.</summary>
     public bool IsEyeInLava { get; private set; }
 
+    /// <summary>World Y of the water surface over the eye's column
+    /// (<see cref="ChunkManager.GetFluidColumnTopGlobal"/>), which the underwater rays march
+    /// against. Sticky: it keeps its last value after the eye leaves the water, so the rays'
+    /// fade-out does not jump to another plane.</summary>
+    public float EyeWaterSurfaceY { get; private set; } = WorldGenerationConfig.SeaLevel + FluidState.SourceHeight;
+
     /// <summary>Whether any cell the body overlaps holds an emissive fluid (lava): the
     /// damage volume for lava burns. Glow tells lava apart from water, exactly like
     /// <see cref="IsEyeInLava"/>, so a new emissive fluid burns unnamed.</summary>
@@ -753,6 +759,8 @@ public class Camera
             IsEyeInLava = BlockType.Emission[eyeId] > 0;
         }
 
+        UpdateEyeWaterSurface(chunkManager, eyeX, eyeY, eyeZ);
+
         // Lava burns on body contact, not just eye contact: a wade through a shallow pool
         // keeps the eye dry but still has to hurt.
         var lava = false;
@@ -899,6 +907,18 @@ public class Camera
         return BlockType.IsSolid(id) && BlockType.MovementSpeedOf(id) <= 0f;
     }
 
+    // Refreshes EyeWaterSurfaceY while the eye is in water (not lava, which draws no rays);
+    // a non-finite result (the eye cell stopped being loaded fluid) keeps the last value
+    private void UpdateEyeWaterSurface(ChunkManager chunkManager, int eyeX, int eyeY, int eyeZ)
+    {
+        if (!IsEyeInWater || IsEyeInLava)
+            return;
+
+        var surface = chunkManager.GetFluidColumnTopGlobal(eyeX, eyeY, eyeZ);
+        if (float.IsFinite(surface))
+            EyeWaterSurfaceY = surface;
+    }
+
     private void RefreshEyeWaterState(ChunkManager chunkManager)
     {
         if (!IsShoulderSurf)
@@ -913,6 +933,8 @@ public class Camera
         {
             IsEyeInLava = BlockType.Emission[eyeId] > 0;
         }
+
+        UpdateEyeWaterSurface(chunkManager, eyeX, eyeY, eyeZ);
     }
 
     /// <summary>

@@ -496,6 +496,10 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float FluidTickSeconds = 0.25f;
     public const int MaxFluidTicksPerFrame = 4;
 
+    // Cap on how many cells up the eye's column the underwater rays look for the water top
+    // (ChunkManager.GetFluidColumnTopGlobal); a deeper column reads its surface at the cap
+    public const int FluidSurfaceSearchCells = 64;
+
     // Cells one fluid tick processes per frame at most. A tick's cells are spread over the
     // frames until the next tick, so per-frame work stays flat while the simulation still keeps
     // up with a chunk-load wake storm (a per-tick cap alone leaves the storm queued, which
