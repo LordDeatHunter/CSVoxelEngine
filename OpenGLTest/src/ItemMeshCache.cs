@@ -17,7 +17,18 @@ public class ItemMeshCache : IDisposable
     private readonly GL _gl;
     private readonly Dictionary<byte, (Mesh Mesh, Dictionary<int, uint> Textures)> _entries = new();
 
-    public ItemMeshCache(GL gl) => _gl = gl;
+    /// <param name="srgb">Upload every texture this cache builds as <c>SRGB8_ALPHA8</c>, for
+    /// item meshes drawn in the lit (tonemapped) world; the UI reads <see cref="IsSrgb"/> to
+    /// re-encode them for the gamma framebuffer.</param>
+    public ItemMeshCache(GL gl, bool srgb = false)
+    {
+        _gl = gl;
+        IsSrgb = srgb;
+    }
+
+    /// <summary>Whether every texture this cache builds is sRGB-encoded (decoded to linear on
+    /// sampling). Per cache, since every texture it builds shares the flag.</summary>
+    public bool IsSrgb { get; }
 
     /// <summary>
     /// Raised after this cache has uploaded a texture, i.e. after it has bound (and unbound) a
@@ -69,7 +80,7 @@ public class ItemMeshCache : IDisposable
     private uint BuildTexture(Item type, int frame)
     {
         var (pixels, width, height) = FramePixels(type, frame);
-        var texture = TextureLoader.Upload(_gl, pixels, width, height);
+        var texture = TextureLoader.Upload(_gl, pixels, width, height, IsSrgb);
         // Upload bound and unbound a Texture2DArray on the live active unit; tell whoever is
         // tracking unit state. Only the texture path needs this - BuildMesh touches no unit.
         GlStateChanged?.Invoke();

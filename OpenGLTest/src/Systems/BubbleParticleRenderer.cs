@@ -40,7 +40,7 @@ public sealed class BubbleParticleRenderer : IDisposable
             FileUtils.ReadFile("assets/shaders/bubble-particle-fragment.glsl"));
         _shader.Use();
         _shader.SetUniform("uSprite", 0);
-        _texture = TextureLoader.LoadFromFile(gl, SpritePath);
+        _texture = TextureLoader.LoadFromFile(gl, SpritePath, srgb: true);
 
         _verts = new Vertex[_max * 4];
         _depths = new float[_max];

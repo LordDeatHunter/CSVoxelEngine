@@ -30,14 +30,6 @@ vec3 SkySample(vec3 dir)
     return mix(uSkyHorizon * (1.0 + haze), uSkyZenith, band) + uSkyGlow * lobe;
 }
 
-// Cheap static value hash (vignette-fragment.glsl's Hash) for the output dither.
-float Hash12(vec2 p)
-{
-    p = fract(p * vec2(123.34, 456.21));
-    p += dot(p, p + 45.32);
-    return fract(p.x * p.y);
-}
-
 void main()
 {
     vec2 ndc = fUv * 2.0 - 1.0;
@@ -50,6 +42,5 @@ void main()
     // V-6: moon (visibility from -elevation) and stars are added here, before the tint
 
     col = mix(col, uSkyTint, uSkyTintAmount);
-    col += (Hash12(gl_FragCoord.xy) - 0.5) / 255.0;
     FragColor = vec4(max(col, 0.0), 1.0);
 }

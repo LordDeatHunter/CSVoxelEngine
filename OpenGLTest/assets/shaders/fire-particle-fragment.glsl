@@ -10,6 +10,11 @@ uniform float uFogFar;
 
 out vec4 FragColor;
 
+// Twin of ColorSpace.SrgbToLinear
+vec3 SrgbToLinear(vec3 c) {
+    return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+}
+
 void main() {
     float d = length(fUv - vec2(0.5)) * 2.0;
     float shape = smoothstep(1.0, 0.35, d);
@@ -17,7 +22,8 @@ void main() {
     if (alpha < 0.01) discard;
 
     float core = 1.0 - smoothstep(0.0, 1.0, d);
-    vec3 col = fTint.rgb * mix(0.6, 1.0 + 1.6 * core, fEmissive);
+    // The ember and smoke colours are authored as sRGB bytes; decode them for the linear target
+    vec3 col = SrgbToLinear(fTint.rgb) * mix(0.6, 1.0 + 1.6 * core, fEmissive);
 
     float f = clamp((fDist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
     if (fEmissive > 0.5) {

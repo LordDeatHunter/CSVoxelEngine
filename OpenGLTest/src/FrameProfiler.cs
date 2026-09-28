@@ -37,6 +37,7 @@ public enum ProfileSection
     CloudPass,
     RaysPass,
     SelectPass,
+    PostPass,
     UiPass,
 
     // Frame shell: work around the measured passes that used to hide inside "other"
@@ -77,7 +78,7 @@ public static class FrameProfiler
         "fluidWake", "fluidTick", "raycast", "breaking",
         "progUpdate", "usePlace", "debugLog", "player",
         "lighting", "shadows", "reflect", "lodPass", "worldPass", "entityPass", "waterPass", "cloudPass",
-        "raysPass", "selectPass", "uiPass",
+        "raysPass", "selectPass", "postPass", "uiPass",
         "rendShell", "screenshot", "publish",
     ];
 

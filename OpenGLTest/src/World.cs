@@ -610,6 +610,14 @@ public class World : IItemUseWorld
         renderManager.RenderUnderwaterRays(Camera);
         renderManager.EndGpuPass(ProfileSection.RaysPass);
         FrameProfiler.End(ProfileSection.RaysPass);
+
+        // Last world pass: tonemap the linear HDR scene target into the default framebuffer.
+        // The UI draws after this, straight onto that gamma framebuffer.
+        FrameProfiler.Begin(ProfileSection.PostPass);
+        renderManager.BeginGpuPass(ProfileSection.PostPass);
+        renderManager.RenderPostProcess();
+        renderManager.EndGpuPass(ProfileSection.PostPass);
+        FrameProfiler.End(ProfileSection.PostPass);
     }
 
     /// <summary>

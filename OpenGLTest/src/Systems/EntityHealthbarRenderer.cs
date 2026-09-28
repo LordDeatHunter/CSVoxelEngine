@@ -60,8 +60,8 @@ public sealed class EntityHealthbarRenderer : IDisposable
             FileUtils.ReadFile("assets/shaders/entity-healthbar-fragment.glsl"));
         _shader.Use();
         _shader.SetUniform("uSprite", 0);
-        _heartTexture = TextureLoader.LoadFromFile(gl, HeartSpritePath);
-        _heartEmptyTexture = TextureLoader.LoadFromFile(gl, HeartEmptySpritePath);
+        _heartTexture = TextureLoader.LoadFromFile(gl, HeartSpritePath, srgb: true);
+        _heartEmptyTexture = TextureLoader.LoadFromFile(gl, HeartEmptySpritePath, srgb: true);
 
         _verts = new Vertex[_maxQuads * 4];
         _depths = new float[WorldGenerationConfig.SlimeMaxAlive];

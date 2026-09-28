@@ -42,14 +42,16 @@ public static class TextureAtlas
 
     /// <summary>
     /// Builds the atlas from every <c>*.png</c> in <paramref name="folder"/>, uploads it,
-    /// and records each file's slice under its name without extension.
+    /// and records each file's slice under its name without extension. <paramref name="srgb"/>
+    /// uploads it as <c>SRGB8_ALPHA8</c> so the world shader samples linear albedo; the game
+    /// passes true (it tonemaps), a tool with no post pass passes false.
     /// </summary>
     /// <returns>The uploaded GL texture handle.</returns>
-    public static uint Build(GL gl, string folder)
+    public static uint Build(GL gl, string folder, bool srgb)
     {
         var (layers, width, height) = Load(folder);
         _levelZero = layers;
-        return TextureLoader.UploadArray(gl, layers, width, height, sampleMips: true);
+        return TextureLoader.UploadArray(gl, layers, width, height, sampleMips: true, srgb: srgb);
     }
 
     /// <summary>
@@ -184,6 +186,8 @@ public static class TextureAtlas
             layers.Add(image.Data);
         }
 
+        // Plain RGBA, never sRGB: a tangent-space normal plus a metallic multiplier is data,
+        // not colour, and an sRGB decode would bend every normal and the metallic scale.
         return TextureLoader.UploadArray(gl, layers, TileWidth, TileHeight, sampleMips: true);
     }
 

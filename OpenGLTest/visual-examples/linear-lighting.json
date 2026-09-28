@@ -1,0 +1,49 @@
+// Linear-lighting check (SH-10/SH-9). Run from OpenGLTest/, once per time of day, copying
+// visual/linear-lighting/ aside between runs since each run overwrites it:
+//   $env:DOTNET_ROLL_FORWARD='LatestMajor'; $env:VOXEL_SCRIPT='visual-examples/linear-lighting.json';
+//   $env:VOXEL_TIME='<t>'; ~/.dotnet/dotnet.exe run --project silkgltriangle.csproj -c Release
+// Times: 147 noon, 440 dusk, 700 night. Compare each shot against the same shot captured
+// before the linear pipeline landed: overall brightness and hue should stay close, with AO
+// and shadowed faces reading somewhat lighter.
+// Camera.IsEyeInWater and the physics only update during wait/walk/mine (never on a
+// teleport, look or screenshot), so every shot after a teleport is preceded by a wait.
+{
+  "steps": [
+    // Block and item icons for the HUD shot (4) to cover. Each give equips the selected slot,
+    // so the block goes last and stays there; the tools keep their own slots.
+    { "op": "give", "block": "item/copper_pickaxe", "count": 1 },
+    { "op": "give", "block": "item/bucket", "count": 1 },
+    { "op": "give", "block": "block/stone", "count": 8 },
+
+    // (1) grounded surface vista at the origin spawn.
+    { "op": "wait", "seconds": 5 },
+    { "op": "screenshot", "name": "surface", "hideHud": true },
+
+    // (2) underwater in the open ocean, grounded exactly as sky.json frames it: the Snell
+    // window, the underwater fog and the sun shafts.
+    { "op": "walk", "keys": ["Space"], "seconds": 0.05 },
+    { "op": "wait", "seconds": 0.12 },
+    { "op": "walk", "keys": ["Space"], "seconds": 0.05 },
+    { "op": "teleport", "pos": [360.5, -3.5, 136.5], "yaw": 90, "pitch": 10 },
+    { "op": "look", "yaw": 90, "pitch": 80 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "underwater", "hideHud": true },
+
+    // Flight on from here: grounded, the player drops straight into the lava pool below the
+    // cave eye position during the 10 s wait and the shot is just the in-lava tint.
+    { "op": "fly" },
+
+    // (3) a cave over lava.json's generated lava pocket: block light, lava glow, AO.
+    { "op": "teleport", "pos": [-41.5, -51.5, 79.5], "yaw": -45, "pitch": -45 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "screenshot", "name": "cave", "hideHud": true },
+
+    // (4) the same pocket with the HUD, so the hotbar and its icons are covered.
+    { "op": "screenshot", "name": "cave_hud", "hideHud": false },
+
+    // (5) the terrain, fog and LOD-edge vista from a hover (flight is still on).
+    { "op": "teleport", "pos": [0.5, 140.5, 0.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "vista", "hideHud": true }
+  ]
+}

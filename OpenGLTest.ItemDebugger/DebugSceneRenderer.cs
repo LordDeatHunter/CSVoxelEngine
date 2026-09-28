@@ -47,7 +47,7 @@ public sealed class DebugSceneRenderer : IDisposable
         _gl = gl;
 
         ContentRegistry.Load("assets");
-        _atlasTexture = TextureAtlas.Build(gl, "assets/textures/blocks");
+        _atlasTexture = TextureAtlas.Build(gl, "assets/textures/blocks", srgb: false);
         ContentRegistry.BakeModels();
 
         _world = new Shader(gl,
@@ -88,7 +88,7 @@ public sealed class DebugSceneRenderer : IDisposable
         _playerMeshes = PlayerModel.BuildMeshes(gl, Rig);
         _blockCubes = new BlockCubeCache(gl);
         _itemMeshes = new ItemMeshCache(gl);
-        Ui = new UIRenderer(gl, _atlasTexture, _blockCubes, _itemMeshes);
+        Ui = new UIRenderer(gl, _atlasTexture, _blockCubes, _itemMeshes, atlasIsSrgb: false);
         _lavaLayer = ContentRegistry.RequireBlock("lava").Top;
     }
 

@@ -287,7 +287,9 @@ void main() {
     // Gated so unlit fragments (and the LOD horizon, which carries no block light) skip the
     // four-corner flicker lookup entirely
     float flick = fBlock > 0.0 ? BlockFlicker(fWorldPos) : 1.0;
-    vec3 torch = uTorchColor * (fBlock * uTorchIntensity * flick);
+    // The block-light ramp was tuned as a display-space gradient; raising it to ~2.2 in linear
+    // light reproduces that falloff instead of letting every lamp pool spread twice as far.
+    vec3 torch = uTorchColor * pow(fBlock * uTorchIntensity * flick, 2.2);
     vec3 pl = vec3(0.0);
     for (int i = 0; i < 8; i++) {
         if (i >= uNumPointLights) break;
@@ -337,8 +339,9 @@ void main() {
 
             // Blinn-Phong exponent from roughness. The textbook 2/r^4 - 2 puts polished obsidian
             // past 150000, where only texels aimed exactly at the half vector light up and the
-            // highlight shatters into single-pixel sparkle; squaring lands it near 550, right
-            // alongside the water glitter's own pow(ndh, 300).
+            // highlight aliases into single-pixel sparkle on a 32px tile; squaring lands it near
+            // 550, right alongside the water glitter's own pow(ndh, 300). This is about aliasing,
+            // not headroom, so it stays in linear/HDR.
             float shine = 2.0 / (roughness * roughness) - 2.0;
             vec3 Hm = normalize(Vm + uSunDir);
             // Gated by skylight and the shadow exactly as the water glitter is, or the highlight
@@ -363,9 +366,10 @@ void main() {
             float F = 0.06 + 0.94 * pow(1.0 - max(dot(Vm, Nm), 0.0), 5.0);
             vec3 skyColor = uFogColor * clamp(0.12 + 0.88 * fSun, 0.0, 1.0);
 
-            // There is no HDR headroom to add into, so the diffuse pays for the highlight:
-            // metal is a dark body with a bright specular, which is how obsidian already reads.
-            col *= 1.0 - metallic * 0.6 * nearFade;
+            // Metal is a dark body with a bright specular. The HDR target now has headroom for
+            // the highlight to go past 1 and roll off through the tonemap shoulder, so the
+            // diffuse only darkens a little to keep the body reading as metal.
+            col *= 1.0 - metallic * 0.3 * nearFade;
             // The sky is mixed in, not added. A reflection replaces what the surface would
             // otherwise show, and adding it instead piled a whole extra sky on top of the albedo
             // at grazing angles, where F approaches 1 - obsidian came out pale blue rather than
@@ -383,13 +387,14 @@ void main() {
         vec2 cp = fWorldPos.xz - uSunDir.xz / max(uSunDir.y, 0.2) * below;
         float causticShadow = SampleShadow(fWorldPos, N, ndl, uShadowStrengthDry);
         float fade = (1.0 - smoothstep(48.0, 96.0, dist)) * exp(-0.06 * below);
-        // Caustics redistribute the sunlight rather than add to it: the cells go a little
-        // darker and the filaments brighter, so the net still reads on sand the sun has
-        // already lit to full brightness (there is no HDR headroom to add into).
+        // Caustics redistribute the sunlight: the cells lose a little and the filaments gain
+        // focused sun on top. In the HDR target the filaments may go past 1 and roll off
+        // through the tonemap shoulder, so the net reads on brightly lit sand too.
         // Seen from above, the surface adds its own glitter on top, so the net backs off
         float w = fSun * causticShadow * fade * uWaterCausticStrength
             * smoothstep(0.1, 0.6, uSunIntensity) * mix(0.6, 1.0, uUnderwater);
-        col *= 1.0 + w * (Caustics(cp, uTime) * 1.2 - 0.45);
+        col *= 1.0 - 0.25 * w;
+        col += albedo * uSunColor * (uSunIntensity * w * Caustics(cp, uTime) * 1.2);
     }
 
     float waterSpec = 0.0;
@@ -404,7 +409,8 @@ void main() {
         // rock stays near-neutral, so it keeps its own dark colour and only magma glows.
         float molten = clamp((albedo.r - max(albedo.g, albedo.b)) * 4.0, 0.0, 1.0);
         float pulse = 0.9 + 0.1 * sin(uTime * 2.0 + fWorldPos.x * 1.3 + fWorldPos.z * 1.7);
-        col = mix(albedo, albedo * 2.0 + vec3(0.55, 0.13, 0.01), molten) * pulse;
+        // The floor is the old sRGB orange (0.55, 0.13, 0.01) decoded to linear light
+        col = mix(albedo, albedo * 2.0 + vec3(0.263, 0.0152, 0.00077), molten) * pulse;
     } else if (isWater) {
         // Far water skips the wave/reflection/refraction model below: past the full-detail
         // ring each pixel covers metres of surface, so a geometric-normal fresnel between
@@ -525,6 +531,10 @@ void main() {
             vec3 fogDir = (fWorldPos - uCameraPos) / max(dist, 1e-4);
             fogCol = mix(SkySample(fogDir), uFogColor, uFogWet);
         }
+        // Squared ramp, kept after SH-10: a mix in linear light already reads hazier than the
+        // same mix did in display space, and f*f is the steeper of the candidates at short
+        // range (smoothstep lifts the near fog further), so it stays closest to the old look.
+        // It still reaches exactly 1 at uFogFar, which is what keeps the LOD edge seamless.
         col = mix(col, fogCol, f * f);
     }
     // Tile alpha carries the translucent mesh's translucency; fAlpha is the chunk fade-in.
@@ -542,9 +552,9 @@ void main() {
 #endif
     float alpha = texAlpha * fAlpha;
     if (isWater) alpha = fAlpha;
-    vec3 outCol = mix(col, vec3(1.0), uFlash);
-    // Half-LSB dither before the 8-bit write, so the long fog and lighting gradients break up
-    // instead of banding. Static per pixel (a gl_FragCoord hash, no time term) so it never crawls.
-    outCol += (Hash12(gl_FragCoord.xy) - 0.5) / 255.0;
+    // An HDR white: the tonemap shoulder maps 1.0 to only ~0.9, so a primed TNT strobes toward
+    // a value well past the knee to still read as display white.
+    vec3 outCol = mix(col, vec3(4.0), uFlash);
+    // No dither here: the frame is dithered once, after the tonemap, in post-fragment.glsl.
     FragColor = vec4(outCol, alpha);
 }

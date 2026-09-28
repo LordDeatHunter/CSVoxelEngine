@@ -151,6 +151,19 @@ public const float DayLengthSeconds = 1200f;
     public const float FogNearBlocks = 200f;
     public const float FogFarBlocks = 1800f;
 
+    /// <summary>Linear multiplier applied to the HDR scene before the tonemap
+    /// (post-fragment.glsl's uExposure). Left at 1: the brightness retune lives in
+    /// RenderManager's sun/ambient constants instead, where each term could be matched against
+    /// the pre-SH-10 shots separately, and a global exposure would have moved them all at once.</summary>
+    public const float TonemapExposure = 1.0f;
+
+    /// <summary>Max-channel level below which the post pass's shoulder tonemap is the identity,
+    /// so today's darks and mid-tones survive untouched and only highlights roll off toward 1.
+    /// Checked against the SH-10 baseline screenshots: 0.8 keeps sunlit grass and stone (well
+    /// below it) byte-close to the old look while snow, sand and sky highlights roll off softly
+    /// instead of clipping; see Tonemap.Shoulder for the curve.</summary>
+    public const float TonemapKnee = 0.8f;
+
     // Sunlight and lamp light spread through air losing one level per block from a max
     // of 15, so one edited block can change light up to this far away. Block edits must
     // remesh every chunk in this radius, not just face-adjacent ones.

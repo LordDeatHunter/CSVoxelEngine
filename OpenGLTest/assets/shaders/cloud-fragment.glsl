@@ -37,14 +37,6 @@ vec3 SkySample(vec3 dir)
 
 out vec4 FragColor;
 
-// Cheap static value hash (vignette-fragment.glsl's Hash) for the output dither.
-float Hash12(vec2 p)
-{
-    p = fract(p * vec2(123.34, 456.21));
-    p += dot(p, p + 45.32);
-    return fract(p.x * p.y);
-}
-
 void main() {
     vec3 N = normalize(fNormal);
     float ndl = dot(N, uSunDir) * 0.5 + 0.5;
@@ -56,10 +48,9 @@ void main() {
     float az = dot(V.xz, uSunDir.xz) * inversesqrt(max(dot(V.xz, V.xz) * dot(uSunDir.xz, uSunDir.xz), 1e-6));
     light += uSkyGlow * pow(max(az, 0.0), uSkyShape.w) * ndl;
     float up = smoothstep(-0.9, 0.15, N.y);
-    vec3 col = light * mix(vec3(0.93, 0.94, 0.98), vec3(1.03), up);
+    // The old sRGB albedo mix(vec3(0.93, 0.94, 0.98), vec3(1.03), up), decoded to linear light
+    vec3 col = light * mix(vec3(0.855, 0.872, 0.955), vec3(1.069), up);
     float f = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
     col = mix(col, mix(SkySample(V), uFogColor, uFogWet), f * f);
-    // Half-LSB dither against banding in the soft fog blend; static per pixel, never crawls.
-    col += (Hash12(gl_FragCoord.xy) - 0.5) / 255.0;
     FragColor = vec4(col, uOpacity * (1.0 - f * f * f));
 }

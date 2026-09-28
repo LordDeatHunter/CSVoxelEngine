@@ -150,6 +150,10 @@ public class UIRenderer : IDisposable
     // is picking a mesh, and every frame mipmaps without bleeding into its neighbours.
     private readonly Dictionary<byte, Mesh[]> _itemFrames = new();
     private readonly int _locAlphaCutoff;
+    private readonly int _locSrgbTex;
+    // Whether the shared block atlas is SRGB8_ALPHA8 (the game) or linear (the ItemDebugger);
+    // decides whether its icons are re-encoded for the gamma framebuffer.
+    private readonly bool _atlasIsSrgb;
 
     // Unit shapes, scaled per draw so a colour or size change costs no buffer work
     private readonly Mesh _unitSquare;
@@ -207,10 +211,15 @@ public class UIRenderer : IDisposable
     private float _scale = 1f;
     private bool _depthCleared;
 
-    public UIRenderer(GL gl, uint atlasTexture, BlockCubeCache blockCubes, ItemMeshCache itemMeshes)
+    /// <param name="atlasIsSrgb">Whether <paramref name="atlasTexture"/> was uploaded as
+    /// <c>SRGB8_ALPHA8</c>: its icons are then re-encoded in the shader so they write the same
+    /// bytes to the gamma framebuffer as a linear upload would.</param>
+    public UIRenderer(GL gl, uint atlasTexture, BlockCubeCache blockCubes, ItemMeshCache itemMeshes,
+        bool atlasIsSrgb)
     {
         _gl = gl;
         _atlasTexture = atlasTexture;
+        _atlasIsSrgb = atlasIsSrgb;
         _blockCubes = blockCubes;
         _itemMeshes = itemMeshes;
 
@@ -218,6 +227,8 @@ public class UIRenderer : IDisposable
         var fragmentSource = FileUtils.ReadFile("assets/shaders/ui-fragment.glsl");
         _shader = new Shader(gl, vertexSource, fragmentSource);
         _shader.SetUniform("uTex", 0);
+        _locSrgbTex = _shader.GetUniformLocation("uSrgbTex");
+        _shader.SetUniform(_locSrgbTex, false);
 
         _crosshairTexture = TextureLoader.LoadFromFile(gl, "assets/textures/crosshair.png");
         _heartTexture = TextureLoader.LoadFromFile(gl, "assets/textures/ui/heart.png");
@@ -425,7 +436,7 @@ public class UIRenderer : IDisposable
             _shader.Use();
             _shader.SetUniform(_locAlphaCutoff, 0.5f);
         }
-        DrawMesh(mesh, model, Rgba.White, _atlasTexture);
+        DrawMesh(mesh, model, Rgba.White, _atlasTexture, _atlasIsSrgb);
         if (cutout)
             _shader.SetUniform(_locAlphaCutoff, 0f);
 
@@ -657,7 +668,7 @@ public class UIRenderer : IDisposable
     /// old per-draw tint uniform exactly. That identity depends on the fragment shader keeping
     /// its per-vertex term — drop <c>fColor</c> there and all text turns white.
     ///
-    /// Sets the same three uniforms <see cref="DrawMesh"/> does and no others, so
+    /// Sets the same four uniforms <see cref="DrawMesh"/> does and no others, so
     /// <c>uAlphaCutoff</c> keeps the sticky value it had before.
     /// </summary>
     private void DrawTextBatch(int quadCount)
@@ -666,6 +677,8 @@ public class UIRenderer : IDisposable
         _shader.SetUniform("uModel", Matrix4x4.Identity);
         _shader.SetUniform("uColor", Rgba.White.ToVector4());
         _shader.SetUniform("uUseTexture", true);
+        // The font is a linear (UI-only) texture: never re-encode it.
+        _shader.SetUniform(_locSrgbTex, false);
 
         _gl.ActiveTexture(TextureUnit.Texture0);
         _gl.BindTexture(TextureTarget.Texture2DArray, _font!.Texture);
@@ -1414,7 +1427,7 @@ public class UIRenderer : IDisposable
         // behind them for half of every turn
         _shader.Use();
         _shader.SetUniform(_locAlphaCutoff, 0.5f);
-        DrawMesh(mesh, model, Rgba.White, texture);
+        DrawMesh(mesh, model, Rgba.White, texture, _itemMeshes.IsSrgb);
         _shader.SetUniform(_locAlphaCutoff, 0f);
 
         _gl.Disable(EnableCap.DepthTest);
@@ -1442,7 +1455,7 @@ public class UIRenderer : IDisposable
             _shader.Use();
             _shader.SetUniform(_locAlphaCutoff, 0.5f);
         }
-        DrawMesh(mesh, model, Rgba.White, _atlasTexture);
+        DrawMesh(mesh, model, Rgba.White, _atlasTexture, _atlasIsSrgb);
         if (cutout)
             _shader.SetUniform(_locAlphaCutoff, 0f);
 
@@ -1502,14 +1515,17 @@ public class UIRenderer : IDisposable
 
     /// <summary>
     /// Draws any primitive with an explicit model matrix. <paramref name="texture"/> of 0 draws
-    /// the mesh as flat colour without sampling.
+    /// the mesh as flat colour without sampling. <paramref name="srgb"/> says the texture is
+    /// <c>SRGB8_ALPHA8</c> (the shared atlas or an <see cref="ItemMeshCache"/> texture), so the
+    /// shader re-encodes the decoded texel; UIRenderer's own sprites are linear and pass false.
     /// </summary>
-    public void DrawMesh(Mesh mesh, Matrix4x4 model, Rgba? tint = null, uint texture = 0)
+    public void DrawMesh(Mesh mesh, Matrix4x4 model, Rgba? tint = null, uint texture = 0, bool srgb = false)
     {
         _shader.Use();
         _shader.SetUniform("uModel", model);
         _shader.SetUniform("uColor", (tint ?? Rgba.White).ToVector4());
         _shader.SetUniform("uUseTexture", texture != 0);
+        _shader.SetUniform(_locSrgbTex, texture != 0 && srgb);
 
         if (texture != 0)
         {

@@ -123,6 +123,18 @@ public class RenderManager : IDisposable
     // LoadResources builds it; the clear colour stands in for it until then.
     private SkyRenderer? _skyDome;
 
+    // The frame's resolve pass: tonemaps the HDR scene target into the default framebuffer at
+    // the end of World.Render, before the UI (RenderPostProcess). Null until LoadResources.
+    private PostProcessRenderer? _post;
+
+    // The linear HDR scene target every world pass renders into (BindSceneTarget): an RGBA16F
+    // colour texture plus a depth renderbuffer, sized to the viewport by CreateHdrTarget.
+    // Only RenderPostProcess reads it, and only the post pass and the UI touch framebuffer 0.
+    private uint _hdrFbo;
+    private uint _hdrColorTex;
+    private uint _hdrDepthRb;
+    private Vector2D<int> _hdrSize;
+
     // Damage reddening: one full-screen radial-gradient pass, drawn first inside the UI pass.
     // Null until LoadResources builds it.
     private DamageVignetteRenderer? _vignette;
@@ -161,7 +173,7 @@ public class RenderManager : IDisposable
     private bool _reflMirrorValid;
     private bool _reflReusedLastFrame;
 
-    // The scene copies the water pass refracts through: the default framebuffer's colour on
+    // The scene copies the water pass refracts through: the HDR scene target's colour on
     // unit 3 and its depth on unit 4, snapshotted by CopyScene just before the water draws.
     private uint _sceneColorTex;
     private uint _sceneDepthTex;
@@ -190,8 +202,20 @@ public class RenderManager : IDisposable
     private Vector3 _sunColor = Vector3.One;
     private float _sunIntensity = 1f;
     private Vector3 _ambient = new(0.42f, 0.45f, 0.52f);
-    private readonly Vector3 _torchColor = new(1f, 0.62f, 0.25f);
+    // The voxel block-light colour, authored in sRGB (1, 0.62, 0.25) and uploaded linear
+    private static readonly Vector3 TorchColorLinear = ColorSpace.SrgbToLinear(new Vector3(1f, 0.62f, 0.25f));
     private const float TorchIntensity = 1.2f;
+    // Linear-light curve on the direct sun (SH-10): intensity = gain * (old ramp)^exponent. The
+    // sun term was tuned in display space, where a sunlit top came out at ~1.6x albedo; linear
+    // light needs roughly that gain raised to 2.2 at noon (gain 2.0 keeps noon tops within a few
+    // percent of the old shots), while the exponent pulls the low end down so dusk does not turn
+    // brighter and redder than before. The ambient (what shaded faces see) only needed decoding;
+    // its night end is lifted a touch because the decoded blue night sun no longer props it up.
+    private const float SunLinearGain = 2.0f;
+    private const float SunLinearExponent = 1.4f;
+    private const float SunDiscIntensity = 2.5f;
+    // Scales the additive underwater sun shafts, tuned against the pre-SH-10 display-space look
+    private const float RaysLinearScale = 1.2f;
     private Vector3 _fogColor = new(0.3f, 0.6f, 0.9f);
     private Vector3 _skyColor = new(0.3f, 0.6f, 0.9f);
     // The sky dome's palette for this frame (SkyPalette), plus what the dome fades toward in
@@ -246,6 +270,18 @@ public class RenderManager : IDisposable
     private static readonly Vector3 UnderwaterAmbientTint = new(0.55f, 0.75f, 1f);
     private static readonly Vector3 LavaFogColor = new(0.55f, 0.12f, 0.02f);
     private static readonly Vector3 LavaAmbientTint = new(1.2f, 0.6f, 0.4f);
+    // Linear twins for SetLighting, which feeds pre-tonemap shaders. The gamma fog colours above
+    // stay for RenderUI's wash rect, which draws after the tonemap onto the gamma framebuffer.
+    private static readonly Vector3 UnderwaterFogColorLinear = ColorSpace.SrgbToLinear(UnderwaterFogColor);
+    private static readonly Vector3 UnderwaterAmbientTintLinear = ColorSpace.SrgbToLinear(UnderwaterAmbientTint);
+    private static readonly Vector3 LavaFogColorLinear = ColorSpace.SrgbToLinear(LavaFogColor);
+    private static readonly Vector3 LavaAmbientTintLinear = ColorSpace.SrgbToLinear(LavaAmbientTint);
+    // Point-light hues (sRGB-authored, decoded once); SetLighting scales them as linear intensities
+    private static readonly Vector3 TntLightColor = ColorSpace.SrgbToLinear(new Vector3(1f, 0.45f, 0.15f));
+    private static readonly Vector3 TntFlashColor = ColorSpace.SrgbToLinear(new Vector3(1f, 0.9f, 0.8f));
+    private static readonly Vector3 SelectionOutlineColor = ColorSpace.SrgbToLinear(new Vector3(0.8f, 0.8f, 0.85f));
+    private static readonly Vector3 SelectionFaceColor = ColorSpace.SrgbToLinear(new Vector3(0.7f, 0.7f, 0.75f));
+    private static readonly Vector3 CampfireLightColor = ColorSpace.SrgbToLinear(new Vector3(1f, 0.5f, 0.15f));
     private double _prevTime;
     private float _underwaterT;
     private bool _eyeInLava;
@@ -449,8 +485,11 @@ public class RenderManager : IDisposable
         var sunVs = FileUtils.ReadFile("assets/shaders/sun-vertex.glsl");
         var sunFs = FileUtils.ReadFile("assets/shaders/sun-fragment.glsl");
 
-        textureAtlas = TextureAtlas.Build(gl, "assets/textures/blocks");
-        _lodLeafColor = LoadOpaqueAverage("assets/textures/blocks/leaves.png", _lodLeafColor);
+        // sRGB: the world samples linear albedo and the post pass tonemaps and re-encodes.
+        textureAtlas = TextureAtlas.Build(gl, "assets/textures/blocks", srgb: true);
+        // The average stands in for decoded atlas albedo on the far LOD, so decode it too.
+        _lodLeafColor = ColorSpace.SrgbToLinear(
+            LoadOpaqueAverage("assets/textures/blocks/leaves.png", _lodLeafColor));
         ContentRegistry.BakeModels();
         // After the bake, the first point that knows which tiles cutout blocks wear: their
         // box-filtered mips would average leaf alpha under the cutoff and thin canopies out.
@@ -471,6 +510,8 @@ public class RenderManager : IDisposable
         chunkShader.SetUniform("uFlash", 0f);
         chunkShader.SetUniform("uHitFlash", 0f);
         chunkShader.SetUniform("uAlphaCutoff", WorldGenerationConfig.AlphaCutoff);
+        // The HDR target first, so every creator after it restores to the scene target it made.
+        CreateHdrTarget();
         CreateReflectionTarget();
         CreateSceneCopy();
         CreateRaysTarget();
@@ -498,7 +539,7 @@ public class RenderManager : IDisposable
         // The crack sprite is a single column of BreakOverlayFrames stacked 32x32 frames, so
         // each frame becomes its own array slice and no mip level bleeds a neighbour in.
         _breakProgressTexture = TextureLoader.LoadSpritesheet(gl, "assets/textures/environment/break_progress.png",
-            1, WorldGenerationConfig.BreakOverlayFrames, WorldGenerationConfig.BreakOverlayFrames);
+            1, WorldGenerationConfig.BreakOverlayFrames, WorldGenerationConfig.BreakOverlayFrames, srgb: true);
         breakShader.Use();
         breakShader.SetUniform("uBreakProgress", 0);
         breakShader.SetUniform("uOpacity", WorldGenerationConfig.BreakOverlayOpacity);
@@ -530,7 +571,7 @@ public class RenderManager : IDisposable
         sunShader.Use();
         sunShader.SetUniform("uSunTexture", 0);
 
-        _sunTexture = TextureLoader.LoadFromFile(gl, "assets/textures/environment/sun.png");
+        _sunTexture = TextureLoader.LoadFromFile(gl, "assets/textures/environment/sun.png", srgb: true);
         // The loader hard-codes Nearest for the block tiles; the 64px disc is scaled up a lot
         // on screen, so it needs Linear or its edge turns into a staircase.
         gl.BindTexture(TextureTarget.Texture2DArray, _sunTexture);
@@ -540,6 +581,7 @@ public class RenderManager : IDisposable
         _sunQuad = Primitives.CreateSquare(gl, 1f);
         _clouds = new CloudRenderer(gl);
         _skyDome = new SkyRenderer(gl);
+        _post = new PostProcessRenderer(gl);
         _rays = new UnderwaterRaysRenderer(gl);
         _vignette = new DamageVignetteRenderer(gl);
         _leaves = new LeafParticleRenderer(gl);
@@ -548,7 +590,7 @@ public class RenderManager : IDisposable
         _healthbars = new EntityHealthbarRenderer(gl);
 
         blockCubes = new BlockCubeCache(gl);
-        itemMeshes = new ItemMeshCache(gl);
+        itemMeshes = new ItemMeshCache(gl, srgb: true);
         // Item textures are uploaded lazily, on first sight, from inside the entity and UI passes,
         // and TextureLoader.Upload binds on whatever unit is live. UIRenderer shares this instance,
         // so one hook covers both callers.
@@ -564,16 +606,16 @@ public class RenderManager : IDisposable
             Log.WriteLine($"Player model '{PlayerModelPath}' not used ({e.Message}); using built-in Steve.");
         }
         _playerPaletteTex = TextureLoader.Upload(gl, PlayerRig.TexturePixels,
-            PlayerRig.TextureWidth, PlayerRig.TextureHeight);
+            PlayerRig.TextureWidth, PlayerRig.TextureHeight, srgb: true);
         _playerMeshes = PlayerModel.BuildMeshes(gl, PlayerRig);
         if (EntityRegistry.TryGet("slime") is { } slimeType)
         {
             var slimeModel = EntityModel.Load(slimeType.ModelPath);
             _slimeMesh = slimeModel.BuildMesh(gl);
             _slimeTexture = TextureLoader.Upload(gl, slimeModel.TexturePixels,
-                slimeModel.TextureWidth, slimeModel.TextureHeight);
+                slimeModel.TextureWidth, slimeModel.TextureHeight, srgb: true);
         }
-        ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes);
+        ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes, atlasIsSrgb: true);
         CreateSelectionGeometry();
         CreatePopGeometry();
         // Everything above binds raw - the atlas build, the loader, the sun's filter tweak and
@@ -632,7 +674,7 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterRefractStrength", WorldGenerationConfig.WaterRefractStrength);
         program.SetUniform("uWaterWindowRefract", WorldGenerationConfig.WaterWindowRefractScale);
         program.SetUniform("uWaterAbsorb", WorldGenerationConfig.WaterAbsorb);
-        program.SetUniform("uWaterScatter", WorldGenerationConfig.WaterScatter);
+        program.SetUniform("uWaterScatter", ColorSpace.SrgbToLinear(WorldGenerationConfig.WaterScatter));
         program.SetUniform("uWaterCausticStrength", WorldGenerationConfig.WaterCausticStrength);
         program.SetUniform("uWaterFancyNear", WorldGenerationConfig.WaterFancyNearBlocks);
         program.SetUniform("uWaterFancyFar", WorldGenerationConfig.WaterFancyFarBlocks);
@@ -724,7 +766,8 @@ public class RenderManager : IDisposable
         if (status != GLEnum.FramebufferComplete)
             throw new Exception($"Shadow framebuffer incomplete: {status}");
 
-        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        // Back to the scene target (the HDR FBO once it exists, framebuffer 0 before that).
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, _hdrFbo);
         gl.BindTexture(TextureTarget.Texture2D, 0);
         // Raw binds above, and _shadowDepthTex is a brand-new name.
         InvalidateTextureUnits();
@@ -734,6 +777,8 @@ public class RenderManager : IDisposable
     {
         _viewportSize = size;
         gl.Viewport(size);
+        // The HDR target first, so the creators after it restore to the resized scene target.
+        CreateHdrTarget();
         CreateReflectionTarget();
         CreateSceneCopy();
         CreateRaysTarget();
@@ -798,12 +843,24 @@ public class RenderManager : IDisposable
 
         _sunColor = Mix(new Vector3(0.3f, 0.4f, 0.7f), new Vector3(1f, 0.96f, 0.88f), dayness);
         _sunColor = Mix(_sunColor, new Vector3(1f, 0.5f, 0.25f), duskAmount * 0.55f);
-        _sunIntensity = 0.05f + 1.2f * dayness;
+        // Every palette colour here is authored in sRGB (display) space and decoded once, where
+        // it is computed, so fog, the clear colour, clouds, the mirror and the rays all see linear
+        // light (SH-10).
+        _sunColor = ColorSpace.SrgbToLinear(_sunColor);
+        _sunIntensity = SunLinearGain * MathF.Pow(0.05f + 1.2f * dayness, SunLinearExponent);
 
-        _ambient = Mix(new Vector3(0.06f, 0.07f, 0.11f), new Vector3(0.42f, 0.45f, 0.52f), dayness);
+        _ambient = ColorSpace.SrgbToLinear(
+            Mix(new Vector3(0.1f, 0.11f, 0.155f), new Vector3(0.42f, 0.45f, 0.52f), dayness));
 
         _duskAmount = duskAmount;
         _sky = SkyPalette.Compute(dayness, duskAmount);
+        // SkyPalette stays authored (and tested) in sRGB; the dome and fog want it linear
+        _sky = _sky with
+        {
+            Zenith = ColorSpace.SrgbToLinear(_sky.Zenith),
+            Horizon = ColorSpace.SrgbToLinear(_sky.Horizon),
+            Glow = ColorSpace.SrgbToLinear(_sky.Glow),
+        };
         // The flat sky/fog colour is the dome's no-glow horizon sample
         _skyColor = _sky.HazedHorizon;
         // Fog melts the far terrain (and the LOD edge) into the sky, day and night
@@ -818,8 +875,8 @@ public class RenderManager : IDisposable
                 if (_pointCount >= WorldGenerationConfig.MaxPointLights) break;
                 _pointPos[_pointCount] = tnt.Position;
                 var flash = tnt.WhiteFlash;
-                _pointColors[_pointCount] = new Vector3(1f, 0.45f, 0.15f) * 1.2f
-                    + new Vector3(1f, 0.9f, 0.8f) * (flash * 2f);
+                // Linear intensities: the hues are the old sRGB ones decoded, the gains retuned
+                _pointColors[_pointCount] = TntLightColor * 1.4f + TntFlashColor * (flash * 3f);
                 _pointCount++;
             }
         }
@@ -833,7 +890,7 @@ public class RenderManager : IDisposable
                 if (_pointCount >= WorldGenerationConfig.MaxPointLights) break;
                 var flicker = LightFlicker.Campfire(_time, LightFlicker.CellPhase(cell));
                 _pointPos[_pointCount] = cell + FireLightOffset;
-                _pointColors[_pointCount] = new Vector3(1f, 0.5f, 0.15f) * (1.6f * flicker);
+                _pointColors[_pointCount] = CampfireLightColor * (2.0f * flicker);
                 _pointCount++;
             }
         }
@@ -881,16 +938,20 @@ public class RenderManager : IDisposable
         if (wet <= 0f) return;
 
         var underwaterColor = _eyeInLava
-            ? LavaFogColor * (0.6f + 0.4f * dayness)
-            : UnderwaterFogColor * (0.15f + 0.85f * dayness);
+            // The dayness dims were tuned as display-space factors; raised to 1.6 (matched against the
+            // old night shots) they dim the linear colours about as much on screen as they used to
+            ? LavaFogColorLinear * MathF.Pow(0.6f + 0.4f * dayness, 1.6f)
+            : UnderwaterFogColorLinear * MathF.Pow(0.15f + 0.85f * dayness, 1.6f);
         _skyTint = underwaterColor;
         _skyTintAmount = lavaWet;
         _fogColor = Mix(_fogColor, underwaterColor, wet);
         // _fogColor was copied from the dry _skyColor earlier, so this leaves the fog tint alone;
         // afterwards _skyColor only feeds the clear colour, which the window shows from below.
         _skyColor = Mix(_skyColor, underwaterColor, lavaWet);
-        _ambient = Mix(_ambient, _ambient * (_eyeInLava ? LavaAmbientTint : UnderwaterAmbientTint), wet);
-        _sunIntensity = MathUtils.Lerp(_sunIntensity, _sunIntensity * 0.5f, wet);
+        _ambient = Mix(_ambient, _ambient * (_eyeInLava ? LavaAmbientTintLinear : UnderwaterAmbientTintLinear), wet);
+        // 0.25 in linear light is the old display-space 0.5 raised to ~2.2 (SH-10): the sun is
+        // what lights the sea floor, so a larger factor turned it warm and bright
+        _sunIntensity = MathUtils.Lerp(_sunIntensity, _sunIntensity * 0.25f, wet);
     }
 
     /// <summary>
@@ -956,7 +1017,7 @@ public class RenderManager : IDisposable
     /// <summary>
     /// Depth-only pass that fills the shadow map with every caster inside the light's ortho
     /// box: opaque chunk meshes, primed TNT and toppling trees. Runs first each frame, before
-    /// anything draws to the default framebuffer; water never casts. Culling uses the light
+    /// anything draws to the scene target; water never casts. Culling uses the light
     /// frustum, so the caster set is exactly what the box can hold.
     /// <paramref name="chunks"/> is <see cref="ChunkManager.Renderable"/>, a superset of the
     /// casters: water-only chunks are in it and are skipped here. The chunk casters that
@@ -1080,9 +1141,8 @@ public class RenderManager : IDisposable
             BindUnit(0, TextureTarget.Texture2DArray, textureAtlas);
         }
 
-        // Back to the default framebuffer and the blend state the world passes expect
-        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-        gl.Viewport(_viewportSize);
+        // Back to the HDR scene target and the blend state the world passes expect
+        BindSceneTarget();
         gl.Enable(EnableCap.Blend);
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
     }
@@ -1094,6 +1154,10 @@ public class RenderManager : IDisposable
     /// Returns true when the target was actually (re)created, which also invalidates the
     /// temporal-reuse cache in <see cref="RenderReflection"/> - the fresh colour texture holds
     /// nothing a water fragment may sample.
+    /// It runs every frame from <see cref="RenderReflection"/>, including frames that then take
+    /// that method's early return, so its recreate path must restore the HDR scene target, never
+    /// framebuffer 0: a quality-slider change on a frame with no water in view would otherwise
+    /// leave the rest of the frame drawing outside the target the post pass resolves.
     /// </summary>
     private bool CreateReflectionTarget()
     {
@@ -1115,8 +1179,10 @@ public class RenderManager : IDisposable
         gl.BindTexture(TextureTarget.Texture2D, _reflTex);
         unsafe
         {
-            gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.Rgba8,
-                (uint)w, (uint)h, 0, PixelFormat.Rgba, PixelType.UnsignedByte, null);
+            // Half-float: the mirror carries the same linear HDR values as the scene target,
+            // which 8 bits would band in the darks and clip in the highlights.
+            gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.Rgba16f,
+                (uint)w, (uint)h, 0, PixelFormat.Rgba, PixelType.Float, null);
         }
         gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
         gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
@@ -1144,7 +1210,8 @@ public class RenderManager : IDisposable
         if (status != GLEnum.FramebufferComplete)
             throw new Exception($"Reflection framebuffer incomplete: {status}");
 
-        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        // Back to the scene target (see the summary: this can run on a frame that renders no mirror).
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, _hdrFbo);
         gl.BindTexture(TextureTarget.Texture2D, 0);
         // Recreate path only. The size-unchanged early return above binds nothing, and this
         // method runs every frame - invalidating up there would cost a full rebind per frame.
@@ -1164,8 +1231,8 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Allocates the two full-resolution textures <see cref="CopyScene"/> snapshots the default
-    /// framebuffer into. No FBO and no depth attachment: these are copy destinations only, read
+    /// Allocates the two full-resolution textures <see cref="CopyScene"/> snapshots the HDR scene
+    /// target into. No FBO and no depth attachment: these are copy destinations only, read
     /// back by the water fragment shader on units 3 and 4. Called from
     /// <see cref="LoadResources"/> and <see cref="SetViewport"/>, recreating only on a resize.
     /// </summary>
@@ -1182,8 +1249,9 @@ public class RenderManager : IDisposable
         gl.BindTexture(TextureTarget.Texture2D, _sceneColorTex);
         unsafe
         {
-            gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.Rgba8,
-                (uint)w, (uint)h, 0, PixelFormat.Rgba, PixelType.UnsignedByte, null);
+            // Half-float like the HDR target it copies, so the refraction carries linear values.
+            gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.Rgba16f,
+                (uint)w, (uint)h, 0, PixelFormat.Rgba, PixelType.Float, null);
         }
         // Linear: the refraction offset lands between texels, and a nearest fetch there
         // turns the ripple into a staircase.
@@ -1272,7 +1340,8 @@ public class RenderManager : IDisposable
         if (status != GLEnum.FramebufferComplete)
             throw new Exception($"Underwater rays framebuffer incomplete: {status}");
 
-        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        // Back to the scene target (the HDR FBO once it exists, framebuffer 0 before that).
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, _hdrFbo);
         gl.BindTexture(TextureTarget.Texture2D, 0);
         // Recreate path only (the size-unchanged early return above binds nothing).
         InvalidateTextureUnits();
@@ -1288,9 +1357,101 @@ public class RenderManager : IDisposable
         InvalidateTextureUnits();
     }
 
-    /// <summary>Snapshots the default framebuffer's colour and depth into the scene textures so the
+    /// <summary>
+    /// Builds the linear HDR scene target every world pass renders into: an RGBA16F colour
+    /// texture and a DepthComponent24 renderbuffer (nothing uses stencil), sized to the viewport.
+    /// Called first from <see cref="LoadResources"/> and <see cref="SetViewport"/>, so the other
+    /// target creators restore to it, and recreating only on a resize. Nearest filtering: the
+    /// post pass reads it with <c>texelFetch</c> only. Leaves framebuffer 0 bound, like the
+    /// window state it was called from; <see cref="BeginFrame"/> binds the target each frame.
+    /// </summary>
+    private void CreateHdrTarget()
+    {
+        var w = Math.Max(2, _viewportSize.X);
+        var h = Math.Max(2, _viewportSize.Y);
+        if (_hdrFbo != 0 && _hdrSize.X == w && _hdrSize.Y == h) return;
+
+        DeleteHdrTarget();
+        _hdrSize = new Vector2D<int>(w, h);
+
+        _hdrColorTex = gl.GenTexture();
+        gl.BindTexture(TextureTarget.Texture2D, _hdrColorTex);
+        unsafe
+        {
+            gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.Rgba16f,
+                (uint)w, (uint)h, 0, PixelFormat.Rgba, PixelType.Float, null);
+        }
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
+
+        _hdrDepthRb = gl.GenRenderbuffer();
+        gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _hdrDepthRb);
+        gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.DepthComponent24, (uint)w, (uint)h);
+        gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, 0);
+
+        _hdrFbo = gl.GenFramebuffer();
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, _hdrFbo);
+        gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+            TextureTarget.Texture2D, _hdrColorTex, 0);
+        gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
+            RenderbufferTarget.Renderbuffer, _hdrDepthRb);
+
+        var status = gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
+        if (status != GLEnum.FramebufferComplete)
+            throw new Exception($"HDR framebuffer incomplete: {status}");
+
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        gl.BindTexture(TextureTarget.Texture2D, 0);
+        // Recreate path only (the size-unchanged early return above binds nothing).
+        InvalidateTextureUnits();
+    }
+
+    private void DeleteHdrTarget()
+    {
+        if (_hdrFbo == 0) return;
+        // Never leave a deleted FBO as the draw target.
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        gl.DeleteFramebuffer(_hdrFbo);
+        gl.DeleteTexture(_hdrColorTex);
+        gl.DeleteRenderbuffer(_hdrDepthRb);
+        _hdrFbo = 0;
+        _hdrColorTex = 0;
+        _hdrDepthRb = 0;
+        // Deleting a texture reverts its bindings to 0 on every unit of the current context.
+        InvalidateTextureUnits();
+    }
+
+    /// <summary>Binds the HDR scene target at the full viewport: where every world pass draws and
+    /// every mid-frame detour (shadows, mirror, rays) returns to - never framebuffer 0.</summary>
+    private void BindSceneTarget()
+    {
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, _hdrFbo);
+        gl.Viewport(_viewportSize);
+    }
+
+    /// <summary>
+    /// Resolves the HDR scene target into the default framebuffer (exposure, shoulder tonemap,
+    /// sRGB encode and dither in post-fragment.glsl). Runs at the end of World.Render; the UI then
+    /// draws on top of the result in gamma space. The scene texture is unbound from unit 0 again
+    /// afterwards so next frame's render target never sits on a sampler unit.
+    /// </summary>
+    public void RenderPostProcess()
+    {
+        if (_post == null || _hdrFbo == 0) return;
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        gl.Viewport(_viewportSize);
+        BindUnit(0, TextureTarget.Texture2D, _hdrColorTex);
+        ActiveUnit(0);
+        _post.Render();
+        BindUnit(0, TextureTarget.Texture2D, 0);
+    }
+
+    /// <summary>Snapshots the HDR scene target's colour and depth into the scene textures so the
     /// water pass can refract what is behind the surface and measure how thick the water is. Two
-    /// texture copies, no FBO: the window has no MSAA, so CopyTexSubImage2D reads it directly.</summary>
+    /// texture copies, no extra FBO: CopyTexSubImage2D reads the bound read framebuffer, which is
+    /// the HDR FBO (read buffer ColorAttachment0, the default for an FBO) during the world passes.</summary>
     private void CopyScene(bool colour)
     {
         if (colour)
@@ -1468,8 +1629,8 @@ public class RenderManager : IDisposable
 
         _cameraPos = savedCamPos;
         _clipY = savedClip;
-        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-        gl.Viewport(_viewportSize);
+        // Back to the HDR scene target the rest of the frame draws into
+        BindSceneTarget();
         gl.Enable(EnableCap.Blend);
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
         // Restores the real eye's fog/camera uniforms; uReflViewProj survives in the program.
@@ -1486,7 +1647,7 @@ public class RenderManager : IDisposable
     private static Vector3 Mix(Vector3 a, Vector3 b, float t) => a.Lerp(b, t);
 
     /// <summary>
-    /// Clears (colour to the flat sky fallback, and depth), paints the sky dome and the sun over
+    /// Binds and clears the HDR scene target (colour to the flat sky fallback, and depth), paints the sky dome and the sun over
     /// it (<see cref="RenderSky"/>), and leaves the GL state the world passes expect.
     /// <paramref name="camera"/> only orients the dome and the sun quad; a null camera skips
     /// both and leaves the flat clear colour.
@@ -1496,6 +1657,7 @@ public class RenderManager : IDisposable
         // The once-a-frame hard reset for the texture-unit cache: the UI pass, the particle
         // renderers and anything that rebuilt a GL texture ran since the last one.
         InvalidateTextureUnits();
+        BindSceneTarget();
         gl.ClearColor(_skyColor.X, _skyColor.Y, _skyColor.Z, 1f);
         gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
@@ -1576,7 +1738,10 @@ public class RenderManager : IDisposable
         sunShader.SetUniform("uDiscFraction", 1f / WorldGenerationConfig.SunGlowScale);
         sunShader.SetUniform("uGlowIntensity", GameSettings.SunGlow);
         sunShader.SetUniform("uGlowExponent", WorldGenerationConfig.SunGlowExponent);
-        sunShader.SetUniform("uSunColor", _sunColor);
+        // An HDR intensity: the disc plus the sky behind it has to clear the tonemap knee by a
+        // wide margin to read as display white, and the additive glow needs the same lift to show
+        // over a bright linear sky as it did added in display space.
+        sunShader.SetUniform("uSunColor", _sunColor * SunDiscIntensity);
         sunShader.SetUniform("uVisibility", _sunVisibility);
 
         _sunQuad.Render();
@@ -1645,6 +1810,7 @@ public class RenderManager : IDisposable
     /// <see cref="DeleteReflectionTarget"/>;
     /// <see cref="CreateSceneCopy"/> / <see cref="DeleteSceneCopy"/>;
     /// <see cref="CreateRaysTarget"/> / <see cref="DeleteRaysTarget"/>;
+    /// <see cref="CreateHdrTarget"/> / <see cref="DeleteHdrTarget"/>;
     /// <see cref="SetViewport"/>;
     /// <see cref="RenderLeafParticles"/> and <see cref="RenderBubbleParticles"/> (both renderers
     /// bind their own sprite to unit 0);
@@ -1663,7 +1829,8 @@ public class RenderManager : IDisposable
     /// <c>ActiveTexture</c>/<c>BindTexture</c> at all - their VAO/VBO binds are buffer
     /// state, and the program they switch is handled by <c>Shader.Use</c>'s own cache.
     /// <see cref="RenderBlockBreaking"/> binds its crack sprite through <see cref="BindUnit"/>,
-    /// which updates the cache rather than invalidating it, so it needs no call either.
+    /// which updates the cache rather than invalidating it, so it needs no call either; so does
+    /// <see cref="RenderPostProcess"/> with the HDR colour texture on unit 0 (and its unbind).
     /// <c>ChunkDrawBatch</c>, <c>ChunkGeometryPool</c> and <c>Mesh.Render</c> touch VAO/VBO/indirect
     /// state only. <see cref="CopyScene"/>'s <c>glCopyTexSubImage2D</c> changes texture
     /// <em>contents</em>, not bindings (its own select/bind pair is routed through
@@ -1732,7 +1899,7 @@ public class RenderManager : IDisposable
         program.SetUniform("uSunColor", _sunColor);
         program.SetUniform("uSunIntensity", _sunIntensity);
         program.SetUniform("uAmbient", _ambient);
-        program.SetUniform("uTorchColor", _torchColor);
+        program.SetUniform("uTorchColor", TorchColorLinear);
         program.SetUniform("uTorchIntensity", TorchIntensity);
         program.SetUniform("uFogColor", _fogColor);
         program.SetUniform("uFogNear", _fogNear);
@@ -1840,15 +2007,20 @@ public class RenderManager : IDisposable
     {
         if (camera == null || _rays == null || _eyeInLava) return;
         var wet = MathUtils.SmoothStep(_underwaterT);
-        var strength = wet * _shadowStrengthDry * _dayness * GameSettings.WaterSunShafts;
+        // RaysLinearScale: the shafts add straight onto the linear HDR scene now, where the same
+        // added amount reads far brighter over dark water than it did added in display space.
+        // The sun colour is cooled by the same tint the underwater ambient takes: added in linear
+        // light a warm-white shaft greys the blue water out instead of reading cyan as it did
+        // when the display-space add clipped the blue channel.
+        var strength = wet * _shadowStrengthDry * _dayness * GameSettings.WaterSunShafts * RaysLinearScale;
         if (strength <= 0.0005f) return;
         if (_raysFbo == 0) return;             // no target to march into (never happens after LoadResources)
         CopyScene(colour: false);
         BindUnit(1, TextureTarget.Texture2D, _shadowDepthTex);
         BindUnit(4, TextureTarget.Texture2D, _sceneDepthTex);
         ActiveUnit(0);
-        _rays.Render(_raysFbo, _raysTex, _raysSize, _viewportSize, _invViewProj, _cameraPos, _sunDir,
-            _sunColor, strength, camera.EyeWaterSurfaceY, WorldGenerationConfig.WaterAbsorb, _lightViewProj, _time);
+        _rays.Render(_raysFbo, _raysTex, _raysSize, _hdrFbo, _viewportSize, _invViewProj, _cameraPos, _sunDir,
+            _sunColor * UnderwaterAmbientTintLinear, strength, camera.EyeWaterSurfaceY, WorldGenerationConfig.WaterAbsorb, _lightViewProj, _time);
         // UnderwaterRaysRenderer selects unit 5 for the upsample and puts unit 0 back. Unit 5 is
         // untracked so the records happen to survive, but the renderer does not promise that.
         InvalidateTextureUnits();
@@ -2405,7 +2577,10 @@ public class RenderManager : IDisposable
     private Mesh MoltenQuad(MoltenMaterial material)
     {
         if (_moltenQuads.TryGetValue(material.Id, out var mesh)) return mesh;
-        mesh = Primitives.CreateFlatQuad(gl, material.Color, UvRect.Tile(material.Tile));
+        // The tint is authored in sRGB and multiplies the decoded lava tile, so decode it too
+        var c = material.Color.ToVector4();
+        var lin = ColorSpace.SrgbToLinear(new Vector3(c.X, c.Y, c.Z));
+        mesh = Primitives.CreateFlatQuad(gl, Rgba.FromFloat(lin.X, lin.Y, lin.Z, c.W), UvRect.Tile(material.Tile));
         _moltenQuads[material.Id] = mesh;
         return mesh;
     }
@@ -2961,7 +3136,8 @@ public class RenderManager : IDisposable
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
         boxes ??= BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
-        selectionShader.SetUniform("uColor", new Vector3(0.8f, 0.8f, 0.85f));
+        // sRGB-authored outline colours, decoded: the selection draws into the linear HDR target
+        selectionShader.SetUniform("uColor", SelectionOutlineColor);
         selectionShader.SetUniform("uOpacity", 0.95f);
 
         // The outline is twelve edge beams (SelectionOutlineMesh) rather than GL lines, since
@@ -2996,7 +3172,7 @@ public class RenderManager : IDisposable
                             * Matrix4x4.CreateScale(hitBox.Size + new Vector3(grow))
                             * Matrix4x4.CreateTranslation(hitCenter + hitNormal * 0.003f);
             selectionShader.SetUniform("uMVP", faceModel * viewProj);
-            selectionShader.SetUniform("uColor", new Vector3(0.7f, 0.7f, 0.75f));
+            selectionShader.SetUniform("uColor", SelectionFaceColor);
             selectionShader.SetUniform("uOpacity", 0.15f);
 
             gl.BindVertexArray(faceVao);
@@ -3284,6 +3460,7 @@ public class RenderManager : IDisposable
         sunShader.Dispose();
         _clouds?.Dispose();
         _skyDome?.Dispose();
+        _post?.Dispose();
         _rays?.Dispose();
         _vignette?.Dispose();
         _leaves?.Dispose();
@@ -3298,6 +3475,7 @@ public class RenderManager : IDisposable
         DeleteReflectionTarget();
         DeleteSceneCopy();
         DeleteRaysTarget();
+        DeleteHdrTarget();
         gl.DeleteBuffer(outlineVbo);
         gl.DeleteBuffer(outlineEbo);
         gl.DeleteVertexArray(outlineVao);

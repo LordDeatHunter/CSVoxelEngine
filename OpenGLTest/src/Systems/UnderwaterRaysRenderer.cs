@@ -78,8 +78,9 @@ public sealed class UnderwaterRaysRenderer : IDisposable
     /// near/far planes or the clip-depth convention; <paramref name="lightViewProj"/> is the same
     /// light-space matrix the world shader samples the shadow map with.
     /// The march goes into <paramref name="halfResFbo"/> at <paramref name="halfResSize"/>; the
-    /// composite reads it back out of <paramref name="halfResTex"/> and draws to the default
-    /// framebuffer at <paramref name="viewportSize"/>. Both shaders must unproject with the SAME
+    /// composite reads it back out of <paramref name="halfResTex"/> and draws into
+    /// <paramref name="sceneFbo"/> (the HDR scene target the rest of the frame renders into) at
+    /// <paramref name="viewportSize"/>. Both shaders must unproject with the SAME
     /// matrix in the same frame - the composite weighs each tap by comparing marched distances,
     /// and that comparison is only meaningful because both sides computed them the same way.
     /// <paramref name="waterAbsorb"/> is the per-channel absorption per block of depth below
@@ -89,7 +90,7 @@ public sealed class UnderwaterRaysRenderer : IDisposable
     /// gets shafts as well.
     /// </summary>
     public void Render(uint halfResFbo, uint halfResTex, Vector2D<int> halfResSize,
-        Vector2D<int> viewportSize, Matrix4x4 invViewProj, Vector3 cameraPos, Vector3 sunDir,
+        uint sceneFbo, Vector2D<int> viewportSize, Matrix4x4 invViewProj, Vector3 cameraPos, Vector3 sunDir,
         Vector3 sunColor, float strength, float surfaceY, Vector3 waterAbsorb, Matrix4x4 lightViewProj, float time)
     {
         _gl.Disable(EnableCap.DepthTest);      // full-screen: nothing to test against
@@ -119,8 +120,8 @@ public sealed class UnderwaterRaysRenderer : IDisposable
         _gl.BindVertexArray(_vao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
 
-        // Back to the window before the composite.
-        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        // Back to the scene target before the composite.
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, sceneFbo);
         _gl.Viewport(0, 0, (uint)viewportSize.X, (uint)viewportSize.Y);
 
         // Only NOW is the march output safe to sample: binding it to a unit while it was still
