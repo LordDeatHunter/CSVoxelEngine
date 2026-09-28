@@ -5,7 +5,7 @@ layout (location = 2) in vec2 vTexCoord;
 layout (location = 3) in float vSun;
 layout (location = 4) in float vBlock;
 // Vertex.Normal (low byte) + Vertex.LightTint (high byte) as one integer ushort: face in
-// bits 0-2, submerged 3, wet band 4, leaf sway 5, the 10-bit block-light tint code in 6-15.
+// bits 0-2, submerged 3, bit 4 unused, leaf sway 5, the 10-bit block-light tint code in 6-15.
 layout (location = 5) in uint vNormalBits;
 layout (location = 7) in uint vLayer; // array-texture slice (Vertex.Layer)
 layout (location = 8) in uint vWaterSurface; // Vertex.WaterSurface
@@ -55,11 +55,9 @@ flat out vec3 fTangent;
 flat out vec3 fBitangent;
 out vec3 fWorldPos;
 out float fSubmerged;
-// 1 on a dry face just above a fluid surface (the wet band, bit 4 of the packed normal).
-out float fWet;
 flat out float fAlpha;
-// World Y of the water surface above a submerged face, or below a wet-band face (0 elsewhere,
-// decoding far below any face).
+// World Y of the water surface above a submerged face (0 elsewhere, decoding far below any
+// face).
 flat out float fWaterSurfaceY;
 // Water flow on fluid quads (Vertex.EncodeWaterFlow): xy = flow direction * strength, z = falling
 // flag. Deliberately NOT flat: the mesher bakes one code per corner and neighbouring cells share
@@ -171,13 +169,11 @@ void main() {
 #endif
     // uModel is a pure translation for chunks/LOD, so the normal is unchanged.
     // The mesher packs the face as a 0..5 index (Chunk.CubeFaces order) in bits 0-2 and
-    // "this face looks into water" in bit 3 and "this dry face sits just above a fluid surface"
-    // (the wet band) in bit 4 (bit 5 is sway, read above); a nested ternary keeps the decode
-    // branchless without relying on dynamic array indexing.
+    // "this face looks into water" in bit 3 (bit 4 is unused, bit 5 is sway, read above); a
+    // nested ternary keeps the decode branchless without relying on dynamic array indexing.
     int nIdx = int(vNormalBits & 63u);
     int face = nIdx & 7;
     fSubmerged = (nIdx & 8) != 0 ? 1.0 : 0.0;
-    fWet = (nIdx & 16) != 0 ? 1.0 : 0.0;
     vec3 vNormal = face == 0 ? vec3(0.0, 0.0, -1.0)
         : face == 1 ? vec3(0.0, 0.0, 1.0)
         : face == 2 ? vec3(-1.0, 0.0, 0.0)

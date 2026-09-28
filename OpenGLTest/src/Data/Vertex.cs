@@ -33,10 +33,8 @@ public struct Vertex
     /// <see cref="Chunk.CubeFaces"/> order, reconstructed in the vertex shader. Sloped fluid tops
     /// and spun pebbles snap to their dominant axis; both sit within a few degrees of one, so the
     /// sun diffuse barely moves. Bit 3: the face looks into water, which is what the fragment
-    /// shader paints the caustic net onto. Bit 4: wet band, a dry face just above a fluid surface
-    /// (a bank wall one cell over the waterline, a beach top level with the water);
-    /// <see cref="WaterSurface"/> then carries that surface. Bits 3 and 4 are mutually exclusive,
-    /// which is what lets them share it. Bit 5: leaf-wind sway (<see cref="IsSwaying"/>; chunk
+    /// shader paints the caustic net onto. Bit 4: unused, reserved (sway and tint keep their
+    /// positions rather than re-packing). Bit 5: leaf-wind sway (<see cref="IsSwaying"/>; chunk
     /// meshes set it on canopy leaves, standalone cubes such as drops, icons and mining pops stay
     /// planted). Bits 6-7: the low two bits of the 10-bit block-light tint code
     /// (<see cref="BlockTint"/>).</summary>
@@ -52,8 +50,8 @@ public struct Vertex
     public ushort Layer;
 
     /// <summary>For a submerged face (<see cref="Normal"/> bit 3): the world Y of the water
-    /// surface above it (for a wet-band face, bit 4, the surface just below it), in quarter blocks offset by <see cref="WaterSurfaceOffset"/>
-    /// (<see cref="EncodeWaterSurface"/>); 0 everywhere else. The caustic net fades with depth
+    /// surface above it, in quarter blocks offset by <see cref="WaterSurfaceOffset"/>
+    /// (<see cref="EncodeWaterSurface"/>); 0 on every other non-fluid face. The caustic net fades with depth
     /// below this, so a pond above sea level measures from its own surface. Also keeps the
     /// struct at 32 bytes.
     /// <para>On a fluid quad (alpha byte 254) the same ushort instead carries the flow code
@@ -125,7 +123,7 @@ public struct Vertex
     /// <summary>Atlas geometry: a UV in tile units on <paramref name="layer"/>.</summary>
     public Vertex(Vector3 position, byte r, byte g, byte b, byte a, Vector2 uv, ushort layer,
         float sun = 1f, float block = 0f, Vector3? normal = null, float sway = 0f, bool submerged = false,
-        ushort waterSurface = 0, bool wet = false, ushort tint = 0)
+        ushort waterSurface = 0, ushort tint = 0)
     {
         System.Diagnostics.Debug.Assert(tint <= TintMask, "block-light tint code exceeds 10 bits");
         tint &= TintMask;
@@ -136,7 +134,7 @@ public struct Vertex
         WaterSurface = waterSurface;
         Sun = EncodeLight(sun);
         Block = EncodeLight(block);
-        Normal = (byte)(EncodeNormal(normal ?? Vector3.UnitY) | (submerged ? SubmergedBit : 0) | (wet ? WetBit : 0)
+        Normal = (byte)(EncodeNormal(normal ?? Vector3.UnitY) | (submerged ? SubmergedBit : 0)
                         | (sway >= 0.5f ? SwayBit : 0) | ((tint & 3) << 6));
         LightTint = (byte)(tint >> 2);
     }
@@ -163,16 +161,11 @@ public struct Vertex
     }
 
     private const int SubmergedBit = 1 << 3;
-    private const int WetBit = 1 << 4;
     private const int SwayBit = 1 << 5;
     private const ushort TintMask = 0x3FF;
 
     /// <summary><see cref="Normal"/> bit 3: the face looks into a fluid.</summary>
     public readonly bool IsSubmerged => (Normal & SubmergedBit) != 0;
-
-    /// <summary><see cref="Normal"/> bit 4: the face sits in the wet band just above a fluid
-    /// surface.</summary>
-    public readonly bool IsWet => (Normal & WetBit) != 0;
 
     /// <summary><see cref="Normal"/> bit 5: the leaf-wave shader sways this vertex.</summary>
     public readonly bool IsSwaying => (Normal & SwayBit) != 0;

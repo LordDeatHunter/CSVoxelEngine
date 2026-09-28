@@ -260,7 +260,7 @@ public sealed class GreedyMeshingTests
     /// <summary>What one unit cell face looks like once rendered, independent of how many
     /// quads it was drawn with: attributes plus the shade, sun and lamp light, decoded lamp tint
     /// colour and UV interpolated at its four corners. <c>Flags</c> is the packed normal above the face index
-    /// (submerged bit 3, wet band bit 4, ...).</summary>
+    /// (submerged bit 3, sway bit 5, ...).</summary>
     private sealed record CellFace(int Face, int Flags, int Alpha, int Layer, bool Sway, int WaterSurface, int List,
         float[] Shade, float[] Sun, float[] Block, Vector3[] Tint, float[] U, float[] V);
 
@@ -297,7 +297,7 @@ public sealed class GreedyMeshingTests
             var v0 = quad[0];
             foreach (var v in quad)
             {
-                // Bits 0-5 (face, submerged, wet, sway) are per quad; the tint code above them is
+                // Bits 0-5 (face, submerged, unused bit 4, sway) are per quad; the tint code above them is
                 // per corner and is compared through the rasterised corners instead
                 Assert.Equal(v0.Normal & 0x3F, v.Normal & 0x3F);
                 Assert.Equal(v0.Layer, v.Layer);
@@ -522,10 +522,10 @@ public sealed class GreedyMeshingTests
     }
 
     [Fact]
-    public void WetShorelineMeshesTheSameBothWays()
+    public void ShorelineMeshesTheSameBothWays()
     {
-        // A pond sunk into stone ground level with its surface (wet beach tops all round) and a
-        // low wall along one bank (wet bank faces just over the waterline)
+        // A pond sunk into stone ground level with its surface (dry beach tops all round) and a
+        // low wall along one bank (dry bank faces just over the waterline)
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
         var stone = Block("stone");
         var water = Block("water");
@@ -540,9 +540,10 @@ public sealed class GreedyMeshingTests
 
         var cells = AssertGreedyMatchesPerQuad(manager, center);
 
-        // The shore really is flagged, so the parity above compared something
-        Assert.Contains(cells.Values, c => (c.Flags & 2) != 0 && c.Face == 4);
-        Assert.Contains(cells.Values, c => (c.Flags & 2) != 0 && c.Face == 3);
+        // The pond bed and the bank wall under the waterline really are submerged, so the
+        // parity above compared baked water surfaces as well as dry faces
+        Assert.Contains(cells.Values, c => (c.Flags & 1) != 0 && c.Face == 4);
+        Assert.Contains(cells.Values, c => (c.Flags & 1) != 0 && c.Face == 3);
     }
 
     [Fact]

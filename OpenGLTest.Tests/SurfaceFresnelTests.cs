@@ -4,8 +4,8 @@ namespace silkgltriangle.Tests;
 
 /// <summary>
 /// <see cref="SurfaceFresnel"/> mirrors the wet waterline in test-fragment.glsl. The rules: the
-/// fresnel only ever grows toward a graze, a submerged face is fully wet, the wet band fades out
-/// monotonically with height above its surface, an unflagged face never darkens, and the
+/// fresnel only ever grows toward a graze, a submerged fragment is wet at or below its own surface
+/// and dry above it, a dry face never darkens at any height, and the
 /// universal rim is nothing head-on or on a back face, everything at a graze and gone past its
 /// fade distance.
 /// </summary>
@@ -26,37 +26,31 @@ public sealed class SurfaceFresnelTests
     }
 
     [Theory]
-    [InlineData(false, 0f)]
-    [InlineData(true, 0f)]
-    [InlineData(true, 3f)]
-    public void SubmergedIsFullyWet(bool alsoWetBand, float height)
+    [InlineData(0f)]
+    [InlineData(-0.01f)]
+    [InlineData(-3f)]
+    public void SubmergedFragmentAtOrBelowItsSurfaceIsFullyWet(float heightAboveSurface)
     {
-        Assert.Equal(1f, SurfaceFresnel.WetWeight(true, alsoWetBand, height, 0.5f));
-    }
-
-    [Fact]
-    public void WetBandFadesOutWithHeight()
-    {
-        const float band = 0.5f;
-        Assert.Equal(1f, SurfaceFresnel.WetWeight(false, true, 0f, band));
-        var previous = 1f;
-        for (var i = 1; i <= 10; i++)
-        {
-            var w = SurfaceFresnel.WetWeight(false, true, band * i / 10f, band);
-            Assert.True(w < previous, $"wet weight did not fall at {i}/10 of the band");
-            previous = w;
-        }
-        Assert.Equal(0f, previous);
-        Assert.Equal(0f, SurfaceFresnel.WetWeight(false, true, band * 2f, band));
+        Assert.Equal(1f, SurfaceFresnel.WetWeight(true, heightAboveSurface));
     }
 
     [Theory]
+    [InlineData(0.01f)]
+    [InlineData(0.25f)]
+    [InlineData(3f)]
+    public void SubmergedFragmentAboveItsOwnSurfaceIsDry(float heightAboveSurface)
+    {
+        Assert.Equal(0f, SurfaceFresnel.WetWeight(true, heightAboveSurface));
+    }
+
+    [Theory]
+    [InlineData(-3f)]
     [InlineData(0f)]
     [InlineData(0.2f)]
-    [InlineData(-1f)]
-    public void DryFaceIsNotWet(float height)
+    [InlineData(3f)]
+    public void DryFaceIsNeverWet(float heightAboveSurface)
     {
-        Assert.Equal(0f, SurfaceFresnel.WetWeight(false, false, height, 0.5f));
+        Assert.Equal(0f, SurfaceFresnel.WetWeight(false, heightAboveSurface));
     }
 
     [Fact]

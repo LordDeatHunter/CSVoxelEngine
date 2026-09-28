@@ -27,8 +27,7 @@ flat in vec3 fTangent;
 flat in vec3 fBitangent;
 in vec3 fWorldPos;
 in float fSubmerged;
-in float fWet; // dry face just above a fluid surface: the wet band (bit 4 of the packed normal)
-// Baked fluid surface (Vertex.WaterSurface): above a submerged face, or below a wet-band face.
+// Baked fluid surface (Vertex.WaterSurface) above a submerged face.
 flat in float fWaterSurfaceY;
 in vec3 fWaterFlow; // flow xy * strength, z = falling (fluid quads only; see test-vertex.glsl)
 flat in float fAlpha; // per-draw fade from the vertex stage: a uniform cannot vary inside one multi-draw
@@ -145,13 +144,9 @@ const float WaterEta = 1.333;
 uniform vec3 uWaterAbsorb;
 uniform vec3 uWaterScatter;
 uniform float uWaterCausticStrength;
-// Wet waterline (SH-22): submerged and wet-band faces darken their albedo by uWetDarken; the
-// band fades out over uWetBand blocks above the surface and carries a Schlick sky sheen
-// (uWetReflect) plus a tight sun highlight (Blinn-Phong exponent uWetShine).
+// Wet albedo (SH-22): a submerged face darkens its albedo by uWetDarken, but only below its
+// own baked water surface, so dry ground beside or above the water keeps its colour.
 uniform float uWetDarken;
-uniform float uWetBand;
-uniform float uWetReflect;
-uniform float uWetShine;
 // Surface rim (SH-23): a faint grazing-angle sky fresnel on every non-ore, non-water tile,
 // uRimStrength at a full graze, faded out from uRimFade.x to uRimFade.y blocks.
 uniform float uRimStrength;
@@ -519,12 +514,12 @@ void main() {
     // rather than stacking a second fresnel on top. fLayer is flat: this resolves per quad.
     bool oreTile = !isWater && uMaterialCount > 0 && int(fLayer) < uMaterialCount
         && uTileMaterials[fLayer].x > 0.0;
-    // Wet waterline: a face under water is fully wet, and a dry face the mesher flagged as just
-    // above a fluid surface (fWaterSurfaceY is that surface) fades from wet at the waterline to
-    // dry uWetBand blocks up. Water darkens what it soaks, so the albedo drops exactly once,
-    // here before the light multiply, and the caustics below see the wet albedo too.
-    float band = fWet > 0.5 ? 1.0 - smoothstep(0.0, uWetBand, fWorldPos.y - fWaterSurfaceY) : 0.0;
-    float wet = (isWater || oreTile) ? 0.0 : max(fSubmerged > 0.5 ? 1.0 : 0.0, band);
+    // Wet albedo: a submerged face is wet only at or below its own baked water surface
+    // (fWaterSurfaceY), so the dry top of a side face poking out of a thin flow keeps its colour.
+    // Water darkens what it soaks, so the albedo drops exactly once, here before the light
+    // multiply, and the caustics below see the wet albedo too. GL-free twin:
+    // SurfaceFresnel.WetWeight.
+    float wet = (isWater || oreTile || fSubmerged < 0.5) ? 0.0 : step(fWorldPos.y, fWaterSurfaceY);
     albedo *= mix(1.0, uWetDarken, wet);
     vec3 col = albedo * light;
     // Wanted by the caustics and the refraction below as well as by the fog at the end
@@ -594,29 +589,13 @@ void main() {
         }
     }
 
-    // Wet sheen on the band above the waterline: a thin water film is a low-roughness dielectric,
-    // so it mirrors a little sky at a graze (the same Schlick the ores use) and catches a tight
-    // sun glint, both gated like the ore highlight by skylight and the shadow. Faded out with
-    // distance for the same aliasing reason. Submerged faces are only darkened: the water above
-    // them does the reflecting.
-    if (band > 0.0 && !isWater && !oreTile) {
-        float wetFade = 1.0 - smoothstep(48.0, 112.0, dist);
-        if (wetFade > 0.0) {
-            vec3 Vw = normalize(uCameraPos - fWorldPos);
-            float Fw = Schlick(max(dot(Vw, N), 0.0));
-            vec3 wetSky = uFogColor * clamp(0.12 + 0.88 * fSun, 0.0, 1.0);
-            col = mix(col, wetSky, Fw * band * uWetReflect * wetFade);
-            col += uSunColor * uSunIntensity * pow(max(dot(N, normalize(Vw + uSunDir)), 0.0), uWetShine)
-                * band * fSun * shadow * smoothstep(0.0, 0.2, uSunIntensity) * wetFade * 0.5;
-        }
-    }
-
     // Universal rim: every dielectric reflects a little more sky at a graze, so faces seen
     // edge-on pick up a faint sky-tinted edge (the same Schlick, normalised to 0 head-on). It is
     // a mix toward the sky, never an add, so it stays energy-bounded in linear HDR. The fade
     // starts right at the camera: flat ground seen from standing height turns grazing within a
     // few tens of blocks, and a later fade would leave a lighter ring travelling with the camera.
-    // Ores keep their own material fresnel and wet faces their sheen, so both are excluded.
+    // Ores keep their own material fresnel and are excluded; submerged faces, which the water
+    // above does the reflecting for, get none either.
     // GL-free twin: SurfaceFresnel.Rim / RimFade.
     if (!isWater && !oreTile && uRimStrength > 0.0) {
         float rimFade = 1.0 - smoothstep(uRimFade.x, uRimFade.y, dist);
@@ -637,7 +616,7 @@ void main() {
         }
     }
 
-    if (fSubmerged > 0.5 && !isWater && dist < 96.0) {
+    if (fSubmerged > 0.5 && !isWater && dist < 96.0 && fWorldPos.y <= fWaterSurfaceY) {
         // Where on the surface did this sunlight come through? Follow the sun back up to this
         // face's own water surface (baked by the mesher), not the sea plane, so a pond above sea
         // level gets its net too and walls match the floor beside them.

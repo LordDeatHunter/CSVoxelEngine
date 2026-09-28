@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Xunit;
 
@@ -282,7 +283,6 @@ public sealed class MeshingTests
             Assert.Equal(tint, t.BlockTint);
             Assert.Equal(2, t.Normal & 7);
             Assert.True(t.IsSubmerged);
-            Assert.False(t.IsWet);
             Assert.True(t.IsSwaying);
         }
 
@@ -300,7 +300,8 @@ public sealed class MeshingTests
     }
 
     /// <summary>Decoded water surface of every submerged top face at world Y
-    /// <paramref name="faceY"/>; asserts every other vertex carries no surface.</summary>
+    /// <paramref name="faceY"/>; asserts every vertex that is neither submerged nor a fluid quad
+    /// carries no surface.</summary>
     private static List<float> SubmergedTopSurfaces(ChunkMeshData mesh, float faceY)
     {
         var surfaces = new List<float>();
@@ -309,8 +310,8 @@ public sealed class MeshingTests
             var submerged = (vertex.Normal & 8) != 0;
             if (!submerged)
             {
-                // A wet-band face carries the surface below it in the same field
-                if (!vertex.IsWet) Assert.Equal(0, vertex.WaterSurface);
+                // A fluid quad (alpha 254) carries its flow code in the same field instead
+                if ((vertex.PackedColor >> 24) != 254) Assert.Equal(0, vertex.WaterSurface);
                 continue;
             }
             Assert.NotEqual(0, vertex.WaterSurface);
@@ -321,7 +322,7 @@ public sealed class MeshingTests
         return surfaces;
     }
 
-    // ---------------------------------------------------------------- wet band (SH-22)
+    // ---------------------------------------------------------------- shoreline faces
 
     /// <summary>A stone column at (8, 8..9, 8) beside one water source at (9, 8, 8) resting on
     /// stone: the column's +X face at y = 8 looks into the water, the one at y = 9 looks into
@@ -356,41 +357,26 @@ public sealed class MeshingTests
     }
 
     [Fact]
-    public void BankWallAboveWaterIsWetNotSubmerged()
+    public void DryFacesBesideWaterAreNotSubmergedAndCarryNoSurface()
     {
-        var (manager, center) = Shore(wall: true);
-        var mesh = center.GenerateMeshData(manager);
-        Assert.NotNull(mesh);
+        // The bank wall just over the waterline (+X of the upper stone) and a beach top level
+        // with the water beside it look into air: neither may take the water's shading
+        var (wallManager, wallCenter) = Shore(wall: true);
+        var wallMesh = wallCenter.GenerateMeshData(wallManager);
+        Assert.NotNull(wallMesh);
+        var (beachManager, beachCenter) = Shore(wall: false);
+        var beachMesh = beachCenter.GenerateMeshData(beachManager);
+        Assert.NotNull(beachMesh);
 
-        // +X (face 3) of the upper stone looks into the air cell over the water
-        foreach (var v in FaceVertices(mesh, 3, 9f, 9f))
+        foreach (var v in FaceVertices(wallMesh, 3, 9f, 9f).Concat(FaceVertices(beachMesh, 4, 9f, 9f)))
         {
-            Assert.True(v.IsWet);
             Assert.False(v.IsSubmerged);
-            var surface = Vertex.DecodeWaterSurface(v.WaterSurface);
-            Assert.True(surface <= 9f && surface > 8f, $"{surface}");
+            Assert.Equal(0, v.WaterSurface);
         }
     }
 
     [Fact]
-    public void BeachTopBesideWaterIsWetWithSurfaceBelowFace()
-    {
-        var (manager, center) = Shore(wall: false);
-        var mesh = center.GenerateMeshData(manager);
-        Assert.NotNull(mesh);
-
-        // The top (face 4) of the stone at y = 8 sits at y = 9, level with the water beside it
-        foreach (var v in FaceVertices(mesh, 4, 9f, 9f))
-        {
-            Assert.True(v.IsWet);
-            Assert.False(v.IsSubmerged);
-            var surface = Vertex.DecodeWaterSurface(v.WaterSurface);
-            Assert.True(surface <= 9f && surface >= 8f, $"{surface}");
-        }
-    }
-
-    [Fact]
-    public void FaceLookingIntoWaterIsSubmergedNotWet()
+    public void FaceLookingIntoWaterIsSubmerged()
     {
         var (manager, center) = Shore(wall: true);
         var mesh = center.GenerateMeshData(manager);
@@ -399,12 +385,11 @@ public sealed class MeshingTests
         foreach (var v in FaceVertices(mesh, 3, 9f, 8f))
         {
             Assert.True(v.IsSubmerged);
-            Assert.False(v.IsWet);
         }
     }
 
     [Fact]
-    public void DryFaceIsNeitherWetNorSubmerged()
+    public void DryFaceIsNotSubmerged()
     {
         var (manager, center) = MeshTestWorld.WalledArea();
         center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
@@ -412,7 +397,6 @@ public sealed class MeshingTests
         Assert.NotNull(mesh);
         Assert.All(mesh.Vertices, v =>
         {
-            Assert.False(v.IsWet);
             Assert.False(v.IsSubmerged);
             Assert.Equal(0, v.WaterSurface);
         });

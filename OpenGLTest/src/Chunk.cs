@@ -1547,7 +1547,6 @@ public class Chunk : IDisposable
                 // shader paints caustics on it. Interior sub-cell quads have no neighbour to
                 // look into and stay false.
                 var submerged = false;
-                var wet = false;
                 ushort waterSurface = 0;
 
                 if (cullFace >= 0)
@@ -1574,17 +1573,6 @@ public class Chunk : IDisposable
                     if (submerged)
                         waterSurface = BakedWaterSurface(padded, paddedState, pIdx + FaceNeighborDelta[cullFace],
                             chunkBaseY, worldX0, worldZ0);
-                    else if (!BlockType.IsFluid(blockId))
-                    {
-                        // Bit 4: a dry face just above a fluid surface, sharing WaterSurface
-                        // (resolved exactly as the greedy pass keys it)
-                        var wetCell = WetBandFluidCell(padded, pIdx, cullFace, pIdx + FaceNeighborDelta[cullFace]);
-                        if (wetCell >= 0)
-                        {
-                            wet = true;
-                            waterSurface = BakedWaterSurface(padded, paddedState, wetCell, chunkBaseY, worldX0, worldZ0);
-                        }
-                    }
                 }
                 else
                 {
@@ -1613,7 +1601,7 @@ public class Chunk : IDisposable
                     // brightness and no ambient occlusion
                     for (var j = 0; j < 4; j++)
                         dstVertices.Add(new Vertex(basePos + positions[j], 255, 255, 255, 255, uvs[j], quad.Tile,
-                            sun, block, normal, sway, submerged, waterSurface, wet, flatTint));
+                            sun, block, normal, sway, submerged, waterSurface, flatTint));
                 }
                 else if (quad.IsFullFace)
                 {
@@ -1645,7 +1633,7 @@ public class Chunk : IDisposable
                         }
 
                         dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j], quad.Tile,
-                            vSun, vBlock, normal, sway, submerged, waterSurface, wet, vTint));
+                            vSun, vBlock, normal, sway, submerged, waterSurface, vTint));
                     }
                 }
                 else
@@ -1655,7 +1643,7 @@ public class Chunk : IDisposable
                     var shade = ShadeLut[(face << 2) | 3];
                     for (var j = 0; j < 4; j++)
                         dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j], quad.Tile,
-                            sun, block, normal, sway, submerged, waterSurface, wet, flatTint));
+                            sun, block, normal, sway, submerged, waterSurface, flatTint));
                 }
 
                 dstIndices.Add((ushort)(dstOffset + 0));
@@ -1739,37 +1727,6 @@ public class Chunk : IDisposable
         int chunkBaseY, int worldX0, int worldZ0) =>
         Vertex.EncodeWaterSurface(DecodeSurfaceCode(chunkBaseY,
             SubmergedSurfaceCode(padded, paddedState, fluidPIdx, chunkBaseY, worldX0, worldZ0)));
-
-    /// <summary>
-    /// The fluid cell that wets a dry face just above its surface (<see cref="Vertex.IsWet"/>),
-    /// as a padded index, or -1. Only called for a non-fluid block whose face looks into a
-    /// non-fluid cell (<paramref name="neighbourPIdx"/>). A side face (0-3) is wet when the cell
-    /// below the one it looks into is fluid: the bank wall just over the waterline. A top face
-    /// (4) is wet when one of the block's own horizontal neighbours, checked in face order, is
-    /// fluid: a beach top level with the water. Nothing else is. Shared by the greedy key and the
-    /// per-voxel loop so both paths flag exactly the same faces; every index read stays inside
-    /// the 18^3 snapshot because the block itself is an interior cell.
-    /// </summary>
-    internal static int WetBandFluidCell(byte[] padded, int pIdx, int face, int neighbourPIdx)
-    {
-        if (face < 4)
-        {
-            // Y stride of the snapshot is Padded (px * PaddedSq + py * Padded + pz)
-            var below = neighbourPIdx - Padded;
-            return BlockType.IsFluid(padded[below]) ? below : -1;
-        }
-
-        if (face == 4)
-        {
-            for (var i = 0; i < 4; i++)
-            {
-                var side = pIdx + FaceNeighborDelta[i];
-                if (BlockType.IsFluid(padded[side])) return side;
-            }
-        }
-
-        return -1;
-    }
 
     // Axis each face's plane is perpendicular to (0 = X, 1 = Y, 2 = Z), in CubeFaces order,
     // and whether the face looks along +axis. Rows and columns of a face's bit plane are the two
@@ -1919,9 +1876,8 @@ public class Chunk : IDisposable
                         tint |= (ulong)(code >> 12) << (10 * j);
                     }
 
-                    // Key: id 0-7, AO 8-15, wet 16, 17-23 unused, submerged 24, and for a
-                    // submerged or wet face its 7-bit water surface code in 25-31 (the two
-                    // flags are exclusive, so they share it). Bit 31 can make the key
+                    // Key: id 0-7, AO 8-15, 16-23 unused, submerged 24, and for a submerged
+                    // face its 7-bit water surface code in 25-31. Bit 31 can make the key
                     // negative; that is safe because the slot hash reads it as (uint)key and an
                     // empty slot is table entry 0, never a key value. The light travels in a
                     // parallel 48-bit key: four 12-bit SmoothCornerLight codes, corner j at 12j,
@@ -1931,13 +1887,6 @@ public class Chunk : IDisposable
                     if (BlockType.IsFluid(neighbour))
                         key |= 1 << 24 | SubmergedSurfaceCode(padded, paddedState, pIdx + faceDelta,
                             chunkBaseY, worldX0, worldZ0) << 25;
-                    else if (!BlockType.IsFluid(id))
-                    {
-                        var wetCell = WetBandFluidCell(padded, pIdx, f, pIdx + faceDelta);
-                        if (wetCell >= 0)
-                            key |= 1 << 16 | SubmergedSurfaceCode(padded, paddedState, wetCell,
-                                chunkBaseY, worldX0, worldZ0) << 25;
-                    }
 
                     // Find or open the key's plane
                     var h = ((ulong)(uint)key ^ light * 0x9E3779B97F4A7C15UL ^ tint * 0xC2B2AE3D27D4EB4FUL)
@@ -2018,8 +1967,7 @@ public class Chunk : IDisposable
         var alongRow = yFace ? code[0] == code[3] && code[1] == code[2] : code[0] == code[1] && code[3] == code[2];
 
         var submerged = ((key >> 24) & 1) != 0;
-        var wet = ((key >> 16) & 1) != 0;
-        var waterSurface = submerged || wet
+        var waterSurface = submerged
             ? Vertex.EncodeWaterSurface(DecodeSurfaceCode(chunkBaseY, (key >> 25) & 127))
             : (ushort)0;
         var layer = type.FaceTiles[f];
@@ -2078,7 +2026,7 @@ public class Chunk : IDisposable
                     var sun = (int)((light >> (12 * j)) & 63) / SmoothLightDivisor;
                     var block = (int)((light >> (12 * j + 6)) & 63) / SmoothLightDivisor;
                     vertices.Add(new Vertex(origin + local, shade, shade, shade, 255,
-                        TiledUv(f, local, extent), layer, sun, block, normal, sway, submerged, waterSurface, wet,
+                        TiledUv(f, local, extent), layer, sun, block, normal, sway, submerged, waterSurface,
                         (ushort)((tint >> (10 * j)) & 0x3FF)));
                 }
 

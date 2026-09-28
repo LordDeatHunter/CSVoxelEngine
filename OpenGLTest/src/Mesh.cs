@@ -63,7 +63,7 @@ public class Mesh : IDisposable
         gl.EnableVertexAttribArray(4);
 
         // Vertex.Normal and Vertex.LightTint read together as one integer ushort: face 0-2,
-        // submerged 3, wet 4, sway 5, block-light tint code 6-15
+        // submerged 3, unused 4, sway 5, block-light tint code 6-15
         gl.VertexAttribIPointer(5, 1, VertexAttribIType.UnsignedShort, Vertex.Size, (void*)26);
         gl.EnableVertexAttribArray(5);
 
