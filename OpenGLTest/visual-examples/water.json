@@ -71,6 +71,13 @@
     { "op": "screenshot", "name": "water_pond_window", "hideHud": true },
     { "op": "teleport", "pos": [-304.5, 3.2, 474.5], "yaw": -90, "pitch": 15 },
     { "op": "wait", "seconds": 0.5 },
-    { "op": "screenshot", "name": "water_pond_graze", "hideHud": true }
+    { "op": "screenshot", "name": "water_pond_graze", "hideHud": true },
+    // The player in the mirror: hovering 3 blocks over the sea surface (sea level 0) of the
+    // verified ocean column, looking steeply down, the whole body - head included - should
+    // show reflected, and nothing below the plane.
+    { "op": "fly" },
+    { "op": "teleport", "pos": [360.5, 3.0, 136.5], "yaw": -90, "pitch": -65 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "mirror-self", "hideHud": true }
   ]
 }

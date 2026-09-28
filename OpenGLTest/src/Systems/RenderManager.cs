@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 using System.Numerics;
@@ -194,6 +195,19 @@ public class RenderManager : IDisposable
     // A real mirror render happened and _reflTex still matches _reflPose.
     private bool _reflMirrorValid;
     private bool _reflReusedLastFrame;
+
+    // Entity positions (fixed order: drops, thrown, primed, falling, slimes, toppling) at the
+    // last real mirror render, and this frame's scratch; swapped when a render happens. A
+    // moving entity forces a refresh, since a reused mirror would show it frozen.
+    private List<Vector3> _reflEntityPositions = new(64);
+    private List<Vector3> _reflEntityScratch = new(64);
+    // The entities this frame's mirror draws: near the eye and above the plane.
+    private readonly List<ItemDrop> _mirrorDrops = new(32);
+    private readonly List<ThrownProjectile> _mirrorThrown = new(8);
+    private readonly List<PrimedTnt> _mirrorPrimed = new(8);
+    private readonly List<FallingBlock> _mirrorFalling = new(8);
+    private readonly List<Slime> _mirrorSlimes = new(16);
+    private readonly List<TopplingTree> _mirrorToppling = new(4);
 
     // The scene copies the water pass refracts through: the HDR scene target's colour on
     // unit 3 and its depth on unit 4, snapshotted by CopyScene just before the water draws.
@@ -1514,7 +1528,7 @@ public class RenderManager : IDisposable
     /// thresholds in <see cref="WorldGenerationConfig"/>.
     /// </summary>
     public void RenderReflection(Camera camera, IReadOnlyList<Chunk> chunks,
-        IReadOnlyList<LodRegion> regions)
+        IReadOnlyList<LodRegion> regions, in ReflectionEntities entities)
     {
         worldShader.Use();
         // The target follows the reflection-quality setting: recreating is a no-op while the
@@ -1531,6 +1545,7 @@ public class RenderManager : IDisposable
             // texture is, it no longer stands in any known relation to the current camera.
             _reflMirrorValid = false;
             _reflReusedLastFrame = false;
+            _reflEntityPositions.Clear();
             SetWorldUniform("uReflValid", 0f);
             return;
         }
@@ -1539,8 +1554,11 @@ public class RenderManager : IDisposable
         var fwd = camera.ViewDirection;
         var pose = new ReflectionReuse.ReflectionPose(camera.RenderEye, fwd, camera.CurrentFov,
             _viewportSize.X / (float)Math.Max(1, _viewportSize.Y), WaterPlaneY);
+        GatherMirrorEntities(camera.RenderEye, entities);
+        var entitiesMoved = ReflectionReuse.EntitiesMoved(CollectionsMarshal.AsSpan(_reflEntityPositions),
+            CollectionsMarshal.AsSpan(_reflEntityScratch), WorldGenerationConfig.ReflectionReuseMaxEntityMoveBlocks);
         if (!ReflectionReuse.ShouldRefresh(_reflPose, pose, _reflMirrorValid, targetRecreated,
-                _reflReusedLastFrame))
+                _reflReusedLastFrame, entitiesMoved))
         {
             _reflReusedLastFrame = true;
             // _reflTex still holds the mirror built from _reflPose, so the water has to project
@@ -1643,6 +1661,15 @@ public class RenderManager : IDisposable
 
         _chunkDraws.Draw(LodGeometry.Vao, chunkShader, _locChunkDrawBase);
 
+        // Entities, while blend is still off and _cameraPos/_clipY hold the mirrored values (the
+        // clip drops anything below the plane). Invariant: unit 2 stays 0 for the whole mirror
+        // pass, since _reflTex is this pass's target - so only the atlas is rebound afterwards,
+        // never through BindWorldTextures.
+        DrawMirrorEntities(camera, entities.Player);
+        worldShader.Use();
+        BindUnit(0, TextureTarget.Texture2DArray, textureAtlas);
+        ActiveUnit(0);
+
         // Clouds in the mirror are what makes the reflection readable on open water (the dome
         // alone is only a smooth gradient). The mirror flips triangle winding, so cull front faces
         // here to keep the same "nearest exterior surface wins" behaviour RenderClouds relies on.
@@ -1673,8 +1700,68 @@ public class RenderManager : IDisposable
         SetWorldUniform("uReflValid", 1f);
         // _reflTex now matches this camera, so the next frame may reuse it (once).
         _reflPose = pose;
+        (_reflEntityPositions, _reflEntityScratch) = (_reflEntityScratch, _reflEntityPositions);
         _reflMirrorValid = true;
         _reflReusedLastFrame = false;
+    }
+
+    /// <summary>
+    /// Fills the per-kind mirror draw lists and the position scratch the motion signal compares,
+    /// in the fixed order drops, thrown, primed, falling, slimes, toppling. An entity counts only
+    /// within <see cref="WorldGenerationConfig.ReflectionEntityRadius"/> (horizontally) of the eye
+    /// and no lower than a block under the water plane; the player is covered by the camera pose.
+    /// </summary>
+    private void GatherMirrorEntities(Vector3 eye, in ReflectionEntities entities)
+    {
+        _reflEntityScratch.Clear();
+        _mirrorDrops.Clear();
+        _mirrorThrown.Clear();
+        _mirrorPrimed.Clear();
+        _mirrorFalling.Clear();
+        _mirrorSlimes.Clear();
+        _mirrorToppling.Clear();
+
+        foreach (var drop in entities.Drops)
+            if (KeepForMirror(eye, drop.Position)) _mirrorDrops.Add(drop);
+        foreach (var projectile in entities.Thrown)
+            if (KeepForMirror(eye, projectile.Position)) _mirrorThrown.Add(projectile);
+        foreach (var tnt in entities.Primed)
+            if (KeepForMirror(eye, tnt.Position)) _mirrorPrimed.Add(tnt);
+        foreach (var block in entities.Falling)
+            if (KeepForMirror(eye, block.Position)) _mirrorFalling.Add(block);
+        if (_slimeMesh != null)
+            foreach (var slime in entities.Slimes)
+                if (KeepForMirror(eye, slime.Position)) _mirrorSlimes.Add(slime);
+        // A felled tree's base stays put while it swings, so its crown stands in for it.
+        foreach (var tree in entities.Toppling)
+            if (KeepForMirror(eye, Vector3.Transform(new Vector3(0f, 4f, 0f), tree.Model)))
+                _mirrorToppling.Add(tree);
+    }
+
+    private bool KeepForMirror(Vector3 eye, Vector3 position)
+    {
+        var dx = position.X - eye.X;
+        var dz = position.Z - eye.Z;
+        var r = WorldGenerationConfig.ReflectionEntityRadius;
+        if (dx * dx + dz * dz > r * r || position.Y < WaterPlaneY - 1f) return false;
+        _reflEntityScratch.Add(position);
+        return true;
+    }
+
+    /// <summary>
+    /// Draws the gathered entities and the whole player body into the mirror through
+    /// <c>_reflViewProj</c>. Every core runs in mirror mode, so unit 2 is never bound to the
+    /// reflection texture this pass renders into.
+    /// </summary>
+    private void DrawMirrorEntities(Camera camera, PlayerModel? player)
+    {
+        if (_mirrorDrops.Count > 0) DrawItemDrops(_mirrorDrops, _reflViewProj, mirror: true);
+        if (_mirrorThrown.Count > 0) DrawThrown(_mirrorThrown, _reflViewProj, mirror: true);
+        if (_mirrorPrimed.Count > 0) DrawPrimedTnt(_mirrorPrimed, _reflViewProj, mirror: true);
+        if (_mirrorFalling.Count > 0) DrawFallingBlocks(_mirrorFalling, _reflViewProj, mirror: true);
+        if (_mirrorSlimes.Count > 0) DrawSlimes(_mirrorSlimes, _reflViewProj, mirror: true);
+        foreach (var tree in _mirrorToppling) DrawTopplingTree(tree, _reflViewProj, mirror: true);
+        if (player != null) DrawPlayer(camera, player, _reflViewProj, fullBody: true, mirror: true);
     }
 
     private static float Smooth01(float t) => MathUtils.SmoothStep(t);
@@ -1904,6 +1991,33 @@ public class RenderManager : IDisposable
         BindLazy(MaterialUnit, TextureTarget.Texture2DArray, materialAtlas);
         BindLazy(FarShadowUnit, TextureTarget.Texture2D, _farShadow.DepthTex);
         ActiveUnit(0);
+    }
+
+    /// <summary>
+    /// <see cref="BindWorldTextures"/> for a draw into the water mirror: identical, except that
+    /// unit 2 is bound to 0 instead of <c>_reflTex</c>. While <c>_reflFbo</c> is the draw target,
+    /// <c>_reflTex</c> must not be bound, or the draw is a rendering feedback loop (see the
+    /// unit-2 unbind at the top of <see cref="RenderReflection"/>'s real-render path). Same
+    /// postcondition: unit 0 is left active.
+    /// </summary>
+    private void BindWorldTexturesForMirror()
+    {
+        BindLazy(1, TextureTarget.Texture2D, _nearShadow.DepthTex);
+        BindLazy(2, TextureTarget.Texture2D, 0);
+        BindLazy(3, TextureTarget.Texture2D, _sceneColorTex);
+        BindLazy(4, TextureTarget.Texture2D, _sceneDepthTex);
+        BindLazy(0, TextureTarget.Texture2DArray, textureAtlas);
+        BindLazy(MaterialUnit, TextureTarget.Texture2DArray, materialAtlas);
+        BindLazy(FarShadowUnit, TextureTarget.Texture2D, _farShadow.DepthTex);
+        ActiveUnit(0);
+    }
+
+    /// <summary>The world-texture bind an entity draw core uses: the mirror-safe one while it
+    /// draws into the water mirror, the ordinary one otherwise.</summary>
+    private void BindEntityTextures(bool mirror)
+    {
+        if (mirror) BindWorldTexturesForMirror();
+        else BindWorldTextures();
     }
 
     /// <summary>
@@ -2403,11 +2517,14 @@ public class RenderManager : IDisposable
     public void RenderItemDrops(Camera camera, IReadOnlyList<ItemDrop> drops)
     {
         if (camera == null || drops.Count == 0) return;
+        DrawItemDrops(drops, camera.GetViewProjection(), mirror: false);
+    }
 
+    private void DrawItemDrops(IReadOnlyList<ItemDrop> drops, in Matrix4x4 viewProj, bool mirror)
+    {
         worldShader.Use();
-        BindWorldTextures();
+        BindEntityTextures(mirror);
 
-        var viewProj = camera.GetViewProjection();
         // Only an item sprite ever takes unit 0 away from the atlas, so the atlas is rebound
         // when one actually did rather than once per drop. Unit 1 (the shadow map) never
         // changes in here.
@@ -2426,7 +2543,7 @@ public class RenderManager : IDisposable
             {
                 if (!atlasBound)
                 {
-                    BindWorldTextures();
+                    BindEntityTextures(mirror);
                     atlasBound = true;
                 }
 
@@ -2447,11 +2564,14 @@ public class RenderManager : IDisposable
     public void RenderThrown(Camera camera, IReadOnlyList<ThrownProjectile> thrown)
     {
         if (camera == null || thrown.Count == 0) return;
+        DrawThrown(thrown, camera.GetViewProjection(), mirror: false);
+    }
 
+    private void DrawThrown(IReadOnlyList<ThrownProjectile> thrown, in Matrix4x4 viewProj, bool mirror)
+    {
         worldShader.Use();
-        BindWorldTextures();
+        BindEntityTextures(mirror);
 
-        var viewProj = camera.GetViewProjection();
         var atlasBound = true;
 
         foreach (var projectile in thrown)
@@ -2467,7 +2587,7 @@ public class RenderManager : IDisposable
             {
                 if (!atlasBound)
                 {
-                    BindWorldTextures();
+                    BindEntityTextures(mirror);
                     atlasBound = true;
                 }
 
@@ -2840,11 +2960,14 @@ public class RenderManager : IDisposable
     public void RenderPrimedTnt(Camera camera, IReadOnlyList<PrimedTnt> primed)
     {
         if (camera == null || primed.Count == 0) return;
+        DrawPrimedTnt(primed, camera.GetViewProjection(), mirror: false);
+    }
 
+    private void DrawPrimedTnt(IReadOnlyList<PrimedTnt> primed, in Matrix4x4 viewProj, bool mirror)
+    {
         worldShader.Use();
-        BindWorldTextures();
+        BindEntityTextures(mirror);
 
-        var viewProj = camera.GetViewProjection();
         var drewFlash = false;
 
         foreach (var tnt in primed)
@@ -2875,11 +2998,13 @@ public class RenderManager : IDisposable
     public void RenderFallingBlocks(Camera camera, IReadOnlyList<FallingBlock> falling)
     {
         if (camera == null || falling.Count == 0) return;
+        DrawFallingBlocks(falling, camera.GetViewProjection(), mirror: false);
+    }
 
+    private void DrawFallingBlocks(IReadOnlyList<FallingBlock> falling, in Matrix4x4 viewProj, bool mirror)
+    {
         worldShader.Use();
-        BindWorldTextures();
-
-        var viewProj = camera.GetViewProjection();
+        BindEntityTextures(mirror);
 
         foreach (var block in falling)
         {
@@ -2902,12 +3027,17 @@ public class RenderManager : IDisposable
     public void RenderSlimes(Camera camera, IReadOnlyList<Slime> slimes)
     {
         if (camera == null || _slimeMesh == null || slimes.Count == 0) return;
+        DrawSlimes(slimes, camera.GetViewProjection(), mirror: false);
+    }
+
+    private void DrawSlimes(IReadOnlyList<Slime> slimes, in Matrix4x4 viewProj, bool mirror)
+    {
+        if (_slimeMesh == null) return;
 
         worldShader.Use();
-        BindWorldTextures();
+        BindEntityTextures(mirror);
         BindUnit(0, TextureTarget.Texture2DArray, _slimeTexture);
 
-        var viewProj = camera.GetViewProjection();
         var drewFlash = false;
 
         foreach (var slime in slimes)
@@ -2923,7 +3053,7 @@ public class RenderManager : IDisposable
         if (drewFlash)
             worldShader.SetUniform(_locHitFlash, 0f);
 
-        BindWorldTextures();
+        BindEntityTextures(mirror);
     }
 
     // The model's base sits on y = 0 while Position is the body centre, so the feet offset lifts
@@ -3023,14 +3153,23 @@ public class RenderManager : IDisposable
     public void RenderPlayer(Camera camera, PlayerModel player)
     {
         if (camera == null || player == null) return;
+        DrawPlayer(camera, player, camera.GetViewProjection(), fullBody: false, mirror: false);
+    }
 
+    /// <summary>
+    /// The body of <see cref="RenderPlayer"/> through an explicit <paramref name="viewProj"/>.
+    /// <paramref name="fullBody"/> forces the shoulder-surf path (every part plus the head, opaque,
+    /// unshifted) whatever the shoulder blend: the first-person head skip and back shift only
+    /// protect the real eye, so a view from anywhere else (the water mirror) wants the whole body.
+    /// </summary>
+    private void DrawPlayer(Camera camera, PlayerModel player, in Matrix4x4 viewProj, bool fullBody, bool mirror)
+    {
         worldShader.Use();
-        BindWorldTextures();
+        BindEntityTextures(mirror);
 
         BindUnit(0, TextureTarget.Texture2DArray, _playerPaletteTex);
 
-        var blend = camera.ShoulderBlend;
-        var viewProj = camera.GetViewProjection();
+        var blend = fullBody ? 1f : camera.ShoulderBlend;
         var bodyYaw = camera.PlayerYaw;
         // One sample for the whole body: every part is lit alike, so no seam opens between them
         var light = LightAt(camera.Position);
@@ -3072,7 +3211,7 @@ public class RenderManager : IDisposable
             gl.DepthMask(true);
         }
 
-        BindWorldTextures();
+        BindEntityTextures(mirror);
     }
 
     // Held-item sizing, in blocks. The sprite is unit-sized and the cube is full-block;
@@ -3153,16 +3292,20 @@ public class RenderManager : IDisposable
     public void RenderTopplingTree(Camera camera, TopplingTree tree)
     {
         if (camera == null || tree == null) return;
+        DrawTopplingTree(tree, camera.GetViewProjection(), mirror: false);
+    }
 
+    private void DrawTopplingTree(TopplingTree tree, in Matrix4x4 viewProj, bool mirror)
+    {
         tree.EnsureMesh(gl);
         var mesh = tree.Mesh;
         if (mesh == null) return;
 
         worldShader.Use();
-        BindWorldTextures();
+        BindEntityTextures(mirror);
 
         var model = tree.Model;
-        SetDrawUniforms(model, model * camera.GetViewProjection(), 1f, LightAt(model.Translation));
+        SetDrawUniforms(model, model * viewProj, 1f, LightAt(model.Translation));
 
         mesh.Render();
     }

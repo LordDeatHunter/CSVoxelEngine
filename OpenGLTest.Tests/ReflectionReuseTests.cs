@@ -165,6 +165,64 @@ public sealed class ReflectionReuseTests
         Assert.Equal(expected, ReflectionReuse.MirrorApplies(0.875f + eyeOffset, 0.875f, eyeInWater));
     }
 
+    private static readonly Vector3[] Entities =
+        [new(1f, 2f, 3f), new(-4f, 1.5f, 8f), new(12f, 0.9f, -6f)];
+
+    private static Vector3[] Shifted(Vector3[] src, int index, Vector3 delta)
+    {
+        var copy = (Vector3[])src.Clone();
+        copy[index] += delta;
+        return copy;
+    }
+
+    [Fact]
+    public void StillEntitiesDoNotForceRefresh()
+    {
+        Assert.False(ReflectionReuse.EntitiesMoved(Entities, (Vector3[])Entities.Clone(),
+            WorldGenerationConfig.ReflectionReuseMaxEntityMoveBlocks));
+    }
+
+    [Fact]
+    public void SubThresholdEntityDriftStillReuses()
+    {
+        var current = Shifted(Entities, 1,
+            new Vector3(0f, 0.5f * WorldGenerationConfig.ReflectionReuseMaxEntityMoveBlocks, 0f));
+
+        Assert.False(ReflectionReuse.EntitiesMoved(Entities, current,
+            WorldGenerationConfig.ReflectionReuseMaxEntityMoveBlocks));
+    }
+
+    [Fact]
+    public void MovingEntityForcesRefresh()
+    {
+        var current = Shifted(Entities, 2,
+            new Vector3(2f * WorldGenerationConfig.ReflectionReuseMaxEntityMoveBlocks, 0f, 0f));
+
+        Assert.True(ReflectionReuse.EntitiesMoved(Entities, current,
+            WorldGenerationConfig.ReflectionReuseMaxEntityMoveBlocks));
+    }
+
+    [Fact]
+    public void EntityCountChangeForcesRefresh()
+    {
+        // A drop picked up (or a slime spawned) changes the mirror even if nothing else moved.
+        Assert.True(ReflectionReuse.EntitiesMoved(Entities, Entities.AsSpan(0, Entities.Length - 1),
+            WorldGenerationConfig.ReflectionReuseMaxEntityMoveBlocks));
+        Assert.True(ReflectionReuse.EntitiesMoved(ReadOnlySpan<Vector3>.Empty, Entities,
+            WorldGenerationConfig.ReflectionReuseMaxEntityMoveBlocks));
+    }
+
+    [Fact]
+    public void EntityMotionOverridesAReusablePose()
+    {
+        var pose = Pose(new Vector3(10f, 5f, -3f), Yawed(0f));
+
+        Assert.True(ReflectionReuse.ShouldRefresh(pose, pose,
+            hasCachedMirror: true, targetRecreated: false, reusedLastFrame: false, entitiesMoved: true));
+        Assert.False(ReflectionReuse.ShouldRefresh(pose, pose,
+            hasCachedMirror: true, targetRecreated: false, reusedLastFrame: false, entitiesMoved: false));
+    }
+
     [Fact]
     public void DegenerateForwardForcesRefresh()
     {

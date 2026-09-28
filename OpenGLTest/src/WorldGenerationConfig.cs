@@ -387,6 +387,17 @@ public const float DayLengthSeconds = 1200f;
     // Viewport aspect change, the other GetProjectionMatrix input. A tiny resize can round to the
     // same reflection texture size, so the FBO-recreation trigger alone does not cover it.
     public const float ReflectionReuseMaxAspect = 0.001f;
+    /// <summary>
+    /// How far (in blocks) any mirrored entity may drift from where the cached mirror drew it
+    /// before the reflection has to refresh (<c>ReflectionReuse.EntitiesMoved</c>). Small, so a
+    /// hopping slime or a bobbing drop never visibly lags its own reflection.
+    /// </summary>
+    public const float ReflectionReuseMaxEntityMoveBlocks = 0.02f;
+    /// <summary>
+    /// Only entities within this horizontal distance (blocks) of the eye, and above the water
+    /// plane, both feed the reflection's entity-motion signal and are drawn in the mirror.
+    /// </summary>
+    public const float ReflectionEntityRadius = 64f;
 
     // --- GPU timer queries (RenderManager.BeginGpuFrame / BeginGpuPass, item R6) ---
     // One frame in this many still issues its TIME_ELAPSED queries while the X overlay is down,

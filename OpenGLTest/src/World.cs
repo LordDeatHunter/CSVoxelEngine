@@ -558,7 +558,8 @@ public class World : IItemUseWorld
         // One frustum pass over the translucent draws feeds both this and the water pass, and
         // tells the reflection whether there is any water on screen to be worth rendering
         renderManager.CullWater(Camera, _chunkManager.TranslucentRenderable, _lodManager.RegionList);
-        renderManager.RenderReflection(Camera, _chunkManager.Renderable, _lodManager.RegionList);
+        renderManager.RenderReflection(Camera, _chunkManager.Renderable, _lodManager.RegionList,
+            new ReflectionEntities(_dropManager.Drops, _thrown, _tntManager.Primed, _falling.Falling, Slimes, _toppling, Player));
         renderManager.EndGpuPass(ProfileSection.Reflection);
         FrameProfiler.End(ProfileSection.Reflection);
 

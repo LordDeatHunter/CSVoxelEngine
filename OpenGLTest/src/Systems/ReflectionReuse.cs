@@ -37,16 +37,23 @@ internal static class ReflectionReuse
     /// <param name="hasCachedMirror">A real mirror render happened and its texture still matches <paramref name="cached"/>.</param>
     /// <param name="targetRecreated">The reflection render target was (re)created this frame, so its contents are undefined.</param>
     /// <param name="reusedLastFrame">The previous frame already skipped the mirror render.</param>
+    /// <param name="entitiesMoved">An entity drawn in the mirror moved since the cached render
+    /// (<see cref="EntitiesMoved"/>), so the cached texture shows it in a stale place.</param>
     internal static bool ShouldRefresh(
         in ReflectionPose cached,
         in ReflectionPose current,
         bool hasCachedMirror,
         bool targetRecreated,
-        bool reusedLastFrame)
+        bool reusedLastFrame,
+        bool entitiesMoved = false)
     {
         // Nothing to reuse, the texture is undefined, or reusing again would let the mirror (and the
         // shadow map, sun and clouds baked into it) step at fps/2 for more than a single frame.
         if (!hasCachedMirror || targetRecreated || reusedLastFrame)
+            return true;
+
+        // A mirrored entity moved: however still the camera is, its reflection would lag it.
+        if (entitiesMoved)
             return true;
 
         // The mirror plane itself moved, so every mirrored vertex is wrong.
@@ -73,6 +80,27 @@ internal static class ReflectionReuse
         // Angular delta: the mirror only covers the frustum of the frame that drew it, and the shader
         // clamps lookups outside it, so a turn past the threshold smears the texture's screen edge.
         return Vector3.Dot(Vector3.Normalize(cached.Forward), Vector3.Normalize(current.Forward)) < CosMaxAngle;
+    }
+
+    /// <summary>
+    /// True when the mirrored entities are not where the cached mirror drew them: the counts
+    /// differ, or any index-matched pair is farther apart than <paramref name="maxMoveBlocks"/>.
+    /// Both lists must be built in the same stable order (entity kind, then list order), or an
+    /// unchanged scene would compare mismatched pairs.
+    /// </summary>
+    internal static bool EntitiesMoved(ReadOnlySpan<Vector3> cached, ReadOnlySpan<Vector3> current, float maxMoveBlocks)
+    {
+        if (cached.Length != current.Length)
+            return true;
+
+        var max2 = maxMoveBlocks * maxMoveBlocks;
+        for (var i = 0; i < current.Length; i++)
+        {
+            if (Vector3.DistanceSquared(cached[i], current[i]) > max2)
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>
