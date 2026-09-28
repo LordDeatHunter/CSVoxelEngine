@@ -160,6 +160,22 @@ public const float DayLengthSeconds = 1200f;
     public const float FogNearBlocks = 200f;
     public const float FogFarBlocks = 1800f;
 
+    // --- Exponential / height fog (test-fragment.glsl, FogModel, SH-24) ---
+
+    /// <summary>Squared-exponential distance fog density per block. Normalised over
+    /// FogNear..FogFar (so it still reaches exactly 1 at FogFar); 1/1600 gives k = 1 over that
+    /// span, which stays close to the old squared linear ramp through the mid-range.</summary>
+    public const float FogDensity = 1f / 1600f;
+
+    /// <summary>Height fog density per block at sea level (the layer's base).</summary>
+    public const float FogHeightDensity = 0.0006f;
+
+    /// <summary>Blocks above sea level over which the height fog thins by 1/e.</summary>
+    public const float FogHeightFalloff = 12f;
+
+    /// <summary>Cap on the height fog amount, so valleys haze over but never go solid.</summary>
+    public const float FogHeightMax = 0.35f;
+
     /// <summary>Linear multiplier applied to the HDR scene before the tonemap
     /// (post-fragment.glsl's uExposure). Left at 1: the brightness retune lives in
     /// RenderManager's sun/ambient constants instead, where each term could be matched against

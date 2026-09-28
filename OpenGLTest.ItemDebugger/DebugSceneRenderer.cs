@@ -189,6 +189,12 @@ public sealed class DebugSceneRenderer : IDisposable
         _world.SetUniform("uFogColor", FogColor);
         _world.SetUniform("uFogNear", 200f);
         _world.SetUniform("uFogFar", 1800f);
+        _world.SetUniform("uFogDensity", WorldGenerationConfig.FogDensity);
+        // No height fog in the item preview: there is no sea level to base it on
+        _world.SetUniform("uFogHeightDensity", 0f);
+        _world.SetUniform("uFogHeightFalloff", 1f);
+        _world.SetUniform("uFogHeightMax", 0f);
+        _world.SetUniform("uFogHeightBase", 0f);
         _world.SetUniform("uCameraPos", eyePos);
         _world.SetUniform("uNumPointLights", 0);
         _world.SetUniformArray3(_locPointPos, NoPoints);

@@ -2087,6 +2087,12 @@ public class RenderManager : IDisposable
         program.SetUniform("uFogColor", _fogColor);
         program.SetUniform("uFogNear", _fogNear);
         program.SetUniform("uFogFar", _fogFar);
+        // SH-24 fog shape (FogModel): EXP2 distance density plus a height layer based at sea level
+        program.SetUniform("uFogDensity", WorldGenerationConfig.FogDensity);
+        program.SetUniform("uFogHeightDensity", WorldGenerationConfig.FogHeightDensity);
+        program.SetUniform("uFogHeightFalloff", WorldGenerationConfig.FogHeightFalloff);
+        program.SetUniform("uFogHeightMax", WorldGenerationConfig.FogHeightMax);
+        program.SetUniform("uFogHeightBase", WaterPlaneY);
         // The dome's palette, so the fog samples the sky behind each fragment (SkySample).
         program.SetUniform("uSkyZenith", _sky.Zenith);
         program.SetUniform("uSkyHorizon", _sky.Horizon);
