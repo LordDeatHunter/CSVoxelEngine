@@ -33,6 +33,7 @@ public enum ProfileSection
     LodPass,
     WorldPass,
     EntityPass,
+    AoPass,
     WaterPass,
     CloudPass,
     RaysPass,
@@ -77,8 +78,8 @@ public static class FrameProfiler
         "camera", "chunkUnld", "chunkApply", "chunkDirty", "lod", "entities",
         "fluidWake", "fluidTick", "raycast", "breaking",
         "progUpdate", "usePlace", "debugLog", "player",
-        "lighting", "shadows", "reflect", "lodPass", "worldPass", "entityPass", "waterPass", "cloudPass",
-        "raysPass", "selectPass", "postPass", "uiPass",
+        "lighting", "shadows", "reflect", "lodPass", "worldPass", "entityPass", "aoPass", "waterPass",
+        "cloudPass", "raysPass", "selectPass", "postPass", "uiPass",
         "rendShell", "screenshot", "publish",
     ];
 

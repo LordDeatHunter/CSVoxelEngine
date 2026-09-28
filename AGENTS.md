@@ -51,7 +51,7 @@ of the frame — `camera`, the three `chunk*` rows from `ChunkManager.Update`, `
 `fluidWake`, `fluidTick`, `raycast`, `breaking`, plus the `progUpdate` input shell and the
 `player` spawn/animation shell on the update side (right-click use/place work and console
 logging are split out as `usePlace` and `debugLog`), then `lighting`, `shadows`,
-`lodPass`, `worldPass`, `entityPass`, `waterPass`, `selectPass`, `postPass` (the tonemap resolve, see
+`lodPass`, `worldPass`, `entityPass`, `aoPass` (contact AO, see below), `waterPass`, `selectPass`, `postPass` (the tonemap resolve, see
 "Linear lighting" below), `uiPass` on the render side,
 and the `rendShell`/`screenshot`/`publish` frame shell —
 with its average and worst millisecond cost over the last second; `other` is the wall time no
@@ -77,8 +77,9 @@ Standing in water switches the player to **swimming** (`Camera.IsInWater`, recom
 **Water rendering** lives in the shared world shader plus two extra passes in `RenderManager`. Just before `RenderWorldTranslucent` draws, `CopyScene` snapshots the HDR scene target's colour and depth (see "Linear lighting" below; the colour copy is `Rgba16f`, like the reflection mirror) into two textures on units 3 and 4 (`CopyTexSubImage2D` from the bound HDR FBO — the water pass depth-tests while sampling, so it cannot read the target directly); the water fragment then composes its own look out of them: a refracted lookup offset along the analytic wave normal, Beer-Lambert absorption over the water's measured thickness (`WaterAbsorb`) plus in-scattered `WaterScatter`, and a Schlick fresnel mix into the planar reflection. Flowing water carries its baked flow into that normal (`FlowWaveNormal`: a bounded two-phase flow map that scrolls the ripples downstream and stretches them along the flow, identical to `WaveNormal` when the flow is zero), and falling side faces add fast vertical streaks; generated rivers and lakes are all source cells, so they bake no flow and stay still until the simulation makes them flow (`visual-examples/flow-water.json`, `VOXEL_TIME=147`, pours some). The mirror plane itself is the single `RenderManager.WaterPlaneY` at sea level, so a lake whose surface stands above it reflects against that plane rather than its own - an accepted approximation, since only one plane can be mirrored per frame. Seen from below — decided per fragment from the face normal (`fromBehind` in `test-fragment.glsl`), never from the sea plane, since a pond stands above it — the surface is a Snell window: the same scene copy shows through it distorted by the wave normal, the inside fresnel goes to total internal reflection past the critical angle and that band fades to the underwater fog colour, and the mirror is never sampled from that side; `ReflectionReuse.MirrorApplies` also skips rendering it whenever `Camera.IsEyeInWater`, and the sky dome (`SkyRenderer`) and the sun disc stay dry in water (lava still fades the dome via `_skyTintAmount`, eased through `_lavaT`) so the window shows real sky. World, cloud and sky fog share `SkySample`, duplicated verbatim in `sky-fragment.glsl`, `test-fragment.glsl` and `cloud-fragment.glsl`, with `SkyPalette.Sample` as the tested C# reference, so change all four together. The reflection pass now also draws the sun disc and the cloud layer into the mirror, and both it and the scene copies are skipped whenever `CullWater` (one frustum pass a frame, feeding the water pass its draw lists) found no water on screen — glass shares the translucent mesh, so `Chunk.HasWaterMesh` is the flag that decides, not `HasTranslucentMesh`. Opaque faces that look into water are flagged by the mesher in bit 3 of `Vertex.Normal` (bits 0-2 stay the face index) and get the animated Voronoi caustic net. Bit 4 is the **wet band**: a dry face just above a fluid surface (a bank wall whose cell below the neighbour it faces is fluid, or a top face with fluid beside it, `Chunk.WetBandFluidCell`); it is exclusive with bit 3, so both share `Vertex.WaterSurface` for the surface height, and the greedy key carries it as bit 16 beside the surface code, so a wet face never merges with a dry one. The world fragment darkens submerged and wet-band albedo by `WetDarken` once, before the light multiply, fading the band out over `WetBandBlocks` above the surface, and gives the band (never a submerged face, whose water does the reflecting) a Schlick sky sheen and a tight sun glint, both faded out by 112 blocks; ore tiles (a non-zero `material.metallic`) are excluded, so the wet and ore fresnels never stack. `SurfaceFresnel` is the GL-free twin (`Schlick`, `WetWeight`), and `visual-examples/water.json`'s `wet_bank` shot frames it on a warm river. While the eye is submerged, `UnderwaterRaysRenderer` adds one additive full-screen ray-march for sun shafts. Both measure depth from the **local** water surface, never the sea plane: the caustics from the surface baked into each submerged face's vertex (`Vertex.WaterSurface`, read as `fWaterSurfaceY`), the rays from `Camera.EyeWaterSurfaceY` (`ChunkManager.GetFluidColumnTopGlobal` over the eye's column), so a pond above sea level gets both — only the planar mirror still uses the sea plane. The rays are why the shadow map keeps rendering underwater (`_shadowStrengthDry`, the strength before the underwater fade) even though the world diffuse no longer uses it. **Depth convention**: `Camera.GetProjectionMatrix` comes from `System.Numerics`, which is Direct3D-style (clip depth 0..1), so window depth is *not* the GL -1..1 mapping — never write a near/far linearization. Reconstruct a world position by inverting the very matrix that wrote the depth (`uInvViewProj`), and compare raw depth values directly for "which is nearer". `visual-examples/water.json` (run it with `VOXEL_TIME=360`) frames the shallows, the grazing surface, deep water from height and the underwater shots, including the surface seen from below in the sea and in a pond above sea level (a liquid one — a frozen pond has an ice lid, not a water top face).
 
 **Linear lighting (SH-10).** The world is lit in linear light and rendered into
-`RenderManager`'s HDR scene target — an `RGBA16F` colour texture plus a `DepthComponent24`
-renderbuffer (`CreateHdrTarget`, recreated with the viewport like the reflection, scene-copy and
+`RenderManager`'s HDR scene target — an `RGBA16F` colour texture plus a sampleable `DepthComponent24`
+depth texture (`CreateHdrTarget`, which also builds `_hdrColorOnlyFbo` over the colour alone for the
+contact-AO pass; recreated with the viewport like the reflection, scene-copy and
 rays targets). `BeginFrame` binds and clears it, and **every mid-frame restore goes back to it,
 never to framebuffer 0** (`BindSceneTarget` at the tails of `RenderShadows` and
 `RenderReflection`, the `Create*Target` recreate paths, the `UnderwaterRaysRenderer` composite);
@@ -127,6 +128,22 @@ along it (`FireParticle.Update`'s `wind`), and the cloud layer and its shadows a
 gets the same lighting clock through `World.TimeOffset`, which `Program` sets from `VOXEL_TIME`, so
 leaves, smoke and clouds agree; `RenderManager.WindDirection` exposes the unit direction for future
 rain and snow.
+
+**Contact AO (SH-28).** A cheap screen-space contact AO darkens the crevices the baked vertex AO
+cannot see — where pebbles, branch piles and other per-quad emitters meet the ground, and inner
+corners between greedy quads. `RenderManager.RenderContactAo` (`ContactAoRenderer`,
+`contact-ao-fragment.glsl`, GL-free twin `ContactAo`) runs mid entity pass as its own `aoPass`:
+after everything that writes honest depth (terrain, drops, stations, TNT, falling blocks, slimes)
+and before the depth-less or blended draws (healthbars, the first-person head, debris, toppling
+trees, player, held item), the selection outline, water (whose refraction copy then carries the AO),
+clouds and particles. It samples the HDR depth texture through the colour-only
+`_hdrColorOnlyFbo` (no feedback loop) with multiplicative blending (`Zero, SrcColor`). Four taps
+per pixel, `ContactAoRadiusBlocks` wide in the world (clamped to `ContactAoMaxPx`): for each opposite
+pair, the midpoint of their raw depths is reconstructed on the centre ray and compared with the
+centre. Raw depth is affine in screen space over a plane, so planes never darken at any angle;
+a concave corner creases positive, convex edges and far silhouettes are rejected by the
+`ContactAoMinBlocks..RangeBlocks` window, and it fades out by `ContactAoFadeFar`.
+`ContactAoEnabled = false` skips the pass entirely.
 
 Shaders (`assets/shaders/**/*.glsl`), textures (`assets/textures/**/*.png`), fonts (`assets/fonts/**/*.ttf`) and all content JSON (`assets/**/*.json` — blocks, items, loot tables, models) are copied to the output directory via `CopyToOutputDirectory` rules in the csproj — **new asset types/extensions need a matching `<None Update>` entry** or they won't be found at runtime. The JSON rule is a wildcard over the whole `assets` tree, so adding a block, item, loot table or model needs no csproj edit.
 
@@ -350,6 +367,9 @@ OpenGLTest/
                                #   fuel lying flat) and RenderCastings (the pouring liquid
                                #   dissolving into the cast, drawn at CastingRenderer.ResultSize
                                #   — the pocket's width — not drop size)
+                               #   RenderContactAo: the multiplicative screen-space contact AO
+                               #   (ContactAoRenderer) drawn through the colour-only HDR FBO while
+                               #   sampling the HDR depth texture, placed mid entity pass
       ShadowCascade.cs         # one sun shadow cascade: radius, map size, depth FBO/texture, texel-stepped centre (StepCentre) and light view-proj
       UnderwaterRaysRenderer.cs # additive full-screen sun shafts while the eye is submerged
       SkyRenderer.cs           # the full-screen sky dome pass (sky-fragment.glsl)

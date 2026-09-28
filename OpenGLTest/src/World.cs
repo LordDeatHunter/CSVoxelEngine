@@ -613,6 +613,21 @@ public class World : IItemUseWorld
         renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
         renderManager.RenderFallingBlocks(Camera, _falling.Falling);
         renderManager.RenderSlimes(Camera, Slimes);
+        renderManager.EndGpuPass(ProfileSection.EntityPass);
+        FrameProfiler.End(ProfileSection.EntityPass);
+
+        // Contact AO reads the scene depth, so it goes after everything above (which writes
+        // honest depth) and before the healthbars and first-person head (drawn without depth, so
+        // terrain AO would smudge them) and every later pass. Debris, toppling trees, the player
+        // and the held item simply receive none.
+        FrameProfiler.Begin(ProfileSection.AoPass);
+        renderManager.BeginGpuPass(ProfileSection.AoPass);
+        renderManager.RenderContactAo(Camera);
+        renderManager.EndGpuPass(ProfileSection.AoPass);
+        FrameProfiler.End(ProfileSection.AoPass);
+
+        FrameProfiler.Begin(ProfileSection.EntityPass);
+        renderManager.BeginGpuPass(ProfileSection.EntityPass);
         renderManager.RenderEntityHealthbars(Camera, Slimes);
         renderManager.RenderBlockDebris(Camera, _debris.Debris);
         foreach (var tree in _toppling)

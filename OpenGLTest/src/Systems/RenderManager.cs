@@ -143,13 +143,18 @@ public class RenderManager : IDisposable
     // The frame's resolve pass: tonemaps the HDR scene target into the default framebuffer at
     // the end of World.Render, before the UI (RenderPostProcess). Null until LoadResources.
     private PostProcessRenderer? _post;
+    private ContactAoRenderer? _contactAo;
 
     // The linear HDR scene target every world pass renders into (BindSceneTarget): an RGBA16F
-    // colour texture plus a depth renderbuffer, sized to the viewport by CreateHdrTarget.
-    // Only RenderPostProcess reads it, and only the post pass and the UI touch framebuffer 0.
+    // colour texture plus a DepthComponent24 depth *texture* (sampleable, compare mode off), sized
+    // to the viewport by CreateHdrTarget. Only the post pass and the UI touch framebuffer 0.
     private uint _hdrFbo;
     private uint _hdrColorTex;
-    private uint _hdrDepthRb;
+    private uint _hdrDepthTex;
+    // The same _hdrColorTex on ColorAttachment0 with no depth attachment: a full-screen pass can
+    // blend into the scene colour here while sampling _hdrDepthTex, with no feedback loop,
+    // because the depth texture it reads is not attached to the framebuffer it writes.
+    private uint _hdrColorOnlyFbo;
     private Vector2D<int> _hdrSize;
 
     // Damage reddening: one full-screen radial-gradient pass, drawn first inside the UI pass.
@@ -349,10 +354,11 @@ public class RenderManager : IDisposable
     // non-overlapping ranges are legal, so the passes are bracketed one after another and
     // each range lands in its own query. A result is only ever read when its slot comes
     // back around, a few frames late, so this never stalls. Three slots cover the usual
-    // one-to-two frame latency. EntityPass runs in two segments per frame (entities, then
+    // one-to-two frame latency. EntityPass runs in three segments per frame (the opaque entities,
+    // the depth-less and blended ones after the contact-AO pass, then
     // bubbles after the water pass), hence up to MaxGpuSegments ranges per (pass, slot).
     private const int GpuRingSize = 3;
-    private const int MaxGpuSegments = 2;
+    private const int MaxGpuSegments = 3;
     // Every section, not just the render passes: UiPass is no longer the last enum value, and an
     // out-of-range index inside BeginGpuPass would fail silently, so size by the enum.
     private static readonly int GpuSectionCount = Enum.GetValues<ProfileSection>().Length;
@@ -647,6 +653,7 @@ public class RenderManager : IDisposable
         gl.ActiveTexture(TextureUnit.Texture0);
         _skyDome = new SkyRenderer(gl);
         _post = new PostProcessRenderer(gl);
+        _contactAo = new ContactAoRenderer(gl);
         _rays = new UnderwaterRaysRenderer(gl);
         _vignette = new DamageVignetteRenderer(gl);
         _leaves = new LeafParticleRenderer(gl);
@@ -1448,7 +1455,8 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// Builds the linear HDR scene target every world pass renders into: an RGBA16F colour
-    /// texture and a DepthComponent24 renderbuffer (nothing uses stencil), sized to the viewport.
+    /// texture and a sampleable DepthComponent24 depth texture (nothing uses stencil), plus a
+    /// colour-only FBO over the same colour texture, all sized to the viewport.
     /// Called first from <see cref="LoadResources"/> and <see cref="SetViewport"/>, so the other
     /// target creators restore to it, and recreating only on a resize. Nearest filtering: the
     /// post pass reads it with <c>texelFetch</c> only. Leaves framebuffer 0 bound, like the
@@ -1475,21 +1483,41 @@ public class RenderManager : IDisposable
         gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
         gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
 
-        _hdrDepthRb = gl.GenRenderbuffer();
-        gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _hdrDepthRb);
-        gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.DepthComponent24, (uint)w, (uint)h);
-        gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, 0);
+        // A texture rather than a renderbuffer so a full-screen pass can sample the scene depth
+        // (with texelFetch; compare mode off, or sampler2D reads would be undefined).
+        _hdrDepthTex = gl.GenTexture();
+        gl.BindTexture(TextureTarget.Texture2D, _hdrDepthTex);
+        unsafe
+        {
+            gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.DepthComponent24,
+                (uint)w, (uint)h, 0, PixelFormat.DepthComponent, PixelType.UnsignedInt, null);
+        }
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToEdge);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToEdge);
+        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureCompareMode, (int)GLEnum.None);
 
         _hdrFbo = gl.GenFramebuffer();
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, _hdrFbo);
         gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
             TextureTarget.Texture2D, _hdrColorTex, 0);
-        gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
-            RenderbufferTarget.Renderbuffer, _hdrDepthRb);
+        gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
+            TextureTarget.Texture2D, _hdrDepthTex, 0);
 
         var status = gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
         if (status != GLEnum.FramebufferComplete)
             throw new Exception($"HDR framebuffer incomplete: {status}");
+
+        // Colour-only view of the same target (see _hdrColorOnlyFbo).
+        _hdrColorOnlyFbo = gl.GenFramebuffer();
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, _hdrColorOnlyFbo);
+        gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+            TextureTarget.Texture2D, _hdrColorTex, 0);
+
+        status = gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
+        if (status != GLEnum.FramebufferComplete)
+            throw new Exception($"HDR colour-only framebuffer incomplete: {status}");
 
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         gl.BindTexture(TextureTarget.Texture2D, 0);
@@ -1503,11 +1531,13 @@ public class RenderManager : IDisposable
         // Never leave a deleted FBO as the draw target.
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         gl.DeleteFramebuffer(_hdrFbo);
+        gl.DeleteFramebuffer(_hdrColorOnlyFbo);
         gl.DeleteTexture(_hdrColorTex);
-        gl.DeleteRenderbuffer(_hdrDepthRb);
+        gl.DeleteTexture(_hdrDepthTex);
         _hdrFbo = 0;
+        _hdrColorOnlyFbo = 0;
         _hdrColorTex = 0;
-        _hdrDepthRb = 0;
+        _hdrDepthTex = 0;
         // Deleting a texture reverts its bindings to 0 on every unit of the current context.
         InvalidateTextureUnits();
     }
@@ -1535,6 +1565,40 @@ public class RenderManager : IDisposable
         ActiveUnit(0);
         _post.Render(_viewportSize);
         BindUnit(0, TextureTarget.Texture2D, 0);
+    }
+
+    /// <summary>
+    /// Multiplies the screen-space contact AO (SH-28, <see cref="ContactAoRenderer"/>) into the
+    /// HDR scene colour. World.Render calls it mid entity pass: after everything that writes
+    /// honest depth (terrain, drops, stations, TNT, falling blocks, slimes) and before the
+    /// depth-less or blended draws (healthbars, the first-person head, debris, player, held item),
+    /// the selection outline, water, clouds and particles, none of which own the depth it reads.
+    /// It draws through <see cref="_hdrColorOnlyFbo"/>, which shares the colour texture but not the
+    /// depth, so sampling <see cref="_hdrDepthTex"/> is no feedback loop, and puts the world's
+    /// depth, blend and target state back on the way out.
+    /// </summary>
+    public void RenderContactAo(Camera camera)
+    {
+        if (!WorldGenerationConfig.ContactAoEnabled || _contactAo == null || _hdrColorOnlyFbo == 0) return;
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, _hdrColorOnlyFbo);
+        gl.Viewport(_viewportSize);
+        gl.Disable(EnableCap.DepthTest);
+        gl.DepthMask(false);
+        gl.Enable(EnableCap.Blend);
+        // dst * src: the pass outputs a 0..1 multiplier
+        gl.BlendFunc(BlendingFactor.Zero, BlendingFactor.SrcColor);
+        BindUnit(0, TextureTarget.Texture2D, _hdrDepthTex);
+        ActiveUnit(0);
+
+        var pxPerBlock = ContactAo.PxPerBlockAtUnitDist(_viewportSize.Y, MathUtils.ToRadians(camera.CurrentFov));
+        _contactAo.Render(_invViewProj, camera.RenderEye, _viewportSize, pxPerBlock, ContactAoSettings.Default);
+
+        BindUnit(0, TextureTarget.Texture2D, 0);
+        ActiveUnit(0);
+        gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+        gl.Enable(EnableCap.DepthTest);
+        gl.DepthMask(true);
+        BindSceneTarget();
     }
 
     /// <summary>Snapshots the HDR scene target's colour and depth into the scene textures so the
@@ -3712,6 +3776,7 @@ public class RenderManager : IDisposable
         _cloudShadow?.Dispose();
         _skyDome?.Dispose();
         _post?.Dispose();
+        _contactAo?.Dispose();
         _rays?.Dispose();
         _vignette?.Dispose();
         _leaves?.Dispose();

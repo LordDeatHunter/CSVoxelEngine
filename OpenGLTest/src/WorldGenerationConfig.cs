@@ -214,6 +214,43 @@ public const float DayLengthSeconds = 1200f;
     /// caves and at night is not smeared.</summary>
     public const float FxaaEdgeThresholdMin = 0.0312f;
 
+    // --- Contact AO (ContactAo, contact-ao-fragment.glsl, SH-28) ---
+
+    /// <summary>Master switch for the screen-space contact AO pass run mid entity pass
+    /// (RenderManager.RenderContactAo). Off, the frame is exactly what it was without it.</summary>
+    public const bool ContactAoEnabled = true;
+
+    /// <summary>Most a pixel is darkened by the contact AO (1 - this is the darkest multiplier);
+    /// kept subtle, since the baked vertex AO already shades every block corner.</summary>
+    public const float ContactAoStrength = 0.22f;
+
+    /// <summary>Crease depth, in blocks, below which a pixel is left alone: depth noise and
+    /// near-planar surfaces never reach it.</summary>
+    public const float ContactAoMinBlocks = 0.03f;
+
+    /// <summary>Crease depth, in blocks, at which the AO is strongest.</summary>
+    public const float ContactAoPeakBlocks = 0.25f;
+
+    /// <summary>Crease depth, in blocks, past which the AO has faded out again, so a silhouette
+    /// in front of distant terrain is not mistaken for a crevice.</summary>
+    public const float ContactAoRangeBlocks = 1.2f;
+
+    /// <summary>Distance, in blocks, where the contact AO starts fading out.</summary>
+    public const float ContactAoFadeNear = 24f;
+
+    /// <summary>Distance, in blocks, past which there is no contact AO at all.</summary>
+    public const float ContactAoFadeFar = 64f;
+
+    /// <summary>World-space tap radius, in blocks, converted to pixels per fragment and clamped
+    /// to 1..<see cref="ContactAoMaxPx"/>.</summary>
+    public const float ContactAoRadiusBlocks = 0.2f;
+
+    /// <summary>Largest tap radius in pixels, which bounds the pass's texture-cache footprint. Large
+    /// enough that the taps keep their <see cref="ContactAoRadiusBlocks"/> world size down to a few
+    /// blocks away at 1080p: a smaller cap shrinks near creases below <see cref="ContactAoMinBlocks"/>
+    /// and the AO vanishes exactly where it is most visible.</summary>
+    public const float ContactAoMaxPx = 32f;
+
     // Sunlight and lamp light spread through air losing one level per block from a max
     // of 15, so one edited block can change light up to this far away. Block edits must
     // remesh every chunk in this radius, not just face-adjacent ones.
