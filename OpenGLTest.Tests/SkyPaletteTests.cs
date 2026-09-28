@@ -34,20 +34,6 @@ public sealed class SkyPaletteTests
         Assert.InRange(MathF.Abs(expected.Z - actual.Z), 0f, eps);
     }
 
-    private static float Luminance(Vector3 c) => 0.2126f * c.X + 0.7152f * c.Y + 0.0722f * c.Z;
-
-    [Fact]
-    public void NoonHasNoGlowAndSamplesHitZenithAndHazedHorizon()
-    {
-        var sun = SunDirAt(MathF.PI / 2f);
-        var sky = PaletteFor(sun);
-
-        Assert.Equal(Vector3.Zero, sky.Glow);
-        Near(sky.Zenith, sky.Sample(Vector3.UnitY, sun));
-        for (var az = 0f; az < MathF.Tau; az += 0.7f)
-            Near(sky.HazedHorizon, sky.Sample(Horizontal(az), sun));
-    }
-
     [Theory]
     [InlineData(MathF.PI / 2f)] // noon
     [InlineData(MathF.PI)]      // sunset
@@ -79,21 +65,15 @@ public sealed class SkyPaletteTests
     }
 
     [Theory]
-    [InlineData(MathF.PI)] // sunset: sun on the -X horizon
-    [InlineData(0f)]       // sunrise
-    public void SunsetGlowPeaksTowardTheSunAzimuth(float angle)
+    [InlineData(0.2f)]
+    [InlineData(0.5f)]
+    [InlineData(1f)]
+    public void DuskWarmsTheSky(float dayness)
     {
-        var sun = SunDirAt(angle);
-        var sky = PaletteFor(sun);
-        var toward = Vector3.Normalize(new Vector3(sun.X, 0f, sun.Z));
-        var away = -toward;
+        var calm = SkyPalette.Compute(dayness, 0f).Horizon;
+        var dusk = SkyPalette.Compute(dayness, 1f).Horizon;
 
-        var towardSample = sky.Sample(toward, sun);
-        var awaySample = sky.Sample(away, sun);
-
-        Assert.True(towardSample.X > awaySample.X);
-        Assert.True(Luminance(towardSample) > Luminance(awaySample));
-        Near(sky.HazedHorizon, awaySample);
+        Assert.True(dusk.X / dusk.Z > calm.X / calm.Z);
     }
 
     [Theory]

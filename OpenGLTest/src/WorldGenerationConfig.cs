@@ -286,20 +286,18 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>Sine of the view elevation over which the brighter horizon haze band fades out.</summary>
     public const float SkyHazeWidth = 0.08f;
 
-    /// <summary>How much brighter the haze band makes the horizon right at elevation 0 (0.2 = 20 %).</summary>
-    public const float SkyHazeStrength = 0.2f;
+    /// <summary>
+    /// How much brighter the haze band makes the horizon right at elevation 0 (0.2 = 20 %).
+    /// 0 while the palette is the flat 28198cc sky colour: the haze multiplies the (linearised)
+    /// horizon, which would push the low sky and every fogged fragment away from that colour.
+    /// </summary>
+    public const float SkyHazeStrength = 0f;
 
     /// <summary>Azimuthal falloff exponent of the dusk glow toward the sun; higher is a narrower lobe.</summary>
     public const float SkyGlowExponent = 4f;
 
-    /// <summary>Peak brightness the dusk glow adds on the horizon straight under the sun at full dusk.</summary>
-    public const float SkyGlowStrength = 0.6f;
-
-    /// <summary>How far the horizon colour moves toward the dusk orange at full dusk.</summary>
-    public const float SkyDuskHorizonMix = 0.6f;
-
-    /// <summary>How far the zenith colour moves toward the dusk violet at full dusk.</summary>
-    public const float SkyDuskZenithMix = 0.3f;
+    /// <summary>How far the flat sky colour moves toward the dusk orange at full dusk (the 28198cc mix).</summary>
+    public const float SkyDuskMix = 0.5f;
 
     /// <summary>Cloud ambient-light weight at full dusk (1.2 at day); lowered so the sun term dominates.</summary>
     public const float CloudDuskAmbientWeight = 0.7f;

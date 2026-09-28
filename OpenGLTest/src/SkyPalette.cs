@@ -8,33 +8,29 @@ namespace silkgltriangle;
 /// glow toward the sun. Computed once a frame on the CPU from the sun's elevation terms and
 /// uploaded as uniforms; <see cref="Sample"/> is the C# reference of the GLSL <c>SkySample</c>
 /// helper shared by the sky dome, the world fog and the cloud fog, so a fully fogged fragment
-/// comes out exactly the colour of the dome behind it.
+/// comes out exactly the colour of the dome behind it. The palette is currently the flat sky
+/// colour of 28198cc (the look before the SH-11 dome): zenith and horizon are the same colour
+/// and the glow is zero, so every direction samples that one colour and its dusk/night mix.
 /// </summary>
 public readonly record struct SkyPalette(Vector3 Zenith, Vector3 Horizon, Vector3 Glow)
 {
-    private static readonly Vector3 NightZenith = new(0.004f, 0.008f, 0.025f);
-    private static readonly Vector3 DayZenith = new(0.12f, 0.3f, 0.7f);
-    private static readonly Vector3 NightHorizon = new(0.015f, 0.022f, 0.055f);
-    // Chosen so the hazed day horizon, Horizon * (1 + SkyHazeStrength), lands on the old flat
-    // sky colour (0.3, 0.6, 0.9) and the dry look does not jump.
-    private static readonly Vector3 DayHorizon = new(0.25f, 0.5f, 0.75f);
-    private static readonly Vector3 DuskHorizon = new(0.82f, 0.38f, 0.17f);
-    private static readonly Vector3 DuskZenith = new(0.2f, 0.2f, 0.38f);
-    private static readonly Vector3 DuskGlow = new(1f, 0.45f, 0.15f);
+    // sRGB, exactly the old RenderManager.SetLighting sky colours; RenderManager decodes the
+    // computed palette to linear light where it uploads it
+    private static readonly Vector3 NightSky = new(0.012f, 0.018f, 0.045f);
+    private static readonly Vector3 DaySky = new(0.3f, 0.6f, 0.9f);
+    private static readonly Vector3 DuskSky = new(0.98f, 0.45f, 0.2f);
 
     /// <summary>
     /// Builds the palette from <paramref name="dayness"/> (0 night, 1 full day) and
-    /// <paramref name="duskAmount"/> (1 with the sun on the horizon, 0 well away from it).
-    /// The glow is exactly zero when <paramref name="duskAmount"/> is 0.
+    /// <paramref name="duskAmount"/> (1 with the sun on the horizon, 0 well away from it):
+    /// night mixed toward day by dayness, then toward the dusk orange by
+    /// <c>duskAmount * SkyDuskMix</c>, used for both zenith and horizon with no glow.
     /// </summary>
     public static SkyPalette Compute(float dayness, float duskAmount)
     {
-        var zenith = Vector3.Lerp(NightZenith, DayZenith, dayness);
-        var horizon = Vector3.Lerp(NightHorizon, DayHorizon, dayness);
-        horizon = Vector3.Lerp(horizon, DuskHorizon, duskAmount * WorldGenerationConfig.SkyDuskHorizonMix);
-        zenith = Vector3.Lerp(zenith, DuskZenith, duskAmount * WorldGenerationConfig.SkyDuskZenithMix);
-        var glow = DuskGlow * (duskAmount * WorldGenerationConfig.SkyGlowStrength);
-        return new SkyPalette(zenith, horizon, glow);
+        var flat = Vector3.Lerp(NightSky, DaySky, dayness);
+        flat = Vector3.Lerp(flat, DuskSky, duskAmount * WorldGenerationConfig.SkyDuskMix);
+        return new SkyPalette(flat, flat, Vector3.Zero);
     }
 
     /// <summary>
