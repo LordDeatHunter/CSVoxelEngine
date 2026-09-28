@@ -147,10 +147,6 @@ uniform float uWaterCausticStrength;
 // Wet albedo (SH-22): a submerged face darkens its albedo by uWetDarken, but only below its
 // own baked water surface, so dry ground beside or above the water keeps its colour.
 uniform float uWetDarken;
-// Surface rim (SH-23): a faint grazing-angle sky fresnel on every non-ore, non-water tile,
-// uRimStrength at a full graze, faded out from uRimFade.x to uRimFade.y blocks.
-uniform float uRimStrength;
-uniform vec2 uRimFade;
 uniform float uWaterFancyNear;
 uniform float uWaterFancyFar;
 uniform float uWaterFlowStretch;  // fraction of the along-flow slope damped at full strength
@@ -586,33 +582,6 @@ void main() {
             // near-black texels far more than the same add did in display space; uOreSpecScale
             // (WorldGenerationConfig.OreSpecLinearScale) brings the lift back to the old look.
             col += uSunColor * (spec * uSunIntensity * uOreSpecScale) * tint * nearFade;
-        }
-    }
-
-    // Universal rim: every dielectric reflects a little more sky at a graze, so faces seen
-    // edge-on pick up a faint sky-tinted edge (the same Schlick, normalised to 0 head-on). It is
-    // a mix toward the sky, never an add, so it stays energy-bounded in linear HDR. The fade
-    // starts right at the camera: flat ground seen from standing height turns grazing within a
-    // few tens of blocks, and a later fade would leave a lighter ring travelling with the camera.
-    // Ores keep their own material fresnel and are excluded; submerged faces, which the water
-    // above does the reflecting for, get none either.
-    // GL-free twin: SurfaceFresnel.Rim / RimFade.
-    if (!isWater && !oreTile && uRimStrength > 0.0) {
-        float rimFade = 1.0 - smoothstep(uRimFade.x, uRimFade.y, dist);
-        if (rimFade > 0.0) {
-            // A back face (a cutout leaf or cross plant seen from behind) has no graze to speak
-            // of: clamping its negative cosine to 0 would hand it the full rim, so it gets none.
-            // And only a reflection that heads up can see sky: a canopy underside or a wall below
-            // eye level mirrors the ground, so its rim fades out as the reflected ray turns down.
-            vec3 Vr = normalize(uCameraPos - fWorldPos);
-            float c = dot(Vr, N);
-            float rim = c > 0.0 ? (Schlick(c) - 0.06) / 0.94 : 0.0;
-            rim *= smoothstep(-0.2, 0.0, reflect(-Vr, N).y);
-            // Skylight (fSun) barely drops under a leaf canopy, so it would let shaded foliage
-            // mirror a sky it cannot see; the sun shadow is the better visibility proxy there.
-            rim *= mix(0.3, 1.0, shadow);
-            col = mix(col, uFogColor * clamp(0.12 + 0.88 * fSun, 0.0, 1.0),
-                rim * uRimStrength * rimFade * (1.0 - wet));
         }
     }
 

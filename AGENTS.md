@@ -213,11 +213,8 @@ UV orientation or the relief comes out rotated or mirrored per face. Regenerate 
 tracks the sun. The ore body darkens by `metallic * 0.6` and the sun highlight, added in linear light,
 is scaled by `WorldGenerationConfig.OreSpecLinearScale` (`uOreSpecScale`), because the sRGB encode
 lifts an add on the near-black body far more than it did in display space and smeared coal's
-specks into grey. Every other (non-ore, non-water) tile gets only a faint, near-camera grazing sky rim
-(SH-23: `uRimStrength`, a renormalised Schlick mixed toward the sky and faded out between
-`RimFadeNear` and `RimFadeFar`, twin `SurfaceFresnel.Rim`/`RimFade`; back faces, reflections
-that head down and sun-shadowed foliage get little or none), which is excluded on ores (they carry their own fresnel)
-and on submerged fragments.
+specks into grey. Every other (non-ore, non-water) tile is plain diffuse: the SH-23 grazing sky
+rim was removed because it tinted grazing foliage teal.
 
 **Chunk meshing.** `Chunk.GenerateMeshDataFromSnapshot` runs two passes over the padded 18³
 block snapshot. The binary greedy pass (`EmitGreedyFaces`, scratch in the `[ThreadStatic]`
