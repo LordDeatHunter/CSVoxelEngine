@@ -51,6 +51,8 @@ uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 uniform float uSunIntensity;
 uniform vec3 uAmbient;
+// Ambient a downward face sees (RenderManager.GroundAmbientOf(uAmbient))
+uniform vec3 uGroundAmbient;
 uniform vec3 uTorchColor;
 uniform float uTorchIntensity;
 uniform vec3 uFogColor;
@@ -402,7 +404,10 @@ void main() {
     // Block and point lights fill in where the sun doesn't reach but never stack on top of
     // it: the direct term is the stronger of the two, so a lamp can't push sunlit ground
     // past white at noon yet still lights caves and the night.
-    vec3 light = uAmbient * (0.12 + 0.88 * fSun) + max(sun, torch + pl);
+    // Hemispheric ambient: floors face the sky, while ceilings and overhangs see the warm,
+    // darker bounce off the ground; side faces get the average of the two.
+    vec3 hemi = mix(uGroundAmbient, uAmbient, 0.5 + 0.5 * N.y);
+    vec3 light = hemi * (0.12 + 0.88 * fSun) + max(sun, torch + pl);
     vec3 col = albedo * light;
     // Wanted by the caustics and the refraction below as well as by the fog at the end
     float dist = distance(fWorldPos, uCameraPos);

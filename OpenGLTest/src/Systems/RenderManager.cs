@@ -293,6 +293,16 @@ public class RenderManager : IDisposable
     private static readonly Vector3 UnderwaterAmbientTintLinear = ColorSpace.SrgbToLinear(UnderwaterAmbientTint);
     private static readonly Vector3 LavaFogColorLinear = ColorSpace.SrgbToLinear(LavaFogColor);
     private static readonly Vector3 LavaAmbientTintLinear = ColorSpace.SrgbToLinear(LavaAmbientTint);
+    // Hemispheric ambient: the sRGB-authored tint the sky ambient is multiplied by for a face
+    // looking straight down (warmer and darker than the sky - light bounced off the ground)
+    private static readonly Vector3 GroundBounceTint = new(0.62f, 0.52f, 0.42f);
+    private static readonly Vector3 GroundBounceTintLinear = ColorSpace.SrgbToLinear(GroundBounceTint);
+
+    /// <summary>
+    /// The ambient colour a downward face sees, derived from the final sky ambient so the
+    /// underwater and lava tints carry over to the ground bounce.
+    /// </summary>
+    public static Vector3 GroundAmbientOf(Vector3 skyAmbient) => skyAmbient * GroundBounceTintLinear;
     // Point-light hues (sRGB-authored, decoded once); SetLighting scales them as linear intensities
     private static readonly Vector3 TntLightColor = ColorSpace.SrgbToLinear(new Vector3(1f, 0.45f, 0.15f));
     private static readonly Vector3 TntFlashColor = ColorSpace.SrgbToLinear(new Vector3(1f, 0.9f, 0.8f));
@@ -1925,6 +1935,8 @@ public class RenderManager : IDisposable
         program.SetUniform("uSunColor", _sunColor);
         program.SetUniform("uSunIntensity", _sunIntensity);
         program.SetUniform("uAmbient", _ambient);
+        // Derived here, not in SetLighting, which returns early on every dry frame
+        program.SetUniform("uGroundAmbient", GroundAmbientOf(_ambient));
         program.SetUniform("uTorchColor", TorchColorLinear);
         program.SetUniform("uTorchIntensity", TorchIntensity);
         program.SetUniform("uFogColor", _fogColor);

@@ -177,6 +177,7 @@ public sealed class DebugSceneRenderer : IDisposable
         _world.SetUniform("uSunColor", SunColor);
         _world.SetUniform("uSunIntensity", 1.2f);
         _world.SetUniform("uAmbient", Ambient);
+        _world.SetUniform("uGroundAmbient", RenderManager.GroundAmbientOf(Ambient));
         _world.SetUniform("uTorchColor", TorchColor);
         _world.SetUniform("uTorchIntensity", 1.2f);
         _world.SetUniform("uFogColor", FogColor);
