@@ -48,22 +48,22 @@ public sealed class CloudShadowTests
     }
 
     [Fact]
-    public void FieldUvLandsOnTheDrawnCopies()
+    public void FieldUvOfCopyOriginIsIntegralOnBothAxes()
     {
         var field = WorldGenerationConfig.CloudFieldSize;
         var cellSize = WorldGenerationConfig.CloudCellSize;
         var cells = CloudField.Cells;
         const float tolerance = 1e-4f;
 
-        foreach (var time in new[] { 0f, 7.25f, 333.3f, 1200f, 5000f })
+        foreach (var time in new[] { 0.0, 7.25, 333.3, 1200, 5000, 900000 })
         {
             var drift = CloudCopies.Drift(time, field);
             for (var s = -3; s <= 3; s++)
             for (var k = -1; k <= 1; k++)
             {
                 var snap = s * field;
-                var originX = snap + k * field + drift;
-                var originZ = snap + k * field;
+                var originX = snap + k * field + drift.X;
+                var originZ = snap - k * field + drift.Y;
 
                 var uv = CloudCopies.FieldUv(originX, originZ, drift, field);
                 Assert.True(DistanceToInteger(uv.X) < tolerance, $"copy origin u {uv.X} at drift {drift}");

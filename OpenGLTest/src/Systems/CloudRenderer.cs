@@ -82,7 +82,7 @@ public sealed class CloudRenderer : IDisposable
 
     /// <summary>
     /// Draws the field 3x3 around the camera. Copy offsets snap to field multiples so tiles never
-    /// swim; drift is a plain translation wrapped modulo the field on the CPU (the pattern repeats
+    /// swim; drift is a plain translation along the wind, wrapped modulo the field on both axes on the CPU (the pattern repeats
     /// every field, so the wrap is seamless). Nothing wraps per vertex, so a copy can never tear.
     /// Copies outside the frustum are skipped like every other pass, and the survivors go up as one
     /// instance stream, so each sweep is a single draw. The remaining uniforms mirror the world
@@ -92,7 +92,7 @@ public sealed class CloudRenderer : IDisposable
     /// whose dusk-scaled glow lights the sun-facing sides, and <paramref name="duskAmount"/> shifts
     /// the light weights from ambient toward the sun term (<see cref="SkyPalette.CloudLightWeights"/>).
     /// </summary>
-    public void Render(Matrix4x4 viewProj, Vector3 cameraPos, float time,
+    public void Render(Matrix4x4 viewProj, Vector3 cameraPos, double time,
         Vector3 sunDir, Vector3 sunColor, float sunIntensity, Vector3 ambient,
         Vector3 fogColor, float fogNear, float fogFar, in SkyPalette sky, float duskAmount, float fogWet)
     {

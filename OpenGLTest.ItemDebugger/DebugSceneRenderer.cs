@@ -200,6 +200,8 @@ public sealed class DebugSceneRenderer : IDisposable
         _world.SetUniformArray3(_locPointPos, NoPoints);
         _world.SetUniformArray3(_locPointColor, NoPoints);
         _world.SetUniform("uSwayStrength", 0f);
+        _world.SetUniform("uWind", new Vector2(1f, 0f));
+        _world.SetUniform("uWindOffset", Vector2.Zero);
         _world.SetUniform("uLightViewProj", Matrix4x4.Identity);
         _world.SetUniform("uShadowStrength", 0f);
         _world.SetUniform("uShadowStrengthDry", 0f);

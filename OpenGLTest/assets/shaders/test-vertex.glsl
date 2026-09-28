@@ -29,6 +29,8 @@ uniform float uEntityBlock;
 #endif
 uniform float uTime;
 uniform float uSwayStrength;
+uniform vec2 uWind;       // downwind direction * WindLean (Wind.Direction)
+uniform vec2 uWindOffset; // Wind.Offset(time, WindGustSpeed): how far the gusts have rolled
 uniform vec3 uCameraPos;
 // Atlas slice of the lava tile (RenderManager.InitWorldProgram): picks lava's own swell.
 uniform float uLavaLayer;
@@ -105,12 +107,17 @@ void main() {
     }
     if (vSway > 0.001 && uSwayStrength > 0.001) {
         vec3 anchor = TO_WORLD(vPosition);
-        float gust = 0.6 + 0.4 * sin(uTime * 0.5 + anchor.x * 0.08 + anchor.z * 0.06);
+        // The gust wave is sampled at the anchor carried back by the wind's travelled offset
+        // (Wind.Offset, bounded), so gusts roll downwind while the phase rate stays the same
+        // anywhere in the world; Wind.GustPhase is the C# twin.
+        vec2 ga = anchor.xz - uWindOffset;
+        float gust = 0.6 + 0.4 * sin(uTime * 0.5 + ga.x * 0.08 + ga.y * 0.06);
         float w1 = sin(uTime * 1.6 + anchor.x * 0.45 + anchor.z * 0.28);
         float w2 = sin(uTime * 2.7 + anchor.z * 0.62 - anchor.x * 0.19 + 1.3);
-        // TO_WORLD is a pure translation for chunks, so a world-space offset applies to local coords as-is
-        displaced += vec3(w1 * 0.055 + w2 * 0.028, (w1 + w2) * 0.018, w2 * 0.055 - w1 * 0.028)
-            * (vSway * uSwayStrength * gust);
+        // TO_WORLD is a pure translation for chunks, so a world-space offset applies to local coords as-is.
+        // uWind is the downwind direction scaled by WindLean, so its length is the lean at full gust.
+        displaced += (vec3(w1 * 0.055 + w2 * 0.028, (w1 + w2) * 0.018, w2 * 0.055 - w1 * 0.028)
+            + vec3(uWind.x, 0.0, uWind.y)) * (vSway * uSwayStrength * gust);
     }
     fWorldPos = TO_WORLD(displaced);
 #ifdef CHUNK_DRAW

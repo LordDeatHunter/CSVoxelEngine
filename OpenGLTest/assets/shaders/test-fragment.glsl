@@ -107,7 +107,7 @@ uniform sampler2D uCloudShadowMap;
 uniform float uCloudShadowStrength;
 uniform float uCloudHeight;
 uniform float uCloudField;
-uniform float uCloudDrift;
+uniform vec2 uCloudDrift;
 
 // The frame as it stood just before the water pass: colour to refract, depth to measure the
 // water's thickness with. Plain samplers, no compare mode - uSceneDepth is read for its value.
@@ -292,7 +292,7 @@ float CloudShadow(vec3 p) {
         return 1.0;
     vec2 cp = p.xz + uSunDir.xz / max(uSunDir.y, 0.2) * (uCloudHeight - p.y);
     // Mirrors CloudCopies.FieldUv; the map's REPEAT wrap tiles it like the 3x3 cloud copies.
-    vec2 uv = vec2(cp.x - uCloudDrift, cp.y) / uCloudField;
+    vec2 uv = (cp - uCloudDrift) / uCloudField;
     return 1.0 - uCloudShadowStrength * texture(uCloudShadowMap, uv).r;
 }
 

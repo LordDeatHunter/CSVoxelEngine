@@ -89,6 +89,7 @@ public static class Program
         world = new World(renderManager.gl, renderManager.OpaqueChunkGeometry,
             renderManager.TranslucentChunkGeometry, renderManager.LodGeometry,
             windowManager.Window, inputManager.InputContext, sfx);
+        world.TimeOffset = timeOffset;
         world.Player.Rig = renderManager.PlayerRig;
         // Entity draws sample their light from the live chunks from here on
         renderManager.LightSource = world.GetChunkManager();

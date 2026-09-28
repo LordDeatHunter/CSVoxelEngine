@@ -266,6 +266,16 @@ public class RenderManager : IDisposable
     private float _fogFar = WorldGenerationConfig.FogFarBlocks;
     private Vector3 _cameraPos;
     private float _time;
+    // The same lighting clock in double, for the cloud drift: Wind.Offset needs the precision a
+    // large VOXEL_TIME would lose in float.
+    private double _timeD;
+    // The shared wind (Wind.cs) at the lighting clock, refreshed in SetLighting: the unit
+    // downwind direction and how far the leaf gusts have rolled along it.
+    private Vector2 _wind = new(1f, 0f);
+    private Vector2 _windOffset;
+
+    /// <summary>Unit downwind direction (x, z) this frame, for wind consumers such as future rain or snow.</summary>
+    public Vector2 WindDirection => _wind;
 
     // Average opaque colour of the leaves tile, uploaded as uLodLeafColor: far LOD crowns
     // sample the cutout leaf texture stretched over whole cells, so their transparent texels
@@ -395,6 +405,8 @@ public class RenderManager : IDisposable
     private int _locChunkShadowDrawBase;
     private int _locChunkShadowTime;
     private int _locChunkShadowSway;
+    private int _locChunkShadowWind;
+    private int _locChunkShadowWindOffset;
     private int _locChunkShadowOpaque;
     private int[] _locChunkPointPos = [];
     private int[] _locChunkPointColor = [];
@@ -601,6 +613,8 @@ public class RenderManager : IDisposable
         _locChunkShadowDrawBase = chunkShadowShader.GetUniformLocation("uDrawBase");
         _locChunkShadowTime = chunkShadowShader.GetUniformLocation("uTime");
         _locChunkShadowSway = chunkShadowShader.GetUniformLocation("uSwayStrength");
+        _locChunkShadowWind = chunkShadowShader.GetUniformLocation("uWind");
+        _locChunkShadowWindOffset = chunkShadowShader.GetUniformLocation("uWindOffset");
         _locChunkShadowOpaque = chunkShadowShader.GetUniformLocation("uOpaqueCasters");
         CreateShadowMap();
 
@@ -861,6 +875,10 @@ public class RenderManager : IDisposable
         _prevTime = time;
 
         _time = (float)time;
+        _timeD = time;
+        // Both from the double clock: the offset is bounded but its phase needs the precision
+        _wind = Wind.Direction(time);
+        _windOffset = Wind.Offset(time, WorldGenerationConfig.WindGustSpeed);
         if (camera != null)
         {
             _cameraPos = camera.RenderEye;
@@ -1060,6 +1078,8 @@ public class RenderManager : IDisposable
         BindUnit(0, TextureTarget.Texture2DArray, textureAtlas);
         shadowShader.SetUniform("uTime", _time);
         shadowShader.SetUniform("uSwayStrength", GameSettings.LeafSway);
+        shadowShader.SetUniform("uWind", _wind * WorldGenerationConfig.WindLean);
+        shadowShader.SetUniform("uWindOffset", _windOffset);
 
         var frustum = new Frustum(_nearShadow.ViewProj);
 
@@ -1068,6 +1088,8 @@ public class RenderManager : IDisposable
         chunkShadowShader.Use();
         chunkShadowShader.SetUniform(_locChunkShadowTime, _time);
         chunkShadowShader.SetUniform(_locChunkShadowSway, GameSettings.LeafSway);
+        chunkShadowShader.SetUniform(_locChunkShadowWind, _wind * WorldGenerationConfig.WindLean);
+        chunkShadowShader.SetUniform(_locChunkShadowWindOffset, _windOffset);
         chunkShadowShader.SetUniform(_locChunkShadowViewProj, _nearShadow.ViewProj);
         DrawChunkCasters(chunks, frustum);
         shadowShader.Use();
@@ -1707,7 +1729,7 @@ public class RenderManager : IDisposable
             gl.DepthMask(false);
             gl.Enable(EnableCap.CullFace);
             gl.CullFace(TriangleFace.Front);
-            _clouds.Render(_reflViewProj, mirroredPos, _time, _sunDir, _sunColor, _sunIntensity, _ambient,
+            _clouds.Render(_reflViewProj, mirroredPos, _timeD, _sunDir, _sunColor, _sunIntensity, _ambient,
                 _fogColor, _fogNear, _fogFar, _sky, _duskAmount, _fogWet);
             gl.CullFace(TriangleFace.Back);
             gl.Disable(EnableCap.CullFace);
@@ -2106,6 +2128,9 @@ public class RenderManager : IDisposable
         program.SetUniformArray3(locPointPos, _pointPos);
         program.SetUniformArray3(locPointColor, _pointColors);
         program.SetUniform("uSwayStrength", GameSettings.LeafSway);
+        // uWind carries the leaf lean in its length (direction * WindLean), see test-vertex.glsl
+        program.SetUniform("uWind", _wind * WorldGenerationConfig.WindLean);
+        program.SetUniform("uWindOffset", _windOffset);
         // The water look rides here (not the one-time init) so the settings sliders act live.
         program.SetUniform("uWaterNormalScale", GameSettings.WaterWaves);
         program.SetUniform("uWaterRefractStrength", GameSettings.WaterRefraction);
@@ -2126,7 +2151,7 @@ public class RenderManager : IDisposable
         // one-time init) so turning the clouds off in the settings takes their shadows with them.
         program.SetUniform("uCloudShadowStrength",
             GameSettings.CloudOpacity > 0f ? WorldGenerationConfig.CloudShadowStrength : 0f);
-        program.SetUniform("uCloudDrift", CloudCopies.Drift(_time, WorldGenerationConfig.CloudFieldSize));
+        program.SetUniform("uCloudDrift", CloudCopies.Drift(_timeD, WorldGenerationConfig.CloudFieldSize));
         program.SetUniform("uClipY", _clipY);
         // The water pass reads the scene copies by screen uv and unprojects their depth; both
         // describe the real eye, so the reflection pass (which draws no water) can ignore them.
@@ -2180,7 +2205,7 @@ public class RenderManager : IDisposable
         gl.DepthMask(false);
         gl.Enable(EnableCap.CullFace);
         gl.CullFace(TriangleFace.Back);
-        _clouds.Render(camera.GetViewProjection(), _cameraPos, _time,
+        _clouds.Render(camera.GetViewProjection(), _cameraPos, _timeD,
             _sunDir, _sunColor, _sunIntensity, _ambient, _fogColor, _fogNear, _fogFar, _sky, _duskAmount, _fogWet);
         gl.Disable(EnableCap.CullFace);
         gl.DepthMask(true);

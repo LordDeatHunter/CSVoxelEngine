@@ -36,14 +36,14 @@ public sealed class CloudCopiesTests
             * Matrix4x4.CreatePerspectiveFieldOfView(fovRadians, 16f / 9f, 0.1f, far));
 
     /// <summary>The pre-extraction loop, verbatim, as the reference the extraction must reproduce.</summary>
-    private static List<Vector2> ReferenceLoop(in Frustum frustum, float snapX, float snapZ, float drift)
+    private static List<Vector2> ReferenceLoop(in Frustum frustum, float snapX, float snapZ, Vector2 drift)
     {
         var expected = new List<Vector2>();
         for (var ix = -1; ix <= 1; ix++)
         for (var iz = -1; iz <= 1; iz++)
         {
-            var minX = snapX + ix * Field + drift;
-            var minZ = snapZ + iz * Field;
+            var minX = snapX + ix * Field + drift.X;
+            var minZ = snapZ + iz * Field + drift.Y;
             var min = new Vector3(minX, WorldGenerationConfig.CloudHeight, minZ);
             if (!frustum.IntersectsAABB(min, min + new Vector3(Field, Thickness, Field)))
                 continue;
@@ -67,18 +67,65 @@ public sealed class CloudCopiesTests
         Assert.Equal(CloudCopies.MaxCopies, cells);
     }
 
+    private static readonly double[] Times = { 0, 0.5, 1, 60, 1365.25, 4096, 100000, 1e7 };
+
     [Fact]
-    public void DriftWrapsWithinTheField()
+    public void DriftWrapsIntoFieldOnBothAxes()
     {
-        // Game time only ever moves forward from zero, so the wrap is tested over non-negative
-        // times; the pattern repeats every field, which is what makes the wrap invisible.
-        foreach (var time in new[] { 0f, 0.5f, 1f, 60f, 1365.25f, 4096f, 100000f })
+        // The wind turns, so either axis of the raw offset can go negative; the positive modulo
+        // must still land both in [0, field), large times included.
+        foreach (var time in Times)
         {
             var drift = CloudCopies.Drift(time, Field);
 
-            Assert.Equal((time * WorldGenerationConfig.CloudDriftBlocksPerSecond) % Field, drift);
-            Assert.InRange(drift, 0f, Field);
-            Assert.NotEqual(Field, drift);
+            Assert.InRange(drift.X, 0f, Field);
+            Assert.InRange(drift.Y, 0f, Field);
+            Assert.NotEqual(Field, drift.X);
+            Assert.NotEqual(Field, drift.Y);
+        }
+    }
+
+    [Fact]
+    public void DriftIsContinuousAcrossTheWrap()
+    {
+        // Over a short step the layer moves about speed * dt along the wind; measured modulo the
+        // field on each axis, so a step that crosses the wrap still reads as a small move.
+        const double dt = 0.05;
+        var speed = WorldGenerationConfig.CloudDriftBlocksPerSecond;
+        for (var t = 0.0; t < 20000.0; t += 97.3)
+        {
+            var a = CloudCopies.Drift(t, Field);
+            var b = CloudCopies.Drift(t + dt, Field);
+            var dx = WrappedDelta(b.X - a.X);
+            var dz = WrappedDelta(b.Y - a.Y);
+            var step = MathF.Sqrt(dx * dx + dz * dz);
+
+            Assert.InRange(step, speed * dt * 0.9, speed * dt * 1.1 + 1e-3);
+        }
+    }
+
+    // A difference folded into [-field/2, field/2), undoing the wrap.
+    private static float WrappedDelta(float d) => d - Field * MathF.Floor(d / Field + 0.5f);
+
+    [Fact]
+    public void CopyOriginsAreFieldMultiplesAfterDrift()
+    {
+        // Every copy is the snapped grid translated by the drift, on both axes: taking the drift
+        // back off leaves a field multiple, which is what keeps the copies tiling seamlessly.
+        var frustum = AcceptsEverything();
+        Span<Vector2> offsets = stackalloc Vector2[CloudCopies.MaxCopies];
+        foreach (var time in Times)
+        foreach (var snap in new[] { 0f, -3f * Field, 5f * Field })
+        {
+            var drift = CloudCopies.Drift(time, Field);
+            var count = CloudCopies.Gather(frustum, snap, -snap, drift, Field, Thickness, offsets);
+            for (var i = 0; i < count; i++)
+            {
+                var kx = (offsets[i].X - drift.X) / Field;
+                var kz = (offsets[i].Y - drift.Y) / Field;
+                Assert.True(MathF.Abs(kx - MathF.Round(kx)) < 1e-4f, $"x origin {offsets[i].X} at drift {drift}");
+                Assert.True(MathF.Abs(kz - MathF.Round(kz)) < 1e-4f, $"z origin {offsets[i].Y} at drift {drift}");
+            }
         }
     }
 
@@ -108,7 +155,7 @@ public sealed class CloudCopiesTests
 
         foreach (var snapX in new[] { 0f, Field, -Field, 8f * Field, -32f * Field })
         foreach (var snapZ in new[] { 0f, -Field, 4f * Field })
-        foreach (var drift in new[] { 0f, 1.5f, 0.0009765625f, Field - 0.5f })
+        foreach (var drift in new[] { Vector2.Zero, new Vector2(1.5f, 0f), new Vector2(0.0009765625f, 7.25f), new Vector2(Field - 0.5f, Field - 0.25f) })
         {
             var expected = ReferenceLoop(frustum, snapX, snapZ, drift);
             var count = CloudCopies.Gather(frustum, snapX, snapZ, drift, Field, Thickness, offsets);
@@ -129,7 +176,7 @@ public sealed class CloudCopiesTests
         var frustum = Looking(new Vector3(0f, 40000f, 0f), Vector3.Zero, Vector3.UnitZ, 2.6f, 200000f);
         Span<Vector2> offsets = stackalloc Vector2[CloudCopies.MaxCopies];
 
-        var count = CloudCopies.Gather(frustum, 0f, 0f, 0f, Field, Thickness, offsets);
+        var count = CloudCopies.Gather(frustum, 0f, 0f, Vector2.Zero, Field, Thickness, offsets);
 
         Assert.Equal(CloudCopies.MaxCopies, count);
     }
@@ -142,13 +189,13 @@ public sealed class CloudCopiesTests
         // the tail is left untouched.
         var frustum = Looking(new Vector3(0f, WorldGenerationConfig.CloudHeight + 4f, 0f),
             new Vector3(10000f, WorldGenerationConfig.CloudHeight + 4f, 0f), Vector3.UnitY, MathF.PI / 3f, 100000f);
-        var expected = ReferenceLoop(frustum, 0f, 0f, 0f);
+        var expected = ReferenceLoop(frustum, 0f, 0f, Vector2.Zero);
 
         Span<Vector2> offsets = stackalloc Vector2[CloudCopies.MaxCopies];
         var sentinel = new Vector2(-12345f, -6789f);
         offsets.Fill(sentinel);
 
-        var count = CloudCopies.Gather(frustum, 0f, 0f, 0f, Field, Thickness, offsets);
+        var count = CloudCopies.Gather(frustum, 0f, 0f, Vector2.Zero, Field, Thickness, offsets);
 
         // The cull must actually be doing something here, or the packing is untested.
         Assert.InRange(count, 1, CloudCopies.MaxCopies - 1);
@@ -166,7 +213,7 @@ public sealed class CloudCopiesTests
         var frustum = Looking(Vector3.Zero, new Vector3(0f, -1000f, 0f), Vector3.UnitZ, MathF.PI / 3f, 1000f);
         Span<Vector2> offsets = stackalloc Vector2[CloudCopies.MaxCopies];
 
-        var count = CloudCopies.Gather(frustum, 0f, 0f, 0f, Field, Thickness, offsets);
+        var count = CloudCopies.Gather(frustum, 0f, 0f, Vector2.Zero, Field, Thickness, offsets);
 
         Assert.Equal(0, count);
     }
@@ -180,6 +227,6 @@ public sealed class CloudCopiesTests
         var tooShort = new Vector2[CloudCopies.MaxCopies - 1];
 
         Assert.Throws<ArgumentException>(() =>
-            CloudCopies.Gather(frustum, 0f, 0f, 0f, Field, Thickness, tooShort));
+            CloudCopies.Gather(frustum, 0f, 0f, Vector2.Zero, Field, Thickness, tooShort));
     }
 }

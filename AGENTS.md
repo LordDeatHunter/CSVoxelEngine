@@ -117,6 +117,17 @@ and switched off when wet. The two combine as independent transmittances, so ful
 stays exactly the sky colour. `FogModel` is the tested C# twin, so change it and
 `test-fragment.glsl` together. Cloud, particle and healthbar fogs are still linear.
 
+**Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
+heading turns slowly (`WorldGenerationConfig.Wind*`), with `Wind.Offset` its bounded closed-form
+integral. Leaf sway reads it in both vertex shaders (`uWind`, the direction scaled by `WindLean`,
+leans the canopy downwind; `uWindOffset` advects the gust pattern, so the gust phase rate is the
+same anywhere in the world — keep the two sway blocks byte-identical), fire smoke and embers drift
+along it (`FireParticle.Update`'s `wind`), and the cloud layer and its shadows are carried by it
+(`CloudCopies.Drift`, wrapped modulo the field on both axes; `uCloudDrift` is a `vec2`). `World`
+gets the same lighting clock through `World.TimeOffset`, which `Program` sets from `VOXEL_TIME`, so
+leaves, smoke and clouds agree; `RenderManager.WindDirection` exposes the unit direction for future
+rain and snow.
+
 Shaders (`assets/shaders/**/*.glsl`), textures (`assets/textures/**/*.png`), fonts (`assets/fonts/**/*.ttf`) and all content JSON (`assets/**/*.json` — blocks, items, loot tables, models) are copied to the output directory via `CopyToOutputDirectory` rules in the csproj — **new asset types/extensions need a matching `<None Update>` entry** or they won't be found at runtime. The JSON rule is a wildcard over the whole `assets` tree, so adding a block, item, loot table or model needs no csproj edit.
 
 Assets are opened by **relative** path (`FileUtils.ReadFile("assets/shaders/...")`, `TextureAtlas.Build(gl, "assets/textures/blocks")` in `RenderManager.LoadResources`), so the app must be launched with a working directory that contains `assets/` — either the build output directory or `OpenGLTest/`. `dotnet run --project OpenGLTest/silkgltriangle.csproj` satisfies this (it runs from the project folder); launching the built executable from an arbitrary directory does not.

@@ -65,7 +65,11 @@ public sealed class FireParticle
         _swayAmp = kind == FireParticleKind.Ember ? 0.35f : 0.15f;
     }
 
-    public bool Update(float deltaTime)
+    /// <summary>
+    /// Advances the particle. <paramref name="wind"/> is the unit downwind direction
+    /// (<see cref="Wind.Direction"/>); left at default the particle sways along X only, with no drift.
+    /// </summary>
+    public bool Update(float deltaTime, Vector2 wind = default)
     {
         if (!IsAlive) return false;
         if (deltaTime <= 0f) return true;
@@ -76,7 +80,21 @@ public sealed class FireParticle
             return false;
         }
         Position += _velocity * deltaTime;
-        Position += new Vector3(MathF.Sin(_age * 3f + _swayPhase) * _swayAmp * deltaTime, 0f, 0f);
+        var sway = MathF.Sin(_age * 3f + _swayPhase) * _swayAmp * deltaTime;
+        if (wind == default)
+        {
+            Position += new Vector3(sway, 0f, 0f);
+        }
+        else
+        {
+            // Sway across the wind and drift down it. Smoke picks the drift up as it rises clear
+            // of the fire (full after half its life); embers are carried from the start.
+            var drift = Kind == FireParticleKind.Smoke
+                ? WorldGenerationConfig.WindSmokeDrift * MathUtils.Clamp01(_age / (0.5f * _lifetime))
+                : WorldGenerationConfig.WindEmberDrift;
+            Position += new Vector3(-wind.Y * sway + wind.X * drift * deltaTime, 0f,
+                wind.X * sway + wind.Y * drift * deltaTime);
+        }
         Size += _grow * deltaTime;
         return true;
     }

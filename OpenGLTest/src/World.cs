@@ -289,6 +289,13 @@ public class World : IItemUseWorld
         Camera.TestTeleport(new Vector3(_spawnX, holdEye, _spawnZ), Camera.Yaw, Camera.Pitch);
     }
 
+    /// <summary>
+    /// Seconds added to the window clock to get the lighting clock (Program's <c>VOXEL_TIME</c>
+    /// offset). Set once before the first <see cref="Update"/>, so gameplay-side wind consumers
+    /// read the same <see cref="Wind"/> as the render side.
+    /// </summary>
+    public double TimeOffset { get; set; }
+
     public void Update(double deltaTime, IKeyboard? keyboard)
     {
         FrameProfiler.Begin(ProfileSection.Player);
@@ -356,9 +363,11 @@ public class World : IItemUseWorld
         _fireCells.Clear();
         _fireCells.AddRange(_campfires.LitCells);
         _fireCells.AddRange(_kilns.LitCells);
-        _fire.Update((float)deltaTime, _fireCells, Camera.RenderEye);
+        // The lighting clock (window time plus VOXEL_TIME), so the smoke blows the way the leaves lean
+        var wind = Wind.Direction(_window.Time + TimeOffset);
+        _fire.Update((float)deltaTime, _fireCells, Camera.RenderEye, wind: wind);
         GatherLavaVents(Camera.RenderEye);
-        _lavaFire.Update((float)deltaTime, _lavaVents, Camera.RenderEye);
+        _lavaFire.Update((float)deltaTime, _lavaVents, Camera.RenderEye, wind: wind);
         _bubbles.Update((float)deltaTime, Camera.RenderEye, Camera.ViewDirection, Camera.IsEyeInWater, _chunkManager);
 
         // Falling cubes shove the player aside instead of landing inside them; strictly

@@ -132,4 +132,39 @@ public sealed class FireParticleTests
         // Anti-vacuity: the feed really drove the ring to its cap.
         Assert.Equal(cap, peak);
     }
+
+    private static Vector3 Run(FireParticleKind kind, Vector2 wind, int seed, float seconds, int steps)
+    {
+        var particle = new FireParticle(Vector3.Zero, kind, new Random(seed));
+        for (var i = 0; i < steps; i++)
+            particle.Update(seconds / steps, wind);
+        return particle.Position;
+    }
+
+    /// <summary>
+    /// SH-27: smoke and embers are carried downwind. The same particle (same seed) ends further
+    /// along +X under a +X wind than under a -X one, and further along +Z under +Z than under -Z;
+    /// with no wind the sway stays on X only, so the Z path is the straight velocity line and does
+    /// not depend on how the time is stepped.
+    /// </summary>
+    [Fact]
+    public void SmokeDriftsDownwind()
+    {
+        foreach (var kind in new[] { FireParticleKind.Smoke, FireParticleKind.Ember })
+        {
+            // Shorter than the shortest lifetime of either kind, so the particle is alive throughout
+            var seconds = kind == FireParticleKind.Smoke ? 3f : 1f;
+            for (var seed = 0; seed < 8; seed++)
+            {
+                Assert.True(Run(kind, new Vector2(1f, 0f), seed, seconds, 60).X
+                            > Run(kind, new Vector2(-1f, 0f), seed, seconds, 60).X);
+                Assert.True(Run(kind, new Vector2(0f, 1f), seed, seconds, 60).Z
+                            > Run(kind, new Vector2(0f, -1f), seed, seconds, 60).Z);
+
+                var fine = Run(kind, default, seed, seconds, 60);
+                var coarse = Run(kind, default, seed, seconds, 1);
+                Assert.Equal(coarse.Z, fine.Z, 4);
+            }
+        }
+    }
 }

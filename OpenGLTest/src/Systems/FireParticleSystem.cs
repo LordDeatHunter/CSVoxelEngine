@@ -57,7 +57,9 @@ public sealed class FireParticleSystem
 
     internal void AddForTest(FireParticle particle) => _particles.Add(particle);
 
-    public void Update(float deltaTime, IReadOnlyList<Vector3> litCells, Vector3 cameraPos, Random? random = null)
+    /// <summary>Spawns for the lit cells in range and advances every particle, drifting them along <paramref name="wind"/> (see <see cref="FireParticle.Update"/>).</summary>
+    public void Update(float deltaTime, IReadOnlyList<Vector3> litCells, Vector3 cameraPos, Random? random = null,
+        Vector2 wind = default)
     {
         if (deltaTime <= 0f) return;
         var rng = random ?? Random.Shared;
@@ -88,7 +90,7 @@ public sealed class FireParticleSystem
         }
         for (var i = _particles.Count - 1; i >= 0; i--)
         {
-            if (!_particles[i].Update(deltaTime))
+            if (!_particles[i].Update(deltaTime, wind))
                 _particles.RemoveAt(i);
         }
     }

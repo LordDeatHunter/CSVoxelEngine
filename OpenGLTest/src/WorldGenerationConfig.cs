@@ -1054,6 +1054,21 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Seconds a cube takes to fade out at the end of its life (or after landing)
     public const float BlockDebrisFadeSeconds = 0.4f;
 
+    // --- Wind (Wind.cs, SH-27) ---
+    // One slowly turning wind shared by leaf sway, fire smoke and the cloud drift.
+    /// <summary>Wind heading at lighting time 0, degrees from +X toward +Z.</summary>
+    public const float WindStartDegrees = 30f;
+    /// <summary>How fast the wind heading turns: a full circle every 2400 s (two day cycles).</summary>
+    public const float WindTurnDegreesPerSecond = 360f / 2400f;
+    /// <summary>Blocks per second the leaf gust pattern rolls downwind (Wind.Offset -> uWindOffset).</summary>
+    public const float WindGustSpeed = 3f;
+    /// <summary>Downwind lean of swaying leaves at full gust, in blocks (uploaded as the length of uWind).</summary>
+    public const float WindLean = 0.02f;
+    /// <summary>Blocks per second a smoke puff drifts downwind once it has risen clear of the fire.</summary>
+    public const float WindSmokeDrift = 0.35f;
+    /// <summary>Blocks per second an ember drifts downwind.</summary>
+    public const float WindEmberDrift = 0.15f;
+
     // --- Campfire particles (FireParticleSystem + FireParticleRenderer) ---
     // Embers and smoke rising off lit firepits, spawned per lit cell near the camera.
     public const float FireEmberLifetime = 1.8f;

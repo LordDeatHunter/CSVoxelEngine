@@ -3,7 +3,8 @@
   // (working directory OpenGLTest/). Shots land in visual/cloud-shadows/. VOXEL_TIME=400 gives a
   // low sun and a long sideways projection (the shadows then sit far from their clouds).
   // terrain_under_clouds and terrain_under_clouds_later are 4 s apart: the clouds drift
-  // CloudDriftBlocksPerSecond (1.5) in +X, so the soft dark patches move ~6 blocks with them.
+  // CloudDriftBlocksPerSecond (1.5) along the turning wind (Wind.cs), so the soft dark patches
+  // move ~6 blocks with them.
   "steps": [
     { "op": "wait", "seconds": 5 },
     { "op": "fly" },
