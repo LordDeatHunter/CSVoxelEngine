@@ -357,6 +357,7 @@ public class RenderManager : IDisposable
     private int _locChunkShadowDrawBase;
     private int _locChunkShadowTime;
     private int _locChunkShadowSway;
+    private int _locChunkShadowOpaque;
     private int[] _locChunkPointPos = [];
     private int[] _locChunkPointColor = [];
 
@@ -562,6 +563,7 @@ public class RenderManager : IDisposable
         _locChunkShadowDrawBase = chunkShadowShader.GetUniformLocation("uDrawBase");
         _locChunkShadowTime = chunkShadowShader.GetUniformLocation("uTime");
         _locChunkShadowSway = chunkShadowShader.GetUniformLocation("uSwayStrength");
+        _locChunkShadowOpaque = chunkShadowShader.GetUniformLocation("uOpaqueCasters");
         CreateShadowMap();
 
         // The shared chunk and LOD geometry, and the ring the chunk passes build their draw
@@ -953,7 +955,9 @@ public class RenderManager : IDisposable
     /// Depth-only passes that fill both shadow cascades. The near pass renders every caster
     /// inside the near light box: opaque chunk meshes, primed TNT, falling blocks, slimes,
     /// toppling trees and the player. The far pass then renders only the opaque chunk casters
-    /// inside the far box - entities are sub-texel at that range. Both run first each frame,
+    /// inside the far box - entities are sub-texel at that range - plus every non-buried LOD
+    /// region (<paramref name="lodRegions"/>) it holds, drawn with opaque foliage so the LOD
+    /// ring is shadowed by its own hills and canopy out to the far box. Both run first each frame,
     /// before anything draws to the scene target; water never casts. Culling uses each
     /// cascade's light frustum, so the caster set is exactly what its box can hold.
     /// <paramref name="chunks"/> is <see cref="ChunkManager.Renderable"/>, a superset of the
@@ -964,7 +968,8 @@ public class RenderManager : IDisposable
     /// </summary>
     public void RenderShadows(Camera camera, IReadOnlyList<Chunk> chunks,
         IReadOnlyList<PrimedTnt> primed, IReadOnlyList<FallingBlock> falling, IEnumerable<TopplingTree> trees,
-        PlayerModel? player = null, IReadOnlyList<Slime>? slimes = null)
+        PlayerModel? player = null, IReadOnlyList<Slime>? slimes = null,
+        IReadOnlyList<LodRegion>? lodRegions = null)
     {
         // The dry strength, not the wet-faded one: submerged, the caustics and the sun shafts
         // still sample this map even though the world diffuse has stopped using it.
@@ -1064,7 +1069,37 @@ public class RenderManager : IDisposable
         BindUnit(0, TextureTarget.Texture2DArray, textureAtlas);
         chunkShadowShader.Use();
         chunkShadowShader.SetUniform(_locChunkShadowViewProj, _farShadow.ViewProj);
-        DrawChunkCasters(chunks, new Frustum(_farShadow.ViewProj));
+        var farFrustum = new Frustum(_farShadow.ViewProj);
+        DrawChunkCasters(chunks, farFrustum);
+
+        // The LOD ring casts into the far cascade only: the near box never reaches it. Buried
+        // regions are skipped because loaded chunks or finer regions already cast over their
+        // area. Lifetime and the fade-in alpha are RenderLod's alone and are not touched here;
+        // a caster is always drawn at full alpha. A partly covered, non-buried level-0 region
+        // also casts over the loaded chunks it overlaps - its shell sits under the real
+        // surface, but its opaque canopy pillars could double up tree shadows at the 256-block
+        // seam; if that ever shows, skip those regions here.
+        if (lodRegions != null)
+        {
+            chunkShadowShader.SetUniform(_locChunkShadowOpaque, 1);
+            _chunkDraws.BeginPass(lodRegions.Count);
+
+            for (var i = 0; i < lodRegions.Count; i++)
+            {
+                var region = lodRegions[i];
+                if (!region.HasMesh || region.IsBuried) continue;
+
+                var min = new Vector3(region.X * region.SizeBlocks, region.YMin, region.Z * region.SizeBlocks);
+                var max = new Vector3(min.X + region.SizeBlocks, region.YMax, min.Z + region.SizeBlocks);
+                if (!farFrustum.IntersectsAABB(min, max)) continue;
+
+                _chunkDraws.Add(region.OpaqueSlice!.Value,
+                    new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks), 1f);
+            }
+
+            _chunkDraws.Draw(LodGeometry.Vao, chunkShadowShader, _locChunkShadowDrawBase);
+            chunkShadowShader.SetUniform(_locChunkShadowOpaque, 0);
+        }
 
         // Back to the HDR scene target (which restores the viewport) and the blend state the
         // world passes expect

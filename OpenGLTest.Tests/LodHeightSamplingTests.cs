@@ -15,6 +15,7 @@ namespace silkgltriangle.Tests;
 /// against, the way <c>GenerateMeshData(manager, greedy: false)</c> backs
 /// <c>GreedyMeshingTests</c>.
 /// </summary>
+[Collection("LOD column caps")]
 public sealed class LodHeightSamplingTests
 {
     public LodHeightSamplingTests() => TestContent.EnsureLoaded();

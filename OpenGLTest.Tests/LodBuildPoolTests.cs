@@ -50,6 +50,7 @@ namespace silkgltriangle.Tests;
 /// None of these tests calls <see cref="LodManager.Start"/>: that would spawn the production pool
 /// alongside the test's own threads and measure two pools at once.</para>
 /// </summary>
+[Collection("LOD column caps")]
 public sealed class LodBuildPoolTests
 {
     public LodBuildPoolTests() => TestContent.EnsureLoaded();

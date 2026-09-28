@@ -476,7 +476,8 @@ public class World : IItemUseWorld
         // Depth-only sun pass first: every world draw below samples the shadow map it fills
         FrameProfiler.Begin(ProfileSection.Shadows);
         renderManager.BeginGpuPass(ProfileSection.Shadows);
-        renderManager.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player, Slimes);
+        renderManager.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player, Slimes,
+            _lodManager.RegionList);
         renderManager.EndGpuPass(ProfileSection.Shadows);
         FrameProfiler.End(ProfileSection.Shadows);
 

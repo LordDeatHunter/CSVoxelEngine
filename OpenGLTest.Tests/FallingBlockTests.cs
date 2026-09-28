@@ -3,6 +3,7 @@ using Xunit;
 
 namespace silkgltriangle.Tests;
 
+[Collection("LOD column caps")]
 public sealed class FallingBlockTests
 {
     public FallingBlockTests() => TestContent.EnsureLoaded();

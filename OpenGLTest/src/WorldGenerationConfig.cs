@@ -607,6 +607,20 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // the step is also visible edge-on as a thin line at the ring, so keep it as small as safe
     public const float LodWaterSink = 0.05f;
 
+    // --- LOD sky exposure ---
+    // LOD vertices bake a coarse skylight term from the column heights (LodSkyExposure), so a
+    // far notch or the underside of a canopy bump is not lit like open ground. Open ground,
+    // open walls and water keep 1, matching the full skylight near chunks give open sky.
+    // How many cells a column must rise above a vertex to fully block that direction. The rise
+    // is measured against a one-cell horizontal step, so it is a slope and holds at every level.
+    public const float LodSkyRiseCells = 4f;
+    // How much a fully blocked horizon (all sampled columns saturated) darkens a vertex
+    public const float LodValleyShade = 0.45f;
+    // How much the base of a canopy bump is darkened relative to its top face
+    public const float LodCanopyShade = 0.55f;
+    // Lowest sky exposure any LOD vertex can bake, so no far face goes pitch black
+    public const float LodSkyExposureFloor = 0.35f;
+
     // Underwater view: the fog closes in to a few blocks and everything turns blue-green.    // The fade is deliberately short, so breaking the surface reads as a hard boundary
     // rather than a slow filter, but is still eased instead of snapped.
     public const float UnderwaterFadeSeconds = 0.15f;

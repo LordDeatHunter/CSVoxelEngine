@@ -629,7 +629,8 @@ public class LodRegion : IDisposable
         const int topFace = 4;
 
         void AddQuad(List<Vertex> targetVertices, List<ushort> targetIndices,
-            int faceIndex, Vector3 cellOrigin, ushort tile, Span<byte> shades, bool isWater = false, bool lodLeaves = false)
+            int faceIndex, Vector3 cellOrigin, ushort tile, Span<byte> shades, ReadOnlySpan<float> suns,
+            bool isWater = false, bool lodLeaves = false)
         {
             // Meshes are indexed with ushort; a region can't realistically exceed this,
             // but degrade gracefully instead of overflowing if terrain is extreme
@@ -656,12 +657,13 @@ public class LodRegion : IDisposable
                 if (pos.Y < yMin) yMin = pos.Y;
                 if (pos.Y > yMax) yMax = pos.Y;
                 var shade = shades[c];
-                // Far shells sit in open sky: full sun, no lamp light, real face normal.
+                // Sun is the coarse height-derived sky exposure (LodSkyExposure); no lamp
+                // light, real face normal.
                 // ponytail: vertex alpha flags the fragment path (254 = water, 253 = opaque
                 // LOD foliage, 255 = everything else); fColor.a is otherwise unused by the
                 // world shader, so the flags are invisible.
                 var alpha = (byte)(isWater ? 254 : lodLeaves ? 253 : 255);
-                targetVertices.Add(new Vertex(pos, shade, shade, shade, alpha, uv[c], tile, 1f, 0f, normal));
+                targetVertices.Add(new Vertex(pos, shade, shade, shade, alpha, uv[c], tile, suns[c], 0f, normal));
             }
 
             targetIndices.Add((ushort)(indexOffset + 0));
@@ -689,6 +691,9 @@ public class LodRegion : IDisposable
         // shade table as chunk meshing): a neighboring column rising above a face corner
         // occludes it. Cell-scale AO, so the soft shadows match the LOD resolution.
         Span<byte> shades = stackalloc byte[4];
+        // Per-vertex sky exposure from the same grid (LodSkyExposure); the sea/ice sheet is open sky
+        Span<float> suns = stackalloc float[4];
+        Span<float> waterSuns = [1f, 1f, 1f, 1f];
 
         for (var i = 0; i < cells; i++)
         {
@@ -708,6 +713,10 @@ public class LodRegion : IDisposable
                     var side2 = topCell[gi * heightGrid + (gj + dz)] > top;
                     var diagonal = topCell[(gi + dx) * heightGrid + (gj + dz)] > top;
                     shades[c] = Chunk.ShadeLut[(topFace << 2) | Chunk.VertexAO(side1, side2, diagonal)];
+                    suns[c] = LodSkyExposure.TopFace(ground, top,
+                        topCell[(gi + dx) * heightGrid + gj],
+                        topCell[gi * heightGrid + (gj + dz)],
+                        topCell[(gi + dx) * heightGrid + (gj + dz)]);
                 }
 
                 // Shoreline columns wear sand (gravel where the cell is patched) like the
@@ -731,7 +740,7 @@ public class LodRegion : IDisposable
                     : rock ? stone.FaceTiles[topFace]
                     : snowCell ? snow.FaceTiles[topFace]
                     : biome == Biome.Desert ? sand.FaceTiles[topFace]
-                    : grass.FaceTiles[topFace], shades, lodLeaves: top > ground);
+                    : grass.FaceTiles[topFace], shades, suns, lodLeaves: top > ground);
 
                 // AddQuad places a +Y face one cell above its origin, so the origin sits a
                 // cell below the sheet. A frozen cell shows snow-covered ice instead of open
@@ -744,7 +753,7 @@ public class LodRegion : IDisposable
                     AddQuad(waterVertices, waterIndices, topFace,
                         new Vector3(i * cellSize, sheetY - cellSize, j * cellSize),
                         frozen ? (snowCovered ? snow.FaceTiles[topFace] : ice.FaceTiles[topFace]) : waterTile,
-                        waterShades, isWater: !frozen);
+                        waterShades, waterSuns, isWater: !frozen);
                 }
 
                 foreach (var f in sideFaces)
@@ -771,6 +780,15 @@ public class LodRegion : IDisposable
                             var side2 = neighborTop >= cy + v;
                             var diagonal = lateralTop >= cy + v;
                             shades[c] = Chunk.ShadeLut[(f << 2) | Chunk.VertexAO(side1, side2, diagonal)];
+
+                            // Sky exposure reads only columns in front of the face: both front
+                            // diagonals and the one straight ahead, never the coplanar wall column
+                            var oppositeDiagonal = normal.X != 0
+                                ? topCell[ni * heightGrid + (nj + (corner.Z == 0 ? 1 : -1))]
+                                : topCell[(ni + (corner.X == 0 ? 1 : -1)) * heightGrid + nj];
+                            var vertexY = cy + (corner.Y == 0 ? 0 : 1);
+                            suns[c] = LodSkyExposure.SideFace(vertexY, cy, ground, top,
+                                lateralTop, oppositeDiagonal, neighborTop);
                         }
 
                         // Canopy airspace wears leaves; at and below the eroded surface the
@@ -788,7 +806,7 @@ public class LodRegion : IDisposable
                                     : isSeaCell || rock || biome == Biome.Frozen ? stone.FaceTiles[f]
                                     : soil.FaceTiles[f])
                                 : stone.FaceTiles[f];
-                        AddQuad(vertices, indices, f, new Vector3(i * cellSize, cy * cellSize, j * cellSize), tile, shades, lodLeaves: cy > ground);
+                        AddQuad(vertices, indices, f, new Vector3(i * cellSize, cy * cellSize, j * cellSize), tile, shades, suns, lodLeaves: cy > ground);
                     }
                 }
             }
