@@ -34,6 +34,13 @@ public class RenderManager : IDisposable
     /// set, 5 is the underwater-rays detour and 6 the material atlas; 7 is untracked like 6, so
     /// <see cref="BindLazy"/> always rebinds it.</summary>
     private const int FarShadowUnit = 7;
+
+    /// <summary>Texture unit of the cloud-shadow coverage map (<see cref="CloudShadowTexture"/>).
+    /// Units 0-4 are the tracked world set, 5 the underwater-rays detour, 6 the material atlas and
+    /// 7 the far cascade. Unit 8 is bound ONCE in <see cref="LoadResources"/> and nothing else ever
+    /// binds it, so <see cref="BindWorldTextures"/> does not rebind it; any future pass that binds a
+    /// texture here must restore it or the cloud shadow silently samples the wrong texture.</summary>
+    private const int CloudShadowUnit = 8;
     private Shader chunkShader;
     private Shader chunkShadowShader;
 
@@ -120,6 +127,10 @@ public class RenderManager : IDisposable
     // The cloud layer as one static, stitched mesh (see CloudRenderer), drawn translucent
     // after the water pass. Null until LoadResources builds it.
     private CloudRenderer? _clouds;
+
+    // The cloud layer's baked coverage, sampled by the world shader's CloudShadow on unit 8.
+    // Null until LoadResources builds it.
+    private CloudShadowTexture? _cloudShadow;
 
     // Underwater sun shafts, one additive full-screen pass. Null until LoadResources builds it.
     private UnderwaterRaysRenderer? _rays;
@@ -588,6 +599,11 @@ public class RenderManager : IDisposable
         gl.BindTexture(TextureTarget.Texture2DArray, 0);
         _sunQuad = Primitives.CreateSquare(gl, 1f);
         _clouds = new CloudRenderer(gl);
+        _cloudShadow = new CloudShadowTexture(gl);
+        // Bound once for the whole run: nothing else ever touches unit 8 (see CloudShadowUnit).
+        gl.ActiveTexture(TextureUnit.Texture0 + CloudShadowUnit);
+        gl.BindTexture(TextureTarget.Texture2D, _cloudShadow.Handle);
+        gl.ActiveTexture(TextureUnit.Texture0);
         _skyDome = new SkyRenderer(gl);
         _post = new PostProcessRenderer(gl);
         _rays = new UnderwaterRaysRenderer(gl);
@@ -674,6 +690,9 @@ public class RenderManager : IDisposable
         program.SetUniform("uSceneColor", 3);
         program.SetUniform("uSceneDepth", 4);
         program.SetUniform("uMaterialAtlas", MaterialUnit);
+        program.SetUniform("uCloudShadowMap", CloudShadowUnit);
+        program.SetUniform("uCloudHeight", WorldGenerationConfig.CloudHeight);
+        program.SetUniform("uCloudField", WorldGenerationConfig.CloudFieldSize);
         // Doubles as the switch for the whole reflective path: left at 0 the shader never reads
         // the material buffer, which is what keeps the ItemDebugger (same shaders, no buffer)
         // and a world with no reflective tiles safe.
@@ -1808,6 +1827,9 @@ public class RenderManager : IDisposable
     /// <see cref="LoadResources"/> (the sun upload, <c>TextureAtlas.Build</c>,
     /// <c>TextureLoader.LoadFromFile</c> and the target creators all bind raw);
     /// <see cref="CreateShadowMap"/> (both cascades; the far map's unit 7 is untracked anyway);
+    /// the cloud-shadow map's one-time unit-8 bind in <see cref="LoadResources"/> (untracked, and
+    /// covered by LoadResources' own closing call, since it leaves unit 0 active and changes the
+    /// unit-0 binding through the constructor's raw bind);
     /// <see cref="CreateReflectionTarget"/> on its recreate path only (it is called every frame and
     /// early-returns without binding when the size is unchanged) and
     /// <see cref="DeleteReflectionTarget"/>;
@@ -1936,6 +1958,12 @@ public class RenderManager : IDisposable
         program.SetUniform("uLightViewProjFar", _farShadow.ViewProj);
         program.SetUniform("uShadowWorldTexelFar", _farShadow.WorldTexel);
         program.SetUniform("uShadowBiasScaleFar", _farShadow.BiasScale);
+        // Cloud shadows track the drawn clouds: the same clock (_time, window time plus
+        // Program.timeOffset) CloudRenderer.Render drifts the mesh by. Rides the frame (not the
+        // one-time init) so turning the clouds off in the settings takes their shadows with them.
+        program.SetUniform("uCloudShadowStrength",
+            GameSettings.CloudOpacity > 0f ? WorldGenerationConfig.CloudShadowStrength : 0f);
+        program.SetUniform("uCloudDrift", CloudCopies.Drift(_time, WorldGenerationConfig.CloudFieldSize));
         program.SetUniform("uClipY", _clipY);
         // The water pass reads the scene copies by screen uv and unprojects their depth; both
         // describe the real eye, so the reflection pass (which draws no water) can ignore them.
@@ -3463,6 +3491,7 @@ public class RenderManager : IDisposable
         chunkShadowShader.Dispose();
         sunShader.Dispose();
         _clouds?.Dispose();
+        _cloudShadow?.Dispose();
         _skyDome?.Dispose();
         _post?.Dispose();
         _rays?.Dispose();

@@ -47,6 +47,17 @@ internal static class CloudCopies
         (time * WorldGenerationConfig.CloudDriftBlocksPerSecond) % field;
 
     /// <summary>
+    /// The single world-XZ-to-field-UV definition the cloud shadow samples its coverage map with.
+    /// <c>CloudField.BuildMesh</c> places cell i at mesh-local <c>[i * CloudCellSize, (i + 1) *
+    /// CloudCellSize)</c> and every copy sits at <c>snap + k * field + drift</c> in x and
+    /// <c>snap + k * field</c> in z, so subtracting the drift and dividing by the field lands every
+    /// copy's origin on an integer UV; the texture's REPEAT wrap handles the tiling.
+    /// <c>CloudShadow</c> in test-fragment.glsl mirrors this expression.
+    /// </summary>
+    internal static Vector2 FieldUv(float worldX, float worldZ, float drift, float field) =>
+        new((worldX - drift) / field, worldZ / field);
+
+    /// <summary>
     /// The field multiple at or below <paramref name="coord"/>. Floor, not truncation: at negative
     /// coordinates truncation would round towards zero and snap the grid a whole field out of place.
     /// </summary>

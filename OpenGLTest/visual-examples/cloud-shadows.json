@@ -1,0 +1,22 @@
+{
+  // Cloud-shadow check (SH-16): run with VOXEL_TIME=147 (noon) VOXEL_SCRIPT=visual-examples/cloud-shadows.json
+  // (working directory OpenGLTest/). Shots land in visual/cloud-shadows/. VOXEL_TIME=400 gives a
+  // low sun and a long sideways projection (the shadows then sit far from their clouds).
+  // terrain_under_clouds and terrain_under_clouds_later are 4 s apart: the clouds drift
+  // CloudDriftBlocksPerSecond (1.5) in +X, so the soft dark patches move ~6 blocks with them.
+  "steps": [
+    { "op": "wait", "seconds": 5 },
+    { "op": "fly" },
+    { "op": "teleport", "pos": [0.5, 90.5, 0.5], "yaw": -90, "pitch": -60 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "terrain_under_clouds", "hideHud": true },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "terrain_under_clouds_later", "hideHud": true },
+    { "op": "teleport", "pos": [0.5, 30.5, 0.5], "yaw": -90, "pitch": 40 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "clouds_overhead", "hideHud": true },
+    { "op": "teleport", "pos": [0.5, 120.5, 0.5], "yaw": -90, "pitch": -12 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "horizon_lod", "hideHud": true }
+  ]
+}

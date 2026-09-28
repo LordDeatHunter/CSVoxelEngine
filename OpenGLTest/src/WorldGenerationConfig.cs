@@ -280,6 +280,11 @@ public const float DayLengthSeconds = 1200f;
     public const int CloudFilletSegments = 3;
     public const int CloudSeed = 9241;
     public const float CloudDriftBlocksPerSecond = 1.5f;
+    /// <summary>
+    /// Fraction of direct sun a full-thickness cloud removes from the terrain under its shadow
+    /// (test-fragment.glsl CloudShadow); a one-layer cloud removes half of it.
+    /// </summary>
+    public const float CloudShadowStrength = 0.4f;
 
     // --- Far-terrain LOD ---
     // Level definitions (cell sizes, per-level radii) live in LodRegion.Levels.

@@ -52,6 +52,24 @@ public static class CloudField
         return levels;
     }
 
+    /// <summary>
+    /// Bakes a level grid into the cloud-shadow coverage map: one byte per cell, row-major with index
+    /// <c>z * cells + x</c> (so a GL texture row is one z), holding <c>255 * level / maxLevels</c>.
+    /// It reads the same thresholded grid the mesh is built from, so a shadow follows the visible
+    /// silhouette rather than the raw density. Texel centres are cell centres, matching the +0.5
+    /// sample point of <see cref="BuildLevels(int, int, float, float, int)"/>, and linear filtering
+    /// between them is what gives the shadow its penumbra.
+    /// </summary>
+    public static byte[] BuildShadowCoverage(byte[,] levels, int maxLevels)
+    {
+        var cells = levels.GetLength(0);
+        var coverage = new byte[cells * levels.GetLength(1)];
+        for (var z = 0; z < levels.GetLength(1); z++)
+        for (var x = 0; x < cells; x++)
+            coverage[z * cells + x] = (byte)MathF.Round(255f * levels[x, z] / maxLevels);
+        return coverage;
+    }
+
     /// <summary>Cloud density 0..1 at cell coordinates; periodic with period <paramref name="cells"/> in both axes.</summary>
     public static float Density(float cx, float cz, int cells, int seed)
     {

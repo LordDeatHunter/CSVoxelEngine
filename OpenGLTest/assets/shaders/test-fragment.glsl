@@ -89,6 +89,14 @@ uniform sampler2DShadow uShadowMapFar;
 uniform mat4 uLightViewProjFar;
 uniform float uShadowWorldTexelFar;
 uniform float uShadowBiasScaleFar;
+// Cloud shadows: an R8 coverage map baked from CloudField's level grid (unit 8), the cloud
+// layer's base height, the field size and this frame's drift. uCloudShadowStrength 0 (the
+// default, and the ItemDebugger's) switches the whole path off.
+uniform sampler2D uCloudShadowMap;
+uniform float uCloudShadowStrength;
+uniform float uCloudHeight;
+uniform float uCloudField;
+uniform float uCloudDrift;
 
 // The frame as it stood just before the water pass: colour to refract, depth to measure the
 // water's thickness with. Plain samplers, no compare mode - uSceneDepth is read for its value.
@@ -200,6 +208,19 @@ float SampleShadow(vec3 wp, vec3 N, float ndl, float strength) {
     // Inside the near core (fadeN = 1) this is exactly the old mix(1, litN, strength).
     float lit = mix(mix(1.0, litF, fadeF), litN, fadeN);
     return mix(1.0, lit, strength);
+}
+
+// How much of the direct sun the cloud layer lets through at p: follow the sun ray up to the
+// cloud base and read the baked coverage there. uSunDir points toward the sun, so the cloud
+// casting onto p sits sun-ward of it. Skipped at night, above the layer and wherever no sky
+// light reaches (fSun 0: a sealed cave never pays the tap).
+float CloudShadow(vec3 p) {
+    if (uCloudShadowStrength <= 0.0 || uSunDir.y <= 0.0 || p.y >= uCloudHeight || fSun <= 0.0)
+        return 1.0;
+    vec2 cp = p.xz + uSunDir.xz / max(uSunDir.y, 0.2) * (uCloudHeight - p.y);
+    // Mirrors CloudCopies.FieldUv; the map's REPEAT wrap tiles it like the 3x3 cloud copies.
+    vec2 uv = vec2(cp.x - uCloudDrift, cp.y) / uCloudField;
+    return 1.0 - uCloudShadowStrength * texture(uCloudShadowMap, uv).r;
 }
 
 // Analytic slope of WaveHeight (same terms, differentiated). WaveSlope is the copy of
@@ -346,6 +367,9 @@ void main() {
     vec3 N = normalize(fNormal);
     float ndl = max(dot(N, uSunDir), 0.0);
     float shadow = SampleShadow(fWorldPos, N, ndl, uShadowStrength);
+    // Clouds dim the direct sun only; the ambient below stays untouched.
+    float cloudShadow = CloudShadow(fWorldPos);
+    shadow *= cloudShadow;
     // Blend between flat and directional so sides stay readable while the sun orbits;
     // the shadow term only ever dims the direct sun, never the ambient below
     vec3 sun = uSunColor * (fSun * uSunIntensity * (0.35 + 0.65 * ndl) * shadow);
@@ -456,7 +480,7 @@ void main() {
         // focused sun on top. In the HDR target the filaments may go past 1 and roll off
         // through the tonemap shoulder, so the net reads on brightly lit sand too.
         // Seen from above, the surface adds its own glitter on top, so the net backs off
-        float w = fSun * causticShadow * fade * uWaterCausticStrength
+        float w = fSun * causticShadow * cloudShadow * fade * uWaterCausticStrength
             * smoothstep(0.1, 0.6, uSunIntensity) * mix(0.6, 1.0, uUnderwater);
         col *= 1.0 - 0.25 * w;
         col += albedo * uSunColor * (uSunIntensity * w * Caustics(cp, uTime) * 1.2);

@@ -303,6 +303,12 @@ OpenGLTest/
                                #   so the terrain that follows occludes it
                                #   CopyScene snapshots the frame's colour/depth to units 3/4
                                #   for the water pass's refraction (see Water rendering above)
+                               #   cloud shadows: CloudShadowTexture bakes CloudField's level
+                               #   grid into an R8 map bound ONCE on unit 8 (nothing else may
+                               #   bind that unit); CloudShadow in test-fragment.glsl projects
+                               #   each fragment up the sun ray to CloudHeight and dims the sun
+                               #   term there, off while uCloudShadowStrength is 0 (ItemDebugger,
+                               #   clouds turned off); visual-examples/cloud-shadows.json
                                #   owns the two ChunkGeometryPools, the ChunkDrawBatch and the
                                #   CHUNK_DRAW variants of the world/shadow programs; the four
                                #   chunk passes are one MultiDrawElementsIndirect each
