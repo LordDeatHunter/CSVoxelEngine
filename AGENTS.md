@@ -284,9 +284,12 @@ OpenGLTest/
       WindowManager.cs         # Silk.NET window setup
       InputManager.cs          # keyboard/mouse context
       RenderManager.cs         # GL state, world/selection/UI passes, viewport
-                               #   a depth-only directional shadow pass (RenderShadows) into its
-                               #   own FBO runs first each frame, and SampleShadow in
-                               #   test-fragment.glsl consumes that depth texture on unit 1
+                               #   depth-only directional shadow passes (RenderShadows) run first
+                               #   each frame into two cascades: the near one (90 blocks, unit 1)
+                               #   with chunk and entity casters, then a coarse far one (352
+                               #   blocks, unit 7) with chunk casters only; SampleShadow in
+                               #   test-fragment.glsl reads the near map and blends in one far
+                               #   tap where the near box fades out
                                #   the sky dome is drawn first, right after the clear (RenderSky:
                                #   SkyRenderer, then the additive sun disc from
                                #   assets/textures/environment/sun.png via RenderSun), depth off,
@@ -302,6 +305,7 @@ OpenGLTest/
                                #   fuel lying flat) and RenderCastings (the pouring liquid
                                #   dissolving into the cast, drawn at CastingRenderer.ResultSize
                                #   — the pocket's width — not drop size)
+      ShadowCascade.cs         # one sun shadow cascade: radius, map size, depth FBO/texture, texel-stepped centre (StepCentre) and light view-proj
       UnderwaterRaysRenderer.cs # additive full-screen sun shafts while the eye is submerged
       SkyRenderer.cs           # the full-screen sky dome pass (sky-fragment.glsl)
       ChunkGeometryPool.cs     # the two shared chunk vertex/index buffers (opaque, translucent):

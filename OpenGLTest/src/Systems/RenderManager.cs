@@ -29,6 +29,11 @@ public class RenderManager : IDisposable
     /// <summary>Texture unit of <see cref="materialAtlas"/>. Units 0-4 are the world shader's
     /// existing samplers and 5 is the rays upsample's transient bind.</summary>
     private const int MaterialUnit = 6;
+
+    /// <summary>Texture unit of the far shadow cascade's depth map. Units 0-4 are the tracked world
+    /// set, 5 is the underwater-rays detour and 6 the material atlas; 7 is untracked like 6, so
+    /// <see cref="BindLazy"/> always rebinds it.</summary>
+    private const int FarShadowUnit = 7;
     private Shader chunkShader;
     private Shader chunkShadowShader;
 
@@ -149,11 +154,17 @@ public class RenderManager : IDisposable
     // Null until LoadResources builds it.
     private EntityHealthbarRenderer? _healthbars;
 
-    // Directional sun shadows: RenderShadows fills _shadowDepthTex (a depth-only FBO
-    // attachment, sampled as a comparison sampler on unit 1) through _lightViewProj, and
-    // every world draw hands both to test-fragment.glsl's SampleShadow.
-    private uint _shadowFbo;
-    private uint _shadowDepthTex;
+    // Directional sun shadows: RenderShadows fills _nearShadow's depth texture (a depth-only FBO
+    // attachment, sampled as a comparison sampler on unit 1) through its ViewProj, and every
+    // world draw hands both to test-fragment.glsl's SampleShadow. The cascade also carries its
+    // own texel-stepped box centre (ShadowCascade.StepCentre) from frame to frame.
+    private readonly ShadowCascade _nearShadow =
+        new(WorldGenerationConfig.ShadowRadiusBlocks, WorldGenerationConfig.ShadowMapSize);
+
+    // The coarse far cascade (unit 7): chunk casters only, sampled by SampleShadow where the near
+    // box fades out. Its own ShadowCascade, so it steps its own centre on its own texel lattice.
+    private readonly ShadowCascade _farShadow =
+        new(WorldGenerationConfig.FarShadowRadiusBlocks, WorldGenerationConfig.FarShadowMapSize);
     private Vector2D<int> _viewportSize;
 
     // Planar water reflections: the opaque world mirrored across the sea surface, drawn
@@ -254,11 +265,6 @@ public class RenderManager : IDisposable
     /// after the World exists; null lights every draw at <see cref="EntityLightSample.Default"/>.
     /// </summary>
     public ChunkManager? LightSource { get; set; }
-    private Matrix4x4 _lightViewProj = Matrix4x4.Identity;
-    // The shadow box centre carried frame to frame by StepShadowCentre; invalid until the first
-    // frame with shadows, which seeds it on the camera instead of stepping from a stale point.
-    private Vector3 _shadowCentre;
-    private bool _shadowCentreValid;
 
     // Inverse of the current view-projection, for the shaders that reconstruct a world
     // position out of the depth texture (see the depth-convention note in test-fragment.glsl)
@@ -659,6 +665,9 @@ public class RenderManager : IDisposable
         program.Use();
         program.SetUniform("uTextureAtlas", 0);
         program.SetUniform("uShadowMap", 1);
+        // A sampler2DShadow left at the default unit 0 collides with the sampler2DArray atlas
+        // there and fails at draw time.
+        program.SetUniform("uShadowMapFar", FarShadowUnit);
         program.SetUniform("uReflectionMap", 2);
         program.SetUniform("uSceneColor", 3);
         program.SetUniform("uSceneDepth", 4);
@@ -728,48 +737,18 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Allocates the shadow map: one depth texture, no colour attachment. It is sampled as a
-    /// <c>sampler2DShadow</c>, so the compare mode does the depth test in hardware and Linear
-    /// filtering gives free 2x2 bilinear PCF on top of the shader's own kernel. Outside the
-    /// ortho box the border colour reads as depth 1 (farthest), i.e. fully lit.
+    /// Allocates both shadow cascades' maps (<see cref="ShadowCascade.Create"/>), then restores
+    /// the scene target and resets the texture-unit tracking the raw binds went around.
     /// </summary>
     private void CreateShadowMap()
     {
-        const uint size = WorldGenerationConfig.ShadowMapSize;
-
-        _shadowDepthTex = gl.GenTexture();
-        gl.BindTexture(TextureTarget.Texture2D, _shadowDepthTex);
-        unsafe
-        {
-            gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.DepthComponent24,
-                size, size, 0, PixelFormat.DepthComponent, PixelType.Float, null);
-        }
-
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)GLEnum.ClampToBorder);
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)GLEnum.ClampToBorder);
-        Span<float> border = [1f, 1f, 1f, 1f];
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureBorderColor, border);
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureCompareMode,
-            (int)GLEnum.CompareRefToTexture);
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureCompareFunc, (int)GLEnum.Lequal);
-
-        _shadowFbo = gl.GenFramebuffer();
-        gl.BindFramebuffer(FramebufferTarget.Framebuffer, _shadowFbo);
-        gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
-            TextureTarget.Texture2D, _shadowDepthTex, 0);
-        gl.DrawBuffer(DrawBufferMode.None);
-        gl.ReadBuffer(ReadBufferMode.None);
-
-        var status = gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
-        if (status != GLEnum.FramebufferComplete)
-            throw new Exception($"Shadow framebuffer incomplete: {status}");
+        _nearShadow.Create(gl);
+        _farShadow.Create(gl);
 
         // Back to the scene target (the HDR FBO once it exists, framebuffer 0 before that).
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, _hdrFbo);
         gl.BindTexture(TextureTarget.Texture2D, 0);
-        // Raw binds above, and _shadowDepthTex is a brand-new name.
+        // Raw binds inside Create, and the cascades' depth textures are brand-new names.
         InvalidateTextureUnits();
     }
 
@@ -955,74 +934,33 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Builds the light-space matrix for this frame: an orthographic box of half-extent
-    /// <see cref="WorldGenerationConfig.ShadowRadiusBlocks"/> centred a little ahead of the
-    /// camera (most of what the player looks at is in front of them) and looking down the sun
-    /// direction. <see cref="StepShadowCentre"/> carries that centre forward in whole shadow
-    /// texels, or the sub-texel drift as the player walks makes every shadow edge crawl.
+    /// Builds the light-space matrices for this frame: the near cascade's ortho box of half-extent
+    /// <see cref="WorldGenerationConfig.ShadowRadiusBlocks"/> and the far cascade's of
+    /// <see cref="WorldGenerationConfig.FarShadowRadiusBlocks"/>, each centred a little ahead of
+    /// the camera and looking down the sun direction. <see cref="ShadowCascade.StepCentre"/> carries
+    /// that centre forward in whole shadow texels, or the sub-texel drift as the player walks
+    /// makes every shadow edge crawl. Each cascade steps its own centre on its own texel lattice.
     /// </summary>
     private void UpdateShadowCamera(Camera? camera)
     {
         if (camera == null || _shadowStrengthDry <= 0f) return;
 
-        const float r = WorldGenerationConfig.ShadowRadiusBlocks;
-        const float d = 2.5f * r;
-        var target = camera.RenderEye + camera.ViewDirection * (r * 0.35f);
-        _shadowCentre = _shadowCentreValid
-            ? StepShadowCentre(_shadowCentre, target, _sunDir, r, WorldGenerationConfig.ShadowMapSize)
-            : target;
-        _shadowCentreValid = true;
-
-        var lightView = Matrix4x4.CreateLookAt(_shadowCentre + _sunDir * d, _shadowCentre, Vector3.UnitY);
-        // The sun's 0.35 Z tilt keeps it more than 19 degrees off vertical, so UnitY is
-        // never parallel to the view direction and the look-at stays well defined
-        var lightProj = Matrix4x4.CreateOrthographic(2f * r, 2f * r, d - 2f * r, d + 2f * r);
-        _lightViewProj = lightView * lightProj;
+        _nearShadow.Update(camera.RenderEye, camera.ViewDirection, _sunDir);
+        _farShadow.Update(camera.RenderEye, camera.ViewDirection, _sunDir);
     }
 
     /// <summary>
-    /// Advances a shadow box centre towards the point this frame wants to centre on, so the light
-    /// view can be rebuilt around it. The centre is a running value rather than a fresh function of
-    /// the desired point, and that is the whole point: it follows the desired point in whole
-    /// shadow-texel steps along the light's lateral axes and tracks its depth exactly.
-    /// <para>
-    /// Quantizing the movement (not the position) is what keeps the map still. Whole-texel lateral
-    /// steps are invisible - geometry and lookup shift by the same integer count of texels - while
-    /// anything with a fractional texel in it resamples the map and shimmers. Deriving the snapped
-    /// centre from scratch each frame instead compares the point against a lattice that rotates
-    /// with the sun, so the "nearest" lattice vertex hops by a fractional texel every frame and
-    /// every shadow edge twitches at the frame rate; the further the camera sits from the world
-    /// origin, the faster the lattice sweeps past it and the worse it gets. Measuring the move from
-    /// the previous centre sidesteps that entirely: a camera that has not moved asks for a zero
-    /// move, so the projection is identical and nothing twitches, however the sun turns.
-    /// </para>
-    /// </summary>
-    internal static Vector3 StepShadowCentre(Vector3 previous, Vector3 desired, Vector3 sunDir,
-        float radiusBlocks, int mapSize)
-    {
-        var texel = 2f * radiusBlocks / mapSize;
-        var delta = desired - previous;
-        var along = Vector3.Dot(delta, sunDir);
-        var lateral = delta - sunDir * along;
-        // Columns, not rows: Vector3.Transform treats a matrix as row-vector form, so the camera's
-        // basis vectors in world space are the columns of the view rotation.
-        var rotation = Matrix4x4.CreateLookAt(Vector3.Zero, -sunDir, Vector3.UnitY);
-        var right = new Vector3(rotation.M11, rotation.M21, rotation.M31);
-        var up = new Vector3(rotation.M12, rotation.M22, rotation.M32);
-        var stepsRight = MathF.Round(Vector3.Dot(lateral, right) / texel);
-        var stepsUp = MathF.Round(Vector3.Dot(lateral, up) / texel);
-        return previous + sunDir * along + right * (stepsRight * texel) + up * (stepsUp * texel);
-    }
-
-    /// <summary>
-    /// Depth-only pass that fills the shadow map with every caster inside the light's ortho
-    /// box: opaque chunk meshes, primed TNT and toppling trees. Runs first each frame, before
-    /// anything draws to the scene target; water never casts. Culling uses the light
-    /// frustum, so the caster set is exactly what the box can hold.
+    /// Depth-only passes that fill both shadow cascades. The near pass renders every caster
+    /// inside the near light box: opaque chunk meshes, primed TNT, falling blocks, slimes,
+    /// toppling trees and the player. The far pass then renders only the opaque chunk casters
+    /// inside the far box - entities are sub-texel at that range. Both run first each frame,
+    /// before anything draws to the scene target; water never casts. Culling uses each
+    /// cascade's light frustum, so the caster set is exactly what its box can hold.
     /// <paramref name="chunks"/> is <see cref="ChunkManager.Renderable"/>, a superset of the
     /// casters: water-only chunks are in it and are skipped here. The chunk casters that
-    /// survive the culls are drawn with a single <c>glMultiDrawElementsIndirect</c> through
-    /// <see cref="ChunkDrawBatch"/>; TNT, falling blocks and trees keep the plain program.
+    /// survive the culls are drawn with a single <c>glMultiDrawElementsIndirect</c> per cascade
+    /// through <see cref="ChunkDrawBatch"/> (<see cref="DrawChunkCasters"/>); TNT, falling
+    /// blocks and trees keep the plain program.
     /// </summary>
     public void RenderShadows(Camera camera, IReadOnlyList<Chunk> chunks,
         IReadOnlyList<PrimedTnt> primed, IReadOnlyList<FallingBlock> falling, IEnumerable<TopplingTree> trees,
@@ -1032,9 +970,9 @@ public class RenderManager : IDisposable
         // still sample this map even though the world diffuse has stopped using it.
         if (camera == null || _shadowStrengthDry <= 0f) return;
 
-        const uint size = WorldGenerationConfig.ShadowMapSize;
+        var size = (uint)_nearShadow.MapSize;
 
-        gl.BindFramebuffer(FramebufferTarget.Framebuffer, _shadowFbo);
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, _nearShadow.Fbo);
         gl.Viewport(0, 0, size, size);
         gl.Clear(ClearBufferMask.DepthBufferBit);
         // No colour is written, so blending would only cost fill rate
@@ -1049,14 +987,100 @@ public class RenderManager : IDisposable
         shadowShader.SetUniform("uTime", _time);
         shadowShader.SetUniform("uSwayStrength", GameSettings.LeafSway);
 
-        var frustum = new Frustum(_lightViewProj);
+        var frustum = new Frustum(_nearShadow.ViewProj);
 
         // The chunk casters go through the CHUNK_DRAW variant and one MultiDrawElementsIndirect;
         // the entity loops below keep the plain program, which is still bound above for them.
         chunkShadowShader.Use();
         chunkShadowShader.SetUniform(_locChunkShadowTime, _time);
         chunkShadowShader.SetUniform(_locChunkShadowSway, GameSettings.LeafSway);
-        chunkShadowShader.SetUniform(_locChunkShadowViewProj, _lightViewProj);
+        chunkShadowShader.SetUniform(_locChunkShadowViewProj, _nearShadow.ViewProj);
+        DrawChunkCasters(chunks, frustum);
+        shadowShader.Use();
+
+        foreach (var tnt in primed)
+        {
+            var mesh = blockCubes.Get(tnt.BlockId);
+            if (mesh == null) continue;
+
+            var model = Matrix4x4.CreateScale(tnt.Scale)
+                        * Matrix4x4.CreateTranslation(tnt.Position);
+            shadowShader.SetUniform("uModel", model);
+            shadowShader.SetUniform("uLightMVP", model * _nearShadow.ViewProj);
+            mesh.Render();
+        }
+
+        foreach (var block in falling)
+        {
+            var mesh = blockCubes.Get(block.BlockId);
+            if (mesh == null) continue;
+
+            var model = Matrix4x4.CreateTranslation(block.Position);
+            shadowShader.SetUniform("uModel", model);
+            shadowShader.SetUniform("uLightMVP", model * _nearShadow.ViewProj);
+            mesh.Render();
+        }
+
+        if (slimes != null && _slimeMesh != null)
+        {
+            foreach (var slime in slimes)
+            {
+                var model = SlimeTransform(slime);
+                shadowShader.SetUniform("uModel", model);
+                shadowShader.SetUniform("uLightMVP", model * _nearShadow.ViewProj);
+                _slimeMesh.Render();
+            }
+        }
+
+        foreach (var tree in trees)
+        {
+            tree.EnsureMesh(gl);
+            var mesh = tree.Mesh;
+            if (mesh == null) continue;
+
+            var model = tree.Model;
+            shadowShader.SetUniform("uModel", model);
+            shadowShader.SetUniform("uLightMVP", model * _nearShadow.ViewProj);
+            mesh.Render();
+        }
+
+        if (player != null && camera != null)
+        {
+            BindUnit(0, TextureTarget.Texture2DArray, _playerPaletteTex);
+            foreach (var part in PlayerModel.BodyParts)
+                DrawPlayerPartShadow(player, part, camera);
+            DrawPlayerPartShadow(player, "Head", camera);
+            BindUnit(0, TextureTarget.Texture2DArray, textureAtlas);
+        }
+
+        // The far cascade: the same depth-only chunk casters into its own coarse map. No entity
+        // casters - they are sub-texel at this range, and skipping them keeps the pass to one
+        // indirect draw.
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, _farShadow.Fbo);
+        gl.Viewport(0, 0, (uint)_farShadow.MapSize, (uint)_farShadow.MapSize);
+        gl.Clear(ClearBufferMask.DepthBufferBit);
+        // Same feedback-loop guard as unit 1 above: this pass renders into the far map.
+        BindUnit(FarShadowUnit, TextureTarget.Texture2D, 0);
+        BindUnit(0, TextureTarget.Texture2DArray, textureAtlas);
+        chunkShadowShader.Use();
+        chunkShadowShader.SetUniform(_locChunkShadowViewProj, _farShadow.ViewProj);
+        DrawChunkCasters(chunks, new Frustum(_farShadow.ViewProj));
+
+        // Back to the HDR scene target (which restores the viewport) and the blend state the
+        // world passes expect
+        BindSceneTarget();
+        gl.Enable(EnableCap.Blend);
+        gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+    }
+
+    /// <summary>
+    /// Appends every opaque chunk caster that survives the mesh, burial and light-frustum culls
+    /// to one <see cref="ChunkDrawBatch"/> pass and draws it with a single
+    /// <c>glMultiDrawElementsIndirect</c>. <c>chunkShadowShader</c> must be bound with the
+    /// cascade's view-proj already set.
+    /// </summary>
+    private void DrawChunkCasters(IReadOnlyList<Chunk> chunks, Frustum frustum)
+    {
         _chunkDraws.BeginPass(chunks.Count);
 
         for (var i = 0; i < chunks.Count; i++)
@@ -1067,9 +1091,9 @@ public class RenderManager : IDisposable
             // nothing else) never enters the depth pass — fluids are not casters anyway.
             if (!chunk.HasMesh) continue;
 
-            // Cull buried casters. The light's ortho box is 180 blocks wide and 360 deep, so
-            // its frustum admits every chunk of a column right down to bedrock, and a chunk
-            // whose top sits below the lowest surface height in its own 16x16 column is
+            // Cull buried casters. A cascade's ortho box is twice its radius wide and four times
+            // its radius deep, so its frustum admits every chunk of a column right down to
+            // bedrock, and a chunk whose top sits below the lowest surface height in its own 16x16 column is
             // completely under the terrain: no sunlight reaches it, so it can occlude nothing.
             // A 1-block margin keeps the surface block itself (and the face under it) in.
             // Trees do poke above the surface, but only into the chunk ABOVE, whose own top is
@@ -1084,67 +1108,6 @@ public class RenderManager : IDisposable
         }
 
         _chunkDraws.Draw(OpaqueChunkGeometry.Vao, chunkShadowShader, _locChunkShadowDrawBase);
-        shadowShader.Use();
-
-        foreach (var tnt in primed)
-        {
-            var mesh = blockCubes.Get(tnt.BlockId);
-            if (mesh == null) continue;
-
-            var model = Matrix4x4.CreateScale(tnt.Scale)
-                        * Matrix4x4.CreateTranslation(tnt.Position);
-            shadowShader.SetUniform("uModel", model);
-            shadowShader.SetUniform("uLightMVP", model * _lightViewProj);
-            mesh.Render();
-        }
-
-        foreach (var block in falling)
-        {
-            var mesh = blockCubes.Get(block.BlockId);
-            if (mesh == null) continue;
-
-            var model = Matrix4x4.CreateTranslation(block.Position);
-            shadowShader.SetUniform("uModel", model);
-            shadowShader.SetUniform("uLightMVP", model * _lightViewProj);
-            mesh.Render();
-        }
-
-        if (slimes != null && _slimeMesh != null)
-        {
-            foreach (var slime in slimes)
-            {
-                var model = SlimeTransform(slime);
-                shadowShader.SetUniform("uModel", model);
-                shadowShader.SetUniform("uLightMVP", model * _lightViewProj);
-                _slimeMesh.Render();
-            }
-        }
-
-        foreach (var tree in trees)
-        {
-            tree.EnsureMesh(gl);
-            var mesh = tree.Mesh;
-            if (mesh == null) continue;
-
-            var model = tree.Model;
-            shadowShader.SetUniform("uModel", model);
-            shadowShader.SetUniform("uLightMVP", model * _lightViewProj);
-            mesh.Render();
-        }
-
-        if (player != null && camera != null)
-        {
-            BindUnit(0, TextureTarget.Texture2DArray, _playerPaletteTex);
-            foreach (var part in PlayerModel.BodyParts)
-                DrawPlayerPartShadow(player, part, camera);
-            DrawPlayerPartShadow(player, "Head", camera);
-            BindUnit(0, TextureTarget.Texture2DArray, textureAtlas);
-        }
-
-        // Back to the HDR scene target and the blend state the world passes expect
-        BindSceneTarget();
-        gl.Enable(EnableCap.Blend);
-        gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
     }
 
     /// <summary>
@@ -1804,7 +1767,7 @@ public class RenderManager : IDisposable
     /// <see cref="BeginFrame"/> (the once-a-frame hard reset);
     /// <see cref="LoadResources"/> (the sun upload, <c>TextureAtlas.Build</c>,
     /// <c>TextureLoader.LoadFromFile</c> and the target creators all bind raw);
-    /// <see cref="CreateShadowMap"/>;
+    /// <see cref="CreateShadowMap"/> (both cascades; the far map's unit 7 is untracked anyway);
     /// <see cref="CreateReflectionTarget"/> on its recreate path only (it is called every frame and
     /// early-returns without binding when the size is unchanged) and
     /// <see cref="DeleteReflectionTarget"/>;
@@ -1845,9 +1808,9 @@ public class RenderManager : IDisposable
     private void InvalidateTextureUnits() => _texUnits.Invalidate();
 
     /// <summary>
-    /// Binds the world textures for a world draw: the atlas on unit 0, the shadow map on
-    /// unit 1, the reflection texture on unit 2 and the scene colour/depth copies on units 3
-    /// and 4. Unit 0 is left active on the way out, because <see cref="RenderItemDrops"/>
+    /// Binds the world textures for a world draw: the atlas on unit 0, the near shadow map on
+    /// unit 1, the reflection texture on unit 2, the scene colour/depth copies on units 3
+    /// and 4, the material atlas on unit 6 and the far shadow map on unit 7. Unit 0 is left active on the way out, because <see cref="RenderItemDrops"/>
     /// binds an item's own texture assuming that; the trailing unconditional
     /// <see cref="ActiveUnit"/> call is what upholds that postcondition now that the five binds
     /// themselves may skip their selects.
@@ -1858,12 +1821,13 @@ public class RenderManager : IDisposable
     /// </summary>
     private void BindWorldTextures()
     {
-        BindLazy(1, TextureTarget.Texture2D, _shadowDepthTex);
+        BindLazy(1, TextureTarget.Texture2D, _nearShadow.DepthTex);
         BindLazy(2, TextureTarget.Texture2D, _reflTex);
         BindLazy(3, TextureTarget.Texture2D, _sceneColorTex);
         BindLazy(4, TextureTarget.Texture2D, _sceneDepthTex);
         BindLazy(0, TextureTarget.Texture2DArray, textureAtlas);
         BindLazy(MaterialUnit, TextureTarget.Texture2DArray, materialAtlas);
+        BindLazy(FarShadowUnit, TextureTarget.Texture2D, _farShadow.DepthTex);
         ActiveUnit(0);
     }
 
@@ -1874,7 +1838,7 @@ public class RenderManager : IDisposable
     /// uniform values live in the program object and survive any number of <c>UseProgram</c>
     /// switches, so the selection, break, sun and UI shaders running in between do not disturb
     /// these and every later world pass in the frame inherits them. Everything it reads is final
-    /// by then: <see cref="SetLighting"/> (including <c>_lightViewProj</c>) runs before
+    /// by then: <see cref="SetLighting"/> (including <c>_nearShadow.ViewProj</c>) runs before
     /// <see cref="BeginFrame"/>, and nothing in a world pass writes these fields.
     /// <c>uFlash</c>/<c>uHitFlash</c> are entity-only (primed TNT / hurt slimes), so they are
     /// reset on the plain program alone.
@@ -1921,17 +1885,17 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterNormalScale", GameSettings.WaterWaves);
         program.SetUniform("uWaterRefractStrength", GameSettings.WaterRefraction);
         program.SetUniform("uWaterCausticStrength", GameSettings.WaterCaustics);
-        program.SetUniform("uLightViewProj", _lightViewProj);
+        program.SetUniform("uLightViewProj", _nearShadow.ViewProj);
         program.SetUniform("uShadowStrength", _shadowStrength);
         program.SetUniform("uShadowTexel", 1f / WorldGenerationConfig.ShadowMapSize);
-        program.SetUniform("uShadowWorldTexel",
-            2f * WorldGenerationConfig.ShadowRadiusBlocks / WorldGenerationConfig.ShadowMapSize);
+        program.SetUniform("uShadowWorldTexel", _nearShadow.WorldTexel);
         program.SetUniform("uShadowSoftness", WorldGenerationConfig.ShadowSoftnessTexels);
         program.SetUniform("uShadowNormalOffset", WorldGenerationConfig.ShadowNormalOffsetTexels);
         program.SetUniform("uShadowBiasTexels", WorldGenerationConfig.ShadowBiasTexels);
-        // World blocks -> uvz.z: the ortho box's 4r-block depth range is halved into 0.5 of the
-        // uvz range, so one whole uvz unit is 8r blocks.
-        program.SetUniform("uShadowBiasScale", 1f / (8f * WorldGenerationConfig.ShadowRadiusBlocks));
+        program.SetUniform("uShadowBiasScale", _nearShadow.BiasScale);
+        program.SetUniform("uLightViewProjFar", _farShadow.ViewProj);
+        program.SetUniform("uShadowWorldTexelFar", _farShadow.WorldTexel);
+        program.SetUniform("uShadowBiasScaleFar", _farShadow.BiasScale);
         program.SetUniform("uClipY", _clipY);
         // The water pass reads the scene copies by screen uv and unprojects their depth; both
         // describe the real eye, so the reflection pass (which draws no water) can ignore them.
@@ -2016,11 +1980,11 @@ public class RenderManager : IDisposable
         if (strength <= 0.0005f) return;
         if (_raysFbo == 0) return;             // no target to march into (never happens after LoadResources)
         CopyScene(colour: false);
-        BindUnit(1, TextureTarget.Texture2D, _shadowDepthTex);
+        BindUnit(1, TextureTarget.Texture2D, _nearShadow.DepthTex);
         BindUnit(4, TextureTarget.Texture2D, _sceneDepthTex);
         ActiveUnit(0);
         _rays.Render(_raysFbo, _raysTex, _raysSize, _hdrFbo, _viewportSize, _invViewProj, _cameraPos, _sunDir,
-            _sunColor * UnderwaterAmbientTintLinear, strength, camera.EyeWaterSurfaceY, WorldGenerationConfig.WaterAbsorb, _lightViewProj, _time);
+            _sunColor * UnderwaterAmbientTintLinear, strength, camera.EyeWaterSurfaceY, WorldGenerationConfig.WaterAbsorb, _nearShadow.ViewProj, _time);
         // UnderwaterRaysRenderer selects unit 5 for the upsample and puts unit 0 back. Unit 5 is
         // untracked so the records happen to survive, but the renderer does not promise that.
         InvalidateTextureUnits();
@@ -3095,7 +3059,7 @@ public class RenderManager : IDisposable
     {
         var model = player.GetPartMatrix(part, camera.Position, camera.PlayerYaw, camera.Pitch);
         shadowShader.SetUniform("uModel", model);
-        shadowShader.SetUniform("uLightMVP", model * _lightViewProj);
+        shadowShader.SetUniform("uLightMVP", model * _nearShadow.ViewProj);
         _playerMeshes[part].Render();
     }
 
@@ -3470,8 +3434,8 @@ public class RenderManager : IDisposable
         _sunQuad.Dispose();
         gl.DeleteTexture(_sunTexture);
         gl.DeleteTexture(_breakProgressTexture);
-        gl.DeleteFramebuffer(_shadowFbo);
-        gl.DeleteTexture(_shadowDepthTex);
+        _nearShadow.Dispose(gl);
+        _farShadow.Dispose(gl);
         DeleteReflectionTarget();
         DeleteSceneCopy();
         DeleteRaysTarget();

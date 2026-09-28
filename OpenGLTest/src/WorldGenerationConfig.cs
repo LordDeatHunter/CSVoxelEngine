@@ -111,6 +111,15 @@ public const float DayLengthSeconds = 1200f;
     // Half-extent in blocks of the shadow camera's ortho box around the view target
     public const float ShadowRadiusBlocks = 90f;
 
+    // Half-extent in blocks of the far shadow cascade: a coarse, silhouette-only box sampled
+    // where the near box fades out. The near box's fade band must lie inside the far box's
+    // unfaded core, which ShadowCascadeTests checks.
+    public const float FarShadowRadiusBlocks = 352f;
+
+    // Far cascade map resolution (~0.34 block per texel). This is the lever if the far pass's
+    // fill cost ever shows up: halving it keeps silhouettes at about 0.7 block per texel.
+    public const int FarShadowMapSize = 2048;
+
     // Whether the depth-only shadow pass runs at all (false leaves the world fully lit)
     public const bool ShadowsEnabled = true;
 

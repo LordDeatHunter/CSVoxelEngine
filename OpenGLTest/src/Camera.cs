@@ -1250,7 +1250,7 @@ public class Camera
     /// pose (PERF_TODO R11). Three passes - RenderWorld, CullWater and RenderLod - used to
     /// derive this independently from the identical unchanged matrix, paying six plane
     /// extractions and normalisations three times a frame. The shadow and mirror frusta are
-    /// built from <c>_lightViewProj</c> / <c>_reflViewProj</c> and are deliberately not
+    /// built from the shadow cascades' <c>ViewProj</c> / <c>_reflViewProj</c> and are deliberately not
     /// routed through here.
     /// </summary>
     public Frustum GetViewFrustum()

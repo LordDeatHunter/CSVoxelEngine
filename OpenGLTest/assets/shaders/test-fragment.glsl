@@ -83,6 +83,11 @@ uniform float uShadowSoftness;
 uniform float uShadowNormalOffset;
 uniform float uShadowBiasTexels;
 uniform float uShadowBiasScale;
+// The far cascade: a coarse, silhouette-only box sampled where the near box fades out.
+uniform sampler2DShadow uShadowMapFar;
+uniform mat4 uLightViewProjFar;
+uniform float uShadowWorldTexelFar;
+uniform float uShadowBiasScaleFar;
 
 // The frame as it stood just before the water pass: colour to refract, depth to measure the
 // water's thickness with. Plain samplers, no compare mode - uSceneDepth is read for its value.
@@ -128,20 +133,24 @@ vec3 SkySample(vec3 dir)
 }
 
 // Directional sun shadows. RenderManager renders the casters depth-only through
-// uLightViewProj into uShadowMap, so a fragment's own light-space depth compared against
-// what is stored there says whether something else got the sunlight first. The ortho
+// uLightViewProj into uShadowMap (the near cascade) and through uLightViewProjFar into
+// uShadowMapFar (the coarse far cascade), so a fragment's own light-space depth compared
+// against what is stored there says whether something else got the sunlight first. The ortho
 // projection puts clip z in 0..1 exactly like GL's depth write, so all three components
 // map with *0.5+0.5 and the comparison is apples to apples.
-float SampleShadow(vec3 wp, vec3 N, float ndl, float strength) {
-    if (strength <= 0.0) return 1.0;
+//
+// One cascade's lookup: normal offset, projection into its box, the box-edge fade (0 outside
+// the box or past its far plane) and the slope-scaled bias. Returns the fade; uvz is the
+// biased compare coordinate to sample with.
+float CascadeLookup(mat4 vp, float worldTexel, float biasScale, vec3 wp, vec3 N, float ndl, out vec3 uvz) {
     // Normal offset: axis-aligned voxel faces at grazing angles otherwise show acne
-    vec3 p = wp + N * (uShadowWorldTexel * uShadowNormalOffset * (1.0 - ndl));
-    vec4 lp = uLightViewProj * vec4(p, 1.0);
+    vec3 p = wp + N * (worldTexel * uShadowNormalOffset * (1.0 - ndl));
+    vec4 lp = vp * vec4(p, 1.0);
     vec3 ndc = lp.xyz / lp.w;
-    vec3 uvz = ndc * 0.5 + 0.5;                 // all three components -> [0,1]
+    uvz = ndc * 0.5 + 0.5;                      // all three components -> [0,1]
     float edge = max(abs(ndc.x), abs(ndc.y));
     float fade = 1.0 - smoothstep(0.85, 1.0, edge);   // soften the ortho-box boundary
-    if (fade <= 0.0 || uvz.z > 1.0) return 1.0;
+    if (uvz.z > 1.0) fade = 0.0;
     // Slope-scaled depth bias. One shadow texel spans texel*cot(theta) of depth on a receiver
     // whose normal sits theta off the light axis, and anything less than that makes the
     // surface shadow itself. Deriving it from the fragment's own normal is what keeps the
@@ -150,17 +159,41 @@ float SampleShadow(vec3 wp, vec3 N, float ndl, float strength) {
     // their edges wandered across the terrain's own block steps. theta is clamped at 16
     // texels (about 4 degrees off the light) - past that the fade above owns the result.
     float cot = sqrt(max(1.0 - ndl * ndl, 0.0)) / max(ndl, 0.0625);
-    uvz.z -= (cot + uShadowBiasTexels) * uShadowWorldTexel * uShadowBiasScale;
-    if (uShadowSoftness <= 0.0) return mix(1.0, texture(uShadowMap, uvz), fade * strength);
-    // Four taps on the diagonals, half a texel out. The sampler filters linearly, so each
-    // fetch is already a hardware 2x2 comparison and the four overlap into a smooth ~3x3
-    // tent — the same softness as the old (2s+1)^2 loop for 4 fetches instead of 9.
-    float o = 0.5 * uShadowTexel * uShadowSoftness;
-    float lit = texture(uShadowMap, vec3(uvz.x - o, uvz.y - o, uvz.z))
-              + texture(uShadowMap, vec3(uvz.x + o, uvz.y - o, uvz.z))
-              + texture(uShadowMap, vec3(uvz.x - o, uvz.y + o, uvz.z))
-              + texture(uShadowMap, vec3(uvz.x + o, uvz.y + o, uvz.z));
-    return mix(1.0, lit * 0.25, fade * strength);
+    uvz.z -= (cot + uShadowBiasTexels) * worldTexel * biasScale;
+    return fade;
+}
+
+float SampleShadow(vec3 wp, vec3 N, float ndl, float strength) {
+    if (strength <= 0.0) return 1.0;
+    // litN / litF are raw 0..1 comparison results; fade and strength are applied once below.
+    vec3 uvzN;
+    float fadeN = CascadeLookup(uLightViewProj, uShadowWorldTexel, uShadowBiasScale, wp, N, ndl, uvzN);
+    float litN = 1.0;
+    if (fadeN > 0.0) {
+        if (uShadowSoftness <= 0.0) {
+            litN = texture(uShadowMap, uvzN);
+        } else {
+            // Four taps on the diagonals, half a texel out. The sampler filters linearly, so each
+            // fetch is already a hardware 2x2 comparison and the four overlap into a smooth ~3x3
+            // tent — the same softness as the old (2s+1)^2 loop for 4 fetches instead of 9.
+            float o = 0.5 * uShadowTexel * uShadowSoftness;
+            litN = (texture(uShadowMap, vec3(uvzN.x - o, uvzN.y - o, uvzN.z))
+                  + texture(uShadowMap, vec3(uvzN.x + o, uvzN.y - o, uvzN.z))
+                  + texture(uShadowMap, vec3(uvzN.x - o, uvzN.y + o, uvzN.z))
+                  + texture(uShadowMap, vec3(uvzN.x + o, uvzN.y + o, uvzN.z))) * 0.25;
+        }
+    }
+    // The far cascade only where the near one has faded: one silhouette-only tap (the
+    // sampler's hardware 2x2 bilinear compare), no PCF kernel by design (PERF_TODO).
+    float litF = 1.0, fadeF = 0.0;
+    if (fadeN < 1.0) {
+        vec3 uvzF;
+        fadeF = CascadeLookup(uLightViewProjFar, uShadowWorldTexelFar, uShadowBiasScaleFar, wp, N, ndl, uvzF);
+        if (fadeF > 0.0) litF = texture(uShadowMapFar, uvzF);
+    }
+    // Inside the near core (fadeN = 1) this is exactly the old mix(1, litN, strength).
+    float lit = mix(mix(1.0, litF, fadeF), litN, fadeN);
+    return mix(1.0, lit, strength);
 }
 
 // Analytic slope of WaveHeight (same terms, differentiated), scaled up: the geometry moves a few

@@ -56,6 +56,9 @@ public sealed class DebugSceneRenderer : IDisposable
         _world.Use();
         _world.SetUniform("uTextureAtlas", 0);
         _world.SetUniform("uShadowMap", 1);
+        // The far cascade shares the dummy shadow texture on unit 1: same sampler type, so it
+        // never lands on unit 0 beside the sampler2DArray atlas.
+        _world.SetUniform("uShadowMapFar", 1);
         _world.SetUniform("uReflectionMap", 2);
         _world.SetUniform("uSceneColor", 3);
         _world.SetUniform("uSceneDepth", 4);
@@ -186,6 +189,11 @@ public sealed class DebugSceneRenderer : IDisposable
         _world.SetUniform("uShadowTexel", 1f / WorldGenerationConfig.ShadowMapSize);
         _world.SetUniform("uShadowWorldTexel",
             2f * WorldGenerationConfig.ShadowRadiusBlocks / WorldGenerationConfig.ShadowMapSize);
+        // Harmless placeholders: uShadowStrength is 0 here, so SampleShadow never reads them.
+        _world.SetUniform("uLightViewProjFar", Matrix4x4.Identity);
+        _world.SetUniform("uShadowWorldTexelFar",
+            2f * WorldGenerationConfig.FarShadowRadiusBlocks / WorldGenerationConfig.FarShadowMapSize);
+        _world.SetUniform("uShadowBiasScaleFar", 1f / (8f * WorldGenerationConfig.FarShadowRadiusBlocks));
         _world.SetUniform("uShadowSoftness", WorldGenerationConfig.ShadowSoftnessTexels);
         _world.SetUniform("uShadowNormalOffset", WorldGenerationConfig.ShadowNormalOffsetTexels);
         _world.SetUniform("uClipY", -1e9f);
