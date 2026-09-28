@@ -106,6 +106,19 @@ uniform sampler2D uSceneColor;
 uniform sampler2D uSceneDepth;
 uniform vec2 uInvViewport;
 uniform mat4 uInvViewProj;
+// The same frame's forward view-projection: the SSR march projects its steps through it.
+uniform mat4 uSceneViewProj;
+// Screen-space reflection for water the planar mirror cannot serve. uWaterSsrMode is 0 (off:
+// reflections disabled, or nothing near to reflect in), 1 (blend in by the surface's distance
+// from the mirror plane uWaterPlaneY) or 2 (the mirror is invalid this frame: SSR everywhere).
+uniform float uWaterSsrMode;
+uniform float uWaterPlaneY;
+uniform int uWaterSsrSteps;
+uniform float uWaterSsrStepStart;
+uniform float uWaterSsrStepGrowth;
+uniform float uWaterSsrThickness;   // hit tolerance behind the depth buffer, in current steps
+uniform float uWaterSsrPlaneNear;
+uniform float uWaterSsrPlaneFar;
 // The shadow strength before the underwater fade: the caustics still want crisp sun shadows
 // even once the diffuse has stopped using them.
 uniform float uShadowStrengthDry;
@@ -149,6 +162,41 @@ vec3 SkySample(vec3 dir)
     float lobe = pow(max(az, 0.0), uSkyShape.w) * (1.0 - band);
     float haze = uSkyShape.z * (1.0 - smoothstep(0.0, uSkyShape.y, e));
     return mix(uSkyHorizon * (1.0 + haze), uSkyZenith, band) + uSkyGlow * lobe;
+}
+
+// A short world-space reflection march against the scene copies (units 3/4): from P along R,
+// each step projected through uSceneViewProj and compared with the stored depth. The compare
+// is raw window depth (ndc.z * 0.5 + 0.5) against the texel, and the hit is reconstructed with
+// the same * 2 - 1 as the refraction path - the projection is Direct3D-style, so never
+// linearize. A ray that ends behind the scene within the thickness tolerance is a hit; one
+// that ends far behind has passed behind an occluder and misses. The copy holds no water or
+// glass, so SSR never reflects those - acceptable for a fallback.
+vec3 WaterSsr(vec3 P, vec3 R, vec3 miss)
+{
+    vec3 p = P + R * 0.05;
+    float stepLen = uWaterSsrStepStart;
+    for (int i = 0; i < 8; i++) {
+        if (i >= uWaterSsrSteps) break;
+        p += R * stepLen;
+        vec4 c = uSceneViewProj * vec4(p, 1.0);
+        if (c.w <= 0.0) break;
+        vec3 ndc = c.xyz / c.w;
+        vec2 uv = ndc.xy * 0.5 + 0.5;
+        if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) break;
+        float sd = texture(uSceneDepth, uv).r;
+        if (ndc.z * 0.5 + 0.5 > sd) {
+            vec4 sp = uInvViewProj * vec4(uv * 2.0 - 1.0, sd * 2.0 - 1.0, 1.0);
+            if (distance(sp.xyz / sp.w, p) < stepLen * uWaterSsrThickness) {
+                // Fade toward the miss colour near the screen border, where the copy runs out.
+                vec2 e2 = min(uv, 1.0 - uv);
+                float edge = smoothstep(0.0, 0.08, min(e2.x, e2.y));
+                return mix(miss, texture(uSceneColor, uv).rgb, edge);
+            }
+            break;
+        }
+        stepLen *= uWaterSsrStepGrowth;
+    }
+    return miss;
 }
 
 // Directional sun shadows. RenderManager renders the casters depth-only through
@@ -650,7 +698,23 @@ void main() {
         }
         // No sky to mirror underground: dim the reflection (fallback or stale mirror
         // alike) by the voxel skylight, or sealed caves glow sky-blue in daytime.
-        refl *= clamp(0.12 + 0.88 * fSun, 0.0, 1.0);
+        refl *= skyDim;   // the cheap path's clamp(0.12 + 0.88 * fSun) above
+        // Off the sea plane (a pond above sea level) the planar mirror reflects the wrong
+        // height, so a short screen-space march takes over by the surface's plane error.
+        // Fluid quads carry flow codes rather than fWaterSurfaceY, so the fragment's own Y is
+        // its local surface. Hits are already-lit scene colour and stay undimmed - a torch-lit
+        // cave pool must not reflect black; only the miss colour takes the skylight dim.
+        if (!fromBehind && uWaterSsrMode > 0.5) {
+            float planeErr = abs(fWorldPos.y - uWaterPlaneY);
+            float ssrW = uWaterSsrMode > 1.5 ? 1.0 : smoothstep(uWaterSsrPlaneNear, uWaterSsrPlaneFar, planeErr);
+            if (ssrW > 0.001) {
+                vec3 R = reflect(-V, nW);
+                R.y = max(R.y, 0.02);
+                R = normalize(R);
+                vec3 miss = mix(SkySample(R), uFogColor, uFogWet) * skyDim;
+                refl = mix(refl, WaterSsr(fWorldPos, R, miss), ssrW);
+            }
+        }
         vec3 fancyCol = mix(refr, refl, F);
 
         vec3 H = normalize(V + uSunDir);

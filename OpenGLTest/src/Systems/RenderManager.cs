@@ -294,6 +294,9 @@ public class RenderManager : IDisposable
     // Inverse of the current view-projection, for the shaders that reconstruct a world
     // position out of the depth texture (see the depth-convention note in test-fragment.glsl)
     private Matrix4x4 _invViewProj = Matrix4x4.Identity;
+    // The forward twin of _invViewProj: the water's SSR march projects its steps through it
+    // into the scene copies.
+    private Matrix4x4 _sceneViewProj = Matrix4x4.Identity;
 
     // Underwater tint: the eye state is a hard flag, so it is eased into _underwaterT
     // (0 = above water, 1 = fully submerged) over UnderwaterFadeSeconds
@@ -742,6 +745,14 @@ public class RenderManager : IDisposable
         program.SetUniform("uLavaCatchLight", WorldGenerationConfig.LavaCatchLightStrength);
         program.SetUniform("uLavaCatchPower", WorldGenerationConfig.LavaCatchLightPower);
         program.SetUniform("uLodLeafColor", _lodLeafColor);
+        program.SetUniform("uWaterPlaneY", WaterPlaneY);
+        program.SetUniform("uWaterSsrSteps", WorldGenerationConfig.WaterSsrSteps);
+        program.SetUniform("uWaterSsrStepStart", WorldGenerationConfig.WaterSsrStepStart);
+        program.SetUniform("uWaterSsrStepGrowth", WorldGenerationConfig.WaterSsrStepGrowth);
+        program.SetUniform("uWaterSsrThickness", WorldGenerationConfig.WaterSsrThickness);
+        program.SetUniform("uWaterSsrPlaneNear", WorldGenerationConfig.WaterSsrPlaneNear);
+        program.SetUniform("uWaterSsrPlaneFar", WorldGenerationConfig.WaterSsrPlaneFar);
+        program.SetUniform("uWaterSsrMode", 0f);
     }
 
     /// <summary>
@@ -849,7 +860,8 @@ public class RenderManager : IDisposable
             _cameraPos = camera.RenderEye;
             // Inverting the exact matrix the depth was written with is what makes the shaders'
             // position reconstruction independent of the clip-depth convention.
-            if (!Matrix4x4.Invert(camera.GetViewProjection(), out _invViewProj))
+            _sceneViewProj = camera.GetViewProjection();
+            if (!Matrix4x4.Invert(_sceneViewProj, out _invViewProj))
                 _invViewProj = Matrix4x4.Identity;
         }
 
@@ -1537,10 +1549,18 @@ public class RenderManager : IDisposable
         // CullWater ran a moment ago, so a frame with no water on screen skips the whole
         // mirrored render rather than filling a texture nothing will sample. Far-only water
         // draws through the cheap shader path, which never samples the mirror either.
-        if (!WorldGenerationConfig.WaterEnabled || !GameSettings.WaterReflections || camera == null || !_waterVisible
-            || !_nearWaterVisible || !ReflectionReuse.MirrorApplies(camera.RenderEye.Y, WaterPlaneY, camera.IsEyeInWater)
-            || _reflFbo == 0)
+        // Named so the SSR mode below can tell the reasons apart; the return condition is the
+        // same short-circuit OR it always was.
+        var reflectionsOff = !WorldGenerationConfig.WaterEnabled || !GameSettings.WaterReflections;
+        var nothingToReflect = camera == null || !_waterVisible || !_nearWaterVisible;
+        var mirrorInvalid = !reflectionsOff && !nothingToReflect
+            && !ReflectionReuse.MirrorApplies(camera!.RenderEye.Y, WaterPlaneY, camera.IsEyeInWater);
+        if (reflectionsOff || nothingToReflect || mirrorInvalid || _reflFbo == 0)
         {
+            // SSR follows the reflection setting (off costs nothing), and takes over entirely
+            // where the mirror is wrong for eye reasons; with no near water or no target the
+            // fancy water branch would not reach it anyway.
+            SetWorldUniform("uWaterSsrMode", mirrorInvalid ? 2f : 0f);
             // A frame that fell through here must never be reused from: however old the
             // texture is, it no longer stands in any known relation to the current camera.
             _reflMirrorValid = false;
@@ -1565,6 +1585,7 @@ public class RenderManager : IDisposable
             // through the matrix that produced it - this frame's would make the mirror swim.
             SetWorldUniform("uReflViewProj", _reflViewProj);
             SetWorldUniform("uReflValid", 1f);
+            SetWorldUniform("uWaterSsrMode", 1f);
             return;
         }
 
@@ -1698,6 +1719,7 @@ public class RenderManager : IDisposable
         // Restores the real eye's fog/camera uniforms; uReflViewProj survives in the program.
         ApplyFrameUniforms();
         SetWorldUniform("uReflValid", 1f);
+        SetWorldUniform("uWaterSsrMode", 1f);
         // _reflTex now matches this camera, so the next frame may reuse it (once).
         _reflPose = pose;
         (_reflEntityPositions, _reflEntityScratch) = (_reflEntityScratch, _reflEntityPositions);
@@ -2099,6 +2121,7 @@ public class RenderManager : IDisposable
         program.SetUniform("uInvViewport",
             new Vector2(1f / Math.Max(1, _viewportSize.X), 1f / Math.Max(1, _viewportSize.Y)));
         program.SetUniform("uInvViewProj", _invViewProj);
+        program.SetUniform("uSceneViewProj", _sceneViewProj);
         program.SetUniform("uShadowStrengthDry", _shadowStrengthDry);
         program.SetUniform("uUnderwater", _eyeInLava ? 0f : MathUtils.SmoothStep(_underwaterT));
     }

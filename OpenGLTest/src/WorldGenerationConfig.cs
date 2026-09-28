@@ -462,6 +462,28 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>How strongly the falling streaks tilt the side-face normal.</summary>
     public const float WaterFallStreakStrength = 0.5f;
 
+    /// <summary>
+    /// Steps of the screen-space reflection march that stands in for the planar mirror on water
+    /// off the sea plane (a pond above sea level). The shader's loop bound is 8, so more is clamped.
+    /// </summary>
+    public const int WaterSsrSteps = 6;
+    /// <summary>Length of the first SSR step, in blocks.</summary>
+    public const float WaterSsrStepStart = 0.75f;
+    /// <summary>Factor each SSR step grows by, so a few steps still reach a far bank.</summary>
+    public const float WaterSsrStepGrowth = 1.6f;
+    /// <summary>
+    /// How far behind the depth buffer a march point may land and still count as a hit, as a
+    /// multiple of the current step length; farther means the ray passed behind an occluder.
+    /// </summary>
+    public const float WaterSsrThickness = 1.5f;
+    /// <summary>
+    /// Distance (blocks) of a water surface from the mirror plane at which SSR starts to blend
+    /// in. Above the lava/water wave amplitude (~0.09), so sea-level water never pays for it.
+    /// </summary>
+    public const float WaterSsrPlaneNear = 0.25f;
+    /// <summary>Plane distance (blocks) at which SSR fully replaces the planar mirror.</summary>
+    public const float WaterSsrPlaneFar = 1.0f;
+
     // Beaches ring the sea: dry columns up to BeachAboveSeaLevel over the waterline and
     // submerged columns down to BeachBelowSeaLevel under it build their top and soil band
     // from sand instead of grass/dirt. Ravine bare-stone walls still win over the beach.

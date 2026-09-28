@@ -72,6 +72,13 @@
     { "op": "teleport", "pos": [-304.5, 3.2, 474.5], "yaw": -90, "pitch": 15 },
     { "op": "wait", "seconds": 0.5 },
     { "op": "screenshot", "name": "water_pond_graze", "hideHud": true },
+    // The same pond from above, grazing: its surface stands off the sea-level mirror plane,
+    // so the reflection comes from the screen-space march - banks and trees, fading to sky
+    // where a ray leaves the screen.
+    { "op": "fly" },
+    { "op": "teleport", "pos": [-304.5, 5.5, 480.5], "yaw": -90, "pitch": -6 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "pond_ssr", "hideHud": true },
     // The player in the mirror: hovering 3 blocks over the sea surface (sea level 0) of the
     // verified ocean column, looking steeply down, the whole body - head included - should
     // show reflected, and nothing below the plane.
