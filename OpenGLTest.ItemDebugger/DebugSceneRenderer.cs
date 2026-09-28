@@ -66,6 +66,10 @@ public sealed class DebugSceneRenderer : IDisposable
         // type clash fails the draw; unit 2 already holds a sampler2D. uCloudShadowStrength stays
         // at its default 0, which keeps the cloud-shadow path off here.
         _world.SetUniform("uCloudShadowMap", 2);
+        _world.SetUniform("uWetDarken", WorldGenerationConfig.WetDarken);
+        _world.SetUniform("uWetBand", WorldGenerationConfig.WetBandBlocks);
+        _world.SetUniform("uWetReflect", WorldGenerationConfig.WetReflect);
+        _world.SetUniform("uWetShine", WorldGenerationConfig.WetShine);
         // The plain vertex path lights meshes from these per-draw uniforms (the game samples the
         // world through RenderManager.SetDrawUniforms). The debugger has no world, so it lights
         // everything like the old vertex defaults: full sun, no block light. Unset they would be 0,

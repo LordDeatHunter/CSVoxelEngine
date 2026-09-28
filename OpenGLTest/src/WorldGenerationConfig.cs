@@ -494,6 +494,16 @@ public const float DayLengthSeconds = 1200f;
     public const float GravelFrequency = 1f / 48f;
     public const float GravelThreshold = 0.45f;
 
+    // --- Wet waterline (test-fragment.glsl, SH-22) ---
+    // Albedo multiplier on a fully wet face (submerged, or at the waterline of the wet band)
+    public const float WetDarken = 0.62f;
+    // Blocks above a fluid surface over which the wet band fades back to dry
+    public const float WetBandBlocks = 0.5f;
+    // Strength of the grazing Schlick sky sheen on the wet band (0 = none, 1 = full mirror at a graze)
+    public const float WetReflect = 0.35f;
+    // Blinn-Phong exponent of the wet band's sun glint: a thin water film is very smooth
+    public const float WetShine = 120f;
+
     // --- Surface water (lakes and rivers) ---
     // The forest floor sits above sea level, so an un-carved column is always the dry rim of any
     // carved water: a lake is a bowl and a river a channel, and water fills only the part cut

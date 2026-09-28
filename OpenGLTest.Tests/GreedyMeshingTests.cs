@@ -259,8 +259,9 @@ public sealed class GreedyMeshingTests
 
     /// <summary>What one unit cell face looks like once rendered, independent of how many
     /// quads it was drawn with: attributes plus the shade, sun and lamp light and UV
-    /// interpolated at its four corners.</summary>
-    private sealed record CellFace(int Face, int Alpha, int Layer, int Sway, int WaterSurface, int List,
+    /// interpolated at its four corners. <c>Flags</c> is the packed normal above the face index
+    /// (submerged bit 3, wet band bit 4, ...).</summary>
+    private sealed record CellFace(int Face, int Flags, int Alpha, int Layer, int Sway, int WaterSurface, int List,
         float[] Shade, float[] Sun, float[] Block, float[] U, float[] V);
 
     private static float Bilinear(float[,] c, float s, float t) =>
@@ -375,7 +376,7 @@ public sealed class GreedyMeshingTests
 
                 var key = (cell[0], cell[1], cell[2], face);
                 Assert.False(cells.ContainsKey(key), $"cell face {key} drawn twice");
-                cells[key] = new CellFace(face, (int)(v0.PackedColor >> 24), v0.Layer, v0.Sway, v0.WaterSurface, list,
+                cells[key] = new CellFace(face, v0.Normal >> 3, (int)(v0.PackedColor >> 24), v0.Layer, v0.Sway, v0.WaterSurface, list,
                     cornerShade, cornerSun, cornerBlock, cornerU, cornerV);
             }
         }
@@ -454,6 +455,7 @@ public sealed class GreedyMeshingTests
             Assert.Equal(expected.Alpha, actual.Alpha);
             Assert.Equal(expected.Layer, actual.Layer);
             Assert.Equal(expected.Sway, actual.Sway);
+            Assert.Equal(expected.Flags, actual.Flags);
             Assert.Equal(expected.WaterSurface, actual.WaterSurface);
             Assert.Equal(expected.List, actual.List);
             for (var c = 0; c < 4; c++)
@@ -480,6 +482,30 @@ public sealed class GreedyMeshingTests
         Assert.True(greedy.TranslucentVertices.Count <= scalar.TranslucentVertices.Count,
             $"translucent vertices greedy {greedy.TranslucentVertices.Count} vs per-quad {scalar.TranslucentVertices.Count}");
         return sCells;
+    }
+
+    [Fact]
+    public void WetShorelineMeshesTheSameBothWays()
+    {
+        // A pond sunk into stone ground level with its surface (wet beach tops all round) and a
+        // low wall along one bank (wet bank faces just over the waterline)
+        var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
+        var stone = Block("stone");
+        var water = Block("water");
+        for (var x = 0; x < Chunk.Size; x++)
+        for (var z = 0; z < Chunk.Size; z++)
+        {
+            var pond = x is >= 4 and <= 11 && z is >= 4 and <= 11;
+            for (var y = 0; y <= 5; y++)
+                center.SetBlockRaw(x, y, z, pond && y >= 3 ? water : stone, pond && y >= 3 ? FluidState.Source : (byte)0);
+            if (x == 3) for (var y = 6; y <= 7; y++) center.SetBlockRaw(x, y, z, stone, 0);
+        }
+
+        var cells = AssertGreedyMatchesPerQuad(manager, center);
+
+        // The shore really is flagged, so the parity above compared something
+        Assert.Contains(cells.Values, c => (c.Flags & 2) != 0 && c.Face == 4);
+        Assert.Contains(cells.Values, c => (c.Flags & 2) != 0 && c.Face == 3);
     }
 
     [Fact]

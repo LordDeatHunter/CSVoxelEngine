@@ -31,7 +31,11 @@ public struct Vertex
     /// <summary>Bits 0-2: face index in <see cref="Chunk.CubeFaces"/> order, reconstructed in
     /// the vertex shader. Sloped fluid tops and spun pebbles snap to their dominant axis; both
     /// sit within a few degrees of one, so the sun diffuse barely moves. Bit 3: the face looks
-    /// into water, which is what the fragment shader paints the caustic net onto.</summary>
+    /// into water, which is what the fragment shader paints the caustic net onto. Bit 4: wet
+    /// band, a dry face just above a fluid surface (a bank wall one cell over the waterline, a
+    /// beach top level with the water); <see cref="WaterSurface"/> then carries that surface.
+    /// Bits 3 and 4 are mutually exclusive, which is what lets them share it. Bits 5-7 are
+    /// unused.</summary>
     public byte Normal;
 
     /// <summary>Wind weight for the leaf-wave shader (1 on canopy leaves, 0 elsewhere).
@@ -43,7 +47,7 @@ public struct Vertex
     public ushort Layer;
 
     /// <summary>For a submerged face (<see cref="Normal"/> bit 3): the world Y of the water
-    /// surface above it, in quarter blocks offset by <see cref="WaterSurfaceOffset"/>
+    /// surface above it (for a wet-band face, bit 4, the surface just below it), in quarter blocks offset by <see cref="WaterSurfaceOffset"/>
     /// (<see cref="EncodeWaterSurface"/>); 0 everywhere else. The caustic net fades with depth
     /// below this, so a pond above sea level measures from its own surface. Also keeps the
     /// struct at 32 bytes.
@@ -116,7 +120,7 @@ public struct Vertex
     /// <summary>Atlas geometry: a UV in tile units on <paramref name="layer"/>.</summary>
     public Vertex(Vector3 position, byte r, byte g, byte b, byte a, Vector2 uv, ushort layer,
         float sun = 1f, float block = 0f, Vector3? normal = null, float sway = 0f, bool submerged = false,
-        ushort waterSurface = 0)
+        ushort waterSurface = 0, bool wet = false)
     {
         Position = position;
         PackedColor = (uint)(r | (g << 8) | (b << 16) | (a << 24));
@@ -125,7 +129,7 @@ public struct Vertex
         WaterSurface = waterSurface;
         Sun = EncodeLight(sun);
         Block = EncodeLight(block);
-        Normal = (byte)(EncodeNormal(normal ?? Vector3.UnitY) | (submerged ? 8 : 0));
+        Normal = (byte)(EncodeNormal(normal ?? Vector3.UnitY) | (submerged ? SubmergedBit : 0) | (wet ? WetBit : 0));
         Sway = sway >= 0.5f ? (byte)255 : (byte)0;
     }
 
@@ -149,6 +153,16 @@ public struct Vertex
         : this(position, color.R, color.G, color.B, color.A, uv, 0, sun, block, normal, sway, submerged)
     {
     }
+
+    private const int SubmergedBit = 1 << 3;
+    private const int WetBit = 1 << 4;
+
+    /// <summary><see cref="Normal"/> bit 3: the face looks into a fluid.</summary>
+    public readonly bool IsSubmerged => (Normal & SubmergedBit) != 0;
+
+    /// <summary><see cref="Normal"/> bit 4: the face sits in the wet band just above a fluid
+    /// surface.</summary>
+    public readonly bool IsWet => (Normal & WetBit) != 0;
 
     /// <summary>The UV as stored (tests, debugging).</summary>
     public readonly Vector2 UV => Uv;

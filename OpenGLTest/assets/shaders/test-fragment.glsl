@@ -27,7 +27,9 @@ flat in vec3 fTangent;
 flat in vec3 fBitangent;
 in vec3 fWorldPos;
 in float fSubmerged;
-flat in float fWaterSurfaceY; // baked water surface over a submerged face (Vertex.WaterSurface)
+in float fWet; // dry face just above a fluid surface: the wet band (bit 4 of the packed normal)
+// Baked fluid surface (Vertex.WaterSurface): above a submerged face, or below a wet-band face.
+flat in float fWaterSurfaceY;
 in vec3 fWaterFlow; // flow xy * strength, z = falling (fluid quads only; see test-vertex.glsl)
 flat in float fAlpha; // per-draw fade from the vertex stage: a uniform cannot vary inside one multi-draw
 
@@ -134,6 +136,13 @@ const float WaterEta = 1.333;
 uniform vec3 uWaterAbsorb;
 uniform vec3 uWaterScatter;
 uniform float uWaterCausticStrength;
+// Wet waterline (SH-22): submerged and wet-band faces darken their albedo by uWetDarken; the
+// band fades out over uWetBand blocks above the surface and carries a Schlick sky sheen
+// (uWetReflect) plus a tight sun highlight (Blinn-Phong exponent uWetShine).
+uniform float uWetDarken;
+uniform float uWetBand;
+uniform float uWetReflect;
+uniform float uWetShine;
 uniform float uWaterFancyNear;
 uniform float uWaterFancyFar;
 uniform float uWaterFlowStretch;  // fraction of the along-flow slope damped at full strength
@@ -397,6 +406,13 @@ float Caustics(vec2 p, float t) {
     return sharp + 0.2 * soft;
 }
 
+// Schlick fresnel with the water/wet-surface F0 of 0.06, shared by the ore path and the wet
+// sheen. GL-free twin: SurfaceFresnel.Schlick. The water surface keeps its own inline copies,
+// which carry the inside-view total-internal-reflection variants.
+float Schlick(float cosT) {
+    return 0.06 + 0.94 * pow(1.0 - cosT, 5.0);
+}
+
 void main() {
     // The reflection pass clips everything below the sea surface out of the mirror.
     if (fWorldPos.y < uClipY) discard;
@@ -470,18 +486,29 @@ void main() {
     // darker bounce off the ground; side faces get the average of the two.
     vec3 hemi = mix(uGroundAmbient, uAmbient, 0.5 + 0.5 * N.y);
     vec3 light = hemi * (0.12 + 0.88 * fSun) + max(sun, torch + pl);
+    // The reflective tiles (the ores) carry their own sheen, so the wet and rim terms skip them
+    // rather than stacking a second fresnel on top. fLayer is flat: this resolves per quad.
+    bool oreTile = !isWater && uMaterialCount > 0 && int(fLayer) < uMaterialCount
+        && uTileMaterials[fLayer].x > 0.0;
+    // Wet waterline: a face under water is fully wet, and a dry face the mesher flagged as just
+    // above a fluid surface (fWaterSurfaceY is that surface) fades from wet at the waterline to
+    // dry uWetBand blocks up. Water darkens what it soaks, so the albedo drops exactly once,
+    // here before the light multiply, and the caustics below see the wet albedo too.
+    float band = fWet > 0.5 ? 1.0 - smoothstep(0.0, uWetBand, fWorldPos.y - fWaterSurfaceY) : 0.0;
+    float wet = (isWater || oreTile) ? 0.0 : max(fSubmerged > 0.5 ? 1.0 : 0.0, band);
+    albedo *= mix(1.0, uWetDarken, wet);
     vec3 col = albedo * light;
     // Wanted by the caustics and the refraction below as well as by the fog at the end
     float dist = distance(fWorldPos, uCameraPos);
 
     // Reflective surfaces: the ores. fLayer is a flat varying, so this branch resolves the same
     // way for every fragment of a quad and the diffuse tiles never pay for the texture fetch.
-    if (!isWater && uMaterialCount > 0 && int(fLayer) < uMaterialCount) {
+    if (oreTile) {
         vec4 tileMat = uTileMaterials[fLayer];
         // Highlights on a 32px tile alias hard once a texel goes subpixel, so the whole path
         // fades out with distance instead of sparkling along the horizon and through the LOD.
         float nearFade = 1.0 - smoothstep(48.0, 112.0, dist);
-        if (tileMat.x > 0.0 && nearFade > 0.0) {
+        if (nearFade > 0.0) {
             vec4 matSample = texture(uMaterialAtlas, vec3(fTexCoord, float(fLayer)));
             float metallic = tileMat.x * matSample.a;
             float roughness = clamp(tileMat.y, 0.02, 1.0);
@@ -519,7 +546,7 @@ void main() {
             // metallic would instead mirror the flat sky colour at full strength head-on and
             // flatten obsidian into a pale slab with no material left in it. Dimmed by skylight
             // so there is no sky to reflect underground.
-            float F = 0.06 + 0.94 * pow(1.0 - max(dot(Vm, Nm), 0.0), 5.0);
+            float F = Schlick(max(dot(Vm, Nm), 0.0));
             vec3 skyColor = uFogColor * clamp(0.12 + 0.88 * fSun, 0.0, 1.0);
 
             // Metal is a dark body with a bright specular. The HDR target now has headroom for
@@ -532,6 +559,23 @@ void main() {
             // black glass catching the sky. Capped below a full mirror so it keeps its own colour.
             col = mix(col, skyColor, F * metallic * 0.65 * nearFade);
             col += uSunColor * (spec * uSunIntensity) * tint * nearFade;
+        }
+    }
+
+    // Wet sheen on the band above the waterline: a thin water film is a low-roughness dielectric,
+    // so it mirrors a little sky at a graze (the same Schlick the ores use) and catches a tight
+    // sun glint, both gated like the ore highlight by skylight and the shadow. Faded out with
+    // distance for the same aliasing reason. Submerged faces are only darkened: the water above
+    // them does the reflecting.
+    if (band > 0.0 && !isWater && !oreTile) {
+        float wetFade = 1.0 - smoothstep(48.0, 112.0, dist);
+        if (wetFade > 0.0) {
+            vec3 Vw = normalize(uCameraPos - fWorldPos);
+            float Fw = Schlick(max(dot(Vw, N), 0.0));
+            vec3 wetSky = uFogColor * clamp(0.12 + 0.88 * fSun, 0.0, 1.0);
+            col = mix(col, wetSky, Fw * band * uWetReflect * wetFade);
+            col += uSunColor * uSunIntensity * pow(max(dot(N, normalize(Vw + uSunDir)), 0.0), uWetShine)
+                * band * fSun * shadow * smoothstep(0.0, 0.2, uSunIntensity) * wetFade * 0.5;
         }
     }
 

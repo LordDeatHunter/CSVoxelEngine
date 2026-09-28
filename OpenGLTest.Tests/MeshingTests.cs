@@ -296,7 +296,8 @@ public sealed class MeshingTests
             var submerged = (vertex.Normal & 8) != 0;
             if (!submerged)
             {
-                Assert.Equal(0, vertex.WaterSurface);
+                // A wet-band face carries the surface below it in the same field
+                if (!vertex.IsWet) Assert.Equal(0, vertex.WaterSurface);
                 continue;
             }
             Assert.NotEqual(0, vertex.WaterSurface);
@@ -305,6 +306,103 @@ public sealed class MeshingTests
         }
         Assert.NotEmpty(surfaces);
         return surfaces;
+    }
+
+    // ---------------------------------------------------------------- wet band (SH-22)
+
+    /// <summary>A stone column at (8, 8..9, 8) beside one water source at (9, 8, 8) resting on
+    /// stone: the column's +X face at y = 8 looks into the water, the one at y = 9 looks into
+    /// the air over it, and the top of a lone stone at (8, 8, 8) would sit level with it.</summary>
+    private static (ChunkManager Manager, Chunk Center) Shore(bool wall)
+    {
+        var (manager, center) = MeshTestWorld.WalledArea();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var water = ContentRegistry.RequireBlock("water").Id;
+        center.SetBlockRaw(8, 8, 8, stone, 0);
+        if (wall) center.SetBlockRaw(8, 9, 8, stone, 0);
+        center.SetBlockRaw(9, 7, 8, stone, 0);
+        center.SetBlockRaw(9, 8, 8, water, FluidState.Source);
+        return (manager, center);
+    }
+
+    /// <summary>The opaque vertices of the face of <paramref name="face"/> whose lowest corner
+    /// sits at <paramref name="bottomY"/> and which touches x = <paramref name="x"/>.</summary>
+    private static List<Vertex> FaceVertices(ChunkMeshData mesh, int face, float x, float bottomY)
+    {
+        var found = new List<Vertex>();
+        for (var q = 0; q + 3 < mesh.Vertices.Count; q += 4)
+        {
+            var quad = mesh.Vertices.GetRange(q, 4);
+            if ((quad[0].Normal & 7) != face) continue;
+            var minY = MathF.Min(MathF.Min(quad[0].Position.Y, quad[1].Position.Y), MathF.Min(quad[2].Position.Y, quad[3].Position.Y));
+            if (minY != bottomY || !quad.Exists(v => v.Position.X == x)) continue;
+            found.AddRange(quad);
+        }
+        Assert.NotEmpty(found);
+        return found;
+    }
+
+    [Fact]
+    public void BankWallAboveWaterIsWetNotSubmerged()
+    {
+        var (manager, center) = Shore(wall: true);
+        var mesh = center.GenerateMeshData(manager);
+        Assert.NotNull(mesh);
+
+        // +X (face 3) of the upper stone looks into the air cell over the water
+        foreach (var v in FaceVertices(mesh, 3, 9f, 9f))
+        {
+            Assert.True(v.IsWet);
+            Assert.False(v.IsSubmerged);
+            var surface = Vertex.DecodeWaterSurface(v.WaterSurface);
+            Assert.True(surface <= 9f && surface > 8f, $"{surface}");
+        }
+    }
+
+    [Fact]
+    public void BeachTopBesideWaterIsWetWithSurfaceBelowFace()
+    {
+        var (manager, center) = Shore(wall: false);
+        var mesh = center.GenerateMeshData(manager);
+        Assert.NotNull(mesh);
+
+        // The top (face 4) of the stone at y = 8 sits at y = 9, level with the water beside it
+        foreach (var v in FaceVertices(mesh, 4, 9f, 9f))
+        {
+            Assert.True(v.IsWet);
+            Assert.False(v.IsSubmerged);
+            var surface = Vertex.DecodeWaterSurface(v.WaterSurface);
+            Assert.True(surface <= 9f && surface >= 8f, $"{surface}");
+        }
+    }
+
+    [Fact]
+    public void FaceLookingIntoWaterIsSubmergedNotWet()
+    {
+        var (manager, center) = Shore(wall: true);
+        var mesh = center.GenerateMeshData(manager);
+        Assert.NotNull(mesh);
+
+        foreach (var v in FaceVertices(mesh, 3, 9f, 8f))
+        {
+            Assert.True(v.IsSubmerged);
+            Assert.False(v.IsWet);
+        }
+    }
+
+    [Fact]
+    public void DryFaceIsNeitherWetNorSubmerged()
+    {
+        var (manager, center) = MeshTestWorld.WalledArea();
+        center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
+        var mesh = center.GenerateMeshData(manager);
+        Assert.NotNull(mesh);
+        Assert.All(mesh.Vertices, v =>
+        {
+            Assert.False(v.IsWet);
+            Assert.False(v.IsSubmerged);
+            Assert.Equal(0, v.WaterSurface);
+        });
     }
 
     private static float StackedSurface(int stackHeight, byte topState)

@@ -85,6 +85,13 @@
     { "op": "fly" },
     { "op": "teleport", "pos": [360.5, 3.0, 136.5], "yaw": -90, "pitch": -65 },
     { "op": "wait", "seconds": 1 },
-    { "op": "screenshot", "name": "mirror-self", "hideHud": true }
+    { "op": "screenshot", "name": "mirror-self", "hideHud": true },
+    // The wet waterline: a warm forest river at (-600, 653) whose banks and beach tops meet the
+    // water (sea level 0). The faces just above the surface read darker with a faint sky sheen,
+    // fading back to dry half a block up; the submerged bed beside them is darkened too.
+    { "op": "fly" },
+    { "op": "teleport", "pos": [-600.5, 5.0, 653.5], "yaw": 0, "pitch": -40 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "wet_bank", "hideHud": true }
   ]
 }
