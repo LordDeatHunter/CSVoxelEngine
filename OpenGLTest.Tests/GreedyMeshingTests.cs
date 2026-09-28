@@ -294,7 +294,12 @@ public sealed class GreedyMeshingTests
                 Assert.Equal(v0.Normal, v.Normal);
                 Assert.Equal(v0.Layer, v.Layer);
                 Assert.Equal(v0.Sway, v.Sway);
-                Assert.Equal(v0.WaterSurface, v.WaterSurface);
+                // A fluid quad (alpha 254) carries its flow code per corner by design, so only the
+                // falling bit (bit 14) has to be per quad; everything else keeps one value per quad
+                if (v0.PackedColor >> 24 == 254)
+                    Assert.Equal(v0.WaterSurface >> 14, v.WaterSurface >> 14);
+                else
+                    Assert.Equal(v0.WaterSurface, v.WaterSurface);
                 Assert.Equal(v0.PackedColor >> 24, v.PackedColor >> 24);
             }
 

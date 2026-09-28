@@ -46,9 +46,13 @@ out float fSubmerged;
 flat out float fAlpha;
 // World Y of the water surface above a submerged face (0 elsewhere, decoding far below any face).
 flat out float fWaterSurfaceY;
+// Water flow on fluid quads (Vertex.EncodeWaterFlow): xy = flow direction * strength, z = falling
+// flag. Deliberately NOT flat: the mesher bakes one code per corner and neighbouring cells share
+// their corner codes (FluidFlow.Corner), so the interpolated flow is continuous across cells.
+out vec3 fWaterFlow;
 
 // Four directional sines: the sum stays under 0.09 blocks so a full cell's surface (8/9) never
-// pokes out of its block. Duplicated verbatim in test-fragment.glsl for the analytic normal.
+// pokes out of its block. Duplicated verbatim in test-fragment.glsl's WaveSlope for the analytic normal.
 float WaveHeight(vec2 p, float t) {
     return 0.035 * sin(dot(p, vec2(0.9, 0.4)) * 0.9 + t * 1.6)
          + 0.025 * sin(dot(p, vec2(-0.5, 0.85)) * 1.4 + t * 2.1)
@@ -105,6 +109,21 @@ void main() {
     // Vertex.WaterSurfaceOffset. Only chunk faces are ever submerged, so the entity path's
     // value is never read.
     fWaterSurfaceY = float(vWaterSurface) / 4.0 - 4096.0;
+    // On a fluid quad the same ushort carries the per-corner flow code instead. Mirrors
+    // Vertex.EncodeWaterFlow / Vertex.WaterFlowSteps (63): 7-bit two's complement X in bits 0-6,
+    // Z in bits 7-13, falling in bit 14; 0 is still water. The wave DISPLACEMENT above stays
+    // flow-free on purpose (it must agree across every vertex sharing an XZ); only the fragment
+    // normal reads the flow.
+    if (isWater) {
+        uint c = vWaterSurface;
+        int fx = int(c & 127u);
+        int fz = int((c >> 7) & 127u);
+        if (fx >= 64) fx -= 128;
+        if (fz >= 64) fz -= 128;
+        fWaterFlow = vec3(float(fx) / 63.0, float(fz) / 63.0, float((c >> 14) & 1u));
+    } else {
+        fWaterFlow = vec3(0.0);
+    }
 #ifdef CHUNK_DRAW
     fSun = vSun;
     fBlock = vBlock;

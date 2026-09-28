@@ -1,0 +1,45 @@
+{
+  // Flow-water check (SH-14): run with VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/flow-water.json
+  // (working directory OpenGLTest/). Shots land in visual/flow-water/.
+  // Generated water is all sources and bakes no flow, so this scenario makes its own: over the
+  // snowed-over cold pond ponds.json frames, it stacks a four-stone pillar straight down from a
+  // hovering eye (each place lands on the previous stone's top face) and pours a water bucket on
+  // top. The water runs off the pillar's top as a thin flowing skirt, drops down all four sides as
+  // falling columns and spreads out where it lands. Verified by the first shot after the pour:
+  // the pillar wears a light-blue cap and blue falling faces. Poured shallow water is faint from
+  // steep angles (little thickness to absorb over), so the skirt shots are low and close.
+  // still_pond is the control: it is taken BEFORE any edit, at ponds.json's lake_across pose, and
+  // must match a pre-SH-14 run, since still water bakes flow code 0.
+  "steps": [
+    { "op": "wait", "seconds": 5 },
+    { "op": "fly" },
+    { "op": "teleport", "pos": [-320.5, 9.5, 486.5], "yaw": -90, "pitch": -8 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "screenshot", "name": "still_pond", "hideHud": true },
+    { "op": "teleport", "pos": [-320.5, 13.5, 460.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "give", "block": "stone", "count": 4 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "give", "block": "item/water_bucket" },
+    { "op": "place" },
+    { "op": "wait", "seconds": 8 },
+    { "op": "teleport", "pos": [-320.5, 12.5, 467.5], "yaw": -90, "pitch": -25 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "pour_overview", "hideHud": true },
+    { "op": "teleport", "pos": [-316.5, 10.5, 465.5], "yaw": -130, "pitch": -30 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "skirt", "hideHud": true },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "skirt_later", "hideHud": true },
+    { "op": "teleport", "pos": [-320.5, 8.5, 463.5], "yaw": -90, "pitch": -5 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "falling_face", "hideHud": true }
+  ]
+}

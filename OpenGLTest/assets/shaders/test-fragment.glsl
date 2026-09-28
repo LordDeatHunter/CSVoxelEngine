@@ -28,6 +28,7 @@ flat in vec3 fBitangent;
 in vec3 fWorldPos;
 in float fSubmerged;
 flat in float fWaterSurfaceY; // baked water surface over a submerged face (Vertex.WaterSurface)
+in vec3 fWaterFlow; // flow xy * strength, z = falling (fluid quads only; see test-vertex.glsl)
 flat in float fAlpha; // per-draw fade from the vertex stage: a uniform cannot vary inside one multi-draw
 
 // One slice per block tile; UVs are tile-local and REPEAT across merged quads.
@@ -112,6 +113,11 @@ uniform vec3 uWaterScatter;
 uniform float uWaterCausticStrength;
 uniform float uWaterFancyNear;
 uniform float uWaterFancyFar;
+uniform float uWaterFlowStretch;  // fraction of the along-flow slope damped at full strength
+uniform float uWaterFlowScroll;   // blocks/s the ripples travel at full strength
+uniform float uWaterFlowPeriod;   // seconds per flow-map phase; 0 turns the flow map off
+uniform float uWaterFallScroll;   // blocks/s the streaks run down a falling face
+uniform float uWaterFallStreak;   // tangent tilt of the falling streaks; 0 turns them off
 // Average opaque colour of the leaves tile, for LOD foliage below: far crowns are
 // drawn opaque (no cutout holes) and transparent texels fall back to this.
 uniform vec3 uLodLeafColor;
@@ -196,14 +202,40 @@ float SampleShadow(vec3 wp, vec3 N, float ndl, float strength) {
     return mix(1.0, lit, strength);
 }
 
-// Analytic slope of WaveHeight (same terms, differentiated), scaled up: the geometry moves a few
-// centimetres but the shading wants a visibly rippled surface.
-vec3 WaveNormal(vec2 p, float t, float k) {
+// Analytic slope of WaveHeight (same terms, differentiated). WaveSlope is the copy of
+// test-vertex.glsl's WaveHeight terms and must change with them.
+vec2 WaveSlope(vec2 p, float t) {
     vec2 g = vec2(0.0);
     g += 0.035 * 0.9 * cos(dot(p, vec2(0.9, 0.4)) * 0.9 + t * 1.6) * vec2(0.9, 0.4);
     g += 0.025 * 1.4 * cos(dot(p, vec2(-0.5, 0.85)) * 1.4 + t * 2.1) * vec2(-0.5, 0.85);
     g += 0.015 * 2.6 * cos(dot(p, vec2(0.3, -0.95)) * 2.6 + t * 2.9) * vec2(0.3, -0.95);
     g += 0.010 * 4.1 * cos(dot(p, vec2(-0.8, -0.6)) * 4.1 + t * 3.7) * vec2(-0.8, -0.6);
+    return g;
+}
+
+// The slope scaled up into a normal: the geometry moves a few centimetres but the shading wants
+// a visibly rippled surface.
+vec3 WaveNormal(vec2 p, float t, float k) {
+    vec2 g = WaveSlope(p, t);
+    return normalize(vec3(-g.x * k, 1.0, -g.y * k));
+}
+
+// WaveNormal carried along a flow: a two-phase flow map. Each phase samples the wave slope at an
+// offset that slides downstream over one period and snaps back; the two phases sit half a period
+// apart with triangle weights that sum to 1, so each snap lands while its phase weighs 0. The
+// offsets are bounded by span (never an unbounded world or time phase), so neighbouring cells
+// with different flows meet without a seam, and still water (flow 0) is exactly WaveNormal.
+// Damping the along-flow slope stretches the crests along the flow without shifting their phase.
+vec3 FlowWaveNormal(vec2 p, float t, float k, vec2 flow) {
+    float fs = length(flow);
+    if (fs < 1e-3 || uWaterFlowPeriod <= 0.0) return WaveNormal(p, t, k);
+    float ph0 = fract(t / uWaterFlowPeriod);
+    float ph1 = fract(ph0 + 0.5);
+    vec2 span = flow * uWaterFlowScroll * uWaterFlowPeriod;
+    vec2 g = WaveSlope(p - span * ph0, t) * (1.0 - abs(2.0 * ph0 - 1.0))
+           + WaveSlope(p - span * ph1, t) * (1.0 - abs(2.0 * ph1 - 1.0));
+    vec2 dir = flow / fs;
+    g -= dir * dot(dir, g) * (uWaterFlowStretch * fs);
     return normalize(vec3(-g.x * k, 1.0, -g.y * k));
 }
 
@@ -472,12 +504,26 @@ void main() {
         // Which side of this face the eye is on, per fragment rather than against the sea plane:
         // a pond stands above sea level, and one frame can hold several bodies at different heights.
         bool fromBehind = dot(geomN, V) < 0.0;
-        vec3 nWup = WaveNormal(fWorldPos.xz, uTime, uWaterNormalScale);
+        vec3 nWup = FlowWaveNormal(fWorldPos.xz, uTime, uWaterNormalScale, fWaterFlow.xy);
         nWup = normalize(nWup + vec3(wob1 * 0.09, 0.0, wob2 * 0.09));   // fine glitter on top of the swell
         vec2 tilt = nWup.xz / max(nWup.y, 0.2);
-        vec3 nW = geomN.y > 0.5
-            ? nWup
-            : normalize(geomN + vec3(tilt.x, 0.0, tilt.y) * 0.35 + vec3(wob1 * 0.03, 0.0, wob2 * 0.03));
+        vec3 nW;
+        if (geomN.y > 0.5) {
+            nW = nWup;
+        } else {
+            vec3 sideN = geomN + vec3(tilt.x, 0.0, tilt.y) * 0.35 + vec3(wob1 * 0.03, 0.0, wob2 * 0.03);
+            // Falling water: vertical streaks running down the face, faster than any ripple.
+            // Keyed off the per-quad falling bit, so a still or merely flowing side takes nothing.
+            if (fWaterFlow.z > 0.5) {
+                vec3 tangent = vec3(-geomN.z, 0.0, geomN.x);
+                float u = dot(fWorldPos.xz, tangent.xz);
+                float v = fWorldPos.y + uTime * uWaterFallScroll;
+                float streak = sin(u * 7.3 + sin(v * 0.9) * 1.5) * 0.6 + sin(u * 13.1 - v * 0.4) * 0.4;
+                sideN += tangent * (streak * uWaterFallStreak)
+                       + vec3(0.0, sin(v * 2.3) * uWaterFallStreak * 0.3, 0.0);
+            }
+            nW = normalize(sideN);
+        }
         // Seen from behind the wave normal has to face the eye as well, or V.N pins at 0 and the
         // fresnel saturates into a full mirror - which from under the sea was a flat sheet of fog.
         if (fromBehind) nW = -nW;

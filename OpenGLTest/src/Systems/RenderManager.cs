@@ -689,6 +689,11 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterCausticStrength", WorldGenerationConfig.WaterCausticStrength);
         program.SetUniform("uWaterFancyNear", WorldGenerationConfig.WaterFancyNearBlocks);
         program.SetUniform("uWaterFancyFar", WorldGenerationConfig.WaterFancyFarBlocks);
+        program.SetUniform("uWaterFlowStretch", WorldGenerationConfig.WaterFlowStretch);
+        program.SetUniform("uWaterFlowScroll", WorldGenerationConfig.WaterFlowScrollSpeed);
+        program.SetUniform("uWaterFlowPeriod", WorldGenerationConfig.WaterFlowPeriod);
+        program.SetUniform("uWaterFallScroll", WorldGenerationConfig.WaterFallScrollSpeed);
+        program.SetUniform("uWaterFallStreak", WorldGenerationConfig.WaterFallStreakStrength);
         program.SetUniform("uLavaLayer", (float)ContentRegistry.RequireBlock("lava").Top);
         program.SetUniform("uLodLeafColor", _lodLeafColor);
     }

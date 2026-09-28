@@ -1924,6 +1924,12 @@ public class Chunk : IDisposable
         // A fluid's model only supplies its tile (see the block schema), so every face uses it
         var tile = type.Top;
 
+        // Per-corner flow codes (Vertex.EncodeWaterFlow), indexed like `corners`. Computed on the
+        // first face that survives the culls, so a fully enclosed sea cell pays nothing.
+        Span<ushort> flowCodes = stackalloc ushort[4];
+        var flowComputed = false;
+        var anyFlow = false;
+
         for (var face = 0; face < 6; face++)
         {
             var neighbour = padded[pIdx + FaceNeighborDelta[face]];
@@ -1938,6 +1944,12 @@ public class Chunk : IDisposable
             // Meshes are indexed with ushort (mirrors LodRegion.AddQuad): stop emitting
             // instead of wrapping the offset if a chunk somehow runs past the limit
             if (vertices.Count > ushort.MaxValue - 3) return;
+
+            if (!flowComputed)
+            {
+                flowComputed = true;
+                anyFlow = ComputeFluidFlowCodes(padded, paddedState, pIdx, flowCodes);
+            }
 
             var faceCorners = CubeFaces[face].face;
             var a = LowerCorner(faceCorners[0], corners);
@@ -1955,6 +1967,62 @@ public class Chunk : IDisposable
             EmitQuad(vertices, indices, ref indexOffset, basePos, a, b, c, d, normal,
                 CropUv(face, a), CropUv(face, b), CropUv(face, c), CropUv(face, d), tile,
                 ShadeLut[(face << 2) | 3], light, 254);
+
+            // EmitQuad appended a, b, c, d in that order; each vertex takes its (X, Z) corner's
+            // flow code (LowerCorner keeps X/Z at 0 or 1, so side and bottom vertices do too)
+            if (anyFlow)
+            {
+                var span = CollectionsMarshal.AsSpan(vertices);
+                span[^4].WaterSurface = flowCodes[(int)a.X * 2 + (int)a.Z];
+                span[^3].WaterSurface = flowCodes[(int)b.X * 2 + (int)b.Z];
+                span[^2].WaterSurface = flowCodes[(int)c.X * 2 + (int)c.Z];
+                span[^1].WaterSurface = flowCodes[(int)d.X * 2 + (int)d.Z];
+            }
+        }
+    }
+
+    /// <summary>
+    /// Fills the four per-corner flow codes of the fluid cell at <paramref name="pIdx"/>
+    /// (<see cref="FluidFlow.Corner{T}"/> scaled by <see cref="WorldGenerationConfig.WaterFlowFullStrength"/>,
+    /// plus the cell's falling flag) and reports whether any is nonzero. Falling is the cell's own
+    /// state alone, never "fluid above": a stack of still sources is not a waterfall.
+    /// </summary>
+    private static bool ComputeFluidFlowCodes(byte[] padded, byte[] paddedState, int pIdx, Span<ushort> codes)
+    {
+        var cells = new PaddedFluidCells(padded, paddedState, pIdx);
+        var falling = FluidState.IsFalling(paddedState[pIdx]);
+        var any = false;
+        for (var cx = 0; cx < 2; cx++)
+        for (var cz = 0; cz < 2; cz++)
+        {
+            var v = FluidFlow.Corner(cells, 0, 0, 0, cx == 0 ? -1 : 1, cz == 0 ? -1 : 1);
+            var dir = v.NormalizeSafe();
+            var strength = dir == Vector3.Zero
+                ? 0f
+                : MathF.Min(v.Length() / WorldGenerationConfig.WaterFlowFullStrength, 1f);
+            var code = Vertex.EncodeWaterFlow(new Vector2(dir.X, dir.Z) * strength, falling);
+            codes[cx * 2 + cz] = code;
+            any |= code != 0;
+        }
+
+        return any;
+    }
+
+    /// <summary>
+    /// <see cref="IFluidCellReader"/> over the mesher's padded snapshot, in coordinates relative
+    /// to the cell at <paramref name="pIdx"/>. Always succeeds: <see cref="FluidFlow.Corner{T}"/>
+    /// reads only within ±1 horizontally at y and y - 1, which stays inside the 18³ snapshot for
+    /// any own cell at padded 1..16, and an absent edge/corner chunk reads as air there - the same
+    /// "no term" branch a live TryGetCell == false would take.
+    /// </summary>
+    private readonly struct PaddedFluidCells(byte[] padded, byte[] paddedState, int pIdx) : IFluidCellReader
+    {
+        public bool TryGetCell(int x, int y, int z, out byte id, out byte state)
+        {
+            var q = pIdx + x * PaddedSq + y * Padded + z;
+            id = padded[q];
+            state = paddedState[q];
+            return true;
         }
     }
 

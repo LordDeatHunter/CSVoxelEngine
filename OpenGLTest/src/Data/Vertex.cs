@@ -46,7 +46,11 @@ public struct Vertex
     /// surface above it, in quarter blocks offset by <see cref="WaterSurfaceOffset"/>
     /// (<see cref="EncodeWaterSurface"/>); 0 everywhere else. The caustic net fades with depth
     /// below this, so a pond above sea level measures from its own surface. Also keeps the
-    /// struct at 32 bytes.</summary>
+    /// struct at 32 bytes.
+    /// <para>On a fluid quad (alpha byte 254) the same ushort instead carries the flow code
+    /// (<see cref="EncodeWaterFlow"/>), one per vertex, i.e. per top corner of the cell
+    /// (<see cref="FluidFlow.Corner"/>); 0 means still. That is safe because the shader reads the
+    /// surface meaning only on submerged faces that are not water themselves.</para></summary>
     public ushort WaterSurface;
 
     /// <summary>Blocks added to a world Y before <see cref="WaterSurface"/> quantises it, so
@@ -65,6 +69,49 @@ public struct Vertex
 
     /// <summary>Inverse of <see cref="EncodeWaterSurface"/>.</summary>
     public static float DecodeWaterSurface(ushort v) => v / (float)WaterSurfaceStepsPerBlock - WaterSurfaceOffset;
+
+    /// <summary>Quantisation steps per unit of each flow component in
+    /// <see cref="EncodeWaterFlow"/>. The world vertex shader mirrors this constant.</summary>
+    public const int WaterFlowSteps = 63;
+
+    private const int WaterFlowFallingBit = 1 << 14;
+
+    /// <summary>
+    /// Packs a fluid vertex's horizontal flow (length clamped to 1: direction times strength)
+    /// and the falling flag into <see cref="WaterSurface"/>: X in bits 0-6 and Z in bits 7-13 as
+    /// 7-bit two's complement of <c>round(c * 63)</c>, falling in bit 14. Only (zero, not
+    /// falling) packs to 0, so a still, non-falling vertex is bit-identical to every other emitter.
+    /// </summary>
+    public static ushort EncodeWaterFlow(Vector2 flow, bool falling)
+    {
+        var length = flow.Length();
+        if (length > 1f)
+            flow /= length;
+
+        var qx = (int)MathF.Round(flow.X * WaterFlowSteps);
+        var qz = (int)MathF.Round(flow.Y * WaterFlowSteps);
+        if (qx == 0 && qz == 0 && length > 0f)
+        {
+            // A trickle too weak to quantise still has to read as moving, not still
+            if (MathF.Abs(flow.X) >= MathF.Abs(flow.Y))
+                qx = flow.X >= 0f ? 1 : -1;
+            else
+                qz = flow.Y >= 0f ? 1 : -1;
+        }
+
+        qx = Math.Clamp(qx, -WaterFlowSteps, WaterFlowSteps);
+        qz = Math.Clamp(qz, -WaterFlowSteps, WaterFlowSteps);
+        return (ushort)((qx & 0x7F) | ((qz & 0x7F) << 7) | (falling ? WaterFlowFallingBit : 0));
+    }
+
+    /// <summary>Inverse of <see cref="EncodeWaterFlow"/>.</summary>
+    public static (Vector2 Flow, bool Falling) DecodeWaterFlow(ushort code)
+    {
+        static int Signed7(int v) => v >= 64 ? v - 128 : v;
+        var qx = Signed7(code & 0x7F);
+        var qz = Signed7((code >> 7) & 0x7F);
+        return (new Vector2(qx, qz) / WaterFlowSteps, (code & WaterFlowFallingBit) != 0);
+    }
 
     /// <summary>Atlas geometry: a UV in tile units on <paramref name="layer"/>.</summary>
     public Vertex(Vector3 position, byte r, byte g, byte b, byte a, Vector2 uv, ushort layer,

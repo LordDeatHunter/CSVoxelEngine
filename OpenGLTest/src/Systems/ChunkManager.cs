@@ -890,57 +890,24 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         return MathF.Max(walked, level + FluidState.SourceHeight);
     }
 
-    // The four horizontal neighbours a flow can be pulled toward, as (dx, dz)
-    private static readonly (int X, int Z)[] FlowNeighbours = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+    // The live world as a FluidFlow cell reader: unloaded chunks report no cell
+    private readonly struct LiveCells(ChunkManager m) : IFluidCellReader
+    {
+        public bool TryGetCell(int x, int y, int z, out byte id, out byte state) =>
+            m.TryGetCell(x, y, z, out id, out state);
+    }
 
     /// <summary>
     /// Unit-length horizontal direction the fluid in the cell (x, y, z) flows, or
-    /// <see cref="Vector3.Zero"/> when the cell holds no fluid or the fluid is still. Mirrors
-    /// Minecraft's <c>FlowingFluid.getFlow</c>: every horizontal neighbour pulls the flow toward
-    /// itself in proportion to how much lower its own surface sits, a replaceable cell the fluid
-    /// can drop off into counting as a whole source lower still, and a solid neighbour
-    /// contributing nothing. A pool of sources therefore cancels out to zero, while a skirt
-    /// points away from its source and toward the edge it pours over.
+    /// <see cref="Vector3.Zero"/> when the cell holds no fluid or the fluid is still: the
+    /// normalised <see cref="FluidFlow.Raw"/> (Minecraft's <c>FlowingFluid.getFlow</c>).
     /// </summary>
-    public Vector3 GetFluidFlowGlobal(int x, int y, int z)
-    {
-        if (!TryGetCell(x, y, z, out var id, out var state) || !BlockType.IsFluid(id))
-            return Vector3.Zero;
+    public Vector3 GetFluidFlowGlobal(int x, int y, int z) =>
+        FluidFlow.Raw(new LiveCells(this), x, y, z).NormalizeSafe();
 
-        // The cell's own level, deliberately not GetFluidSurfaceGlobal: pinning a cell with
-        // fluid above it to a full block would flatten a falling column's gradient to nothing
-        var ownHeight = FluidState.SurfaceHeight(state);
-        var flow = Vector3.Zero;
-
-        foreach (var (dx, dz) in FlowNeighbours)
-        {
-            if (!TryGetCell(x + dx, y, z + dz, out var neighbourId, out var neighbourState))
-                continue;
-
-            float neighbourHeight;
-            if (neighbourId == id)
-            {
-                neighbourHeight = FluidState.SurfaceHeight(neighbourState);
-            }
-            else if (BlockType.IsReplaceable(neighbourId))
-            {
-                // Air or a fragile block: the fluid only gets pulled that way if it would drop
-                // off there, and a drop counts as a full source lower than any level could be
-                if (TryGetCell(x + dx, y - 1, z + dz, out var belowId, out var belowState) && belowId == id)
-                    neighbourHeight = FluidState.SurfaceHeight(belowState) - FluidState.SourceHeight;
-                else
-                    continue;
-            }
-            else
-            {
-                continue; // a solid neighbour dams the flow instead of steering it
-            }
-
-            flow += new Vector3(dx, 0f, dz) * (ownHeight - neighbourHeight);
-        }
-
-        return flow.NormalizeSafe();
-    }
+    /// <summary>The un-normalised <see cref="FluidFlow.Raw"/> flow at (x, y, z).</summary>
+    internal Vector3 GetFluidFlowRawGlobal(int x, int y, int z) =>
+        FluidFlow.Raw(new LiveCells(this), x, y, z);
 
     /// <summary>
     /// Checks if a chunk needs to be created at the given position.

@@ -421,6 +421,22 @@ public const float DayLengthSeconds = 1200f;
     // is exponential, so ~2 blocks of mismatch keeps about a third of a tap's weight and a
     // silhouette several blocks deep rejects its neighbours outright.
     public const float WaterRayUpsampleToleranceBlocks = 2f;
+    // Flow-aware water (SH-14): the mesher bakes each fluid corner's FluidFlow.Corner vector into
+    // the vertex and the world shaders stretch and scroll the wave normal along it.
+    /// <summary>Corner flow magnitude (<see cref="FluidFlow.Corner{T}"/>) that reads as full
+    /// strength; weaker corners scale their baked flow down linearly.</summary>
+    public const float WaterFlowFullStrength = 0.5f;
+    /// <summary>Fraction of the along-flow wave slope damped at full strength, which stretches
+    /// the crests along the flow.</summary>
+    public const float WaterFlowStretch = 0.6f;
+    /// <summary>How fast the flow map scrolls the wave pattern at full strength, in blocks per second.</summary>
+    public const float WaterFlowScrollSpeed = 1.5f;
+    /// <summary>Seconds per flow-map phase; the two crossfaded phases each restart this often.</summary>
+    public const float WaterFlowPeriod = 2f;
+    /// <summary>Vertical scroll speed of the streaks on falling-water side faces, in blocks per second.</summary>
+    public const float WaterFallScrollSpeed = 5f;
+    /// <summary>How strongly the falling streaks tilt the side-face normal.</summary>
+    public const float WaterFallStreakStrength = 0.5f;
 
     // Beaches ring the sea: dry columns up to BeachAboveSeaLevel over the waterline and
     // submerged columns down to BeachBelowSeaLevel under it build their top and soil band
