@@ -427,13 +427,6 @@ float Schlick(float cosT) {
     return 0.06 + 0.94 * pow(1.0 - cosT, 5.0);
 }
 
-// Interleaved gradient noise (Jimenez 2014) at a pixel centre (gl_FragCoord.xy): a 0..1
-// threshold whose kept fraction tracks the coverage it is compared against. GL-free twin:
-// ScreenDoor.Threshold.
-float Ign(vec2 p) {
-    return fract(52.9829189 * fract(p.x * 0.06711056 + p.y * 0.00583715));
-}
-
 void main() {
     // The reflection pass clips everything below the sea surface out of the mirror.
     if (fWorldPos.y < uClipY) discard;
@@ -461,15 +454,6 @@ void main() {
         vec3 leafRgb = texColor.a < 0.5 ? uLodLeafColor : texColor.rgb;
         texColor = vec4(leafRgb, 1.0);
     } else if (texColor.a < uAlphaCutoff) discard;
-#ifdef CHUNK_DRAW
-    // Screen-door stream-in (SH-25): in the alpha-tested opaque chunk pass (chunks and LOD
-    // land) the fade is coverage, not blending. A fragment survives only where the fade beats
-    // the pixel's noise threshold, and every survivor is fully opaque and writes honest depth,
-    // so a fading chunk never shows the chunk behind it through itself. Water (including the
-    // LOD water sheets drawn in the opaque pass), the translucent pass (cutoff 0: glass) and
-    // the plain program keep their real blended fade.
-    if (uAlphaCutoff > 0.0 && !isWater && fAlpha < 1.0 && fAlpha <= Ign(gl_FragCoord.xy)) discard;
-#endif
     vec3 albedo = texColor.rgb * fColor.rgb;
     // Hit flash tints the albedo before lighting, so it goes dark with the scene instead of
     // glowing like the emissive uFlash mix at the end.
@@ -823,18 +807,14 @@ void main() {
     // Water composited the refracted scene itself, so nothing is left for the blender to
     // show through: its only alpha is the chunk's stream-in fade.
     float texAlpha = texColor.a;
-    float streamFade = fAlpha;
 #ifdef CHUNK_DRAW
     // The atlas samples its mips, so a leaf texel that survived the cutoff can still carry a
     // filtered alpha below 1; blended as-is the sky would tint the canopy through it. In the
     // alpha-tested opaque chunk pass a surviving fragment is opaque. Only the chunk program:
     // the plain one also draws the kiln's molten pool, whose tile alpha is meant to blend.
     if (uAlphaCutoff > 0.0) texAlpha = 1.0;
-    // The screen door above already spent the fade as coverage; blending it again would
-    // double-fade the survivors.
-    if (uAlphaCutoff > 0.0 && !isWater) streamFade = 1.0;
 #endif
-    float alpha = texAlpha * streamFade;
+    float alpha = texAlpha * fAlpha;
     if (isWater) alpha = fAlpha;
     // An HDR white well past 1, so a primed TNT strobes to display white after the clamp.
     vec3 outCol = mix(col, vec3(4.0), uFlash);

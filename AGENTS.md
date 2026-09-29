@@ -281,13 +281,7 @@ keeps `uModel`/`uMVP`/`uAlpha` for LOD, drops, TNT, falling blocks, trees and bl
 (`SetDrawUniforms`), and takes its light per draw as `uEntitySun`/`uEntityBlock`, sampled from the
 world at the entity's cell by `EntityLight.Sample` (each chunk keeps its mesh-time light snapshot
 for that) and passed through `SetDrawUniforms`'s required `EntityLightSample` argument. Per-draw fade alpha reaches the fragment stage as the `flat` varying
-`fAlpha`, because a uniform cannot vary between the sub-draws of one multi-draw. In the
-alpha-tested opaque chunk pass (chunks and LOD land, `CHUNK_DRAW` with `uAlphaCutoff` > 0) that
-fade is **screen-door coverage** (SH-25): a non-water fragment is discarded where `fAlpha` does
-not beat the pixel's interleaved-gradient-noise threshold (`Ign`, GL-free twin `ScreenDoor`), and
-every survivor is fully opaque and writes honest depth, so a streaming chunk never shows the one
-behind it through itself. Water (the LOD water sheets included), the translucent pass (cutoff 0:
-glass) and the plain program keep a real blended fade. The wave and
+`fAlpha`, because a uniform cannot vary between the sub-draws of one multi-draw. The wave and
 sway blocks of `test-vertex.glsl` and `shadow-vertex.glsl` must stay byte-identical — a
 `TO_WORLD(p)` macro is what lets them be, and `ChunkDrawShaderTests` guards it.
 
