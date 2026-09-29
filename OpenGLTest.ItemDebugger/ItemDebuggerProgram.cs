@@ -13,7 +13,9 @@ namespace silkgltriangle;
 /// Standalone item-debugger entrypoint: a window showing the player model in its carrying pose
 /// with the selected item in the right hand. Left-drag orbits the camera, right-drag moves the
 /// model, middle-drag pans, the wheel zooms (or scrolls the item grid), and the UI edits the
-/// item's display transform and previews the walk/mine/jump animations.
+/// item's display transform and previews the walk/mine/jump animations. The ENTITIES tab swaps
+/// the player for a registered entity, previewing each of its Blockbench clips (and the hurt
+/// flash) through <see cref="EntityPreviewState"/>.
 /// </summary>
 public static class ItemDebuggerProgram
 {
@@ -22,6 +24,10 @@ public static class ItemDebuggerProgram
     private static InputManager _input = null!;
     private static DebugSceneRenderer _scene = null!;
     private static ItemDebuggerUi _ui = null!;
+    // No initializer: it snapshots EntityRegistry, so it is built in OnLoad once the scene
+    // renderer has loaded the content; a static initializer would see an empty registry.
+    private static EntityPreviewState _entities = null!;
+    private static DebuggerTab _tab;
     private static readonly PlayerModel Player = new();
     private static readonly ItemDisplayEditor Editor = new();
 
@@ -31,6 +37,9 @@ public static class ItemDebuggerProgram
     private static Vector3 _pan;
     private static Vector3 _modelOffset;
     private const float BodyYaw = -90f;
+    // Orbit targets: the player's chest, and roughly the middle of a goblin-sized entity.
+    private static readonly Vector3 PlayerOrbitTarget = new(0f, 0.95f, 0f);
+    private static readonly Vector3 EntityOrbitTarget = new(0f, 0.65f, 0f);
     private static bool _firstPerson;
     private static float _lookYaw = BodyYaw;
     private static float _lookPitch;
@@ -86,6 +95,7 @@ public static class ItemDebuggerProgram
         _gl.DepthFunc(DepthFunction.Lequal);
 
         _scene = new DebugSceneRenderer(_gl);
+        _entities = new EntityPreviewState();
         _ui = new ItemDebuggerUi();
         Player.Rig = _scene.Rig;
         Player.HoldingItem = true;
@@ -94,8 +104,19 @@ public static class ItemDebuggerProgram
         if (_ui.Entries.Count > 0)
             Editor.Select(_ui.Entries[0].Id);
         var select = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_SELECT")?.Trim();
-        if (!string.IsNullOrEmpty(select))
-            TrySelectByName(select);
+        if (!string.IsNullOrEmpty(select) && !TrySelectByName(select))
+        {
+            if (_entities.SelectByName(select))
+                _tab = DebuggerTab.Entities;
+            else
+                Log.Warn($"ITEM_DEBUGGER_SELECT: no item or entity named '{select}'.");
+        }
+
+        // A clip name of the selected entity, or "hurt".
+        var anim = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_ANIM")?.Trim();
+        if (!string.IsNullOrEmpty(anim) && !_entities.SetMode(anim))
+            Log.Warn($"ITEM_DEBUGGER_ANIM: '{anim}' is not a mode of " +
+                     $"{_entities.Selected?.DisplayName ?? "any entity"} ({string.Join(", ", _entities.Modes)}).");
 
         if (string.Equals(Environment.GetEnvironmentVariable("ITEM_DEBUGGER_VIEW")?.Trim(), "first",
                 StringComparison.OrdinalIgnoreCase))
@@ -162,7 +183,7 @@ public static class ItemDebuggerProgram
         {
             if (_leftDrag && mouse.IsButtonPressed(MouseButton.Left))
             {
-                if (_firstPerson) Look(motion);
+                if (_firstPerson && _tab == DebuggerTab.Items) Look(motion);
                 else Orbit(motion);
             }
 
@@ -182,7 +203,10 @@ public static class ItemDebuggerProgram
             }
         }
 
-        UpdateAnimation((float)dt);
+        if (_tab == DebuggerTab.Entities)
+            _entities.Update((float)dt);
+        else
+            UpdateAnimation((float)dt);
     }
 
     private static void OnRender(double deltaTime)
@@ -192,6 +216,28 @@ public static class ItemDebuggerProgram
 
         var projection = Matrix4x4.CreatePerspectiveFieldOfView(
             70f * MathF.PI / 180f, size.X / (float)size.Y, 0.05f, 200f);
+        if (_tab == DebuggerTab.Entities)
+        {
+            // First person has no meaning without the player, so the entity tab always orbits.
+            var entityView = BuildView(EntityOrbitTarget, out var cameraEye);
+            _scene.RenderEntity(entityView * projection, cameraEye, _entities, (float)_time, size);
+        }
+        else
+        {
+            RenderItemScene(projection, size);
+        }
+
+        _scene.Ui.Begin(size);
+        _ui.Draw(_scene.Ui, Editor, _entities, _tab, _mode, new Vector2(size.X, size.Y), _status,
+            _firstPerson && _tab == DebuggerTab.Items);
+        _scene.Ui.End();
+        _gl.BindVertexArray(0);
+
+        CaptureScreenshot(size);
+    }
+
+    private static void RenderItemScene(Matrix4x4 projection, Vector2D<int> size)
+    {
         var eye = BodyEye();
 
         Matrix4x4 view;
@@ -208,17 +254,10 @@ public static class ItemDebuggerProgram
         else
         {
             bodyYaw = BodyYaw;
-            view = BuildView();
+            view = BuildView(PlayerOrbitTarget, out _);
         }
 
         _scene.Render(view * projection, eye, bodyYaw, 0f, Player, Editor, (float)_time, size, _firstPerson);
-
-        _scene.Ui.Begin(size);
-        _ui.Draw(_scene.Ui, Editor, _mode, new Vector2(size.X, size.Y), _status, _firstPerson);
-        _scene.Ui.End();
-        _gl.BindVertexArray(0);
-
-        CaptureScreenshot(size);
     }
 
     private static void CaptureScreenshot(Vector2D<int> size)
@@ -237,10 +276,10 @@ public static class ItemDebuggerProgram
 
     private static Vector3 BodyEye() => _modelOffset + new Vector3(0f, Camera.EyeHeight, 0f);
 
-    private static Matrix4x4 BuildView()
+    private static Matrix4x4 BuildView(Vector3 orbitTarget, out Vector3 eye)
     {
-        var target = new Vector3(0f, 0.95f, 0f) + _pan;
-        var eye = target + OrbitDirection() * _distance;
+        var target = orbitTarget + _pan;
+        eye = target + OrbitDirection() * _distance;
         return Matrix4x4.CreateLookAt(eye, target, Vector3.UnitY);
     }
 
@@ -324,7 +363,7 @@ public static class ItemDebuggerProgram
         {
             if (_ui.ButtonAt(position) is { } debugButton)
             {
-                HandleButton(debugButton);
+                HandleButton(debugButton.Button, debugButton.Arg);
                 return;
             }
             if (_ui.SliderAt(position) is { } slider)
@@ -335,8 +374,16 @@ public static class ItemDebuggerProgram
             }
             if (_ui.SlotAt(position) is { } slot)
             {
-                Editor.Select(_ui.Entries[slot].Id);
-                _status = "";
+                // The slot index belongs to whichever grid the active tab shows.
+                if (_tab == DebuggerTab.Entities)
+                {
+                    _entities.Select(slot);
+                }
+                else
+                {
+                    Editor.Select(_ui.Entries[slot].Id);
+                    _status = "";
+                }
                 return;
             }
             _leftDrag = true;
@@ -391,10 +438,20 @@ public static class ItemDebuggerProgram
             _distance = Math.Clamp(_distance - wheel.Y * 0.4f, 1.2f, 20f);
     }
 
-    private static void HandleButton(DebugButton button)
+    private static void HandleButton(DebugButton button, int arg)
     {
         switch (button)
         {
+            case DebugButton.TabItems:
+                _tab = DebuggerTab.Items;
+                break;
+            case DebugButton.TabEntities:
+                _tab = DebuggerTab.Entities;
+                break;
+            case DebugButton.EntityMode:
+                if (arg >= 0 && arg < _entities.Modes.Count)
+                    _entities.SetMode(_entities.Modes[arg]);
+                break;
             case DebugButton.Idle:
                 _mode = PreviewMode.Idle;
                 break;

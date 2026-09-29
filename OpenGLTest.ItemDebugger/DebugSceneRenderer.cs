@@ -37,6 +37,14 @@ public sealed class DebugSceneRenderer : IDisposable
     private readonly int _locAlphaCutoff;
     private readonly int[] _locPointPos;
     private readonly int[] _locPointColor;
+    // Resolved in the ctor body after ContentRegistry.Load: a field initializer would run first,
+    // against an empty registry.
+    private readonly byte _flintId;
+    // Entity rigs, built the first time the ENTITIES tab shows each one.
+    private readonly Dictionary<string, EntityPreview> _entityPreviews = new();
+
+    // One entity's per-part meshes (ordinal-sorted names, index-aligned), rig and skin.
+    private sealed record EntityPreview(string[] PartNames, Mesh[] Parts, PlayerModel.PlayerRig Rig, uint Texture);
 
     public PlayerModel.PlayerRig Rig { get; }
     public UIRenderer Ui { get; }
@@ -48,6 +56,7 @@ public sealed class DebugSceneRenderer : IDisposable
         ContentRegistry.Load("assets");
         _atlasTexture = TextureAtlas.Build(gl, "assets/textures/blocks", srgb: false);
         ContentRegistry.BakeModels();
+        _flintId = ContentRegistry.RequireItem("flint").Id;
 
         _world = new Shader(gl,
             FileUtils.ReadFile("assets/shaders/test-vertex.glsl"),
@@ -129,6 +138,66 @@ public sealed class DebugSceneRenderer : IDisposable
             DrawPart("Head", viewProj, eyePos, bodyYaw, bodyPitch, player, backOffset);
 
         DrawHeldItem(viewProj, eyePos, bodyYaw, bodyPitch, player, editor, time, backOffset);
+    }
+
+    /// <summary>
+    /// Draws the entity <paramref name="state"/> previews, part by part, at the origin: each part
+    /// from the state's <see cref="EntityAnimator.GetPartMatrix"/>, the flint in the hand when the
+    /// rig has one, and the hurt mode's hit-flash tint. Same frame setup as <see cref="Render"/>.
+    /// </summary>
+    public void RenderEntity(Matrix4x4 viewProj, Vector3 eyePos, EntityPreviewState state, float time,
+        Vector2D<int> size)
+    {
+        _gl.Viewport(0, 0, (uint)size.X, (uint)size.Y);
+        _gl.ClearColor(0.53f, 0.64f, 0.76f, 1f);
+        _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+        _gl.Enable(EnableCap.DepthTest);
+        _gl.DepthFunc(DepthFunction.Lequal);
+        _gl.DepthMask(true);
+        _gl.Disable(EnableCap.CullFace);
+        _gl.Enable(EnableCap.Blend);
+        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+
+        _world.Use();
+        ApplyFrameUniforms(viewProj, eyePos, time, size);
+        if (state.Selected is not { } type) return;
+
+        var preview = Preview(type);
+        var animator = state.Animator;
+        _world.SetUniform("uHitFlash", state.HitFlash);
+        BindWorldTextures();
+        BindArray(0, preview.Texture);
+        for (var i = 0; i < preview.Parts.Length; i++)
+            Draw(preview.Parts[i],
+                animator.GetPartMatrix(preview.PartNames[i], preview.Rig, Vector3.Zero, state.FacingYaw), viewProj);
+
+        if (state.ShowsHeldStone && _itemMeshes.TryGet(_flintId, out var stone, out var stoneTex))
+        {
+            BindArray(0, stoneTex);
+            var model = Matrix4x4.CreateScale(Goblin.HeldStoneScale)
+                        * animator.HandAnchor(Goblin.HandPart, preview.Rig, Vector3.Zero, state.FacingYaw);
+            Draw(stone, model, viewProj);
+        }
+        _world.SetUniform("uHitFlash", 0f);
+    }
+
+    private EntityPreview Preview(EntityType type)
+    {
+        if (_entityPreviews.TryGetValue(type.Name, out var cached)) return cached;
+
+        var rig = PlayerModel.PlayerRig.FromBbmodel(type.Model);
+        var byName = PlayerModel.BuildMeshes(_gl, rig);
+        var names = new string[byName.Count];
+        byName.Keys.CopyTo(names, 0);
+        Array.Sort(names, StringComparer.Ordinal);
+        var meshes = new Mesh[names.Length];
+        for (var i = 0; i < names.Length; i++) meshes[i] = byName[names[i]];
+        // Plain (not sRGB) upload: this renderer is not linear-lit, like its atlas.
+        var texture = TextureLoader.Upload(_gl, rig.TexturePixels, rig.TextureWidth, rig.TextureHeight);
+
+        var preview = new EntityPreview(names, meshes, rig, texture);
+        _entityPreviews[type.Name] = preview;
+        return preview;
     }
 
     private void DrawHeldItem(Matrix4x4 viewProj, Vector3 eyePos, float bodyYaw, float bodyPitch,
@@ -275,6 +344,12 @@ public sealed class DebugSceneRenderer : IDisposable
         _itemMeshes.Dispose();
         _blockCubes.Dispose();
         foreach (var mesh in _playerMeshes.Values) mesh.Dispose();
+        foreach (var preview in _entityPreviews.Values)
+        {
+            foreach (var mesh in preview.Parts) mesh.Dispose();
+            _gl.DeleteTexture(preview.Texture);
+        }
+        _entityPreviews.Clear();
         _world.Dispose();
         _gl.DeleteTexture(_paletteTex);
         _gl.DeleteTexture(_dummyColor);
