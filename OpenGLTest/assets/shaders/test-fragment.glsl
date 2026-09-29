@@ -623,10 +623,14 @@ void main() {
         // tile into a pale salmon (their near-neutral albedo plus the orange floor adds a
         // near-equal amount to all three channels). Weigh it by how orange the texel is -
         // rock stays near-neutral, so it keeps its own dark colour and only magma glows.
-        float molten = clamp((albedo.r - max(albedo.g, albedo.b)) * 4.0, 0.0, 1.0);
+        // The glow is evaluated on the display-space (sRGB) albedo and clipped to 1 there, then
+        // decoded, exactly as 28198cc's 8-bit target saw it: doubling the *linear* albedo and
+        // adding a decoded floor pushes red far past green, so the tonemap clamp left the lava
+        // saturated red instead of the old orange-yellow.
+        vec3 albedoS = LinearToSrgb(albedo);
+        float molten = clamp((albedoS.r - max(albedoS.g, albedoS.b)) * 4.0, 0.0, 1.0);
         float pulse = 0.9 + 0.1 * sin(uTime * 2.0 + fWorldPos.x * 1.3 + fWorldPos.z * 1.7);
-        // The floor is the old sRGB orange (0.55, 0.13, 0.01) decoded to linear light
-        col = mix(albedo, albedo * 2.0 + vec3(0.263, 0.0152, 0.00077), molten) * pulse;
+        col = SrgbToLinear(min(mix(albedoS, albedoS * 2.0 + vec3(0.55, 0.13, 0.01), molten) * pulse, vec3(1.0)));
         // A glossy crust catches the nearby fires, kilns and TNT as small highlights riding the
         // swell, plus a faint fresnel sheen of the sky. The torch/block channel is excluded:
         // lava's own emission saturates fBlock on every lava fragment, so it carries no direction.
