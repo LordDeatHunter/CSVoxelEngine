@@ -166,13 +166,6 @@ public const float DayLengthSeconds = 1200f;
     /// the pre-SH-10 shots separately, and a global exposure would have moved them all at once.</summary>
     public const float TonemapExposure = 1.0f;
 
-    /// <summary>Max-channel level below which the post pass's shoulder tonemap is the identity,
-    /// so today's darks and mid-tones survive untouched and only highlights roll off toward 1.
-    /// Checked against the SH-10 baseline screenshots: 0.8 keeps sunlit grass and stone (well
-    /// below it) byte-close to the old look while snow, sand and sky highlights roll off softly
-    /// instead of clipping; see Tonemap.Shoulder for the curve.</summary>
-    public const float TonemapKnee = 0.8f;
-
     /// <summary>FXAA's floor on the edge-direction reduction (post-fragment.glsl's
     /// uFxaaReduceMin): keeps the direction from blowing up on near-flat luma, so faint
     /// gradients are not smeared across <see cref="FxaaSpanMax"/> pixels.</summary>

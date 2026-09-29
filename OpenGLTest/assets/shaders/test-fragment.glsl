@@ -605,7 +605,7 @@ void main() {
         float fade = (1.0 - smoothstep(48.0, 96.0, dist)) * exp(-0.06 * below);
         // Caustics redistribute the sunlight: the cells lose a little and the filaments gain
         // focused sun on top. In the HDR target the filaments may go past 1 and roll off
-        // through the tonemap shoulder, so the net reads on brightly lit sand too.
+        // through the tonemap clamp, so the net reads on brightly lit sand too.
         // Seen from above, the surface adds its own glitter on top, so the net backs off
         float w = fSun * causticShadow * cloudShadow * fade * uWaterCausticStrength
             * smoothstep(0.1, 0.6, uSunIntensity) * mix(0.6, 1.0, uUnderwater);
@@ -832,8 +832,7 @@ void main() {
 #endif
     float alpha = texAlpha * streamFade;
     if (isWater) alpha = fAlpha;
-    // An HDR white: the tonemap shoulder maps 1.0 to only ~0.9, so a primed TNT strobes toward
-    // a value well past the knee to still read as display white.
+    // An HDR white well past 1, so a primed TNT strobes to display white after the clamp.
     vec3 outCol = mix(col, vec3(4.0), uFlash);
     // No dither here: the frame is dithered once, after the tonemap, in post-fragment.glsl.
     FragColor = vec4(outCol, alpha);

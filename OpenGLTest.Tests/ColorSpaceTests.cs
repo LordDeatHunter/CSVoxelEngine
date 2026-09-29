@@ -74,78 +74,48 @@ public sealed class ColorSpaceTests
 }
 
 /// <summary>
-/// <see cref="Tonemap"/> is the C# twin of the post pass's max-channel Reinhard shoulder:
-/// identity below the knee, C1 at it, bounded below 1 above it and hue-preserving.
+/// <see cref="Tonemap"/> is the C# twin of the post pass's tonemap: a per-channel clamp after
+/// exposure, so in-range colour passes through and each over-bright channel clips on its own.
 /// </summary>
 public sealed class TonemapTests
 {
-    private static readonly float[] Knees = { 0.5f, 0.7f, 0.8f, 0.9f };
-
     [Fact]
-    public void ShoulderIsIdentityBelowKnee()
-    {
-        foreach (float k in Knees)
-            for (int i = 0; i <= 100; i++)
-            {
-                float m = k * i / 100f;
-                Assert.Equal(m, Tonemap.Shoulder(m, k));
-            }
-    }
-
-    [Fact]
-    public void ShoulderIsIncreasingAndBoundedBelowOne()
-    {
-        foreach (float k in Knees)
-        {
-            float prev = Tonemap.Shoulder(0f, k);
-            for (int i = 1; i <= 1000; i++)
-            {
-                float m = i * 0.01f; // up to 10x over-bright, where float steps still resolve
-                float v = Tonemap.Shoulder(m, k);
-                Assert.True(v > prev, $"knee {k}: not increasing at {m}");
-                Assert.True(v < 1f, $"knee {k}: reached 1 at {m}");
-                prev = v;
-            }
-            // Far past that the curve flattens below float resolution; it must still never
-            // fall back or reach 1.
-            for (float m = 10f; m <= 1000f; m *= 1.5f)
-            {
-                float v = Tonemap.Shoulder(m, k);
-                Assert.True(v >= prev && v < 1f, $"knee {k}: {v} at {m}");
-                prev = v;
-            }
-        }
-    }
-
-    [Fact]
-    public void ShoulderValueAndSlopeAreContinuousAtKnee()
-    {
-        const float h = 1e-3f;
-        foreach (float k in Knees)
-        {
-            Assert.InRange(Tonemap.Shoulder(k + 1e-6f, k), k - 1e-5f, k + 1e-5f);
-            float below = (Tonemap.Shoulder(k, k) - Tonemap.Shoulder(k - h, k)) / h;
-            float above = (Tonemap.Shoulder(k + h, k) - Tonemap.Shoulder(k, k)) / h;
-            Assert.InRange(below, 1f - 1e-3f, 1f + 1e-3f);
-            // The shoulder's slope is 1 / (1 + x)^2, so over one step h it dips by about 2h / (1 - k).
-            Assert.InRange(above, 1f - 2f * h / (1f - k) - 1e-3f, 1f + 1e-3f);
-        }
-    }
-
-    [Fact]
-    public void ApplyPreservesHueOfOverBrightInput()
-    {
-        var hdr = new Vector3(3f, 1.5f, 0.3f);
-        Vector3 c = Tonemap.Apply(hdr, 1f, 0.8f);
-        Assert.True(c.X < 1f);
-        Assert.InRange(c.Y / c.X, 0.5f - 1e-5f, 0.5f + 1e-5f);
-        Assert.InRange(c.Z / c.X, 0.1f - 1e-5f, 0.1f + 1e-5f);
-    }
-
-    [Fact]
-    public void ApplyLeavesSubKneeInputUnchanged()
+    public void InRangeInputPassesThroughUnchanged()
     {
         var v = new Vector3(0.7f, 0.4f, 0.05f);
-        Assert.Equal(v, Tonemap.Apply(v, 1f, 0.8f));
+        Assert.Equal(v, Tonemap.Apply(v, 1f));
+    }
+
+    [Fact]
+    public void EachOverBrightChannelClipsOnItsOwn()
+    {
+        // An over-bright warm colour clips toward white/yellow like the old 8-bit target,
+        // instead of keeping its ratios: the clipped channels meet at 1, the rest are untouched.
+        var hdr = new Vector3(3f, 1.5f, 0.3f);
+        Vector3 c = Tonemap.Apply(hdr, 1f);
+        Assert.Equal(1f, c.X);
+        Assert.Equal(c.X, c.Y);
+        Assert.Equal(hdr.Z, c.Z);
+    }
+
+    [Fact]
+    public void OutputStaysInDisplayRangeAndIsMonotonic()
+    {
+        float prev = -1f;
+        for (int i = -10; i <= 400; i++)
+        {
+            float m = i * 0.01f;
+            float v = Tonemap.Apply(new Vector3(m), 1f).X;
+            Assert.InRange(v, 0f, 1f);
+            Assert.True(v >= prev, $"not monotonic at {m}");
+            prev = v;
+        }
+    }
+
+    [Fact]
+    public void ExposureScalesBeforeTheClamp()
+    {
+        var v = new Vector3(0.2f, 0.1f, 0.05f);
+        Assert.Equal(Tonemap.Apply(v * 2f, 1f), Tonemap.Apply(v, 2f));
     }
 }

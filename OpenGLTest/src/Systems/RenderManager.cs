@@ -1560,7 +1560,7 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Resolves the HDR scene target into the default framebuffer (exposure, shoulder tonemap,
+    /// Resolves the HDR scene target into the default framebuffer (exposure, clamp tonemap,
     /// sRGB encode and dither in post-fragment.glsl). Runs at the end of World.Render; the UI then
     /// draws on top of the result in gamma space. The scene texture is unbound from unit 0 again
     /// afterwards so next frame's render target never sits on a sampler unit.

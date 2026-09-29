@@ -1,12 +1,12 @@
 #version 460 core
 // The frame's resolve pass: reads the linear RGBA16F scene target RenderManager renders the
-// world into and writes the gamma default framebuffer, in this order: exposure, a hue-preserving
-// Reinhard shoulder on the max channel, the exact sRGB encode, then the frame's one half-LSB
-// dither (the per-shader dithers are gone; everything before this pass is float).
-// The shoulder is the identity below uKnee, so darks and mid-tones pass through unchanged and
-// only highlights roll off toward 1 (C1 at the knee). At the default knee 0.8 it maps
-// 0.05 -> 0.05, 0.2 -> 0.2, 0.5 -> 0.5 and 1.0 -> 0.9, and never reaches 1.
-// C# twin: Tonemap.cs (Tonemap.Apply / Tonemap.Shoulder); keep the two in step.
+// world into and writes the gamma default framebuffer, in this order: exposure, a per-channel
+// clamp to 0..1, the exact sRGB encode, then the frame's one half-LSB dither (the per-shader
+// dithers are gone; everything before this pass is float).
+// The clamp is what the old 8-bit target did to every over-bright channel, so sunlit snow and
+// white sand still clip to white and lava to yellow; a hue-preserving max-channel shoulder was
+// tried and kept those saturated (cream snow, orange sand, red lava), which read worse.
+// C# twin: Tonemap.cs (Tonemap.Apply); keep the two in step.
 // FXAA (SH-9) runs unconditionally between the tonemap and the dither, on display values:
 // every tap goes through ToDisplay first, so the edge search and the blend see the image the
 // way it will be shown.
@@ -14,7 +14,6 @@ in vec2 fUv;
 
 uniform sampler2D uScene;
 uniform float uExposure;
-uniform float uKnee;
 uniform vec2 uResolution;      // scene texture size in pixels; taps clamp to it
 uniform float uFxaaReduceMin;  // WorldGenerationConfig.FxaaReduceMin
 uniform float uFxaaReduceMul;  // WorldGenerationConfig.FxaaReduceMul
@@ -23,16 +22,6 @@ uniform float uFxaaEdgeThreshold;     // WorldGenerationConfig.FxaaEdgeThreshold
 uniform float uFxaaEdgeThresholdMin;  // WorldGenerationConfig.FxaaEdgeThresholdMin
 
 out vec4 FragColor;
-
-// Tonemap.Apply's twin: scale rgb by Shoulder(max)/max, so the hue survives the roll-off.
-vec3 Shoulder(vec3 hdr)
-{
-    float m = max(hdr.r, max(hdr.g, hdr.b));
-    if (m <= uKnee || m <= 1e-6) return hdr;
-    float x = (m - uKnee) / (1.0 - uKnee);
-    float f = uKnee + (1.0 - uKnee) * x / (1.0 + x);
-    return hdr * (f / m);
-}
 
 // Exact piecewise sRGB encode, the twin of ColorSpace.LinearToSrgb.
 vec3 LinearToSrgb(vec3 c)
@@ -48,7 +37,7 @@ vec3 ToDisplay(vec3 hdr)
     // RGBA16F can hold NaN and Inf, which the old 8-bit write clamped away; never let one
     // reach the tonemap (a NaN max channel would poison the whole pixel).
     hdr = any(isnan(hdr)) ? vec3(0.0) : clamp(hdr, 0.0, 64.0);
-    return LinearToSrgb(Shoulder(hdr * uExposure));
+    return LinearToSrgb(clamp(hdr * uExposure, 0.0, 1.0)); // Tonemap.Apply's twin
 }
 
 // Cheap static value hash (vignette-fragment.glsl's Hash) for the output dither.
@@ -68,7 +57,7 @@ vec3 DisplayAt(ivec2 p)
 // Manual bilinear filter at pixelPos (pixel units, texel centres at .5). Each of the four texels
 // is converted to display space before they are mixed, so a filtered tap is an average of
 // tonemapped, encoded values. A hardware bilinear sample of the HDR buffer would instead average
-// a highlight far above 1 with its dark neighbours before the tonemap, and the shoulder would
+// a highlight far above 1 with its dark neighbours before the tonemap, and the clamp would
 // turn that mix into a bright halo around the sun disc, lava and ore highlights.
 vec3 DisplayBilinear(vec2 pixelPos)
 {

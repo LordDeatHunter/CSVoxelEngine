@@ -30,7 +30,6 @@ public sealed class PostProcessRenderer : IDisposable
         _shader.Use();
         _shader.SetUniform("uScene", 0);
         _shader.SetUniform("uExposure", WorldGenerationConfig.TonemapExposure);
-        _shader.SetUniform("uKnee", WorldGenerationConfig.TonemapKnee);
         _shader.SetUniform("uFxaaReduceMin", WorldGenerationConfig.FxaaReduceMin);
         _shader.SetUniform("uFxaaReduceMul", WorldGenerationConfig.FxaaReduceMul);
         _shader.SetUniform("uFxaaSpanMax", WorldGenerationConfig.FxaaSpanMax);

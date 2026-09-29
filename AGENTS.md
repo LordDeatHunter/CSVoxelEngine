@@ -102,8 +102,8 @@ place of the old single `uTorchColor`; a GLSL constant that stands for one is wr
 decoded value with the sRGB original in a comment. At the end of `World.Render` the `postPass`
 section calls `RenderManager.RenderPostProcess`, which binds framebuffer 0 and runs
 `PostProcessRenderer` (`post-fragment.glsl`): exposure (`WorldGenerationConfig.TonemapExposure`),
-a max-channel, hue-preserving Reinhard shoulder that is the identity below
-`TonemapKnee` (`Tonemap.cs` is its tested C# twin), the exact sRGB encode, and the frame's one
+a per-channel clamp to 0..1 (what the old 8-bit target did, so snow and white sand clip to white
+rather than staying cream; `Tonemap.cs` is its tested C# twin), the exact sRGB encode, and the frame's one
 half-LSB dither. FXAA (SH-9) runs unconditionally inside the same pass, on display-space
 (tonemapped, encoded) taps filtered by hand from `texelFetch`, before the dither (knobs
 `WorldGenerationConfig.Fxaa*`; its contrast early-out keeps it near 1 ms at 1080p). The UI draws
