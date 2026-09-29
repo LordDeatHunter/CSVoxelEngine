@@ -13,7 +13,7 @@ namespace silkgltriangle.Tests;
 /// </summary>
 /// <remarks>
 /// Overrides and caps are process-global (reset only by WorldSeed.Apply, which the parallel suite
-/// never calls), so every fact here works in its own far level-1 region row: rz 779..783 and 790,
+/// never calls), so every fact here works in its own far level-1 region row: rz 779..783, 789 and 790,
 /// clear of LodColumnCapTests (rz 777) and every other test's regions.
 /// </remarks>
 [Collection("LOD column caps")]
@@ -271,6 +271,11 @@ public sealed class LodSurfaceTests
         Assert.True(LodSurface.RecordEdit(manager, x, h + 3, z));
         AssertOverride(x, z, h + 3, sand);
 
+        // Recording the same replacement again neither reports a change nor bumps the version.
+        var version = LodSurface.EditVersion;
+        Assert.False(LodSurface.RecordEdit(manager, x, h + 3, z));
+        Assert.Equal(version, LodSurface.EditVersion);
+
         // (3) Removing it rescans down to the real surface, found here by an independent walk.
         Set(manager, x, h + 3, z, 0);
         Assert.True(LodSurface.RecordEdit(manager, x, h + 3, z));
@@ -279,6 +284,12 @@ public sealed class LodSurfaceTests
         while (!(manager.TryGetCell(x, oracleY, z, out oracleId, out _)
                  && BlockType.IsSolid(oracleId) && BlockType.Occludes(oracleId)))
             oracleY--;
+        AssertOverride(x, z, oracleY, oracleId);
+
+        // The same removal recorded twice changes nothing the second time.
+        version = LodSurface.EditVersion;
+        Assert.False(LodSurface.RecordEdit(manager, x, h + 3, z));
+        Assert.Equal(version, LodSurface.EditVersion);
         AssertOverride(x, z, oracleY, oracleId);
 
         // (4) A non-solid block above the top is not a surface.
@@ -293,6 +304,29 @@ public sealed class LodSurfaceTests
         Assert.True(LodSurface.RecordEdit(manager, x, oracleY - 1, z));
         Assert.False(LodRegion.LowerColumnBelow(x, oracleY - 1, z));
         AssertOverride(x, z, oracleY, oracleId);
+    }
+
+    [Fact]
+    public void SetOfAnIdenticalOverrideIsANoOp()
+    {
+        var x = (777 * ChunksPerLevel1Region + CentreChunk) * Chunk.Size + 3;
+        var z = (789 * ChunksPerLevel1Region + CentreChunk) * Chunk.Size + 9;
+        var stone = TerrainGenerator.RockBlock;
+        var sand = TerrainGenerator.SandBlock;
+
+        var v0 = LodSurface.EditVersion;
+        Assert.True(LodSurface.Set(x, z, 70, stone));
+        Assert.NotEqual(v0, LodSurface.EditVersion);
+
+        // The identical override again: no change reported, no version bump.
+        var v1 = LodSurface.EditVersion;
+        Assert.False(LodSurface.Set(x, z, 70, stone));
+        Assert.Equal(v1, LodSurface.EditVersion);
+
+        // A different block or a different top is a change.
+        Assert.True(LodSurface.Set(x, z, 70, sand));
+        Assert.True(LodSurface.Set(x, z, 71, sand));
+        AssertOverride(x, z, 71, sand);
     }
 
     [Fact]

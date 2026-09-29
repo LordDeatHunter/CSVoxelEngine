@@ -45,7 +45,7 @@ public static class LodSurface
         block = (byte)value;
     }
 
-    /// <summary>Bumped by every <see cref="Set"/>, so a save can tell whether anything changed.</summary>
+    /// <summary>Bumped by every <see cref="Set"/> that changes a column, so a save can tell whether anything changed.</summary>
     internal static int EditVersion => Volatile.Read(ref _editVersion);
 
     /// <summary>Whether no column carries an override, the case every unedited region build skips on.</summary>
@@ -83,13 +83,20 @@ public static class LodSurface
 
     /// <summary>
     /// Records that world column (x, z)'s surface is at <paramref name="top"/> wearing
-    /// <paramref name="block"/> (0 = keep the generated tile rule).
+    /// <paramref name="block"/> (0 = keep the generated tile rule). Returns false when the column
+    /// already held exactly this override, so a repeated record never bumps
+    /// <see cref="EditVersion"/> (which drives lod-edits.bin autosaves) or rebuilds a region.
     /// </summary>
-    internal static void Set(int x, int z, int top, byte block)
+    internal static bool Set(int x, int z, int top, byte block)
     {
+        var packed = Pack(top, block);
         var bucket = Overrides.GetOrAdd((x >> Chunk.SizeShift, z >> Chunk.SizeShift), static _ => NewBucket());
-        Volatile.Write(ref bucket[LocalIndex(x, z)], Pack(top, block));
+        var local = LocalIndex(x, z);
+        if (Volatile.Read(ref bucket[local]) == packed) return false;
+
+        Volatile.Write(ref bucket[local], packed);
         Interlocked.Increment(ref _editVersion);
+        return true;
     }
 
     /// <summary>The column's overridden top, or its generated terrain height when it has no override.</summary>
@@ -159,8 +166,9 @@ public static class LodSurface
 
     /// <summary>
     /// Updates the LOD surface of column (x, z) after the cell (x, y, z) was edited. Main thread
-    /// only, called AFTER the edit. Returns whether the column's LOD surface changed, i.e. whether
-    /// the caller must follow with <see cref="LodManager.MarkEditedColumn"/>.
+    /// only, called AFTER the edit. Returns whether the effective LOD surface changed (a record
+    /// that leaves the override exactly as it was reports false), i.e. whether the caller must
+    /// follow with <see cref="LodManager.MarkEditedColumn"/>.
     /// <list type="bullet">
     /// <item><b>Above the top</b>: a surface-solid block raises the override to it; anything else
     /// (a flower, a leaf, a pane of glass) changes nothing.</item>
@@ -188,7 +196,8 @@ public static class LodSurface
     /// and its Settle (a surface-solid landing)</item>
     /// <item>TntManager.Detonate (the highest then the lowest blasted cell per column)</item>
     /// <item>KilnManager.Update (the integrity sweep's revert, all eight cells)</item>
-    /// <item>FluidManager.Write (block writes: lava hardening, dirt turning to mud)</item>
+    /// <item>FluidManager.Write (block writes above the column's generated water level: lava
+    /// hardening, dirt turning to mud)</item>
     /// </list>
     /// Campfire branch piles, stack placements through SetStateAt and bucket fluid edits need no
     /// hook: none of them is ever surface-solid.
@@ -204,40 +213,28 @@ public static class LodSurface
         if (y > top)
         {
             if (!IsSurfaceSolid(id)) return false;
-            Set(x, z, y, id);
-            return true;
+            return Set(x, z, y, id);
         }
 
         if (y == top)
         {
+            // A replacement: the top stays where it is and only its tile changes. Set reports
+            // false when the column already carries exactly this override.
             if (IsSurfaceSolid(id))
-            {
-                // A replacement: the top stays where it is and only its tile changes.
-                if (TryGet(x, z, out var oldTop, out var oldBlock) && oldTop == y && oldBlock == id)
-                    return false;
-                Set(x, z, y, id);
-                return true;
-            }
+                return Set(x, z, y, id);
 
             // The top was removed: find the next surface below it.
             var depth = WorldGenerationConfig.LodSurfaceRescanDepth;
             for (var yy = y - 1; yy >= y - depth; yy--)
             {
                 if (!chunks.TryGetCell(x, yy, z, out var below, out _))
-                {
-                    Set(x, z, yy, 0);
-                    return true;
-                }
+                    return Set(x, z, yy, 0);
 
                 if (IsSurfaceSolid(below))
-                {
-                    Set(x, z, yy, below);
-                    return true;
-                }
+                    return Set(x, z, yy, below);
             }
 
-            Set(x, z, y - depth - 1, 0);
-            return true;
+            return Set(x, z, y - depth - 1, 0);
         }
 
         return !IsSurfaceSolid(id) && LodRegion.LowerColumnBelow(x, y, z);

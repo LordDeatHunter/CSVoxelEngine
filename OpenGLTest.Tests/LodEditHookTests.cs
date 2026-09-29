@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Numerics;
 using Xunit;
@@ -11,8 +12,8 @@ namespace silkgltriangle.Tests;
 /// </summary>
 /// <remarks>
 /// Overrides and caps are process-global (reset only by WorldSeed.Apply, which the parallel suite
-/// never calls), so every fact works in its own far level-1 region row: rz 784, 785 and 791,
-/// clear of LodColumnCapTests (777), LodSurfaceTests (779..783, 790) and LodEditStateTests
+/// never calls), so every fact works in its own far level-1 region row: rz 784, 785, 791 and 792,
+/// clear of LodColumnCapTests (777), LodSurfaceTests (779..783, 789, 790) and LodEditStateTests
 /// (786, 787).
 /// </remarks>
 [Collection("LOD column caps")]
@@ -159,6 +160,46 @@ public sealed class LodEditHookTests
         Assert.False(LodSurface.TryGet(x2, z2, out _, out _));
     }
 
+    [Fact]
+    public void BlockWritesUnderTheGeneratedWaterLevelLeaveTheLodAlone()
+    {
+        const int Rz = 792;
+        var cz = Rz * ChunksPerLevel1Region + CentreChunk;
+        var cx = 0;
+        var waterLevel = 0;
+        var found = false;
+        for (var rx = 777; rx < 777 + 400 && !found; rx++)
+        {
+            cx = rx * ChunksPerLevel1Region + CentreChunk;
+            var column = Chunk.GetColumnData(cx, cz);
+            waterLevel = column.WaterLevel[LocalIndex(8, 8)];
+            // Any generated water will do (sea level is 0, so the chunk under it may sit at
+            // negative y), as long as the crust cell of (A) stands above the generated terrain:
+            // there an ungated record would raise the override, so (A) proves the gate.
+            found = waterLevel != TerrainGenerator.NoWater
+                    && (((waterLevel >> Chunk.SizeShift) - 1) << Chunk.SizeShift) + 1 > column.Heights[LocalIndex(8, 8)];
+        }
+        Assert.True(found, $"no chunk column in row {Rz} whose centre column stands under generated water");
+
+        // (A) The whole chunk sits at or below the generated level: the lava still hardens, but
+        // the crust is on the bed, so the far LOD keeps its generated depth band.
+        var (x, y, z, cobble, under) = HardenLavaAt(cx, cz, (waterLevel >> Chunk.SizeShift) - 1, attachLod: true);
+        Assert.True(y <= waterLevel);
+        Assert.True(y > HeightAt(x, z), "the crust is not above the generated terrain");
+        Assert.Equal(cobble, BlockAt(under, x, y, z));
+        Assert.False(LodSurface.TryGet(x, z, out _, out _), "a crust under the water moved the LOD");
+
+        // (B) The same column above both the terrain and the water line records the crust.
+        var heights = Chunk.GetColumnHeights(cx, cz);
+        var aboveCy = (Math.Max(heights.Max(), waterLevel) >> Chunk.SizeShift) + 3;
+        var (x2, y2, z2, _, above) = HardenLavaAt(cx, cz, aboveCy, attachLod: true);
+        Assert.True(y2 > waterLevel);
+        Assert.Equal(cobble, BlockAt(above, x2, y2, z2));
+        Assert.True(LodSurface.TryGet(x2, z2, out var top, out var block), "a crust above the water was not recorded");
+        Assert.Equal(y2, top);
+        Assert.Equal(cobble, block);
+    }
+
     /// <summary>
     /// A lava source beside a water source on a stone floor in an empty chunk high above chunk
     /// column (cx, cz)'s terrain, ticked until the lava crusts over.
@@ -167,6 +208,19 @@ public sealed class LodEditHookTests
         int cx, int cz, bool attachLod)
     {
         var cy = (Chunk.GetColumnHeights(cx, cz).Max() >> Chunk.SizeShift) + 3;
+        var result = HardenLavaAt(cx, cz, cy, attachLod);
+        Assert.True(result.Y > HeightAt(result.X, result.Z), "the chunk is not above the terrain");
+        return result;
+    }
+
+    /// <summary>
+    /// A lava source beside a water source on a stone floor in an empty chunk at chunk
+    /// (cx, <paramref name="cy"/>, cz), ticked until the lava crusts over. The crust cell is at
+    /// local (8, 1, 8); callers assert how it sits against the generated terrain and water.
+    /// </summary>
+    private static (int X, int Y, int Z, byte Cobble, ChunkManager Chunks) HardenLavaAt(
+        int cx, int cz, int cy, bool attachLod)
+    {
         var pos = new Vector3(cx, cy, cz);
         var chunks = new ChunkManager(null!);
         var chunk = new Chunk(null!, pos, generateBlockData: false) { IsBlockDataReady = true };
@@ -185,7 +239,6 @@ public sealed class LodEditHookTests
         var x = (cx << Chunk.SizeShift) + 8;
         var y = chunk.LowerBoundY + 1;
         var z = (cz << Chunk.SizeShift) + 8;
-        Assert.True(y > HeightAt(x, z), "the chunk is not above the terrain");
 
         var fluids = new FluidManager();
         var drops = new DropManager();

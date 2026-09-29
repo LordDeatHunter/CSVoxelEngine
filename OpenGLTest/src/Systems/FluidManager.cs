@@ -782,10 +782,19 @@ public class FluidManager
         // A block write — lava crusting to cobblestone, dirt turning to mud — leaves a real block
         // behind, which can raise or re-tile the far LOD like a placement. Fluid and air writes
         // never count as its surface, so they are skipped rather than read as a sub-surface
-        // removal.
-        if (_lod != null && id != 0 && !BlockType.IsFluid(id) && LodSurface.RecordEdit(_chunks, x, y, z))
+        // removal. A write at or below the column's generated water level (mud forming on a lake
+        // or sea bed, lava crusting under the sea) never moves the far LOD either, which keeps
+        // drawing the generated depth band there; only a block left above the water line can
+        // raise or re-tile it.
+        if (_lod != null && id != 0 && !BlockType.IsFluid(id) && AboveGeneratedWater(x, y, z)
+            && LodSurface.RecordEdit(_chunks, x, y, z))
             _lod.MarkEditedColumn(x, z);
     }
+
+    /// <summary>Whether world cell (x, y, z) sits above its column's generated water level.</summary>
+    private static bool AboveGeneratedWater(int x, int y, int z) =>
+        y > Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
+            .WaterLevel[VoxelCoords.ColumnIndex(x & Chunk.SizeMask, z & Chunk.SizeMask)];
 
     /// <summary>Whether fluid may replace what is in a cell: loaded, not already fluid, and
     /// either air or a fragile block the flow washes away.</summary>
