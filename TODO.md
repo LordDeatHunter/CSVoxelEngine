@@ -181,7 +181,14 @@ same world, and a player can move between them freely — neither arc gates the 
     that homes on the player, airborne contact damage and knockback, a shove when grounded,
     floats on water, death loot (`slimeball`), despawn and a spawn cap. It spawns on dry forest
     surface in a 20-40 block ring only: not yet light/time-keyed, no cave spawns, hop-chase
-    rather than voxel pathing, and it is the only hostile.
+    rather than voxel pathing.
+  - Progress: the goblin landed as the second hostile, and slimes and goblins now share a `Mob`
+    base class. It is a ranged-then-melee raider: it carries 3-6 flint and lobs them on a solved
+    ballistic arc from a 4-12 block band, then chases the player for a club swing once they are gone.
+    Carried stones drop on death; missed stones shatter. It spawns like the slime (dry forest surface,
+    20-40 block ring, cap and despawn radius, shared `MobSpawner`). Still open for both hostiles:
+    light/time-keyed and cave spawns, and voxel pathing. The goblin walks straight at the player and
+    only auto-jumps one-block steps.
 - [ ] **`F-4` · Combat** — P2, L.
   First cut: a **sword** — left-click swings, and left-clicking mid-swing chains a swing-back
   left-to-right combo — plus **right-click to shield/block**. A **bow** with arrows covers ranged,
@@ -193,6 +200,10 @@ same world, and a player can move between them freely — neither arc gates the 
     obsidian blade (`attack: "slice"`) swings the two-phase, two-target sweep (`SliceCombo`) and
     the arm carries it across the front. Still open: right-click shield/block, bow + arrows, and
     the fireball bridging to `P-14`; attack cooldown and armor also remain.
+  - Progress: mobs now hit back at range. Goblins throw flint stones at the player, then close for
+    a melee swing whose damage lands on the clip's impact frame; creative and flight are immune.
+    The punch, the slice and the player's thrown items all target every `Mob`. Throws test each
+    mob's body box rather than a centre sphere, so a tall goblin is hit through its head and shins.
 - [ ] **`F-5` · Weather & day/night threat** — P1, M.
   Rain/snow, thunder, cold at night so shelter matters; drives the visual pass (`V-1`).
 - [ ] **`F-6` · Fire spread & extinguishing** — P2, M.
@@ -255,6 +266,13 @@ same world, and a player can move between them freely — neither arc gates the 
   `PlayerModel` exists and is currently never seen; also helps showcase shots.
 - [ ] **`V-10` · Mob / entity rendering** — P2, L.
   Models and animation for `F-1`–`F-3`.
+  - Progress: the goblin is the first articulated mob. It is a nested-group Blockbench rig drawn
+    per part, animated from keyframe clips authored in the `.bbmodel` (idle, walk, throw, melee).
+    `BbmodelLoader` parses the clips into `AnimationClip`s, and a generic `EntityAnimator` layers
+    speed-crossfaded locomotion under one-shot actions that fire gameplay events. The item
+    debugger's ENTITIES tab previews every entity with one button per clip plus HURT
+    (`ITEM_DEBUGGER_ANIM`). Still open: the slime is still one baked mesh with a procedural squash, there is no
+    death animation, and the goblin shows no hurt pose beyond the hit-flash tint.
 - [ ] **`V-11` · Ambient critter particles (fireflies, insects)** — P2, S.
 
 ---

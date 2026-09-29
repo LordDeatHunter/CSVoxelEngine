@@ -39,9 +39,27 @@ Both csprojs target **net9.0**. On a machine that only has the .NET 10 SDK insta
 `dotnet` command with `DOTNET_ROLL_FORWARD=LatestMajor` (and use the SDK's own launcher, e.g.
 `~/.dotnet/dotnet.exe`) or the build and the tests refuse to run at all.
 
-Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit (one full cycle is `WorldGenerationConfig.DayLengthSeconds`, 1200 s like Minecraft's 20 minutes, with the sun starting mid-morning, so noon is about 147 and sunset about 447). All three parse once at startup and ignore garbage with a console warning. Setting `VOXEL_SCRIPT` to a scenario JSON path (see `OpenGLTest/visual-examples/basic.json`) runs a scripted visual test instead of playing: `teleport`/`look`/`wait`/`walk`/`mine`/`place`/`fly`/`give`/`screenshot` steps drive the real update functions through a scripted keyboard and save numbered PNGs to `visual/<name>/` (`screenshot` takes an optional `hideHud`), then the window closes. `fly` turns creative flight on (or off with `"on": false`, `Camera.TestSetFlight`) so a scripted camera can hover over a spot instead of falling. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
+Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit (one full cycle is `WorldGenerationConfig.DayLengthSeconds`, 1200 s like Minecraft's 20 minutes, with the sun starting mid-morning, so noon is about 147 and sunset about 447). All three parse once at startup and ignore garbage with a console warning. Setting `VOXEL_SCRIPT` to a scenario JSON path (see `OpenGLTest/visual-examples/basic.json`) runs a scripted visual test instead of playing: `teleport`/`look`/`wait`/`walk`/`mine`/`place`/`fly`/`give`/`spawn`/`screenshot` steps drive the real update functions through a scripted keyboard and save numbered PNGs to `visual/<name>/` (`screenshot` takes an optional `hideHud`), then the window closes. `fly` turns creative flight on (or off with `"on": false`, `Camera.TestSetFlight`) so a scripted camera can hover over a spot instead of falling. `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position; the entity name (`slime` or `goblin`) is checked only when the step runs, so parsing stays registry-free. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
 
-The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, `C` to toggle creative mode (placing costs nothing, breaking drops nothing; double-tap Space toggles flight, but only while creative — flight is noclip and Space/Left Ctrl move up/down while flying), Left Shift to sprint (1.5x on foot, 10x while flying), hold left-click to punch first, then mine: a slime inside the forward punch cone (3 blocks, 30° half-angle, line of sight required; only the nearest is hit) takes the held item's `entityDamage` (1 bare-hand, 3 for the primitive tools, 5 for the copper tools, 6 for the obsidian blade) and a knockback shove instead of being mined through (an item declaring `attack: "slice"` — the obsidian blade — instead swings a two-phase blade sweep: each click hits the nearest two slimes in the forward hemisphere of the same reach, the buffered return swing lands at half power, and the arm and blade are carried across the front), while a clear cone mines the targeted block (hit-based: one hit per the held item's `tool.hitDelayMs`, deals the item's `blockDamage`, 0.5 bare-hand, against the block's float `hardness`, declared in its JSON - 5 for most blocks, 8 for malachite ore, 24 for the full-width log, with each thinner taper step down to the twig shaving 15% of that log's base off its hardness, 2 for leaves, and `0` means it pops on first contact like a pebble; a block with `requiresTool` and a `tools` dict needs a listed tool tag at or above its required tier, and the wrong tool whiffs for 0 damage and no progress; damage resets if you release, switch target or switch tool; instant while creative, which ignores the gate; a click with no block under the crosshair still swings the fist); a stepped crack-sprite overlay drawn on the block's faces via `break-*.glsl` from `assets/textures/environment/break_progress.png` (8 stacked 32x32 frames, the top one blank); each hit pops the block out and back via `RenderManager.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), 1-10 to pick one of the 10 hotbar slots, `E` for the list inventory (blocks/tools/misc tabs with shared caps of 2048/8/2048; click a row to preview, click a hotbar slot to equip, same item again to unequip; the world keeps running and `E`/Escape closes it), `X` to toggle debug logging (FPS/position/water state to console), Escape to quit.
+The **item debugger** (`dotnet run --project OpenGLTest.ItemDebugger -c Release`, same working-directory
+rule) previews held items and entities. Its left panel has two tabs. **ITEMS** is the item grid with the
+display sliders. **ENTITIES** lists every `EntityRegistry` entry and draws the selected one part by part
+through its `EntityAnimator` (`DebugSceneRenderer.RenderEntity`). The mode buttons are data-driven: one
+per clip in the selected model's `.bbmodel`, in file order, plus HURT (the hit-flash tint). For the
+goblin they read IDLE WALK THROW MELEE HURT. A clipless model such as the slime shows its rest pose and
+only HURT. One-shot clips replay after a short rest, and the preview consumes their events itself. The
+GL-free, tested state behind the tab is `OpenGLTest.ItemDebugger/EntityPreviewState.cs`. Environment
+variables for scripted captures:
+- `ITEM_DEBUGGER_SELECT=<item|entity>` tries the item grid first, then an entity by name or display
+  name, and switches to ENTITIES on an entity match.
+- `ITEM_DEBUGGER_ANIM=<clip|hurt>` picks the entity mode. An unknown mode logs a warning listing the
+  valid ones.
+- `ITEM_DEBUGGER_SHOT=<png path>` saves one screenshot and closes. It fires on an early frame, so a
+  one-shot clip is caught near its start.
+- `ITEM_DEBUGGER_VIEW=first` starts the ITEMS view in first person.
+- `ITEM_DEBUGGER_LOOK=yaw,pitch` pins the first-person look angles.
+
+The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, `C` to toggle creative mode (placing costs nothing, breaking drops nothing; double-tap Space toggles flight, but only while creative — flight is noclip and Space/Left Ctrl move up/down while flying), Left Shift to sprint (1.5x on foot, 10x while flying), hold left-click to punch first, then mine: a mob (a slime or a goblin) inside the forward punch cone (3 blocks, 30° half-angle, line of sight required; only the nearest is hit) takes the held item's `entityDamage` (1 bare-hand, 3 for the primitive tools, 5 for the copper tools, 6 for the obsidian blade) and a knockback shove instead of being mined through (an item declaring `attack: "slice"` — the obsidian blade — instead swings a two-phase blade sweep: each click hits the nearest two mobs in the forward hemisphere of the same reach, the buffered return swing lands at half power, and the arm and blade are carried across the front), while a clear cone mines the targeted block (hit-based: one hit per the held item's `tool.hitDelayMs`, deals the item's `blockDamage`, 0.5 bare-hand, against the block's float `hardness`, declared in its JSON - 5 for most blocks, 8 for malachite ore, 24 for the full-width log, with each thinner taper step down to the twig shaving 15% of that log's base off its hardness, 2 for leaves, and `0` means it pops on first contact like a pebble; a block with `requiresTool` and a `tools` dict needs a listed tool tag at or above its required tier, and the wrong tool whiffs for 0 damage and no progress; damage resets if you release, switch target or switch tool; instant while creative, which ignores the gate; a click with no block under the crosshair still swings the fist); a stepped crack-sprite overlay drawn on the block's faces via `break-*.glsl` from `assets/textures/environment/break_progress.png` (8 stacked 32x32 frames, the top one blank); each hit pops the block out and back via `RenderManager.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), 1-10 to pick one of the 10 hotbar slots, `E` for the list inventory (blocks/tools/misc tabs with shared caps of 2048/8/2048; click a row to preview, click a hotbar slot to equip, same item again to unequip; the world keeps running and `E`/Escape closes it), `X` to toggle debug logging (FPS/position/water state to console), Escape to quit.
 
 `X` also raises the **frame profiler overlay** under the FPS counter, and prints the same
 snapshot to the console once a second so a headless run's log carries it. Console writes go
@@ -141,7 +159,7 @@ rain and snow.
 cannot see — where pebbles, branch piles and other per-quad emitters meet the ground, and inner
 corners between greedy quads. `RenderManager.RenderContactAo` (`ContactAoRenderer`,
 `contact-ao-fragment.glsl`, GL-free twin `ContactAo`) runs mid entity pass as its own `aoPass`:
-after everything that writes honest depth (terrain, drops, stations, TNT, falling blocks, slimes)
+after everything that writes honest depth (terrain, drops, stations, TNT, falling blocks, slimes, goblins)
 and before the depth-less or blended draws (healthbars, the first-person head, debris, toppling
 trees, player, held item), the selection outline, water (whose refraction copy then carries the AO),
 clouds and particles. It samples the HDR depth texture through the colour-only
@@ -313,6 +331,15 @@ OpenGLTest/
     Combat.cs                  # GL-free punch rules: the forward cone (3 blocks, 30° half-angle)
                                #   and entity damage, shared by the punch loop and the tests
     SliceCombo.cs              # the blade's two-phase slice combo: press/queue/advance state
+    Mob.cs                     # abstract base of every hostile (Slime, Goblin): position, health,
+                               #   facing, hit flash, body box, TakeDamage/Shove
+    Goblin.cs                  # the goblin: body physics, throw-then-melee AI, clip/event contract
+                               #   (ValidateContent), animation-driven release/impact events
+    GoblinAim.cs               # GL-free low-arc ballistic solver for the thrown stones
+    AnimationClip.cs           # GL-free Blockbench keyframe clip: per-bone rotation/position/scale
+                               #   tracks, linear/catmull-rom/step, loop/once/hold, timeline events
+    EntityAnimator.cs          # GL-free per-entity animator: idle/walk locomotion + one-shot action
+                               #   layer, events, parent-chain part matrices, HandAnchor
     Placement.cs               # GL-free placement rules: which cell a right-click fills (a stack
                                #   flagged replaceableByPlacement, layered snow, is taken over in
                                #   place) and what a placement may write over
@@ -337,6 +364,11 @@ OpenGLTest/
       BlockModel.cs, ModelLoader.cs         # Minecraft model format: parent chains, #texture refs
       ModelBaker.cs, BakedModel.cs, BakedQuad.cs   # elements -> atlas-ready quads + full-cube flags
       LootTable.cs, LootContext.cs          # compiled loot tables and the world cell they roll at
+      BbmodelLoader.cs                      # Blockbench .bbmodel: groups (nested, with Parent),
+                                            #   cubes, per-face UVs, the skin texture and the
+                                            #   keyframe `animations`; rest rotations rejected
+                                            #   (the player's posing is procedural, entities
+                                            #   animate from their clips)
       BlockRenderer.cs, BlockBreakAction.cs, AttackPattern.cs, ItemUseAction.cs  # geometry/break/attack/use enums
       WoodShape.cs, SnowShape.cs            # state/neighbour-aware hitbox shapes (tapered wood, layered snow)
       MultiblockShape.cs                    # the 2x2x2 volume's geometry: rotating a point, a
@@ -407,6 +439,10 @@ OpenGLTest/
       KilnManager.cs           # kiln block entities keyed by anchor: fuel, ignition, the crucible
                                #   slot and its melt loop, plus the multiblock integrity sweep
       CastingManager.cs        # one cast per mold cell: pour from a held crucible, cool, collect
+      SlimeManager.cs          # slimes: hop AI tick, contact damage, loot, ring spawning
+      GoblinManager.cs         # goblins: AI tick, their thrown stones, melee damage at the impact
+                               #   event, loot + carried flint on death, ring spawning
+      MobSpawner.cs            # the shared dry-forest-surface ring spawn search
     WorldGen/
       TerrainGenerator.cs      # the 2D half: owns every 2D noise channel and the biome split; Compute -> ColumnData
       Biome.cs                 # the Forest / Desert / Ocean / Taiga / Frozen enum
@@ -426,11 +462,16 @@ OpenGLTest/
   assets/data/blocks/<name>.json      # one file per block; the file name is its string id
   assets/data/items/<name>.json       # vine, branch, flint, bucket, water_bucket, lava_bucket
   assets/data/loot/<name>.json        # stone, wood, leaves, pebble
+  assets/data/entities/<name>.json    # slime, goblin: display name, hp, loot table, optional model
   assets/data/molten/<name>.json      # molten materials (copper): tile + tint the liquid is drawn with
   assets/data/recipes/melt/<in>.json  # what a block or item melts into, and how many ml
   assets/data/recipes/cast/<out>.json # (fired mold + material) -> result, amount and cooling time
   assets/models/block/<name>.json     # Minecraft Java block models, incl. the built-in parents
                                       #   cube, cube_all, cube_column, cube_bottom_top
+  assets/models/entity/<name>.bbmodel # Blockbench entity projects (slime, goblin with its four
+                                      #   clips) + <name>.png skins
+OpenGLTest.ItemDebugger/              # the item/entity preview tool (ITEMS and ENTITIES tabs)
+tools/generate-goblin-skin.ps1        # deterministic generator of goblin.png; its header pins the UV layout
 ```
 
 ## Content: blocks, items, models and loot are data
@@ -593,7 +634,7 @@ right-click behaviour (`World.TryUseSelected` -> `TryUseItem`):
 | `use.fluid` | the fluid block the action works on; must be a block with `fluid: true` || `use.result` | the item this one becomes on success; must be an item, and the two normally point at each other |
 | `display` | how the item sits in the right hand: `rotation` as `[pitch, yaw, roll]` degrees (composed yaw, then pitch, then roll), `translation` in blocks of hand space, `scale` as a multiplier; omitted means `{"rotation": [-30, 10, 0]}`, i.e. upright over the hand with a slight sideways cant — the pickaxe yaws to 60 so a tip faces forward, the compass uses rotation `[-60, 0, 0]`, scale `0.67` and a lift to face back up at the holder |
 | `blockDamage` | damage one left-click hit removes from a block's `hardness`; default 0.5 (the bare-hand baseline). Independent of `tool`, which only gates *whether* the block may be mined |
-| `entityDamage` | damage one punch deals to an enemy (a slime); default 1 (the bare-hand baseline). A weapon raises it without needing a `tool` block (the obsidian blade is `6`) |
+| `entityDamage` | damage one punch or slice deals to an enemy (any `Mob`: a slime or a goblin); default 1 (the bare-hand baseline). A weapon raises it without needing a `tool` block (the obsidian blade is `6`) |
 | `attack` | left-click attack behaviour, an `AttackPattern`: `punch` (default; forward cone, hits the nearest one) or `slice` (forward hemisphere, hits the nearest two, two-phase swing — the obsidian blade). See `Combat`/`SliceCombo` |
 | `fuel.burnSeconds` | seconds one unit of this item keeps a kiln lit (coal 60; 1..3600). Writing the object is what makes an item kiln fuel — a kiln takes up to `KilnManager.MaxFuel` units of **one** kind at a time |
 | `crucible.capacityMl` | marks the item a **crucible**: a vessel holding this many millilitres of metal, melted and pending together (100..10000). A crucible stores in the **Tools** pool, one instance at a time, because its contents ride on that instance's `ItemStack` as a `CrucibleComponent(MaterialId, MoltenMl, PendingMl, PendingInputId)` — the last field is display-only, the last melt input charged in, so the kiln can draw what is waiting to melt; while the vessel stands in a kiln the same struct lives in `KilnState` instead, and taking it out writes it back onto a fresh instance (`CrucibleInventory.Add`). The stack carries no melt timer, so putting a crucible back into a kiln restarts the partial chunk it was melting |
@@ -841,8 +882,8 @@ distant desert and sea floor agree with the near chunks.
 Vegetation is biome-gated: broadleaf trees (`TreeGenerator`, forest), **spruce** conifers
 (`TreeGenerator.BuildSpruceShape`, taiga) and flowers (`FlowerGenerator`, forest), and the desert
 grows **cacti** (`CactusGenerator`) — a tapered stem that throws a few arms which bend upward into
-prongs, no leaves; the frozen plains grow nothing. Slime spawning already asks
-`TerrainGenerator.IsForest(x, z)`, which is now a real test.
+prongs, no leaves; the frozen plains grow nothing. Mob spawning (`MobSpawner`, shared by slimes and
+goblins) asks `TerrainGenerator.IsForest(x, z)`, which is now a real test.
 
 Spruce is a third **wood family**: a block's JSON may set `wood.family` (default `"tree"`), and
 `ContentRegistry.BuildWoodLevels` validates each family's levels contiguously from 0 (tree 6,
@@ -859,9 +900,27 @@ wear generated `cactus_side`/`cactus_top` tiles and `sandstone`; see
 Entities (mobs) are data-driven like blocks: `assets/data/entities/<name>.json` gives a display
 `name`, an `hp` pool, an optional `loot` table rolled on death, and an optional `model` Blockbench
 project (default `assets/models/entity/<name>.bbmodel`). `ContentRegistry.Load` parses them into
-`EntityType`s published on `EntityRegistry` (`RequireEntity`/`TryGet`). Entity models reuse
-`BbmodelLoader` (which takes an optional required-group list: the player rig passes `RequiredParts`,
-entities pass none) and `EntityModel`, which bakes the whole project into one mesh plus its skin.
+`EntityType`s published on `EntityRegistry` (`RequireEntity`/`TryGet`), and parses each entity's
+`.bbmodel` once, GL-free, into `EntityType.Model` (a `BbmodelData`: parts, skin pixels and animation
+clips). The entity, the renderer and the item debugger all share that one parse. A broken entity model
+therefore fails content load, and with it every test through `TestContent`. Entity models reuse
+`BbmodelLoader`, which takes an optional required-group list: the player rig passes `RequiredParts`,
+entities pass none. The slime draws through `EntityModel`, which bakes the whole project into one mesh
+plus its skin. The goblin draws per part: `PlayerModel.PlayerRig.FromBbmodel(type.Model)` +
+`PlayerModel.BuildMeshes`, one mesh per group, each placed by its `EntityAnimator`.
+
+Every hostile derives from the abstract **`Mob`** (`Mob.cs`). It exposes `Type`, `Position` (the body
+centre), `Health`/`IsDead`, `Facing` (yaw, the model faces -Z at 0), `HitFlash`, and the body box as
+`BodyHalfExtent`/`BodyHalfHeight`. `HeadAboveCentre` is where the healthbar sits. It also has
+`TakeDamage` and `Shove`. `World` rebuilds one `_mobs` list each frame (`RefreshMobs`), after every mob
+manager has run and before `UpdateThrown`, so a mob killed or despawned this frame is never hit or given
+a healthbar. The punch, the slice, the player's thrown items (`ThrownProjectile.Update`, an AABB overlap
+against each mob's body box, so a tall goblin is hit through its head and shins) and the healthbars
+(`EntityHealthbarRenderer`, buffers sized by `WorldGenerationConfig.MobsMaxAlive`, the sum of every
+kind's cap) all read that one list. A new mob kind must be added to `MobsMaxAlive`, or its hearts vanish
+past the cap. The render passes keep one list per kind, because the meshes differ; `ReflectionEntities`
+carries both. Ring spawning on dry, loaded forest surface goes through `Systems/MobSpawner.cs`
+(`TryFindSurfaceSpawn`), and each manager wraps it with its own radii and body-centre offset.
 
 The first entity is the **slime** (`Slime` + `Systems/SlimeManager.cs`), owned by `World`. It hops
 toward the player, damages on contact only while airborne (a slime merely bobbing in water is
@@ -870,14 +929,102 @@ item drop (its water hops keep a land hop's total speed but halve the vertical a
 horizontal, so it skims forward as a low jumping slide), and rolls its `loot` table on death. Natural
 spawns appear on dry forest surface in a 20-40 block ring around the player; `SlimeManager` holds the
 cap, cadence, damage and shove numbers via `WorldGenerationConfig.Slime*`. The player fights back with
-the left-click punch (`World.UpdatePunch` + `Combat`): a slime inside the forward 3-block, 30°-half-angle
+the left-click punch (`World.UpdatePunch` + `Combat`): a mob inside the forward 3-block, 30°-half-angle
 cone with line of sight takes the held item's `entityDamage` and a knockback shove, and while one is in
 the cone mining stands down (attack-first). `Mining.EntityDamage` is the bare-hand baseline (1) an item
 overrides with its `entityDamage` (primitive tools 3, copper tools 5, obsidian blade 6). The obsidian
 blade (`attack: "slice"`) instead swings a two-phase sweep (`World.UpdateSlice` + `SliceCombo`): each
-swing hits the nearest two slimes in a forward hemisphere of the same reach with line of sight, the
+swing hits the nearest two mobs in a forward hemisphere of the same reach with line of sight, the
 buffered return swing is at half power, and the damage lands at the swing's impact frame rather than on
 the click, with the arm and blade carried across the front by `PlayerModel`.
+
+The second entity is the **goblin** (`Goblin` + `Systems/GoblinManager.cs`, owned by `World`), a short
+forest raider that throws the flint it carries and then closes for a club swing. It spawns like the
+slime: dry forest surface, a 20-40 block ring, a cap of `GoblinMaxAlive` and despawn beyond
+`GoblinDespawnRadiusBlocks`. It has no light or time keying. Its **ammo** is a count of the ordinary
+`flint` item, rolled at spawn (`GoblinStoneMin..Max`). The stones still carried drop as flint on death,
+on top of the goblin's own loot table. A stone that misses **shatters**: it leaves no drop, so thrown
+stones never pile up as pickups. The rules:
+- **Stance.** With ammo, the goblin walks in beyond `GoblinThrowMaxRange`, backpedals inside
+  `GoblinThrowMinRange` and holds position inside the band.
+- **When it throws.** Only while grounded, so the auto-jump can never lift the throw origin over a
+  wall, and only when the throw cooldown has run out. A fresh goblin waits an unjittered
+  `GoblinFirstThrowDelaySeconds`, so it visibly notices the player first; later throws use the
+  jittered cooldown.
+- **Line of sight.** A throw needs a clear segment from `ThrowOrigin` to the player's chest
+  (`Camera.SegmentHitsBlock`). A blocked check is retried only every `GoblinLosRetrySeconds`, and
+  while the line stays blocked the goblin keeps walking at the player.
+- **The throw.** It aims at the chest seen when the throw starts, plays the `throw` clip, and spawns
+  the stone only at that clip's `release` event (`Goblin.TryTakeThrowRelease`, one stone per release).
+- **Stones.** A stone is a plain `ThrownProjectile` owned by the manager (`GoblinManager.Stones`).
+  `World.Projectiles` merges the stones with the player's throws, so they render and mirror with no
+  new plumbing. A stone deals `GoblinStoneDamage` when it touches the player's body.
+- **Melee.** Out of ammo, the goblin closes to `GoblinStandoffBlocks` and plays the `melee` clip when
+  in reach and off `GoblinMeleeCooldownSeconds`. The damage and knockback land at that clip's `impact`
+  event, and only if the player is still in reach (`TryTakeMeleeImpact` + `Goblin.InMeleeReach`).
+- **Immunity.** A creative or flying player takes no damage from stones or swings, which is what lets
+  `visual-examples/goblins.json` film them from a hovering camera.
+- **Movement.** Goblins auto-jump a one-block step they walked into, float and paddle in water like
+  the slime, and are shoved away when they overlap the player on the ground.
+The launch velocity comes from **`GoblinAim.TryLaunchVelocity`**, the low arc of the exact ballistic
+solve under `ThrownProjectile.Gravity`. Always pass that constant, never a second gravity. The level
+range of a stone is `v²/g` (`GoblinStoneSpeed` 20 against gravity 28 gives about 14.3 blocks). The
+throw band must stay inside it, with margin for a chest-height target and the semi-implicit Euler drop.
+`GoblinAimTests` locks that relation down, so retuning the speed or the band cannot silently make edge
+throws fall short. An out-of-range target still gets a 45-degree maximum-range toss toward it. Every
+goblin number lives under `WorldGenerationConfig.Goblin*`.
+
+### Entity animation
+
+Entity rigs come from Blockbench. **Groups may nest**: `BbmodelPart.Parent` names the enclosing group
+(null at the top level), and the goblin keeps `Head`, `ArmL` and `ArmR` under `Torso`. Group origins
+stay absolute, as Blockbench stores them. Rest rotations on groups and cubes are still rejected. The
+project's top-level `animations` array is parsed by `BbmodelLoader.ReadAnimations` into GL-free
+`AnimationClip`s (`BbmodelData.Animations`, in file order):
+- **Loop modes:** `loop`, `once` and `hold`.
+- **Tracks:** per-bone `rotation`/`position`/`scale` tracks keyed by group uuid, or by the animator's
+  `name`.
+- **Interpolation:** `linear`, `catmullrom` and `step`, using Blockbench's segment rule: catmull-rom
+  when either end key is catmull-rom, step when the earlier key is step, otherwise linear. Components
+  are interpolated as raw Euler values, as Blockbench does.
+- **Events:** the `effects` animator's `timeline` keyframes become the clip's sorted events. The name
+  is the trimmed `script`; sound and particle keys are ignored.
+- **Values:** a data point may be a number or a numeric string. A Molang expression, an unknown
+  channel, `bezier` or any other interpolation, and an animator naming a group the outliner lacks all
+  throw, naming the file and the animation.
+- **Unanimated files:** a file without `animations` loads exactly as before.
+The **sign and order convention** lives in one place, the comment above `BbmodelLoader.ReadAnimations`,
+taken from Blockbench's `BoneAnimator.displayRotation`/`displayPosition`:
+- A rotation `(x, y, z)` in degrees becomes engine Euler `(-x, -y, z)`, applied X first, then Y, then
+  Z (Blockbench's 'ZYX' order, `AnimationClip.RotationFromDegrees`).
+- A position in pixels becomes `(-x, y, z) / 16` blocks, in the parent bone's space.
+- Scale is unchanged.
+- +X is the model's right (`ArmR`) and -Z its front, so a Blockbench author types a **negative** x to
+  raise a hanging arm forward.
+If a clip ever plays mirrored, fix the loader, never the clips.
+
+**`EntityAnimator`** (one per entity, GL-free, no per-frame allocation) has two layers:
+- **Locomotion** crossfades the `idle` and `walk` clips by horizontal speed through `MathUtils.Damp`.
+  The walk plays back at a rate that scales with speed against the animator's reference speed.
+- **Action** runs a one-shot clip (`Play("throw")`). Replaying the clip that is already running is
+  ignored, and a different one replaces it. The action overrides only the bones its clip keys, with an
+  `ActionBlendSeconds` smoothstep in and out, so it returns exactly to the locomotion pose at its end.
+`ConsumeEvent(name)` returns true exactly once per play, when playback crosses the event time.
+`GetPartMatrix(part, rig, feet, facingYaw)` composes the parent chain in System.Numerics row-vector
+order: scale, rotation, then pivot delta plus animated translation, then the parent, down to the root
+`RotY(facing) * T(feet)`. `HandAnchor(part, ...)` is that matrix dropped to the part's lowest cube; it
+is where the goblin's held flint is drawn (`Goblin.HandPart` = `ArmR`, `Goblin.HeldStoneScale`). The
+player's `PlayerModel` still poses procedurally and ignores `Parent`.
+
+The goblin's **content contract** is enforced at startup by `Goblin.ValidateContent`, which the
+`GoblinManager` constructor calls. The model must provide:
+- the groups `Torso`, `Head`, `ArmL`, `ArmR`, `LegL` and `LegR` (`Goblin.RequiredParts`);
+- the clips `idle`, `walk`, `throw` and `melee`;
+- a `release` event on `throw` and an `impact` event on `melee`.
+A missing piece throws, naming the model file. The clips' keyframes may be retuned freely in
+Blockbench; the clip and event names may not change. Hurt is not a clip: it is the hit-flash tint.
+`goblin.png` is generated by `tools/generate-goblin-skin.ps1`, whose UV layout must match the
+`.bbmodel`'s face UVs.
 
 ## Conventions
 
