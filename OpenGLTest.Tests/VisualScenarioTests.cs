@@ -24,13 +24,14 @@ public sealed class VisualScenarioTests
                 { "op": "screenshot" },
                 { "op": "give", "block": "glass", "count": 16 },
                 { "op": "give", "block": "stone" },
+                { "op": "spawn", "entity": "goblin", "pos": [48.5, 40.5] },
               ],
             }
             """, "tour");
 
         Assert.Equal("tour", scenario.Name);
         Assert.Equal(Path.Combine("visual", "tour"), scenario.OutputDir);
-        Assert.Equal(10, scenario.Steps.Count);
+        Assert.Equal(11, scenario.Steps.Count);
 
         var teleport = scenario.Steps[0];
         Assert.Equal(new System.Numerics.Vector3(8.5f, 30f, 8.5f), teleport.Pos);
@@ -52,6 +53,47 @@ public sealed class VisualScenarioTests
         var giveDefault = scenario.Steps[9];
         Assert.Equal("stone", giveDefault.Block);
         Assert.Equal(1, giveDefault.Count);
+
+        // Two numbers are [x, z]: the director snaps the feet onto the terrain there.
+        var spawn = scenario.Steps[10];
+        Assert.Equal("spawn", spawn.Op);
+        Assert.Equal("goblin", spawn.Entity);
+        Assert.True(spawn.SnapToGround);
+        Assert.Equal(48.5f, spawn.Pos!.Value.X);
+        Assert.Equal(40.5f, spawn.Pos!.Value.Z);
+    }
+
+    [Theory]
+    [InlineData("""{ "steps": [{ "op": "wait", "seconds": 1 }, { "op": "spawn", "pos": [1, 2] }] }""", "'entity'")]
+    [InlineData("""{ "steps": [{ "op": "wait", "seconds": 1 }, { "op": "spawn", "entity": "  ", "pos": [1, 2] }] }""", "'entity'")]
+    [InlineData("""{ "steps": [{ "op": "wait", "seconds": 1 }, { "op": "spawn", "entity": "goblin" }] }""", "'pos'")]
+    [InlineData("""{ "steps": [{ "op": "wait", "seconds": 1 }, { "op": "spawn", "entity": "goblin", "pos": [1] }] }""", "'pos'")]
+    public void SpawnNeedsAnEntityAndAPosition(string json, string fragment)
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() => VisualScenario.Parse(json, "bad"));
+        Assert.Contains(fragment, ex.Message);
+        Assert.Contains("Step 2", ex.Message);
+        Assert.Contains("(spawn)", ex.Message);
+    }
+
+    [Fact]
+    public void SpawnWithThreeCoordinatesIsExact()
+    {
+        var scenario = VisualScenario.Parse(
+            """{ "steps": [{ "op": "spawn", "entity": "slime", "pos": [3.5, 64, -7.25] }] }""", "tour");
+        var spawn = scenario.Steps[0];
+        Assert.Equal("slime", spawn.Entity);
+        Assert.False(spawn.SnapToGround);
+        Assert.Equal(new System.Numerics.Vector3(3.5f, 64f, -7.25f), spawn.Pos);
+    }
+
+    [Fact]
+    public void UnknownOpNamesEveryOp()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => VisualScenario.Parse("""{ "steps": [{ "op": "dance" }] }""", "bad"));
+        foreach (var op in new[] { "teleport", "look", "wait", "walk", "mine", "place", "fly", "give", "spawn", "screenshot" })
+            Assert.Contains(op, ex.Message);
     }
 
     [Fact]

@@ -91,6 +91,23 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 Advance();
                 break;
 
+            case "spawn":
+                // The entity name is validated here rather than at parse time, so parsing stays
+                // registry-free for the tests.
+                var feet = step.Pos!.Value;
+                if (step.SnapToGround)
+                {
+                    if (!world.TryGroundHeight((int)MathF.Floor(feet.X), (int)MathF.Floor(feet.Z), out var ground))
+                        throw new InvalidOperationException(
+                            $"Step {_step + 1} spawns on column ({feet.X}, {feet.Z}), whose ground height is unavailable.");
+                    feet.Y = ground + 1;
+                }
+                if (!world.SpawnEntity(step.Entity!, feet))
+                    throw new InvalidOperationException($"Step {_step + 1} spawns unknown entity '{step.Entity}'.");
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} spawn {step.Entity} at {feet}");
+                Advance();
+                break;
+
             case "screenshot":
                 ScreenshotPath = Path.Combine(scenario.OutputDir, $"{_step + 1:D2}-{step.ShotName}.png");
                 ScreenshotHideHud = step.HideHud;

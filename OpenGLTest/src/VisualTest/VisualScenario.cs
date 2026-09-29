@@ -24,10 +24,17 @@ public sealed class VisualStep
     public string? Block { get; init; }
     public int Count { get; init; } = 1;
     public bool On { get; init; } = true;
+
+    /// <summary>The entity name a <c>spawn</c> step creates (resolved at run time).</summary>
+    public string? Entity { get; init; }
+
+    /// <summary>True when a <c>spawn</c> step gave only <c>[x, z]</c>: the feet go on top of the
+    /// terrain column there, and <see cref="Pos"/>'s Y is ignored.</summary>
+    public bool SnapToGround { get; init; }
 }
 
 /// <summary>
-/// A scripted in-game run: teleport/look/wait/walk/mine/place/screenshot steps loaded from
+/// A scripted in-game run: teleport/look/wait/walk/mine/place/fly/give/spawn/screenshot steps loaded from
 /// JSON (<c>VOXEL_SCRIPT</c>), driving the real world-update functions for agent screenshots.
 /// </summary>
 public sealed class VisualScenario
@@ -111,7 +118,7 @@ public sealed class VisualScenario
             "teleport" => new VisualStep
             {
                 Op = "teleport",
-                Pos = ReadPos(element, index),
+                Pos = ReadPos(element, index, "teleport"),
                 Yaw = ReadOptionalFloat(element, "yaw"),
                 Pitch = ReadOptionalFloat(element, "pitch"),
             },
@@ -141,6 +148,7 @@ public sealed class VisualScenario
                 Block = ReadGiveBlock(element, index),
                 Count = ReadGiveCount(element, index),
             },
+            "spawn" => ReadSpawn(element, index),
             "screenshot" => new VisualStep
             {
                 Op = "screenshot",
@@ -148,23 +156,57 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, fly, give or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, fly, give, spawn or screenshot."),
         };
     }
 
-    private static Vector3 ReadPos(JsonElement element, int index)
+    private static Vector3 ReadPos(JsonElement element, int index, string op)
     {
-        if (!element.TryGetProperty("pos", out var pos))
-            throw new InvalidOperationException($"Step {index} (teleport) needs 'pos': [x, y, z].");
+        var values = ReadPosValues(element, index, op, "[x, y, z]");
+        if (values.Count != 3)
+            throw new InvalidOperationException(
+                $"Step {index} ({op}) needs 'pos' with exactly 3 numbers, got {values.Count}.");
+
+        return new Vector3(values[0], values[1], values[2]);
+    }
+
+    private static List<float> ReadPosValues(JsonElement element, int index, string op, string shape)
+    {
+        if (!element.TryGetProperty("pos", out var pos) || pos.ValueKind != JsonValueKind.Array)
+            throw new InvalidOperationException($"Step {index} ({op}) needs 'pos': {shape}.");
 
         var values = new List<float>();
         foreach (var value in pos.EnumerateArray())
             values.Add((float)value.GetDouble());
-        if (values.Count != 3)
-            throw new InvalidOperationException(
-                $"Step {index} (teleport) needs 'pos' with exactly 3 numbers, got {values.Count}.");
+        return values;
+    }
 
-        return new Vector3(values[0], values[1], values[2]);
+    /// <summary>A <c>spawn</c> step: <c>entity</c> names what to create (validated against the
+    /// registry only when the step runs, so parsing stays content-free), and <c>pos</c> is either
+    /// <c>[x, z]</c> (feet snapped onto the terrain) or <c>[x, y, z]</c> (an exact feet position).</summary>
+    private static VisualStep ReadSpawn(JsonElement element, int index)
+    {
+        if (!element.TryGetProperty("entity", out var entity)
+            || entity.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(entity.GetString()))
+            throw new InvalidOperationException($"Step {index} (spawn) needs 'entity'.");
+
+        var values = ReadPosValues(element, index, "spawn", "[x, z] or [x, y, z]");
+        return values.Count switch
+        {
+            2 => new VisualStep
+            {
+                Op = "spawn", Entity = entity.GetString()!.Trim(),
+                Pos = new Vector3(values[0], 0f, values[1]), SnapToGround = true,
+            },
+            3 => new VisualStep
+            {
+                Op = "spawn", Entity = entity.GetString()!.Trim(),
+                Pos = new Vector3(values[0], values[1], values[2]),
+            },
+            _ => throw new InvalidOperationException(
+                $"Step {index} (spawn) needs 'pos' with 2 or 3 numbers, got {values.Count}."),
+        };
     }
 
     private static float? ReadOptionalFloat(JsonElement element, string field) =>
