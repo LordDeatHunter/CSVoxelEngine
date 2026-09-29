@@ -92,6 +92,17 @@ public class RenderManager : IDisposable
     private Mesh? _slimeMesh;
     private uint _slimeTexture;
 
+    // The goblin rig: one mesh per Blockbench group, posed per frame by each goblin's
+    // EntityAnimator. The names are every rig part, ordinal-sorted, so a group the file adds
+    // beyond Goblin.RequiredParts draws too; _goblinMeshes is index-aligned with them.
+    // Null only when no 'goblin' entity kind is registered, in which case the passes are no-ops.
+    private PlayerModel.PlayerRig? _goblinRig;
+    private string[]? _goblinPartNames;
+    private Mesh[]? _goblinMeshes;
+    private uint _goblinTexture;
+    // The flint item: the stone a goblin holds while it still has ammo.
+    private byte _flintId;
+
     /// <summary>Blockbench project behind the player model; a missing or broken file falls back to built-in Steve.</summary>
     public const string PlayerModelPath = "assets/models/player/player.bbmodel";
 
@@ -207,7 +218,7 @@ public class RenderManager : IDisposable
     private bool _reflMirrorValid;
     private bool _reflReusedLastFrame;
 
-    // Entity positions (fixed order: drops, thrown, primed, falling, slimes, toppling) at the
+    // Entity positions (fixed order: drops, thrown, primed, falling, slimes, goblins, toppling) at the
     // last real mirror render, and this frame's scratch; swapped when a render happens. A
     // moving entity forces a refresh, since a reused mirror would show it frozen.
     private List<Vector3> _reflEntityPositions = new(64);
@@ -218,6 +229,7 @@ public class RenderManager : IDisposable
     private readonly List<PrimedTnt> _mirrorPrimed = new(8);
     private readonly List<FallingBlock> _mirrorFalling = new(8);
     private readonly List<Slime> _mirrorSlimes = new(16);
+    private readonly List<Goblin> _mirrorGoblins = new(8);
     private readonly List<TopplingTree> _mirrorToppling = new(4);
 
     // The scene copies the water pass refracts through: the HDR scene target's colour on
@@ -707,6 +719,21 @@ public class RenderManager : IDisposable
             _slimeTexture = TextureLoader.Upload(gl, slimeModel.TexturePixels,
                 slimeModel.TextureWidth, slimeModel.TextureHeight, srgb: true);
         }
+        if (EntityRegistry.TryGet("goblin") is { } goblinType)
+        {
+            // The parse happened once at content load (EntityType.Model); only GL work is left.
+            _goblinRig = PlayerModel.PlayerRig.FromBbmodel(goblinType.Model);
+            var byName = PlayerModel.BuildMeshes(gl, _goblinRig);
+            _goblinPartNames = new string[byName.Count];
+            byName.Keys.CopyTo(_goblinPartNames, 0);
+            Array.Sort(_goblinPartNames, StringComparer.Ordinal);
+            _goblinMeshes = new Mesh[_goblinPartNames.Length];
+            for (var i = 0; i < _goblinPartNames.Length; i++)
+                _goblinMeshes[i] = byName[_goblinPartNames[i]];
+            _goblinTexture = TextureLoader.Upload(gl, _goblinRig.TexturePixels,
+                _goblinRig.TextureWidth, _goblinRig.TextureHeight, srgb: true);
+        }
+        _flintId = ContentRegistry.RequireItem("flint").Id;
         ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes, atlasIsSrgb: true);
         CreateSelectionGeometry();
         CreatePopGeometry();
@@ -1070,7 +1097,7 @@ public class RenderManager : IDisposable
     /// <summary>
     /// Depth-only passes that fill both shadow cascades. The near pass renders every caster
     /// inside the near light box: opaque chunk meshes, primed TNT, falling blocks, slimes,
-    /// toppling trees and the player. The far pass then renders only the opaque chunk casters
+    /// goblins (<paramref name="goblins"/>, the last parameter), toppling trees and the player. The far pass then renders only the opaque chunk casters
     /// inside the far box - entities are sub-texel at that range - plus every non-buried LOD
     /// region (<paramref name="lodRegions"/>) it holds, drawn with opaque foliage so the LOD
     /// ring is shadowed by its own hills and canopy out to the far box. Both run first each frame,
@@ -1085,7 +1112,7 @@ public class RenderManager : IDisposable
     public void RenderShadows(Camera camera, IReadOnlyList<Chunk> chunks,
         IReadOnlyList<PrimedTnt> primed, IReadOnlyList<FallingBlock> falling, IEnumerable<TopplingTree> trees,
         PlayerModel? player = null, IReadOnlyList<Slime>? slimes = null,
-        IReadOnlyList<LodRegion>? lodRegions = null)
+        IReadOnlyList<LodRegion>? lodRegions = null, IReadOnlyList<Goblin>? goblins = null)
     {
         // The dry strength, not the wet-faded one: submerged, the caustics and the sun shafts
         // still sample this map even though the world diffuse has stopped using it.
@@ -1155,6 +1182,38 @@ public class RenderManager : IDisposable
                 shadowShader.SetUniform("uLightMVP", model * _nearShadow.ViewProj);
                 _slimeMesh.Render();
             }
+        }
+
+        if (goblins != null && goblins.Count > 0 && _goblinMeshes != null && _goblinRig != null
+            && _goblinPartNames != null)
+        {
+            // The goblin skin on unit 0, like the player casters: cutout texels would otherwise
+            // be alpha-tested against the atlas.
+            BindUnit(0, TextureTarget.Texture2DArray, _goblinTexture);
+            foreach (var goblin in goblins)
+            {
+                var feet = GoblinFeet(goblin);
+                for (var i = 0; i < _goblinMeshes.Length; i++)
+                {
+                    var model = goblin.Animation.GetPartMatrix(_goblinPartNames[i], _goblinRig, feet, goblin.Facing);
+                    shadowShader.SetUniform("uModel", model);
+                    shadowShader.SetUniform("uLightMVP", model * _nearShadow.ViewProj);
+                    _goblinMeshes[i].Render();
+                }
+
+                // The flint in the hand casts too, on its own texture.
+                if (goblin.Ammo > 0 && itemMeshes.TryGet(_flintId, out var stone, out var stoneTexture))
+                {
+                    BindUnit(0, TextureTarget.Texture2DArray, stoneTexture);
+                    var held = Matrix4x4.CreateScale(Goblin.HeldStoneScale)
+                               * goblin.Animation.HandAnchor(Goblin.HandPart, _goblinRig, feet, goblin.Facing);
+                    shadowShader.SetUniform("uModel", held);
+                    shadowShader.SetUniform("uLightMVP", held * _nearShadow.ViewProj);
+                    stone.Render();
+                    BindUnit(0, TextureTarget.Texture2DArray, _goblinTexture);
+                }
+            }
+            BindUnit(0, TextureTarget.Texture2DArray, textureAtlas);
         }
 
         foreach (var tree in trees)
@@ -1847,7 +1906,7 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// Fills the per-kind mirror draw lists and the position scratch the motion signal compares,
-    /// in the fixed order drops, thrown, primed, falling, slimes, toppling. An entity counts only
+    /// in the fixed order drops, thrown, primed, falling, slimes, goblins, toppling. An entity counts only
     /// within <see cref="WorldGenerationConfig.ReflectionEntityRadius"/> (horizontally) of the eye
     /// and no lower than a block under the water plane; the player is covered by the camera pose.
     /// </summary>
@@ -1859,6 +1918,7 @@ public class RenderManager : IDisposable
         _mirrorPrimed.Clear();
         _mirrorFalling.Clear();
         _mirrorSlimes.Clear();
+        _mirrorGoblins.Clear();
         _mirrorToppling.Clear();
 
         foreach (var drop in entities.Drops)
@@ -1872,6 +1932,9 @@ public class RenderManager : IDisposable
         if (_slimeMesh != null)
             foreach (var slime in entities.Slimes)
                 if (KeepForMirror(eye, slime.Position)) _mirrorSlimes.Add(slime);
+        if (_goblinMeshes != null)
+            foreach (var goblin in entities.Goblins)
+                if (KeepForMirror(eye, goblin.Position)) _mirrorGoblins.Add(goblin);
         // A felled tree's base stays put while it swings, so its crown stands in for it.
         foreach (var tree in entities.Toppling)
             if (KeepForMirror(eye, Vector3.Transform(new Vector3(0f, 4f, 0f), tree.Model)))
@@ -1900,6 +1963,7 @@ public class RenderManager : IDisposable
         if (_mirrorPrimed.Count > 0) DrawPrimedTnt(_mirrorPrimed, _reflViewProj, mirror: true);
         if (_mirrorFalling.Count > 0) DrawFallingBlocks(_mirrorFalling, _reflViewProj, mirror: true);
         if (_mirrorSlimes.Count > 0) DrawSlimes(_mirrorSlimes, _reflViewProj, mirror: true);
+        if (_mirrorGoblins.Count > 0) DrawGoblins(_mirrorGoblins, _reflViewProj, mirror: true);
         foreach (var tree in _mirrorToppling) DrawTopplingTree(tree, _reflViewProj, mirror: true);
         if (player != null) DrawPlayer(camera, player, _reflViewProj, fullBody: true, mirror: true);
     }
@@ -3213,14 +3277,67 @@ public class RenderManager : IDisposable
             slime.Position.X, slime.Position.Y - Slime.HalfExtent, slime.Position.Z);
 
     /// <summary>
-    /// Draws the five-heart healthbar above every live slime (see
+    /// Draws the live goblins part by part, each part posed by the goblin's own
+    /// <see cref="EntityAnimator"/> down the rig's parent chain, plus the flint held in the right
+    /// hand while it still has stones to throw. Restores the world textures on the way out, like
+    /// <see cref="RenderSlimes"/>.
+    /// </summary>
+    public void RenderGoblins(Camera camera, IReadOnlyList<Goblin> goblins)
+    {
+        if (camera == null || _goblinMeshes == null || goblins.Count == 0) return;
+        DrawGoblins(goblins, camera.GetViewProjection(), mirror: false);
+    }
+
+    private void DrawGoblins(IReadOnlyList<Goblin> goblins, in Matrix4x4 viewProj, bool mirror)
+    {
+        if (_goblinMeshes == null || _goblinRig == null || _goblinPartNames == null || goblins.Count == 0)
+            return;
+
+        worldShader.Use();
+        BindEntityTextures(mirror);
+        BindUnit(0, TextureTarget.Texture2DArray, _goblinTexture);
+
+        foreach (var goblin in goblins)
+        {
+            var feet = GoblinFeet(goblin);
+            var light = LightAt(goblin.Position);
+            worldShader.SetUniform(_locHitFlash, goblin.HitFlash);
+            for (var i = 0; i < _goblinMeshes.Length; i++)
+            {
+                var model = goblin.Animation.GetPartMatrix(_goblinPartNames[i], _goblinRig, feet, goblin.Facing);
+                SetDrawUniforms(model, model * viewProj, 1f, light);
+                _goblinMeshes[i].Render();
+            }
+
+            if (goblin.Ammo > 0 && itemMeshes.TryGet(_flintId, out var stone, out var stoneTexture))
+            {
+                BindUnit(0, TextureTarget.Texture2DArray, stoneTexture);
+                var held = Matrix4x4.CreateScale(Goblin.HeldStoneScale)
+                           * goblin.Animation.HandAnchor(Goblin.HandPart, _goblinRig, feet, goblin.Facing);
+                SetDrawUniforms(held, held * viewProj, 1f, light);
+                stone.Render();
+                BindUnit(0, TextureTarget.Texture2DArray, _goblinTexture);
+            }
+        }
+
+        // uHitFlash is a per-goblin value, so put it back rather than tinting whatever draws next.
+        worldShader.SetUniform(_locHitFlash, 0f);
+        BindEntityTextures(mirror);
+    }
+
+    // Position is the body centre and the model stands on y = 0, so the rig roots at the feet.
+    private static Vector3 GoblinFeet(Goblin goblin) =>
+        goblin.Position - new Vector3(0f, Goblin.Height * 0.5f, 0f);
+
+    /// <summary>
+    /// Draws the five-heart healthbar above every live mob (see
     /// <see cref="EntityHealthbarRenderer"/>), right after the bodies so the row tracks them.
     /// </summary>
-    public void RenderEntityHealthbars(Camera camera, IReadOnlyList<Slime> slimes)
+    public void RenderEntityHealthbars(Camera camera, IReadOnlyList<Mob> mobs)
     {
-        if (camera == null || slimes.Count == 0 || _healthbars == null) return;
+        if (camera == null || mobs.Count == 0 || _healthbars == null) return;
 
-        _healthbars.Render(slimes, camera.GetViewProjection(), camera.RenderEye, camera.ViewDirection,
+        _healthbars.Render(mobs, camera.GetViewProjection(), camera.RenderEye, camera.ViewDirection,
             _fogColor, _fogNear, _fogFar);
         // The healthbar renderer binds its own heart sprites to unit 0.
         InvalidateTextureUnits();
@@ -3803,6 +3920,12 @@ public class RenderManager : IDisposable
         _slimeMesh?.Dispose();
         if (_slimeTexture != 0)
             gl.DeleteTexture(_slimeTexture);
+        if (_goblinMeshes != null)
+            foreach (var mesh in _goblinMeshes)
+                mesh.Dispose();
+        _goblinMeshes = null;
+        if (_goblinTexture != 0)
+            gl.DeleteTexture(_goblinTexture);
         worldShader.Dispose();
         chunkShader.Dispose();
         selectionShader.Dispose();

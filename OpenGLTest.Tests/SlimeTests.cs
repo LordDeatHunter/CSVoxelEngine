@@ -12,24 +12,12 @@ public sealed class SlimeTests
 
     private static SlimeManager Manager() => new(EntityRegistry.Require("slime"));
 
-    private static ChunkManager FloorWorld(byte topId)
-    {
-        var chunks = new ChunkManager(null!);
-        var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);
-        chunk.IsBlockDataReady = true;
-        chunks.Chunks[Vector3.Zero] = chunk;
-        for (var x = 0; x < Chunk.Size; x++)
-        for (var z = 0; z < Chunk.Size; z++)
-            chunk.SetBlockRaw(x, 0, z, topId, 0);
-        return chunks;
-    }
-
     private static Vector3 GroundBody(float x, float z) => new(x, 1f + Slime.HalfExtent, z);
 
     [Fact]
     public void GroundedSlimeIsHarmless()
     {
-        var chunks = FloorWorld(ContentRegistry.RequireBlock("stone").Id);
+        var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
         var slime = new Slime(EntityRegistry.Require("slime"), GroundBody(2.5f, 2.5f));
 
         // The player stands on the slime's own column, so it never hops and stays grounded.
@@ -43,7 +31,7 @@ public sealed class SlimeTests
     [Fact]
     public void AirborneSlimeDealsDamageUntilItsCooldown()
     {
-        var chunks = FloorWorld(ContentRegistry.RequireBlock("stone").Id);
+        var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
         var slime = new Slime(EntityRegistry.Require("slime"), GroundBody(2.5f, 2.5f));
         var player = new Vector3(5.5f, 1.62f, 2.5f);
 
@@ -60,7 +48,7 @@ public sealed class SlimeTests
     [Fact]
     public void HopCarriesTheSlimeTowardThePlayer()
     {
-        var chunks = FloorWorld(ContentRegistry.RequireBlock("stone").Id);
+        var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
         var slime = new Slime(EntityRegistry.Require("slime"), GroundBody(2.5f, 2.5f));
         var player = new Vector3(2.5f + 6f, 1.62f, 2.5f);
         var startX = slime.Position.X;
@@ -74,7 +62,7 @@ public sealed class SlimeTests
     [Fact]
     public void GroundedContactShovesTheSlimeAwayFromThePlayer()
     {
-        var chunks = FloorWorld(ContentRegistry.RequireBlock("stone").Id);
+        var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
         var drops = new DropManager();
         var manager = Manager();
         var slime = manager.Spawn(GroundBody(8.5f, 8.5f));
@@ -97,7 +85,7 @@ public sealed class SlimeTests
     [Fact]
     public void KillingASlimeDropsSlimeballs()
     {
-        var chunks = FloorWorld(ContentRegistry.RequireBlock("stone").Id);
+        var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
         var drops = new DropManager();
         var manager = Manager();
         var camera = new Camera(null, null);
@@ -115,7 +103,7 @@ public sealed class SlimeTests
     [Fact]
     public void TakeDamageSnapsTheHitFlashWhichThenFades()
     {
-        var chunks = FloorWorld(ContentRegistry.RequireBlock("stone").Id);
+        var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
         var slime = new Slime(EntityRegistry.Require("slime"), GroundBody(2.5f, 2.5f));
         var player = new Vector3(2.5f, 1.62f, 2.5f);
 
@@ -134,7 +122,7 @@ public sealed class SlimeTests
     [Fact]
     public void SpawnRingPlacesSlimesOnDryLoadedSurface()
     {
-        var chunks = SurfaceWorld();
+        var chunks = MobTestWorld.Surface();
         var player = new Vector3(0.5f, 100f, 0.5f);
 
         var found = false;
@@ -154,7 +142,7 @@ public sealed class SlimeTests
     [Fact]
     public void LivingCapStopsFurtherSpawns()
     {
-        var chunks = SurfaceWorld();
+        var chunks = MobTestWorld.Surface();
         var drops = new DropManager();
         var manager = Manager();
         var camera = new Camera(null, null);
@@ -171,7 +159,7 @@ public sealed class SlimeTests
     [Fact]
     public void SlimesOutsideTheDespawnRadiusAreCulled()
     {
-        var chunks = FloorWorld(ContentRegistry.RequireBlock("stone").Id);
+        var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
         var drops = new DropManager();
         var manager = Manager();
         var camera = new Camera(null, null);
@@ -187,7 +175,7 @@ public sealed class SlimeTests
     [Fact]
     public void KnockbackPushesThePlayerAndThenDecays()
     {
-        var chunks = FloorWorld(ContentRegistry.RequireBlock("stone").Id);
+        var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
         var camera = new Camera(null, null);
         camera.TestTeleport(new Vector3(2.5f, 1f + Camera.EyeHeight, 8.5f), yaw: 0f, pitch: 0f);
         var keys = new ScriptedKeyboard();
@@ -209,7 +197,7 @@ public sealed class SlimeTests
     [Fact]
     public void KnockbackCannotPushThePlayerThroughAWall()
     {
-        var chunks = FloorWorld(ContentRegistry.RequireBlock("stone").Id);
+        var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
         for (var y = 1; y <= 2; y++)
             chunks.Chunks[Vector3.Zero].SetBlockRaw(4, y, 8, ContentRegistry.RequireBlock("stone").Id, 0);
         var camera = new Camera(null, null);
@@ -226,7 +214,7 @@ public sealed class SlimeTests
     [Fact]
     public void AirborneSlimeHitKnocksThePlayerBack()
     {
-        var chunks = FloorWorld(ContentRegistry.RequireBlock("stone").Id);
+        var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
         var drops = new DropManager();
         var manager = Manager();
         var camera = new Camera(null, null);
@@ -253,7 +241,7 @@ public sealed class SlimeTests
     [Fact]
     public void SlimeFloatsUpToTheWaterSurface()
     {
-        var chunks = PoolWorld(waterCells: 5);
+        var chunks = MobTestWorld.Pool(waterCells: 5);
         var slime = new Slime(EntityRegistry.Require("slime"), new Vector3(8.5f, 1f + Slime.HalfExtent, 8.5f));
         var player = new Vector3(8.5f, 6.62f, 8.5f);
 
@@ -277,46 +265,5 @@ public sealed class SlimeTests
         Assert.Equal(land.Length(), water.Length(), 4);
         Assert.Equal(land.Y / 2f, water.Y, 4);
         Assert.True(water.X > land.X * 1.9f, $"water horizontal {water.X} vs land {land.X}");
-    }
-
-    // A flat floor with source water stacked on top; a slime spawned at the floor is submerged.
-    private static ChunkManager PoolWorld(int waterCells)
-    {
-        var chunks = FloorWorld(ContentRegistry.RequireBlock("stone").Id);
-        var chunk = chunks.Chunks[Vector3.Zero];
-        var water = ContentRegistry.RequireBlock("water").Id;
-        for (var x = 0; x < Chunk.Size; x++)
-        for (var z = 0; z < Chunk.Size; z++)
-        for (var y = 1; y <= waterCells; y++)
-            chunk.SetBlockRaw(x, y, z, water, 0);
-        return chunks;
-    }
-
-    // Builds the surface layer of a 7x7 chunk area at each column's real worldgen height, so the
-    // spawn ring finds solid loaded ground and two clear cells above every dry column.
-    private static ChunkManager SurfaceWorld()
-    {
-        var chunks = new ChunkManager(null!);
-        var stone = ContentRegistry.RequireBlock("stone").Id;
-        for (var cx = -3; cx <= 3; cx++)
-        for (var cz = -3; cz <= 3; cz++)
-        {
-            var heights = Chunk.GetColumnHeights(cx, cz);
-            for (var lx = 0; lx < Chunk.Size; lx++)
-            for (var lz = 0; lz < Chunk.Size; lz++)
-            {
-                var height = heights[(lx << Chunk.SizeShift) | lz];
-                var cy = height >> Chunk.SizeShift;
-                var pos = new Vector3(cx, cy, cz);
-                if (!chunks.Chunks.TryGetValue(pos, out var chunk))
-                {
-                    chunk = new Chunk(null!, pos, generateBlockData: false);
-                    chunk.IsBlockDataReady = true;
-                    chunks.Chunks[pos] = chunk;
-                }
-                chunk.SetBlockRaw(lx, height & Chunk.SizeMask, lz, stone, 0);
-            }
-        }
-        return chunks;
     }
 }

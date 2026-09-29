@@ -1,0 +1,10 @@
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "item/branch", "weight": 1, "count": { "min": 0, "max": 1 } }
+      ]
+    }
+  ]
+}

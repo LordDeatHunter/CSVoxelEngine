@@ -14,5 +14,6 @@ public readonly record struct ReflectionEntities(
     IReadOnlyList<PrimedTnt> Primed,
     IReadOnlyList<FallingBlock> Falling,
     IReadOnlyList<Slime> Slimes,
+    IReadOnlyList<Goblin> Goblins,
     IReadOnlyList<TopplingTree> Toppling,
     PlayerModel? Player);

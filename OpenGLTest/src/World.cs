@@ -38,6 +38,7 @@ public class World : IItemUseWorld
     private readonly TntManager _tntManager = new();
     private readonly FallingBlockManager _falling = new();
     private readonly SlimeManager? _slimes;
+    private readonly GoblinManager? _goblins;
     private readonly FluidManager _fluidManager = new();
     private readonly LeafParticleSystem _leaves = new();
     private readonly BlockDebrisSystem _debris = new();
@@ -99,6 +100,9 @@ public class World : IItemUseWorld
     // Previous frame's left-click state, so the slice combo can see a fresh press.
     private bool _attackWasPressed;
     private readonly List<ThrownProjectile> _thrown = [];
+    // Every airborne projectile to draw and mirror this frame: the player's throws followed by
+    // the goblins' stones, rebuilt after both updated. Drawing only - hit tests stay per owner.
+    private readonly List<ThrownProjectile> _projectiles = [];
     private bool _throwCharging;
     private float _throwChargeSeconds;
     private byte _throwItemId;
@@ -152,6 +156,16 @@ public class World : IItemUseWorld
     /// <summary>Live slimes, feeding the entity and shadow passes.</summary>
     public IReadOnlyList<Slime> Slimes => _slimes?.Slimes ?? (IReadOnlyList<Slime>)Array.Empty<Slime>();
 
+    /// <summary>Live goblins, feeding the entity, shadow and mirror passes.</summary>
+    public IReadOnlyList<Goblin> Goblins => _goblins?.Goblins ?? (IReadOnlyList<Goblin>)Array.Empty<Goblin>();
+
+    // Every live mob of every kind, rebuilt once a frame after the mob managers ran
+    // (RefreshMobs), so punch, slice, thrown items and healthbars target them all.
+    private readonly List<Mob> _mobs = [];
+
+    /// <summary>Every live mob (slimes, goblins), feeding targeting and the healthbars.</summary>
+    public IReadOnlyList<Mob> Mobs => _mobs;
+
     /// <summary>Live falling leaves, feeding the batched billboard pass.</summary>
     public IReadOnlyList<LeafParticle> LeafParticles => _leaves.Particles;
 
@@ -181,6 +195,10 @@ public class World : IItemUseWorld
     public IReadOnlyList<BubbleParticle> Bubbles => _bubbles.Particles;
 
     public IReadOnlyList<ThrownProjectile> Thrown => _thrown;
+
+    /// <summary>Every projectile in flight this frame - the player's throws and the goblins'
+    /// stones - feeding the thrown-item pass and the water mirror.</summary>
+    public IReadOnlyList<ThrownProjectile> Projectiles => _projectiles;
     public bool IsThrowCharging => _throwCharging;
     public float ThrowCharge01 => MathUtils.Clamp01(_throwChargeSeconds / WorldGenerationConfig.ThrowChargeSeconds);
 
@@ -209,9 +227,83 @@ public class World : IItemUseWorld
         _canAcceptDrop = Inventory.CanAccept;
         if (EntityRegistry.TryGet("slime") is { } slimeType)
             _slimes = new SlimeManager(slimeType);
+        if (EntityRegistry.TryGet("goblin") is { } goblinType)
+            _goblins = new GoblinManager(goblinType);
 
         _generationWorker.Start();
         _lodManager.Start(Camera);
+        RefreshMobs();
+    }
+
+    /// <summary>
+    /// Rebuilds <see cref="Mobs"/> from every mob manager. Indexed loops rather than
+    /// <c>AddRange</c>, whose IEnumerable overload would allocate an enumerator every frame.
+    /// </summary>
+    private void RefreshMobs()
+    {
+        _mobs.Clear();
+        if (_slimes != null)
+        {
+            var slimes = _slimes.Slimes;
+            for (var i = 0; i < slimes.Count; i++)
+                _mobs.Add(slimes[i]);
+        }
+        if (_goblins != null)
+        {
+            var goblins = _goblins.Goblins;
+            for (var i = 0; i < goblins.Count; i++)
+                _mobs.Add(goblins[i]);
+        }
+    }
+
+    /// <summary>Rebuilds <see cref="Projectiles"/> from the player's throws and the goblins'
+    /// stones, with indexed loops for the same reason as <see cref="RefreshMobs"/>.</summary>
+    private void RefreshProjectiles()
+    {
+        _projectiles.Clear();
+        for (var i = 0; i < _thrown.Count; i++)
+            _projectiles.Add(_thrown[i]);
+        if (_goblins != null)
+        {
+            var stones = _goblins.Stones;
+            for (var i = 0; i < stones.Count; i++)
+                _projectiles.Add(stones[i]);
+        }
+    }
+
+    /// <summary>
+    /// Spawns one mob of the named entity kind standing with its feet at <paramref name="feet"/>
+    /// (the scripted visual tests' <c>spawn</c> op). False for an unknown name, or a kind whose
+    /// manager does not exist because its content is not registered.
+    /// </summary>
+    public bool SpawnEntity(string name, Vector3 feet)
+    {
+        if (string.Equals(name, "slime", StringComparison.OrdinalIgnoreCase))
+        {
+            if (_slimes == null) return false;
+            _slimes.Spawn(feet + new Vector3(0f, Slime.HalfExtent, 0f));
+            return true;
+        }
+        if (string.Equals(name, "goblin", StringComparison.OrdinalIgnoreCase))
+        {
+            if (_goblins == null) return false;
+            _goblins.Spawn(feet + new Vector3(0f, Goblin.Height * 0.5f, 0f));
+            RefreshMobs();
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// The generated terrain height of the column at (<paramref name="x"/>, <paramref name="z"/>):
+    /// the top solid cell before player edits, the same lookup the mob spawn ring uses. The
+    /// heightmap is a pure function of the column, so it is always available.
+    /// </summary>
+    public bool TryGroundHeight(int x, int z, out int height)
+    {
+        var heights = Chunk.GetColumnHeights(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
+        height = heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
+        return true;
     }
 
     private void EnsureSpawnSettled()
@@ -387,8 +479,26 @@ public class World : IItemUseWorld
             }
         }
 
+        // Goblins lob their flint and then close in for a club swing; like the slimes, the
+        // manager only reports the damage and the health pool stays here.
+        if (_goblins != null)
+        {
+            _goblins.Update((float)deltaTime, _chunkManager, _dropManager, Camera);
+            var goblinDamage = _goblins.DamageDealtThisFrame;
+            if (goblinDamage > 0)
+            {
+                _health.TakeDamage(goblinDamage);
+                Camera.AddShake(Math.Clamp(goblinDamage / 20f, 0.2f, 1f));
+            }
+        }
+
+        // After every mob manager and before the thrown items, so a mob killed or despawned
+        // this frame is never hit by a projectile or drawn a healthbar.
+        RefreshMobs();
+
         UpdateToppling((float)deltaTime);
         UpdateThrown((float)deltaTime);
+        RefreshProjectiles();
         FrameProfiler.End(ProfileSection.Entities);
 
         // Chunks that streamed in this frame hand over their water/air frontier, so a sea a
@@ -558,7 +668,7 @@ public class World : IItemUseWorld
         FrameProfiler.Begin(ProfileSection.Shadows);
         renderManager.BeginGpuPass(ProfileSection.Shadows);
         renderManager.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player, Slimes,
-            _lodManager.RegionList);
+            _lodManager.RegionList, goblins: Goblins);
         renderManager.EndGpuPass(ProfileSection.Shadows);
         FrameProfiler.End(ProfileSection.Shadows);
 
@@ -568,7 +678,8 @@ public class World : IItemUseWorld
         // tells the reflection whether there is any water on screen to be worth rendering
         renderManager.CullWater(Camera, _chunkManager.TranslucentRenderable, _lodManager.RegionList);
         renderManager.RenderReflection(Camera, _chunkManager.Renderable, _lodManager.RegionList,
-            new ReflectionEntities(_dropManager.Drops, _thrown, _tntManager.Primed, _falling.Falling, Slimes, _toppling, Player));
+            new ReflectionEntities(_dropManager.Drops, _projectiles, _tntManager.Primed, _falling.Falling, Slimes, Goblins,
+                _toppling, Player));
         renderManager.EndGpuPass(ProfileSection.Reflection);
         FrameProfiler.End(ProfileSection.Reflection);
 
@@ -605,7 +716,7 @@ public class World : IItemUseWorld
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.BeginGpuPass(ProfileSection.EntityPass);
         renderManager.RenderItemDrops(Camera, _dropManager.Drops);
-        renderManager.RenderThrown(Camera, _thrown);
+        renderManager.RenderThrown(Camera, _projectiles);
         renderManager.RenderCampfireCooking(Camera, _campfires);
         renderManager.RenderQuerns(Camera, _querns);
         renderManager.RenderKilns(Camera, _kilns);
@@ -613,6 +724,7 @@ public class World : IItemUseWorld
         renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
         renderManager.RenderFallingBlocks(Camera, _falling.Falling);
         renderManager.RenderSlimes(Camera, Slimes);
+        renderManager.RenderGoblins(Camera, Goblins);
         renderManager.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);
 
@@ -628,7 +740,7 @@ public class World : IItemUseWorld
 
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.BeginGpuPass(ProfileSection.EntityPass);
-        renderManager.RenderEntityHealthbars(Camera, Slimes);
+        renderManager.RenderEntityHealthbars(Camera, Mobs);
         renderManager.RenderBlockDebris(Camera, _debris.Debris);
         foreach (var tree in _toppling)
             renderManager.RenderTopplingTree(Camera, tree);
@@ -735,7 +847,7 @@ public class World : IItemUseWorld
     }
     
     /// <summary>
-    /// Drives the left-click action, attack-first. A slime inside the forward punch cone
+    /// Drives the left-click action, attack-first. A mob inside the forward punch cone
     /// (see <see cref="Combat"/>) takes the swing — <c>entityDamage</c> plus a shove — and the
     /// block under the crosshair is left alone for as long as one is there; with the cone clear
     /// the block is mined. Mining itself is hit-based: the first hit on a block lands the instant
@@ -781,7 +893,7 @@ public class World : IItemUseWorld
         // Orbit mode turns the body toward the aim while the action fires at once.
         Camera.NotifyPlayerAction();
 
-        // Attack-first: while a slime is in the punch cone it owns the swing, so no block is
+        // Attack-first: while a mob is in the punch cone it owns the swing, so no block is
         // mined through it (including while the punch itself is on cooldown).
         if (UpdatePunch(deltaTime))
         {
@@ -903,10 +1015,10 @@ public class World : IItemUseWorld
     }
 
     /// <summary>
-    /// The punch half of the left-click action. While a slime sits in the forward cone the
+    /// The punch half of the left-click action. While a mob sits in the forward cone the
     /// swing belongs to it: once the held item's pace has elapsed the nearest one takes
-    /// <c>entityDamage</c> and a knockback shove. Returns true when a slime owns the swing (the
-    /// caller must not mine). With the cone clear the timer keeps running, so the first slime to
+    /// <c>entityDamage</c> and a knockback shove. Returns true when a mob owns the swing (the
+    /// caller must not mine). With the cone clear the timer keeps running, so the first mob to
     /// enter is punched at once; and when there is no block targeted either, the fist still
     /// swings on the same pace, so left-clicking the sky plays the animation.
     /// </summary>
@@ -940,36 +1052,33 @@ public class World : IItemUseWorld
     }
 
     /// <summary>
-    /// Nearest slime inside the forward punch cone with an unobstructed line of sight, or false
+    /// Nearest mob inside the forward punch cone with an unobstructed line of sight, or false
     /// when none is in reach. The punch fires from the head along the aim, so a wall between the
-    /// player and a slime stops it.
+    /// player and a mob stops it.
     /// </summary>
-    private bool TryFindPunchTarget(out Slime target)
+    private bool TryFindPunchTarget(out Mob target)
     {
         target = null!;
-        if (_slimes == null)
-            return false;
-
-        var slimes = _slimes.Slimes;
-        if (slimes.Count == 0)
+        var mobs = _mobs;
+        if (mobs.Count == 0)
             return false;
 
         var origin = Camera.Position;
         var direction = Camera.ViewDirection;
         var bestDistance = float.PositiveInfinity;
-        Slime? best = null;
+        Mob? best = null;
 
-        for (var i = 0; i < slimes.Count; i++)
+        for (var i = 0; i < mobs.Count; i++)
         {
-            var slime = slimes[i];
-            if (!Combat.InPunchCone(origin, direction, slime.Position, out var distance))
+            var mob = mobs[i];
+            if (!Combat.InPunchCone(origin, direction, mob.Position, out var distance))
                 continue;
-            if (Camera.SegmentHitsBlock(origin, slime.Position, _chunkManager))
+            if (Camera.SegmentHitsBlock(origin, mob.Position, _chunkManager))
                 continue;
             if (distance < bestDistance)
             {
                 bestDistance = distance;
-                best = slime;
+                best = mob;
             }
         }
 
@@ -1015,34 +1124,31 @@ public class World : IItemUseWorld
     }
 
     /// <summary>
-    /// Lands one slice swing: the nearest two slimes inside the forward hemisphere with an
+    /// Lands one slice swing: the nearest two mobs inside the forward hemisphere with an
     /// unobstructed line of sight each take the swing's damage and a knockback shove. The return
     /// swing is at half power (<paramref name="returnSwing"/>).
     /// </summary>
     private void ApplySliceDamage(bool returnSwing)
     {
-        if (_slimes == null)
-            return;
-
-        var slimes = _slimes.Slimes;
-        if (slimes.Count == 0)
+        var mobs = _mobs;
+        if (mobs.Count == 0)
             return;
 
         var origin = Camera.Position;
         var direction = Camera.ViewDirection;
         var damage = Combat.SliceDamage(HeldItem(), returnSwing);
 
-        Slime? first = null;
-        Slime? second = null;
+        Mob? first = null;
+        Mob? second = null;
         var firstDistance = float.PositiveInfinity;
         var secondDistance = float.PositiveInfinity;
 
-        for (var i = 0; i < slimes.Count; i++)
+        for (var i = 0; i < mobs.Count; i++)
         {
-            var slime = slimes[i];
-            if (!Combat.InFrontHemisphere(origin, direction, slime.Position, out var distance))
+            var mob = mobs[i];
+            if (!Combat.InFrontHemisphere(origin, direction, mob.Position, out var distance))
                 continue;
-            if (Camera.SegmentHitsBlock(origin, slime.Position, _chunkManager))
+            if (Camera.SegmentHitsBlock(origin, mob.Position, _chunkManager))
                 continue;
 
             // Keep the two closest, shifting the old nearest down when a closer one arrives.
@@ -1050,12 +1156,12 @@ public class World : IItemUseWorld
             {
                 second = first;
                 secondDistance = firstDistance;
-                first = slime;
+                first = mob;
                 firstDistance = distance;
             }
             else if (distance < secondDistance)
             {
-                second = slime;
+                second = mob;
                 secondDistance = distance;
             }
         }
@@ -1064,13 +1170,13 @@ public class World : IItemUseWorld
         StrikeSliceTarget(second, damage);
     }
 
-    private void StrikeSliceTarget(Slime? slime, int damage)
+    private void StrikeSliceTarget(Mob? mob, int damage)
     {
-        if (slime == null) return;
-        slime.TakeDamage(damage);
+        if (mob == null) return;
+        mob.TakeDamage(damage);
         var away = new Vector3(
-            slime.Position.X - Camera.Position.X, 0f, slime.Position.Z - Camera.Position.Z);
-        slime.Shove(away, WorldGenerationConfig.SlimePunchShoveSpeed);
+            mob.Position.X - Camera.Position.X, 0f, mob.Position.Z - Camera.Position.Z);
+        mob.Shove(away, WorldGenerationConfig.SlimePunchShoveSpeed);
     }
 
     /// <summary>
@@ -1513,11 +1619,10 @@ public class World : IItemUseWorld
     private void UpdateThrown(float deltaTime)
     {
         if (_thrown.Count == 0) return;
-        var slimes = _slimes?.Slimes ?? (IReadOnlyList<Slime>)Array.Empty<Slime>();
         for (var i = _thrown.Count - 1; i >= 0; i--)
         {
             var projectile = _thrown[i];
-            var alive = projectile.Update(deltaTime, _chunkManager, slimes, out var hit);
+            var alive = projectile.Update(deltaTime, _chunkManager, _mobs, out var hit);
             if (hit != null)
             {
                 hit.TakeDamage(projectile.Damage);

@@ -1,0 +1,407 @@
+using System;
+using System.Numerics;
+
+namespace silkgltriangle;
+
+/// <summary>
+/// A goblin: a short forest raider that lobs the flint it carries at the player from a
+/// standoff band, backing off when the player closes in, and once its stones run out runs in
+/// for a club swing. It walks rather than hops (auto-jumping a one-block step), floats in water
+/// like the slime, and is animated from the Blockbench clips in its model through an
+/// <see cref="EntityAnimator"/>: the stone leaves the hand at the throw clip's
+/// <see cref="ReleaseEvent"/> and the swing lands at the melee clip's <see cref="ImpactEvent"/>,
+/// which <c>GoblinManager</c> collects through <see cref="TryTakeThrowRelease"/> and
+/// <see cref="TryTakeMeleeImpact"/>. Main thread only.
+/// </summary>
+public sealed class Goblin : Mob
+{
+    /// <summary>Groups the goblin's model must provide; the renderer draws each one.</summary>
+    public static readonly string[] RequiredParts = ["Torso", "Head", "ArmL", "ArmR", "LegL", "LegR"];
+
+    /// <summary>The part that holds and throws the stone.</summary>
+    public const string HandPart = "ArmR";
+
+    public const string ThrowClip = "throw";
+    public const string MeleeClip = "melee";
+
+    /// <summary>Timeline event on the throw clip at which the stone leaves the hand.</summary>
+    public const string ReleaseEvent = "release";
+
+    /// <summary>Timeline event on the melee clip at which the swing connects.</summary>
+    public const string ImpactEvent = "impact";
+
+    /// <summary>Draw scale of the flint held in the throwing hand while ammo remains.</summary>
+    public const float HeldStoneScale = 0.28f;
+
+    /// <summary>Half the collision body's horizontal edge.</summary>
+    public const float HalfExtent = 0.3f;
+
+    /// <summary>Height of the collision body; <see cref="Mob.Position"/> is its centre, so the
+    /// feet are at <c>Position.Y - Height / 2</c>.</summary>
+    public const float Height = 1.3f;
+
+    private const float Gravity = 28f;
+    private const float TerminalVelocity = -30f;
+    private const float CollisionStepSize = 0.05f;
+    private const float GroundFriction = 8f;
+
+    // Damp rate of the walking velocity toward the chosen move, so a goblin speeds up and turns
+    // over a few frames instead of snapping to full speed.
+    private const float MoveAccel = 12f;
+
+    // Buoyancy, the slime's numbers: a floating goblin eases toward a rise proportional to how
+    // far under the surface its feet are, so it climbs and bobs at the top.
+    private const float FloatSpeed = 1.5f;
+    private const float BuoyancyStiffness = 3f;
+    private const float WaterDrag = 4f;
+    private const float WaterFriction = 3f;
+
+    // A floating goblin paddles toward its goal at this fraction of its walk speed, so it can
+    // cross a pond and climb out instead of bobbing in place forever.
+    private const float SwimSpeedFactor = 0.5f;
+
+    // Hit flash: snapped to full on TakeDamage, then fades linearly back over this long.
+    private const float HitFlashSeconds = 0.25f;
+
+    private Vector3 _velocity;
+    private bool _inWater;
+    private float _throwCooldown;
+    private float _meleeCooldown;
+    private float _losRetry;
+    private bool _losBlocked;
+    private Vector3 _aimTarget;
+    private bool _hitWall;
+
+    public Goblin(EntityType type, Vector3 position, int ammo) : base(type, position)
+    {
+        Ammo = Math.Max(0, ammo);
+        Animation = new EntityAnimator(type.Model.Animations, WorldGenerationConfig.GoblinWalkSpeed);
+        // A fresh goblin notices the player before its first throw rather than throwing on its
+        // first grounded frame; unjittered so scripted shots repeat.
+        _throwCooldown = WorldGenerationConfig.GoblinFirstThrowDelaySeconds;
+    }
+
+    /// <summary>Stones left to throw; the manager drops what remains on death.</summary>
+    public int Ammo { get; private set; }
+
+    /// <summary>Whether the goblin currently stands on the ground.</summary>
+    public bool IsGrounded { get; private set; }
+
+    /// <summary>The goblin's own animation state, driven by its speed and actions.</summary>
+    public EntityAnimator Animation { get; }
+
+    public Vector3 Velocity => _velocity;
+
+    /// <inheritdoc />
+    public override float BodyHalfExtent => HalfExtent;
+
+    /// <inheritdoc />
+    public override float BodyHalfHeight => Height * 0.5f;
+
+    /// <inheritdoc />
+    public override float HeadAboveCentre => Height * 0.5f;
+
+    /// <summary>Unit horizontal direction the goblin faces (the model faces -Z at yaw 0).</summary>
+    private Vector3 Forward => new(-MathF.Sin(Facing), 0f, -MathF.Cos(Facing));
+
+    /// <summary>Where a thrown stone leaves the hand: a little in front of the body at
+    /// shoulder height.</summary>
+    public Vector3 ThrowOrigin => Position + Forward * 0.4f + new Vector3(0f, 0.35f, 0f);
+
+    /// <summary>Where a stone is aimed on the player: the chest, a little under the eye.</summary>
+    public static Vector3 ChestOf(Camera camera) => camera.Position - new Vector3(0f, 0.4f, 0f);
+
+    /// <summary>
+    /// Whether a goblin body centred at <paramref name="goblinPosition"/> can land a swing on a
+    /// player whose eye is at <paramref name="playerEye"/>: horizontally within
+    /// <see cref="WorldGenerationConfig.GoblinMeleeReach"/> and roughly level with the player's
+    /// body centre.
+    /// </summary>
+    public static bool InMeleeReach(Vector3 goblinPosition, Vector3 playerEye)
+    {
+        var dx = playerEye.X - goblinPosition.X;
+        var dz = playerEye.Z - goblinPosition.Z;
+        var reach = WorldGenerationConfig.GoblinMeleeReach;
+        if (dx * dx + dz * dz > reach * reach) return false;
+        return MathF.Abs(goblinPosition.Y - (playerEye.Y - Camera.EyeHeight * 0.5f)) <= 1.5f;
+    }
+
+    /// <summary>
+    /// Throws, naming the model file, unless the goblin's model provides every
+    /// <see cref="RequiredParts"/> group, the idle, walk, throw and melee clips, and the
+    /// release and impact events the throw and swing are timed by.
+    /// </summary>
+    public static void ValidateContent(EntityType type)
+    {
+        var model = type.Model;
+        foreach (var part in RequiredParts)
+        {
+            if (!model.Parts.TryGetValue(part, out var group) || group.Cubes.Count == 0)
+                throw new InvalidOperationException(
+                    $"Goblin model '{type.ModelPath}' needs a non-empty group named '{part}'.");
+        }
+
+        RequireClip(type, EntityAnimator.IdleClip);
+        RequireClip(type, EntityAnimator.WalkClip);
+        RequireEvent(type, RequireClip(type, ThrowClip), ReleaseEvent);
+        RequireEvent(type, RequireClip(type, MeleeClip), ImpactEvent);
+    }
+
+    private static AnimationClip RequireClip(EntityType type, string name)
+    {
+        foreach (var clip in type.Model.Animations)
+        {
+            if (string.Equals(clip.Name, name, StringComparison.OrdinalIgnoreCase))
+                return clip;
+        }
+
+        throw new InvalidOperationException(
+            $"Goblin model '{type.ModelPath}' has no animation named '{name}'.");
+    }
+
+    private static void RequireEvent(EntityType type, AnimationClip clip, string eventName)
+    {
+        foreach (var e in clip.Events)
+        {
+            if (string.Equals(e.Name, eventName, StringComparison.OrdinalIgnoreCase))
+                return;
+        }
+
+        throw new InvalidOperationException(
+            $"Goblin model '{type.ModelPath}' animation '{clip.Name}' has no '{eventName}' timeline event.");
+    }
+
+    /// <inheritdoc />
+    public override void Shove(Vector3 horizontalDirection, float speed)
+    {
+        if (horizontalDirection.LengthSquared() < 1e-6f) return;
+        horizontalDirection.Y = 0f;
+        horizontalDirection = Vector3.Normalize(horizontalDirection);
+        _velocity.X = horizontalDirection.X * speed;
+        _velocity.Z = horizontalDirection.Z * speed;
+    }
+
+    /// <summary>
+    /// Advances the AI, the physics and the animation. With stones left the goblin keeps to the
+    /// throw band (<see cref="WorldGenerationConfig.GoblinThrowMinRange"/>..
+    /// <see cref="WorldGenerationConfig.GoblinThrowMaxRange"/>) and starts a throw whenever it
+    /// stands on the ground with a clear line to the player's chest; out of stones it closes to
+    /// the standoff distance and starts a swing when in reach. It stands still while a throw or
+    /// swing plays.
+    /// </summary>
+    public void Update(float deltaTime, ChunkManager chunks, Camera player)
+    {
+        if (deltaTime <= 0f || chunks == null || player == null) return;
+
+        _hitFlash = MathF.Max(0f, _hitFlash - deltaTime / HitFlashSeconds);
+        _throwCooldown = MathF.Max(0f, _throwCooldown - deltaTime);
+        _meleeCooldown = MathF.Max(0f, _meleeCooldown - deltaTime);
+        _losRetry = MathF.Max(0f, _losRetry - deltaTime);
+
+        var target = player.Position;
+        var to = new Vector3(target.X - Position.X, 0f, target.Z - Position.Z);
+        var dist = to.Length();
+        var toward = dist > 1e-3f ? to / dist : Vector3.Zero;
+        // The model faces -Z at yaw 0, so this rotation points -Z at the player.
+        if (dist > 1e-3f) Facing = MathF.Atan2(-to.X, -to.Z);
+
+        var move = Decide(dist, toward, chunks, player);
+
+        // Walking: ease the horizontal velocity toward the chosen move (or friction toward a
+        // stop), on the ground at full speed and afloat at a paddle.
+        if (IsGrounded || _inWater)
+        {
+            var speed = IsGrounded ? WorldGenerationConfig.GoblinWalkSpeed
+                : WorldGenerationConfig.GoblinWalkSpeed * SwimSpeedFactor;
+            var moving = move != Vector3.Zero;
+            var rate = moving ? MoveAccel : IsGrounded ? GroundFriction : 0f;
+            if (rate > 0f)
+            {
+                _velocity.X = MathUtils.Damp(_velocity.X, move.X * speed, rate, deltaTime);
+                _velocity.Z = MathUtils.Damp(_velocity.Z, move.Z * speed, rate, deltaTime);
+            }
+            if (!moving && IsGrounded)
+            {
+                if (MathF.Abs(_velocity.X) < 0.01f) _velocity.X = 0f;
+                if (MathF.Abs(_velocity.Z) < 0.01f) _velocity.Z = 0f;
+            }
+
+            // Auto-jump a one-block step the goblin walked into last frame.
+            if (moving && _hitWall)
+            {
+                _velocity.Y = WorldGenerationConfig.GoblinJumpSpeed;
+                IsGrounded = false;
+            }
+        }
+
+        ApplyPhysics(deltaTime, chunks);
+
+        Animation.Update(deltaTime, MathF.Sqrt(_velocity.X * _velocity.X + _velocity.Z * _velocity.Z));
+    }
+
+    // Chooses this frame's horizontal move (a unit vector or zero) and starts a throw or swing
+    // when one is due.
+    private Vector3 Decide(float dist, Vector3 toward, ChunkManager chunks, Camera player)
+    {
+        if (Animation.IsActionPlaying) return Vector3.Zero;
+
+        if (Ammo > 0)
+        {
+            if (dist > WorldGenerationConfig.GoblinThrowMaxRange) return toward;
+            if (dist < WorldGenerationConfig.GoblinThrowMinRange) return -toward;
+
+            // Grounded only, so the auto-jump can never lift the throw origin over a wall the
+            // goblin is walking into; the LOS test is throttled while it stays blocked.
+            if (IsGrounded && _throwCooldown <= 0f && _losRetry <= 0f)
+            {
+                var chest = ChestOf(player);
+                if (!player.SegmentHitsBlock(ThrowOrigin, chest, chunks))
+                {
+                    _losBlocked = false;
+                    _aimTarget = chest;
+                    Animation.Play(ThrowClip);
+                    _throwCooldown = WorldGenerationConfig.GoblinThrowCooldownSeconds
+                                     + (Random.Shared.NextSingle() - 0.5f) * 2f * WorldGenerationConfig.GoblinThrowCooldownJitter;
+                    return Vector3.Zero;
+                }
+
+                _losBlocked = true;
+                _losRetry = WorldGenerationConfig.GoblinLosRetrySeconds;
+            }
+
+            // Inside the band: hold, unless the last look found the line blocked, in which case
+            // keep walking at the player until a throw finds it clear again.
+            return _losBlocked ? toward : Vector3.Zero;
+        }
+
+        if (InMeleeReach(Position, player.Position) && _meleeCooldown <= 0f)
+        {
+            Animation.Play(MeleeClip);
+            _meleeCooldown = WorldGenerationConfig.GoblinMeleeCooldownSeconds;
+            return Vector3.Zero;
+        }
+
+        return dist > WorldGenerationConfig.GoblinStandoffBlocks ? toward : Vector3.Zero;
+    }
+
+    /// <summary>
+    /// True once per throw, at the throw clip's release event while stones remain: spends one
+    /// stone and returns where it leaves the hand and the launch velocity that lobs it onto the
+    /// chest the throw was aimed at (a maximum-range toss toward it when out of reach).
+    /// </summary>
+    public bool TryTakeThrowRelease(out Vector3 origin, out Vector3 velocity)
+    {
+        origin = default;
+        velocity = default;
+        if (!Animation.ConsumeEvent(ReleaseEvent) || Ammo <= 0) return false;
+
+        origin = ThrowOrigin;
+        // The bool is ignored: an out-of-range player still gets the fallback toss.
+        GoblinAim.TryLaunchVelocity(origin, _aimTarget, WorldGenerationConfig.GoblinStoneSpeed,
+            ThrownProjectile.Gravity, out velocity);
+        Ammo--;
+        return true;
+    }
+
+    /// <summary>True once per swing, at the melee clip's impact event; the manager decides
+    /// whether the player is still in reach.</summary>
+    public bool TryTakeMeleeImpact() => Animation.ConsumeEvent(ImpactEvent);
+
+    private void ApplyPhysics(float deltaTime, ChunkManager chunks)
+    {
+        var feetY = Position.Y - Height * 0.5f;
+        var feetCell = new Vector3(Position.X, feetY, Position.Z).BlockCell();
+        var surfaceY = chunks.GetFluidSurfaceGlobal(feetCell.X, feetCell.Y, feetCell.Z);
+        var floating = feetY < surfaceY;
+        _inWater = floating;
+
+        if (floating)
+        {
+            var targetY = Math.Clamp((surfaceY - feetY) * BuoyancyStiffness, -FloatSpeed, FloatSpeed);
+            _velocity.Y = MathUtils.Damp(_velocity.Y, targetY, WaterDrag, deltaTime);
+
+            var drag = MathF.Exp(-WaterFriction * deltaTime);
+            _velocity.X *= drag;
+            _velocity.Z *= drag;
+        }
+        else
+        {
+            _velocity.Y = MathF.Max(_velocity.Y - Gravity * deltaTime, TerminalVelocity);
+        }
+
+        var movement = _velocity * deltaTime;
+
+        Position = MoveOnAxis(Position, movement.X, 0, chunks, out var hitX);
+        Position = MoveOnAxis(Position, movement.Z, 2, chunks, out var hitZ);
+        Position = MoveOnAxis(Position, movement.Y, 1, chunks, out var hitY);
+
+        if (hitX) _velocity.X = 0f;
+        if (hitZ) _velocity.Z = 0f;
+        _hitWall = hitX || hitZ;
+
+        if (hitY)
+        {
+            IsGrounded = movement.Y < 0f;
+            _velocity.Y = 0f;
+        }
+        else
+        {
+            IsGrounded = false;
+        }
+    }
+
+    private static Vector3 MoveOnAxis(Vector3 start, float delta, int axis, ChunkManager chunks, out bool collided)
+    {
+        collided = false;
+        if (MathF.Abs(delta) < float.Epsilon)
+            return start;
+
+        var position = start;
+        var remaining = delta;
+
+        while (MathF.Abs(remaining) > float.Epsilon)
+        {
+            var step = MathUtils.ClampStep(remaining, CollisionStepSize);
+            var candidate = OffsetAxis(position, axis, step);
+
+            if (IsColliding(candidate, chunks))
+            {
+                collided = true;
+                break;
+            }
+
+            position = candidate;
+            remaining -= step;
+        }
+
+        return position;
+    }
+
+    private static Vector3 OffsetAxis(Vector3 value, int axis, float delta)
+    {
+        return axis switch
+        {
+            0 => new Vector3(value.X + delta, value.Y, value.Z),
+            1 => new Vector3(value.X, value.Y + delta, value.Z),
+            2 => new Vector3(value.X, value.Y, value.Z + delta),
+            _ => value
+        };
+    }
+
+    private static bool IsColliding(Vector3 center, ChunkManager chunks)
+    {
+        var half = new Vector3(HalfExtent, Height * 0.5f, HalfExtent);
+        VoxelCoords.CellRange(center - half, center + half,
+            out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
+
+        for (var x = minX; x <= maxX; x++)
+        for (var y = minY; y <= maxY; y++)
+        for (var z = minZ; z <= maxZ; z++)
+        {
+            if (BlockType.IsSolid(chunks.GetBlockGlobal(x, y, z)))
+                return true;
+        }
+
+        return false;
+    }
+}
