@@ -31,6 +31,9 @@ public sealed class UnderwaterRaysRenderer : IDisposable
     private readonly GL _gl;
     private readonly Shader _shader;
     private readonly Shader _upsample;
+    // Unit the composite reads the HDR scene target from; bound only around that draw (the
+    // caller invalidates its texture-unit records afterwards).
+    private const int SceneUnit = 9;
     private readonly uint _vao;
     private readonly uint _vbo;
     private bool _disposed;
@@ -55,6 +58,7 @@ public sealed class UnderwaterRaysRenderer : IDisposable
         _upsample.Use();
         _upsample.SetUniform("uRays", 5);
         _upsample.SetUniform("uSceneDepth", 4);
+        _upsample.SetUniform("uScene", SceneUnit);
 
         // One triangle covering NDC: the two off-screen corners keep the visible area seamless
         Span<float> vertices = [-1f, -1f, 3f, -1f, -1f, 3f];
@@ -90,7 +94,7 @@ public sealed class UnderwaterRaysRenderer : IDisposable
     /// gets shafts as well.
     /// </summary>
     public void Render(uint halfResFbo, uint halfResTex, Vector2D<int> halfResSize,
-        uint sceneFbo, Vector2D<int> viewportSize, Matrix4x4 invViewProj, Vector3 cameraPos, Vector3 sunDir,
+        uint sceneFbo, uint sceneTex, Vector2D<int> viewportSize, Matrix4x4 invViewProj, Vector3 cameraPos, Vector3 sunDir,
         Vector3 sunColor, float strength, float surfaceY, Vector3 waterAbsorb, Matrix4x4 lightViewProj, float time)
     {
         _gl.Disable(EnableCap.DepthTest);      // full-screen: nothing to test against
@@ -130,10 +134,14 @@ public sealed class UnderwaterRaysRenderer : IDisposable
         // composite reconstructs its own marched distance from it.
         _gl.ActiveTexture(TextureUnit.Texture5);
         _gl.BindTexture(TextureTarget.Texture2D, halfResTex);
+        // The composite adds the shafts in display space over the very target it draws into
+        // (rays-upsample-fragment.glsl), so it reads that target on SceneUnit with blending off
+        // (still off from the march); the barrier makes this frame's earlier writes visible.
+        _gl.ActiveTexture(TextureUnit.Texture0 + SceneUnit);
+        _gl.BindTexture(TextureTarget.Texture2D, sceneTex);
         _gl.ActiveTexture(TextureUnit.Texture0);
+        _gl.TextureBarrier();
 
-        _gl.Enable(EnableCap.Blend);
-        _gl.BlendFunc(BlendingFactor.One, BlendingFactor.One);   // light adds, never darkens
         _upsample.Use();
         _upsample.SetUniform("uInvViewProj", invViewProj);
         _upsample.SetUniform("uCameraPos", cameraPos);
@@ -147,8 +155,11 @@ public sealed class UnderwaterRaysRenderer : IDisposable
         // it matches the convention CopyScene and every other pass here follows.
         _gl.ActiveTexture(TextureUnit.Texture5);
         _gl.BindTexture(TextureTarget.Texture2D, 0);
+        _gl.ActiveTexture(TextureUnit.Texture0 + SceneUnit);
+        _gl.BindTexture(TextureTarget.Texture2D, 0);
         _gl.ActiveTexture(TextureUnit.Texture0);
 
+        _gl.Enable(EnableCap.Blend);
         _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
         _gl.DepthMask(true);
         _gl.Enable(EnableCap.DepthTest);       // the selection pass right after depends on it

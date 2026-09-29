@@ -11,6 +11,12 @@
 // uMaxDistance), so bilinear would smear the far term over the near geometry as a halo. Instead
 // each of the four half-res taps is weighted by how closely the distance IT marched matches the
 // distance THIS full-res pixel marches, which stops the bleed across depth discontinuities.
+//
+// The shafts are display-space light, added to the ENCODED scene and clipped at 1 the way the
+// pre-SH-10 8-bit target did, then decoded again: added straight onto the linear HDR target the
+// same march read far weaker toward the sun and greyed the water elsewhere. uScene is the HDR
+// target this pass draws into, read texel-for-texel after a glTextureBarrier with blending off
+// (one full-screen triangle writes each pixel once).
 in vec2 fUv;
 uniform sampler2D uRays;        // unit 5: the half-res march output (rgb = shafts, a = marched distance)
 uniform sampler2D uSceneDepth;  // unit 4: the same full-res scene depth copy the march read
@@ -18,7 +24,25 @@ uniform mat4 uInvViewProj;
 uniform vec3 uCameraPos;
 uniform float uMaxDistance;
 uniform float uTolerance;       // blocks of marched-distance mismatch before a tap stops contributing
+uniform sampler2D uScene;       // the HDR target being drawn into
 out vec4 FragColor;
+
+// Exact piecewise sRGB encode, the twin of ColorSpace.LinearToSrgb (and post-fragment.glsl's).
+vec3 LinearToSrgb(vec3 c)
+{
+    c = max(c, 0.0);
+    vec3 lo = c * 12.92;
+    vec3 hi = 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055;
+    return mix(hi, lo, lessThanEqual(c, vec3(0.0031308)));
+}
+
+// Twin of ColorSpace.SrgbToLinear
+vec3 SrgbToLinear(vec3 c)
+{
+    vec3 lo = c / 12.92;
+    vec3 hi = pow((c + 0.055) / 1.055, vec3(2.4));
+    return mix(hi, lo, lessThanEqual(c, vec3(0.04045)));
+}
 
 void main() {
     // Reconstruct this full-res pixel's own marched distance exactly the way the march does
@@ -70,7 +94,10 @@ void main() {
     // blocks at the default tolerance) - i.e. a thin full-res feature that no half-res sample
     // landed on. There the geometrically right answer is the single closest-matching tap (a
     // nearest-depth upsample), not a bilinear blend of four taps that are all wrong.
-    // Alpha stays 1.0, exactly what today's full-res pass writes, so what the additive blend
-    // contributes to the default framebuffer's alpha channel is unchanged.
-    FragColor = vec4(wsum > 1e-4 ? weighted / wsum : best, 1.0);
+    vec3 rays = wsum > 1e-4 ? weighted / wsum : best;
+    // The tonemap is a plain clamp at exposure 1, so the encode alone is the display value of
+    // anything up to 1; whatever lies above keeps its overflow untouched.
+    vec3 dst = texelFetch(uScene, ivec2(gl_FragCoord.xy), 0).rgb;
+    vec3 body = min(dst, vec3(1.0));
+    FragColor = vec4(SrgbToLinear(min(LinearToSrgb(body) + rays, vec3(1.0))) + (dst - body), 1.0);
 }

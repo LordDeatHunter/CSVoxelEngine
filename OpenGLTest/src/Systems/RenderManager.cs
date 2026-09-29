@@ -262,17 +262,16 @@ public class RenderManager : IDisposable
     private const float SunLinearGain = 2.0f;
     private const float SunLinearExponent = 1.4f;
     private const float SunDiscIntensity = 2.5f;
-    // Scales the additive underwater sun shafts, tuned against the pre-SH-10 display-space look
-    private const float RaysLinearScale = 1.2f;
     private Vector3 _fogColor = new(0.3f, 0.6f, 0.9f);
     private Vector3 _skyColor = new(0.3f, 0.6f, 0.9f);
     // The sky dome's palette for this frame (SkyPalette), plus what the dome fades toward in
     // lava (_skyTint by _skyTintAmount; it stays dry in water so the Snell window shows sky),
     // and how far the fog has closed in to the underwater tint.
     private SkyPalette _sky = SkyPalette.Compute(1f, 0f);
-    // The cloud layer's display-space (sRGB) sun colour, sun intensity and ambient, set by
-    // SetLighting to the pre-SH-10 values (see CloudRenderer.Render).
-    private Vector3 _cloudSunSrgb = Vector3.One;
+    // Display-space (sRGB) light at the pre-SH-10 values, set by SetLighting: the sun colour
+    // (the cloud layer and the underwater shafts), and the cloud layer's sun intensity and
+    // ambient (see CloudRenderer.Render and RenderUnderwaterRays).
+    private Vector3 _sunSrgb = Vector3.One;
     private float _cloudSunIntensity = 1f;
     private Vector3 _cloudAmbientSrgb = Vector3.One;
     private Vector3 _skyTint;
@@ -938,10 +937,11 @@ public class RenderManager : IDisposable
         // Every palette colour here is authored in sRGB (display) space and decoded once, where
         // it is computed, so fog, the clear colour, clouds, the mirror and the rays all see linear
         // light (SH-10).
-        // The cloud layer is still lit in display space (cloud-fragment.glsl), with the exact
-        // pre-SH-10 sun, intensity and ambient: the world's retuned linear constants below
-        // would light it brighter than it was.
-        _cloudSunSrgb = _sunColor;
+        // The cloud layer and the underwater shafts are still lit in display space
+        // (cloud-fragment.glsl, rays-upsample-fragment.glsl), with the exact pre-SH-10 sun,
+        // intensity and ambient: the world's retuned linear constants below would light them
+        // differently than they were.
+        _sunSrgb = _sunColor;
         _cloudSunIntensity = 0.05f + 1.2f * dayness;
         _cloudAmbientSrgb = Mix(new Vector3(0.06f, 0.07f, 0.11f), new Vector3(0.42f, 0.45f, 0.52f), dayness);
         _sunColor = ColorSpace.SrgbToLinear(_sunColor);
@@ -1817,7 +1817,7 @@ public class RenderManager : IDisposable
             gl.CullFace(TriangleFace.Front);
             // The clouds mix over the mirror in display space by reading it (CloudRenderer.Render).
             BindUnit(SceneReadUnit, TextureTarget.Texture2D, _reflTex);
-            _clouds.Render(_reflViewProj, mirroredPos, _timeD, _sunDir, _cloudSunSrgb, _cloudSunIntensity, _cloudAmbientSrgb,
+            _clouds.Render(_reflViewProj, mirroredPos, _timeD, _sunDir, _sunSrgb, _cloudSunIntensity, _cloudAmbientSrgb,
                 _fogColor, _fogNear, _fogFar, _sky, _fogWet, SceneReadUnit);
             BindUnit(SceneReadUnit, TextureTarget.Texture2D, 0);
             ActiveUnit(0);
@@ -2294,7 +2294,7 @@ public class RenderManager : IDisposable
         // (CloudRenderer.Render); never leave it sitting on a sampler unit afterwards.
         BindUnit(SceneReadUnit, TextureTarget.Texture2D, _hdrColorTex);
         _clouds.Render(camera.GetViewProjection(), _cameraPos, _timeD,
-            _sunDir, _cloudSunSrgb, _cloudSunIntensity, _cloudAmbientSrgb, _fogColor, _fogNear, _fogFar, _sky, _fogWet, SceneReadUnit);
+            _sunDir, _sunSrgb, _cloudSunIntensity, _cloudAmbientSrgb, _fogColor, _fogNear, _fogFar, _sky, _fogWet, SceneReadUnit);
         BindUnit(SceneReadUnit, TextureTarget.Texture2D, 0);
         ActiveUnit(0);
         gl.Disable(EnableCap.CullFace);
@@ -2318,20 +2318,18 @@ public class RenderManager : IDisposable
     {
         if (camera == null || _rays == null || _eyeInLava) return;
         var wet = MathUtils.SmoothStep(_underwaterT);
-        // RaysLinearScale: the shafts add straight onto the linear HDR scene now, where the same
-        // added amount reads far brighter over dark water than it did added in display space.
-        // The sun colour is cooled by the same tint the underwater ambient takes: added in linear
-        // light a warm-white shaft greys the blue water out instead of reading cyan as it did
-        // when the display-space add clipped the blue channel.
-        var strength = wet * _shadowStrengthDry * _dayness * GameSettings.WaterSunShafts * RaysLinearScale;
+        // The shafts are added in display space (rays-upsample-fragment.glsl), so they take the
+        // display-space sun colour and the pre-SH-10 strength, as they did before the scene went
+        // linear.
+        var strength = wet * _shadowStrengthDry * _dayness * GameSettings.WaterSunShafts;
         if (strength <= 0.0005f) return;
         if (_raysFbo == 0) return;             // no target to march into (never happens after LoadResources)
         CopyScene(colour: false);
         BindUnit(1, TextureTarget.Texture2D, _nearShadow.DepthTex);
         BindUnit(4, TextureTarget.Texture2D, _sceneDepthTex);
         ActiveUnit(0);
-        _rays.Render(_raysFbo, _raysTex, _raysSize, _hdrFbo, _viewportSize, _invViewProj, _cameraPos, _sunDir,
-            _sunColor * UnderwaterAmbientTintLinear, strength, camera.EyeWaterSurfaceY, WorldGenerationConfig.WaterAbsorb, _nearShadow.ViewProj, _time);
+        _rays.Render(_raysFbo, _raysTex, _raysSize, _hdrFbo, _hdrColorTex, _viewportSize, _invViewProj, _cameraPos, _sunDir,
+            _sunSrgb, strength, camera.EyeWaterSurfaceY, WorldGenerationConfig.WaterAbsorb, _nearShadow.ViewProj, _time);
         // UnderwaterRaysRenderer selects unit 5 for the upsample and puts unit 0 back. Unit 5 is
         // untracked so the records happen to survive, but the renderer does not promise that.
         InvalidateTextureUnits();
