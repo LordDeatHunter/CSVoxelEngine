@@ -252,4 +252,73 @@ public sealed class ChunkManagerTests
         Assert.Equal(0, manager.PlayerPlacedChunkCount);
         Assert.False(manager.IsPlayerPlaced(100, 100, 100));
     }
+
+    /// <summary>
+    /// <see cref="ChunkManager.ReleaseAll"/> (world teardown, after the workers joined and the
+    /// mesh work drained) leaves no chunk, renderable, dirty entry, pending build, placement or
+    /// finished-but-unapplied mesh behind, makes every position needed again, and is idempotent.
+    /// The area is walled solid so the centre's mesh is empty: the only kind a pool-less
+    /// manager can apply.
+    /// </summary>
+    [Fact]
+    public void ReleaseAllEmptiesEveryTableAndFreesEveryMesh()
+    {
+        var (manager, centre) = MeshTestWorld.WalledArea();
+        MeshTestWorld.FillWalledArea(manager, TerrainGenerator.RockBlock);
+        var camera = new Camera(null, null);
+        camera.TestTeleport(new Vector3(8f, 8f, 8f), yaw: 0f, pitch: 0f);
+        // Generous: this build is often the process's first, and at suite start it runs cold
+        // (JIT, worldgen static constructors) against every other test class; the wait returns
+        // as soon as the work is done
+        var drain = System.TimeSpan.FromSeconds(30);
+
+        manager.MarkDirty(centre.Position);
+        manager.Update(camera); // schedules the build
+        Assert.True(manager.DrainMeshWork(drain), "mesh work did not drain");
+        manager.Update(camera); // applies it
+        Assert.True(centre.IsMeshed);
+
+        // A second build that finishes but is never applied: it sits in the completed queue
+        manager.MarkDirty(centre.Position);
+        manager.Update(camera);
+        Assert.True(manager.DrainMeshWork(drain), "mesh work did not drain");
+
+        // Pending state in the tables the release has to empty
+        manager.MarkPlayerPlaced(1, 1, 1);
+        manager.MarkDirty(centre.Position + Vector3.UnitX);
+        Assert.True(manager.PlayerPlacedChunkCount > 0);
+        Assert.True(manager.DirtyCount > 0);
+
+        var former = new List<Chunk>(manager.Chunks.Values);
+        Assert.NotEmpty(former);
+
+        manager.ReleaseAll();
+
+        Assert.Equal(0, manager.Chunks.Count);
+        Assert.Empty(manager.Renderable);
+        Assert.Empty(manager.TranslucentRenderable);
+        Assert.Equal(0, manager.LoadedChunkCount);
+        Assert.Equal(0, manager.DirtyCount);
+        Assert.Equal(0, manager.PendingMeshWorkCount);
+        Assert.Equal(0, manager.GeneratingMeshCount);
+        Assert.Equal(0, manager.PlayerPlacedChunkCount);
+        foreach (var chunk in former)
+        {
+            Assert.Null(chunk.OpaqueSlice);
+            Assert.Null(chunk.TranslucentSlice);
+            Assert.Equal(-1, chunk.RenderIndex);
+        }
+        Assert.True(manager.NeedsChunk(centre.Position));
+
+        // The unapplied build was drained with the release: a following frame applies nothing
+        var meshedAfterRelease = centre.IsMeshed;
+        var versionAfterRelease = manager.MeshVersion;
+        manager.Update(camera);
+        Assert.Equal(meshedAfterRelease, centre.IsMeshed);
+        Assert.Equal(versionAfterRelease, manager.MeshVersion);
+        Assert.Equal(0, manager.Chunks.Count);
+
+        Assert.Null(Record.Exception(manager.ReleaseAll));
+        Assert.Equal(0, manager.Chunks.Count);
+    }
 }

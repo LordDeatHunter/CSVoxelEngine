@@ -96,6 +96,20 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
 
     internal int GeneratingMeshCount => _generatingMeshes.Count;
 
+    /// <summary>
+    /// Finished meshes <see cref="ApplyCompletedMeshes"/> uploads per frame (the rest wait for the
+    /// next). Defaults to <see cref="WorldGenerationConfig.MaxMeshUploadsPerFrame"/>; World raises it
+    /// while a world is loading and restores it when the world starts playing. Main thread only.
+    /// </summary>
+    public int MeshUploadBudget { get; set; } = WorldGenerationConfig.MaxMeshUploadsPerFrame;
+
+    /// <summary>
+    /// Mesh builds <see cref="ProcessDirtyChunks"/> starts per frame. Defaults to
+    /// <see cref="WorldGenerationConfig.MaxDirtyChunksPerFrame"/>; raised by World while loading and
+    /// restored at the flip to playing, like <see cref="MeshUploadBudget"/>. Main thread only.
+    /// </summary>
+    public int DirtyStartBudget { get; set; } = WorldGenerationConfig.MaxDirtyChunksPerFrame;
+
     private int _loadedChunkCount;
 
     // The camera chunk the last unload scan ran for, and how many frames ago that was. See
@@ -415,7 +429,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
                     continue;
                 }
 
-                if (appliedCount < WorldGenerationConfig.MaxMeshUploadsPerFrame)
+                if (appliedCount < MeshUploadBudget)
                 {
                     ApplyMesh(chunk, meshData);
                     appliedCount++;
@@ -454,7 +468,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
 
         // The set holds thousands of entries mid-stream and every one costs several
         // dictionary probes, so the scan itself is capped: leftovers wait for the next
-        // frames, which meshgen (64 starts/frame, 4 concurrent builds) cannot outrun
+        // frames, which meshgen (DirtyStartBudget starts/frame, 4 concurrent builds) cannot outrun
         // anyway. Drops do not need a second visit — out-of-range entries are removed
         // on sight and missing-neighbour ones are re-added by QueueChunk on arrival.
         var scanned = 0;
@@ -507,16 +521,16 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             _dirtyCandidates.Add((key, pos, chunk, distSq));
         }
 
-        if (_dirtyCandidates.Count > WorldGenerationConfig.MaxDirtyChunksPerFrame)
+        if (_dirtyCandidates.Count > DirtyStartBudget)
         {
             // Only sorted when the budget actually has to choose between candidates
             _dirtyCandidates.Sort((a, b) => a.distSq.CompareTo(b.distSq));
 
-            for (var i = 0; i < WorldGenerationConfig.MaxDirtyChunksPerFrame; i++)
+            for (var i = 0; i < DirtyStartBudget; i++)
                 StartMeshGeneration(_dirtyCandidates[i].key, _dirtyCandidates[i].pos, _dirtyCandidates[i].chunk);
 
             // Everything past the budget goes back in the dirty set for next frame
-            for (var i = WorldGenerationConfig.MaxDirtyChunksPerFrame; i < _dirtyCandidates.Count; i++)
+            for (var i = DirtyStartBudget; i < _dirtyCandidates.Count; i++)
                 _dirtyChunks.TryAdd(_dirtyCandidates[i].key, 0);
         }
         else
@@ -699,9 +713,10 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// <para>
     /// A mesh build reads worldgen state (<c>Chunk.SubmergedSurfaceCode</c> falls back to
     /// <see cref="Chunk.GetColumnData"/>), so a world-seed swap must wait for this as well as
-    /// for the worker joins. World teardown calls <see cref="ChunkGenerationWorker.Stop"/>, then
-    /// <see cref="LodManager.Stop"/>, then this, and only when all three return true may it call
-    /// <see cref="WorldSeed.EndWorld"/> and <see cref="WorldSeed.Apply"/>.
+    /// for the worker joins. <c>World.SaveAndDispose</c> calls <see cref="ChunkGenerationWorker.Stop"/>,
+    /// then <see cref="LodManager.Stop"/>, then this, and only when all three return true does it
+    /// free the chunks through <see cref="ReleaseAll"/> and call <see cref="WorldSeed.EndWorld"/>
+    /// (after which <see cref="WorldSeed.Apply"/> is legal again).
     /// </para>
     /// </summary>
     public bool DrainMeshWork(TimeSpan timeout)
@@ -715,6 +730,58 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
                 return false;
             Thread.Sleep(1);
         }
+    }
+
+    /// <summary>
+    /// Unloads every chunk at once and empties every table this manager keeps, handing each
+    /// chunk's geometry-pool slices back to the shared pools (which stay alive for the next
+    /// world). Takes no snapshots: the caller has already flushed the modified chunks. Main
+    /// thread only (it frees GL slices).
+    /// <para>
+    /// PRECONDITION: the generation worker is stopped and joined
+    /// (<see cref="ChunkGenerationWorker.Stop"/> returned true) and <see cref="DrainMeshWork"/>
+    /// returned true, so no thread can add to <see cref="Chunks"/>, the completed-mesh queue or
+    /// the pending mesh work while this runs. Never call it while the workers run: a straggler
+    /// could register a chunk after the sweep, or write into a chunk that was just freed.
+    /// Calling it twice is a no-op the second time.
+    /// </para>
+    /// </summary>
+    public void ReleaseAll()
+    {
+        foreach (var kvp in Chunks.Packed)
+        {
+            if (!Chunks.TryRemovePacked(kvp.Key, out var chunk)) continue;
+
+            // Dispose nulls both slices, so the Renderable bookkeeping has to happen first,
+            // exactly as UnloadDistantChunks orders it
+            RemoveRenderable(chunk);
+            chunk.Dispose();
+        }
+
+        // Belt and braces: every renderable chunk was in Chunks, so both lists are empty already
+        Renderable.Clear();
+        TranslucentRenderable.Clear();
+
+        // Finished builds nobody will apply: their lists go back to the buffer pool
+        while (_completedMeshQueue.TryDequeue(out var item))
+            MeshBuffers.Return(item.meshData);
+
+        // Empty by the precondition, drained anyway so no chunk reference outlives the world
+        while (_pendingMeshWork.TryDequeue(out _)) { }
+        while (_restoredChunks.TryDequeue(out _)) { }
+        while (_loadedChunks.TryDequeue(out _)) { }
+
+        _dirtyChunks.Clear();
+        _queuedChunkPositions.Clear();
+        _generatingMeshes.Clear();
+        _playerPlacedByChunk.Clear();
+        _applyScratch.Clear();
+        _dirtyCandidates.Clear();
+
+        Interlocked.Exchange(ref _loadedChunkCount, 0);
+        MeshVersion++;
+        Interlocked.Increment(ref _chunkRemovalVersion);
+        _lastUnloadCamChunk = null;
     }
 
     /// <summary>

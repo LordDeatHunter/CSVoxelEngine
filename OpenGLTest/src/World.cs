@@ -63,9 +63,29 @@ public class World : IItemUseWorld
     private readonly BubbleParticleSystem _bubbles = new();
     private readonly SfxManager? _sfx;
 
-    // Where edited chunks and the far-LOD edit state are persisted; null = no persistence
-    // (tests, VOXEL_SCRIPT runs and, until the menu lands, the game itself)
+    // Where edited chunks, the far-LOD edit state, the player and the entities are persisted; null = no
+    // persistence (tests, VOXEL_SCRIPT runs, and the game until the menu attaches one)
     private readonly ChunkSaveStore? _saveStore;
+
+    // Readiness of the chunks around the player while Loading; null for a world that starts
+    // Playing (no save store)
+    private WorldLoadGate? _loadGate;
+
+    // The player.json this world was opened with, kept until the Loading -> Playing flip has
+    // applied its lighting clock; null when the world has no saved player
+    private PlayerSaveData? _savedPlayer;
+
+    // What the first SaveAndDispose returned, so a repeated call reports the same thing
+    private bool _disposeResult;
+
+    // Saved mobs and drops (entities.json) not spawned yet: each waits for its chunk to load,
+    // and the lot is discarded after EntityRestoreTimeoutSeconds of play (RestorePendingEntities)
+    private readonly List<EntitySaveData.MobData> _pendingMobs = [];
+    private readonly List<EntitySaveData.DropData> _pendingDrops = [];
+    private double _entityRestoreTimer;
+
+    // Scratch for CaptureEntities' nearest-first drop order, reused across saves
+    private readonly List<(float dist2, ItemDrop drop)> _dropSort = [];
 
     // Seconds since the last completed autosave pass
     private double _autosaveTimer;
@@ -81,7 +101,13 @@ public class World : IItemUseWorld
 
     // Trees currently toppling over after their base log was mined
     private readonly List<TopplingTree> _toppling = [];
-    private readonly IWindow _window;
+
+    // Null on the headless path (tests), where Now runs off the summed Update deltas instead
+    private readonly IWindow? _window;
+    private double _headlessTime;
+
+    // The window clock, or the headless one: every gameplay time read goes through this
+    private double Now => _window?.Time ?? _headlessTime;
     private bool _hasSelectedBlock;
     private Vector3 _selectedBlockPosition;
     private Vector3 _selectedFaceNormal;
@@ -158,6 +184,28 @@ public class World : IItemUseWorld
     private Vector3 _respawnEye;
     private bool _hasRespawnEye;
 
+    /// <summary>Where the world is in its lifecycle (see <see cref="WorldPhase"/>).</summary>
+    public WorldPhase Phase { get; private set; }
+
+    /// <summary>Whether the full game runs: input, physics, mobs, fluids and autosave.</summary>
+    public bool IsPlaying => Phase == WorldPhase.Playing;
+
+    /// <summary>False only while the world is still <see cref="WorldPhase.Loading"/>.</summary>
+    public bool IsLoaded => Phase != WorldPhase.Loading;
+
+    /// <summary>How far loading got, 0..1 and never decreasing; 1 for a world that never loaded.</summary>
+    public float LoadProgress => _loadGate?.Progress ?? 1f;
+
+    /// <summary>
+    /// True when the world started playing because <see cref="WorldGenerationConfig.LoadTimeoutSeconds"/>
+    /// ran out rather than because its ready sphere was meshed. A loading screen can report it; the
+    /// lifecycle tests assert it stays false.
+    /// </summary>
+    public bool LoadTimedOut => _loadGate?.TimedOut ?? false;
+
+    /// <summary>Live item drops lying in (or flying through) the world.</summary>
+    public IReadOnlyList<ItemDrop> Drops => _dropManager.Drops;
+
     /// <summary>Live primed TNT, feeding the renderer's dynamic point lights.</summary>
     public IReadOnlyList<PrimedTnt> PrimedTnt => _tntManager.Primed;
 
@@ -225,44 +273,130 @@ public class World : IItemUseWorld
     /// <summary>
     /// Builds the world and starts its chunk-generation and LOD workers. With a
     /// <paramref name="saveStore"/>, edited chunks are snapshotted to it on unload and on autosave,
-    /// restored from it when they stream back in, and the far-LOD edit state
-    /// (<see cref="LodEditState"/>) is imported from it before the first LOD region builds; null
-    /// (the default) keeps the old regenerate-and-forget behaviour.
+    /// restored from it when they stream back in, the far-LOD edit state
+    /// (<see cref="LodEditState"/>) is imported from it before the first LOD region builds, and the
+    /// saved player (<see cref="PlayerSaveCodec.FileName"/>: pose, modes, health, inventory) is
+    /// applied before the workers start, so they stream around the restored position; the saved mobs
+    /// and drops (<see cref="EntitySaveCodec.FileName"/>) are spawned once loading finishes, each
+    /// as soon as its chunk is loaded (<see cref="RestorePendingEntities"/>). A world with
+    /// a store starts <see cref="WorldPhase.Loading"/>; null (the default) keeps the old
+    /// regenerate-and-forget behaviour and starts <see cref="WorldPhase.Playing"/> at once.
     /// </summary>
     /// <remarks>
+    /// Passing null for <paramref name="gl"/>, the three pools, <paramref name="window"/> and
+    /// <paramref name="input"/> is the headless path the tests use: the camera takes no input and
+    /// the clock runs off the summed <see cref="Update"/> deltas.
+    /// <para>
     /// The constructor registers the world as live (<see cref="WorldSeed.BeginWorld"/>), so
     /// <see cref="WorldSeed.Apply"/> refuses to run from here on: its worker threads read the
-    /// worldgen statics unsynchronised. The teardown that stops the workers calls
-    /// <see cref="WorldSeed.EndWorld"/> last.
+    /// worldgen statics unsynchronised. <see cref="SaveAndDispose"/> is the teardown; it stops the
+    /// workers and calls <see cref="WorldSeed.EndWorld"/> last. A constructor that throws stops what
+    /// it started and ends the world itself.
+    /// </para>
     /// </remarks>
     public World(GL gl, ChunkGeometryPool opaqueGeometry, ChunkGeometryPool translucentGeometry,
         ChunkGeometryPool lodGeometry, IWindow window, IInputContext input, SfxManager? sfx = null,
         ChunkSaveStore? saveStore = null)
     {
         WorldSeed.BeginWorld();
-        _window = window;
-        _sfx = sfx;
-        _saveStore = saveStore;
-        Camera = new Camera(window, input);
-        _spawnX = Camera.Position.X;
-        _spawnZ = Camera.Position.Z;
-        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("VOXEL_SPAWN")))
-            _spawnSettled = true;
-        _chunkManager = new ChunkManager(gl, opaqueGeometry, translucentGeometry, saveStore);
-        _generationWorker = new ChunkGenerationWorker(_chunkManager, Camera);
-        _lodManager = new LodManager(lodGeometry);
-        _canAcceptDrop = Inventory.CanAccept;
-        if (EntityRegistry.TryGet("slime") is { } slimeType)
-            _slimes = new SlimeManager(slimeType);
-        if (EntityRegistry.TryGet("goblin") is { } goblinType)
-            _goblins = new GoblinManager(goblinType);
+        ChunkGenerationWorker? generationWorker = null;
+        LodManager? lodManager = null;
+        try
+        {
+            _window = window;
+            _sfx = sfx;
+            _saveStore = saveStore;
+            Camera = new Camera(window, input);
+            _savedPlayer = PlayerSaveCodec.TryParse(saveStore?.ReadFile(PlayerSaveCodec.FileName));
+            if (_savedPlayer != null)
+                ApplySavedPlayer(_savedPlayer);
+            if (saveStore != null)
+            {
+                // Held until the Loading -> Playing flip, then spawned as their chunks load
+                var savedEntities = EntitySaveCodec.TryParse(saveStore.ReadFile(EntitySaveCodec.FileName));
+                if (savedEntities?.Mobs != null)
+                    _pendingMobs.AddRange(savedEntities.Mobs);
+                if (savedEntities?.Drops != null)
+                    _pendingDrops.AddRange(savedEntities.Drops);
+            }
+            _spawnX = Camera.Position.X;
+            _spawnZ = Camera.Position.Z;
+            if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("VOXEL_SPAWN")))
+                _spawnSettled = true;
+            _chunkManager = new ChunkManager(gl, opaqueGeometry, translucentGeometry, saveStore);
+            generationWorker = _generationWorker = new ChunkGenerationWorker(_chunkManager, Camera);
+            lodManager = _lodManager = new LodManager(lodGeometry);
+            _canAcceptDrop = Inventory.CanAccept;
+            if (EntityRegistry.TryGet("slime") is { } slimeType)
+                _slimes = new SlimeManager(slimeType);
+            if (EntityRegistry.TryGet("goblin") is { } goblinType)
+                _goblins = new GoblinManager(goblinType);
 
-        _generationWorker.Start();
-        // Before the LOD workers start, so the first region builds already see the saved
-        // caps, surface overrides and felled canopies; a missing or corrupt file imports nothing.
-        LodEditState.TryParse(_saveStore?.ReadFile(LodEditState.FileName))?.Import();
-        _lodManager.Start(Camera);
-        RefreshMobs();
+            // A store means a real world opened from (or created into) a save: it streams first and
+            // plays once the chunks around the player are there. Larger, still bounded budgets
+            // speed the stream up without letting any one frame spike.
+            Phase = saveStore != null ? WorldPhase.Loading : WorldPhase.Playing;
+            if (Phase == WorldPhase.Loading)
+            {
+                _loadGate = new WorldLoadGate(WorldGenerationConfig.LoadReadyRadiusChunks,
+                    WorldGenerationConfig.LoadTimeoutSeconds);
+                _chunkManager.MeshUploadBudget = WorldGenerationConfig.LoadingMeshUploadsPerFrame;
+                _chunkManager.DirtyStartBudget = WorldGenerationConfig.LoadingDirtyChunksPerFrame;
+                _lodManager.UploadBudget = WorldGenerationConfig.LoadingLodUploadsPerFrame;
+                Camera.SuppressLook = true;
+            }
+
+            _generationWorker.Start();
+            // Before the LOD workers start, so the first region builds already see the saved
+            // caps, surface overrides and felled canopies; a missing or corrupt file imports nothing.
+            LodEditState.TryParse(_saveStore?.ReadFile(LodEditState.FileName))?.Import();
+            _lodManager.Start(Camera);
+            RefreshMobs();
+        }
+        catch
+        {
+            // Nothing else will ever tear this world down, so stop what was started and end it
+            // here; a worker that outlived its join keeps the seed locked instead.
+            var joined = (generationWorker?.Stop() ?? true) & (lodManager?.Stop() ?? true);
+            Camera?.Detach();
+            if (joined)
+                WorldSeed.EndWorld();
+            else
+                Log.Warn("World construction failed with a worker still running; the seed can no longer be changed in this process");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Applies a parsed <see cref="PlayerSaveCodec.FileName"/> field by field: a saved position
+    /// restores the pose and marks the spawn settled (a restored player is never relocated to the
+    /// surface), and without one the modes still apply at the current pose. The respawn eye,
+    /// health and inventory are restored when present. The lighting clock waits for the
+    /// Loading -> Playing flip (<see cref="FinishLoading"/>).
+    /// </summary>
+    private void ApplySavedPlayer(PlayerSaveData saved)
+    {
+        if (saved.Position is { Length: 3 } p)
+        {
+            Camera.RestoreState(new Vector3(p[0], p[1], p[2]), saved.Yaw ?? Camera.Yaw, saved.Pitch ?? Camera.Pitch,
+                saved.Creative ?? false, saved.Flying ?? false);
+            _spawnSettled = true;
+        }
+        else
+        {
+            Camera.RestoreState(Camera.Position, Camera.Yaw, Camera.Pitch, saved.Creative ?? false, saved.Flying ?? false);
+        }
+
+        if (saved.RespawnEye is { Length: 3 } r)
+        {
+            _respawnEye = new Vector3(r[0], r[1], r[2]);
+            _hasRespawnEye = true;
+        }
+
+        if (saved.Health is { } hp)
+            _health.Restore(hp);
+        if (saved.Inventory is { } inventory)
+            Inventory.Import(inventory);
     }
 
     /// <summary>
@@ -412,18 +546,37 @@ public class World : IItemUseWorld
     }
 
     /// <summary>
-    /// Seconds added to the window clock to get the lighting clock (Program's <c>VOXEL_TIME</c>
-    /// offset). Set once before the first <see cref="Update"/>, so gameplay-side wind consumers
-    /// read the same <see cref="Wind"/> as the render side.
+    /// Seconds added to the window clock to get <see cref="LightingTime"/>. Program sets it from
+    /// <c>VOXEL_TIME</c> right after construction; a world restored from a save with a lighting
+    /// clock overrides it at the Loading -> Playing flip, so the day resumes where it was saved.
     /// </summary>
     public double TimeOffset { get; set; }
 
     /// <summary>
+    /// THE lighting clock: the window (or headless) clock plus <see cref="TimeOffset"/>. Program's
+    /// <c>SetLighting</c> and HUD read it, the wind here reads it, and the save stores it as
+    /// <see cref="PlayerSaveData.LightingClock"/>.
+    /// </summary>
+    public double LightingTime => Now + TimeOffset;
+
+    /// <summary>
     /// One gameplay frame. Each block of work runs under its own profiler section; the autosave
     /// runs under <see cref="ProfileSection.Save"/>, which never nests inside another section.
+    /// While <see cref="WorldPhase.Loading"/> only the streaming runs (<see cref="UpdateLoading"/>),
+    /// and once <see cref="WorldPhase.Disposed"/> it does nothing.
     /// </summary>
     public void Update(double deltaTime, IKeyboard? keyboard)
     {
+        if (_window == null)
+            _headlessTime += deltaTime;
+        if (Phase == WorldPhase.Disposed)
+            return;
+        if (Phase == WorldPhase.Loading)
+        {
+            UpdateLoading(deltaTime);
+            return;
+        }
+
         FrameProfiler.Begin(ProfileSection.Player);
         EnsureSpawnSettled();
         FrameProfiler.End(ProfileSection.Player);
@@ -468,6 +621,10 @@ public class World : IItemUseWorld
 
         FrameProfiler.Begin(ProfileSection.Entities);
 
+        // Saved mobs and drops whose chunk has streamed in since the flip; RefreshMobs below
+        // picks the new mobs up this same frame. Returns at once once nothing is pending.
+        RestorePendingEntities(deltaTime);
+
         // Drops collected this tick land in the inventory pools. A full pool ignores the
         // drop (it is never attracted), and an id with no pool is discarded.
         _dropManager.Update((float)deltaTime, Camera.Position, _chunkManager, _canAcceptDrop);
@@ -490,7 +647,7 @@ public class World : IItemUseWorld
         _fireCells.AddRange(_campfires.LitCells);
         _fireCells.AddRange(_kilns.LitCells);
         // The lighting clock (window time plus VOXEL_TIME), so the smoke blows the way the leaves lean
-        var wind = Wind.Direction(_window.Time + TimeOffset);
+        var wind = Wind.Direction(LightingTime);
         _fire.Update((float)deltaTime, _fireCells, Camera.RenderEye, wind: wind);
         GatherLavaVents(Camera.RenderEye);
         _lavaFire.Update((float)deltaTime, _lavaVents, Camera.RenderEye, wind: wind);
@@ -573,10 +730,145 @@ public class World : IItemUseWorld
     }
 
     /// <summary>
+    /// The <see cref="WorldPhase.Loading"/> frame: streaming only. Chunks and far LOD stream and
+    /// upload under the loading budgets, the spawn settles and freshly loaded water wakes, but
+    /// there is no camera physics (unloaded cells read as air and the player would fall), no
+    /// health, mobs, drops, fluid tick, autosave or raycast. The gate's sphere walk runs only
+    /// here, never in the Playing hot path.
+    /// </summary>
+    private void UpdateLoading(double deltaTime)
+    {
+        FrameProfiler.Begin(ProfileSection.Player);
+        EnsureSpawnSettled();
+        FrameProfiler.End(ProfileSection.Player);
+
+        // Times itself, as ChunkUnload / ChunkApply / ChunkDirty
+        _chunkManager.Update(Camera);
+
+        FrameProfiler.Begin(ProfileSection.Lod);
+        _lodManager.Update(_chunkManager);
+        FrameProfiler.End(ProfileSection.Lod);
+
+        FrameProfiler.Begin(ProfileSection.FluidWake);
+        _fluidManager.WakeLoadedChunks(_chunkManager);
+        FrameProfiler.End(ProfileSection.FluidWake);
+
+        var gateDone = _loadGate!.Update(_chunkManager, Camera.Position, deltaTime);
+        if ((gateDone && _spawnSettled) || _loadGate.TimedOut)
+            FinishLoading();
+    }
+
+    /// <summary>
+    /// The Loading -> Playing flip: the play budgets and mouse look come back, the saved lighting
+    /// clock is applied against the clock as it stands now (so the day did not advance while
+    /// loading), and the walk cycle forgets the pre-load position so the whole load never reads
+    /// as one enormous step. The saved mobs and drops whose chunks the ready sphere already covers
+    /// spawn here, before any manager has run; the rest keep waiting for their chunks.
+    /// </summary>
+    private void FinishLoading()
+    {
+        _chunkManager.MeshUploadBudget = WorldGenerationConfig.MaxMeshUploadsPerFrame;
+        _chunkManager.DirtyStartBudget = WorldGenerationConfig.MaxDirtyChunksPerFrame;
+        _lodManager.UploadBudget = WorldGenerationConfig.MaxLodUploadsPerFrame;
+        Camera.SuppressLook = false;
+        if (_savedPlayer?.LightingClock is { } clock)
+            TimeOffset = clock - Now;
+        Phase = WorldPhase.Playing;
+        _hasPrevCamPos = false;
+        RestorePendingEntities(0);
+        RefreshMobs();
+        // The clock is applied and the capture no longer needs the saved one
+        _savedPlayer = null;
+    }
+
+    /// <summary>
+    /// Spawns every pending saved mob and drop whose chunk is loaded, through the managers' own
+    /// spawn paths, and restores its health, facing and motion. Each waits for its chunk because
+    /// an entity restored over an unloaded chunk would fall through air (slimes, goblins and drops
+    /// all read unloaded cells as air). An unknown entity kind or item name, or a record with no
+    /// position, is dropped with one warning per pass. After
+    /// <see cref="WorldGenerationConfig.EntityRestoreTimeoutSeconds"/> of play whatever is still
+    /// pending is discarded. Main thread, Playing only; nothing pending costs one check.
+    /// </summary>
+    private void RestorePendingEntities(double deltaTime)
+    {
+        if (_pendingMobs.Count == 0 && _pendingDrops.Count == 0)
+            return;
+        _entityRestoreTimer += deltaTime;
+        List<string>? dropped = null;
+
+        for (var i = _pendingMobs.Count - 1; i >= 0; i--)
+        {
+            var mob = _pendingMobs[i];
+            var type = mob.Type == null ? null : EntityRegistry.TryGet(mob.Type);
+            var known = type != null
+                && ((_slimes != null && string.Equals(type.Name, "slime", StringComparison.OrdinalIgnoreCase))
+                    || (_goblins != null && string.Equals(type.Name, "goblin", StringComparison.OrdinalIgnoreCase)));
+            if (!known || mob.Position is not { Length: 3 } p)
+            {
+                (dropped ??= []).Add($"mob '{mob.Type ?? "?"}'");
+                _pendingMobs.RemoveAt(i);
+                continue;
+            }
+
+            var centre = new Vector3(p[0], p[1], p[2]);
+            if (!IsCellLoaded(centre))
+                continue;
+
+            var velocity = ToVector(mob.Velocity);
+            Mob spawned = string.Equals(type!.Name, "slime", StringComparison.OrdinalIgnoreCase)
+                ? _slimes!.Spawn(centre)
+                : _goblins!.Spawn(centre, mob.Ammo ?? 0);
+            spawned.RestoreState(mob.Health ?? type.MaxHealth, mob.Facing ?? 0f, velocity);
+            _pendingMobs.RemoveAt(i);
+        }
+
+        for (var i = _pendingDrops.Count - 1; i >= 0; i--)
+        {
+            var drop = _pendingDrops[i];
+            if (!SaveNames.TryResolve(drop.Item, out var id) || drop.Position is not { Length: 3 } p)
+            {
+                (dropped ??= []).Add($"drop '{drop.Item ?? "?"}'");
+                _pendingDrops.RemoveAt(i);
+                continue;
+            }
+
+            var position = new Vector3(p[0], p[1], p[2]);
+            if (!IsCellLoaded(position))
+                continue;
+
+            if (!_dropManager.SpawnRestored(id, position, ToVector(drop.Velocity), drop.Age ?? 0f))
+                (dropped ??= []).Add($"drop '{drop.Item}'");
+            _pendingDrops.RemoveAt(i);
+        }
+
+        if (dropped != null)
+            Log.Warn($"Entity save: dropped {dropped.Count} unrestorable entr{(dropped.Count == 1 ? "y" : "ies")}: {string.Join(", ", dropped)}");
+
+        if (_entityRestoreTimer >= WorldGenerationConfig.EntityRestoreTimeoutSeconds
+            && (_pendingMobs.Count > 0 || _pendingDrops.Count > 0))
+        {
+            Log.Warn($"Entity save: discarded {_pendingMobs.Count} mob(s) and {_pendingDrops.Count} drop(s) whose chunk never loaded");
+            _pendingMobs.Clear();
+            _pendingDrops.Clear();
+        }
+    }
+
+    // Whether the chunk owning the cell under a world position is loaded
+    private bool IsCellLoaded(Vector3 position) =>
+        _chunkManager.ChunkAt(MathUtils.FloorToInt(position.X), MathUtils.FloorToInt(position.Y),
+            MathUtils.FloorToInt(position.Z)) != null;
+
+    // A saved float[3] as a vector; anything else is zero
+    private static Vector3 ToVector(float[]? v) => v is { Length: 3 } ? new Vector3(v[0], v[1], v[2]) : Vector3.Zero;
+
+    /// <summary>
     /// One autosave pass: snapshots up to <see cref="WorldGenerationConfig.MaxAutosaveSnapshotsPerCall"/>
     /// modified loaded chunks to the save store (the copies are cheap; encoding and disk I/O run
-    /// on its writer thread), then the far-LOD edit state if it changed. A burst that fills the
-    /// cap leaves the timer due, so the rest continues next frame instead of stalling this one.
+    /// on its writer thread), then the far-LOD edit state if it changed, the player and the
+    /// entities. A burst
+    /// that fills the cap leaves the timer due, so the rest continues next frame instead of
+    /// stalling this one.
     /// </summary>
     private void Autosave()
     {
@@ -589,6 +881,112 @@ public class World : IItemUseWorld
 
         _autosaveTimer = 0;
         SaveLodEditStateIfChanged();
+        SavePlayerState();
+        SaveEntityState();
+    }
+
+    /// <summary>
+    /// The player as <see cref="PlayerSaveCodec"/> writes it. While still Loading the saved clock
+    /// has not been applied yet, so a flush then keeps the saved one instead of overwriting it
+    /// with an unrestored clock.
+    /// </summary>
+    private PlayerSaveData CapturePlayer()
+    {
+        var pos = Camera.Position;
+        return new PlayerSaveData
+        {
+            Position = [pos.X, pos.Y, pos.Z],
+            Yaw = Camera.Yaw,
+            Pitch = Camera.Pitch,
+            Creative = Camera.IsCreative,
+            Flying = Camera.IsFlying,
+            Health = _health.Health,
+            LightingClock = Phase == WorldPhase.Loading ? _savedPlayer?.LightingClock ?? LightingTime : LightingTime,
+            RespawnEye = _hasRespawnEye ? [_respawnEye.X, _respawnEye.Y, _respawnEye.Z] : null,
+            Inventory = Inventory.Export()
+        };
+    }
+
+    /// <summary>Enqueues <see cref="PlayerSaveCodec.FileName"/>; does nothing without a save store.</summary>
+    private void SavePlayerState()
+    {
+        if (_saveStore == null)
+            return;
+        _saveStore.EnqueueFile(PlayerSaveCodec.FileName, PlayerSaveCodec.ToBytes(CapturePlayer()));
+    }
+
+    /// <summary>
+    /// The live mobs and drops as <see cref="EntitySaveCodec"/> writes them: every living slime and
+    /// goblin (kind by <see cref="EntityType.Name"/>, body centre, health, facing, velocity, a
+    /// goblin's ammo) and the item drops nearest the player first, capped at
+    /// <see cref="WorldGenerationConfig.MaxSavedDrops"/>, by <see cref="SaveNames"/> name (an id
+    /// with no name is skipped with one warning). Entries still pending a restore are appended, so a
+    /// flush during loading, or before a far entity's chunk arrived, never loses them.
+    /// </summary>
+    private EntitySaveData CaptureEntities()
+    {
+        var mobs = new List<EntitySaveData.MobData>();
+        var slimes = Slimes;
+        for (var i = 0; i < slimes.Count; i++)
+            if (!slimes[i].IsDead)
+                mobs.Add(CaptureMob(slimes[i], null));
+        var goblins = Goblins;
+        for (var i = 0; i < goblins.Count; i++)
+            if (!goblins[i].IsDead)
+                mobs.Add(CaptureMob(goblins[i], goblins[i].Ammo));
+        mobs.AddRange(_pendingMobs);
+
+        _dropSort.Clear();
+        var eye = Camera.Position;
+        var liveDrops = _dropManager.Drops;
+        for (var i = 0; i < liveDrops.Count; i++)
+            _dropSort.Add((Vector3.DistanceSquared(liveDrops[i].Position, eye), liveDrops[i]));
+        _dropSort.Sort(static (a, b) => a.dist2.CompareTo(b.dist2));
+
+        var drops = new List<EntitySaveData.DropData>();
+        var unnamed = 0;
+        for (var i = 0; i < _dropSort.Count && drops.Count < WorldGenerationConfig.MaxSavedDrops; i++)
+        {
+            var drop = _dropSort[i].drop;
+            if (SaveNames.NameOf(drop.BlockId) is not { } name)
+            {
+                unnamed++;
+                continue;
+            }
+
+            drops.Add(new EntitySaveData.DropData
+            {
+                Item = name,
+                Position = [drop.Position.X, drop.Position.Y, drop.Position.Z],
+                Velocity = [drop.Velocity.X, drop.Velocity.Y, drop.Velocity.Z],
+                Age = drop.Age
+            });
+        }
+        _dropSort.Clear();
+        for (var i = 0; i < _pendingDrops.Count && drops.Count < WorldGenerationConfig.MaxSavedDrops; i++)
+            drops.Add(_pendingDrops[i]);
+
+        if (unnamed > 0)
+            Log.Warn($"Entity save: skipped {unnamed} drop(s) of an item with no save name");
+        return new EntitySaveData { Mobs = mobs, Drops = drops };
+    }
+
+    private static EntitySaveData.MobData CaptureMob(Mob mob, int? ammo) => new()
+    {
+        Type = mob.Type.Name,
+        Position = [mob.Position.X, mob.Position.Y, mob.Position.Z],
+        Health = mob.Health,
+        Facing = mob.Facing,
+        Velocity = [mob.Velocity.X, mob.Velocity.Y, mob.Velocity.Z],
+        Ammo = ammo
+    };
+
+    /// <summary>Enqueues <see cref="EntitySaveCodec.FileName"/>; does nothing without a save store.</summary>
+    private void SaveEntityState()
+    {
+        if (_saveStore == null)
+            return;
+        _saveStore.EnqueueFile(EntitySaveCodec.FileName, EntitySaveCodec.ToBytes(CaptureEntities()));
     }
 
     /// <summary>
@@ -609,13 +1007,16 @@ public class World : IItemUseWorld
     }
 
     /// <summary>
-    /// Hands every modified loaded chunk and the far-LOD edit state to the save store, so what
-    /// the player sees now is what the save holds once the writer drains. Main thread only; no
-    /// GL, no profiler span and no shutdown: the caller that closes the world calls this, then
-    /// <see cref="ChunkSaveStore.Shutdown"/> with
-    /// <see cref="WorldGenerationConfig.SaveWriterShutdownTimeoutSeconds"/>, then stops the
-    /// generation and LOD workers, drains the mesh runners and finally
-    /// <see cref="WorldSeed.EndWorld"/>. Does nothing without a save store.
+    /// Hands every modified loaded chunk, the far-LOD edit state, the player
+    /// (<see cref="PlayerSaveCodec.FileName"/>) and the mobs and drops
+    /// (<see cref="EntitySaveCodec.FileName"/>) to the save store, so what the player sees now is
+    /// what the save holds once the writer drains. Main thread only; no GL, no profiler span and no
+    /// shutdown. <see cref="SaveAndDispose"/> is the caller that closes the world: it stops and
+    /// joins the generation and LOD workers and drains the mesh runners
+    /// (<see cref="ChunkManager.DrainMeshWork"/>) first, so this flush sees a quiescent world, then
+    /// calls this, then <see cref="ChunkSaveStore.Shutdown"/> with
+    /// <see cref="WorldGenerationConfig.SaveWriterShutdownTimeoutSeconds"/>, releases the geometry
+    /// and finally <see cref="WorldSeed.EndWorld"/>. Does nothing without a save store.
     /// </summary>
     public void FlushAll()
     {
@@ -623,7 +1024,70 @@ public class World : IItemUseWorld
             return;
         _chunkManager.FlushModified(int.MaxValue);
         SaveLodEditStateIfChanged(force: true);
+        SavePlayerState();
+        SaveEntityState();
         _autosaveTimer = 0;
+    }
+
+    /// <summary>
+    /// Saves and tears the world down so a second <see cref="World"/> (with any seed) can be built
+    /// in this process. Main thread only, and blocking: up to
+    /// <see cref="WorldGenerationConfig.WorkerStopJoinTimeoutMs"/> per worker thread, plus
+    /// <see cref="WorldGenerationConfig.MeshDrainTimeoutMs"/> and
+    /// <see cref="WorldGenerationConfig.SaveWriterShutdownTimeoutSeconds"/>.
+    /// <list type="number">
+    /// <item>The camera stops listening to the window and mouse.</item>
+    /// <item>The generation and LOD workers are stopped and joined and the mesh runners drained
+    /// FIRST, so the flush below sees a quiescent world and no thread can touch a chunk that is
+    /// about to be freed.</item>
+    /// <item><see cref="FlushAll"/> hands every edit, the player and the entities to the store, BEFORE
+    /// <see cref="ChunkSaveStore.Shutdown"/>, since a store that stopped accepting drops every later
+    /// write.</item>
+    /// <item>Only when every join and the drain succeeded: every chunk and LOD slice goes back to
+    /// the shared pools (<see cref="ChunkManager.ReleaseAll"/>, <see cref="LodManager.ReleaseAll"/>),
+    /// the toppling-tree meshes are disposed and <see cref="WorldSeed.EndWorld"/> runs last. A
+    /// timed-out join leaves all of that in place (freeing a slice a straggler may still write to
+    /// would be worse) and keeps <see cref="WorldSeed.Apply"/> illegal; the process must not open
+    /// another world then.</item>
+    /// <item><paramref name="renderManager"/>, when given, forgets its references into this world
+    /// (<see cref="RenderManager.ForgetWorld"/>); its pools and programs stay alive.</item>
+    /// </list>
+    /// The World owns the store's shutdown: the caller must not shut it down again, and must give
+    /// the next World a NEW <see cref="ChunkSaveStore"/> over the same folder. Idempotent: a
+    /// repeated call returns the first result. False means a join, the drain or the writer timed
+    /// out. Afterwards <see cref="Update"/> is a no-op and <see cref="Render"/> must not be called.
+    /// </summary>
+    public bool SaveAndDispose(RenderManager? renderManager = null)
+    {
+        if (Phase == WorldPhase.Disposed)
+            return _disposeResult;
+
+        Camera.Detach();
+        var genStopped = _generationWorker.Stop();
+        var lodStopped = _lodManager.Stop();
+        var drained = _chunkManager.DrainMeshWork(TimeSpan.FromMilliseconds(WorldGenerationConfig.MeshDrainTimeoutMs));
+        FlushAll();
+        var written = _saveStore?.Shutdown(TimeSpan.FromSeconds(WorldGenerationConfig.SaveWriterShutdownTimeoutSeconds)) ?? true;
+
+        var quiet = genStopped && lodStopped && drained;
+        if (quiet)
+        {
+            _chunkManager.ReleaseAll();
+            _lodManager.ReleaseAll();
+            foreach (var tree in _toppling)
+                tree.Dispose();
+            _toppling.Clear();
+            WorldSeed.EndWorld();
+        }
+        else
+        {
+            Log.Warn("World teardown: a worker or mesh build outlived its timeout; the world's chunks were left in place and the seed cannot be changed in this process");
+        }
+
+        renderManager?.ForgetWorld();
+        Phase = WorldPhase.Disposed;
+        _disposeResult = quiet && written;
+        return _disposeResult;
     }
 
     /// <summary>
@@ -790,7 +1254,7 @@ public class World : IItemUseWorld
 
         FrameProfiler.Begin(ProfileSection.WorldPass);
         renderManager.BeginGpuPass(ProfileSection.WorldPass);
-        renderManager.RenderWorld(Camera, _chunkManager.Renderable, _window.Time);
+        renderManager.RenderWorld(Camera, _chunkManager.Renderable, Now);
         renderManager.EndGpuPass(ProfileSection.WorldPass);
         FrameProfiler.End(ProfileSection.WorldPass);
 
@@ -845,7 +1309,7 @@ public class World : IItemUseWorld
             renderManager.RenderTopplingTree(Camera, tree);
         renderManager.RenderPlayer(Camera, Player);
         renderManager.RenderHeldItem(Camera, Player, _heldId, _hasHeld,
-            (float)_window.Time, Compass.HeadingFromYaw(Camera.Yaw));
+            (float)Now, Compass.HeadingFromYaw(Camera.Yaw));
         renderManager.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);
 
@@ -941,7 +1405,7 @@ public class World : IItemUseWorld
         int fps, bool showProfiler, bool showCoordinates = true, PauseMenuView? menu = null,
         SettingsMenuView? settings = null)
     {
-        renderManager.RenderUI(_window, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings,
+        renderManager.RenderUI(_window!, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings,
             _health.Health, _health.DamageFlash);
     }
     
@@ -958,10 +1422,12 @@ public class World : IItemUseWorld
     /// swing still plays. A block of hardness 0 breaks on first contact. Damage is discarded when
     /// the target, the held tool or the button changes. A click with no block under the
     /// crosshair still swings the fist. Creative instamines and ignores the gate.
-    /// Call after Update so the selection is current.
+    /// Call after Update so the selection is current. Does nothing unless the world is playing:
+    /// nothing may edit an unloaded world.
     /// </summary>
     public void UpdateBlockBreaking(double deltaTime, bool isHolding)
     {
+        if (!IsPlaying) return;
         var justPressed = isHolding && !_attackWasPressed;
         _attackWasPressed = isHolding;
 
@@ -1590,9 +2056,11 @@ public class World : IItemUseWorld
     /// stack when <paramref name="wholeStack"/> is set. Works for blocks and pure items alike;
     /// does nothing when the slot is empty. Each unit spawns its own drop, so a thrown stack
     /// scatters (every drop rolls its own random pop) and picks back up one unit at a time.
+    /// Does nothing unless the world is playing: nothing may edit an unloaded world.
     /// </summary>
     public void ThrowSelected(bool wholeStack = false)
     {
+        if (!IsPlaying) return;
         var forward = Camera.ViewDirection;
 
         // A held tool is one instance: it leaves the pool and every hotbar slot holding it
@@ -1626,9 +2094,11 @@ public class World : IItemUseWorld
     /// that bucket flips with it and scooping and pouring alternate on one button. Returns
     /// whether the click was claimed, so a plain throwable only starts charging when nothing
     /// here owned it — a mudball aimed at a lit campfire cooks instead of being thrown.
+    /// False unless the world is playing: nothing may edit an unloaded world.
     /// </summary>
     public bool TryUseSelected(float maxDistance)
     {
+        if (!IsPlaying) return false;
         if (_throwCharging) return false;
         Camera.NotifyPlayerAction();
         if (TryCookOrCollect(maxDistance))
@@ -1658,8 +2128,11 @@ public class World : IItemUseWorld
         return DispatchUse(item, maxDistance);
     }
 
+    /// <summary>Starts charging a throw of the selected throwable. False unless the world is
+    /// playing: nothing may edit an unloaded world.</summary>
     public bool TryBeginThrowCharge()
     {
+        if (!IsPlaying) return false;
         if (_throwCharging) return true;
         var id = Inventory.SelectedBlockId;
         if (id == 0 || Inventory.SelectedCount <= 0) return false;
@@ -1672,8 +2145,11 @@ public class World : IItemUseWorld
         return true;
     }
 
+    /// <summary>Advances a held throw charge. Does nothing unless the world is playing: nothing
+    /// may edit an unloaded world.</summary>
     public void UpdateThrowCharge(float deltaTime)
     {
+        if (!IsPlaying) return;
         if (!_throwCharging) return;
         _throwChargeSeconds = Math.Min(_throwChargeSeconds + Math.Max(0f, deltaTime), WorldGenerationConfig.ThrowChargeSeconds);
         if (Inventory.SelectedBlockId != _throwItemId || Inventory.SelectedCount <= 0)
@@ -1691,8 +2167,11 @@ public class World : IItemUseWorld
         Player.CancelThrowCharge();
     }
 
+    /// <summary>Releases a charged throw. False unless the world is playing: nothing may edit an
+    /// unloaded world.</summary>
     public bool ReleaseThrow()
     {
+        if (!IsPlaying) return false;
         if (!_throwCharging) return false;
         _throwCharging = false;
         var charge01 = MathUtils.Clamp01(_throwChargeSeconds / WorldGenerationConfig.ThrowChargeSeconds);
@@ -1768,7 +2247,7 @@ public class World : IItemUseWorld
     // One implementation for every Item override: queries read the live managers, effects write
     // them, and the inventory tail runs through the dispatcher's active tool instance.
 
-    double IItemUseWorld.NowSeconds => _window.Time;
+    double IItemUseWorld.NowSeconds => Now;
 
     bool IItemUseWorld.IsCreative => Camera.IsCreative;
 
@@ -1891,12 +2370,12 @@ public class World : IItemUseWorld
     }
 
     bool IItemUseWorld.ToolReady() =>
-        _activeToolInstance > 0 && Inventory.ToolReadyAt(_activeToolInstance, _window.Time);
+        _activeToolInstance > 0 && Inventory.ToolReadyAt(_activeToolInstance, Now);
 
     void IItemUseWorld.MarkToolUsed(float delaySeconds)
     {
         if (_activeToolInstance > 0)
-            Inventory.MarkToolUsed(_activeToolInstance, _window.Time, delaySeconds);
+            Inventory.MarkToolUsed(_activeToolInstance, Now, delaySeconds);
     }
 
     bool IItemUseWorld.DamageTool(int amount) =>
@@ -2083,10 +2562,12 @@ public class World : IItemUseWorld
     /// <summary>
     /// Places the hotbar's selected block against the face the player is looking at and spends
     /// one from that slot — except in creative mode, where placing is free. Does nothing
-    /// when the slot is empty or holds no blocks. Returns whether one was placed.
+    /// when the slot is empty or holds no blocks. Returns whether one was placed; false unless the
+    /// world is playing, since nothing may edit an unloaded world.
     /// </summary>
     public bool TryPlaceSelectedBlock(float maxDistance)
     {
+        if (!IsPlaying) return false;
         if (!Inventory.CanPlaceSelected) return false;
 
         // Only spend a block if one actually went down (and never in creative)
@@ -2096,17 +2577,22 @@ public class World : IItemUseWorld
         return true;
     }
 
+    /// <summary>Picks the targeted block into the hotbar. False unless the world is playing:
+    /// nothing may edit an unloaded world.</summary>
     public bool TryPickTargetedBlock()
     {
+        if (!IsPlaying) return false;
         if (!_hasSelectedBlock) return false;
         var id = BlockIdAt(_selectedBlockPosition);
         if (id == 0) return false;
         return Inventory.PickBlock(id);
     }
 
-    /// <summary>Places a block against the targeted face. Returns whether one was placed.</summary>
+    /// <summary>Places a block against the targeted face. Returns whether one was placed; false
+    /// unless the world is playing, since nothing may edit an unloaded world.</summary>
     public bool TryPlaceBlockFromRaycast(float maxDistance, byte blockId)
     {
+        if (!IsPlaying) return false;
         if (blockId == 0) return false;
 
         if (!Camera.Raycast(maxDistance, _chunkManager, out var hitPos, out var hitNormal))
@@ -2179,4 +2665,6 @@ public class World : IItemUseWorld
     }
     
     public ChunkManager GetChunkManager() => _chunkManager;
+
+    internal LodManager GetLodManager() => _lodManager;
 }

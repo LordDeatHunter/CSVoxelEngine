@@ -364,6 +364,19 @@ public const float DayLengthSeconds = 1200f;
     public const int MeshDrainTimeoutMs = 5000;
     // Cells a removal of a column's top block scans down for the new LOD surface before giving up.
     public const int LodSurfaceRescanDepth = 64;
+    // Chunks around the camera that must be generated and meshed before a loaded world starts
+    // playing; the sphere is ~123 chunks, kept far below ChunkRadius so meshing always has its neighbours.
+    public const int LoadReadyRadiusChunks = 3;
+    // A loading world starts playing anyway after this much accumulated update time.
+    public const double LoadTimeoutSeconds = 30.0;
+    // The per-frame caps while loading: larger than play, still bounded so no frame spikes.
+    public const int LoadingMeshUploadsPerFrame = 64;
+    public const int LoadingDirtyChunksPerFrame = 128;
+    public const int LoadingLodUploadsPerFrame = 8;
+    // Saved mobs and drops whose chunk never loads are dropped after this many seconds of play.
+    public const double EntityRestoreTimeoutSeconds = 30.0;
+    // Nearest-first cap on the item drops one save writes.
+    public const int MaxSavedDrops = 512;
 
     // --- Deterministic worldgen caches (GenerationalCache) ---
     // Chunk.GetColumnData's cache. Column data depends only on (x, z), so one entry serves the whole

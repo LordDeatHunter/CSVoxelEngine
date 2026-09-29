@@ -651,6 +651,91 @@ public sealed class LodManagerTests
             () => new LodRegion(null, new LodMeshData(0, 0, 0, [], [], quad, indices, 0f, 0f, [], [])));
     }
 
+    /// <summary>The manager-level half of the headless seam: with no pool, a finished build
+    /// that carries real geometry is dropped by the apply pass instead of reaching the throwing
+    /// LodRegion constructor, so a headless World can drive <see cref="LodManager.Update"/> over
+    /// real terrain. An empty build still becomes a region exactly as before.</summary>
+    [Fact]
+    public void HeadlessApplyDropsANonEmptyBuildInsteadOfThrowing()
+    {
+        var lods = new LodManager(null!);
+        var span = LodRegion.Levels[0].RegionBlocks / Chunk.Size;
+        var n = span * span;
+
+        List<Vertex> vertices = [new()];
+        List<ushort> indices = [0, 0, 0];
+        lods.EnqueueCompletedMesh(new LodMeshData(0, 0, 0, vertices, indices, [], [], 0f, 0f,
+            new int[n], new int[n]));
+        lods.EnqueueCompletedMesh(new LodMeshData(0, 1, 0, [], [], [], [], 0f, 0f,
+            new int[n], new int[n]));
+
+        var camRegions = new (int, int)[LodRegion.Levels.Length];
+        var ex = Record.Exception(() => lods.ApplyCompletedMeshes(camRegions));
+        Assert.Null(ex);
+
+        Assert.True(lods.Regions.ContainsKey((0, 1, 0)));
+        Assert.False(lods.Regions.ContainsKey((0, 0, 0)));
+        Assert.Single(lods.RegionList);
+    }
+
+    /// <summary>
+    /// <see cref="LodManager.ReleaseAll"/> (world teardown) disposes every region, leaves every
+    /// table and the upload queue empty, and leaves the manager usable: a build queued before the
+    /// release never lands afterwards, and a region added later registers normally.
+    /// </summary>
+    [Fact]
+    public void ReleaseAllDisposesEveryRegionAndDrainsTheQueue()
+    {
+        var lods = new LodManager(null!);
+        var span = LodRegion.Levels[0].RegionBlocks / Chunk.Size;
+        var n = span * span;
+
+        // Four level-0 regions under one level-1 parent (so the finer-child counts are filled)
+        // plus that parent itself: two levels in the tables at once.
+        var released = new List<LodRegion>
+        {
+            HeadlessRegion(0, 0, 7),
+            HeadlessRegion(0, 1, 7),
+            HeadlessRegion(1, 0, 7),
+            HeadlessRegion(1, 1, 7),
+            CoarseHeadlessRegion(1, 0, 0),
+        };
+        foreach (var region in released)
+            lods.AddRegion((region.Level, region.X, region.Z), region);
+        Assert.Equal(released.Count, lods.RegionList.Count);
+
+        lods.EnqueueCompletedMesh(new LodMeshData(0, 2, 0, [], [], [], [], 0f, 0f,
+            new int[n], new int[n]));
+
+        lods.ReleaseAll();
+
+        Assert.True(lods.Regions.IsEmpty);
+        Assert.Empty(lods.RegionList);
+        foreach (var region in released)
+        {
+            Assert.Equal(-1, region.ListIndex);
+            Assert.Equal(-1, region.PendingCoverIndex);
+        }
+
+        // The queued build was drained by the release, so nothing lands afterwards
+        var camRegions = new (int, int)[LodRegion.Levels.Length];
+        lods.ApplyCompletedMeshes(camRegions);
+        Assert.Empty(lods.RegionList);
+        Assert.True(lods.Regions.IsEmpty);
+
+        var emptyChunks = new ChunkManager(null!);
+        Assert.Null(Record.Exception(() => lods.Update(emptyChunks)));
+        Assert.Null(Record.Exception(() => lods.UpdateCoverFlags(emptyChunks, Vector3.Zero)));
+
+        lods.AddRegion((0, 3, 3), HeadlessRegion(3, 3, 7));
+        Assert.Single(lods.RegionList);
+        Assert.True(lods.Regions.ContainsKey((0, 3, 3)));
+
+        // A second release is a no-op on an empty manager and does not throw
+        lods.ReleaseAll();
+        Assert.Null(Record.Exception(lods.ReleaseAll));
+    }
+
     /// <summary>
     /// <see cref="LodManager.Stop"/> joins the LodGen pool, so once it returns true no region
     /// build can still be reading worldgen state (the precondition a world-seed swap needs), and

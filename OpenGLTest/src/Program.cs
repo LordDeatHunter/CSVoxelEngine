@@ -54,8 +54,9 @@ public static class Program
     // breakdown once a second without anyone pressing a key
     private const string DebugVariable = "VOXEL_DEBUG";
 
-    // Added to the window clock before the lighting pass sees it, so a screenshot can be taken
-    // at any point of the day without waiting for the sun to get there
+    // VOXEL_TIME: seeds World.TimeOffset once after construction, so a screenshot can be taken at
+    // any point of the day without waiting for the sun to get there. The World owns the lighting
+    // clock from then on (World.LightingTime), and a restored world overrides this offset.
     private static double timeOffset;
 
     public static void Main()
@@ -666,7 +667,7 @@ public static class Program
 
         FrameProfiler.Begin(ProfileSection.Lighting);
         renderManager.BeginGpuPass(ProfileSection.Lighting);
-        renderManager.SetLighting(windowManager.Window.Time + timeOffset, world.Camera, world.PrimedTnt,
+        renderManager.SetLighting(world.LightingTime, world.Camera, world.PrimedTnt,
             world.Camera.IsEyeInWater, world.Camera.IsEyeInLava, world.FireCells);
         ambience?.Update(renderManager.Dayness, (float)MathUtils.Clamp(deltaTime, 0.0, 0.25));
         sfx?.Update();
@@ -692,7 +693,7 @@ public static class Program
         var hideHud = visualDirector?.TakeScreenshot == true && visualDirector.ScreenshotHideHud;
         if (!hideHud)
             world.RenderUI(renderManager, inventoryView,
-                (float)(windowManager.Window.Time + timeOffset), shownFps, debugEnabled,
+                (float)world.LightingTime, shownFps, debugEnabled,
                 showCoordinates: true, menu: pauseMenuView, settings: settingsMenuView);
         renderManager.EndGpuPass(ProfileSection.UiPass);
         FrameProfiler.End(ProfileSection.UiPass);

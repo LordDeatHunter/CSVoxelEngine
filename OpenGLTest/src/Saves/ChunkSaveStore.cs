@@ -178,6 +178,9 @@ public sealed class ChunkSaveStore
     /// Stops accepting jobs and waits up to <paramref name="timeout"/> for the writer to finish the
     /// ones already queued. Returns false (warned) when it did not finish in time; the writer is a
     /// background thread, so it never keeps the process alive. Reads keep working afterwards.
+    /// A store handed to a <see cref="World"/> is shut down by <see cref="World.SaveAndDispose"/>:
+    /// the World owns it, so its caller must not shut it down again and gives the next World a
+    /// new store over the same folder.
     /// </summary>
     public bool Shutdown(TimeSpan timeout)
     {

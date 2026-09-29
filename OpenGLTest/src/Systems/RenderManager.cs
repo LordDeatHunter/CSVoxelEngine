@@ -323,10 +323,40 @@ public class RenderManager : IDisposable
     public float Dayness => _dayness;
 
     /// <summary>
-    /// Where entity draws read their world light (<see cref="EntityLight.Sample"/>). Set once
-    /// after the World exists; null lights every draw at <see cref="EntityLightSample.Default"/>.
+    /// Where entity draws read their world light (<see cref="EntityLight.Sample"/>). Set per world,
+    /// once that World exists, and cleared by <see cref="ForgetWorld"/> when it is torn down; null
+    /// lights every draw at <see cref="EntityLightSample.Default"/>.
     /// </summary>
     public ChunkManager? LightSource { get; set; }
+
+    /// <summary>
+    /// Drops every reference this renderer holds into the current world: the light source, the
+    /// per-frame chunk and region draw lists, the mirror's entity lists, and the mirror itself
+    /// (marked invalid so the next world renders a fresh one instead of reusing the old image).
+    /// Called by <c>World.SaveAndDispose</c> after the world freed its slices. The geometry pools,
+    /// programs, caches and the <see cref="ChunkDrawBatch"/> stay alive for the next world, so a
+    /// frame rendered before that world exists draws nothing stale. The logged unit counts are
+    /// the leak check: after a clean teardown every pool reads 0. Render thread only.
+    /// </summary>
+    public void ForgetWorld()
+    {
+        LightSource = null;
+        _visibleChunks.Clear();
+        _translucentChunks.Clear();
+        _visibleRegions.Clear();
+        _translucentRegions.Clear();
+        _mirrorDrops.Clear();
+        _mirrorThrown.Clear();
+        _mirrorPrimed.Clear();
+        _mirrorFalling.Clear();
+        _mirrorSlimes.Clear();
+        _mirrorGoblins.Clear();
+        _mirrorToppling.Clear();
+        _reflMirrorValid = false;
+
+        Log.WriteLine($"World released: geometry in use opaque {OpaqueChunkGeometry.UsedUnits}, " +
+                      $"translucent {TranslucentChunkGeometry.UsedUnits}, lod {LodGeometry.UsedUnits} units");
+    }
 
     // Inverse of the current view-projection, for the shaders that reconstruct a world
     // position out of the depth texture (see the depth-convention note in test-fragment.glsl)
@@ -3964,8 +3994,8 @@ public class RenderManager : IDisposable
         foreach (var query in _gpuPassQueries)
             gl.DeleteQuery(query);
         // The chunks and LOD regions that hold slices in these pools are gone by now (the world
-        // stops before the render manager does), so freeing the buffers here cannot orphan a
-        // live slice.
+        // is torn down through World.SaveAndDispose before the render manager is disposed), so
+        // freeing the buffers here cannot orphan a live slice.
         _chunkDraws.Dispose();
         OpaqueChunkGeometry.Dispose();
         TranslucentChunkGeometry.Dispose();

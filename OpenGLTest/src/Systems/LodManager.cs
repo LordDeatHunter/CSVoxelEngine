@@ -23,11 +23,19 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
 {
     /// <summary>
     /// The shared pool every resident region's terrain shell and sea sheet is uploaded into, or
-    /// null in headless tests, which only ever build empty meshes. One pool covers both meshes
+    /// null headless (the tests and a headless World), where a non-empty build is dropped by
+    /// <see cref="ApplyCompletedMeshes"/> instead of uploaded. One pool covers both meshes
     /// because a region's pair is born from one <see cref="LodMeshData"/> and freed together.
     /// Render thread only, like the two chunk pools.
     /// </summary>
     private readonly ChunkGeometryPool? _lodGeometry = lodGeometry;
+
+    /// <summary>
+    /// Finished region builds <see cref="ApplyCompletedMeshes"/> uploads per frame. Defaults to
+    /// <see cref="WorldGenerationConfig.MaxLodUploadsPerFrame"/>; World raises it while a world is
+    /// loading and restores it when the world starts playing. Main thread only.
+    /// </summary>
+    public int UploadBudget { get; set; } = WorldGenerationConfig.MaxLodUploadsPerFrame;
 
     public readonly ConcurrentDictionary<(int Level, int X, int Z), LodRegion> Regions = new();
 
@@ -255,6 +263,51 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
         _threads = null;
         _wake.Reset();
         return true;
+    }
+
+    /// <summary>
+    /// Unloads every region at once and empties every table this manager keeps, handing each
+    /// region's slices back to the shared LOD pool (which stays alive for the next world) and
+    /// every waiting build's lists back to <see cref="MeshBuffers"/>. Main thread only (it frees
+    /// GL slices).
+    /// <para>
+    /// PRECONDITION: <see cref="Stop"/> returned true, so no LodGen thread can claim a key or
+    /// enqueue a build while this runs. Calling it twice is a no-op the second time.
+    /// </para>
+    /// </summary>
+    public void ReleaseAll()
+    {
+        // Backwards, like Update's unload loop: RemoveRegion swap-removes the last entry into
+        // the hole, which a descending walk has already visited
+        for (var i = RegionList.Count - 1; i >= 0; i--)
+        {
+            var region = RegionList[i];
+            Regions.TryRemove((region.Level, region.X, region.Z), out _);
+            RemoveRegion(region);
+            region.Dispose();
+        }
+
+        // Defensive: a region in the table but not in the list (none should exist)
+        foreach (var kvp in Regions)
+        {
+            if (Regions.TryRemove(kvp.Key, out var stray))
+                stray.Dispose();
+        }
+
+        Regions.Clear();
+        RegionList.Clear();
+        _pendingCover.Clear();
+        _finerChildCounts.Clear();
+        _queued.Clear();
+        _dirtyRegions.Clear();
+        _building.Clear();
+
+        while (_completedMeshes.TryDequeue(out var data))
+            MeshBuffers.Return(data.Vertices, data.Indices, data.WaterVertices, data.WaterIndices);
+
+        _regionSetVersion++;
+        _coverConverged = true;
+        _coverCursor = 0;
     }
 
     private void WorkerLoop()
@@ -543,7 +596,7 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
     internal void ApplyCompletedMeshes(ReadOnlySpan<(int camX, int camZ)> camRegions)
     {
         var uploaded = 0;
-        while (uploaded < WorldGenerationConfig.MaxLodUploadsPerFrame && _completedMeshes.TryDequeue(out var data))
+        while (uploaded < UploadBudget && _completedMeshes.TryDequeue(out var data))
         {
             var key = (data.Level, data.X, data.Z);
             var radius = LodRegion.Levels[data.Level].RegionRadius + 1;
@@ -556,6 +609,17 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
                 _queued.TryRemove(key, out _);
                 // Nothing was ever built from this data, so its lists recycle straight away.
                 MeshBuffers.Return(data.Vertices, data.Indices, data.WaterVertices, data.WaterIndices);
+                continue;
+            }
+
+            // Headless (no pool): a real build has nowhere to go, so it is dropped as if uploaded.
+            // The key stays in _queued so the builder does not spin on it. The LodRegion
+            // constructor's throw for this case was unreachable in every headless test, and this
+            // is what lets a headless World drive Update over real terrain.
+            if (_lodGeometry == null && (data.Vertices.Count > 0 || data.WaterVertices.Count > 0))
+            {
+                MeshBuffers.Return(data.Vertices, data.Indices, data.WaterVertices, data.WaterIndices);
+                uploaded++;
                 continue;
             }
 
