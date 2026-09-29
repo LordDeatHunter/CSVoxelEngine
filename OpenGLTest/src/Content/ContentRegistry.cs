@@ -825,8 +825,9 @@ public static class ContentRegistry
 
     /// <summary>
     /// Parses <c>data/entities</c> into <see cref="EntityType"/>s: display name, health and the
-    /// loot table rolled on death, resolved against the already-compiled tables. The model path
-    /// is checked here so a missing Blockbench project fails at startup naming the file.
+    /// loot table rolled on death, resolved against the already-compiled tables. The model is
+    /// checked and parsed here (<see cref="EntityType.Model"/>) so a missing or malformed
+    /// Blockbench project fails at startup naming the file.
     /// </summary>
     private static void LoadEntities(string assetsRoot)
     {
@@ -853,6 +854,9 @@ public static class ContentRegistry
                 : Path.Combine(assetsRoot, "models", "entity", name + ".bbmodel");
             if (!File.Exists(model))
                 throw new InvalidOperationException($"Entity '{path}' names model '{model}', which does not exist.");
+            // Parsed once here, GL-free, so the entity, the renderer and the debugger share one
+            // parse; the loader's own errors already name the model file.
+            var parsed = BbmodelLoader.Load(model, Array.Empty<string>());
 
             types[name] = new EntityType
             {
@@ -861,6 +865,7 @@ public static class ContentRegistry
                 MaxHealth = hp,
                 LootTable = loot,
                 ModelPath = model,
+                Model = parsed,
             };
         }
 

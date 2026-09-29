@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using StbImageSharp;
@@ -22,12 +24,18 @@ public sealed class BbmodelData
     public int ResolutionWidth = 64;
     public int ResolutionHeight = 64;
     public readonly Dictionary<string, BbmodelPart> Parts = new(StringComparer.Ordinal);
+    /// <summary>Keyframe clips from the project's <c>animations</c> array, in file order.</summary>
+    public readonly List<AnimationClip> Animations = new();
 }
 
 public sealed class BbmodelPart
 {
     /// <summary>Group origin in blocks, model space (author the model standing on y = 0).</summary>
     public Vector3 Pivot;
+    /// <summary>Name of the enclosing group in the outliner, or null for a top-level group.</summary>
+    public string? Parent;
+    /// <summary>The group's Blockbench uuid ("" when the file has none); animators key it.</summary>
+    public string Uuid = "";
     public readonly List<BbmodelCube> Cubes = new();
 }
 
@@ -43,8 +51,10 @@ public sealed class BbmodelCube
 /// Minimal Blockbench (.bbmodel) reader for rigid models: axis-aligned cubes with per-face UVs,
 /// grouped by named parts. The player rig gives <see cref="RequiredParts"/> so a partially
 /// authored rig fails fast; entity models pass no required parts and keep whatever groups the
-/// file has. Rotations stay procedural, so group and cube angles must be zero and every failure
-/// names the file that caused it.
+/// file has. Groups keep their outliner nesting (<see cref="BbmodelPart.Parent"/>), and the
+/// project's keyframe <c>animations</c> are parsed into <see cref="AnimationClip"/>s. Rest
+/// rotations are not supported, so group and cube angles must be zero; every failure names the
+/// file that caused it.
 /// </summary>
 public static class BbmodelLoader
 {
@@ -117,6 +127,7 @@ public static class BbmodelLoader
                 throw new InvalidOperationException(
                     $"Model '{path}' needs one non-empty group per part; missing: {string.Join(", ", missing)}.");
 
+            ReadAnimations(root, path, data);
             ReadTexture(root, path, readBytes, data);
             return data;
         }
@@ -181,8 +192,16 @@ public static class BbmodelLoader
                 throw new InvalidOperationException(
                     $"Model '{path}' group '{name}' is rotated: keep groups unrotated, posing is procedural.");
 
+            // A duplicate group name keeps the first entry's parent and uuid.
             if (!data.Parts.ContainsKey(name))
-                data.Parts[name] = new BbmodelPart { Pivot = pivot };
+                data.Parts[name] = new BbmodelPart
+                {
+                    Pivot = pivot,
+                    Parent = group,
+                    Uuid = entry.TryGetProperty("uuid", out var uuidEl) && uuidEl.ValueKind == JsonValueKind.String
+                        ? uuidEl.GetString() ?? ""
+                        : "",
+                };
 
             if (entry.TryGetProperty("children", out var children))
                 ReadOutliner(children, path, data, cubesByUuid, name);
@@ -233,6 +252,199 @@ public static class BbmodelLoader
                 new Vector2(x2 / texWidth, y2 / texHeight));
         }
         return faces;
+    }
+
+    // Conversion from Blockbench's animation convention to the engine's, taken from Blockbench's
+    // preview code (animation.js, BoneAnimator.displayRotation / displayPosition) and its group
+    // meshes' Euler order 'ZYX':
+    //   rotation (x, y, z) degrees -> engine Euler degrees (-x, -y, z), applied X first, then Y,
+    //     then Z (AnimationClip.RotationFromDegrees);
+    //   position (x, y, z) pixels  -> engine blocks (-x, y, z) / 16, in the parent bone's space;
+    //   scale                      -> unchanged.
+    // Handedness: +X is the model's right (ArmR), -Z its front. A positive engine X rotation
+    // raises a hanging arm forward, so Blockbench authors type a negative x for that (as in
+    // Bedrock's own humanoid animations). This is the one place the sign lives: if a clip plays
+    // mirrored, fix it here, never in the clips.
+    private static void ReadAnimations(JsonElement root, string path, BbmodelData data)
+    {
+        if (!root.TryGetProperty("animations", out var animations) || animations.ValueKind != JsonValueKind.Array)
+            return;
+
+        var uuidToName = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (partName, part) in data.Parts)
+            if (part.Uuid.Length > 0)
+                uuidToName.TryAdd(part.Uuid, partName);
+
+        foreach (var anim in animations.EnumerateArray())
+        {
+            if (anim.ValueKind != JsonValueKind.Object) continue;
+            if (!anim.TryGetProperty("name", out var nameEl) || nameEl.ValueKind != JsonValueKind.String
+                || string.IsNullOrWhiteSpace(nameEl.GetString()))
+                throw new InvalidOperationException($"Model '{path}' has an animation without a 'name'.");
+            var name = nameEl.GetString()!;
+
+            var loop = AnimationClip.LoopMode.Once;
+            if (anim.TryGetProperty("loop", out var loopEl))
+            {
+                loop = (loopEl.ValueKind == JsonValueKind.String ? loopEl.GetString() : null) switch
+                {
+                    "loop" => AnimationClip.LoopMode.Loop,
+                    "hold" => AnimationClip.LoopMode.Hold,
+                    "once" => AnimationClip.LoopMode.Once,
+                    var other => throw new InvalidOperationException(
+                        $"Model '{path}' animation '{name}' has unknown loop mode '{other ?? loopEl.ToString()}'."),
+                };
+            }
+
+            var length = 0f;
+            if (anim.TryGetProperty("length", out var lengthEl))
+                length = Num(lengthEl, path, $"animation '{name}' length");
+
+            var tracks = new Dictionary<string, AnimationClip.BoneTrack>(StringComparer.Ordinal);
+            var events = new List<AnimationClip.Event>();
+            if (anim.TryGetProperty("animators", out var animators) && animators.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var animator in animators.EnumerateObject())
+                {
+                    var value = animator.Value;
+                    if (value.ValueKind != JsonValueKind.Object) continue;
+                    var type = value.TryGetProperty("type", out var typeEl) && typeEl.ValueKind == JsonValueKind.String
+                        ? typeEl.GetString()
+                        : null;
+                    if (animator.Name == "effects" || type == "effect")
+                    {
+                        ReadEffects(value, path, name, events);
+                        continue;
+                    }
+
+                    // Blockbench keys a bone animator by the group's uuid; fall back to the
+                    // animator's own name for hand-written files.
+                    string? bone = null;
+                    if (uuidToName.TryGetValue(animator.Name, out var byUuid))
+                        bone = byUuid;
+                    else if (value.TryGetProperty("name", out var boneNameEl)
+                             && boneNameEl.ValueKind == JsonValueKind.String
+                             && boneNameEl.GetString() is { } boneName
+                             && data.Parts.ContainsKey(boneName))
+                        bone = boneName;
+                    if (bone == null)
+                        throw new InvalidOperationException(
+                            $"Model '{path}' animation '{name}' animates group '{animator.Name}' which the outliner does not have.");
+
+                    tracks[bone] = ReadBoneTrack(value, path, name, bone);
+                }
+            }
+
+            data.Animations.Add(new AnimationClip(name, length, loop, tracks, events));
+        }
+    }
+
+    private static void ReadEffects(JsonElement animator, string path, string anim, List<AnimationClip.Event> events)
+    {
+        if (!animator.TryGetProperty("keyframes", out var keyframes) || keyframes.ValueKind != JsonValueKind.Array)
+            return;
+        foreach (var key in keyframes.EnumerateArray())
+        {
+            if (key.ValueKind != JsonValueKind.Object) continue;
+            // Only timeline keys carry script markers; sound and particle keys are ignored.
+            if (!key.TryGetProperty("channel", out var channel) || channel.ValueKind != JsonValueKind.String
+                || channel.GetString() != "timeline")
+                continue;
+            if (!key.TryGetProperty("data_points", out var points) || points.ValueKind != JsonValueKind.Array
+                || points.GetArrayLength() == 0)
+                continue;
+            var point = points[0];
+            if (point.ValueKind != JsonValueKind.Object || !point.TryGetProperty("script", out var scriptEl)
+                || scriptEl.ValueKind != JsonValueKind.String)
+                continue;
+            var script = scriptEl.GetString()!.Trim();
+            if (script.Length == 0) continue;
+            var time = Num(Req(key, "time", path, $"animation '{anim}' timeline keyframe"), path,
+                $"animation '{anim}' timeline keyframe time");
+            events.Add(new AnimationClip.Event(time, script));
+        }
+    }
+
+    private static AnimationClip.BoneTrack ReadBoneTrack(JsonElement animator, string path, string anim, string bone)
+    {
+        var rotation = new List<AnimationClip.Keyframe>();
+        var position = new List<AnimationClip.Keyframe>();
+        var scale = new List<AnimationClip.Keyframe>();
+
+        if (animator.TryGetProperty("keyframes", out var keyframes) && keyframes.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var key in keyframes.EnumerateArray())
+            {
+                if (key.ValueKind != JsonValueKind.Object) continue;
+                var channel = key.TryGetProperty("channel", out var channelEl) && channelEl.ValueKind == JsonValueKind.String
+                    ? channelEl.GetString()
+                    : null;
+                var target = channel switch
+                {
+                    "rotation" => rotation,
+                    "position" => position,
+                    "scale" => scale,
+                    _ => throw new InvalidOperationException(
+                        $"Model '{path}' animation '{anim}' bone '{bone}' has unknown channel '{channel ?? "(none)"}'."),
+                };
+
+                var mode = AnimationClip.Interpolation.Linear;
+                if (key.TryGetProperty("interpolation", out var interpEl))
+                {
+                    mode = (interpEl.ValueKind == JsonValueKind.String ? interpEl.GetString() : null) switch
+                    {
+                        "linear" => AnimationClip.Interpolation.Linear,
+                        "catmullrom" => AnimationClip.Interpolation.CatmullRom,
+                        "step" => AnimationClip.Interpolation.Step,
+                        var other => throw new InvalidOperationException(
+                            $"Model '{path}' animation '{anim}' bone '{bone}' has unsupported interpolation '{other ?? interpEl.ToString()}'."),
+                    };
+                }
+
+                var time = Num(Req(key, "time", path, $"animation '{anim}' bone '{bone}' keyframe"), path,
+                    $"animation '{anim}' bone '{bone}' keyframe time");
+                if (!key.TryGetProperty("data_points", out var points) || points.ValueKind != JsonValueKind.Array
+                    || points.GetArrayLength() == 0 || points[0].ValueKind != JsonValueKind.Object)
+                    throw new InvalidOperationException(
+                        $"Model '{path}' animation '{anim}' bone '{bone}' has a keyframe without 'data_points'.");
+                // Only the first data point is used (a second one is Blockbench's split key).
+                var point = points[0];
+                var raw = new Vector3(AnimNum(point, "x", path, anim, bone), AnimNum(point, "y", path, anim, bone),
+                    AnimNum(point, "z", path, anim, bone));
+
+                var value = channel switch
+                {
+                    "rotation" => new Vector3(-raw.X, -raw.Y, raw.Z),
+                    "position" => new Vector3(-raw.X, raw.Y, raw.Z) / UnitsPerBlock,
+                    _ => raw,
+                };
+                target.Add(new AnimationClip.Keyframe(time, value, mode));
+            }
+        }
+
+        // OrderBy is stable, so keys at equal times keep their authored order.
+        return new AnimationClip.BoneTrack
+        {
+            Rotation = rotation.OrderBy(k => k.Time).ToArray(),
+            Position = position.OrderBy(k => k.Time).ToArray(),
+            Scale = scale.OrderBy(k => k.Time).ToArray(),
+        };
+    }
+
+    // A keyframe component: a JSON number, or the numeric string Blockbench writes. Molang
+    // expressions (any other string) are rejected rather than silently read as 0.
+    private static float AnimNum(JsonElement point, string axis, string path, string anim, string bone)
+    {
+        if (!point.TryGetProperty(axis, out var el))
+            throw new InvalidOperationException(
+                $"Model '{path}' animation '{anim}' bone '{bone}' has a keyframe without '{axis}'.");
+        if (el.ValueKind == JsonValueKind.Number) return (float)el.GetDouble();
+        var s = el.ValueKind == JsonValueKind.String ? el.GetString() ?? "" : el.ToString();
+        if (el.ValueKind == JsonValueKind.String
+            && float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var v))
+            return v;
+        throw new InvalidOperationException(
+            $"Model '{path}' animation '{anim}' bone '{bone}' has a non-numeric value '{s}': Molang expressions are not supported.");
     }
 
     private static void ReadTexture(JsonElement root, string path, Func<string, byte[]> readBytes, BbmodelData data)

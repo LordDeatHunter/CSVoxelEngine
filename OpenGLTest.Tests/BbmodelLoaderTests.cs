@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -73,6 +74,112 @@ public sealed class BbmodelLoaderTests
             root["textures"] = new JsonArray(new JsonObject { ["source"] = textureSource });
         return root.ToJsonString();
     }
+
+    private const string TorsoUuid = "11111111-1111-4111-8111-111111111111";
+    private const string HeadUuid = "22222222-2222-4222-8222-222222222222";
+
+    private static JsonObject Key(string channel, double time, string x, string y, string z,
+        string interpolation = "linear") => new()
+    {
+        ["channel"] = channel,
+        ["data_points"] = new JsonArray(new JsonObject { ["x"] = x, ["y"] = y, ["z"] = z }),
+        ["uuid"] = Guid.NewGuid().ToString(),
+        ["time"] = time,
+        ["color"] = -1,
+        ["interpolation"] = interpolation,
+    };
+
+    private static JsonObject Timeline(double time, string script) => new()
+    {
+        ["channel"] = "timeline",
+        ["data_points"] = new JsonArray(new JsonObject { ["script"] = script }),
+        ["uuid"] = Guid.NewGuid().ToString(),
+        ["time"] = time,
+        ["color"] = -1,
+        ["interpolation"] = "linear",
+    };
+
+    /// <summary>
+    /// A two-group entity model (Head nested in Torso) with one Blockbench 4.0 animation that
+    /// keys Torso only, plus an effects animator carrying timeline events authored out of order.
+    /// </summary>
+    private static string AnimatedModel(JsonArray? torsoKeys = null, string animatorKey = TorsoUuid,
+        string loop = "loop", string animationName = "swing")
+    {
+        torsoKeys ??= new JsonArray(
+            Key("rotation", 0, "0", "0", "0"),
+            Key("rotation", 0.5, "-30", "0", "0", "catmullrom"));
+
+        var root = new JsonObject
+        {
+            ["meta"] = new JsonObject { ["format_version"] = "4.0", ["model_format"] = "free", ["box_uv"] = false },
+            ["resolution"] = new JsonObject { ["width"] = 64, ["height"] = 64 },
+            ["elements"] = new JsonArray(
+                new JsonObject
+                {
+                    ["name"] = "body", ["uuid"] = "c-torso", ["type"] = "cube",
+                    ["from"] = new JsonArray(-4, 6, -2), ["to"] = new JsonArray(4, 14, 2),
+                    ["faces"] = new JsonObject { ["north"] = FaceObj(0, 0, 8, 8) },
+                },
+                new JsonObject
+                {
+                    ["name"] = "skull", ["uuid"] = "c-head", ["type"] = "cube",
+                    ["from"] = new JsonArray(-3, 14, -3), ["to"] = new JsonArray(3, 20, 3),
+                    ["faces"] = new JsonObject { ["north"] = FaceObj(8, 0, 14, 6) },
+                }),
+            ["outliner"] = new JsonArray(new JsonObject
+            {
+                ["name"] = "Torso",
+                ["uuid"] = TorsoUuid,
+                ["origin"] = new JsonArray(0, 6, 0),
+                ["children"] = new JsonArray(
+                    "c-torso",
+                    new JsonObject
+                    {
+                        ["name"] = "Head",
+                        ["uuid"] = HeadUuid,
+                        ["origin"] = new JsonArray(0, 14, 0),
+                        ["children"] = new JsonArray("c-head"),
+                    }),
+            }),
+            ["animations"] = new JsonArray(new JsonObject
+            {
+                ["uuid"] = "33333333-3333-4333-8333-333333333333",
+                ["name"] = animationName,
+                ["loop"] = loop,
+                ["override"] = false,
+                ["length"] = 1.0,
+                ["snapping"] = 24,
+                ["animators"] = new JsonObject
+                {
+                    [animatorKey] = new JsonObject
+                    {
+                        ["name"] = "Torso",
+                        ["type"] = "bone",
+                        ["keyframes"] = torsoKeys,
+                    },
+                    ["effects"] = new JsonObject
+                    {
+                        ["name"] = "Effects",
+                        ["type"] = "effect",
+                        ["keyframes"] = new JsonArray(
+                            Timeline(0.75, "impact"),
+                            new JsonObject
+                            {
+                                ["channel"] = "sound",
+                                ["data_points"] = new JsonArray(new JsonObject { ["effect"] = "whoosh" }),
+                                ["time"] = 0.1,
+                            },
+                            Timeline(0.25, " release ")),
+                    },
+                },
+            }),
+        };
+        return root.ToJsonString();
+    }
+
+    private static BbmodelData ParseEntity(string json) =>
+        BbmodelLoader.Parse(json, Path, _ => [], Array.Empty<string>());
 
     private static byte[] TestPng()
     {
@@ -228,5 +335,84 @@ public sealed class BbmodelLoaderTests
     {
         var e = Assert.Throws<InvalidOperationException>(() => BbmodelLoader.Parse("{nope", Path, _ => []));
         Assert.Contains(Path, e.Message);
+    }
+
+    [Fact]
+    public void ParsesAnimationsKeyedByGroupName()
+    {
+        var data = ParseEntity(AnimatedModel(loop: "hold"));
+
+        var clip = Assert.Single(data.Animations, a => a.Name == "swing");
+        Assert.True(clip.Keys("Torso"));
+        Assert.False(clip.Keys("Head"));
+        Assert.Equal(AnimationClip.LoopMode.Hold, clip.Loop);
+
+        // Only timeline keys become events, trimmed and sorted by time whatever the file order.
+        Assert.Equal(["release", "impact"], clip.Events.Select(e => e.Name));
+        Assert.Equal(0.25f, clip.Events[0].Time, 1e-5f);
+        Assert.Equal(0.75f, clip.Events[1].Time, 1e-5f);
+    }
+
+    [Fact]
+    public void NestedGroupRecordsItsParent()
+    {
+        var data = ParseEntity(AnimatedModel());
+
+        Assert.Equal("Torso", data.Parts["Head"].Parent);
+        Assert.Null(data.Parts["Torso"].Parent);
+        Assert.Equal(TorsoUuid, data.Parts["Torso"].Uuid);
+
+        // Each cube attaches to its nearest enclosing group, pivot-relative to it.
+        var headCube = Assert.Single(data.Parts["Head"].Cubes);
+        var torsoCube = Assert.Single(data.Parts["Torso"].Cubes);
+        Assert.Equal(0f, headCube.Min.Y, 1e-5f);
+        Assert.Equal(0f, torsoCube.Min.Y, 1e-5f);
+    }
+
+    [Fact]
+    public void PositionKeyframesConvertPixelsToBlocksWithTheBedrockXFlip()
+    {
+        var data = ParseEntity(AnimatedModel(new JsonArray(Key("position", 0, "16", "16", "0"))));
+        var moved = data.Animations[0].Sample("Torso", 0f).Translation;
+        Assert.True(Vector3.Distance(new Vector3(-1f, 1f, 0f), moved) < 1e-5f, $"got {moved}");
+    }
+
+    [Fact]
+    public void MolangValueNamesTheFileAndAnimation()
+    {
+        var json = AnimatedModel(new JsonArray(Key("rotation", 0, "math.sin(q.anim_time)", "0", "0")));
+        var e = Assert.Throws<InvalidOperationException>(() => ParseEntity(json));
+        Assert.Contains(Path, e.Message);
+        Assert.Contains("swing", e.Message);
+    }
+
+    [Fact]
+    public void UnknownChannelNamesTheFileAndAnimation()
+    {
+        var json = AnimatedModel(new JsonArray(Key("wobble", 0, "0", "0", "0")));
+        var e = Assert.Throws<InvalidOperationException>(() => ParseEntity(json));
+        Assert.Contains(Path, e.Message);
+        Assert.Contains("swing", e.Message);
+        Assert.Contains("wobble", e.Message);
+    }
+
+    [Fact]
+    public void AnimatorForAMissingGroupThrows()
+    {
+        // An unknown uuid whose animator name names no group either.
+        var json = AnimatedModel(animatorKey: "99999999-9999-4999-8999-999999999999")
+            .Replace("\"name\":\"Torso\",\"type\":\"bone\"", "\"name\":\"Tail\",\"type\":\"bone\"");
+        var e = Assert.Throws<InvalidOperationException>(() => ParseEntity(json));
+        Assert.Contains(Path, e.Message);
+        Assert.Contains("swing", e.Message);
+    }
+
+    [Fact]
+    public void FileWithoutAnimationsParsesAsBefore()
+    {
+        var data = BbmodelLoader.Parse(MinimalModel(), Path, _ => throw new NotSupportedException());
+        Assert.Empty(data.Animations);
+        // The flat player-style outliner leaves every group at the top level.
+        Assert.All(data.Parts.Values, part => Assert.Null(part.Parent));
     }
 }

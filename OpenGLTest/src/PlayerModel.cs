@@ -751,6 +751,9 @@ public class PlayerModel
         public sealed class RigPart
         {
             public Vector3 Pivot;
+            /// <summary>Enclosing part's name from the Blockbench outliner, null at the top level.
+            /// The player's own posing ignores it; <see cref="EntityAnimator"/> walks it.</summary>
+            public string? Parent;
             public readonly List<RigCube> Cubes = new();
         }
 
@@ -822,7 +825,7 @@ public class PlayerModel
 
             foreach (var (name, part) in data.Parts)
             {
-                var rigPart = new RigPart { Pivot = part.Pivot };
+                var rigPart = new RigPart { Pivot = part.Pivot, Parent = part.Parent };
                 foreach (var cube in part.Cubes)
                     rigPart.Cubes.Add(new RigCube { Min = cube.Min, Max = cube.Max, Faces = cube.Faces });
                 rig.Parts[name] = rigPart;

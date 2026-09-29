@@ -25,6 +25,12 @@ public sealed class EntityType
 
     /// <summary>Blockbench project that supplies the entity's mesh and skin.</summary>
     public required string ModelPath { get; init; }
+
+    /// <summary>
+    /// The parsed Blockbench project — parts, skin pixels and animation clips — shared by the
+    /// entity, the renderer and the debugger. Parsed once at content load, GL-free.
+    /// </summary>
+    public required BbmodelData Model { get; init; }
 }
 
 /// <summary>
