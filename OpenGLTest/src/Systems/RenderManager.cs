@@ -337,8 +337,10 @@ public class RenderManager : IDisposable
     private static readonly Vector3 LavaFogColorLinear = ColorSpace.SrgbToLinear(LavaFogColor);
     private static readonly Vector3 LavaAmbientTintLinear = ColorSpace.SrgbToLinear(LavaAmbientTint);
     // Hemispheric ambient: the sRGB-authored tint the sky ambient is multiplied by for a face
-    // looking straight down (warmer and darker than the sky - light bounced off the ground)
-    private static readonly Vector3 GroundBounceTint = new(0.62f, 0.52f, 0.42f);
+    // looking straight down (warmer and darker than the sky - light bounced off the ground).
+    // Kept mild: ambient is all a shaded face gets, so a deep tint (0.62, 0.52, 0.42) turned
+    // canopy undersides, overhangs and trunks murky next to the flat-ambient 28198cc look.
+    private static readonly Vector3 GroundBounceTint = new(0.86f, 0.82f, 0.76f);
     private static readonly Vector3 GroundBounceTintLinear = ColorSpace.SrgbToLinear(GroundBounceTint);
 
     /// <summary>
