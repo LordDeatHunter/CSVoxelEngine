@@ -354,6 +354,16 @@ public static class ContentRegistry
     /// </summary>
     public static bool TryResolveBlock(string name, out byte id) => BlockIds.TryGetValue(name, out id);
 
+    /// <summary>
+    /// The id of the pure item registered under <paramref name="name"/> (its JSON file name), or
+    /// false when no item has that name. Items only, the counterpart of
+    /// <see cref="TryResolveBlock"/>; the player and entity save loaders use it (through
+    /// <see cref="SaveNames"/>) to map a saved item name back to this run's id, so a removed item
+    /// is dropped instead of failing the load. Read-only after <see cref="Load"/>, so any thread
+    /// may call it.
+    /// </summary>
+    public static bool TryResolveItem(string name, out byte id) => ItemIds.TryGetValue(name, out id);
+
     /// <summary>The item registered under that JSON file name; items only, like
     /// <see cref="RequireBlock"/>.</summary>
     public static Item RequireItem(string name) => ItemRegistry.RequireItem(name);

@@ -101,6 +101,12 @@ public sealed class Slime : Mob
         _velocity.Z = horizontalDirection.Z * speed;
     }
 
+    /// <inheritdoc />
+    public override Vector3 Velocity => _velocity;
+
+    /// <inheritdoc />
+    protected override void SetVelocity(Vector3 velocity) => _velocity = velocity;
+
     /// <summary>Advances the hop AI and the physics. <paramref name="playerPosition"/> is the
     /// camera eye; the slime hops toward the player's feet so it climbs toward them.</summary>
     public void Update(float deltaTime, ChunkManager chunks, Vector3 playerPosition)

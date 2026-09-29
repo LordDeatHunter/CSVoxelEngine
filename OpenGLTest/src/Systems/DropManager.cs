@@ -15,7 +15,7 @@ public class DropManager
     public const float PickupRange = 3f;
 
     // Drops aim below the eye so they fly to the player's chest rather than into the camera
-    private const float CollectHeightOffset = 0.35f;
+    internal const float CollectHeightOffset = 0.35f;
 
     private readonly List<ItemDrop> _drops = [];
     private readonly List<byte> _collected = [];
@@ -49,6 +49,19 @@ public class DropManager
         if (BlockType.ById[blockId] == null && !ItemRegistry.IsItem(blockId)) return;
 
         _drops.Add(new ItemDrop(blockId, position, toss));
+    }
+
+    /// <summary>
+    /// Puts back a drop a save recorded, with its exact position, velocity and age and no pop.
+    /// False (and nothing added) for an id that is neither a block nor an item, the same guard
+    /// as <see cref="SpawnAt"/>.
+    /// </summary>
+    public bool SpawnRestored(byte blockId, Vector3 position, Vector3 velocity, float age)
+    {
+        if (BlockType.ById[blockId] == null && !ItemRegistry.IsItem(blockId)) return false;
+
+        _drops.Add(new ItemDrop(blockId, position, velocity, age));
+        return true;
     }
 
     /// <summary>

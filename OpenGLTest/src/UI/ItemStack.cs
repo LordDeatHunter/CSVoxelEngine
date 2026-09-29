@@ -117,6 +117,15 @@ public sealed class ItemStack
     public T Get<T>() where T : struct =>
         _components.TryGetValue(typeof(T), out var value) ? (T)value : default;
 
+    /// <summary>Whether a component of this type has been set on the stack.</summary>
+    public bool Has<T>() where T : struct => _components.ContainsKey(typeof(T));
+
+    /// <summary>
+    /// The types of every component currently set on the stack. The save codec's coverage test
+    /// enumerates these, so a new component type cannot be silently left out of the save.
+    /// </summary>
+    internal IReadOnlyCollection<Type> ComponentTypes => _components.Keys;
+
     public bool UsesDurability => Get<DurabilityComponent>().MaxUses > 0;
 
     public float DurabilityFraction => Get<DurabilityComponent>().Fraction;

@@ -58,4 +58,23 @@ public abstract class Mob
     /// <summary>Sets the horizontal shove a contact or hit imparts, leaving vertical motion
     /// alone. Setting (not adding) keeps a sustained touch from accelerating the mob.</summary>
     public abstract void Shove(Vector3 horizontalDirection, float speed);
+
+    /// <summary>Current body velocity in blocks per second (what an entity save records).</summary>
+    public abstract Vector3 Velocity { get; }
+
+    /// <summary>Replaces the body velocity; the save-restore path of <see cref="RestoreState"/>.</summary>
+    protected abstract void SetVelocity(Vector3 velocity);
+
+    /// <summary>
+    /// Puts back the health, facing and velocity a save recorded, on a mob freshly spawned at
+    /// its saved position. The health is clamped into 1..<see cref="EntityType.MaxHealth"/>, so
+    /// a restored mob is never dead on arrival and never above its kind's pool (a retuned
+    /// <c>hp</c> wins). AI timers and the animation stay the constructor's: they restart.
+    /// </summary>
+    internal void RestoreState(int health, float facing, Vector3 velocity)
+    {
+        Health = Math.Clamp(health, 1, Math.Max(1, Type.MaxHealth));
+        Facing = facing;
+        SetVelocity(velocity);
+    }
 }

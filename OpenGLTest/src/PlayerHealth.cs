@@ -49,6 +49,18 @@ public sealed class PlayerHealth
         return Math.Clamp((blocks - 4) * HpPerHeart, 0, MaxHealth);
     }
 
+    /// <summary>
+    /// Save-restore seam: sets the pool to a saved value, clamped to 0..<see cref="MaxHealth"/>,
+    /// with no damage flash and no partial lava tick. A saved 0 stays 0, so the owner's first
+    /// tick respawns the player instead of loading them dead.
+    /// </summary>
+    public void Restore(int health)
+    {
+        Health = Math.Clamp(health, 0, MaxHealth);
+        DamageFlash = 0f;
+        _lavaTimer = 0f;
+    }
+
     public void TakeDamage(int amount)
     {
         if (amount <= 0)

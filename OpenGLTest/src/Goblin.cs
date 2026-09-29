@@ -90,7 +90,11 @@ public sealed class Goblin : Mob
     /// <summary>The goblin's own animation state, driven by its speed and actions.</summary>
     public EntityAnimator Animation { get; }
 
-    public Vector3 Velocity => _velocity;
+    /// <inheritdoc />
+    public override Vector3 Velocity => _velocity;
+
+    /// <inheritdoc />
+    protected override void SetVelocity(Vector3 velocity) => _velocity = velocity;
 
     /// <inheritdoc />
     public override float BodyHalfExtent => HalfExtent;

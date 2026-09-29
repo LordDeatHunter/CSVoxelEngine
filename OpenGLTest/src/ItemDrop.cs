@@ -106,6 +106,26 @@ public class ItemDrop
     }
 
     /// <summary>
+    /// The save-restore path: a drop put back exactly as a save recorded it, with its velocity
+    /// and age and no random pop (the public constructor keeps the pop). The age carries the
+    /// pickup grace period, so a drop saved before it could be collected still waits out the
+    /// rest of it.
+    /// </summary>
+    internal ItemDrop(byte blockId, Vector3 position, Vector3 velocity, float age)
+    {
+        BlockId = blockId;
+        Position = position;
+        _velocity = velocity;
+        _age = age;
+    }
+
+    /// <summary>Current velocity in blocks per second (what an entity save records).</summary>
+    public Vector3 Velocity => _velocity;
+
+    /// <summary>Seconds since the drop appeared; drives the spin, the pulse and the pickup delay.</summary>
+    internal float Age => _age;
+
+    /// <summary>
     /// Advances the drop, returning true once it reaches <paramref name="target"/> and should be
     /// collected. While idle the drop falls under gravity and collides with blocks;
     /// <paramref name="inRange"/> latches attraction on, so a drop already being

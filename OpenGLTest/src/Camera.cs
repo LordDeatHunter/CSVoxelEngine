@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using Silk.NET.Input;
+using Silk.NET.Maths;
 using Silk.NET.Windowing;
 
 namespace silkgltriangle;
@@ -344,11 +345,48 @@ public class Camera
         mouse = input?.Mice.FirstOrDefault();
 
         if (window != null)
-            window.FramebufferResize += size => SetAspectRatio(size.X / (float)size.Y);
+        {
+            _onResize = size => SetAspectRatio(size.X / (float)size.Y);
+            window.FramebufferResize += _onResize;
+        }
 
         if (mouse == null) return;
         mouse.Cursor.CursorMode = CursorMode.Disabled;
         mouse.MouseMove += OnMouseMove;
+    }
+
+    // Kept so Detach can unsubscribe exactly the handler the constructor added
+    private readonly Action<Vector2D<int>>? _onResize;
+    private bool _detached;
+
+    /// <summary>
+    /// Unhooks the camera from the window and mouse events the constructor subscribed to, so a
+    /// torn-down world's camera stops turning its view and re-aspecting. Called by
+    /// <c>World.SaveAndDispose</c>; idempotent. It does not change the cursor mode: whatever
+    /// menu follows the world decides that.
+    /// </summary>
+    public void Detach()
+    {
+        if (_detached)
+            return;
+        _detached = true;
+        if (window != null && _onResize != null)
+            window.FramebufferResize -= _onResize;
+        if (mouse != null)
+            mouse.MouseMove -= OnMouseMove;
+    }
+
+    /// <summary>
+    /// Save-restore seam: puts the player back at a saved eye position and facing with its
+    /// saved modes. The pose goes through <see cref="TestTeleport"/>, so velocity, knockback and
+    /// the shoulder state are zeroed exactly as for a scripted teleport. Flight implies creative,
+    /// as <see cref="TestSetFlight"/> and the in-game toggle order already require.
+    /// </summary>
+    public void RestoreState(Vector3 position, float yaw, float pitch, bool creative, bool flying)
+    {
+        TestTeleport(position, yaw, pitch);
+        IsCreative = creative || flying;
+        IsFlying = flying;
     }
 
     /// <summary>
