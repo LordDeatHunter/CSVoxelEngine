@@ -61,13 +61,6 @@ uniform float uTorchIntensity;
 uniform vec3 uFogColor;
 uniform float uFogNear;
 uniform float uFogFar;
-// SH-24 fog shape (FogModel): squared-exponential distance density, normalised over
-// uFogNear..uFogFar, plus an exponential height layer based at uFogHeightBase (sea level).
-uniform float uFogDensity;
-uniform float uFogHeightDensity;
-uniform float uFogHeightFalloff;
-uniform float uFogHeightMax;
-uniform float uFogHeightBase;
 uniform vec3 uCameraPos;
 // The sky dome's palette (SkyPalette), for fog that matches the dome in the view direction.
 uniform vec3 uSkyZenith;
@@ -164,6 +157,23 @@ uniform float uLavaCatchLight;   // strength of the point-light catch-light on l
 uniform float uLavaCatchPower;   // Blinn exponent of that catch-light
 
 out vec4 FragColor;
+
+// Exact piecewise sRGB transfer functions (post-fragment.glsl's LinearToSrgb and the
+// ColorSpace twins), used only by the fog mix below.
+vec3 LinearToSrgb(vec3 c)
+{
+    c = max(c, 0.0);
+    vec3 lo = c * 12.92;
+    vec3 hi = 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055;
+    return mix(hi, lo, lessThanEqual(c, vec3(0.0031308)));
+}
+
+vec3 SrgbToLinear(vec3 c)
+{
+    vec3 lo = c / 12.92;
+    vec3 hi = pow((c + 0.055) / 1.055, vec3(2.4));
+    return mix(hi, lo, lessThanEqual(c, vec3(0.04045)));
+}
 
 // Twin copies: sky-fragment.glsl, test-fragment.glsl, cloud-fragment.glsl; C# reference SkyPalette.Sample - change all four together
 vec3 SkySample(vec3 dir)
@@ -779,40 +789,29 @@ void main() {
         }
     }
 
-    // Fog (SH-24; FogModel is the tested C# twin - keep in step), all in linear light.
-    // Distance: GL_EXP2 normalised over [uFogNear, uFogFar], so it is exactly 0 at uFogNear and
-    // exactly 1 at uFogFar - a fully fogged fragment is the sky behind it, which keeps the LOD
-    // edge seamless against the graded dome - and convex like the old t^2 near the camera.
-    // Underwater and in lava (uFogWet 1) it is exactly the old t^2 ramp.
-    float ft = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
-    float fk = uFogDensity * (uFogFar - uFogNear);
-    float fkt = fk * ft;
-    float fd = fk < 1e-3 ? ft * ft : (1.0 - exp(-fkt * fkt)) / (1.0 - exp(-fk * fk));
-    fd = mix(fd, ft * ft, uFogWet);
-    // Height: an exponential layer thinning upward from uFogHeightBase, integrated analytically
-    // between the eye and fragment heights over only the stretch of the ray past uFogNear (the
-    // first uFogNear blocks stay clear), and capped at uFogHeightMax < 1. The two combine as
-    // independent transmittances, so full distance fog is still exactly the sky; wet switches
-    // the height term off. In the mirror pass uCameraPos is the mirrored eye (below the sea
-    // plane, so its height clamps to the base).
-    float fs = max(dist - uFogNear, 0.0);
-    float fy0 = max(uCameraPos.y - uFogHeightBase, 0.0);
-    float fy1 = max(fWorldPos.y - uFogHeightBase, 0.0);
-    float favg = abs(fy1 - fy0) < 1e-3
-        ? exp(-fy0 / uFogHeightFalloff)
-        : uFogHeightFalloff * (exp(-fy0 / uFogHeightFalloff) - exp(-fy1 / uFogHeightFalloff)) / (fy1 - fy0);
-    float fh = min(1.0 - exp(-uFogHeightDensity * fs * favg), uFogHeightMax);
-    float f = 1.0 - (1.0 - fd) * (1.0 - fh * (1.0 - uFogWet));
-    // Fog toward the dome's own colour in the view direction. The outer branch keeps the sample's
-    // cost at zero inside FogNear; underwater (uFogWet ~1) the sample would be thrown away, so it
-    // is skipped.
+    float f = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
+    // Fog toward the dome's own colour in the view direction, so a fully fogged fragment is
+    // exactly the sky behind it (seamless LOD edge against the graded sky). The outer branch
+    // keeps the cost at zero inside FogNear; underwater (uFogWet ~1) the sample would be
+    // thrown away, so it is skipped. In the mirror pass uCameraPos is the mirrored eye.
     if (f > 0.0) {
         vec3 fogCol = uFogColor;
         if (uFogWet < 0.999) {
             vec3 fogDir = (fWorldPos - uCameraPos) / max(dist, 1e-4);
             fogCol = mix(SkySample(fogDir), uFogColor, uFogWet);
         }
-        col = mix(col, fogCol, f);
+        // Squared ramp, mixed in display space in dry air: the same f*f mix done in linear
+        // light reads visibly hazier (a half-fogged dark forest lands far brighter once
+        // encoded), so the dry mix encodes both ends, mixes, and decodes again - the pre-SH-10
+        // look. The display mix clamps the fogged colour to 1 first (only fogged fragments pay
+        // that clamp). Underwater and in lava (uFogWet 1) it stays the linear mix; the two are
+        // blended by uFogWet rather than branched, so the wet transition never pops. Both still
+        // reach exactly fogCol at uFogFar, which is what keeps the LOD edge seamless.
+        float ff = f * f;
+        vec3 linearMix = mix(col, fogCol, ff);
+        vec3 displayMix = SrgbToLinear(mix(LinearToSrgb(min(col, vec3(1.0))),
+                                           LinearToSrgb(min(fogCol, vec3(1.0))), ff));
+        col = mix(displayMix, linearMix, uFogWet);
     }
     // Tile alpha carries the translucent mesh's translucency; fAlpha is the chunk fade-in.
     // The discard above still removes the leaf tiles' fully transparent holes in the

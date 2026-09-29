@@ -115,16 +115,13 @@ constructor flag, `ItemMeshCache.IsSrgb`), so icons write the same bytes as befo
 the Snell window, the lava cave with and without the HUD and a high LOD/fog vista for comparing a
 lighting change against earlier shots.
 
-**World fog (SH-24)** is mixed in linear light toward `SkySample` in the view direction, and has
-two terms. The distance term is GL_EXP2 normalised over `FogNear..FogFar`
-(`(1 - exp(-(k t)^2)) / (1 - exp(-k^2))`, `k = FogDensity * (FogFar - FogNear)`): it is exactly 0
-at FogNear and **exactly 1 at FogFar**, so a fully fogged fragment is the sky behind it and the LOD
-edge stays seamless. Underwater and in lava (`uFogWet` 1) it is exactly the old squared linear ramp.
-The height term is an exponential layer based at sea level (`FogHeight*`), integrated analytically
-between eye and fragment height over only the ray's stretch past FogNear, capped at `FogHeightMax`
-and switched off when wet. The two combine as independent transmittances, so full distance fog
-stays exactly the sky colour. `FogModel` is the tested C# twin, so change it and
-`test-fragment.glsl` together. Cloud, particle and healthbar fogs are still linear.
+**World fog** is the squared linear ramp `f*f` over `FogNear..FogFar` toward `SkySample` in the
+view direction, reaching exactly the sky at FogFar so the LOD edge stays seamless. In dry air it is
+mixed in **display space** (`test-fragment.glsl` encodes the fragment, clamped to 1, and the fog
+colour, mixes, and decodes), because the same mix in linear light reads visibly hazier than the
+pre-SH-10 look; underwater and in lava it stays the linear mix toward `uFogColor`, and the two are
+blended by `uFogWet` rather than branched so the transition never pops. Cloud, particle and
+healthbar fogs are still linear.
 
 **Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
 heading turns slowly (`WorldGenerationConfig.Wind*`), with `Wind.Offset` its bounded closed-form
