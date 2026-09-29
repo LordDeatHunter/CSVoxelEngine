@@ -6,10 +6,10 @@ using Silk.NET.OpenGL;
 namespace silkgltriangle;
 
 /// <summary>
-/// Five hearts floating above every live slime, always facing the camera. Uses the same
+/// Five hearts floating above every live mob, always facing the camera. Uses the same
 /// <c>assets/textures/ui/heart.png</c> / <c>heart_empty.png</c> sprites as the player HUD
 /// (with the same 1px side-padding crop), but drawn as world-space camera-facing billboards
-/// in the entity pass rather than screen-space UI, so they sit above the slime's head,
+/// in the entity pass rather than screen-space UI, so they sit above the mob's head,
 /// occlude against terrain and fog out with distance like the other billboard batches.
 /// Each heart is an empty shell with a left-aligned fill overlay cropped to the exact
 /// fraction, so the row reads the HP percentage whatever the entity's pool is.
@@ -54,7 +54,7 @@ public sealed class EntityHealthbarRenderer : IDisposable
     public EntityHealthbarRenderer(GL gl)
     {
         _gl = gl;
-        _maxQuads = WorldGenerationConfig.SlimeMaxAlive * HeartCount;
+        _maxQuads = WorldGenerationConfig.MobsMaxAlive * HeartCount;
         _shader = new Shader(gl,
             FileUtils.ReadFile("assets/shaders/entity-healthbar-vertex.glsl"),
             FileUtils.ReadFile("assets/shaders/entity-healthbar-fragment.glsl"));
@@ -64,8 +64,8 @@ public sealed class EntityHealthbarRenderer : IDisposable
         _heartEmptyTexture = TextureLoader.LoadFromFile(gl, HeartEmptySpritePath, srgb: true);
 
         _verts = new Vertex[_maxQuads * 4];
-        _depths = new float[WorldGenerationConfig.SlimeMaxAlive];
-        _order = new int[WorldGenerationConfig.SlimeMaxAlive];
+        _depths = new float[WorldGenerationConfig.MobsMaxAlive];
+        _order = new int[WorldGenerationConfig.MobsMaxAlive];
 
         var indices = new ushort[_maxQuads * 6];
         for (var i = 0; i < _maxQuads; i++)
@@ -122,19 +122,19 @@ public sealed class EntityHealthbarRenderer : IDisposable
     /// <summary>
     /// World Y of the hearts row's centre for a body centred at
     /// <paramref name="bodyCentreY"/> whose head sits <paramref name="headAboveCentre"/>
-    /// above it (already scaled — pass <c>Slime.HalfExtent * slime.VerticalScale</c>).
+    /// above it (already scaled — pass <see cref="Mob.HeadAboveCentre"/>).
     /// </summary>
     public static float BarCentreY(float bodyCentreY, float headAboveCentre) =>
         bodyCentreY + headAboveCentre + WorldGenerationConfig.EntityHealthbarLiftBlocks;
 
     /// <summary>
-    /// Draws one five-heart row above each slime as two blended, depth-tested batches with
+    /// Draws one five-heart row above each mob as two blended, depth-tested batches with
     /// no depth writes: first every empty shell, then every non-empty fill over them.
     /// </summary>
-    public void Render(IReadOnlyList<Slime> slimes, Matrix4x4 viewProj, Vector3 cameraPos,
+    public void Render(IReadOnlyList<Mob> mobs, Matrix4x4 viewProj, Vector3 cameraPos,
         Vector3 forward, Vector3 fogColor, float fogNear, float fogFar)
     {
-        var count = Math.Min(slimes.Count, WorldGenerationConfig.SlimeMaxAlive);
+        var count = Math.Min(mobs.Count, WorldGenerationConfig.MobsMaxAlive);
         if (count == 0) return;
 
         forward.BillboardBasis(out var right, out var up);
@@ -143,7 +143,7 @@ public sealed class EntityHealthbarRenderer : IDisposable
 
         for (var i = 0; i < count; i++)
         {
-            _depths[i] = Vector3.DistanceSquared(slimes[i].Position, cameraPos);
+            _depths[i] = Vector3.DistanceSquared(mobs[i].Position, cameraPos);
             _order[i] = i;
         }
         Array.Sort(_depths, _order, 0, count);
@@ -165,10 +165,10 @@ public sealed class EntityHealthbarRenderer : IDisposable
         var quads = 0;
         for (var slot = 0; slot < count; slot++)
         {
-            var slime = slimes[_order[count - 1 - slot]];
-            var centre = new Vector3(slime.Position.X,
-                BarCentreY(slime.Position.Y, Slime.HalfExtent * slime.VerticalScale),
-                slime.Position.Z);
+            var mob = mobs[_order[count - 1 - slot]];
+            var centre = new Vector3(mob.Position.X,
+                BarCentreY(mob.Position.Y, mob.HeadAboveCentre),
+                mob.Position.Z);
             for (var h = 0; h < HeartCount; h++)
             {
                 var heartCentre = centre + right * ((h - (HeartCount - 1) * 0.5f) * size);
@@ -183,11 +183,11 @@ public sealed class EntityHealthbarRenderer : IDisposable
         quads = 0;
         for (var slot = 0; slot < count; slot++)
         {
-            var slime = slimes[_order[count - 1 - slot]];
-            HeartFills(slime.Health, slime.Type.MaxHealth, _fills);
-            var centre = new Vector3(slime.Position.X,
-                BarCentreY(slime.Position.Y, Slime.HalfExtent * slime.VerticalScale),
-                slime.Position.Z);
+            var mob = mobs[_order[count - 1 - slot]];
+            HeartFills(mob.Health, mob.Type.MaxHealth, _fills);
+            var centre = new Vector3(mob.Position.X,
+                BarCentreY(mob.Position.Y, mob.HeadAboveCentre),
+                mob.Position.Z);
             for (var h = 0; h < HeartCount; h++)
             {
                 var fill = _fills[h];

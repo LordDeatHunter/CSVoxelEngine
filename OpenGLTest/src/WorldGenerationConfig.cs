@@ -1159,14 +1159,61 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float SlimeKnockbackSpeed = 6f;
     public const float SlimeKnockbackLift = 4.5f;
 
+    // --- Goblins (GoblinManager) ---
+    // Short forest raiders that throw the flint they carry at the player from a standoff band,
+    // then close in for a club swing once their stones are gone. They spawn like slimes (dry
+    // forest surface, a ring around the player) and are culled when they stray too far. The
+    // throw band must stay inside the stone's level-ground range, v^2/g at GoblinStoneSpeed
+    // under ThrownProjectile.Gravity, with margin for a chest-height target and the
+    // semi-implicit Euler drop, or the far edge of the band has no solvable arc.
+    public const int GoblinMaxAlive = 4;
+    public const float GoblinSpawnIntervalSeconds = 14f;
+    public const float GoblinSpawnMinRadiusBlocks = 20f;
+    public const float GoblinSpawnMaxRadiusBlocks = 40f;
+    public const int GoblinSpawnTries = 8;
+    public const float GoblinDespawnRadiusBlocks = 64f;
+    public const float GoblinWalkSpeed = 3.2f;
+    public const float GoblinJumpSpeed = 8.5f;
+    // Stones (flint) a goblin carries, rolled inclusive at spawn; the rest drop on death.
+    public const int GoblinStoneMin = 3;
+    public const int GoblinStoneMax = 6;
+    // Horizontal distance band a goblin throws from: it closes in beyond the far edge and
+    // backpedals inside the near one.
+    public const float GoblinThrowMinRange = 4f;
+    public const float GoblinThrowMaxRange = 12f;
+    // A fresh goblin notices the player before its first throw; unjittered so scripted shots
+    // repeat.
+    public const float GoblinFirstThrowDelaySeconds = 1f;
+    public const float GoblinThrowCooldownSeconds = 2.2f;
+    public const float GoblinThrowCooldownJitter = 0.6f;
+    // How long a goblin whose throw line was blocked waits before testing it again.
+    public const float GoblinLosRetrySeconds = 0.3f;
+    // 20^2 / 28 = 14.3 blocks of level range, so the 12-block band edge solves with ~2 blocks
+    // to spare.
+    public const float GoblinStoneSpeed = 20f;
+    public const int GoblinStoneDamage = 8;
+    public const float GoblinStoneKnockbackSpeed = 3f;
+    public const float GoblinMeleeReach = 1.9f;
+    // How close an empty-handed goblin walks before it stops and swings.
+    public const float GoblinStandoffBlocks = 1.1f;
+    public const int GoblinMeleeDamage = 10;
+    public const float GoblinMeleeCooldownSeconds = 1.1f;
+    // Knockback a club swing gives the player: a horizontal shove plus a small upward pop.
+    public const float GoblinKnockbackSpeed = 5f;
+    public const float GoblinKnockbackLift = 3f;
+    // Horizontal shove a grounded goblin gets when the player walks into it.
+    public const float GoblinShoveSpeed = 3.5f;
+
     // --- Entity healthbars (EntityHealthbarRenderer) ---
-    // Five hearts float above every live slime, billboarded to face the camera, using the same
+    // Five hearts float above every live mob, billboarded to face the camera, using the same
     // heart sprites as the player HUD. The pool is drawn proportionally across the row (each
     // heart is MaxHealth / Hearts HP), so any entity kind reads correctly whatever its pool is.
+    // The buffers are sized for every mob kind alive together.
+    public const int MobsMaxAlive = SlimeMaxAlive + GoblinMaxAlive;
     public const int EntityHealthbarHearts = 5;
     // Width (and height) of one heart in blocks; neighbours sit edge to edge like the HUD row.
     public const float EntityHeartSizeBlocks = 0.2f;
-    // How far above the slime's head (Position + HalfExtent * VerticalScale) the row's centre floats.
+    // How far above the mob's head (Position + Mob.HeadAboveCentre) the row's centre floats.
     public const float EntityHealthbarLiftBlocks = 0.22f;
 
     // --- Charged throws (ThrownProjectile) ---

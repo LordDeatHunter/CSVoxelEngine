@@ -107,36 +107,19 @@ public sealed class SlimeManager
             Spawn(position);
     }
 
+    /// <summary>The slime's spawn ring through <see cref="MobSpawner.TryFindSurfaceSpawn"/>,
+    /// returning the body centre resting on the found ground cell.</summary>
     internal static bool TryFindSpawn(ChunkManager chunks, Vector3 playerPosition, out Vector3 position)
     {
-        for (var attempt = 0; attempt < WorldGenerationConfig.SlimeSpawnTries; attempt++)
+        if (!MobSpawner.TryFindSurfaceSpawn(chunks, playerPosition,
+                WorldGenerationConfig.SlimeSpawnMinRadiusBlocks, WorldGenerationConfig.SlimeSpawnMaxRadiusBlocks,
+                WorldGenerationConfig.SlimeSpawnTries, out var x, out var groundY, out var z))
         {
-            var angle = Random.Shared.NextSingle() * MathF.Tau;
-            var radius = MathUtils.Lerp(WorldGenerationConfig.SlimeSpawnMinRadiusBlocks,
-                WorldGenerationConfig.SlimeSpawnMaxRadiusBlocks, Random.Shared.NextSingle());
-            var x = MathUtils.FloorToInt(playerPosition.X + MathF.Cos(angle) * radius);
-            var z = MathUtils.FloorToInt(playerPosition.Z + MathF.Sin(angle) * radius);
-
-            var chunkX = VoxelCoords.WorldToChunk(x);
-            var chunkZ = VoxelCoords.WorldToChunk(z);
-            var localX = VoxelCoords.WorldToLocal(x);
-            var localZ = VoxelCoords.WorldToLocal(z);
-            var height = Chunk.GetColumnHeights(chunkX, chunkZ)[VoxelCoords.ColumnIndex(localX, localZ)];
-
-            // Surface spawns only: dry forest ground with two clear cells above, all of them in
-            // loaded chunks (TryGetCell reports unloaded as absent, not as air). A lake bed counts
-            // as wet even where it sits above sea level, so a slime never spawns inside a pond.
-            if (TerrainGenerator.IsWaterColumn(x, z, height)) continue;
-            if (!TerrainGenerator.IsForest(x, z)) continue;
-            if (!chunks.TryGetCell(x, height, z, out var ground, out _) || !BlockType.IsSolid(ground)) continue;
-            if (!chunks.TryGetCell(x, height + 1, z, out var above1, out _) || BlockType.IsSolid(above1)) continue;
-            if (!chunks.TryGetCell(x, height + 2, z, out var above2, out _) || BlockType.IsSolid(above2)) continue;
-
-            position = new Vector3(x + 0.5f, height + 1 + Slime.HalfExtent, z + 0.5f);
-            return true;
+            position = default;
+            return false;
         }
 
-        position = default;
-        return false;
+        position = new Vector3(x + 0.5f, groundY + 1 + Slime.HalfExtent, z + 0.5f);
+        return true;
     }
 }

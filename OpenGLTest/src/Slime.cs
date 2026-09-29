@@ -9,7 +9,7 @@ namespace silkgltriangle;
 /// axis by axis like the falling cubes and primed TNT, sinks slowly through water, faces the
 /// player, and squashes on landing / stretches in the air. Main thread only.
 /// </summary>
-public sealed class Slime
+public sealed class Slime : Mob
 {
     private const float Gravity = 28f;
     private const float TerminalVelocity = -30f;
@@ -53,35 +53,28 @@ public sealed class Slime
     private float _landPulse;
     private float _airBlend;
     private float _damageCooldown;
-    private float _hitFlash;
     private float _nextHop;
     private bool _inWater;
 
-    public Slime(EntityType type, Vector3 position)
+    public Slime(EntityType type, Vector3 position) : base(type, position)
     {
-        Type = type;
-        Position = position;
-        Health = type.MaxHealth;
         _nextHop = HopIntervalSeconds;
     }
 
-    public EntityType Type { get; }
+    /// <inheritdoc />
+    public override float BodyHalfExtent => HalfExtent;
 
-    /// <summary>Body centre; the feet sit <see cref="HalfExtent"/> below it.</summary>
-    public Vector3 Position { get; private set; }
+    /// <inheritdoc />
+    public override float BodyHalfHeight => HalfExtent;
 
-    public int Health { get; private set; }
-
-    public bool IsDead => Health <= 0;
+    /// <inheritdoc />
+    public override float HeadAboveCentre => HalfExtent * VerticalScale;
 
     /// <summary>Whether the slime currently rests on the ground.</summary>
     public bool IsGrounded { get; private set; }
 
     /// <summary>Off the ground — the only time a touch hurts.</summary>
     public bool IsAirborne => !IsGrounded;
-
-    /// <summary>Yaw in radians the body faces (toward the player); the model faces -Z at 0.</summary>
-    public float Facing { get; private set; }
 
     /// <summary>Whether a touch may deal damage right now: airborne (not merely floating in
     /// water), and past the per-hop cooldown.</summary>
@@ -94,24 +87,12 @@ public sealed class Slime
     /// <see cref="VerticalScale"/>.</summary>
     public float HorizontalScale => 1f - (VerticalScale - 1f) * 0.5f;
 
-    /// <summary>Hit flash amount, 1 right after <see cref="TakeDamage"/> fading to 0 over
-    /// <c>HitFlashSeconds</c>. The entity pass tints the skin red by this (non-emissive).</summary>
-    public float HitFlash => _hitFlash;
-
-    /// <summary>Applies a hit; the owner drops the loot and removes the slime once dead.</summary>
-    public void TakeDamage(int amount)
-    {
-        if (amount <= 0) return;
-        Health = Math.Max(0, Health - amount);
-        _hitFlash = 1f;
-    }
-
     /// <summary>Records that contact damage just landed, starting the per-hop cooldown.</summary>
     public void NotifyContactDamage() => _damageCooldown = ContactDamageCooldownSeconds;
 
     /// <summary>Sets the horizontal shove a grounded player contact imparts, leaving vertical
     /// motion alone. Setting (not adding) keeps a sustained touch from accelerating the slime.</summary>
-    public void Shove(Vector3 horizontalDirection, float speed)
+    public override void Shove(Vector3 horizontalDirection, float speed)
     {
         if (horizontalDirection.LengthSquared() < 1e-6f) return;
         horizontalDirection.Y = 0f;

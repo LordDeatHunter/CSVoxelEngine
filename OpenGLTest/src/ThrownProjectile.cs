@@ -7,7 +7,9 @@ namespace silkgltriangle;
 public sealed class ThrownProjectile
 {
     public const float HalfExtent = 0.15f;
-    private const float Gravity = 28f;
+    /// <summary>Downward acceleration of every thrown projectile; the goblin aim solver uses
+    /// the same value.</summary>
+    public const float Gravity = 28f;
     private const float TerminalVelocity = -30f;
     private const float CollisionStepSize = 0.05f;
 
@@ -46,7 +48,7 @@ public sealed class ThrownProjectile
         return direction * (WorldGenerationConfig.ThrowSpeed * ChargeFactor(charge01));
     }
 
-    public bool Update(float deltaTime, ChunkManager chunks, IReadOnlyList<Slime> slimes, out Slime? hit)
+    public bool Update(float deltaTime, ChunkManager chunks, IReadOnlyList<Mob>? mobs, out Mob? hit)
     {
         hit = null;
         _age += Math.Max(0f, deltaTime);
@@ -60,16 +62,20 @@ public sealed class ThrownProjectile
         Position = next;
         if (hitX || hitY || hitZ) return false;
 
-        if (slimes != null)
+        if (mobs != null)
         {
-            for (var i = 0; i < slimes.Count; i++)
+            // Box overlap against the mob's own body, so a tall mob is hittable through its
+            // head and shins rather than only near its centre.
+            for (var i = 0; i < mobs.Count; i++)
             {
-                var slime = slimes[i];
-                if (slime.IsDead) continue;
-                var radius = HalfExtent + Slime.HalfExtent + 0.1f;
-                if (Vector3.DistanceSquared(Position, slime.Position) <= radius * radius)
+                var mob = mobs[i];
+                if (mob.IsDead) continue;
+                var d = Position - mob.Position;
+                var reachXz = HalfExtent + mob.BodyHalfExtent + 0.05f;
+                var reachY = HalfExtent + mob.BodyHalfHeight + 0.05f;
+                if (MathF.Abs(d.X) <= reachXz && MathF.Abs(d.Z) <= reachXz && MathF.Abs(d.Y) <= reachY)
                 {
-                    hit = slime;
+                    hit = mob;
                     return false;
                 }
             }

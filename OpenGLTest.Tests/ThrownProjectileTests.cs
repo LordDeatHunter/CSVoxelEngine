@@ -67,7 +67,7 @@ public sealed class ThrownProjectileTests
         var slime = new Slime(slimeType, new Vector3(3f, 0.5f, 0.5f));
         var projectile = new ThrownProjectile(1, new Vector3(0f, 0.5f, 0.5f), new Vector3(20f, 2f, 0f), 2f, 1f);
         var alive = true;
-        Slime? hit = null;
+        Mob? hit = null;
         for (var i = 0; i < 120 && alive && hit == null; i++)
             alive = projectile.Update(1f / 60f, chunks, [slime], out hit);
         Assert.NotNull(hit);
@@ -78,7 +78,7 @@ public sealed class ThrownProjectileTests
             ContentRegistry.RequireBlock("stone").Id, 0);
         var blocked = new ThrownProjectile(1, new Vector3(0f, 0.5f, 0.5f), new Vector3(20f, 2f, 0f), 2f, 1f);
         var far = new Slime(slimeType, new Vector3(5f, 0.5f, 0.5f));
-        Slime? wallHit = null;
+        Mob? wallHit = null;
         var wallAlive = true;
         for (var i = 0; i < 120 && wallAlive && wallHit == null; i++)
             wallAlive = blocked.Update(1f / 60f, wallChunks, [far], out wallHit);
