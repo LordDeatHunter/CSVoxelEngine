@@ -276,15 +276,6 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>How far the flat sky colour moves toward the dusk orange at full dusk (the 28198cc mix).</summary>
     public const float SkyDuskMix = 0.5f;
 
-    /// <summary>Cloud ambient-light weight at full dusk (1.2 at day); lowered so the sun term dominates.</summary>
-    public const float CloudDuskAmbientWeight = 0.7f;
-
-    /// <summary>Cloud sun-light base weight at full dusk (0.26 at day), so the orange sun tints every side.</summary>
-    public const float CloudDuskSunBase = 0.7f;
-
-    /// <summary>Cloud sun-light N·L weight at full dusk (0.04 at day), so the sun-facing sides warm more.</summary>
-    public const float CloudDuskSunNdl = 0.3f;
-
     // --- Clouds ---
     // One static field of CloudCellSize-block cells (CloudField) drawn 3x3 around the camera by
     // CloudRenderer. Cell levels come from periodic value noise, so the field tiles with no seam.

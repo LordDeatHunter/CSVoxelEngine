@@ -89,20 +89,4 @@ public sealed class SkyPaletteTests
         Assert.True(night.Horizon.X < day.Horizon.X && night.Horizon.Y < day.Horizon.Y && night.Horizon.Z < day.Horizon.Z);
         Assert.True(night.Zenith.X < day.Zenith.X && night.Zenith.Y < day.Zenith.Y && night.Zenith.Z < day.Zenith.Z);
     }
-
-    [Fact]
-    public void CloudSunWeightGrowsWithDuskAndClamps()
-    {
-        var previous = float.NegativeInfinity;
-        foreach (var dusk in new[] { 0f, 0.25f, 0.5f, 0.75f, 1f })
-        {
-            var w = SkyPalette.CloudLightWeights(dusk);
-            var ratio = w.Y / w.X;
-            Assert.True(ratio > previous);
-            previous = ratio;
-        }
-
-        Assert.Equal(SkyPalette.CloudLightWeights(0f), SkyPalette.CloudLightWeights(-1f));
-        Assert.Equal(SkyPalette.CloudLightWeights(1f), SkyPalette.CloudLightWeights(2f));
-    }
 }

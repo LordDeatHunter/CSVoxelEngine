@@ -88,13 +88,17 @@ public sealed class CloudRenderer : IDisposable
     /// instance stream, so each sweep is a single draw. The remaining uniforms mirror the world
     /// shader's frame state, so clouds sit in the same day/night cycle and fog: <paramref name="sky"/>
     /// is the frame's dome palette, which the fog samples in the view direction (falling back to
-    /// the flat <paramref name="fogColor"/> by <paramref name="fogWet"/> underwater or in lava) and
-    /// whose dusk-scaled glow lights the sun-facing sides, and <paramref name="duskAmount"/> shifts
-    /// the light weights from ambient toward the sun term (<see cref="SkyPalette.CloudLightWeights"/>).
+    /// the flat <paramref name="fogColor"/> by <paramref name="fogWet"/> underwater or in lava).
+    /// <paramref name="sunColor"/>, <paramref name="sunIntensity"/> and <paramref name="ambient"/>
+    /// are display-space (sRGB) light, not the world's linear uniforms; fog and sky stay linear.
+    /// The colour pass mixes over the scene in display space by reading the render target it
+    /// draws into (cloud-fragment.glsl): the caller binds that target's colour texture to
+    /// <paramref name="sceneUnit"/> and unbinds it afterwards, and this method issues the
+    /// <c>glTextureBarrier</c> and turns blending off around that one sweep.
     /// </summary>
     public void Render(Matrix4x4 viewProj, Vector3 cameraPos, double time,
         Vector3 sunDir, Vector3 sunColor, float sunIntensity, Vector3 ambient,
-        Vector3 fogColor, float fogNear, float fogFar, in SkyPalette sky, float duskAmount, float fogWet)
+        Vector3 fogColor, float fogNear, float fogFar, in SkyPalette sky, float fogWet, int sceneUnit)
     {
         if (GameSettings.CloudOpacity <= 0f)
             return;
@@ -130,7 +134,7 @@ public sealed class CloudRenderer : IDisposable
         _shader.SetUniform("uSkyGlow", sky.Glow);
         _shader.SetUniform("uSkyShape", SkyPalette.Shape);
         _shader.SetUniform("uFogWet", fogWet);
-        _shader.SetUniform("uCloudLight", SkyPalette.CloudLightWeights(duskAmount));
+        _shader.SetUniform("uScene", sceneUnit);
 
         _gl.NamedBufferSubData(_instanceVbo, 0, offsets[..count]);
         _gl.BindVertexArray(_vao);
@@ -144,7 +148,12 @@ public sealed class CloudRenderer : IDisposable
         DrawCopies(count);
         _gl.ColorMask(true, true, true, true);
         _gl.DepthMask(false);
+        // The colour sweep reads the target it writes (one surviving surface per pixel, thanks
+        // to the pre-pass), so earlier writes must be made visible and the blender kept out.
+        _gl.TextureBarrier();
+        _gl.Disable(EnableCap.Blend);
         DrawCopies(count);
+        _gl.Enable(EnableCap.Blend);
 
         _gl.BindVertexArray(0);
     }

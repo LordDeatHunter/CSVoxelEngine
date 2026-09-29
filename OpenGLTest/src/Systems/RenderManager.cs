@@ -43,9 +43,11 @@ public class RenderManager : IDisposable
     /// texture here must restore it or the cloud shadow silently samples the wrong texture.</summary>
     private const int CloudShadowUnit = 8;
 
-    /// <summary>Transient unit the selection face highlight reads the HDR scene colour from
-    /// (<see cref="RenderBlockSelection"/>); bound only around that one draw and unbound again.</summary>
-    private const int SelectionSceneUnit = 9;
+    /// <summary>Transient unit the display-space mixes read the target they draw into from: the
+    /// selection face highlight (<see cref="RenderBlockSelection"/>) and the cloud layer
+    /// (<see cref="RenderClouds"/> and the mirror's clouds); bound only around those draws and
+    /// unbound again.</summary>
+    private const int SceneReadUnit = 9;
     private Shader chunkShader;
     private Shader chunkShadowShader;
 
@@ -266,9 +268,13 @@ public class RenderManager : IDisposable
     private Vector3 _skyColor = new(0.3f, 0.6f, 0.9f);
     // The sky dome's palette for this frame (SkyPalette), plus what the dome fades toward in
     // lava (_skyTint by _skyTintAmount; it stays dry in water so the Snell window shows sky),
-    // the frame's dusk amount and how far the fog has closed in to the underwater tint.
+    // and how far the fog has closed in to the underwater tint.
     private SkyPalette _sky = SkyPalette.Compute(1f, 0f);
-    private float _duskAmount;
+    // The cloud layer's display-space (sRGB) sun colour, sun intensity and ambient, set by
+    // SetLighting to the pre-SH-10 values (see CloudRenderer.Render).
+    private Vector3 _cloudSunSrgb = Vector3.One;
+    private float _cloudSunIntensity = 1f;
+    private Vector3 _cloudAmbientSrgb = Vector3.One;
     private Vector3 _skyTint;
     private float _skyTintAmount;
     private float _fogWet;
@@ -930,13 +936,18 @@ public class RenderManager : IDisposable
         // Every palette colour here is authored in sRGB (display) space and decoded once, where
         // it is computed, so fog, the clear colour, clouds, the mirror and the rays all see linear
         // light (SH-10).
+        // The cloud layer is still lit in display space (cloud-fragment.glsl), with the exact
+        // pre-SH-10 sun, intensity and ambient: the world's retuned linear constants below
+        // would light it brighter than it was.
+        _cloudSunSrgb = _sunColor;
+        _cloudSunIntensity = 0.05f + 1.2f * dayness;
+        _cloudAmbientSrgb = Mix(new Vector3(0.06f, 0.07f, 0.11f), new Vector3(0.42f, 0.45f, 0.52f), dayness);
         _sunColor = ColorSpace.SrgbToLinear(_sunColor);
         _sunIntensity = SunLinearGain * MathF.Pow(0.05f + 1.2f * dayness, SunLinearExponent);
 
         _ambient = ColorSpace.SrgbToLinear(
             Mix(new Vector3(0.1f, 0.11f, 0.155f), new Vector3(0.42f, 0.45f, 0.52f), dayness));
 
-        _duskAmount = duskAmount;
         _sky = SkyPalette.Compute(dayness, duskAmount);
         // SkyPalette stays authored (and tested) in sRGB; the dome and fog want it linear
         _sky = _sky with
@@ -1802,8 +1813,12 @@ public class RenderManager : IDisposable
             gl.DepthMask(false);
             gl.Enable(EnableCap.CullFace);
             gl.CullFace(TriangleFace.Front);
-            _clouds.Render(_reflViewProj, mirroredPos, _timeD, _sunDir, _sunColor, _sunIntensity, _ambient,
-                _fogColor, _fogNear, _fogFar, _sky, _duskAmount, _fogWet);
+            // The clouds mix over the mirror in display space by reading it (CloudRenderer.Render).
+            BindUnit(SceneReadUnit, TextureTarget.Texture2D, _reflTex);
+            _clouds.Render(_reflViewProj, mirroredPos, _timeD, _sunDir, _cloudSunSrgb, _cloudSunIntensity, _cloudAmbientSrgb,
+                _fogColor, _fogNear, _fogFar, _sky, _fogWet, SceneReadUnit);
+            BindUnit(SceneReadUnit, TextureTarget.Texture2D, 0);
+            ActiveUnit(0);
             gl.CullFace(TriangleFace.Back);
             gl.Disable(EnableCap.CullFace);
             gl.DepthMask(true);
@@ -2273,8 +2288,13 @@ public class RenderManager : IDisposable
         gl.DepthMask(false);
         gl.Enable(EnableCap.CullFace);
         gl.CullFace(TriangleFace.Back);
+        // The clouds mix over the scene in display space by reading the HDR target
+        // (CloudRenderer.Render); never leave it sitting on a sampler unit afterwards.
+        BindUnit(SceneReadUnit, TextureTarget.Texture2D, _hdrColorTex);
         _clouds.Render(camera.GetViewProjection(), _cameraPos, _timeD,
-            _sunDir, _sunColor, _sunIntensity, _ambient, _fogColor, _fogNear, _fogFar, _sky, _duskAmount, _fogWet);
+            _sunDir, _cloudSunSrgb, _cloudSunIntensity, _cloudAmbientSrgb, _fogColor, _fogNear, _fogFar, _sky, _fogWet, SceneReadUnit);
+        BindUnit(SceneReadUnit, TextureTarget.Texture2D, 0);
+        ActiveUnit(0);
         gl.Disable(EnableCap.CullFace);
         gl.DepthMask(true);
     }
@@ -3497,8 +3517,8 @@ public class RenderManager : IDisposable
             selectionShader.SetUniform("uColor", SelectionFaceColorSrgb);
             selectionShader.SetUniform("uOpacity", 0.15f);
             selectionShader.SetUniform("uDisplayMix", 1);
-            selectionShader.SetUniform("uScene", SelectionSceneUnit);
-            BindUnit(SelectionSceneUnit, TextureTarget.Texture2D, _hdrColorTex);
+            selectionShader.SetUniform("uScene", SceneReadUnit);
+            BindUnit(SceneReadUnit, TextureTarget.Texture2D, _hdrColorTex);
             gl.TextureBarrier();
             gl.Disable(EnableCap.Blend);
 
@@ -3507,7 +3527,7 @@ public class RenderManager : IDisposable
 
             gl.Enable(EnableCap.Blend);
             // Never leave the render target sitting on a sampler unit
-            BindUnit(SelectionSceneUnit, TextureTarget.Texture2D, 0);
+            BindUnit(SceneReadUnit, TextureTarget.Texture2D, 0);
             ActiveUnit(0);
         }
 

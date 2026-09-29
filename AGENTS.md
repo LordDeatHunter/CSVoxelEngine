@@ -93,7 +93,10 @@ or uploaded (the sun, ambient and sky palette in `SetLighting`, torch, point lig
 scatter, molten tints, selection outline); the selection *face* highlight is the one overlay
 mixed in display space instead (`selection-fragment.glsl`'s `uDisplayMix`: it reads the HDR target
 it draws into after a `glTextureBarrier`, blend off), since a linear 15% blend turned any dark
-targeted face into a flat grey; the block-light colours are the exception that is
+targeted face into a flat grey, and the cloud layer does the same (`cloud-fragment.glsl` lights,
+fogs and mixes in display space over the target it reads through `RenderManager.SceneReadUnit`,
+the HDR target or the mirror; the depth pre-pass lets one surface per pixel through), since a
+linear blend left the clouds opaque, cream slabs; the block-light colours are the exception that is
 uploaded pre-linearised: `BlockLightPalette.Linear` goes up once per frame as the
 `uBlockLightPalette[8]` array, `test-vertex.glsl` decodes each chunk vertex's tint code into the
 smooth `fBlockTint` (mirroring `LightTint.Decode`), the plain (entity) path reads
@@ -120,8 +123,8 @@ view direction, reaching exactly the sky at FogFar so the LOD edge stays seamles
 mixed in **display space** (`test-fragment.glsl` encodes the fragment, clamped to 1, and the fog
 colour, mixes, and decodes), because the same mix in linear light reads visibly hazier than the
 pre-SH-10 look; underwater and in lava it stays the linear mix toward `uFogColor`, and the two are
-blended by `uFogWet` rather than branched so the transition never pops. Cloud, particle and
-healthbar fogs are still linear.
+blended by `uFogWet` rather than branched so the transition never pops. Cloud fog is display
+space too (see the cloud layer above); particle and healthbar fogs are still linear.
 
 **Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
 heading turns slowly (`WorldGenerationConfig.Wind*`), with `Wind.Offset` its bounded closed-form

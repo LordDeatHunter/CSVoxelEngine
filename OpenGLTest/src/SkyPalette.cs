@@ -68,18 +68,4 @@ public readonly record struct SkyPalette(Vector3 Zenith, Vector3 Horizon, Vector
         var haze = shape.Z * (1f - MathUtils.SmoothStep(0f, shape.Y, e));
         return Vector3.Lerp(Horizon * (1f + haze), Zenith, band) + Glow * lobe;
     }
-
-    /// <summary>
-    /// The cloud shader's light weights (ambient weight, sun base, sun N·L) for a dusk amount:
-    /// as the sun lowers, weight moves from the ambient term to the dusk-orange sun term. The
-    /// dusk-0 endpoint is cloud-fragment.glsl's pre-SH-21 expression
-    /// (<c>uAmbient * 1.2 + uSunColor * (uSunIntensity * (0.26 + 0.04 * ndl))</c>).
-    /// </summary>
-    public static Vector3 CloudLightWeights(float duskAmount) =>
-        Vector3.Lerp(
-            new Vector3(1.2f, 0.26f, 0.04f),
-            new Vector3(WorldGenerationConfig.CloudDuskAmbientWeight,
-                WorldGenerationConfig.CloudDuskSunBase,
-                WorldGenerationConfig.CloudDuskSunNdl),
-            MathUtils.Clamp01(duskAmount));
 }
