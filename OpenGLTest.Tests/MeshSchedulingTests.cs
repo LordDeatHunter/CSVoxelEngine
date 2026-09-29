@@ -145,4 +145,29 @@ public sealed class MeshSchedulingTests
         manager.Update(camera);
         manager.Update(camera);
     }
+
+    /// <summary>
+    /// <see cref="ChunkManager.DrainMeshWork"/> returns only once the build queue is empty and
+    /// every pool runner has exited, so a world-seed swap after it cannot race a mesh build, and
+    /// the finished result is still there for the next Update to apply. The whole walled area
+    /// is stone, so the centre is a real 4096-cell build (not the empty-chunk fast path) whose
+    /// faces are all culled: its mesh is empty and applies headlessly.
+    /// </summary>
+    [Fact]
+    public void DrainMeshWorkWaitsForEveryRunner()
+    {
+        var (manager, center) = MeshTestWorld.WalledArea();
+        MeshTestWorld.FillWalledArea(manager, ContentRegistry.RequireBlock("stone").Id);
+        var camera = AtOrigin();
+
+        manager.MarkDirty(center.Position);
+        manager.Update(camera);                       // schedules the build
+
+        Assert.True(manager.DrainMeshWork(TimeSpan.FromSeconds(5)), "mesh work did not drain");
+        Assert.Equal(0, manager.PendingMeshWorkCount);
+        Assert.Equal(0, manager.ActiveMeshRunnerCount);
+
+        manager.Update(camera);                       // applies the drained result
+        Assert.True(center.IsMeshed, "the drained build was never applied");
+    }
 }

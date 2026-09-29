@@ -345,6 +345,15 @@ public static class ContentRegistry
         throw new InvalidOperationException($"No block named '{name}' is registered.");
     }
 
+    /// <summary>
+    /// The id of the block registered under <paramref name="name"/> (its JSON file name), or
+    /// false when no block has that name. Blocks only, like <see cref="RequireBlock"/>; the chunk
+    /// save loader uses it to map a saved palette name back to this run's id, so a renamed or
+    /// removed block degrades to air instead of failing the load. Read-only after
+    /// <see cref="Load"/>, so worker threads may call it.
+    /// </summary>
+    public static bool TryResolveBlock(string name, out byte id) => BlockIds.TryGetValue(name, out id);
+
     /// <summary>The item registered under that JSON file name; items only, like
     /// <see cref="RequireBlock"/>.</summary>
     public static Item RequireItem(string name) => ItemRegistry.RequireItem(name);

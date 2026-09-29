@@ -341,8 +341,29 @@ public const float DayLengthSeconds = 1200f;
     public const int MaxLodCoverTestsPerFrame = 64;
 
     // --- Terrain ---
-    // Every noise channel derives its seed from this one (TerrainGenerator, NoiseCaves, WormCarver)
-    public const int Seed = 1337;
+    // Every noise channel and worldgen hash derives its seed from this one (TerrainGenerator,
+    // NoiseCaves, WormCarver, the feature generators). It is runtime state, not a constant: a world
+    // sets it through WorldSeed.Apply between worlds (never while one is live), and it defaults to
+    // WorldSeed.Default, so tests, the item debugger and scripted runs see the old fixed seed.
+    public static int Seed => WorldSeed.Value;
+
+    // --- Saves ---
+    // Seconds between autosaves of the loaded, edited chunks while a world with a save store runs.
+    public const double AutosaveIntervalSeconds = 60.0;
+    // Chunk snapshots one autosave call takes, so a large burst of edits spreads over frames.
+    public const int MaxAutosaveSnapshotsPerCall = 256;
+    // How long closing a world waits for the save writer thread to land its queued files.
+    public const double SaveWriterShutdownTimeoutSeconds = 10.0;
+    // Attempts to move a written temp file into place, since a reader or scanner may hold it briefly.
+    public const int SaveMoveRetries = 3;
+    // Pause between those move attempts.
+    public const int SaveMoveRetryDelayMs = 50;
+    // How long stopping the chunk-generation and LOD workers waits to join each thread.
+    public const int WorkerStopJoinTimeoutMs = 5000;
+    // How long closing a world waits for in-flight mesh builds (they read the worldgen caches).
+    public const int MeshDrainTimeoutMs = 5000;
+    // Cells a removal of a column's top block scans down for the new LOD surface before giving up.
+    public const int LodSurfaceRescanDepth = 64;
 
     // --- Deterministic worldgen caches (GenerationalCache) ---
     // Chunk.GetColumnData's cache. Column data depends only on (x, z), so one entry serves the whole

@@ -413,8 +413,8 @@ public sealed class GeometryLayoutReplayProbe
     // ---------------------------------------------------------------------------------------
 
     /// <summary>
-    /// The far region coordinates. <c>LodRegion.ColumnCaps</c> is process-global with no reset
-    /// hook and xUnit runs test classes in parallel, so a near-origin build is contaminated by
+    /// The far region coordinates. <c>LodRegion.ColumnCaps</c> is process-global, reset only by
+    /// <c>WorldSeed.Apply</c> (which the parallel suite never calls), and xUnit runs test classes in parallel, so a near-origin build is contaminated by
     /// whatever other class happened to mine a block — which is exactly why
     /// <c>LodBuildPoolTests.RegionBuildsAreIdenticalWhicheverThreadRunsThem</c> and
     /// <c>LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel</c> are

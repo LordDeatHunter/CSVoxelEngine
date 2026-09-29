@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -647,5 +649,51 @@ public sealed class LodManagerTests
         // An all-sea region reaches the second guard without ever touching the first.
         Assert.Throws<InvalidOperationException>(
             () => new LodRegion(null, new LodMeshData(0, 0, 0, [], [], quad, indices, 0f, 0f, [], [])));
+    }
+
+    /// <summary>
+    /// <see cref="LodManager.Stop"/> joins the LodGen pool, so once it returns true no region
+    /// build can still be reading worldgen state (the precondition a world-seed swap needs), and
+    /// the manager can be started and stopped again. A Stop with no Start is trivially joined.
+    /// </summary>
+    [Fact]
+    public void StopJoinsTheLodGenThreads()
+    {
+        var lod = new LodManager(null!);
+        Assert.True(lod.Stop(), "Stop without Start must report joined");
+
+        var camera = new Camera(null, null);
+        camera.TestTeleport(new Vector3(8f, 100f, 8f), yaw: 0f, pitch: 0f);
+
+        for (var round = 0; round < 2; round++)
+        {
+            var builtBefore = lod.CompletedBuildCount;
+            lod.Start(camera);
+            Assert.True(WaitUntil(() => lod.CompletedBuildCount > builtBefore),
+                $"round {round}: the pool never finished a region build");
+
+            Assert.True(lod.Stop(), $"round {round}: a LodGen worker outlived its join");
+            Assert.False(lod.AnyThreadAlive);
+
+            // Joined means quiet: no build may still complete after Stop returned.
+            var builtAfterStop = lod.CompletedBuildCount;
+            Thread.Sleep(50);
+            Assert.Equal(builtAfterStop, lod.CompletedBuildCount);
+
+            // Recycle the finished builds so the next round is not throttled by the in-flight cap.
+            while (lod.TryTakeCompletedMesh(out var data))
+                lod.MeshBuffers.Return(data.Vertices, data.Indices, data.WaterVertices, data.WaterIndices);
+        }
+    }
+
+    private static bool WaitUntil(Func<bool> done, int timeoutMs = 30000)
+    {
+        var sw = Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            if (done()) return true;
+            Thread.Sleep(1);
+        }
+        return done();
     }
 }

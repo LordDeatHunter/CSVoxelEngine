@@ -10,9 +10,9 @@ namespace silkgltriangle;
 /// </summary>
 public static class CoalGenerator
 {
-    private static readonly FastNoiseLite VeinNoise;
+    private static FastNoiseLite VeinNoise;
 
-    /// <summary>Block this generator stamps; resolved once, like the noise.</summary>
+    /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
     public static readonly byte OreBlock;
 
     private static readonly byte RockBlock;
@@ -20,11 +20,17 @@ public static class CoalGenerator
 
     static CoalGenerator()
     {
-        VeinNoise = TerrainGenerator.MakeNoise(142, WorldGenerationConfig.CoalFrequency);
+        Reseed();
         OreBlock = ContentRegistry.RequireBlock("coal_ore").Id;
         RockBlock = ContentRegistry.RequireBlock("stone").Id;
         SandstoneBlock = ContentRegistry.RequireBlock("sandstone").Id;
     }
+
+    /// <summary>
+    /// Builds the noise from the current <see cref="WorldGenerationConfig.Seed"/>: once from the
+    /// static constructor, and again by <see cref="WorldSeed.Apply"/> while no worker thread runs.
+    /// </summary>
+    internal static void Reseed() => VeinNoise = TerrainGenerator.MakeNoise(142, WorldGenerationConfig.CoalFrequency);
 
     /// <summary>
     /// Whether the host cell (x, y, z) is coal ore. Threshold test only; the

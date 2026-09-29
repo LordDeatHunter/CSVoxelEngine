@@ -13,16 +13,22 @@ public static class LavaGenerator
     private const int PatchSalt = 0x5A1A90;
     private const int PoolSalt = 0x5A1A91;
 
-    private static readonly FastNoiseLite PatchNoise;
+    private static FastNoiseLite PatchNoise;
 
-    /// <summary>Block this generator stamps; resolved once, like the noise.</summary>
+    /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
     public static readonly byte LavaBlock;
 
     static LavaGenerator()
     {
-        PatchNoise = TerrainGenerator.MakeNoise(71, WorldGenerationConfig.LavaPatchFrequency);
+        Reseed();
         LavaBlock = ContentRegistry.RequireBlock("lava").Id;
     }
+
+    /// <summary>
+    /// Builds the noise from the current <see cref="WorldGenerationConfig.Seed"/>: once from the
+    /// static constructor, and again by <see cref="WorldSeed.Apply"/> while no worker thread runs.
+    /// </summary>
+    internal static void Reseed() => PatchNoise = TerrainGenerator.MakeNoise(71, WorldGenerationConfig.LavaPatchFrequency);
 
     /// <summary>
     /// Whether the air cell (x, y, z) ponds lava. Deep interior cells only: below the lava

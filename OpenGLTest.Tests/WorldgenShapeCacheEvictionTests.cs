@@ -60,8 +60,9 @@ namespace silkgltriangle.Tests;
 /// <see cref="EvictionInserts"/> and <see cref="CanopySweepColumns"/>.</para>
 ///
 /// <para><b>Why the coordinates sit far from the origin, and disjoint from each other.</b>
-/// <see cref="LodRegion"/>'s <c>ColumnCaps</c> is process-global with no reset hook and xUnit runs
-/// test classes in parallel, so a class that generates or edits near another's probe can flip a
+/// <see cref="LodRegion"/>'s <c>ColumnCaps</c> is process-global, reset only by
+/// <c>WorldSeed.Apply</c> (which the parallel suite never calls), and xUnit runs test classes in
+/// parallel, so a class that generates or edits near another's probe can flip a
 /// region's build output mid-suite (<c>LodColumnCapTests</c>, <c>LodHeightSamplingTests</c> and
 /// <c>ColumnCacheEvictionTests</c> all dodge this the same way). Every area below is disjoint from
 /// <c>ColumnCacheEvictionTests</c>' probe (3100, -3100) and sweep (3600, 3600 x 182), from the Lod

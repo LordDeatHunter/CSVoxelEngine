@@ -63,6 +63,17 @@ public class World : IItemUseWorld
     private readonly BubbleParticleSystem _bubbles = new();
     private readonly SfxManager? _sfx;
 
+    // Where edited chunks and the far-LOD edit state are persisted; null = no persistence
+    // (tests, VOXEL_SCRIPT runs and, until the menu lands, the game itself)
+    private readonly ChunkSaveStore? _saveStore;
+
+    // Seconds since the last completed autosave pass
+    private double _autosaveTimer;
+
+    // LodEditState.CombinedVersion when lod-edits.bin was last enqueued; -1 so the first
+    // autosave always writes it
+    private int _lodStateVersionSaved = -1;
+
     // Inventory is assigned in its own initialiser and never replaced, so the method group is the
     // same closed delegate every frame; passing `Inventory.CanAccept` inline at the DropManager call
     // allocated a fresh one per frame (PERF_TODO C7).
@@ -211,17 +222,33 @@ public class World : IItemUseWorld
     private float BlockPopGrowNow =>
         BlockPopGrow * MathUtils.Pulse(_popElapsed / BlockPopSeconds);
 
+    /// <summary>
+    /// Builds the world and starts its chunk-generation and LOD workers. With a
+    /// <paramref name="saveStore"/>, edited chunks are snapshotted to it on unload and on autosave,
+    /// restored from it when they stream back in, and the far-LOD edit state
+    /// (<see cref="LodEditState"/>) is imported from it before the first LOD region builds; null
+    /// (the default) keeps the old regenerate-and-forget behaviour.
+    /// </summary>
+    /// <remarks>
+    /// The constructor registers the world as live (<see cref="WorldSeed.BeginWorld"/>), so
+    /// <see cref="WorldSeed.Apply"/> refuses to run from here on: its worker threads read the
+    /// worldgen statics unsynchronised. The teardown that stops the workers calls
+    /// <see cref="WorldSeed.EndWorld"/> last.
+    /// </remarks>
     public World(GL gl, ChunkGeometryPool opaqueGeometry, ChunkGeometryPool translucentGeometry,
-        ChunkGeometryPool lodGeometry, IWindow window, IInputContext input, SfxManager? sfx = null)
+        ChunkGeometryPool lodGeometry, IWindow window, IInputContext input, SfxManager? sfx = null,
+        ChunkSaveStore? saveStore = null)
     {
+        WorldSeed.BeginWorld();
         _window = window;
         _sfx = sfx;
+        _saveStore = saveStore;
         Camera = new Camera(window, input);
         _spawnX = Camera.Position.X;
         _spawnZ = Camera.Position.Z;
         if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("VOXEL_SPAWN")))
             _spawnSettled = true;
-        _chunkManager = new ChunkManager(gl, opaqueGeometry, translucentGeometry);
+        _chunkManager = new ChunkManager(gl, opaqueGeometry, translucentGeometry, saveStore);
         _generationWorker = new ChunkGenerationWorker(_chunkManager, Camera);
         _lodManager = new LodManager(lodGeometry);
         _canAcceptDrop = Inventory.CanAccept;
@@ -231,6 +258,9 @@ public class World : IItemUseWorld
             _goblins = new GoblinManager(goblinType);
 
         _generationWorker.Start();
+        // Before the LOD workers start, so the first region builds already see the saved
+        // caps, surface overrides and felled canopies; a missing or corrupt file imports nothing.
+        LodEditState.TryParse(_saveStore?.ReadFile(LodEditState.FileName))?.Import();
         _lodManager.Start(Camera);
         RefreshMobs();
     }
@@ -388,6 +418,10 @@ public class World : IItemUseWorld
     /// </summary>
     public double TimeOffset { get; set; }
 
+    /// <summary>
+    /// One gameplay frame. Each block of work runs under its own profiler section; the autosave
+    /// runs under <see cref="ProfileSection.Save"/>, which never nests inside another section.
+    /// </summary>
     public void Update(double deltaTime, IKeyboard? keyboard)
     {
         FrameProfiler.Begin(ProfileSection.Player);
@@ -444,12 +478,12 @@ public class World : IItemUseWorld
             _sfx?.Play(SfxLibrary.PickupGroup);
 
         _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager, _falling, _leaves);
-        _falling.Update((float)deltaTime, _chunkManager, _dropManager, _fluidManager);
+        _falling.Update((float)deltaTime, _chunkManager, _dropManager, _fluidManager, _lodManager);
         _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager);
         _debris.Update((float)deltaTime, _chunkManager);
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
         _querns.Update((float)deltaTime, _chunkManager, _dropManager);
-        _kilns.Update((float)deltaTime, _chunkManager, _dropManager);
+        _kilns.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
         _casting.Update((float)deltaTime, _chunkManager, _dropManager, Inventory,
             Inventory.SelectedToolInstance, Camera.Position, InteractionReach);
         _fireCells.Clear();
@@ -512,9 +546,20 @@ public class World : IItemUseWorld
 
         // Runs after every path that can edit a block this frame, so the cells they scheduled
         // are all in the same tick
-        _fluidManager.Update((float)deltaTime, _chunkManager, _dropManager);
+        _fluidManager.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
 
         FrameProfiler.End(ProfileSection.FluidTick);
+
+        // After the fluid tick, so every edit path of the frame precedes the autosave. The one
+        // Save span in the codebase, entered here only and never nested inside another section.
+        FrameProfiler.Begin(ProfileSection.Save);
+        if (_saveStore != null)
+        {
+            _autosaveTimer += deltaTime;
+            if (_autosaveTimer >= WorldGenerationConfig.AutosaveIntervalSeconds)
+                Autosave();
+        }
+        FrameProfiler.End(ProfileSection.Save);
 
         Inventory.Update((float)deltaTime);
 
@@ -525,6 +570,60 @@ public class World : IItemUseWorld
             out _selectedBlockPosition, out _selectedFaceNormal, out _selectedBoxIndex,
             includeFluids: ItemRegistry.TryGet(Inventory.SelectedBlockId)?.TargetsFluids ?? false);
         FrameProfiler.End(ProfileSection.Raycast);
+    }
+
+    /// <summary>
+    /// One autosave pass: snapshots up to <see cref="WorldGenerationConfig.MaxAutosaveSnapshotsPerCall"/>
+    /// modified loaded chunks to the save store (the copies are cheap; encoding and disk I/O run
+    /// on its writer thread), then the far-LOD edit state if it changed. A burst that fills the
+    /// cap leaves the timer due, so the rest continues next frame instead of stalling this one.
+    /// </summary>
+    private void Autosave()
+    {
+        var snapshots = _chunkManager.FlushModified(WorldGenerationConfig.MaxAutosaveSnapshotsPerCall);
+        if (snapshots >= WorldGenerationConfig.MaxAutosaveSnapshotsPerCall)
+        {
+            _autosaveTimer = WorldGenerationConfig.AutosaveIntervalSeconds;
+            return;
+        }
+
+        _autosaveTimer = 0;
+        SaveLodEditStateIfChanged();
+    }
+
+    /// <summary>
+    /// Enqueues <see cref="LodEditState.FileName"/> when the LOD edit state moved since the last
+    /// write (<see cref="LodEditState.CombinedVersion"/>), or unconditionally when
+    /// <paramref name="force"/> is set. Main thread only: <see cref="LodEditState.Capture"/>
+    /// reads the process-global edit stores.
+    /// </summary>
+    private void SaveLodEditStateIfChanged(bool force = false)
+    {
+        if (_saveStore == null)
+            return;
+        var version = LodEditState.CombinedVersion;
+        if (!force && version == _lodStateVersionSaved)
+            return;
+        _saveStore.EnqueueFile(LodEditState.FileName, LodEditState.Capture().ToBytes());
+        _lodStateVersionSaved = version;
+    }
+
+    /// <summary>
+    /// Hands every modified loaded chunk and the far-LOD edit state to the save store, so what
+    /// the player sees now is what the save holds once the writer drains. Main thread only; no
+    /// GL, no profiler span and no shutdown: the caller that closes the world calls this, then
+    /// <see cref="ChunkSaveStore.Shutdown"/> with
+    /// <see cref="WorldGenerationConfig.SaveWriterShutdownTimeoutSeconds"/>, then stops the
+    /// generation and LOD workers, drains the mesh runners and finally
+    /// <see cref="WorldSeed.EndWorld"/>. Does nothing without a save store.
+    /// </summary>
+    public void FlushAll()
+    {
+        if (_saveStore == null)
+            return;
+        _chunkManager.FlushModified(int.MaxValue);
+        SaveLodEditStateIfChanged(force: true);
+        _autosaveTimer = 0;
     }
 
     /// <summary>
@@ -1260,13 +1359,14 @@ public class World : IItemUseWorld
         // Water beside or above the hole pours into it on the next fluid tick
         _fluidManager.ScheduleAround(blockPos);
 
-        // Keep the buried LOD mesh below the newly exposed hole
+        // Keep the far LOD on the current terrain: a mined top lowers the column's surface, a
+        // dig below it keeps the buried shell under the newly exposed hole
         // (blockPos components are floored floats, so the int casts are exact)
-        if (LodRegion.LowerColumnBelow((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z))
-            _lodManager.MarkEditedColumn((int)blockPos.X, (int)blockPos.Z);
+        NotifyLodEdit((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
 
-        // Wood and leaves live above the heightmap caps, so the gate above never fires for
-        // them — yet the far LOD draws their canopy. Disturb it and rebuild regardless.
+        // Wood and leaves are never surface-solid and sit above the terrain, so the surface
+        // record above never fires for them — yet the far LOD draws their canopy. Disturb it
+        // and rebuild regardless.
         if (TreeGenerator.IsTreeBlock(brokenId))
         {
             TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z);
@@ -1353,10 +1453,7 @@ public class World : IItemUseWorld
                 (int)block.Cell.X, (int)block.Cell.Y + 1, (int)block.Cell.Z);
 
         foreach (var ((lx, lz), ly) in lowestY)
-        {
-            if (LodRegion.LowerColumnBelow(lx, ly, lz))
-                _lodManager.MarkEditedColumn(lx, lz);
-        }
+            NotifyLodEdit(lx, ly, lz);
 
         // The whole canopy came down above the caps: disturb it once at the break (its reach
         // covers the crown) and rebuild every touched column so no ghost lingers at range. A
@@ -1409,6 +1506,7 @@ public class World : IItemUseWorld
 
         var touchedChunks = new HashSet<Vector3>();
         Multiblock.Convert(_chunkManager, anchor, facing, anchorType, touchedChunks);
+        NotifyLodEditMultiblock(anchor);
 
         _chunkManager.ImmediateRemeshWithBorders(VoxelCoords.ChunkPosOf(hitCell), hitCell);
         foreach (var chunkPos in touchedChunks)
@@ -1438,6 +1536,7 @@ public class World : IItemUseWorld
 
         var touchedChunks = new HashSet<Vector3>();
         Multiblock.Revert(_chunkManager, anchor, anchorType, blockPos, touchedChunks);
+        NotifyLodEditMultiblock(anchor);
 
         _chunkManager.ImmediateRemeshWithBorders(VoxelCoords.ChunkPosOf(blockPos), blockPos);
         foreach (var chunkPos in touchedChunks)
@@ -1769,10 +1868,26 @@ public class World : IItemUseWorld
 
     void IItemUseWorld.ScheduleFluidAround(Vector3 cell) => _fluidManager.ScheduleAround(cell);
 
-    void IItemUseWorld.MarkLodColumnEdited(int x, int y, int z)
+    void IItemUseWorld.MarkLodColumnEdited(int x, int y, int z) => NotifyLodEdit(x, y, z);
+
+    /// <summary>
+    /// Keeps the far LOD on the current terrain after the cell (x, y, z) was edited: records the
+    /// column's new surface (or its sub-surface removal cap) through
+    /// <see cref="LodSurface.RecordEdit"/> and rebuilds the regions that sample the column on
+    /// every level when it moved. Main thread only, called after the edit.
+    /// </summary>
+    private void NotifyLodEdit(int x, int y, int z)
     {
-        if (LodRegion.LowerColumnBelow(x, y, z))
+        if (LodSurface.RecordEdit(_chunkManager, x, y, z))
             _lodManager.MarkEditedColumn(x, z);
+    }
+
+    /// <summary>Runs <see cref="NotifyLodEdit"/> over every cell of the 2x2x2 structure at
+    /// <paramref name="anchor"/>, after a convert or a revert rewrote them.</summary>
+    private void NotifyLodEditMultiblock(Vector3 anchor)
+    {
+        foreach (var (dx, dy, dz) in Multiblock.Offsets)
+            NotifyLodEdit((int)anchor.X + dx, (int)anchor.Y + dy, (int)anchor.Z + dz);
     }
 
     bool IItemUseWorld.ToolReady() =>
@@ -2046,6 +2161,12 @@ public class World : IItemUseWorld
         }
 
         if (!chunk.PlaceBlockAt(placePos, blockId, _chunkManager, state)) return false;
+
+        // A full solid cube can raise or re-tile the far LOD's surface. Anything else never
+        // counts as that surface (LodSurface.IsSurfaceSolid), and recording it would only read as
+        // a sub-surface removal and cap the column, so a torch in a cave never dents the LOD.
+        if (LodSurface.IsSurfaceSolid(blockId))
+            NotifyLodEdit((int)placePos.X, (int)placePos.Y, (int)placePos.Z);
 
         // The chunk only meshes a quern's base: register the cell so its plate draws at
         // rest until it is inserted into or spun.

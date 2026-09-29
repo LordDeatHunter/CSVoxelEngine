@@ -121,8 +121,8 @@ public sealed class LodHeightSamplingTests
     [Fact]
     public void SeparableMinMatchesTheNestedWindowUnderColumnCaps()
     {
-        // ColumnCaps is process-global with no reset hook and xUnit runs test classes in
-        // parallel, so this region sits far from every other test's regions: level 2 region
+        // ColumnCaps is process-global, reset only by WorldSeed.Apply (which the parallel suite
+        // never calls), and xUnit runs test classes in parallel, so this region sits far from every other test's regions: level 2 region
         // (555, -555) covers fine ~142080, while the rest of the suite stays near the origin
         // (and LodColumnCapTests sits at level 1 region (777, 777), fine ~99456).
         const int Level = 2, Rx = 555, Rz = -555;

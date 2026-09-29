@@ -1,5 +1,8 @@
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Numerics;
+using System.Threading;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -128,5 +131,47 @@ public sealed class ChunkGenerationWorkerTests
         Assert.True(expected.Count > 1000);
         Assert.Equal(expected.Count, actual.Count);
         Assert.True(actual.SetEquals(expected));
+    }
+
+    /// <summary>
+    /// <see cref="ChunkGenerationWorker.Stop"/> joins every thread it started, so once it
+    /// returns true nothing generates any more (the precondition a world-seed swap needs), and
+    /// the worker can be started and stopped again. The camera sits far above the terrain, so
+    /// every chunk the pool claims takes the above-terrain early return and the run stays cheap.
+    /// </summary>
+    [Fact]
+    public void StopJoinsEveryWorkerThread()
+    {
+        var manager = new ChunkManager(null!);
+        var camera = new Camera(null, null);
+        camera.TestTeleport(new Vector3(0f, 1e6f, 0f), yaw: 0f, pitch: 0f);
+        var worker = new ChunkGenerationWorker(manager, camera);
+
+        for (var round = 0; round < 2; round++)
+        {
+            var loadedBefore = manager.LoadedChunkCount;
+            worker.Start();
+            Assert.True(WaitUntil(() => manager.LoadedChunkCount > loadedBefore),
+                $"round {round}: the pool never generated a chunk");
+
+            Assert.True(worker.Stop(), $"round {round}: a worker outlived its join");
+            Assert.False(worker.AnyThreadAlive);
+
+            // Joined means quiet: nothing may still be adding chunks after Stop returned.
+            var loadedAfterStop = manager.LoadedChunkCount;
+            Thread.Sleep(50);
+            Assert.Equal(loadedAfterStop, manager.LoadedChunkCount);
+        }
+    }
+
+    private static bool WaitUntil(Func<bool> done, int timeoutMs = 15000)
+    {
+        var sw = Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            if (done()) return true;
+            Thread.Sleep(1);
+        }
+        return done();
     }
 }

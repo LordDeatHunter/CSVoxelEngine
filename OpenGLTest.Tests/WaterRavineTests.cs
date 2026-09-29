@@ -152,6 +152,10 @@ public sealed class WaterRavineTests
             {
                 var h = b.Heights[t];
                 if (h < 1 || h > Chunk.Size - 2) continue;
+                // The source must sit inside its own column's terrain, where generated fluid
+                // lives (a carved pocket); a source above both its terrain top and water level
+                // is poured water, which wakes against any replaceable neighbour by design
+                if (a.Heights[(Chunk.SizeMask << Chunk.SizeShift) | t] < h + 1) continue;
                 cx = ax;
                 cz = az;
                 z = t;

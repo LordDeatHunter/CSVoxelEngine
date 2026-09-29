@@ -9,19 +9,25 @@ namespace silkgltriangle;
 /// </summary>
 public static class MalachiteGenerator
 {
-    private static readonly FastNoiseLite VeinNoise;
+    private static FastNoiseLite VeinNoise;
 
-    /// <summary>Block this generator stamps; resolved once, like the noise.</summary>
+    /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
     public static readonly byte OreBlock;
 
     private static readonly byte RockBlock;
 
     static MalachiteGenerator()
     {
-        VeinNoise = TerrainGenerator.MakeNoise(141, WorldGenerationConfig.MalachiteFrequency);
+        Reseed();
         OreBlock = ContentRegistry.RequireBlock("malachite_ore").Id;
         RockBlock = ContentRegistry.RequireBlock("stone").Id;
     }
+
+    /// <summary>
+    /// Builds the noise from the current <see cref="WorldGenerationConfig.Seed"/>: once from the
+    /// static constructor, and again by <see cref="WorldSeed.Apply"/> while no worker thread runs.
+    /// </summary>
+    internal static void Reseed() => VeinNoise = TerrainGenerator.MakeNoise(141, WorldGenerationConfig.MalachiteFrequency);
 
     /// <summary>
     /// Whether the stone cell (x, y, z) is malachite ore. Threshold test only; the

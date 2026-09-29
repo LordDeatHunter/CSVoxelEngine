@@ -25,6 +25,7 @@ public enum ProfileSection
     UsePlace,
     DebugLog,
     Player,
+    Save,
 
     // Render side
     Lighting,
@@ -72,12 +73,12 @@ public enum ProfileSection
 /// </summary>
 public static class FrameProfiler
 {
-    // Short enough for the 32-character cap in UIRenderer.DrawText, parallel to ProfileSection
+    // Short enough that a formatted row fits BitmapFont.MaxLayoutChars (64), parallel to ProfileSection
     private static readonly string[] Labels =
     [
         "camera", "chunkUnld", "chunkApply", "chunkDirty", "lod", "entities",
         "fluidWake", "fluidTick", "raycast", "breaking",
-        "progUpdate", "usePlace", "debugLog", "player",
+        "progUpdate", "usePlace", "debugLog", "player", "save",
         "lighting", "shadows", "reflect", "lodPass", "worldPass", "entityPass", "aoPass", "waterPass",
         "cloudPass", "raysPass", "selectPass", "postPass", "uiPass",
         "rendShell", "screenshot", "publish",

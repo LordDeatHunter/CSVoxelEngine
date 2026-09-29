@@ -6,39 +6,40 @@ namespace silkgltriangle;
 /// The 2D half of world generation: terrain heights with ravines cut in, dirt depth and the
 /// per-column cave inputs (entrance zones, cave intensity). Everything is a pure function of
 /// (x, z) and the seed, so results are cached per chunk column by <see cref="Chunk.GetColumnData"/>
-/// and shared by the vertical chunk stack and the far LOD. Noise instances are configured once
-/// here and only read afterwards, which keeps this safe to call from any worker thread.
+/// and shared by the vertical chunk stack and the far LOD. Noise instances are built by
+/// <see cref="Reseed"/>, once at startup and again only by <see cref="WorldSeed.Apply"/> while no
+/// worker runs, and are only read otherwise, which keeps this safe to call from any worker thread.
 /// </summary>
 public static class TerrainGenerator
 {
-    private static readonly FastNoiseLite ForestSwellNoise;
-    private static readonly FastNoiseLite HillNoise;
-    private static readonly FastNoiseLite HillMaskNoise;
-    private static readonly FastNoiseLite ValleyRoughNoise;
-    private static readonly FastNoiseLite HillWarp;
-    private static readonly FastNoiseLite DirtNoise;
-    private static readonly FastNoiseLite RavineRidge;
-    private static readonly FastNoiseLite RavineWarp;
-    private static readonly FastNoiseLite RavineMask;
-    private static readonly FastNoiseLite EntranceNoise;
-    private static readonly FastNoiseLite IntensityNoise;
-    private static readonly FastNoiseLite GravelNoise;
-    private static readonly FastNoiseLite ContinentNoise;
-    private static readonly FastNoiseLite TemperatureNoise;
-    private static readonly FastNoiseLite HumidityNoise;
-    private static readonly FastNoiseLite DuneNoise;
-    private static readonly FastNoiseLite TrenchMask;
-    private static readonly FastNoiseLite TrenchRidge;
-    private static readonly FastNoiseLite TrenchWarp;
-    private static readonly FastNoiseLite RiverMask;
-    private static readonly FastNoiseLite RiverRidge;
-    private static readonly FastNoiseLite RiverWarp;
-    private static readonly FastNoiseLite MountainMask;
-    private static readonly FastNoiseLite MountainNoise;
-    private static readonly FastNoiseLite MountainWarp;
-    private static readonly FastNoiseLite OpennessNoise;
-    private static readonly FastNoiseLite BiomeDitherNoise;
-    private static readonly FastNoiseLite LakeShapeNoise;
+    private static FastNoiseLite ForestSwellNoise;
+    private static FastNoiseLite HillNoise;
+    private static FastNoiseLite HillMaskNoise;
+    private static FastNoiseLite ValleyRoughNoise;
+    private static FastNoiseLite HillWarp;
+    private static FastNoiseLite DirtNoise;
+    private static FastNoiseLite RavineRidge;
+    private static FastNoiseLite RavineWarp;
+    private static FastNoiseLite RavineMask;
+    private static FastNoiseLite EntranceNoise;
+    private static FastNoiseLite IntensityNoise;
+    private static FastNoiseLite GravelNoise;
+    private static FastNoiseLite ContinentNoise;
+    private static FastNoiseLite TemperatureNoise;
+    private static FastNoiseLite HumidityNoise;
+    private static FastNoiseLite DuneNoise;
+    private static FastNoiseLite TrenchMask;
+    private static FastNoiseLite TrenchRidge;
+    private static FastNoiseLite TrenchWarp;
+    private static FastNoiseLite RiverMask;
+    private static FastNoiseLite RiverRidge;
+    private static FastNoiseLite RiverWarp;
+    private static FastNoiseLite MountainMask;
+    private static FastNoiseLite MountainNoise;
+    private static FastNoiseLite MountainWarp;
+    private static FastNoiseLite OpennessNoise;
+    private static FastNoiseLite BiomeDitherNoise;
+    private static FastNoiseLite LakeShapeNoise;
 
     // The terrain palette: the generator owns the choice of which blocks natural ground is made
     // of, and Chunk only fills its columns with them. Resolved once here so the per-voxel fill
@@ -87,6 +88,16 @@ public static class TerrainGenerator
         IceBlock = ContentRegistry.RequireBlock("ice").Id;
         SnowBlock = ContentRegistry.RequireBlock("snow").Id;
 
+        Reseed();
+    }
+
+    /// <summary>
+    /// Builds every noise channel from the current <see cref="WorldGenerationConfig.Seed"/>. The
+    /// static constructor runs it once; <see cref="WorldSeed.Apply"/> runs it again between worlds,
+    /// only while no worker thread can read these fields.
+    /// </summary>
+    internal static void Reseed()
+    {
         // The rolling base keeps the original seed and settings exactly, so natural terrain
         // is unchanged wherever the flat mask stays at zero. The mask is rare and
         // low-frequency on purpose: most of the world keeps its old look, and only large
@@ -97,10 +108,7 @@ public static class TerrainGenerator
         ValleyRoughNoise = MakeNoise(56, WorldGenerationConfig.ValleyRoughFrequency);
 
         // Winding hill outlines, the same domain-warp trick the ravines and rivers use
-        HillWarp = new FastNoiseLite(WorldGenerationConfig.Seed + 57);
-        HillWarp.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2);
-        HillWarp.SetFrequency(WorldGenerationConfig.HillWarpFrequency);
-        HillWarp.SetDomainWarpAmp(WorldGenerationConfig.HillWarpAmplitude);
+        HillWarp = MakeWarp(57, WorldGenerationConfig.HillWarpFrequency, WorldGenerationConfig.HillWarpAmplitude);
 
         DirtNoise = MakeNoise(11, WorldGenerationConfig.DirtDepthFrequency);
         RavineRidge = MakeNoise(21, WorldGenerationConfig.RavineRidgeFrequency);
@@ -116,26 +124,17 @@ public static class TerrainGenerator
         TrenchRidge = MakeNoise(74, WorldGenerationConfig.TrenchFrequency);
 
         // Displaces the ridge lookup so ravines wind instead of following straight noise contours
-        RavineWarp = new FastNoiseLite(WorldGenerationConfig.Seed + 22);
-        RavineWarp.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2);
-        RavineWarp.SetFrequency(WorldGenerationConfig.RavineWarpFrequency);
-        RavineWarp.SetDomainWarpAmp(WorldGenerationConfig.RavineWarpAmplitude);
+        RavineWarp = MakeWarp(22, WorldGenerationConfig.RavineWarpFrequency, WorldGenerationConfig.RavineWarpAmplitude);
 
         // Trench lines wind the same way, so a gash runs along the basin floor instead of
         // tracking a straight noise contour
-        TrenchWarp = new FastNoiseLite(WorldGenerationConfig.Seed + 75);
-        TrenchWarp.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2);
-        TrenchWarp.SetFrequency(WorldGenerationConfig.TrenchWarpFrequency);
-        TrenchWarp.SetDomainWarpAmp(WorldGenerationConfig.TrenchWarpAmplitude);
+        TrenchWarp = MakeWarp(75, WorldGenerationConfig.TrenchWarpFrequency, WorldGenerationConfig.TrenchWarpAmplitude);
 
         RiverMask = MakeNoise(81, WorldGenerationConfig.RiverMaskFrequency);
         RiverRidge = MakeNoise(82, WorldGenerationConfig.RiverFrequency);
 
         // Like the trench, a river winds rather than tracking a straight noise contour
-        RiverWarp = new FastNoiseLite(WorldGenerationConfig.Seed + 83);
-        RiverWarp.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2);
-        RiverWarp.SetFrequency(WorldGenerationConfig.RiverWarpFrequency);
-        RiverWarp.SetDomainWarpAmp(WorldGenerationConfig.RiverWarpAmplitude);
+        RiverWarp = MakeWarp(83, WorldGenerationConfig.RiverWarpFrequency, WorldGenerationConfig.RiverWarpAmplitude);
 
         MountainMask = MakeNoise(84, WorldGenerationConfig.MountainMaskFrequency, octaves: 2);
         MountainNoise = MakeNoise(85, WorldGenerationConfig.MountainFrequency, octaves: 3);
@@ -144,10 +143,7 @@ public static class TerrainGenerator
         LakeShapeNoise = MakeNoise(90, WorldGenerationConfig.LakeShapeFrequency);
 
         // Mountains wind like ravines and rivers, so a range snakes instead of tracking a contour
-        MountainWarp = new FastNoiseLite(WorldGenerationConfig.Seed + 87);
-        MountainWarp.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2);
-        MountainWarp.SetFrequency(WorldGenerationConfig.MountainWarpFrequency);
-        MountainWarp.SetDomainWarpAmp(WorldGenerationConfig.MountainWarpAmplitude);
+        MountainWarp = MakeWarp(87, WorldGenerationConfig.MountainWarpFrequency, WorldGenerationConfig.MountainWarpAmplitude);
     }
 
     /// <summary>
@@ -496,6 +492,16 @@ public static class TerrainGenerator
         // checkerboard instead of a ragged edge.
         if (BiomeDitherNoise.GetNoise(x, z) <= 0f) return biome;
         return biome == Biome.Forest ? Biome.Desert : Biome.Forest;
+    }
+
+    /// <summary>An OpenSimplex2 domain warp seeded from the world seed plus <paramref name="seedOffset"/>.</summary>
+    private static FastNoiseLite MakeWarp(int seedOffset, float frequency, float amplitude)
+    {
+        var warp = new FastNoiseLite(WorldGenerationConfig.Seed + seedOffset);
+        warp.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2);
+        warp.SetFrequency(frequency);
+        warp.SetDomainWarpAmp(amplitude);
+        return warp;
     }
 
     /// <summary>OpenSimplex2 noise seeded from the world seed; more than one octave turns on FBm.</summary>

@@ -36,7 +36,13 @@ public class FallingBlockManager
         return block;
     }
 
-    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, FluidManager fluids)
+    /// <summary>
+    /// Moves every live cube and writes the rested ones back as blocks. <paramref name="lod"/>
+    /// receives the surface change of each landing (see <see cref="LodSurface.RecordEdit"/>);
+    /// null records nothing, which the headless tests use.
+    /// </summary>
+    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, FluidManager fluids,
+        LodManager? lod = null)
     {
         // Ascending, because a toppled column is stored bottom-up: the lowest cube is written
         // back as a block before the one above it moves for this frame, so each cube lands on
@@ -61,7 +67,7 @@ public class FallingBlockManager
             if (!block.IsSettled) continue;
 
             _falling.RemoveAt(i);
-            Settle(block, chunks, drops, fluids);
+            Settle(block, chunks, drops, fluids, lod);
             i--; // the cube after this one shifted down into its slot
         }
     }
@@ -106,14 +112,22 @@ public class FallingBlockManager
             // Water beside or above the freed cell pours into it on the next fluid tick
             fluids.ScheduleAround(cell);
 
-            // The removal exposes a hole like any mined block
-            if (LodRegion.LowerColumnBelow(x, cy, z))
-                lod.MarkEditedColumn(x, z);
-
             cy++;
         }
 
         if (batch == null) return false;
+
+        // The removals change the far LOD like any mined block, recorded once the whole run is
+        // clear: the highest cell first, which rescans down through the emptied run when it was
+        // the column's top, then the lowest, which caps the column when the run sat below the
+        // top. Recording bottom-up while cells still stood above would cap a column whose top
+        // simply fell away.
+        var lodChanged = LodSurface.RecordEdit(chunks, x, cy - 1, z);
+        if (cy - 1 > y)
+            lodChanged |= LodSurface.RecordEdit(chunks, x, y, z);
+        if (lodChanged)
+            lod.MarkEditedColumn(x, z);
+
         if (batch.Count > 1)
             foreach (var block in batch)
                 block.ChainCollapse = true;
@@ -137,7 +151,8 @@ public class FallingBlockManager
     /// nothing is ever lost or duplicated. A cube resting half off a corner can report a
     /// floored cell with air underneath — that is dropped too rather than cemented floating.
     /// </summary>
-    private void Settle(FallingBlock block, ChunkManager chunks, DropManager drops, FluidManager fluids)
+    private void Settle(FallingBlock block, ChunkManager chunks, DropManager drops, FluidManager fluids,
+        LodManager? lod)
     {
         var x = (int)System.MathF.Floor(block.Position.X);
         var y = (int)System.MathF.Floor(block.Position.Y);
@@ -158,7 +173,16 @@ public class FallingBlockManager
         }
 
         if (chunk.PlaceBlockAt(cell, block.BlockId, chunks))
+        {
             fluids.ScheduleAround(cell);
+
+            // A landing cube can raise or re-tile the far LOD's surface like a placement; only a
+            // surface-solid block is recorded, since anything else would read as a sub-surface
+            // removal and cap the column
+            if (lod != null && LodSurface.IsSurfaceSolid(block.BlockId)
+                && LodSurface.RecordEdit(chunks, x, y, z))
+                lod.MarkEditedColumn(x, z);
+        }
         else
             drops.Spawn(block.BlockId, cell);
     }

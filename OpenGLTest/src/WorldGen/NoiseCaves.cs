@@ -31,14 +31,32 @@ public static class NoiseCaves
     private const int ChNarrowMask = 7;
     private const int Channels = 8;
 
-    private static readonly FastNoiseLite Cheese = TerrainGenerator.MakeNoise(101, WorldGenerationConfig.CheeseFrequency, octaves: 2);
-    private static readonly FastNoiseLite SpaghettiA = TerrainGenerator.MakeNoise(111, WorldGenerationConfig.SpaghettiFrequency);
-    private static readonly FastNoiseLite SpaghettiB = TerrainGenerator.MakeNoise(112, WorldGenerationConfig.SpaghettiFrequency);
-    private static readonly FastNoiseLite Thickness = TerrainGenerator.MakeNoise(113, WorldGenerationConfig.SpaghettiThicknessFrequency);
-    private static readonly FastNoiseLite NarrowA = TerrainGenerator.MakeNoise(121, WorldGenerationConfig.NarrowSpaghettiFrequency);
-    private static readonly FastNoiseLite NarrowB = TerrainGenerator.MakeNoise(122, WorldGenerationConfig.NarrowSpaghettiFrequency);
-    private static readonly FastNoiseLite NarrowMask = TerrainGenerator.MakeNoise(123, WorldGenerationConfig.NarrowSpaghettiMaskFrequency);
-    private static readonly FastNoiseLite Cavern = TerrainGenerator.MakeNoise(131, WorldGenerationConfig.CavernFrequency);
+    private static FastNoiseLite Cheese;
+    private static FastNoiseLite SpaghettiA;
+    private static FastNoiseLite SpaghettiB;
+    private static FastNoiseLite Thickness;
+    private static FastNoiseLite NarrowA;
+    private static FastNoiseLite NarrowB;
+    private static FastNoiseLite NarrowMask;
+    private static FastNoiseLite Cavern;
+
+    static NoiseCaves() => Reseed();
+
+    /// <summary>
+    /// Builds every cave noise field from the current <see cref="WorldGenerationConfig.Seed"/>: once
+    /// from the static constructor, and again by <see cref="WorldSeed.Apply"/> while no worker runs.
+    /// </summary>
+    internal static void Reseed()
+    {
+        Cheese = TerrainGenerator.MakeNoise(101, WorldGenerationConfig.CheeseFrequency, octaves: 2);
+        SpaghettiA = TerrainGenerator.MakeNoise(111, WorldGenerationConfig.SpaghettiFrequency);
+        SpaghettiB = TerrainGenerator.MakeNoise(112, WorldGenerationConfig.SpaghettiFrequency);
+        Thickness = TerrainGenerator.MakeNoise(113, WorldGenerationConfig.SpaghettiThicknessFrequency);
+        NarrowA = TerrainGenerator.MakeNoise(121, WorldGenerationConfig.NarrowSpaghettiFrequency);
+        NarrowB = TerrainGenerator.MakeNoise(122, WorldGenerationConfig.NarrowSpaghettiFrequency);
+        NarrowMask = TerrainGenerator.MakeNoise(123, WorldGenerationConfig.NarrowSpaghettiMaskFrequency);
+        Cavern = TerrainGenerator.MakeNoise(131, WorldGenerationConfig.CavernFrequency);
+    }
 
     /// <summary>
     /// Clears cave air out of a freshly filled chunk. <paramref name="blocks"/> is the chunk's

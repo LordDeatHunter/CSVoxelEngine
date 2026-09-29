@@ -21,9 +21,9 @@ public static class PebbleGenerator
     // True texels per block edge: block textures are 32x32 (see TextureAtlas).
     private const int TexelsPerBlock = 32;
 
-    private static readonly FastNoiseLite PatchNoise;
+    private static FastNoiseLite PatchNoise;
 
-    /// <summary>Block this generator stamps; resolved once, like the noise.</summary>
+    /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
     public static readonly byte PebbleBlock;
 
     /// <summary>Obsidian block whose tile tints obsidian stones; resolved once.</summary>
@@ -34,11 +34,17 @@ public static class PebbleGenerator
 
     static PebbleGenerator()
     {
-        PatchNoise = TerrainGenerator.MakeNoise(61, WorldGenerationConfig.PebblePatchFrequency);
+        Reseed();
         PebbleBlock = ContentRegistry.RequireBlock("pebble").Id;
         ObsidianBlock = ContentRegistry.RequireBlock("obsidian").Id;
         ObsidianItem = ContentRegistry.RequireItem("obsidian").Id;
     }
+
+    /// <summary>
+    /// Builds the noise from the current <see cref="WorldGenerationConfig.Seed"/>: once from the
+    /// static constructor, and again by <see cref="WorldSeed.Apply"/> while no worker thread runs.
+    /// </summary>
+    internal static void Reseed() => PatchNoise = TerrainGenerator.MakeNoise(61, WorldGenerationConfig.PebblePatchFrequency);
 
     /// <summary>
     /// Whether the surface column (x, z) grows pebbles, and how many stones share its cell.

@@ -28,6 +28,9 @@ public static class CactusGenerator
     private static readonly GenerationalCache<(int X, int Z), (int BaseY, CactusShape Shape)> ShapeCache =
         new(WorldGenerationConfig.CactusShapeCacheCapacity, WorldGenerationConfig.CactusShapeCacheGenerations);
 
+    /// <summary>Drops every cached cactus shape; only <see cref="WorldSeed.Apply"/> calls it.</summary>
+    internal static void ResetShapeCache() => ShapeCache.Clear();
+
     // Static delegate, not a lambda at the call site. GetOrAdd's factory takes the key alone, and
     // TryGetCactus has baseY in hand by the time it reaches the cache -- but capturing it would
     // allocate a closure on EVERY call, hits included, on the four chunk-gen threads. Recomputing

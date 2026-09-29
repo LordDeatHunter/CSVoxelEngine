@@ -34,8 +34,8 @@ public sealed class LodColumnCapTests
     [Fact]
     public void MinedColumnCapsPropagateIntoARebuiltRegion()
     {
-        // ColumnCaps is process-global with no reset hook and xUnit runs test classes in
-        // parallel, so this region sits far away from every other test's regions: region index
+        // ColumnCaps is process-global, reset only by WorldSeed.Apply (which the parallel suite
+        // never calls), and xUnit runs test classes in parallel, so this region sits far away from every other test's regions: region index
         // 777+ covers fine ~49728, while the rest of the suite stays near the origin (region
         // index ~5). The climate rework moved the biomes around, so the region is chosen as the
         // first far frozen one rather than a fixed index: frozen land carries no canopy, and a

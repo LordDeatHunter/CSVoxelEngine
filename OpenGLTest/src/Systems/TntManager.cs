@@ -75,7 +75,7 @@ public class TntManager
     /// <summary>
     /// Clears a sphere of blocks around <paramref name="center"/> (TNT blocks are primed instead
     /// of destroyed, so blasts chain; everything else drops like a mined block), remeshing each
-    /// touched chunk once, then lowers the buried LOD under every blasted column. Fluid cells
+    /// touched chunk once, then moves the far LOD of every blasted column onto the crater. Fluid cells
     /// are left standing — clearing them would only be undone by the hundreds of sources around
     /// the crater — and the water around the blast is scheduled so it floods the hole instead.
     /// </summary>
@@ -85,8 +85,9 @@ public class TntManager
         var radius = BlastRadius;
         var radiusSq = radius * radius;
         var touchedChunks = new HashSet<Vector3>();
-        // Lowest destroyed y per (x, z), so each blasted column lowers the LOD cap once
-        var blastedColumns = new Dictionary<(int X, int Z), int>();
+        // Per blasted (x, z): the lowest destroyed y and the highest destroyed surface-solid y
+        // (int.MinValue while none), so each column updates the far LOD once
+        var blastedColumns = new Dictionary<(int X, int Z), (int Lowest, int HighestSolid)>();
         List<Vector3>? blastedLeaves = null;
 
         var min = (center - new Vector3(radius)).Floor();
@@ -143,17 +144,17 @@ public class TntManager
                     DropManager.PileSecondary(removed, x, z, removedState));
             }
 
-            // The cell is air now either way, so the buried LOD must duck below it
-            if (!blastedColumns.TryGetValue((x, z), out var lowest) || y < lowest)
-            {
-                blastedColumns[(x, z)] = y;
-            }
+            // The cell is air now either way, so the far LOD must follow it down
+            var solidY = LodSurface.IsSurfaceSolid(removed) ? y : int.MinValue;
+            blastedColumns[(x, z)] = blastedColumns.TryGetValue((x, z), out var span)
+                ? (Math.Min(span.Lowest, y), Math.Max(span.HighestSolid, solidY))
+                : (y, solidY);
         }
 
         // Pebbles and their kind need support: pop survivors left floating where the blast
         // took the ground from under them. The scan runs after all clearing, so a block found
         // over air genuinely lost its support (or was already floating).
-        foreach (var ((x, z), lowestY) in blastedColumns)
+        foreach (var ((x, z), (lowestY, _)) in blastedColumns)
         {
             for (var y = lowestY; y <= (int)max.Y + 1; y++)
             {
@@ -183,9 +184,17 @@ public class TntManager
                 chunk.RemeshAfterBatchEdit(chunks);
         }
 
-        foreach (var ((x, z), lowestY) in blastedColumns)
+        // The highest blasted surface-solid cell first: when it was the column's top, its removal
+        // rescans down through the crater to the new floor (a snow layer or pebble blown off above
+        // it is no surface, so it is not the cell to start from). The lowest blasted cell then caps
+        // a crater that sat below the surface (a buried blast), so the hole never exposes the
+        // shell; after a rescan it sits above the new top and records nothing.
+        foreach (var ((x, z), (lowestY, highestSolidY)) in blastedColumns)
         {
-            if (LodRegion.LowerColumnBelow(x, lowestY, z))
+            var changed = highestSolidY != int.MinValue && LodSurface.RecordEdit(chunks, x, highestSolidY, z);
+            if (lowestY != highestSolidY)
+                changed |= LodSurface.RecordEdit(chunks, x, lowestY, z);
+            if (changed)
                 lod.MarkEditedColumn(x, z);
         }
 

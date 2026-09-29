@@ -122,12 +122,26 @@ public class LodRegion : IDisposable
 
     // Destroying blocks exposes the LOD buried beneath the surface. These per-column caps
     // force the LOD height below every removed block so the LOD always stays hidden.
+    // They are one half of a pair: the cap has MIN semantics (it only ever falls, so a hole dug
+    // below the surface can never expose the shell), while LodSurface's per-column override has
+    // REPLACE semantics (the actual top height and block after a placement, a replacement or a
+    // removal of the top). A fine column's LOD height is min(override ?? Heights, cap), and
+    // BuildMeshData applies both before erosion and HeightBias, so the nesting invariants hold.
     // Bucketed by chunk column (item C9): the value is a Chunk.Size * Chunk.Size array of caps
     // indexed exactly like a heightmap (((x & SizeMask) << SizeShift) | (z & SizeMask)), NoCap
     // where the column is uncapped. A region build then resolves one bucket per prefetched
     // heightmap instead of hashing an (x, z) tuple per height sample, so an unedited region pays
     // nothing and an edited one pays one probe per chunk column, not one per sample.
+    // Process-global but per WORLD: the caps record that world's edits, so WorldSeed.Apply resets
+    // them between worlds (ResetColumnCaps), and a save carries them across a restart through
+    // LodEditState (lod-edits.bin: ExportColumnCaps / ImportColumnCaps).
     private static readonly ConcurrentDictionary<(int CX, int CZ), int[]> ColumnCaps = new();
+
+    /// <summary>
+    /// Forgets every column cap, which belongs to the previous world's edits; only
+    /// <see cref="WorldSeed.Apply"/> calls it.
+    /// </summary>
+    internal static void ResetColumnCaps() => ColumnCaps.Clear();
 
     // "Never capped". A cap is always a removed block's Y minus one, so int.MaxValue can never
     // compare below a real terrain height and the uncapped case needs no separate test.
@@ -149,7 +163,9 @@ public class LodRegion : IDisposable
         var cx = x >> Chunk.SizeShift;
         var cz = z >> Chunk.SizeShift;
         var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
-        var current = Chunk.GetColumnHeights(cx, cz)[local];
+        // The column's current top: a surface override (a raised or re-scanned column) if it has
+        // one, else the generated terrain height. The cap then applies on top, as before.
+        var current = LodSurface.TopOrHeight(x, z);
 
         ColumnCaps.TryGetValue((cx, cz), out var bucket);
         if (bucket != null)
@@ -168,7 +184,60 @@ public class LodRegion : IDisposable
         // multi-threaded LodGen (item C5) stays safe.
         bucket ??= ColumnCaps.GetOrAdd((cx, cz), static _ => NewCapBucket());
         Volatile.Write(ref bucket[local], y - 1);
+        Interlocked.Increment(ref _capEditVersion);
         return true;
+    }
+
+    private static int _capEditVersion;
+
+    /// <summary>Bumped by every cap <see cref="LowerColumnBelow"/> writes, so a save can tell whether anything changed.</summary>
+    internal static int CapEditVersion => Volatile.Read(ref _capEditVersion);
+
+    /// <summary>
+    /// A copy of every cap bucket that caps at least one column, for the per-world LOD edit save
+    /// (<c>LodEditState</c>). Main thread (the only writer), so the copies are consistent.
+    /// </summary>
+    internal static List<(int CX, int CZ, int[] Values)> ExportColumnCaps()
+    {
+        var result = new List<(int CX, int CZ, int[] Values)>();
+        foreach (var (key, bucket) in ColumnCaps)
+        {
+            var copy = new int[bucket.Length];
+            var any = false;
+            for (var i = 0; i < copy.Length; i++)
+            {
+                copy[i] = Volatile.Read(ref bucket[i]);
+                any |= copy[i] != NoCap;
+            }
+
+            if (any) result.Add((key.CX, key.CZ, copy));
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Merges saved caps into the live table. Min semantics like every cap write: the lower cap
+    /// wins, so an import can never raise a live edit's cap. Call before <c>LodManager.Start</c> so
+    /// the first region builds see it; regions built later pick it up on their own. Leaves
+    /// <see cref="CapEditVersion"/> alone: the imported caps are already what the file holds.
+    /// </summary>
+    internal static void ImportColumnCaps(IEnumerable<(int CX, int CZ, int[] Values)> caps)
+    {
+        foreach (var (cx, cz, values) in caps)
+        {
+            int[]? bucket = null;
+            var n = Math.Min(values.Length, Chunk.Size * Chunk.Size);
+            for (var i = 0; i < n; i++)
+            {
+                var cap = values[i];
+                if (cap == NoCap) continue;
+
+                bucket ??= ColumnCaps.GetOrAdd((cx, cz), static _ => NewCapBucket());
+                if (cap < Volatile.Read(ref bucket[i]))
+                    Volatile.Write(ref bucket[i], cap);
+            }
+        }
     }
 
     /// <summary>
@@ -300,17 +369,34 @@ public class LodRegion : IDisposable
         var baseChunkX = rx * regionChunkSpan - 1;
         var baseChunkZ = rz * regionChunkSpan - 1;
         var hasCaps = !ColumnCaps.IsEmpty;
+        var hasOverrides = !LodSurface.IsEmpty;
         var heightmaps = new int[chunkSpan * chunkSpan][];
         // One cap-bucket resolution per prefetched heightmap (item C9). Null for every chunk column
         // the player has never edited — which is all of them until the first mined block — and the
         // whole array is skipped while the table is empty. Same shape and lifetime as heightmaps.
         var capmaps = hasCaps ? new int[chunkSpan * chunkSpan][] : null;
+        // The LodSurface override buckets, resolved the same way and with the same shape.
+        var overrideMaps = hasOverrides ? new int[chunkSpan * chunkSpan][] : null;
+        // Whether any chunk column this region samples carries an edit. Only then does the build
+        // pay for the generated-only grid and the tile rule; an unedited region keeps the old path.
+        var hasEdits = false;
+        var hasRegionOverrides = false;
         for (var cx = 0; cx < chunkSpan; cx++)
         for (var cz = 0; cz < chunkSpan; cz++)
         {
             heightmaps[cx * chunkSpan + cz] = Chunk.GetColumnHeights(baseChunkX + cx, baseChunkZ + cz);
             if (capmaps != null && ColumnCaps.TryGetValue((baseChunkX + cx, baseChunkZ + cz), out var bucket))
+            {
                 capmaps[cx * chunkSpan + cz] = bucket;
+                hasEdits = true;
+            }
+
+            if (overrideMaps != null && LodSurface.BucketOf(baseChunkX + cx, baseChunkZ + cz) is { } overrides)
+            {
+                overrideMaps[cx * chunkSpan + cz] = overrides;
+                hasEdits = true;
+                hasRegionOverrides = true;
+            }
         }
 
         var baseFineX = rx * spec.RegionBlocks;
@@ -320,24 +406,46 @@ public class LodRegion : IDisposable
         // cellSize + margin on each side - the same reach LodManager.MarkEditedColumn uses. Filling
         // it chunk column by chunk column out of the prefetched heightmaps turns each sample into a
         // contiguous copy (the per-sample chunk-index math FineHeight does disappears) and applies
-        // the C9 cap bucket once per chunk column as it copies.
+        // the C9 cap bucket and the LodSurface override bucket once per chunk column as it copies.
         var fineMargin = cellSize + margin;                  // 3 / 7 / 15, always < Chunk.Size
         var fineSpan = spec.RegionBlocks + 2 * fineMargin;   // 70 / 142 / 286
         var fineOriginX = baseFineX - fineMargin;
         var fineOriginZ = baseFineZ - fineMargin;
         var windowSpan = cellSize + 2 * margin;              // 4 / 10 / 22
 
-        int FineHeight(int fineX, int fineZ)
+        // The seam path's per-sample read of the EDITED height: the override replaces the generated
+        // height, then the cap lowers it, exactly the order the separable fill applies. block is
+        // the override's block while that override is the column's drawn height, else 0.
+        int FineHeight(int fineX, int fineZ, out byte block)
         {
             var cx = (fineX >> Chunk.SizeShift) - baseChunkX;
             var cz = (fineZ >> Chunk.SizeShift) - baseChunkZ;
             var local = ((fineX & Chunk.SizeMask) << Chunk.SizeShift) | (fineZ & Chunk.SizeMask);
             var height = heightmaps[cx * chunkSpan + cz][local];
+            block = 0;
+
+            var overrides = overrideMaps?[cx * chunkSpan + cz];
+            var packed = overrides != null ? overrides[local] : LodSurface.None;
+            if (packed != LodSurface.None) LodSurface.Unpack(packed, out height, out block);
 
             var caps = capmaps?[cx * chunkSpan + cz];
-            if (caps != null && caps[local] < height) height = caps[local];
+            if (caps != null && caps[local] < height)
+            {
+                height = caps[local];
+                block = 0;
+            }
 
             return height;
+        }
+
+        // The seam path's GENERATED height, ignoring every edit: what the water, beach and rock
+        // decisions read, so a player edit never turns a sea cell into land or the reverse.
+        int FineHeightGen(int fineX, int fineZ)
+        {
+            var cx = (fineX >> Chunk.SizeShift) - baseChunkX;
+            var cz = (fineZ >> Chunk.SizeShift) - baseChunkZ;
+            var local = ((fineX & Chunk.SizeMask) << Chunk.SizeShift) | (fineZ & Chunk.SizeMask);
+            return heightmaps[cx * chunkSpan + cz][local];
         }
 
         // Top solid cell per LOD column (with 1-cell border): the eroded terrain below, the
@@ -374,6 +482,16 @@ public class LodRegion : IDisposable
         // Both are rented unconditionally, seam path included, so the finally has no condition.
         var fine = ArrayPool<int>.Shared.Rent(fineSpan * fineSpan);
         var xMin = ArrayPool<int>.Shared.Rent(fineSpan);
+        // Edited regions only: the GENERATED fine heights (no override, no cap), which the per-cell
+        // uneroded max reads so water, sea floor, beach and rock stay the generated decisions — a
+        // pillar in the shallows must never delete the sea sheet. An unedited region aliases it to
+        // `fine`, which is then the same numbers, and pays for no second grid.
+        var fineGen = hasEdits ? ArrayPool<int>.Shared.Rent(fineSpan * fineSpan) : fine;
+        // The override block of each fine column while that override is its drawn height (0
+        // otherwise), and the block each cell's drawn surface wears by the tile rule below (0 =
+        // the generated tile chain). Only read while the region has overrides.
+        var fineBlock = ArrayPool<byte>.Shared.Rent(fineSpan * fineSpan);
+        var topBlockGrid = ArrayPool<byte>.Shared.Rent(gridSize);
         try
         {
         if (separableMin)
@@ -388,6 +506,7 @@ public class LodRegion : IDisposable
             {
                 var heights = heightmaps[cx * chunkSpan + cz];
                 var caps = capmaps?[cx * chunkSpan + cz];
+                var overrides = overrideMaps?[cx * chunkSpan + cz];
                 var wx0 = (baseChunkX + cx) << Chunk.SizeShift;
                 var wz0 = (baseChunkZ + cz) << Chunk.SizeShift;
                 var lx0 = Math.Max(0, fineOriginX - wx0);
@@ -398,17 +517,35 @@ public class LodRegion : IDisposable
                 {
                     var src = lx << Chunk.SizeShift;
                     var dst = (wx0 + lx - fineOriginX) * fineSpan + (wz0 - fineOriginZ);
-                    // Split on caps so the uncapped case - every chunk column in an unedited
+                    // Split on edits so the unedited case - every chunk column in an unedited
                     // world - stays a branch-free copy.
-                    if (caps == null)
+                    if (caps == null && overrides == null)
+                    {
                         for (var lz = lz0; lz < lz1; lz++)
                             fine[dst + lz] = heights[src + lz];
+                        if (!ReferenceEquals(fineGen, fine))
+                            Array.Copy(fine, dst + lz0, fineGen, dst + lz0, lz1 - lz0);
+                        // ArrayPool hands back uncleared arrays, so a clean column says so.
+                        if (hasRegionOverrides)
+                            Array.Clear(fineBlock, dst + lz0, lz1 - lz0);
+                    }
                     else
                         for (var lz = lz0; lz < lz1; lz++)
                         {
+                            // Override first (replace), then the cap (min), as FineHeight does.
                             var h = heights[src + lz];
-                            var c = caps[src + lz];
-                            fine[dst + lz] = c < h ? c : h;
+                            fineGen[dst + lz] = h;
+                            byte b = 0;
+                            var o = overrides != null ? overrides[src + lz] : LodSurface.None;
+                            if (o != LodSurface.None) LodSurface.Unpack(o, out h, out b);
+                            var c = caps != null ? caps[src + lz] : NoCap;
+                            if (c < h)
+                            {
+                                h = c;
+                                b = 0;   // a cap below the override: the override is not what shows
+                            }
+                            fine[dst + lz] = h;
+                            fineBlock[dst + lz] = b;
                         }
                 }
             }
@@ -454,15 +591,34 @@ public class LodRegion : IDisposable
 
                     // The uneroded per-cell max is NOT separable and is not meant to be: it reads
                     // the cell's own footprint only (no margin), exactly as before, just out of the
-                    // grid.
+                    // grid - the GENERATED grid, so no edit moves the water or beach decisions.
                     var ox = i * cellSize + fineMargin;
                     var oz = j * cellSize + fineMargin;
                     for (var dx = 0; dx < cellSize; dx++)
                     {
                         var row = (ox + dx) * fineSpan + oz;
                         for (var dz = 0; dz < cellSize; dz++)
-                            if (fine[row + dz] > maxOwn) maxOwn = fine[row + dz];
+                            if (fineGen[row + dz] > maxOwn) maxOwn = fineGen[row + dz];
                     }
+
+                    // Tile rule: an override's block shows only where that override actually is
+                    // the drawn (eroded-min) surface, so a lone block never repaints a coarse cell.
+                    // First match in dx-outer, dz-inner order, the seam path's order too.
+                    byte topBlock = 0;
+                    if (hasRegionOverrides)
+                    {
+                        for (var dx = 0; dx < cellSize && topBlock == 0; dx++)
+                        {
+                            var row = (ox + dx) * fineSpan + oz;
+                            for (var dz = 0; dz < cellSize; dz++)
+                                if (fine[row + dz] == minHeight && fineBlock[row + dz] != 0)
+                                {
+                                    topBlock = fineBlock[row + dz];
+                                    break;
+                                }
+                        }
+                    }
+                    topBlockGrid[(i + 1) * heightGrid + (j + 1)] = topBlock;
                 }
                 else
                 {
@@ -472,10 +628,30 @@ public class LodRegion : IDisposable
                     for (var dx = -margin; dx < cellSize + margin; dx++)
                     for (var dz = -margin; dz < cellSize + margin; dz++)
                     {
-                        var h = FineHeight(baseFineX + i * cellSize + dx, baseFineZ + j * cellSize + dz);
+                        var fx = baseFineX + i * cellSize + dx;
+                        var fz = baseFineZ + j * cellSize + dz;
+                        var h = FineHeight(fx, fz, out _);
                         if (h < minHeight) minHeight = h;
-                        if (h > maxOwn && dx >= 0 && dx < cellSize && dz >= 0 && dz < cellSize) maxOwn = h;
+                        var g = FineHeightGen(fx, fz);
+                        if (g > maxOwn && dx >= 0 && dx < cellSize && dz >= 0 && dz < cellSize) maxOwn = g;
                     }
+
+                    // The same tile rule, restricted to the cell's own footprint.
+                    byte topBlock = 0;
+                    if (hasRegionOverrides)
+                    {
+                        for (var dx = 0; dx < cellSize && topBlock == 0; dx++)
+                        for (var dz = 0; dz < cellSize; dz++)
+                        {
+                            var h = FineHeight(baseFineX + i * cellSize + dx, baseFineZ + j * cellSize + dz, out var b);
+                            if (h == minHeight && b != 0)
+                            {
+                                topBlock = b;
+                                break;
+                            }
+                        }
+                    }
+                    topBlockGrid[(i + 1) * heightGrid + (j + 1)] = topBlock;
                 }
 
                 // Biome read at the cell centre, like the gravel patch below: the coarse cell
@@ -563,6 +739,15 @@ public class LodRegion : IDisposable
                 var maxHeight = int.MinValue;
                 foreach (var h in heightmaps[(ci + 1) * chunkSpan + (cj + 1)])
                     if (h > maxHeight) maxHeight = h;
+                // A raised column (a structure built above the terrain) must be covered too before
+                // the shell is judged buried, so the chunks holding its top have to be drawn.
+                if (overrideMaps?[(ci + 1) * chunkSpan + (cj + 1)] is { } overrides)
+                    foreach (var packed in overrides)
+                    {
+                        if (packed == LodSurface.None) continue;
+                        LodSurface.Unpack(packed, out var top, out _);
+                        if (top > maxHeight) maxHeight = top;
+                    }
 
                 // A water cell hides this shell only once the chunk holding its surface is meshed
                 // too, or the sheet would vanish before the chunk water appears
@@ -732,9 +917,15 @@ public class LodRegion : IDisposable
                 var isSeaCell = cellLevel > TerrainGenerator.NoWater;
                 var sheetY = isSeaCell ? cellLevel + sheetDrop : 0f;
                 var floor = seaFloor[gi * heightGrid + gj];
+                // The edited surface's own block (see the tile rule), which outranks the generated
+                // material chain wherever it is the drawn surface.
+                var edited = hasRegionOverrides && topBlockGrid[gi * heightGrid + gj] is var eb and not 0
+                    ? BlockType.ById[eb]
+                    : null;
 
                 AddQuad(vertices, indices, topFace, new Vector3(i * cellSize, top * cellSize, j * cellSize),
                     top > ground ? CanopyTile(canopyLeaf[gi * heightGrid + gj], topFace)
+                    : edited != null ? edited.FaceTiles[topFace]
                     : isSeaCell ? FloorTile(floor, topFace)   // seabed wears its depth band, not dirt
                     : beach ? cap.FaceTiles[topFace]
                     : rock ? stone.FaceTiles[topFace]
@@ -795,7 +986,8 @@ public class LodRegion : IDisposable
                         // grass/dirt/stone rule applies, measured from the ground (not the bump),
                         // with the biome's own top material and soil band beneath it
                         var tile = cy > ground ? CanopyTile(canopyLeaf[gi * heightGrid + gj], f)
-                            : cy == top ? (isSeaCell ? FloorTile(floor, f)
+                            : cy == top ? (edited != null ? edited.FaceTiles[f]
+                                : isSeaCell ? FloorTile(floor, f)
                                 : beach ? cap.FaceTiles[f]
                                 : rock ? stone.FaceTiles[f]
                                 : snowCell ? snow.FaceTiles[f]
@@ -830,6 +1022,9 @@ public class LodRegion : IDisposable
             ArrayPool<byte>.Shared.Return(canopyLeaf);
             ArrayPool<int>.Shared.Return(fine);
             ArrayPool<int>.Shared.Return(xMin);
+            if (!ReferenceEquals(fineGen, fine)) ArrayPool<int>.Shared.Return(fineGen);
+            ArrayPool<byte>.Shared.Return(fineBlock);
+            ArrayPool<byte>.Shared.Return(topBlockGrid);
         }
     }
 }

@@ -289,8 +289,10 @@ public sealed class KilnManager
     /// built from, drops its fuel and is forgotten — that is the only cleanup a blast gets, since
     /// <see cref="TntManager"/> clears cells without knowing about structures. A kiln with a cell
     /// in an unloaded chunk freezes instead, so a half-loaded structure is never mangled.
+    /// <paramref name="lod"/> receives the surface change of each reverted cell (see
+    /// <see cref="LodSurface.RecordEdit"/>); null records nothing, which the headless tests use.
     /// </summary>
-    public void Update(float deltaTime, ChunkManager chunks, DropManager drops)
+    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, LodManager? lod = null)
     {
         if (deltaTime <= 0f || _kilns.Count == 0) return;
         _stale.Clear();
@@ -380,6 +382,17 @@ public sealed class KilnManager
                 {
                     if (chunks.Chunks.TryGetValue(chunkPos, out var touched))
                         touched.RemeshAfterBatchEdit(chunks);
+                }
+
+                // The cells went back to their source block, which can re-tile the far LOD
+                if (lod != null)
+                {
+                    foreach (var (dx, dy, dz) in Multiblock.Offsets)
+                    {
+                        int cx = key.X + dx, cy = key.Y + dy, cz = key.Z + dz;
+                        if (LodSurface.RecordEdit(chunks, cx, cy, cz))
+                            lod.MarkEditedColumn(cx, cz);
+                    }
                 }
             }
 

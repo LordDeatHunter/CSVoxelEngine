@@ -11,12 +11,18 @@ namespace silkgltriangle;
 /// </summary>
 public static class SnowGenerator
 {
-    private static readonly FastNoiseLite DriftNoise;
+    private static FastNoiseLite DriftNoise;
 
     static SnowGenerator()
     {
-        DriftNoise = TerrainGenerator.MakeNoise(89, WorldGenerationConfig.SnowFrequency, octaves: 2);
+        Reseed();
     }
+
+    /// <summary>
+    /// Builds the noise from the current <see cref="WorldGenerationConfig.Seed"/>: once from the
+    /// static constructor, and again by <see cref="WorldSeed.Apply"/> while no worker thread runs.
+    /// </summary>
+    internal static void Reseed() => DriftNoise = TerrainGenerator.MakeNoise(89, WorldGenerationConfig.SnowFrequency, octaves: 2);
 
     /// <summary>
     /// Natural snow depth of the column (x, z) in layers: 0 when it is too warm for snow, otherwise

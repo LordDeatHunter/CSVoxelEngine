@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 
 namespace silkgltriangle;
 
@@ -428,8 +430,27 @@ public static class TreeGenerator
     // The static canopy above knows nothing of edits, so lookups here read 0 (no bump) rather
     // than resurrecting a chopped crown at long range. Entries are gameplay truth, so the cap
     // only bounds memory; clearing it can briefly show a stale bump far away, never a hole.
+    // Process-global but per WORLD: WorldSeed.Apply resets it between worlds (ResetCanopyDisturbed),
+    // and a save carries it across a restart through LodEditState (lod-edits.bin; the wholesale
+    // Clear at CanopyDisturbedLimit makes that lossy in a very long session, M-10).
     private static readonly ConcurrentDictionary<(int X, int Z), byte> CanopyDisturbed = new();
     private const int CanopyDisturbedLimit = 16384;
+
+    /// <summary>
+    /// Drops the cached tree shapes and canopy tops; only <see cref="WorldSeed.Apply"/> calls it,
+    /// since both are a function of the seed.
+    /// </summary>
+    internal static void ResetCaches()
+    {
+        ShapeCache.Clear();
+        CanopyCache.Clear();
+    }
+
+    /// <summary>
+    /// Forgets every felled-canopy marker, which belongs to the previous world's edits; only
+    /// <see cref="WorldSeed.Apply"/> calls it.
+    /// </summary>
+    internal static void ResetCanopyDisturbed() => CanopyDisturbed.Clear();
 
     /// <summary>
     /// Highest canopy cell over the ground column (x, z), or 0 under open sky. Disturbed
@@ -476,15 +497,36 @@ public static class TreeGenerator
     /// </summary>
     public static void PoisonCanopy(int x, int z)
     {
+        // One bound check per call, not per cell: ConcurrentDictionary.Count takes every lock, and
+        // the limit only bounds memory, so overshooting it by one call's square is harmless.
+        if (CanopyDisturbed.Count >= CanopyDisturbedLimit)
+            CanopyDisturbed.Clear();
+
         var r = WorldGenerationConfig.TreeCanopyPoisonRadius;
         for (var dx = -r; dx <= r; dx++)
         for (var dz = -r; dz <= r; dz++)
-        {
-            if (CanopyDisturbed.Count >= CanopyDisturbedLimit)
-                CanopyDisturbed.Clear();
-
             CanopyDisturbed[(x + dx, z + dz)] = 0;
-        }
+
+        Interlocked.Increment(ref _canopyEditVersion);
+    }
+
+    private static int _canopyEditVersion;
+
+    /// <summary>Bumped once per <see cref="PoisonCanopy"/> call, so a save can tell whether anything changed.</summary>
+    internal static int CanopyEditVersion => Volatile.Read(ref _canopyEditVersion);
+
+    /// <summary>Every felled-canopy marker, for the per-world LOD edit save (<c>LodEditState</c>).</summary>
+    internal static (int X, int Z)[] ExportCanopyDisturbed() => CanopyDisturbed.Keys.ToArray();
+
+    /// <summary>
+    /// Adds saved felled-canopy markers to the live set (a marker is a plain flag, so the union is
+    /// the merge). Call before <c>LodManager.Start</c> so the first region builds see it. Leaves
+    /// <see cref="CanopyEditVersion"/> alone: the imported markers are what the file holds.
+    /// </summary>
+    internal static void ImportCanopyDisturbed(IEnumerable<(int X, int Z)> columns)
+    {
+        foreach (var column in columns)
+            CanopyDisturbed.TryAdd(column, 0);
     }
 
     internal static int[] GetCanopyTops(int chunkX, int chunkZ) => GetCanopyColumns(chunkX, chunkZ).Tops;

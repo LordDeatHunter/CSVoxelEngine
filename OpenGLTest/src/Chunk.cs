@@ -16,7 +16,7 @@ public class Chunk : IDisposable
     public const int Size = 16;
     public const int SizeShift = 4; // log2(Size), for shift/mask coordinate math
     public const int SizeMask = Size - 1;
-    private const int BlockCount = Size * Size * Size;
+    public const int BlockCount = Size * Size * Size;
 
     // Meshing reads a snapshot of this chunk plus a 1-block border from neighbors
     internal const int Padded = Size + 2;
@@ -153,18 +153,45 @@ public class Chunk : IDisposable
     public int SurfaceMinY { get; private set; } = int.MinValue;
 
     /// <summary>
-    /// The fluid cells inside this chunk that already sit against a carved cavity they could
-    /// flow into (local block indices as <see cref="Idx"/> produces them), or <c>null</c> when
-    /// there are none. Generated sea water is static source blocks, so a cave carved into the
-    /// sea floor leaves water standing against worldgen air that nothing would ever schedule;
-    /// this is the list <see cref="FluidManager.WakeLoadedChunks"/> uses to make it pour in the
-    /// moment the chunk loads. Open air above the terrain is not a cavity (see
-    /// <see cref="FluidManager.IsCarvedFlowTarget"/>), so a ravine, beach or hillside never
-    /// wakes the sea. Written once by the generation worker before
-    /// <see cref="IsBlockDataReady"/> goes true and read once on the main thread afterwards, so
-    /// it needs no locking.
+    /// The fluid cells inside this chunk that could already move when it loads (local block
+    /// indices as <see cref="Idx"/> produces them), or <c>null</c> when there are none.
+    /// Generated sea water is static source blocks, so a cave carved into the sea floor leaves
+    /// water standing against worldgen air that nothing would ever schedule; this is the list
+    /// <see cref="FluidManager.WakeLoadedChunks"/> uses to make it pour in the moment the chunk
+    /// loads. Generated water keeps the carved rule: open air above the terrain is not a cavity
+    /// (see <see cref="FluidManager.IsWakeTarget"/>), so a ravine, beach or hillside never wakes
+    /// the sea. A restored chunk can hold fluid the player poured, so a non-source (mid-flow)
+    /// cell always counts, and so does a source above both its column's terrain top and water
+    /// level (only ever poured) wherever it has a replaceable neighbour. Written once by the
+    /// generation worker before <see cref="IsBlockDataReady"/> goes true and read once on the
+    /// main thread afterwards, so it needs no locking.
     /// </summary>
     internal ushort[]? FluidFrontier { get; private set; }
+
+    /// <summary>
+    /// Whether a block edit has changed this chunk since it was generated, restored or last
+    /// snapshotted (<see cref="TakeSnapshot"/>). Set by the three raw writers every edit goes
+    /// through — <see cref="SetBlockRaw"/> (which <see cref="PlaceBlockAt"/>,
+    /// <see cref="SetStateAt"/> and the fluid tick use), <see cref="RemoveBlockAt"/> and
+    /// <see cref="ClearBlockAt"/> — and never by generation, so an untouched chunk is never
+    /// written to disk and simply regenerates. Main thread only, like the edits.
+    /// </summary>
+    public bool ModifiedSinceSave { get; private set; }
+
+    /// <summary>
+    /// Whether this chunk's blocks came from a save (<see cref="RestoreFrom"/>) instead of
+    /// worldgen. A restored chunk can hold poured water anywhere, which is what makes the fluid
+    /// wake scan its borders whatever height it sits at.
+    /// </summary>
+    public bool IsRestored { get; private set; }
+
+    /// <summary>
+    /// The player-placed cells (chunk-local <see cref="Idx"/> indices) a restored chunk brought
+    /// back that the chunk manager has not yet adopted into its own player-placed set, or null.
+    /// Set by <see cref="RestoreFrom"/> on the generation worker, cleared on the main thread
+    /// once adopted.
+    /// </summary>
+    internal ushort[]? RestoredPlayerPlaced { get; set; }
 
     // Column data only depends on (x, z), so vertical chunk stacks share one entry. Sizing (capacity,
     // generations and the memory arithmetic behind both) lives in WorldGenerationConfig; the safety
@@ -190,6 +217,12 @@ public class Chunk : IDisposable
     // Static, so a miss on any of the four chunk-gen threads does not allocate a closure per call
     private static readonly Func<(int X, int Z), ColumnData> ComputeColumn =
         static key => TerrainGenerator.Compute(key.X, key.Z);
+
+    /// <summary>
+    /// Drops every cached column. Only <see cref="WorldSeed.Apply"/> calls it: the columns are a
+    /// function of the seed, so a swap makes all of them wrong.
+    /// </summary>
+    internal static void ResetColumnCache() => ColumnCache.Clear();
 
     // Meshing lookup tables, flattened from CubeFaces/AONeighbors into padded-snapshot index deltas
     private static readonly int[] FaceNeighborDelta = new int[6];
@@ -752,15 +785,20 @@ public class Chunk : IDisposable
     }
 
     /// <summary>
-    /// Collects the cells where this chunk's water already touches a carved cavity it could flow
-    /// into, into <see cref="FluidFrontier"/>. The sea is generated as static sources, so without
-    /// this a cave or an entrance that breached it would leave a wall of water standing beside
-    /// worldgen air forever — nothing schedules those cells, since only block edits do.
+    /// Collects the fluid cells that could already move when this chunk loads into
+    /// <see cref="FluidFrontier"/>. The sea is generated as static sources, so without this a
+    /// cave or an entrance that breached it would leave a wall of water standing beside worldgen
+    /// air forever — nothing schedules those cells, since only block edits do.
     ///
-    /// Only cells at or below their column's natural terrain top count (see
-    /// <see cref="FluidManager.IsCarvedFlowTarget"/>): that is what a carver opened, and open air
-    /// above the terrain is deliberately excluded so a generated sea never wakes across a ravine,
-    /// a beach or a hillside. Minecraft's generated water is static the same way.
+    /// Generated water keeps the carved rule: only neighbours at or below their column's natural
+    /// terrain top count (see <see cref="FluidManager.IsWakeTarget"/>), since that is what a
+    /// carver opened, and open air above the terrain is deliberately excluded so a generated sea
+    /// never wakes across a ravine, a beach or a hillside. Minecraft's generated water is static
+    /// the same way. A restored chunk can also hold fluid the player poured: a non-source
+    /// (mid-flow) cell is always reported, and a source above both its own column's terrain top
+    /// and water level — which generated water and lava never are — wakes against any
+    /// replaceable neighbour. Generated fluid is always a source at or below one of those two,
+    /// so a generated chunk's frontier is exactly the carved rule's.
     ///
     /// +Y is deliberately not tested: every sea-surface cell has air above it and water never
     /// flows upward, so including it would report a useless 256 cells per surface chunk.
@@ -779,11 +817,17 @@ public class Chunk : IDisposable
             var i = Idx(x, y, z);
             if (!BlockType.IsFluid(_blocks[i])) continue;
 
-            var exposed = (x > 0 && IsCarvedFlowTarget(column, lowerBoundY, x - 1, y, z))
-                          || (x < SizeMask && IsCarvedFlowTarget(column, lowerBoundY, x + 1, y, z))
-                          || (z > 0 && IsCarvedFlowTarget(column, lowerBoundY, x, y, z - 1))
-                          || (z < SizeMask && IsCarvedFlowTarget(column, lowerBoundY, x, y, z + 1))
-                          || (y > 0 && IsCarvedFlowTarget(column, lowerBoundY, x, y - 1, z));
+            var fluidY = lowerBoundY + y;
+            var column2D = (x << SizeShift) | z;
+            var fluidHeight = column.Heights[column2D];
+            var fluidWaterLevel = column.WaterLevel[column2D];
+
+            var exposed = !FluidState.IsSource(GetLocalState(x, y, z))
+                          || (x > 0 && IsWakeTarget(column, lowerBoundY, x - 1, y, z, fluidY, fluidHeight, fluidWaterLevel))
+                          || (x < SizeMask && IsWakeTarget(column, lowerBoundY, x + 1, y, z, fluidY, fluidHeight, fluidWaterLevel))
+                          || (z > 0 && IsWakeTarget(column, lowerBoundY, x, y, z - 1, fluidY, fluidHeight, fluidWaterLevel))
+                          || (z < SizeMask && IsWakeTarget(column, lowerBoundY, x, y, z + 1, fluidY, fluidHeight, fluidWaterLevel))
+                          || (y > 0 && IsWakeTarget(column, lowerBoundY, x, y - 1, z, fluidY, fluidHeight, fluidWaterLevel));
             if (!exposed) continue;
 
             frontier ??= [];
@@ -793,10 +837,12 @@ public class Chunk : IDisposable
         FluidFrontier = frontier?.ToArray();
     }
 
-    /// <summary>Whether a chunk-local neighbour is a carved cavity the fluid may wake into.</summary>
-    private bool IsCarvedFlowTarget(ColumnData column, int lowerBoundY, int x, int y, int z) =>
-        FluidManager.IsCarvedFlowTarget(_blocks[Idx(x, y, z)], lowerBoundY + y,
-            column.Heights[(x << SizeShift) | z]);
+    /// <summary>Whether a chunk-local neighbour is somewhere the fluid beside it may wake into
+    /// (<see cref="FluidManager.IsWakeTarget"/> with this chunk's column data).</summary>
+    private bool IsWakeTarget(ColumnData column, int lowerBoundY, int x, int y, int z,
+        int fluidY, int fluidColumnHeight, int fluidColumnWaterLevel) =>
+        FluidManager.IsWakeTarget(_blocks[Idx(x, y, z)], lowerBoundY + y,
+            column.Heights[(x << SizeShift) | z], fluidY, fluidColumnHeight, fluidColumnWaterLevel);
 
     /// <summary>
     /// Floods every air cell up to each column's own water level (see
@@ -1079,7 +1125,61 @@ public class Chunk : IDisposable
             _state[i] = 0;
         }
 
+        MarkModified();
         return previous;
+    }
+
+    /// <summary>Flags the chunk as holding unsaved edits (see <see cref="ModifiedSinceSave"/>).
+    /// The test keeps the hot fluid-tick path from rewriting a field it already set.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void MarkModified()
+    {
+        if (!ModifiedSinceSave) ModifiedSinceSave = true;
+    }
+
+    /// <summary>
+    /// Copies this chunk's blocks and state into a <see cref="ChunkSnapshot"/> for the save
+    /// writer and clears <see cref="ModifiedSinceSave"/>. Copies only — no palette, no Deflate:
+    /// the encoding happens on the writer thread. Main thread only, since that is the only
+    /// thread that edits blocks, so the copy is consistent.
+    /// </summary>
+    /// <param name="playerPlaced">The chunk's player-placed cells as local <see cref="Idx"/>
+    /// indices (the chunk manager owns that set), or null.</param>
+    internal ChunkSnapshot TakeSnapshot(ushort[]? playerPlaced)
+    {
+        // The snapshot's constructor copies both arrays itself
+        var snapshot = new ChunkSnapshot(_blocks, _state, playerPlaced);
+        ModifiedSinceSave = false;
+        return snapshot;
+    }
+
+    /// <summary>
+    /// Fills this chunk from a save instead of generating it: the blocks, the state bytes and
+    /// the player-placed cells (handed to the chunk manager through
+    /// <see cref="RestoredPlayerPlaced"/>) come from <paramref name="snapshot"/>, and everything
+    /// <see cref="GenerateBlockData"/> derives on the way — the non-air count, the surface
+    /// floor and the fluid frontier — is recomputed from them. Runs on a generation worker on a
+    /// chunk built with <c>generateBlockData: false</c>, before any other thread can see it;
+    /// <see cref="IsBlockDataReady"/> goes true last, which is what publishes the rest.
+    /// </summary>
+    internal void RestoreFrom(ChunkSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        Array.Copy(snapshot.Blocks, _blocks, BlockCount);
+        _state = snapshot.State is { } state ? (byte[])state.Clone() : null;
+        _solidCount = BlockCount - _blocks.AsSpan().Count(BlockType.Air);
+
+        var column = GetColumnData((int)Position.X, (int)Position.Z);
+        SurfaceMinY = column.MinHeight;
+        IsRestored = true;
+        RestoredPlayerPlaced = snapshot.PlayerPlaced is { } placed ? (ushort[])placed.Clone() : null;
+
+        // A restored chunk can hold fluid anywhere, so it always scans (a chunk with no fluid
+        // cell simply reports nothing)
+        ScanFluidFrontier(column, LowerBoundY);
+
+        IsBlockDataReady = true;
     }
 
     /// <summary>Clears a block. Returns false if the cell is outside this chunk or already air.</summary>
@@ -1094,6 +1194,7 @@ public class Chunk : IDisposable
         _blocks[Idx(localX, localY, localZ)] = 0;
         _solidCount--;
         ClearState(Idx(localX, localY, localZ));
+        MarkModified();
 
         chunkManager.UnmarkPlayerPlaced((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
         chunkManager.ImmediateRemeshWithBorders(Position, worldPos);
@@ -1170,6 +1271,7 @@ public class Chunk : IDisposable
         _blocks[Idx(localX, localY, localZ)] = 0;
         _solidCount--;
         ClearState(Idx(localX, localY, localZ));
+        MarkModified();
         return removed;
     }
 

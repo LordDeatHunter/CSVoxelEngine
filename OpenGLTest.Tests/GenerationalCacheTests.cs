@@ -385,4 +385,45 @@ public sealed class GenerationalCacheTests
         Assert.Equal(2, calls);
         Assert.Equal(2, cache.Misses);
     }
+
+    [Fact]
+    public void ClearDropsEveryGenerationAndKeepsTheBudget()
+    {
+        // 8 / 2 => a generation rotates after exactly 4 inserts. The factory stamps each value with
+        // its call number, so a value served after Clear can be told apart from the one it replaced.
+        var cache = new GenerationalCache<int, string>(8, 2);
+        var calls = 0;
+        string Factory(int key) => $"{key}#{++calls}";
+
+        const int Keys = 6;
+        var before = new string[Keys];
+        for (var k = 0; k < Keys; k++)
+            before[k] = cache.GetOrAdd(k, Factory);
+        Assert.True(cache.Rotations > 0, "the fill must cross at least one rotation");
+
+        var rotations = cache.Rotations;
+        var misses = cache.Misses;
+
+        cache.Clear();
+
+        for (var k = 0; k < Keys; k++)
+            Assert.False(cache.TryPeek(k, out _), $"key {k} survived Clear");
+        Assert.Equal(0, cache.EntryCount);
+        Assert.True(cache.Rotations >= rotations);
+        Assert.True(cache.Misses >= misses);
+
+        // A lookup after Clear recomputes rather than serving the dropped value.
+        var callsBefore = calls;
+        var recomputed = cache.GetOrAdd(2, Factory);
+        Assert.Equal(callsBefore + 1, calls);
+        Assert.NotEqual(before[2], recomputed);
+        Assert.Equal(recomputed, cache.GetOrAdd(2, Factory));
+        Assert.Equal(callsBefore + 1, calls);
+        Assert.True(cache.Misses > misses);
+
+        // The insert budget is intact: filling a fresh generation still rotates.
+        for (var k = 100; k < 100 + Keys; k++)
+            cache.GetOrAdd(k, Factory);
+        Assert.True(cache.Rotations > rotations, "a cleared cache must keep rotating on its budget");
+    }
 }

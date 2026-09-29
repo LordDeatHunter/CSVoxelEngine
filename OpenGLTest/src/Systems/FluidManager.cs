@@ -78,6 +78,11 @@ public class FluidManager
     // The manager the current tick reads and writes through; set by Update before the ticks run
     private ChunkManager _chunks = null!;
 
+    // Where the tick reports a block write (lava crusting to cobblestone, dirt turning to mud)
+    // that changes the far LOD's surface; set by Update, null in the headless tests, which
+    // records nothing
+    private LodManager? _lod;
+
     // Direct-mapped chunk-lookup cache for one tick. Every simulation cell read goes through
     // TryGetCell; without this each read is a Vector3 hash lookup in the chunk dictionary. A
     // slope search spans at most a handful of chunks, so 16 slots hold every key it can reach,
@@ -128,12 +133,17 @@ public class FluidManager
     }
 
     /// <summary>
-    /// Schedules the frontier of every chunk that finished generating since the last call, so a
-    /// sea breached by a cave or an entrance starts pouring in the moment it loads instead of
-    /// standing there as a wall. Only flow targets at or below their column's terrain top count,
-    /// so open air above the terrain is never woken (see <see cref="IsCarvedFlowTarget"/>).
+    /// Schedules the frontier of every chunk that finished generating (or was restored from a
+    /// save) since the last call, so a sea breached by a cave or an entrance starts pouring in
+    /// the moment it loads instead of standing there as a wall, and water a player poured before
+    /// the chunk unloaded picks up where it left off. Generated water only wakes against flow
+    /// targets at or below their column's terrain top, so open air above the terrain is never
+    /// woken (see <see cref="IsCarvedFlowTarget"/>); a mid-flow cell, or a source above both its
+    /// column's terrain top and water level (only ever poured), wakes against any replaceable
+    /// neighbour (see <see cref="IsWakeTarget"/>).
     /// Interior frontiers were found on the generation worker (<see cref="Chunk.FluidFrontier"/>);
-    /// the borders need both chunks loaded, so they are scanned here. At most
+    /// the borders need both chunks loaded, so they are scanned here — always for a restored
+    /// chunk and for a chunk loading beside one, since poured water can sit at any height. At most
     /// <see cref="WorldGenerationConfig.MaxWakeChunksPerFrame"/> chunks are woken per call; the
     /// rest wait in the queue for the next frame.
     ///
@@ -167,14 +177,17 @@ public class FluidManager
                 }
             }
 
-            // Generated water never sits above its column's own level, and a chunk that just
-            // streamed in holds nothing but generated blocks, so a chunk entirely above every
-            // level it could share can neither hold water nor border any — the block edit paths
-            // cover player-placed water up there.
+            // Generated water never sits above its column's own level, so a generated chunk
+            // entirely above every level it could share can neither hold water nor border any
+            // generated water — the block edit paths cover water placed while it is loaded.
+            // Saved water breaks that: a restored chunk can hold poured water anywhere, and a
+            // generated chunk loading beside one must scan the shared face too, or water on that
+            // border would never wake when the generated side streams in last.
             // Note this is not the same test as an empty frontier: a chunk can be solid water
             // inside and still face air across a border.
             var column = Chunk.GetColumnData((int)chunk.Position.X, (int)chunk.Position.Z);
-            if (chunk.LowerBoundY > Math.Max(column.MaxWaterLevel, WorldGenerationConfig.SeaLevel))
+            if (!chunk.IsRestored && !HasRestoredFaceNeighbour(chunk, chunks)
+                && chunk.LowerBoundY > Math.Max(column.MaxWaterLevel, WorldGenerationConfig.SeaLevel))
                 continue;
 
             WakeBorders(chunk, chunks);
@@ -182,18 +195,22 @@ public class FluidManager
     }
 
     /// <summary>
-    /// Schedules the fluid side of every fluid/carved-cavity pair across the faces this chunk
-    /// shares with its loaded neighbours, in whichever chunk the fluid actually lives. Only a
-    /// neighbour at or below its column's terrain top counts (see
-    /// <see cref="IsCarvedFlowTarget"/>), so a generated sea does not wake into open air above a
-    /// ravine, beach or hillside. Blocks are read straight off both chunks (they are loaded, so
-    /// their arrays are there) rather than through <c>GetBlockGlobal</c>, which would call an
-    /// unloaded chunk air.
+    /// Schedules the fluid side of every fluid/wake-target pair across the faces this chunk
+    /// shares with its loaded neighbours, in whichever chunk the fluid actually lives. The pair
+    /// is judged by <see cref="IsWakeTarget"/>, with the fluid-side values read from the column
+    /// of the chunk that holds the fluid: a generated sea keeps the carved rule (only a neighbour
+    /// at or below its column's terrain top counts), so it does not wake into open air above a
+    /// ravine, beach or hillside, while a fluid above both its column's terrain top and water
+    /// level (only ever poured, brought back by a restored chunk) wakes against any replaceable
+    /// neighbour. Blocks are read straight off both chunks (they are loaded, so their arrays are
+    /// there) rather than through <c>GetBlockGlobal</c>, which would call an unloaded chunk air.
     /// </summary>
     private void WakeBorders(Chunk chunk, ChunkManager chunks)
     {
         var pos = chunk.Position;
-        var ownHeights = Chunk.GetColumnHeights((int)pos.X, (int)pos.Z);
+        var ownColumn = Chunk.GetColumnData((int)pos.X, (int)pos.Z);
+        var ownHeights = ownColumn.Heights;
+        var ownWater = ownColumn.WaterLevel;
 
         // Floored once for the six chunk-map probes below. Every one of them is a distinct key,
         // so ChunkMap's int overload packs straight from these, where its Vector3 overload would
@@ -210,7 +227,9 @@ public class FluidManager
             // axis the face cuts, the neighbour's directly across at `far`
             var near = dx + dz > 0 ? Chunk.SizeMask : 0;
             var far = Chunk.SizeMask - near;
-            var neighbourHeights = Chunk.GetColumnHeights((int)neighbour.Position.X, (int)neighbour.Position.Z);
+            var neighbourColumn = Chunk.GetColumnData((int)neighbour.Position.X, (int)neighbour.Position.Z);
+            var neighbourHeights = neighbourColumn.Heights;
+            var neighbourWater = neighbourColumn.WaterLevel;
 
             for (var ly = 0; ly < Chunk.Size; ly++)
             {
@@ -225,12 +244,17 @@ public class FluidManager
 
                     var here = chunk.GetLocalBlock(hx, ly, hz);
                     var there = neighbour.GetLocalBlock(nx, ly, nz);
+                    var hi = (hx << Chunk.SizeShift) | hz;
+                    var ni = (nx << Chunk.SizeShift) | nz;
 
+                    // The fluid side is judged against the column of the chunk that holds it
                     if (BlockType.IsFluid(here)
-                        && IsCarvedFlowTarget(there, worldY, neighbourHeights[(nx << Chunk.SizeShift) | nz]))
+                        && IsWakeTarget(there, worldY, neighbourHeights[ni],
+                            worldY, ownHeights[hi], ownWater[hi]))
                         ScheduleLocal(chunk, hx, ly, hz);
                     else if (BlockType.IsFluid(there)
-                        && IsCarvedFlowTarget(here, worldY, ownHeights[(hx << Chunk.SizeShift) | hz]))
+                        && IsWakeTarget(here, worldY, ownHeights[hi],
+                            worldY, neighbourHeights[ni], neighbourWater[ni]))
                         ScheduleLocal(neighbour, nx, ly, nz);
                 }
             }
@@ -243,9 +267,12 @@ public class FluidManager
             for (var lx = 0; lx < Chunk.Size; lx++)
             for (var lz = 0; lz < Chunk.Size; lz++)
             {
+                // Same column for the hole below and the fluid over it
+                var i = (lx << Chunk.SizeShift) | lz;
                 if (BlockType.IsFluid(chunk.GetLocalBlock(lx, 0, lz))
-                    && IsCarvedFlowTarget(below.GetLocalBlock(lx, Chunk.SizeMask, lz),
-                        chunk.LowerBoundY - 1, ownHeights[(lx << Chunk.SizeShift) | lz]))
+                    && IsWakeTarget(below.GetLocalBlock(lx, Chunk.SizeMask, lz),
+                        chunk.LowerBoundY - 1, ownHeights[i],
+                        chunk.LowerBoundY, ownHeights[i], ownWater[i]))
                     ScheduleLocal(chunk, lx, 0, lz);
             }
         }
@@ -255,12 +282,31 @@ public class FluidManager
             for (var lx = 0; lx < Chunk.Size; lx++)
             for (var lz = 0; lz < Chunk.Size; lz++)
             {
+                // The chunk above shares this column, so its column data is ownColumn too
+                var i = (lx << Chunk.SizeShift) | lz;
                 if (BlockType.IsFluid(above.GetLocalBlock(lx, 0, lz))
-                    && IsCarvedFlowTarget(chunk.GetLocalBlock(lx, Chunk.SizeMask, lz),
-                        chunk.LowerBoundY + Chunk.SizeMask, ownHeights[(lx << Chunk.SizeShift) | lz]))
+                    && IsWakeTarget(chunk.GetLocalBlock(lx, Chunk.SizeMask, lz),
+                        chunk.LowerBoundY + Chunk.SizeMask, ownHeights[i],
+                        chunk.LowerBoundY + Chunk.Size, ownHeights[i], ownWater[i]))
                     ScheduleLocal(above, lx, 0, lz);
             }
         }
+    }
+
+    /// <summary>Whether any of the chunk's six loaded face neighbours was restored from a save.</summary>
+    private static bool HasRestoredFaceNeighbour(Chunk chunk, ChunkManager chunks)
+    {
+        var cx = MathUtils.FloorToInt(chunk.Position.X);
+        var cy = MathUtils.FloorToInt(chunk.Position.Y);
+        var cz = MathUtils.FloorToInt(chunk.Position.Z);
+        foreach (var d in Vector3Directions.CardinalOffsets)
+        {
+            if (TryGetLoadedNeighbour(chunks, cx, cy, cz, d.X, d.Y, d.Z, out var neighbour)
+                && neighbour.IsRestored)
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>The face neighbour at the offset, when it exists and its blocks are generated.</summary>
@@ -286,13 +332,14 @@ public class FluidManager
     /// Leftover time past the tick budget is dropped, so a hitch can never leave the simulation
     /// spiralling to catch up.
     /// </summary>
-    public void Update(float deltaTime, ChunkManager chunks, DropManager drops)
+    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, LodManager? lod = null)
     {
         _accumulator += deltaTime;
 
         // The tick's helpers read through this and its chunk cache, so they need no manager
         // argument of their own
         _chunks = chunks;
+        _lod = lod;
 
         // The chunk cache is valid for one frame only: an unload can replace a chunk between
         // frames, and a reference cached before it must never be handed back
@@ -731,6 +778,13 @@ public class FluidManager
 
         chunk!.SetBlockRaw(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask, id, state);
         AddTouchedChunks(x, y, z, _dirtyChunks);
+
+        // A block write — lava crusting to cobblestone, dirt turning to mud — leaves a real block
+        // behind, which can raise or re-tile the far LOD like a placement. Fluid and air writes
+        // never count as its surface, so they are skipped rather than read as a sub-surface
+        // removal.
+        if (_lod != null && id != 0 && !BlockType.IsFluid(id) && LodSurface.RecordEdit(_chunks, x, y, z))
+            _lod.MarkEditedColumn(x, z);
     }
 
     /// <summary>Whether fluid may replace what is in a cell: loaded, not already fluid, and
@@ -753,11 +807,29 @@ public class FluidManager
     /// natural terrain top, i.e. a carver opened it (a cave, an entrance, a breach). Open air
     /// above the terrain — a ravine, a beach, a hillside — is not one, so a generated sea stays
     /// static across them exactly like Minecraft's and only floods the caves that breach it.
-    /// Shared with <see cref="Chunk.FluidFrontier"/>'s worker-thread scan so both halves of the
-    /// wake agree on where generated water may go.
+    /// This is the first clause of <see cref="IsWakeTarget"/>, which both halves of the wake (the
+    /// worker-thread <see cref="Chunk.FluidFrontier"/> scan and the border scan) now call.
     /// </summary>
     internal static bool IsCarvedFlowTarget(byte id, int worldY, int columnHeight) =>
         IsFlowTarget(id) && worldY <= columnHeight;
+
+    /// <summary>
+    /// Whether a fluid cell should wake, when its chunk loads, into the neighbour
+    /// <paramref name="targetId"/> at <paramref name="targetY"/>. The first clause is
+    /// <see cref="IsCarvedFlowTarget"/>'s carved-cavity rule (a flow target at or below its own
+    /// column's terrain top). The second admits any flow target, but only beside a fluid that
+    /// sits above BOTH its own column's terrain top and its water level — which generated water
+    /// (always at or below <see cref="ColumnData.WaterLevel"/>) and generated lava (always buried,
+    /// at or below <see cref="ColumnData.Heights"/>) never are. So a generated chunk wakes exactly
+    /// as it did under the carved rule, and only water the player poured (brought back by a
+    /// restored chunk) wakes against any replaceable neighbour. Shared by
+    /// <see cref="Chunk.FluidFrontier"/>'s worker-thread scan and <see cref="WakeBorders"/>.
+    /// </summary>
+    internal static bool IsWakeTarget(byte targetId, int targetY, int targetColumnHeight,
+        int fluidY, int fluidColumnHeight, int fluidColumnWaterLevel) =>
+        IsFlowTarget(targetId)
+        && (targetY <= targetColumnHeight
+            || (fluidY > fluidColumnHeight && fluidY > fluidColumnWaterLevel));
 
     /// <summary>Whether a cell would let fluid drain into it: replaceable, or already the same
     /// fluid. What the slope search calls a "hole".</summary>

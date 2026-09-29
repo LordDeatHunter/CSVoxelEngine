@@ -13,19 +13,25 @@ public static class FlowerGenerator
     private const int PatchSalt = 0x7A3B1C;
     private const int DensitySalt = 0x7A3B1D;
 
-    private static readonly FastNoiseLite PatchNoise;
+    private static FastNoiseLite PatchNoise;
 
-    /// <summary>Block this generator stamps; resolved once, like the noise.</summary>
+    /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
     public static readonly byte FlowerBlock;
 
     private static readonly byte GrassBlock;
 
     static FlowerGenerator()
     {
-        PatchNoise = TerrainGenerator.MakeNoise(62, WorldGenerationConfig.FlowerPatchFrequency);
+        Reseed();
         FlowerBlock = ContentRegistry.RequireBlock("flower").Id;
         GrassBlock = ContentRegistry.RequireBlock("grass").Id;
     }
+
+    /// <summary>
+    /// Builds the noise from the current <see cref="WorldGenerationConfig.Seed"/>: once from the
+    /// static constructor, and again by <see cref="WorldSeed.Apply"/> while no worker thread runs.
+    /// </summary>
+    internal static void Reseed() => PatchNoise = TerrainGenerator.MakeNoise(62, WorldGenerationConfig.FlowerPatchFrequency);
 
     /// <summary>Whether the surface column (x, z) grows a flower.</summary>
     public static bool TryGetFlower(int x, int z)

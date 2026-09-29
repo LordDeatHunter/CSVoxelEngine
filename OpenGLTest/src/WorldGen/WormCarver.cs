@@ -44,6 +44,9 @@ public static class WormCarver
     // every chunk-generation thread.
     private static readonly Func<(int X, int Z), Worm[]> BuildCellFor = static key => BuildCell(key.X, key.Z);
 
+    /// <summary>Drops every cached cell's worms; only <see cref="WorldSeed.Apply"/> calls it.</summary>
+    internal static void ResetCellCache() => CellCache.Clear();
+
     /// <summary>
     /// Carves every worm from the cells within reach through this chunk. Only <paramref name="blocks"/>
     /// is written; neighbouring chunks carve their own share of the same worms.
