@@ -211,6 +211,23 @@ public class UIRenderer : IDisposable
     private float _scale = 1f;
     private bool _depthCleared;
 
+    // Alpha multiplier DrawText applies to both the face and the shadow; only the loading
+    // overlay lowers it (inside a try/finally), and Begin resets it to 1.
+    private float _textFade = 1f;
+
+    // Main-menu and loading-screen string caches, render thread only, so an idle menu allocates
+    // nothing per frame: FitText allocates a Substring per trial length, and the seed and
+    // percentage strings would otherwise be formatted every frame. Fitted strings are keyed by
+    // the raw text, scale and width they were fitted to, and cleared when the canvas size changes.
+    private const int MaxFittedTexts = 256;
+    private readonly Dictionary<(string Text, float Scale, float Width), string> _fittedTexts = new();
+    private Vector2 _fitCacheScreen;
+    private readonly Dictionary<int, string> _seedTexts = new();
+    private readonly string?[] _percentTexts = new string?[101];
+
+    // The opaque backdrop behind every menu and loading frame: nothing is rendered behind those.
+    private static readonly Rgba MenuBackdrop = Rgba.Grey(0.08f);
+
     /// <param name="atlasIsSrgb">Whether <paramref name="atlasTexture"/> was uploaded as
     /// <c>SRGB8_ALPHA8</c>: its icons are then re-encoded in the shader so they write the same
     /// bytes to the gamma framebuffer as a linear upload would.</param>
@@ -322,6 +339,13 @@ public class UIRenderer : IDisposable
         _framebufferSize = new Vector2(framebufferSize.X, framebufferSize.Y);
         _scale = scale > 0f ? scale : 1f;
         _screenSize = UiCanvas.CanvasSizeFor(_windowSize, _scale);
+        if (_screenSize != _fitCacheScreen)
+        {
+            // Fitted strings depend on the canvas they were fitted for.
+            _fittedTexts.Clear();
+            _fitCacheScreen = _screenSize;
+        }
+        _textFade = 1f;
         _projection = Matrix4x4.CreateOrthographicOffCenter(
             0f, _screenSize.X, _screenSize.Y, 0f, -DepthRange, DepthRange);
 
@@ -595,12 +619,15 @@ public class UIRenderer : IDisposable
         if (n == 0)
             return;
 
+        // _textFade is 1 outside the loading overlay, so ordinary text keeps its exact colours.
+        var shadow = _textFade >= 1f ? CountShadow : Faded(CountShadow, _textFade);
+        var face = _textFade >= 1f ? color : Faded(color, _textFade);
         for (var i = 0; i < n; i++)
             WriteGlyphQuad(_textVerts.AsSpan(i * 4, 4), instances[i],
-                instances[i].Centre + new Vector2(1f, 1f), CountShadow);
+                instances[i].Centre + new Vector2(1f, 1f), shadow);
         for (var i = 0; i < n; i++)
             WriteGlyphQuad(_textVerts.AsSpan((n + i) * 4, 4), instances[i],
-                instances[i].Centre, color);
+                instances[i].Centre, face);
 
         DrawTextBatch(n * 2);
     }
@@ -880,9 +907,9 @@ public class UIRenderer : IDisposable
     /// The ESC pause menu over the still-rendered game: a fullscreen dim standing in for a
     /// blur (this pass has no blur target; the dark translucency keeps the scene visible
     /// but unreadable, like the Godot reference's BlurOverlay in overlay mode), then a
-    /// centred title with RESUME / SETTINGS / EXIT buttons, or the settings title with a
+    /// centred title with RESUME / SETTINGS / SAVE &amp; QUIT buttons, or the settings title with a
     /// BACK button. Click targets come from <see cref="PauseMenuLayout"/> so drawing and
-    /// hit-testing can never drift apart.
+    /// hit-testing can never drift apart (the third button is still <see cref="PauseMenuHit.Exit"/>).
     /// </summary>
     public void DrawPauseMenu(PauseMenuView view, SettingsMenuView settings)
     {
@@ -897,7 +924,7 @@ public class UIRenderer : IDisposable
                 PauseMenuLayout.TitleTop(screen, view.Page), _headScale, Rgba.White);
             DrawMenuButton(PauseMenuLayout.MainButtonCentre(screen, 0), "RESUME");
             DrawMenuButton(PauseMenuLayout.MainButtonCentre(screen, 1), "SETTINGS");
-            DrawMenuButton(PauseMenuLayout.MainButtonCentre(screen, 2), "EXIT");
+            DrawMenuButton(PauseMenuLayout.MainButtonCentre(screen, 2), "SAVE & QUIT");
             return;
         }
 
@@ -1009,6 +1036,294 @@ public class UIRenderer : IDisposable
         DrawRect(centre, PauseMenuLayout.ButtonSize, SlotBackground);
         DrawBorder(centre, PauseMenuLayout.ButtonSize, SlotBorder, SelectedBorderColor);
         DrawTextCentred(label, centre.X, centre.Y - 9f, _countScale, Rgba.White);
+    }
+
+    /// <summary>
+    /// The main menu the game boots to, over an opaque backdrop (no world is rendered behind a
+    /// menu frame). Every rectangle comes from <see cref="MainMenuLayout"/> (the main page from
+    /// <see cref="PauseMenuLayout"/>), which <see cref="MainMenuHitAt"/> also reads, so drawing and
+    /// hit-testing cannot drift apart. The settings page is the pause menu's, shared as is.
+    /// <paramref name="time"/> is the window clock, for the text caret's blink.
+    /// </summary>
+    public void DrawMainMenu(MainMenuView view, SettingsMenuView settings, float time)
+    {
+        var screen = _screenSize;
+        DrawRect(screen * 0.5f, screen, MenuBackdrop);
+
+        switch (view.Page)
+        {
+            case MainMenuPage.Main:
+                DrawTextCentred("CSVOXELENGINE", screen.X * 0.5f,
+                    MainMenuLayout.TitleTop(screen, MainMenuPage.Main), _headScale, Rgba.White);
+                DrawMenuButton(PauseMenuLayout.MainButtonCentre(screen, 0), "START");
+                DrawMenuButton(PauseMenuLayout.MainButtonCentre(screen, 1), "SETTINGS");
+                DrawMenuButton(PauseMenuLayout.MainButtonCentre(screen, 2), "EXIT");
+                break;
+
+            case MainMenuPage.Worlds:
+                DrawWorldsPage(view, screen);
+                break;
+
+            case MainMenuPage.Create:
+                DrawTextCentred("NEW WORLD", screen.X * 0.5f,
+                    MainMenuLayout.TitleTop(screen, MainMenuPage.Create), _headScale, Rgba.White);
+                DrawLabelledField(MainMenuLayout.NameFieldCentre(screen), "NAME", view.Name,
+                    view.Focus == MenuField.Name, WorldNames.DefaultName, time);
+                DrawLabelledField(MainMenuLayout.SeedFieldCentre(screen), "SEED", view.Seed,
+                    view.Focus == MenuField.Seed, "random", time);
+                DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 0), "CREATE");
+                DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 1), "BACK");
+                break;
+
+            case MainMenuPage.Edit:
+                DrawTextCentred("EDIT WORLD", screen.X * 0.5f,
+                    MainMenuLayout.TitleTop(screen, MainMenuPage.Edit), _headScale, Rgba.White);
+                DrawLabelledField(MainMenuLayout.NameFieldCentre(screen), "NAME", view.Name,
+                    view.Focus == MenuField.Name, WorldNames.DefaultName, time);
+                DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 0), "SAVE");
+                DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 1), "BACK");
+                break;
+
+            case MainMenuPage.ConfirmDelete:
+                DrawWorldsPage(view, screen);
+                DrawConfirmDelete(view, screen);
+                break;
+
+            case MainMenuPage.Settings:
+                DrawSettingsMenu(settings);
+                break;
+        }
+    }
+
+    // The worlds list: title, panel, the scissored rows (name and seed on their own lines, never
+    // concatenated since a layout run stops at MaxLayoutChars), the empty-state line, the notice
+    // and the CREATE / BACK buttons.
+    private void DrawWorldsPage(MainMenuView view, Vector2 screen)
+    {
+        DrawTextCentred("WORLDS", screen.X * 0.5f,
+            MainMenuLayout.TitleTop(screen, MainMenuPage.Worlds), _headScale, Rgba.White);
+
+        var left = MainMenuLayout.PanelLeft(screen);
+        var top = MainMenuLayout.ListTop(screen);
+        var listHeight = MainMenuLayout.ListHeight(screen);
+        var panelCentre = new Vector2(left + MainMenuLayout.PanelWidth * 0.5f, top + listHeight * 0.5f);
+        var panelSize = new Vector2(MainMenuLayout.PanelWidth, listHeight);
+        DrawRect(panelCentre, panelSize, SlotBackground);
+        DrawBorder(panelCentre, panelSize, SlotBorder, SlotBorderColor);
+
+        var count = view.Worlds.Count;
+        if (count == 0)
+        {
+            DrawTextCentred("No worlds yet - create one", panelCentre.X, panelCentre.Y - 8f,
+                _countScale, TextDim);
+        }
+        else
+        {
+            // Clamped with this frame's row count, exactly as MainMenuLayout.HitAt clamps it.
+            var offset = MainMenuLayout.ClampedOffset(view.ScrollOffset, count, screen);
+            var (first, end) = MainMenuLayout.VisibleRows(offset, count, screen);
+            var nameLeft = MainMenuLayout.NameLeft(screen);
+            var nameWidth = MainMenuLayout.NameMaxWidth(screen);
+
+            // glScissor takes framebuffer pixels with a bottom-left origin, hence the conversion.
+            // Only the row loop runs while it is enabled, and nothing returns from inside it.
+            var (sx, sy, sw, sh) = UiCanvas.ScissorRect(new Vector2(left, top), panelSize,
+                _scale, _windowSize, _framebufferSize);
+            _gl.Enable(EnableCap.ScissorTest);
+            _gl.Scissor(sx, sy, (uint)sw, (uint)sh);
+            try
+            {
+                for (var i = first; i < end; i++)
+                {
+                    var world = view.Worlds[i];
+                    var rowTop = MainMenuLayout.RowTop(i, offset, screen);
+                    if (i > 0)
+                        DrawRect(new Vector2(panelCentre.X, rowTop),
+                            new Vector2(MainMenuLayout.PanelWidth - 2f * MainMenuLayout.RowPad, 1.5f),
+                            SlotBorderColor);
+                    DrawText(FittedText(world.Name, _countScale, nameWidth),
+                        new Vector2(nameLeft, rowTop + 8f), _countScale, Rgba.White);
+                    DrawText(SeedText(world.Seed), new Vector2(nameLeft, rowTop + 36f), _countScale, TextDim);
+                    DrawSmallButton(MainMenuLayout.RowButtonCentre(screen, i, offset, 0),
+                        MainMenuLayout.RowButtonSize, "PLAY");
+                    DrawSmallButton(MainMenuLayout.RowButtonCentre(screen, i, offset, 1),
+                        MainMenuLayout.RowButtonSize, "EDIT");
+                    DrawSmallButton(MainMenuLayout.RowButtonCentre(screen, i, offset, 2),
+                        MainMenuLayout.RowButtonSize, "DELETE", DangerRed);
+                }
+            }
+            finally
+            {
+                _gl.Disable(EnableCap.ScissorTest);
+            }
+        }
+
+        if (!string.IsNullOrEmpty(view.Notice))
+            DrawTextCentred(FittedText(view.Notice, _countScale, MainMenuLayout.PanelWidth),
+                screen.X * 0.5f, MainMenuLayout.NoticeTop(screen), _countScale, AccentGold);
+
+        DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 0), "CREATE");
+        DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 1), "BACK");
+    }
+
+    // The delete confirmation over the dimmed worlds page: question, the world's name on its own
+    // line, DELETE / CANCEL.
+    private void DrawConfirmDelete(MainMenuView view, Vector2 screen)
+    {
+        DrawRect(screen * 0.5f, screen, Rgba.Grey(0f, 0.62f));
+
+        var centre = MainMenuLayout.ConfirmBoxCentre(screen);
+        var size = MainMenuLayout.ConfirmBoxSize;
+        // CardBackground rather than the translucent SlotBackground, so the rows under the dim
+        // do not show through the box.
+        DrawRect(centre, size, CardBackground);
+        DrawBorder(centre, size, SlotBorder, SelectedBorderColor);
+
+        var top = centre.Y - size.Y * 0.5f;
+        DrawTextCentred("Delete this world?", centre.X, top + 32f, _headScale, Rgba.White);
+        if (view.SelectedWorld is { } world)
+            DrawTextCentred(FittedText(world.Name, _countScale, size.X - 48f),
+                centre.X, top + 84f, _countScale, AccentGold);
+
+        DrawSmallButton(MainMenuLayout.ConfirmYesCentre(screen), MainMenuLayout.ConfirmButtonSize,
+            "DELETE", DangerRed);
+        DrawSmallButton(MainMenuLayout.ConfirmNoCentre(screen), MainMenuLayout.ConfirmButtonSize, "CANCEL");
+    }
+
+    private void DrawLabelledField(Vector2 centre, string label, TextFieldState field, bool focused,
+        string placeholder, float time)
+    {
+        DrawText(label, new Vector2(centre.X - MainMenuLayout.FieldSize.X * 0.5f,
+            MainMenuLayout.FieldLabelTop(centre)), _countScale, TextDim);
+        DrawTextField(centre, MainMenuLayout.FieldSize, field, focused, placeholder, time);
+    }
+
+    /// <summary>A <see cref="DrawMenuButton"/> of any size, with an optional border colour.</summary>
+    private void DrawSmallButton(Vector2 centre, Vector2 size, string label, Rgba? border = null)
+    {
+        DrawRect(centre, size, SlotBackground);
+        DrawBorder(centre, size, SlotBorder, border ?? SelectedBorderColor);
+        DrawTextCentred(label, centre.X, centre.Y - 9f, _countScale, Rgba.White);
+    }
+
+    /// <summary>
+    /// A one-line text field: the text left-aligned, the placeholder dimmed while it is empty,
+    /// and while focused a caret after the text blinking twice a second on the window clock.
+    /// Both fields' length caps keep their text inside the box at the count scale.
+    /// </summary>
+    private void DrawTextField(Vector2 centre, Vector2 size, TextFieldState field, bool focused,
+        string placeholder, float time)
+    {
+        const float pad = 12f;
+        DrawRect(centre, size, SlotBackground);
+        DrawBorder(centre, size, SlotBorder, focused ? SelectedBorderColor : SlotBorderColor);
+
+        var textLeft = centre.X - size.X * 0.5f + pad;
+        var textTop = centre.Y - 9f;
+        if (field.IsEmpty)
+            DrawText(placeholder, new Vector2(textLeft, textTop), _countScale, TextDim);
+        else
+            DrawText(field.Text, new Vector2(textLeft, textTop), _countScale, Rgba.White);
+
+        if (focused && ((int)(time * 2f)) % 2 == 0)
+        {
+            var caretX = textLeft + (field.IsEmpty ? 0f : TextWidth(field.Text, _countScale)) + 3f;
+            DrawRect(new Vector2(caretX, centre.Y), new Vector2(2f, 22f), Rgba.White);
+        }
+    }
+
+    /// <summary>Main-menu widget under a window-pixel point (top-left origin).</summary>
+    public MainMenuHit MainMenuHitAt(Vector2 windowPoint, MainMenuView view) =>
+        MainMenuLayout.HitAt(ToCanvas(windowPoint), _screenSize, view);
+
+    /// <summary>Whether a window-pixel point is over the worlds list (the mouse-wheel target).</summary>
+    public bool IsOverWorldList(Vector2 windowPoint) =>
+        MainMenuLayout.IsOverList(ToCanvas(windowPoint), _screenSize);
+
+    /// <summary>
+    /// The loading screen: the world name, an animated spinner (a pure function of the window
+    /// clock, so a hitch never stalls it), the caption and, for <see cref="LoadingScreenKind.Loading"/>,
+    /// a progress bar with its percentage. <paramref name="opaque"/> draws a fully opaque backdrop
+    /// (a loading or saving frame, with nothing behind it); otherwise the backdrop takes
+    /// <see cref="LoadingScreenView.FadeAlpha"/>, which is the fade over the first playing frames.
+    /// Every other element is multiplied by the fade alpha either way. Geometry comes from
+    /// <see cref="LoadingScreenLayout"/>.
+    /// </summary>
+    public void DrawLoadingScreen(LoadingScreenView view, double time, bool opaque)
+    {
+        var fade = MathUtils.Clamp01(view.FadeAlpha);
+        var screen = _screenSize;
+        DrawRect(screen * 0.5f, screen, opaque ? MenuBackdrop : Faded(MenuBackdrop, fade));
+        if (fade <= 0f) return;
+
+        _textFade = fade;
+        try
+        {
+            var barSize = LoadingScreenLayout.BarSize;
+            if (!string.IsNullOrEmpty(view.WorldName))
+                DrawTextCentred(FittedText(view.WorldName, _headScale, barSize.X), screen.X * 0.5f,
+                    LoadingScreenLayout.TitleTop(screen), _headScale, Rgba.White);
+            DrawTextCentred(view.Caption, screen.X * 0.5f, LoadingScreenLayout.CaptionTop(screen),
+                _countScale, TextDim);
+
+            const int dots = WorldGenerationConfig.LoadingSpinnerDots;
+            var phase = LoadingScreenLayout.SpinnerPhase(time);
+            for (var d = 0; d < dots; d++)
+            {
+                var brightness = LoadingScreenLayout.DotBrightness(d, dots, phase);
+                DrawSquare(LoadingScreenLayout.DotCentre(screen, d, dots), LoadingScreenLayout.DotSize,
+                    Faded(AccentGold, brightness * fade));
+            }
+
+            if (view.Kind == LoadingScreenKind.Loading)
+            {
+                var centre = LoadingScreenLayout.BarCentre(screen);
+                DrawRect(centre, barSize, Faded(SlotBackground, fade));
+                DrawBorder(centre, barSize, SlotBorder, Faded(SlotBorderColor, fade));
+                var progress = MathUtils.Clamp01(view.ShownProgress);
+                if (progress > 0f)
+                {
+                    var fillW = barSize.X * progress;
+                    DrawRect(new Vector2(centre.X - barSize.X * 0.5f + fillW * 0.5f, centre.Y),
+                        new Vector2(fillW, barSize.Y), Faded(AccentGold, fade));
+                }
+                DrawTextCentred(PercentText(progress), screen.X * 0.5f,
+                    LoadingScreenLayout.PercentTop(screen), _countScale, Rgba.White);
+            }
+        }
+        finally
+        {
+            _textFade = 1f;
+        }
+    }
+
+    // A colour with its alpha multiplied by factor (clamped to 0..1).
+    private static Rgba Faded(Rgba color, float factor) =>
+        color with { A = (byte)(color.A * MathUtils.Clamp01(factor) + 0.5f) };
+
+    // FitText through the cache: each (text, width) pair is fitted once per canvas size.
+    private string FittedText(string text, float scale, float maxWidth)
+    {
+        if (_fittedTexts.TryGetValue((text, scale, maxWidth), out var fitted)) return fitted;
+        if (_fittedTexts.Count >= MaxFittedTexts) _fittedTexts.Clear();
+        fitted = FitText(text, scale, maxWidth);
+        _fittedTexts[(text, scale, maxWidth)] = fitted;
+        return fitted;
+    }
+
+    private string SeedText(int seed)
+    {
+        if (_seedTexts.TryGetValue(seed, out var text)) return text;
+        if (_seedTexts.Count >= MaxFittedTexts) _seedTexts.Clear();
+        text = $"seed {seed}";
+        _seedTexts[seed] = text;
+        return text;
+    }
+
+    private string PercentText(float progress)
+    {
+        var p = Math.Clamp((int)MathF.Round(progress * 100f), 0, 100);
+        return _percentTexts[p] ??= $"{p}%";
     }
 
     /// <summary>Hotbar slot under a window-pixel point (top-left origin), if any.</summary>

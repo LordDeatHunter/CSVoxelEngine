@@ -71,4 +71,22 @@ public sealed class InventoryView
     {
         ThumbDragGrab = null;
     }
+
+    /// <summary>
+    /// Returns the panel to its fresh state when a world is opened or closed: the crafting session
+    /// must not keep pointing at a dead world's <see cref="Inventory"/>, and no tab may carry the
+    /// old world's scroll.
+    /// </summary>
+    public void ResetForNewWorld()
+    {
+        IsOpen = false;
+        ClearSelection();
+        Craft.Clear();
+        EndThumbDrag();
+        ThumbDragRowCount = 0;
+        CraftScrollOffset = 0f;
+        for (var i = 0; i < _scroll.Length; i++)
+            _scroll[i] = 0f;
+        Tab = InventoryCategory.Blocks;
+    }
 }

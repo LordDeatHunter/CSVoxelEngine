@@ -353,6 +353,11 @@ public class RenderManager : IDisposable
         _mirrorGoblins.Clear();
         _mirrorToppling.Clear();
         _reflMirrorValid = false;
+        // The eased eye state belongs to the world just released: without this, a quit from
+        // underwater would wash the next world's first frames in the fading tint.
+        _underwaterT = 0f;
+        _lavaT = 0f;
+        _eyeInLava = false;
 
         Log.WriteLine($"World released: geometry in use opaque {OpaqueChunkGeometry.UsedUnits}, " +
                       $"translucent {TranslucentChunkGeometry.UsedUnits}, lod {LodGeometry.UsedUnits} units");
@@ -3889,6 +3894,52 @@ public class RenderManager : IDisposable
         InvalidateTextureUnits();
     }
 
+    // Clear colour of a menu frame; the menu and loading backdrops cover it anyway.
+    private static readonly Vector4 MenuClearColor = new(0.06f, 0.07f, 0.09f, 1f);
+
+    /// <summary>
+    /// A whole frame with no world: the main menu (<paramref name="menu"/>) or, when
+    /// <paramref name="loading"/> is set, the opaque loading / saving screen. Nothing HDR runs -
+    /// no <c>BeginFrame</c>, <c>SetLighting</c>, <c>CullWater</c> or <c>RenderPostProcess</c>, and
+    /// no GPU timer bracket - and <see cref="LightSource"/> may be null. The default framebuffer is
+    /// cleared and written directly, in display space like the HUD. Render thread only.
+    /// </summary>
+    public void RenderMenuFrame(IWindow window, MainMenuView? menu, SettingsMenuView settings,
+        LoadingScreenView? loading, double time)
+    {
+        InvalidateTextureUnits();
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        gl.Viewport(_viewportSize);
+        gl.ClearColor(MenuClearColor.X, MenuClearColor.Y, MenuClearColor.Z, MenuClearColor.W);
+        gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+        var windowSize = new Vector2(window.Size.X, window.Size.Y);
+        ui.Begin(window.Size, window.FramebufferSize,
+            UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
+        if (loading != null)
+            ui.DrawLoadingScreen(loading, time, opaque: true);
+        else if (menu != null)
+            ui.DrawMainMenu(menu, settings, (float)time);
+        ui.End();
+        // The font takes unit 0, and this pass sits across the frame boundary.
+        InvalidateTextureUnits();
+    }
+
+    /// <summary>
+    /// The loading screen fading out over the first playing frames, drawn translucently over
+    /// whatever the frame already holds. Program calls it after <c>World.RenderUI</c>, where
+    /// framebuffer 0 is already bound. Render thread only.
+    /// </summary>
+    public void RenderLoadingOverlay(IWindow window, LoadingScreenView loading, double time)
+    {
+        var windowSize = new Vector2(window.Size.X, window.Size.Y);
+        ui.Begin(window.Size, window.FramebufferSize,
+            UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
+        ui.DrawLoadingScreen(loading, time, opaque: false);
+        ui.End();
+        InvalidateTextureUnits();
+    }
+
     /// <summary>Delegates click hit-testing to the UI pass (valid after a frame has begun).</summary>
     public int? UiHotbarSlotAt(Vector2 point) => ui.HotbarSlotAt(point);
     /// <summary>Window pixels -> UI canvas units (the space every UI layout is measured in).</summary>
@@ -3903,6 +3954,8 @@ public class RenderManager : IDisposable
     public float UiClampCraftScroll(float offset) => ui.ClampCraftScroll(offset);
     public PauseMenuHit UiPauseMenuHitAt(Vector2 point, PauseMenuView menu) => ui.PauseMenuHitAt(point, menu);
     public SettingsHit UiSettingsHitAt(Vector2 point, SettingsMenuView settings) => ui.SettingsHitAt(point, settings);
+    public MainMenuHit UiMainMenuHitAt(Vector2 point, MainMenuView view) => ui.MainMenuHitAt(point, view);
+    public bool UiIsOverWorldList(Vector2 point) => ui.IsOverWorldList(point);
 
     // The compass item id, resolved once: null when no item named "compass" is registered,
     // in which case the HUD compass never shows rather than throwing every frame.
