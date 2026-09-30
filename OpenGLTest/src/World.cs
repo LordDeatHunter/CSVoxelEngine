@@ -785,7 +785,11 @@ public class World : IItemUseWorld
     /// Spawns every pending saved mob and drop whose chunk is loaded, through the managers' own
     /// spawn paths, and restores its health, facing and motion. Each waits for its chunk because
     /// an entity restored over an unloaded chunk would fall through air (slimes, goblins and drops
-    /// all read unloaded cells as air). An unknown entity kind or item name, or a record with no
+    /// all read unloaded cells as air). A mob whose kind is at its alive cap
+    /// (<see cref="WorldGenerationConfig.SlimeMaxAlive"/>, <see cref="WorldGenerationConfig.GoblinMaxAlive"/>;
+    /// the healthbar buffers are sized by <see cref="WorldGenerationConfig.MobsMaxAlive"/>) waits the
+    /// same way, so an over-full save never overfills the world and loses nothing, since pending
+    /// entries are re-saved. An unknown entity kind or item name, or a record with no
     /// position, is dropped with one warning per pass. After
     /// <see cref="WorldGenerationConfig.EntityRestoreTimeoutSeconds"/> of play whatever is still
     /// pending is discarded. Main thread, Playing only; nothing pending costs one check.
@@ -815,8 +819,17 @@ public class World : IItemUseWorld
             if (!IsCellLoaded(centre))
                 continue;
 
+            // A kind at its alive cap waits like an unloaded chunk: the entry stays pending (and is
+            // re-saved by CaptureEntities) instead of overfilling the cap-sized healthbar buffers
+            var isSlime = string.Equals(type!.Name, "slime", StringComparison.OrdinalIgnoreCase);
+            var atCap = isSlime
+                ? _slimes!.Slimes.Count >= WorldGenerationConfig.SlimeMaxAlive
+                : _goblins!.Goblins.Count >= WorldGenerationConfig.GoblinMaxAlive;
+            if (atCap)
+                continue;
+
             var velocity = ToVector(mob.Velocity);
-            Mob spawned = string.Equals(type!.Name, "slime", StringComparison.OrdinalIgnoreCase)
+            Mob spawned = isSlime
                 ? _slimes!.Spawn(centre)
                 : _goblins!.Spawn(centre, mob.Ammo ?? 0);
             spawned.RestoreState(mob.Health ?? type.MaxHealth, mob.Facing ?? 0f, velocity);
@@ -848,7 +861,7 @@ public class World : IItemUseWorld
         if (_entityRestoreTimer >= WorldGenerationConfig.EntityRestoreTimeoutSeconds
             && (_pendingMobs.Count > 0 || _pendingDrops.Count > 0))
         {
-            Log.Warn($"Entity save: discarded {_pendingMobs.Count} mob(s) and {_pendingDrops.Count} drop(s) whose chunk never loaded");
+            Log.Warn($"Entity save: discarded {_pendingMobs.Count} mob(s) and {_pendingDrops.Count} drop(s) whose chunk never loaded or whose kind stayed at its alive cap");
             _pendingMobs.Clear();
             _pendingDrops.Clear();
         }
@@ -888,14 +901,18 @@ public class World : IItemUseWorld
     /// <summary>
     /// The player as <see cref="PlayerSaveCodec"/> writes it. While still Loading the saved clock
     /// has not been applied yet, so a flush then keeps the saved one instead of overwriting it
-    /// with an unrestored clock.
+    /// with an unrestored clock. No position is written before the spawn settled: until
+    /// <c>EnsureSpawnSettled</c> has placed the player, <see cref="Camera.Position"/> is the
+    /// pre-settle hold eye, and saving it would make <c>ApplySavedPlayer</c> mark the spawn settled
+    /// on the next load and skip the surface search. A close mid-load therefore persists everything
+    /// but the pose, and the next load searches again.
     /// </summary>
     private PlayerSaveData CapturePlayer()
     {
         var pos = Camera.Position;
         return new PlayerSaveData
         {
-            Position = [pos.X, pos.Y, pos.Z],
+            Position = _spawnSettled ? [pos.X, pos.Y, pos.Z] : null,
             Yaw = Camera.Yaw,
             Pitch = Camera.Pitch,
             Creative = Camera.IsCreative,
@@ -2161,8 +2178,11 @@ public class World : IItemUseWorld
         Player.UpdateThrowCharge(ThrowCharge01);
     }
 
+    /// <summary>Cancels a held throw charge. Does nothing unless the world is playing: nothing
+    /// may touch an unloaded world's player state.</summary>
     public void CancelThrowCharge()
     {
+        if (!IsPlaying) return;
         _throwCharging = false;
         Player.CancelThrowCharge();
     }

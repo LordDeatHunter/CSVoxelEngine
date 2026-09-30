@@ -383,6 +383,53 @@ public sealed class WorldLifecycleTests : IDisposable
     }
 
     [Fact]
+    public void SavedMobsNeverExceedTheirKindsAliveCapAndTheSurplusStaysSaved()
+    {
+        WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
+        // More slimes than their kind may have alive, all inside the ready sphere, plus one goblin
+        var mobs = new List<EntitySaveData.MobData>();
+        for (var i = 0; i < WorldGenerationConfig.SlimeMaxAlive + 3; i++)
+            mobs.Add(new EntitySaveData.MobData { Type = "slime", Position = [i, High, 0f] });
+        mobs.Add(new EntitySaveData.MobData { Type = "goblin", Position = [0f, High, 2f] });
+        WriteEntitiesFile(new EntitySaveData { Mobs = mobs });
+
+        var world = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(RunUntil(world, () => world.IsLoaded, LoadWallSeconds), "the world did not finish loading");
+        Assert.False(world.LoadTimedOut);
+
+        // Read right after the flipping Update, before any manager could move or despawn a mob
+        Assert.True(world.Slimes.Count <= WorldGenerationConfig.SlimeMaxAlive,
+            $"{world.Slimes.Count} slimes restored past the cap");
+        Assert.Single(world.Goblins);
+        Assert.Equal(world.Slimes.Count + world.Goblins.Count, world.Mobs.Count);
+        Assert.True(world.Mobs.Count <= WorldGenerationConfig.MobsMaxAlive);
+
+        // The live mobs plus the surplus still pending are all written back
+        Assert.True(world.SaveAndDispose());
+        var saved = ReadEntitiesFile();
+        Assert.NotNull(saved);
+        Assert.Equal(mobs.Count, saved!.Mobs!.Count);
+    }
+
+    [Fact]
+    public void ASaveBeforeTheSpawnSettledKeepsNoPosition()
+    {
+        // No player file: the camera starts at the surface spawn, unsettled. Torn down with no
+        // Update, so no mesh is ever applied through the null pools.
+        var world = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(world.SaveAndDispose());
+
+        var store = new ChunkSaveStore(_dir);
+        var saved = PlayerSaveCodec.TryParse(store.ReadFile(PlayerSaveCodec.FileName));
+        Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
+        Assert.NotNull(saved);
+        Assert.Null(saved!.Position);
+        // Everything but the pose is still written
+        Assert.NotNull(saved.Creative);
+        Assert.NotNull(saved.Flying);
+    }
+
+    [Fact]
     public void UnknownEntityNamesAreDroppedWithoutFailingTheLoad()
     {
         WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
