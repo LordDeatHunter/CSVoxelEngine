@@ -377,6 +377,14 @@ public const float DayLengthSeconds = 1200f;
     public const double EntityRestoreTimeoutSeconds = 30.0;
     // Nearest-first cap on the item drops one save writes.
     public const int MaxSavedDrops = 512;
+    // Per-second rate the loading screen's shown bar eases toward the real load progress (MathUtils.Damp).
+    public const float LoadingProgressDampRate = 6f;
+    // Seconds of wall time for one revolution of the loading screen's spinner.
+    public const double LoadingSpinnerPeriodSeconds = 1.2;
+    // The loading overlay fades out over this many seconds once the world plays.
+    public const float LoadingFadeSeconds = 0.5f;
+    // Dots around the loading screen's spinner ring.
+    public const int LoadingSpinnerDots = 8;
 
     // --- Deterministic worldgen caches (GenerationalCache) ---
     // Chunk.GetColumnData's cache. Column data depends only on (x, z), so one entry serves the whole
