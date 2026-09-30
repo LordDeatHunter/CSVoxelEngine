@@ -24,17 +24,21 @@ same world, and a player can move between them freely — neither arc gates the 
 - Priority: **P0** foundation/do first · **P1** next · **P2** later · **P3** someday/XL.
 - Effort: **S** under a session · **M** a few sessions · **L** a week+ · **XL** weeks.
 - IDs (`P-1`, `U-3`, ...) are stable references; keep them when reordering.
-- **Current priority: `M-1` (save/load)** — nothing built above it persists until it lands.
+- **Current priority:** `M-1`'s core (save/load) and `U-6`'s main menu have landed; what is left
+  of them is `M-12` (station block entities and in-flight TNT/falling blocks/projectiles) and
+  `U-6`'s world type/difficulty options.
 
 ### Suggested first wave
 
-1. `M-1` save/load — the foundation everything else hangs off.
+1. `M-1` save/load — core landed (chunk edits, LOD edit state, player, inventory, time,
+   entities); what is left is `M-12`.
 2. `P-1` real tools — the mechanic landed (tool tags, `requiresTool` gate, pace/damage);
    what is left is tool durability and the shovel/hoe/sword kinds.
 3. `M-2` SFX + `U-1` tooltips + `V-3` footstep dust — cheap, high-feel wins.
 4. `P-10` health + `P-11` hunger + `P-13` fall damage/drowning — the survival skeleton.
 5. `P-24` biomes + `P-25` ores + `V-1` weather — make the world worth exploring.
-6. `U-6` main menu/world select + `U-7` dev commands — needed to test everything after.
+6. `U-6` main menu/world select (landed; world options left) + `U-7` dev commands — needed to
+   test everything after.
 
 ---
 
@@ -233,7 +237,12 @@ same world, and a player can move between them freely — neither arc gates the 
   exists but appears unbound).
 - [ ] **`U-5` · Death / respawn screen** — P1, S. Pairs with `P-10`.
 - [ ] **`U-6` · Main menu / world select / seed entry** — P1, M.
-  Currently launches straight into a world; required once `M-1` lands.
+  - Progress: the game boots to a main menu (START / SETTINGS / EXIT); START opens a worlds page
+    listing the saves with PLAY / EDIT (rename) / DELETE (confirm popup) per row plus CREATE
+    (name field with the store's unique-suffix rule, seed field: empty = random) and BACK; opening
+    a world shows an animated loading screen, and the pause menu's third button is SAVE & QUIT
+    (`MainMenuController`, `LoadingScreenView`, see AGENTS.md "Launch flow"). Still open: world
+    type and difficulty options (`M-5`).
 - [ ] **`U-7` · Creative palette + dev commands** — P1, M.
   Searchable all-blocks inventory; `/give`, `/tp`, `/time`, `/gamemode`, `/seed` for testing and
   content authoring. Huge for iteration speed.
@@ -279,10 +288,16 @@ same world, and a player can move between them freely — neither arc gates the 
 
 ## 5. Misc / foundations
 
-- [ ] **`M-1` · Save/load — region files, seed + block deltas** — **P0, L. Current top priority.**
+- [ ] **`M-1` · Save/load — region files, seed + block deltas** — **P0, L. Core landed; the rest is `M-12`.**
   Persist block edits, inventory, position, time of day and block-entity state (campfires,
   querns, TNT). Worldgen stays a pure function; only deltas + the seed are written. Nothing above
   this line has lasting meaning until it ships.
+  - Progress: chunk edits (modified chunks only, per-world `chunks/*.bin`), the far-LOD edit state
+    (`lod-edits.bin`: caps, surface overrides, canopy markers), the player (pose, modes, health,
+    time of day, inventory + hotbar) and nearby entities (mobs + drops) are persisted, with
+    autosave and save & quit (AGENTS.md "Saves"). Still open: station block entities
+    (campfire/quern/kiln/casting) and in-flight TNT/falling blocks/projectiles, split out as
+    `M-12`.
 - [ ] **`M-2` · Gameplay SFX** — P1, M.
   Break/place/step/splash/fire/UI sounds on the existing NAudio stack (day/night ambience already
   crossfades there). Note: the old plan said "Silk.NET audio" — the code actually uses
@@ -298,7 +313,12 @@ same world, and a player can move between them freely — neither arc gates the 
   conflicts).
 - [ ] **`M-5` · World options on new game** — P2, S.
   Seed picker, world type, difficulty, survival/creative.
+  - Progress: the seed picker landed with the create-world page (`WorldSeedParser`). World type,
+    difficulty and a survival/creative choice are still open.
 - [ ] **`M-6` · Per-world config + settings persistence** — P2, S.
+  - Progress: each world's name, seed, timestamps and format version live in its `world.json`
+    (`WorldStore`), and the player settings already persist in `settings.json`. Still open: any
+    other per-world config (game rules, difficulty).
 - [ ] **`M-7` · Localisation / text pipeline** — P3, M.
 - [ ] **`M-8` · Fix: falling blocks do not slide off a single block** — P2, S. Carried from the
   old TODO.
@@ -322,6 +342,9 @@ same world, and a player can move between them freely — neither arc gates the 
   at the source (store one entry per edited chunk column rather than 289 per block) and to hoist
   the `Count` test out of the loop. The same argument applies to `LodRegion.ColumnCaps`, tracked
   below as `M-11`.
+  - Progress: the markers are now persisted per world (`LodEditState`, `lod-edits.bin`) and reset
+    between worlds by `WorldSeed.Apply`, so they survive a restart; the 16384-entry wholesale
+    `Clear()` at the cap is still there, so the bug above is unchanged within a session.
 - [ ] **`M-11` · `LodRegion.ColumnCaps` grows unbounded, and it must NOT take D2's scheme** —
   P2, L, blocked on a design. **It is edit state, not a cache**, and it is the sibling of `M-10`
   above. `LodRegion.ColumnCaps` (`LodRegion.cs:130`) is a **process-global** `ConcurrentDictionary`
@@ -357,6 +380,17 @@ same world, and a player can move between them freely — neither arc gates the 
   classes do not. **Expect the two intermittents; never "fix" them by touching `ColumnCaps`.**
   Arrived here from PERF_TODO's `D2b` when that file was closed out: its entries are irreproducible
   player edits, which makes it a **correctness** item entangled with save/load, not a perf item.
+  - Progress: the caps are now persisted per world (`LodEditState`), imported before the first
+    LOD region builds and reset between worlds by `WorldSeed.Apply`. They are still one
+    process-global, never-shrinking table within a world, so the growth problem above stands.
+- [ ] **`M-12` · Persist station block entities (campfire/quern/kiln/casting) and in-flight
+  TNT/falling blocks/projectiles** — P1, M.
+  The save format covers chunks, the far-LOD edit state, the player and mobs/drops, but not the
+  in-memory station registries (a lit campfire, a spinning quern, a kiln's fuel and crucible, a
+  mold's cast progress), primed TNT, falling blocks, projectiles or toppling trees. A reloaded
+  kiln is plain blocks plus state bytes until a right-click re-registers it. Add a side-car per
+  registry or one `block-entities.json`, restored like the mobs once the cell's chunk loads (see
+  AGENTS.md "Saves").
 
 ---
 
