@@ -89,6 +89,27 @@ public sealed class LakeTests
     }
 
     [Fact]
+    public void NoRiverChannelCrossesAnElevatedPond()
+    {
+        // A pond standing above the waterline takes its surface from the ground before any river
+        // cut it, so a channel through it would carve a bank under the water. Such sites are
+        // dropped, which leaves every elevated pond column clear of the river band.
+        var elevated = 0;
+        foreach (var (level, cells) in Ponds.Value)
+        {
+            if (level <= WorldGenerationConfig.SeaLevel) continue;
+            foreach (var cell in cells)
+            {
+                elevated++;
+                Assert.True(TerrainGenerator.RiverWeight(cell.X, cell.Z) == 0f,
+                    $"a river crosses the pond at ({cell.X}, {cell.Z}), surface {level}");
+            }
+        }
+
+        Assert.True(elevated > 0, "no elevated pond in the scanned region");
+    }
+
+    [Fact]
     public void AnElevatedPondIsFilledWithWaterUpToItsOwnSurface()
     {
         var checkedPond = false;

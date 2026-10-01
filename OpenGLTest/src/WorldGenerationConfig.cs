@@ -580,10 +580,13 @@ public const float DayLengthSeconds = 1200f;
     public const float WaterBodyThreshold = 0.05f;
     // The lake/river carve and the flood test are scaled by 1 - smoothstep of desertWeight over
     // [WaterDesertFadeStart, WaterDesertFadeEnd], so a bowl or channel tapers out and closes on
-    // forest ground just before the hard forest/desert line (0.5). Only the last stretch before the
-    // desert is affected, so lakes elsewhere in the forest keep their full depth. Without it a pond
-    // that straddled the border was carved only on the forest side and ended in a vertical wall
-    // against the uncarved desert (see TerrainGenerator.SurfaceWaterGate).
+    // forest ground just before the hard forest/desert line (0.5). That line is exact on both
+    // borders, the humid one and the temperate one: desertWeight = min(warm, dry) * (1 - ocean) and
+    // desert classifies at min(warm, dry) >= 0.5, so the fade has fully closed on every inland
+    // desert column. Only the last stretch before the desert is affected, so lakes elsewhere in the
+    // forest keep their full depth. Without it a pond that straddled the border was carved only on
+    // the forest side and ended in a vertical wall against the uncarved desert (see
+    // TerrainGenerator.SurfaceWaterGate).
     public const float WaterDesertFadeStart = 0.3f;
     public const float WaterDesertFadeEnd = 0.5f;
 
@@ -655,23 +658,37 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // water instead of a cliff where the hard biome flip used to be.
     public const float OceanShoreWeight = 0.35f;
 
-    // Temperature: cold where the noise runs low. Cold land is taiga (with humidity) or the barren
+    // Temperature: a three-band axis. The cold ramp (TemperatureCold*, read by
+    // TerrainGenerator.ColdWeight) holds the snow, the ice and the taiga/frozen biomes; the warm
+    // ramp (TemperatureWarm*, read by TerrainGenerator.WarmWeight) holds the desert; the raw-noise
+    // gap between them is the temperate band. Cold land is taiga (with humidity) or the barren
     // frozen biome (without it). Temperature and humidity are read only while choosing a biome and
     // the worldgen features that follow from it, so nothing else in the game sees them.
-    public const float TemperatureFrequency = 1f / 2300f;
+    // Low frequency (one octave, see TerrainGenerator's ctor) keeps the temperature gradient shallow,
+    // so the raw-noise gap between the two ramps spans a wide band of world: at this frequency it
+    // keeps every hot column at least a full-detail load radius from snow
+    // (BiomeTests.HotAirKeepsAFullLoadRadiusFromSnow). Changing it re-lays every temperature
+    // value, the origin's included.
+    public const float TemperatureFrequency = 1f / 4500f;
     public const float TemperatureColdStart = -0.35f;  // at or below: fully cold
-    public const float TemperatureColdEnd = -0.05f;    // at or above: fully warm
+    public const float TemperatureColdEnd = -0.05f;    // at or above: no cold at all
+    // The warm ramp must start at or after the cold ramp ends, so no column is ever both cold and
+    // warm (a test rule: TemperatureRampsAreExclusiveWithATemperateBandBetween). Desert begins at
+    // the ramp's midpoint (WarmWeight 0.5), where the dune profile is half blended in.
+    public const float TemperatureWarmStart = 0.05f;   // at or below: no warmth
+    public const float TemperatureWarmEnd = 0.35f;     // at or above: fully warm
 
     // Humidity: dry where the noise runs low. Dry land is desert (warm) or barren frozen (cold).
     public const float HumidityFrequency = 1f / 1700f;
     public const float HumidityDryStart = -0.35f;      // at or below: fully dry
     public const float HumidityDryEnd = -0.05f;        // at or above: fully wet
 
-    // Temperate buffer between hot and cold biomes: desert needs firmly warm air and the
-    // taiga/frozen need firmly cold air, so the ColdWeight band in between always classifies
-    // as forest. Without it the warm/cold isoline puts dunes directly against snow whenever
-    // the humidity stays dry across the temperature line.
-    public const float DesertMaxCold = 0.30f;   // above: too cold for desert, forest instead
+    // Temperate band between hot and cold biomes: taiga/frozen live on the cold ramp (at
+    // ColdBiomeMinCold and colder), desert on the warm ramp (from its midpoint up), and the whole
+    // raw-noise gap between those two lines always classifies as forest. Without it the warm/cold
+    // isoline puts dunes directly against snow whenever the humidity stays dry across the
+    // temperature line. Widen the band by raising both TemperatureWarm constants together (which
+    // keeps the dune fade width), never by moving the cold ramp.
     public const float ColdBiomeMinCold = 0.70f; // below: too warm for taiga/frozen, forest instead
 
     // Ocean depth ramp: the shelf sits just over the waterline and the basin falls to the floor.

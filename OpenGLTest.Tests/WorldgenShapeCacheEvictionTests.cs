@@ -166,8 +166,8 @@ public sealed class WorldgenShapeCacheEvictionTests
     private const int TrunkSweepWidth = 3008;
     private const int TrunkSweepColumns = TrunkSweepWidth * TrunkSweepWidth; // 9048064
 
-    private const int CactusSweepBaseX = 24096;
-    private const int CactusSweepBaseZ = 40480;
+    private const int CactusSweepBaseX = 12288;
+    private const int CactusSweepBaseZ = 38912;
     private const int CactusSweepWidth = 4096;
     private const int CactusSweepColumns = 29_000_000;
 

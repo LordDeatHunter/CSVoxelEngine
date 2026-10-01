@@ -575,4 +575,147 @@ public sealed class BiomeTests
         Assert.True(differingNeighbour * 3 < band,
             $"the dither flips single columns: {differingNeighbour} of {band} samples differ from a neighbour");
     }
+
+    [Fact]
+    public void TemperatureRampsAreExclusiveWithATemperateBandBetween()
+    {
+        // Sweeps raw temperature through the real ramps and the real classifier. No column is ever
+        // both cold and warm, the cold biomes and the (fully dry) desert each own one end of the
+        // axis, and everything strictly between them is temperate forest whatever the humidity.
+        var dries = new[] { 0f, 0.5f, 1f };
+        const int samples = 400;
+        float T(int i) => -1f + i * 0.005f;
+
+        float? tColdMax = null;
+        float? tHotMin = null;
+        for (var i = 0; i <= samples; i++)
+        {
+            var t = T(i);
+            var cold = TerrainGenerator.ColdOf(t);
+            var warm = TerrainGenerator.WarmOf(t);
+            Assert.False(cold > 0f && warm > 0f, $"t {t} is both cold ({cold}) and warm ({warm})");
+
+            foreach (var dry in dries)
+                if (TerrainGenerator.Classify(0f, cold, warm, dry) is Biome.Taiga or Biome.Frozen)
+                    tColdMax = t;
+            if (tHotMin == null && TerrainGenerator.Classify(0f, cold, warm, 1f) == Biome.Desert)
+                tHotMin = t;
+        }
+
+        Assert.True(tColdMax.HasValue, "no temperature classifies taiga or frozen");
+        Assert.True(tHotMin.HasValue, "no temperature classifies desert even when fully dry");
+        Assert.True(tColdMax < tHotMin, $"the cold biomes reach t {tColdMax}, past the desert's {tHotMin}");
+
+        for (var i = 0; i <= samples; i++)
+        {
+            var t = T(i);
+            var cold = TerrainGenerator.ColdOf(t);
+            var warm = TerrainGenerator.WarmOf(t);
+            foreach (var dry in dries)
+            {
+                var biome = TerrainGenerator.Classify(0f, cold, warm, dry);
+                if (t < tColdMax)
+                    Assert.True(biome is Biome.Taiga or Biome.Frozen, $"t {t} dry {dry} is {biome}, below the cold line");
+                else if (t > tColdMax && t < tHotMin)
+                    Assert.True(biome == Biome.Forest, $"t {t} dry {dry} is {biome} inside the temperate band");
+            }
+
+            if (t > tHotMin)
+                Assert.Equal(Biome.Desert, TerrainGenerator.Classify(0f, cold, warm, 1f));
+        }
+    }
+
+    [Fact]
+    public void SurfaceWaterFadeHasClosedOnEveryDesertColumn()
+    {
+        // The surface-water gate fades over desertWeight FadeStart..FadeEnd, so it must have fully
+        // closed by the time a column classifies desert, on the humid border and the temperate
+        // border alike. Inland only: the shore band scales desertWeight by the ocean's share.
+        var inlandDesert = 0;
+        for (var x = -2048; x <= 2048; x += 8)
+        for (var z = -2048; z <= 2048; z += 8)
+        {
+            var biome = TerrainGenerator.BiomeWeights(x, z, out var ocean, out var desertWeight);
+            if (biome != Biome.Desert || ocean != 0f) continue;
+            inlandDesert++;
+            Assert.True(desertWeight >= WorldGenerationConfig.WaterDesertFadeEnd,
+                $"desert at ({x},{z}) has desertWeight {desertWeight}, below the closed water fade");
+        }
+
+        Assert.True(inlandDesert > 0, "no inland desert column found in the scanned area");
+    }
+
+    [Fact]
+    public void HotAirKeepsAFullLoadRadiusFromSnow()
+    {
+        // The temperate band must be at least the full-detail load radius wide, so a player standing
+        // on the last dune never has snow loaded around them. Hot = would be desert if fully dry (the
+        // temperature band itself, independent of humidity luck); cold = the snow line.
+        var bufferBlocks = WorldGenerationConfig.ChunkRadius * Chunk.Size;
+        const int stride = 8;
+        const int window = 2048;
+        // Cold seeds just outside the asserted window still count.
+        var reach = window + bufferBlocks;
+        var size = reach * 2 / stride + 1;
+        int Coord(int g) => g * stride - reach;
+        bool InWindow(int g) => Math.Abs(Coord(g)) <= window;
+
+        var hot = new bool[size * size];
+        var seed = new int[size * size];
+        Array.Fill(seed, -1);
+        var frontier = new List<int>();
+        var hotInWindow = 0;
+        for (var gz = 0; gz < size; gz++)
+        for (var gx = 0; gx < size; gx++)
+        {
+            var x = Coord(gx);
+            var z = Coord(gz);
+            var k = gz * size + gx;
+            hot[k] = TerrainGenerator.Classify(0f, TerrainGenerator.ColdWeight(x, z),
+                TerrainGenerator.WarmWeight(x, z), 1f) == Biome.Desert;
+            if (hot[k] && InWindow(gx) && InWindow(gz)) hotInWindow++;
+            if (SnowGenerator.DepthAt(x, z) <= 0) continue;
+            seed[k] = k;
+            frontier.Add(k);
+        }
+
+        Assert.True(frontier.Count > 0, "no snow found in the scanned area");
+        Assert.True(hotInWindow > 0, "no hot column found in the asserted window");
+
+        // Multi-source 8-connected BFS from the snow. Ring r is a Chebyshev distance of r * stride,
+        // a lower bound on the Euclidean band, so a failure measured on the diagonal is a real
+        // shortfall rather than a test artefact. The rule is "no hot cell closer than bufferBlocks",
+        // so rings stop before reaching it and a hot cell exactly bufferBlocks away is never visited.
+        void Check(int k, int ring)
+        {
+            int gx = k % size, gz = k / size;
+            if (!hot[k] || !InWindow(gx) || !InWindow(gz)) return;
+            var s = seed[k];
+            Assert.Fail($"hot column ({Coord(gx)},{Coord(gz)}) is {ring * stride} blocks (Chebyshev) from " +
+                        $"snow at ({Coord(s % size)},{Coord(s / size)}), under the {bufferBlocks}-block load radius");
+        }
+
+        foreach (var k in frontier) Check(k, 0);
+        for (var ring = 1; ring * stride < bufferBlocks && frontier.Count > 0; ring++)
+        {
+            var next = new List<int>();
+            foreach (var k in frontier)
+            {
+                int gx = k % size, gz = k / size;
+                for (var dz = -1; dz <= 1; dz++)
+                for (var dx = -1; dx <= 1; dx++)
+                {
+                    int nx = gx + dx, nz = gz + dz;
+                    if ((uint)nx >= (uint)size || (uint)nz >= (uint)size) continue;
+                    var n = nz * size + nx;
+                    if (seed[n] >= 0) continue;
+                    seed[n] = seed[k];
+                    next.Add(n);
+                }
+            }
+
+            foreach (var n in next) Check(n, ring);
+            frontier = next;
+        }
+    }
 }

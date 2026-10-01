@@ -117,7 +117,11 @@ public static class TerrainGenerator
         IntensityNoise = MakeNoise(41, WorldGenerationConfig.CaveIntensityFrequency);
         GravelNoise = MakeNoise(61, WorldGenerationConfig.GravelFrequency);
         ContinentNoise = MakeNoise(70, WorldGenerationConfig.ContinentFrequency, octaves: 2);
-        TemperatureNoise = MakeNoise(71, WorldGenerationConfig.TemperatureFrequency, octaves: 2);
+        // Temperature is a single octave on purpose: the fine octave only steepened the gradient,
+        // which is what squeezes the temperate band between snow and sand. Single-octave output
+        // spans the raw [-1, 1] where two-octave FBm was scaled by 1/1.5, so this choice also set
+        // the cold ramp's share (taiga, frozen, snow) and re-laid every temperature value.
+        TemperatureNoise = MakeNoise(71, WorldGenerationConfig.TemperatureFrequency);
         HumidityNoise = MakeNoise(88, WorldGenerationConfig.HumidityFrequency, octaves: 2);
         DuneNoise = MakeNoise(72, WorldGenerationConfig.DuneFrequency, octaves: 3);
         TrenchMask = MakeNoise(73, WorldGenerationConfig.TrenchMaskFrequency);
@@ -172,12 +176,15 @@ public static class TerrainGenerator
     /// 0..1 weights of the two land profiles <see cref="Compute"/> needs, plus the biome they
     /// classify to. Ocean takes the share of continentalness that falls low; desert takes the
     /// warm+dry share of what is left, so a coastal blend never grows a desert out over the water.
-    /// Desert needs firmly warm air (<see cref="WorldGenerationConfig.DesertMaxCold"/>) and the
-    /// cold biomes firmly cold air (<see cref="WorldGenerationConfig.ColdBiomeMinCold"/>), so the
-    /// band between them is always temperate forest and dunes never touch snow. The cold biomes
-    /// ride the forest's height profile, so they need no weight of their own here. Every weight is
-    /// smooth, which is what lets <see cref="Compute"/> lerp the height across a border instead of
-    /// stepping.
+    /// Desert needs firmly warm air (the midpoint of the warm ramp,
+    /// <see cref="WorldGenerationConfig.TemperatureWarmStart"/>..<see cref="WorldGenerationConfig.TemperatureWarmEnd"/>)
+    /// and the cold biomes firmly cold air (<see cref="WorldGenerationConfig.ColdBiomeMinCold"/> on
+    /// the cold ramp), so the whole raw-noise band between the two ramps is temperate forest and
+    /// dunes never touch snow. <paramref name="desertWeight"/> is min(warm, dry) scaled by the land
+    /// share, so it is exactly 0.5 on the inland desert line, on the humid border and the temperate
+    /// border alike. The cold biomes ride the forest's height profile, so they need no weight of
+    /// their own here. Every weight is smooth, which is what lets <see cref="Compute"/> lerp the
+    /// height across a border instead of stepping.
     /// </summary>
     public static Biome BiomeWeights(float x, float z, out float oceanWeight, out float desertWeight)
     {
@@ -188,24 +195,51 @@ public static class TerrainGenerator
         oceanWeight = (1f - MathUtils.SmoothStep(WorldGenerationConfig.ContinentOceanStart,
             WorldGenerationConfig.ContinentOceanEnd, continent)) * gate;
 
-        var cold = 1f - MathUtils.SmoothStep(WorldGenerationConfig.TemperatureColdStart,
-            WorldGenerationConfig.TemperatureColdEnd, TemperatureNoise.GetNoise(x, z));
+        // One temperature eval feeds both ramps.
+        var temperature = TemperatureNoise.GetNoise(x, z);
+        var cold = ColdOf(temperature);
+        var warm = WarmOf(temperature);
         var dry = 1f - MathUtils.SmoothStep(WorldGenerationConfig.HumidityDryStart,
             WorldGenerationConfig.HumidityDryEnd, HumidityNoise.GetNoise(x, z));
-        desertWeight = (1f - cold) * dry * (1f - oceanWeight) * gate;
+        // Min, not a product: the dune blend reaches 0.5 exactly where Classify turns desert.
+        desertWeight = MathF.Min(warm, dry) * (1f - oceanWeight) * gate;
 
-        var biome = oceanWeight >= WorldGenerationConfig.OceanShoreWeight ? Biome.Ocean
-            : cold >= WorldGenerationConfig.ColdBiomeMinCold ? dry >= 0.5f ? Biome.Frozen : Biome.Taiga
-            : cold <= WorldGenerationConfig.DesertMaxCold && dry >= 0.5f ? Biome.Desert
-            : Biome.Forest;
-        return gate < 0.5f ? Biome.Forest : biome;
+        return gate < 0.5f ? Biome.Forest : Classify(oceanWeight, cold, warm, dry);
     }
 
-    /// <summary>0..1 how cold (x, z) is: 1 in the taiga/frozen band, 0 in the warm band. A
-    /// biome-generation input, read by the snow and freezing passes to place their features.</summary>
-    public static float ColdWeight(float x, float z) =>
+    /// <summary>
+    /// The pure classification rule behind <see cref="BiomeWeights"/>. 0.5 is the midpoint of
+    /// every smoothstep ramp in this file, and the same line the desert weight, the border dither
+    /// and the surface-water fade are keyed to.
+    /// </summary>
+    internal static Biome Classify(float oceanWeight, float cold, float warm, float dry) =>
+        oceanWeight >= WorldGenerationConfig.OceanShoreWeight ? Biome.Ocean
+        : cold >= WorldGenerationConfig.ColdBiomeMinCold ? dry >= 0.5f ? Biome.Frozen : Biome.Taiga
+        : MathF.Min(warm, dry) >= 0.5f ? Biome.Desert
+        : Biome.Forest;
+
+    /// <summary>The pure cold ramp behind <see cref="ColdWeight"/>: 1 at or below
+    /// <see cref="WorldGenerationConfig.TemperatureColdStart"/>, 0 at or above
+    /// <see cref="WorldGenerationConfig.TemperatureColdEnd"/>.</summary>
+    internal static float ColdOf(float temperature) =>
         1f - MathUtils.SmoothStep(WorldGenerationConfig.TemperatureColdStart,
-            WorldGenerationConfig.TemperatureColdEnd, TemperatureNoise.GetNoise(x, z));
+            WorldGenerationConfig.TemperatureColdEnd, temperature);
+
+    /// <summary>The pure warm ramp behind <see cref="WarmWeight"/>: 0 at or below
+    /// <see cref="WorldGenerationConfig.TemperatureWarmStart"/>, 1 at or above
+    /// <see cref="WorldGenerationConfig.TemperatureWarmEnd"/>.</summary>
+    internal static float WarmOf(float temperature) =>
+        MathUtils.SmoothStep(WorldGenerationConfig.TemperatureWarmStart,
+            WorldGenerationConfig.TemperatureWarmEnd, temperature);
+
+    /// <summary>0..1 how cold (x, z) is: 1 in the taiga/frozen band, 0 through the temperate band
+    /// and the warm ramp. A biome-generation input, read by the snow and freezing passes to place
+    /// their features.</summary>
+    public static float ColdWeight(float x, float z) => ColdOf(TemperatureNoise.GetNoise(x, z));
+
+    /// <summary>0..1 how warm (x, z) is: 1 in the desert band, 0 through the temperate band and
+    /// the whole cold ramp. A biome-generation input like <see cref="ColdWeight"/>.</summary>
+    public static float WarmWeight(float x, float z) => WarmOf(TemperatureNoise.GetNoise(x, z));
 
     /// <summary>Whether world column (x, z) is forest; vegetation and spawn rules ask here.</summary>
     public static bool IsForest(int x, int z) => BiomeAt(x, z) == Biome.Forest;
@@ -354,6 +388,9 @@ public static class TerrainGenerator
     /// grows with the lake. A rim that climbs more than
     /// <see cref="WorldGenerationConfig.LakeSiteFlatness"/> is a hillside, and a pond there would
     /// tower over its downhill side, so the candidate is dropped and the terrain keeps the slope.
+    /// The rim is read from <see cref="LandHeight"/>, the profile before a river cuts it, so a pond
+    /// standing above the waterline is also dropped when a river channel crosses its footprint
+    /// (<see cref="RiverCrossesSite"/>): the channel would cut a bank below the pond's surface.
     /// </summary>
     private static bool TryLakeSite(float centreX, float centreZ, float radius, float size,
         out int surface, out int floor)
@@ -377,7 +414,40 @@ public static class TerrainGenerator
             WorldGenerationConfig.LakeMaxDepth, size * size);
         surface = (int)MathF.Round(rimMin - WorldGenerationConfig.LakeBankDepth);
         floor = (int)MathF.Round(surface - depth);
+        // A pond at or below the river's own waterline cannot spill into the channel, so only an
+        // elevated one pays for the river samples.
+        if (surface > WorldGenerationConfig.SeaLevel && RiverCrossesSite(centreX, centreZ, radius))
+            return false;
         return true;
+    }
+
+    /// <summary>Blocks between river samples across a lake candidate's footprint, ring to ring and along a ring.</summary>
+    private const float RiverSampleSpacing = 6f;
+
+    /// <summary>
+    /// Whether a river channel reaches a lake candidate's footprint. The disc is sampled with
+    /// concentric rings every <see cref="RiverSampleSpacing"/> blocks of radius (the rim ring
+    /// included), each ring holding points no more than that far apart, so neighbouring samples sit
+    /// closer together than a river channel is wide and a channel cannot slip between them,
+    /// whatever the lake's size.
+    /// </summary>
+    private static bool RiverCrossesSite(float centreX, float centreZ, float radius)
+    {
+        if (RiverWeight(centreX, centreZ) > 0f) return true;
+        var rings = Math.Max(1, (int)MathF.Ceiling(radius / RiverSampleSpacing));
+        for (var ring = 1; ring <= rings; ring++)
+        {
+            var r = radius * ring / rings;
+            var points = Math.Max(1, (int)MathF.Ceiling(MathF.Tau * r / RiverSampleSpacing));
+            for (var k = 0; k < points; k++)
+            {
+                var angle = k * (MathF.Tau / points);
+                if (RiverWeight(centreX + MathF.Cos(angle) * r, centreZ + MathF.Sin(angle) * r) > 0f)
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>One 0..1 hash value for a candidate, re-mixed by <paramref name="index"/>.</summary>
@@ -385,7 +455,7 @@ public static class TerrainGenerator
         (SplitMix64.Mix(h + (ulong)index * 0x9E3779B97F4A7C15UL) >> 40) * (1f / (1 << 24));
 
     /// <summary>0..1 river weight: a warped ridge band (|noise| near zero) gated by a rarity mask.</summary>
-    private static float RiverWeight(float x, float z)
+    internal static float RiverWeight(float x, float z)
     {
         var mask = MathUtils.SmoothStep(WorldGenerationConfig.RiverMaskStart,
             WorldGenerationConfig.RiverMaskEnd, RiverMask.GetNoise(x, z));
@@ -483,9 +553,9 @@ public static class TerrainGenerator
         if (biome is not (Biome.Forest or Biome.Desert)) return biome;
         if (MathF.Abs(desertWeight - 0.5f) >= WorldGenerationConfig.BiomeBorderDither) return biome;
 
-        // The dither only raggeds the material line; it must not push sand past the temperate
-        // buffer into the cold band, or dunes would again sit against snow.
-        if (biome == Biome.Forest && ColdWeight(x, z) > WorldGenerationConfig.DesertMaxCold)
+        // The dither only raggeds the material line; it must never push sand below the warm line
+        // into the temperate band, so a desert column is always fully on the warm ramp.
+        if (biome == Biome.Forest && WarmWeight(x, z) < 0.5f)
             return biome;
 
         // A coherent field, so whole patches flip: a per-column hash turned the line into a

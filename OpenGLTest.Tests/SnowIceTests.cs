@@ -165,17 +165,29 @@ public sealed class SnowIceTests
     [Fact]
     public void ColdOceanFreezesAndWarmOceanStaysLiquid()
     {
+        // Only columns that really hold sea water at sea level: an ocean-biome shore column whose
+        // beach stands at or above the waterline has nothing to freeze or keep liquid.
         Assert.True(TryFindColumn(
-            (x, z) => TerrainGenerator.BiomeAt(x, z) == Biome.Ocean
+            (x, z) => IsSeaColumn(x, z)
                       && TerrainGenerator.ColdWeight(x, z) > WorldGenerationConfig.FreezeColdThreshold,
             out var coldX, out var coldZ));
         Assert.Equal(Ice, SurfaceSeaCell(coldX, coldZ));
 
         if (TryFindColumn(
-            (x, z) => TerrainGenerator.BiomeAt(x, z) == Biome.Ocean
+            (x, z) => IsSeaColumn(x, z)
                       && TerrainGenerator.ColdWeight(x, z) < WorldGenerationConfig.SnowColdThreshold,
             out var warmX, out var warmZ))
             Assert.Equal(TerrainGenerator.SeaBlock, SurfaceSeaCell(warmX, warmZ));
+    }
+
+    /// <summary>Whether (x, z) is an ocean column whose floor lies below a sea-level water surface.</summary>
+    private static bool IsSeaColumn(int x, int z)
+    {
+        if (TerrainGenerator.BiomeAt(x, z) != Biome.Ocean) return false;
+        if (TerrainGenerator.WaterLevelAt(x, z) != WorldGenerationConfig.SeaLevel) return false;
+        var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+        return TerrainGenerator.IsWaterColumn(x, z,
+            column.Bed[VoxelCoords.ColumnIndex(x & Chunk.SizeMask, z & Chunk.SizeMask)]);
     }
 
     /// <summary>The block at sea level in the chunk holding the column (x, z).</summary>

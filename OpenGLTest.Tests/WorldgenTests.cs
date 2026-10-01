@@ -349,49 +349,31 @@ public sealed class WorldgenTests
     }
 
     [Fact]
-    public void DesertNeverTouchesSnowBiomes()
+    public void DesertColumnsAreNeverCold()
     {
-        // The temperate buffer: desert needs firmly warm air and taiga/frozen firmly cold air,
-        // so a desert column must never be 8-adjacent to a taiga or frozen column. Scans the
-        // dithered column biomes (what the mesher and LOD actually wear), not just BiomeAt.
-        const int radius = 1024;
-        const int step = 4;
-        var size = radius * 2 / step + 1;
-        var biomes = new Biome[size * size];
+        // The temperate band: desert lives on the warm ramp and snow on the cold ramp, and the two
+        // ramps never overlap, so a desert column sits off the cold ramp entirely and never under
+        // snow. Scans the dithered column biomes (what the mesher and LOD actually wear), not just
+        // BiomeAt, since the border dither must never push sand back toward the cold side.
+        const int radius = 2048;
+        const int step = 8;
         var foundDesert = false;
         var foundCold = false;
-        for (var gz = 0; gz < size; gz++)
-        for (var gx = 0; gx < size; gx++)
+        for (var z = -radius; z <= radius; z += step)
+        for (var x = -radius; x <= radius; x += step)
         {
-            var cx = (gx * step - radius) >> Chunk.SizeShift;
-            var cz = (gz * step - radius) >> Chunk.SizeShift;
-            var lx = (gx * step - radius) & Chunk.SizeMask;
-            var lz = (gz * step - radius) & Chunk.SizeMask;
-            var biome = Chunk.GetColumnData(cx, cz).Biomes[(lx << Chunk.SizeShift) | lz];
-            biomes[gz * size + gx] = biome;
-            foundDesert |= biome == Biome.Desert;
-            foundCold |= biome is Biome.Taiga or Biome.Frozen;
+            var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
+            var biome = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift).Biomes[local];
+            foundCold |= biome is Biome.Taiga or Biome.Frozen || SnowGenerator.DepthAt(x, z) > 0;
+            if (biome != Biome.Desert) continue;
+            foundDesert = true;
+
+            Assert.True(TerrainGenerator.ColdWeight(x, z) == 0f,
+                $"desert at ({x},{z}) is on the cold ramp (cold {TerrainGenerator.ColdWeight(x, z)})");
+            Assert.True(SnowGenerator.DepthAt(x, z) == 0, $"desert at ({x},{z}) lies under snow");
         }
 
         Assert.True(foundDesert, "scan area holds no desert");
-        Assert.True(foundCold, "scan area holds no taiga/frozen");
-
-        for (var gz = 0; gz < size; gz++)
-        for (var gx = 0; gx < size; gx++)
-        {
-            if (biomes[gz * size + gx] != Biome.Desert) continue;
-            for (var dz = -1; dz <= 1; dz++)
-            for (var dx = -1; dx <= 1; dx++)
-            {
-                if (dx == 0 && dz == 0) continue;
-                var nx = gx + dx;
-                var nz = gz + dz;
-                if ((uint)nx >= (uint)size || (uint)nz >= (uint)size) continue;
-                var neighbour = biomes[nz * size + nx];
-                Assert.False(neighbour is Biome.Taiga or Biome.Frozen,
-                    $"desert at ({gx * step - radius},{gz * step - radius}) touches {neighbour} " +
-                    $"at ({nx * step - radius},{nz * step - radius})");
-            }
-        }
+        Assert.True(foundCold, "scan area holds no taiga/frozen or snow");
     }
 }
