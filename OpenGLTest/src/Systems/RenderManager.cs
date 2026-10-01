@@ -131,8 +131,8 @@ public class RenderManager : IDisposable
     private uint _popVbo;
     private uint _popEbo;
     private int _popBoxCapacity = MaxPopBoxes;
-    private readonly List<Vertex> _popVerts = new(MaxPopBoxes * 24);
-    private readonly List<ushort> _popIndices = new(MaxPopBoxes * 36);
+    private readonly List<Vertex> _popVerts = new(MaxPopBoxes * PopBoxEmitter.MaxQuadsPerBox * 4);
+    private readonly List<ushort> _popIndices = new(MaxPopBoxes * PopBoxEmitter.MaxQuadsPerBox * 6);
 
     // The sun disc: one shared unit quad plus its sprite, oriented around _sunDir every frame
     // by RenderSun. _sunVisibility fades it out below the horizon and underwater.
@@ -453,6 +453,8 @@ public class RenderManager : IDisposable
     private int _locModel;
     private int _locMvp;
     private int _locAlpha;
+    // uBiomeTint: the per-draw tint of a mining pop or a debris cube of a biome-tinted block.
+    private int _locBiomeTint;
     private int _locEntitySun;
     private int _locEntityBlock;
     private int _locEntityTint;
@@ -646,6 +648,10 @@ public class RenderManager : IDisposable
         _locModel = worldShader.GetUniformLocation("uModel");
         _locMvp = worldShader.GetUniformLocation("uMVP");
         _locAlpha = worldShader.GetUniformLocation("uAlpha");
+        // Cache only: the white default is written in InitWorldProgram, where the program is
+        // bound (SetUniform writes into whichever program is current, and the target creators
+        // above have bound others by now).
+        _locBiomeTint = worldShader.GetUniformLocation("uBiomeTint");
         _locEntitySun = worldShader.GetUniformLocation("uEntitySun");
         _locEntityBlock = worldShader.GetUniformLocation("uEntityBlock");
         _locEntityTint = worldShader.GetUniformLocation("uEntityTint");
@@ -850,6 +856,10 @@ public class RenderManager : IDisposable
         program.SetUniform("uLavaCatchLight", WorldGenerationConfig.LavaCatchLightStrength);
         program.SetUniform("uLavaCatchPower", WorldGenerationConfig.LavaCatchLightPower);
         program.SetUniform("uLodLeafColor", _lodLeafColor);
+        // The plain path's per-draw biome tint (mining pop, debris) must read as white for every
+        // other draw, GLSL's zero default would draw a flagged vertex black; the chunk program
+        // has no such uniform and -1 is a silent no-op.
+        program.SetUniform("uBiomeTint", Vector3.One);
         program.SetUniform("uWaterPlaneY", WaterPlaneY);
         program.SetUniform("uWaterSsrSteps", WorldGenerationConfig.WaterSsrSteps);
         program.SetUniform("uWaterSsrStepStart", WorldGenerationConfig.WaterSsrStepStart);
@@ -2734,7 +2744,7 @@ public class RenderManager : IDisposable
             var half = (box.Size + grownVec) * 0.5f;
             var grown = new BlockHitbox(box.Center - half, box.Center + half);
             PopBoxEmitter.EmitBox(_popVerts, _popIndices, ref indexOffset,
-                grown, box, blockPosition, type.FaceTiles);
+                grown, box, blockPosition, type.FaceTiles, type.BiomeTint);
         }
         if (_popVerts.Count == 0) return;
 
@@ -2748,11 +2758,20 @@ public class RenderManager : IDisposable
         var matrix = Matrix4x4.Identity;
         SetDrawUniforms(matrix, matrix * camera.GetViewProjection(), 1f,
             LightAt(blockPosition + new Vector3(0.5f)));
+        // A biome-tinted block's pop takes the field at the mined cell, so it matches the
+        // terrain it jumps out of (the emitter flags the tinted quads and keeps the rgb shade only)
+        worldShader.SetUniform(_locBiomeTint, type.BiomeTint is { } bt
+            ? BiomeTint.CellTint(bt.Palette, (int)MathF.Floor(blockPosition.X), (int)MathF.Floor(blockPosition.Z))
+            : Vector3.One);
         unsafe
         {
             gl.DrawElements(PrimitiveType.Triangles, (uint)_popIndices.Count,
                 DrawElementsType.UnsignedShort, null);
         }
+        // Shader.SetUniform writes to the bound program, so this reset is only valid here,
+        // with worldShader still bound; it keeps uBiomeTint white unless a tinted draw is in
+        // flight, for the plain draws that follow (toppling tree, drops, entities)
+        worldShader.SetUniform(_locBiomeTint, Vector3.One);
         gl.BindVertexArray(0);
     }
 
@@ -3429,7 +3448,7 @@ public class RenderManager : IDisposable
 
         foreach (var cube in debris)
         {
-            var mesh = blockCubes.Get(cube.BlockId);
+            var mesh = blockCubes.GetTinted(cube.BlockId);
             if (mesh == null) continue;
 
             var model = Matrix4x4.CreateScale(cube.Size)
@@ -3438,8 +3457,16 @@ public class RenderManager : IDisposable
                         * Matrix4x4.CreateTranslation(cube.Position);
 
             SetDrawUniforms(model, model * viewProj, MathUtils.Clamp01(cube.Alpha), LightAt(cube.Position));
+            // One cached cube per block id serves every cell, so a tinted chip's colour rides
+            // the per-draw uniform (white for an untinted block, whose mesh sets no bit 4)
+            worldShader.SetUniform(_locBiomeTint, cube.Tint);
             mesh.Render();
         }
+
+        // Shader.SetUniform writes to the bound program, so this reset is only valid here,
+        // with worldShader still bound; it keeps uBiomeTint white unless a tinted draw is in
+        // flight, for the plain draws that follow (toppling tree, drops, entities)
+        worldShader.SetUniform(_locBiomeTint, Vector3.One);
     }
 
     /// <summary>
@@ -3798,10 +3825,12 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// The mining pop's streaming buffers: a dynamic VBO refilled with the hitbox boxes every
-    /// frame while mining, and a static EBO holding the box-quad index pattern (every box emits
-    /// the same six quads, so any box count draws as a prefix). The pattern is generated by
-    /// running the real emitter over dummy boxes, so it can never drift from what
-    /// <see cref="RenderBlockPop"/> streams.
+    /// frame while mining, and a static EBO holding the quad index pattern. Every quad the
+    /// emitter writes is sequential (quad k uses vertices 4k..4k+3), so any quad count draws as
+    /// a prefix of one pattern; both are sized for <see cref="PopBoxEmitter.MaxQuadsPerBox"/>
+    /// quads per box, which a biome-tinted block (a base and a tinted quad per face) needs. The
+    /// pattern is generated by running the real emitter over dummy boxes, so it can never
+    /// drift from what <see cref="RenderBlockPop"/> streams.
     /// </summary>
     private void CreatePopGeometry()
     {
@@ -3809,16 +3838,19 @@ public class RenderManager : IDisposable
         _popVbo = gl.GenBuffer();
         _popEbo = gl.GenBuffer();
 
+        var maxQuads = _popBoxCapacity * PopBoxEmitter.MaxQuadsPerBox;
         gl.BindVertexArray(_popVao);
         gl.BindBuffer(BufferTargetARB.ArrayBuffer, _popVbo);
         gl.BufferData<Vertex>(BufferTargetARB.ArrayBuffer,
-            (nuint)(_popBoxCapacity * 24 * Vertex.Size),
-            new Vertex[_popBoxCapacity * 24], BufferUsageARB.DynamicDraw);
+            (nuint)(maxQuads * 4 * Vertex.Size),
+            new Vertex[maxQuads * 4], BufferUsageARB.DynamicDraw);
 
-        var dummyVerts = new List<Vertex>(_popBoxCapacity * 24);
-        var dummyIndices = new List<ushort>(_popBoxCapacity * 36);
+        // A plain box emits six sequential quads, so maxQuads / 6 of them lay down exactly the
+        // pattern a budget of MaxQuadsPerBox quads per box draws a prefix of
+        var dummyVerts = new List<Vertex>(maxQuads * 4);
+        var dummyIndices = new List<ushort>(maxQuads * 6);
         ushort offset = 0;
-        for (var i = 0; i < _popBoxCapacity; i++)
+        for (var i = 0; i < maxQuads / 6; i++)
             PopBoxEmitter.EmitBox(dummyVerts, dummyIndices, ref offset,
                 BlockHitbox.FullCube, BlockHitbox.FullCube, Vector3.Zero, new ushort[6]);
         gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _popEbo);
@@ -3836,7 +3868,6 @@ public class RenderManager : IDisposable
         gl.DeleteBuffer(_popVbo);
         gl.DeleteBuffer(_popEbo);
         gl.DeleteVertexArray(_popVao);
-        if (materialSsbo != 0) gl.DeleteBuffer(materialSsbo);
         _popBoxCapacity = boxes * 2;
         CreatePopGeometry();
     }

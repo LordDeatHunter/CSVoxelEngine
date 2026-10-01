@@ -66,6 +66,15 @@ public sealed class BlockDefinition
     public bool? Cutout { get; set; }
     public bool? Translucent { get; set; }
     public bool? Sway { get; set; }
+
+    /// <summary>
+    /// Climate-coloured faces (grass, leaves): which faces wear a grey tile tinted by the
+    /// <see cref="silkgltriangle.BiomeTint"/> field, and from which palette. Omitted, every face is
+    /// drawn exactly as the model says. Only legal on a block whose model bakes to a plain full
+    /// cube; the model's own tiles stay the block's icon, drop and held look.
+    /// </summary>
+    public BiomeTintDefinition? BiomeTint { get; set; }
+
     public bool? HasItem { get; set; }
     public bool? NeedsSupport { get; set; }
 
@@ -195,6 +204,43 @@ public sealed class BlockDefinition
         /// <summary>Plain block the 2x2x2 volume is built from, and what each cell turns back
         /// into when the structure is broken, e.g. <c>"block/mud_bricks"</c>.</summary>
         public string? Source { get; set; }
+    }
+
+    /// <summary>
+    /// The <c>"biomeTint"</c> object: a palette selector beside the per-face entries, which sit
+    /// under their own <c>faces</c> key so a face name can never collide with the palette key.
+    /// </summary>
+    public sealed class BiomeTintDefinition
+    {
+        /// <summary>Which climate palette tints the faces: <c>"grass"</c> (the default) or
+        /// <c>"foliage"</c> (leaves, a little darker); see <see cref="BiomeTintPalette"/>.</summary>
+        public string? Palette { get; set; }
+
+        /// <summary>
+        /// Face name to what that face wears. Keys are the Minecraft face names
+        /// <c>north</c>/<c>south</c>/<c>west</c>/<c>east</c>/<c>up</c>/<c>down</c> plus the
+        /// shorthands <c>side</c> (the four horizontal faces) and <c>all</c>; a face may be named
+        /// only once, shorthands included.
+        /// </summary>
+        public Dictionary<string, BiomeTintFaceDefinition>? Faces { get; set; }
+    }
+
+    /// <summary>
+    /// One face of a <see cref="BiomeTintDefinition"/>. Exactly one of <see cref="Tile"/> and
+    /// <see cref="Overlay"/> is set; <see cref="Base"/> is only legal with an overlay.
+    /// </summary>
+    public sealed class BiomeTintFaceDefinition
+    {
+        /// <summary>A tinted tile drawn <em>instead</em> of the model's face (one quad).</summary>
+        public string? Tile { get; set; }
+
+        /// <summary>The untinted tile beneath an overlay, replacing the model's face tile
+        /// (grass: dirt). Omitted, the model's own face tile stays underneath.</summary>
+        public string? Base { get; set; }
+
+        /// <summary>A tinted cutout tile drawn <em>over</em> the face (two coplanar quads: the
+        /// untinted base, then this).</summary>
+        public string? Overlay { get; set; }
     }
 
     /// <summary>Voxel light behaviour of a block.</summary>

@@ -174,7 +174,9 @@ public class TopplingTree : IDisposable
     /// full daylight (a falling tree is out in the open; sampling its old nook's light would
     /// freeze stale cave shade onto it). The scratch chunk sits in a throwaway manager holding
     /// nothing but empty neighbours, so everything around it reads as air and severed ends cap
-    /// themselves.
+    /// themselves. The biome tint is the field over the tree's own footprint from its minimum
+    /// cell (<see cref="BiomeTint.FieldsAt"/>), not the scratch chunk's, so a felled canopy keeps
+    /// the colour it stood in.
     /// </summary>
     public static ChunkMeshData BuildMeshData(List<FellBlock> blocks, Vector3 pivot)
     {
@@ -183,6 +185,11 @@ public class TopplingTree : IDisposable
         var min = new Vector3(float.MaxValue);
         foreach (var block in blocks)
             min = Vector3.Min(min, block.Cell);
+
+        // The scratch chunk stands at (256, 0, 256) but its local 0..16 is the tree's footprint
+        // from min, so the tint field has to be the one over that footprint, or a felled canopy
+        // would wear the climate of world (4096, 4096).
+        var tintFields = BiomeTint.FieldsAt((int)min.X, (int)min.Z);
 
         var scratchManager = new ChunkManager(null!);
         var scratch = new Chunk(null!, new Vector3(256, 0, 256), generateBlockData: false);
@@ -209,7 +216,7 @@ public class TopplingTree : IDisposable
             scratchManager.Chunks[emptyNeighbour.Position] = emptyNeighbour;
         }
 
-        var meshData = scratch.GenerateMeshData(scratchManager) ?? new ChunkMeshData([], [], [], [], false);
+        var meshData = scratch.GenerateMeshData(scratchManager, greedy: true, tintFields) ?? new ChunkMeshData([], [], [], [], false);
 
         var rebase = min - pivot;
         for (var i = 0; i < meshData.Vertices.Count; i++)

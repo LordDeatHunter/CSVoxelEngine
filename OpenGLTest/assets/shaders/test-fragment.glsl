@@ -31,6 +31,7 @@ in float fSubmerged;
 flat in float fWaterSurfaceY;
 in vec3 fWaterFlow; // flow xy * strength, z = falling (fluid quads only; see test-vertex.glsl)
 flat in float fAlpha; // per-draw fade from the vertex stage: a uniform cannot vary inside one multi-draw
+flat in float fTintGain; // BiomeTint.Gain on a biome-tinted face (Vertex.Normal bit 4), else 1
 
 // One slice per block tile; UVs are tile-local and REPEAT across merged quads.
 uniform sampler2DArray uTextureAtlas;
@@ -451,10 +452,12 @@ void main() {
     // Far LOD crowns are opaque instead: holes fall back to the average leaf colour so no
     // sky shows through the magnified texels.
     if (lodLeaves) {
-        vec3 leafRgb = texColor.a < 0.5 ? uLodLeafColor : texColor.rgb;
+        // A biome-tinted canopy falls back to its textureless tile's grey (sRGB 98/255,
+        // WorldGenerationConfig.BiomeTintTextureGrey, decoded) so the tint still applies in the holes.
+        vec3 leafRgb = texColor.a < 0.5 ? (fTintGain > 1.0 ? vec3(0.1221) : uLodLeafColor) : texColor.rgb;
         texColor = vec4(leafRgb, 1.0);
     } else if (texColor.a < uAlphaCutoff) discard;
-    vec3 albedo = texColor.rgb * fColor.rgb;
+    vec3 albedo = texColor.rgb * fColor.rgb * fTintGain; // biome tint gain, see test-vertex.glsl
     // Hit flash tints the albedo before lighting, so it goes dark with the scene instead of
     // glowing like the emissive uFlash mix at the end.
     albedo = mix(albedo, vec3(1.0, 0.0, 0.0), uHitFlash * 0.6);

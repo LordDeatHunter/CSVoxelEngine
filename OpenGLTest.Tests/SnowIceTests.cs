@@ -117,7 +117,7 @@ public sealed class SnowIceTests
         static int DivFloor(int a, int b) => a >= 0 ? a / b : (a - b + 1) / b;
         var mesh = LodRegion.BuildMeshData(0, DivFloor(trunkX, spec.RegionBlocks), DivFloor(trunkZ, spec.RegionBlocks));
         var spruce = BlockType.ById[TreeGenerator.SpruceLeavesBlock]!;
-        var spruceTiles = new HashSet<ushort>(spruce.FaceTiles);
+        var spruceTiles = TestContent.WorldTiles(spruce);
         Assert.Contains(mesh.Vertices,
             v => (v.PackedColor >> 24) == 253u && spruceTiles.Contains(v.Layer));
     }

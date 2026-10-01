@@ -58,6 +58,11 @@ public static class ContentRegistry
     private static readonly List<MeltRecipe> MeltRecipes = [];
     private static readonly List<CastRecipe> CastRecipes = [];
 
+    // Blocks declaring a "biomeTint", validated at load (so a bad face names its file before any
+    // GL) and resolved to atlas tiles in BakeModels, the first point the tiles exist.
+    private static readonly List<(byte Id, BiomeTintPalette Palette, BlockDefinition.BiomeTintFaceDefinition?[] Faces, string Path)>
+        BiomeTintPending = [];
+
     private static string _assetsRoot = "assets";
     private static ModelLoader? _models;
 
@@ -200,6 +205,9 @@ public static class ContentRegistry
             BlockType.GreedyById[id] = type.Renderer == BlockRenderer.Model && !type.Fluid && BakesGreedy(baked);
         }
 
+        // Needs every block's greedy flag and face tiles, settled just above.
+        ResolveBiomeTints();
+
         // An item that declares a model bakes exactly like a block's, minus every cell-shaped
         // conclusion (occlusion, light, greedy): it is drawn as an entity mesh, never as a cell.
         foreach (var (id, model) in ItemModels)
@@ -236,6 +244,60 @@ public static class ContentRegistry
         TileMaterials.Build(TextureAtlas.LayerCount, BlockType.Types.Values);
 
         SelfCheckBuiltInParents();
+    }
+
+    /// <summary>
+    /// Turns each validated <c>biomeTint</c> into the block's <see cref="BiomeTintFaces"/>. The
+    /// tint rides the plain cube-face emitters only, so the block must bake greedy and be opaque
+    /// or cutout (never translucent), and an overlay needs an opaque base quad beneath it, so it
+    /// is refused on a cutout block. The model's <see cref="BlockType.FaceTiles"/> are left alone:
+    /// they stay the icon, drop and held look.
+    /// </summary>
+    private static void ResolveBiomeTints()
+    {
+        foreach (var (id, palette, faces, path) in BiomeTintPending)
+        {
+            var type = BlockType.ById[id]!;
+            if (!BlockType.GreedyById[id] || type.Translucent)
+                throw new InvalidOperationException(
+                    $"Block '{path}' declares biomeTint but its model is not a plain full cube; the tint rides the cube-face emitters only.");
+
+            var baseTiles = (ushort[])type.FaceTiles.Clone();
+            var tintedTiles = new ushort[6];
+            Array.Fill(tintedTiles, BiomeTintFaces.NoTile);
+            for (var f = 0; f < 6; f++)
+            {
+                if (faces[f] is not { } face) continue;
+                if (face.Tile != null)
+                {
+                    baseTiles[f] = BiomeTintFaces.NoTile;
+                    tintedTiles[f] = BiomeTintTileOf(face.Tile, path);
+                    continue;
+                }
+
+                if (type.Cutout)
+                    throw new InvalidOperationException(
+                        $"Block '{path}' declares a biomeTint overlay on a cutout block; an overlay needs an opaque base quad.");
+                tintedTiles[f] = BiomeTintTileOf(face.Overlay!, path);
+                if (face.Base != null)
+                    baseTiles[f] = BiomeTintTileOf(face.Base, path);
+            }
+
+            type.BiomeTint = new BiomeTintFaces(palette, baseTiles, tintedTiles);
+        }
+    }
+
+    private static ushort BiomeTintTileOf(string tile, string path)
+    {
+        try
+        {
+            return TextureAtlas.TileOf(tile);
+        }
+        catch (KeyNotFoundException e)
+        {
+            throw new InvalidOperationException(
+                $"Block '{path}' biomeTint names texture '{tile}', which is not an atlas tile.", e);
+        }
     }
 
     /// <summary>
@@ -457,6 +519,7 @@ public static class ContentRegistry
         BlockModels.Clear();
         ItemModels.Clear();
         BlockDefinitions.Clear();
+        BiomeTintPending.Clear();
         _sfxGroups = new Dictionary<string, IReadOnlyList<string>>();
         ItemRegistry.Reset();
         EntityRegistry.Reset();
@@ -1322,6 +1385,11 @@ public static class ContentRegistry
             hardenPending.Add((id, flow?.HardensTo, flow?.HardensTouching, path));
             if (definition.Multiblock != null)
                 multiblockPending.Add((id, definition.Multiblock.Part, definition.Multiblock.Source, path));
+            if (definition.BiomeTint != null)
+            {
+                var (palette, faces) = BiomeTintFaces.Expand(definition.BiomeTint, path);
+                BiomeTintPending.Add((id, palette, faces, path));
+            }
 
             BlockModels[id] = ResolveModel(definition.Model, path);
             BlockDefinitions[id] = definition;

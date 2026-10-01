@@ -14,6 +14,13 @@ public class BlockDebris
     /// <summary>Block the cube renders as (see <see cref="BlockCubeCache"/>).</summary>
     public byte BlockId { get; }
 
+    /// <summary>
+    /// The plain path's <c>uBiomeTint</c> for this cube: a biome-tinted block's tint sampled at
+    /// the cell it chipped off (<see cref="BiomeTint.CellTint"/>), so the chips match the
+    /// terrain they fly out of; white for every other block.
+    /// </summary>
+    public Vector3 Tint { get; }
+
     public Vector3 Position { get; private set; }
 
     /// <summary>Edge length of the cube, in blocks.</summary>
@@ -68,10 +75,12 @@ public class BlockDebris
 
     private float HalfExtent => Size * 0.5f;
 
-    public BlockDebris(byte blockId, Vector3 position, Vector3? toss = null, float? size = null, Random? random = null)
+    public BlockDebris(byte blockId, Vector3 position, Vector3? toss = null, float? size = null, Random? random = null,
+        Vector3? tint = null)
     {
         var rng = random ?? Random.Shared;
         BlockId = blockId;
+        Tint = tint ?? Vector3.One;
         Position = position;
         Size = size ?? WorldGenerationConfig.BlockDebrisSize * (0.7f + 0.6f * rng.NextSingle());
         _lifetime = WorldGenerationConfig.BlockDebrisLifetime * (0.7f + 0.6f * rng.NextSingle());

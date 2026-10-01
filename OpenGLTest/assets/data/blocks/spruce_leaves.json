@@ -5,6 +5,7 @@
   "movementSpeed": 0.5,
   "cutout": true,
   "sway": true,
+  "biomeTint": { "palette": "foliage", "faces": { "all": { "tile": "spruce_leaves_textureless" } } },
   "occludes": false,
   "castsAO": false,
   "light": { "passes": true },

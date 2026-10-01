@@ -55,6 +55,91 @@ public sealed class ContentTests
     }
 
     [Fact]
+    public void BiomeTintLeavesTheModelTilesAlone()
+    {
+        // The tinted tiles live beside the model's: the default coloured tiles stay the block's
+        // icon, drop and held look, and the block still takes the greedy cube-face path.
+        var grass = ContentRegistry.RequireBlock("grass");
+        Assert.NotNull(grass.BiomeTint);
+        Assert.Equal(TextureAtlas.TileOf("grass_top"), grass.FaceTiles[4]);
+        Assert.Equal(TextureAtlas.TileOf("grass_side"), grass.FaceTiles[0]);
+        Assert.True(BlockType.IsGreedy(grass.Id));
+    }
+
+    [Fact]
+    public void BiomeTintResolvesReplacementsAndOverlays()
+    {
+        var grass = ContentRegistry.RequireBlock("grass");
+        var bt = grass.BiomeTint!;
+        Assert.Equal(BiomeTintPalette.Grass, bt.Palette);
+
+        // "tile": the face is wholly replaced, so no base quad is left under it.
+        Assert.Equal(BiomeTintFaces.NoTile, bt.Base[4]);
+        Assert.Equal(TextureAtlas.TileOf("grass_top_textureless"), bt.Tinted[4]);
+
+        // "side" with a base: every horizontal face draws the base, then the overlay.
+        for (var f = 0; f < 4; f++)
+        {
+            Assert.True(bt.IsOverlay(f));
+            Assert.Equal(TextureAtlas.TileOf("dirt"), bt.Base[f]);
+            Assert.Equal(TextureAtlas.TileOf("grass_side_textureless"), bt.Tinted[f]);
+        }
+
+        // A face the file does not name is drawn exactly as the model says.
+        Assert.False(bt.IsTinted(5));
+        Assert.Equal(grass.FaceTiles[5], bt.Base[5]);
+    }
+
+    [Fact]
+    public void AlphaTestedTintTilesGetCutoutMips()
+    {
+        var cutoutTiles = BlockType.CutoutTiles();
+        var any = false;
+        foreach (var block in BlockType.ById)
+        {
+            if (block?.BiomeTint is not { } bt) continue;
+            for (var f = 0; f < 6; f++)
+            {
+                if (!bt.IsTinted(f) || !(bt.IsOverlay(f) || block.Cutout)) continue;
+                any = true;
+                Assert.Contains(bt.Tinted[f], cutoutTiles);
+            }
+        }
+        Assert.True(any, "no block wears an alpha-tested biome-tint tile");
+    }
+
+    [Fact]
+    public void BiomeTintRejectsMalformedFaces()
+    {
+        BlockDefinition.BiomeTintDefinition Def(string? palette, params (string Name, BlockDefinition.BiomeTintFaceDefinition Face)[] faces) =>
+            new() { Palette = palette, Faces = faces.ToDictionary(f => f.Name, f => f.Face) };
+        var tile = new BlockDefinition.BiomeTintFaceDefinition { Tile = "a" };
+
+        void Rejects(BlockDefinition.BiomeTintDefinition dto)
+        {
+            var e = Assert.Throws<InvalidOperationException>(() => BiomeTintFaces.Expand(dto, "data/blocks/x.json"));
+            Assert.Contains("data/blocks/x.json", e.Message);
+        }
+
+        Rejects(Def("purple", ("up", tile)));
+        Rejects(Def(null));
+        Rejects(Def(null, ("top", tile)));
+        Rejects(Def(null, ("north", tile), ("side", tile)));
+        Rejects(Def(null, ("up", new BlockDefinition.BiomeTintFaceDefinition())));
+        Rejects(Def(null, ("up", new BlockDefinition.BiomeTintFaceDefinition { Tile = "a", Overlay = "b" })));
+        Rejects(Def(null, ("up", new BlockDefinition.BiomeTintFaceDefinition { Tile = "a", Base = "b" })));
+
+        // The shorthands expand onto the faces they name, and the palette name is case-blind.
+        var (palette, expanded) = BiomeTintFaces.Expand(Def("Foliage", ("all", tile)), "data/blocks/x.json");
+        Assert.Equal(BiomeTintPalette.Foliage, palette);
+        Assert.All(expanded, f => Assert.Same(tile, f));
+        var (_, sides) = BiomeTintFaces.Expand(Def(null, ("side", tile)), "data/blocks/x.json");
+        Assert.All(sides.Take(4), f => Assert.Same(tile, f));
+        Assert.Null(sides[4]);
+        Assert.Null(sides[5]);
+    }
+
+    [Fact]
     public void BakedQuadsCarryTileLocalUvs()
     {
         // Every face of a full cube spans its whole tile: local UVs sit at 0 or 1 and the quad

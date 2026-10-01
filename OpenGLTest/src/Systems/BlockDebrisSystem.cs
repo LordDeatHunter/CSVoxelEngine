@@ -27,6 +27,10 @@ public class BlockDebrisSystem
         if (blockId == BlockType.Air || BlockType.ById[blockId] == null) return;
         var rng = random ?? Random.Shared;
         var center = cell + new Vector3(0.5f);
+        // One tint per burst: every chip of a biome-tinted block wears the field at its cell
+        var tint = BlockType.ById[blockId]!.BiomeTint is { } bt
+            ? BiomeTint.CellTint(bt.Palette, (int)MathF.Floor(cell.X), (int)MathF.Floor(cell.Z))
+            : Vector3.One;
         for (var i = 0; i < count; i++)
         {
             var jitter = new Vector3(
@@ -39,7 +43,7 @@ public class BlockDebrisSystem
                 (rng.NextSingle() * 2f - 1f) * 1.2f);
             if (_debris.Count >= WorldGenerationConfig.BlockDebrisMax)
                 _debris.RemoveAt(0);
-            _debris.Add(new BlockDebris(blockId, center + jitter, toss, random: rng));
+            _debris.Add(new BlockDebris(blockId, center + jitter, toss, random: rng, tint: tint));
         }
     }
 

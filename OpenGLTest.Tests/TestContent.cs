@@ -28,6 +28,23 @@ internal static class TestContent
         }
     }
 
+    /// <summary>
+    /// The tiles a block's faces are drawn with in the world: its model's
+    /// <see cref="BlockType.FaceTiles"/>, or, for a biome-tinted block, the base and tinted tiles
+    /// its <see cref="BlockType.BiomeTint"/> draws instead (the default tiles stay with icons).
+    /// </summary>
+    internal static System.Collections.Generic.HashSet<ushort> WorldTiles(BlockType block)
+    {
+        if (block.BiomeTint is not { } bt) return [.. block.FaceTiles];
+        var tiles = new System.Collections.Generic.HashSet<ushort>();
+        for (var f = 0; f < 6; f++)
+        {
+            if (bt.Base[f] != BiomeTintFaces.NoTile) tiles.Add(bt.Base[f]);
+            if (bt.Tinted[f] != BiomeTintFaces.NoTile) tiles.Add(bt.Tinted[f]);
+        }
+        return tiles;
+    }
+
     internal static string FindAssetsRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

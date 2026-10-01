@@ -492,6 +492,16 @@ public class LodRegion : IDisposable
         // the generated tile chain). Only read while the region has overrides.
         var fineBlock = ArrayPool<byte>.Shared.Rent(fineSpan * fineSpan);
         var topBlockGrid = ArrayPool<byte>.Shared.Rent(gridSize);
+        // The biome tint lattice (BiomeTint) at this region's chunk-column corners, both palettes
+        // from one climate evaluation per point. Indexed from the region's OWN first chunk column,
+        // never from baseChunkX, which is the prefetch origin one chunk before it: the chunk mesher
+        // samples BiomeTint.FieldFor(cx, cz) of the chunk a vertex stands in, so the LOD has to read
+        // the very same lattice points or its grass would shift a chunk against the near terrain.
+        var regionChunkX = rx * regionChunkSpan;   // = baseChunkX + 1
+        var regionChunkZ = rz * regionChunkSpan;   // = baseChunkZ + 1
+        var latticeSpan = regionChunkSpan + 1;
+        var grassTint = ArrayPool<Vector3>.Shared.Rent(latticeSpan * latticeSpan);
+        var foliageTint = ArrayPool<Vector3>.Shared.Rent(latticeSpan * latticeSpan);
         try
         {
         if (separableMin)
@@ -777,19 +787,41 @@ public class LodRegion : IDisposable
         var snow = BlockType.ById[TerrainGenerator.SnowBlock]!;
         var ice = BlockType.ById[TerrainGenerator.IceBlock]!;
 
-        ushort CanopyTile(byte leafId, int face) =>
-            (leafId != 0 ? BlockType.ById[leafId] : null)?.FaceTiles[face] ?? fallbackLeaves.FaceTiles[face];
+        BlockType CanopyBlock(byte leafId) =>
+            (leafId != 0 ? BlockType.ById[leafId] : null) ?? fallbackLeaves;
 
-        // Ocean floor tile by the depth band the chunk mesher's GenerateColumn would pick for the
+        // Ocean floor block by the depth band the chunk mesher's GenerateColumn would pick for the
         // same height (0 sand, 1 gravel, 2 stone), so far seabed matches near seabed. A land biome's
         // lake or river bed keeps the soil the column wears under water instead (3), which is dirt.
-        ushort FloorTile(byte material, int face) => material switch
+        BlockType FloorBlock(byte material) => material switch
         {
-            0 => sand.FaceTiles[face],
-            1 => gravel.FaceTiles[face],
-            3 => dirt.FaceTiles[face],
-            _ => stone.FaceTiles[face],
+            0 => sand,
+            1 => gravel,
+            3 => dirt,
+            _ => stone,
         };
+
+        // Fill the tint lattice: one climate evaluation per point gives both palettes.
+        for (var li = 0; li < latticeSpan; li++)
+        for (var lj = 0; lj < latticeSpan; lj++)
+            BiomeTint.LatticeTints(regionChunkX + li, regionChunkZ + lj,
+                out grassTint[li * latticeSpan + lj], out foliageTint[li * latticeSpan + lj]);
+
+        // The tint at a region-local position, interpolated over the lattice cell of the chunk
+        // column it stands in exactly as the chunk mesher's BiomeTintField.Sample does. The far edge
+        // (x == RegionBlocks) reads the last column at fx = 1, which the weighted-sum Bilinear makes
+        // bit-identical to the next region's first column at fx = 0.
+        Vector3 SampleTint(BiomeTintPalette palette, Vector3 regionLocalPos)
+        {
+            var grid = palette == BiomeTintPalette.Foliage ? foliageTint : grassTint;
+            var cx = Math.Clamp((int)regionLocalPos.X >> Chunk.SizeShift, 0, regionChunkSpan - 1);
+            var cz = Math.Clamp((int)regionLocalPos.Z >> Chunk.SizeShift, 0, regionChunkSpan - 1);
+            var fx = regionLocalPos.X / Chunk.Size - cx;
+            var fz = regionLocalPos.Z / Chunk.Size - cz;
+            return BiomeTint.Bilinear(
+                grid[cx * latticeSpan + cz], grid[(cx + 1) * latticeSpan + cz],
+                grid[cx * latticeSpan + cz + 1], grid[(cx + 1) * latticeSpan + cz + 1], fx, fz);
+        }
 
         byte FloorMaterial(int height, int level, Biome biome) =>
             biome == Biome.Frozen ? (byte)2
@@ -815,7 +847,7 @@ public class LodRegion : IDisposable
 
         void AddQuad(List<Vertex> targetVertices, List<ushort> targetIndices,
             int faceIndex, Vector3 cellOrigin, ushort tile, Span<byte> shades, ReadOnlySpan<float> suns,
-            bool isWater = false, bool lodLeaves = false)
+            bool isWater = false, bool lodLeaves = false, BiomeTintPalette? tinted = null)
         {
             // Meshes are indexed with ushort; a region can't realistically exceed this,
             // but degrade gracefully instead of overflowing if terrain is extreme
@@ -848,7 +880,18 @@ public class LodRegion : IDisposable
                 // LOD foliage, 255 = everything else); fColor.a is otherwise unused by the
                 // world shader, so the flags are invisible.
                 var alpha = (byte)(isWater ? 254 : lodLeaves ? 253 : 255);
-                targetVertices.Add(new Vertex(pos, shade, shade, shade, alpha, uv[c], tile, suns[c], 0f, normal));
+                if (tinted is { } palette)
+                {
+                    // A biome-tinted face bakes shade * tint into the rgb like the chunk mesher
+                    // (Chunk.EmitTintedCubeFace); bit 4 makes the fragment apply BiomeTint.Gain.
+                    BiomeTint.Shade(shade, SampleTint(palette, pos), out var r, out var g, out var b);
+                    targetVertices.Add(new Vertex(pos, r, g, b, alpha, uv[c], tile, suns[c], 0f, normal,
+                        biomeTint: true));
+                }
+                else
+                {
+                    targetVertices.Add(new Vertex(pos, shade, shade, shade, alpha, uv[c], tile, suns[c], 0f, normal));
+                }
             }
 
             targetIndices.Add((ushort)(indexOffset + 0));
@@ -857,6 +900,26 @@ public class LodRegion : IDisposable
             targetIndices.Add((ushort)(indexOffset + 0));
             targetIndices.Add((ushort)(indexOffset + 2));
             targetIndices.Add((ushort)(indexOffset + 3));
+        }
+
+        // One terrain face of a whole block. A biome-tinted block draws what its BiomeTint says, the
+        // same order the chunk mesher uses: the untinted base quad first (grass sides: dirt), then
+        // the tinted quad coplanar over it, so Lequal lets the overlay win; a `tile` face is the
+        // tinted quad alone. Every other block wears its plain face tile.
+        void AddBlockFace(int face, Vector3 origin, BlockType block, Span<byte> faceShades,
+            ReadOnlySpan<float> faceSuns, bool lodLeaves = false)
+        {
+            if (block.BiomeTint is { } bt)
+            {
+                if (bt.Base[face] != BiomeTintFaces.NoTile)
+                    AddQuad(vertices, indices, face, origin, bt.Base[face], faceShades, faceSuns, lodLeaves: lodLeaves);
+                if (bt.Tinted[face] != BiomeTintFaces.NoTile)
+                    AddQuad(vertices, indices, face, origin, bt.Tinted[face], faceShades, faceSuns,
+                        lodLeaves: lodLeaves, tinted: bt.Palette);
+                return;
+            }
+
+            AddQuad(vertices, indices, face, origin, block.FaceTiles[face], faceShades, faceSuns, lodLeaves: lodLeaves);
         }
 
         // The water reads as one flat sheet at range, so it is a single +Y quad per wet cell at that
@@ -923,15 +986,18 @@ public class LodRegion : IDisposable
                     ? BlockType.ById[eb]
                     : null;
 
-                AddQuad(vertices, indices, topFace, new Vector3(i * cellSize, top * cellSize, j * cellSize),
-                    top > ground ? CanopyTile(canopyLeaf[gi * heightGrid + gj], topFace)
-                    : edited != null ? edited.FaceTiles[topFace]
-                    : isSeaCell ? FloorTile(floor, topFace)   // seabed wears its depth band, not dirt
-                    : beach ? cap.FaceTiles[topFace]
-                    : rock ? stone.FaceTiles[topFace]
-                    : snowCell ? snow.FaceTiles[topFace]
-                    : biome == Biome.Desert ? sand.FaceTiles[topFace]
-                    : grass.FaceTiles[topFace], shades, suns, lodLeaves: top > ground);
+                // The block the cell's drawn surface wears: the canopy bump's leaves above the
+                // ground, else the edited block, else the generated material chain.
+                var surface = edited
+                    ?? (isSeaCell ? FloorBlock(floor)   // seabed wears its depth band, not dirt
+                    : beach ? cap
+                    : rock ? stone
+                    : snowCell ? snow
+                    : biome == Biome.Desert ? sand
+                    : grass);
+                AddBlockFace(topFace, new Vector3(i * cellSize, top * cellSize, j * cellSize),
+                    top > ground ? CanopyBlock(canopyLeaf[gi * heightGrid + gj]) : surface,
+                    shades, suns, lodLeaves: top > ground);
 
                 // AddQuad places a +Y face one cell above its origin, so the origin sits a
                 // cell below the sheet. A frozen cell shows snow-covered ice instead of open
@@ -985,20 +1051,26 @@ public class LodRegion : IDisposable
                         // Canopy airspace wears leaves; at and below the eroded surface the
                         // grass/dirt/stone rule applies, measured from the ground (not the bump),
                         // with the biome's own top material and soil band beneath it
-                        var tile = cy > ground ? CanopyTile(canopyLeaf[gi * heightGrid + gj], f)
-                            : cy == top ? (edited != null ? edited.FaceTiles[f]
-                                : isSeaCell ? FloorTile(floor, f)
-                                : beach ? cap.FaceTiles[f]
-                                : rock ? stone.FaceTiles[f]
-                                : snowCell ? snow.FaceTiles[f]
-                                : biome == Biome.Desert ? sand.FaceTiles[f]
-                                : grass.FaceTiles[f])
-                            : (ground - cy) * cellSize <= WorldGenerationConfig.NominalDirtDepth
+                        var sideOrigin = new Vector3(i * cellSize, cy * cellSize, j * cellSize);
+                        if (cy > ground)
+                        {
+                            AddBlockFace(f, sideOrigin, CanopyBlock(canopyLeaf[gi * heightGrid + gj]),
+                                shades, suns, lodLeaves: true);
+                        }
+                        else if (cy == top)
+                        {
+                            AddBlockFace(f, sideOrigin, surface, shades, suns);
+                        }
+                        else
+                        {
+                            // The soil/stone band below the top cell never tints.
+                            var tile = (ground - cy) * cellSize <= WorldGenerationConfig.NominalDirtDepth
                                 ? (biome == Biome.Desert ? sandstone.FaceTiles[f]
                                     : isSeaCell || rock || biome == Biome.Frozen ? stone.FaceTiles[f]
                                     : soil.FaceTiles[f])
                                 : stone.FaceTiles[f];
-                        AddQuad(vertices, indices, f, new Vector3(i * cellSize, cy * cellSize, j * cellSize), tile, shades, suns, lodLeaves: cy > ground);
+                            AddQuad(vertices, indices, f, sideOrigin, tile, shades, suns);
+                        }
                     }
                 }
             }
@@ -1025,6 +1097,8 @@ public class LodRegion : IDisposable
             if (!ReferenceEquals(fineGen, fine)) ArrayPool<int>.Shared.Return(fineGen);
             ArrayPool<byte>.Shared.Return(fineBlock);
             ArrayPool<byte>.Shared.Return(topBlockGrid);
+            ArrayPool<Vector3>.Shared.Return(grassTint);
+            ArrayPool<Vector3>.Shared.Return(foliageTint);
         }
     }
 }

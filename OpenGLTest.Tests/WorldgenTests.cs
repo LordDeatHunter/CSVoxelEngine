@@ -197,7 +197,7 @@ public sealed class WorldgenTests
         var spec = LodRegion.Levels[level];
         var mesh = LodRegion.BuildMeshData(level, tx / spec.RegionBlocks, tz / spec.RegionBlocks);
         var leaves = BlockType.ById[TreeGenerator.LeavesBlock]!;
-        var leafTiles = new HashSet<ushort>(leaves.FaceTiles);
+        var leafTiles = TestContent.WorldTiles(leaves);
         Assert.Contains(mesh.Vertices,
             v => (v.PackedColor >> 24) == 253u && leafTiles.Contains(v.Layer));
     }

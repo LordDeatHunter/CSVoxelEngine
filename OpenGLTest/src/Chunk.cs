@@ -1328,8 +1328,13 @@ public class Chunk : IDisposable
     /// <see cref="GenerateMeshData(ChunkManager)"/> with the binary greedy pass switchable: the
     /// differential test meshes the same chunk both ways and compares. A parameter rather than
     /// a static flag because test classes run in parallel and pool threads read it.
+    /// <paramref name="tintFields"/> overrides the biome tint field: a build whose chunk is not
+    /// where its blocks really stand (TopplingTree.BuildMeshData's scratch chunk at (256, 0, 256))
+    /// passes the field of the real footprint; null means the chunk's own
+    /// <see cref="BiomeTint.FieldsFor"/>.
     /// </summary>
-    internal ChunkMeshData? GenerateMeshData(ChunkManager chunkManager, bool greedy)
+    internal ChunkMeshData? GenerateMeshData(ChunkManager chunkManager, bool greedy,
+        BiomeTintFields? tintFields = null)
     {
         // Resolve before renting or touching anything: an abandoned build should cost nothing.
         // The neighbourhood lives in the thread's mesh scratch, not in two fresh arrays.
@@ -1378,7 +1383,8 @@ public class Chunk : IDisposable
                 packed[Idx(x, y, z)] = (byte)(sunLight[li] << 4 | (b & BlockLevelMask));
                 if (anyTinted) packed[BlockCount + Idx(x, y, z)] = (byte)(b >> 4);
             }
-            return GenerateMeshDataFromSnapshot(padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy)
+            return GenerateMeshDataFromSnapshot(padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy,
+                    tintFields)
                 with { Light = packed };
         }
         finally
@@ -1524,7 +1530,7 @@ public class Chunk : IDisposable
     /// replays its baked model's quads.
     /// </summary>
     private ChunkMeshData GenerateMeshDataFromSnapshot(byte[] padded, byte[] paddedState,
-        byte[] sunLight, byte[] blockLight, MeshBufferPool pool, bool greedy)
+        byte[] sunLight, byte[] blockLight, MeshBufferPool pool, bool greedy, BiomeTintFields? tintFields)
     {
         // Rented, not allocated: ChunkManager returns them once the mesh is on the GPU
         var vertices = pool.RentVertices();
@@ -1551,9 +1557,19 @@ public class Chunk : IDisposable
         var worldX0 = (int)Position.X * Size;
         var worldZ0 = (int)Position.Z * Size;
 
+        // Biome tint of grass and leaves, both palettes from one climate evaluation per lattice
+        // corner (8 noise evaluations per build). A scratch build away from its blocks' real
+        // position (a felled tree) passes the field of the real footprint instead.
+        var fields = tintFields ?? BiomeTint.FieldsFor((int)Position.X, (int)Position.Z);
+        // Corner scratch of a biome-tinted face in the per-voxel loop below
+        Span<byte> tShade = stackalloc byte[4];
+        Span<float> tSun = stackalloc float[4];
+        Span<float> tBlock = stackalloc float[4];
+        Span<ushort> tTint = stackalloc ushort[4];
+
         if (greedy)
             EmitGreedyFaces(MeshScratch.Current, padded, paddedState, chunkBaseY, worldX0, worldZ0,
-                sunLight, blockLight, vertices, indices, ref indexOffset, tVertices, tIndices, ref tIndexOffset);
+                sunLight, blockLight, vertices, indices, ref indexOffset, tVertices, tIndices, ref tIndexOffset, in fields);
 
         for (var x = 0; x < Size; x++)
         for (var y = 0; y < Size; y++)
@@ -1713,6 +1729,30 @@ public class Chunk : IDisposable
                     // see ContentRegistry.BakesGreedy) also averages its light per corner.
                     var aoDeltas = AODeltas[face];
                     var smooth = cullFace == face;
+
+                    // A biome-tinted block BakesGreedy, so this is one of its six plain cube
+                    // faces (smooth, positions and UVs in CubeFaces order): the corners are
+                    // computed exactly as below and handed to the emitter the greedy pass uses.
+                    if (type.BiomeTint is { } bt)
+                    {
+                        for (var j = 0; j < 4; j++)
+                        {
+                            var side1Id = padded[pIdx + aoDeltas[j * 3 + 0]];
+                            var side2Id = padded[pIdx + aoDeltas[j * 3 + 1]];
+                            var cornerId = padded[pIdx + aoDeltas[j * 3 + 2]];
+                            var ao = VertexAO(BlockType.OccludesAO(side1Id), BlockType.OccludesAO(side2Id),
+                                BlockType.OccludesAO(cornerId));
+                            tShade[j] = ShadeLut[(face << 2) | ao];
+                            var code = SmoothCornerLight(face, j, sunLight, blockLight, lightBase, side1Id, side2Id, cornerId);
+                            tSun[j] = (code & 63) / SmoothLightDivisor;
+                            tBlock[j] = ((code >> 6) & 63) / SmoothLightDivisor;
+                            tTint[j] = (ushort)(code >> 12);
+                        }
+                        EmitTintedCubeFace(dstVertices, dstIndices, ref dstOffset, face, basePos, Vector3.One,
+                            tShade, tSun, tBlock, tTint, bt, fields.Field(bt.Palette), submerged, waterSurface, sway);
+                        continue;
+                    }
+
                     for (var j = 0; j < 4; j++)
                     {
                         var side1Id = padded[pIdx + aoDeltas[j * 3 + 0]];
@@ -1858,7 +1898,7 @@ public class Chunk : IDisposable
     private static void EmitGreedyFaces(MeshScratch scratch, byte[] padded, byte[] paddedState,
         int chunkBaseY, int worldX0, int worldZ0, byte[] sunLight, byte[] blockLight,
         List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        List<Vertex> tVertices, List<ushort> tIndices, ref ushort tIndexOffset)
+        List<Vertex> tVertices, List<ushort> tIndices, ref ushort tIndexOffset, in BiomeTintFields fields)
     {
         var greedyCols = scratch.GreedyColumns;
         var occCols = scratch.OccluderColumns;
@@ -2028,9 +2068,9 @@ public class Chunk : IDisposable
                     var type = BlockType.ById[key & 0xFF]!;
                     var rows = planeRows.AsSpan(plane * Size, Size);
                     if (type.Translucent)
-                        EmitGreedyRun(f, axis, depth, chunkBaseY, key, light, tint, type, rows, tVertices, tIndices, ref tIndexOffset);
+                        EmitGreedyRun(f, axis, depth, chunkBaseY, key, light, tint, type, rows, tVertices, tIndices, ref tIndexOffset, in fields);
                     else
-                        EmitGreedyRun(f, axis, depth, chunkBaseY, key, light, tint, type, rows, vertices, indices, ref indexOffset);
+                        EmitGreedyRun(f, axis, depth, chunkBaseY, key, light, tint, type, rows, vertices, indices, ref indexOffset, in fields);
                 }
             }
         }
@@ -2053,7 +2093,7 @@ public class Chunk : IDisposable
     /// </summary>
     private static void EmitGreedyRun(int f, int axis, int depth, int chunkBaseY, int key, ulong light, ulong tint,
         BlockType type,
-        Span<ushort> rows, List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset)
+        Span<ushort> rows, List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset, in BiomeTintFields fields)
     {
         var ao = (key >> 8) & 0xFF;
         // Per-corner code: AO in bits 0-1, the 12-bit smooth light code in 2-13, the 10-bit
@@ -2076,6 +2116,24 @@ public class Chunk : IDisposable
         var sway = type.Sway ? 1f : 0f;
         var normal = CubeFaces[f].normal;
         var corners = CubeFaces[f].face;
+
+        // A biome-tinted block's corner values, decoded once per plane exactly as the plain
+        // vertex loop below decodes them per quad (the key holds them constant over the plane)
+        var biomeTint = type.BiomeTint;
+        Span<byte> tShade = stackalloc byte[4];
+        Span<float> tSun = stackalloc float[4];
+        Span<float> tBlock = stackalloc float[4];
+        Span<ushort> tTint = stackalloc ushort[4];
+        if (biomeTint != null)
+        {
+            for (var j = 0; j < 4; j++)
+            {
+                tShade[j] = ShadeLut[(f << 2) | ((ao >> (2 * j)) & 3)];
+                tSun[j] = (int)((light >> (12 * j)) & 63) / SmoothLightDivisor;
+                tBlock[j] = (int)((light >> (12 * j + 6)) & 63) / SmoothLightDivisor;
+                tTint[j] = (ushort)((tint >> (10 * j)) & 0x3FF);
+            }
+        }
 
         for (var row = 0; row < Size; row++)
         {
@@ -2119,6 +2177,16 @@ public class Chunk : IDisposable
                         break;
                 }
 
+                // A biome-tinted block (grass, leaves) goes through the emitter the per-voxel
+                // path shares, so both paths give identical output. The tint is a function of
+                // vertex position, not of the cell, so it never splits a merge.
+                if (biomeTint is { } bt)
+                {
+                    EmitTintedCubeFace(vertices, indices, ref indexOffset, f, origin, extent,
+                        tShade, tSun, tBlock, tTint, bt, fields.Field(bt.Palette), submerged, waterSurface, sway);
+                    continue;
+                }
+
                 // Corner j of the merged quad sits where corner j of a cell quad would, scaled
                 // by the extent, so key AO and light corner j land on the matching corner
                 for (var j = 0; j < 4; j++)
@@ -2140,6 +2208,66 @@ public class Chunk : IDisposable
                 indices.Add((ushort)(indexOffset + 3));
                 indexOffset += 4;
             }
+        }
+    }
+
+    /// <summary>
+    /// Emits one face of a biome-tinted cube (<see cref="BlockType.BiomeTint"/>), merged over
+    /// <paramref name="extent"/> or a single cell, for both the greedy pass and the per-voxel
+    /// replay, so their output is identical by construction. Up to two coplanar quads: first the
+    /// untinted base (grass sides: dirt) when the face keeps one, then the tinted quad, whose rgb
+    /// is shade * the field's tint at each corner and whose packed normal sets bit 4 so the world
+    /// fragment shader applies <see cref="BiomeTint.Gain"/>. The base goes first so the overlay,
+    /// at identical depth, wins under Lequal. Corner values are in <see cref="CubeFaces"/> order;
+    /// the field is sampled at the chunk-local vertex position, so neighbouring chunks agree.
+    /// </summary>
+    private static void EmitTintedCubeFace(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        int f, Vector3 origin, Vector3 extent, ReadOnlySpan<byte> shade, ReadOnlySpan<float> sun,
+        ReadOnlySpan<float> block, ReadOnlySpan<ushort> lightTint, BiomeTintFaces bt, in BiomeTintField field,
+        bool submerged, ushort waterSurface, float sway)
+    {
+        var normal = CubeFaces[f].normal;
+        var corners = CubeFaces[f].face;
+
+        if (bt.Base[f] != BiomeTintFaces.NoTile)
+        {
+            if (vertices.Count > ushort.MaxValue - 3) return;
+            var layer = bt.Base[f];
+            for (var j = 0; j < 4; j++)
+            {
+                var local = corners[j] * extent;
+                vertices.Add(new Vertex(origin + local, shade[j], shade[j], shade[j], 255,
+                    TiledUv(f, local, extent), layer, sun[j], block[j], normal, sway, submerged, waterSurface,
+                    lightTint[j]));
+            }
+            AddQuadIndices(indices, ref indexOffset);
+        }
+
+        if (bt.Tinted[f] != BiomeTintFaces.NoTile)
+        {
+            if (vertices.Count > ushort.MaxValue - 3) return;
+            var layer = bt.Tinted[f];
+            for (var j = 0; j < 4; j++)
+            {
+                var local = corners[j] * extent;
+                var position = origin + local;
+                BiomeTint.Shade(shade[j], field.Sample(position.X, position.Z), out var r, out var g, out var b);
+                vertices.Add(new Vertex(position, r, g, b, 255,
+                    TiledUv(f, local, extent), layer, sun[j], block[j], normal, sway, submerged, waterSurface,
+                    lightTint[j], biomeTint: true));
+            }
+            AddQuadIndices(indices, ref indexOffset);
+        }
+
+        static void AddQuadIndices(List<ushort> indices, ref ushort indexOffset)
+        {
+            indices.Add((ushort)(indexOffset + 0));
+            indices.Add((ushort)(indexOffset + 1));
+            indices.Add((ushort)(indexOffset + 2));
+            indices.Add((ushort)(indexOffset + 0));
+            indices.Add((ushort)(indexOffset + 2));
+            indices.Add((ushort)(indexOffset + 3));
+            indexOffset += 4;
         }
     }
 

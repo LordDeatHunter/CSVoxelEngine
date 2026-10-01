@@ -5,7 +5,7 @@ layout (location = 2) in vec2 vTexCoord;
 layout (location = 3) in float vSun;
 layout (location = 4) in float vBlock;
 // Vertex.Normal (low byte) + Vertex.LightTint (high byte) as one integer ushort: face in
-// bits 0-2, submerged 3, bit 4 unused, leaf sway 5, the 10-bit block-light tint code in 6-15.
+// bits 0-2, submerged 3, biome tint 4, leaf sway 5, the 10-bit block-light tint code in 6-15.
 layout (location = 5) in uint vNormalBits;
 layout (location = 7) in uint vLayer; // array-texture slice (Vertex.Layer)
 layout (location = 8) in uint vWaterSurface; // Vertex.WaterSurface
@@ -28,6 +28,10 @@ uniform float uEntitySun;
 uniform float uEntityBlock;
 // Palette slot of the block light at the entity's cell (EntityLightSample.Tint).
 uniform int uEntityTint;
+// Per-draw tint of a standalone copy of a biome-tinted block (mining pop, debris): one cached mesh
+// is drawn at many cells, so the tint cannot ride its rgb. White for every other draw
+// (RenderManager.InitWorldProgram sets the default; the chunk program never reads it).
+uniform vec3 uBiomeTint;
 #define TO_WORLD(p) ((uModel * vec4((p), 1.0)).xyz)
 #endif
 uniform float uTime;
@@ -56,6 +60,8 @@ flat out vec3 fBitangent;
 out vec3 fWorldPos;
 out float fSubmerged;
 flat out float fAlpha;
+// BiomeTint.Gain on a biome-tinted face (Vertex.Normal bit 4), 1 everywhere else.
+flat out float fTintGain;
 // World Y of the water surface above a submerged face (0 elsewhere, decoding far below any
 // face).
 flat out float fWaterSurfaceY;
@@ -133,6 +139,14 @@ void main() {
     gl_Position = uMVP * vec4(displaced, 1.0);
 #endif
     fColor = vColor;
+    // Vertex.Normal bit 4: biome-tinted face. Mirrors BiomeTint.Gain (4): the grey textureless
+    // tiles need a multiplier above 1 to reach grass green, so the vertex rgb carries tint/4 and
+    // the fragment scales it back.
+    bool biomeTinted = (vNormalBits & 16u) != 0u;
+    fTintGain = biomeTinted ? 4.0 : 1.0;
+#ifndef CHUNK_DRAW
+    if (biomeTinted) fColor.rgb *= uBiomeTint;
+#endif
     fTexCoord = vTexCoord;
     fLayer = vLayer;
     // Mirrors Vertex.DecodeWaterSurface: must change with Vertex.WaterSurfaceStepsPerBlock and
@@ -169,7 +183,7 @@ void main() {
 #endif
     // uModel is a pure translation for chunks/LOD, so the normal is unchanged.
     // The mesher packs the face as a 0..5 index (Chunk.CubeFaces order) in bits 0-2 and
-    // "this face looks into water" in bit 3 (bit 4 is unused, bit 5 is sway, read above); a
+    // "this face looks into water" in bit 3 (bit 4 is the biome tint and bit 5 sway, both read above); a
     // nested ternary keeps the decode branchless without relying on dynamic array indexing.
     int nIdx = int(vNormalBits & 63u);
     int face = nIdx & 7;

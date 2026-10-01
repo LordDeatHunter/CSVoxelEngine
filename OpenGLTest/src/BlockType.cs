@@ -182,6 +182,15 @@ public sealed record BlockType
     public bool Sway { get; init; }
 
     /// <summary>
+    /// Which faces wear a climate-tinted tile and from which palette (grass, leaves), or null when
+    /// every face is drawn as the model says. Set in <c>ContentRegistry.BakeModels</c>, and only
+    /// ever non-null on a block that bakes greedy (<see cref="IsGreedy"/>), so both mesh paths may
+    /// treat its faces as plain cube faces. <see cref="FaceTiles"/> keep the default coloured
+    /// tiles, which is what icons, drops and the held block wear.
+    /// </summary>
+    public BiomeTintFaces? BiomeTint { get; internal set; }
+
+    /// <summary>
     /// How reflective the block's surface is, or null for the ordinary diffuse blocks (all but
     /// the ores). The renderer never reads this per block: <see cref="TileMaterials"/> spreads it
     /// across the block's <see cref="FaceTiles"/> at bake time and the shader looks it up by
@@ -303,7 +312,8 @@ public sealed record BlockType
 
     /// <summary>
     /// Every atlas slice a <see cref="Cutout"/> block samples (its baked quads' tiles plus its
-    /// <see cref="FaceTiles"/>), distinct and ascending: the slices whose mips
+    /// <see cref="FaceTiles"/>) plus every alpha-tested <see cref="BiomeTint"/> tile (an overlay,
+    /// or a cutout block's tinted replacement), distinct and ascending: the slices whose mips
     /// <see cref="CutoutMipmap"/> rebuilds so alpha-tested coverage survives minification.
     /// Must be called after <c>ContentRegistry.BakeModels</c>, which is what fills the tiles.
     /// </summary>
@@ -316,6 +326,16 @@ public sealed record BlockType
             if (type.BakedModel is { } model)
                 foreach (var quad in model.Quads) tiles.Add(quad.Tile);
             foreach (var tile in type.FaceTiles) tiles.Add(tile);
+        }
+
+        // An overlay is alpha-tested wherever it is drawn, and a cutout block's replacement tile
+        // keeps the leaf holes, so both need coverage-preserving mips like a leaf tile.
+        foreach (var type in ById)
+        {
+            if (type?.BiomeTint is not { } bt) continue;
+            for (var f = 0; f < 6; f++)
+                if (bt.IsTinted(f) && (bt.IsOverlay(f) || type.Cutout))
+                    tiles.Add(bt.Tinted[f]);
         }
         return [.. tiles];
     }

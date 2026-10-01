@@ -135,11 +135,24 @@ public sealed class CutoutMipmapTests
         IEnumerable<ushort> TilesOf(BlockType t) =>
             (t.BakedModel?.Quads.Select(q => q.Tile) ?? []).Concat(t.FaceTiles);
 
-        foreach (var block in cutouts)
-            foreach (var tile in TilesOf(block))
-                Assert.Contains(tile, tiles);
+        // A biome-tint tile is alpha-tested too when it is an overlay, or when it replaces the
+        // face of a cutout block (the leaf holes), so it belongs to the set as well.
+        IEnumerable<ushort> AlphaTestedTintTiles(BlockType t)
+        {
+            if (t.BiomeTint is not { } bt) yield break;
+            for (var f = 0; f < 6; f++)
+                if (bt.IsTinted(f) && (bt.IsOverlay(f) || t.Cutout))
+                    yield return bt.Tinted[f];
+        }
+
+        var expected = cutouts.SelectMany(TilesOf)
+            .Concat(BlockType.ById.Where(t => t != null).SelectMany(t => AlphaTestedTintTiles(t!)))
+            .ToHashSet();
+
+        foreach (var tile in expected)
+            Assert.Contains(tile, tiles);
         foreach (var tile in tiles)
-            Assert.Contains(cutouts, b => TilesOf(b).Contains(tile));
+            Assert.Contains(tile, expected);
         Assert.Equal(tiles.Distinct().Count(), tiles.Count);
     }
 }

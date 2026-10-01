@@ -260,9 +260,9 @@ public sealed class GreedyMeshingTests
     /// <summary>What one unit cell face looks like once rendered, independent of how many
     /// quads it was drawn with: attributes plus the shade, sun and lamp light, decoded lamp tint
     /// colour and UV interpolated at its four corners. <c>Flags</c> is the packed normal above the face index
-    /// (submerged bit 3, sway bit 5, ...).</summary>
+    /// (submerged bit 3, biome tint bit 4, sway bit 5, ...), so comparing it compares IsBiomeTinted too.</summary>
     private sealed record CellFace(int Face, int Flags, int Alpha, int Layer, bool Sway, int WaterSurface, int List,
-        float[] Shade, float[] Sun, float[] Block, Vector3[] Tint, float[] U, float[] V);
+        Vector3[] Shade, float[] Sun, float[] Block, Vector3[] Tint, float[] U, float[] V);
 
     private static float Bilinear(float[,] c, float s, float t) =>
         c[0, 0] * (1 - s) * (1 - t) + c[1, 0] * s * (1 - t) + c[0, 1] * (1 - s) * t + c[1, 1] * s * t;
@@ -284,7 +284,7 @@ public sealed class GreedyMeshingTests
     /// those with the same code, so they must match byte for byte.
     /// </summary>
     private static void Rasterise(List<Vertex> vertices, List<ushort> indices, int list,
-        Dictionary<(int X, int Y, int Z, int Face), CellFace> cells, List<string> raw)
+        Dictionary<(int X, int Y, int Z, int Face, int Layer), CellFace> cells, List<string> raw)
     {
         Assert.Equal(0, indices.Count % 6);
         Assert.Equal(vertices.Count, indices.Count / 6 * 4);
@@ -297,7 +297,7 @@ public sealed class GreedyMeshingTests
             var v0 = quad[0];
             foreach (var v in quad)
             {
-                // Bits 0-5 (face, submerged, unused bit 4, sway) are per quad; the tint code above them is
+                // Bits 0-5 (face, submerged, biome tint, sway) are per quad; the tint code above them is
                 // per corner and is compared through the rasterised corners instead
                 Assert.Equal(v0.Normal & 0x3F, v.Normal & 0x3F);
                 Assert.Equal(v0.Layer, v.Layer);
@@ -334,7 +334,7 @@ public sealed class GreedyMeshingTests
                 continue;
             }
 
-            var shade = new float[2, 2];
+            var shade = new Vector3[2, 2];
             var sun = new float[2, 2];
             var block = new float[2, 2];
             var tint = new Vector3[2, 2];
@@ -347,7 +347,7 @@ public sealed class GreedyMeshingTests
                 var t = (Axis(v.Position, b) - Axis(min, b)) / Axis(extent, b);
                 Assert.True(s is 0f or 1f && t is 0f or 1f, $"corner not on the quad's rectangle: {v.Position}");
                 seen[(int)s, (int)t] = true;
-                shade[(int)s, (int)t] = v.PackedColor & 0xFF;
+                shade[(int)s, (int)t] = new Vector3(v.PackedColor & 0xFF, (v.PackedColor >> 8) & 0xFF, (v.PackedColor >> 16) & 0xFF);
                 sun[(int)s, (int)t] = v.Sun;
                 block[(int)s, (int)t] = v.Block;
                 tint[(int)s, (int)t] = DecodeTint(v);
@@ -367,7 +367,7 @@ public sealed class GreedyMeshingTests
                 cell[a] = (int)MathF.Round(Axis(min, a)) + i;
                 cell[b] = (int)MathF.Round(Axis(min, b)) + j;
 
-                var cornerShade = new float[4];
+                var cornerShade = new Vector3[4];
                 var cornerSun = new float[4];
                 var cornerBlock = new float[4];
                 var cornerTint = new Vector3[4];
@@ -385,7 +385,9 @@ public sealed class GreedyMeshingTests
                     cornerV[c] = Bilinear(vs, s, t);
                 }
 
-                var key = (cell[0], cell[1], cell[2], face);
+                // Keyed by layer too: a biome-tint overlay is a second, coplanar quad over its base (grass
+                // side: dirt, then the tinted band), not the same cell face drawn twice
+                var key = (cell[0], cell[1], cell[2], face, (int)v0.Layer);
                 Assert.False(cells.ContainsKey(key), $"cell face {key} drawn twice");
                 cells[key] = new CellFace(face, (v0.Normal & 0x3F) >> 3, (int)(v0.PackedColor >> 24), v0.Layer, v0.IsSwaying, v0.WaterSurface, list,
                     cornerShade, cornerSun, cornerBlock, cornerTint, cornerU, cornerV);
@@ -393,9 +395,9 @@ public sealed class GreedyMeshingTests
         }
     }
 
-    private static (Dictionary<(int, int, int, int), CellFace> Cells, List<string> Raw) Rasterise(ChunkMeshData mesh)
+    private static (Dictionary<(int, int, int, int, int), CellFace> Cells, List<string> Raw) Rasterise(ChunkMeshData mesh)
     {
-        var cells = new Dictionary<(int, int, int, int), CellFace>();
+        var cells = new Dictionary<(int, int, int, int, int), CellFace>();
         var raw = new List<string>();
         Rasterise(mesh.Vertices, mesh.Indices, 0, cells, raw);
         Rasterise(mesh.TranslucentVertices, mesh.TranslucentIndices, 1, cells, raw);
@@ -443,7 +445,7 @@ public sealed class GreedyMeshingTests
 
     /// <summary>Meshes <paramref name="center"/> both ways and requires the two outputs to draw
     /// the same unit cell faces with the same attributes. Returns the per-quad cells.</summary>
-    private static Dictionary<(int, int, int, int), CellFace> AssertGreedyMatchesPerQuad(ChunkManager manager, Chunk center)
+    private static Dictionary<(int, int, int, int, int), CellFace> AssertGreedyMatchesPerQuad(ChunkManager manager, Chunk center)
     {
         var greedy = center.GenerateMeshData(manager, greedy: true);
         var scalar = center.GenerateMeshData(manager, greedy: false);
@@ -471,8 +473,11 @@ public sealed class GreedyMeshingTests
             Assert.Equal(expected.List, actual.List);
             for (var c = 0; c < 4; c++)
             {
-                Assert.True(MathF.Abs(expected.Shade[c] - actual.Shade[c]) <= 1.01f,
-                    $"cell face {key} corner {c}: shade {expected.Shade[c]} vs {actual.Shade[c]}");
+                // All three channels: a biome-tinted face carries shade * tint per channel, so a
+                // tint bug in one channel must not hide behind the others
+                var ds = Vector3.Abs(expected.Shade[c] - actual.Shade[c]);
+                Assert.True(ds.X <= 1.01f && ds.Y <= 1.01f && ds.Z <= 1.01f,
+                    $"cell face {key} corner {c}: rgb {expected.Shade[c]} vs {actual.Shade[c]}");
                 Assert.True(MathF.Abs(expected.Sun[c] - actual.Sun[c]) <= 1.01f,
                     $"cell face {key} corner {c}: sun {expected.Sun[c]} vs {actual.Sun[c]}");
                 Assert.True(MathF.Abs(expected.Block[c] - actual.Block[c]) <= 1.01f,
@@ -564,8 +569,9 @@ public sealed class GreedyMeshingTests
 
         var cells = AssertGreedyMatchesPerQuad(manager, center);
 
-        var shallow = cells[(2, 4, 8, 4)].WaterSurface;
-        var deep = cells[(Chunk.Size - 3, 4, 8, 4)].WaterSurface;
+        var stoneTop = ContentRegistry.RequireBlock("stone").FaceTiles[4];
+        var shallow = cells[(2, 4, 8, 4, stoneTop)].WaterSurface;
+        var deep = cells[(Chunk.Size - 3, 4, 8, 4, stoneTop)].WaterSurface;
         Assert.NotEqual(0, shallow);
         Assert.True(Vertex.DecodeWaterSurface((ushort)deep) > Vertex.DecodeWaterSurface((ushort)shallow));
     }

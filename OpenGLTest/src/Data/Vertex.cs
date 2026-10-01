@@ -33,8 +33,10 @@ public struct Vertex
     /// <see cref="Chunk.CubeFaces"/> order, reconstructed in the vertex shader. Sloped fluid tops
     /// and spun pebbles snap to their dominant axis; both sit within a few degrees of one, so the
     /// sun diffuse barely moves. Bit 3: the face looks into water, which is what the fragment
-    /// shader paints the caustic net onto. Bit 4: unused, reserved (sway and tint keep their
-    /// positions rather than re-packing). Bit 5: leaf-wind sway (<see cref="IsSwaying"/>; chunk
+    /// shader paints the caustic net onto. Bit 4: biome tint (<see cref="IsBiomeTinted"/>): the
+    /// rgb carries shade * <see cref="BiomeTint"/> (chunks, LOD, the felled tree) or shade alone
+    /// with the tint in <c>uBiomeTint</c> (mining pop, debris), and the fragment shader multiplies
+    /// the texel by <see cref="BiomeTint.Gain"/>. Bit 5: leaf-wind sway (<see cref="IsSwaying"/>; chunk
     /// meshes set it on canopy leaves, standalone cubes such as drops, icons and mining pops stay
     /// planted). Bits 6-7: the low two bits of the 10-bit block-light tint code
     /// (<see cref="BlockTint"/>).</summary>
@@ -123,7 +125,7 @@ public struct Vertex
     /// <summary>Atlas geometry: a UV in tile units on <paramref name="layer"/>.</summary>
     public Vertex(Vector3 position, byte r, byte g, byte b, byte a, Vector2 uv, ushort layer,
         float sun = 1f, float block = 0f, Vector3? normal = null, float sway = 0f, bool submerged = false,
-        ushort waterSurface = 0, ushort tint = 0)
+        ushort waterSurface = 0, ushort tint = 0, bool biomeTint = false)
     {
         System.Diagnostics.Debug.Assert(tint <= TintMask, "block-light tint code exceeds 10 bits");
         tint &= TintMask;
@@ -135,6 +137,7 @@ public struct Vertex
         Sun = EncodeLight(sun);
         Block = EncodeLight(block);
         Normal = (byte)(EncodeNormal(normal ?? Vector3.UnitY) | (submerged ? SubmergedBit : 0)
+                        | (biomeTint ? BiomeTintBit : 0)
                         | (sway >= 0.5f ? SwayBit : 0) | ((tint & 3) << 6));
         LightTint = (byte)(tint >> 2);
     }
@@ -161,11 +164,16 @@ public struct Vertex
     }
 
     private const int SubmergedBit = 1 << 3;
+    private const int BiomeTintBit = 1 << 4;
     private const int SwayBit = 1 << 5;
     private const ushort TintMask = 0x3FF;
 
     /// <summary><see cref="Normal"/> bit 3: the face looks into a fluid.</summary>
     public readonly bool IsSubmerged => (Normal & SubmergedBit) != 0;
+
+    /// <summary><see cref="Normal"/> bit 4: a biome-tinted face; the world fragment shader
+    /// multiplies its texel by <see cref="BiomeTint.Gain"/>.</summary>
+    public readonly bool IsBiomeTinted => (Normal & BiomeTintBit) != 0;
 
     /// <summary><see cref="Normal"/> bit 5: the leaf-wave shader sways this vertex.</summary>
     public readonly bool IsSwaying => (Normal & SwayBit) != 0;
