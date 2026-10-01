@@ -1,0 +1,105 @@
+{
+  // Biome tint check (grass and leaves coloured by climate): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/grass-tint.json
+  // Shots land in visual/grass-tint/. VOXEL_TIME=147 is noon, so the tint is read under a high,
+  // neutral sun rather than the warm low light of a morning or a dusk.
+  //
+  // What each shot is for:
+  //   forest_aerial / forest_ground - the forest around (-80, 8) with the desert starting to the
+  //     east: the grass top and the canopies turn yellower toward the warm, dry edge.
+  //   slope_closeup                 - a one-block grass rise at pitch -30: the tinted top and the
+  //     side drawn as dirt with the tinted grass band over it.
+  //   forest_leaves                 - a broadleaf crown seen from underneath, standing beside its
+  //     trunk: tinted and still cut out (sway is a mesh flag the tests check; a still frame cannot
+  //     show it).
+  //   forest_open_aerial            - a high view across the full-detail ring (256 blocks) into the
+  //     far LOD, for a band or offset where the two meet, on grass and on canopies.
+  //   forest_mountain(_ground)      - the far mountain aerial puts the LOD ring and the chunks in
+  //     one frame again, from a different climate.
+  //   taiga_aerial / taiga_spruce   - spruce in the cold, wet taiga: the cooler foliage corner.
+  //   mine_pop                      - mid-hit on the side of the rise, HUD on: the pop wears the
+  //     terrain's tint (dirt + band on its side) while the held grass block and its hotbar icon
+  //     keep the default colours.
+  //   felled_tree_falling / felled_tree_fallen - a forest tree toppling: the falling canopy keeps
+  //     the colour of the standing canopies beside it. A copper axe is given first only so the hand
+  //     holds something that belongs in the frame instead of the grass block.
+  //
+  // The vantage points come from biomes.json's probe (forest (-80, 8), mountain
+  // (120, 73, -280), meadow (-328, 14, 8)) plus headless probes made for this file:
+  //   a one-block rise in +X at (-97, 13): ground 14 on the low side, flat and treeless for four
+  //     columns before it, so the camera stands at x -100.5 facing +X.
+  //   forest trunks around the forest ground spot (x, baseY, z): (-79, 14, -2), (-70, 13, -6),
+  //     (-66, 13, -12); the (-79, -2) crown tops out at y 24 over ground 13.
+  //   the nearest taiga columns with a spruce canopy within 4 blocks of a chunk centre:
+  //     (-172, -124) canopy top 19 over ground 13, with ground 13 again 14 blocks south of it,
+  //     and further ones at (-172, -132) and (-172, -108).
+  // Since the temperature-band change the meadow aerial at (-328, 82, 8) looks over taiga and snow
+  // in the foreground, which is useful here: the grass, the snow line and the spruce share a frame.
+  // biomes.json's forest lake at (-616, 464) has turned into frozen plain the same way, so it is left
+  // out: with no grass in frame it says nothing about the tint.
+  //
+  // Order matters. The camera shots run first with an empty hand: hideHud hides the HUD but not
+  // the first-person hand, and "give" puts its block in the hand for the rest of the run. The
+  // mining shot runs on foot (creative breaks instantly, so no pop), and only then does "fly"
+  // switch creative on (it stays on after fly off), where one instant hit topples the tree.
+  // Every teleport starts well above its stand point or near its target and the long waits double
+  // as streaming time; the hovering shots (the aerials and the spruce) teleport a second time
+  // and shoot with no wait, so the pose is held exactly.
+  "steps": [
+    { "op": "teleport", "pos": [-80.5, 90.5, 8.5], "yaw": 0, "pitch": -18 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "teleport", "pos": [-80.5, 90.5, 8.5], "yaw": 0, "pitch": -18 },
+    { "op": "screenshot", "name": "forest_aerial", "hideHud": true },
+    { "op": "teleport", "pos": [-80.5, 22.5, 8.5], "yaw": 0, "pitch": -4 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "forest_ground", "hideHud": true },
+    { "op": "teleport", "pos": [-78.5, 18.5, 7.5], "yaw": -95, "pitch": 22 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "forest_leaves", "hideHud": true },
+
+    { "op": "teleport", "pos": [-100.5, 18.5, 13.5], "yaw": 0, "pitch": -30 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "slope_closeup", "hideHud": true },
+
+    { "op": "teleport", "pos": [-328.5, 82.5, 8.5], "yaw": 0, "pitch": -22 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-328.5, 82.5, 8.5], "yaw": 0, "pitch": -22 },
+    { "op": "screenshot", "name": "forest_open_aerial", "hideHud": true },
+
+    { "op": "teleport", "pos": [40.5, 120.5, -320.5], "yaw": 27, "pitch": -24 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [40.5, 120.5, -320.5], "yaw": 27, "pitch": -24 },
+    { "op": "screenshot", "name": "forest_mountain", "hideHud": true },
+    { "op": "teleport", "pos": [120.5, 48.5, -190.5], "yaw": -90, "pitch": 8 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "forest_mountain_ground", "hideHud": true },
+
+    { "op": "teleport", "pos": [-171.5, 40.5, -100.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "teleport", "pos": [-171.5, 40.5, -100.5], "yaw": -90, "pitch": -20 },
+    { "op": "screenshot", "name": "taiga_aerial", "hideHud": true },
+    { "op": "teleport", "pos": [-172.5, 25.5, -113.5], "yaw": -90, "pitch": -12 },
+    { "op": "screenshot", "name": "taiga_spruce", "hideHud": true },
+
+    { "op": "teleport", "pos": [-100.5, 18.5, 13.5], "yaw": 0, "pitch": -15 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "give", "block": "grass", "count": 1 },
+    { "op": "look", "yaw": 0, "pitch": -15 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "mine", "seconds": 0.45 },
+    { "op": "screenshot", "name": "mine_pop" },
+
+    { "op": "give", "block": "item/copper_axe", "count": 1 },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-78.5, 22.5, 14.5], "yaw": -95, "pitch": 5 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "teleport", "pos": [-78.5, 16.6, 1.5], "yaw": -90, "pitch": -12 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "mine", "seconds": 0.3 },
+    { "op": "teleport", "pos": [-78.5, 22.5, 14.5], "yaw": -95, "pitch": 5 },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "felled_tree_falling", "hideHud": true },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "felled_tree_fallen", "hideHud": true }
+  ]
+}

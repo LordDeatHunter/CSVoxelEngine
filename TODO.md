@@ -159,6 +159,13 @@ same world, and a player can move between them freely — neither arc gates the 
 - [ ] **`P-24` · Biomes** — P1, M.
   2D noise masks in `TerrainGenerator` (desert/snow/swamp/…). Palette and LOD are already
   data-driven, so per-biome surfaces, wood, plants and water colour are mostly content.
+  - Progress: grass, `leaves` and `spruce_leaves` are tinted by climate (the `biomeTint` block
+    field, a grass and a foliage palette over `TerrainGenerator.Climate`; see AGENTS.md "Biome-tinted
+    grass and leaves"), in the chunks, the far LOD, felled trees, the mining pop and the debris.
+    Item drops, inventory icons and the held block keep the default grass/leaf tiles on purpose.
+    Open: falling-leaf particles (`LeafParticleRenderer`) still wear the default leaf colour and
+    read yellower than a tinted canopy, and could sample the foliage field at the burst cell;
+    flowers and water could opt into `biomeTint`'s `tile` form later.
 - [ ] **`P-25` · More ores + deeper strata** — P1, M.
   Coal/iron/gold/… veins placed deterministically like trees/pebbles/Malachite; tiers gate tools
   (`P-1`, `P-7`).

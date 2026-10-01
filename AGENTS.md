@@ -137,7 +137,7 @@ stopwatch.
 
 Standing in water switches the player to **swimming** (`Camera.IsInWater`, recomputed every frame by `Camera.UpdateWaterState` from the real fluid surface heights under the body): horizontal speed halves, gravity is replaced by an eased sink toward `SinkSpeed` (Space eases up toward `SwimUpSpeed` instead, both through `MathUtils.Damp`), and swimming into a bank while holding Space adds `SwimExitBoost` so the player can climb out without a ramp. Flight ignores water entirely, and a player standing on the bottom of a shallow puddle still jumps normally. Flowing water also pushes the player and floating item drops along its flow direction (`ChunkManager.GetFluidFlowGlobal`, Minecraft's `FlowingFluid.getFlow`: a horizontal vector summed from how much lower each neighbouring cell's surface sits, zero in a still pool). `Camera.IsEyeInWater` is the separate eye-only test and is the source of truth for the underwater tint.
 
-**Water rendering** lives in the shared world shader plus two extra passes in `RenderManager`. Just before `RenderWorldTranslucent` draws, `CopyScene` snapshots the HDR scene target's colour and depth (see "Linear lighting" below; the colour copy is `Rgba16f`, like the reflection mirror) into two textures on units 3 and 4 (`CopyTexSubImage2D` from the bound HDR FBO — the water pass depth-tests while sampling, so it cannot read the target directly); the water fragment then composes its own look out of them: a refracted lookup offset along the analytic wave normal, Beer-Lambert absorption over the water's measured thickness (`WaterAbsorb`) plus in-scattered `WaterScatter`, and a Schlick fresnel mix into the planar reflection. Flowing water carries its baked flow into that normal (`FlowWaveNormal`: a bounded two-phase flow map that scrolls the ripples downstream and stretches them along the flow, identical to `WaveNormal` when the flow is zero), and falling side faces add fast vertical streaks; generated rivers and lakes are all source cells, so they bake no flow and stay still until the simulation makes them flow (`visual-examples/flow-water.json`, `VOXEL_TIME=147`, pours some). The mirror plane itself is the single `RenderManager.WaterPlaneY` at sea level, so a lake whose surface stands above it reflects against that plane rather than its own - an accepted approximation, since only one plane can be mirrored per frame. Seen from below — decided per fragment from the face normal (`fromBehind` in `test-fragment.glsl`), never from the sea plane, since a pond stands above it — the surface is a Snell window: the same scene copy shows through it distorted by the wave normal, the inside fresnel goes to total internal reflection past the critical angle and that band fades to the underwater fog colour, and the mirror is never sampled from that side; `ReflectionReuse.MirrorApplies` also skips rendering it whenever `Camera.IsEyeInWater`, and the sky dome (`SkyRenderer`) and the sun disc stay dry in water (lava still fades the dome via `_skyTintAmount`, eased through `_lavaT`) so the window shows real sky. World, cloud and sky fog share `SkySample`, duplicated verbatim in `sky-fragment.glsl`, `test-fragment.glsl` and `cloud-fragment.glsl`, with `SkyPalette.Sample` as the tested C# reference, so change all four together. The dome currently samples the flat 28198cc sky colour: `SkyPalette.Compute` returns the old night/day mix, pulled toward the dusk orange by `SkyDuskMix`, as both zenith and horizon with zero glow, and `SkyHazeStrength` is 0, so every direction (and every fully fogged fragment) is that one colour. The reflection pass now also draws the sun disc and the cloud layer into the mirror, and both it and the scene copies are skipped whenever `CullWater` (one frustum pass a frame, feeding the water pass its draw lists) found no water on screen — glass shares the translucent mesh, so `Chunk.HasWaterMesh` is the flag that decides, not `HasTranslucentMesh`. Opaque faces that look into water are flagged by the mesher in bit 3 of `Vertex.Normal` (bits 0-2 stay the face index, bit 5 is the leaf-sway flag, bits 6-7 the low bits of the block-light tint code) and get the animated Voronoi caustic net; bit 4 is unused. The world fragment darkens a submerged face's albedo by `WetDarken` once, before the light multiply, and only at or below that face's own baked surface (`step(fWorldPos.y, fWaterSurfaceY)`; the caustics stop at the same line), so a dry face beside water — a beach top, a bank wall over the waterline — is never darkened or tinted; ore tiles (a non-zero `material.metallic`) are excluded. `SurfaceFresnel` is the GL-free twin (`Schlick`, `WetWeight`). While the eye is submerged, `UnderwaterRaysRenderer` adds one full-screen ray-march for sun shafts, composited in display space (the upsample reads the HDR target it draws into, adds the shafts to the encoded scene with the pre-SH-10 sRGB sun colour and strength, clips at 1 and decodes), since the same add in linear light lost the glare toward the sun. Both measure depth from the **local** water surface, never the sea plane: the caustics from the surface baked into each submerged face's vertex (`Vertex.WaterSurface`, read as `fWaterSurfaceY`), the rays from `Camera.EyeWaterSurfaceY` (`ChunkManager.GetFluidColumnTopGlobal` over the eye's column), so a pond above sea level gets both — only the planar mirror still uses the sea plane. The rays are why the shadow map keeps rendering underwater (`_shadowStrengthDry`, the strength before the underwater fade) even though the world diffuse no longer uses it. **Depth convention**: `Camera.GetProjectionMatrix` comes from `System.Numerics`, which is Direct3D-style (clip depth 0..1), so window depth is *not* the GL -1..1 mapping — never write a near/far linearization. Reconstruct a world position by inverting the very matrix that wrote the depth (`uInvViewProj`), and compare raw depth values directly for "which is nearer". `visual-examples/water.json` (run it with `VOXEL_TIME=360`) frames the shallows, the grazing surface, deep water from height and the underwater shots, including the surface seen from below in the sea and in a pond above sea level (a liquid one — a frozen pond has an ice lid, not a water top face).
+**Water rendering** lives in the shared world shader plus two extra passes in `RenderManager`. Just before `RenderWorldTranslucent` draws, `CopyScene` snapshots the HDR scene target's colour and depth (see "Linear lighting" below; the colour copy is `Rgba16f`, like the reflection mirror) into two textures on units 3 and 4 (`CopyTexSubImage2D` from the bound HDR FBO — the water pass depth-tests while sampling, so it cannot read the target directly); the water fragment then composes its own look out of them: a refracted lookup offset along the analytic wave normal, Beer-Lambert absorption over the water's measured thickness (`WaterAbsorb`) plus in-scattered `WaterScatter`, and a Schlick fresnel mix into the planar reflection. Flowing water carries its baked flow into that normal (`FlowWaveNormal`: a bounded two-phase flow map that scrolls the ripples downstream and stretches them along the flow, identical to `WaveNormal` when the flow is zero), and falling side faces add fast vertical streaks; generated rivers and lakes are all source cells, so they bake no flow and stay still until the simulation makes them flow (`visual-examples/flow-water.json`, `VOXEL_TIME=147`, pours some). The mirror plane itself is the single `RenderManager.WaterPlaneY` at sea level, so a lake whose surface stands above it reflects against that plane rather than its own - an accepted approximation, since only one plane can be mirrored per frame. Seen from below — decided per fragment from the face normal (`fromBehind` in `test-fragment.glsl`), never from the sea plane, since a pond stands above it — the surface is a Snell window: the same scene copy shows through it distorted by the wave normal, the inside fresnel goes to total internal reflection past the critical angle and that band fades to the underwater fog colour, and the mirror is never sampled from that side; `ReflectionReuse.MirrorApplies` also skips rendering it whenever `Camera.IsEyeInWater`, and the sky dome (`SkyRenderer`) and the sun disc stay dry in water (lava still fades the dome via `_skyTintAmount`, eased through `_lavaT`) so the window shows real sky. World, cloud and sky fog share `SkySample`, duplicated verbatim in `sky-fragment.glsl`, `test-fragment.glsl` and `cloud-fragment.glsl`, with `SkyPalette.Sample` as the tested C# reference, so change all four together. The dome currently samples the flat 28198cc sky colour: `SkyPalette.Compute` returns the old night/day mix, pulled toward the dusk orange by `SkyDuskMix`, as both zenith and horizon with zero glow, and `SkyHazeStrength` is 0, so every direction (and every fully fogged fragment) is that one colour. The reflection pass now also draws the sun disc and the cloud layer into the mirror, and both it and the scene copies are skipped whenever `CullWater` (one frustum pass a frame, feeding the water pass its draw lists) found no water on screen — glass shares the translucent mesh, so `Chunk.HasWaterMesh` is the flag that decides, not `HasTranslucentMesh`. Opaque faces that look into water are flagged by the mesher in bit 3 of `Vertex.Normal` (bits 0-2 stay the face index, bit 5 is the leaf-sway flag, bits 6-7 the low bits of the block-light tint code) and get the animated Voronoi caustic net; bit 4 is the biome-tint flag (see "Biome-tinted grass and leaves" below). The world fragment darkens a submerged face's albedo by `WetDarken` once, before the light multiply, and only at or below that face's own baked surface (`step(fWorldPos.y, fWaterSurfaceY)`; the caustics stop at the same line), so a dry face beside water — a beach top, a bank wall over the waterline — is never darkened or tinted; ore tiles (a non-zero `material.metallic`) are excluded. `SurfaceFresnel` is the GL-free twin (`Schlick`, `WetWeight`). While the eye is submerged, `UnderwaterRaysRenderer` adds one full-screen ray-march for sun shafts, composited in display space (the upsample reads the HDR target it draws into, adds the shafts to the encoded scene with the pre-SH-10 sRGB sun colour and strength, clips at 1 and decodes), since the same add in linear light lost the glare toward the sun. Both measure depth from the **local** water surface, never the sea plane: the caustics from the surface baked into each submerged face's vertex (`Vertex.WaterSurface`, read as `fWaterSurfaceY`), the rays from `Camera.EyeWaterSurfaceY` (`ChunkManager.GetFluidColumnTopGlobal` over the eye's column), so a pond above sea level gets both — only the planar mirror still uses the sea plane. The rays are why the shadow map keeps rendering underwater (`_shadowStrengthDry`, the strength before the underwater fade) even though the world diffuse no longer uses it. **Depth convention**: `Camera.GetProjectionMatrix` comes from `System.Numerics`, which is Direct3D-style (clip depth 0..1), so window depth is *not* the GL -1..1 mapping — never write a near/far linearization. Reconstruct a world position by inverting the very matrix that wrote the depth (`uInvViewProj`), and compare raw depth values directly for "which is nearer". `visual-examples/water.json` (run it with `VOXEL_TIME=360`) frames the shallows, the grazing surface, deep water from height and the underwater shots, including the surface seen from below in the sea and in a pond above sea level (a liquid one — a frozen pond has an ice lid, not a water top face).
 
 **Linear lighting (SH-10).** The world is lit in linear light and rendered into
 `RenderManager`'s HDR scene target — an `RGBA16F` colour texture plus a sampleable `DepthComponent24`
@@ -230,7 +230,7 @@ no 2D-texture path for meshes. `Vertex` is 32 bytes: position (3 floats), packed
 two floats in tile units** (0..1 across one tile, 0..W across a quad merged over W cells — the
 sampler's REPEAT tiles it, so UVs are never atlas-absolute), sun/block bytes at 24-25, bytes
 26-27 read by GL as **one integer ushort** at attribute location 5 (`Normal` + `LightTint`: bits
-0-2 face, 3 submerged, 4 unused, 5 sway, 6-15 the 10-bit block-light tint code, `Vertex.BlockTint`,
+0-2 face, 3 submerged, 4 biome tint (`IsBiomeTinted`), 5 sway, 6-15 the 10-bit block-light tint code, `Vertex.BlockTint`,
 `IsSwaying`; attribute 6 is gone), the `ushort Layer` at 28 (attribute location 7, an integer attribute) and the `ushort
 WaterSurface` at 30 (attribute location 8, also integer): the baked water surface over a
 submerged face in quarter blocks (`Vertex.EncodeWaterSurface`, 0 on every dry face). The mesher
@@ -329,6 +329,71 @@ almost untouched (+0.2 % vertices over eight sampled surface and cave chunks, me
 within noise), since generated terrain is mostly uniformly lit and only lamp and shadow
 gradients split merges.
 
+**Biome-tinted grass and leaves.** Grass, `leaves` and `spruce_leaves` take their colour from the
+climate at their position, Minecraft style, while `FaceTiles` keep the default coloured tiles, so
+inventory icons, item drops and the held block never change. It is block data: a `biomeTint`
+object on the block JSON (`BlockDefinition.BiomeTintDefinition`) names a `palette` (`grass`, the
+default, or `foliage`) and a `faces` map keyed by face name (`north`..`down`, or the shorthands
+`side` and `all`). A face entry is either `{ "tile" }`, a tinted tile drawn *instead of* the
+model's face (one quad; the leaves use it on every face), or `{ "overlay", "base"? }`, a tinted
+cutout tile drawn *over* the face with `base` optionally replacing the untinted tile beneath (the
+grass side: a `dirt` base, then `grass_side_textureless`). `ContentRegistry.ResolveBiomeTints`
+resolves it in `BakeModels` into `BlockType.BiomeTint` (`Content/BiomeTintFaces.cs`: `Palette` plus
+per-face `Base`/`Tinted` tiles, `NoTile` where a face has none) and throws naming the file unless
+the block `BakesGreedy` and is not translucent, so both mesh paths can treat every tinted face as a
+plain cube face; an `overlay` is further refused on a cutout block, which has no opaque base quad.
+The alpha-tested tint tiles (every overlay, and a cutout block's replacement tile) join
+`BlockType.CutoutTiles`, so they get the coverage-preserving mips a leaf tile gets. The colour is
+`TerrainGenerator.Climate`, the temperature and humidity noises normalised through the biome ramps
+to warmth 0..1 (exactly 0.5 across the temperate band) and wetness 0..1, so the palette's four
+sRGB corners (`WorldGenerationConfig.GrassColorColdDry/ColdWet/WarmDry/WarmWet` and the slightly
+darker `FoliageColor*`) sit on the biome lines. `BiomeTint` samples it on a 16-block lattice of
+chunk-column corners: `TintsAt` reads the climate once and returns both palettes, `FieldsFor(cx, cz)`
+gives a chunk column's `BiomeTintFields` (a grass and a foliage `BiomeTintField`, four corners each)
+and `BiomeTintField.Sample` interpolates bilinearly in weighted-sum form, which makes two columns
+sharing lattice points agree bit for bit, so the colour is continuous across chunk borders. Because
+it is a function of the vertex *position*, not of the cell, the greedy key is unchanged and a
+merge never splits (a merged quad interpolates per triangle on the GPU where the field is bilinear;
+over 16 blocks of a field with a wavelength of thousands that cross term is far below a byte step,
+and it is accepted). The tint rides the vertex rgb as `shade * tint` (`BiomeTint.Shade`), flagged by
+`Vertex.Normal` bit 4 (`IsBiomeTinted`), and the world fragment multiplies a flagged face by
+`BiomeTint.Gain` (4, mirrored by the literal `4.0` behind `fTintGain` in `test-vertex.glsl` — keep
+the two together): the textureless tiles are grey around `WorldGenerationConfig.BiomeTintTextureGrey`
+(sRGB 98), so a byte rgb capped at 1 needs that headroom to reach grass green. The two grass tiles
+are supplied art; `tools/generate-leaf-textureless.ps1` writes the leaf ones from `leaves.png` and
+`spruce_leaves.png` (Rec. 601 luminance, alpha copied, scaled to the same mean grey, byte-identical
+re-runs). Both chunk mesh paths go through the one `Chunk.EmitTintedCubeFace`, which draws the
+base quad first and then the coplanar tinted quad, the overlay winning by draw order under
+`Lequal`; the reflection and shadow passes reuse the same lists and inherit the order, and the
+shadow pass's alpha test punches the overlay's holes over the opaque base. The far LOD reads the
+same lattice from the region's own origin (`rx * regionChunkSpan`, never the prefetch origin
+`baseChunkX`) through `AddBlockFace`, for grass tops and sides and for the canopy bumps, and a
+tinted canopy's transparent texels fall back to the textureless grey (`vec3(0.1221)`, the decoded
+98) instead of `uLodLeafColor`, so the tint still applies there; chunks, LOD and the felled tree
+all bake the tint into their rgb. The felled tree is meshed by the real chunk mesher in a scratch
+chunk at (256, 0, 256), so `TopplingTree.BuildMeshData` passes `BiomeTint.FieldsAt(min)` (a field
+whose origin is the tree's own min cell) through the `tintFields` override of the internal
+`Chunk.GenerateMeshData(manager, greedy, tintFields)`, or a falling canopy would snap to the climate
+of world (4096, 4096). The mining pop and the break debris are standalone copies drawn at many
+cells from streamed or cached geometry, so they wear the `BiomeTint` tiles (`PopBoxEmitter.EmitBox`'s
+`biomeTint` argument; `BlockCubeCache.GetTinted`/`BuildTintedCube`, one cached debris mesh per
+block, which only the debris asks for) with grey shade-only rgb, and the cell's colour comes from
+the plain program's per-draw `uBiomeTint` uniform (`BiomeTint.CellTint` at the mined cell, carried by
+`BlockDebris.Tint` for each cube), multiplied into bit-4 vertices in the vertex shader. Its white
+default is written in `RenderManager.InitWorldProgram`, which binds the program first;
+`Shader.SetUniform` writes to whatever program is bound, so every per-draw set sits after
+`worldShader.Use()` and is reset to white straight after the pop or debris draw for the plain
+draws that follow (the chunk program has no such uniform). `PopBoxEmitter.MaxQuadsPerBox` (12: six
+faces, each at most a base and a tinted quad) sizes the pop's streaming buffers and its static
+index pattern. `visual-examples/grass-tint.json` (run with `VOXEL_TIME=147`) frames the forest
+toward the desert edge, a grass rise, a broadleaf crown, the LOD meet, the taiga spruce, a mining
+pop next to the default hotbar icon and a felled tree. Tests: `BiomeTintTests` (field continuity,
+the palette range Gain can reach, climate vs biome classification), `BiomeTintMeshTests` (both mesh
+paths, overlay order, no merge fragmentation, the field override, leaves keep sway),
+`BiomeTintLodTests` (the LOD matches the chunk mesher's field, canopies carry the foliage field),
+`BiomeTintTextureTests` (the tiles are grey at the Gain's grey and keep their source holes),
+`BiomeTintPopTests`, `TopplingTreeTintTests` and the `biomeTint` rules in `ContentTests`.
+
 **Chunk drawing.** Chunks do not own `Mesh` objects. `Chunk.UpdateMesh` uploads its vertex and
 index lists into the two `ChunkGeometryPool`s owned by `RenderManager` (opaque and translucent:
 one `BufferStorage` VBO + EBO + VAO each, allocated by `GeometryAllocator`, a first-fit free list
@@ -343,8 +408,8 @@ with `FenceSync`/`ClientWaitSync`, since VSync is off) and issues one
 `MultiDrawElementsIndirect`. The chunk vertex shaders are compiled twice from the same source
 (`Shader`'s `defines` prefix): the `#define CHUNK_DRAW` variant reads the `ChunkInfo` SSBO at
 binding 0 at `uDrawBase + gl_DrawID` and transforms with `uViewProj`, while the plain variant
-keeps `uModel`/`uMVP`/`uAlpha` for LOD, drops, TNT, falling blocks, trees and block pops
-(`SetDrawUniforms`), and takes its light per draw as `uEntitySun`/`uEntityBlock`, sampled from the
+keeps `uModel`/`uMVP`/`uAlpha` for drops, TNT, falling blocks, toppling trees, block pops and debris
+(`SetDrawUniforms`; the far LOD draws through the `CHUNK_DRAW` program too, `RenderLod` -> `chunkShader`), and takes its light per draw as `uEntitySun`/`uEntityBlock`, sampled from the
 world at the entity's cell by `EntityLight.Sample` (each chunk keeps its mesh-time light snapshot
 for that) and passed through `SetDrawUniforms`'s required `EntityLightSample` argument. Per-draw fade alpha reaches the fragment stage as the `flat` varying
 `fAlpha`, because a uniform cannot vary between the sub-draws of one multi-draw. The wave and
@@ -407,6 +472,10 @@ OpenGLTest/
     SkyPalette.cs              # GL-free zenith/horizon/glow sky palette and the C# reference of SkySample
     BlockLightPalette.cs       # GL-free 8-slot block-light colour palette (slot 0 = the default warm torch colour)
     LightTint.cs               # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
+    BiomeTint.cs               # GL-free biome tint: Climate -> palette -> vertex tint on a 16-block lattice, Gain, Shade, CellTint
+    BiomeTintPalette.cs        # Grass / Foliage: which palette a biomeTint block reads
+    BiomeTintField.cs          # one palette's four lattice corners over a 16-block field, sampled bilinearly
+    BiomeTintFields.cs         # a mesh build's grass and foliage fields, both from one climate evaluation per corner
     Mesh.cs, Shader.cs, TextureLoader.cs, FileUtils.cs, FastNoiseLite.cs (vendored, don't reformat)
     Data/                      # Vertex struct (32 B: float pos, rgba, float tile-local UV, sun/block bytes, a normal/sway/tint
                                #   ushort, ushort array-texture layer), cube geometry, frustum/plane math, direction tables
@@ -422,6 +491,7 @@ OpenGLTest/
                                             #   (the player's posing is procedural, entities
                                             #   animate from their clips)
       BlockRenderer.cs, BlockBreakAction.cs, AttackPattern.cs, ItemUseAction.cs  # geometry/break/attack/use enums
+      BiomeTintFaces.cs                     # a block's resolved biomeTint: palette + per-face base/tinted tiles
       WoodShape.cs, SnowShape.cs            # state/neighbour-aware hitbox shapes (tapered wood, layered snow)
       MultiblockShape.cs                    # the 2x2x2 volume's geometry: rotating a point, a
                                             #   direction or a whole baked model to a facing
@@ -566,6 +636,7 @@ OpenGLTest/
                                       #   clips) + <name>.png skins
 OpenGLTest.ItemDebugger/              # the item/entity preview tool (ITEMS and ENTITIES tabs)
 tools/generate-goblin-skin.ps1        # deterministic generator of goblin.png; its header pins the UV layout
+tools/generate-leaf-textureless.ps1   # deterministic grey leaf tiles for the biome tint (scaled to BiomeTintTextureGrey)
 ```
 
 ## Content: blocks, items, models and loot are data
@@ -620,6 +691,7 @@ trailing commas.
 | `cutout` | false | alpha-tested texture; forces `occludes` off whatever the file says |
 | `translucent` | false | drawn blended in the sorted translucent pass with the fluids (glass); forces occludes off; never casts a shadow |
 | `sway` | false | leaf-wind sway in the vertex shader |
+| `biomeTint` | none | colour the block by climate (see "Biome-tinted grass and leaves"): `{"palette": p, "faces": {face: entry}}`, where `palette` is `grass` (default) or `foliage`, a face key is `north`..`down`, `side` or `all`, and an entry is `{"tile": t}` or `{"overlay": t, "base": b}`. `tile` replaces the face with a tinted tile, `overlay` draws a tinted cutout tile over it (`base` optionally swapping the tile beneath). Only on a block that bakes to a plain full cube and is not translucent; `overlay` not on a cutout block. `FaceTiles` stay the default tiles for icons, drops and the held block |
 | `material` | none | reflective surface tuning for the ores: `metallic` (0..1, default 0 - an ordinary diffuse block), `roughness` (0..1, default 1, lower being a tighter highlight) and `normalStrength` (0..4, default 1, scaling the tile's normal map). Omitting the object costs nothing at render time. Keyed by *texture*, not by block - see the material atlas below |
 | `light.emission` | 0 | 0..15 (`LightEmission`) |
 | `light.color` | warm torch colour | sRGB `[r, g, b]`, 0..255 each, of the block's light; only legal with `emission` > 0. Colours within 0.5/255 share a `BlockLightPalette` slot, and at most 8 distinct colours exist (the default included) - a ninth throws naming the file. `blue_lamp` is the example |
@@ -1007,8 +1079,9 @@ The four land biomes sit on a temperature x humidity grid: **forest** (warm+wet;
 grass hills with flat valleys), **desert** (warm+dry; dunes of sand over sandstone), **taiga**
 (cold+wet; a snowy spruce wood) and **frozen** (cold+dry; a barren snow plain of bare rock and
 occasional ice). Selection is a pure function of (x, z) from low-frequency noise — continentalness
-(low = ocean) plus temperature and humidity, which are read **only** while choosing a biome and the
-worldgen features that follow from it — in `TerrainGenerator.BiomeWeights`; `TerrainGenerator.BiomeAt`
+(low = ocean) plus temperature and humidity, which are read **only** while choosing a biome, the
+worldgen features that follow from it and the grass/foliage tint (`TerrainGenerator.Climate`, see
+"Biome-tinted grass and leaves") — in `TerrainGenerator.BiomeWeights`; `TerrainGenerator.BiomeAt`
 classifies the result. Temperature is a **three-band axis**: the cold ramp
 (`TemperatureColdStart/End`, read by `ColdWeight`: snow, ice, and taiga/frozen at
 `ColdBiomeMinCold`), a temperate band, and the warm ramp (`TemperatureWarmStart/End`, read by
