@@ -1,0 +1,31 @@
+{
+  "wood": "block/log",
+  "leaves": "block/leaves",
+  "growth": {
+    "logic": "oak",
+    "signalEnergy": 14,
+    "upProbability": 2,
+    "lowestBranchHeight": 3,
+    "maturitySteps": [60, 90]
+  },
+  "thickness": {
+    "tipPx": 1,
+    "pipeExponent": 2.0,
+    "maxPx": 16,
+    "girthProfile": [[0, 1.0]],
+    "trunkShape": "circle",
+    "rim": "block"
+  },
+  "leafCluster": { "shape": "blob", "radius": 2, "hydration": 4, "tipMaxPx": 3 },
+  "features": [ { "type": "roots", "depth": 4 } ],
+  "lod": { "crownHeight": [6, 10], "crownRadius": 2, "profile": "dome" },
+  "worldgen": {
+    "biomes": ["forest"],
+    "density": 0.02,
+    "spacing": 2,
+    "maxSlope": 2,
+    "minSoil": 2,
+    "minGround": 4,
+    "maxGround": 90
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "wood": "block/spruce_log",
+  "leaves": "block/spruce_leaves",
+  "growth": {
+    "logic": "conifer",
+    "signalEnergy": 16,
+    "upProbability": 4,
+    "lowestBranchHeight": 2,
+    "maturitySteps": [70, 110]
+  },
+  "thickness": { "tipPx": 1, "pipeExponent": 2.0, "maxPx": 16 },
+  "leafCluster": { "shape": "cone", "radius": 3, "hydration": 3, "tipMaxPx": 3 },
+  "features": [ { "type": "roots", "depth": 4 } ],
+  "lod": { "crownHeight": [7, 12], "crownRadius": 3, "profile": "cone" },
+  "worldgen": {
+    "biomes": ["taiga"],
+    "density": 0.03,
+    "spacing": 2,
+    "maxSlope": 2,
+    "minSoil": 2,
+    "minGround": 4,
+    "maxGround": 90
+  }
+}

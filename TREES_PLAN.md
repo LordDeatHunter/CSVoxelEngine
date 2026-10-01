@@ -2,8 +2,8 @@
 
 ## Status
 
-No phase is done yet. Each phase lands as its own commit on `tree-rework`; finished phases are
-collapsed into short summaries here.
+Phase 1 done (content + codecs, headless). Phases 2-8 pending. Each phase lands as its own
+commit on `tree-rework`; finished phases are collapsed into short summaries here.
 
 ## Context
 Trees are hardcoded C# today: `TreeGenerator.BuildShape` (broadleaf) and `BuildSpruceShape`,
@@ -19,7 +19,7 @@ per taper step (log/branch/limb/sprig/switch/twig, 4 cactus ids, `wood.taperLeve
   are exact.
 
 Implementation is tracked here, one plan-and-implement run per phase,
-`plan-and-implement`, like `MESHER_PLAN.md`. Old saves are allowed to break.
+like `MESHER_PLAN.md`. Old saves are allowed to break.
 
 ## Design (decisions from the grilling session)
 
@@ -153,10 +153,18 @@ bands }`:
   the existing tiles).
 
 ## Phases
-1. **Content + codecs (headless, beside the old code).** Add the
-   species DTO, registry loading and validation, `WoodState`/`LeafState`, and the
-   `IGrowthLogic`/`ITreeFeature` registries. Tests: codec round-trip rules and the validation
-   errors.
+1. **Done — content + codecs.** `src/WorldGen/Trees/`: `WoodState` (bits 0-3 thickness, 4-6
+   parent dir in `Chunk.CubeFaces` order with 6 root / 7 detached, bit 7 shell; `TryParentOffset`
+   reads the face table) and `LeafState` (bits 0-2 hydration, bit 3 persistent);
+   `IGrowthLogic`/`ITreeFeature` with immutable name registries (oak, conifer, cactus, umbrella,
+   baobab; roots, buttress — placeholders until phase 2); `TreeSpeciesDefinition` ->
+   `TreeSpeciesCompiler.Compile` (pure, every error names the file) -> `TreeSpeciesRegistry`,
+   loaded by `ContentRegistry.Load` after the blocks (a missing `assets/data/trees` folder is
+   tolerated). oak/spruce/cactus ship in `assets/data/trees` pointing at today's log/leaves,
+   spruce_log/spruce_leaves and cactus blocks, mirroring `WorldGenerationConfig`'s placement
+   numbers; `leaves` and `leafCluster` are optional together (cactus). Nothing reads the species
+   yet. Tests: `WoodStateTests`, `LeafStateTests`, `TreeSpeciesCompilerTests`,
+   `TreeSpeciesContentTests`.
 2. **Growth engine (headless).** `TreeGraph`, `ITreeSpace` (virtual), `TreeGrower.Pulse` with
    the pipe model and girth, the `oak`/`conifer`/`cactus` logics, the leaf-cluster rule,
    `TreeRasterizer` (no wide trunks yet) and the `roots` feature. Tests: determinism, a parent

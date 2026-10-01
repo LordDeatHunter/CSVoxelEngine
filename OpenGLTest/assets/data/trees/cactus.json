@@ -1,0 +1,22 @@
+{
+  "wood": "block/cactus",
+  "growth": {
+    "logic": "cactus",
+    "signalEnergy": 8,
+    "upProbability": 3,
+    "lowestBranchHeight": 1,
+    "maturitySteps": [25, 45]
+  },
+  "thickness": { "tipPx": 4, "pipeExponent": 1.5, "maxPx": 12, "trunkShape": "square" },
+  "features": [ { "type": "roots", "depth": 2 } ],
+  "lod": { "crownHeight": [3, 6], "crownRadius": 1, "profile": "column" },
+  "worldgen": {
+    "biomes": ["desert"],
+    "density": 0.010,
+    "spacing": 2,
+    "maxSlope": 2,
+    "minSoil": 0,
+    "minGround": 1,
+    "maxGround": 90
+  }
+}

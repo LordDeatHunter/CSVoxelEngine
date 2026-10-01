@@ -115,6 +115,7 @@ public static class ContentRegistry
         LoadMeltRecipes(Path.Combine(assetsRoot, "data", "recipes", "melt"));
         LoadCastRecipes(Path.Combine(assetsRoot, "data", "recipes", "cast"));
         LoadEntities(assetsRoot);
+        LoadTreeSpecies(Path.Combine(assetsRoot, "data", "trees"));
         ValidateItemUses(itemFiles);
     }
 
@@ -523,6 +524,7 @@ public static class ContentRegistry
         _sfxGroups = new Dictionary<string, IReadOnlyList<string>>();
         ItemRegistry.Reset();
         EntityRegistry.Reset();
+        TreeSpeciesRegistry.Reset();
 
         Array.Clear(BlockType.ById);
         Array.Clear(BlockType.Emission);
@@ -952,6 +954,43 @@ public static class ContentRegistry
         }
 
         EntityRegistry.Publish(types);
+    }
+
+    /// <summary>
+    /// Compiles every tree species under <c>assets/data/trees</c> into
+    /// <see cref="TreeSpeciesRegistry"/>. Runs after the blocks, so block ids and
+    /// <see cref="BlockType.ById"/> are settled; nothing from <see cref="BakeModels"/> is read. A
+    /// missing folder is tolerated (an empty registry), like the recipe folders.
+    /// </summary>
+    private static void LoadTreeSpecies(string folder)
+    {
+        var species = new Dictionary<string, TreeSpecies>(StringComparer.Ordinal);
+        if (Directory.Exists(folder))
+        {
+            foreach (var (name, path) in JsonFilesIn(folder))
+                species[name] = CompileTreeSpeciesFile(name, path);
+        }
+
+        TreeSpeciesRegistry.Publish(species);
+    }
+
+    /// <summary>
+    /// Reads and compiles one species file. Internal so tests can feed a file and see the same
+    /// JSON and validation errors, each naming that path, without reloading the registry.
+    /// </summary>
+    internal static TreeSpecies CompileTreeSpeciesFile(string name, string path) =>
+        TreeSpeciesCompiler.Compile(name, ReadJson<TreeSpeciesDefinition>(path), path, ResolveSpeciesBlock);
+
+    /// <summary>
+    /// A species' block reference: an optional <c>block/</c> prefix or a bare block file name.
+    /// Species name blocks only, never items, which is why <see cref="TryResolve"/>'s bare-name
+    /// item fallback is not used; anything else resolves to null.
+    /// </summary>
+    private static byte? ResolveSpeciesBlock(string reference)
+    {
+        if (reference.StartsWith("item/", StringComparison.Ordinal)) return null;
+        var bare = reference.StartsWith("block/", StringComparison.Ordinal) ? reference["block/".Length..] : reference;
+        return BlockIds.TryGetValue(bare, out var id) && BlockType.ById[id] != null ? id : null;
     }
 
     private static void LoadRecipes(string folder)
