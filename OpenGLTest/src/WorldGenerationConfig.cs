@@ -663,7 +663,8 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // ramp (TemperatureWarm*, read by TerrainGenerator.WarmWeight) holds the desert; the raw-noise
     // gap between them is the temperate band. Cold land is taiga (with humidity) or the barren
     // frozen biome (without it). Temperature and humidity are read only while choosing a biome and
-    // the worldgen features that follow from it, so nothing else in the game sees them.
+    // the worldgen features that follow from it, and by the grass/foliage tint through
+    // TerrainGenerator.Climate, so nothing else in the game sees them.
     // Low frequency (one octave, see TerrainGenerator's ctor) keeps the temperature gradient shallow,
     // so the raw-noise gap between the two ramps spans a wide band of world: at this frequency it
     // keeps every hot column at least a full-detail load radius from snow
@@ -749,6 +750,28 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
 
     // How far a spreading fluid looks for a hole to fall into before spreading evenly
     public const int FluidSlopeSearchDistance = 4;
+
+    // --- Biome tint (BiomeTint: grass and foliage colour from climate) ---
+    // sRGB target colours of a flat, fully lit tinted face, one palette per tint kind. The four
+    // corners sit on the biome lines of TerrainGenerator.Climate (ColdDry = frozen, ColdWet =
+    // taiga, WarmDry = desert, WarmWet = warm forest); the temperate band is the midpoint of the
+    // two rows, and at full wetness the grass midpoint (70, 132, 77) lands near grass_top's
+    // measured mean, so near-spawn grass matches the inventory icon. Every channel must stay
+    // under the ceiling BiomeTint.Gain reaches against the grey tiles (about sRGB 183), which
+    // BiomeTintTests enforces.
+    public static readonly Vector3 GrassColorColdDry = new Vector3(112f, 138f, 104f) / 255f;
+    public static readonly Vector3 GrassColorColdWet = new Vector3(74f, 124f, 88f) / 255f;
+    public static readonly Vector3 GrassColorWarmDry = new Vector3(142f, 146f, 70f) / 255f;
+    public static readonly Vector3 GrassColorWarmWet = new Vector3(66f, 140f, 66f) / 255f;
+    // Foliage (leaves, spruce leaves): the same climate axes, a little darker than the grass.
+    public static readonly Vector3 FoliageColorColdDry = new Vector3(92f, 118f, 86f) / 255f;
+    public static readonly Vector3 FoliageColorColdWet = new Vector3(58f, 106f, 70f) / 255f;
+    public static readonly Vector3 FoliageColorWarmDry = new Vector3(120f, 126f, 58f) / 255f;
+    public static readonly Vector3 FoliageColorWarmWet = new Vector3(52f, 120f, 52f) / 255f;
+    // The sRGB grey every textureless tile averages to (the two supplied grass tiles measure 98.4
+    // and 97.4, and tools/generate-leaf-textureless.ps1 normalises the leaf tiles to it), so the
+    // one BiomeTint.Gain fits them all.
+    public const float BiomeTintTextureGrey = 98f / 255f;
 
     // --- Mud ---
     // Dirt with water directly above it and at least this many water cells in its

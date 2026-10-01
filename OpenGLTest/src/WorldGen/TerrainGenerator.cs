@@ -241,6 +241,22 @@ public static class TerrainGenerator
     /// the whole cold ramp. A biome-generation input like <see cref="ColdWeight"/>.</summary>
     public static float WarmWeight(float x, float z) => WarmOf(TemperatureNoise.GetNoise(x, z));
 
+    /// <summary>
+    /// The climate axes behind the biome ramps, as 0..1, so a palette keyed to them has its
+    /// corners on the biome lines (<see cref="BiomeTint"/>). Warmth is 0 fully cold, exactly 0.5
+    /// across the temperate band (the cold and warm ramps are exclusive) and 1 fully warm;
+    /// wetness is 1 minus the <c>dry</c> weight of <see cref="BiomeWeights"/>. Raw humidity is
+    /// two-octave FBm and would never reach the palette corners, hence the ramp. A pure function
+    /// of position like everything else here.
+    /// </summary>
+    public static void Climate(float x, float z, out float warmth01, out float wetness01)
+    {
+        var t = TemperatureNoise.GetNoise(x, z);
+        warmth01 = 0.5f * (1f - ColdOf(t)) + 0.5f * WarmOf(t);
+        wetness01 = MathUtils.SmoothStep(WorldGenerationConfig.HumidityDryStart,
+            WorldGenerationConfig.HumidityDryEnd, HumidityNoise.GetNoise(x, z));
+    }
+
     /// <summary>Whether world column (x, z) is forest; vegetation and spawn rules ask here.</summary>
     public static bool IsForest(int x, int z) => BiomeAt(x, z) == Biome.Forest;
 
