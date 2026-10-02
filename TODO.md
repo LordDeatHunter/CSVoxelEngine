@@ -357,6 +357,18 @@ same world, and a player can move between them freely — neither arc gates the 
   op) shows no far canopy until reload; needs an add-canopy override (`LodSurface`-style) keyed by
   column. Every grow also spends `CanopyDisturbedLimit` budget (radius 0 per column), so heavy
   growth brings `M-10`'s wholesale `Clear()` closer.
+- [ ] **`M-14` · Wide-trunk residue (TREES_PLAN phase 7)** — P3, M. Three known gaps left by the
+  core/shell trunks: (1) a felled tree is meshed by `TopplingTree.BuildMeshData` inside one 16³
+  scratch chunk, so a wide or tall tree's falling mesh is truncated to that box (the drops are
+  intact) — needs a multi-chunk scratch or a bounds-sized mesh build; (2) cutting a wide trunk's
+  core while its slice's shells stand leaves the crown unreachable for reactive growth, because
+  `TreeGraph.FromWorld` stops at the missing core and `TreeGrowthWriter` cannot refill it (the
+  core above still names it as its parent, so the cell reads as an orphan's missing parent) —
+  needs `FromWorld` to bridge a cut core through its shell ring, or the writer to re-core it;
+  (3) a bevelled pixel-rim shell's cap cull reads the edge neighbours of the cell above or below,
+  which can lie in an edge-diagonal chunk that face-adjacent dirtying (`ChunkManager.MarkDirty`)
+  does not remesh, so an edit there can leave a rare stale cap hole or overdraw until the chunk is
+  next rebuilt — needs the edit paths to dirty edge-diagonal chunks for pixel-rim wood.
 - [ ] **`M-11` · `LodRegion.ColumnCaps` grows unbounded, and it must NOT take D2's scheme** —
   P2, L, blocked on a design. **It is edit state, not a cache**, and it is the sibling of `M-10`
   above. `LodRegion.ColumnCaps` (`LodRegion.cs:130`) is a **process-global** `ConcurrentDictionary`

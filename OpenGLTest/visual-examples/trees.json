@@ -48,6 +48,45 @@
   // leaves. Each grow schedules leaf decay over the box it wrote, so a few leaves the old tips
   // fed may speckle away after it, and every grown column loses its far-LOD canopy until reload
   // (the LOD hook can only remove a canopy bump, not add one).
+  //
+  // Wide trunks (phase 7): the last block plants a baobab and a stone pine, neither of which
+  // has a worldgen block, on open flat forest about 40 blocks south-west of the oak. Both columns
+  // were probed headless: the generated ground is level over the 9x9 around each root (grass,
+  // dry), no worldgen tree stands within 34 blocks of either (baobab reach plus a worldgen tree's
+  // reach), every sight line below crosses only air before the subject, and the grows were
+  // replayed with the writer's call counter at 4 and 5 (the four earlier grows of this scenario
+  // advance it; a new grow inserted before them reshapes both trees).
+  //   baobab     root (-121, 11, 40), planted with 120 steps: 186 wood cells (nodes, shells and
+  //              fins), 244 leaves, crown x -126..-116, y 11..26, z 35..45. Circle trunk of
+  //              block radius 2 up to root + 2, radius 1 to root + 4, the crown forking at root + 5;
+  //              buttress fins on the root level run west to x -124, north to z 37 and south to
+  //              z 44. The cut slice is y 12 (root + 1, above the fins): 21 cells, rows z 39..41
+  //              five wide (x -123..-119), the outer rows z 38 and z 42 three wide (x -122..-120).
+  //   stone pine root (-90, 14, 43), planted with 90 steps: an 11-cell trunk under a flat crown
+  //              13 blocks wide (x -96..-84, z 37..49) and about 5 tall.
+  // baobab_grown should show a wide round trunk with stair-stepped bevelled corners on its outer
+  // shells and the fins resting on the ground; baobab_rim is the close look at the trunk base:
+  // each rim must match its outline (aim at it in a manual run), with no hole above or below a
+  // bevelled shell and full faces where a shell meets the core or another shell. stone_pine_grown
+  // shows the flat, wide umbrella crown on its bare trunk.
+  // The cut follows the limb idiom: every cell is aimed from 4 blocks west along its own row (eye
+  // at the cell's z + 0.5 and y 12.5, yaw 0, pitch 0, inside InteractionReach), so the ray crosses
+  // only the row's cells already cut, and one single-frame creative `mine` removes exactly that
+  // cell. The three middle rows go first; baobab_partial_cut, filmed from 13 blocks west at slot
+  // height (beyond InteractionReach, so no outline) once the debris has settled, must show sky
+  // and terrain through the notch and the tree still standing on the two outer rows
+  // (shell-to-shell vertical links carry it). Cutting the core alone (the eighth cut) drops just
+  // that cell and the two leaves the felling sweep finds within two cells of it. The last of the
+  // six outer-row cuts fells everything above the slice (383 blocks), which tips east, away from
+  // the eye: baobab_felled_falling should show the whole crown toppling and baobab_felled_down it
+  // lying, with the root slice and the fins left standing. Known truncation: the felled mesh is
+  // drawn only inside its 16^3 scratch chunk, so a tree wider than that would lose its rim while
+  // falling; its drops are intact either way.
+  // The grown shots wait 3 s: a chunk meshed for the first time (the air chunks the crowns grow
+  // into) fades in over Chunk.MAX_LIFETIME once its asynchronous mesh lands, and a shot taken
+  // during that fade shows the crown half see-through and sky-tinted. Natural slime and goblin
+  // spawns roam this open forest and may stand in a shot; a mob inside the punch cone of a cut
+  // would take the punch instead of the cell, so check the log's mine steps if a cut looks short.
   "steps": [
     { "op": "fly" },
 
@@ -103,6 +142,75 @@
 
     { "op": "teleport", "pos": [594.3, 19.5, 1281.8], "yaw": -168.8, "pitch": -4.8 },
     { "op": "wait", "seconds": 8 },
-    { "op": "screenshot", "name": "cactus", "hideHud": true }
+    { "op": "screenshot", "name": "cactus", "hideHud": true },
+
+    { "op": "teleport", "pos": [-120.5, 19.0, 56.5], "yaw": -90, "pitch": -2 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "grow", "species": "baobab", "pos": [-121, 40], "steps": 120 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "baobab_grown", "hideHud": true },
+    { "op": "teleport", "pos": [-124.5, 13.0, 45.5], "yaw": -51.3, "pitch": -12.3 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "baobab_rim", "hideHud": true },
+
+    { "op": "teleport", "pos": [-89.5, 21.0, 59.5], "yaw": -90, "pitch": 0 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "grow", "species": "stone_pine", "pos": [-90, 43], "steps": 90 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "stone_pine_grown", "hideHud": true },
+
+    { "op": "teleport", "pos": [-126.5, 12.5, 39.5], "yaw": 0, "pitch": 0 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "baobab_cut_aim" },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-125.5, 12.5, 39.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-124.5, 12.5, 39.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-123.5, 12.5, 39.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-122.5, 12.5, 39.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-126.5, 12.5, 40.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-125.5, 12.5, 40.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-124.5, 12.5, 40.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-123.5, 12.5, 40.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-122.5, 12.5, 40.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-126.5, 12.5, 41.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-125.5, 12.5, 41.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-124.5, 12.5, 41.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-123.5, 12.5, 41.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-122.5, 12.5, 41.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-133.5, 12.6, 40.5], "yaw": 0, "pitch": 0 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "baobab_partial_cut", "hideHud": true },
+
+    { "op": "teleport", "pos": [-125.5, 12.5, 38.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-124.5, 12.5, 38.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-123.5, 12.5, 38.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-125.5, 12.5, 42.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-124.5, 12.5, 42.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-123.5, 12.5, 42.5], "yaw": 0, "pitch": 0 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-112.5, 34.0, 60.5], "yaw": -90, "pitch": -45 },
+    { "op": "wait", "seconds": 0.7 },
+    { "op": "screenshot", "name": "baobab_felled_falling", "hideHud": true },
+    { "op": "wait", "seconds": 1.3 },
+    { "op": "screenshot", "name": "baobab_felled_down", "hideHud": true }
   ]
 }

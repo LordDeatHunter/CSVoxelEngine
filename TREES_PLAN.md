@@ -2,8 +2,9 @@
 
 ## Status
 
-Phases 1-6 done (content + codecs; headless growth engine; cutover to engine-grown trees;
-tree-vs-tree cell batches + LOD canopy proxy + perf; leaf decay; reactive growth). Phases 7-8 pending. Each phase lands as its own commit on `tree-rework`; finished phases are
+Phases 1-7 done (content + codecs; headless growth engine; cutover to engine-grown trees;
+tree-vs-tree cell batches + LOD canopy proxy + perf; leaf decay; reactive growth; wide trunks +
+baobab/stone pine). Phase 8 pending. Each phase lands as its own commit on `tree-rework`; finished phases are
 collapsed into short summaries here.
 
 ## Context
@@ -105,8 +106,9 @@ bands }`:
 - **Leaves follow the wood:** they are a pure function of the graph plus obstacles and never
   steer growth. Worldgen computes them once at maturity; in-world growth regrows the clusters
   around changed tips and prunes the leaves that lost hydration.
-- **`TreeRasterizer`:** turns the graph into cells + state (wood, then core/shell girth, then
-  features, then leaves). It is shared by worldgen stamping, the far LOD and the debugger.
+- **`TreeRasterizer`:** turns the graph into cells + state (the graph nodes in index
+  order — growth nodes, then feature nodes — then the trunk chain's core/shell girth, then
+  leaves). It is shared by worldgen stamping, the far LOD and the debugger.
 - **Reactive mode:** `TreeGraph.FromWorld(root)` rebuilds the graph from the wood states.
   Cut branches stay cut, obstacles are real blocks, and growth writes only into air or the
   species' own leaves.
@@ -379,10 +381,106 @@ bands }`:
    target column that crosses only a branch, not the root, plants a sapling; unmodified neighbour
    chunks re-stamp the original worldgen tree on load (the same residue as cutting); the World's
    immediate remesh duplicates one async rebuild.
-7. **Wide trunks + new species.** Core/shell rasterisation (circle and square), the pixel-rim
-   bevel in the mesher and the hitboxes, shell-aware felling, `girthProfile`, the `buttress`
-   feature, the `baobab` and `umbrella` logics, the baobab and stone_pine species without a
-   `worldgen` block, and the placeholder art script.
+7. **Done — wide trunks + new species.** `TreeRasterizer` is the only place a wide node becomes
+   a core plus shells: `MaxShellRadius` (`RawBlockRadius(TreeSpeciesCompiler.MaxTrunkPx)`, now
+   `internal`, assigned before the offset tables are built in the static ctor), `BlockRadius(d)`
+   (`floor((d/16 - 1)/2)` clamped to it, so the `2R+1` footprint never exceeds the diameter and
+   shells first appear at 48 px), `MinDiameterPx(r)`, `InFootprint` (square = Chebyshev `<= r`,
+   circle = `dx²+dz² <= r²+r`), `ShellParentDir` (one step toward the core, along X when
+   `|dx| >= |dz|`), `ShellOffsets` (static `ShellOffset(Dx, Dz, ParentDir)` tables sorted
+   parent-first) and `TrunkChain` (the root, then repeated `ChildIn(Up)`). Only the trunk chain
+   grows shells, so every core is alone at its Y and emission is a function of the node set,
+   never of index order. The new `Rasterize(..., out int woodCount)` overload fixes the order as
+   nodes in index order (growth, then feature nodes), then shells (thickness 15, shell bit,
+   parent toward the core, emitted only when that parent is the core, an emitted shell or a
+   full-cube feature node at the core's Y), then leaves; `TreeGenerator`
+   (`TreeShape.WoodCount`), `TreeGrowthWriter` and `StampedTree` split wood from leaves at
+   `woodCount`. `ITreeSpace.AcceptsShell` (default `IsFree`) is the shell placement test,
+   `LeafCluster.Collect` takes an `exclude` set so no leaf lands on a shell, and `ReachOf` widens
+   Horizontal by `BlockRadius(MaxPx)` (plus `TreeButtressMaxReach` for a buttress species). A
+   species that never passes 16 px rasterises byte-identically, so oak, spruce and cactus
+   worldgen is unchanged. `girthProfile` multiplies the grower's thickness by height fraction.
+   `TreeGraph.FromWorld` skips shells, recovers a trunk core's floor as `MinDiameterPx(R)` from
+   the longest shell run along the eight lines `(±k,0)`, `(0,±k)`, `(±k,±1)` (only when
+   `BlockRadius(MaxPx) > 0`), and loads non-root nodes at the root's Y as feature nodes for a
+   buttress species; the compiler requires `lowestBranchHeight >= 1` for those, which makes the
+   rule exact. `WorldTreeSpace.AcceptsShell` also accepts the species' own attached shells (they
+   stay non-free, so growth never grows into them), `TreeGrower.GrowFurther(applyFeatures)` runs
+   the features only for a freshly planted sapling, and `TreeGrowthWriter` gained a parent-first
+   shell pass with the **new-ring-only** rule: inside the footprint each original core had before
+   the call it only re-codes existing shells, and it fills free cells only outside that ring or
+   around a core new this call, so a mined shell or a partial slice cut stays mined. Felling and
+   decay share one GL-free bounded search, `TreeSupport` (`TreeSupportResult` Supported /
+   Unsupported / Unknown): links are parent edges (`TreeWoodShape.Connects`) plus vertical
+   shell-to-shell adjacency, anchors are root cells and shells standing on real ground (solid,
+   not tree wood, not leaves), and cells that lose every path to an anchor fall.
+   `TopplingTree.Collect` fells the components that lose every anchor once the cut cell is gone
+   (unloaded reads are no link; identical to the old subtree walk on thin trees; the canopy sweep
+   skips shells), so a wide trunk falls only once a whole slice is cut;
+   `LeafDecayManager.TickWood` crumbles by the same rule through a memoised parent-chain fast
+   path (`WalkParentChain`) and a full search on a broken chain (unloaded = freeze), with
+   per-frame `_supported`/`_unsupported` memos, and shells are never live tips. The caps
+   decouple: `TreeGrowNodeCap` 512 (FromWorld and grown nodes), `TreeFellWoodCap` 2048 (nodes plus
+   shells, the support search cap), `TreeFellTotalCap` 4096. `ButtressFeature` (replacing the
+   placeholder; `TreeButtressFinChance`, `TreeButtressMaxReach`) walks full-cube feature fins
+   along the four cardinal axes at the root's Y out to `R + len`, stopping at an occupied or
+   non-free cell or one over a free cell, always drawing both random numbers per side; on-axis
+   fins replace the on-axis shells and the off-axis shells chain through them.
+   `BaobabGrowthLogic` (forks boosted at the crown base, trunk stops at `LowestBranchHeight +
+   CrownLift`, limbs bounded by `LimbReach` Chebyshev from the root column, a climbing limb never
+   turns back out) and `UmbrellaGrowthLogic` (trunk stops at `LowestBranchHeight + CrownLift`,
+   limbs run straight and rarely climb) replace `PlaceholderGrowthLogic`; both only lower, zero
+   or multiply weights. The pixel rim: `BlockType.PixelRimById`/`HasPixelRim`, filled from each
+   species' `rim` in `ContentRegistry.LoadTreeSpecies` (two species sharing a wood must agree, or
+   load throws naming both files); `TreeWoodShape.CanBevel`, `IsRimMass`, `RimCornerMask` (a
+   corner is carved when neither of its two edge neighbours is same-id attached full-cube wood —
+   the marching-squares outcome, and diagonals never matter because a cell only removes its own
+   material), `RimInsetPx`, `RimBoxes` (stair-stepped full-height boxes, at most `MaxRimBoxes`,
+   `TreeRimBevelPx` 8) and `RimSideFull` (the culling predicate) feed `GetBoxes`/`GetBoxesAt`/
+   `OverlapsShape` (allocation-free; non-rim cells keep the zero-read path), and through them the
+   raycast, outline and collision. `Chunk.EmitRimWood` meshes a bevelled shell from the 18³
+   snapshot (`RimMaskInSnapshot`, `RimFaceFull`; exact caps that subtract a bevelled cell above or
+   below), and the plain cube path culls a same-wood face only when the neighbour's facing side
+   is full. Content: `assets/data/trees/baobab.json` (logic baobab, maxPx 80, circle, pixel rim,
+   buttress) and `stone_pine.json` (logic umbrella, maxPx 24, circle, block rim, roots), both
+   **without** a `worldgen` block, the blocks `baobab_log`, `baobab_leaves`, `stone_pine_log`,
+   `stone_pine_leaves` mirroring oak's, and placeholder art from the deterministic
+   `tools/generate-tree-textures.ps1` (oak tiles times a per-species tint, then
+   `generate-leaf-textureless.ps1 -Sources baobab_leaves,stone_pine_leaves`, which leaves the oak
+   and spruce tiles untouched); `TreeGenerator.LeavesBlock` is now taken only from worldgen
+   species, so the far LOD's fallback canopy stays oak. `trees.json` gained `baobab_grown`,
+   `baobab_rim`, `stone_pine_grown`, `baobab_cut_aim`, `baobab_partial_cut`,
+   `baobab_felled_falling` and `baobab_felled_down` (baobab grown 120 steps at (-121, 40), stone
+   pine 90 steps at (-90, 43), slice y 12 cut middle rows first). Tests: `TreeRasterizerTests`
+   (shells only around wide trunk nodes, every shell chains to its core inside the footprint,
+   parents step toward the core, circle inside square and rotation-symmetric, footprint never
+   exceeds the diameter, shells never land on nodes/leaves/blocked cells, emission ignores node
+   order; the order and parent tests run over wide species), `TreeGrowerTests` (a larger girth
+   never thins a node or drops a shell, buttress fins are connected wood on the ground, a thin
+   root grows no buttress, buttress never lands on blocked cells, the reach bound restated per
+   node kind), `TreeGraphFromWorldTests` (a wide trunk round-trips, shells are never nodes),
+   `TreeSpeciesCompilerTests` (buttress needs `lowestBranchHeight >= 1`), `TreeGrowthTests`
+   (growth keeps a wide trunk and never thins it, a mined shell stays mined, planting applies
+   features only once), `TreeFellingTests` (a partial slice fells nothing, a whole slice fells
+   everything above, cutting the root core leaves the trunk standing, only real ground anchors
+   a shell), `LeafDecayTests` (the orphan crumble agrees with felling for a thin limb and partial
+   and whole slices, a standing wide trunk never crumbles), `TreeGrowthLogicTests` (umbrella
+   crowns are wider than tall, umbrella and baobab trunks stop at the crown, baobab limbs stay in
+   reach and never turn back out, every wide species grows shells), `TreeWoodShapeGeometryTests`
+   (rim boxes tile the carved footprint, carving never adds material, insets shrink from the
+   corner, mirroring, box bound, `RimSideFull` matches coverage), `TreeWoodShapeTests` (the rim
+   mesh covers exactly the rim hitboxes), `HitboxCollisionTests` (pixel-rim shells collide with
+   their rim boxes), `TreeSpeciesContentTests` (the pixel-rim flag follows the species), and the
+   shared `WideTreeSpecies` harness. Known residue (`TODO.md` `M-14` for the first three): the
+   felled mesh is drawn only inside its 16³ scratch chunk (the drops are intact); a wide core cut
+   while its slice's shells stand leaves the crown unreachable for reactive growth, because
+   `FromWorld` stops at the missing core, which cannot be refilled since the core above names it;
+   a bevelled shell's vertical cull reads the edge neighbours of the cell above, which can lie in
+   an edge-diagonal chunk that face-adjacent dirtying does not remesh, so a rare cap can go stale;
+   cutting a wide trunk's root core drops only its root walk and fins (plus a couple of leaves the
+   canopy sweep finds); buttress fins apply only at maturity or planting; mined shells never
+   regrow inside the old ring; the selection outline shows the rim box seams; leaf particles for
+   the new leaves use oak tiles; limbs over 16 px render as 16 px cubes.
 8. **ItemDebugger TREES tab + docs.** A third tab that grows a species pulse by pulse with a
    step slider, meshed through the scratch-chunk path `TopplingTree.BuildMeshData` already
    uses, plus a GL-free tested state class. Extend `visual-examples/trees.json`, and update
