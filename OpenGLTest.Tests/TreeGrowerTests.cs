@@ -7,7 +7,7 @@ namespace silkgltriangle.Tests;
 
 /// <summary>
 /// Rules of <see cref="TreeGrower"/>: determinism from position and seed, the parent chain, the
-/// pipe model and girth, the reach bound, obstacles and the roots feature. Every shipped species
+/// pipe model and girth, the reach bound, obstacles, the roots feature and the buttress fins. Every shipped species
 /// is checked through <see cref="TreeSpeciesRegistry.All"/>; nothing pins a height, a count or a
 /// JSON number.
 /// </summary>
@@ -186,20 +186,66 @@ public sealed class TreeGrowerTests
     }
 
     [Fact]
+    public void ALargerGirthProfileNeverThinsANodeOrDropsAShell()
+    {
+        const float k = 1.5f;
+        var anyShell = false;
+        foreach (var shape in Enum.GetValues<TrunkShape>())
+        {
+            var thin = WideTreeSpecies.Default(shape);
+            var scaled = thin.GirthProfile.Select(p => (p.Height01, p.Multiplier * k)).ToList();
+            var thick = WideTreeSpecies.From(WideTreeSpecies.LeafyBase, thin.MaxPx, scaled, shape);
+
+            foreach (var pos in Positions)
+            {
+                var spaceA = Flat();
+                var spaceB = Flat();
+                var a = Grow(thin, pos, SeedA, spaceA);
+                var b = Grow(thick, pos, SeedA, spaceB);
+
+                // Girth never steers: the same cells under the same parents
+                Assert.Equal(a.Count, b.Count);
+                for (var i = 0; i < a.Count; i++)
+                {
+                    Assert.Equal((a[i].X, a[i].Y, a[i].Z, a[i].Parent), (b[i].X, b[i].Y, b[i].Z, b[i].Parent));
+                    Assert.True(b[i].ThicknessPx >= a[i].ThicknessPx, $"{shape} node {i} thinned under the larger girth");
+                }
+
+                var shellsA = Shells(TreeRasterizer.Rasterize(a, thin, spaceA, out var woodA), woodA);
+                var shellsB = Shells(TreeRasterizer.Rasterize(b, thick, spaceB, out var woodB), woodB);
+                Assert.Subset(shellsB, shellsA);
+                anyShell |= shellsB.Count > 0;
+            }
+        }
+        Assert.True(anyShell, "the larger girth grew no shell, so the shell subset went untested");
+
+        static HashSet<TreeCell> Shells(List<TreeCell> cells, int woodCount) =>
+            cells.Take(woodCount).Where(c => WoodState.IsShell(c.State)).ToHashSet();
+    }
+
+    [Fact]
     public void GrowthStaysWithinTheSpeciesReach()
     {
-        foreach (var species in TreeSpeciesRegistry.All)
+        foreach (var species in TreeSpeciesRegistry.All.Concat(WideTreeSpecies.AllShapes).Concat(WideButtressSpecies))
         foreach (var pos in Positions)
         {
             var space = Flat();
             var graph = Grow(species, pos, SeedA, space);
             var reach = TreeRasterizer.ReachOf(species);
+            int growth = 0, belowRoot = 0, atRoot = 0;
 
             for (var i = 0; i < graph.Count; i++)
             {
                 var n = graph[i];
                 if (n.IsFeature)
+                {
+                    // Features never climb: roots run below the root, buttress fins along its level
+                    Assert.True(n.Y <= graph.RootY, $"{species.Name}: feature node {i} above the root");
+                    if (n.Y < graph.RootY) belowRoot++;
+                    else atRoot++;
                     continue;
+                }
+                growth++;
                 Assert.True(LeafCluster.Distance(n.X - pos.X, n.Y - pos.Y, n.Z - pos.Z) <= species.SignalEnergy);
                 Assert.True(n.Y >= graph.RootY);
             }
@@ -210,8 +256,125 @@ public sealed class TreeGrowerTests
                 Assert.InRange(c.Z - pos.Z, -reach.Horizontal, reach.Horizontal);
                 Assert.InRange(c.Y - pos.Y, -reach.Down, reach.Up);
             }
-            Assert.True(graph.Count <= species.MaturityStepsMax + 1 + reach.Down);
+            // One growth node per pulse plus the root; roots are one straight column inside the
+            // downward reach; fins are at most one straight cardinal walk per side inside the
+            // horizontal reach
+            Assert.True(growth <= species.MaturityStepsMax + 1);
+            Assert.True(belowRoot <= reach.Down);
+            Assert.True(atRoot <= 4 * reach.Horizontal);
         }
+    }
+
+    // --- Buttress fins ---
+
+    private static readonly int[] Seeds = [SeedA, SeedB, 31337, 777];
+
+    private static IReadOnlyList<TreeFeatureSpec> ButtressOnly =>
+        [new TreeFeatureSpec(TreeFeatureRegistry.Require("buttress"), 0)];
+
+    private static bool HasButtress(TreeSpecies species) =>
+        species.Features.Any(f => f.Feature.Name == "buttress");
+
+    /// <summary>The wide synthetic species with only a buttress feature, for every trunk shape.</summary>
+    private static IEnumerable<TreeSpecies> WideButtressSpecies =>
+        Enum.GetValues<TrunkShape>().Select(s => WideTreeSpecies.Default(s, features: ButtressOnly));
+
+    /// <summary>Every registered buttress species plus the wide synthetic ones.</summary>
+    private static IEnumerable<TreeSpecies> ButtressSpecies =>
+        TreeSpeciesRegistry.All.Where(HasButtress).Concat(WideButtressSpecies);
+
+    /// <summary>The graph's root-level feature nodes: the buttress fins.</summary>
+    private static List<int> FinsOf(TreeGraph graph) =>
+        Enumerable.Range(0, graph.Count)
+            .Where(i => graph[i].IsFeature && graph[i].Y == graph.RootY)
+            .ToList();
+
+    [Fact]
+    public void ButtressFinsAreConnectedWoodOnTheGround()
+    {
+        var anyFin = false;
+        foreach (var species in ButtressSpecies)
+        foreach (var pos in Positions)
+        foreach (var seed in Seeds)
+        {
+            var space = Flat();
+            var graph = Grow(species, pos, seed, space);
+            foreach (var i in FinsOf(graph))
+            {
+                anyFin = true;
+                var n = graph[i];
+                Assert.False(space.IsFree(n.X, n.Y - 1, n.Z), $"{species.Name}: fin {i} hangs over a free cell");
+                Assert.True(TreeDirections.IsSide(n.ParentDir), $"{species.Name}: fin {i} is not a horizontal step");
+                Assert.Equal(WoodState.FullCube, TreeRasterizer.ThicknessCode(n.ThicknessPx));
+                Assert.False(LeafCluster.IsLiveTip(graph, species, i), $"{species.Name}: fin {i} is a leaf tip");
+
+                // The chain runs along the ground through fins only, down to the root
+                var at = n.Parent;
+                while (at != TreeGraph.Root)
+                {
+                    Assert.True(at >= 0, $"{species.Name}: fin {i} does not reach the root");
+                    Assert.True(graph[at].IsFeature && graph[at].Y == graph.RootY,
+                        $"{species.Name}: fin {i} hangs off node {at}, which is not a fin");
+                    at = graph[at].Parent;
+                }
+            }
+        }
+        Assert.True(anyFin, "no buttress fin grew, so the fin rules went untested");
+    }
+
+    [Fact]
+    public void AThinRootGrowsNoButtress()
+    {
+        // Every trunk cap whose diameter is too thin for a shell ring
+        var thinCaps = Enumerable.Range(WoodState.PixelsPerBlock, TreeSpeciesCompiler.MaxTrunkPx)
+            .Where(px => TreeRasterizer.BlockRadius(px) == 0)
+            .ToList();
+        Assert.NotEmpty(thinCaps);
+        foreach (var maxPx in new[] { thinCaps.First(), thinCaps.Last() })
+        foreach (var shape in Enum.GetValues<TrunkShape>())
+        {
+            var species = WideTreeSpecies.From(WideTreeSpecies.LeafyBase, maxPx, WideTreeSpecies.StrongGirth,
+                shape, features: ButtressOnly);
+            foreach (var pos in Positions)
+            foreach (var seed in Seeds)
+                Assert.Empty(FinsOf(Grow(species, pos, seed)));
+        }
+    }
+
+    [Fact]
+    public void ButtressNeverLandsOnBlockedCells()
+    {
+        const int ring = 2;
+        var blockedSomething = false;
+        foreach (var species in ButtressSpecies)
+        foreach (var pos in Positions)
+        foreach (var seed in Seeds)
+        {
+            // The fins this tree grows in the open, to know the ring really stood in their way
+            var open = Grow(species, pos, seed);
+            blockedSomething |= FinsOf(open).Any(i =>
+                Math.Max(Math.Abs(open[i].X - pos.X), Math.Abs(open[i].Z - pos.Z)) >= ring);
+
+            var space = Flat();
+            for (var dx = -ring; dx <= ring; dx++)
+            for (var dz = -ring; dz <= ring; dz++)
+            {
+                if (Math.Max(Math.Abs(dx), Math.Abs(dz)) == ring)
+                    space.Occupy(pos.X + dx, pos.Y, pos.Z + dz);
+            }
+
+            var graph = Grow(species, pos, seed, space);
+            foreach (var i in FinsOf(graph))
+            {
+                var n = graph[i];
+                Assert.False(space.IsOccupied(n.X, n.Y, n.Z), $"{species.Name}: fin {i} landed on a blocked cell");
+                Assert.True(Math.Max(Math.Abs(n.X - pos.X), Math.Abs(n.Z - pos.Z)) < ring,
+                    $"{species.Name}: fin {i} jumped past a blocked cell");
+            }
+            foreach (var c in TreeRasterizer.Rasterize(graph, species, space))
+                Assert.False(space.IsOccupied(c.X, c.Y, c.Z), $"{species.Name}: wrote into a blocked cell at {c}");
+        }
+        Assert.True(blockedSomething, "no fin ever reached the blocked ring, so the obstacle rule went untested");
     }
 
     [Fact]

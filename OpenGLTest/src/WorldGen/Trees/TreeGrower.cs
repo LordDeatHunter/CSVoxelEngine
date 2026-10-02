@@ -313,10 +313,14 @@ public static class TreeGrower
     /// rebuilds the pipe values from the topology for a graph seeded from integer diameters, then
     /// up to <paramref name="steps"/> pulses with <paramref name="energy"/>, stopping once the
     /// graph holds <paramref name="maxNodes"/>, then a final <see cref="Thicken"/>. Only appends
-    /// nodes, and runs no features. Returns the number of nodes added.
+    /// nodes. Features run only when the caller asks (<paramref name="applyFeatures"/>), which is a
+    /// freshly planted sapling: they then apply after the final thicken, in order and with the same
+    /// <paramref name="rng"/>, exactly as <see cref="GrowToMaturity(TreeSpecies, int, int, int,
+    /// ITreeSpace, int)"/> applies them. A later grow never re-runs them, since a feature is not
+    /// idempotent. Returns the number of nodes added, feature nodes included.
     /// </summary>
     public static int GrowFurther(TreeGraph graph, TreeSpecies species, ITreeSpace space, SplitMix64 rng,
-        int energy, int steps, int maxNodes)
+        int energy, int steps, int maxNodes, bool applyFeatures = false)
     {
         var countBefore = graph.Count;
         Thicken(graph, species);
@@ -327,6 +331,13 @@ public static class TreeGrower
             Pulse(graph, species, space, rng, energy);
         }
         Thicken(graph, species);
+
+        if (applyFeatures)
+        {
+            var features = species.Features;
+            for (var f = 0; f < features.Count; f++)
+                features[f].Feature.Apply(graph, species, space, features[f].Depth, rng);
+        }
         return graph.Count - countBefore;
     }
 }

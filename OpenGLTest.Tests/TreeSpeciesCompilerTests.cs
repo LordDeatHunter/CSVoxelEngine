@@ -197,7 +197,15 @@ public sealed class TreeSpeciesCompilerTests
         Rejects(d => d.Features = [new() { Type = "roots", Depth = 0 }]);
         Rejects(d => d.Features = [new() { Type = "roots" }]);
         Rejects(d => d.Features = [new() { Type = "buttress", Depth = 2 }]);
+        // Root-level fins are recognised by height, so a buttress species may not branch at the root.
+        Rejects(d => { d.Growth!.LowestBranchHeight = 0; d.Features = [new() { Type = "buttress" }]; });
         Rejects(d => d.Features = [new() { Type = "roots", Depth = 2 }, new() { Type = "roots", Depth = 3 }]);
+
+        // The same buttress compiles once the species branches no lower than one block up.
+        var buttressed = Valid();
+        buttressed.Growth!.LowestBranchHeight = 1;
+        buttressed.Features = [new() { Type = "buttress" }];
+        Assert.Contains(Compile(buttressed).Features, f => f.Feature.Name == "buttress");
 
         // Omitted features compile to none.
         var dto = Valid();

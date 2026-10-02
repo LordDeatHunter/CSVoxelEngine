@@ -12,6 +12,9 @@ namespace silkgltriangle;
 /// neighbour of the species' wood names it as its parent cell, because filling that cell would
 /// re-attach a cut branch. An unloaded cell is never free, and a cell beside one is refused too,
 /// since the orphan rule cannot be checked there.</para>
+/// <para>A wide trunk's shells (<see cref="WoodState.IsShell"/>) are the tree's own wood: never
+/// free, so growth never grows into one, and never obstacles to their own re-rasterisation
+/// (<see cref="AcceptsShell"/>).</para>
 /// <para>A space lives for one main-thread growth call, during which no chunk unloads, so it
 /// caches the last chunk it read through. It is not thread-safe.</para>
 /// </summary>
@@ -38,6 +41,22 @@ public sealed class WorldTreeSpace : ITreeSpace
 
     /// <inheritdoc />
     public bool IsFree(int x, int y, int z) => Check(x, y, z, false);
+
+    /// <summary>
+    /// The shell placement test: everything <see cref="IsFree"/> accepts, plus a loaded cell that
+    /// already holds an attached shell of this species' wood. Re-rasterising a wide trunk lays its
+    /// shells back onto the shells it already has, so the tree's own shells are never obstacles to
+    /// it, while <see cref="IsFree"/> still refuses them and growth never grows a node into one.
+    /// </summary>
+    public bool AcceptsShell(int x, int y, int z)
+    {
+        if (IsFree(x, y, z))
+            return true;
+        return TryGetCell(x, y, z, out var id, out var state)
+               && id == _species.WoodId
+               && WoodState.IsShell(state)
+               && !WoodState.IsDetached(state);
+    }
 
     /// <summary>
     /// Whether a sapling's root may go into the cell: everything <see cref="IsFree"/> accepts, plus

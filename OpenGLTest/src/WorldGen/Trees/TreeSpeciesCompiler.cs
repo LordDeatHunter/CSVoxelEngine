@@ -16,7 +16,7 @@ internal static class TreeSpeciesCompiler
     private const int MaxTipPx = WoodState.PixelsPerBlock;
 
     /// <summary>Largest trunk diameter in pixels (eight blocks), room for wide trunks.</summary>
-    private const int MaxTrunkPx = 128;
+    internal const int MaxTrunkPx = 128;
 
     /// <summary>Largest leaf cluster radius in blocks.</summary>
     private const int MaxLeafRadius = 8;
@@ -123,6 +123,11 @@ internal static class TreeSpeciesCompiler
                     throw Fail(path, $"features[{i}] 'roots' needs a depth of at least 1, got {depth}.");
                 if (feature.Name == "buttress" && depth != 0)
                     throw Fail(path, $"features[{i}] 'buttress' takes no depth (0), got {depth}.");
+                // Reactive growth recognises root-level fins by height alone (TreeGraph.FromWorld),
+                // which is only exact while growth never branches off the trunk at the root's level.
+                if (feature.Name == "buttress" && lowestBranch < 1)
+                    throw Fail(path, $"features[{i}] 'buttress' needs growth.lowestBranchHeight of at least 1 "
+                        + $"(root-level nodes are read back as fins), got {lowestBranch}.");
                 features.Add(new TreeFeatureSpec(feature, depth));
             }
         }

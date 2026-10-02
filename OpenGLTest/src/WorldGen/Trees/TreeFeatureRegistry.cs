@@ -14,7 +14,7 @@ public static class TreeFeatureRegistry
     private static readonly Dictionary<string, ITreeFeature> ByNameTable = new(StringComparer.Ordinal)
     {
         ["roots"] = new RootsFeature(),
-        ["buttress"] = new PlaceholderTreeFeature("buttress"),
+        ["buttress"] = new ButtressFeature(),
     };
 
     /// <summary>Every registered feature by name.</summary>

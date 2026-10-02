@@ -11,7 +11,8 @@ namespace silkgltriangle.Tests;
 /// nothing (not even into a mined crown), growth only appends to the tree and never thins it,
 /// never writes over a foreign block, never re-attaches a cut branch, writes leaves exactly as
 /// leaf decay re-derives them, is deterministic for the same history, advances its stream per
-/// call and fires the fluid, decay and far-LOD hooks; a column with no tree plants a rooted
+/// call and fires the fluid, decay and far-LOD hooks; keeps a wide trunk's shells and leaves a
+/// mined shell mined; a column with no tree plants a rooted
 /// sapling only on legal ground under a plantable cell, taking over a ground cover, and plants
 /// deterministically. In the LOD column caps collection, because
 /// a grow poisons the process-global canopy markers of its columns; every test roots its tree on
@@ -366,6 +367,100 @@ public sealed class TreeGrowthTests
         }
     }
 
+    // --- Wide trunks: shells are the tree's own wood, and a mined shell stays mined ---
+
+    private static Dictionary<(int X, int Y, int Z), byte> ShellsOf(StampedTree tree) =>
+        tree.Wood.Where(kv => WoodState.IsShell(kv.Value.State)).ToDictionary(kv => kv.Key, kv => kv.Value.State);
+
+    private static (int X, int Y, int Z) ParentCellOf((int X, int Y, int Z) cell, byte state)
+    {
+        Assert.True(WoodState.TryParentOffset(state, out var dx, out var dy, out var dz));
+        return (cell.X + dx, cell.Y + dy, cell.Z + dz);
+    }
+
+    [Fact]
+    public void GrowthKeepsAWideTrunkAndNeverThinsIt()
+    {
+        var test = 220;
+        foreach (var species in WideTreeSpecies.AllShapes)
+        {
+            var rootX = RootXOf(test++);
+            var tree = StampLoaded(species, rootX);
+            var shells = ShellsOf(tree);
+            Assert.NotEmpty(shells);
+            var nodeCodes = tree.NodeWood.ToDictionary(c => c, c => WoodState.Thickness(tree.Read(c).State));
+
+            var writer = new TreeGrowthWriter();
+            for (var call = 0; call < 2; call++)
+            {
+                var result = Grow(writer, tree, rootX, 40);
+                Assert.Equal(TreeGrowthStatus.Grew, result.Status);
+            }
+
+            foreach (var (cell, state) in shells)
+                Assert.Equal((species.WoodId, state), tree.Read(cell));
+            foreach (var (cell, code) in nodeCodes)
+            {
+                var (id, state) = tree.Read(cell);
+                Assert.Equal(species.WoodId, id);
+                Assert.True(WoodState.Thickness(state) >= code,
+                    $"{species.Name}: {cell} thinned from {code} to {WoodState.Thickness(state)}");
+            }
+
+            // Every shell in the world hangs off attached full-cube wood of the species
+            foreach (var (cell, value) in SnapshotReach(tree, rootX))
+            {
+                if (value.Id != species.WoodId || !WoodState.IsShell(value.State))
+                    continue;
+                var (pid, pstate) = tree.Read(ParentCellOf(cell, value.State));
+                Assert.Equal(species.WoodId, pid);
+                Assert.False(WoodState.IsDetached(pstate), $"{species.Name}: shell {cell} hangs off a detached log");
+                Assert.True(WoodState.IsFullCube(pstate), $"{species.Name}: shell {cell} hangs off a thin cell");
+            }
+        }
+    }
+
+    [Fact]
+    public void AMinedShellStaysMined()
+    {
+        var test = 230;
+        foreach (var species in WideTreeSpecies.AllShapes)
+        {
+            // An outermost shell: no other shell names it as its parent
+            {
+                var rootX = RootXOf(test++);
+                var tree = StampLoaded(species, rootX);
+                var shells = ShellsOf(tree);
+                var named = shells.Select(kv => ParentCellOf(kv.Key, kv.Value)).ToHashSet();
+                var outer = shells.Keys.First(c => !named.Contains(c));
+                tree.Write(outer, 0, 0);
+
+                var writer = new TreeGrowthWriter();
+                for (var call = 0; call < 2; call++)
+                    Assert.Equal(TreeGrowthStatus.Grew, Grow(writer, tree, rootX, 40).Status);
+
+                Assert.Equal(((byte)0, (byte)0), tree.Read(outer));
+            }
+
+            // A mid-ring shell whose outward shell still stands, naming the hole as its parent
+            {
+                var rootX = RootXOf(test++);
+                var tree = StampLoaded(species, rootX);
+                var shells = ShellsOf(tree);
+                var (outward, outwardState) = shells.First(kv => shells.ContainsKey(ParentCellOf(kv.Key, kv.Value)));
+                var mid = ParentCellOf(outward, outwardState);
+                tree.Write(mid, 0, 0);
+
+                var writer = new TreeGrowthWriter();
+                for (var call = 0; call < 2; call++)
+                    Assert.Equal(TreeGrowthStatus.Grew, Grow(writer, tree, rootX, 40).Status);
+
+                Assert.Equal(((byte)0, (byte)0), tree.Read(mid));
+                Assert.Equal((species.WoodId, outwardState), tree.Read(outward));
+            }
+        }
+    }
+
     // --- Planting: a column with no tree roots a sapling on its ground ---
 
     /// <summary>A loaded, empty area around a column with a one-cell floor of
@@ -523,5 +618,61 @@ public sealed class TreeGrowthTests
             foreach (var (cell, value) in snapA)
                 Assert.Equal(value, snapB[cell]);
         }
+    }
+
+    [Fact]
+    public void PlantingAppliesFeaturesOnlyOnce()
+    {
+        var buttress = new[] { new TreeFeatureSpec(TreeFeatureRegistry.Require("buttress"), 0) };
+        var test = 240;
+        bool anyFin = false, anyThinPlantWidened = false;
+        foreach (var shape in Enum.GetValues<TrunkShape>())
+        foreach (var seed in new[] { Seed, Seed + 1, Seed + 2, Seed + 3 })
+        foreach (var plantSteps in new[] { 4, 0 })
+        {
+            var species = WideTreeSpecies.Default(shape, features: buttress);
+            var rootX = RootXOf(test++);
+            var chunks = FloorWorld(species, rootX, TerrainGenerator.SurfaceBlock);
+            var writer = new TreeGrowthWriter();
+            var mature = Math.Min(species.MaturityStepsMax, WorldGenerationConfig.TreeGrowMaxPulsesPerCall);
+
+            // The node wood (never a shell) at and below the root's level: the root and its fins
+            HashSet<(int X, int Y, int Z)> GroundNodes() => SnapshotReach(chunks, species, rootX)
+                .Where(kv => kv.Key.Y <= RootY && kv.Value.Id == species.WoodId && !WoodState.IsShell(kv.Value.State))
+                .Select(kv => kv.Key)
+                .ToHashSet();
+            bool RootIsWide() => SnapshotReach(chunks, species, rootX)
+                .Any(kv => kv.Key.Y == RootY && kv.Value.Id == species.WoodId && WoodState.IsShell(kv.Value.State));
+
+            // 0 means a mature planting, whose root is wide when the features run; a short one
+            // plants a thin root that grows no fin and only widens on the later grows
+            var planted = writer.Grow(chunks, species, rootX, RootY, RootZ, plantSteps > 0 ? plantSteps : mature, seed);
+            Assert.Equal(TreeGrowthStatus.Planted, planted.Status);
+            var groundNodes = GroundNodes();
+            var thinPlant = !RootIsWide();
+            if (plantSteps == 0)
+                anyFin |= groundNodes.Count > 1;
+
+            for (var call = 0; call < 2; call++)
+            {
+                var before = SnapshotReach(chunks, species, rootX);
+                Assert.Equal(TreeGrowthStatus.Grew, writer.Grow(chunks, species, rootX, RootY, RootZ, mature, seed).Status);
+                var after = SnapshotReach(chunks, species, rootX);
+
+                // A later grow may widen the root's shell ring, but it never grows another fin
+                foreach (var cell in Diff(before, after))
+                {
+                    if (cell.Y > RootY || after[cell].Id != species.WoodId)
+                        continue;
+                    Assert.True(WoodState.IsShell(after[cell].State) || groundNodes.Contains(cell),
+                        $"{species.Name}: a later grow wrote new node wood at {cell}, at or below the root");
+                }
+                Assert.Equal(groundNodes, GroundNodes());
+            }
+            anyThinPlantWidened |= thinPlant && RootIsWide();
+        }
+        Assert.True(anyFin, "no mature planting grew a fin, so the features-on-planting rule went untested");
+        Assert.True(anyThinPlantWidened,
+            "no thin planting widened later, so a feature pass on a later grow could not have shown");
     }
 }

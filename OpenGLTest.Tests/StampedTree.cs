@@ -9,8 +9,8 @@ namespace silkgltriangle.Tests;
 /// <summary>
 /// A grown species stamped into a headless <see cref="ChunkManager"/>, shared by the felling and
 /// leaf-decay rules: the species is grown on a flat <see cref="VirtualTreeSpace"/>, rasterised and
-/// written wood first, then leaves into air only, exactly like worldgen, so the facts read the
-/// same wood and leaf state bytes worldgen writes.
+/// written wood first (nodes and any shells), then leaves into air only, exactly like worldgen, so
+/// the facts read the same wood and leaf state bytes worldgen writes.
 /// </summary>
 internal sealed class StampedTree
 {
@@ -127,13 +127,17 @@ internal sealed class StampedTree
         return result;
     }
 
-    /// <summary>Grows the species on flat ground and stamps it like worldgen: wood first, then
-    /// leaves into air only.</summary>
+    /// <summary>The wood cells that are graph nodes: every wood cell but a wide trunk's shells.</summary>
+    public IEnumerable<(int X, int Y, int Z)> NodeWood =>
+        Wood.Where(kv => !WoodState.IsShell(kv.Value.State)).Select(kv => kv.Key);
+
+    /// <summary>Grows the species on flat ground and stamps it like worldgen: wood (nodes, then a
+    /// wide trunk's shells) first, then leaves into air only.</summary>
     internal static StampedTree Stamp(TreeSpecies species, int seed, int rootX, int rootY, int rootZ)
     {
         var space = new VirtualTreeSpace((_, _) => rootY - 1);
         var graph = TreeGrower.GrowToMaturity(species, rootX, rootY, rootZ, space, seed);
-        var cells = TreeRasterizer.Rasterize(graph, species, space);
+        var cells = TreeRasterizer.Rasterize(graph, species, space, out _);
 
         var chunks = new ChunkManager(null!);
         var wood = new Dictionary<(int, int, int), (byte, byte)>();
@@ -142,7 +146,8 @@ internal sealed class StampedTree
         {
             var c = cells[i];
             var key = (c.X, c.Y, c.Z);
-            if (i < graph.Count)
+            // Wood is nodes then a wide trunk's shells; everything else is a leaf
+            if (c.Block == species.WoodId)
             {
                 wood[key] = (c.Block, c.State);
                 WriteCell(chunks, key, c.Block, c.State);

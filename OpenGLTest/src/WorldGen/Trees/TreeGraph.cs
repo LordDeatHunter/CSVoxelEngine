@@ -79,13 +79,22 @@ public sealed class TreeGraph
     /// (x, y, z), which must hold <see cref="TreeSpecies.WoodId"/> with the
     /// <see cref="WoodState.ParentRoot"/> parent code; null otherwise. The walk is breadth-first
     /// over child edges only: a face neighbour is a child when it holds the species' wood, is
-    /// not detached and its stored parent offset lands exactly on the current cell. Detached
-    /// cells and cells whose parent no longer exists are therefore never reached, so a cut branch
-    /// stays cut. A node below the root's level loads as a feature node (roots), which is exact
-    /// because <see cref="TreeGrower.Pulse"/> never descends. Every node's thickness floor
+    /// not detached, is not a wide trunk's shell (<see cref="WoodState.IsShell"/>: shells are
+    /// rasterised around the trunk chain, never graph nodes) and its stored parent offset lands
+    /// exactly on the current cell. Detached cells and cells whose parent no longer exists are
+    /// therefore never reached, so a cut branch stays cut. A node below the root's level loads as
+    /// a feature node (roots), which is exact because <see cref="TreeGrower.Pulse"/> never
+    /// descends; for a species with a <c>buttress</c> feature a non-root node at the root's own
+    /// level loads as a feature node too (a fin), which is exact because the compiler requires
+    /// such a species to have <c>growth.lowestBranchHeight</c> of at least 1, so growth never
+    /// leaves the root column at the root's level. Every node's thickness floor
     /// (<see cref="Node.FloorPx"/>) is its stored diameter, so a later
     /// <see cref="TreeGrower.Thicken"/> never thins the tree; until the caller runs it, the
-    /// thickness floats are just those integer diameters. Returns null when a read hits an
+    /// thickness floats are just those integer diameters. A wide trunk's core only stores the
+    /// full-cube code, so for a species that can grow shells each trunk-chain node (the root and
+    /// every node reached from it straight up) also measures its shell radius R from the shells
+    /// around it, and its floor becomes at least <see cref="TreeRasterizer.MinDiameterPx"/>(R);
+    /// species that never grow shells skip those reads. Returns null when a read hits an
     /// unloaded chunk (the tree may continue there, and a partial graph must never grow) or the
     /// walk passes <see cref="WorldGenerationConfig.TreeGrowNodeCap"/> nodes.
     /// </summary>
@@ -96,9 +105,20 @@ public sealed class TreeGraph
             || !WoodState.IsRoot(rootState))
             return null;
 
+        var hasButtress = false;
+        for (var f = 0; f < species.Features.Count; f++)
+            hasButtress |= species.Features[f].Feature.Name == "buttress";
+        // 0 for every species that never grows shells, which then skips the girth reads
+        var maxShellR = TreeRasterizer.BlockRadius(species.MaxPx);
+
         float rootPx = WoodState.DiameterPx(rootState);
         var graph = new TreeGraph(x, y, z, rootPx);
         graph.SetFloor(Root, rootPx);
+        if (maxShellR > 0 && !TryFloorWideCore(graph, read, species, Root, rootState, maxShellR))
+            return null;
+
+        // The trunk chain's top so far: the root, then each child loaded straight up from it.
+        var trunkTip = Root;
 
         // The node index is the queue, so children always index above their parents.
         for (var head = 0; head < graph.Count; head++)
@@ -112,7 +132,7 @@ public sealed class TreeGraph
                 int nz = cz + TreeDirections.Dz[dir];
                 if (!read(nx, ny, nz, out var id, out var state))
                     return null;
-                if (id != species.WoodId || WoodState.IsDetached(state))
+                if (id != species.WoodId || WoodState.IsDetached(state) || WoodState.IsShell(state))
                     continue;
                 if (!WoodState.TryParentOffset(state, out var pdx, out var pdy, out var pdz)
                     || nx + pdx != cx || ny + pdy != cy || nz + pdz != cz)
@@ -123,12 +143,66 @@ public sealed class TreeGraph
                     return null;
 
                 float d = WoodState.DiameterPx(state);
-                var child = graph.AddChild(head, dir, d, feature: ny < y);
+                var child = graph.AddChild(head, dir, d, feature: ny < y || (ny == y && hasButtress));
                 graph.SetFloor(child, d);
+
+                if (head == trunkTip && dir == TreeDirections.Up)
+                {
+                    trunkTip = child;
+                    if (maxShellR > 0 && !TryFloorWideCore(graph, read, species, child, state, maxShellR))
+                        return null;
+                }
             }
         }
 
         return graph;
+    }
+
+    // The eight lines a core's shell radius is measured along, as a step plus a fixed Z offset:
+    // (±k, 0) and (0, ±k) on the axes, and (±k, ±1) beside the X axis, whose shells point their
+    // parent along X too. The (±k, ±1) lines still measure R at the root's level when buttress
+    // fins stand on the axes in place of the on-axis shells.
+    private static readonly int[] LineStepX = [1, -1, 0, 0, 1, 1, -1, -1];
+    private static readonly int[] LineStepZ = [0, 0, 1, -1, 0, 0, 0, 0];
+    private static readonly int[] LineOffZ = [0, 0, 0, 0, 1, -1, 1, -1];
+
+    /// <summary>
+    /// Raises a trunk-chain node's floor to the diameter its shells imply. A core stored as a full
+    /// cube measures R, the longest run k (up to <paramref name="maxR"/>) of cells 1..k along one
+    /// of the measuring lines that all hold the species' wood, attached, as shells whose parent
+    /// offset points one step back along the line; R of at least 1 floors the node at
+    /// <see cref="TreeRasterizer.MinDiameterPx"/>(R). A mismeasured R only ever weakens the floor,
+    /// since <see cref="TreeGrower.Thicken"/> rebuilds the pipe from the topology. False when a
+    /// read hits an unloaded chunk.
+    /// </summary>
+    private static bool TryFloorWideCore(TreeGraph graph, TreeCellReader read, TreeSpecies species,
+        int node, byte coreState, int maxR)
+    {
+        if (!WoodState.IsFullCube(coreState))
+            return true;
+
+        int cx = graph._nodes[node].X, cy = graph._nodes[node].Y, cz = graph._nodes[node].Z;
+        var radius = 0;
+        for (var line = 0; line < LineStepX.Length && radius < maxR; line++)
+        {
+            int sx = LineStepX[line], sz = LineStepZ[line], oz = LineOffZ[line];
+            var run = 0;
+            for (var k = 1; k <= maxR; k++)
+            {
+                if (!read(cx + sx * k, cy, cz + sz * k + oz, out var id, out var state))
+                    return false;
+                if (id != species.WoodId || WoodState.IsDetached(state) || !WoodState.IsShell(state)
+                    || !WoodState.TryParentOffset(state, out var pdx, out var pdy, out var pdz)
+                    || pdx != -sx || pdy != 0 || pdz != -sz)
+                    break;
+                run = k;
+            }
+            radius = Math.Max(radius, run);
+        }
+
+        if (radius >= 1)
+            graph.SetFloor(node, MathF.Max(graph._nodes[node].FloorPx, TreeRasterizer.MinDiameterPx(radius)));
+        return true;
     }
 
     /// <summary>Number of nodes, root included.</summary>

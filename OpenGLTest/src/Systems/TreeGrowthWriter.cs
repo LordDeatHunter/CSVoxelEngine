@@ -21,6 +21,19 @@ namespace silkgltriangle;
 /// species only ever has its hydration raised; persistent leaves and every other block are never
 /// touched.</para>
 ///
+/// <para><b>Shells</b> (a wide trunk's ring cells, TREES_PLAN phase 7) are written after the nodes,
+/// parent-first, and only when their parent cell already holds attached full-cube wood of the
+/// species. An existing shell is only ever re-coded. A missing one is filled only on the <b>new
+/// ring</b>: outside the footprint its core had before the call (the
+/// <see cref="TreeRasterizer.BlockRadius"/> of the core's rebuilt floor), or around a core that is
+/// new this call, and then only into air or a non-persistent leaf of the species that the space
+/// still calls free. A shell mined or cut inside the old ring therefore stays mined, like a mined
+/// leaf. Shells are never tips and never regrow leaves.</para>
+///
+/// <para><b>Features</b> (roots, buttress fins) run only on the call that plants a sapling, as
+/// worldgen runs them once at maturity; a later grow never re-runs them and never rewrites an
+/// existing feature node.</para>
+///
 /// <para><b>Leaves regrow only around changed tips</b>: a live tip that is new this call, or whose
 /// wood state the call rewrote. Leaf cells outside every changed tip's cluster are never written,
 /// so a hole mined in an untouched part of the crown stays mined. A written leaf carries the full
@@ -189,9 +202,22 @@ public sealed class TreeGrowthWriter
         var rng = new SplitMix64(GrowSeed(TreeGrower.SeedFor(rx, ry, rz, worldSeed, species), graph.Count, _calls++));
         var space = new WorldTreeSpace(chunks, species, reserved);
 
+        // The block radius each original trunk-chain core already had (its shell ring before this
+        // call), indexed by node: the shell pass refills nothing inside it. Thin species skip it.
+        int[]? oldRadius = null;
+        if (originalCount > 0 && TreeRasterizer.BlockRadius(species.MaxPx) > 0)
+        {
+            oldRadius = new int[originalCount];
+            var chain = new List<int>();
+            TreeRasterizer.TrunkChain(graph, chain);
+            foreach (var t in chain)
+                oldRadius[t] = TreeRasterizer.BlockRadius(graph[t].FloorPx);
+        }
+
         var added = TreeGrower.GrowFurther(graph, species, space, rng, energy,
-            Math.Clamp(steps, 0, WorldGenerationConfig.TreeGrowMaxPulsesPerCall), WorldGenerationConfig.TreeGrowNodeCap);
-        var cells = TreeRasterizer.Rasterize(graph, species, space);
+            Math.Clamp(steps, 0, WorldGenerationConfig.TreeGrowMaxPulsesPerCall), WorldGenerationConfig.TreeGrowNodeCap,
+            applyFeatures: status == TreeGrowthStatus.Planted);
+        var cells = TreeRasterizer.Rasterize(graph, species, space, out var woodCount);
 
         // Wood pass: thickness rewrites of existing nodes, then new nodes, in index order (a
         // parent is always written before its children)
@@ -201,7 +227,9 @@ public sealed class TreeGrowthWriter
         for (var i = 0; i < graph.Count; i++)
         {
             ref readonly var n = ref graph[i];
-            if (n.IsFeature)
+            // Existing feature nodes (roots, fins) are never rewritten; new ones (a planted
+            // sapling's features) take the new-node path below
+            if (n.IsFeature && i < originalCount)
                 continue;
             var c = cells[i];
 
@@ -240,6 +268,44 @@ public sealed class TreeGrowthWriter
             }
         }
 
+        // Shell pass: shells are emitted parent-first, so a parent written earlier in this pass is
+        // already in the world when its children are read
+        for (var i = graph.Count; i < woodCount; i++)
+        {
+            var c = cells[i];
+            if (!chunks.TryGetCell(c.X, c.Y, c.Z, out var id, out var state))
+                continue;
+
+            // The parent has to be attached full-cube wood of the species in the world: never
+            // hang a shell off a core or a shell that did not make it there
+            if (!WoodState.TryParentOffset(c.State, out var pdx, out var pdy, out var pdz)
+                || !chunks.TryGetCell(c.X + pdx, c.Y + pdy, c.Z + pdz, out var pid, out var pstate)
+                || pid != species.WoodId || WoodState.IsDetached(pstate) || !WoodState.IsFullCube(pstate))
+                continue;
+
+            if (id == species.WoodId && WoodState.IsShell(state) && !WoodState.IsDetached(state))
+            {
+                if (state != c.State)
+                {
+                    Write(chunks, c.X, c.Y, c.Z, c.Block, c.State, log, idChanged: false, mesh: true);
+                    woodWritten++;
+                }
+                continue;
+            }
+
+            // New ring only: inside the footprint an original core already had, a missing shell
+            // was mined or cut and stays that way, like a mined leaf
+            var core = graph.NodeAt(rx, c.Y, rz);
+            int dx = c.X - rx, dz = c.Z - rz;
+            var inOldRing = oldRadius != null && core >= 0 && core < originalCount
+                            && TreeRasterizer.InFootprint(species.TrunkShape, oldRadius[core], dx, dz);
+            if (!inOldRing && IsOwnGrowable(species, id, state) && space.IsFree(c.X, c.Y, c.Z))
+            {
+                Write(chunks, c.X, c.Y, c.Z, c.Block, c.State, log, idChanged: true, mesh: true);
+                woodWritten++;
+            }
+        }
+
         // Leaves regrow only inside the clusters of tips this call changed
         var regrow = new HashSet<long>();
         var radius = species.HasLeaves ? species.LeafRadius : 0;
@@ -258,7 +324,7 @@ public sealed class TreeGrowthWriter
         // Leaf pass: new leaves into air, hydration only ever raised on the species' own leaves
         var leavesPlaced = 0;
         var hydrationRaised = 0;
-        for (var i = graph.Count; i < cells.Count && regrow.Count > 0; i++)
+        for (var i = woodCount; i < cells.Count && regrow.Count > 0; i++)
         {
             var c = cells[i];
             if (!regrow.Contains(TreeCellKey.Pack(c.X, c.Y, c.Z)))

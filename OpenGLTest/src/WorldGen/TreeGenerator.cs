@@ -56,7 +56,8 @@ public static class TreeGenerator
     /// <summary><see cref="ReachHorizontal"/> in whole chunks, rounded up.</summary>
     public static readonly int ReachChunkRadius;
 
-    /// <summary>Leaf block the far LOD falls back to: the first leafy species' leaves.</summary>
+    /// <summary>Leaf block the far LOD falls back to: the first leafy worldgen species' leaves (a species
+    /// kept out of worldgen never sets it, so adding one leaves the far LOD unchanged).</summary>
     public static readonly byte LeavesBlock;
 
     // The widest LOD crown proxy of any leafy worldgen species: how far outside a chunk column
@@ -80,7 +81,7 @@ public static class TreeGenerator
             LeafById[species.LeavesId] = true;
             CanopyBlockById[species.LeavesId] = true;
             CanopyBlockById[species.WoodId] = true;
-            if (LeavesBlock == BlockType.Air) LeavesBlock = species.LeavesId;
+            if (LeavesBlock == BlockType.Air && species.Worldgen != null) LeavesBlock = species.LeavesId;
         }
 
         foreach (var species in Species)
@@ -106,7 +107,7 @@ public static class TreeGenerator
 
     /// <summary>
     /// One grown, rasterised tree: its species, base cell and every cell it writes in rasterizer
-    /// order (wood first: the first <see cref="WoodCount"/> cells, then the leaves), plus the
+    /// order (wood first: the first <see cref="WoodCount"/> cells, nodes then shells, then the leaves), plus the
     /// vertical span of those cells. Immutable after build and shared across threads.
     /// </summary>
     internal sealed class TreeShape
@@ -172,8 +173,8 @@ public static class TreeGenerator
         var baseY = HeightAt(key.X, key.Z) + 1;
         var space = new VirtualTreeSpace(GrowthGround);
         var graph = TreeGrower.GrowToMaturity(species, key.X, baseY, key.Z, space);
-        var cells = TreeRasterizer.Rasterize(graph, species, space).ToArray();
-        var shape = TreeShape.Build(species, key.X, baseY, key.Z, cells, graph.Count);
+        var cells = TreeRasterizer.Rasterize(graph, species, space, out var woodCount).ToArray();
+        var shape = TreeShape.Build(species, key.X, baseY, key.Z, cells, woodCount);
         _growsOnThread++;
         WorldgenStats.AddGrow(System.Diagnostics.Stopwatch.GetTimestamp() - start);
         return shape;
@@ -321,9 +322,9 @@ public static class TreeGenerator
                 // One AddGrow per tree, so `grows` and `grow ms/tree` keep their meaning
                 var start = System.Diagnostics.Stopwatch.GetTimestamp();
                 var graph = TreeGrower.GrowToMaturity(t.Species, t.X, t.BaseY, t.Z, space);
-                var cells = TreeRasterizer.Rasterize(graph, t.Species, space).ToArray();
+                var cells = TreeRasterizer.Rasterize(graph, t.Species, space, out var woodCount).ToArray();
                 space.OccupyAll(cells);
-                var shape = TreeShape.Build(t.Species, t.X, t.BaseY, t.Z, cells, graph.Count);
+                var shape = TreeShape.Build(t.Species, t.X, t.BaseY, t.Z, cells, woodCount);
                 _growsOnThread++;
                 WorldgenStats.AddGrow(System.Diagnostics.Stopwatch.GetTimestamp() - start);
 

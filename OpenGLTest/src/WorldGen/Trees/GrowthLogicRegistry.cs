@@ -16,8 +16,8 @@ public static class GrowthLogicRegistry
         ["oak"] = new OakGrowthLogic(),
         ["conifer"] = new ConiferGrowthLogic(),
         ["cactus"] = new CactusGrowthLogic(),
-        ["umbrella"] = new PlaceholderGrowthLogic("umbrella"),
-        ["baobab"] = new PlaceholderGrowthLogic("baobab"),
+        ["umbrella"] = new UmbrellaGrowthLogic(),
+        ["baobab"] = new BaobabGrowthLogic(),
     };
 
     /// <summary>Every registered growth logic by name.</summary>

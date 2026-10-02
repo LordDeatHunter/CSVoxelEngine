@@ -83,8 +83,11 @@ public static class LeafCluster
     /// <see cref="HydrationAt"/> by construction. Tips are visited in index order and offsets in
     /// a fixed x, y, z order, and cells are emitted in first-visit order through a list, so the
     /// output depends only on the graph and never on dictionary order. A leafless species adds nothing.
+    /// Cells in <paramref name="exclude"/> (the rasteriser's shells, packed by
+    /// <see cref="TreeCellKey.Pack"/>) are skipped like the graph's own cells.
     /// </summary>
-    public static void Collect(TreeGraph graph, TreeSpecies species, ITreeSpace space, List<TreeCell> output)
+    public static void Collect(TreeGraph graph, TreeSpecies species, ITreeSpace space, List<TreeCell> output,
+        HashSet<long>? exclude = null)
     {
         if (!species.HasLeaves)
             return;
@@ -112,6 +115,8 @@ public static class LeafCluster
                     continue;
 
                 long key = TreeCellKey.Pack(x, y, z);
+                if (exclude != null && exclude.Contains(key))
+                    continue;
                 if (index.TryGetValue(key, out int at))
                 {
                     if (h > cells[at].H)

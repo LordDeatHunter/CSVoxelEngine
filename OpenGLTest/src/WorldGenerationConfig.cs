@@ -992,6 +992,16 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // No trunk roots this close (Chebyshev) to the origin column, so the surface spawn the
     // camera picks there is always in the open; a species opts out with worldgen.spawnClear false
     public const int TreeSpawnClearRadius = 3;
+    // Buttress fins (ButtressFeature): each cardinal side of a wide root (TreeRasterizer.BlockRadius
+    // >= 1) grows a fin with this chance, reaching 1..TreeButtressMaxReach blocks past the trunk's
+    // shell footprint along the ground. TreeRasterizer.ReachOf widens a buttress species' horizontal
+    // reach by that maximum
+    public const float TreeButtressFinChance = 0.75f;
+    public const int TreeButtressMaxReach = 2;
+    // Pixel-rim bevel (TreeWoodShape.RimBoxes): the quarter-round radius in pixels a rim:"pixel"
+    // species carves into each exposed corner of a trunk shell. Valid 2..8: at least 2 so the
+    // corner row is carved, at most half a cell so two rounds on one edge never meet
+    public const int TreeRimBevelPx = 8;
 
     // TreeGenerator.ShapeCache and TreeGenerator.CanopyCache, both on the same GenerationalCache as
     // the column and worm-path caches above (item D6).
@@ -1165,17 +1175,19 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // accelerating slam), then rest before its wood pops out as item drops
     public const float TreeToppleSeconds = 1.2f;
     public const float TreeFellRestSeconds = 2f;
-    // Collection bounds: the subtree walk's wood cap, then the overall cap including the
-    // canopy. Sized to bound a mature oak's ~100 wood and ~500 leaf cells with room to spare
-    // (two grafted trees, a big spruce). Anything past the caps stays standing (and still
-    // drops normally when mined).
-    public const int TreeFellWoodCap = 512;
-    public const int TreeFellTotalCap = 2048;
+    // Collection bounds: the wood cap covers a fell's nodes plus a wide trunk's shells and is
+    // also the TreeSupport search cap (felling and the orphan crumble share it), then the
+    // overall cap including the canopy. Sized to bound a mature wide trunk's nodes, shells and
+    // fins and its canopy with room to spare. Anything past the caps stays standing (and
+    // still drops normally when mined).
+    public const int TreeFellWoodCap = 2048;
+    public const int TreeFellTotalCap = 4096;
 
     // --- Reactive tree growth (TreeGrowthWriter) ---
-    // Node cap of a grown tree, tied to the fell's wood cap so a grown tree's wood still fells
-    // whole; it also bounds the TreeGraph.FromWorld rebuild walk
-    public const int TreeGrowNodeCap = TreeFellWoodCap;
+    // Node cap of a grown tree (graph nodes only, never shells); it also bounds the
+    // TreeGraph.FromWorld rebuild walk. Kept well under the fell's wood cap so a grown tree's
+    // wood, shells included, still fells whole
+    public const int TreeGrowNodeCap = 512;
     // Growth pulses one grow call may run at most
     public const int TreeGrowMaxPulsesPerCall = 256;
 
