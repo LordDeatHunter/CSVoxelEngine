@@ -2,10 +2,11 @@
 
 ## Status
 
-Phases 1-7 done (content + codecs; headless growth engine; cutover to engine-grown trees;
+All phases (1-8) done (content + codecs; headless growth engine; cutover to engine-grown trees;
 tree-vs-tree cell batches + LOD canopy proxy + perf; leaf decay; reactive growth; wide trunks +
-baobab/stone pine). Phase 8 pending. Each phase lands as its own commit on `tree-rework`; finished phases are
-collapsed into short summaries here.
+baobab/stone pine; ItemDebugger TREES tab + docs). Each phase landed as its own commit on
+`tree-rework`; finished phases are collapsed into short summaries here. The residue left open is
+tracked in `TODO.md` (`M-10`, `M-13`, `M-14`).
 
 ## Context
 Trees are hardcoded C# today: `TreeGenerator.BuildShape` (broadleaf) and `BuildSpruceShape`,
@@ -481,10 +482,40 @@ bands }`:
    canopy sweep finds); buttress fins apply only at maturity or planting; mined shells never
    regrow inside the old ring; the selection outline shows the rim box seams; leaf particles for
    the new leaves use oak tiles; limbs over 16 px render as 16 px cubes.
-8. **ItemDebugger TREES tab + docs.** A third tab that grows a species pulse by pulse with a
-   step slider, meshed through the scratch-chunk path `TopplingTree.BuildMeshData` already
-   uses, plus a GL-free tested state class. Extend `visual-examples/trees.json`, and update
-   AGENTS.md (Content schema, Layout, invariants).
+8. **Done — ItemDebugger TREES tab + docs.** `TreeGrower` gained a deterministic scrub seam:
+   `GrowSteps(species, x, y, z, space, worldSeed, steps, applyFeatures)` grows exactly N pulses
+   (negative = 0) and `MaturityStepsAt` replays the rolled step count; both share one private core
+   with `GrowToMaturity`, which still draws `RollMaturity` first and so stays byte-identical
+   (`GrowSteps(MaturityStepsAt(...), true)` is exactly `GrowToMaturity`; without features a
+   shorter grow's nodes are a prefix of a longer one's). `CellBatchMesher.Build` (`src/`, GL-free)
+   meshes any `TreeCell` list with the real chunk mesher across scratch chunks at their real
+   positions, padded by an empty ring with the edge and corner diagonals, output in world cell
+   coordinates; `TopplingTree` is deliberately untouched (it is the ready fix for `M-14`(1)).
+   `OpenGLTest.ItemDebugger/TreePreviewState.cs` is the tab's GL-free state: the
+   `TreeSpeciesRegistry` species sorted by name, an explicit seed (`WorldSeed.Default`, REGROW
+   adds one, never `WorldSeed.Apply`), a step clamped to 0..`MaturityStepsMax`, a per-step
+   snapshot cache regrown in a fresh flat `VirtualTreeSpace`, features from the rolled maturity
+   step on (selecting a species lands there, so it shows the worldgen tree; roots never grow on
+   flat ground), grass ground cells, framing over the union of the current and the max-step
+   bounds (`FitDistance`) and a `Version` the renderer rebuilds on. `DebugSceneRenderer.RenderTree`
+   uploads the `CellBatchMesher` output on a `Version` change; the plain program's `uBiomeTint` is
+   now set white (unset, tinted grass and leaves drew black), and `ToDisplaySpaceTint` rebakes the
+   linear biome tint for the debugger's undecoded atlas. The UI has the third tab, the species
+   grid, STEP -/STEP +/MATURE/REGROW (NEW SEED), the Step slider and wheel zoom;
+   `ITEM_DEBUGGER_SELECT` now tries items, entities, then species (`tree/` forces the species,
+   e.g. `tree/cactus`), and `ITEM_DEBUGGER_TREE_STEP` takes an integer or `mature`. Captures of
+   oak, baobab and `tree/cactus` at step 10 rendered whole trees with no seam clipping, tinted
+   grass and leaves, the oak's thin tubes and the baobab's bevelled core/shell trunk with its
+   buttress fins. `visual-examples/trees.json` already covered the whole Verification list, so
+   it needed no change. AGENTS.md was rewritten for the tree rework: the `grow` op, the TREES
+   tab and its env vars, tree-wood hardness, the mesher and biome-tint mentions, the Layout tree,
+   the `tree_wood`/`wood{}` block schema rows, a `### Tree species schema` and a `### Trees`
+   engine section, the `WoodState`/`LeafState` state-byte users, the
+   `LeafDecayManager.ScheduleAround` edit-path rule, the six `GenerationalCache` sites, the LOD
+   canopy proxy and the Biomes vegetation text. Tests: `TreeGrowerTests` (the seam),
+   `CellBatchMesherTests` (world-space output, no exposed cell dropped, every touched chunk
+   meshed, determinism), `TreePreviewStateTests` (determinism, scrubbing, clamping, maturity,
+   seed, bounds, ground, framing, name lookup, version).
 
 ## Perf baseline
 
@@ -593,4 +624,5 @@ From phase 3 on:
   `visual-examples/trees.json` (`VOXEL_TIME=147`): oak, spruce, cactus, a cut limb, a felled
   trunk, leaf decay over time, and from phase 7 a `grow`n baobab and stone pine.
 
-Phase 8: an `ITEM_DEBUGGER_SELECT=<species>` + `ITEM_DEBUGGER_SHOT` capture of the TREES tab.
+Phase 8: `ITEM_DEBUGGER_SELECT=<species>` + `ITEM_DEBUGGER_SHOT` captures of the TREES tab were
+run (oak, baobab, and `tree/cactus` with `ITEM_DEBUGGER_TREE_STEP=10`) and inspected.

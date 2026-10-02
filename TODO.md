@@ -360,7 +360,10 @@ same world, and a player can move between them freely — neither arc gates the 
 - [ ] **`M-14` · Wide-trunk residue (TREES_PLAN phase 7)** — P3, M. Three known gaps left by the
   core/shell trunks: (1) a felled tree is meshed by `TopplingTree.BuildMeshData` inside one 16³
   scratch chunk, so a wide or tall tree's falling mesh is truncated to that box (the drops are
-  intact) — needs a multi-chunk scratch or a bounds-sized mesh build; (2) cutting a wide trunk's
+  intact) — needs a multi-chunk scratch or a bounds-sized mesh build. `CellBatchMesher.Build`
+  (TREES_PLAN phase 8, the item debugger's TREES tab) is a ready replacement for that single
+  window: it meshes any cell list with the real chunk mesher across tiled scratch chunks at their
+  real positions, padded by an empty ring with the edge and corner diagonals; (2) cutting a wide trunk's
   core while its slice's shells stand leaves the crown unreachable for reactive growth, because
   `TreeGraph.FromWorld` stops at the missing core and `TreeGrowthWriter` cannot refill it (the
   core above still names it as its parent, so the cell reads as an orphan's missing parent) —

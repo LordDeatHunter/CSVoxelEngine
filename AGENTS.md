@@ -83,19 +83,44 @@ while the spawn has not settled) and `entities.json` (`EntitySaveCodec`: the liv
 goblins with health, facing, velocity and ammo plus still-pending entries, and up to
 `MaxSavedDrops` item drops, nearest first). See "Saves" below for the rules.
 
-Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit (one full cycle is `WorldGenerationConfig.DayLengthSeconds`, 1200 s like Minecraft's 20 minutes, with the sun starting mid-morning, so noon is about 147 and sunset about 447). All three parse once at startup and ignore garbage with a console warning. `VOXEL_SPAWN` and `VOXEL_LOOK` (like `VOXEL_SCRIPT` below) skip the main menu and play a storeless, unsaved world; `VOXEL_TIME` alone still boots to the menu and offsets every world opened from it (see "Launch flow" above). Setting `VOXEL_SCRIPT` to a scenario JSON path (see `OpenGLTest/visual-examples/basic.json`) runs a scripted visual test instead of playing: `teleport`/`look`/`wait`/`walk`/`mine`/`place`/`fly`/`give`/`spawn`/`screenshot` steps drive the real update functions through a scripted keyboard and save numbered PNGs to `visual/<name>/` (`screenshot` takes an optional `hideHud`), then the window closes. `fly` turns creative flight on (or off with `"on": false`, `Camera.TestSetFlight`) so a scripted camera can hover over a spot instead of falling. `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position; the entity name (`slime` or `goblin`) is checked only when the step runs, so parsing stays registry-free. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
+Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit (one full cycle is `WorldGenerationConfig.DayLengthSeconds`, 1200 s like Minecraft's 20 minutes, with the sun starting mid-morning, so noon is about 147 and sunset about 447). All three parse once at startup and ignore garbage with a console warning. `VOXEL_SPAWN` and `VOXEL_LOOK` (like `VOXEL_SCRIPT` below) skip the main menu and play a storeless, unsaved world; `VOXEL_TIME` alone still boots to the menu and offsets every world opened from it (see "Launch flow" above). Setting `VOXEL_SCRIPT` to a scenario JSON path (see `OpenGLTest/visual-examples/basic.json`) runs a scripted visual test instead of playing: `teleport`/`look`/`wait`/`walk`/`mine`/`place`/`fly`/`give`/`spawn`/`grow`/`screenshot` steps drive the real update functions through a scripted keyboard and save numbered PNGs to `visual/<name>/` (`screenshot` takes an optional `hideHud`), then the window closes. `fly` turns creative flight on (or off with `"on": false`, `Camera.TestSetFlight`) so a scripted camera can hover over a spot instead of falling. `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position; the entity name (`slime` or `goblin`) is checked only when the step runs, so parsing stays registry-free. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, and the baobab's wide-trunk cuts and fall. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
 
 The **item debugger** (`dotnet run --project OpenGLTest.ItemDebugger -c Release`, same working-directory
-rule) previews held items and entities. Its left panel has two tabs. **ITEMS** is the item grid with the
+rule) previews held items, entities and trees. Its left panel has three tabs. **ITEMS** is the item grid with the
 display sliders. **ENTITIES** lists every `EntityRegistry` entry and draws the selected one part by part
 through its `EntityAnimator` (`DebugSceneRenderer.RenderEntity`). The mode buttons are data-driven: one
 per clip in the selected model's `.bbmodel`, in file order, plus HURT (the hit-flash tint). For the
 goblin they read IDLE WALK THROW MELEE HURT. A clipless model such as the slime shows its rest pose and
 only HURT. One-shot clips replay after a short rest, and the preview consumes their events itself. The
-GL-free, tested state behind the tab is `OpenGLTest.ItemDebugger/EntityPreviewState.cs`. Environment
-variables for scripted captures:
-- `ITEM_DEBUGGER_SELECT=<item|entity>` tries the item grid first, then an entity by name or display
-  name, and switches to ENTITIES on an entity match.
+GL-free, tested state behind the tab is `OpenGLTest.ItemDebugger/EntityPreviewState.cs`.
+
+**TREES** lists every `TreeSpeciesRegistry` species and grows the selected one pulse by pulse over a
+flat grass plane, at a fixed seed (`WorldSeed.Default` at first; the debugger never calls
+`WorldSeed.Apply`). The Step slider runs 0..the species' `MaturityStepsMax` and scrubs the growth
+deterministically: each step is regrown from scratch in a fresh `VirtualTreeSpace` through
+`TreeGrower.GrowSteps`, so dragging back and forth shows the same tree at the same step. STEP - and
+STEP + move one pulse, MATURE jumps to the step this seed rolls for maturity
+(`TreeGrower.MaturityStepsAt`, which is also where selecting a species lands), and REGROW (NEW SEED)
+bumps the seed and keeps the step. Features (the buttress fins) apply only from that maturity step
+on, so the mature step is exactly the worldgen tree (`GrowToMaturity`). Flat ground has no carved
+cells, so the roots feature never shows here. The tree is rasterised with `TreeRasterizer` and meshed
+by `CellBatchMesher` (`OpenGLTest/src/CellBatchMesher.cs`): the real chunk mesher run over scratch
+chunks at the cells' real chunk positions, padded by a ring of empty chunks, so thin tree-wood tubes,
+wide-trunk shells, the pixel-rim bevel, leaves and the biome tint look as in game, with no clipping at
+16-block seams. `DebugSceneRenderer.RenderTree` rebuilds the meshes only when the state's `Version`
+moves, and `ToDisplaySpaceTint` rebakes the biome-tinted vertex colours for the debugger, which
+samples its atlas without the sRGB decode. The camera frames the union of the current and the
+fully grown tree's bounds (`TreePreviewState.FitDistance`), so it stays steady while you scrub, and
+the wheel off the grid zooms that framing. The GL-free, tested state is
+`OpenGLTest.ItemDebugger/TreePreviewState.cs`.
+
+Environment variables for scripted captures:
+- `ITEM_DEBUGGER_SELECT=<item|entity|species>` tries the item grid first, then an entity by name or
+  display name (switching to ENTITIES), then a tree species by file name (switching to TREES). A
+  `tree/` prefix (`TreePreviewState.NamePrefix`) skips the first two, which is how `tree/cactus`
+  reaches the species past the `cactus` block. An unknown name logs a warning.
+- `ITEM_DEBUGGER_TREE_STEP=<n|mature>` pins the TREES step (an integer, clamped to the slider range,
+  or `mature`). Without it a selected species shows its mature tree.
 - `ITEM_DEBUGGER_ANIM=<clip|hurt>` picks the entity mode. An unknown mode logs a warning listing the
   valid ones.
 - `ITEM_DEBUGGER_SHOT=<png path>` saves one screenshot and closes. It fires on an early frame, so a
@@ -103,7 +128,7 @@ variables for scripted captures:
 - `ITEM_DEBUGGER_VIEW=first` starts the ITEMS view in first person.
 - `ITEM_DEBUGGER_LOOK=yaw,pitch` pins the first-person look angles.
 
-The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, `C` to toggle creative mode (placing costs nothing, breaking drops nothing; double-tap Space toggles flight, but only while creative — flight is noclip and Space/Left Ctrl move up/down while flying), Left Shift to sprint (1.5x on foot, 10x while flying), hold left-click to punch first, then mine: a mob (a slime or a goblin) inside the forward punch cone (3 blocks, 30° half-angle, line of sight required; only the nearest is hit) takes the held item's `entityDamage` (1 bare-hand, 3 for the primitive tools, 5 for the copper tools, 6 for the obsidian blade) and a knockback shove instead of being mined through (an item declaring `attack: "slice"` — the obsidian blade — instead swings a two-phase blade sweep: each click hits the nearest two mobs in the forward hemisphere of the same reach, the buffered return swing lands at half power, and the arm and blade are carried across the front), while a clear cone mines the targeted block (hit-based: one hit per the held item's `tool.hitDelayMs`, deals the item's `blockDamage`, 0.5 bare-hand, against the block's float `hardness`, declared in its JSON - 5 for most blocks, 8 for malachite ore, 24 for the full-width log, with each thinner taper step down to the twig shaving 15% of that log's base off its hardness, 2 for leaves, and `0` means it pops on first contact like a pebble; a block with `requiresTool` and a `tools` dict needs a listed tool tag at or above its required tier, and the wrong tool whiffs for 0 damage and no progress; damage resets if you release, switch target or switch tool; instant while creative, which ignores the gate; a click with no block under the crosshair still swings the fist); a stepped crack-sprite overlay drawn on the block's faces via `break-*.glsl` from `assets/textures/environment/break_progress.png` (8 stacked 32x32 frames, the top one blank); each hit pops the block out and back via `RenderManager.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), 1-10 to pick one of the 10 hotbar slots, `E` for the list inventory (blocks/tools/misc tabs with shared caps of 2048/8/2048; click a row to preview, click a hotbar slot to equip, same item again to unequip; the world keeps running and `E`/Escape closes it), `X` to toggle debug logging (FPS/position/water state to console), Escape to open the pause menu (RESUME / SETTINGS / SAVE & QUIT; Escape on its settings page steps back to it, and on the main page resumes). SAVE & QUIT presents a `Saving...` frame, calls `World.SaveAndDispose` on the next update and returns to the main menu's worlds page. None of these keys act while a world is still loading.
+The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, `C` to toggle creative mode (placing costs nothing, breaking drops nothing; double-tap Space toggles flight, but only while creative — flight is noclip and Space/Left Ctrl move up/down while flying), Left Shift to sprint (1.5x on foot, 10x while flying), hold left-click to punch first, then mine: a mob (a slime or a goblin) inside the forward punch cone (3 blocks, 30° half-angle, line of sight required; only the nearest is hit) takes the held item's `entityDamage` (1 bare-hand, 3 for the primitive tools, 5 for the copper tools, 6 for the obsidian blade) and a knockback shove instead of being mined through (an item declaring `attack: "slice"` — the obsidian blade — instead swings a two-phase blade sweep: each click hits the nearest two mobs in the forward hemisphere of the same reach, the buffered return swing lands at half power, and the arm and blade are carried across the front), while a clear cone mines the targeted block (hit-based: one hit per the held item's `tool.hitDelayMs`, deals the item's `blockDamage`, 0.5 bare-hand, against the block's float `hardness`, declared in its JSON - 5 for most blocks, 8 for malachite ore, 24 for a full-cube trunk of the `tree_wood` logs and 1 for leaves; a tree-wood cell scales its block's `hardness` by the thickness in its `WoodState` (`Mining.HardnessOf`: `hardness * (tipHardness + (1 - tipHardness) * thickness / WoodState.FullCube)`, so the thinnest wood keeps `wood.tipHardness` of it and placed, detached wood is as hard as a trunk), and `0` means it pops on first contact like a pebble; a block with `requiresTool` and a `tools` dict needs a listed tool tag at or above its required tier, and the wrong tool whiffs for 0 damage and no progress; damage resets if you release, switch target or switch tool; instant while creative, which ignores the gate; a click with no block under the crosshair still swings the fist); a stepped crack-sprite overlay drawn on the block's faces via `break-*.glsl` from `assets/textures/environment/break_progress.png` (8 stacked 32x32 frames, the top one blank); each hit pops the block out and back via `RenderManager.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), 1-10 to pick one of the 10 hotbar slots, `E` for the list inventory (blocks/tools/misc tabs with shared caps of 2048/8/2048; click a row to preview, click a hotbar slot to equip, same item again to unequip; the world keeps running and `E`/Escape closes it), `X` to toggle debug logging (FPS/position/water state to console), Escape to open the pause menu (RESUME / SETTINGS / SAVE & QUIT; Escape on its settings page steps back to it, and on the main page resumes). SAVE & QUIT presents a `Saving...` frame, calls `World.SaveAndDispose` on the next update and returns to the main menu's worlds page. None of these keys act while a world is still loading.
 
 `X` also raises the **frame profiler overlay** under the FPS counter, and prints the same
 snapshot to the console once a second so a headless run's log carries it. Console writes go
@@ -314,9 +339,11 @@ faces per depth slice into a 16×16 bit plane and merges rectangles — but only
 where the key's AO and both corner lights are constant, so the merged quad's interpolated shade
 and light equal the per-cell values exactly. Merged quads carry UVs 0..W / 0..H in tile units
 (`TiledUv`) and the sampler's REPEAT tiles them. The per-voxel loop then skips greedy cells and
-emits everything else as before (tapered wood, pebbles, fluids, any model with cropped or rotated
-UVs); its full, shaded, culled cube faces use the same corner rule, and the procedural emitters
-(tapered wood, pebbles, branch piles, snow layers) bilinearly interpolate the smooth corner light
+emits everything else as before (tree wood — `Chunk.EmitTreeWood`'s node box and connecting tubes
+for a thin cell, `Chunk.EmitRimWood`'s stair-stepped `TreeWoodShape.RimBoxes` for a bevelled
+pixel-rim trunk shell — pebbles, fluids, any model with cropped or rotated UVs); its full, shaded,
+culled cube faces use the same corner rule, and the procedural emitters (tree wood, pebbles, branch
+piles, snow layers) bilinearly interpolate the smooth corner light
 of the cell face they sample (`FaceLight`, flat where that face's front neighbour occludes).
 Fluids average each corner over the same own/dx/dz/diagonal cells `CornerHeight` reads, with a
 blocked cell replaced by the brightest open one, an order-independent rule so neighbouring fluid
@@ -329,7 +356,8 @@ almost untouched (+0.2 % vertices over eight sampled surface and cave chunks, me
 within noise), since generated terrain is mostly uniformly lit and only lamp and shadow
 gradients split merges.
 
-**Biome-tinted grass and leaves.** Grass, `leaves` and `spruce_leaves` take their colour from the
+**Biome-tinted grass and leaves.** Grass and every species' leaves (`oak_leaves`, `spruce_leaves`,
+`baobab_leaves`, `stone_pine_leaves`, all on the `foliage` palette) take their colour from the
 climate at their position, Minecraft style, while `FaceTiles` keep the default coloured tiles, so
 inventory icons, item drops and the held block never change. It is block data: a `biomeTint`
 object on the block JSON (`BlockDefinition.BiomeTintDefinition`) names a `palette` (`grass`, the
@@ -360,9 +388,12 @@ and it is accepted). The tint rides the vertex rgb as `shade * tint` (`BiomeTint
 `BiomeTint.Gain` (4, mirrored by the literal `4.0` behind `fTintGain` in `test-vertex.glsl` — keep
 the two together): the textureless tiles are grey around `WorldGenerationConfig.BiomeTintTextureGrey`
 (sRGB 98), so a byte rgb capped at 1 needs that headroom to reach grass green. The two grass tiles
-are supplied art; `tools/generate-leaf-textureless.ps1` writes the leaf ones from `leaves.png` and
-`spruce_leaves.png` (Rec. 601 luminance, alpha copied, scaled to the same mean grey, byte-identical
-re-runs). Both chunk mesh paths go through the one `Chunk.EmitTintedCubeFace`, which draws the
+are supplied art; `tools/generate-leaf-textureless.ps1` writes each leaf one,
+`<name>_leaves_textureless.png`, from its `<name>_leaves.png` (Rec. 601 luminance, alpha copied,
+scaled to the same mean grey, byte-identical re-runs). Its `-Sources` list defaults to all four leaf
+tiles; `tools/generate-tree-textures.ps1`, which tints the placeholder baobab and stone pine log and
+leaf tiles from the oak art, calls it with `-Sources baobab_leaves, stone_pine_leaves` so a run of it
+never rewrites the oak and spruce tiles. Both chunk mesh paths go through the one `Chunk.EmitTintedCubeFace`, which draws the
 base quad first and then the coplanar tinted quad, the overlay winning by draw order under
 `Lequal`; the reflection and shadow passes reuse the same lists and inherit the order, and the
 shadow pass's alpha test punches the overlay's holes over the opaque base. The far LOD reads the
@@ -431,6 +462,11 @@ OpenGLTest/
     WorldLoadGate.cs           # GL-free: when a loading world may play (ready sphere meshed, or timeout); load progress
     Chunk.cs                   # 16^3 block storage (byte IDs), block/column fill + cave carving via WorldGen/, mesh data generation (greedy pass + per-quad emitters) + AO
     MeshScratch.cs             # per-thread scratch buffers of the binary greedy mesh pass
+    CellBatchMesher.cs         # GL-free: meshes any TreeCell set with the real chunk mesher over scratch chunks
+                               #   at their real positions inside an empty ring (the item debugger's TREES tab)
+    TopplingTree.cs            # a felled tree: the wood TreeSupport finds cut off plus its canopy, meshed once in
+                               #   a 16^3 scratch chunk, swung flat around the cut, then popped out as drops
+    LeafParticle.cs            # one falling leaf billboard (sway, tumble, rest, fade); LeafParticleSystem owns them
     FaceLight.cs               # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters
     CutoutMipmap.cs            # GL-free coverage-preserving mip chain for cutout tiles (alpha rescaled per level)
     LightFlicker.cs            # GL-free per-cell flicker phase + curve for the campfire point lights
@@ -465,8 +501,6 @@ OpenGLTest/
                                #   anchor resolution, the integrity check, Convert and Revert
     MultiblockPlacement.cs     # which 2x2x2 volume a right-click meant: the right-down/right-up/
                                #   left-down/left-up search and the facing the opening takes
-    ItemType.cs                # pure items (vine, branch, flint): ids handed out after the blocks;
-                               #   never placed or meshed, only drops and inventory slots
     WorldGenerationConfig.cs   # all tuning constants (view radius, per-frame budgets, thread counts) and every worldgen knob (seed, ravine, cave, carver)
     MathUtils.cs               # lerp/easing/pulse helpers for animation curves + shared constants
     SkyPalette.cs              # GL-free zenith/horizon/glow sky palette and the C# reference of SkySample
@@ -492,7 +526,12 @@ OpenGLTest/
                                             #   animate from their clips)
       BlockRenderer.cs, BlockBreakAction.cs, AttackPattern.cs, ItemUseAction.cs  # geometry/break/attack/use enums
       BiomeTintFaces.cs                     # a block's resolved biomeTint: palette + per-face base/tinted tiles
-      WoodShape.cs, SnowShape.cs            # state/neighbour-aware hitbox shapes (tapered wood, layered snow)
+      SnowShape.cs                          # state-aware hitbox shape of layered snow
+      TreeWoodShape.cs                      # the one tree_wood shape rule: which cells connect (parent
+                                            #   edges, never detached wood), node and tube hitboxes,
+                                            #   body overlap and the bevelled pixel-rim boxes (RimBoxes)
+      TreeSpeciesDefinition.cs              # JSON DTO of assets/data/trees/<species>.json
+      WoodLootBand.cs                       # one thickness band of a tree_wood block's loot (self or a table)
       MultiblockShape.cs                    # the 2x2x2 volume's geometry: rotating a point, a
                                             #   direction or a whole baked model to a facing
       KilnRenderer.cs, QuernRenderer.cs, CastingRenderer.cs  # GL-free placement/animation
@@ -542,6 +581,9 @@ OpenGLTest/
       Compass.cs               # HUD compass heading math
       Primitives.cs            # Vertex-layout mesh factories for simple shapes
     Items/                     # the Item class hierarchy ItemFactory hands out per use action
+      Item.cs, ItemFactory.cs  # the abstract item; the per-use.action factory building the singletons
+      ItemRegistry.cs          # every item by shared byte id: pure items (vine, branch, flint, ...) plus
+                               #   one BlockItem per placeable block
       CrucibleItem.cs          # a vessel whose molten contents ride on its own ItemStack
       CrucibleInventory.cs     # GL-free helper that adds a crucible and hands back its stack
       ConvertMultiblockItem.cs # the converter's right-click: find the volume, convert in place
@@ -600,6 +642,13 @@ OpenGLTest/
       ChunkManager.cs          # chunk lifecycle: load/unload, dirty tracking, mesh scheduling
       LodManager.cs            # LOD region lifecycle: worker thread builds, main thread uploads/unloads, burial flags
       FluidManager.cs          # the fluid tick: scheduled cells, level recompute + spread, batched remeshes
+      LeafDecayManager.cs      # leaf decay + orphaned-wood crumble: a fixed tick over scheduled cells,
+                               #   hydration from live tips (ScheduleAround/ScheduleBox from every edit path)
+      TreeGrowthWriter.cs      # reactive growth on the live world: rebuild a column's tree from its wood
+                               #   state bytes (or plant a sapling), GrowFurther in a WorldTreeSpace, write
+                               #   the difference back; TreeGrowthResult.cs / TreeGrowthStatus.cs are its result
+      LeafParticleSystem.cs    # falling leaves: ambient fall off canopy near the camera + bursts where it was disturbed
+      LeafParticleRenderer.cs  # the falling leaves as one back-to-front billboard draw
       KilnManager.cs           # kiln block entities keyed by anchor: fuel, ignition, the crucible
                                #   slot and its melt loop, plus the multiblock integrity sweep
       CastingManager.cs        # one cast per mold cell: pour from a held crucible, cool, collect
@@ -612,7 +661,28 @@ OpenGLTest/
       Biome.cs                 # the Forest / Desert / Ocean / Taiga / Frozen enum
       ColumnData.cs            # per-chunk-column arrays: Heights (ravines cut in), DirtDepth, EntranceWeight,
                                #   CaveIntensity, Biomes, Bed (pre-ravine profile: decides wetness)
-      CactusGenerator.cs       # desert saguaros: tapered stem + pitchfork arms, no leaves (wood.family "cactus")
+      TreeGenerator.cs         # the tree worldgen front end: which columns root which species (worldgen
+                               #   rules), stamping the rasterised cells into chunks, the far-LOD canopy
+                               #   lookups (TryGetCanopy, the crown proxy) and the felled-canopy markers
+      TreeBatch.cs             # every tree of one 64x64 XZ cell grown together in one VirtualTreeSpace
+      Trees/                   # the tree growth engine (see "Trees")
+        TreeGraph.cs, TreeGrower.cs        # the node graph; Pulse / GrowToMaturity / GrowSteps / GrowFurther
+        GrowthSignal.cs, TreeDirections.cs, TreeCellKey.cs  # a pulse step, the six face dirs, cell keys
+        IGrowthLogic.cs, GrowthLogicRegistry.cs            # growth.logic: the direction chooser + its table
+        OakGrowthLogic.cs, ConiferGrowthLogic.cs, CactusGrowthLogic.cs,
+          BaobabGrowthLogic.cs, UmbrellaGrowthLogic.cs     # oak, conifer, cactus, baobab, umbrella logics
+        ITreeFeature.cs, TreeFeatureRegistry.cs, TreeFeatureSpec.cs  # features[]: post-growth stages
+        RootsFeature.cs, ButtressFeature.cs                # roots down into carved air; buttress fins
+        TreeRasterizer.cs, TreeCell.cs     # graph -> wood/shell/leaf cells with their state bytes
+        ShellOffset.cs, TrunkShape.cs, TrunkRim.cs  # wide-trunk shells: offsets, footprint, rim style
+        LeafCluster.cs, LeafClusterShape.cs         # leaves around live tips and their hydration
+        TreeSpecies.cs, TreeSpeciesCompiler.cs, TreeSpeciesRegistry.cs,
+          TreeWorldgenRules.cs             # compiled species, its validation, the registry, worldgen rules
+        ITreeSpace.cs, VirtualTreeSpace.cs, WorldTreeSpace.cs, TreeCellReader.cs  # what a tree may grow
+                                           #   into: worldgen heightmap view, live-world view, world reads
+        TreeSupport.cs, TreeSupportResult.cs  # which wood stands: paths to an anchor (felling, crumbling)
+        WoodState.cs, LeafState.cs         # the wood and leaf meanings of the per-block state byte
+        LodCrownProxy.cs, LodCrownProfile.cs  # the far-LOD crown silhouette of a species
       SnowGenerator.cs         # cold weather: freezes surface water to ice, lays one layered-snow cell per cold column
       IceSpikeGenerator.cs     # rare single-column ice spikes on the barren frozen plains
       NoiseCaves.cs            # 3D-noise caves (cheese rooms, wide/narrow spaghetti, deep caverns) on a strided lattice
@@ -627,6 +697,8 @@ OpenGLTest/
   assets/data/items/<name>.json       # vine, branch, flint, bucket, water_bucket, lava_bucket
   assets/data/loot/<name>.json        # stone, wood, leaves, pebble
   assets/data/entities/<name>.json    # slime, goblin: display name, hp, loot table, optional model
+  assets/data/trees/<species>.json    # tree species (oak, spruce, cactus, baobab, stone_pine): wood and
+                                      #   leaves, growth, thickness, leaf cluster, features, LOD crown, worldgen
   assets/data/molten/<name>.json      # molten materials (copper): tile + tint the liquid is drawn with
   assets/data/recipes/melt/<in>.json  # what a block or item melts into, and how many ml
   assets/data/recipes/cast/<out>.json # (fired mold + material) -> result, amount and cooling time
@@ -634,9 +706,13 @@ OpenGLTest/
                                       #   cube, cube_all, cube_column, cube_bottom_top
   assets/models/entity/<name>.bbmodel # Blockbench entity projects (slime, goblin with its four
                                       #   clips) + <name>.png skins
-OpenGLTest.ItemDebugger/              # the item/entity preview tool (ITEMS and ENTITIES tabs)
+OpenGLTest.ItemDebugger/              # the item/entity/tree preview tool (ITEMS, ENTITIES and TREES tabs)
+  EntityPreviewState.cs               # GL-free state of the ENTITIES tab
+  TreePreviewState.cs                 # GL-free state of the TREES tab: species, seed, step, per-step
+                                      #   snapshots, ground plane and framing bounds
 tools/generate-goblin-skin.ps1        # deterministic generator of goblin.png; its header pins the UV layout
 tools/generate-leaf-textureless.ps1   # deterministic grey leaf tiles for the biome tint (scaled to BiomeTintTextureGrey)
+tools/generate-tree-textures.ps1      # placeholder baobab / stone pine log and leaf tiles tinted from the oak art
 ```
 
 ## Content: blocks, items, models and loot are data
@@ -652,8 +728,9 @@ to name a specific block or item asks for it by file name — `ContentRegistry.R
 `ContentRegistry.RequireItem("bucket")` — which throws naming the missing content at startup
 instead of silently mis-indexing. Hot paths must not do that per voxel: worldgen and the LOD
 mesher resolve their palette once in the owning feature's static constructor
-(`TerrainGenerator.SurfaceBlock/SoilBlock/RockBlock/SeaBlock`, `TreeGenerator.LeavesBlock/SpruceLeavesBlock`,
-`PebbleGenerator.PebbleBlock`) and everything else reads those bytes. Best of all is not naming
+(`TerrainGenerator.SurfaceBlock/SoilBlock/RockBlock/SeaBlock`, `TreeGenerator.LeavesBlock` — the
+far LOD's fallback canopy leaf —, `PebbleGenerator.PebbleBlock`), a tree species resolves its
+blocks once at load (`TreeSpecies.WoodId`/`LeavesId`), and everything else reads those bytes. Best of all is not naming
 a block: when the question is "what does this block do", add a data flag and read it (see the
 convention below). Every content error names the file it came from.
 
@@ -678,7 +755,7 @@ trailing commas.
 |---|---|---|
 | `model` | required | a `"block/cube_all"`-style path under `assets/models/`, **or** an inline model object with the same schema |
 | `name` | file name | display name for inventory rows and preview headings (`BlockType.DisplayName`) |
-| `hardness` | 5 | float damage the block absorbs before breaking; each hit deals the held tool's power (`Item.ToolPower`, bare hand 1), so 5 with a power-1 tool is five hits; `0` breaks on first contact (pebble). See `Mining` |
+| `hardness` | 5 | float damage the block absorbs before breaking; each hit deals the held tool's power (`Item.ToolPower`, bare hand 1), so 5 with a power-1 tool is five hits; `0` breaks on first contact (pebble). On a `tree_wood` block it is the hardness of a full-thickness cell, and a thinner cell scales down linearly with the thickness in its state byte to `wood.tipHardness` of it (`Mining.HardnessOf(id, state)`: `hardness * (tipHardness + (1 - tipHardness) * thickness / 15)`). See `Mining` |
 | `requiresTool` | false | when true, a hit only damages the block if the held item belongs to one of the `tools` tags at or above the required power; the wrong kind or a lower tier deals 0 damage and no progress. When false, any tool or bare hand mines it and `tools` is ignored |
 | `tools` | none | tag name to minimum tool power, e.g. `{"pickaxe": 1.0}` admits any item listed in the `pickaxe` tag (`assets/data/tags/pickaxe.json`) whose `tool.power` is at least 1.0; `0` admits any member. Only read while `requiresTool` is true; a tag no item provides warns yellow at startup |
 | `solid` | true | collides with bodies (`BlockType.IsSolid`) |
@@ -696,15 +773,15 @@ trailing commas.
 | `light.emission` | 0 | 0..15 (`LightEmission`) |
 | `light.color` | warm torch colour | sRGB `[r, g, b]`, 0..255 each, of the block's light; only legal with `emission` > 0. Colours within 0.5/255 share a `BlockLightPalette` slot, and at most 8 distinct colours exist (the default included) - a ninth throws naming the file. `blue_lamp` is the example |
 | `light.passes` | `!fullCube` | whether voxel light travels through the cell (`PassesLight`) |
-| `renderer` | `"model"` | `model` (baked quads), `tapered_wood`, `pebbles`, `branch_pile`, `snow_layers`, `fluid` or `quern` (procedural emitters), `multiblock` (the anchor cell of a structure, carrying the whole volume's pre-rotated model) or `multiblock_part` (one of its other cells, solid and occluding but never meshed); a fluid's or layer block's model only supplies its tile |
+| `renderer` | `"model"` | `model` (baked quads), `tree_wood` (a grown tree's wood: its shape, thickness and tree-graph links come from the state byte, see `### Trees`; requires a `wood` object, forces `occludes` and `castsAO` off and `light.passes` on, never meshes greedy, and refuses `cutout`, `translucent`, `fluid`, `falls`, `needsSupport`, `stackMax` and `hitbox`), `pebbles`, `branch_pile`, `snow_layers`, `fluid` or `quern` (procedural emitters), `multiblock` (the anchor cell of a structure, carrying the whole volume's pre-rotated model) or `multiblock_part` (one of its other cells, solid and occluding but never meshed); a fluid's or layer block's model only supplies its tile |
 | `multiblock` | none | required on, and only legal with, `renderer: "multiblock"`: `{"part": "block/<name>", "source": "block/<name>"}` — the block filling the other seven cells (which must use `multiblock_part`) and the plain block the volume is built from and reverts to. The anchor and its part must both set `hasItem: false` (a structure is built, never held), and `cutout`/`translucent`/`fluid` are rejected, since both halves are ordinary opaque solids to everything but the mesher. Both default `occludes` and `light.passes` to **true**: the structure's surface really does cover its neighbours, and its quads carry no cullface and are lit from the anchor's own cell, so light has to reach that cell or the whole thing renders black. The model is authored in 0..32 model units (the 2x2x2 volume) with the opening on **north**, no `cullface` on any face and no face covering a whole cell plane — see `### Multiblocks` below |
 | `kiln` | false | marks a multiblock anchor as a kiln, which is what gives it `KilnManager`'s fuel, ignition, crucible slot and integrity sweep. Only legal on the `multiblock` renderer |
-| `wood.taperLevel` | none | 0 = the family's base, each step up narrows toward its tip; each family's levels must be covered contiguously from 0 (tree 0..5, cactus 0..3, spruce 0) |
-| `wood.halfWidth` | 0.5 | half edge length of the tapered box, in blocks (`HalfWidth`) |
-| `wood.family` | `"tree"` | which taper family this level belongs to; wood of two families never welds. `"cactus"` is the 4-level saguaro set, `"spruce"` the taiga conifer's single full-cube trunk |
+| `wood` | none | required on, and only legal with, `renderer: "tree_wood"`: how hardness and loot follow the thickness stored in each cell's `WoodState` (code 0 = 1 px across .. 15 = full cube) |
+| `wood.tipHardness` | 0.25 | the share of `hardness` the thinnest (1 px) wood keeps, 0..1, rising linearly to the full `hardness` at a full cube (`BlockType.TipHardness`, read by `Mining.HardnessOf`). Player-placed tree wood is a full detached cube and therefore as hard as a trunk |
+| `wood.loot` | always drop self | thickness bands `[{"minThickness": n, "loot": l}, ...]`, strictly ascending by `minThickness` (0..15) and starting at exactly 0, so every thickness has loot; `loot` is `self` (drop the block, the default), `none` or a loot table name. The band with the largest `minThickness` at or below the cell's thickness is rolled (`WoodLootBand.Select`, through `LootContext.State` on every destruction path): `oak_log` gives the `wood` table (a stick half the time) under 8 px and itself from there, `cactus` always itself |
 | `stackMax` | 0 | units that stack in one cell (pebble piles 3, branch piles 4, snow layers 16): the count lives in the chunk state byte, 0 = untouched worldgen (the generator's own default), 1..`stackMax` an explicit stack. 2..16 |
 | `stackSolidAt` | 0 | stack count at which a stack block turns solid, for a block whose partial stacks are walked through (layered snow at 16). Only legal from 1..`stackMax` on a `solid: false` stack block |
-| `hasItem` | true | enters the blocks pool and can be hotbarred; false for taper wood and pebbles |
+| `hasItem` | true | enters the blocks pool and can be hotbarred; false for pebbles, branch piles, layered snow and the kiln's anchor and part (fluids force it off). Every `tree_wood` log and every leaf block keeps its item: placing one writes a detached full cube (`WoodState.Detached`) or a persistent leaf (`LeafState`), which never fells with a tree or decays |
 | `needsSupport` | false | pops, rolling its loot, when the block below is removed; also makes the block replaceable, so a flow washes it away |
 | `replaceableByPlacement` | false | a block placement aimed at this block fills the block's own cell and discards it, instead of filling the cell across the hit face, so a block placed against a partial snow drift rests on the ground instead of hovering a layer above it. Only fires while the cell is not solid, so a full snow stack stays an ordinary block, and the displaced block drops nothing. Independent of `needsSupport`, which is what a flow or a bucket may overwrite. Illegal on an always-solid block, which could never honour it |
 | `falls` | false | gravity-affected (sand, gravel): topples into a `FallingBlock` entity when the cell below stops being solid, sinks through water, slides off lone supports; never combines with `fluid`/`needsSupport` |
@@ -712,9 +789,9 @@ trailing commas.
 | `flow` | water behaviour | per-fluid tuning, only legal with `fluid: true`: `tickDivisor` (ticks between updates, lava `2` = half water speed), `range` (sideways spread 1..7, lava `3`), `infinite` (adjacent sources birth new ones, lava `false`), and the `hardensTo` + `hardensTouching` pair (lava hardens to `cobblestone` on touching `block/water`) |
 | `onBreak` | `"drop"` | `drop` (roll loot) or `prime_tnt` (no drop, spawns a `PrimedTnt`) |
 | `loot` | the table sharing this block's name, else drop self | loot table name; `"none"` drops nothing |
-| `sfx` | `hit_default` | sound group played while the block is mined, e.g. `hit_rock` (stone family) or `hit_wood` (wood family). A group is every `<group>.wav` / `<group>_N.wav` directly under `assets/sfx`, and one variant is picked at random per hit (`SfxManager`). An unknown group warns yellow and uses the default |
+| `sfx` | `hit_default` | sound group played while the block is mined, e.g. `hit_rock` (the stone blocks) or `hit_wood` (the logs and cactus). A group is every `<group>.wav` / `<group>_N.wav` directly under `assets/sfx`, and one variant is picked at random per hit (`SfxManager`). An unknown group warns yellow and uses the default |
 | `hitbox` | full cube | selection boxes in cell-local 0..1 space: one `{"min": [x,y,z], "max": [x,y,z]}` object or an array of them; the outline draws all, the raycast only targets through one |
-| `collidesByHitbox` | false | the body collides with the declared `hitbox` boxes instead of the full cell, like tapered wood (a 0.25 slab is stepped onto and stood on; `Camera.IsColliding` -> `WoodShape.OverlapsShape`); requires `hitbox`, `solid: true`, no `stackMax`, not a fluid. Player body only: drops, slimes and falling blocks still see the full cell |
+| `collidesByHitbox` | false | the body collides with the declared `hitbox` boxes instead of the full cell, the way tree wood collides with its drawn node and tubes (a 0.25 slab is stepped onto and stood on; `Camera.IsColliding` -> `TreeWoodShape.OverlapsShape`, which tests the registered hitboxes for every block that is not thin or bevelled tree wood); requires `hitbox`, `solid: true`, no `stackMax`, not a fluid. Player body only: drops, slimes and falling blocks still see the full cell |
 
 Two traps worth repeating: a **model that is not a full cube needs `light.passes: true`** (which
 is its default) or its own cell stays dark and the interior quads render black; and a **cutout
@@ -815,7 +892,7 @@ slot holding that bucket flips with it and scooping and pouring alternate on the
 A `pickup_fluid` item scoops the fluid it names into its `result`, but an empty bucket also
 scoops any other fluid that has its own full bucket (lava becomes `item/lava_bucket`) — the
 pour side is what decides the pairing, so new fluids only need a `place_fluid` item to be scoopable.
-`ItemType.TargetsFluids` makes the selection
+`Item.TargetsFluids` (true on `BucketPickupItem`) makes the selection
 raycast include fluid sources only while a `pickup_fluid` item is held — otherwise water is
 aimed straight through, and mining refuses fluid cells regardless.
 
@@ -837,14 +914,18 @@ aimed straight through, and mining refuses fluid cells regardless.
 ```
 
 An `item` name resolves against blocks first, then items; a `block/` or `item/` prefix pins it to
-one of the two. `leaves.json` therefore has to say `"item/branch"`, because a *block* named
-`branch` (the thickest taper step) exists as well. The only roll-count provider is `pebble_count`
+one of the two, so a table that means the item says so whenever a block of the same name could
+exist: `leaves.json` (shared by every `*_leaves` block) and `wood.json` (the thin-wood band of the
+`tree_wood` logs) both write `"item/branch"`, which keeps the stick an item even beside the
+`branch_pile` block. The only roll-count provider is `pebble_count`
 (`PebbleGenerator.CountAt(x, z)` at the loot context's cell).
 
 Every destruction path rolls through one place: `DropManager.RollLoot` (a block with no table
 drops itself, `LootTable.None` drops nothing) and its spawning wrapper `SpawnLoot`. Mining
-(`World.RemoveBlock`), blasts (`TntManager.Detonate`) and felled trees (`TopplingTree.TakeDrops`)
-all go through it, so a block's yield never depends on how it came down.
+(`World.RemoveBlock`), blasts (`TntManager.Detonate`), felled trees (`TopplingTree.TakeDrops`) and
+decaying leaves and crumbling orphaned wood (`LeafDecayManager`) all go through it, with the
+cell's state byte in `LootContext.State` so tree wood picks its thickness band, so a block's
+yield never depends on how it came down.
 
 ### Model schema (`assets/models/block/<name>.json`)
 
@@ -864,6 +945,215 @@ works unchanged: `cube` (six faces, `#north #south #east #west #up #down`), `cub
 `#all`), `cube_column` (`#end` on up/down, `#side` around) and `cube_bottom_top` (`#top`,
 `#bottom`, `#side`). `ContentRegistry.BakeModels` self-checks at startup that all four still bake
 to six full faces.
+
+### Tree species schema (`assets/data/trees/<species>.json`)
+
+One file per species; the file name is the species name (`TreeSpeciesRegistry.ByName`, which
+`ITEM_DEBUGGER_SELECT` and the `grow` op match). `ContentRegistry.Load` reads the folder **after
+the blocks** (`LoadTreeSpecies`; a missing folder is an empty registry), compiles each file through
+the pure `TreeSpeciesCompiler.Compile` (DTO `TreeSpeciesDefinition.cs`) into an immutable
+`TreeSpecies`, and every error starts `Tree species '<path>'`. Block references take an optional
+`block/` prefix and never resolve to an item. Five species ship: `oak`, `spruce` and `cactus`
+generate in the world, while `baobab` and `stone_pine` have **no `worldgen` block** and are only
+ever grown (`TreeGrowthWriter`, the `grow` op, the item debugger). See `### Trees` for what the
+fields drive.
+
+| field | default | meaning |
+|---|---|---|
+| `wood` | required | the wood block; must use `renderer: "tree_wood"` and must not be a fluid. Two species may share one wood only if they agree on `thickness.rim` |
+| `leaves` | none | the leaf block (not the wood, not a fluid). Omitted means a leafless species (cactus), and then `leafCluster` must be omitted too; present means `leafCluster` is required. A leaves block is what `TreeGenerator.IsLeaf` answers for, and so the block whose state byte is a `LeafState` |
+| `growth.logic` | required | the registered `IGrowthLogic` direction chooser (`GrowthLogicRegistry`): `oak`, `conifer`, `cactus`, `umbrella` (stone pine) or `baobab` |
+| `growth.signalEnergy` | required, >= 1 | the energy a growth signal starts with: one per step out from the root, so it bounds the tree's reach. Each tree also rolls its own energy, clamped to 1..this (`IGrowthLogic.TreeEnergy`) |
+| `growth.upProbability` | required, >= 0 | weight of growing straight up against the four sideways choices (weight 1 each) |
+| `growth.lowestBranchHeight` | required, >= 0 | height above the root below which nothing forks; a `buttress` species needs >= 1 |
+| `growth.maturitySteps` | required | `[min, max]`, `1 <= min <= max`: the pulse count a tree grows to maturity, rolled per tree |
+| `thickness.tipPx` | required, 1..16 | diameter of a branch tip in pixels |
+| `thickness.pipeExponent` | required, finite > 0 | exponent of the pipe model that sums child diameters into the parent's |
+| `thickness.maxPx` | required, `tipPx`..128 | largest diameter in pixels; past 16 a node is a full cube, and from 48 a trunk node grows shells (wide trunk) |
+| `thickness.girthProfile` | `[[0, 1]]` | `[[height01, multiplier], ...]` along the tree's height: heights start at exactly 0, strictly increase within 0..1, multipliers > 0 (`TreeGrower.Girth`) |
+| `thickness.trunkShape` | `circle` | `circle` or `square` (`TrunkShape`): a wide trunk's block footprint |
+| `thickness.rim` | `block` | `block` or `pixel` (`TrunkRim`): `pixel` bevels the outer shells of a wide trunk with pixel-stepped quarter-rounds |
+| `leafCluster.shape` | `blob` | `blob` or `cone` (`LeafClusterShape`) |
+| `leafCluster.radius` | required, 1..8 | cluster radius in blocks around each live tip |
+| `leafCluster.hydration` | required, 1..7 | hydration a leaf right at a tip gets (`LeafState.MaxHydration` is 7); it falls by one per Manhattan step, and a leaf needs at least 1 to exist |
+| `leafCluster.tipMaxPx` | required, 1..`maxPx` | the thickest childless wood (in pixels) that still counts as a live tip and grows a cluster |
+| `features[].type` | none | a registered post-growth `ITreeFeature` (`TreeFeatureRegistry`): `roots` (feature nodes walked down through free cells) or `buttress` (full-cube fins along the four axes at the root's level); each at most once per species |
+| `features[].depth` | 0 | >= 0; `roots` needs >= 1 (its depth in blocks), `buttress` takes exactly 0 |
+| `lod.crownHeight` | required | `[min, max]`, `0 <= min <= max`: the far rings' proxy crown height, rolled per tree from its placement hash |
+| `lod.crownRadius` | required, >= 0 | the proxy crown radius in blocks |
+| `lod.profile` | `dome` | `dome`, `cone` or `column` (`LodCrownProfile`, the silhouette `LodCrownProxy.TopOffset` draws) |
+| `worldgen.biomes` | required | non-empty, duplicate-free list of `Biome` names (`forest`, `desert`, `ocean`, `taiga`, `frozen`) the species is planted in |
+| `worldgen.density` | required, 0..1 | chance per candidate column |
+| `worldgen.spacing` | required, >= 0 | minimum gap to another trunk in blocks (the lowest placement hash wins) |
+| `worldgen.maxSlope` | required, >= 0 | largest ground height step across the footprint |
+| `worldgen.minSoil` | 0 | soil depth the column needs, >= 0 (oak and spruce 2, so they never root on bare rock) |
+| `worldgen.minGround` / `maxGround` | required | the ground height band the species grows in, `minGround <= maxGround` |
+| `worldgen.openness` | 1 | 0..1, the share of the forest-openness thinning (`TerrainGenerator.ForestOpenness`) applied to this species (spruce 0.5, cactus 0) |
+| `worldgen.spawnClear` | true | whether the species keeps out of the spawn clearing (`TreeSpawnClearRadius`) |
+
+`worldgen` as a whole is optional: leaving it out keeps the species out of worldgen entirely
+(`TreeSpecies.Worldgen` is null and `TreeGenerator.TryGetTree` never picks it).
+
+### Trees
+
+Trees are grown, not drawn from templates: one generic, deterministic, step-based engine under
+`src/WorldGen/Trees/` grows every species from its JSON (`### Tree species schema` above), and the
+world stores the result as **plain blocks plus the state byte** — one `tree_wood` block and one
+leaves block per species, no per-tree registry or entity.
+
+- **Wood state** (`WoodState`): bits 0-3 the thickness code `n` (diameter `n + 1` px, 15 =
+  `FullCube`), bits 4-6 the parent direction in `Chunk.CubeFaces` order (0-5, 6 = `ParentRoot`,
+  7 = `ParentDetached`) and bit 7 `ShellBit` (a girth cell of a wide trunk). The one connection
+  rule is `TreeWoodShape.Connects`: same id, neither side detached, and one cell's parent points at
+  the other — so siblings and two neighbouring trees never weld, and the tree graph can be read back
+  out of the blocks (`TreeGraph.FromWorld`). Placed wood is `WoodState.Detached`, a full cube that
+  never welds or fells.
+- **Leaf state** (`LeafState`): bits 0-2 hydration, bit 3 `PersistentBit` (player-placed leaves,
+  which never decay). Hydration is `leafCluster.hydration` minus the Manhattan distance to the
+  nearest **live tip** whose cluster shape holds the cell (`LeafCluster.HydrationFromTip`, the one
+  per-tip formula, behind `HydrationAt`, `Collect` and decay alike); a live tip is a non-detached,
+  non-shell cell of the species' wood at or under `tipMaxPx` with no child, so a thick stub left by
+  a cut is not a tip and its leaves decay. The mesher never reads `LeafState`.
+
+**Growth engine** (GL-free, headless). `TreeGraph` holds int-indexed nodes (cell, parent and
+parent direction, children, the girth-free `PipePx`, the displayed `ThicknessPx`, `IsFeature`, a
+`FloorPx` that a tree rebuilt from the world never thins below). `ITreeSpace.IsFree` is the obstacle
+view, implemented by `VirtualTreeSpace` (a ground-height delegate, optional carved cells and an
+occupied set; `FromTerrain` reads `Chunk.GetColumnData`) for worldgen and the item debugger, and by
+`WorldTreeSpace` for live chunks. `TreeGrower.Pulse` sends one Dynamic-Trees style signal up from
+the root: each step it weighs the six directions (sideways 1, up `upProbability`, existing limbs
+followed by their `PipePx`, no forks under `lowestBranchHeight`, never down, blocked cells masked)
+and lets the species' `IGrowthLogic.AdjustWeights` lower, zero or scale them, then either follows a
+child or grows exactly one new face-adjacent node and stops, thickening the path on the way back
+down. Thickness follows the pipe model on `PipePx` (`pipeExponent`), and the displayed
+`ThicknessPx = min(maxPx, max(tipPx, PipePx * Girth))` is raised to the thickest child, so the
+girth profile applies once and a parent is never thinner than a child. Everything is deterministic
+from `TreeGrower.SeedFor(x, y, z, worldSeed, species)` (position, world seed and an FNV-1a hash of
+the species name) through one `SplitMix64` stream:
+- `GrowToMaturity` draws the maturity step count and the per-tree energy first, runs that many
+  pulses, one final bottom-up `Thicken` (so the girth profile sees the final height), then the
+  species' `features` on the same stream;
+- `GrowSteps(..., steps, applyFeatures)` replays exactly that stream for any pulse count (the item
+  debugger's scrub path); `GrowSteps(MaturityStepsAt(...), applyFeatures: true)` *is*
+  `GrowToMaturity`, and without features a shorter grow's nodes are a prefix of a longer one's.
+  `MaturityStepsAt` and `TreeEnergyAt` replay the two rolls on their own;
+- `GrowFurther` is the reactive path: `Thicken`, N pulses under a node cap, `Thicken`, and the
+  features only when asked (a freshly planted sapling), since a feature is not idempotent.
+
+**Rasteriser.** `TreeRasterizer.Rasterize(graph, species, space, out woodCount)` turns a graph into
+`TreeCell`s (cell, block, state) in a load-bearing order: the graph nodes in index order (growth
+nodes, then feature nodes), then the shells, which end the wood at `woodCount`, then the leaves
+(`LeafCluster.Collect`, which never lands a leaf on a shell). The thickness code is
+`ThicknessCode(px)` = `ceil(px) - 1` clamped at the full cube. Worldgen stamping, the first far-LOD
+ring, reactive growth, the felling and decay tests and the item debugger all share it.
+`ReachOf(species)` is the tree's (horizontal, up, down) bound from its root — the energy plus the
+leaf radius, widened by the shell radius and the buttress reach — which sizes chunk-border margins
+and the decay schedule.
+
+**Wide trunks** are a core plus shells, and only the rasteriser makes them. A node on the
+**trunk chain** (`TrunkChain`: the root, then repeated straight-up children) whose diameter `d`
+gives `BlockRadius(d)` = `floor((d/16 - 1) / 2)` (capped at `MaxShellRadius`) above 0 stays the
+graph node as the **core**, and shell cells fill its footprint at the same Y — `InFootprint`:
+Chebyshev `<= r` for a `square` trunk, `dx² + dz² <= r² + r` for a `circle` — so the `2r + 1`
+footprint never exceeds the diameter and shells first appear at 48 px. A shell is a full cube with
+the shell bit and its parent one step toward the core (`ShellParentDir`, along X when
+`|dx| >= |dz|`), so a diagonal shell chains through an edge shell; the `ShellOffsets` tables are
+sorted parent-first, and a shell is only emitted when its parent was (or is a full-cube feature
+node at the core's Y, a buttress fin) and the space `AcceptsShell`. Because only the trunk chain
+grows shells, every core is alone at its Y and the shells are a function of the node set, never of
+index order; a wide limb elsewhere renders as a 16 px full cube, and a species that never passes
+16 px rasterises exactly as before shells existed.
+
+**Mesh, collision and the pixel rim.** `tree_wood` meshes on the per-voxel path, never greedy:
+`Chunk.EmitTreeWood` draws a thin cell as a node box sized `TreeWoodShape.HalfWidth(t)` plus one
+capless tube toward every connection at the thinner of the two widths (`TubeHalf`), with cropped
+UVs and smooth light; a full-thickness or detached cell takes the model path and culls against a
+same-id full cube. A wood block whose species sets `rim: "pixel"` (`BlockType.PixelRimById`, filled
+by `ContentRegistry.LoadTreeSpecies`) gets its outer shells bevelled from their eight horizontal
+neighbours: `TreeWoodShape.RimCornerMask` carves a corner when neither of its two edge neighbours
+is same-id attached full-cube wood (a cell only ever removes its own material, so diagonals never
+matter), `RimBoxes` turns the mask into stair-stepped full-height boxes (`RimInsetPx`, at most
+`MaxRimBoxes`, `TreeRimBevelPx` deep), and `Chunk.EmitRimWood` meshes exactly those boxes from the
+18³ snapshot with caps that subtract a bevelled cell above or below. The hitboxes match the mesh:
+`TreeWoodShape.GetBoxes`/`GetBoxesAt`/`OverlapsShape` (node, tubes and rim boxes, allocation-free)
+feed the raycast, the selection outline and `Camera.IsColliding`.
+
+**Worldgen** (`TreeGenerator`, a pure function of position like the rest of worldgen).
+`TreeGenerator.TryGetTree(x, z, ...)` keeps the placement gates per species from its `worldgen`
+block (one hash stream, biome -> species in ordinal name order, density, lowest-hash spacing,
+slope, soil, ground band, water, openness, the spawn clearing). Every tree of a 64x64 XZ cell
+(`TreeCellShift`/`TreeCellBlocks`, `TreeGenerator.CellOf`) then grows together as one `TreeBatch`
+in placement-hash order inside one `VirtualTreeSpace`, each grown tree's cells occupied before the
+next grows, so neighbouring crowns grow around each other; the trees of the eight neighbouring
+cells count as obstacles only as their cached **solo** shapes (`ShapeOf`), which keeps a batch a
+pure function of (cell, seed) and independent of chunk order. `Stamp` writes wood with its state
+into air or leaves, then leaves into air, in a fixed scan order (the root walk extends the trunk
+down through cave air only inside the chunk holding the base). The far LOD's first rings read the
+stamped canopy (`TreeGenerator.TryGetCanopy`), while the coarse rings (`LodLevelSpec.ProxyCanopy`)
+read a proxy rolled from the same placement: the species' `lod` crown height and radius through
+`LodCrownProxy.TopOffset`'s dome/cone/column silhouette, so the far sweep never grows a tree. The
+solo shapes, the batches and both canopy tables are `GenerationalCache` sites (`TreeShapeCache*`,
+`TreeBatchCache*`, `TreeCanopyCache*`, `TreeProxyCanopyCache*` in `WorldGenerationConfig`).
+
+**Leaf decay** (`Systems/LeafDecayManager.cs`, owned by `World`, main thread only, never while
+loading, the `leafDecay` profiler row) is a `FluidManager`-style scheduled-cell simulation. An edit
+schedules the cells around it (`ScheduleAround`/`ScheduleBox`, which grow the box by
+`ScheduleReach` so callers never know a radius — see the edit-path invariant below); a tick
+re-derives each scheduled non-persistent leaf's hydration as the best `HydrationFromTip` over the
+live tips in its species' cluster box, so a settled canopy reads back bit for bit and costs nothing,
+and a leaf left at 0 decays to air (at most `LeafDecayMaxRemovalsPerTick` a tick, in a scattered
+order, so a crown dissolves speckled), rolling its loot through `DropManager.SpawnLoot` with a few
+leaf particles. The same manager crumbles **orphaned wood**: a scheduled non-root, non-detached
+`tree_wood` cell that `TreeSupport` finds no longer anchored (`TickWood`, a memoised parent-chain
+fast path plus the full search on a broken chain) drops with its thickness-band loot and schedules
+its reach box, so a blasted subtree crumbles outward a layer per tick. Any read in an unloaded
+chunk drops the cell from the schedule (it freezes, never decays), and a chunk load schedules
+nothing. Tuning: `LeafDecayTickSeconds`, `MaxLeafDecayTicksPerFrame`, `MaxLeafDecayCellsPerFrame`,
+`MaxLeafDecayBacklogCells`.
+
+**Felling** (`World.FellWood` -> `TopplingTree.Collect`). Mining tree wood fells the cells that
+lose every path to an anchor once the cut cell is gone, through the GL-free bounded search
+`TreeSupport` (`TreeSupportResult` Supported / Unsupported / Unknown): links are parent edges
+(`TreeSupport.Links`) plus vertical shell-to-shell adjacency, anchors are root cells and shells
+standing on real ground (`TreeSupport.IsAnchor`: solid, neither tree wood nor leaves), and an
+unloaded read is no link. So a cut limb drops only the limb, a cut 1-wide trunk drops the crown,
+and a wide trunk falls only once a whole horizontal slice of core and shells is cut. Canopy leaves
+within Chebyshev 2 of the falling wood come along. The search is capped at `TreeFellWoodCap` wood cells and the whole fell at
+`TreeFellTotalCap` (leaves past it are left standing and decay). The falling tree is meshed by the
+real chunk mesher in one 16³ scratch chunk (`TopplingTree.BuildMeshData`) and drops through
+`TopplingTree.TakeDrops`.
+
+**Reactive growth** (`World.TryGrowTree(species, x, yHint, z, steps)`, refused while loading or
+for an unknown species; the `grow` scenario op calls it). `TreeGrowthWriter` (`Systems/`, GL-free,
+main thread; `TreeGrowthResult`/`TreeGrowthStatus` Grew / Planted / NoGround / NotGrowable) scans
+the target column for the species' root and rebuilds the tree with `TreeGraph.FromWorld` (a
+breadth-first walk over child edges only, so detached and cut-off wood is never reached; every node
+floored at its stored diameter, a wide core's floor recovered from its shell run, nodes below the
+root loaded as feature nodes; null on an unloaded read or past `TreeGrowNodeCap`), or plants a
+sapling on solid ground when there is none. It then runs `GrowFurther` (at most
+`TreeGrowMaxPulsesPerCall` pulses) in a `WorldTreeSpace` — a cell is free when it is loaded, not
+reserved by a falling block, air or a non-persistent leaf of the species, and not the missing parent
+of an orphan, which is what keeps a cut branch cut — rasterises once and writes back only the
+difference: existing nodes are only re-coded thicker, new wood goes only into free cells, leaves
+only around changed tips, and shells follow the **new-ring-only** rule (inside the footprint a core
+already had, existing shells are only re-coded, so a mined shell or a partial slice cut stays
+mined). All writes are `Chunk.SetBlockRaw`, followed by `FluidManager.ScheduleAround` per changed
+id, one `LeafDecayManager.ScheduleBox` over the written box (pruning is left to decay), a
+`ChunkManager.MarkDirty` per touched chunk and `TreeGenerator.PoisonCanopy(x, z, 0)` plus
+`LodManager.MarkEditedColumn` per changed column.
+
+**The item debugger's TREES tab** (`OpenGLTest.ItemDebugger/TreePreviewState.cs`, see "Build and
+run") grows any species pulse by pulse over flat grass at a fixed seed through `GrowSteps`, and
+meshes it with `CellBatchMesher` (`src/CellBatchMesher.cs`): the real chunk mesher over as many
+scratch chunks as the cells span, each at its real position inside an empty one-chunk ring, so a
+wide or tall tree is never clipped at a chunk seam and wears the real biome tint.
+
+Known gaps, all open: `TreeGenerator.CanopyDisturbed` still clears wholesale at its cap
+(`TODO.md` `M-10`); a grown tree shows no far-LOD canopy until reload, since `PoisonCanopy` only
+removes canopy (`M-13`); and the wide-trunk residue of `M-14` — the felled mesh is drawn only
+inside its 16³ scratch window (the drops are intact), a wide core cut while its shells stand
+leaves the crown unreachable for reactive growth, and a bevelled shell's cap can go stale when an
+edit lands in an edge-diagonal chunk that face-adjacent dirtying does not remesh.
 
 ### Recipes, cast molds and metalworks
 
@@ -980,11 +1270,12 @@ Other invariants:
 
 - World/chunk coordinates: `Chunk.Position` is in chunk units; world pos = chunk pos × `Chunk.Size` (16). Chunks are cubic and stacked vertically too (3D chunk grid, not 2D columns).
 - Blocks are `byte` IDs; `0` is air. Everything else about a block comes from `assets/data/blocks/<name>.json` through `ContentRegistry` (see "Content" above), never from a new `switch` on the id. Hot paths read the flat mirrors (`BlockType.IsSolid/Occludes/CastsAO`, `BlockType.Emission`, `BlockType.PassesLightById`) rather than `BlockType.ById[...]`, so keep new per-id flags in that shape.
-- **Per-block state byte**: alongside `Chunk._blocks` each chunk has a lazily allocated `volatile byte[]? _state` (null = all zero), read through `Chunk.GetLocalState` / `ChunkManager.GetStateGlobal` / `TryGetCell` and written only by `Chunk.SetBlockRaw` (no remesh, no scheduling — the fluid tick batches those). Three features share it, one per block: **fluid levels** (`FluidState` decodes it as source `0`, falling `8` or flowing level `1..7`), **stack counts** (a `stackMax` block's 0 = untouched worldgen, 1..`stackMax` an explicit pile) and a **multiblock's facing and offset** (`Multiblock.EncodeState`, `facing | dx<<2 | dy<<3 | dz<<4`, written by `Multiblock.Convert` through `SetBlockRaw`). Which meaning a byte carries is decided entirely by the block id that owns the cell, so a new user must pick a block kind, never a spare bit. **Every write that is not one of those zeroes it** (`RemoveBlockAt`, `PlaceBlockAt` — which also treats a fluid cell as replaceable — and `ClearBlockAt`), and `Multiblock.Revert` likewise writes its source block with an explicit `0`, so a stale level, count or offset can never outlive the block that owned it. Meshing gets it as a second padded snapshot from `FillPaddedSnapshot(padded, paddedState, neighbors, neighborStates)`, filled from the neighbourhood `TryResolveNeighbors` resolved for the build; the fluid simulation must read cells through `TryGetCell`/`ChunkAt`, never `GetBlockGlobal`, which reports unloaded chunks as air.
+- **Per-block state byte**: alongside `Chunk._blocks` each chunk has a lazily allocated `volatile byte[]? _state` (null = all zero), read through `Chunk.GetLocalState` / `ChunkManager.GetStateGlobal` / `TryGetCell` and written only by `Chunk.SetBlockRaw` (no remesh, no scheduling — the fluid tick batches those). Five features share it, one per block: **fluid levels** (`FluidState` decodes it as source `0`, falling `8` or flowing level `1..7`), **stack counts** (a `stackMax` block's 0 = untouched worldgen, 1..`stackMax` an explicit pile), a **multiblock's facing and offset** (`Multiblock.EncodeState`, `facing | dx<<2 | dy<<3 | dz<<4`, written by `Multiblock.Convert` through `SetBlockRaw`), **tree wood** (`WoodState` on a `tree_wood` block: bits 0-3 the thickness code, `FullCube` = 15 being a whole 16 px cell, bits 4-6 the parent direction in `Chunk.CubeFaces` order or `ParentRoot`/`ParentDetached`, bit 7 the shell flag) and **leaves** (`LeafState` on a leaf block: bits 0-2 the hydration, bit 3 the persistent flag) — see `### Trees`. The tree states are written by `TreeGenerator.Stamp` into the generated state array, by `TreeGrowthWriter` and `LeafDecayManager` through `SetBlockRaw`, and by placement, which passes an explicit state to `PlaceBlockAt` (`World.PlaceBlockAtFace` gives a placed log `WoodState.Detached` and a placed leaf a persistent `LeafState`). Which meaning a byte carries is decided entirely by the block id that owns the cell, so a new user must pick a block kind, never a spare bit. **Every write that is not one of those zeroes it** (`RemoveBlockAt`, `ClearBlockAt` and `PlaceBlockAt` with its default state `0` — which also treats a fluid cell as replaceable), and `Multiblock.Revert` likewise writes its source block with an explicit `0`, so a stale level, count, offset, thickness or hydration can never outlive the block that owned it. Meshing gets it as a second padded snapshot from `FillPaddedSnapshot(padded, paddedState, neighbors, neighborStates)`, filled from the neighbourhood `TryResolveNeighbors` resolved for the build; the fluid simulation must read cells through `TryGetCell`/`ChunkAt`, never `GetBlockGlobal`, which reports unloaded chunks as air.
 - **Station block entities**: `CampfireManager`, `QuernManager`, `KilnManager` and `CastingManager` are all owned by `World`, all **main thread only** and all in-memory only — a lit campfire, a spinning quern, a kiln's fuel and crucible and a mold's cast progress are lost on a restart, a save & quit or a chunk reload, even though the chunk's blocks and state bytes around them are saved (see "Saves"). Each is keyed by the cell (the kiln by its structure's anchor), each is ticked from `World.Update` and each has a `NotifyBlockRemoved` that `World.RemoveBlock` calls so a broken station drops what it held. `World.FireCells` gathers every burning cell (campfires and lit kilns) once a frame and feeds both the fire billboards (`FireParticleSystem.SpawnOffset`) and the warm point lights (`RenderManager.FireLightOffset`), so a new fire source only has to appear in that list. Their render passes — `RenderQuerns`, `RenderKilns`, `RenderCastings` — sit inside the existing `entityPass` profiler span rather than adding sections of their own.
 - **Fluid tick**: `Systems/FluidManager.cs` (owned by `World`, main thread only) is a *scheduled-cell* simulation, not a scan. `World.Update` calls it once per frame after `UpdateToppling`; it runs whole ticks every `WorldGenerationConfig.FluidTickSeconds` (0.25 s), at most `MaxFluidTicksPerFrame` of them per frame, and drops the leftover time so a hitch never leaves it spiralling. Each tick takes the set of cells scheduled by the previous one (packed as `long`, 21 bits per axis — the same budget `ChunkKey` (`src/ChunkKey.cs`) uses to pack a **chunk** position for `ChunkMap` and for `ChunkManager`'s dirty/queued/generating/placement dictionaries; `FluidManager`'s packer is block-scale, `ChunkKey`'s is chunk-scale, and neither floors nor truncates differently from `VoxelCoords.ChunkPosOf`), recomputes every **non-source** fluid cell from its neighbours (Minecraft's `getNewLiquid`: two adjacent sources over ground that cannot drain become a source themselves, fluid directly above means falling, otherwise one level thinner than the fullest neighbour, and nothing left means the cell drains to air), then spreads it downwards, or sideways toward the nearest hole within `FluidSlopeSearchDistance` (ties spread evenly). The level rules are per-fluid data (`flow.*` on the block: lava updates every other tick, spreads 3 instead of 7 and never forms new sources). Contact hardening runs before all of it: a fluid cell touching its `hardensTouching` fluid becomes `hardensTo` (lava beside water becomes cobblestone), and a flow settling against a fluid that hardens on its touch crusts over the same way, so water reaching lava also yields cobblestone whichever side ticks first. Spreading only ever writes into non-fluid `IsReplaceable` cells, popping the fragile block it washes away through `DropManager.SpawnLoot`; a cell that already holds fluid recomputes itself on its own tick. Writes go through `Chunk.SetBlockRaw` and dirty only the cell's own chunk plus the face-adjacent chunk on each axis where the cell sits on a border, batched into `MarkDirty` at the end of the tick — not `ImmediateRemesh`, and never `MarkAreaDirty`, because a fluid passes light and casts no AO. A cell reschedules itself and its neighbourhood exactly when it changed or wrote into a neighbour, so settled water costs nothing.
 - **Waking worldgen water**: the sea is generated as static source cells, so a cave or entrance carved into a land column beside it would leave a wall of water standing against worldgen air that nothing ever schedules. `FluidManager.WakeLoadedChunks(chunks)` — called from `World.Update` each frame, immediately before the fluid tick — fixes that by scheduling the frontier of its water against a carved cavity when it loads, so the sea pours into whatever breached it exactly like Minecraft water does when you dig into an ocean. Only cells at or below their column's natural terrain top count (`FluidManager.IsCarvedFlowTarget`), so open air above the terrain — a ravine, a beach, a hillside — is never woken and generated water stays static across it. It has two halves: the **interior**, collected on the generation worker at the end of `Chunk.GenerateBlockData` into `Chunk.FluidFrontier` (local block indices of every fluid cell with a `FluidManager.IsCarvedFlowTarget` neighbour in -X/+X/-Z/+Z/-Y — never +Y, since water does not flow upward and every sea-surface cell has air above it; only its own `_blocks` are read, so worldgen stays a pure per-chunk function), and the **borders**, which need both chunks loaded and are therefore scanned on the main thread over the shared 16x16 plane of each face neighbour, scheduling whichever side holds the fluid when the other side is a carved cavity (the vertical faces only ever schedule the fluid above the hole). Chunks entirely above every level they could share with a neighbour (`ColumnData.MaxWaterLevel`, never below `SeaLevel`) skip the border scan — generated water cannot reach them, and player-placed water is woken by the edit paths. The queue of newly generated chunks is `ChunkManager.TryDequeueLoaded`; a consumer must re-check that the chunk is still the live one at its position, because an unload can race the queue. Once the frontier has settled, it costs nothing again. Deep lava pockets wake through the same path: the frontier scan is fluid-generic, and chunks at or below `LavaMaxY` report theirs even when they never held sea water.
 - **Every block edit path must call `FluidManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the water beside the edit will never notice it: `World.RemoveBlock`, `World.FellWood` (per cleared cell, and in both single-block branches), `World.TryPlaceBlockFromRaycast`, `TntManager.Detonate` (`ScheduleBox` over the blast box grown by one; the blast also **skips fluid cells**, since a dry crater under water would just refill from every side) and bucket edits through `FluidManager.SetCellImmediate`, which is the only fluid write that remeshes synchronously. Mining never takes a fluid out: `RemoveBlock` returns early on `BlockType.IsFluid`, so only a bucket removes fluids.
+- **Every block edit path must also call `LeafDecayManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the leaves near the edit never re-derive their hydration: a cut limb's canopy would hang forever, and an orphaned wood cell would never crumble. `Systems/LeafDecayManager.cs` (owned by `World` as `_leafDecay`, main thread only) grows each scheduled box by its `ScheduleReach` itself, so a caller passes only the edited cells. The current call sites: `World.RemoveBlock`; `World.FellWood` (`ScheduleAround` in both single-block branches, one `ScheduleBox` over the whole felled batch, never one per cell); `World.PlaceBlockAtFace`, which every placement goes through (`TryPlaceBlockFromRaycast` and the item-use `IItemUseWorld.PlaceBlockAtFace`); the `IItemUseWorld` bucket and TNT-prime wrappers (`ScoopFluidCell`, `PourFluidCell`, `RemoveCellForPrime`), scheduled for uniformity; `TntManager.Detonate` (`ScheduleBox` over the blast box); and `TreeGrowthWriter` (one `ScheduleBox` over the box it wrote). A new edit path adds its call next to its `FluidManager.ScheduleAround`.
 - **Gravity**: `Systems/FallingBlockManager.cs` (owned by `World`, main thread only) topples `falls` blocks into `FallingBlock` entities and writes rested cubes back as blocks. Every edit path that can unsupport one must call `TryTopple` above it (`World.RemoveBlock`, `World.FellWood` per cleared cell, `World.TryPlaceBlockFromRaycast` at the placed cell, `TntManager.Detonate` via `CheckColumn` bottom-up over the blast box); fluids never count as support, so fluid edits need no hook. A landing cube slides with chance (8 - solid neighbours of its support) / 8 toward a random clear side, corners included (a corner needs its two flanking sides and the three cells above it clear), committing to its direction across landings, and drops straight once past the edge. Sand stacks on sand: a falls-block support never slides, so towers rebuild. A calm landing converts at once so a collapsing tower settles bottom-up instead of interpenetrating, and a cube that would rest over air pops out as a drop instead of floating. A live cube owns its cell: `TryPlaceBlockFromRaycast` refuses placements into one, cubes shove the player aside one-way (`Camera.PushOutOf`, never through walls, never while flying), and a cube motionless-but-unsettled for 5 s breaks into its usual loot instead of hovering. Shorelines generate from sand (`TerrainGenerator.IsBeachHeight`, gravel-capped where `IsGravelPatch`); the far LOD wears sand and gravel there too, the gravel read with one noise eval per cell.
 - Worldgen must stay deterministic and thread-safe (`FastNoiseLite.GetNoise` is read-only after setup; noise instances are configured once in static constructors and never re-tuned per call). All noise seeds derive from `WorldGenerationConfig.Seed` plus fixed per-channel offsets (`TerrainGenerator.MakeNoise`); `Seed` reads `WorldSeed.Value`, which `WorldSeed.Apply` sets (rebuilding every noise from it) before a World is built, never while one is live (see "Saves"). Before player edits, terrain obeys:
   - **Nothing generated is ever solid above `height(x,z)`** — heights come from `Chunk.GetColumnData(...).Heights` (or the `GetColumnHeights` wrapper) and already include ravines, which are cut into the heightmap so the far LOD sees them too. The ravine cut fades out across the shore band (`OceanShoreWeight`..0.5), so it never slices the ocean's edge; the block at `height` is solid unless a cave or entrance carved it.
@@ -992,9 +1283,9 @@ Other invariants:
   - **Water** fills every air cell up to the column's own level in a **wet** column, in `Chunk.FillWater` after both carvers and before trees and pebbles: an ocean floor, or a lake or river bed, where a hashed lake bowl or a warped river ridge channel carves the ground below it. There is **no single water plane**: `ColumnData.WaterLevel` (`TerrainGenerator.WaterLevelAt`) is sea level for the ocean and for rivers, but a lake's **own** surface, so a pond rests in the ground it was dug into instead of at the bottom of a crater dug to sea level. A lake takes that surface from its own rim (`TerrainGenerator.TryLakeSite`): the lowest ground on the rim minus `LakeBankDepth`, and a candidate whose rim climbs more than `LakeSiteFlatness` is dropped rather than dug into a hillside, which is what keeps every bank it floods against above the water. A candidate standing above `SeaLevel` is also dropped when a river channel crosses its footprint (`TerrainGenerator.RiverCrossesSite`, sampled every few blocks across the disc), because the rim is read from `LandHeight` before any river cut and the channel would carve a bank below the pond's surface (rule test `LakeTests.NoRiverChannelCrossesAnElevatedPond`). Its radius (skewed small by `LakeRadiusSkew`), depth and outline (wobbled by `LakeShapeNoise`, so a shoreline is ragged rather than a circle) all vary per lake. `TerrainGenerator.IsWaterColumn` is now just `height < WaterLevelAt(x, z)`, so the carve in `Compute` and the fill agree by construction, and the far LOD draws its sheet at the same per-cell level. Wetness reads the column's `ColumnData.Bed` — the profile before a ravine cut it — not the ravine-cut `Heights`, so a ravine that merely deepens an otherwise dry column holds no water instead of flooding as a narrow spike, while a ravine under a real lake or river just deepens that body (and the cut fades out across the shore band, so no ravine ever cuts the ocean floor). Every other below-level basin is left **dry** — the forest is not flooded wholesale now that ocean carries the bulk of the water — and a desert stays dry; sand and gravel ring actual water only (`TerrainGenerator.SurfaceWaterWeight` gates the height band), never a dry ravine floor in the band. Both the carve and the flood test are scaled by `TerrainGenerator.SurfaceWaterGate` (`WaterDesertFadeStart`/`WaterDesertFadeEnd`), which fades the body out over the last stretch before the desert, so a pond closes on its own forest rim instead of ending in a vertical wall where the hard forest/desert classification flips, while lakes away from a desert keep their full depth. Sea-floor caves still flood, nothing grows in water (wet columns top out in dirt instead of grass), and `IsSubmerged(height)` is only the waterline height test, since wetness is a per-column level now. Generated water is always a **source** (state `0`). A cold column's top water cell is then replaced by `ice` in `SnowGenerator.Stamp` (see Biomes), so a cold ocean or lake freezes into a walkable sheet. `WaterEnabled = false` turns the water off; `LakesAndRiversEnabled = false` leaves oceans only.
   - **Lava pockets** pond over dry cave floors at/below `LavaMaxY` (`LavaGenerator.Stamp`, after the sea so flooded caves stay water): a patch mask plus a per-cell roll, buried under the terrain so ravines and entrances stay dry. Generated lava is likewise all sources; set `LavaEnabled = false` to turn it off.
   - Caves fade out within ~`CaveSurfaceFadeEnd` blocks of the surface (`WormSurfaceMargin` for worms), except inside entrance zones — sparse patches where `ColumnData.EntranceWeight` lifts the fade and caves reach the sky. The entrance weight fades out before the shore band (`EntranceShoreFade`, see `OceanShoreWeight`), so a cave never breaches a beach or the sea floor into a water-filled hole.
-  - Worldgen is a **pure function of world position**: each chunk generates its own blocks with no cross-chunk writes, so neighbours agree at their borders without shared state. Worm paths are cached per 64-block XZ cell in `WormCarver` exactly the way column data is cached per chunk column in `Chunk.GetColumnData`, and so are the three worldgen shape caches: tree shapes (`TreeGenerator.ShapeCache`, shared between `Stamp` on the generation workers and the far-LOD canopy sweep), canopy tops (`TreeGenerator.CanopyCache`, whose one engine caller is `LodRegion.BuildMeshData`, once per *fine* column of a region) and cactus stems (`CactusGenerator.ShapeCache`, whose one caller is `CactusGenerator.Stamp`). All five go through `GenerationalCache<TKey, TValue>` (`WorldGen/GenerationalCache.cs`): the cache is split into G generation dictionaries published as one immutable node swapped by `Interlocked.CompareExchange`, a read probes the newest first, a miss computes into the newest, and when the newest fills its `capacity / G` insert budget the node rotates and the *oldest* generation is dropped — so eviction retains the most recently used generations instead of clearing wholesale, and an entry read while it sits in the oldest generation is promoted forward (a second chance). Entries are deterministic, so a race, an eviction or a duplicate yields identical values, and the worst an evicted entry can ever cost is a recompute. Capacities and generation counts all live in `WorldGenerationConfig`, one pair per site: `ColumnCacheCapacity`/`ColumnCacheGenerations`, `CellCacheCapacity`/`CellCacheGenerations`, `TreeShapeCacheCapacity`/`TreeShapeCacheGenerations`, `TreeCanopyCacheCapacity`/`TreeCanopyCacheGenerations` and `CactusShapeCacheCapacity`/`CactusShapeCacheGenerations` — every site ships at 4 generations, and that count is a re-pricing lever that may only be moved against a real capture, never blind. The factory a site passes to `GetOrAdd` must be a `static`, non-capturing delegate *field* (`Chunk.ComputeColumn`, `WormCarver.BuildCellFor`, `TreeGenerator.BuildShapeFor`), because the factory takes the key alone: a lambda written at the call site that captured locals would allocate a closure on every call, hits included, on the generation workers — recomputing those values from the key on a miss is the cheaper trade. **Standing rule: only values that are a pure function of the key may live in that type.** State carrying *player edits* must never be moved into it, because there eviction is data loss rather than a recompute — `LodRegion.ColumnCaps` (mined-column LOD caps) and `TreeGenerator.CanopyDisturbed` (felled-canopy markers) are the two current examples, and both are tracked as their own items rather than converted. They are still plain process-global tables; `LodEditState` exports and imports them per world (with the `LodSurface` overrides) and `WorldSeed.Apply` resets them between worlds.
+  - Worldgen is a **pure function of world position**: each chunk generates its own blocks with no cross-chunk writes, so neighbours agree at their borders without shared state. Worm paths are cached per 64-block XZ cell in `WormCarver` exactly the way column data is cached per chunk column in `Chunk.GetColumnData`, and so are the four tree caches in `TreeGenerator` (see `### Trees`): the cell batches (`BatchCache`, every tree rooted in one 64x64 XZ cell grown together, shared by `Stamp` on the generation workers and the first LOD ring's canopy on the LOD builder), the solo tree shapes (`ShapeCache`, which `BuildBatch` reads as the neighbouring cells' obstacles), the grown canopy tops (`CanopyCache`) and the far rings' crown-proxy canopy (`ProxyCanopyCache`), the last two read by their one engine caller `LodRegion.BuildMeshData` once per *fine* column of a region. All six go through `GenerationalCache<TKey, TValue>` (`WorldGen/GenerationalCache.cs`): the cache is split into G generation dictionaries published as one immutable node swapped by `Interlocked.CompareExchange`, a read probes the newest first, a miss computes into the newest, and when the newest fills its `capacity / G` insert budget the node rotates and the *oldest* generation is dropped — so eviction retains the most recently used generations instead of clearing wholesale, and an entry read while it sits in the oldest generation is promoted forward (a second chance). Entries are deterministic, so a race, an eviction or a duplicate yields identical values, and the worst an evicted entry can ever cost is a recompute. Capacities and generation counts all live in `WorldGenerationConfig`, one pair per site: `ColumnCacheCapacity`/`ColumnCacheGenerations`, `CellCacheCapacity`/`CellCacheGenerations`, `TreeBatchCacheCapacity`/`TreeBatchCacheGenerations`, `TreeShapeCacheCapacity`/`TreeShapeCacheGenerations`, `TreeCanopyCacheCapacity`/`TreeCanopyCacheGenerations` and `TreeProxyCanopyCacheCapacity`/`TreeProxyCanopyCacheGenerations` — every site ships at 4 generations, and that count is a re-pricing lever that may only be moved against a real capture, never blind. The factory a site passes to `GetOrAdd` must be a `static`, non-capturing delegate *field* (`Chunk.ComputeColumn`, `WormCarver.BuildCellFor`, `TreeGenerator.BuildShapeFor`, `BuildBatchFor`, `BuildCanopyFor`, `BuildProxyCanopyFor`), because the factory takes the key alone: a lambda written at the call site that captured locals would allocate a closure on every call, hits included, on the generation workers — recomputing those values from the key on a miss is the cheaper trade. **Standing rule: only values that are a pure function of the key may live in that type.** State carrying *player edits* must never be moved into it, because there eviction is data loss rather than a recompute — `LodRegion.ColumnCaps` (mined-column LOD caps) and `TreeGenerator.CanopyDisturbed` (felled-canopy markers) are the two current examples, and both are tracked as their own items rather than converted. They are still plain process-global tables; `LodEditState` exports and imports them per world (with the `LodSurface` overrides) and `WorldSeed.Apply` resets them between worlds.
   - 3D cave noise is sampled on a `CaveNoiseStride` lattice (aligned to world coordinates so adjacent chunks share boundary samples) and trilinearly interpolated per block before thresholding.
-- **Far-terrain LOD**: full-detail chunks load to `ChunkRadius` (16 chunks = 256 blocks); a cascade of LOD rings defined in `LodRegion.Levels` extends the render distance (level 1: 2-block cells to 512, level 2: 4-block cells to 1024, level 3: 8-block cells to 2048 blocks). Regions are columns meshed at reduced resolution straight from the heightmap cache (no block data). Each level's heights are eroded (min over a widened fine-column window) and biased downward so its mesh sits strictly inside real terrain *and* strictly below the next finer level — finer geometry always buries coarser via the depth buffer, so no masking or camera-driven remeshing exists. Because those shells are stacked, only one level may actually be drawn per area — otherwise they are all visible once the camera is inside the terrain — so `LodManager.UpdateBuriedFlags` marks each region whose footprint is fully covered by *loaded* finer-level regions (region grids nest exactly: one region = ratio×ratio regions of the finer level) and `RenderLod` skips those. Testing loaded regions rather than each level's radius means an unbuilt finer region can never open a hole in the horizon. The finest level (0) has no finer level to hide it, so it is additionally marked buried wherever the full-detail chunks its shell could show through are loaded *and* meshed (`LodManager.IsCoveredByChunks`, using the per-column inclusive chunk-Y ranges recorded at region build in `LodRegion.ColumnCyMin/ColumnCyMax` and `Chunk.IsMeshed`, which unlike `HasMesh` is true for all-air and fully enclosed chunks too). This is needed because caves cut into the band the shell occupies and would otherwise show it from inside; presence is tested per chunk rather than by horizontal distance because the load volume is a sphere. LOD side faces use grass at the top cell, dirt above `NominalDirtDepth` and the stone tile below it, so far cliffs match near ones; a desert cell wears sand over sandstone and a sea-floor cell the sand/gravel/stone band its depth picks (`LodRegion.BuildMeshData` reads `Chunk.GetColumnBiomes`). The nesting invariants (`SampleMargin(L+1) >= SampleMargin(L) + CellSize(L) - 1`, `HeightBias(L+1) >= HeightBias(L) + CellSize(L)`) must hold when adding levels, and `Camera.NearPlane`/`FarPlane` are tuned to keep those separations from z-fighting at the outermost ring. LOD draws before chunks, coarsest level first (`RenderManager.RenderLod`). Destroying a block would expose the buried LOD, so removals cap that column's LOD height below the removed block (`LodRegion.LowerColumnBelow`) and affected regions on every level rebuild (`LodManager.MarkEditedColumn`); placements need nothing. Canopy bumps wear the owning trunk's leaf block (`TreeGenerator.TryGetCanopy`/`CanopyLeafBlock`, resolved generically via `BlockType.ById` in `LodRegion.BuildMeshData`), so a new tree species only needs its `LeafBlock` stored in the canopy cache — never a new LOD branch. LOD vertices bake a coarse sky exposure from those same column heights into `Vertex.Sun` (`LodSkyExposure`, tuned by the `LodSky*`/`LodValleyShade`/`LodCanopyShade` constants): a vertex darkens by how far the columns in front of or around it rise above it, and a canopy bump darkens toward its base, while open ground, straight walls under open sky and the water sheet keep full sun so the ring matches the near chunks.
+- **Far-terrain LOD**: full-detail chunks load to `ChunkRadius` (16 chunks = 256 blocks); a cascade of LOD rings defined in `LodRegion.Levels` extends the render distance (level 1: 2-block cells to 512, level 2: 4-block cells to 1024, level 3: 8-block cells to 2048 blocks). Regions are columns meshed at reduced resolution straight from the heightmap cache (no block data). Each level's heights are eroded (min over a widened fine-column window) and biased downward so its mesh sits strictly inside real terrain *and* strictly below the next finer level — finer geometry always buries coarser via the depth buffer, so no masking or camera-driven remeshing exists. Because those shells are stacked, only one level may actually be drawn per area — otherwise they are all visible once the camera is inside the terrain — so `LodManager.UpdateBuriedFlags` marks each region whose footprint is fully covered by *loaded* finer-level regions (region grids nest exactly: one region = ratio×ratio regions of the finer level) and `RenderLod` skips those. Testing loaded regions rather than each level's radius means an unbuilt finer region can never open a hole in the horizon. The finest level (0) has no finer level to hide it, so it is additionally marked buried wherever the full-detail chunks its shell could show through are loaded *and* meshed (`LodManager.IsCoveredByChunks`, using the per-column inclusive chunk-Y ranges recorded at region build in `LodRegion.ColumnCyMin/ColumnCyMax` and `Chunk.IsMeshed`, which unlike `HasMesh` is true for all-air and fully enclosed chunks too). This is needed because caves cut into the band the shell occupies and would otherwise show it from inside; presence is tested per chunk rather than by horizontal distance because the load volume is a sphere. LOD side faces use grass at the top cell, dirt above `NominalDirtDepth` and the stone tile below it, so far cliffs match near ones; a desert cell wears sand over sandstone and a sea-floor cell the sand/gravel/stone band its depth picks (`LodRegion.BuildMeshData` reads `Chunk.GetColumnBiomes`). The nesting invariants (`SampleMargin(L+1) >= SampleMargin(L) + CellSize(L) - 1`, `HeightBias(L+1) >= HeightBias(L) + CellSize(L)`) must hold when adding levels, and `Camera.NearPlane`/`FarPlane` are tuned to keep those separations from z-fighting at the outermost ring. LOD draws before chunks, coarsest level first (`RenderManager.RenderLod`). Destroying a block would expose the buried LOD, so removals cap that column's LOD height below the removed block (`LodRegion.LowerColumnBelow`) and affected regions on every level rebuild (`LodManager.MarkEditedColumn`); placements need nothing. Canopy bumps come from `TreeGenerator.TryGetCanopy(x, z, proxy, out top, out leaf)`, read once per fine column with the level's `LodLevelSpec.ProxyCanopy`: the first ring reads the grown canopy of the same cell batches the chunks stamp, and the farther rings read each species' `lod` crown proxy (`LodCrownProxy.TopOffset` over its `LodCrownProfile`), which never grows a tree. Either way a bump wears the leaf block that owns its top cell (the species' `LeavesId`, resolved generically via `BlockType.ById` in `LodRegion.BuildMeshData`, falling back to `TreeGenerator.LeavesBlock`), so a new tree species only needs its species file — never a new LOD branch. An edited canopy reads as open sky: mining or blasting a wood or leaf cell, every fell, every column `LeafDecayManager` clears or `TreeGrowthWriter` writes call `TreeGenerator.PoisonCanopy`, whose `CanopyDisturbed` markers `TryGetCanopy` and `CanopyLeafBlock` consult before either cache. LOD vertices bake a coarse sky exposure from those same column heights into `Vertex.Sun` (`LodSkyExposure`, tuned by the `LodSky*`/`LodValleyShade`/`LodCanopyShade` constants): a vertex darkens by how far the columns in front of or around it rise above it, and a canopy bump darkens toward its base, while open ground, straight walls under open sky and the water sheet keep full sun so the ring matches the near chunks.
 
 ## Saves
 
@@ -1026,7 +1317,9 @@ pure function of the seed: only **deltas** and the seed are written.
 - **The far LOD always reflects the current terrain.** `LodSurface` holds per-column surface
   overrides (the real top height and the block wearing it, REPLACE semantics), beside
   `LodRegion.ColumnCaps` (MIN semantics, only ever falls, so a dug hole never exposes the buried
-  shell) and `TreeGenerator.CanopyDisturbed` (felled-canopy markers); a fine column's LOD height is
+  shell) and `TreeGenerator.CanopyDisturbed` (the edited-canopy markers `PoisonCanopy` writes;
+  its wholesale clear at `CanopyDisturbedLimit` makes them lossy in a very long session, TODO
+  `M-10`); a fine column's LOD height is
   `min(override ?? generated, cap)`, fed in before the erosion window and bias so the nesting and
   burial invariants hold by construction. `LodEditState` exports all three to `lod-edits.bin`
   (only when their combined version moved) and imports them **before** `LodManager.Start`, so
@@ -1035,7 +1328,7 @@ pure function of the seed: only **deltas** and the seed are written.
   `WorldSeed.Value`; `WorldSeed.Default` is what tests and scripted runs use). It is legal only
   while no World is live (`WorldSeed.BeginWorld` in the World constructor, `EndWorld` at the very
   end of a clean teardown; `WorldIsLive` reports it), and it rebuilds every worldgen noise, clears
-  the five `GenerationalCache` sites and resets the process-global LOD edit state — always, even
+  the six `GenerationalCache` sites and resets the process-global LOD edit state — always, even
   for the same seed, since another world sharing it must not inherit the previous one's edits.
 - **The loading phase.** A World built with a store starts in `WorldPhase.Loading`. The saved
   player is applied before the workers start, so they stream around the restored position;
@@ -1116,8 +1409,8 @@ faded out near the origin) lifts an occasional range well above the hills; a cre
 matching rock cap), so it reads as rock rather than another wooded hill. A low-frequency
 **openness** mask (`Openness*`) flattens the hills a little and thins the trees toward none, so the
 forest alternates between rolling woodland and open grass instead of one uniform canopy
-(`TreeGenerator.TryGetTrunk` reads `TerrainGenerator.ForestOpenness`, and a taiga keeps more of its
-spruce via `SpruceOpennessRelief`). On land a hashed lake bowl and a warped river ridge carve below
+(`TreeGenerator.TryGetTree` reads `TerrainGenerator.ForestOpenness`, scaled per species by its
+`worldgen.openness`, so a taiga keeps more of its spruce and the desert's cactus ignores it). On land a hashed lake bowl and a warped river ridge carve below
 their own water level and flood only those (every land biome but the desert; both fade out toward a
 desert so a pond closes on its own rim) — see the Water invariant below.
 A desert column is sand over `SandstoneDepth` sandstone blocks, then stone; a frozen column is bare
@@ -1137,21 +1430,13 @@ block, so a full stack is solid and partial layers are walked through (`BlockTyp
 cell, snow-covered ice for a frozen sea sheet — snow tile when snow-covered, else ice, and never
 flagged water, since the flag alone selects the fragment-shader water model whatever the tile), so a
 distant desert and sea floor agree with the near chunks.
-Vegetation is biome-gated: broadleaf trees (`TreeGenerator`, forest), **spruce** conifers
-(`TreeGenerator.BuildSpruceShape`, taiga) and flowers (`FlowerGenerator`, forest), and the desert
-grows **cacti** (`CactusGenerator`) — a tapered stem that throws a few arms which bend upward into
-prongs, no leaves; the frozen plains grow nothing. Mob spawning (`MobSpawner`, shared by slimes and
-goblins) asks `TerrainGenerator.IsForest(x, z)`, which is now a real test.
-
-Spruce is a third **wood family**: a block's JSON may set `wood.family` (default `"tree"`), and
-`ContentRegistry.BuildWoodLevels` validates each family's levels contiguously from 0 (tree 6,
-cactus 4, spruce 1 — the full-cube trunk). Wood of two families never welds (`WoodShape` checks the
-family), which is what lets a cactus or spruce reuse the tapered-wood mesh, its shape-accurate
-hitboxes and tree felling (`TopplingTree` floods any wood family). The cactus blocks are `cactus`
-(stem, level 0), `cactus_arm` (the base branch-off, 1), `cactus_prong` (2) and `cactus_tip` (3),
-all strictly one level thinner than the cell below so only the base arm welds to the stem; they
-wear generated `cactus_side`/`cactus_top` tiles and `sandstone`; see
-`tools/generate-biome-textures.ps1` for the placeholder art.
+Vegetation is biome-gated. Trees come from the species files (`assets/data/trees`), each planted
+only in its `worldgen.biomes`: `oak` in the forest, `spruce` in the taiga and the leafless `cactus`
+(a thick stem whose few arms bend upward, wearing the generated `cactus_side`/`cactus_top` tiles;
+see `tools/generate-biome-textures.ps1`) in the desert, while `baobab` and `stone_pine` never
+generate; the forest also grows flowers (`FlowerGenerator`), and the frozen plains grow nothing.
+How a tree is grown, stamped, felled and decays is in `### Trees`. Mob spawning (`MobSpawner`,
+shared by slimes and goblins) asks `TerrainGenerator.IsForest(x, z)`, which is now a real test.
 
 ## Entities
 
