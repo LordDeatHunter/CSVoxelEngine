@@ -25,13 +25,14 @@ public sealed class VisualScenarioTests
                 { "op": "give", "block": "glass", "count": 16 },
                 { "op": "give", "block": "stone" },
                 { "op": "spawn", "entity": "goblin", "pos": [48.5, 40.5] },
+                { "op": "grow", "species": "oak", "pos": [-79, -2], "steps": 40 },
               ],
             }
             """, "tour");
 
         Assert.Equal("tour", scenario.Name);
         Assert.Equal(Path.Combine("visual", "tour"), scenario.OutputDir);
-        Assert.Equal(11, scenario.Steps.Count);
+        Assert.Equal(12, scenario.Steps.Count);
 
         var teleport = scenario.Steps[0];
         Assert.Equal(new System.Numerics.Vector3(8.5f, 30f, 8.5f), teleport.Pos);
@@ -61,6 +62,31 @@ public sealed class VisualScenarioTests
         Assert.True(spawn.SnapToGround);
         Assert.Equal(48.5f, spawn.Pos!.Value.X);
         Assert.Equal(40.5f, spawn.Pos!.Value.Z);
+
+        // A grow step always names a column: the director searches the tree on its ground.
+        var grow = scenario.Steps[11];
+        Assert.Equal("grow", grow.Op);
+        Assert.Equal("oak", grow.Species);
+        Assert.Equal(40, grow.GrowSteps);
+        Assert.True(grow.SnapToGround);
+        Assert.Equal(-79f, grow.Pos!.Value.X);
+        Assert.Equal(-2f, grow.Pos!.Value.Z);
+    }
+
+    [Theory]
+    [InlineData("""{ "steps": [{ "op": "wait", "seconds": 1 }, { "op": "grow", "pos": [1, 2], "steps": 4 }] }""", "'species'")]
+    [InlineData("""{ "steps": [{ "op": "wait", "seconds": 1 }, { "op": "grow", "species": "  ", "pos": [1, 2], "steps": 4 }] }""", "'species'")]
+    [InlineData("""{ "steps": [{ "op": "wait", "seconds": 1 }, { "op": "grow", "species": "oak", "steps": 4 }] }""", "'pos'")]
+    [InlineData("""{ "steps": [{ "op": "wait", "seconds": 1 }, { "op": "grow", "species": "oak", "pos": [1, 2, 3], "steps": 4 }] }""", "'pos'")]
+    [InlineData("""{ "steps": [{ "op": "wait", "seconds": 1 }, { "op": "grow", "species": "oak", "pos": [1], "steps": 4 }] }""", "'pos'")]
+    [InlineData("""{ "steps": [{ "op": "wait", "seconds": 1 }, { "op": "grow", "species": "oak", "pos": [1, 2] }] }""", "'steps'")]
+    [InlineData("""{ "steps": [{ "op": "wait", "seconds": 1 }, { "op": "grow", "species": "oak", "pos": [1, 2], "steps": 0 }] }""", "'steps'")]
+    public void GrowNeedsASpeciesTwoCoordinatesAndPositiveSteps(string json, string fragment)
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() => VisualScenario.Parse(json, "bad"));
+        Assert.Contains(fragment, ex.Message);
+        Assert.Contains("Step 2", ex.Message);
+        Assert.Contains("(grow)", ex.Message);
     }
 
     [Theory]
@@ -92,7 +118,7 @@ public sealed class VisualScenarioTests
     {
         var ex = Assert.Throws<InvalidOperationException>(
             () => VisualScenario.Parse("""{ "steps": [{ "op": "dance" }] }""", "bad"));
-        foreach (var op in new[] { "teleport", "look", "wait", "walk", "mine", "place", "fly", "give", "spawn", "screenshot" })
+        foreach (var op in new[] { "teleport", "look", "wait", "walk", "mine", "place", "fly", "give", "spawn", "grow", "screenshot" })
             Assert.Contains(op, ex.Message);
     }
 

@@ -1172,6 +1172,13 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int TreeFellWoodCap = 512;
     public const int TreeFellTotalCap = 2048;
 
+    // --- Reactive tree growth (TreeGrowthWriter) ---
+    // Node cap of a grown tree, tied to the fell's wood cap so a grown tree's wood still fells
+    // whole; it also bounds the TreeGraph.FromWorld rebuild walk
+    public const int TreeGrowNodeCap = TreeFellWoodCap;
+    // Growth pulses one grow call may run at most
+    public const int TreeGrowMaxPulsesPerCall = 256;
+
     // --- Leaf decay (LeafDecayManager) ---
     // Leaf decay simulation: one tick every LeafDecayTickSeconds, like the fluid tick, at most
     // MaxLeafDecayTicksPerFrame of them in a frame; leftover time is dropped so a hitch never

@@ -120,6 +120,10 @@ public class FluidManager
         _next.Add(Pack(x, y, z - 1));
     }
 
+    /// <summary>Test seam, like <see cref="LeafDecayManager.PendingCells"/>: cells waiting for a
+    /// tick, scheduled or still in the current one.</summary>
+    internal int PendingCells => _next.Count + (_tickCells.Count - _tickCursor);
+
     /// <summary>
     /// Schedules every cell of the inclusive integer box for the next tick. Used by a TNT blast,
     /// which clears a whole sphere at once and needs the water around all of it to pour in.

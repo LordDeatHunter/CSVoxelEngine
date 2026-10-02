@@ -2,8 +2,8 @@
 
 ## Status
 
-Phases 1-5 done (content + codecs; headless growth engine; cutover to engine-grown trees;
-tree-vs-tree cell batches + LOD canopy proxy + perf; leaf decay). Phases 6-8 pending. Each phase lands as its own commit on `tree-rework`; finished phases are
+Phases 1-6 done (content + codecs; headless growth engine; cutover to engine-grown trees;
+tree-vs-tree cell batches + LOD canopy proxy + perf; leaf decay; reactive growth). Phases 7-8 pending. Each phase lands as its own commit on `tree-rework`; finished phases are
 collapsed into short summaries here.
 
 ## Context
@@ -311,10 +311,74 @@ bands }`:
    crumbles while the connected rest stays), the shared `StampedTree` harness. Known residue: the
    world cannot tell a root-walk feature node from a branch, so a thin childless root counts as a
    tip there (it can only raise a leaf's hydration, never decay one).
-6. **Reactive growth.** `WorldTreeSpace`, `TreeGraph.FromWorld`, a growth write path that
-   remeshes and schedules decay and fluids, and the `grow` scenario op
-   (`{ "op": "grow", "species", "pos": [x, z], "steps" }`) with `VisualScenarioTests`
-   parsing.
+6. **Done — reactive growth.** `WorldTreeSpace : ITreeSpace` (`src/WorldGen/Trees/`) reads only
+   through `ChunkManager.ChunkAt` + `GetLocalBlock`/`GetLocalState` behind a single-slot cache of
+   the last loaded chunk (one main-thread growth call, no unloads, not thread-safe): a cell is free
+   when it is loaded, not `reserved` (World passes `FallingBlockManager.OverlapsAny`), air or a
+   non-persistent leaf of the species, and not the missing parent of an orphan (no non-detached
+   face neighbour of the species' wood names it as its parent — the rule that keeps a cut branch
+   cut); any unloaded cell or neighbour read refuses. `IsPlantable` also accepts a non-solid
+   placement-replaceable cover (a partial snow layer) for the sapling root. `TreeCellReader` (a
+   delegate `ChunkManager.TryGetCell` binds to, so the engine stays storage-agnostic) feeds
+   `TreeGraph.FromWorld`: from a root cell (parent code 6) a breadth-first walk with the node index
+   as queue follows only child edges (same wood id, not detached, parent offset landing on the
+   current cell), so detached and orphaned wood is never reached; every node is seeded and floored
+   (`Node.FloorPx`/`SetFloor`) at its stored `DiameterPx`, nodes below the root's Y load as feature
+   nodes (exact, since `Pulse` never descends — this resolves phase 5's root-walk residue inside
+   the graph; the world-side decay tip rule still counts thin childless roots), and it returns null
+   on an unloaded read or past `TreeGrowNodeCap`, so a partial tree never grows. `TreeGrower`:
+   `Recompute` became feature-aware (a feature node keeps its thickness, a parent ignores feature
+   children) and floor-aware (`max(thick, FloorPx)`), both no-ops for worldgen (features apply after
+   the final `Thicken`, grown floors are 0), so a rebuilt tree never thins and graph codes always
+   equal world codes; `RollMaturity` (steps, then the clamped `TreeEnergy`, same stream order) backs
+   `GrowToMaturity` and `TreeEnergyAt`, which replays a worldgen tree's exact energy from
+   `SeedFor`; `GrowFurther` = `Thicken`, N pulses under a node cap, `Thicken`, no features. Knobs:
+   `TreeGrowNodeCap` (= `TreeFellWoodCap`, so a grown tree's wood fells whole; leaves past
+   `TreeFellTotalCap` are left standing by a fell and cleaned up by decay) and
+   `TreeGrowMaxPulsesPerCall` (256). `TreeGrowthWriter` (`src/Systems/`, GL-free, main thread,
+   with `TreeGrowthResult`/`TreeGrowthStatus` Grew/Planted/NoGround/NotGrowable) scans the target
+   column top-down over the reach window `[yHint - Reach.Down - 1, yHint + Reach.Up]` for the
+   species' root (any unloaded read = NotGrowable); with none it plants a sapling on the first
+   ground candidate (not air, leaves, attached tree wood or cover — cover is looked through) that
+   is solid, not a fluid and, for a `minSoil > 0` species, `SurfaceBlock`/`SoilBlock`, with a
+   plantable root cell above (a cover there is cleared to air, dropping nothing); biome and
+   ground-height rules are not applied. Planting and an existing tree share one `GrowAndWrite`
+   tail: RNG `GrowSeed(SeedFor(root, worldSeed, species), nodeCount, call counter)` so a repeated
+   grow never replays the same pulses, `GrowFurther`, rasterise once, then wood (existing nodes
+   only re-coded for thickness, new nodes only into air or own leaves that are free, never thinning,
+   a skipped parent skips its subtree) and then leaves only around changed tips (new tips or
+   re-coded live tips): a new leaf only into free air, an existing own non-persistent leaf only
+   ever has its hydration raised, so a mined hole in an untouched part of the crown stays mined.
+   All writes are `Chunk.SetBlockRaw` (never player-placed). Pruning is left to decay through one
+   `LeafDecayManager.ScheduleBox` over the written box (the hydration rule stays single-sourced);
+   `FluidManager.ScheduleAround` per id change; `ChunkManager.MarkDirty` on each touched chunk and
+   its border-adjacent ones (never `RemeshAfterBatchEdit`, which dirties the whole radius-15 light
+   area for light-neutral blocks); `TreeGenerator.PoisonCanopy(x, z, 0)` + `LodManager.
+   MarkEditedColumn` per deduplicated mesh-affecting column; no `TryTopple` and no
+   `NotifyLodEdit`, since growth only fills air, leaves or cover and never writes surface solids.
+   `World.TryGrowTree` (refuses while loading or for an unknown species) wires the managers and
+   does one `ImmediateRemeshWithBorders` on the root chunk, only when mesh cells were written. The
+   `grow` scenario op (`{ "op": "grow", "species", "pos": [x, z], "steps" }`) parses registry-free
+   in `VisualScenario` (species checked by `VisualDirector` at run time, pos snapped to
+   `TryGroundHeight + 1`, a refused grow throws). `trees.json` gained `oak_grown` (the cut oak
+   grown 40 steps from the limb overview: +30 nodes, `base_aim` unaffected) and `sapling_1..3` on
+   the felled column (Planted +4, Grew +16, Grew +59). `FluidManager.PendingCells` is a new test
+   seam. Tests: `TreeGraphFromWorldTests` (round trip of every species, Thicken reproduces the
+   stamped states, a cut tree never thins, cut and detached subtrees stay out, below-root nodes are
+   features, an unloaded neighbour and a non-root cell refuse), `WorldTreeSpaceTests` (air and own
+   leaves free, persistent/foreign/terrain/fluid/unloaded/reserved not, the orphan-parent rule,
+   cover plantable but not free), `TreeGrowthTests` (an intact tree and a mined crown rewrite
+   nothing, growth only appends and never thins, foreign blocks survive, a cut branch stays cut,
+   grown leaves are what decay re-derives, determinism and per-call streams, the edit hooks fire,
+   sapling rooting, soil rule, plantable root and cover takeover), `TreeGrowerTests` additions
+   (feature-aware and floored Thicken, `GrowFurther` append/cap/determinism, `TreeEnergyAt`), the
+   `grow` cases in `VisualScenarioTests`, and the shared `StampedTree` loaded-area helpers
+   (`LoadAround`, `Fill`, `Snapshot`, `Min`/`Max`). Known residue: the far-LOD hook only removes
+   stale canopy bumps, so a grown column shows no far canopy until reload (no add path, `TODO.md`
+   `M-13`); the call counter is not persisted; growth does not avoid the player or mob bodies; a
+   target column that crosses only a branch, not the root, plants a sapling; unmodified neighbour
+   chunks re-stamp the original worldgen tree on load (the same residue as cutting); the World's
+   immediate remesh duplicates one async rebuild.
 7. **Wide trunks + new species.** Core/shell rasterisation (circle and square), the pixel-rim
    bevel in the mesher and the hitboxes, shell-aware felling, `girthProfile`, the `buttress`
    feature, the `baobab` and `umbrella` logics, the baobab and stone_pine species without a

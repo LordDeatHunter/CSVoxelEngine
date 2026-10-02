@@ -352,6 +352,11 @@ same world, and a player can move between them freely — neither arc gates the 
   - Progress: the markers are now persisted per world (`LodEditState`, `lod-edits.bin`) and reset
     between worlds by `WorldSeed.Apply`, so they survive a restart; the 16384-entry wholesale
     `Clear()` at the cap is still there, so the bug above is unchanged within a session.
+- [ ] **`M-13` · Far-LOD canopy for grown trees** — P3, M. `TreeGenerator.PoisonCanopy` only
+  removes canopy, so a tree grown by `TreeGrowthWriter` (TREES_PLAN phase 6, the `grow` scenario
+  op) shows no far canopy until reload; needs an add-canopy override (`LodSurface`-style) keyed by
+  column. Every grow also spends `CanopyDisturbedLimit` budget (radius 0 per column), so heavy
+  growth brings `M-10`'s wholesale `Clear()` closer.
 - [ ] **`M-11` · `LodRegion.ColumnCaps` grows unbounded, and it must NOT take D2's scheme** —
   P2, L, blocked on a design. **It is edit state, not a cache**, and it is the sibling of `M-10`
   above. `LodRegion.ColumnCaps` (`LodRegion.cs:130`) is a **process-global** `ConcurrentDictionary`

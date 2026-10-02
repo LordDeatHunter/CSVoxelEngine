@@ -38,6 +38,13 @@ public sealed class TreeGraph
 
         /// <summary>Whether the node was appended by a post-growth feature (roots).</summary>
         public bool IsFeature;
+
+        /// <summary>
+        /// Lower bound on the displayed thickness. A node rebuilt from the world gets its stored
+        /// diameter, so a rebuilt tree never thins (a cut limb does not shrink the trunk); 0 for
+        /// grown nodes.
+        /// </summary>
+        public float FloorPx;
     }
 
     /// <summary>Index of the root node.</summary>
@@ -65,6 +72,63 @@ public sealed class TreeGraph
         _count = 1;
         _cells[TreeCellKey.Pack(x, y, z)] = Root;
         _maxY = y;
+    }
+
+    /// <summary>
+    /// Rebuilds a tree's graph from the world's wood state bytes, starting at the root cell
+    /// (x, y, z), which must hold <see cref="TreeSpecies.WoodId"/> with the
+    /// <see cref="WoodState.ParentRoot"/> parent code; null otherwise. The walk is breadth-first
+    /// over child edges only: a face neighbour is a child when it holds the species' wood, is
+    /// not detached and its stored parent offset lands exactly on the current cell. Detached
+    /// cells and cells whose parent no longer exists are therefore never reached, so a cut branch
+    /// stays cut. A node below the root's level loads as a feature node (roots), which is exact
+    /// because <see cref="TreeGrower.Pulse"/> never descends. Every node's thickness floor
+    /// (<see cref="Node.FloorPx"/>) is its stored diameter, so a later
+    /// <see cref="TreeGrower.Thicken"/> never thins the tree; until the caller runs it, the
+    /// thickness floats are just those integer diameters. Returns null when a read hits an
+    /// unloaded chunk (the tree may continue there, and a partial graph must never grow) or the
+    /// walk passes <see cref="WorldGenerationConfig.TreeGrowNodeCap"/> nodes.
+    /// </summary>
+    public static TreeGraph? FromWorld(TreeCellReader read, TreeSpecies species, int x, int y, int z)
+    {
+        if (!read(x, y, z, out var rootId, out var rootState)
+            || rootId != species.WoodId
+            || !WoodState.IsRoot(rootState))
+            return null;
+
+        float rootPx = WoodState.DiameterPx(rootState);
+        var graph = new TreeGraph(x, y, z, rootPx);
+        graph.SetFloor(Root, rootPx);
+
+        // The node index is the queue, so children always index above their parents.
+        for (var head = 0; head < graph.Count; head++)
+        {
+            // Copy before any AddChild: the node reference is invalidated by a reallocation.
+            int cx = graph._nodes[head].X, cy = graph._nodes[head].Y, cz = graph._nodes[head].Z;
+            for (var dir = 0; dir < TreeDirections.Count; dir++)
+            {
+                int nx = cx + TreeDirections.Dx[dir];
+                int ny = cy + TreeDirections.Dy[dir];
+                int nz = cz + TreeDirections.Dz[dir];
+                if (!read(nx, ny, nz, out var id, out var state))
+                    return null;
+                if (id != species.WoodId || WoodState.IsDetached(state))
+                    continue;
+                if (!WoodState.TryParentOffset(state, out var pdx, out var pdy, out var pdz)
+                    || nx + pdx != cx || ny + pdy != cy || nz + pdz != cz)
+                    continue;
+                if (graph.Occupies(nx, ny, nz))
+                    continue;
+                if (graph.Count >= WorldGenerationConfig.TreeGrowNodeCap)
+                    return null;
+
+                float d = WoodState.DiameterPx(state);
+                var child = graph.AddChild(head, dir, d, feature: ny < y);
+                graph.SetFloor(child, d);
+            }
+        }
+
+        return graph;
     }
 
     /// <summary>Number of nodes, root included.</summary>
@@ -185,6 +249,13 @@ public sealed class TreeGraph
         CheckIndex(i);
         _nodes[i].PipePx = pipePx;
         _nodes[i].ThicknessPx = thicknessPx;
+    }
+
+    /// <summary>Sets a node's thickness floor (<see cref="Node.FloorPx"/>).</summary>
+    public void SetFloor(int i, float floorPx)
+    {
+        CheckIndex(i);
+        _nodes[i].FloorPx = floorPx;
     }
 
     /// <summary>Whether two nodes sit exactly one face step apart.</summary>

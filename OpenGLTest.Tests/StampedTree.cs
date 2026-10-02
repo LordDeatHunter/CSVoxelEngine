@@ -52,6 +52,81 @@ internal sealed class StampedTree
         chunk.SetBlockRaw(cell.X & Chunk.SizeMask, cell.Y & Chunk.SizeMask, cell.Z & Chunk.SizeMask, id, state);
     }
 
+    /// <summary>The inclusive bounding box of the tree's wood and leaf cells.</summary>
+    public (int X, int Y, int Z) Min => IntBounds(Wood.Keys.Concat(Leaves.Keys)).Min;
+
+    /// <summary>The inclusive bounding box of the tree's wood and leaf cells.</summary>
+    public (int X, int Y, int Z) Max => IntBounds(Wood.Keys.Concat(Leaves.Keys)).Max;
+
+    /// <summary>Loads empty chunks over the tree's wood and leaf cells grown by
+    /// <paramref name="margin"/>, so no read near the tree hits an unloaded chunk.</summary>
+    public void LoadAround(int margin) => LoadAround(Chunks, Wood.Keys.Concat(Leaves.Keys), margin);
+
+    /// <summary>The bounding box of <paramref name="cells"/> as float corners.</summary>
+    internal static (Vector3 Min, Vector3 Max) Bounds(IEnumerable<(int X, int Y, int Z)> cells)
+    {
+        var min = new Vector3(float.MaxValue);
+        var max = new Vector3(float.MinValue);
+        foreach (var (x, y, z) in cells)
+        {
+            min = Vector3.Min(min, new Vector3(x, y, z));
+            max = Vector3.Max(max, new Vector3(x, y, z));
+        }
+
+        return (min, max);
+    }
+
+    private static ((int X, int Y, int Z) Min, (int X, int Y, int Z) Max) IntBounds(IEnumerable<(int X, int Y, int Z)> cells)
+    {
+        var (min, max) = Bounds(cells);
+        return (((int)min.X, (int)min.Y, (int)min.Z), ((int)max.X, (int)max.Y, (int)max.Z));
+    }
+
+    /// <summary>Creates the chunk at chunk position (cx, cy, cz), all air with block data ready,
+    /// unless it is already loaded.</summary>
+    internal static void EnsureChunk(ChunkManager chunks, int cx, int cy, int cz)
+    {
+        var pos = new Vector3(cx, cy, cz);
+        if (!chunks.Chunks.TryGetValue(pos, out _))
+            chunks.Chunks[pos] = new Chunk(null!, pos, generateBlockData: false) { IsBlockDataReady = true };
+    }
+
+    /// <summary>Creates every missing chunk (all air, block data ready) covering the bounding box
+    /// of <paramref name="cells"/> grown by <paramref name="margin"/> on every side.</summary>
+    internal static void LoadAround(ChunkManager chunks, IEnumerable<(int X, int Y, int Z)> cells, int margin)
+    {
+        var (min, max) = IntBounds(cells);
+        for (var cx = (min.X - margin) >> Chunk.SizeShift; cx <= (max.X + margin) >> Chunk.SizeShift; cx++)
+        for (var cy = (min.Y - margin) >> Chunk.SizeShift; cy <= (max.Y + margin) >> Chunk.SizeShift; cy++)
+        for (var cz = (min.Z - margin) >> Chunk.SizeShift; cz <= (max.Z + margin) >> Chunk.SizeShift; cz++)
+            EnsureChunk(chunks, cx, cy, cz);
+    }
+
+    /// <summary>Writes <paramref name="id"/> and <paramref name="state"/> into every cell of the
+    /// inclusive box, creating chunks as needed.</summary>
+    internal static void Fill(ChunkManager chunks, (int X, int Y, int Z) min, (int X, int Y, int Z) max, byte id, byte state = 0)
+    {
+        for (var x = min.X; x <= max.X; x++)
+        for (var y = min.Y; y <= max.Y; y++)
+        for (var z = min.Z; z <= max.Z; z++)
+            WriteCell(chunks, (x, y, z), id, state);
+    }
+
+    /// <summary>Every loaded cell of the inclusive box with its id and state; cells in unloaded
+    /// chunks are left out.</summary>
+    internal static Dictionary<(int X, int Y, int Z), (byte Id, byte State)> Snapshot(
+        ChunkManager chunks, (int X, int Y, int Z) min, (int X, int Y, int Z) max)
+    {
+        var result = new Dictionary<(int X, int Y, int Z), (byte Id, byte State)>();
+        for (var x = min.X; x <= max.X; x++)
+        for (var y = min.Y; y <= max.Y; y++)
+        for (var z = min.Z; z <= max.Z; z++)
+            if (chunks.TryGetCell(x, y, z, out var id, out var state))
+                result[(x, y, z)] = (id, state);
+
+        return result;
+    }
+
     /// <summary>Grows the species on flat ground and stamps it like worldgen: wood first, then
     /// leaves into air only.</summary>
     internal static StampedTree Stamp(TreeSpecies species, int seed, int rootX, int rootY, int rootZ)

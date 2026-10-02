@@ -35,6 +35,19 @@
   // for the leaves beyond the sweep gone in limb_cut_decayed, the standing crown untouched, and no
   // floating node boxes left where the limb was. felled_after, 3 s after felled_down, should show
   // nothing standing: every leaf of a felled oak goes down with its wood.
+  //
+  // Reactive growth (`grow`, World.TryGrowTree -> TreeGrowthWriter): the step snaps its [x, z]
+  // to TryGroundHeight + 1, rebuilds the tree rooted in that column from its wood state bytes
+  // (or plants a sapling root on the real ground when the column holds none), runs `steps`
+  // growth pulses in the live world and writes the new wood and the leaves around the changed
+  // tips back. (a) oak_grown grows the cut oak further, filmed from the overview vantage: the
+  // cut limb must stay missing (neither regrown nor re-attached), the trunk must not thin, and
+  // new tips and leaves should appear elsewhere on the crown. (b) sapling_1..3 plant on the
+  // felled oak's column (the fell took the root cell and its root walk, so it is bare ground) and
+  // grow it in three stages from the `oak` vantage: look for a rooted tree, no floating wood or
+  // leaves. Each grow schedules leaf decay over the box it wrote, so a few leaves the old tips
+  // fed may speckle away after it, and every grown column loses its far-LOD canopy until reload
+  // (the LOD hook can only remove a canopy bump, not add one).
   "steps": [
     { "op": "fly" },
 
@@ -56,6 +69,9 @@
     { "op": "teleport", "pos": [-78.5, 21.0, -16.5], "yaw": 90, "pitch": -5 },
     { "op": "wait", "seconds": 1 },
     { "op": "screenshot", "name": "limb_cut_overview", "hideHud": true },
+    { "op": "grow", "species": "oak", "pos": [-79, -2], "steps": 40 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "oak_grown", "hideHud": true },
 
     { "op": "teleport", "pos": [-81.5, 15.7, -1.5], "yaw": 0, "pitch": -21.8 },
     { "op": "wait", "seconds": 0.5 },
@@ -68,6 +84,18 @@
     { "op": "screenshot", "name": "felled_down", "hideHud": true },
     { "op": "wait", "seconds": 3 },
     { "op": "screenshot", "name": "felled_after", "hideHud": true },
+
+    { "op": "teleport", "pos": [-67.4, 21.0, 3.1], "yaw": -157.5, "pitch": -4.8 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "grow", "species": "oak", "pos": [-79, -2], "steps": 4 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "sapling_1", "hideHud": true },
+    { "op": "grow", "species": "oak", "pos": [-79, -2], "steps": 16 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "sapling_2", "hideHud": true },
+    { "op": "grow", "species": "oak", "pos": [-79, -2], "steps": 60 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "sapling_3", "hideHud": true },
 
     { "op": "teleport", "pos": [-304.5, 19.5, -251.5], "yaw": 0, "pitch": -4.1 },
     { "op": "wait", "seconds": 8 },

@@ -81,42 +81,12 @@ public sealed class LeafDecayTests
                 $"{tree.Species.Name}: node {i} is a feature node on flat ground; the graph rule no longer matches the world rule");
     }
 
-    private static (Vector3 Min, Vector3 Max) Bounds(IEnumerable<(int X, int Y, int Z)> cells)
-    {
-        var min = new Vector3(float.MaxValue);
-        var max = new Vector3(float.MinValue);
-        foreach (var (x, y, z) in cells)
-        {
-            min = Vector3.Min(min, new Vector3(x, y, z));
-            max = Vector3.Max(max, new Vector3(x, y, z));
-        }
-
-        return (min, max);
-    }
-
-    private static void EnsureChunk(ChunkManager chunks, int cx, int cy, int cz)
-    {
-        var pos = new Vector3(cx, cy, cz);
-        if (!chunks.Chunks.TryGetValue(pos, out _))
-            chunks.Chunks[pos] = new Chunk(null!, pos, generateBlockData: false) { IsBlockDataReady = true };
-    }
-
-    /// <summary>Loads empty chunks over the tree's cells grown by twice the schedule reach, so
-    /// no decision the facts expect is frozen by an unloaded scan box.</summary>
-    private static void LoadAround(StampedTree tree, int reach)
-    {
-        var (min, max) = Bounds(tree.Wood.Keys.Concat(tree.Leaves.Keys));
-        var margin = 2 * reach;
-        for (var cx = ((int)min.X - margin) >> Chunk.SizeShift; cx <= ((int)max.X + margin) >> Chunk.SizeShift; cx++)
-        for (var cy = ((int)min.Y - margin) >> Chunk.SizeShift; cy <= ((int)max.Y + margin) >> Chunk.SizeShift; cy++)
-        for (var cz = ((int)min.Z - margin) >> Chunk.SizeShift; cz <= ((int)max.Z + margin) >> Chunk.SizeShift; cz++)
-            EnsureChunk(tree.Chunks, cx, cy, cz);
-    }
-
+    /// <summary>Stamps the species and loads empty chunks over its cells grown by twice the
+    /// schedule reach, so no decision the facts expect is frozen by an unloaded scan box.</summary>
     private static StampedTree StampLoaded(TreeSpecies species, LeafDecayManager manager)
     {
         var tree = StampedTree.Stamp(species, Seed, RootX, RootY, RootZ);
-        LoadAround(tree, manager.ScheduleReach);
+        tree.LoadAround(2 * manager.ScheduleReach);
         return tree;
     }
 
@@ -176,7 +146,7 @@ public sealed class LeafDecayTests
             var tree = StampLoaded(species, manager);
             AssertNoFeatureNodes(tree);
 
-            var (min, max) = Bounds(tree.Wood.Keys.Concat(tree.Leaves.Keys));
+            var (min, max) = StampedTree.Bounds(tree.Wood.Keys.Concat(tree.Leaves.Keys));
             manager.ScheduleBox(min, max);
 
             var guard = manager.TickIndex + 32;
@@ -229,7 +199,7 @@ public sealed class LeafDecayTests
             var expected = tree.Leaves.Keys.ToDictionary(c => c, c => ExpectedHydration(tree.Graph, species, tips, c));
             var doomed = expected.Where(e => e.Value == 0).Select(e => e.Key).ToList();
 
-            var (min, max) = Bounds(subtreeCells);
+            var (min, max) = StampedTree.Bounds(subtreeCells);
             manager.ScheduleBox(min, max);
 
             if (doomed.Count > WorldGenerationConfig.LeafDecayMaxRemovalsPerTick)
@@ -352,7 +322,7 @@ public sealed class LeafDecayTests
             Assert.True(drops.Drops.Count == 0, $"{what} beside an unloaded chunk dropped loot");
             Assert.True(manager.PendingCells == 0, $"{what} beside an unloaded chunk kept rescheduling itself");
 
-            EnsureChunk(chunks, cx - 1, 0, cz);
+            StampedTree.EnsureChunk(chunks, cx - 1, 0, cz);
             manager.ScheduleAround(cell.X, cell.Y, cell.Z);
             RunTicks(manager, chunks, drops, Bound(1));
 
@@ -378,7 +348,7 @@ public sealed class LeafDecayTests
 
             foreach (var cell in tree.Wood.Keys)
                 tree.Write(cell, 0, 0);
-            var (min, max) = Bounds(tree.Wood.Keys.Concat(tree.Leaves.Keys));
+            var (min, max) = StampedTree.Bounds(tree.Wood.Keys.Concat(tree.Leaves.Keys));
             manager.ScheduleBox(min, max);
 
             // A whole crown dissolves over several ticks, never past the per-tick budget
@@ -418,7 +388,7 @@ public sealed class LeafDecayTests
 
             foreach (var cell in tree.Wood.Keys)
                 tree.Write(cell, 0, 0);
-            var (min, max) = Bounds(tree.Wood.Keys.Concat(tree.Leaves.Keys));
+            var (min, max) = StampedTree.Bounds(tree.Wood.Keys.Concat(tree.Leaves.Keys));
             manager.ScheduleBox(min, max);
 
             // A leaf feeds no other cell, so after any tick the only work left is the doomed

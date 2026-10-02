@@ -309,4 +309,180 @@ public sealed class TreeGrowerTests
         foreach (var pos in Positions)
             Assert.True(Grow(species, pos, SeedA).Count > 1, $"{species.Name} did not grow at {pos}");
     }
+
+    /// <summary>Every node of a graph as (cell, parent, pipe, thickness), in index order.</summary>
+    private static List<(int X, int Y, int Z, int Parent, float Pipe, float Thick)> Nodes(TreeGraph graph)
+    {
+        var list = new List<(int, int, int, int, float, float)>(graph.Count);
+        for (var i = 0; i < graph.Count; i++)
+        {
+            var n = graph[i];
+            list.Add((n.X, n.Y, n.Z, n.Parent, n.PipePx, n.ThicknessPx));
+        }
+        return list;
+    }
+
+    /// <summary>A flat space with every wood cell of the graph occupied, like a stamped tree's.</summary>
+    private static VirtualTreeSpace FlatAround(TreeGraph graph)
+    {
+        var space = Flat();
+        for (var i = 0; i < graph.Count; i++)
+        {
+            var n = graph[i];
+            space.Occupy(n.X, n.Y, n.Z);
+        }
+        return space;
+    }
+
+    [Fact]
+    public void ThickenLeavesFeatureNodesAndIgnoresThemInTheParent()
+    {
+        foreach (var species in TreeSpeciesRegistry.All)
+        foreach (var pos in Positions)
+        {
+            var plain = Grow(species, pos, SeedA);
+            var featured = Grow(species, pos, SeedA);
+            Assert.Equal(plain.Count, featured.Count);
+
+            // Hang the feature off a tip whose cell below is free, so it would turn the tip into
+            // an interior node if the parent counted it.
+            var host = -1;
+            for (var i = featured.Count - 1; i > TreeGraph.Root && host < 0; i--)
+            {
+                var n = featured[i];
+                if (n.ChildCount == 0 && !featured.Occupies(n.X, n.Y - 1, n.Z))
+                    host = i;
+            }
+            if (host < 0)
+                continue;
+
+            var odd = species.MaxPx * 3f + 0.37f;
+            var feature = featured.AddChild(host, TreeDirections.Down, species.TipPx, feature: true);
+            featured.SetThickness(feature, odd, odd);
+
+            TreeGrower.Thicken(plain, species);
+            TreeGrower.Thicken(featured, species);
+
+            Assert.Equal(odd, featured[feature].PipePx);
+            Assert.Equal(odd, featured[feature].ThicknessPx);
+            for (var i = 0; i < plain.Count; i++)
+            {
+                Assert.Equal(plain[i].PipePx, featured[i].PipePx);
+                Assert.Equal(plain[i].ThicknessPx, featured[i].ThicknessPx);
+            }
+        }
+    }
+
+    [Fact]
+    public void ThickenNeverGoesBelowTheFloor()
+    {
+        foreach (var species in TreeSpeciesRegistry.All)
+        foreach (var pos in Positions)
+        {
+            var graph = Grow(species, pos, SeedA);
+            var original = Nodes(graph);
+
+            int interior = -1, tip = -1;
+            for (var i = graph.Count - 1; i > TreeGraph.Root; i--)
+            {
+                var n = graph[i];
+                if (n.IsFeature || n.ThicknessPx >= species.MaxPx)
+                    continue;
+                if (n.ChildCount == 0 && tip < 0)
+                    tip = i;
+                else if (n.ChildCount > 0 && interior < 0)
+                    interior = i;
+            }
+
+            var floored = new List<int>();
+            if (interior >= 0)
+                floored.Add(interior);
+            if (tip >= 0)
+                floored.Add(tip);
+            foreach (var i in floored)
+                graph.SetFloor(i, species.MaxPx);
+
+            TreeGrower.Thicken(graph, species);
+
+            foreach (var i in floored)
+                Assert.True(graph[i].ThicknessPx >= species.MaxPx, $"{species.Name} node {i} thinned below its floor");
+            for (var i = 1; i < graph.Count; i++)
+            {
+                var n = graph[i];
+                if (!n.IsFeature)
+                    Assert.True(graph[n.Parent].ThicknessPx >= n.ThicknessPx,
+                        $"{species.Name} node {n.Parent} thinner than its child {i}");
+            }
+
+            var twin = Grow(species, pos, SeedA);
+            TreeGrower.Thicken(twin, species);
+            Assert.Equal(original, Nodes(twin));
+        }
+    }
+
+    [Fact]
+    public void GrowFurtherOnlyAppends()
+    {
+        var anyGrew = false;
+        foreach (var species in TreeSpeciesRegistry.All)
+        foreach (var pos in Positions)
+        {
+            var graph = Grow(species, pos, SeedA);
+            var space = FlatAround(graph);
+            var before = Nodes(graph);
+            var energy = TreeGrower.TreeEnergyAt(species, pos.X, pos.Y, pos.Z, SeedA);
+
+            var added = TreeGrower.GrowFurther(graph, species, space, new SplitMix64(99), energy, 40, int.MaxValue);
+
+            Assert.Equal(before.Count + added, graph.Count);
+            for (var i = 0; i < before.Count; i++)
+            {
+                var n = graph[i];
+                Assert.Equal((before[i].X, before[i].Y, before[i].Z, before[i].Parent), (n.X, n.Y, n.Z, n.Parent));
+            }
+            anyGrew |= added > 0;
+        }
+        Assert.True(anyGrew, "no species grew any further");
+    }
+
+    [Fact]
+    public void GrowFurtherNeverExceedsTheNodeCap()
+    {
+        foreach (var species in TreeSpeciesRegistry.All)
+        {
+            const int cap = 4;
+            var graph = new TreeGraph(0, 1, 0, species.TipPx);
+            TreeGrower.GrowFurther(graph, species, Flat(), new SplitMix64(7), species.SignalEnergy, cap * 10, cap);
+            Assert.True(graph.Count <= cap, $"{species.Name} grew past the node cap");
+        }
+    }
+
+    [Fact]
+    public void GrowFurtherIsDeterministic()
+    {
+        foreach (var species in TreeSpeciesRegistry.All)
+        foreach (var pos in Positions)
+        {
+            var a = Grow(species, pos, SeedA);
+            var b = Grow(species, pos, SeedA);
+            var energy = TreeGrower.TreeEnergyAt(species, pos.X, pos.Y, pos.Z, SeedA);
+            TreeGrower.GrowFurther(a, species, FlatAround(a), new SplitMix64(1234567), energy, 30, int.MaxValue);
+            TreeGrower.GrowFurther(b, species, FlatAround(b), new SplitMix64(1234567), energy, 30, int.MaxValue);
+            Assert.Equal(Nodes(a), Nodes(b));
+        }
+    }
+
+    [Fact]
+    public void TreeEnergyAtMatchesTheMaturityRoll()
+    {
+        foreach (var species in TreeSpeciesRegistry.All.Where(s => s.Worldgen != null))
+        foreach (var pos in Positions)
+        foreach (var seed in new[] { SeedA, SeedB })
+        {
+            var rng = new SplitMix64(TreeGrower.SeedFor(pos.X, pos.Y, pos.Z, seed, species));
+            rng.NextInt(species.MaturityStepsMin, species.MaturityStepsMax + 1);
+            var expected = Math.Clamp(species.Logic.TreeEnergy(species, rng), 1, species.SignalEnergy);
+            Assert.Equal(expected, TreeGrower.TreeEnergyAt(species, pos.X, pos.Y, pos.Z, seed));
+        }
+    }
 }

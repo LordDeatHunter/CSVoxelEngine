@@ -41,6 +41,7 @@ public class World : IItemUseWorld
     private readonly GoblinManager? _goblins;
     private readonly FluidManager _fluidManager = new();
     private readonly LeafDecayManager _leafDecay = new();
+    private readonly TreeGrowthWriter _treeGrowth = new();
     private readonly LeafParticleSystem _leaves = new();
     private readonly BlockDebrisSystem _debris = new();
     private readonly CampfireManager _campfires = new();
@@ -469,6 +470,36 @@ public class World : IItemUseWorld
         var heights = Chunk.GetColumnHeights(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
         height = heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
         return true;
+    }
+
+    /// <summary>
+    /// Grows the tree of the named species rooted in column (<paramref name="x"/>,
+    /// <paramref name="z"/>) by up to <paramref name="steps"/> growth pulses, or plants a sapling
+    /// on the column's ground when it has no such tree (<see cref="TreeGrowthWriter"/>). Main
+    /// thread only; this is the scripted visual tests' <c>grow</c> op's entry point.
+    /// <paramref name="yHint"/> centres the column scan (the generated ground + 1). Refused with
+    /// <see cref="TreeGrowthStatus.NotGrowable"/> while the world is still loading or for an
+    /// unknown species.
+    /// </summary>
+    public TreeGrowthResult TryGrowTree(string speciesName, int x, int yHint, int z, int steps)
+    {
+        var species = IsPlaying ? TreeSpeciesRegistry.TryGet(speciesName) : null;
+        if (species == null)
+            return new TreeGrowthResult(TreeGrowthStatus.NotGrowable, x, yHint, z, 0, 0, 0, 0);
+
+        var result = _treeGrowth.Grow(_chunkManager, species, x, yHint, z, steps, WorldGenerationConfig.Seed,
+            _fluidManager, _leafDecay, _lodManager, _falling.OverlapsAny);
+
+        // One synchronous remesh at the root so the grow frame already shows the base; the
+        // writer's MarkDirty batch rebuilds every other touched chunk asynchronously. Never loop
+        // immediate remeshes here, and never use RemeshAfterBatchEdit: tree blocks are
+        // light-neutral, and it would dirty the whole light radius around every touched chunk.
+        if (result.MeshCellsWritten > 0)
+        {
+            var rootCell = new Vector3(result.RootX, result.RootY, result.RootZ);
+            _chunkManager.ImmediateRemeshWithBorders(VoxelCoords.ChunkPosOf(rootCell), rootCell);
+        }
+        return result;
     }
 
     private void EnsureSpawnSettled()

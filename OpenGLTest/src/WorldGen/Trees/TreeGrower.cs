@@ -207,24 +207,40 @@ public static class TreeGrower
     /// the trunk; the displayed thickness lies in [<see cref="TreeSpecies.TipPx"/>,
     /// <see cref="TreeSpecies.MaxPx"/>] because the floor comes after the multiply; and the final
     /// max keeps a parent never thinner than any child.
+    /// <para>
+    /// Feature nodes (roots) keep the thickness their feature gave them and are ignored by their
+    /// parent, and the result never drops below the node's <see cref="TreeGraph.Node.FloorPx"/>.
+    /// Features apply after <see cref="GrowToMaturity(TreeSpecies, int, int, int, ITreeSpace,
+    /// int)"/>'s final <see cref="Thicken"/> and every floor is 0 there, so worldgen output is
+    /// bit-identical; both rules only matter for graphs rebuilt from the world.
+    /// </para>
     /// </summary>
     internal static void Recompute(TreeGraph graph, TreeSpecies species, int i)
     {
         ref readonly var n = ref graph[i];
+        if (n.IsFeature)
+            return;
+
+        var floor = n.FloorPx;
         var sumPipe = 0f;
         var maxChildThick = 0f;
+        var nonFeatureChildren = 0;
         for (var c = n.FirstChild; c >= 0; c = graph[c].NextSibling)
         {
             ref readonly var child = ref graph[c];
+            if (child.IsFeature)
+                continue;
+            nonFeatureChildren++;
             sumPipe += MathF.Pow(child.PipePx, species.PipeExponent);
             maxChildThick = MathF.Max(maxChildThick, child.ThicknessPx);
         }
 
         float tip = species.TipPx;
-        var pipe = n.ChildCount == 0 ? tip : MathF.Max(tip, MathF.Pow(sumPipe, 1f / species.PipeExponent));
+        var pipe = nonFeatureChildren == 0 ? tip : MathF.Max(tip, MathF.Pow(sumPipe, 1f / species.PipeExponent));
         var h01 = Math.Clamp((float)(n.Y - graph.RootY) / Math.Max(1, graph.MaxY - graph.RootY), 0f, 1f);
         var thick = MathF.Min(species.MaxPx, MathF.Max(tip, pipe * Girth(species, h01)));
         thick = MathF.Max(thick, maxChildThick);
+        thick = MathF.Max(thick, floor);
         graph.SetThickness(i, pipe, thick);
     }
 
@@ -259,8 +275,7 @@ public static class TreeGrower
     public static TreeGraph GrowToMaturity(TreeSpecies species, int x, int y, int z, ITreeSpace space, int worldSeed)
     {
         var rng = new SplitMix64(SeedFor(x, y, z, worldSeed, species));
-        var steps = rng.NextInt(species.MaturityStepsMin, species.MaturityStepsMax + 1);
-        var energy = Math.Clamp(species.Logic.TreeEnergy(species, rng), 1, species.SignalEnergy);
+        var (steps, energy) = RollMaturity(species, rng);
 
         var graph = new TreeGraph(x, y, z, species.TipPx);
         for (var s = 0; s < steps; s++)
@@ -272,5 +287,46 @@ public static class TreeGrower
         for (var f = 0; f < features.Count; f++)
             features[f].Feature.Apply(graph, species, space, features[f].Depth, rng);
         return graph;
+    }
+
+    /// <summary>
+    /// The first two draws of a tree's stream: the maturity step count, then the per-tree energy
+    /// clamped to 1..<see cref="TreeSpecies.SignalEnergy"/>, in exactly that order.
+    /// </summary>
+    private static (int Steps, int Energy) RollMaturity(TreeSpecies species, SplitMix64 rng)
+    {
+        var steps = rng.NextInt(species.MaturityStepsMin, species.MaturityStepsMax + 1);
+        var energy = Math.Clamp(species.Logic.TreeEnergy(species, rng), 1, species.SignalEnergy);
+        return (steps, energy);
+    }
+
+    /// <summary>
+    /// The per-tree energy a worldgen tree rooted at (x, y, z) grew with: a replay of the energy
+    /// roll from <see cref="SeedFor"/>'s stream, so reactive growth keeps an existing tree's
+    /// reach and a planted sapling gets the energy a worldgen tree on that cell would have had.
+    /// </summary>
+    public static int TreeEnergyAt(TreeSpecies species, int x, int y, int z, int worldSeed) =>
+        RollMaturity(species, new SplitMix64(SeedFor(x, y, z, worldSeed, species))).Energy;
+
+    /// <summary>
+    /// Grows an existing graph further (reactive growth): a <see cref="Thicken"/> first, which
+    /// rebuilds the pipe values from the topology for a graph seeded from integer diameters, then
+    /// up to <paramref name="steps"/> pulses with <paramref name="energy"/>, stopping once the
+    /// graph holds <paramref name="maxNodes"/>, then a final <see cref="Thicken"/>. Only appends
+    /// nodes, and runs no features. Returns the number of nodes added.
+    /// </summary>
+    public static int GrowFurther(TreeGraph graph, TreeSpecies species, ITreeSpace space, SplitMix64 rng,
+        int energy, int steps, int maxNodes)
+    {
+        var countBefore = graph.Count;
+        Thicken(graph, species);
+        for (var s = 0; s < steps; s++)
+        {
+            if (graph.Count >= maxNodes)
+                break;
+            Pulse(graph, species, space, rng, energy);
+        }
+        Thicken(graph, species);
+        return graph.Count - countBefore;
     }
 }

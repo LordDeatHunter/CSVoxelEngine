@@ -28,13 +28,20 @@ public sealed class VisualStep
     /// <summary>The entity name a <c>spawn</c> step creates (resolved at run time).</summary>
     public string? Entity { get; init; }
 
-    /// <summary>True when a <c>spawn</c> step gave only <c>[x, z]</c>: the feet go on top of the
-    /// terrain column there, and <see cref="Pos"/>'s Y is ignored.</summary>
+    /// <summary>True when a <c>spawn</c> step gave only <c>[x, z]</c>, and always for a <c>grow</c>
+    /// step: the feet (or the tree's root search) go on top of the terrain column there, and
+    /// <see cref="Pos"/>'s Y is ignored.</summary>
     public bool SnapToGround { get; init; }
+
+    /// <summary>The tree species a <c>grow</c> step grows (resolved at run time).</summary>
+    public string? Species { get; init; }
+
+    /// <summary>The growth pulses a <c>grow</c> step runs.</summary>
+    public int GrowSteps { get; init; }
 }
 
 /// <summary>
-/// A scripted in-game run: teleport/look/wait/walk/mine/place/fly/give/spawn/screenshot steps loaded from
+/// A scripted in-game run: teleport/look/wait/walk/mine/place/fly/give/spawn/grow/screenshot steps loaded from
 /// JSON (<c>VOXEL_SCRIPT</c>), driving the real world-update functions for agent screenshots.
 /// </summary>
 public sealed class VisualScenario
@@ -149,6 +156,7 @@ public sealed class VisualScenario
                 Count = ReadGiveCount(element, index),
             },
             "spawn" => ReadSpawn(element, index),
+            "grow" => ReadGrow(element, index),
             "screenshot" => new VisualStep
             {
                 Op = "screenshot",
@@ -156,7 +164,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, fly, give, spawn or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, fly, give, spawn, grow or screenshot."),
         };
     }
 
@@ -206,6 +214,35 @@ public sealed class VisualScenario
             },
             _ => throw new InvalidOperationException(
                 $"Step {index} (spawn) needs 'pos' with 2 or 3 numbers, got {values.Count}."),
+        };
+    }
+
+    /// <summary>A <c>grow</c> step: <c>species</c> names the tree (validated against the registry
+    /// only when the step runs, so parsing stays content-free), <c>pos</c> is the <c>[x, z]</c>
+    /// column (snapped onto the terrain there) and <c>steps</c> the growth pulses to run.</summary>
+    private static VisualStep ReadGrow(JsonElement element, int index)
+    {
+        if (!element.TryGetProperty("species", out var species)
+            || species.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(species.GetString()))
+            throw new InvalidOperationException($"Step {index} (grow) needs 'species'.");
+
+        var values = ReadPosValues(element, index, "grow", "[x, z]");
+        if (values.Count != 2)
+            throw new InvalidOperationException(
+                $"Step {index} (grow) needs 'pos' with exactly 2 numbers ([x, z]), got {values.Count}.");
+
+        if (!element.TryGetProperty("steps", out var stepsElement)
+            || stepsElement.ValueKind != JsonValueKind.Number
+            || !stepsElement.TryGetInt32(out var steps)
+            || steps <= 0)
+            throw new InvalidOperationException($"Step {index} (grow) needs 'steps' above 0.");
+
+        return new VisualStep
+        {
+            Op = "grow", Species = species.GetString()!.Trim(),
+            Pos = new Vector3(values[0], 0f, values[1]), SnapToGround = true,
+            GrowSteps = steps,
         };
     }
 

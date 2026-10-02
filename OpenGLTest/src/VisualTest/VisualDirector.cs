@@ -108,6 +108,30 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 Advance();
                 break;
 
+            case "grow":
+            {
+                // The species name is validated here rather than at parse time, so parsing stays
+                // registry-free for the tests.
+                var column = step.Pos!.Value;
+                var gx = (int)MathF.Floor(column.X);
+                var gz = (int)MathF.Floor(column.Z);
+                if (!world.TryGroundHeight(gx, gz, out var growGround))
+                    throw new InvalidOperationException(
+                        $"Step {_step + 1} grows on column ({gx}, {gz}), whose ground height is unavailable.");
+                if (TreeSpeciesRegistry.TryGet(step.Species!) == null)
+                    throw new InvalidOperationException(
+                        $"Step {_step + 1} grows unknown tree species '{step.Species}'.");
+                var result = world.TryGrowTree(step.Species!, gx, growGround + 1, gz, step.GrowSteps);
+                if (!result.Succeeded)
+                    throw new InvalidOperationException(
+                        $"Step {_step + 1} could not grow {step.Species} on column ({gx}, {gz}): {result.Status}.");
+                Log.WriteLine(
+                    $"[visual] {_step + 1}/{scenario.Steps.Count} grow {step.Species} at ({gx}, {gz}): "
+                    + $"{result.Status}, +{result.NodesAdded} nodes, {result.CellsWritten} cells");
+                Advance();
+                break;
+            }
+
             case "screenshot":
                 ScreenshotPath = Path.Combine(scenario.OutputDir, $"{_step + 1:D2}-{step.ShotName}.png");
                 ScreenshotHideHud = step.HideHud;
