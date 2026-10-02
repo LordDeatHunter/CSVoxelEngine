@@ -1,6 +1,6 @@
 export const meta = {
   name: 'plan-and-implement',
-  description: 'Sonnet scouts the codebase, Fable designs the plan, Opus implements it step by step, then build/test + Fable acceptance review',
+  description: 'Sonnet scouts the codebase, Fable designs the plan, Opus implements it step by step, then build/test + Fable acceptance review (Fable steps fall back to Opus if Fable is unavailable)',
   whenToUse: 'A feature, refactor, or bug fix in CSVoxelEngine that deserves a plan before code. Pass the task as args: a string, or {task, extraContext?, maxFixRounds?, dryRun?}. dryRun stops after the plan.',
   phases: [
     { title: 'Scout', detail: 'Sonnet maps the relevant code from four angles', model: 'sonnet' },
@@ -30,6 +30,28 @@ The system "dotnet" has no SDK — always use ~/.dotnet/dotnet.exe:
 `.trim()
 
 const TASK = `TASK:\n${task}${extraContext ? `\n\nADDITIONAL CONTEXT FROM THE USER:\n${extraContext}` : ''}`
+
+// ---------------------------------------------------------------------------
+// Fable fallback
+// ---------------------------------------------------------------------------
+// When Fable hits its usage limit, agent() returns null. Every Fable call goes through this wrapper.
+// The first null retries the same prompt on Opus, and from then on the rest of the run goes straight
+// to Opus. Without it a dead Fable either kills the run ("Architect returned no plan") or silently
+// drops the red-team and acceptance review. The latch is derived only from agent results, so a
+// resumed run replays it identically. Caveat: an agent the user skips mid-run also returns null, so
+// a skipped Fable agent gets one Opus retry.
+const FABLE_FALLBACK_MODEL = 'opus'
+let fableDown = false
+async function agentWithFallback(prompt, opts) {
+  if (opts.model !== 'fable') return agent(prompt, opts)
+  if (!fableDown) {
+    const result = await agent(prompt, opts)
+    if (result) return result
+    fableDown = true
+    log(`${opts.label}: Fable returned nothing (usage limit?); using ${FABLE_FALLBACK_MODEL} for the rest of the run`)
+  }
+  return agent(prompt, { ...opts, model: FABLE_FALLBACK_MODEL, label: `${opts.label}:${FABLE_FALLBACK_MODEL}` })
+}
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -248,7 +270,7 @@ ${TASK}
 ## Scout reports
 ${scoutDigest}`
 
-let plan = await agent(planPrompt, { label: 'architect:draft', phase: 'Architect', model: 'fable', schema: PLAN_SCHEMA })
+let plan = await agentWithFallback(planPrompt, { label: 'architect:draft', phase: 'Architect', model: 'fable', schema: PLAN_SCHEMA })
 if (!plan) throw new Error('Architect returned no plan')
 log(`Draft plan: ${plan.steps.length} step(s), ${plan.openQuestions.length} open question(s)`)
 
@@ -263,7 +285,7 @@ WHY IT MATTERS: ${q.whyItMatters}`,
       { label: `scout:q${i + 1}`, phase: 'Architect', model: 'sonnet', schema: ANSWER_SCHEMA })
   ))).filter(Boolean)
 
-  plan = await agent(`${ARCHITECT_ROLE}
+  plan = await agentWithFallback(`${ARCHITECT_ROLE}
 
 ${TASK}
 
@@ -282,7 +304,7 @@ Leave openQuestions empty unless an answer was low-confidence AND the choice mat
 }
 
 // Red-team the plan with an independent Fable critic, then revise once if needed.
-const critique = await agent(`${REPO}
+const critique = await agentWithFallback(`${REPO}
 
 You are an adversarial reviewer of an implementation plan. Your job is to find where it FAILS: missing steps, a step that will not build on its own,
 wrong file or symbol names (verify them by reading the code), thread-safety violations (GL calls off the render thread, unsynchronised shared state),
@@ -301,7 +323,7 @@ ${JSON.stringify(plan, null, 2)}`,
 const seriousIssues = critique ? critique.issues.filter(i => i.severity !== 'minor') : []
 if (critique && (critique.verdict === 'needs-revision' || seriousIssues.length)) {
   log(`Red-team found ${critique.issues.length} issue(s) (${seriousIssues.length} blocker/major); revising plan`)
-  plan = await agent(`${ARCHITECT_ROLE}
+  plan = await agentWithFallback(`${ARCHITECT_ROLE}
 
 ${TASK}
 
@@ -415,7 +437,7 @@ ${planText}
 ${implemented.map(r => `- [${r.stepId}] ${r.status}: ${r.summary}`).join('\n')}`,
     { label: `verify:build-test${round ? `:r${round}` : ''}`, phase: 'Verify', model: 'opus', schema: VERIFY_SCHEMA })
 
-  review = await agent(`${REPO}
+  review = await agentWithFallback(`${REPO}
 
 You are the architect reviewing whether the implementation matches your plan. Run "git status" and "git diff" (plus "git diff --stat") to see
 every change, read the touched files in full where needed, and check each step's acceptance criterion. Look for: plan steps skipped or half-done,
