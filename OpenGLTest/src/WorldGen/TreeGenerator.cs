@@ -9,10 +9,12 @@ namespace silkgltriangle;
 /// <summary>
 /// The worldgen front-end over the tree growth engine (<see cref="TreeGrower"/>): decides which
 /// columns root a tree and of which <see cref="TreeSpecies"/> (each species' <c>worldgen</c>
-/// rules), grows every tree solo to maturity over the terrain heightmap, caches the rasterised
-/// cells per trunk and stamps them into chunks. Like <see cref="WormCarver"/>, a tree is a pure
-/// function of its trunk's (x, z): any chunk stamps the share of every nearby trunk that crosses
-/// it, so neighbours agree without shared state. Growth only uses cells above the terrain
+/// rules), grows every tree to maturity over the terrain heightmap and stamps the rasterised
+/// cells into chunks. The trees of one 64x64 XZ cell grow together (<see cref="TreeBatch"/>),
+/// each avoiding the cells of the batch's earlier trees and the SOLO shapes (one tree grown
+/// alone, cached per trunk) of the neighbour cells' trees. Like <see cref="WormCarver"/>'s
+/// cells, a batch is a pure function of its cell key: any chunk stamps the share of every
+/// nearby batch that crosses it, so neighbours agree without shared state. Growth only uses cells above the terrain
 /// heightmap, wood only replaces air or leaves and leaves only settle into air, so trees never
 /// bury terrain and caves (carved before this runs) never lose rock to them.
 /// </summary>
@@ -60,6 +62,10 @@ public static class TreeGenerator
     /// <summary>Leaf block the far LOD falls back to: the first leafy species' leaves.</summary>
     public static readonly byte LeavesBlock;
 
+    // The widest LOD crown proxy of any leafy worldgen species: how far outside a chunk column
+    // the proxy sweep looks for trunks whose crown can overhang it.
+    private static readonly int ProxyReach;
+
     // Explicit so the tables are built the first time anything touches this class (after
     // ContentRegistry.Load), not at whatever point beforefieldinit would allow
     static TreeGenerator()
@@ -91,6 +97,15 @@ public static class TreeGenerator
         }
 
         ReachChunkRadius = (ReachHorizontal + Chunk.Size - 1) / Chunk.Size;
+
+        foreach (var species in Species)
+            if (species.HasLeaves && species.Worldgen != null)
+                ProxyReach = Math.Max(ProxyReach, species.CrownRadius);
+
+        if (2 * ReachHorizontal > WorldGenerationConfig.TreeCellBlocks)
+            throw new InvalidOperationException(
+                $"Tree reach {ReachHorizontal} x 2 exceeds the {WorldGenerationConfig.TreeCellBlocks}-block batch cell; " +
+                "a batch's neighbour obstacles must come from the 8 adjacent cells only.");
     }
 
     /// <summary>
@@ -108,11 +123,39 @@ public static class TreeGenerator
         public required int WoodCount { get; init; }
         public required int MinY { get; init; }
         public required int MaxY { get; init; }
+
+        /// <summary>
+        /// Wraps a grown tree's rasterised cells, computing the vertical span (seeded with the
+        /// base cell, so an empty raster still spans its base).
+        /// </summary>
+        internal static TreeShape Build(TreeSpecies species, int x, int baseY, int z, TreeCell[] cells, int woodCount)
+        {
+            var minY = baseY;
+            var maxY = baseY;
+            foreach (var cell in cells)
+            {
+                if (cell.Y < minY) minY = cell.Y;
+                if (cell.Y > maxY) maxY = cell.Y;
+            }
+
+            return new TreeShape
+            {
+                Species = species,
+                X = x,
+                BaseY = baseY,
+                Z = z,
+                Cells = cells,
+                WoodCount = woodCount,
+                MinY = minY,
+                MaxY = maxY,
+            };
+        }
     }
 
     // A tree is a pure function of its trunk's (x, z), but every chunk in reach (and the far-LOD
-    // canopy sweep) needs it, and growing one costs far more than reading it. Shared between Stamp
-    // on the generation workers and BuildCanopyTops on the LOD builder thread; the safety
+    // canopy sweep) needs it, and growing one costs far more than reading it. These are the SOLO
+    // shapes: BuildBatch reads them as the neighbour cells' obstacles, on the generation workers
+    // and (through the first LOD ring's batch canopy) the LOD builder thread; the safety
     // argument lives in GenerationalCache, the sizing knobs in WorldGenerationConfig.
     private static readonly GenerationalCache<(int X, int Z), TreeShape> ShapeCache =
         new(WorldGenerationConfig.TreeShapeCacheCapacity, WorldGenerationConfig.TreeShapeCacheGenerations);
@@ -134,29 +177,19 @@ public static class TreeGenerator
         var space = new VirtualTreeSpace(GrowthGround);
         var graph = TreeGrower.GrowToMaturity(species, key.X, baseY, key.Z, space);
         var cells = TreeRasterizer.Rasterize(graph, species, space).ToArray();
-
-        var minY = baseY;
-        var maxY = baseY;
-        foreach (var cell in cells)
-        {
-            if (cell.Y < minY) minY = cell.Y;
-            if (cell.Y > maxY) maxY = cell.Y;
-        }
-
-        var shape = new TreeShape
-        {
-            Species = species,
-            X = key.X,
-            BaseY = baseY,
-            Z = key.Z,
-            Cells = cells,
-            WoodCount = graph.Count,
-            MinY = minY,
-            MaxY = maxY,
-        };
+        var shape = TreeShape.Build(species, key.X, baseY, key.Z, cells, graph.Count);
+        _growsOnThread++;
         WorldgenStats.AddGrow(System.Diagnostics.Stopwatch.GetTimestamp() - start);
         return shape;
     };
+
+    // Trees grown on this thread, solo or in a batch. Per-thread on purpose: a test proves a
+    // synchronous call grew nothing even while other test classes generate chunks in parallel,
+    // which the process-wide cache Misses counters cannot.
+    [ThreadStatic] private static long _growsOnThread;
+
+    /// <summary>Trees grown (solo or in a batch) on the calling thread so far; a test seam.</summary>
+    internal static long GrowsOnThisThread => _growsOnThread;
 
     // The ground a tree grows over: the terrain heightmap, raised to the water level in a column
     // Chunk.FillWater floods (the same Bed < level rule), so no limb or leaf is planned into a
@@ -178,30 +211,180 @@ public static class TreeGenerator
     /// <summary>The grown tree rooted at (x, z); only meaningful where <see cref="TryGetTree"/> is true.</summary>
     internal static TreeShape ShapeOf(int x, int z) => ShapeCache.GetOrAdd((x, z), BuildShapeFor);
 
+    // Every tree of a 64x64 cell grown together (TreeBatch). Shared by Stamp on the generation
+    // workers and the first LOD ring's canopy on the LOD builder; sizing knobs in
+    // WorldGenerationConfig, the safety argument in GenerationalCache.
+    private static readonly GenerationalCache<(int X, int Z), TreeBatch> BatchCache =
+        new(WorldGenerationConfig.TreeBatchCacheCapacity, WorldGenerationConfig.TreeBatchCacheGenerations);
+
+    // Static delegate, not a lambda at the call site: a closure would allocate on every call,
+    // hits included, on the generation workers and the LOD builder (see BuildShapeFor).
+    private static readonly Func<(int X, int Z), TreeBatch> BuildBatchFor = static key => BuildBatch(key.X, key.Z);
+
+    // Duplicate-build diagnostics: GenerationalCache has no single-flight, so several workers
+    // missing one new cell together each build it (deterministic, interchangeable results). The
+    // in-flight set only counts how often that happens; lock-free, diagnostics only.
+    private static readonly ConcurrentDictionary<(int X, int Z), byte> BatchInFlight = new();
+    private static long _batchDuplicates;
+
+    /// <summary>The batch of every tree rooted in the cell (cellX, cellZ) (see <see cref="CellOf"/>).</summary>
+    internal static TreeBatch BatchOf(int cellX, int cellZ) => BatchCache.GetOrAdd((cellX, cellZ), BuildBatchFor);
+
+    /// <summary>Lifetime batch-cache misses, for the profiler's console line.</summary>
+    internal static long BatchCacheMisses => BatchCache.Misses;
+
+    /// <summary>Lifetime batch-cache generation rotations, for the profiler's console line.</summary>
+    internal static long BatchCacheRotations => BatchCache.Rotations;
+
+    /// <summary>Batch builds started while another build of the same cell was still running.</summary>
+    internal static long BatchDuplicateBuilds => Volatile.Read(ref _batchDuplicates);
+
+    /// <summary>
+    /// The batch-grown tree rooted at (x, z): the shape the chunks stamp. Only meaningful where
+    /// <see cref="TryGetTree"/> is true; for tests and probes.
+    /// </summary>
+    internal static TreeShape BatchShapeOf(int x, int z)
+    {
+        foreach (var tree in BatchOf(CellOf(x), CellOf(z)).Trees)
+            if (tree.X == x && tree.Z == z)
+                return tree;
+        throw new InvalidOperationException($"No batch tree is rooted at ({x}, {z}).");
+    }
+
+    private readonly record struct BatchTrunk(float Hash, int X, int Z, TreeSpecies Species, int BaseY);
+
+    // (hash, x, z) is the design's placement-hash order: a total order, never scan or dictionary
+    // order. TreeGrower.SeedFor makes each tree's RNG independent of that order, so only the
+    // obstacles differ between a tree's solo and batch growth.
+    private static readonly Comparison<BatchTrunk> TrunkOrder = static (a, b) =>
+    {
+        var c = a.Hash.CompareTo(b.Hash);
+        if (c != 0) return c;
+        c = a.X.CompareTo(b.X);
+        return c != 0 ? c : a.Z.CompareTo(b.Z);
+    };
+
+    private static TreeBatch BuildBatch(int cellX, int cellZ)
+    {
+        var key = (cellX, cellZ);
+        var owner = BatchInFlight.TryAdd(key, 0);
+        if (!owner) Interlocked.Increment(ref _batchDuplicates);
+        try
+        {
+            var size = WorldGenerationConfig.TreeCellBlocks;
+            var x0 = cellX << WorldGenerationConfig.TreeCellShift;
+            var z0 = cellZ << WorldGenerationConfig.TreeCellShift;
+
+            var trunks = new List<BatchTrunk>();
+            for (var tx = x0; tx < x0 + size; tx++)
+            for (var tz = z0; tz < z0 + size; tz++)
+                if (TryGetTree(tx, tz, out var species, out var baseY))
+                    trunks.Add(new BatchTrunk(PlacementHash(tx, tz), tx, tz, species, baseY));
+
+            if (trunks.Count == 0)
+                return new TreeBatch { Trees = [], MinY = int.MaxValue, MaxY = int.MinValue };
+            trunks.Sort(TrunkOrder);
+
+            // The solo build's water-raised ground, so a batch tree sees the same terrain
+            var space = new VirtualTreeSpace(GrowthGround);
+
+            // Neighbour obstacles: the SOLO shapes of the neighbour cells' trunks, never their
+            // batches (that would recurse and make the result depend on which cell was asked
+            // first). The ring is 2R wide because both trees reach R from their trunks, and the
+            // static constructor guarantees it stays inside the 8 adjacent cells. A pair farther
+            // apart than the sum of their reaches can never share a cell (both stay inside their
+            // reach boxes), so it is skipped. Occupation is a set, so its order is irrelevant, but
+            // the scan order is fixed anyway.
+            var r = ReachHorizontal;
+            for (var tx = x0 - 2 * r; tx < x0 + size + 2 * r; tx++)
+            for (var tz = z0 - 2 * r; tz < z0 + size + 2 * r; tz++)
+            {
+                if (tx >= x0 && tx < x0 + size && tz >= z0 && tz < z0 + size) continue;
+                if (!TryGetTree(tx, tz, out var nbSpecies, out _)) continue;
+
+                var nbReach = TreeRasterizer.ReachOf(nbSpecies).Horizontal;
+                var reaches = false;
+                foreach (var own in trunks)
+                {
+                    var distance = Math.Max(Math.Abs(own.X - tx), Math.Abs(own.Z - tz));
+                    if (distance > nbReach + TreeRasterizer.ReachOf(own.Species).Horizontal) continue;
+                    reaches = true;
+                    break;
+                }
+
+                if (reaches)
+                    space.OccupyAll(ShapeOf(tx, tz).Cells);
+            }
+
+            var shapes = new TreeShape[trunks.Count];
+            var minY = int.MaxValue;
+            var maxY = int.MinValue;
+            for (var i = 0; i < trunks.Count; i++)
+            {
+                var t = trunks[i];
+                // One AddGrow per tree, so `grows` and `grow ms/tree` keep their meaning
+                var start = System.Diagnostics.Stopwatch.GetTimestamp();
+                var graph = TreeGrower.GrowToMaturity(t.Species, t.X, t.BaseY, t.Z, space);
+                var cells = TreeRasterizer.Rasterize(graph, t.Species, space).ToArray();
+                space.OccupyAll(cells);
+                var shape = TreeShape.Build(t.Species, t.X, t.BaseY, t.Z, cells, graph.Count);
+                _growsOnThread++;
+                WorldgenStats.AddGrow(System.Diagnostics.Stopwatch.GetTimestamp() - start);
+
+                shapes[i] = shape;
+                minY = Math.Min(minY, shape.MinY);
+                maxY = Math.Max(maxY, shape.MaxY);
+            }
+
+            return new TreeBatch { Trees = shapes, MinY = minY, MaxY = maxY };
+        }
+        finally
+        {
+            if (owner) BatchInFlight.TryRemove(key, out _);
+        }
+    }
+
     /// <summary>
     /// Stamps every tree whose volume can intersect this chunk into <paramref name="blocks"/>,
     /// writing each cell's state byte into <paramref name="state"/> (allocated on the first
     /// write). Runs on a generation worker thread, after the cave carvers, before the solid
-    /// recount. Trees are visited in a fixed scan order; every wood cell goes in first (into air
-    /// or leaves), then the leaves (into air only), so a crossing canopy never overwrites wood.
+    /// recount. Trees are grown per 64x64 cell (<see cref="TreeBatch"/>): the chunk reads every
+    /// cell whose reach-expanded box meets it, visited in cell order (x, then z) and within a
+    /// cell in placement-hash order. Every wood cell goes in first (into air or leaves), then the
+    /// leaves (into air only), so a crossing canopy never overwrites wood. That fixed order is
+    /// what settles the leftover overlap deterministically: a cell's trees and a neighbour cell's
+    /// trees (which grew against this cell's SOLO shapes, not its batch) can still meet at the
+    /// border, and a tree's unchecked base cell can sit in an earlier tree's leaves -- wood is
+    /// first-come, leaves never go over anything.
     /// </summary>
     public static void Stamp(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
         var r = ReachHorizontal;
+        var x1 = worldX0 + Chunk.Size;
+        var y1 = worldY0 + Chunk.Size;
+        var z1 = worldZ0 + Chunk.Size;
+        var cx0 = CellOf(worldX0 - r);
+        var cx1 = CellOf(x1 - 1 + r);
+        var cz0 = CellOf(worldZ0 - r);
+        var cz1 = CellOf(z1 - 1 + r);
+
         List<TreeShape>? near = null;
-        for (var tx = worldX0 - r; tx < worldX0 + Chunk.Size + r; tx++)
-        for (var tz = worldZ0 - r; tz < worldZ0 + Chunk.Size + r; tz++)
+        for (var cx = cx0; cx <= cx1; cx++)
+        for (var cz = cz0; cz <= cz1; cz++)
         {
-            if (!TryGetTree(tx, tz, out _, out var baseY))
-                continue;
-            if (baseY - ReachDown > worldY0 + Chunk.Size || baseY + ReachUp < worldY0)
+            var batch = BatchOf(cx, cz);
+            if (batch.MaxY < worldY0 || batch.MinY >= y1)
                 continue;
 
-            var shape = ShapeOf(tx, tz);
-            if (shape.MinY >= worldY0 + Chunk.Size || shape.MaxY < worldY0)
-                continue;
-            near ??= new List<TreeShape>(4);
-            near.Add(shape);
+            foreach (var shape in batch.Trees)
+            {
+                if (shape.X + r < worldX0 || shape.X - r >= x1 || shape.Z + r < worldZ0 || shape.Z - r >= z1)
+                    continue;
+                if (shape.MinY >= y1 || shape.MaxY < worldY0)
+                    continue;
+                near ??= new List<TreeShape>(4);
+                near.Add(shape);
+            }
         }
 
         if (near == null) return;
@@ -351,11 +534,35 @@ public static class TreeGenerator
         return true;
     }
 
-    private static float PlacementHash(int x, int z)
+    // The raw placement bits of a column: PlacementHash derives the placement float from them, and
+    // any other per-tree roll (the LOD crown proxy) derives its own, so they all share one source.
+    private static ulong PlacementBits(int x, int z) =>
+        SplitMix64.Hash(x, z, WorldGenerationConfig.Seed ^ PlacementSalt);
+
+    /// <summary>The column's placement hash in [0, 1): the density gate, spacing and batch order.</summary>
+    internal static float PlacementHash(int x, int z) =>
+        (SplitMix64.Mix(PlacementBits(x, z) + 0x9E3779B97F4A7C15UL) >> 40) * (1f / (1 << 24));
+
+    private const ulong CrownSalt = 0xC0A5E1D5A17UL;
+
+    /// <summary>
+    /// The far-LOD proxy crown height of the tree rooted at (x, z), in [CrownHeightMin,
+    /// CrownHeightMax]: rolled from the same placement bits as the placement itself, so it is a
+    /// pure function of (x, z, seed) and the proxy and the real path agree on which column holds
+    /// which tree.
+    /// </summary>
+    internal static int CrownHeightOf(TreeSpecies species, int x, int z)
     {
-        var h = SplitMix64.Hash(x, z, WorldGenerationConfig.Seed ^ PlacementSalt);
-        return (SplitMix64.Mix(h + 0x9E3779B97F4A7C15UL) >> 40) * (1f / (1 << 24));
+        // 24 bits over 2^24: strictly below 1, so the roll never lands one past the range
+        var roll = (SplitMix64.Mix(PlacementBits(x, z) ^ CrownSalt) >> 40) * (1f / (1 << 24));
+        return species.CrownHeightMin + (int)(roll * (species.CrownHeightMax - species.CrownHeightMin + 1));
     }
+
+    /// <summary>
+    /// The tree batch cell holding a coordinate. Arithmetic shift is floor division, so negative
+    /// coordinates group into the right cell (<c>/</c> would round toward zero and split cell -1 in two).
+    /// </summary>
+    internal static int CellOf(int coord) => coord >> WorldGenerationConfig.TreeCellShift;
 
     private static int HeightAt(int x, int z) =>
         Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
@@ -372,8 +579,8 @@ public static class TreeGenerator
     // cell over each ground column, 0 where the sky is clear, plus the leaf block that owns
     // that top cell. The far LOD reads both instead of block data so distant forests show in the
     // right foliage. Entries are a pure function of the chunk column (BuildCanopyTops reads only
-    // TryGetTree and the grown shapes), so eviction is always safe -- edits never enter here,
-    // they live in CanopyDisturbed, which the CALLERS consult.
+    // the cell batches, themselves a pure function of their cell), so eviction is always safe --
+    // edits never enter here, they live in CanopyDisturbed, which the CALLERS consult.
     internal sealed class CanopyColumns(int[] tops, byte[] leafBlocks)
     {
         public readonly int[] Tops = tops;
@@ -392,6 +599,16 @@ public static class TreeGenerator
     private static readonly Func<(int X, int Z), CanopyColumns> BuildCanopyFor =
         static key => BuildCanopyTops(key.X, key.Z);
 
+    // The far rings' canopy (LodLevelSpec.ProxyCanopy): the species' lod crown proxies per chunk
+    // column, laid out like CanopyCache's entries. Cheap to rebuild and a pure function of the
+    // chunk column, read by the same per-fine-column sweep, so it is sized like the real one.
+    private static readonly GenerationalCache<(int X, int Z), CanopyColumns> ProxyCanopyCache =
+        new(WorldGenerationConfig.TreeProxyCanopyCacheCapacity, WorldGenerationConfig.TreeProxyCanopyCacheGenerations);
+
+    // Static delegate, not a lambda at the call site (see BuildShapeFor).
+    private static readonly Func<(int X, int Z), CanopyColumns> BuildProxyCanopyFor =
+        static key => BuildProxyCanopyTops(key.X, key.Z);
+
     // Fine columns whose canopy was edited by the player (mined wood/leaves, blasts, fells).
     // The static canopy above knows nothing of edits, so lookups here read 0 (no bump) rather
     // than resurrecting a chopped crown at long range. Entries are gameplay truth, so the cap
@@ -402,13 +619,15 @@ public static class TreeGenerator
     private static readonly ConcurrentDictionary<(int X, int Z), byte> CanopyDisturbed = new();
 
     /// <summary>
-    /// Drops the cached tree shapes and canopy tops; only <see cref="WorldSeed.Apply"/> (and
+    /// Drops the cached tree shapes, cell batches and canopy tops (real and proxy); only <see cref="WorldSeed.Apply"/> (and
     /// tests) call it, since both are a function of the seed.
     /// </summary>
     internal static void ResetCaches()
     {
         ShapeCache.Clear();
+        BatchCache.Clear();
         CanopyCache.Clear();
+        ProxyCanopyCache.Clear();
     }
 
     /// <summary>
@@ -439,14 +658,27 @@ public static class TreeGenerator
         return leaf;
     }
 
-    public static bool TryGetCanopy(int x, int z, out int top, out byte leaf)
+    /// <summary>The grown canopy over (x, z); see <see cref="TryGetCanopy(int, int, bool, out int, out byte)"/>.</summary>
+    public static bool TryGetCanopy(int x, int z, out int top, out byte leaf) =>
+        TryGetCanopy(x, z, proxy: false, out top, out leaf);
+
+    /// <summary>
+    /// The canopy top over the ground column (x, z) and the leaf block wearing it; false under
+    /// open sky or where the canopy was disturbed (see <see cref="PoisonCanopy"/>). With
+    /// <paramref name="proxy"/> it reads the species' <c>lod</c> crown proxies instead of the
+    /// grown trees, which never runs tree growth (the far rings, <see cref="LodLevelSpec.ProxyCanopy"/>).
+    /// Safe to call from any thread.
+    /// </summary>
+    public static bool TryGetCanopy(int x, int z, bool proxy, out int top, out byte leaf)
     {
         top = 0;
         leaf = BlockType.Air;
         if (CanopyDisturbed.ContainsKey((x, z)))
             return false;
 
-        var entry = GetCanopyColumns(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+        var entry = proxy
+            ? GetProxyCanopyColumns(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
+            : GetCanopyColumns(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
         var i = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
         top = entry.Tops[i];
         if (top <= 0)
@@ -499,23 +731,38 @@ public static class TreeGenerator
     internal static CanopyColumns GetCanopyColumns(int chunkX, int chunkZ) =>
         CanopyCache.GetOrAdd((chunkX, chunkZ), BuildCanopyFor);
 
+    internal static CanopyColumns GetProxyCanopyColumns(int chunkX, int chunkZ) =>
+        ProxyCanopyCache.GetOrAdd((chunkX, chunkZ), BuildProxyCanopyFor);
+
     // Raises each ground column under a nearby tree's leaf cells to the highest leaf cell above
-    // it. Trunks up to ReachHorizontal outside the chunk column still overhang it.
+    // it. Trunks up to ReachHorizontal outside the chunk column still overhang it. The canopy is
+    // the BATCH canopy -- the same cell walk Stamp does, over the same TreeBatch shapes -- so it is
+    // what the chunks stamp, and the first LOD ring agrees with the full-detail chunks that
+    // replace it. The far rings never come here: they read the per-species proxy instead.
     private static CanopyColumns BuildCanopyTops(int chunkX, int chunkZ)
     {
         var r = ReachHorizontal;
         var x0 = chunkX * Chunk.Size;
         var z0 = chunkZ * Chunk.Size;
+        var x1 = x0 + Chunk.Size;
+        var z1 = z0 + Chunk.Size;
         var tops = new int[Chunk.Size * Chunk.Size];
         var leaves = new byte[Chunk.Size * Chunk.Size];
 
-        for (var tx = x0 - r; tx < x0 + Chunk.Size + r; tx++)
-        for (var tz = z0 - r; tz < z0 + Chunk.Size + r; tz++)
+        var cx0 = CellOf(x0 - r);
+        var cx1 = CellOf(x1 - 1 + r);
+        var cz0 = CellOf(z0 - r);
+        var cz1 = CellOf(z1 - 1 + r);
+        for (var cx = cx0; cx <= cx1; cx++)
+        for (var cz = cz0; cz <= cz1; cz++)
+        foreach (var shape in BatchOf(cx, cz).Trees)
         {
-            if (!TryGetTree(tx, tz, out var species, out _) || !species.HasLeaves)
+            var species = shape.Species;
+            if (!species.HasLeaves)
+                continue;
+            if (shape.X + r < x0 || shape.X - r >= x1 || shape.Z + r < z0 || shape.Z - r >= z1)
                 continue;
 
-            var shape = ShapeOf(tx, tz);
             var cells = shape.Cells;
             for (var c = shape.WoodCount; c < cells.Length; c++)
             {
@@ -528,6 +775,48 @@ public static class TreeGenerator
                 if (cells[c].Y > tops[i])
                 {
                     tops[i] = cells[c].Y;
+                    leaves[i] = species.LeavesId;
+                }
+            }
+        }
+
+        return new CanopyColumns(tops, leaves);
+    }
+
+    // The proxy canopy of a chunk column: every leafy trunk TryGetTree accepts within ProxyReach
+    // (the ONE placement source, shared with the real path) raises the columns under its proxy
+    // crown (LodCrownProxy) to base + offset, highest wins. Never calls ShapeOf or BatchOf, so the
+    // far sweep runs no growth.
+    private static CanopyColumns BuildProxyCanopyTops(int chunkX, int chunkZ)
+    {
+        var x0 = chunkX * Chunk.Size;
+        var z0 = chunkZ * Chunk.Size;
+        var tops = new int[Chunk.Size * Chunk.Size];
+        var leaves = new byte[Chunk.Size * Chunk.Size];
+
+        for (var tx = x0 - ProxyReach; tx < x0 + Chunk.Size + ProxyReach; tx++)
+        for (var tz = z0 - ProxyReach; tz < z0 + Chunk.Size + ProxyReach; tz++)
+        {
+            if (!TryGetTree(tx, tz, out var species, out var baseY) || !species.HasLeaves)
+                continue;
+
+            var height = CrownHeightOf(species, tx, tz);
+            var radius = species.CrownRadius;
+            for (var dx = -radius; dx <= radius; dx++)
+            for (var dz = -radius; dz <= radius; dz++)
+            {
+                var lx = tx + dx - x0;
+                var lz = tz + dz - z0;
+                if ((uint)lx >= Chunk.Size || (uint)lz >= Chunk.Size)
+                    continue;
+                var offset = LodCrownProxy.TopOffset(species.LodProfile, height, radius, dx, dz);
+                if (offset < 1)
+                    continue;
+
+                var i = (lx << Chunk.SizeShift) | lz;
+                if (baseY + offset > tops[i])
+                {
+                    tops[i] = baseY + offset;
                     leaves[i] = species.LeavesId;
                 }
             }

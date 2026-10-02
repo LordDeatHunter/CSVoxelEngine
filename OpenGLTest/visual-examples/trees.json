@@ -5,13 +5,19 @@
   // Look for floating wood, gaps between a node box and its tubes, black faces, wrong tiles, a
   // crown still standing after the limb cut and nothing left standing after the base cut.
   //
-  // Coordinates (default seed, headless probe over TreeGenerator.TryGetTree / ShapeOf):
+  // Trees are grown per 64-block cell (TreeBatch: every tree of a cell together, avoiding the
+  // earlier trees of the batch and the neighbour cells' solo shapes), so the coordinates below
+  // were probed through TreeGenerator.BatchShapeOf / BatchOf, which is what the chunks stamp.
+  // Coordinates (default seed, headless probe over TreeGenerator.TryGetTree / BatchShapeOf):
   //   oak    base (-79, 14, -2), 12 tall, crown x -83..-73, z -8..3; nearest other trunk 9 away.
   //          Limb: node (-79, 19, -6), 2 px thick with two children (3 wood cells in its
   //          subtree), seen from (-80.48, 19.64, -5.29) through exactly one leaf cell (the ray
   //          was checked against every cell box grown and shrunk by 0.03, so no corner grazes).
-  //   spruce base (-371, 13, -150), 11 tall, 60 blocks west of tree-perf.json's taiga vantage,
-  //          one of the few in that dense wood with a clear sight line from outside its crown.
+  //   spruce base (-291, 13, -252), top leaf 11 above it, 35 wood cells, about 130 blocks south of
+  //          tree-perf.json's taiga vantage: one of the few spruces of that dense wood standing
+  //          clear of its neighbours. Filmed from 14 blocks west at base + 6.5, where every
+  //          sampled cell of the tree is seen with no other tree's cell and no terrain on the
+  //          sight line; its own conical crown reaches the ground and hides the trunk.
   //   cactus base (582, 16, 1279), arms along z, by the desert vantage of tree-perf.json.
   // Every vantage was chosen so that no block stands within two cells of the eye and nothing
   // but the subject crosses the sight line; the limb cut is filmed from the -Z side it hangs on.
@@ -51,7 +57,7 @@
     { "op": "wait", "seconds": 3 },
     { "op": "screenshot", "name": "felled_after", "hideHud": true },
 
-    { "op": "teleport", "pos": [-384.5, 18.5, -149.5], "yaw": 0, "pitch": 0 },
+    { "op": "teleport", "pos": [-304.5, 19.5, -251.5], "yaw": 0, "pitch": -4.1 },
     { "op": "wait", "seconds": 8 },
     { "op": "screenshot", "name": "spruce", "hideHud": true },
 

@@ -47,6 +47,16 @@ public sealed class VirtualTreeSpace : ITreeSpace
     /// <summary>Marks the cell as taken (by another tree), so it is no longer free.</summary>
     public void Occupy(int x, int y, int z) => _occupied.Add(TreeCellKey.Pack(x, y, z));
 
+    /// <summary>
+    /// Marks every cell as taken: a finished tree's cells become obstacles for the next tree of a
+    /// batch. The occupied cells are a set, so order and duplicates do not matter.
+    /// </summary>
+    public void OccupyAll(ReadOnlySpan<TreeCell> cells)
+    {
+        foreach (var c in cells)
+            Occupy(c.X, c.Y, c.Z);
+    }
+
     /// <summary>Whether <see cref="Occupy"/> took the cell.</summary>
     public bool IsOccupied(int x, int y, int z) => _occupied.Contains(TreeCellKey.Pack(x, y, z));
 

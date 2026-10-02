@@ -1015,6 +1015,32 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int TreeCanopyCacheCapacity = 4096;
     public const int TreeCanopyCacheGenerations = 4;
 
+    // The tree batch cell: every tree rooted in one 64x64 XZ cell grows together (TreeBatch), the
+    // same 64-block cell size as CarverCellShift's worm cells. TreeGenerator's static constructor
+    // requires 2 * ReachHorizontal <= TreeCellBlocks, so a batch's neighbour obstacles always come
+    // from the 8 adjacent cells.
+    public const int TreeCellShift = 6;
+    public const int TreeCellBlocks = 1 << TreeCellShift;
+
+    // TreeGenerator.BatchCache, on the same GenerationalCache as the sites above. One entry holds a
+    // whole 64x64 cell of grown trees, measured over the 3x3 cells around tree-perf.json's vantages:
+    // forest ~21 trees x ~250 cells x 16 B per entry (~82 KB mean, max ~70 trees / ~250 KB), taiga
+    // ~79 trees x ~230 cells x 16 B per entry (~288 KB mean, max ~350 KB). It is shared by Stamp on
+    // the generation workers and the first LOD ring's canopy sweep on the LOD builder, whose working
+    // set is the generation disc (~70 cells) plus the first LOD ring (~17x17 regions, each reading up
+    // to 4 cells, ~320 cells). Lowered from 384 so even an all-taiga cache stays under ~100 MB
+    // (336 x ~288 KB ~ 95 MB); residency floor 252 at G = 4.
+    public const int TreeBatchCacheCapacity = 336;
+    public const int TreeBatchCacheGenerations = 4;
+
+    // TreeGenerator.ProxyCanopyCache: the proxy CanopyColumns of a chunk column that the far LOD
+    // rings read instead of the grown canopy. Cheap to rebuild (no growth, only placement and the
+    // species' lod crown), and sized like the real canopy cache because the same per-fine-column
+    // sweep in LodRegion.BuildMeshData drives it. G = 4 like every site; re-price only against a
+    // capture (PERF_TODO lesson 4).
+    public const int TreeProxyCanopyCacheCapacity = 4096;
+    public const int TreeProxyCanopyCacheGenerations = 4;
+
     // Felled-canopy markers kept before TreeGenerator.CanopyDisturbed is wiped wholesale (it only
     // bounds memory). Sized so a fell's square, (2 * FellPoisonRadius + 1)^2 ~ 1000 columns, wipes
     // the set no more often than the old 289-column square did against 16384.

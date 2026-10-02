@@ -103,7 +103,7 @@ public sealed class SnowIceTests
                     continue;
 
                 // A leaf cell that is its column's canopy top, so the LOD must wear this species there
-                var shape = TreeGenerator.ShapeOf(wx, wz);
+                var shape = TreeGenerator.BatchShapeOf(wx, wz);
                 for (var i = shape.WoodCount; i < shape.Cells.Length; i++)
                 {
                     var cell = shape.Cells[i];

@@ -11,7 +11,8 @@
   "thickness": { "tipPx": 1, "pipeExponent": 2.0, "maxPx": 16, "girthProfile": [[0, 2.5], [1, 1.0]] },
   "leafCluster": { "shape": "cone", "radius": 3, "hydration": 6, "tipMaxPx": 3 },
   "features": [ { "type": "roots", "depth": 4 } ],
-  "lod": { "crownHeight": [7, 12], "crownRadius": 3, "profile": "cone" },
+  // lod tuned against grown batch crowns near (-312, -120): crown apex above base p20/p80 0/11, leaf radius p50/p80 5/6
+  "lod": { "crownHeight": [7, 7], "crownRadius": 4, "profile": "cone" },
   "worldgen": {
     "biomes": ["taiga"],
     "density": 0.03,

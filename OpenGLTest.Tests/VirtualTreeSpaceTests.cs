@@ -45,6 +45,36 @@ public sealed class VirtualTreeSpaceTests
     }
 
     [Fact]
+    public void OccupyAllMatchesPerCellOccupy()
+    {
+        var cells = new[]
+        {
+            new TreeCell(2, Slope(2, 1) + 1, 1, 1, 0),
+            new TreeCell(-3, Slope(-3, 2) + 4, 2, 1, 0),
+            new TreeCell(2, Slope(2, 1) + 1, 1, 2, 5), // the first cell again, other block and state
+            new TreeCell(0, Slope(0, -1) + 2, -1, 1, 0),
+        };
+
+        var bulk = new VirtualTreeSpace(Slope);
+        bulk.OccupyAll(cells);
+
+        var single = new VirtualTreeSpace(Slope);
+        foreach (var c in cells)
+            single.Occupy(c.X, c.Y, c.Z);
+
+        Assert.Equal(single.OccupiedCount, bulk.OccupiedCount);
+        Assert.Equal(cells.Length - 1, bulk.OccupiedCount);
+
+        for (var x = -4; x <= 4; x++)
+        for (var z = -3; z <= 3; z++)
+        for (var y = Slope(x, z) - 1; y <= Slope(x, z) + 5; y++)
+        {
+            Assert.Equal(single.IsOccupied(x, y, z), bulk.IsOccupied(x, y, z));
+            Assert.Equal(single.IsFree(x, y, z), bulk.IsFree(x, y, z));
+        }
+    }
+
+    [Fact]
     public void CarvedCellsBelowTheSurfaceAreFree()
     {
         const int height = 10;

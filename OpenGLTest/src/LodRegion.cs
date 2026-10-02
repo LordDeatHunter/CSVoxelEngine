@@ -10,8 +10,13 @@ namespace silkgltriangle;
 /// <summary>
 /// Parameters for one far-terrain LOD ring. RegionBlocks and RegionRadius must keep
 /// CellSize * (RegionBlocks / CellSize) == RegionBlocks with power-of-two sizes.
+/// <para><c>ProxyCanopy</c>: whether the ring reads each tree species' <c>lod</c> crown proxy
+/// (<see cref="TreeGenerator.TryGetCanopy(int, int, bool, out int, out byte)"/>) instead of the
+/// grown canopy. The first ring meets the full-detail chunks and must match what they stamp;
+/// every farther ring reads the proxy, so the far sweep never runs tree growth.</para>
 /// </summary>
-public readonly record struct LodLevelSpec(int CellSize, int RegionBlocks, int RegionRadius, int SampleMargin, int HeightBias)
+public readonly record struct LodLevelSpec(int CellSize, int RegionBlocks, int RegionRadius, int SampleMargin, int HeightBias,
+    bool ProxyCanopy = false)
 {
     public int Cells => RegionBlocks / CellSize;
 }
@@ -42,11 +47,13 @@ public class LodRegion : IDisposable
     // Level 0 is full-detail chunks (radius 16 chunks = 256 blocks); these rings extend past it.
     // Nesting invariants: SampleMargin(L+1) >= SampleMargin(L) + CellSize(L) - 1
     //                     HeightBias(L+1)   >= HeightBias(L) + CellSize(L)
+    // The first ring reads the grown (batch) canopy the chunks stamp; the farther rings set
+    // ProxyCanopy and read the species' lod crown proxy, so their sweep never grows a tree.
     public static readonly LodLevelSpec[] Levels =
     [
         new(CellSize: 2, RegionBlocks: 64, RegionRadius: 8, SampleMargin: 1, HeightBias: 0),   // to  512 blocks
-        new(CellSize: 4, RegionBlocks: 128, RegionRadius: 8, SampleMargin: 3, HeightBias: 2),  // to 1024 blocks
-        new(CellSize: 8, RegionBlocks: 256, RegionRadius: 8, SampleMargin: 7, HeightBias: 6),  // to 2048 blocks
+        new(CellSize: 4, RegionBlocks: 128, RegionRadius: 8, SampleMargin: 3, HeightBias: 2, ProxyCanopy: true),  // to 1024 blocks
+        new(CellSize: 8, RegionBlocks: 256, RegionRadius: 8, SampleMargin: 7, HeightBias: 6, ProxyCanopy: true),  // to 2048 blocks
     ];
 
     // Rent sizes for a region build's output lists. Every level is 32x32 cells (64/2, 128/4,
@@ -707,7 +714,8 @@ public class LodRegion : IDisposable
                 for (var dx = 0; dx < cellSize; dx++)
                 for (var dz = 0; dz < cellSize; dz++)
                 {
-                    if (!TreeGenerator.TryGetCanopy(baseFineX + i * cellSize + dx, baseFineZ + j * cellSize + dz, out var t, out var leaf))
+                    if (!TreeGenerator.TryGetCanopy(baseFineX + i * cellSize + dx, baseFineZ + j * cellSize + dz,
+                            spec.ProxyCanopy, out var t, out var leaf))
                         continue;
                     if (t > canopyMax)
                     {

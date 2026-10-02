@@ -136,9 +136,12 @@ public static class FrameProfiler
     // Scratch for the current frame's three deltas, static so EndFrame allocates nothing.
     private static readonly long[] _geoFrameSteps = new long[3];
 
-    // Worldgen instrument: the shape-cache miss counter is lifetime, so the window's delta is
-    // taken against the value seen at the previous publish
+    // Worldgen instrument: the shape- and batch-cache counters are lifetime, so each window's
+    // delta is taken against the value seen at the previous publish
     private static long _shapeMissesPrev;
+    private static long _batchMissesPrev;
+    private static long _batchDuplicatesPrev;
+    private static long _batchRotationsPrev;
 
     private static readonly List<string> _lines = [];
     private static string _consoleLine = string.Empty;
@@ -414,10 +417,13 @@ public static class FrameProfiler
         Array.Clear(_geoWorstFrameSplit);
     }
 
-    // `wgen {chunks} {rate}/s {ms}ms/c trees {ms}/s {ms}/c grow {n} {ms}/s {ms}/t miss {n} tot ...`:
-    // this window's generated chunks, their mean GenerateBlockData cost, the tree/cactus stamp's
-    // share per second and per chunk, the shape builds (cache misses on any thread, the LOD
-    // builder's canopy sweep included) and the lifetime totals. Every ratio is 0 on an empty window.
+    // `wgen {chunks} {rate}/s {ms}ms/c trees {ms}/s {ms}/c grow {n} {ms}/s {ms}/t miss {n}
+    // batch {n} dup {n} brot {n} tot ...`: this window's generated chunks, their mean
+    // GenerateBlockData cost, the tree/cactus stamp's share per second and per chunk, the trees
+    // grown (one entry per tree, solo or in a cell batch, on any thread), the SOLO shape-cache
+    // misses, the cell-batch cache's misses, the batch builds that duplicated one already in
+    // flight (GenerationalCache has no single-flight) and its generation rotations (thrash), then
+    // the lifetime totals. Every ratio is 0 on an empty window.
     private static string FormatWorldgen(double seconds)
     {
         WorldgenStats.TakeWindow(out var treeTicks, out var genTicks, out var chunks,
@@ -425,6 +431,15 @@ public static class FrameProfiler
         var misses = TreeGenerator.ShapeCacheMisses;
         var missDelta = misses - _shapeMissesPrev;
         _shapeMissesPrev = misses;
+        var batchMisses = TreeGenerator.BatchCacheMisses;
+        var batchMissDelta = batchMisses - _batchMissesPrev;
+        _batchMissesPrev = batchMisses;
+        var duplicates = TreeGenerator.BatchDuplicateBuilds;
+        var dupDelta = duplicates - _batchDuplicatesPrev;
+        _batchDuplicatesPrev = duplicates;
+        var rotations = TreeGenerator.BatchCacheRotations;
+        var rotDelta = rotations - _batchRotationsPrev;
+        _batchRotationsPrev = rotations;
 
         var genMs = ToMilliseconds(genTicks);
         var treeMs = ToMilliseconds(treeTicks);
@@ -439,7 +454,7 @@ public static class FrameProfiler
         return $"wgen {chunks} {chunkRate:F1}/s {msPerChunk:F2}ms/c " +
                $"trees {treeMsPerSecond:F1}ms/s {treeMsPerChunk:F2}ms/c " +
                $"grow {grows} {growMsPerSecond:F1}ms/s {growMsPerTree:F3}ms/t " +
-               $"miss {missDelta} " +
+               $"miss {missDelta} batch {batchMissDelta} dup {dupDelta} brot {rotDelta} " +
                $"tot {WorldgenStats.TotalChunks} {ToMilliseconds(WorldgenStats.TotalGenTicks):F0}ms " +
                $"{ToMilliseconds(WorldgenStats.TotalTreeTicks):F0}ms {WorldgenStats.TotalGrows} " +
                $"{ToMilliseconds(WorldgenStats.TotalGrowTicks):F0}ms ";

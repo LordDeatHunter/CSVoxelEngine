@@ -2,8 +2,8 @@
 
 ## Status
 
-Phases 1-3 done (content + codecs; headless growth engine; cutover to engine-grown trees).
-Phases 4-8 pending. Each phase lands as its own commit on `tree-rework`; finished phases are
+Phases 1-4 done (content + codecs; headless growth engine; cutover to engine-grown trees;
+tree-vs-tree cell batches + LOD canopy proxy + perf). Phases 5-8 pending. Each phase lands as its own commit on `tree-rework`; finished phases are
 collapsed into short summaries here.
 
 ## Context
@@ -222,9 +222,44 @@ bands }`:
    `WorldgenStatsTests`, `WoodLootBandTests`, `WoodLootTests`, `TreeWoodShapeGeometryTests`,
    `TreeWoodShapeTests`, `TreeWorldgenTests`, `CanopyDisturbedTests`, `TreeFellingTests`, plus the
    rewritten mining, meshing, biome, snow, LOD, save-codec and main-menu rules.
-4. **Tree vs tree + LOD proxy + perf.** The cell-batch cache with solo-neighbour obstacles, and
-   the LOD level-2/3 proxy. Measure against the phase-3 baseline, record the result in
-   `TREES_PLAN.md` and **stop for the user's call** if it looks bad.
+4. **Done — tree vs tree + LOD proxy + perf.** Every tree of a 64x64 XZ cell
+   (`TreeCellShift`/`TreeCellBlocks`, `TreeGenerator.CellOf` = arithmetic shift) grows together
+   in one `VirtualTreeSpace(GrowthGround)`: `TreeBatch` (immutable `Trees` in placement-hash
+   order + `MinY`/`MaxY`), `BatchOf(cellX, cellZ)` over a second `GenerationalCache` site
+   (`TreeBatchCacheCapacity` 336 / `Generations` 4, static `BuildBatchFor`), and
+   `BatchShapeOf(x, z)` for tests and probes. Trunks come from `TryGetTree` over the cell and are
+   sorted by (`PlacementHash`, x, z), a total order (`TreeGrower.SeedFor` keeps each tree's RNG
+   independent of it). Obstacles are the SOLO shapes (`ShapeOf`, unchanged, still the solo cache)
+   of the neighbour trunks in the 2R ring around the cell that pass a Chebyshev filter (distance
+   <= own reach + neighbour reach), never another batch, so a batch is a pure function of (cell,
+   seed); the static ctor throws if 2R exceeds the cell. Each grown tree's wood and leaf cells
+   are occupied (`VirtualTreeSpace.OccupyAll`) before the next grows; the one residual overlap is a
+   later tree's unchecked base cell landing in an earlier tree's leaves (or rarely wood).
+   `Stamp` and `BuildCanopyTops` walk the cells whose reach-expanded box meets the chunk in
+   (cellX, cellZ) order, then tree order, with the unchanged two passes (wood into air/leaves +
+   roots, then leaves into air), so border residue (a neighbour stamps its batch shapes, which
+   grew against this cell's solo shapes) settles deterministically by stamp order; the first LOD
+   ring therefore shows exactly the stamped canopy. Farther rings read a proxy:
+   `LodLevelSpec.ProxyCanopy` (true on the cell-4 and cell-8 rings), `TryGetCanopy(x, z, proxy,
+   ...)` (CanopyDisturbed first, as before; the 4-argument overload forwards `proxy: false`),
+   `ProxyCanopyCache` (`TreeProxyCanopyCache*` knobs) built by `BuildProxyCanopyTops` from the
+   same `TryGetTree` placement, `CrownHeightOf` (rolled from the placement hash bits with
+   `CrownSalt`) and the GL-free `LodCrownProxy.TopOffset` dome/cone/column silhouette (full height
+   at the trunk column before any arithmetic, non-increasing outward) - no growth on the far sweep.
+   `[ThreadStatic] GrowsOnThisThread` is the test seam for that. The profiler's `wgen` token gained
+   `batch`/`dup`/`brot` (`BatchCacheMisses`, the lock-free `BatchDuplicateBuilds` diagnostic,
+   `BatchCacheRotations`). `lod` blocks retuned from a throwaway probe over grown batches (oak dome
+   [9,9] r4, spruce cone [7,7] r4; cactus is leafless and unused). `trees.json` re-probed through
+   `BatchShapeOf`: oak, limb and cactus unchanged, the spruce shot moved to an isolated spruce at
+   (-291, 13, -252). The single-flight on the batch miss path was not added (dup share 6.5-7.6 %,
+   under the 10 % gate; see "Phase 4 result"). Known residue for later phases: in a dense taiga
+   batch a few late trees have no room left and grow a bare post (8 of 708 sampled, none of them a
+   stump when grown solo), and `grass-tint.json`'s `forest_mountain_ground` vantage now sits in a
+   crown. Tests: `TreeBatchTests` (order independence, disjoint grown cells, no entry into earlier
+   or neighbour-solo cells, trunks = placement, reach, whole trees across cell borders, first ring
+   = stamped canopy), `LodCanopyProxyTests` (proxy placement = real placement, proxy within reach,
+   profiles non-increasing, deterministic roll, far rings never grow), `VirtualTreeSpaceTests.
+   OccupyAllMatchesPerCellOccupy`, and the shared `TreeWorldgenFixture`.
 5. **Leaf decay.** `LeafDecayManager`, the edit-path hooks, persistent placed leaves.
 6. **Reactive growth.** `WorldTreeSpace`, `TreeGraph.FromWorld`, a growth write path that
    remeshes and schedules decay and fluids, and the `grow` scenario op
@@ -254,8 +289,11 @@ above-terrain early exits included, which is why ms/chunk is low); *ms/chunk* an
 are lifetime totals over that count (tree = the tree + cactus stamp); *tree ms/s*, *grow ms/s* and
 *misses/s* are medians of the once-a-second windows that generated any chunk (summed over the
 generation workers, so ms/s can exceed 1000); *grows* is every shape build (tree + cactus cache
-misses, on the generation workers and the LOD builder's canopy sweep alike); *misses/s* counts the
-tree shape cache only.
+misses, on the generation workers and the LOD builder's canopy sweep alike; from phase 4 one entry
+per tree grown, solo or in a cell batch); *misses/s* counts the solo tree shape cache only. From
+phase 4 the token also carries `batch` (cell-batch cache misses), `dup` (batch builds started
+while another thread was already building the same cell) and `brot` (batch cache generation
+rotations), each per window.
 
 | run | chunks | ms/chunk | tree ms/chunk | tree ms/s | grows | grow ms/tree | grow ms/s | misses/s |
 |---|---|---|---|---|---|---|---|---|
@@ -276,6 +314,38 @@ ms/s ~310-325 vs ~435-485), but growing a tree now costs ~0.3 ms instead of ~0.0
 time rose about 100x to ~700-770 ms/s with ~1.5x the shape-cache misses. The stamp's tree time
 includes every grow the generation workers trigger, so at least ~400 ms/s of grow time (over half)
 runs on the single LOD builder thread's far-ring canopy sweep: that is phase 4's LOD proxy target.
+
+Phase 4 result (same machine and command, cell batches + the far-ring canopy proxy):
+
+| run | chunks | ms/chunk | tree ms/chunk | tree ms/s | grows | grow ms/tree | grow ms/s | misses/s |
+|---|---|---|---|---|---|---|---|---|
+| p4 1 | 188917 | 0.61 | 0.048 | 11.0 | 115252 | 0.274 | 369.9 | 694 |
+| p4 2 | 188338 | 0.68 | 0.060 | 12.1 | 113392 | 0.312 | 438.1 | 757 |
+| p4 3 | 187786 | 0.70 | 0.061 | 12.8 | 111460 | 0.325 | 496.5 | 750 |
+
+Batch cache per run: 1685 / 1673 / 1656 misses (median 24-26/s), `dup` 109 / 127 / 117
+(6.5 / 7.6 / 7.1 % of the misses), `brot` 21 / 20 / 20. A measurement run before these three gave
+the same picture (0.62 ms/chunk, 1694 misses, dup 6.9 %, brot 22).
+
+Overall ms/chunk is unchanged (median 0.68 vs 0.67, range 0.61-0.70 vs 0.65-0.69), so the 25 %
+rule did not trip. The expected doubling of grows did not happen. Every tree is still grown twice
+on the near side, solo as a neighbour obstacle and again in its batch, but the far rings no longer
+grow anything, and that more than pays for it: grows fell from 132-145k to 111-115k, solo
+misses/s to about a third (694-757 vs 2281-2448) and grow ms/s from 705-768 to 370-497, while
+grow ms/tree stays at ~0.3 ms (growing against more obstacles costs no more). The stamp itself is
+now nearly free on the generation workers (tree ms/s 11-13 vs 310-325, tree ms/chunk 0.05-0.06 vs
+0.08). The first LOD ring reads batches out to 512 blocks, so the LOD builder has usually grown a
+cell's batch before a generation worker stamps it. Total grow time is 31.6-36.2 s per run against
+only 9.1-11.5 s of total stamp time (which includes every grow the workers trigger), so at least
+two thirds of the growing now runs on that one LOD thread. Duplicate batch builds stay
+under the 10 % gate (they cluster in the cold-start windows, where all four workers open on the
+same cells: the first window of each run reads 35-56 batch misses with 20-30 dup), so the per-key single-flight was **not**
+added and the miss path stays lock-free. The rotations equal the misses divided by the 84-insert
+generation budget (capacity 336 / G 4), which is ordinary turnover as the flight streams new
+cells; nothing here separates re-misses from first misses, but the steady ~25 misses/s while
+flying gives no sign of thrash. Measured batch size: forest ~21 trees and ~5250 cells (~82 KB) on
+average, max ~250 KB; taiga ~79 trees and ~18400 cells (~288 KB), max ~350 KB. Capacity 336 bounds
+an all-taiga cache at ~95 MB.
 
 ## Critical files
 - `OpenGLTest/src/WorldGen/TreeGenerator.cs`: becomes the placement and stamping front-end

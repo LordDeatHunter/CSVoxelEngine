@@ -9,6 +9,7 @@
   },
   "thickness": { "tipPx": 4, "pipeExponent": 1.5, "maxPx": 12, "trunkShape": "square" },
   "features": [ { "type": "roots", "depth": 2 } ],
+  // lod unused: a leafless species never shows a canopy, so this block only has to stay valid
   "lod": { "crownHeight": [3, 6], "crownRadius": 1, "profile": "column" },
   "worldgen": {
     "biomes": ["desert"],

@@ -18,7 +18,8 @@
   },
   "leafCluster": { "shape": "blob", "radius": 2, "hydration": 4, "tipMaxPx": 3 },
   "features": [ { "type": "roots", "depth": 4 } ],
-  "lod": { "crownHeight": [6, 10], "crownRadius": 2, "profile": "dome" },
+  // lod tuned against grown batch crowns near (-80, 8): crown apex above base p20/p80 5/12, leaf radius p50/p80 6/6
+  "lod": { "crownHeight": [9, 9], "crownRadius": 4, "profile": "dome" },
   "worldgen": {
     "biomes": ["forest"],
     "density": 0.02,

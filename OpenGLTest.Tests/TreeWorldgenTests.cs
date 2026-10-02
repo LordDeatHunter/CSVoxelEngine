@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -18,90 +17,15 @@ public sealed class TreeWorldgenTests
 {
     public TreeWorldgenTests() => TestContent.EnsureLoaded();
 
-    private static int HeightAt(int x, int z) =>
-        Chunk.GetColumnHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
-            [((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
-
-    /// <summary>A chunk column whose 3x3 neighbourhood is forest and whose centre roots a tree.</summary>
-    private static (int Cx, int Cz) FindForestTreeColumn()
-    {
-        for (var r = 1; r <= 48; r++)
-        for (var cx = -r; cx <= r; cx++)
-        for (var cz = -r; cz <= r; cz++)
-        {
-            if (Math.Max(Math.Abs(cx), Math.Abs(cz)) != r) continue;
-
-            var allForest = true;
-            for (var dx = -1; dx <= 1 && allForest; dx++)
-            for (var dz = -1; dz <= 1 && allForest; dz++)
-                allForest = TerrainGenerator.IsForest((cx + dx) * Chunk.Size + 8, (cz + dz) * Chunk.Size + 8);
-            if (!allForest) continue;
-
-            for (var x = 0; x < Chunk.Size; x++)
-            for (var z = 0; z < Chunk.Size; z++)
-                if (TreeGenerator.TryGetTree(cx * Chunk.Size + x, cz * Chunk.Size + z, out _, out _))
-                    return (cx, cz);
-        }
-
-        throw new InvalidOperationException("no wooded forest chunk column within 48 chunks");
-    }
-
-    /// <summary>
-    /// Generates the 3x3 chunk columns around (cx, cz) over the band from below the lowest surface
-    /// to above the tallest tree, and returns every cell's (block, state) by world position.
-    /// </summary>
-    private static Dictionary<(int X, int Y, int Z), (byte Block, byte State)> Generate(int cx, int cz, bool reverse)
-    {
-        var minHeight = int.MaxValue;
-        var maxHeight = int.MinValue;
-        for (var dx = -1; dx <= 1; dx++)
-        for (var dz = -1; dz <= 1; dz++)
-        {
-            var column = Chunk.GetColumnData(cx + dx, cz + dz);
-            minHeight = Math.Min(minHeight, column.MinHeight);
-            maxHeight = Math.Max(maxHeight, column.MaxHeight);
-        }
-
-        var cyLo = (minHeight >> Chunk.SizeShift) - 1;
-        var cyHi = ((maxHeight + TreeGenerator.ReachUp) >> Chunk.SizeShift) + 1;
-        var positions = new List<Vector3>();
-        for (var dx = -1; dx <= 1; dx++)
-        for (var dz = -1; dz <= 1; dz++)
-        for (var cy = cyLo; cy <= cyHi; cy++)
-            positions.Add(new Vector3(cx + dx, cy, cz + dz));
-        if (reverse) positions.Reverse();
-
-        var cells = new Dictionary<(int X, int Y, int Z), (byte Block, byte State)>();
-        foreach (var position in positions)
-        {
-            var chunk = new Chunk(null!, position, generateBlockData: false);
-            chunk.GenerateBlockData();
-            var x0 = (int)position.X * Chunk.Size;
-            var y0 = (int)position.Y * Chunk.Size;
-            var z0 = (int)position.Z * Chunk.Size;
-            for (var x = 0; x < Chunk.Size; x++)
-            for (var y = 0; y < Chunk.Size; y++)
-            for (var z = 0; z < Chunk.Size; z++)
-                cells[(x0 + x, y0 + y, z0 + z)] = (chunk.GetLocalBlock(x, y, z), chunk.GetLocalState(x, y, z));
-        }
-
-        return cells;
-    }
-
-    private static HashSet<byte> WoodIds() => TreeSpeciesRegistry.All.Select(s => s.WoodId).ToHashSet();
-
-    private static HashSet<byte> LeafIds() =>
-        TreeSpeciesRegistry.All.Where(s => s.HasLeaves).Select(s => s.LeavesId).ToHashSet();
-
     [Fact]
     public void StampIsIndependentOfGenerationOrder()
     {
-        var (cx, cz) = FindForestTreeColumn();
-        var forward = Generate(cx, cz, reverse: false);
+        var (cx, cz) = TreeWorldgenFixture.FindForestTreeColumn();
+        var forward = TreeWorldgenFixture.Generate(cx, cz, reverse: false);
         TreeGenerator.ResetCaches();
-        var backward = Generate(cx, cz, reverse: true);
+        var backward = TreeWorldgenFixture.Generate(cx, cz, reverse: true);
 
-        var woodIds = WoodIds();
+        var woodIds = TreeWorldgenFixture.WoodIds();
         Assert.Contains(forward.Values, c => woodIds.Contains(c.Block));
         Assert.Equal(forward.Count, backward.Count);
         foreach (var (cell, value) in forward)
@@ -112,10 +36,10 @@ public sealed class TreeWorldgenTests
     [Fact]
     public void EveryStampedWoodCellCarriesAGraphState()
     {
-        var (cx, cz) = FindForestTreeColumn();
-        var cells = Generate(cx, cz, reverse: false);
-        var woodIds = WoodIds();
-        var leafIds = LeafIds();
+        var (cx, cz) = TreeWorldgenFixture.FindForestTreeColumn();
+        var cells = TreeWorldgenFixture.Generate(cx, cz, reverse: false);
+        var woodIds = TreeWorldgenFixture.WoodIds();
+        var leafIds = TreeWorldgenFixture.LeafIds();
 
         var wood = 0;
         var leaves = 0;
@@ -144,16 +68,16 @@ public sealed class TreeWorldgenTests
     [Fact]
     public void WoodNeverBuriesTerrain()
     {
-        var (cx, cz) = FindForestTreeColumn();
-        var cells = Generate(cx, cz, reverse: false);
-        var woodIds = WoodIds();
+        var (cx, cz) = TreeWorldgenFixture.FindForestTreeColumn();
+        var cells = TreeWorldgenFixture.Generate(cx, cz, reverse: false);
+        var woodIds = TreeWorldgenFixture.WoodIds();
 
         var wood = 0;
         foreach (var ((x, y, z), (block, state)) in cells)
         {
             if (!woodIds.Contains(block)) continue;
             wood++;
-            if (y > HeightAt(x, z)) continue;
+            if (y > TreeWorldgenFixture.HeightAt(x, z)) continue;
 
             // At or below the ground: only a root under a trunk, hanging from the base in one
             // contiguous column and inside the chunk that holds the base
