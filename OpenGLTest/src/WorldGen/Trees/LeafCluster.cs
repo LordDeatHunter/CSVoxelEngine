@@ -10,8 +10,9 @@ namespace silkgltriangle;
 /// <see cref="TreeSpecies.LeafShape"/> and <see cref="TreeSpecies.LeafRadius"/>. The convention,
 /// stated once: a leaf's stored hydration is <see cref="TreeSpecies.LeafHydration"/> minus the
 /// Manhattan <see cref="Distance"/> to the nearest live tip whose cluster shape contains the
-/// cell; a leaf is emitted only while that is at least 1, and 0 would decay. Phase 5's decay
-/// manager re-derives the same number through <see cref="HydrationAt"/>.
+/// cell; a leaf is emitted only while that is at least 1, and 0 would decay. Phase 5's
+/// <c>LeafDecayManager</c> re-derives the same number on world cells through
+/// <see cref="HydrationFromTip"/>, the one per-tip formula this rule is built from.
 /// </summary>
 public static class LeafCluster
 {
@@ -44,6 +45,17 @@ public static class LeafCluster
     }
 
     /// <summary>
+    /// The hydration one live tip gives the cell at offset (<paramref name="dx"/>,
+    /// <paramref name="dy"/>, <paramref name="dz"/>) from it: <c>LeafHydration - Distance</c>
+    /// while the species' cluster shape holds the offset, floored at 0, else 0. The one per-tip
+    /// formula the graph rule here and the decay manager's world rule share.
+    /// </summary>
+    public static int HydrationFromTip(TreeSpecies species, int dx, int dy, int dz)
+        => InShape(species.LeafShape, species.LeafRadius, dx, dy, dz)
+            ? Math.Max(0, species.LeafHydration - Distance(dx, dy, dz))
+            : 0;
+
+    /// <summary>
     /// The hydration the rule gives the cell: the maximum over live tips whose shape holds it of
     /// <c>LeafHydration - Distance</c>, or 0 when no tip's shape holds it (callers test
     /// <c>&gt;= 1</c>). Ignores obstacles: it is the value a leaf standing there carries. No allocation.
@@ -54,23 +66,14 @@ public static class LeafCluster
             return 0;
 
         int best = 0;
-        bool any = false;
         for (int i = 0; i < graph.Count; i++)
         {
             if (!IsLiveTip(graph, species, i))
                 continue;
             ref readonly var t = ref graph[i];
-            int dx = x - t.X, dy = y - t.Y, dz = z - t.Z;
-            if (!InShape(species.LeafShape, species.LeafRadius, dx, dy, dz))
-                continue;
-            int h = species.LeafHydration - Distance(dx, dy, dz);
-            if (!any || h > best)
-            {
-                best = h;
-                any = true;
-            }
+            best = Math.Max(best, HydrationFromTip(species, x - t.X, y - t.Y, z - t.Z));
         }
-        return any ? best : 0;
+        return best;
     }
 
     /// <summary>
@@ -87,7 +90,6 @@ public static class LeafCluster
             return;
 
         int radius = species.LeafRadius;
-        var shape = species.LeafShape;
         // Cell -> position in the list; membership only, emission walks the list.
         var index = new Dictionary<long, int>();
         var cells = new List<(int X, int Y, int Z, int H)>();
@@ -102,9 +104,7 @@ public static class LeafCluster
             for (int dy = -radius; dy <= radius; dy++)
             for (int dz = -radius; dz <= radius; dz++)
             {
-                if (!InShape(shape, radius, dx, dy, dz))
-                    continue;
-                int h = species.LeafHydration - Distance(dx, dy, dz);
+                int h = HydrationFromTip(species, dx, dy, dz);
                 if (h < 1)
                     continue;
                 int x = tx + dx, y = ty + dy, z = tz + dz;

@@ -33,6 +33,11 @@
   //   the nearest taiga columns with a spruce canopy within 4 blocks of a chunk centre:
   //     (-172, -124) canopy top 19 over ground 13, with ground 13 again 14 blocks south of it,
   //     and further ones at (-172, -132) and (-172, -108).
+  //   forest_mountain_ground stands at (113.5, -194.5) on ground 27 (eye cell 29), re-probed after
+  //     the batch growth, 2-cell eye clearance: no tree cell within Chebyshev 2 of the eye cell
+  //     and no ground rising within two columns. It teleports to just under a block above the
+  //     standing eye, since the old 21-block drop from y 48.5 was a fatal fall (the run respawned
+  //     at the first aerial), and the old spot at (120.5, -190.5) now lies inside a crown.
   // Since the temperature-band change the meadow aerial at (-328, 82, 8) looks over taiga and snow
   // in the foreground, which is useful here: the grass, the snow line and the spruce share a frame.
   // biomes.json's forest lake at (-616, 464) has turned into frozen plain the same way, so it is left
@@ -70,7 +75,7 @@
     { "op": "wait", "seconds": 12 },
     { "op": "teleport", "pos": [40.5, 120.5, -320.5], "yaw": 27, "pitch": -24 },
     { "op": "screenshot", "name": "forest_mountain", "hideHud": true },
-    { "op": "teleport", "pos": [120.5, 48.5, -190.5], "yaw": -90, "pitch": 8 },
+    { "op": "teleport", "pos": [113.5, 30.5, -194.5], "yaw": -90, "pitch": 8 },
     { "op": "wait", "seconds": 8 },
     { "op": "screenshot", "name": "forest_mountain_ground", "hideHud": true },
 

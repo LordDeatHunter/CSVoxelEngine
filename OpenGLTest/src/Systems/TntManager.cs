@@ -53,7 +53,8 @@ public class TntManager
     }
 
     public void Update(float deltaTime, ChunkManager chunks, LodManager lod, DropManager drops,
-        FluidManager fluids, FallingBlockManager falling, LeafParticleSystem? leaves = null)
+        FluidManager fluids, FallingBlockManager falling, LeafParticleSystem? leaves = null,
+        LeafDecayManager? leafDecay = null)
     {
         foreach (var tnt in _primed)
             tnt.Update(deltaTime, chunks);
@@ -64,7 +65,7 @@ public class TntManager
             if (!_primed[i].IsDue) continue;
             var at = _primed[i].Position;
             _primed.RemoveAt(i);
-            Detonate(at, chunks, lod, drops, fluids, falling, leaves);
+            Detonate(at, chunks, lod, drops, fluids, falling, leaves, leafDecay);
         }
 
         foreach (var (position, blockId) in _pendingSpawns)
@@ -80,7 +81,8 @@ public class TntManager
     /// the crater — and the water around the blast is scheduled so it floods the hole instead.
     /// </summary>
     private void Detonate(Vector3 center, ChunkManager chunks, LodManager lod, DropManager drops,
-        FluidManager fluids, FallingBlockManager falling, LeafParticleSystem? leaves = null)
+        FluidManager fluids, FallingBlockManager falling, LeafParticleSystem? leaves = null,
+        LeafDecayManager? leafDecay = null)
     {
         var radius = BlastRadius;
         var radiusSq = radius * radius;
@@ -208,6 +210,10 @@ public class TntManager
 
         // One box for the whole blast, grown by a block so the water just outside it notices
         fluids.ScheduleBox(min - Vector3.One, max + Vector3.One);
+
+        // The leaves of every blasted tip, and the wood orphaned by a blasted trunk: the manager grows
+        // the box by its own reach
+        leafDecay?.ScheduleBox(min, max);
 
         if (blastedLeaves != null)
             leaves?.BurstCells(blastedLeaves, WorldGenerationConfig.LeafParticleBurstBlast);

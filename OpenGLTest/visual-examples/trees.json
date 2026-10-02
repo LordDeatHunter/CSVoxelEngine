@@ -25,6 +25,16 @@
   // (`seconds` 0.001) removes exactly the block under the crosshair, so the first one clears the
   // leaf in front of the limb and the second cuts the limb itself. The oak comes first so the
   // cuts happen in chunks that loaded around it, before the long hops to the taiga and desert.
+  //
+  // Leaf decay (LeafDecayManager): limb_cut_before_decay is shot 0.3 s after the cut, while the
+  // subtree topples and the leaves it fed beyond the felling sweep (Chebyshev 2 around its wood)
+  // still stand; limb_cut_decayed is shot 4 s later. The decay runs one tick every
+  // LeafDecayTickSeconds, re-deriving each scheduled leaf's hydration from the live tips around
+  // it, and removes at most LeafDecayMaxRemovalsPerTick tipless leaves (and orphaned thin wood) a
+  // tick in a hash-scattered order, so a cut crown speckles away over a couple of seconds. Look
+  // for the leaves beyond the sweep gone in limb_cut_decayed, the standing crown untouched, and no
+  // floating node boxes left where the limb was. felled_after, 3 s after felled_down, should show
+  // nothing standing: every leaf of a felled oak goes down with its wood.
   "steps": [
     { "op": "fly" },
 
@@ -39,8 +49,10 @@
     { "op": "wait", "seconds": 0.2 },
     { "op": "screenshot", "name": "limb_leaf_cleared" },
     { "op": "mine", "seconds": 0.001 },
-    { "op": "wait", "seconds": 3 },
-    { "op": "screenshot", "name": "limb_cut", "hideHud": true },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "limb_cut_before_decay", "hideHud": true },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "limb_cut_decayed", "hideHud": true },
     { "op": "teleport", "pos": [-78.5, 21.0, -16.5], "yaw": 90, "pitch": -5 },
     { "op": "wait", "seconds": 1 },
     { "op": "screenshot", "name": "limb_cut_overview", "hideHud": true },

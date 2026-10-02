@@ -2,8 +2,8 @@
 
 ## Status
 
-Phases 1-4 done (content + codecs; headless growth engine; cutover to engine-grown trees;
-tree-vs-tree cell batches + LOD canopy proxy + perf). Phases 5-8 pending. Each phase lands as its own commit on `tree-rework`; finished phases are
+Phases 1-5 done (content + codecs; headless growth engine; cutover to engine-grown trees;
+tree-vs-tree cell batches + LOD canopy proxy + perf; leaf decay). Phases 6-8 pending. Each phase lands as its own commit on `tree-rework`; finished phases are
 collapsed into short summaries here.
 
 ## Context
@@ -142,7 +142,10 @@ bands }`:
   simulation like `FluidManager`. A wood or leaf edit schedules nearby leaves; a tick
   re-derives hydration only for scheduled cells, and a leaf left with no hydration decays
   through `DropManager.SpawnLoot`. Every edit path calls `ScheduleAround`: `RemoveBlock`,
-  `FellWood`, placement, `TntManager.Detonate` and in-world growth.
+  `FellWood`, placement, `TntManager.Detonate` and in-world growth. The rule is the exact one
+  above, re-derived on world cells (`LeafCluster.HydrationFromTip` over the live tips in the
+  cluster box), and the same manager crumbles orphaned wood: a non-root, non-detached,
+  non-shell wood cell whose loaded parent no longer connects to it drops as loot.
 
 ### Naming and art
 - **Oak (the default broadleaf):** `oak_log`, `oak_leaves`, the tiles `oak_log_side`,
@@ -254,13 +257,60 @@ bands }`:
    (-291, 13, -252). The single-flight on the batch miss path was not added (dup share 6.5-7.6 %,
    under the 10 % gate; see "Phase 4 result"). Known residue for later phases: in a dense taiga
    batch a few late trees have no room left and grow a bare post (8 of 708 sampled, none of them a
-   stump when grown solo), and `grass-tint.json`'s `forest_mountain_ground` vantage now sits in a
-   crown. Tests: `TreeBatchTests` (order independence, disjoint grown cells, no entry into earlier
+   stump when grown solo). Tests: `TreeBatchTests` (order independence, disjoint grown cells, no entry into earlier
    or neighbour-solo cells, trunks = placement, reach, whole trees across cell borders, first ring
    = stamped canopy), `LodCanopyProxyTests` (proxy placement = real placement, proxy within reach,
    profiles non-increasing, deterministic roll, far rings never grow), `VirtualTreeSpaceTests.
    OccupyAllMatchesPerCellOccupy`, and the shared `TreeWorldgenFixture`.
-5. **Leaf decay.** `LeafDecayManager`, the edit-path hooks, persistent placed leaves.
+5. **Done — leaf decay.** `LeafDecayManager` (`src/Systems/`, owned by `World`, main thread
+   only) is a `FluidManager`-style scheduled-cell simulation: 21-bit packed cell keys, a `_next`
+   set snapshotted per tick and walked in per-frame slices, a 16-slot `ChunkAt` cache, leftover
+   time dropped, knobs `LeafDecayTickSeconds`/`MaxLeafDecayTicksPerFrame`/
+   `MaxLeafDecayCellsPerFrame`/`LeafDecayMaxRemovalsPerTick`/`MaxLeafDecayBacklogCells`; it ticks
+   after the fluid tick under the new `leafDecay` profiler row, never while loading. The exact
+   rule: a scheduled non-persistent leaf re-derives its hydration as the max of
+   `LeafCluster.HydrationFromTip` (the one per-tip formula, now shared with `HydrationAt` and
+   `Collect`) over the live tips in its species' cluster box — a non-detached cell of the
+   species' wood with `DiameterPx <= tipMaxPx` and no face neighbour whose parent points at it —
+   so a settled canopy reads back bit for bit and costs nothing. The adjacency chain rule
+   ("a neighbouring leaf minus one") was rejected: leaves reachable from their tip only through
+   the branch's own wood (behind a bend) would re-derive to 0 on an intact tree. Hydration
+   rewrites never remesh (the mesher never reads `LeafState`); a 0 decays to air under
+   `LeafDecayMaxRemovalsPerTick`, the tick's cells taken in a `SplitMix64`-scattered order so a
+   crown dissolves speckled over a couple of seconds, rolling `DropManager.SpawnLoot`, bursting
+   `LeafParticleBurstDecay` leaf particles, poisoning its column with radius 0 plus
+   `LodManager.MarkEditedColumn` (once per column per frame) and scheduling nothing (a leaf feeds
+   no other cell; a reach box per decayed leaf flooded the backlog while a crown dissolved);
+   a tick start drops the air and terrain of its scheduled boxes with one read each, so the
+   per-frame budget and the scatter sort only see leaves and wood, and a leaf scans its tip
+   offsets best first, stopping at the first live tip; the backlog cap holds a whole tree's box
+   (a fell's box ran past the old 16384); removals remesh only the cell's chunk and the border-adjacent ones (both block kinds pass
+   light, cast no AO and occlude nothing). The orphan rule: a scheduled non-root, non-detached,
+   non-shell `tree_wood` cell whose loaded parent no longer `TreeWoodShape.Connects` crumbles
+   under the same budget with its thickness-band loot and schedules its reach box, so a blasted subtree crumbles outward one
+   layer per tick (mining still fells through `TopplingTree`). Freezing: any read that lands in an
+   unloaded chunk drops the cell from the schedule, never decays it. `ScheduleReach` = max leafy
+   `leafRadius` + 1 (the +1 for a parent that turns into a tip); `ScheduleAround`/`ScheduleBox`
+   grow the edited extent by it, so callers never know the radius. Hooks: `World.RemoveBlock`,
+   all three `FellWood` branches (one box over the batch clear, never per cell),
+   `PlaceBlockAtFace` (placed leaves get `LeafState.Encode(0, persistent: true)` beside the wood
+   `Detached` line), the bucket/prime `IItemUseWorld` wrappers (interface unchanged) and
+   `TntManager.Detonate`/`Update` through a new defaulted `leafDecay` parameter. Fluids never
+   wash leaves (they are not replaceable), so the fluid tick has no hook. Chunk loads schedule
+   nothing: worldgen leaves are consistent, and a restored chunk's stale leaves (wood cut before
+   saving) wait for the next nearby edit, since a per-restore chunk walk would tax every load.
+   `trees.json` gained `limb_cut_before_decay` / `limb_cut_decayed` around the oak limb cut;
+   `grass-tint.json`'s `forest_mountain_ground` was re-probed to (113.5, 30.5, -194.5) on ground
+   27 with a 2-cell eye clearance (the old y 48.5 teleport was a fatal fall that framed a respawn
+   among the batch-grown crowns). The dead `TreeGenerator.ReachDown` was deleted (`Stamp`
+   already guards Y through the batch and shape `MinY`/`MaxY`). Tests: `LeafDecayTests` (intact
+   canopy re-derives bit for bit and then schedules nothing, a cut tip's leaves decay within the
+   budget bound, a second live tip holds a leaf, persistent leaves never decay, unloaded
+   neighbours freeze, decay rolls the leaf loot under the per-tick budget, decayed leaves schedule
+   nothing further, a whole tree's box is never truncated by the backlog, orphaned thin wood
+   crumbles while the connected rest stays), the shared `StampedTree` harness. Known residue: the
+   world cannot tell a root-walk feature node from a branch, so a thin childless root counts as a
+   tip there (it can only raise a leaf's hydration, never decay one).
 6. **Reactive growth.** `WorldTreeSpace`, `TreeGraph.FromWorld`, a growth write path that
    remeshes and schedules decay and fluids, and the `grow` scenario op
    (`{ "op": "grow", "species", "pos": [x, z], "steps" }`) with `VisualScenarioTests`

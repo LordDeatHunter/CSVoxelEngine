@@ -40,6 +40,7 @@ public class World : IItemUseWorld
     private readonly SlimeManager? _slimes;
     private readonly GoblinManager? _goblins;
     private readonly FluidManager _fluidManager = new();
+    private readonly LeafDecayManager _leafDecay = new();
     private readonly LeafParticleSystem _leaves = new();
     private readonly BlockDebrisSystem _debris = new();
     private readonly CampfireManager _campfires = new();
@@ -634,7 +635,7 @@ public class World : IItemUseWorld
         if (pickedUp)
             _sfx?.Play(SfxLibrary.PickupGroup);
 
-        _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager, _falling, _leaves);
+        _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager, _falling, _leaves, _leafDecay);
         _falling.Update((float)deltaTime, _chunkManager, _dropManager, _fluidManager, _lodManager);
         _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager);
         _debris.Update((float)deltaTime, _chunkManager);
@@ -706,6 +707,12 @@ public class World : IItemUseWorld
         _fluidManager.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
 
         FrameProfiler.End(ProfileSection.FluidTick);
+
+        // Like the fluid tick: after every edit path of the frame, so the leaves and orphaned
+        // wood they scheduled re-derive together, and never while loading (UpdateLoading skips it)
+        FrameProfiler.Begin(ProfileSection.LeafDecay);
+        _leafDecay.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager, _leaves);
+        FrameProfiler.End(ProfileSection.LeafDecay);
 
         // After the fluid tick, so every edit path of the frame precedes the autosave. The one
         // Save span in the codebase, entered here only and never nested inside another section.
@@ -1844,6 +1851,8 @@ public class World : IItemUseWorld
 
         // Water beside or above the hole pours into it on the next fluid tick
         _fluidManager.ScheduleAround(blockPos);
+        // Leaves fed by a mined tip, and wood whose parent this was, re-derive on the next decay tick
+        _leafDecay.ScheduleAround(blockPos);
 
         // Keep the far LOD on the current terrain: a mined top lowers the column's surface, a
         // dig below it keeps the buried shell under the newly exposed hole
@@ -1895,6 +1904,7 @@ public class World : IItemUseWorld
             if (chunk.RemoveBlockAt(blockPos, _chunkManager) && !creative)
                 _dropManager.SpawnLoot(brokenId, blockPos, state: brokenState);
             _fluidManager.ScheduleAround(blockPos);
+            _leafDecay.ScheduleAround(blockPos);
             return;
         }
 
@@ -1906,11 +1916,14 @@ public class World : IItemUseWorld
             if (chunk.RemoveBlockAt(blockPos, _chunkManager) && !creative)
                 _dropManager.SpawnLoot(brokenId, blockPos, state: brokenState);
             _fluidManager.ScheduleAround(blockPos);
+            _leafDecay.ScheduleAround(blockPos);
             return;
         }
 
         var touchedChunks = new HashSet<Vector3>();
         var lowestY = new Dictionary<(int X, int Z), int>();
+        var min = blockPos;
+        var max = blockPos;
         foreach (var block in collected)
         {
             var chunkPos = VoxelCoords.ChunkPosOf(block.Cell);
@@ -1921,11 +1934,18 @@ public class World : IItemUseWorld
             _chunkManager.UnmarkPlayerPlaced((int)block.Cell.X, (int)block.Cell.Y, (int)block.Cell.Z);
             touchedChunks.Add(chunkPos);
             _fluidManager.ScheduleAround(block.Cell);
+            min = Vector3.Min(min, block.Cell);
+            max = Vector3.Max(max, block.Cell);
 
             var key = ((int)block.Cell.X, (int)block.Cell.Z);
             if (!lowestY.TryGetValue(key, out var lowest) || (int)block.Cell.Y < lowest)
                 lowestY[key] = (int)block.Cell.Y;
         }
+
+        // One box for the whole fell, never one per cell (a 500-cell fell times a reach box
+        // would be hundreds of thousands of adds): the leaves left standing beyond the
+        // Chebyshev-2 sweep lose their tips
+        _leafDecay.ScheduleBox(min, max);
 
         foreach (var chunkPos in touchedChunks)
         {
@@ -2284,11 +2304,23 @@ public class World : IItemUseWorld
 
     byte IItemUseWorld.GetBlockAt(Vector3 pos) => BlockIdAt(pos);
 
-    bool IItemUseWorld.ScoopFluidCell(Vector3 pos) =>
-        _fluidManager.SetCellImmediate(pos, 0, 0, _chunkManager);
+    bool IItemUseWorld.ScoopFluidCell(Vector3 pos)
+    {
+        var changed = _fluidManager.SetCellImmediate(pos, 0, 0, _chunkManager);
+        // Scheduled for uniformity with every other edit path; a flow itself never overwrites a
+        // leaf, since leaves are not replaceable
+        if (changed) _leafDecay.ScheduleAround(pos);
+        return changed;
+    }
 
-    bool IItemUseWorld.PourFluidCell(Vector3 pos, byte fluidId) =>
-        _fluidManager.SetCellImmediate(pos, fluidId, FluidState.Source, _chunkManager);
+    bool IItemUseWorld.PourFluidCell(Vector3 pos, byte fluidId)
+    {
+        var changed = _fluidManager.SetCellImmediate(pos, fluidId, FluidState.Source, _chunkManager);
+        // Scheduled for uniformity with every other edit path; a flow itself never overwrites a
+        // leaf, since leaves are not replaceable
+        if (changed) _leafDecay.ScheduleAround(pos);
+        return changed;
+    }
 
     bool IItemUseWorld.PlaceBlockAtFace(Vector3 hit, Vector3 normal, byte blockId, byte state,
         out Vector3 placedCell) =>
@@ -2361,8 +2393,13 @@ public class World : IItemUseWorld
     bool IItemUseWorld.IsCellSubmerged(int x, int y, int z) =>
         TntManager.IsSubmerged(_chunkManager, x, y, z);
 
-    bool IItemUseWorld.RemoveCellForPrime(Vector3 cell) =>
-        _chunkManager.ChunkAt((int)cell.X, (int)cell.Y, (int)cell.Z)?.RemoveBlockAt(cell, _chunkManager) == true;
+    bool IItemUseWorld.RemoveCellForPrime(Vector3 cell)
+    {
+        var removed = _chunkManager.ChunkAt((int)cell.X, (int)cell.Y, (int)cell.Z)?.RemoveBlockAt(cell, _chunkManager) == true;
+        // Scheduled for uniformity with every other edit path
+        if (removed) _leafDecay.ScheduleAround(cell);
+        return removed;
+    }
 
     void IItemUseWorld.SpawnPrimedTnt(Vector3 cell, byte blockId) =>
         _tntManager.Spawn(cell, blockId, TntManager.PlayerFuseSeconds);
@@ -2671,6 +2708,8 @@ public class World : IItemUseWorld
         // A placed log is building material, not part of a tree: it is a plain full cube that
         // never connects to tree wood around it and never fells (see TreeWoodShape.Connects)
         if (BlockType.IsTreeWood(blockId) && state == 0) state = WoodState.Detached;
+        // A placed leaf is decoration, not canopy: persistent, so no missing tip ever decays it
+        if (TreeGenerator.IsLeaf(blockId) && state == 0) state = LeafState.Encode(0, persistent: true);
 
         if (!chunk.PlaceBlockAt(placePos, blockId, _chunkManager, state)) return false;
 
@@ -2687,6 +2726,7 @@ public class World : IItemUseWorld
 
         // A block placed into water displaces it, so the neighbours recompute their levels
         _fluidManager.ScheduleAround(placePos);
+        _leafDecay.ScheduleAround(placePos);
         return true;
     }
     

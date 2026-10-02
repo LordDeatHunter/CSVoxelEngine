@@ -53,9 +53,6 @@ public static class TreeGenerator
     /// <summary>How far above its base cell any worldgen tree reaches.</summary>
     public static readonly int ReachUp;
 
-    /// <summary>How far below its base cell any worldgen tree reaches.</summary>
-    public static readonly int ReachDown;
-
     /// <summary><see cref="ReachHorizontal"/> in whole chunks, rounded up.</summary>
     public static readonly int ReachChunkRadius;
 
@@ -90,10 +87,9 @@ public static class TreeGenerator
         {
             if (species.Worldgen == null) continue;
             MaxDensity = Math.Max(MaxDensity, species.Worldgen.Density);
-            var (horizontal, up, down) = TreeRasterizer.ReachOf(species);
+            var (horizontal, up, _) = TreeRasterizer.ReachOf(species);
             ReachHorizontal = Math.Max(ReachHorizontal, horizontal);
             ReachUp = Math.Max(ReachUp, up);
-            ReachDown = Math.Max(ReachDown, down);
         }
 
         ReachChunkRadius = (ReachHorizontal + Chunk.Size - 1) / Chunk.Size;

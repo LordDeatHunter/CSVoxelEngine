@@ -19,6 +19,7 @@ public enum ProfileSection
     Entities,
     FluidWake,
     FluidTick,
+    LeafDecay,
     Raycast,
     Breaking,
     ProgramUpdate,
@@ -77,7 +78,7 @@ public static class FrameProfiler
     private static readonly string[] Labels =
     [
         "camera", "chunkUnld", "chunkApply", "chunkDirty", "lod", "entities",
-        "fluidWake", "fluidTick", "raycast", "breaking",
+        "fluidWake", "fluidTick", "leafDecay", "raycast", "breaking",
         "progUpdate", "usePlace", "debugLog", "player", "save",
         "lighting", "shadows", "reflect", "lodPass", "worldPass", "entityPass", "aoPass", "waterPass",
         "cloudPass", "raysPass", "selectPass", "postPass", "uiPass",
