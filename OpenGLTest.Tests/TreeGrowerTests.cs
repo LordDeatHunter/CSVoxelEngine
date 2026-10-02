@@ -648,4 +648,97 @@ public sealed class TreeGrowerTests
             Assert.Equal(expected, TreeGrower.TreeEnergyAt(species, pos.X, pos.Y, pos.Z, seed));
         }
     }
+
+    // --- GrowSteps: the item debugger's scrub path ---
+
+    private static List<(int X, int Y, int Z)> NodeCells(TreeGraph graph)
+    {
+        var list = new List<(int, int, int)>(graph.Count);
+        for (var i = 0; i < graph.Count; i++)
+        {
+            var n = graph[i];
+            list.Add((n.X, n.Y, n.Z));
+        }
+        return list;
+    }
+
+    [Fact]
+    public void GrowStepsAtTheRolledMaturityWithFeaturesIsGrowToMaturity()
+    {
+        foreach (var species in TreeSpeciesRegistry.All)
+        foreach (var pos in Positions)
+        foreach (var seed in new[] { SeedA, SeedB })
+        {
+            var spaceA = Flat();
+            var spaceB = Flat();
+            var mature = TreeGrower.GrowToMaturity(species, pos.X, pos.Y, pos.Z, spaceA, seed);
+            var steps = TreeGrower.MaturityStepsAt(species, pos.X, pos.Y, pos.Z, seed);
+            var stepped = TreeGrower.GrowSteps(species, pos.X, pos.Y, pos.Z, spaceB, seed, steps, applyFeatures: true);
+
+            Assert.Equal(Nodes(mature), Nodes(stepped));
+            Assert.Equal(TreeRasterizer.Rasterize(mature, species, spaceA),
+                TreeRasterizer.Rasterize(stepped, species, spaceB));
+        }
+    }
+
+    [Fact]
+    public void AShorterGrowsNodesAreAPrefixOfALongerGrow()
+    {
+        foreach (var species in TreeSpeciesRegistry.All)
+        foreach (var pos in Positions)
+        {
+            var max = species.MaturityStepsMax;
+            var lengths = new[] { 0, 1, max / 3, max / 2, max }.Distinct().Order().ToArray();
+            var grown = lengths
+                .Select(n => NodeCells(TreeGrower.GrowSteps(species, pos.X, pos.Y, pos.Z, Flat(), SeedA, n, applyFeatures: false)))
+                .ToArray();
+
+            for (var a = 0; a < grown.Length; a++)
+            for (var b = a + 1; b < grown.Length; b++)
+            {
+                Assert.True(grown[a].Count <= grown[b].Count, $"{species.Name}: {lengths[a]} pulses grew more than {lengths[b]}");
+                Assert.Equal(grown[a], grown[b].Take(grown[a].Count));
+            }
+        }
+    }
+
+    [Fact]
+    public void MaturityStepsAtLiesInTheSpeciesRange()
+    {
+        foreach (var species in TreeSpeciesRegistry.All)
+        foreach (var pos in Positions)
+        foreach (var seed in Seeds)
+            Assert.InRange(TreeGrower.MaturityStepsAt(species, pos.X, pos.Y, pos.Z, seed),
+                species.MaturityStepsMin, species.MaturityStepsMax);
+    }
+
+    [Fact]
+    public void GrowStepsIsDeterministic()
+    {
+        var seedBefore = WorldSeed.Value;
+        foreach (var species in TreeSpeciesRegistry.All)
+        foreach (var pos in Positions)
+        foreach (var features in new[] { false, true })
+        {
+            var steps = species.MaturityStepsMax / 2;
+            var spaceA = Flat();
+            var spaceB = Flat();
+            var a = TreeGrower.GrowSteps(species, pos.X, pos.Y, pos.Z, spaceA, SeedB, steps, features);
+            var b = TreeGrower.GrowSteps(species, pos.X, pos.Y, pos.Z, spaceB, SeedB, steps, features);
+            Assert.Equal(TreeRasterizer.Rasterize(a, species, spaceA), TreeRasterizer.Rasterize(b, species, spaceB));
+        }
+        Assert.Equal(seedBefore, WorldSeed.Value);
+    }
+
+    [Fact]
+    public void ANegativeStepCountGrowsOnlyTheRoot()
+    {
+        foreach (var species in TreeSpeciesRegistry.All)
+        {
+            var negative = TreeGrower.GrowSteps(species, 0, 1, 0, Flat(), SeedA, -5, applyFeatures: false);
+            var zero = TreeGrower.GrowSteps(species, 0, 1, 0, Flat(), SeedA, 0, applyFeatures: false);
+            Assert.Equal(Nodes(zero), Nodes(negative));
+            Assert.Equal(1, negative.Count);
+        }
+    }
 }

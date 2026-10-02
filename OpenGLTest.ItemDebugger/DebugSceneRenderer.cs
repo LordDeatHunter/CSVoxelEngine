@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 
@@ -12,6 +13,10 @@ namespace silkgltriangle;
 /// (which would allocate hundreds of megabytes to draw one model). Player and held-item
 /// matrices come straight from <see cref="PlayerModel"/> and <see cref="RenderManager.PoseHeldItem"/>,
 /// so the pose matches the game; lighting is fixed daylight so the transform is easy to read.
+/// The ENTITIES tab draws an <see cref="EntityPreviewState"/> part by part
+/// (<see cref="RenderEntity"/>), and the TREES tab draws a <see cref="TreePreviewState"/>'s
+/// ground and grown tree, meshed by the real chunk mesher through <see cref="CellBatchMesher"/>
+/// (<see cref="RenderTree"/>).
 /// </summary>
 public sealed class DebugSceneRenderer : IDisposable
 {
@@ -45,6 +50,11 @@ public sealed class DebugSceneRenderer : IDisposable
 
     // One entity's per-part meshes (ordinal-sorted names, index-aligned), rig and skin.
     private sealed record EntityPreview(string[] PartNames, Mesh[] Parts, PlayerModel.PlayerRig Rig, uint Texture);
+
+    // The TREES tab's meshes (one per touched scratch chunk, in world cell coordinates) and the
+    // TreePreviewState.Version they were built for; -1 forces the first build.
+    private readonly List<Mesh> _treeMeshes = new();
+    private int _treeVersion = -1;
 
     public PlayerModel.PlayerRig Rig { get; }
     public UIRenderer Ui { get; }
@@ -83,6 +93,10 @@ public sealed class DebugSceneRenderer : IDisposable
         _world.SetUniform("uEntitySun", 1f);
         _world.SetUniform("uEntityBlock", 0f);
         _world.SetUniform("uEntityTint", 0);
+        // The plain vertex path multiplies biome-tinted vertices (grass, leaves) by this per-draw
+        // tint; unset it is black. The game writes the same white default in
+        // RenderManager.InitWorldProgram.
+        _world.SetUniform("uBiomeTint", Vector3.One);
 
         _locModel = _world.GetUniformLocation("uModel");
         _locMvp = _world.GetUniformLocation("uMVP");
@@ -148,18 +162,7 @@ public sealed class DebugSceneRenderer : IDisposable
     public void RenderEntity(Matrix4x4 viewProj, Vector3 eyePos, EntityPreviewState state, float time,
         Vector2D<int> size)
     {
-        _gl.Viewport(0, 0, (uint)size.X, (uint)size.Y);
-        _gl.ClearColor(0.53f, 0.64f, 0.76f, 1f);
-        _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-        _gl.Enable(EnableCap.DepthTest);
-        _gl.DepthFunc(DepthFunction.Lequal);
-        _gl.DepthMask(true);
-        _gl.Disable(EnableCap.CullFace);
-        _gl.Enable(EnableCap.Blend);
-        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-
-        _world.Use();
-        ApplyFrameUniforms(viewProj, eyePos, time, size);
+        BeginScene(viewProj, eyePos, time, size);
         if (state.Selected is not { } type) return;
 
         var preview = Preview(type);
@@ -179,6 +182,94 @@ public sealed class DebugSceneRenderer : IDisposable
             Draw(stone, model, viewProj);
         }
         _world.SetUniform("uHitFlash", 0f);
+    }
+
+    /// <summary>
+    /// Draws the TREES tab: <paramref name="state"/>'s ground plane and grown tree
+    /// (<see cref="TreePreviewState.MeshCells"/>). The meshes are rebuilt through
+    /// <see cref="CellBatchMesher"/> only when <see cref="TreePreviewState.Version"/> moved, so a
+    /// slider drag costs at most one rebuild per rendered frame. Same frame setup as
+    /// <see cref="RenderEntity"/>.
+    /// </summary>
+    public void RenderTree(Matrix4x4 viewProj, Vector3 eyePos, TreePreviewState state, float time,
+        Vector2D<int> size)
+    {
+        BeginScene(viewProj, eyePos, time, size);
+        if (state.Selected is null) return;
+
+        if (state.Version != _treeVersion)
+        {
+            RebuildTreeMeshes(state.MeshCells);
+            _treeVersion = state.Version;
+        }
+
+        BindWorldTextures();
+        foreach (var mesh in _treeMeshes)
+            Draw(mesh, Matrix4x4.Identity, viewProj);
+    }
+
+    private void RebuildTreeMeshes(IReadOnlyList<TreeCell> cells)
+    {
+        foreach (var mesh in _treeMeshes) mesh.Dispose();
+        _treeMeshes.Clear();
+
+        var translucent = 0;
+        foreach (var data in CellBatchMesher.Build(cells))
+        {
+            translucent += data.TranslucentVertices.Count;
+            if (data.Vertices.Count == 0) continue;
+            ToDisplaySpaceTint(data.Vertices);
+            _treeMeshes.Add(new Mesh(_gl, CollectionsMarshal.AsSpan(data.Vertices),
+                CollectionsMarshal.AsSpan(data.Indices)));
+        }
+        // Trees and grass mesh no translucent geometry; if a species ever does, say so rather than
+        // silently leaving it out of the preview.
+        if (translucent > 0)
+            Log.Warn($"Tree preview: {translucent} translucent vertices are not drawn.");
+    }
+
+    // The chunk mesher bakes a biome tint as a *linear* multiplier against the decoded grey of the
+    // textureless tiles (BiomeTint.VertexTint). The debugger samples its atlas undecoded and never
+    // encodes, so that multiplier would lift a tinted face about three times too bright here. Rebake
+    // it so the grey texel times Gain lands on the colour the game displays: encode(greyLin * v * Gain).
+    private static void ToDisplaySpaceTint(List<Vertex> vertices)
+    {
+        var greyLinear = ColorSpace.SrgbToLinear(WorldGenerationConfig.BiomeTintTextureGrey) * BiomeTint.Gain;
+        var greyDisplay = WorldGenerationConfig.BiomeTintTextureGrey * BiomeTint.Gain;
+        var span = CollectionsMarshal.AsSpan(vertices);
+        for (var i = 0; i < span.Length; i++)
+        {
+            ref var v = ref span[i];
+            if (!v.IsBiomeTinted) continue;
+            var c = v.PackedColor;
+            var r = Rebake(c & 0xFF);
+            var g = Rebake((c >> 8) & 0xFF);
+            var b = Rebake((c >> 16) & 0xFF);
+            v.PackedColor = (c & 0xFF000000u) | r | (g << 8) | (b << 16);
+        }
+
+        uint Rebake(uint channel)
+        {
+            var display = ColorSpace.LinearToSrgb(channel / 255f * greyLinear) / greyDisplay;
+            return (uint)Math.Clamp(MathF.Round(display * 255f), 0f, 255f);
+        }
+    }
+
+    // The frame setup shared by the ENTITIES and TREES tabs.
+    private void BeginScene(Matrix4x4 viewProj, Vector3 eyePos, float time, Vector2D<int> size)
+    {
+        _gl.Viewport(0, 0, (uint)size.X, (uint)size.Y);
+        _gl.ClearColor(0.53f, 0.64f, 0.76f, 1f);
+        _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+        _gl.Enable(EnableCap.DepthTest);
+        _gl.DepthFunc(DepthFunction.Lequal);
+        _gl.DepthMask(true);
+        _gl.Disable(EnableCap.CullFace);
+        _gl.Enable(EnableCap.Blend);
+        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+
+        _world.Use();
+        ApplyFrameUniforms(viewProj, eyePos, time, size);
     }
 
     private EntityPreview Preview(EntityType type)
@@ -350,6 +441,8 @@ public sealed class DebugSceneRenderer : IDisposable
             _gl.DeleteTexture(preview.Texture);
         }
         _entityPreviews.Clear();
+        foreach (var mesh in _treeMeshes) mesh.Dispose();
+        _treeMeshes.Clear();
         _world.Dispose();
         _gl.DeleteTexture(_paletteTex);
         _gl.DeleteTexture(_dummyColor);

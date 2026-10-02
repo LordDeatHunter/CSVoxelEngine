@@ -272,20 +272,59 @@ public static class TreeGrower
     /// the final height, and the species' features apply last. The caller supplies a free base
     /// cell; it is not checked.
     /// </summary>
-    public static TreeGraph GrowToMaturity(TreeSpecies species, int x, int y, int z, ITreeSpace space, int worldSeed)
+    public static TreeGraph GrowToMaturity(TreeSpecies species, int x, int y, int z, ITreeSpace space, int worldSeed) =>
+        Grow(species, x, y, z, space, worldSeed, steps: null, applyFeatures: true);
+
+    /// <summary>
+    /// Grows the tree rooted at (x, y, z) for exactly <paramref name="steps"/> pulses (negative
+    /// counts as 0) from the same <see cref="SeedFor"/> stream worldgen uses: the maturity roll is
+    /// still drawn first, so the energy and every later draw match a worldgen tree, but its step
+    /// count is discarded. A final <see cref="Thicken"/> follows, then the species' features when
+    /// <paramref name="applyFeatures"/> is set. This is the item debugger's scrub path.
+    /// <para>
+    /// <c>GrowSteps(..., MaturityStepsAt(...), applyFeatures: true)</c> is exactly
+    /// <see cref="GrowToMaturity(TreeSpecies, int, int, int, ITreeSpace, int)"/>. Pulses only
+    /// append and the final thickening draws nothing, so without features a shorter grow's nodes
+    /// are a prefix of a longer one's.
+    /// </para>
+    /// </summary>
+    public static TreeGraph GrowSteps(TreeSpecies species, int x, int y, int z, ITreeSpace space, int worldSeed,
+        int steps, bool applyFeatures) =>
+        Grow(species, x, y, z, space, worldSeed, Math.Max(0, steps), applyFeatures);
+
+    /// <summary>
+    /// The maturity step count a worldgen tree rooted at (x, y, z) grows for: a replay of the
+    /// step roll from <see cref="SeedFor"/>'s stream, the step-count twin of
+    /// <see cref="TreeEnergyAt"/>.
+    /// </summary>
+    public static int MaturityStepsAt(TreeSpecies species, int x, int y, int z, int worldSeed) =>
+        RollMaturity(species, new SplitMix64(SeedFor(x, y, z, worldSeed, species))).Steps;
+
+    /// <summary>
+    /// The shared core of <see cref="GrowToMaturity(TreeSpecies, int, int, int, ITreeSpace, int)"/>
+    /// and <see cref="GrowSteps"/>: the maturity roll (always drawn, in worldgen's order), then
+    /// <paramref name="steps"/> pulses, or the rolled count when null, the final thickening and
+    /// optionally the features on the same stream.
+    /// </summary>
+    private static TreeGraph Grow(TreeSpecies species, int x, int y, int z, ITreeSpace space, int worldSeed,
+        int? steps, bool applyFeatures)
     {
         var rng = new SplitMix64(SeedFor(x, y, z, worldSeed, species));
-        var (steps, energy) = RollMaturity(species, rng);
+        var (rolledSteps, energy) = RollMaturity(species, rng);
+        var pulses = steps ?? rolledSteps;
 
         var graph = new TreeGraph(x, y, z, species.TipPx);
-        for (var s = 0; s < steps; s++)
+        for (var s = 0; s < pulses; s++)
             Pulse(graph, species, space, rng, energy);
 
         Thicken(graph, species);
 
-        var features = species.Features;
-        for (var f = 0; f < features.Count; f++)
-            features[f].Feature.Apply(graph, species, space, features[f].Depth, rng);
+        if (applyFeatures)
+        {
+            var features = species.Features;
+            for (var f = 0; f < features.Count; f++)
+                features[f].Feature.Apply(graph, species, space, features[f].Depth, rng);
+        }
         return graph;
     }
 

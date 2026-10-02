@@ -26,6 +26,11 @@ public enum DebugButton
     FirstPerson,
     TabItems,
     TabEntities,
+    TabTrees,
+    TreeStepDown,
+    TreeStepUp,
+    TreeMature,
+    TreeRegrow,
     // The button's Arg is the index into EntityPreviewState.Modes.
     EntityMode,
 }
@@ -58,15 +63,20 @@ public sealed class DebugSlider
 
 /// <summary>
 /// Immediate-mode UI for the item debugger: an item grid on the left, transform sliders and
-/// animation-preview buttons on the right. Two tab buttons at the top of the left panel switch
-/// the grid between items and entities; on the entities tab the right panel holds one button per
-/// mode of the selected entity (its clips, then HURT) and nothing else. Geometry is rebuilt each
+/// animation-preview buttons on the right. Three tab buttons at the top of the left panel switch
+/// the grid between items, entities and tree species. On the entities tab the right panel holds
+/// one button per mode of the selected entity (its clips, then HURT) and nothing else; on the
+/// trees tab it holds STEP -/STEP +/MATURE, REGROW and the growth step slider
+/// (<see cref="TreeStepSlider"/>) over <see cref="TreePreviewState"/>. Geometry is rebuilt each
 /// <see cref="Draw"/> and kept so the next frame's mouse-down can hit-test it, mirroring how the
 /// game's panels work.
 /// </summary>
 public sealed class ItemDebuggerUi
 {
     public readonly record struct GridEntry(byte Id, string Name, bool IsBlock);
+
+    /// <summary>The trees tab's growth step slider, which the program drags by label.</summary>
+    public const string TreeStepSlider = "Step";
 
     private const float Pad = 12f;
     private const float PanelWidth = 330f;
@@ -80,7 +90,7 @@ public sealed class ItemDebuggerUi
     private const float TextCap = 12f;
     // The tab buttons' row, which pushes the grid header and the grid down.
     private const float TabRowH = ButtonH + ButtonGap;
-    // Entities have no icon, so their slots are wide enough to hold the display name.
+    // Entities and tree species have no icon, so their slots are wide enough to hold the name.
     private const int EntityColumns = 2;
     private const int ModesPerRow = 3;
 
@@ -99,7 +109,7 @@ public sealed class ItemDebuggerUi
     private int _columns = 5;
     private int _visibleRows = 1;
     // One scroll position per tab, so switching back to ITEMS finds the grid where it was left.
-    private readonly int[] _scrollByTab = new int[2];
+    private readonly int[] _scrollByTab = new int[Enum.GetValues<DebuggerTab>().Length];
     private DebuggerTab _tab;
     private int _gridCount;
 
@@ -183,46 +193,67 @@ public sealed class ItemDebuggerUi
     public static float ValueAt(DebugSlider slider, float x) =>
         slider.Min + Fraction(slider, x) * (slider.Max - slider.Min);
 
-    public void Draw(UIRenderer ui, ItemDisplayEditor editor, EntityPreviewState entities, DebuggerTab tab,
-        PreviewMode mode, Vector2 screen, string status, bool firstPerson)
+    public void Draw(UIRenderer ui, ItemDisplayEditor editor, EntityPreviewState entities, TreePreviewState trees,
+        DebuggerTab tab, PreviewMode mode, Vector2 screen, string status, bool firstPerson)
     {
         _tab = tab;
         _sliders.Clear();
         _buttons.Clear();
         BuildTabs(tab);
-        BuildGrid(screen, tab == DebuggerTab.Entities ? entities.Entries.Count : Entries.Count, tab);
-        if (tab == DebuggerTab.Entities)
-            BuildEntityControls(entities, screen);
-        else
-            BuildControls(editor, mode, screen, firstPerson);
+        var count = tab switch
+        {
+            DebuggerTab.Entities => entities.Entries.Count,
+            DebuggerTab.Trees => trees.Entries.Count,
+            _ => Entries.Count,
+        };
+        BuildGrid(screen, count, tab);
+        switch (tab)
+        {
+            case DebuggerTab.Entities:
+                BuildEntityControls(entities, screen);
+                break;
+            case DebuggerTab.Trees:
+                BuildTreeControls(trees, screen);
+                break;
+            default:
+                BuildControls(editor, mode, screen, firstPerson);
+                break;
+        }
 
         DrawPanel(ui, new Vector2(Pad + PanelWidth * 0.5f, screen.Y * 0.5f),
             new Vector2(PanelWidth, screen.Y - Pad * 2f));
         DrawPanel(ui, new Vector2(screen.X - Pad - PanelWidth * 0.5f, screen.Y * 0.5f),
             new Vector2(PanelWidth, screen.Y - Pad * 2f));
 
-        if (tab == DebuggerTab.Entities)
+        switch (tab)
         {
-            DrawEntityGrid(ui, entities);
-            DrawEntityTitle(ui, entities, screen);
-        }
-        else
-        {
-            DrawGrid(ui, editor);
-            DrawTitle(ui, editor, screen, status);
+            case DebuggerTab.Entities:
+                DrawEntityGrid(ui, entities);
+                DrawEntityTitle(ui, entities, screen);
+                break;
+            case DebuggerTab.Trees:
+                DrawTreeGrid(ui, trees);
+                DrawTreeTitle(ui, trees, screen);
+                break;
+            default:
+                DrawGrid(ui, editor);
+                DrawTitle(ui, editor, screen, status);
+                break;
         }
         DrawControls(ui, screen);
     }
 
     private void BuildTabs(DebuggerTab tab)
     {
-        var width = (PanelWidth - Pad * 2f - ButtonGap) * 0.5f;
+        var width = (PanelWidth - Pad * 2f - ButtonGap * 2f) / 3f;
         var y = Pad + 6f + ButtonH * 0.5f;
         var left = Pad + Pad;
         AddButton(new Vector2(left + width * 0.5f, y), new Vector2(width, ButtonH), DebugButton.TabItems,
             "ITEMS", true, tab == DebuggerTab.Items);
         AddButton(new Vector2(left + width * 1.5f + ButtonGap, y), new Vector2(width, ButtonH),
             DebugButton.TabEntities, "ENTITIES", true, tab == DebuggerTab.Entities);
+        AddButton(new Vector2(left + width * 2.5f + ButtonGap * 2f, y), new Vector2(width, ButtonH),
+            DebugButton.TabTrees, "TREES", true, tab == DebuggerTab.Trees);
     }
 
     private void BuildGrid(Vector2 screen, int count, DebuggerTab tab)
@@ -231,10 +262,10 @@ public sealed class ItemDebuggerUi
         _gridCount = count;
 
         var available = PanelWidth - Pad * 2f;
-        var slotSize = tab == DebuggerTab.Entities
+        var slotSize = tab != DebuggerTab.Items
             ? new Vector2((available - (EntityColumns - 1) * SlotGap) / EntityColumns, SlotSize)
             : new Vector2(SlotSize);
-        _columns = tab == DebuggerTab.Entities
+        _columns = tab != DebuggerTab.Items
             ? EntityColumns
             : Math.Max(1, (int)((available + SlotGap) / (SlotSize + SlotGap)));
         var strideX = slotSize.X + SlotGap;
@@ -286,6 +317,38 @@ public sealed class ItemDebuggerUi
             }
             y += ButtonH + ButtonGap;
         }
+    }
+
+    private void BuildTreeControls(TreePreviewState trees, Vector2 screen)
+    {
+        var left = screen.X - Pad - PanelWidth + Pad;
+        var right = screen.X - Pad - Pad;
+        var width = right - left;
+        var y = Pad + 56f;
+        var enabled = trees.Selected != null;
+
+        var buttonWidth = (width - ButtonGap * 2f) / 3f;
+        AddButton(new Vector2(left + buttonWidth * 0.5f, y + ButtonH * 0.5f),
+            new Vector2(buttonWidth, ButtonH), DebugButton.TreeStepDown, "STEP -", enabled && trees.Step > 0, false);
+        AddButton(new Vector2(left + buttonWidth * 1.5f + ButtonGap, y + ButtonH * 0.5f),
+            new Vector2(buttonWidth, ButtonH), DebugButton.TreeStepUp, "STEP +",
+            enabled && trees.Step < trees.MaxStep, false);
+        AddButton(new Vector2(left + buttonWidth * 2.5f + ButtonGap * 2f, y + ButtonH * 0.5f),
+            new Vector2(buttonWidth, ButtonH), DebugButton.TreeMature, "MATURE", enabled,
+            enabled && trees.Step == trees.MaturitySteps);
+        y += ButtonH + ButtonGap;
+
+        AddButton(new Vector2((left + right) * 0.5f, y + ButtonH * 0.5f),
+            new Vector2(width, ButtonH), DebugButton.TreeRegrow, "REGROW (NEW SEED)", enabled, false);
+        y += ButtonH + ButtonGap + 10f;
+
+        if (!enabled) return;
+        // At least 1 wide, so a species that could never grow still draws a sane track.
+        AddSlider(TreeStepSlider, 0f, Math.Max(1, trees.MaxStep), 0, () => trees.Step,
+            v => trees.SetStep((int)MathF.Round(v)));
+        var slider = _sliders[^1];
+        slider.TrackCentre = new Vector2((left + right) * 0.5f, y + 22f);
+        slider.TrackSize = new Vector2(width, TrackH);
     }
 
     private void BuildControls(ItemDisplayEditor editor, PreviewMode mode, Vector2 screen, bool firstPerson)
@@ -421,6 +484,20 @@ public sealed class ItemDebuggerUi
         }
     }
 
+    private void DrawTreeGrid(UIRenderer ui, TreePreviewState trees)
+    {
+        DrawGridHeader(ui, $"TREES  ({trees.Entries.Count})");
+
+        foreach (var (centre, size, index) in _slots)
+        {
+            DrawSlot(ui, centre, size, index == trees.SelectedIndex);
+            var name = TreePreviewState.DisplayNameOf(trees.Entries[index]);
+            var (scale, cap) = FitText(ui, name, TextCap, size.X - 8f);
+            var width = ui.MeasureTextWidth(name, scale);
+            ui.DrawText(name, new Vector2(centre.X - width * 0.5f, centre.Y - cap * 0.5f), scale, Rgba.White);
+        }
+    }
+
     private void DrawGridHeader(UIRenderer ui, string header)
     {
         var top = Pad + TabRowH;
@@ -462,6 +539,52 @@ public sealed class ItemDebuggerUi
             ui.DrawText("no clips: rest pose", new Vector2(left, Pad + 30f), ui.CapHeightScale(TextCap), TextDim);
     }
 
+    private void DrawTreeTitle(UIRenderer ui, TreePreviewState trees, Vector2 screen)
+    {
+        var left = screen.X - Pad - PanelWidth + Pad;
+        var lineWidth = PanelWidth - Pad * 2f;
+        if (trees.Selected is not { } species)
+        {
+            ui.DrawText("No tree species", new Vector2(left, Pad + 8f), ui.CapHeightScale(18f), Rgba.White);
+            return;
+        }
+
+        ui.DrawText(TreePreviewState.DisplayNameOf(species), new Vector2(left, Pad + 8f), ui.CapHeightScale(18f),
+            Rgba.White);
+        DrawFitted(ui, $"step {trees.Step}/{trees.MaxStep}  mature {trees.MaturitySteps}  seed {trees.Seed}",
+            new Vector2(left, Pad + 30f), lineWidth);
+
+        // Below the step slider: what the shown tree is made of. Flat preview ground carves
+        // nothing, so the roots feature never grows here.
+        if (Slider(TreeStepSlider) is not { } slider) return;
+        var y = slider.TrackCentre.Y + 22f;
+        DrawFitted(ui, $"wood {trees.WoodCount}  leaves {trees.Cells.Count - trees.WoodCount}",
+            new Vector2(left, y), lineWidth);
+        if (!trees.FeaturesApplied)
+        {
+            y += 20f;
+            DrawFitted(ui, "features at maturity", new Vector2(left, y), lineWidth);
+        }
+        DrawFitted(ui, "flat ground: no roots", new Vector2(left, y + 20f), lineWidth);
+    }
+
+    private static void DrawFitted(UIRenderer ui, string text, Vector2 topLeft, float maxWidth)
+    {
+        var (scale, _) = FitText(ui, text, TextCap, maxWidth);
+        ui.DrawText(text, topLeft, scale, TextDim);
+    }
+
+    /// <summary>The text scale (and the cap height it gives) for <paramref name="text"/> at
+    /// <paramref name="cap"/>, shrunk only as far as it takes to fit <paramref name="maxWidth"/>.</summary>
+    private static (float Scale, float Cap) FitText(UIRenderer ui, string text, float cap, float maxWidth)
+    {
+        var scale = ui.CapHeightScale(cap);
+        var width = ui.MeasureTextWidth(text, scale);
+        if (width <= maxWidth || width <= 0f || maxWidth <= 0f) return (scale, cap);
+        cap *= maxWidth / width;
+        return (ui.CapHeightScale(cap), cap);
+    }
+
     private void DrawControls(UIRenderer ui, Vector2 screen)
     {
         var scale = ui.CapHeightScale(TextCap);
@@ -474,8 +597,9 @@ public sealed class ItemDebuggerUi
             ui.DrawRect(centre, size, background);
             ui.DrawBorder(centre, size, 1f, PanelLine);
 
-            var width = ui.MeasureTextWidth(label, scale);
-            ui.DrawText(label, new Vector2(centre.X - width * 0.5f, centre.Y - TextCap * 0.5f), scale,
+            var (labelScale, cap) = FitText(ui, label, TextCap, size.X - 8f);
+            var width = ui.MeasureTextWidth(label, labelScale);
+            ui.DrawText(label, new Vector2(centre.X - width * 0.5f, centre.Y - cap * 0.5f), labelScale,
                 enabled ? Rgba.White : TextDim);
         }
 

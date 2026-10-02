@@ -13,9 +13,14 @@ namespace silkgltriangle;
 /// Standalone item-debugger entrypoint: a window showing the player model in its carrying pose
 /// with the selected item in the right hand. Left-drag orbits the camera, right-drag moves the
 /// model, middle-drag pans, the wheel zooms (or scrolls the item grid), and the UI edits the
-/// item's display transform and previews the walk/mine/jump animations. The ENTITIES tab swaps
-/// the player for a registered entity, previewing each of its Blockbench clips (and the hurt
-/// flash) through <see cref="EntityPreviewState"/>.
+/// item's display transform and previews the walk/mine/jump animations. Three tabs: ITEMS (the
+/// above), ENTITIES, which swaps the player for a registered entity and previews each of its
+/// Blockbench clips (and the hurt flash) through <see cref="EntityPreviewState"/>, and TREES,
+/// which grows the selected tree species pulse by pulse over flat grass at a fixed seed through
+/// <see cref="TreePreviewState"/>, framed on the tree's bounds (the wheel zooms that framing).
+/// <c>ITEM_DEBUGGER_SELECT</c> resolves an item, then an entity, then a species (a <c>tree/</c>
+/// prefix forces the species), and <c>ITEM_DEBUGGER_TREE_STEP</c> (an integer or <c>mature</c>)
+/// pins the shown growth step for a scripted capture.
 /// </summary>
 public static class ItemDebuggerProgram
 {
@@ -27,6 +32,8 @@ public static class ItemDebuggerProgram
     // No initializer: it snapshots EntityRegistry, so it is built in OnLoad once the scene
     // renderer has loaded the content; a static initializer would see an empty registry.
     private static EntityPreviewState _entities = null!;
+    // No initializer for the same reason: it snapshots TreeSpeciesRegistry.
+    private static TreePreviewState _trees = null!;
     private static DebuggerTab _tab;
     private static readonly PlayerModel Player = new();
     private static readonly ItemDisplayEditor Editor = new();
@@ -34,6 +41,11 @@ public static class ItemDebuggerProgram
     private static float _orbitYaw = 30f;
     private static float _orbitPitch = 12f;
     private static float _distance = 4.5f;
+    // The trees tab frames the tree's bounds itself; the wheel scales that fitted distance.
+    private static float _treeZoom = 1f;
+    private const float FieldOfViewY = 70f * MathF.PI / 180f;
+    private const float NearPlane = 0.05f;
+    private const float FarPlane = 200f;
     private static Vector3 _pan;
     private static Vector3 _modelOffset;
     private const float BodyYaw = -90f;
@@ -96,6 +108,7 @@ public static class ItemDebuggerProgram
 
         _scene = new DebugSceneRenderer(_gl);
         _entities = new EntityPreviewState();
+        _trees = new TreePreviewState();
         _ui = new ItemDebuggerUi();
         Player.Rig = _scene.Rig;
         Player.HoldingItem = true;
@@ -104,12 +117,31 @@ public static class ItemDebuggerProgram
         if (_ui.Entries.Count > 0)
             Editor.Select(_ui.Entries[0].Id);
         var select = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_SELECT")?.Trim();
-        if (!string.IsNullOrEmpty(select) && !TrySelectByName(select))
+        if (!string.IsNullOrEmpty(select))
         {
-            if (_entities.SelectByName(select))
+            // Items, then entities, then tree species; "tree/<name>" skips straight to the species,
+            // since a bare name such as "cactus" is also a block.
+            var forceTree = select.StartsWith(TreePreviewState.NamePrefix, StringComparison.OrdinalIgnoreCase);
+            if (!forceTree && TrySelectByName(select))
+                _tab = DebuggerTab.Items;
+            else if (!forceTree && _entities.SelectByName(select))
                 _tab = DebuggerTab.Entities;
+            else if (_trees.SelectByName(select))
+                _tab = DebuggerTab.Trees;
             else
-                Log.Warn($"ITEM_DEBUGGER_SELECT: no item or entity named '{select}'.");
+                Log.Warn($"ITEM_DEBUGGER_SELECT: no item, entity or tree species named '{select}'.");
+        }
+
+        // The tree growth step to show: an integer (clamped to the species' range) or "mature".
+        var treeStep = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_TREE_STEP")?.Trim();
+        if (!string.IsNullOrEmpty(treeStep))
+        {
+            if (string.Equals(treeStep, "mature", StringComparison.OrdinalIgnoreCase))
+                _trees.Mature();
+            else if (int.TryParse(treeStep, NumberStyles.Integer, CultureInfo.InvariantCulture, out var step))
+                _trees.SetStep(step);
+            else
+                Log.Warn($"ITEM_DEBUGGER_TREE_STEP: '{treeStep}' is neither an integer step nor 'mature'.");
         }
 
         // A clip name of the selected entity, or "hurt".
@@ -203,10 +235,18 @@ public static class ItemDebuggerProgram
             }
         }
 
-        if (_tab == DebuggerTab.Entities)
-            _entities.Update((float)dt);
-        else
-            UpdateAnimation((float)dt);
+        switch (_tab)
+        {
+            case DebuggerTab.Entities:
+                _entities.Update((float)dt);
+                break;
+            case DebuggerTab.Trees:
+                // A tree only changes on a step, seed or species change; nothing animates per frame.
+                break;
+            default:
+                UpdateAnimation((float)dt);
+                break;
+        }
     }
 
     private static void OnRender(double deltaTime)
@@ -214,26 +254,53 @@ public static class ItemDebuggerProgram
         var size = _window.Size;
         if (size.X <= 0 || size.Y <= 0) return;
 
-        var projection = Matrix4x4.CreatePerspectiveFieldOfView(
-            70f * MathF.PI / 180f, size.X / (float)size.Y, 0.05f, 200f);
-        if (_tab == DebuggerTab.Entities)
+        var aspect = size.X / (float)size.Y;
+        var projection = Matrix4x4.CreatePerspectiveFieldOfView(FieldOfViewY, aspect, NearPlane, FarPlane);
+        switch (_tab)
         {
-            // First person has no meaning without the player, so the entity tab always orbits.
-            var entityView = BuildView(EntityOrbitTarget, out var cameraEye);
-            _scene.RenderEntity(entityView * projection, cameraEye, _entities, (float)_time, size);
-        }
-        else
-        {
-            RenderItemScene(projection, size);
+            case DebuggerTab.Entities:
+            {
+                // First person has no meaning without the player, so the entity tab always orbits.
+                var entityView = BuildView(EntityOrbitTarget, out var cameraEye);
+                _scene.RenderEntity(entityView * projection, cameraEye, _entities, (float)_time, size);
+                break;
+            }
+            case DebuggerTab.Trees:
+                RenderTreeScene(aspect, size);
+                break;
+            default:
+                RenderItemScene(projection, size);
+                break;
         }
 
         _scene.Ui.Begin(size);
-        _ui.Draw(_scene.Ui, Editor, _entities, _tab, _mode, new Vector2(size.X, size.Y), _status,
+        _ui.Draw(_scene.Ui, Editor, _entities, _trees, _tab, _mode, new Vector2(size.X, size.Y), _status,
             _firstPerson && _tab == DebuggerTab.Items);
         _scene.Ui.End();
         _gl.BindVertexArray(0);
 
         CaptureScreenshot(size);
+    }
+
+    // Orbits the tree's framing centre at the distance that fits its framing sphere in view, so a
+    // baobab and a cactus both fill the frame; the far plane grows with it so the crown never clips.
+    private static void RenderTreeScene(float aspect, Vector2D<int> size)
+    {
+        var radius = _trees.FramingRadius;
+        var distance = TreeViewDistance(aspect);
+        var projection = Matrix4x4.CreatePerspectiveFieldOfView(FieldOfViewY, aspect, NearPlane,
+            MathF.Max(FarPlane, distance + 2f * radius));
+        var view = BuildView(_trees.FramingCentre, distance, out var eye);
+        _scene.RenderTree(view * projection, eye, _trees, (float)_time, size);
+    }
+
+    private static float TreeViewDistance(float aspect) =>
+        TreePreviewState.FitDistance(_trees.FramingRadius, FieldOfViewY, aspect) * _treeZoom;
+
+    private static float WindowAspect()
+    {
+        var size = _window.Size;
+        return size.X > 0 && size.Y > 0 ? size.X / (float)size.Y : 1f;
     }
 
     private static void RenderItemScene(Matrix4x4 projection, Vector2D<int> size)
@@ -276,10 +343,13 @@ public static class ItemDebuggerProgram
 
     private static Vector3 BodyEye() => _modelOffset + new Vector3(0f, Camera.EyeHeight, 0f);
 
-    private static Matrix4x4 BuildView(Vector3 orbitTarget, out Vector3 eye)
+    private static Matrix4x4 BuildView(Vector3 orbitTarget, out Vector3 eye) =>
+        BuildView(orbitTarget, _distance, out eye);
+
+    private static Matrix4x4 BuildView(Vector3 orbitTarget, float distance, out Vector3 eye)
     {
         var target = orbitTarget + _pan;
-        eye = target + OrbitDirection() * _distance;
+        eye = target + OrbitDirection() * distance;
         return Matrix4x4.CreateLookAt(eye, target, Vector3.UnitY);
     }
 
@@ -336,7 +406,8 @@ public static class ItemDebuggerProgram
     {
         var forward = -OrbitDirection();
         var right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
-        return (right, Vector3.Cross(right, forward), _distance * 0.0016f);
+        var distance = _tab == DebuggerTab.Trees ? TreeViewDistance(WindowAspect()) : _distance;
+        return (right, Vector3.Cross(right, forward), distance * 0.0016f);
     }
 
     private static void UpdateAnimation(float dt)
@@ -375,14 +446,18 @@ public static class ItemDebuggerProgram
             if (_ui.SlotAt(position) is { } slot)
             {
                 // The slot index belongs to whichever grid the active tab shows.
-                if (_tab == DebuggerTab.Entities)
+                switch (_tab)
                 {
-                    _entities.Select(slot);
-                }
-                else
-                {
-                    Editor.Select(_ui.Entries[slot].Id);
-                    _status = "";
+                    case DebuggerTab.Entities:
+                        _entities.Select(slot);
+                        break;
+                    case DebuggerTab.Trees:
+                        _trees.Select(slot);
+                        break;
+                    default:
+                        Editor.Select(_ui.Entries[slot].Id);
+                        _status = "";
+                        break;
                 }
                 return;
             }
@@ -434,6 +509,8 @@ public static class ItemDebuggerProgram
     {
         if (_ui.OverGrid(new Vector2(mouse.Position.X, mouse.Position.Y)))
             _ui.ScrollBy(wheel.Y > 0 ? -1 : 1);
+        else if (_tab == DebuggerTab.Trees)
+            _treeZoom = Math.Clamp(_treeZoom * (wheel.Y > 0 ? 0.9f : 1.1f), 0.3f, 3f);
         else
             _distance = Math.Clamp(_distance - wheel.Y * 0.4f, 1.2f, 20f);
     }
@@ -447,6 +524,21 @@ public static class ItemDebuggerProgram
                 break;
             case DebugButton.TabEntities:
                 _tab = DebuggerTab.Entities;
+                break;
+            case DebugButton.TabTrees:
+                _tab = DebuggerTab.Trees;
+                break;
+            case DebugButton.TreeStepDown:
+                _trees.StepBy(-1);
+                break;
+            case DebugButton.TreeStepUp:
+                _trees.StepBy(1);
+                break;
+            case DebugButton.TreeMature:
+                _trees.Mature();
+                break;
+            case DebugButton.TreeRegrow:
+                _trees.Regrow();
                 break;
             case DebugButton.EntityMode:
                 if (arg >= 0 && arg < _entities.Modes.Count)
