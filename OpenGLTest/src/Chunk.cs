@@ -441,8 +441,8 @@ public class Chunk : IDisposable
 
         // Sunlight seeds: air cells at or above the terrain height see the sky directly.
         // Leaves seed too: canopies pass light, so the sky reaches straight through them
-        // (branch tops under leaves stay lit; only depth falloff dims deep cover). Tapered
-        // wood boxes seed as well (see PassesLight): a thin limb never casts a full shadow.
+        // (branch tops under leaves stay lit; only depth falloff dims deep cover). Tree
+        // wood seeds as well (see PassesLight): a thin limb never casts a full shadow.
         for (var lx = 0; lx < LightSize; lx++)
         {
             var columnRow = mapChunk[lx] * 3;
@@ -577,10 +577,10 @@ public class Chunk : IDisposable
     }
 
     /// <summary>Whether voxel light travels through a block: air, plus leaves, whose canopy
-    /// stays lit through instead of casting solid shade, plus the tapered wood boxes, which
-    /// are far thinner than a full cube and should dapple rather than block, plus the
+    /// stays lit through instead of casting solid shade, plus tree wood, which is mostly far
+    /// thinner than a full cube and should dapple rather than block, plus the
     /// ankle-high pebbles, which are too small to shade. Everything else
-    /// (rock, full-cube logs, TNT) still blocks. AO likewise ignores leaves and thin shapes
+    /// (rock, TNT) still blocks. AO likewise ignores leaves and thin shapes
     /// (see <see cref="BlockType.OccludesAO"/>); geometry culling does not
     /// (see <see cref="BlockType.Occludes"/>). Which blocks pass is data now:
     /// <c>light.passes</c> in each block's JSON, defaulting to "not a full cube".</summary>
@@ -664,26 +664,29 @@ public class Chunk : IDisposable
     /// </summary>
     public void GenerateBlockData()
     {
+        // Worldgen timing for the X/VOXEL_DEBUG console line (WorldgenStats, the `wgen` token)
+        var genStart = System.Diagnostics.Stopwatch.GetTimestamp();
         var column = GetColumnData((int)Position.X, (int)Position.Z);
         var lowerBoundY = LowerBoundY;
         SurfaceMinY = column.MinHeight;
 
         // Entirely above the terrain: nothing to fill, nothing to carve, nothing to stamp.
-        // With trees enabled the band above the surface still needs generation (crowns and
-        // limbs reach TreeMaxHeightBlocks past it), and overhanging limbs near cliffs can
-        // cross from higher neighbouring columns, so the test uses the tallest neighbour.
+        // With trees enabled the band above the surface still needs generation (a tree reaches
+        // TreeGenerator.ReachUp above its base), and overhanging limbs near cliffs can cross
+        // from higher neighbouring columns, so the test uses the tallest column in reach.
         var maxHeight = column.MaxHeight;
         if (WorldGenerationConfig.TreesEnabled)
         {
             var cx = (int)Position.X;
             var cz = (int)Position.Z;
-            for (var dx = -1; dx <= 1; dx++)
-            for (var dz = -1; dz <= 1; dz++)
+            var reach = TreeGenerator.ReachChunkRadius;
+            for (var dx = -reach; dx <= reach; dx++)
+            for (var dz = -reach; dz <= reach; dz++)
             {
                 var neighbourMax = GetColumnData(cx + dx, cz + dz).MaxHeight;
                 if (neighbourMax > maxHeight) maxHeight = neighbourMax;
             }
-            maxHeight += WorldGenerationConfig.TreeMaxHeightBlocks;
+            maxHeight += TreeGenerator.ReachUp + 1;
         }
 
         // A chunk above the terrain still has water to fill when a body's surface reaches into it:
@@ -694,6 +697,7 @@ public class Chunk : IDisposable
         if (lowerBoundY > maxHeight + 1 && !needsWater)
         {
             IsBlockDataReady = true;
+            WorldgenStats.AddChunk(System.Diagnostics.Stopwatch.GetTimestamp() - genStart);
             return;
         }
 
@@ -747,12 +751,17 @@ public class Chunk : IDisposable
         if (WorldGenerationConfig.LavaEnabled)
             LavaGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
+        // Every species (cacti included) stamps here, wood and leaves with their state bytes.
+        // Through a local: a ref to the volatile field is refused, and nothing else can see the
+        // chunk until IsBlockDataReady flips below.
+        var treeStart = System.Diagnostics.Stopwatch.GetTimestamp();
         if (WorldGenerationConfig.TreesEnabled)
-            TreeGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
-
-        // Desert-only, so it never competes with the forest canopy for the same cell
-        if (WorldGenerationConfig.CactusEnabled)
-            CactusGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
+        {
+            var state = _state;
+            TreeGenerator.Stamp(_blocks, ref state, worldX0, lowerBoundY, worldZ0);
+            _state = state;
+        }
+        WorldgenStats.AddTreeTicks(System.Diagnostics.Stopwatch.GetTimestamp() - treeStart);
 
         // Frozen-only ice spikes go down before the snow, so a spike keeps its base cell
         if (WorldGenerationConfig.SnowAndIceEnabled)
@@ -782,6 +791,7 @@ public class Chunk : IDisposable
             ScanFluidFrontier(column, lowerBoundY);
 
         IsBlockDataReady = true;
+        WorldgenStats.AddChunk(System.Diagnostics.Stopwatch.GetTimestamp() - genStart);
     }
 
     /// <summary>
@@ -1526,7 +1536,7 @@ public class Chunk : IDisposable
     /// go through the binary greedy pass first (<see cref="EmitGreedyFaces"/>), which merges
     /// identical neighbouring faces into one quad. The per-voxel loop then handles the rest: each
     /// block picks an emitter from its <see cref="BlockType.Renderer"/> — the procedural ones
-    /// (tapered wood, pebbles, branch piles) build their geometry from tiles, everything else
+    /// (tree wood, pebbles, branch piles) build their geometry from tiles, everything else
     /// replays its baked model's quads.
     /// </summary>
     private ChunkMeshData GenerateMeshDataFromSnapshot(byte[] padded, byte[] paddedState,
@@ -1586,13 +1596,21 @@ public class Chunk : IDisposable
             var basePos = new Vector3(x, y, z);
             var pIdx = (x + 1) * PaddedSq + (y + 1) * Padded + (z + 1);
 
-            // Tapered wood renders as a centred box (plus arms reaching parent/child
-            // wood neighbours) instead of a full cube; see EmitBranchBox
-            if (type.Renderer == BlockRenderer.TaperedWood)
+            // Tree wood thinner than a full cube is a node box plus a tube toward every
+            // connected neighbour (see EmitTreeWood); a full-thickness or detached cell falls
+            // through to the plain model path below, which then also culls its faces against
+            // a same-block full-thickness neighbour, since tree wood never occludes
+            var cullSameFullWood = false;
+            if (type.Renderer == BlockRenderer.TreeWood)
             {
-                EmitBranchBox(vertices, indices, ref indexOffset, padded, pIdx, sunLight, blockLight,
-                    x, y, z, type, basePos);
-                continue;
+                if (TreeWoodShape.IsThin(paddedState[pIdx]))
+                {
+                    EmitTreeWood(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
+                        x, y, z, type, basePos);
+                    continue;
+                }
+
+                cullSameFullWood = true;
             }
 
             // Pebbles render as 1-3 ankle-high boxes sharing the cell; see EmitPebbles
@@ -1678,6 +1696,9 @@ public class Chunk : IDisposable
                     // so no coplanar double quad z-fights). CullSelf additionally hides a
                     // face against the same block, the way glass panes fuse.
                     if (BlockType.Occludes(neighbour) || (type.CullSelf && neighbour == blockId)) continue;
+                    // Stacked full-thickness tree wood hides its shared faces itself
+                    if (cullSameFullWood && neighbour == blockId
+                        && WoodState.IsFullCube(paddedState[pIdx + FaceNeighborDelta[cullFace]])) continue;
 
                     // Light of the air cell in front of the face, from the wide light volume
                     // (so lamps across the chunk border still reach): the flat fallback for
@@ -2081,7 +2102,7 @@ public class Chunk : IDisposable
     /// same four corner AO values and the same four corner smooth sun/lamp light sums
     /// (<paramref name="light"/>), but that alone does not make them continuous across two cells:
     /// for ordinary occluders the shared-vertex geometry makes AO so, while a neighbour that
-    /// casts AO without occluding (leaves, tapered wood) can leave a step at a shared edge, and
+    /// casts AO without occluding (leaves) can leave a step at a shared edge, and
     /// light has a gradient wherever a lamp or a shadow edge is near. So a run only grows along an
     /// axis where the key's per-corner code (AO and both lights together) is the same at both
     /// ends of that axis — then the two cells' shared corners carry the same values, shade and
@@ -2542,88 +2563,6 @@ public class Chunk : IDisposable
         return total / weight;
     }
 
-    /// <summary>Half-width of wood for joint comparisons; logs count as full width.</summary>
-    private static float WoodHalfWidth(byte blockId) => BlockType.WoodHalfWidth(blockId);
-
-    /// <summary>
-    /// Emits a tapered wood segment as a centred node cube with square tubes reaching its
-    /// parent/child wood neighbours only (see <see cref="WoodShape"/>), plus a foot onto
-    /// non-wood full cubes, so a segment sitting on terrain or a log never floats.
-    /// Wood that merely touches at the same level or two apart (a sibling limb, another
-    /// tree) gets no tube, which is what used to weld crowns into circular loops. A
-    /// vertical stack of segments reads as one continuous tapering pipe, but a limb cell
-    /// with only horizontal neighbours is just a node with arms — never a full-height
-    /// vertical core, so limbs read as limbs instead of second trunks. Tube mouths
-    /// press against the node faces behind them and cap only into narrower wood; wider wood
-    /// and full cubes already close the joint. No face culling is enabled, so only normals
-    /// matter — but coplanar opposite quads would still z-fight, and these rules emit none.
-    /// </summary>
-    private static void EmitBranchBox(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        byte[] padded, int pIdx, byte[] sunLight, byte[] blockLight,
-        int x, int y, int z, BlockType type, Vector3 basePos)
-    {
-        var w = type.HalfWidth;
-        var c = 0.5f;
-
-        Span<byte> nb = stackalloc byte[6];
-        Span<FaceLight> lights = stackalloc FaceLight[6];
-        var lightBase = LightIdx(x, y, z);
-        for (var i = 0; i < 6; i++)
-        {
-            nb[i] = padded[pIdx + FaceNeighborDelta[i]];
-            // Smooth per corner toward an open neighbour; backed against an occluder, the
-            // neighbour's own (flat) light as before
-            lights[i] = EmitterFaceLight(i, padded, pIdx, sunLight, blockLight, lightBase,
-                lightBase + LightFaceDelta[i]);
-        }
-
-        // Central node: every face draws, closing the tube mouths pressed against it
-        var nodeMin = new Vector3(c - w, c - w, c - w);
-        var nodeMax = new Vector3(c + w, c + w, c + w);
-        for (var i = 0; i < 6; i++)
-        {
-            var tile = i == 4 ? type.Top : i == 5 ? type.Bottom : type.Side;
-            EmitBoxFace(vertices, indices, ref indexOffset, basePos, nodeMin, nodeMax, i,
-                tile, ShadeLut[(i << 2) | 3], lights[i]);
-        }
-
-        // Up-tube continues the taper into the parent/child wood stacked above or into a
-        // tag block (leaves); foreign wood that merely touches (same level side contact
-        // from another limb, a wider-apart level from another tree) gets no tube, so crowns
-        // cannot weld into loops. The mouth cap only closes into narrower wood: a tag
-        // neighbour's own full-cube face already closes the joint, like terrain does.
-        var aboveWidth = WoodHalfWidth(nb[4]);
-        if (WoodShape.ConnectsVertical(type.Id, nb[4]))
-        {
-            EmitTubeSides(vertices, indices, ref indexOffset, basePos, lights,
-                type.Side, c - w, c + w, c + w, 1f);
-            if (aboveWidth >= 0f && aboveWidth < w)
-                EmitTubeCap(vertices, indices, ref indexOffset, padded, pIdx,
-                    lights[4], type.Top, basePos, c, w, top: true);
-        }
-
-        // Down-tube continues into parent/child wood or a tag block below, or feet onto a
-        // tag block; foreign wood below is treated like air (the node bottom face closes it)
-        var belowWidth = WoodHalfWidth(nb[5]);
-        var connectsDown = WoodShape.ConnectsVertical(type.Id, nb[5]);
-        if (connectsDown || WoodShape.HasFoot(nb[5]))
-        {
-            EmitTubeSides(vertices, indices, ref indexOffset, basePos, lights,
-                type.Side, c - w, c + w, 0f, c - w);
-            if (connectsDown && belowWidth >= 0f && belowWidth < w)
-                EmitTubeCap(vertices, indices, ref indexOffset, padded, pIdx,
-                    lights[5], type.Bottom, basePos, c, w, top: false);
-        }
-
-        // Horizontal arms weld this segment to its parent/child wood neighbours and to tag
-        // blocks (leaves); anything else gets no arm
-        for (var i = 0; i < 4; i++)
-        {
-            if (!WoodShape.ConnectsHorizontal(type.Id, nb[i])) continue;
-            EmitArm(vertices, indices, ref indexOffset, lights, type, basePos, c, w, i, nb[i]);
-        }
-    }
-
     /// <summary>
     /// Emits the 1-3 ankle-high stones sharing a pebble cell: floor-sitting cubes sized and
     /// spun per stone (see PebbleGenerator), with the stone tile cropped to their size so
@@ -2777,98 +2716,58 @@ public class Chunk : IDisposable
         return new Vector3(cx + dx * cos + dz * sin, p.Y, cz - dx * sin + dz * cos);
     }
 
-    /// <summary>The four vertical walls of a tapered tube with a square [lo, hi] cross-section
-    /// running from <paramref name="y0"/> to <paramref name="y1"/> (cell-local).</summary>
-    private static void EmitTubeSides(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        Vector3 basePos, Span<FaceLight> lights, ushort tile,
-        float lo, float hi, float y0, float y1)
+    /// <summary>
+    /// Emits a thin <see cref="BlockRenderer.TreeWood"/> cell: a centred node box sized by its
+    /// <see cref="WoodState"/> thickness and one square tube toward every neighbour it connects
+    /// to (<see cref="TreeWoodShape.Connects"/>), at the thinner of the two widths. Tubes carry
+    /// only their four walls - the neighbour emits the matching tube from its side, so the two
+    /// meet flush with no cap between them - and a node face is dropped where a tube of its
+    /// own full width leaves it. The geometry is exactly <see cref="TreeWoodShape.GetBoxes"/>,
+    /// so the hitboxes cover what is drawn. UVs are cropped (<see cref="CropUv"/>), so bark
+    /// keeps the atlas texel density at every thickness.
+    /// </summary>
+    private static void EmitTreeWood(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+        int x, int y, int z, BlockType type, Vector3 basePos)
     {
-        var min = new Vector3(lo, y0, lo);
-        var max = new Vector3(hi, y1, hi);
-        for (var i = 0; i < 4; i++)
-            EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, i,
-                tile, ShadeLut[(i << 2) | 3], lights[i]);
-    }
-
-    /// <summary>Mouth cap of a vertical tube where it meets air or narrower wood; wider wood
-    /// and full cubes already cover the joint, so capping there would z-fight them.</summary>
-    private static void EmitTubeCap(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        byte[] padded, int pIdx, in FaceLight light, ushort tile,
-        Vector3 basePos, float c, float w, bool top)
-    {
-        var i = top ? 4 : 5;
-        var face = CubeFaces[i].face;
-        var aoDeltas = AODeltas[i];
-
-        for (var j = 0; j < 4; j++)
+        var state = paddedState[pIdx];
+        Span<byte> nbIds = stackalloc byte[6];
+        Span<byte> nbStates = stackalloc byte[6];
+        Span<FaceLight> lights = stackalloc FaceLight[6];
+        var lightBase = LightIdx(x, y, z);
+        for (var i = 0; i < 6; i++)
         {
-            var corner = face[j];
-            var side1 = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 0]]);
-            var side2 = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 1]]);
-            var occluder = BlockType.OccludesAO(padded[pIdx + aoDeltas[j * 3 + 2]]);
-
-            var ao = VertexAO(side1, side2, occluder);
-            var shade = ShadeLut[(i << 2) | ao];
-
-            var local = new Vector3(
-                corner.X == 0 ? c - w : c + w,
-                top ? 1f : 0f,
-                corner.Z == 0 ? c - w : c + w);
-            var pos = basePos + local;
-            light.Sample(local, out var sun, out var block, out var tint);
-            vertices.Add(new Vertex(pos, shade, shade, shade, 255,
-                CropUv(i, local), tile, sun, block, CubeFaces[i].normal, tint: tint));
+            nbIds[i] = padded[pIdx + FaceNeighborDelta[i]];
+            nbStates[i] = paddedState[pIdx + FaceNeighborDelta[i]];
+            // Backed against an occluder, the cell's own light (like pebbles), so a limb
+            // pressed against rock never goes black
+            lights[i] = EmitterFaceLight(i, padded, pIdx, sunLight, blockLight, lightBase, lightBase);
         }
 
-        indices.Add((ushort)(indexOffset + 0));
-        indices.Add((ushort)(indexOffset + 1));
-        indices.Add((ushort)(indexOffset + 2));
-        indices.Add((ushort)(indexOffset + 0));
-        indices.Add((ushort)(indexOffset + 2));
-        indices.Add((ushort)(indexOffset + 3));
-        indexOffset += 4;
-    }
+        var mask = TreeWoodShape.ConnectionMask(type.Id, state, nbIds, nbStates);
+        var half = TreeWoodShape.HalfWidth(WoodState.Thickness(state));
+        TreeWoodShape.NodeBox(half, out var nodeMin, out var nodeMax);
+        for (var face = 0; face < 6; face++)
+        {
+            // A tube as wide as the node continues its face, so that face is the tube's mouth
+            if ((mask & 1 << face) != 0 && TreeWoodShape.TubeHalf(state, nbStates[face]) >= half) continue;
+            var tile = face == 4 ? type.Top : face == 5 ? type.Bottom : type.Side;
+            EmitBoxFace(vertices, indices, ref indexOffset, basePos, nodeMin, nodeMax, face,
+                tile, ShadeLut[(face << 2) | 3], lights[face]);
+        }
 
-    /// <summary>
-    /// One horizontal limb from the node wall (so arm walls meet node walls edge-on with no
-    /// coplanar overlap) to the cell face toward a connected neighbour (parent/child wood
-    /// or a tag block). The end cap draws only into a narrower wood neighbour's mouth;
-    /// equal or wider wood, tag blocks and full cubes already close the joint.
-    /// </summary>
-    private static void EmitArm(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        Span<FaceLight> lights, BlockType type,
-        Vector3 basePos, float c, float w, int dir, byte neighbourId)
-    {
-        var n = CubeFaces[dir].normal;
-        var lo = c - w;
-        var hi = c + w;
-        // Box from the core wall out to the neighbour-side cell face
-        var min = new Vector3(
-            n.X > 0 ? hi : n.X < 0 ? 0f : lo,
-            lo,
-            n.Z > 0 ? hi : n.Z < 0 ? 0f : lo);
-        var max = new Vector3(
-            n.X > 0 ? 1f : n.X < 0 ? c - w : hi,
-            hi,
-            n.Z > 0 ? 1f : n.Z < 0 ? c - w : hi);
-
-        // Top, bottom and the two flanks always draw; the mouth cap only into narrower wood
-        EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, 4,
-            type.Side, ShadeLut[(4 << 2) | 3], lights[4]);
-        EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, 5,
-            type.Side, ShadeLut[(5 << 2) | 3], lights[5]);
-
-        var flankA = dir is 0 or 1 ? 2 : 0;
-        var flankB = dir is 0 or 1 ? 3 : 1;
-        EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, flankA,
-            type.Side, ShadeLut[(flankA << 2) | 3], lights[flankA]);
-        EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, flankB,
-            type.Side, ShadeLut[(flankB << 2) | 3], lights[flankB]);
-
-        if (WoodShape.ConnectsHorizontal(type.Id, neighbourId)
-            && WoodShape.IsWood(neighbourId) && WoodHalfWidth(neighbourId) < w)
-            EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, dir,
-                type.Top, ShadeLut[(dir << 2) | 3], lights[dir]);
+        for (var dir = 0; dir < 6; dir++)
+        {
+            if ((mask & 1 << dir) == 0) continue;
+            TreeWoodShape.TubeBox(dir, half, TreeWoodShape.TubeHalf(state, nbStates[dir]), out var min, out var max);
+            var opposite = TreeWoodShape.Opposite(dir);
+            for (var face = 0; face < 6; face++)
+            {
+                if (face == dir || face == opposite) continue;
+                EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, face,
+                    type.Side, ShadeLut[(face << 2) | 3], lights[face]);
+            }
+        }
     }
 
     /// <summary>One axis-aligned face of the [min, max] box (cell-local), with flat shading

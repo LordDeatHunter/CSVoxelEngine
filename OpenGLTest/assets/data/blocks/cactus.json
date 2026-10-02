@@ -5,10 +5,8 @@
     "textures": { "end": "cactus_top", "side": "cactus_side" }
   },
   "hardness": 2,
-  "renderer": "tapered_wood",
+  "renderer": "tree_wood",
   "sfx": "hit_wood",
-  "wood": { "taperLevel": 0, "halfWidth": 0.375, "family": "cactus" },
-  "occludes": false,
-  "castsAO": false,
-  "light": { "passes": true }
+  // Every thickness of cactus drops a cactus
+  "wood": { "tipHardness": 0.5, "loot": [ { "minThickness": 0, "loot": "self" } ] }
 }

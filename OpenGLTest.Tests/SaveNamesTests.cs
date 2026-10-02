@@ -35,21 +35,34 @@ public sealed class SaveNamesTests
     [Fact]
     public void BlockAndItemNamespacesNeverCollide()
     {
-        // A block and an item share the file name "branch"; the prefix keeps them apart.
-        var blockId = ContentRegistry.RequireBlock("branch").Id;
-        var itemId = ContentRegistry.RequireItem("branch").Id;
-        Assert.NotEqual(blockId, itemId);
+        // Blocks and items may share a file name; the prefix keeps every name apart, so no
+        // block name and no item name are ever equal, and each resolves to its own id
+        var names = new Dictionary<string, byte>();
+        foreach (var block in BlockType.Types.Values)
+        {
+            var name = SaveNames.NameOf(block.Id);
+            Assert.NotNull(name);
+            Assert.StartsWith(SaveNames.BlockPrefix, name);
+            Assert.True(names.TryAdd(name, block.Id), $"'{name}' names two ids");
+        }
 
-        var blockName = SaveNames.NameOf(blockId);
-        var itemName = SaveNames.NameOf(itemId);
-        Assert.NotNull(blockName);
-        Assert.NotNull(itemName);
-        Assert.NotEqual(blockName, itemName);
+        var sawItem = false;
+        foreach (var id in ItemRegistry.ById.Keys)
+        {
+            if (!ItemRegistry.IsItem(id)) continue;
+            var name = SaveNames.NameOf(id);
+            Assert.NotNull(name);
+            Assert.StartsWith(SaveNames.ItemPrefix, name);
+            Assert.True(names.TryAdd(name, id), $"'{name}' names two ids");
+            sawItem = true;
+        }
 
-        Assert.True(SaveNames.TryResolve(blockName, out var blockBack));
-        Assert.Equal(blockId, blockBack);
-        Assert.True(SaveNames.TryResolve(itemName, out var itemBack));
-        Assert.Equal(itemId, itemBack);
+        Assert.True(sawItem, "no pure item was named");
+        foreach (var (name, id) in names)
+        {
+            Assert.True(SaveNames.TryResolve(name, out var back), $"'{name}' did not resolve");
+            Assert.Equal(id, back);
+        }
     }
 
     [Fact]

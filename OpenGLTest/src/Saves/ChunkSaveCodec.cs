@@ -16,7 +16,7 @@ namespace silkgltriangle;
 /// Layout, all little-endian:
 /// <code>
 ///   "CVXC"            4 ASCII bytes of magic
-///   version           byte, currently 1
+///   version           byte, currently 2 (2: tree wood and leaves carry their graph state; v1 files regenerate)
 ///   flags             byte: bit 0 = a state array follows, bit 1 = player-placed cells follow
 ///   paletteCount      byte: distinct non-air ids, in first-seen (Idx) order
 ///   paletteCount x    BinaryWriter string (7-bit length prefix + UTF-8); "" = unknown block
@@ -33,7 +33,7 @@ public static class ChunkSaveCodec
     private static readonly byte[] Magic = "CVXC"u8.ToArray();
 
     /// <summary>The format version this build writes and the only one it reads.</summary>
-    public const byte Version = 1;
+    public const byte Version = 2;
 
     private const byte HasStateFlag = 1;
     private const byte HasPlacedFlag = 2;

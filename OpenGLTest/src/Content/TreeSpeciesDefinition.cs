@@ -140,5 +140,11 @@ public sealed class TreeSpeciesDefinition
 
         /// <summary>Highest ground height the species grows on. Required.</summary>
         public int? MaxGround { get; set; }
+
+        /// <summary>Share of the forest-openness thinning applied, 0..1; default 1.</summary>
+        public float? Openness { get; set; }
+
+        /// <summary>Whether the species keeps out of the spawn clearing; default true.</summary>
+        public bool? SpawnClear { get; set; }
     }
 }

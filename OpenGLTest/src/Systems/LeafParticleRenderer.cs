@@ -104,7 +104,7 @@ public sealed class LeafParticleRenderer : IDisposable
 
         if (!_cropResolved)
         {
-            _leavesTile = TextureAtlas.TileOf("leaves");
+            _leavesTile = TextureAtlas.TileOf("oak_leaves");
             _crop = CenterCrop(_leavesTile, tilePixels, WorldGenerationConfig.LeafParticleCropPixels);
             _cropResolved = true;
         }

@@ -298,26 +298,35 @@ public sealed class BiomeTests
     }
 
     [Fact]
-    public void DesertsGrowNoTreesAndForestsGrowNoCacti()
+    public void EveryTreeGrowsInItsSpeciesBiome()
     {
-        var desert = FindDesertChunk();
-        Assert.NotNull(desert);
-
-        // No tree may take root in the desert...
-        for (var x = 0; x < Chunk.Size; x++)
-        for (var z = 0; z < Chunk.Size; z++)
+        // Whatever roots in a desert or forest chunk is a species whose worldgen rules name the
+        // column's biome, so no forest tree takes root in the sand and no desert species grows in
+        // the forest. Sampled until both biomes produced trees, so the check is never vacuous.
+        var seen = new HashSet<Biome>();
+        var checkedChunks = 0;
+        for (var cx = 0; cx <= 64 && (seen.Count < 2 || checkedChunks < 8); cx++)
+        for (var cz = -64; cz <= 64 && (seen.Count < 2 || checkedChunks < 8); cz++)
         {
-            var worldX = desert.Value.Cx * Chunk.Size + x;
-            var worldZ = desert.Value.Cz * Chunk.Size + z;
-            if (TerrainGenerator.BiomeAt(worldX, worldZ) == Biome.Desert)
-                Assert.False(TreeGenerator.TryGetTrunk(worldX, worldZ, out _, out _));
+            var centre = TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8);
+            if (centre is not (Biome.Desert or Biome.Forest)) continue;
+            checkedChunks++;
+
+            for (var x = 0; x < Chunk.Size; x++)
+            for (var z = 0; z < Chunk.Size; z++)
+            {
+                var worldX = cx * Chunk.Size + x;
+                var worldZ = cz * Chunk.Size + z;
+                if (!TreeGenerator.TryGetTree(worldX, worldZ, out var species, out _))
+                    continue;
+                var biome = TerrainGenerator.BiomeAt(worldX, worldZ);
+                Assert.True(species.Worldgen!.GrowsIn(biome), $"{species.Name} rooted in {biome} at ({worldX}, {worldZ})");
+                seen.Add(biome);
+            }
         }
 
-        // ...and no cactus may take root in the origin's forest column.
-        for (var x = 0; x < Chunk.Size; x++)
-        for (var z = 0; z < Chunk.Size; z++)
-            if (TerrainGenerator.IsForest(x, z))
-                Assert.False(CactusGenerator.TryGetCactus(x, z, out _, out _));
+        Assert.Contains(Biome.Desert, seen);
+        Assert.Contains(Biome.Forest, seen);
     }
 
     private static (int Cx, int Cz)? FindDesertChunk()
@@ -330,7 +339,7 @@ public sealed class BiomeTests
     }
 
     [Fact]
-    public void CactiGrowInDesert()
+    public void DesertsGrowALeaflessSpecies()
     {
         var checkedChunks = 0;
         for (var cx = 0; cx <= 64 && checkedChunks < 24; cx++)
@@ -343,137 +352,21 @@ public sealed class BiomeTests
             for (var x = 0; x < Chunk.Size; x++)
             for (var z = 0; z < Chunk.Size; z++)
             {
-                if (!CactusGenerator.TryGetCactus(cx * Chunk.Size + x, cz * Chunk.Size + z, out _, out var shape))
+                var wx = cx * Chunk.Size + x;
+                var wz = cz * Chunk.Size + z;
+                if (TerrainGenerator.BiomeAt(wx, wz) != Biome.Desert
+                    || !TreeGenerator.TryGetTree(wx, wz, out var species, out _))
                     continue;
 
-                Assert.NotEmpty(shape.Wood);
-                foreach (var block in shape.Wood)
-                    Assert.Equal(BlockType.CactusWoodFamily, BlockType.WoodFamilyOf(block.Id));
-
+                Assert.False(species.HasLeaves, $"the desert grew the leafy {species.Name}");
+                var shape = TreeGenerator.ShapeOf(wx, wz);
+                Assert.True(shape.WoodCount > 0);
+                Assert.Equal(shape.WoodCount, shape.Cells.Length);
                 return;
             }
         }
 
-        Assert.Fail("no cactus found in 24 desert chunks");
-    }
-
-    [Fact]
-    public void CactusTaperStepsGetNarrowerTowardTheTip()
-    {
-        var levels = new[] { "cactus", "cactus_arm", "cactus_prong", "cactus_tip" }
-            .Select(ContentRegistry.RequireBlock)
-            .OrderBy(b => b.WoodTaperLevel)
-            .ToArray();
-
-        foreach (var level in levels)
-            Assert.Equal(BlockType.CactusWoodFamily, BlockType.WoodFamilyOf(level.Id));
-
-        Assert.True(levels[0].HalfWidth < 0.5f, $"stem half-width {levels[0].HalfWidth}");
-        for (var i = 1; i < levels.Length; i++)
-            Assert.True(levels[i].HalfWidth < levels[i - 1].HalfWidth,
-                $"{levels[i].Name} is not thinner than {levels[i - 1].Name}");
-
-        Assert.Equal(BlockType.TreeWoodFamily, BlockType.WoodFamilyOf(ContentRegistry.RequireBlock("log").Id));
-    }
-
-    [Fact]
-    public void OnlyTheCactusArmBaseWeldsToTheStem()
-    {
-        var stem = ContentRegistry.RequireBlock("cactus").Id;
-        var arm = ContentRegistry.RequireBlock("cactus_arm").Id;
-        var prong = ContentRegistry.RequireBlock("cactus_prong").Id;
-        var tip = ContentRegistry.RequireBlock("cactus_tip").Id;
-
-        Assert.True(WoodShape.ConnectsHorizontal(arm, stem));
-
-        Assert.False(WoodShape.ConnectsHorizontal(prong, stem));
-        Assert.False(WoodShape.ConnectsHorizontal(tip, stem));
-
-        Assert.True(WoodShape.ConnectsVertical(prong, arm));
-        Assert.True(WoodShape.ConnectsVertical(tip, prong));
-    }
-
-    private static List<Dictionary<(int X, int Y, int Z), byte>> FindStampedCacti(int max)
-    {
-        var cacti = new List<Dictionary<(int X, int Y, int Z), byte>>();
-        for (var cx = 0; cx <= 64 && cacti.Count < max; cx++)
-        for (var cz = -64; cz <= 64 && cacti.Count < max; cz++)
-        {
-            if (TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8) != Biome.Desert)
-                continue;
-
-            for (var x = 0; x < Chunk.Size && cacti.Count < max; x++)
-            for (var z = 0; z < Chunk.Size && cacti.Count < max; z++)
-            {
-                if (!CactusGenerator.TryGetCactus(cx * Chunk.Size + x, cz * Chunk.Size + z, out _, out var shape))
-                    continue;
-                if (!shape.Wood.Any(c => WoodShape.WoodLevel(c.Id) == 1))
-                    continue;
-
-                var stamped = new Dictionary<(int X, int Y, int Z), byte>();
-                foreach (var (wx, wy, wz, id) in shape.Wood)
-                    stamped.TryAdd((wx, wy, wz), id);
-                cacti.Add(stamped);
-            }
-        }
-        return cacti;
-    }
-
-    [Fact]
-    public void GeneratedCactusBranchesWeldOnlyAtTheBase()
-    {
-        var cacti = FindStampedCacti(8);
-        Assert.NotEmpty(cacti);
-
-        var weldCount = 0;
-        foreach (var cells in cacti)
-        foreach (var ((x, y, z), id) in cells)
-        foreach (var (dx, dz) in new[] { (1, 0), (0, 1) })
-        {
-            var other = cells.GetValueOrDefault((x + dx, y, z + dz), BlockType.Air);
-            if (!WoodShape.ConnectsHorizontal(id, other)) continue;
-
-            var a = WoodShape.WoodLevel(id);
-            var b = WoodShape.WoodLevel(other);
-            Assert.Equal(0, Math.Min(a, b));
-            Assert.Equal(1, Math.Max(a, b));
-            weldCount++;
-        }
-
-        Assert.True(weldCount > 0, "generated cactus had no base branch-off weld");
-    }
-
-    [Fact]
-    public void GeneratedCactusNarrowsMonotonicallyUpward()
-    {
-        var cacti = FindStampedCacti(8);
-        Assert.NotEmpty(cacti);
-
-        foreach (var cells in cacti)
-        foreach (var column in cells.GroupBy(c => (c.Key.X, c.Key.Z)))
-        {
-            var widths = column.OrderBy(c => c.Key.Y).Select(c => BlockType.ById[c.Value]!.HalfWidth).ToArray();
-            for (var i = 1; i < widths.Length; i++)
-                Assert.True(widths[i] <= widths[i - 1],
-                    $"cactus column widened from {widths[i - 1]} to {widths[i]} climbing upward");
-        }
-    }
-
-    [Fact]
-    public void WoodFamiliesNeverWeld()
-    {
-        var log = ContentRegistry.RequireBlock("log").Id;
-        var stem = ContentRegistry.RequireBlock("cactus").Id;
-        var arm = ContentRegistry.RequireBlock("cactus_arm").Id;
-
-        Assert.False(WoodShape.ConnectsVertical(log, stem));
-        Assert.False(WoodShape.ConnectsVertical(stem, log));
-        Assert.False(WoodShape.ConnectsHorizontal(log, stem));
-
-        // ...but a cactus welds to itself, and a prong to the stem it leaves
-        Assert.True(WoodShape.ConnectsVertical(stem, stem));
-        Assert.True(WoodShape.ConnectsHorizontal(stem, arm));
-        Assert.True(WoodShape.ConnectsVertical(arm, arm));
+        Assert.Fail("no tree found in 24 desert chunks");
     }
 
     [Fact]

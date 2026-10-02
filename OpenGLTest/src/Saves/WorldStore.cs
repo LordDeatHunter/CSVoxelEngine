@@ -22,7 +22,7 @@ namespace silkgltriangle;
 /// </summary>
 public sealed class WorldStore(string root)
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
     public const string MetadataFileName = "world.json";
     public const string ChunksDirectoryName = "chunks";
     private const string ChunkFileExtension = ".bin";

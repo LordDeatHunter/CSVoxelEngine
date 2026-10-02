@@ -123,8 +123,8 @@ public class RenderManager : IDisposable
     private uint faceVbo;
 
     // The mining pop's streaming box batch (see PopBoxEmitter): one reusable VAO/VBO with a
-    // static index prefix per box, refilled while a block is being mined. Tapered wood tops
-    // out at five boxes (column plus four arms), so eight leaves headroom and the buffers
+    // static index prefix per box, refilled while a block is being mined. Tree wood tops
+    // out at seven boxes (a node plus a tube on every face), so eight leaves headroom and the buffers
     // grow if a future block ever brings more.
     private const int MaxPopBoxes = 8;
     private uint _popVao;
@@ -617,7 +617,7 @@ public class RenderManager : IDisposable
         textureAtlas = TextureAtlas.Build(gl, "assets/textures/blocks", srgb: true);
         // The average stands in for decoded atlas albedo on the far LOD, so decode it too.
         _lodLeafColor = ColorSpace.SrgbToLinear(
-            LoadOpaqueAverage("assets/textures/blocks/leaves.png", _lodLeafColor));
+            LoadOpaqueAverage("assets/textures/blocks/oak_leaves.png", _lodLeafColor));
         ContentRegistry.BakeModels();
         // After the bake, the first point that knows which tiles cutout blocks wear: their
         // box-filtered mips would average leaf alpha under the cutoff and thin canopies out.

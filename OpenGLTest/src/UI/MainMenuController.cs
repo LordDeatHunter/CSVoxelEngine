@@ -176,7 +176,17 @@ public sealed class MainMenuController(WorldStore store, Func<int> randomSeed)
             case MainMenuHitKind.Play when IsRow(hit.Row):
                 if (View.WorldsLocked)
                     return MainMenuAction.None;
-                PlayRequest = View.Worlds[hit.Row];
+                // A world written by another save format is refused here, the one place a world
+                // is opened from, rather than half-loaded; EDIT and DELETE stay available so the
+                // player can wipe it.
+                var world = View.Worlds[hit.Row];
+                if (world.Version != WorldStore.CurrentVersion)
+                {
+                    ShowNotice($"'{world.Name}' was saved by an older version (format {world.Version}, " +
+                               $"this build reads {WorldStore.CurrentVersion}); delete it to make room.");
+                    return MainMenuAction.None;
+                }
+                PlayRequest = world;
                 PlayRequestIsNew = false;
                 return MainMenuAction.Play;
 

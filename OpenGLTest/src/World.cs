@@ -508,7 +508,7 @@ public class World : IItemUseWorld
             return;
         }
 
-        var top = estimate + WorldGenerationConfig.TreeMaxHeightBlocks + 2;
+        var top = estimate + TreeGenerator.ReachUp + 1;
         if (!_chunkManager.TryGetCell(sx, top, sz, out _, out _))
         {
             Camera.TestTeleport(new Vector3(_spawnX, holdEye, _spawnZ), Camera.Yaw, Camera.Pitch);
@@ -1516,7 +1516,9 @@ public class World : IItemUseWorld
             _breakingBlockPosition = _selectedBlockPosition;
             _breakingBlockId = BlockIdAt(_selectedBlockPosition);
             _breakingHeldId = heldId;
-            _breakHardness = BlockType.ById[_breakingBlockId]?.Hardness ?? 0f;
+            // Tree wood's hardness follows its thickness, which lives in the state byte
+            _breakHardness = Mining.HardnessOf(_breakingBlockId, _chunkManager.GetStateGlobal(
+                (int)_selectedBlockPosition.X, (int)_selectedBlockPosition.Y, (int)_selectedBlockPosition.Z));
             _breakAllowed = Mining.CanMine(_breakingBlockId, held);
             _breakPower = Mining.BlockDamage(held);
             _breakHitSeconds = Mining.HitGapSeconds(held);
@@ -1776,8 +1778,8 @@ public class World : IItemUseWorld
         _sfx?.Play(BlockType.ById[blockId]?.Sfx ?? SfxLibrary.DefaultGroup);
 
     /// <summary>
-    /// Hitboxes for the outline, break overlay and mining pop. Tapered wood resolves
-    /// its drawn shape from the live neighbourhood (see <see cref="WoodShape"/>) and layered
+    /// Hitboxes for the outline, break overlay and mining pop. Tree wood resolves
+    /// its drawn shape from the live neighbourhood (see <see cref="TreeWoodShape"/>) and layered
     /// snow from its stack depth (see <see cref="SnowShape"/>); everything else uses its
     /// registered boxes.
     /// </summary>
@@ -1788,9 +1790,9 @@ public class World : IItemUseWorld
             return SnowShape.GetBoxes((int)blockPos.X, (int)blockPos.Z,
                 _chunkManager.GetStateGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z),
                 type.StackMax);
-        if (!WoodShape.IsTapered(blockId))
+        if (!BlockType.IsTreeWood(blockId))
             return type?.Hitboxes ?? [BlockHitbox.FullCube];
-        return WoodShape.GetBoxesAt(blockId, _chunkManager.GetBlockGlobal,
+        return TreeWoodShape.GetBoxesAt(blockId, _chunkManager,
             (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
     }
 
@@ -1816,8 +1818,8 @@ public class World : IItemUseWorld
 
         // A mined wood block fells whatever it was holding up instead of dropping one
         // block (see FellWood): a trunk cut drops the crown, a branch cut only its children
-        if (TreeGenerator.WoodLevel(brokenId) >= 0)
-            FellWood(blockPos, brokenId, chunk, creative);
+        if (BlockType.IsTreeWood(brokenId))
+            FellWood(blockPos, brokenId, brokenState, chunk, creative);
         // Mining any cell of a multiblock takes the whole structure apart instead of leaving
         // invisible part cells standing (see RevertMultiblock)
         else if (Multiblock.IsMultiblockCell(brokenId))
@@ -1828,7 +1830,8 @@ public class World : IItemUseWorld
             if (!creative)
                 _dropManager.SpawnLoot(brokenId, blockPos,
                     DropManager.PileCount(brokenId, (int)blockPos.X, (int)blockPos.Z, brokenState),
-                    DropManager.PileSecondary(brokenId, (int)blockPos.X, (int)blockPos.Z, brokenState));
+                    DropManager.PileSecondary(brokenId, (int)blockPos.X, (int)blockPos.Z, brokenState),
+                    brokenState);
             if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.BranchPile)
                 _campfires.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, _dropManager);
             if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.Quern)
@@ -1852,7 +1855,7 @@ public class World : IItemUseWorld
         // and rebuild regardless.
         if (TreeGenerator.IsTreeBlock(brokenId))
         {
-            TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z);
+            TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z, TreeGenerator.SingleEditPoisonRadius);
             _lodManager.MarkEditedColumn((int)blockPos.X, (int)blockPos.Z);
             _leaves.Burst(blockPos, WorldGenerationConfig.LeafParticleBurstMined);
         }
@@ -1875,11 +1878,11 @@ public class World : IItemUseWorld
     /// Fells the wood a mined wood block was holding up: collects the severed part (the break
     /// plus its children — a branch cut leaves the trunk standing), clears it in one batch
     /// (same pattern as a TNT blast), and launches a toppling entity that drops its blocks
-    /// once it has lain still. Player-placed logs are not trees: they pop out as a plain
-    /// drop with no entity and no animation. A lone block with no children just drops as-is.
-    /// A creative break (<paramref name="creative"/>) still topples, but drops nothing.
+    /// once it has lain still. Player-placed (detached) logs are not trees: they pop out as a
+    /// plain drop with no entity and no animation. A lone block with no children just drops
+    /// as-is. A creative break (<paramref name="creative"/>) still topples, but drops nothing.
     /// </summary>
-    private void FellWood(Vector3 blockPos, byte brokenId, Chunk chunk, bool creative)
+    private void FellWood(Vector3 blockPos, byte brokenId, byte brokenState, Chunk chunk, bool creative)
     {
         var x = (int)blockPos.X;
         var y = (int)blockPos.Y;
@@ -1887,21 +1890,21 @@ public class World : IItemUseWorld
 
         // Player-built logs never topple: no entity, no animation, just a drop.
         // RemoveBlockAt remeshes, so unlike the batch paths below nothing lingers.
-        if (_chunkManager.IsPlayerPlaced(x, y, z))
+        if (WoodState.IsDetached(brokenState) || _chunkManager.IsPlayerPlaced(x, y, z))
         {
             if (chunk.RemoveBlockAt(blockPos, _chunkManager) && !creative)
-                _dropManager.SpawnLoot(brokenId, blockPos);
+                _dropManager.SpawnLoot(brokenId, blockPos, state: brokenState);
             _fluidManager.ScheduleAround(blockPos);
             return;
         }
 
-        var collected = TopplingTree.Collect(_chunkManager, blockPos, brokenId);
+        var collected = TopplingTree.Collect(_chunkManager, blockPos, brokenId, brokenState);
         if (collected.Count < 2)
         {
             // Nothing was held up by this block: drop it as-is through the normal
             // single-block path, which remeshes synchronously.
             if (chunk.RemoveBlockAt(blockPos, _chunkManager) && !creative)
-                _dropManager.SpawnLoot(brokenId, blockPos);
+                _dropManager.SpawnLoot(brokenId, blockPos, state: brokenState);
             _fluidManager.ScheduleAround(blockPos);
             return;
         }
@@ -1941,9 +1944,8 @@ public class World : IItemUseWorld
         // The whole canopy came down above the caps: disturb it once at the break (its reach
         // covers the crown) and rebuild every touched column so no ghost lingers at range. A
         // cactus has no canopy, so it only needs the column rebuild.
-        var brokenFamily = BlockType.WoodFamilyOf(brokenId);
-        if (brokenFamily == BlockType.TreeWoodFamily || brokenFamily == BlockType.SpruceWoodFamily)
-            TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z);
+        if (TreeGenerator.IsTreeBlock(brokenId))
+            TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z, TreeGenerator.FellPoisonRadius);
         foreach (var ((lx, lz), _) in lowestY)
             _lodManager.MarkEditedColumn(lx, lz);
 
@@ -2665,6 +2667,10 @@ public class World : IItemUseWorld
             var below = placePos - Vector3.UnitY;
             if (!BlockType.IsSolid(BlockIdAt(below))) return false;
         }
+
+        // A placed log is building material, not part of a tree: it is a plain full cube that
+        // never connects to tree wood around it and never fells (see TreeWoodShape.Connects)
+        if (BlockType.IsTreeWood(blockId) && state == 0) state = WoodState.Detached;
 
         if (!chunk.PlaceBlockAt(placePos, blockId, _chunkManager, state)) return false;
 

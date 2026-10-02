@@ -136,6 +136,10 @@ public static class FrameProfiler
     // Scratch for the current frame's three deltas, static so EndFrame allocates nothing.
     private static readonly long[] _geoFrameSteps = new long[3];
 
+    // Worldgen instrument: the shape-cache miss counter is lifetime, so the window's delta is
+    // taken against the value seen at the previous publish
+    private static long _shapeMissesPrev;
+
     private static readonly List<string> _lines = [];
     private static string _consoleLine = string.Empty;
     private static bool _consolePending;
@@ -339,6 +343,8 @@ public static class FrameProfiler
             _gcBaseTaken = true;
         }
 
+        var wgenText = FormatWorldgen(seconds);
+
         _lines.Clear();
         _lines.Add($"frame {frameMs,5:F2} ms  {fps,3} fps");
         _lines.Add($"cpu {cpuMs,5:F2}  gpu {gpuText,6}");
@@ -363,6 +369,10 @@ public static class FrameProfiler
             // gate pixel. The token is `regions`, never `lod`: `lod` is already a ProfileSection
             // label inside JoinSections and a scraper keyed on it would match the wrong field.
             $"regions {_lodBuildCount}/{_lodRegionCount} " +
+            // Worldgen instrument (tree rework baseline): chunk generation, the tree stamp and the
+            // shape builds, from WorldgenStats. Console line ONLY, like `regions`; `wgen` collides
+            // with no Labels entry.
+            wgenText +
             // Geometry free-list instrument (item D5), opaque/translucent/lod throughout: current
             // free blocks, this window's largest free-block count, the lifetime peak, this window's
             // scan steps, and the window's worst single frame with its three-way split. The raw
@@ -402,6 +412,37 @@ public static class FrameProfiler
         Array.Clear(_geoFreeWindowMax);
         _geoWorstFrameSteps = 0;
         Array.Clear(_geoWorstFrameSplit);
+    }
+
+    // `wgen {chunks} {rate}/s {ms}ms/c trees {ms}/s {ms}/c grow {n} {ms}/s {ms}/t miss {n} tot ...`:
+    // this window's generated chunks, their mean GenerateBlockData cost, the tree/cactus stamp's
+    // share per second and per chunk, the shape builds (cache misses on any thread, the LOD
+    // builder's canopy sweep included) and the lifetime totals. Every ratio is 0 on an empty window.
+    private static string FormatWorldgen(double seconds)
+    {
+        WorldgenStats.TakeWindow(out var treeTicks, out var genTicks, out var chunks,
+            out var growTicks, out var grows);
+        var misses = TreeGenerator.ShapeCacheMisses;
+        var missDelta = misses - _shapeMissesPrev;
+        _shapeMissesPrev = misses;
+
+        var genMs = ToMilliseconds(genTicks);
+        var treeMs = ToMilliseconds(treeTicks);
+        var growMs = ToMilliseconds(growTicks);
+        var chunkRate = seconds > 0 ? chunks / seconds : 0;
+        var msPerChunk = chunks > 0 ? genMs / chunks : 0;
+        var treeMsPerSecond = seconds > 0 ? treeMs / seconds : 0;
+        var treeMsPerChunk = chunks > 0 ? treeMs / chunks : 0;
+        var growMsPerSecond = seconds > 0 ? growMs / seconds : 0;
+        var growMsPerTree = grows > 0 ? growMs / grows : 0;
+
+        return $"wgen {chunks} {chunkRate:F1}/s {msPerChunk:F2}ms/c " +
+               $"trees {treeMsPerSecond:F1}ms/s {treeMsPerChunk:F2}ms/c " +
+               $"grow {grows} {growMsPerSecond:F1}ms/s {growMsPerTree:F3}ms/t " +
+               $"miss {missDelta} " +
+               $"tot {WorldgenStats.TotalChunks} {ToMilliseconds(WorldgenStats.TotalGenTicks):F0}ms " +
+               $"{ToMilliseconds(WorldgenStats.TotalTreeTicks):F0}ms {WorldgenStats.TotalGrows} " +
+               $"{ToMilliseconds(WorldgenStats.TotalGrowTicks):F0}ms ";
     }
 
     // "label     avg   max   gpu" — 29 characters, inside DrawText's 32-glyph budget

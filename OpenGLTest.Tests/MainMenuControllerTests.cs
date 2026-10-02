@@ -249,6 +249,34 @@ public sealed class MainMenuControllerTests : IDisposable
         Assert.Null(unlocked.View.Notice);
     }
 
+    /// <summary>
+    /// PLAY refuses a world written by another save format with a notice and no request, while a
+    /// world at the current format plays; the refused row can still be edited and deleted.
+    /// </summary>
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(1)]
+    public void PlayRefusesAWorldOfAnotherSaveFormat(int versionOffset)
+    {
+        var controller = NewController();
+        controller.OpenWorlds();
+        var otherVersion = WorldStore.CurrentVersion + versionOffset;
+        controller.View.Worlds.Add(new WorldInfo("old", "Old", 1, 0, 0, otherVersion, "old"));
+        controller.View.Worlds.Add(new WorldInfo("new", "New", 2, 0, 0, WorldStore.CurrentVersion, "new"));
+
+        Assert.Equal(MainMenuAction.None, controller.Click(Hit(MainMenuHitKind.Play, 0)));
+        Assert.Null(controller.PlayRequest);
+        Assert.NotNull(controller.View.Notice);
+        Assert.Equal(MainMenuPage.Worlds, controller.View.Page);
+
+        controller.Click(Hit(MainMenuHitKind.Delete, 0));
+        Assert.Equal(MainMenuPage.ConfirmDelete, controller.View.Page);
+        controller.Key(MenuKey.Escape);
+
+        Assert.Equal(MainMenuAction.Play, controller.Click(Hit(MainMenuHitKind.Play, 1)));
+        Assert.Equal("new", controller.TakePlayRequest()!.Slug);
+    }
+
     [Fact]
     public void AStoreErrorShowsANoticeInsteadOfThrowing()
     {

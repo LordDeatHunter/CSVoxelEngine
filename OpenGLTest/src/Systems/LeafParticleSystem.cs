@@ -137,7 +137,7 @@ public class LeafParticleSystem
         {
             try
             {
-                _leavesId = ContentRegistry.RequireBlock("leaves").Id;
+                _leavesId = ContentRegistry.RequireBlock("oak_leaves").Id;
             }
             catch
             {

@@ -5,7 +5,7 @@ namespace silkgltriangle;
 
 /// <summary>
 /// The smooth corner light of one full cell face (see <see cref="Chunk.SmoothCornerLight"/>),
-/// bilinearly interpolated for geometry that sits inside the cell: tapered wood, pebbles, branch
+/// bilinearly interpolated for geometry that sits inside the cell: tree wood, pebbles, branch
 /// piles, snow layers and fluids light each vertex from where it lies on the cell face it takes
 /// its light from, so a partial block blends into the full cubes beside it instead of stepping.
 /// Each corner is a code <c>sunSum | blockSum &lt;&lt; 6 | tint &lt;&lt; 12</c> with both sums over

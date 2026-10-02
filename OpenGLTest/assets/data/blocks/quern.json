@@ -6,7 +6,7 @@
   // quad at y <= 6 or the split misfires.
   "name": "Quern",
   "model": {
-    "textures": { "base": "cobblestone", "plate": "stone", "rod_side": "log_side", "rod_top": "log_top" },
+    "textures": { "base": "cobblestone", "plate": "stone", "rod_side": "oak_log_side", "rod_top": "oak_log_top" },
     "elements": [
       {
         "from": [1, 0, 1],

@@ -5,8 +5,13 @@
     "textures": { "end": "spruce_log_top", "side": "spruce_log_side" }
   },
   "hardness": 24,
+  "renderer": "tree_wood",
   "sfx": "hit_wood",
   "requiresTool": true,
   "tools": { "axe": 1 },
-  "wood": { "taperLevel": 0, "halfWidth": 0.5, "family": "spruce" }
+  // Same thickness curve and loot bands as the oak log (see oak_log.json)
+  "wood": {
+    "tipHardness": 0.25,
+    "loot": [ { "minThickness": 0, "loot": "wood" }, { "minThickness": 7, "loot": "self" } ]
+  }
 }

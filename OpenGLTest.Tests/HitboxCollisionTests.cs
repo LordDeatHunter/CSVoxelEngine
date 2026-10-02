@@ -126,11 +126,11 @@ public sealed class HitboxCollisionTests
 
         // The predicate Camera.IsColliding consults for a flagged id: free above the slab top,
         // blocked once the body dips into it, and a plain stone cell still blocks the high box.
-        Assert.False(WoodShape.OverlapsShape(mold, manager.GetBlockGlobal, 8, 1, 8,
+        Assert.False(TreeWoodShape.OverlapsShape(mold, manager, 8, 1, 8,
             new Vector3(8.2f, 1.3f, 8.2f), new Vector3(8.8f, 1.9f, 8.8f)));
-        Assert.True(WoodShape.OverlapsShape(mold, manager.GetBlockGlobal, 8, 1, 8,
+        Assert.True(TreeWoodShape.OverlapsShape(mold, manager, 8, 1, 8,
             new Vector3(8.2f, 1.1f, 8.2f), new Vector3(8.8f, 1.9f, 8.8f)));
-        Assert.True(WoodShape.OverlapsShape(stone, manager.GetBlockGlobal, 9, 1, 8,
+        Assert.True(TreeWoodShape.OverlapsShape(stone, manager, 9, 1, 8,
             new Vector3(9.2f, 1.3f, 8.2f), new Vector3(9.8f, 1.9f, 8.8f)));
     }
 }

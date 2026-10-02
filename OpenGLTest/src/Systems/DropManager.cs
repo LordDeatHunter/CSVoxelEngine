@@ -68,12 +68,21 @@ public class DropManager
     /// Rolls what a destroyed block leaves behind into <paramref name="into"/>: its loot table,
     /// or the block itself when it declares none (<see cref="LootTable.None"/> yields nothing).
     /// Every destruction path — mining, TNT, felling — rolls through here, so the yield never
-    /// depends on how the block came down. Unknown ids (air, items) roll nothing.
+    /// depends on how the block came down. Unknown ids (air, items) roll nothing. Tree wood
+    /// rolls the band its thickness (read from <see cref="LootContext.State"/>) falls in.
     /// </summary>
     public static void RollLoot(byte blockId, LootContext context, List<byte> into)
     {
         var type = BlockType.ById[blockId];
         if (type == null) return;
+
+        if (type.Renderer == BlockRenderer.TreeWood)
+        {
+            var band = WoodLootBand.Select(type.WoodLootBands, WoodState.Thickness(context.State));
+            if (band.Self) into.Add(blockId);
+            else band.Table?.Roll(context, into);
+            return;
+        }
 
         if (type.LootTable == null)
         {
@@ -89,13 +98,14 @@ public class DropManager
     /// block occupied. The cell doubles as the loot context, so position-dependent rolls (the
     /// pebble's yield) see where the block stood. <paramref name="count"/> carries an
     /// explicit pile size for a player-built stack (see <see cref="PileCount"/>); 0 derives it.
-    /// <paramref name="secondary"/> carries the obsidian share of a player-built pebble pile.
+    /// <paramref name="secondary"/> carries the obsidian share of a player-built pebble pile,
+    /// <paramref name="state"/> the destroyed cell's state byte (tree wood's thickness band).
     /// </summary>
-    public void SpawnLoot(byte blockId, Vector3 blockPosition, int count = 0, int secondary = 0)
+    public void SpawnLoot(byte blockId, Vector3 blockPosition, int count = 0, int secondary = 0, byte state = 0)
     {
         _loot.Clear();
         RollLoot(blockId,
-            new LootContext((int)blockPosition.X, (int)blockPosition.Y, (int)blockPosition.Z, count, secondary),
+            new LootContext((int)blockPosition.X, (int)blockPosition.Y, (int)blockPosition.Z, count, secondary, state),
             _loot);
 
         foreach (var id in _loot)

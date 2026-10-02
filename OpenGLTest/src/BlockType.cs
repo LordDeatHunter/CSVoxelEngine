@@ -37,30 +37,6 @@ public sealed record BlockType
     /// <summary>Whether voxel light travels through each block id; see Chunk's light passes.</summary>
     public static readonly bool[] PassesLightById = new bool[256];
 
-    /// <summary>Family id of the tree wood set: log (0) down to twig (5).</summary>
-    public const byte TreeWoodFamily = 0;
-
-    /// <summary>Family id of the cactus wood set: stem (0) down to tip (3).</summary>
-    public const byte CactusWoodFamily = 1;
-
-    /// <summary>Family id of the spruce wood set: the full-cube trunk only (level 0).</summary>
-    public const byte SpruceWoodFamily = 2;
-
-    /// <summary>Family of a block that is not tapered wood at all.</summary>
-    public const byte NoWoodFamily = 255;
-
-    /// <summary>Family a block's taper levels belong to, from its <c>wood.family</c>, or
-    /// <see cref="NoWoodFamily"/>. Wood of two different families never welds.</summary>
-    internal static readonly byte[] WoodFamilyById = new byte[256];
-
-    /// <summary>Family name to id, for content that has to name a family (e.g. the cactus
-    /// generator resolving <c>"cactus"</c> once at startup).</summary>
-    internal static readonly Dictionary<string, byte> WoodFamilyIdsByName = new(StringComparer.Ordinal);
-
-    /// <summary>Wood block per family and taper level, each family's levels contiguous from 0.
-    /// Built and validated by the registry from each block's <c>wood.taperLevel</c>.</summary>
-    internal static readonly Dictionary<byte, byte[]> WoodByLevelByFamily = new();
-
     /// <summary>Every registered block keyed by id, for code that enumerates types.</summary>
     public static IReadOnlyDictionary<byte, BlockType> Types { get; internal set; } =
         new Dictionary<byte, BlockType>();
@@ -83,9 +59,10 @@ public sealed record BlockType
     // this surface never grows pebbles. See PebbleGenerator.
     internal static readonly float[] PebbleWeightById = new float[256];
 
-    // Whether tapered wood may grow a tube or arm into each block id (members of the
-    // tree_branch_connectable tag: leaves, never terrain). Flat like the other mesher flags.
-    internal static readonly bool[] BranchConnectableById = new bool[256];
+    // Whether the block is the reworked trees' wood (the tree_wood renderer), whose thickness
+    // and parent direction live in the state byte. Read per voxel by the mesher's connection
+    // test and per DDA step by the raycast, so flat like the other flags.
+    internal static readonly bool[] TreeWoodById = new bool[256];
 
     // Whether the binary greedy mesher may merge this block's faces: a plain full cube whose
     // six faces are the untransformed cube faces (see ContentRegistry.BakesGreedy). Anything
@@ -241,11 +218,15 @@ public sealed record BlockType
     /// </summary>
     public byte StackMax { get; init; }
 
-    /// <summary>Wood taper step, or -1 for anything that is not wood.</summary>
-    public int WoodTaperLevel { get; init; } = -1;
+    /// <summary><see cref="BlockRenderer.TreeWood"/> only: the share of <see cref="Hardness"/>
+    /// the thinnest wood keeps, rising linearly to the full hardness at a full cube (see
+    /// <see cref="Mining.HardnessOf"/>).</summary>
+    public float TipHardness { get; init; } = 0.25f;
 
-    /// <summary>Half edge length of the tapered wood box in blocks, or -1 for non-wood.</summary>
-    public float HalfWidth { get; init; } = -1f;
+    /// <summary><see cref="BlockRenderer.TreeWood"/> only: the loot each thickness band rolls,
+    /// ascending and starting at 0 (see <see cref="WoodLootBand.Select"/>). The default drops
+    /// the block itself at every thickness.</summary>
+    public WoodLootBand[] WoodLootBands { get; init; } = [new(0, null, true)];
 
     /// <summary>Whether the block gets an inventory slot and can be held.</summary>
     public bool HasItem { get; init; } = true;
@@ -295,8 +276,8 @@ public sealed record BlockType
     public BlockHitbox[] Hitboxes { get; init; } = [BlockHitbox.FullCube];
 
     /// <summary>Whether body collision tests this block's <see cref="Hitboxes"/> rather than the
-    /// full cell, the way tapered wood tests its drawn shape; see
-    /// <see cref="WoodShape.OverlapsShape"/>.</summary>
+    /// full cell, the way tree wood tests its drawn shape; see
+    /// <see cref="TreeWoodShape.OverlapsShape"/>.</summary>
     public bool CollidesByHitbox { get; init; }
 
     /// <summary>Loot rolled on break. Null means "drop yourself";
@@ -397,15 +378,15 @@ public sealed record BlockType
 
     /// <summary>Whether a block actually blocks a neighbouring face's corner/edge for ambient
     /// occlusion: only a fully occupying block (see <see cref="Occludes"/>) counts. Leaves pass
-    /// light and thin shapes (tapered wood, pebbles, flowers) never fill the corner voxel, so
+    /// light and thin shapes (tree wood, pebbles, flowers) never fill the corner voxel, so
     /// they leave AO at full brightness even when their JSON flag is set.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool OccludesAO(byte blockId) => OccludesById[blockId] && CastsAoById[blockId];
 
-    /// <summary>Whether tapered wood may grow a tube or arm into this block: a member of
-    /// the <c>tree_branch_connectable</c> tag (leaves), never terrain or rock.</summary>
+    /// <summary>Whether a block id is tree wood (<see cref="BlockRenderer.TreeWood"/>), whose
+    /// state byte is a <see cref="WoodState"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsBranchConnectable(byte blockId) => BranchConnectableById[blockId];
+    public static bool IsTreeWood(byte blockId) => TreeWoodById[blockId];
 
     /// <summary>Whether the greedy mesher handles this block (a plain full cube in the
     /// <see cref="BlockRenderer.Model"/> renderer); false sends it down the per-quad path.</summary>
@@ -437,21 +418,4 @@ public sealed record BlockType
     /// <summary>Whether a block id is gravity-affected; see <see cref="Falls"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsFalling(byte blockId) => FallsById[blockId];
-
-    /// <summary>Half-width of a wood block's box in blocks (the log is 0.5), or -1 when the id
-    /// is not wood at all.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static float WoodHalfWidth(byte blockId) => ById[blockId]?.HalfWidth ?? -1f;
-
-    /// <summary>Wood family of a block id, or <see cref="NoWoodFamily"/> when it is not wood.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static byte WoodFamilyOf(byte blockId) => WoodFamilyById[blockId];
-
-    /// <summary>Wood block of a family at a taper level, clamped to the family's top level the
-    /// way growth clamps rather than running off the end.</summary>
-    public static byte WoodBlock(byte family, int level)
-    {
-        var levels = WoodByLevelByFamily[family];
-        return levels[(uint)level < (uint)levels.Length ? level : levels.Length - 1];
-    }
 }

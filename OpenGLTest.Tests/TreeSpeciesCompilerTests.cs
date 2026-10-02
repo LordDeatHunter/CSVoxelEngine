@@ -20,8 +20,8 @@ public sealed class TreeSpeciesCompilerTests
     public TreeSpeciesCompilerTests()
     {
         TestContent.EnsureLoaded();
-        _woodId = ContentRegistry.RequireBlock("log").Id;
-        _leafId = ContentRegistry.RequireBlock("leaves").Id;
+        _woodId = ContentRegistry.RequireBlock("oak_log").Id;
+        _leafId = ContentRegistry.RequireBlock("oak_leaves").Id;
         _waterId = ContentRegistry.RequireBlock("water").Id;
     }
 
@@ -231,6 +231,9 @@ public sealed class TreeSpeciesCompilerTests
         Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.MinSoil = -1; });
         Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.MinGround = d.Worldgen.MaxGround + 1; });
         Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.MaxGround = null; });
+        Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.Openness = 1.5f; });
+        Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.Openness = -0.1f; });
+        Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.Openness = float.NaN; });
     }
 
     [Fact]
@@ -244,5 +247,29 @@ public sealed class TreeSpeciesCompilerTests
             () => TreeSpeciesCompiler.Compile("y", dto, other, Resolve));
         Assert.Contains(other, e.Message);
         Assert.DoesNotContain(FakePath, e.Message);
+    }
+
+    [Fact]
+    public void OmittedOpennessAndSpawnClearMeanFullThinningAndAClearedSpawn()
+    {
+        var omitted = Valid();
+        omitted.Worldgen = ValidWorldgen();
+        var explicitDefaults = Valid();
+        explicitDefaults.Worldgen = ValidWorldgen();
+        explicitDefaults.Worldgen.Openness = 1f;
+        explicitDefaults.Worldgen.SpawnClear = true;
+        var opposite = Valid();
+        opposite.Worldgen = ValidWorldgen();
+        opposite.Worldgen.Openness = 0f;
+        opposite.Worldgen.SpawnClear = false;
+
+        var a = Compile(omitted).Worldgen!;
+        var b = Compile(explicitDefaults).Worldgen!;
+        var c = Compile(opposite).Worldgen!;
+        Assert.Equal(b.Openness, a.Openness);
+        Assert.Equal(b.SpawnClear, a.SpawnClear);
+        // The explicit values are really read, so the equality above is not two ignored fields
+        Assert.NotEqual(a.Openness, c.Openness);
+        Assert.NotEqual(a.SpawnClear, c.SpawnClear);
     }
 }

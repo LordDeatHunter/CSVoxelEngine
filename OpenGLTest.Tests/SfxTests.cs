@@ -50,7 +50,7 @@ public sealed class SfxTests
     {
         foreach (var name in new[] { "stone", "cobblestone", "mud_bricks", "malachite_ore", "gravel", "pebble", "quern" })
             Assert.Equal(SfxLibrary.StoneGroup, ContentRegistry.RequireBlock(name).Sfx);
-        foreach (var name in new[] { "log", "branch", "limb", "sprig", "switch", "twig", "branch_pile" })
+        foreach (var name in new[] { "oak_log", "spruce_log", "cactus", "branch_pile" })
             Assert.Equal(SfxLibrary.WoodGroup, ContentRegistry.RequireBlock(name).Sfx);
         foreach (var name in new[] { "dirt", "grass", "sand" })
             Assert.Equal(SfxLibrary.DefaultGroup, ContentRegistry.RequireBlock(name).Sfx);

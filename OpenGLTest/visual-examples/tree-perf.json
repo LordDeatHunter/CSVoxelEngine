@@ -1,0 +1,31 @@
+{
+  // Tree worldgen perf fly-through: a fixed path over forest, taiga and desert that forces chunk
+  // streaming (and the far-LOD canopy sweep) through each tree species' biome.
+  // Run from OpenGLTest/ with
+  //   VOXEL_DEBUG=1 VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/tree-perf.json
+  // and read the once-a-second `wgen` token of the console perf line: chunks generated, ms per
+  // chunk, the tree/cactus stamp's ms/s and ms/chunk, and the tree shape builds (cache misses on
+  // the generation workers and the LOD builder alike). TREES_PLAN.md's "Perf baseline" records it.
+  //
+  // Vantage points (default seed, headless probe over TerrainGenerator.BiomeAt on a 64-block grid):
+  //   forest (-80, 8), ground 14; heading -Z stays forest for the whole 960-block leg.
+  //   taiga (-312, -120), ground 11, the interior taiga nearest the origin (every 64-block sample
+  //     within 128 blocks is taiga); heading -Z stays taiga for the whole leg.
+  //   desert (584, 1288), ground 14, the interior desert nearest the origin; heading +X is ~90 %
+  //     desert. (biomes.json's (3, -2224) is forest since the temperature-band change.)
+  // Flight sprint is 80 blocks/s, so each 12 s leg covers ~960 blocks and keeps the generation
+  // workers saturated. The window closes itself after the last step.
+  "steps": [
+    { "op": "fly" },
+    { "op": "teleport", "pos": [-80.5, 60.5, 8.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 12 },
+    { "op": "teleport", "pos": [-312.5, 60.5, -120.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 12 },
+    { "op": "teleport", "pos": [584.5, 60.5, 1288.5], "yaw": 0, "pitch": -20 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 12 },
+    { "op": "screenshot", "name": "tree_perf_end" }
+  ]
+}

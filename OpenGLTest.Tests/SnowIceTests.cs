@@ -53,7 +53,7 @@ public sealed class SnowIceTests
     }
 
     [Fact]
-    public void TaigaGrowsSpruceConifers()
+    public void TaigaGrowsALeafyTaigaSpecies()
     {
         for (var cx = -48; cx <= 48; cx++)
         for (var cz = -48; cz <= 48; cz++)
@@ -64,62 +64,68 @@ public sealed class SnowIceTests
             for (var x = 0; x < Chunk.Size; x++)
             for (var z = 0; z < Chunk.Size; z++)
             {
-                if (!TreeGenerator.TryGetTrunk(cx * Chunk.Size + x, cz * Chunk.Size + z, out _, out var shape))
+                var wx = cx * Chunk.Size + x;
+                var wz = cz * Chunk.Size + z;
+                if (TerrainGenerator.BiomeAt(wx, wz) != Biome.Taiga
+                    || !TreeGenerator.TryGetTree(wx, wz, out var species, out _))
                     continue;
 
-                Assert.Equal(TreeGenerator.SpruceLeavesBlock, shape.LeafBlock);
-                Assert.NotEmpty(shape.Wood);
-                foreach (var block in shape.Wood)
-                    Assert.Equal(BlockType.SpruceWoodFamily, BlockType.WoodFamilyOf(block.Id));
+                Assert.True(species.Worldgen!.GrowsIn(Biome.Taiga), $"{species.Name} does not grow in taiga");
+                Assert.True(species.HasLeaves, $"taiga grew the leafless {species.Name}");
+                var shape = TreeGenerator.ShapeOf(wx, wz);
+                Assert.Same(species, shape.Species);
+                Assert.True(shape.WoodCount > 0);
                 return;
             }
         }
 
-        Assert.Fail("no spruce found in any taiga chunk");
+        Assert.Fail("no tree found in any taiga chunk");
     }
 
     [Fact]
-    public void LodSpruceCanopyWearsSpruceNeedles()
+    public void LodTaigaCanopyWearsItsSpeciesLeaves()
     {
-        var trunkX = 0;
-        var trunkZ = 0;
-        var found = false;
-        for (var cx = -48; cx <= 48 && !found; cx++)
-        for (var cz = -48; cz <= 48 && !found; cz++)
+        var columnX = 0;
+        var columnZ = 0;
+        TreeSpecies? taiga = null;
+        for (var cx = -48; cx <= 48 && taiga == null; cx++)
+        for (var cz = -48; cz <= 48 && taiga == null; cz++)
         {
             if (TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8) != Biome.Taiga)
                 continue;
-            for (var x = 0; x < Chunk.Size && !found; x++)
-            for (var z = 0; z < Chunk.Size && !found; z++)
+            for (var x = 0; x < Chunk.Size && taiga == null; x++)
+            for (var z = 0; z < Chunk.Size && taiga == null; z++)
             {
                 var wx = cx * Chunk.Size + x;
                 var wz = cz * Chunk.Size + z;
-                if (!TreeGenerator.TryGetTrunk(wx, wz, out _, out var shape))
+                if (TerrainGenerator.BiomeAt(wx, wz) != Biome.Taiga
+                    || !TreeGenerator.TryGetTree(wx, wz, out var species, out _))
                     continue;
-                if (shape.LeafBlock != TreeGenerator.SpruceLeavesBlock)
-                    continue;
-                foreach (var (lx, ly, lz) in TreeGenerator.CanopyCells(shape))
+
+                // A leaf cell that is its column's canopy top, so the LOD must wear this species there
+                var shape = TreeGenerator.ShapeOf(wx, wz);
+                for (var i = shape.WoodCount; i < shape.Cells.Length; i++)
                 {
-                    if (!TreeGenerator.TryGetCanopy(lx, lz, out var top, out var leaf) || top < ly)
+                    var cell = shape.Cells[i];
+                    if (!TreeGenerator.TryGetCanopy(cell.X, cell.Z, out var top, out var leaf) || top != cell.Y)
                         continue;
-                    if (leaf != TreeGenerator.SpruceLeavesBlock)
+                    if (leaf != species.LeavesId)
                         continue;
-                    trunkX = lx;
-                    trunkZ = lz;
-                    found = true;
+                    columnX = cell.X;
+                    columnZ = cell.Z;
+                    taiga = species;
                     break;
                 }
             }
         }
-        Assert.True(found);
+        Assert.NotNull(taiga);
 
         var spec = LodRegion.Levels[0];
         static int DivFloor(int a, int b) => a >= 0 ? a / b : (a - b + 1) / b;
-        var mesh = LodRegion.BuildMeshData(0, DivFloor(trunkX, spec.RegionBlocks), DivFloor(trunkZ, spec.RegionBlocks));
-        var spruce = BlockType.ById[TreeGenerator.SpruceLeavesBlock]!;
-        var spruceTiles = TestContent.WorldTiles(spruce);
+        var mesh = LodRegion.BuildMeshData(0, DivFloor(columnX, spec.RegionBlocks), DivFloor(columnZ, spec.RegionBlocks));
+        var leafTiles = TestContent.WorldTiles(BlockType.ById[taiga!.LeavesId]!);
         Assert.Contains(mesh.Vertices,
-            v => (v.PackedColor >> 24) == 253u && spruceTiles.Contains(v.Layer));
+            v => (v.PackedColor >> 24) == 253u && leafTiles.Contains(v.Layer));
     }
 
     [Fact]
@@ -157,7 +163,7 @@ public sealed class SnowIceTests
             {
                 if (TerrainGenerator.BiomeAt(cx * Chunk.Size + x, cz * Chunk.Size + z) != Biome.Frozen)
                     continue;
-                Assert.False(TreeGenerator.TryGetTrunk(cx * Chunk.Size + x, cz * Chunk.Size + z, out _, out _));
+                Assert.False(TreeGenerator.TryGetTree(cx * Chunk.Size + x, cz * Chunk.Size + z, out _, out _));
             }
         }
     }

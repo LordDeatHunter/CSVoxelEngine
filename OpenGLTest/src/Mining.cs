@@ -39,6 +39,22 @@ public static class Mining
         return Refused(block, held) ? 0f : BlockDamage(held);
     }
 
+    /// <summary>
+    /// Hardness of the block in a cell with state byte <paramref name="state"/>: the block's own
+    /// <see cref="BlockType.Hardness"/>, except that tree wood scales it by thickness, from
+    /// <see cref="BlockType.TipHardness"/> of it at the thinnest up to all of it at a full cube
+    /// (so placed, detached wood is as hard as a trunk). 0 for an unknown id.
+    /// </summary>
+    public static float HardnessOf(byte blockId, byte state)
+    {
+        var type = BlockType.ById[blockId];
+        if (type == null) return 0f;
+        if (type.Renderer != BlockRenderer.TreeWood) return type.Hardness;
+
+        var share = WoodState.Thickness(state) / (float)WoodState.FullCube;
+        return type.Hardness * (type.TipHardness + (1f - type.TipHardness) * share);
+    }
+
     /// <summary>Damage per hit the held item removes from a block; a bare hand deals the
     /// baseline. This is the item's <c>blockDamage</c>, not its mining tier (<see cref="Power"/>).</summary>
     public static float BlockDamage(Item? held) => held?.BlockDamage ?? DefaultBlockDamage;

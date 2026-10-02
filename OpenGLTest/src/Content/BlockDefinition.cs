@@ -108,8 +108,8 @@ public sealed class BlockDefinition
     /// water behaviour: every tick, full 7-block range, infinite sources, never hardens.</summary>
     public FlowDefinition? Flow { get; set; }
 
-    /// <summary>"model" | "tapered_wood" | "pebbles" | "branch_pile" | "snow_layers" | "fluid" |
-    /// "quern" | "multiblock" | "multiblock_part".</summary>
+    /// <summary>"model" | "tree_wood" | "pebbles" | "branch_pile" | "snow_layers" |
+    /// "fluid" | "quern" | "multiblock" | "multiblock_part".</summary>
     public string? Renderer { get; set; }
 
     /// <summary>The structure an anchor block stands for; required on (and only legal with) the
@@ -151,7 +151,7 @@ public sealed class BlockDefinition
 
     /// <summary>
     /// Whether bodies collide with the declared <c>hitbox</c> boxes instead of the whole cell,
-    /// the way tapered wood collides with its drawn shape, so a low slab is stepped onto and
+    /// the way tree wood collides with its drawn shape, so a low slab is stepped onto and
     /// stood on rather than walling its cell off. Requires <c>hitbox</c>, <c>solid: true</c>,
     /// no <c>stackMax</c> and not a fluid. Omitted means false.
     /// </summary>
@@ -257,21 +257,32 @@ public sealed class BlockDefinition
         public bool? Passes { get; set; }
     }
 
-    /// <summary>Wood-family membership: taper step and the half-width its box is drawn at.</summary>
+    /// <summary>Tree-wood tuning (<c>tree_wood</c> renderer only): how hardness scales with
+    /// thickness and what each thickness band drops.</summary>
     public sealed class WoodDefinition
     {
-        /// <summary>0 is the family's base, each step up narrows toward its tip.</summary>
-        public int? TaperLevel { get; set; }
-
-        /// <summary>Half edge length of the tapered box, in blocks.</summary>
-        public float? HalfWidth { get; set; }
+        /// <summary>
+        /// <c>tree_wood</c> only: the share of <c>hardness</c> the thinnest (1 px) wood keeps,
+        /// 0..1, rising linearly to the full hardness at a full cube. Default 0.25.
+        /// </summary>
+        public float? TipHardness { get; set; }
 
         /// <summary>
-        /// Which wood family this level belongs to, e.g. <c>"tree"</c> (the default) or
-        /// <c>"cactus"</c>. Levels are numbered per family, and wood of different families never
-        /// welds, so a cactus cannot grow into a trunk.
+        /// <c>tree_wood</c> only: the loot table each thickness band rolls, ascending by
+        /// <see cref="LootBandDefinition.MinThickness"/> and starting at 0. Omitted means the
+        /// block always drops itself.
         /// </summary>
-        public string? Family { get; set; }
+        public LootBandDefinition[]? Loot { get; set; }
+    }
+
+    /// <summary>One thickness band of a <c>tree_wood</c> block's loot.</summary>
+    public sealed class LootBandDefinition
+    {
+        /// <summary>Lowest thickness code (0..15) this band covers.</summary>
+        public int? MinThickness { get; set; }
+
+        /// <summary><c>"self"</c> (drop the block), <c>"none"</c> or a loot table name.</summary>
+        public string? Loot { get; set; }
     }
 
     /// <summary>Per-fluid simulation tuning, mirroring how water and lava differ.</summary>

@@ -13,6 +13,8 @@
   "worldgen": {
     "biomes": ["desert"],
     "density": 0.010,
+    "openness": 0,
+    "spawnClear": false,
     "spacing": 2,
     "maxSlope": 2,
     "minSoil": 0,

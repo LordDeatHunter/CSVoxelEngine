@@ -103,13 +103,13 @@ public sealed class CreativeModeTests
     public void CreativeTreeFellDropsNothingButSurvivalDrops()
     {
         var tree = new TopplingTree(
-            [new TopplingTree.FellBlock(new Vector3(0, 1, 0), ContentRegistry.RequireBlock("stone").Id)],
+            [new TopplingTree.FellBlock(new Vector3(0, 1, 0), ContentRegistry.RequireBlock("stone").Id, 0)],
             new Vector3(0.5f, 1f, 0.5f), Vector3.UnitX, drops: false);
         Assert.Empty(tree.TakeDrops());
         tree.Dispose();
 
         var normal = new TopplingTree(
-            [new TopplingTree.FellBlock(new Vector3(0, 1, 0), ContentRegistry.RequireBlock("stone").Id)],
+            [new TopplingTree.FellBlock(new Vector3(0, 1, 0), ContentRegistry.RequireBlock("stone").Id, 0)],
             new Vector3(0.5f, 1f, 0.5f), Vector3.UnitX);
         Assert.NotEmpty(normal.TakeDrops());
         normal.Dispose();

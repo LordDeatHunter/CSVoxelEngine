@@ -122,7 +122,7 @@ public class TntManager
             // A blasted canopy must not linger in the far LOD (its rebuild is already
             // triggered per blasted column below, which then reads the poison)
             if (TreeGenerator.IsTreeBlock(removed))
-                TreeGenerator.PoisonCanopy(x, z);
+                TreeGenerator.PoisonCanopy(x, z, TreeGenerator.SingleEditPoisonRadius);
 
             if (leaves != null && TreeGenerator.IsLeaf(removed))
             {
@@ -141,7 +141,8 @@ public class TntManager
                 // Same loot a mined block would leave (stone drops cobblestone)
                 drops.SpawnLoot(removed, new Vector3(x, y, z),
                     DropManager.PileCount(removed, x, z, removedState),
-                    DropManager.PileSecondary(removed, x, z, removedState));
+                    DropManager.PileSecondary(removed, x, z, removedState),
+                    removedState);
             }
 
             // The cell is air now either way, so the far LOD must follow it down
@@ -174,7 +175,8 @@ public class TntManager
 
                 drops.SpawnLoot(standing, new Vector3(x, y, z),
                     DropManager.PileCount(standing, x, z, standingState),
-                    DropManager.PileSecondary(standing, x, z, standingState));
+                    DropManager.PileSecondary(standing, x, z, standingState),
+                    standingState);
             }
         }
 

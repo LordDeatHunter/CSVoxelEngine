@@ -139,8 +139,8 @@ public sealed class TreeGrowerTests
     [Fact]
     public void GirthIsAppliedOnceAndNeverSteersGrowth()
     {
-        var wood = ContentRegistry.RequireBlock("log").Id;
-        var leaves = ContentRegistry.RequireBlock("leaves").Id;
+        var wood = ContentRegistry.RequireBlock("oak_log").Id;
+        var leaves = ContentRegistry.RequireBlock("oak_leaves").Id;
         byte? Resolve(string n) => n switch
         {
             "block/wood" => wood,

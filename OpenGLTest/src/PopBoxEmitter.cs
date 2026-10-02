@@ -9,7 +9,7 @@ namespace silkgltriangle;
 /// its texture (what snow slabs showed); emitting the box with the same corner order, UVs
 /// and shade lookup as the chunk mesher (<see cref="Chunk.BoxFaceCorners"/>,
 /// <see cref="Chunk.CropUv"/>) makes the pop pixel-identical to the terrain it jumps out of.
-/// Tile-based like the other procedural emitters (LOD, pebbles, tapered wood), so every
+/// Tile-based like the other procedural emitters (LOD, pebbles, tree wood), so every
 /// partial block is covered with no per-renderer branches: a new one only needs sensible
 /// <c>FaceTiles</c> (the baker falls back to the first quad's tile). A biome-tinted block's
 /// pop wears its <see cref="BiomeTintFaces"/> tiles instead (a base quad, then the tinted quad

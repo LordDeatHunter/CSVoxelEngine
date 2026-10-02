@@ -199,7 +199,7 @@ public sealed class BiomeTintMeshTests
         Assert.True(discriminating > 0, "no vertex discriminated the override field from the chunk's own");
     }
 
-    private static BlockType Leaves => ContentRegistry.RequireBlock("leaves");
+    private static BlockType Leaves => ContentRegistry.RequireBlock("oak_leaves");
 
     private static BiomeTintFaces LeavesTint =>
         Leaves.BiomeTint ?? throw new InvalidOperationException("leaves declare no biomeTint");

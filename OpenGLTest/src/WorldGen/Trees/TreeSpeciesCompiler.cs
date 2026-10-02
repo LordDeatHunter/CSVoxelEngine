@@ -196,6 +196,9 @@ internal static class TreeSpeciesCompiler
         int maxGround = Require(path, "worldgen.maxGround", w.MaxGround);
         if (minGround > maxGround)
             throw Fail(path, $"worldgen.minGround ({minGround}) is above worldgen.maxGround ({maxGround}).");
+        float openness = w.Openness ?? 1f;
+        if (!float.IsFinite(openness) || openness < 0f || openness > 1f)
+            throw Fail(path, $"worldgen.openness must be 0..1, got {openness}.");
 
         return new TreeWorldgenRules
         {
@@ -206,6 +209,8 @@ internal static class TreeSpeciesCompiler
             MinSoil = minSoil,
             MinGround = minGround,
             MaxGround = maxGround,
+            Openness = openness,
+            SpawnClear = w.SpawnClear ?? true,
         };
     }
 

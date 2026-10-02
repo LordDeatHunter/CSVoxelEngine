@@ -32,11 +32,11 @@ public sealed class GreedyMeshingTests
             Assert.True(expected == BlockType.IsGreedy(type.Id), $"{type.Name}: greedy should be {expected}");
         }
 
-        Assert.True(BlockType.IsGreedy(Block("leaves")));
+        Assert.True(BlockType.IsGreedy(Block("oak_leaves")));
         Assert.True(BlockType.IsGreedy(Block("glass")));
         Assert.False(BlockType.IsGreedy(Block("water")));
         Assert.False(BlockType.IsGreedy(Block("pebble")));
-        Assert.False(BlockType.IsGreedy(Block("branch")));
+        Assert.False(BlockType.IsGreedy(Block("oak_log")));
         Assert.False(BlockType.IsGreedy(Block("flower")));
         Assert.False(BlockType.IsGreedy(BlockType.Air));
     }
@@ -240,7 +240,7 @@ public sealed class GreedyMeshingTests
         // Leaves never occlude each other, so every one of the 24576 faces is visible: the
         // per-quad path would overrun a ushort index space and must stop instead
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
-        MeshTestWorld.FillAll(center, Block("leaves"));
+        MeshTestWorld.FillAll(center, Block("oak_leaves"));
 
         var scalar = center.GenerateMeshData(manager, greedy: false);
         Assert.NotNull(scalar);
@@ -412,7 +412,12 @@ public sealed class GreedyMeshingTests
         for (var z = 0; z < Chunk.Size; z++)
         {
             var id = palette[rng.Next(palette.Length)];
-            chunk.SetBlockRaw(x, y, z, id, id == water ? FluidState.Source : (byte)0);
+            // Tree wood gets a random graph state, so thin, full and detached cells and every
+            // parent direction all turn up next to each other
+            var state = id == water ? FluidState.Source
+                : BlockType.IsTreeWood(id) ? (byte)rng.Next(256)
+                : (byte)0;
+            chunk.SetBlockRaw(x, y, z, id, state);
         }
     }
 
@@ -431,9 +436,9 @@ public sealed class GreedyMeshingTests
         byte[] palette =
         [
             0, 0, 0, 0, 0, 0, 0, 0,
-            Block("stone"), Block("stone"), Block("dirt"), Block("grass"), Block("log"),
-            Block("glass"), Block("glass"), Block("leaves"), Block("leaves"), Block("lamp"), Block("blue_lamp"),
-            Block("pebble"), Block("branch_pile"), Block("branch"), water,
+            Block("stone"), Block("stone"), Block("dirt"), Block("grass"), Block("oak_log"),
+            Block("glass"), Block("glass"), Block("oak_leaves"), Block("oak_leaves"), Block("lamp"), Block("blue_lamp"),
+            Block("pebble"), Block("branch_pile"), Block("spruce_log"), water,
         ];
         var rng = new Random(seed);
         // Fill in a fixed order: the dictionary's enumeration order changes per process

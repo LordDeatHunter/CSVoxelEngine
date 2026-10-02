@@ -17,7 +17,7 @@ public sealed class BiomeTintPopTests
     public BiomeTintPopTests() => TestContent.EnsureLoaded();
 
     private static BlockType Grass => ContentRegistry.RequireBlock("grass");
-    private static BlockType Leaves => ContentRegistry.RequireBlock("leaves");
+    private static BlockType Leaves => ContentRegistry.RequireBlock("oak_leaves");
     private static BlockType Stone => ContentRegistry.RequireBlock("stone");
 
     private static BiomeTintFaces TintOf(BlockType type) =>
@@ -132,7 +132,7 @@ public sealed class BiomeTintPopTests
 
     [Theory]
     [InlineData("grass")]
-    [InlineData("leaves")]
+    [InlineData("oak_leaves")]
     public void DebrisCarriesTheCellTintOfATintedBlockOnly(string blockName)
     {
         var type = ContentRegistry.RequireBlock(blockName);

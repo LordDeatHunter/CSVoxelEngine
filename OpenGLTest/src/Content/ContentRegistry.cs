@@ -183,6 +183,15 @@ public static class ContentRegistry
             // neighbours, so it occludes by default; and its quads carry no cullface, so they
             // are lit from the anchor's own cell, which means light has to reach that cell.
             // Explicit JSON still wins, and the cutout/translucent guard above is kept.
+            // Tree wood is a full cube at full thickness and a thin node and tubes below it, and
+            // the per-id mirrors cannot see the state byte: it never hides a neighbour (the mesher
+            // culls same-block full-thickness faces itself) and always lets light through
+            if (type.Renderer == BlockRenderer.TreeWood)
+            {
+                type.OccludesNeighbours = false;
+                type.PassesLight = true;
+            }
+
             if (type.Renderer is BlockRenderer.Multiblock or BlockRenderer.MultiblockPart)
             {
                 type.OccludesNeighbours = !type.Cutout && !type.Translucent && (definition.Occludes ?? true);
@@ -431,13 +440,6 @@ public static class ContentRegistry
     /// <see cref="RequireBlock"/>.</summary>
     public static Item RequireItem(string name) => ItemRegistry.RequireItem(name);
 
-    /// <summary>Id of a loaded wood family (e.g. "tree", "cactus"), for content that has to
-    /// name one at startup.</summary>
-    public static byte RequireWoodFamily(string name) =>
-        BlockType.WoodFamilyIdsByName.TryGetValue(name, out var id)
-            ? id
-            : throw new InvalidOperationException($"No wood family named '{name}' is registered.");
-
     /// <summary>The entity kind registered under that JSON file name.</summary>
     public static EntityType RequireEntity(string name) => EntityRegistry.Require(name);
 
@@ -531,7 +533,7 @@ public static class ContentRegistry
         Array.Clear(BlockType.LightSlot);
         BlockLightPalette.Reset();
         Array.Clear(BlockType.PassesLightById);
-        Array.Clear(BlockType.BranchConnectableById);
+        Array.Clear(BlockType.TreeWoodById);
         Array.Clear(BlockType.SolidById);
         Array.Clear(BlockType.CollidesByHitboxById);
         Array.Clear(BlockType.MovementSpeedById);
@@ -550,9 +552,6 @@ public static class ContentRegistry
         Array.Clear(BlockType.ReplaceableById);
         Array.Clear(BlockType.ReplaceableByPlacementById);
         Array.Clear(BlockType.FallsById);
-        Array.Fill(BlockType.WoodFamilyById, BlockType.NoWoodFamily);
-        BlockType.WoodByLevelByFamily.Clear();
-        BlockType.WoodFamilyIdsByName.Clear();
 
         // Air owns no definition but still has to let light through and stop nothing
         BlockType.PassesLightById[BlockType.Air] = true;
@@ -978,8 +977,16 @@ public static class ContentRegistry
     /// Reads and compiles one species file. Internal so tests can feed a file and see the same
     /// JSON and validation errors, each naming that path, without reloading the registry.
     /// </summary>
-    internal static TreeSpecies CompileTreeSpeciesFile(string name, string path) =>
-        TreeSpeciesCompiler.Compile(name, ReadJson<TreeSpeciesDefinition>(path), path, ResolveSpeciesBlock);
+    internal static TreeSpecies CompileTreeSpeciesFile(string name, string path)
+    {
+        var species = TreeSpeciesCompiler.Compile(name, ReadJson<TreeSpeciesDefinition>(path), path, ResolveSpeciesBlock);
+        // A grown tree's wood carries its thickness and parent direction in the state byte, so
+        // only a tree_wood block can draw, collide and fell it
+        if (BlockType.ById[species.WoodId]!.Renderer != BlockRenderer.TreeWood)
+            throw new InvalidOperationException(
+                $"Tree species '{path}' grows wood '{BlockType.ById[species.WoodId]!.Name}', which does not use renderer \"tree_wood\".");
+        return species;
+    }
 
     /// <summary>
     /// A species' block reference: an optional <c>block/</c> prefix or a bare block file name.
@@ -1213,7 +1220,6 @@ public static class ContentRegistry
         var types = new Dictionary<byte, BlockType>();
         var hardenPending = new List<(byte Id, string? To, string? Touching, string Path)>();
         var multiblockPending = new List<(byte Id, string? Part, string? Source, string Path)>();
-        var woodFamilies = new Dictionary<byte, string>();
 
         foreach (var (name, path) in files)
         {
@@ -1223,7 +1229,7 @@ public static class ContentRegistry
             var renderer = definition.Renderer switch
             {
                 null or "model" => BlockRenderer.Model,
-                "tapered_wood" => BlockRenderer.TaperedWood,
+                "tree_wood" => BlockRenderer.TreeWood,
                 "pebbles" => BlockRenderer.Pebbles,
                 "branch_pile" => BlockRenderer.BranchPile,
                 "snow_layers" => BlockRenderer.SnowLayers,
@@ -1232,7 +1238,7 @@ public static class ContentRegistry
                 "multiblock" => BlockRenderer.Multiblock,
                 "multiblock_part" => BlockRenderer.MultiblockPart,
                 _ => throw new InvalidOperationException(
-                    $"Block '{path}' has unknown renderer '{definition.Renderer}'; expected model, tapered_wood, pebbles, branch_pile, snow_layers, fluid, quern, multiblock or multiblock_part."),
+                    $"Block '{path}' has unknown renderer '{definition.Renderer}'; expected model, tree_wood, pebbles, branch_pile, snow_layers, fluid, quern, multiblock or multiblock_part."),
             };
 
             // A multiblock is a structure built out of eight cells: the anchor names the part
@@ -1265,10 +1271,16 @@ public static class ContentRegistry
                     $"Block '{path}' has unknown onBreak '{definition.OnBreak}'; expected drop or prime_tnt."),
             };
 
-            var taperLevel = definition.Wood?.TaperLevel ?? -1;
-            if (definition.Wood != null && (taperLevel < 0 || taperLevel > 5))
+            // Tree wood carries its thickness and parent direction in the state byte; its wood
+            // object tunes how hardness and loot follow that thickness, so it means nothing on
+            // any other renderer
+            var treeWood = renderer == BlockRenderer.TreeWood;
+            if (!treeWood && definition.Wood != null)
                 throw new InvalidOperationException(
-                    $"Block '{path}' has wood.taperLevel {taperLevel}; expected 0..5.");
+                    $"Block '{path}' declares a wood object without renderer \"tree_wood\"; wood.* only tunes tree wood.");
+            var (tipHardness, woodLootBands) = treeWood
+                ? ParseTreeWood(definition, path)
+                : (0.25f, (WoodLootBand[]?)null);
 
             var emission = definition.Light?.Emission ?? 0;
             if (emission > 15)
@@ -1391,7 +1403,9 @@ public static class ContentRegistry
                 Friction = friction,
                 PebbleWeight = pebbleWeight,
                 CullSelf = definition.CullSelf ?? false,
-                CastsAmbientOcclusion = !fluid && (definition.CastsAO ?? solid),
+                // Tree wood is drawn at any thickness down to a 1 px twig, so it never darkens
+                // its neighbours, whatever the file says (forced here, where CastsAoById is mirrored)
+                CastsAmbientOcclusion = !fluid && (definition.CastsAO ?? solid) && renderer != BlockRenderer.TreeWood,
                 Cutout = definition.Cutout ?? false,
                 Translucent = definition.Translucent ?? false,
                 Sway = definition.Sway ?? false,
@@ -1401,8 +1415,8 @@ public static class ContentRegistry
                 Renderer = renderer,
                 Kiln = definition.Kiln ?? false,
                 StackMax = (byte)stackMax,
-                WoodTaperLevel = taperLevel,
-                HalfWidth = definition.Wood == null ? -1f : definition.Wood.HalfWidth ?? 0.5f,
+                TipHardness = tipHardness,
+                WoodLootBands = woodLootBands ?? [new WoodLootBand(0, null, true)],
                 HasItem = !fluid && (definition.HasItem ?? true),
                 NeedsSupport = needsSupport,
                 ReplaceableByPlacement = replaceableByPlacement,
@@ -1413,7 +1427,7 @@ public static class ContentRegistry
                 FluidInfinite = flow?.Infinite ?? true,
                 OnBreak = onBreak,
                 LootTable = fluid ? LootTable.None : ResolveLoot(name, definition.Loot, path),
-                Hitboxes = hitboxes ?? DefaultWoodHitbox(taperLevel, definition.Wood?.HalfWidth ?? 0.5f),
+                Hitboxes = hitboxes ?? [BlockHitbox.FullCube],
                 CollidesByHitbox = collidesByHitbox,
             };
             type.HardensToId = 0;
@@ -1433,8 +1447,6 @@ public static class ContentRegistry
             BlockModels[id] = ResolveModel(definition.Model, path);
             BlockDefinitions[id] = definition;
             types[id] = type;
-            if (definition.Wood != null)
-                woodFamilies[id] = definition.Wood.Family ?? "tree";
 
             BlockType.ById[id] = type;
             BlockType.Emission[id] = type.LightEmission;
@@ -1446,6 +1458,7 @@ public static class ContentRegistry
             BlockType.FrictionById[id] = type.Friction;
             BlockType.PebbleWeightById[id] = type.PebbleWeight;
             BlockType.CastsAoById[id] = type.CastsAmbientOcclusion;
+            BlockType.TreeWoodById[id] = treeWood;
             BlockType.FluidById[id] = type.Fluid;
             BlockType.FluidTickDivisorById[id] = type.FluidTickDivisor;
             BlockType.FluidRangeById[id] = type.FluidRange;
@@ -1481,79 +1494,14 @@ public static class ContentRegistry
         }
 
         BlockType.Types = types;
-        BuildWoodLevels(types, woodFamilies);
     }
-
-    /// <summary>
-    /// Builds the per-family taper tables. A family's levels must be contiguous from 0, so a
-    /// growth walk that clamps to the top can never land on a missing step; the tree family
-    /// additionally keeps all six steps, since <see cref="TreeGenerator"/> walks 0..5.
-    /// </summary>
-    private static void BuildWoodLevels(Dictionary<byte, BlockType> types, Dictionary<byte, string> families)
-    {
-        // Pinned so a family id is stable across runs and across content reloads in tests
-        var familyIds = new Dictionary<string, byte>(StringComparer.Ordinal)
-        {
-            ["tree"] = BlockType.TreeWoodFamily,
-            ["cactus"] = BlockType.CactusWoodFamily,
-            ["spruce"] = BlockType.SpruceWoodFamily,
-        };
-        byte nextFamily = BlockType.SpruceWoodFamily + 1;
-
-        var byFamily = new Dictionary<string, Dictionary<int, byte>>(StringComparer.Ordinal);
-        foreach (var (id, family) in families)
-        {
-            if (!byFamily.TryGetValue(family, out var levels))
-            {
-                levels = new Dictionary<int, byte>();
-                byFamily[family] = levels;
-            }
-
-            var level = types[id].WoodTaperLevel;
-            if (levels.TryGetValue(level, out var existing))
-                throw new InvalidOperationException(
-                    $"Blocks '{types[existing].Name}' and '{types[id].Name}' both claim family '{family}' wood.taperLevel {level}.");
-            levels[level] = id;
-        }
-
-        foreach (var (family, levels) in byFamily)
-        {
-            if (!familyIds.TryGetValue(family, out var familyId))
-                familyIds[family] = familyId = nextFamily++;
-
-            var max = 0;
-            foreach (var level in levels.Keys)
-                if (level > max) max = level;
-
-            var table = new byte[max + 1];
-            for (var level = 0; level <= max; level++)
-            {
-                if (!levels.TryGetValue(level, out var id))
-                    throw new InvalidOperationException(
-                        $"Wood family '{family}' has no block at taper level {level}.");
-                table[level] = id;
-                BlockType.WoodFamilyById[id] = familyId;
-            }
-
-            BlockType.WoodByLevelByFamily[familyId] = table;
-            BlockType.WoodFamilyIdsByName[family] = familyId;
-        }
-
-        if (!byFamily.TryGetValue("tree", out var tree) || tree.Count != 6)
-            throw new InvalidOperationException("Wood family 'tree' must declare taper levels 0..5.");
-    }
-
-    /// <summary>Tag tapered wood may grow tubes and arms into, beyond parent/child wood.</summary>
-    public const string BranchConnectableTag = "tree_branch_connectable";
 
     /// <summary>Whether a block id belongs to a loaded tag.</summary>
     public static bool IsInTag(string tag, byte id) =>
         Tags.TryGetValue(tag, out var members) && members.Contains(id);
 
     // Block and item tags: named sets from data/tags/<name>.json ({"blocks": [...],
-    // "items": [...]}), resolved here so gameplay and crafting share them. Tapered wood reads
-    // its tag through the flat BranchConnectableById mirror (see BlockType); the dictionary
-    // stays for error messages, tests and recipe ingredients.
+    // "items": [...]}), resolved here so gameplay and crafting share them.
     private static void LoadTags(string folder)
     {
         foreach (var (name, path) in JsonFilesIn(folder))
@@ -1573,17 +1521,6 @@ public static class ContentRegistry
                     throw new InvalidOperationException($"Tag '{path}' lists '{entry}' twice.");
             }
             Tags[name] = members;
-        }
-
-        if (!Tags.TryGetValue(BranchConnectableTag, out var connectable))
-            throw new InvalidOperationException(
-                $"Missing required block tag '{BranchConnectableTag}': expected '{Path.Combine(folder, BranchConnectableTag)}.json'.");
-        foreach (var id in connectable)
-        {
-            if (BlockType.ById[id] == null || ItemRegistry.IsItem(id))
-                throw new InvalidOperationException(
-                    $"Tag '{BranchConnectableTag}' names id {id}: tapered wood only grows into blocks.");
-            BlockType.BranchConnectableById[id] = true;
         }
 
         // Tool tags are free-form strings, so a block may gate on one no item provides: a typo,
@@ -1617,15 +1554,62 @@ public static class ContentRegistry
         throw new InvalidOperationException($"Tag '{path}' names '{name}', which is not a registered block or item.");
     }
 
-    private static BlockHitbox[] DefaultWoodHitbox(int taperLevel, float halfWidth)
+    /// <summary>
+    /// Validates a <c>tree_wood</c> block: it needs a <c>wood</c> object, cannot be cutout, translucent, a fluid, falling, support-fragile, a stack or
+    /// declare a hitbox (its shape comes from the state byte, see <see cref="TreeWoodShape"/>),
+    /// and returns its tip hardness and its ascending thickness loot bands.
+    /// </summary>
+    private static (float TipHardness, WoodLootBand[] Bands) ParseTreeWood(BlockDefinition definition, string path)
     {
-        // Tapered wood renders as a thin column, not the full cube its model bakes to, so the
-        // outline, raycast and mining pop would all float around empty air on the default. The
-        // column spans the full height (node plus the up/down tubes); side arms welding to
-        // neighbours poke out of it, which the single-box shape accepts.
-        if (taperLevel < 0) return [BlockHitbox.FullCube];
-        var hw = Math.Clamp(halfWidth, 0f, 0.5f);
-        return [new BlockHitbox(new Vector3(0.5f - hw, 0f, 0.5f - hw), new Vector3(0.5f + hw, 1f, 0.5f + hw))];
+        var wood = definition.Wood ?? throw new InvalidOperationException(
+            $"Block '{path}' uses renderer \"tree_wood\" without a wood object.");
+        if ((definition.Cutout ?? false) || (definition.Translucent ?? false) || (definition.Fluid ?? false))
+            throw new InvalidOperationException(
+                $"Block '{path}' uses renderer \"tree_wood\" with cutout, translucent or fluid; tree wood is an opaque solid.");
+        if ((definition.Falls ?? false) || (definition.NeedsSupport ?? false) || definition.StackMax.HasValue)
+            throw new InvalidOperationException(
+                $"Block '{path}' uses renderer \"tree_wood\" with falls, needsSupport or stackMax; its state byte holds the tree graph.");
+        if (definition.Hitbox.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null))
+            throw new InvalidOperationException(
+                $"Block '{path}' declares a hitbox on renderer \"tree_wood\"; its boxes follow its thickness and connections.");
+
+        var tip = wood.TipHardness ?? 0.25f;
+        if (!float.IsFinite(tip) || tip < 0f || tip > 1f)
+            throw new InvalidOperationException(
+                $"Block '{path}' has wood.tipHardness {wood.TipHardness}; expected 0..1.");
+
+        if (wood.Loot is not { Length: > 0 } authored)
+            return (tip, [new WoodLootBand(0, null, true)]);
+
+        var bands = new WoodLootBand[authored.Length];
+        for (var i = 0; i < authored.Length; i++)
+        {
+            var band = authored[i] ?? throw new InvalidOperationException(
+                $"Block '{path}' has a null wood.loot[{i}] entry.");
+            var min = band.MinThickness ?? 0;
+            if (min is < 0 or > WoodState.MaxThickness)
+                throw new InvalidOperationException(
+                    $"Block '{path}' has wood.loot[{i}].minThickness {min}; expected 0..{WoodState.MaxThickness}.");
+            if (i == 0 && min != 0)
+                throw new InvalidOperationException(
+                    $"Block '{path}' has wood.loot[0].minThickness {min}; the first band must start at 0 so every thickness has loot.");
+            if (i > 0 && min <= bands[i - 1].MinThickness)
+                throw new InvalidOperationException(
+                    $"Block '{path}' has wood.loot[{i}].minThickness {min}; bands must be strictly ascending.");
+
+            var loot = band.Loot ?? "self";
+            bands[i] = loot switch
+            {
+                "self" => new WoodLootBand(min, null, true),
+                "none" => new WoodLootBand(min, LootTable.None, false),
+                _ => LootTables.TryGetValue(loot, out var table)
+                    ? new WoodLootBand(min, table, false)
+                    : throw new InvalidOperationException(
+                        $"Block '{path}' has wood.loot[{i}].loot '{loot}', which is neither self, none nor an existing loot table."),
+            };
+        }
+
+        return (tip, bands);
     }
 
     /// <summary>Settles <c>collidesByHitbox</c>: only a solid, non-fluid, non-stack block that declares
@@ -1875,7 +1859,8 @@ public static class ContentRegistry
         if (name.StartsWith("item/", StringComparison.Ordinal))
             return ItemIds.TryGetValue(name["item/".Length..], out id);
 
-        // Bare names try blocks first, so "branch" is the block and "item/branch" the pickup
+        // Bare names try blocks first, so a name both a block and an item own resolves to the
+        // block; an item/ prefix reaches the item
         return BlockIds.TryGetValue(name, out id) || ItemIds.TryGetValue(name, out id);
     }
 

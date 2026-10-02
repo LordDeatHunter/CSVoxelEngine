@@ -121,7 +121,7 @@ public sealed class BlockMovementTests
     [Fact]
     public void LeavesAreNonBlockingAtAPartialWalkSpeed()
     {
-        var leaves = ContentRegistry.RequireBlock("leaves");
+        var leaves = ContentRegistry.RequireBlock("oak_leaves");
         Assert.InRange(leaves.MovementSpeed, 0.001f, 0.999f);
         Assert.Equal(leaves.MovementSpeed, BlockType.MovementSpeedOf(leaves.Id));
         Assert.Equal(0f, ContentRegistry.RequireBlock("stone").MovementSpeed);
@@ -143,7 +143,7 @@ public sealed class BlockMovementTests
         var open = Field(BlockType.Air, out var free);
         RunForward(free, open);
 
-        var leaves = Field(ContentRegistry.RequireBlock("leaves").Id, out var slowed);
+        var leaves = Field(ContentRegistry.RequireBlock("oak_leaves").Id, out var slowed);
         RunForward(slowed, leaves);
 
         Assert.True(slowed.Position.X > 4f, $"leaves blocked the walk at x={slowed.Position.X}");
@@ -161,7 +161,7 @@ public sealed class BlockMovementTests
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
             chunk.SetBlockRaw(x, x < 5 ? 0 : 1, z, stone, 0);
-        chunk.SetBlockRaw(4, 1, 8, ContentRegistry.RequireBlock("leaves").Id, 0);
+        chunk.SetBlockRaw(4, 1, 8, ContentRegistry.RequireBlock("oak_leaves").Id, 0);
         manager.Chunks[Vector3.Zero] = chunk;
 
         var camera = new Camera(null, null);
@@ -183,7 +183,7 @@ public sealed class BlockMovementTests
         var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);
         chunk.IsBlockDataReady = true;
         var stone = ContentRegistry.RequireBlock("stone").Id;
-        var leaves = ContentRegistry.RequireBlock("leaves").Id;
+        var leaves = ContentRegistry.RequireBlock("oak_leaves").Id;
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
             chunk.SetBlockRaw(x, x < 5 ? 0 : 1, z, stone, 0);

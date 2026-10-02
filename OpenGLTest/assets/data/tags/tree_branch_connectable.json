@@ -1,7 +1,0 @@
-{
-  // Blocks tapered wood grows tubes and arms into: parent/child wood joins by taper
-  // level (see WoodShape), everything else must be listed here. Leaves are the only
-  // non-wood member: a branch buried in canopy welds into it, but a foot onto grass
-  // or an arm into rock is a bug (the mesh would meet a face it cannot join).
-  "blocks": ["leaves"]
-}

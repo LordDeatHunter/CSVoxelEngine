@@ -29,6 +29,15 @@ public sealed class TreeWorldgenRules
     /// <summary>Highest ground height the species grows on.</summary>
     public required int MaxGround { get; init; }
 
+    /// <summary>
+    /// Share of <see cref="TerrainGenerator.ForestOpenness"/> thinning the species takes, 0..1:
+    /// 1 thins it like the broadleaf forest, 0 ignores open regions entirely.
+    /// </summary>
+    public float Openness { get; init; } = 1f;
+
+    /// <summary>Whether the species keeps out of the spawn clearing (<see cref="WorldGenerationConfig.TreeSpawnClearRadius"/>).</summary>
+    public bool SpawnClear { get; init; } = true;
+
     /// <summary>Whether the species grows in <paramref name="biome"/>.</summary>
     public bool GrowsIn(Biome biome)
     {

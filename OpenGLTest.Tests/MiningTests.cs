@@ -52,7 +52,7 @@ public sealed class MiningTests
         Assert.NotEmpty(stone.Tools!);
         Assert.True(stone.Hardness > 0f);
 
-        var log = ContentRegistry.RequireBlock("log");
+        var log = ContentRegistry.RequireBlock("oak_log");
         Assert.True(log.RequiresTool);
         Assert.NotNull(log.Tools);
         Assert.NotEmpty(log.Tools!);
@@ -66,7 +66,7 @@ public sealed class MiningTests
     public void TheRightToolMinesAndTheWrongToolIsRefused()
     {
         var stone = BlockOf("stone");
-        var log = BlockOf("log");
+        var log = BlockOf("oak_log");
         var pickaxe = ItemOf("primitive_pickaxe");
         var axe = ItemOf("primitive_axe");
         var flint = ItemOf("flint");
@@ -112,19 +112,33 @@ public sealed class MiningTests
     }
 
     [Fact]
-    public void TaperStepsGetSofterTowardTheTip()
+    public void ThinnerWoodIsSofter()
     {
-        var levels = new[] { "log", "branch", "limb", "sprig", "switch", "twig" }
-            .Select(name => ContentRegistry.RequireBlock(name))
-            .ToList();
-        var ordered = levels.OrderBy(b => b.WoodTaperLevel).ToList();
-        Assert.Equal(levels.Count, ordered.Count);
-        for (var i = 1; i < ordered.Count; i++)
+        var woods = BlockType.Types.Values.Where(t => BlockType.IsTreeWood(t.Id)).ToList();
+        Assert.NotEmpty(woods);
+        foreach (var wood in woods)
         {
-            Assert.True(ordered[i].WoodTaperLevel > ordered[i - 1].WoodTaperLevel);
-            Assert.True(ordered[i].Hardness < ordered[i - 1].Hardness);
-            Assert.True(ordered[i].Hardness > 0f);
+            // Hardness never drops as the wood thickens, whatever the parent direction says,
+            // and only the full cube carries the block's whole hardness
+            for (var parent = 0; parent < WoodState.ParentDetached; parent++)
+            {
+                var previous = 0f;
+                for (var t = 0; t <= WoodState.MaxThickness; t++)
+                {
+                    var hardness = Mining.HardnessOf(wood.Id, WoodState.Encode(t, parent, false));
+                    Assert.True(hardness >= previous, $"{wood.Name} softens from thickness {t - 1} to {t}");
+                    previous = hardness;
+                }
+            }
+
+            Assert.Equal(wood.Hardness, Mining.HardnessOf(wood.Id, WoodState.Encode(WoodState.FullCube, 0, false)), precision: 4);
+            Assert.Equal(wood.Hardness, Mining.HardnessOf(wood.Id, WoodState.Detached), precision: 4);
         }
+
+        // Anything that is not tree wood ignores the state byte
+        var stone = ContentRegistry.RequireBlock("stone");
+        for (var state = 0; state < 256; state += 17)
+            Assert.Equal(stone.Hardness, Mining.HardnessOf(stone.Id, (byte)state), precision: 5);
     }
 
     [Fact]

@@ -24,6 +24,7 @@ public sealed class TreeSpeciesContentTests
         {
             Assert.NotNull(BlockType.ById[s.WoodId]);
             Assert.False(BlockType.IsFluid(s.WoodId), s.Name);
+            Assert.True(BlockType.IsTreeWood(s.WoodId), s.Name);
             if (s.HasLeaves)
                 Assert.NotNull(BlockType.ById[s.LeavesId]);
 
@@ -80,11 +81,13 @@ public sealed class TreeSpeciesContentTests
             AssertRejectedNamingFile(dir, "broken.json", "{ not json");
             AssertRejectedNamingFile(dir, "unknown_wood.json", ValidSpecies("block/does_not_exist"));
             AssertRejectedNamingFile(dir, "item_wood.json", ValidSpecies("item/flint"));
+            // A real block that is not tree wood has no state byte to grow a graph into
+            AssertRejectedNamingFile(dir, "plain_wood.json", ValidSpecies("block/stone"));
 
             // The same body with a real block compiles, so the rejections above are the wood alone.
             var ok = Path.Combine(dir, "ok.json");
-            File.WriteAllText(ok, ValidSpecies("block/log"));
-            Assert.Equal(ContentRegistry.RequireBlock("log").Id,
+            File.WriteAllText(ok, ValidSpecies("block/oak_log"));
+            Assert.Equal(ContentRegistry.RequireBlock("oak_log").Id,
                 ContentRegistry.CompileTreeSpeciesFile("ok", ok).WoodId);
         }
         finally

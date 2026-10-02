@@ -134,7 +134,7 @@ public sealed class LodEditStateTests
         Assert.True(LodRegion.LowerColumnBelow(capX, capY, z));
         var ovrTop = HeightAt(ovrX, z) + 11;
         LodSurface.Set(ovrX, z, ovrTop, TerrainGenerator.RockBlock);
-        TreeGenerator.PoisonCanopy(canopyX, z);
+        TreeGenerator.PoisonCanopy(canopyX, z, TreeGenerator.SingleEditPoisonRadius);
 
         var parsed = LodEditState.TryParse(LodEditState.Capture().ToBytes());
         Assert.NotNull(parsed);
@@ -162,7 +162,7 @@ public sealed class LodEditStateTests
         var v1 = LodEditState.CombinedVersion;
         LodSurface.Set(x + 1, z, HeightAt(x + 1, z) + 3, TerrainGenerator.RockBlock);
         var v2 = LodEditState.CombinedVersion;
-        TreeGenerator.PoisonCanopy(x + 2, z);
+        TreeGenerator.PoisonCanopy(x + 2, z, TreeGenerator.SingleEditPoisonRadius);
         var v3 = LodEditState.CombinedVersion;
 
         Assert.NotEqual(v0, v1);

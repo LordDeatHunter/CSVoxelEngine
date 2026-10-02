@@ -1,0 +1,62 @@
+{
+  // Tree cutover check: one grown oak, spruce and cactus each, a cut limb and a felled trunk.
+  // Run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/trees.json
+  // Look for floating wood, gaps between a node box and its tubes, black faces, wrong tiles, a
+  // crown still standing after the limb cut and nothing left standing after the base cut.
+  //
+  // Coordinates (default seed, headless probe over TreeGenerator.TryGetTree / ShapeOf):
+  //   oak    base (-79, 14, -2), 12 tall, crown x -83..-73, z -8..3; nearest other trunk 9 away.
+  //          Limb: node (-79, 19, -6), 2 px thick with two children (3 wood cells in its
+  //          subtree), seen from (-80.48, 19.64, -5.29) through exactly one leaf cell (the ray
+  //          was checked against every cell box grown and shrunk by 0.03, so no corner grazes).
+  //   spruce base (-371, 13, -150), 11 tall, 60 blocks west of tree-perf.json's taiga vantage,
+  //          one of the few in that dense wood with a clear sight line from outside its crown.
+  //   cactus base (582, 16, 1279), arms along z, by the desert vantage of tree-perf.json.
+  // Every vantage was chosen so that no block stands within two cells of the eye and nothing
+  // but the subject crosses the sight line; the limb cut is filmed from the -Z side it hangs on.
+  // The camera flies the whole time, which implies creative: every `mine` of one frame
+  // (`seconds` 0.001) removes exactly the block under the crosshair, so the first one clears the
+  // leaf in front of the limb and the second cuts the limb itself. The oak comes first so the
+  // cuts happen in chunks that loaded around it, before the long hops to the taiga and desert.
+  "steps": [
+    { "op": "fly" },
+
+    { "op": "teleport", "pos": [-67.4, 21.0, 3.1], "yaw": -157.5, "pitch": -4.8 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "oak", "hideHud": true },
+
+    { "op": "teleport", "pos": [-80.48, 19.64, -5.29], "yaw": -6.1, "pitch": -4 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "limb_aim" },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "limb_leaf_cleared" },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "limb_cut", "hideHud": true },
+    { "op": "teleport", "pos": [-78.5, 21.0, -16.5], "yaw": 90, "pitch": -5 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "limb_cut_overview", "hideHud": true },
+
+    { "op": "teleport", "pos": [-81.5, 15.7, -1.5], "yaw": 0, "pitch": -21.8 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "base_aim" },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-78.5, 34.0, 14.5], "yaw": -90, "pitch": -45 },
+    { "op": "wait", "seconds": 0.7 },
+    { "op": "screenshot", "name": "felled_falling", "hideHud": true },
+    { "op": "wait", "seconds": 1.3 },
+    { "op": "screenshot", "name": "felled_down", "hideHud": true },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "felled_after", "hideHud": true },
+
+    { "op": "teleport", "pos": [-384.5, 18.5, -149.5], "yaw": 0, "pitch": 0 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "spruce", "hideHud": true },
+
+    { "op": "teleport", "pos": [594.3, 19.5, 1281.8], "yaw": -168.8, "pitch": -4.8 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "cactus", "hideHud": true }
+  ]
+}

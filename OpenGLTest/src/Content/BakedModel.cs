@@ -10,7 +10,7 @@ namespace silkgltriangle;
 /// block occlude its neighbours and block light by default.</param>
 /// <param name="HasFullFace">Per engine face index, whether that cube face is fully covered.</param>
 /// <param name="FaceTiles">Per engine face index, the tile of that side's full face — or the
-/// first quad's tile as a fallback, so tile-based emitters (LOD, pebbles, tapered wood) always
+/// first quad's tile as a fallback, so tile-based emitters (LOD, pebbles, tree wood) always
 /// have something sensible to sample.</param>
 public sealed record BakedModel(
     BakedQuad[] Quads,

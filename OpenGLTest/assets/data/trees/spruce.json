@@ -15,6 +15,7 @@
   "worldgen": {
     "biomes": ["taiga"],
     "density": 0.03,
+    "openness": 0.5,
     "spacing": 2,
     "maxSlope": 2,
     "minSoil": 2,

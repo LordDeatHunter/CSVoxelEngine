@@ -143,7 +143,7 @@ public class WorldSeedTests
 
             // (2) A felled-canopy marker on the nearest canopy column.
             var (cx, cz) = FindCanopyColumn();
-            TreeGenerator.PoisonCanopy(cx, cz);
+            TreeGenerator.PoisonCanopy(cx, cz, TreeGenerator.SingleEditPoisonRadius);
             Assert.False(TreeGenerator.TryGetCanopy(cx, cz, out _, out _));
 
             // (3) A surface override on another column of the same far region.

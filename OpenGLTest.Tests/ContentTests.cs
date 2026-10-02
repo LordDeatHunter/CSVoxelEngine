@@ -23,6 +23,27 @@ public sealed class ContentTests
     }
 
     [Fact]
+    public void FlatMirrorsAgreeWithEveryBlockType()
+    {
+        // The mesher, the light flood and AO read only the flat per-id arrays, so every
+        // renderer's forced flags must reach them, not just the BlockType record
+        foreach (var (id, type) in BlockType.Types)
+        {
+            Assert.Equal(type.OccludesNeighbours, BlockType.OccludesById[id]);
+            Assert.Equal(type.CastsAmbientOcclusion, BlockType.CastsAoById[id]);
+            Assert.Equal(type.PassesLight, BlockType.PassesLightById[id]);
+            Assert.Equal(type.Renderer == BlockRenderer.TreeWood, BlockType.IsTreeWood(id));
+            if (type.Renderer != BlockRenderer.TreeWood) continue;
+
+            // Tree wood is drawn down to a 1 px twig, which the per-id flags cannot see
+            Assert.False(type.OccludesNeighbours);
+            Assert.False(type.CastsAmbientOcclusion);
+            Assert.True(type.PassesLight);
+            Assert.False(BlockType.IsGreedy(id));
+        }
+    }
+
+    [Fact]
     public void WaterIsForcedToFluidBehaviour()
     {
         var water = ContentRegistry.RequireBlock("water");

@@ -556,15 +556,21 @@ public sealed class MeshingTests
     [Fact]
     public void LeavesAndThinWoodPassLightAndCastNoAO()
     {
-        var leaves = ContentRegistry.RequireBlock("leaves");
-        Assert.True(leaves.PassesLight);
-        Assert.False(leaves.CastsAmbientOcclusion);
-        Assert.False(BlockType.Occludes(leaves.Id));
-        Assert.False(BlockType.OccludesAO(leaves.Id));
-
-        foreach (var name in new[] { "branch", "limb", "sprig", "switch", "twig" })
+        var leafIds = TreeSpeciesRegistry.All.Where(s => s.HasLeaves).Select(s => s.LeavesId).ToList();
+        Assert.NotEmpty(leafIds);
+        foreach (var id in leafIds)
         {
-            var wood = ContentRegistry.RequireBlock(name);
+            var leaves = BlockType.ById[id]!;
+            Assert.True(leaves.PassesLight);
+            Assert.False(leaves.CastsAmbientOcclusion);
+            Assert.False(BlockType.Occludes(leaves.Id));
+            Assert.False(BlockType.OccludesAO(leaves.Id));
+        }
+
+        var woods = BlockType.Types.Values.Where(t => BlockType.IsTreeWood(t.Id)).ToList();
+        Assert.NotEmpty(woods);
+        foreach (var wood in woods)
+        {
             Assert.True(wood.PassesLight);
             Assert.False(wood.CastsAmbientOcclusion);
             Assert.False(BlockType.Occludes(wood.Id));
@@ -582,8 +588,9 @@ public sealed class MeshingTests
         // High above the terrain so sunlight is uniform: only AO can vary the shade.
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
         var stone = ContentRegistry.RequireBlock("stone").Id;
-        var leaves = ContentRegistry.RequireBlock("leaves").Id;
-        var branch = ContentRegistry.RequireBlock("branch").Id;
+        var leaves = ContentRegistry.RequireBlock("oak_leaves").Id;
+        var branch = ContentRegistry.RequireBlock("oak_log").Id;
+        var branchState = WoodState.Encode(0, WoodState.ParentDetached, false);
         center.SetBlockRaw(8, 8, 8, stone, 0);
 
         // Ring the top-face AO neighbourhood with canopy and thin wood: every side/corner
@@ -596,7 +603,7 @@ public sealed class MeshingTests
             (9, 7, leaves), (9, 8, branch), (9, 9, leaves),
         };
         foreach (var (x, z, id) in ring)
-            center.SetBlockRaw(x, 9, z, id, 0);
+            center.SetBlockRaw(x, 9, z, id, id == branch ? branchState : (byte)0);
 
         var mesh = center.GenerateMeshData(manager, greedy: false);
         Assert.NotNull(mesh);
@@ -674,9 +681,9 @@ public sealed class MeshingTests
         // fixed range would then see only the air above it.
         var column = Chunk.GetColumnData(3, -5);
         var cyLo = (column.MinHeight >> Chunk.SizeShift) - 1;
-        // +TreeMaxHeightBlocks clears the tree/cactus canopy above the terrain, so a high chunk
+        // +TreeGenerator.ReachUp clears every tree canopy above the terrain, so a high chunk
         // is genuinely empty (the early-return branch) rather than full of leaves.
-        var cyHi = ((column.MaxHeight + WorldGenerationConfig.TreeMaxHeightBlocks) >> Chunk.SizeShift) + 1;
+        var cyHi = ((column.MaxHeight + TreeGenerator.ReachUp) >> Chunk.SizeShift) + 1;
 
         for (var cy = cyLo; cy <= cyHi; cy++)
         {

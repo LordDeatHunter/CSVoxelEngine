@@ -11,8 +11,7 @@ namespace silkgltriangle;
 ///
 /// <para>
 /// Every name is written with a <see cref="BlockPrefix"/> or <see cref="ItemPrefix"/>, and
-/// <see cref="TryResolve"/> refuses a bare one: blocks and items may share a file name (the
-/// <c>branch</c> taper block and the <c>branch</c> item), and the prefix is what keeps such a
+/// <see cref="TryResolve"/> refuses a bare one: blocks and items may share a file name, and the prefix is what keeps such a
 /// pair unambiguous. Molten materials live in their own 1-based id space and are named by
 /// their file name without a prefix.
 /// </para>

@@ -139,7 +139,7 @@ public sealed class InventoryTests
     public void UncollectableIdsHaveNoPool()
     {
         var water = ContentRegistry.RequireBlock("water").Id;
-        var log = ContentRegistry.RequireBlock("log").Id;
+        var log = ContentRegistry.RequireBlock("oak_log").Id;
         var bucket = ContentRegistry.RequireItem("bucket").Id;
         var stone = ContentRegistry.RequireBlock("stone").Id;
 

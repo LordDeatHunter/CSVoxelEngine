@@ -1073,12 +1073,12 @@ public class Camera
             // A pass-through block (leaves) never blocks the body; it only scales the walk
             // while the body overlaps it (see BlockMoveFactor).
             if (BlockType.MovementSpeedOf(blockId) > 0f) continue;
-            // Tapered wood collides with its drawn node-and-arms shape and a collidesByHitbox
+            // Tree wood collides with its drawn node-and-tubes shape and a collidesByHitbox
             // block (a mold slab) with its declared hitboxes, so the body slips past thin limbs,
-            // under high arms and onto a low slab; every other solid block keeps the full-cube
-            // test it always had.
-            if (!WoodShape.IsTapered(blockId) && !BlockType.CollidesByHitboxOf(blockId)) return true;
-            if (WoodShape.OverlapsShape(blockId, chunkManager.GetBlockGlobal, x, y, z, min, max))
+            // under high branches and onto a low slab; every other solid block keeps the
+            // full-cube test it always had.
+            if (!BlockType.IsTreeWood(blockId) && !BlockType.CollidesByHitboxOf(blockId)) return true;
+            if (TreeWoodShape.OverlapsShape(blockId, chunkManager, x, y, z, min, max))
                 return true;
         }
 
@@ -1503,13 +1503,12 @@ public class Camera
 
             if (targetsCell)
             {
-                // Tapered wood aims at its drawn shape, not the static full-height column:
-                // the node's vertical extent and side arms follow the parent/child
-                // neighbours, so the boxes are resolved from the live neighbourhood. Layered
-                // snow aims at the box its stack depth actually draws.
+                // Tree wood aims at its drawn shape: the node follows its thickness and the
+                // tubes its connections, so the boxes are resolved from the live
+                // neighbourhood. Layered snow aims at the box its stack depth actually draws.
                 var cellType = BlockType.ById[cellId];
-                var boxes = WoodShape.IsTapered(cellId)
-                    ? WoodShape.GetBoxesAt(cellId, chunkManager.GetBlockGlobal, cellX, cellY, cellZ)
+                var boxes = BlockType.IsTreeWood(cellId)
+                    ? TreeWoodShape.GetBoxesAt(cellId, chunkManager, cellX, cellY, cellZ)
                     : cellType?.Renderer == BlockRenderer.SnowLayers
                         ? SnowShape.GetBoxes(cellX, cellZ, chunkManager.GetStateGlobal(cellX, cellY, cellZ), cellType.StackMax)
                         : cellType?.Hitboxes;

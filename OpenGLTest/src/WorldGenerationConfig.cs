@@ -986,117 +986,39 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int CellCacheGenerations = 4;
 
     // --- Trees (TreeGenerator) ---
+    // Species, placement rules and growth all live in assets/data/trees/*.json; these are the
+    // engine-wide switches and cache knobs only. TreesEnabled covers every species (cacti too).
     public const bool TreesEnabled = true;
-    // A ground column grows a tree candidate with this probability; spacing (below) thins it
-    public const float TreeDensity = 0.02f;
-    // A candidate is kept only when its hash is the lowest within this Chebyshev radius,
-    // which spaces trunks apart without any cross-chunk state
-    public const int TreeSpacingRadius = 2;
-    // Trunk height in blocks, from the ground up; the bottom TreeLogHeight blocks are full
-    // cubes (1 size), everything above tapers through branch and twig boxes
-    public const int TreeMinHeight = 6;
-    public const int TreeMaxHeight = 10;
-    public const int TreeLogHeight = 3;                     // full-cube log blocks at the trunk base
-    public const int TreeBranchCount = 4;                   // limbs per tree (plus the crown spike)
-    public const int TreeBranchMinLength = 2;
-    public const int TreeBranchMaxLength = 4;
-    public const float TreeBranchRiseChance = 0.45f;        // per limb step: rise instead of extend
-    public const int TreeRootDepth = 4;                     // trunk extension into post-carve air below the base
-    public const int TreeCrownRadius = 2;                   // leaf blob radius at branch tips + top
-    // Ground rules: needs soil (not ravine rock), gentle slope, and modest altitude
-    public const int TreeMinSoil = 2;
-    public const int TreeMaxSlope = 2;
-    public const int TreeMinGroundHeight = 4;
-    public const int TreeMaxGroundHeight = 90;
-    // Chunk border margin: how far a trunk outside this chunk can still reach into it
-    public const int TreeReachBlocks = 8;
-    public const int TreeMaxHeightBlocks = 16;              // tallest a tree (plus crown) can stand
-    // Canopy columns poisoned around a wood/leaf edit (limb reach + blob radius + margin),
-    // so the far LOD never resurrects an edited crown
-    public const int TreeCanopyPoisonRadius = 8;
     // No trunk roots this close (Chebyshev) to the origin column, so the surface spawn the
-    // camera picks there is always in the open
+    // camera picks there is always in the open; a species opts out with worldgen.spawnClear false
     public const int TreeSpawnClearRadius = 3;
 
     // TreeGenerator.ShapeCache and TreeGenerator.CanopyCache, both on the same GenerationalCache as
     // the column and worm-path caches above (item D6).
     //
-    // CAPACITY is unchanged from the wholesale-Clear() era on purpose for both: the residency
-    // ceiling does not move, only the eviction policy does.
-    //
-    // The SHAPE cache holds (baseY, TreeShape) per accepted trunk column, keyed by (x, z). It is
-    // genuinely shared: TreeGenerator.Stamp asks it on the four generation workers, and
-    // BuildCanopyTops asks it once per column of a trunk's (2 * TreeReachBlocks + 16)^2 footprint,
-    // which the far-LOD canopy sweep drives.
+    // The SHAPE cache holds one grown, rasterised tree per accepted trunk column, keyed by (x, z):
+    // one entry is a whole tree of roughly a thousand TreeCells, so its capacity is far below the
+    // old 16384 small-shape entries. It is genuinely shared: TreeGenerator.Stamp asks it on the
+    // four generation workers, and BuildCanopyTops asks it for every leafy trunk in a
+    // (2 * ReachHorizontal + 16)^2 footprint, which the far-LOD canopy sweep drives. Re-price it
+    // only against the tree-perf.json numbers in TREES_PLAN.md.
     //
     // The CANOPY cache holds one CanopyColumns (the 16x16 tops and leaf blocks of a chunk column).
-    // Its single engine caller is LodRegion.BuildMeshData (LodRegion.cs:524), which asks
-    // TryGetCanopy for every FINE column of a region -- that is what makes the 4096 cap bite. The
-    // radius-8 region disc LodManager.BuildSortedOffsets builds is 197 regions, and this round's
-    // capture (OpenGLTest.Tests/WorldgenShapeCacheReplayProbe.cs) counted its distinct chunk
-    // columns per level: 3152 at level 0 (under the cap), 12608 at level 1 and 50432 at level 2,
-    // so it is the outer rings rather than the near one that outrun this cache.
+    // Its single engine caller is LodRegion.BuildMeshData, which asks TryGetCanopy for every FINE
+    // column of a region -- that is what makes the 4096 cap bite at the outer rings.
     //
     // GENERATIONS is 4 at both sites, matching ColumnCacheGenerations and CellCacheGenerations so
-    // all five GenerationalCache sites read alike. G is the one-token re-pricing lever, and
-    // PERF_TODO's lesson 4 allows moving it only against a real capture -- the probe named above is
-    // this round's, and its interleaved rows never showed G = 4 missing more than the old wholesale
-    // Clear() for either cache, so neither value was re-priced.
-    public const int TreeShapeCacheCapacity = 16384;
+    // all GenerationalCache sites read alike. G is the one-token re-pricing lever, and PERF_TODO's
+    // lesson 4 allows moving it only against a real capture.
+    public const int TreeShapeCacheCapacity = 4096;
     public const int TreeShapeCacheGenerations = 4;
     public const int TreeCanopyCacheCapacity = 4096;
     public const int TreeCanopyCacheGenerations = 4;
 
-    // --- Spruce (TreeGenerator's taiga conifer) ---
-    // The taiga grows a cone: a full-cube spruce trunk with needle blobs stacked every level from
-    // SpruceCrownStart up to the tip, their radius tapering from SpruceMaxRadius to one. Placement
-    // (density, spacing, ground rules) is shared with the broadleaf tree above.
-    public const int SpruceMinHeight = 7;
-    public const int SpruceMaxHeight = 12;
-    public const int SpruceCrownStart = 2;   // blocks of bare trunk before the canopy begins
-    public const int SpruceMaxRadius = 3;    // widest blob radius, at the crown base
-    // Taiga keeps more trees than the openness mask alone would leave, so a cold forest still
-    // reads as wooded rather than as bare snow.
-    public const float SpruceDensity = 0.03f;
-    public const float SpruceOpennessRelief = 0.5f;
-
-    // --- Cacti (CactusGenerator) ---
-    // Desert saguaros: a tapered stem throws a few arms that bend upward into prongs like a
-    // pitchfork. Four taper sizes (wood.family "cactus", levels 0..3) and no leaves.
-    public const bool CactusEnabled = true;
-    // A desert column grows a candidate with this probability; spacing (below) thins it
-    public const float CactusDensity = 0.010f;
-    // A candidate is kept only when its hash is the lowest within this Chebyshev radius
-    public const int CactusSpacingRadius = 2;
-    public const int CactusMinHeight = 3;
-    public const int CactusMaxHeight = 6;
-    public const int CactusMaxArms = 3;
-    // Cells a prong climbs after its arm bends up; its top cell wears the tip size
-    public const int CactusProngMinRise = 2;
-    public const int CactusProngMaxRise = 4;
-    public const int CactusRootDepth = 2;
-    public const int CactusMinGroundHeight = 1;
-    public const int CactusMaxGroundHeight = 90;
-    public const int CactusMaxSlope = 2;
-    // Chunk border margin: how far a stem outside this chunk can still reach into it
-    public const int CactusReachBlocks = 6;
-    public const int CactusMaxHeightBlocks = 12;
-
-    // CactusGenerator.ShapeCache, on the same GenerationalCache as the worldgen caches above
-    // (item D6). It holds (baseY, CactusShape) per accepted stem column, keyed by (x, z).
-    //
-    // CAPACITY is unchanged from the wholesale-Clear() era on purpose: the residency ceiling does
-    // not move, only the eviction policy does. This is the quietest of the three D6 caches --
-    // CactusGenerator.Stamp on the generation workers is its only caller, and nothing sweeps it, so
-    // only a long traverse across desert can outrun it.
-    //
-    // GENERATIONS matches ColumnCacheGenerations and CellCacheGenerations so all five
-    // GenerationalCache sites read alike. G is the one-token re-pricing lever, and PERF_TODO's
-    // lesson 4 allows moving it only against a real capture -- this round's is
-    // OpenGLTest.Tests/WorldgenShapeCacheReplayProbe.cs, whose interleaved rows never showed G = 4
-    // missing more than the old wholesale Clear() at any swept key cardinality, so 4 stands.
-    public const int CactusShapeCacheCapacity = 16384;
-    public const int CactusShapeCacheGenerations = 4;
+    // Felled-canopy markers kept before TreeGenerator.CanopyDisturbed is wiped wholesale (it only
+    // bounds memory). Sized so a fell's square, (2 * FellPoisonRadius + 1)^2 ~ 1000 columns, wipes
+    // the set no more often than the old 289-column square did against 16384.
+    public const int CanopyDisturbedLimit = 65536;
 
     // --- Canopy wind (leaf-wave vertex shader) ---
     // Master strength of the leaf sway, 0 disables it; wavelengths and gusts live in
@@ -1215,10 +1137,12 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // accelerating slam), then rest before its wood pops out as item drops
     public const float TreeToppleSeconds = 1.2f;
     public const float TreeFellRestSeconds = 2f;
-    // Collection bounds: wood flood cap, then overall cap including the canopy. Anything
-    // past the caps stays standing (and still drops normally when mined).
-    public const int TreeFellWoodCap = 256;
-    public const int TreeFellTotalCap = 512;
+    // Collection bounds: the subtree walk's wood cap, then the overall cap including the
+    // canopy. Sized to bound a mature oak's ~100 wood and ~500 leaf cells with room to spare
+    // (two grafted trees, a big spruce). Anything past the caps stays standing (and still
+    // drops normally when mined).
+    public const int TreeFellWoodCap = 512;
+    public const int TreeFellTotalCap = 2048;
 
     // --- Slimes (SlimeManager) ---
     // Forest mobs that hop at the player. Natural spawns appear on dry forest surface in a ring

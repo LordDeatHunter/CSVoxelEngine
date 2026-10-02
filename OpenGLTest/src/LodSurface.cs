@@ -108,7 +108,7 @@ public static class LodSurface
     /// <summary>
     /// Whether a block counts as the LOD surface: a full, solid, occluding cube, the same notion
     /// of "top solid terrain" <c>ColumnData.Heights</c> uses. Translucent ice and glass, cutout
-    /// leaves, tapered wood, pebbles, flowers, snow layers and fluids never count, so trees stay
+    /// leaves, tree wood, pebbles, flowers, snow layers and fluids never count, so trees stay
     /// with the canopy path and a player-built ice or glass structure never raises the LOD.
     /// </summary>
     internal static bool IsSurfaceSolid(byte id) => BlockType.IsSolid(id) && BlockType.Occludes(id);

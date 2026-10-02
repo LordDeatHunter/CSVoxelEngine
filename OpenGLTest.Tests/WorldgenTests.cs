@@ -5,9 +5,9 @@ using Xunit;
 
 namespace silkgltriangle.Tests;
 
-// Shares a collection with WorldgenShapeCacheEvictionTests so its forced shape-cache eviction
-// never lands between TrunkShapeIsCachedAcrossChunks' two adjacent TryGetTrunk calls - that
-// assertion compares the shape's lists by reference. See WorldgenShapeCacheCollection.
+// Shares a collection with TreeWorldgenTests so its shape-cache reset never lands between
+// TrunkShapeIsCachedAcrossChunks' two adjacent ShapeOf calls - that assertion compares the shapes
+// by reference. See WorldgenShapeCacheCollection.
 [Collection("Worldgen shape cache")]
 public sealed class WorldgenTests
 {
@@ -51,13 +51,11 @@ public sealed class WorldgenTests
             for (var x = cx * Chunk.Size; x < cx * Chunk.Size + Chunk.Size && !found; x++)
             for (var z = cz * Chunk.Size; z < cz * Chunk.Size + Chunk.Size && !found; z++)
             {
-                if (!TreeGenerator.TryGetTrunk(x, z, out var baseY1, out var shape1))
+                if (!TreeGenerator.TryGetTree(x, z, out _, out _))
                     continue;
-                Assert.True(TreeGenerator.TryGetTrunk(x, z, out var baseY2, out var shape2));
-                Assert.Equal(baseY1, baseY2);
-                // Record-struct equality compares the wood/blob lists by reference, so this
-                // only passes when the second call hit the shape cache (item 25).
-                Assert.Equal(shape1, shape2);
+                // The same instance twice: the second call hit the shape cache (item 25) instead
+                // of growing the tree again.
+                Assert.Same(TreeGenerator.ShapeOf(x, z), TreeGenerator.ShapeOf(x, z));
                 found = true;
             }
         }

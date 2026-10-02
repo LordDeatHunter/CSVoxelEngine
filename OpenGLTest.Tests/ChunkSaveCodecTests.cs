@@ -149,6 +149,68 @@ public class ChunkSaveCodecTests
         Assert.Equal(stone, restored.GetLocalBlock(3, 4, 5));
     }
 
+    /// <summary>
+    /// A generated chunk holding tree wood keeps every block and state byte through the whole save
+    /// path (snapshot, encode, decode, restore): the graph state of the wood and leaves is what the
+    /// mesher, the hitboxes and felling read, so losing it would turn a reloaded tree into twigs.
+    /// </summary>
+    [Fact]
+    public void WoodAndLeafStateSurviveTheRoundTrip()
+    {
+        TestContent.EnsureLoaded();
+        Assert.True(TryGenerateChunkWithTreeWood(out var source),
+            "no generated chunk near the origin holds tree wood with a graph state");
+
+        // The same id <-> name mapping the save store's writer and reader use
+        var bytes = Encode(source.TakeSnapshot(null), static id => BlockType.ById[id]?.Name);
+        var snapshot = Decode(bytes, static name => ContentRegistry.TryResolveBlock(name, out var id) ? id : null);
+
+        var restored = new Chunk(null!, source.Position, generateBlockData: false);
+        restored.RestoreFrom(snapshot);
+
+        var restoredWood = false;
+        for (var x = 0; x < Chunk.Size; x++)
+        for (var y = 0; y < Chunk.Size; y++)
+        for (var z = 0; z < Chunk.Size; z++)
+        {
+            var block = restored.GetLocalBlock(x, y, z);
+            var state = restored.GetLocalState(x, y, z);
+            Assert.Equal(source.GetLocalBlock(x, y, z), block);
+            Assert.Equal(source.GetLocalState(x, y, z), state);
+            restoredWood |= BlockType.IsTreeWood(block) && state != 0;
+        }
+
+        Assert.True(restoredWood, "the restored chunk holds no tree wood with a non-zero state");
+    }
+
+    /// <summary>Generates the chunk holding a wood cell of some tree near the origin, if any has state.</summary>
+    private static bool TryGenerateChunkWithTreeWood(out Chunk chunk)
+    {
+        for (var x = -96; x < 96; x++)
+        for (var z = -96; z < 96; z++)
+        {
+            if (!TreeGenerator.TryGetTree(x, z, out _, out _)) continue;
+            var shape = TreeGenerator.ShapeOf(x, z);
+            // A cell above the base, so the chunk is the one the trunk climbs through
+            var cell = shape.Cells[Math.Min(1, shape.WoodCount - 1)];
+            var position = new Vector3(cell.X >> Chunk.SizeShift, cell.Y >> Chunk.SizeShift, cell.Z >> Chunk.SizeShift);
+            var candidate = new Chunk(null!, position, generateBlockData: true);
+
+            for (var i = 0; i < Chunk.BlockCount; i++)
+            {
+                var (lx, ly, lz) = (i >> (2 * Chunk.SizeShift), (i >> Chunk.SizeShift) & Chunk.SizeMask, i & Chunk.SizeMask);
+                if (BlockType.IsTreeWood(candidate.GetLocalBlock(lx, ly, lz)) && candidate.GetLocalState(lx, ly, lz) != 0)
+                {
+                    chunk = candidate;
+                    return true;
+                }
+            }
+        }
+
+        chunk = null!;
+        return false;
+    }
+
     [Fact]
     public void GenerationNeverMarksAChunkModified()
     {

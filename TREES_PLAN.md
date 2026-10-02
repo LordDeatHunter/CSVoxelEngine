@@ -2,8 +2,9 @@
 
 ## Status
 
-Phases 1-2 done (content + codecs; headless growth engine). Phases 3-8 pending. Each phase lands as its own
-commit on `tree-rework`; finished phases are collapsed into short summaries here.
+Phases 1-3 done (content + codecs; headless growth engine; cutover to engine-grown trees).
+Phases 4-8 pending. Each phase lands as its own commit on `tree-rework`; finished phases are
+collapsed into short summaries here.
 
 ## Context
 Trees are hardcoded C# today: `TreeGenerator.BuildShape` (broadleaf) and `BuildSpruceShape`,
@@ -189,19 +190,38 @@ bands }`:
    game reads it. oak/spruce/cactus JSON retuned (oak 9-12 tall with a dome crown, spruce 9-14
    conical, cactus 5-6 with 2-3 upward arms). Tests: `TreeGraphTests`, `VirtualTreeSpaceTests`,
    `TreeGrowerTests`, `TreeRasterizerTests`.
-3. **Cutover.** Record the worldgen baseline first: a worker-side tree-time counter plus
-   chunk-gen throughput on a fixed fly-through scenario, written into `TREES_PLAN.md`. Then:
-   - the new oak/spruce/cactus wood + leaf blocks and the renames;
-   - the `tree_wood` renderer and `TreeWoodShape` hitboxes;
-   - mining hardness and loot by `(id, state)`, and detached placement;
-   - worldgen stamping solo species shapes (placement and the chunk-border margin use
-     `TreeRasterizer.ReachOf`, not `TreeReachBlocks`/`TreeMaxHeightBlocks`);
-   - graph-based felling in `TopplingTree.Collect`;
-   - the far LOD reading rasterised canopies;
-   - a world save format version bump.
-
-   Delete the six taper blocks, the cactus taper blocks, `WoodShape`'s level rule,
-   `wood.taperLevel`/`family`, `CactusGenerator`, `BuildShape` and `BuildSpruceShape`.
+3. **Done — cutover.** One `tree_wood` block per species (`oak_log`, `spruce_log`, `cactus`;
+   broadleaf content renamed to oak: `oak_log`/`oak_leaves` and the `oak_log_*`/`oak_leaves*`
+   tiles; the six taper blocks, the three cactus taper blocks, the branch-connectable tag,
+   `wood.taperLevel/halfWidth/family`, every wood family/level table, `WoodShape`,
+   `CactusGenerator`, `BuildShape` and `BuildSpruceShape` deleted). The registry forces tree wood
+   non-occluding, non-AO and light-passing, never greedy. `TreeWoodShape` is the one connection
+   rule (same id, neither side detached, my parent points at you or yours at me) plus node and
+   tube boxes (`HalfWidth = (t+1)/32`); the `Chunk` per-voxel `EmitTreeWood` emitter draws a thin
+   cell as a node box plus one capless tube per connection at min(this, neighbour) width through
+   `EmitBoxFace`/`CropUv` and `EmitterFaceLight`, while a full-thickness or detached cell takes the
+   model path and culls against a same-id full cube. Raycast, selection outline and
+   `Camera.IsColliding` read `TreeWoodShape.GetBoxesAt`/`OverlapsShape`. `Mining.HardnessOf(id,
+   state)` scales by thickness (`wood.tipHardness`), and loot rolls `wood.loot` thickness bands
+   (`WoodLootBand.Select`) through a new `LootContext.State` that mining, TNT, flows and felled
+   trees pass; placing tree wood writes `WoodState.Detached`. `TreeGenerator` keeps the placement
+   gates, now per species (`TryGetTree`: one hash stream, biome -> species in ordinal name order,
+   optional `worldgen.openness`/`spawnClear`), grows each tree solo (`ShapeOf`: a
+   `GenerationalCache` of rasterised `TreeCell[]` over the terrain heightmap raised to flooded
+   water) and `Stamp`s wood with state into air or leaves, then leaves into air, in a fixed scan
+   order; the root walk extends the trunk down through cave air but only inside the chunk holding
+   the base and never past its floor. The far LOD canopy reads the rasterised leaf cells;
+   `PoisonCanopy` takes a radius (1 for a single edit, the species reach on a fell; the disturbed
+   set's cap is `CanopyDisturbedLimit`). `TopplingTree.Collect` fells the cut cell's subtree over
+   child edges (root: the whole tree; limb: its descendants; detached never follows) plus leaves
+   within Chebyshev 2, meshed in a scratch chunk centred on the pivot (`ScratchOrigin`) with the
+   state bytes. Save formats bumped (`ChunkSaveCodec.Version`, `WorldStore.CurrentVersion` 2;
+   PLAY refuses another format with a notice). Instrumentation: `WorldgenStats` and the
+   profiler's `wgen` console token; scenarios `visual-examples/tree-perf.json` (perf fly-through)
+   and `visual-examples/trees.json` (oak, cut limb, felled trunk, spruce, cactus). Tests:
+   `WorldgenStatsTests`, `WoodLootBandTests`, `WoodLootTests`, `TreeWoodShapeGeometryTests`,
+   `TreeWoodShapeTests`, `TreeWorldgenTests`, `CanopyDisturbedTests`, `TreeFellingTests`, plus the
+   rewritten mining, meshing, biome, snow, LOD, save-codec and main-menu rules.
 4. **Tree vs tree + LOD proxy + perf.** The cell-batch cache with solo-neighbour obstacles, and
    the LOD level-2/3 proxy. Measure against the phase-3 baseline, record the result in
    `TREES_PLAN.md` and **stop for the user's call** if it looks bad.
@@ -216,8 +236,46 @@ bands }`:
    `worldgen` block, and the placeholder art script.
 8. **ItemDebugger TREES tab + docs.** A third tab that grows a species pulse by pulse with a
    step slider, meshed through the scratch-chunk path `TopplingTree.BuildMeshData` already
-   uses, plus a GL-free tested state class. Add `visual-examples/trees.json`, and update
+   uses, plus a GL-free tested state class. Extend `visual-examples/trees.json`, and update
    AGENTS.md (Content schema, Layout, invariants).
+
+## Perf baseline
+
+Measured with `visual-examples/tree-perf.json` (a fixed flight-sprint fly-through: forest, taiga,
+desert, 12 s each after an 8 s settle) in Release:
+`cd OpenGLTest && VOXEL_DEBUG=1 VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/tree-perf.json dotnet run -c Release`,
+reading the console line's `wgen` token (`WorldgenStats`, published by `FrameProfiler`).
+
+Machine: `Build: Release | debugger False | serverGC False | latency SustainedLowLatency | cpus 12`,
+`GPU: Quadro T1000 with Max-Q Design/PCIe/SSE2 | NVIDIA Corporation | GL 4.6.0 NVIDIA 597.06`.
+
+Columns: *chunks* is the lifetime `GenerateBlockData` count at exit (every chunk, the many
+above-terrain early exits included, which is why ms/chunk is low); *ms/chunk* and *tree ms/chunk*
+are lifetime totals over that count (tree = the tree + cactus stamp); *tree ms/s*, *grow ms/s* and
+*misses/s* are medians of the once-a-second windows that generated any chunk (summed over the
+generation workers, so ms/s can exceed 1000); *grows* is every shape build (tree + cactus cache
+misses, on the generation workers and the LOD builder's canopy sweep alike); *misses/s* counts the
+tree shape cache only.
+
+| run | chunks | ms/chunk | tree ms/chunk | tree ms/s | grows | grow ms/tree | grow ms/s | misses/s |
+|---|---|---|---|---|---|---|---|---|
+| old 1 | 189247 | 0.66 | 0.124 | 435.8 | 133242 | 0.004 | 7.4 | 1604 |
+| old 2 | 187378 | 0.70 | 0.131 | 464.7 | 123278 | 0.004 | 7.1 | 1602 |
+| old 3 | 186988 | 0.71 | 0.135 | 484.2 | 117306 | 0.004 | 7.3 | 1542 |
+
+Phase 3 result (same machine and command, after the cutover):
+
+| run | chunks | ms/chunk | tree ms/chunk | tree ms/s | grows | grow ms/tree | grow ms/s | misses/s |
+|---|---|---|---|---|---|---|---|---|
+| new 1 | 189306 | 0.65 | 0.083 | 323.6 | 144773 | 0.288 | 721.2 | 2448 |
+| new 2 | 189101 | 0.67 | 0.080 | 309.6 | 138187 | 0.296 | 704.7 | 2281 |
+| new 3 | 188373 | 0.69 | 0.086 | 317.9 | 132462 | 0.313 | 767.5 | 2304 |
+
+Overall ms/chunk is unchanged (0.65-0.69 vs 0.66-0.71) and the stamp itself got cheaper (tree
+ms/s ~310-325 vs ~435-485), but growing a tree now costs ~0.3 ms instead of ~0.004 ms, so grow
+time rose about 100x to ~700-770 ms/s with ~1.5x the shape-cache misses. The stamp's tree time
+includes every grow the generation workers trigger, so at least ~400 ms/s of grow time (over half)
+runs on the single LOD builder thread's far-ring canopy sweep: that is phase 4's LOD proxy target.
 
 ## Critical files
 - `OpenGLTest/src/WorldGen/TreeGenerator.cs`: becomes the placement and stamping front-end

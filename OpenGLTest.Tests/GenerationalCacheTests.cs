@@ -41,8 +41,8 @@ namespace silkgltriangle.Tests;
 /// different key, or a torn read of a half-rotated generation array.</item>
 /// <item><see cref="AValueTypeCacheCompilesAndRoundTrips"/> - a <c>where TValue : class</c>
 /// constraint reintroduced, or the probe rewritten as a null test. Either locks the type out of
-/// <c>TreeGenerator.ShapeCache</c> and <c>CactusGenerator.ShapeCache</c>, whose values are value
-/// tuples, and this fact stops compiling.</item>
+/// value-type payloads (a cache site may hold a tuple or a struct, not only a class), and this
+/// fact stops compiling.</item>
 /// </list></para>
 ///
 /// <para><b>What the concurrency fact proves, and what it does not.</b>
@@ -358,10 +358,9 @@ public sealed class GenerationalCacheTests
     public void AValueTypeCacheCompilesAndRoundTrips()
     {
         // This fact exists to be a compile-time guard: GenerationalCache carries no
-        // `where TValue : class` constraint, because TreeGenerator.ShapeCache and
-        // CactusGenerator.ShapeCache hold (int, record struct) tuples and a class constraint would
-        // lock the type out of those conversions. Reintroducing the constraint, or rewriting the
-        // probe as a null test, breaks this file.
+        // `where TValue : class` constraint, because a cache site may hold value tuples or structs
+        // and a class constraint would lock the type out of those payloads. Reintroducing the
+        // constraint, or rewriting the probe as a null test, breaks this file.
         var cache = new GenerationalCache<(int X, int Z), (int Sum, int Product)>(8, 4);
         var calls = 0;
 

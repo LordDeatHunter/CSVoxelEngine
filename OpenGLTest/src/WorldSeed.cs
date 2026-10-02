@@ -68,7 +68,6 @@ public static class WorldSeed
         Chunk.ResetColumnCache();
         WormCarver.ResetCellCache();
         TreeGenerator.ResetCaches();
-        CactusGenerator.ResetShapeCache();
 
         // The previous world's edit state is process-global and must not leak into the next one.
         LodRegion.ResetColumnCaps();

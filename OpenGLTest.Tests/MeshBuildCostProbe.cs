@@ -43,7 +43,7 @@ public sealed class MeshBuildCostProbe
     {
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
         var lamp = Block("lamp");
-        byte[] solids = [Block("stone"), Block("dirt"), Block("leaves"), Block("glass")];
+        byte[] solids = [Block("stone"), Block("dirt"), Block("oak_leaves"), Block("glass")];
 
         // Fill in a fixed order: the dictionary's enumeration order changes per process
         var chunks = manager.Chunks.Values

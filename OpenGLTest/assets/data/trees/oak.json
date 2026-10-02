@@ -1,6 +1,6 @@
 {
-  "wood": "block/log",
-  "leaves": "block/leaves",
+  "wood": "block/oak_log",
+  "leaves": "block/oak_leaves",
   "growth": {
     "logic": "oak",
     "signalEnergy": 12,

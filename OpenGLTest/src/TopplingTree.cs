@@ -7,17 +7,20 @@ using Silk.NET.OpenGL;
 namespace silkgltriangle;
 
 /// <summary>
-/// A felled tree: the connected wood and canopy above a mined base log, swinging from upright
-/// to flat around its base and popping out item drops after coming to rest. The mesh is baked
-/// once from the real chunk mesher (correct taper boxes, caps, AO and crop UVs) rebased to
+/// A felled tree: the subtree of a mined tree-wood cell (see <see cref="Collect"/>) and the
+/// canopy around it, swinging from upright to flat around the cut and popping out item drops
+/// after coming to rest. The mesh is baked
+/// once from the real chunk mesher (correct node and tube boxes, AO and crop UVs) rebased to
 /// pivot-relative coords; only the GPU upload waits for a GL context on first render.
 /// Everything here runs on the main thread; the block set is fixed at fell time, so chunk
 /// streaming and later edits cannot disturb the fall.
 /// </summary>
 public class TopplingTree : IDisposable
 {
-    /// <summary>One collected block: integer world coords plus its id.</summary>
-    public readonly record struct FellBlock(Vector3 Cell, byte Id);
+    /// <summary>One collected block: integer world coords plus its id and state byte (the
+    /// <see cref="WoodState"/> or <see cref="LeafState"/> it stood with, which the falling mesh
+    /// and the loot roll both read).</summary>
+    public readonly record struct FellBlock(Vector3 Cell, byte Id, byte State);
 
     private readonly List<FellBlock> _blocks;
     private readonly Vector3 _pivot;
@@ -49,105 +52,69 @@ public class TopplingTree : IDisposable
     }
 
     /// <summary>
-    /// Collects the severed part of a tree above a mined wood block: the broken block itself
-    /// plus every connected wood block at or above its height that lost its support through
-    /// the break. The stump below stays standing, and so does any limb still rooted through
-    /// standing wood — cutting one branch no longer fells the crown. Canopy leaves within
-    /// two blocks of the falling wood come along. Bounded by the fell caps; anything past
-    /// them stays standing. Pure CPU over live chunk data — safe to call from the main
-    /// thread on break, whether or not the broken cell itself was already cleared.
+    /// Collects what falls when a tree-wood cell is mined: the cell plus its whole subtree in the
+    /// tree graph, walked over child edges only (a same-block, non-detached neighbour whose
+    /// <see cref="WoodState"/> parent pointer lands on the current cell). Cutting the root takes
+    /// the whole tree, root-walk cells included (they point up at the base); cutting a limb takes
+    /// only its descendants, so the trunk and every other limb stay standing; detached
+    /// (player-placed) wood is never anyone's child. There is no height limit: a drooping limb's
+    /// subtree may dip below the cut. Canopy leaves within Chebyshev 2 of the falling wood come
+    /// along, each with its own state byte. Mining anything that is not tree wood, or detached
+    /// wood, collects just that cell. An unloaded chunk reads as nothing. Bounded by the fell
+    /// caps; anything past them stays standing. Pure CPU over live chunk data, main thread, and
+    /// safe whether or not the broken cell was already cleared (it is seeded from the passed id
+    /// and state).
     /// </summary>
-    public static List<FellBlock> Collect(ChunkManager chunks, Vector3 breakCell, byte brokenId)
+    public static List<FellBlock> Collect(ChunkManager chunks, Vector3 breakCell, byte brokenId, byte brokenState)
     {
-        var baseY = (int)breakCell.Y;
+        if (!BlockType.IsTreeWood(brokenId) || WoodState.IsDetached(brokenState))
+            return [new FellBlock(breakCell, brokenId, brokenState)];
 
-        // Flood first: every wood block connected to the break at or above its height, as if
-        // the break cell were still there (it is seeded either way, so a cleared cell reads
-        // the passed id instead of air).
-        var woodIds = new Dictionary<Vector3, byte>();
-        var seen = new HashSet<Vector3> { breakCell };
-        if (TreeGenerator.WoodLevel(brokenId) >= 0)
-            woodIds[breakCell] = brokenId;
+        var fallingWood = new List<FellBlock> { new(breakCell, brokenId, brokenState) };
+        var taken = new HashSet<Vector3> { breakCell };
 
-        var queue = new Queue<Vector3>();
-        queue.Enqueue(breakCell);
-        while (queue.Count > 0
-               && woodIds.Count < WorldGenerationConfig.TreeFellWoodCap)
+        // Breadth-first over child edges: the list doubles as the queue, so the wood comes out
+        // in walk order (the cut cell first, then outward through the subtree)
+        for (var head = 0;
+             head < fallingWood.Count && fallingWood.Count < WorldGenerationConfig.TreeFellWoodCap;
+             head++)
         {
-            var cell = queue.Dequeue();
-            foreach (var offset in Vector3Directions.CardinalDirections)
+            var current = fallingWood[head].Cell;
+            for (var dir = 0; dir < TreeDirections.Count; dir++)
             {
-                var next = cell + offset;
-                if ((int)next.Y < baseY || !seen.Add(next))
-                    continue;
-                var id = chunks.GetBlockGlobal((int)next.X, (int)next.Y, (int)next.Z);
-                if (TreeGenerator.WoodLevel(id) < 0)
+                if (fallingWood.Count >= WorldGenerationConfig.TreeFellWoodCap)
+                    break;
+
+                var nx = (int)current.X + TreeDirections.Dx[dir];
+                var ny = (int)current.Y + TreeDirections.Dy[dir];
+                var nz = (int)current.Z + TreeDirections.Dz[dir];
+                if (!chunks.TryGetCell(nx, ny, nz, out var id, out var state)
+                    || id != brokenId
+                    || WoodState.IsDetached(state)
+                    || !WoodState.TryParentOffset(state, out var px, out var py, out var pz)
+                    || nx + px != (int)current.X || ny + py != (int)current.Y || nz + pz != (int)current.Z)
                     continue;
 
-                woodIds[next] = id;
-                queue.Enqueue(next);
-            }
-        }
-
-        // Support split: with the break cell gone, whatever is still connected through wood
-        // down to live wood below the break stays up; the rest (the break plus its children)
-        // falls. A floating remnant with no live wood underneath has no seeds, so it all falls.
-        var standing = new HashSet<Vector3>();
-        var supportQueue = new Queue<Vector3>();
-        foreach (var cell in woodIds.Keys)
-        {
-            if (cell == breakCell)
-                continue;
-            foreach (var offset in Vector3Directions.CardinalDirections)
-            {
-                var next = cell + offset;
-                if ((int)next.Y >= baseY)
+                var next = new Vector3(nx, ny, nz);
+                if (!taken.Add(next))
                     continue;
-                if (TreeGenerator.WoodLevel(chunks.GetBlockGlobal((int)next.X, (int)next.Y, (int)next.Z)) < 0)
-                    continue;
-
-                standing.Add(cell);
-                supportQueue.Enqueue(cell);
-                break;
-            }
-        }
-
-        while (supportQueue.Count > 0)
-        {
-            var cell = supportQueue.Dequeue();
-            foreach (var offset in Vector3Directions.CardinalDirections)
-            {
-                var next = cell + offset;
-                if (next == breakCell || !woodIds.ContainsKey(next) || !standing.Add(next))
-                    continue;
-                supportQueue.Enqueue(next);
+                fallingWood.Add(new FellBlock(next, id, state));
             }
         }
 
         // The canopy comes along without chain-felling neighbours: leaves near falling wood
-        // join (the stamper keeps every blob cell within Chebyshev 2 of wood), but the flood
-        // never walks leaf-to-leaf into the next tree. The falling wood is snapshotted first:
-        // leaves append to collected, which must not be enumerated while it grows.
-        var fallingWood = new List<Vector3>(woodIds.Count);
-        foreach (var cell in woodIds.Keys)
-        {
-            if (cell != breakCell && standing.Contains(cell))
-                continue;
-            fallingWood.Add(cell);
-        }
-
-        var collected = new List<FellBlock>(fallingWood.Count + 16);
-        var taken = new HashSet<Vector3>();
-        foreach (var cell in fallingWood)
+        // join (the leaf clusters hug the wood that feeds them), but the walk never goes
+        // leaf-to-leaf into the next tree. The wood count is fixed first: leaves append to
+        // collected, which must not be enumerated while it grows.
+        var collected = new List<FellBlock>(fallingWood.Count + 64);
+        foreach (var wood in fallingWood)
         {
             if (collected.Count >= WorldGenerationConfig.TreeFellTotalCap)
                 return collected;
-
-            collected.Add(new FellBlock(cell, woodIds[cell]));
-            taken.Add(cell);
+            collected.Add(wood);
         }
 
-        foreach (var cell in fallingWood)
+        foreach (var wood in fallingWood)
             for (var dx = -2; dx <= 2; dx++)
             for (var dy = -2; dy <= 2; dy++)
             for (var dz = -2; dz <= 2; dz++)
@@ -155,52 +122,55 @@ public class TopplingTree : IDisposable
                 if (collected.Count >= WorldGenerationConfig.TreeFellTotalCap)
                     return collected;
 
-                var leaf = cell + new Vector3(dx, dy, dz);
-                if ((int)leaf.Y < baseY || !taken.Add(leaf))
+                var leaf = wood.Cell + new Vector3(dx, dy, dz);
+                if (!taken.Add(leaf))
                     continue;
-                var leafId = chunks.GetBlockGlobal((int)leaf.X, (int)leaf.Y, (int)leaf.Z);
-                if (!TreeGenerator.IsLeaf(leafId))
+                if (!chunks.TryGetCell((int)leaf.X, (int)leaf.Y, (int)leaf.Z, out var leafId, out var leafState)
+                    || !TreeGenerator.IsLeaf(leafId))
                     continue;
 
-                collected.Add(new FellBlock(leaf, leafId));
+                collected.Add(new FellBlock(leaf, leafId, leafState));
             }
 
         return collected;
     }
 
     /// <summary>
-    /// Meshes collected blocks with the real chunk mesher (taper boxes, joint caps, AO, crop
+    /// Meshes collected blocks with the real chunk mesher (node and tube boxes, AO, crop
     /// UVs) inside one scratch chunk, then rebases positions to pivot-relative and bakes
     /// full daylight (a falling tree is out in the open; sampling its old nook's light would
     /// freeze stale cave shade onto it). The scratch chunk sits in a throwaway manager holding
     /// nothing but empty neighbours, so everything around it reads as air and severed ends cap
-    /// themselves. The biome tint is the field over the tree's own footprint from its minimum
-    /// cell (<see cref="BiomeTint.FieldsAt"/>), not the scratch chunk's, so a felled canopy keeps
-    /// the colour it stood in.
+    /// themselves. Its local 0..16 is one origin computed once: horizontally centred on the
+    /// pivot's column (<see cref="ScratchOrigin"/>), vertically from the lowest collected cell,
+    /// so a crown spreads evenly around its trunk; cells outside it still drop their loot but
+    /// skip the falling mesh. The biome tint is the field over that same footprint
+    /// (<see cref="BiomeTint.FieldsAt"/> at the origin), not the scratch chunk's, so a felled
+    /// canopy keeps the colour it stood in.
     /// </summary>
     public static ChunkMeshData BuildMeshData(List<FellBlock> blocks, Vector3 pivot)
     {
-        // Real trees fit a chunk (limbs reach ~6, crowns ~13 tall); anything past that is a
-        // player mega-build, whose overflow cells still drop but skip the falling mesh.
-        var min = new Vector3(float.MaxValue);
+        var minY = float.MaxValue;
         foreach (var block in blocks)
-            min = Vector3.Min(min, block.Cell);
+            minY = MathF.Min(minY, block.Cell.Y);
+        var origin = ScratchOrigin(pivot, blocks.Count == 0 ? pivot.Y : minY);
 
-        // The scratch chunk stands at (256, 0, 256) but its local 0..16 is the tree's footprint
-        // from min, so the tint field has to be the one over that footprint, or a felled canopy
+        // The scratch chunk stands at (256, 0, 256) but its local 0..16 is the footprint from
+        // origin, so the tint field has to be the one over that footprint, or a felled canopy
         // would wear the climate of world (4096, 4096).
-        var tintFields = BiomeTint.FieldsAt((int)min.X, (int)min.Z);
+        var tintFields = BiomeTint.FieldsAt((int)origin.X, (int)origin.Z);
 
         var scratchManager = new ChunkManager(null!);
         var scratch = new Chunk(null!, new Vector3(256, 0, 256), generateBlockData: false);
         foreach (var block in blocks)
         {
-            var local = block.Cell - min;
+            var local = block.Cell - origin;
             if (local.X < 0 || local.Y < 0 || local.Z < 0 || local.X >= Chunk.Size || local.Y >= Chunk.Size || local.Z >= Chunk.Size)
                 continue;
 
-            var worldPos = new Vector3(256 * Chunk.Size, 0, 256 * Chunk.Size) + local;
-            scratch.PlaceBlockAt(worldPos, block.Id, scratchManager);
+            // Raw write with the cell's own state byte: the wood keeps its thickness and
+            // connections, so the falling tree draws the shape it stood with
+            scratch.SetBlockRaw((int)local.X, (int)local.Y, (int)local.Z, block.Id, block.State);
         }
 
         // GenerateMeshData refuses to build without its six face neighbours (a real chunk
@@ -218,7 +188,7 @@ public class TopplingTree : IDisposable
 
         var meshData = scratch.GenerateMeshData(scratchManager, greedy: true, tintFields) ?? new ChunkMeshData([], [], [], [], false);
 
-        var rebase = min - pivot;
+        var rebase = origin - pivot;
         for (var i = 0; i < meshData.Vertices.Count; i++)
         {
             var vertex = meshData.Vertices[i];
@@ -230,6 +200,14 @@ public class TopplingTree : IDisposable
 
         return meshData;
     }
+
+    /// <summary>
+    /// World cell the felled mesh's scratch chunk maps to its local (0, 0, 0): the pivot's
+    /// column minus half a chunk on X and Z, so the trunk sits in the middle and a crown up to
+    /// a chunk wide fits around it, and <paramref name="minY"/> (the lowest collected cell) on Y.
+    /// </summary>
+    public static Vector3 ScratchOrigin(Vector3 pivot, float minY) =>
+        new(MathF.Floor(pivot.X) - Chunk.Size / 2, minY, MathF.Floor(pivot.Z) - Chunk.Size / 2);
 
     /// <summary>Current swing angle: cubic ease-in from upright to flat over the topple time.</summary>
     public float AngleNow
@@ -284,7 +262,7 @@ public class TopplingTree : IDisposable
             // The resting cell is the loot context too, so position-dependent rolls see where
             // the block landed rather than where it grew
             rolled.Clear();
-            DropManager.RollLoot(block.Id, new LootContext((int)cell.X, (int)cell.Y, (int)cell.Z), rolled);
+            DropManager.RollLoot(block.Id, new LootContext((int)cell.X, (int)cell.Y, (int)cell.Z, State: block.State), rolled);
 
             foreach (var id in rolled)
                 drops.Add((id, cell));
