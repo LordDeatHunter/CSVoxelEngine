@@ -2,7 +2,7 @@
 
 ## Status
 
-Phase 1 done (content + codecs, headless). Phases 2-8 pending. Each phase lands as its own
+Phases 1-2 done (content + codecs; headless growth engine). Phases 3-8 pending. Each phase lands as its own
 commit on `tree-rework`; finished phases are collapsed into short summaries here.
 
 ## Context
@@ -41,9 +41,10 @@ bit  7    shell (girth cell of a wide trunk, see below)
   never welds and is never felled with a tree.
 
 **Leaf state** (`LeafState`):
-- bits 0-2: hydration, the distance to a **live tip** (a childless wood cell at or under the
-  species' `leafCluster.tipMaxPx`). A thick stub left by a cut is not a tip, so its leaves
-  decay.
+- bits 0-2: hydration — `leafCluster.hydration` minus the Manhattan distance to the nearest
+  **live tip** (a childless wood cell at or under the species' `leafCluster.tipMaxPx`) whose
+  cluster shape holds the cell; a leaf exists only while that is >= 1, and 0 decays. A thick
+  stub left by a cut is not a tip, so its leaves decay.
 - bit 3: persistent (player-placed leaves never decay).
 
 **Wide trunks (core + shell):** when a node's diameter passes 16 px it becomes:
@@ -165,17 +166,36 @@ bands }`:
    numbers; `leaves` and `leafCluster` are optional together (cactus). Nothing reads the species
    yet. Tests: `WoodStateTests`, `LeafStateTests`, `TreeSpeciesCompilerTests`,
    `TreeSpeciesContentTests`.
-2. **Growth engine (headless).** `TreeGraph`, `ITreeSpace` (virtual), `TreeGrower.Pulse` with
-   the pipe model and girth, the `oak`/`conifer`/`cactus` logics, the leaf-cluster rule,
-   `TreeRasterizer` (no wide trunks yet) and the `roots` feature. Tests: determinism, a parent
-   is never thinner than its child, every cell reaches the root, obstacles respected, leaves
-   only within hydration of a tip.
+2. **Done — growth engine (headless).** `TreeGraph` (int-indexed nodes: cell, parent + parent
+   dir in `Chunk.CubeFaces` order via `TreeDirections`, child list, girth-free `PipePx` and
+   displayed `ThicknessPx`, both diameters in px, feature flag), `ITreeSpace.IsFree` with
+   `VirtualTreeSpace` (height delegate, optional carved-cell delegate, occupied set;
+   `FromTerrain` reads `Chunk.GetColumnData`), `TreeGrower` (`Pulse`: base weights sides 1 / up
+   `upProbability` / travel reinforced / thick children followed by `PipePx × FollowScale` / no
+   forks under `lowestBranchHeight`, then `IGrowthLogic.AdjustWeights`, blocked dirs and Down
+   masked, one face-adjacent node per pulse; the grower clamps `EnergyAfterTurn` to 0..energy,
+   so a turn never adds energy and a growth node stays within `signalEnergy` of the root; pipe
+   model on `PipePx`, `ThicknessPx = min(maxPx, max(tipPx, PipePx × girth))` raised to the
+   thickest child, so girth is applied once and a parent is never thinner than a child;
+   `GrowToMaturity` seeded by `SeedFor(x,y,z,seed,species)` = position + world seed + FNV-1a
+   species name (`WorldSeedParser.Fnv1a`), steps and per-tree energy from that stream, final
+   `Thicken`, then `ITreeFeature.Apply`), `OakGrowthLogic`/`ConiferGrowthLogic`/
+   `CactusGrowthLogic` (umbrella/baobab/buttress still placeholders), `RootsFeature` (feature
+   nodes down through free cells), `LeafCluster` (live tips = childless non-feature nodes <=
+   `tipMaxPx`; blob/cone shapes; stored hydration = `leafCluster.hydration` − Manhattan
+   distance to the nearest tip whose shape holds the cell, >= 1; `HydrationAt` is the one
+   predicate) and `TreeRasterizer` (`TreeCell` list: wood, features, leaves; thickness code =
+   ceil(px) − 1 clamped at the full cube; `ReachOf` for phase 3's border margin). Nothing in the
+   game reads it. oak/spruce/cactus JSON retuned (oak 9-12 tall with a dome crown, spruce 9-14
+   conical, cactus 5-6 with 2-3 upward arms). Tests: `TreeGraphTests`, `VirtualTreeSpaceTests`,
+   `TreeGrowerTests`, `TreeRasterizerTests`.
 3. **Cutover.** Record the worldgen baseline first: a worker-side tree-time counter plus
    chunk-gen throughput on a fixed fly-through scenario, written into `TREES_PLAN.md`. Then:
    - the new oak/spruce/cactus wood + leaf blocks and the renames;
    - the `tree_wood` renderer and `TreeWoodShape` hitboxes;
    - mining hardness and loot by `(id, state)`, and detached placement;
-   - worldgen stamping solo species shapes;
+   - worldgen stamping solo species shapes (placement and the chunk-border margin use
+     `TreeRasterizer.ReachOf`, not `TreeReachBlocks`/`TreeMaxHeightBlocks`);
    - graph-based felling in `TopplingTree.Collect`;
    - the far LOD reading rasterised canopies;
    - a world save format version bump.

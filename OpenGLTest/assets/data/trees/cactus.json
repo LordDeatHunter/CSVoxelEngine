@@ -2,10 +2,10 @@
   "wood": "block/cactus",
   "growth": {
     "logic": "cactus",
-    "signalEnergy": 8,
+    "signalEnergy": 5,
     "upProbability": 3,
-    "lowestBranchHeight": 1,
-    "maturitySteps": [25, 45]
+    "lowestBranchHeight": 2,
+    "maturitySteps": [20, 35]
   },
   "thickness": { "tipPx": 4, "pipeExponent": 1.5, "maxPx": 12, "trunkShape": "square" },
   "features": [ { "type": "roots", "depth": 2 } ],

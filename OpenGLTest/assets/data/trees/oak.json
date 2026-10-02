@@ -3,16 +3,16 @@
   "leaves": "block/leaves",
   "growth": {
     "logic": "oak",
-    "signalEnergy": 14,
+    "signalEnergy": 12,
     "upProbability": 2,
-    "lowestBranchHeight": 3,
+    "lowestBranchHeight": 5,
     "maturitySteps": [60, 90]
   },
   "thickness": {
     "tipPx": 1,
     "pipeExponent": 2.0,
     "maxPx": 16,
-    "girthProfile": [[0, 1.0]],
+    "girthProfile": [[0, 2.0], [0.5, 1.4], [1, 1.0]],
     "trunkShape": "circle",
     "rim": "block"
   },

@@ -23,15 +23,24 @@ public static class WorldSeedParser
         if (int.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
             return value;
 
+        return unchecked((int)Fnv1a(trimmed));
+    }
+
+    /// <summary>
+    /// 32-bit FNV-1a over the UTF-16 code units of <paramref name="text"/>: stable across
+    /// processes and runtimes and case-sensitive. Shared with the tree grower's species salt.
+    /// </summary>
+    internal static uint Fnv1a(string text)
+    {
         var hash = FnvOffsetBasis;
         unchecked
         {
-            foreach (var c in trimmed)
+            foreach (var c in text)
             {
                 hash ^= c;
                 hash *= FnvPrime;
             }
-            return (int)hash;
         }
+        return hash;
     }
 }

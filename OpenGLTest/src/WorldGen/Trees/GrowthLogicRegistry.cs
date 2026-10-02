@@ -13,9 +13,9 @@ public static class GrowthLogicRegistry
 {
     private static readonly Dictionary<string, IGrowthLogic> ByNameTable = new(StringComparer.Ordinal)
     {
-        ["oak"] = new PlaceholderGrowthLogic("oak"),
-        ["conifer"] = new PlaceholderGrowthLogic("conifer"),
-        ["cactus"] = new PlaceholderGrowthLogic("cactus"),
+        ["oak"] = new OakGrowthLogic(),
+        ["conifer"] = new ConiferGrowthLogic(),
+        ["cactus"] = new CactusGrowthLogic(),
         ["umbrella"] = new PlaceholderGrowthLogic("umbrella"),
         ["baobab"] = new PlaceholderGrowthLogic("baobab"),
     };

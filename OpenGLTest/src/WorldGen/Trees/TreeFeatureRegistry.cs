@@ -13,7 +13,7 @@ public static class TreeFeatureRegistry
 {
     private static readonly Dictionary<string, ITreeFeature> ByNameTable = new(StringComparer.Ordinal)
     {
-        ["roots"] = new PlaceholderTreeFeature("roots"),
+        ["roots"] = new RootsFeature(),
         ["buttress"] = new PlaceholderTreeFeature("buttress"),
     };
 
