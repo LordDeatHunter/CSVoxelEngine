@@ -1,0 +1,17 @@
+{
+  "name": "Baobab Log",
+  "model": {
+    "parent": "block/cube_column",
+    "textures": { "end": "baobab_log_top", "side": "baobab_log_side" }
+  },
+  "hardness": 24,
+  "renderer": "tree_wood",
+  "sfx": "hit_wood",
+  "requiresTool": true,
+  "tools": { "axe": 1 },
+  // Same thickness curve and loot bands as the oak log (see oak_log.json)
+  "wood": {
+    "tipHardness": 0.25,
+    "loot": [ { "minThickness": 0, "loot": "wood" }, { "minThickness": 7, "loot": "self" } ]
+  }
+}

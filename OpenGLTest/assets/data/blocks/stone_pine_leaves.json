@@ -1,0 +1,13 @@
+{
+  "name": "Stone Pine Leaves",
+  "model": { "parent": "block/cube_all", "textures": { "all": "stone_pine_leaves" } },
+  "hardness": 1,
+  "movementSpeed": 0.5,
+  "cutout": true,
+  "sway": true,
+  "biomeTint": { "palette": "foliage", "faces": { "all": { "tile": "stone_pine_leaves_textureless" } } },
+  "occludes": false,
+  "castsAO": false,
+  "light": { "passes": true },
+  "loot": "leaves"
+}

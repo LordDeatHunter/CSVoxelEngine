@@ -1,0 +1,25 @@
+{
+  "wood": "block/stone_pine_log",
+  "leaves": "block/stone_pine_leaves",
+  "growth": {
+    "logic": "umbrella",
+    "signalEnergy": 14,
+    "upProbability": 2,
+    "lowestBranchHeight": 9,
+    "maturitySteps": [70, 100]
+  },
+  // Tuned against 8 flat-ground seeds: trunk 11 cells, root 11-14 px, nodes 48-89; the crown
+  // above lowestBranchHeight spans 9-13 blocks across and 4-5 blocks tall.
+  "thickness": {
+    "tipPx": 1,
+    "pipeExponent": 2.0,
+    "maxPx": 24,
+    "girthProfile": [[0, 2.4], [0.6, 1.6], [1, 1.0]],
+    "trunkShape": "circle",
+    "rim": "block"
+  },
+  "leafCluster": { "shape": "blob", "radius": 2, "hydration": 4, "tipMaxPx": 3 },
+  "features": [ { "type": "roots", "depth": 4 } ],
+  "lod": { "crownHeight": [4, 6], "crownRadius": 6, "profile": "dome" }
+  // no worldgen block: grown in-world only (TreeGrowthWriter, the `grow` scenario op)
+}

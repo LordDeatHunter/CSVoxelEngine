@@ -1,0 +1,13 @@
+{
+  "name": "Baobab Leaves",
+  "model": { "parent": "block/cube_all", "textures": { "all": "baobab_leaves" } },
+  "hardness": 1,
+  "movementSpeed": 0.5,
+  "cutout": true,
+  "sway": true,
+  "biomeTint": { "palette": "foliage", "faces": { "all": { "tile": "baobab_leaves_textureless" } } },
+  "occludes": false,
+  "castsAO": false,
+  "light": { "passes": true },
+  "loot": "leaves"
+}
