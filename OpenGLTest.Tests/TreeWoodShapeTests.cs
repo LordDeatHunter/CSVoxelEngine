@@ -263,4 +263,207 @@ public sealed class TreeWoodShapeTests
         Assert.Contains(mesh.Vertices, v => (v.Normal & 7) == 4 && MathF.Abs(v.Position.Y - (Cy + 2)) <= Eps);
         Assert.Contains(mesh.Vertices, v => (v.Normal & 7) == 5 && MathF.Abs(v.Position.Y - Cy) <= Eps);
     }
+
+    // One placed tree-wood cell of a rim test configuration, chunk-local
+    private readonly record struct RimCell(int X, int Y, int Z, byte State);
+
+    private static byte ShellState(int dx, int dz) =>
+        WoodState.Encode(WoodState.FullCube, TreeRasterizer.ShellParentDir(dx, dz), true);
+
+    private static byte CoreState => WoodState.Encode(WoodState.FullCube, WoodState.ParentRoot, false);
+
+    // The rim configurations, all one wood, inside the centre chunk and away from its borders
+    private static IEnumerable<(string Name, RimCell[] Cells)> RimConfigurations()
+    {
+        yield return ("lone shell", [new RimCell(Cx, Cy, Cz, ShellState(1, 0))]);
+
+        var slice = new List<RimCell>();
+        for (var dx = -1; dx <= 1; dx++)
+        for (var dz = -1; dz <= 1; dz++)
+            slice.Add(new RimCell(Cx + dx, Cy, Cz + dz, dx == 0 && dz == 0 ? CoreState : ShellState(dx, dz)));
+        yield return ("3x3 slice", slice.ToArray());
+
+        // Lone shells over the core and over a corner shell: diagonal to each other, so both
+        // stay fully bevelled, each narrower than the cell below it
+        var stack = new List<RimCell>(slice)
+        {
+            new(Cx, Cy + 1, Cz, ShellState(1, 0)),
+            new(Cx + 1, Cy + 1, Cz + 1, ShellState(1, 1)),
+        };
+        yield return ("two-slice stack", stack.ToArray());
+
+        yield return ("shell beside a detached log",
+        [
+            new RimCell(Cx, Cy, Cz, ShellState(1, 0)),
+            new RimCell(Cx + 1, Cy, Cz, WoodState.Detached),
+        ]);
+    }
+
+    private static byte PixelRimWood => TreeSpeciesRegistry.All.First(s => s.Rim == TrunkRim.Pixel).WoodId;
+
+    // The boxes of one placed cell, from its neighbours in the configuration
+    private static BlockHitbox[] BoxesOf(byte wood, Dictionary<(int, int, int), byte> cells, RimCell c)
+    {
+        Span<byte> ids = stackalloc byte[6];
+        Span<byte> states = stackalloc byte[6];
+        for (var dir = 0; dir < 6; dir++)
+        {
+            var o = Offset(dir);
+            if (!cells.TryGetValue((c.X + (int)o.X, c.Y + (int)o.Y, c.Z + (int)o.Z), out var s)) continue;
+            ids[dir] = wood;
+            states[dir] = s;
+        }
+
+        return TreeWoodShape.GetBoxes(wood, c.State, ids, states);
+    }
+
+    // 16x16 pixel-centre coverage of the XZ rectangle [min, max] (cell-local)
+    private static void Rasterise(Vector3 min, Vector3 max, int[,] px)
+    {
+        for (var i = 0; i < 16; i++)
+        for (var k = 0; k < 16; k++)
+        {
+            var x = (i + 0.5f) / 16f;
+            var z = (k + 0.5f) / 16f;
+            if (x > min.X && x < max.X && z > min.Z && z < max.Z) px[i, k]++;
+        }
+    }
+
+    private static int[,] Footprint(IEnumerable<BlockHitbox> boxes)
+    {
+        var px = new int[16, 16];
+        foreach (var b in boxes) Rasterise(b.Min, b.Max, px);
+        return px;
+    }
+
+    private static bool IsWhole(int[,] px)
+    {
+        foreach (var p in px)
+            if (p == 0) return false;
+        return true;
+    }
+
+    // The cell holding a quad's material: just behind its centre, against its normal
+    private static (int, int, int) OwnerOf(Vertex[] q)
+    {
+        var centre = (q[0].Position + q[1].Position + q[2].Position + q[3].Position) / 4f;
+        var p = centre - Chunk.CubeFaces[q[0].Normal & 7].normal * 0.01f;
+        return ((int)MathF.Floor(p.X), (int)MathF.Floor(p.Y), (int)MathF.Floor(p.Z));
+    }
+
+    private static Vector3 QuadMin(Vertex[] q) => q.Select(v => v.Position).Aggregate(Vector3.Min);
+
+    private static Vector3 QuadMax(Vertex[] q) => q.Select(v => v.Position).Aggregate(Vector3.Max);
+
+    [Fact]
+    public void RimMeshCoversExactlyTheRimHitboxes()
+    {
+        var wood = PixelRimWood;
+        var bevelled = 0;
+        foreach (var (name, cells) in RimConfigurations())
+        {
+            var (manager, chunk) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
+            var byPos = new Dictionary<(int, int, int), byte>();
+            foreach (var c in cells)
+            {
+                chunk.SetBlockRaw(c.X, c.Y, c.Z, wood, c.State);
+                byPos[(c.X, c.Y, c.Z)] = c.State;
+            }
+
+            var mesh = chunk.GenerateMeshData(manager, greedy: false);
+            Assert.NotNull(mesh);
+            Assert.Equal(0, mesh.Vertices.Count % 4);
+            var quads = new Dictionary<(int, int, int), List<Vertex[]>>();
+            for (var i = 0; i < mesh.Vertices.Count; i += 4)
+            {
+                var q = mesh.Vertices.GetRange(i, 4).ToArray();
+                var owner = OwnerOf(q);
+                if (!quads.TryGetValue(owner, out var list)) quads[owner] = list = [];
+                list.Add(q);
+            }
+
+            foreach (var c in cells)
+            {
+                var origin = new Vector3(c.X, c.Y, c.Z);
+                var boxes = BoxesOf(wood, byPos, c);
+                var mine = quads.GetValueOrDefault((c.X, c.Y, c.Z)) ?? [];
+                Assert.NotEmpty(mine);
+                if (boxes.Length > 1) bevelled++;
+                var self = Footprint(boxes);
+
+                // Top and bottom: a bevelled shell draws its footprint minus what the same-wood
+                // cell beyond covers; a plain cube draws its whole cap unless the cell beyond
+                // fills it, so a cube under a bevelled shell keeps its full top
+                foreach (var (face, dy) in new[] { (4, 1), (5, -1) })
+                {
+                    var beyond = byPos.TryGetValue((c.X, c.Y + dy, c.Z), out var bs)
+                        ? Footprint(BoxesOf(wood, byPos, new RimCell(c.X, c.Y + dy, c.Z, bs)))
+                        : new int[16, 16];
+                    var planeY = c.Y + (dy > 0 ? 1 : 0);
+                    var drawn = new int[16, 16];
+                    foreach (var q in mine.Where(q => (q[0].Normal & 7) == face))
+                    {
+                        Assert.All(q, v => Assert.True(MathF.Abs(v.Position.Y - planeY) <= Eps,
+                            $"{name}: cap vertex {v.Position} off the cell's face plane"));
+                        Rasterise(QuadMin(q) - origin, QuadMax(q) - origin, drawn);
+                    }
+
+                    var beyondWhole = IsWhole(beyond);
+                    for (var i = 0; i < 16; i++)
+                    for (var k = 0; k < 16; k++)
+                    {
+                        var expected = boxes.Length > 1 ? self[i, k] > 0 && beyond[i, k] == 0 : !beyondWhole;
+                        Assert.True(drawn[i, k] == (expected ? 1 : 0),
+                            $"{name}: cell {c} face {face} pixel ({i},{k}) drawn {drawn[i, k]}x, expected {expected}");
+                    }
+                }
+
+                // Every vertex lies on the surface of one of the cell's boxes
+                foreach (var q in mine)
+                foreach (var v in q)
+                    Assert.True(boxes.Any(b => OnSurface(v.Position - origin, b)),
+                        $"{name}: vertex {v.Position} of cell {c} lies on no hitbox surface");
+
+                // Every side quad lies in one box's wall plane, within that box's extent
+                foreach (var q in mine.Where(q => (q[0].Normal & 7) < 4))
+                {
+                    var face = q[0].Normal & 7;
+                    var min = QuadMin(q) - origin;
+                    var max = QuadMax(q) - origin;
+                    Assert.True(boxes.Any(b => InWallOf(min, max, b, face)),
+                        $"{name}: side quad {min}..{max} (face {face}) of cell {c} lies in no box wall");
+                }
+            }
+
+            if (name == "shell beside a detached log")
+            {
+                // The detached log draws its whole face toward the shell's carved side
+                var facing = (quads.GetValueOrDefault((Cx + 1, Cy, Cz)) ?? [])
+                    .Where(q => (q[0].Normal & 7) == 2).ToList();
+                Assert.NotEmpty(facing);
+                var area = facing.Sum(q =>
+                {
+                    var size = QuadMax(q) - QuadMin(q);
+                    return size.Y * size.Z;
+                });
+                Assert.True(MathF.Abs(area - 1f) <= Eps, $"the log's face toward the shell covers {area}");
+            }
+        }
+
+        Assert.True(bevelled > 0, "no configuration produced a bevelled shell");
+    }
+
+    private static bool OnSurface(Vector3 p, BlockHitbox b) =>
+        Inside(p, b)
+        && (MathF.Abs(p.X - b.Min.X) <= Eps || MathF.Abs(p.X - b.Max.X) <= Eps
+            || MathF.Abs(p.Y - b.Min.Y) <= Eps || MathF.Abs(p.Y - b.Max.Y) <= Eps
+            || MathF.Abs(p.Z - b.Min.Z) <= Eps || MathF.Abs(p.Z - b.Max.Z) <= Eps);
+
+    // Whether the axis-aligned side quad [min, max] lies in box b's wall toward face
+    private static bool InWallOf(Vector3 min, Vector3 max, BlockHitbox b, int face)
+    {
+        var plane = face switch { 0 => b.Min.Z, 1 => b.Max.Z, 2 => b.Min.X, _ => b.Max.X };
+        var at = face < 2 ? min.Z : min.X;
+        return MathF.Abs(at - plane) <= Eps && Inside(min, b) && Inside(max, b);
+    }
 }

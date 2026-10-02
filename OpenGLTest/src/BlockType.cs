@@ -64,6 +64,11 @@ public sealed record BlockType
     // test and per DDA step by the raycast, so flat like the other flags.
     internal static readonly bool[] TreeWoodById = new bool[256];
 
+    // Whether the tree wood belongs to a species whose trunk rim is "pixel": its outer shells
+    // bevel their exposed corners (TreeWoodShape.RimBoxes). Set from the compiled tree species,
+    // read per cell by the mesher, the raycast and body collision.
+    internal static readonly bool[] PixelRimById = new bool[256];
+
     // Whether the binary greedy mesher may merge this block's faces: a plain full cube whose
     // six faces are the untransformed cube faces (see ContentRegistry.BakesGreedy). Anything
     // else goes through the per-quad scalar path.
@@ -387,6 +392,11 @@ public sealed record BlockType
     /// state byte is a <see cref="WoodState"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsTreeWood(byte blockId) => TreeWoodById[blockId];
+
+    /// <summary>Whether a tree-wood id belongs to a <c>rim: "pixel"</c> species, so its trunk
+    /// shells bevel their exposed corners (<see cref="TreeWoodShape.RimCornerMask"/>).</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool HasPixelRim(byte blockId) => PixelRimById[blockId];
 
     /// <summary>Whether the greedy mesher handles this block (a plain full cube in the
     /// <see cref="BlockRenderer.Model"/> renderer); false sends it down the per-quad path.</summary>

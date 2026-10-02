@@ -11,18 +11,42 @@ namespace silkgltriangle;
 /// rule is graph-only: wood never welds to leaves, terrain, another species or a sibling limb
 /// that merely touches it.
 ///
-/// A full-thickness (or detached) cell is a plain cube. A thinner cell is a centred node box
-/// <see cref="HalfWidth"/> wide plus one tube per connected neighbour, running from the node
-/// face out to the cell face at the thinner of the two cells' widths, so the neighbour's tube
-/// meets it flush. The mesher (<see cref="Chunk"/>), the raycast and selection outline
-/// (<see cref="Camera"/>, <see cref="World"/>) and body collision all read these boxes, so what
-/// is drawn and what is hit can never disagree. Direction indices follow
+/// Three shapes exist. A thin cell is a centred node box <see cref="HalfWidth"/> wide plus one
+/// tube per connected neighbour, running from the node face out to the cell face at the thinner
+/// of the two cells' widths, so the neighbour's tube meets it flush. A full-thickness (or
+/// detached) cell is a plain cube. A trunk shell of a <c>rim: "pixel"</c> species
+/// (<see cref="BlockType.HasPixelRim"/>) is a cube with each exposed corner bevelled into a
+/// pixel-stepped quarter round: the stair-stepped full-height <see cref="RimBoxes"/> of its
+/// <see cref="RimCornerMask"/>, decided statelessly from its four edge neighbours. The mesher
+/// (<see cref="Chunk"/>), the raycast and selection outline (<see cref="Camera"/>,
+/// <see cref="World"/>) and body collision all read these boxes, so what is drawn and what is
+/// hit can never disagree. The outline draws every rim box, so a bevelled shell shows the seams
+/// between its boxes (accepted residue). Direction indices follow
 /// <see cref="Chunk.CubeFaces"/> order: -Z, +Z, -X, +X, +Y, -Y.
 /// </summary>
 public static class TreeWoodShape
 {
     // Shared result for a cell with no registered type, so a lookup never allocates
     private static readonly BlockHitbox[] FullCubeBoxes = [BlockHitbox.FullCube];
+
+    /// <summary>Pixels across one cell edge, the resolution the rim bevel is stepped at.</summary>
+    private const int CellPx = WoodState.PixelsPerBlock;
+
+    /// <summary>Upper bound on <see cref="RimBoxes"/>' count: each bevelled Z edge contributes
+    /// at most one box per bevel row, plus the unbevelled middle.</summary>
+    public const int MaxRimBoxes = 2 * WorldGenerationConfig.TreeRimBevelPx + 1;
+
+    /// <summary>Rim corner bit of the (-X, -Z) corner; see <see cref="RimCornerMask"/>.</summary>
+    public const int CornerMinXMinZ = 1 << 0;
+
+    /// <summary>Rim corner bit of the (+X, -Z) corner.</summary>
+    public const int CornerMaxXMinZ = 1 << 1;
+
+    /// <summary>Rim corner bit of the (-X, +Z) corner.</summary>
+    public const int CornerMinXMaxZ = 1 << 2;
+
+    /// <summary>Rim corner bit of the (+X, +Z) corner.</summary>
+    public const int CornerMaxXMaxZ = 1 << 3;
 
     /// <summary>Half the edge length of a node of thickness code <paramref name="thickness"/>,
     /// in blocks: <c>(n + 1)</c> pixels across, so a full cube is 0.5.</summary>
@@ -99,16 +123,132 @@ public static class TreeWoodShape
     public static float TubeHalf(byte state, byte neighbourState) =>
         MathF.Min(HalfWidth(WoodState.Thickness(state)), HalfWidth(WoodState.Thickness(neighbourState)));
 
+    /// <summary>Whether a neighbour counts as rim mass for <paramref name="id"/>'s bevel: the
+    /// same wood, a full cube and attached to a tree. A detached log or a thin limb beside a
+    /// shell leaves its edge exposed, so the shell rounds off there.</summary>
+    public static bool IsRimMass(byte id, byte nbId, byte nbState) =>
+        nbId == id && WoodState.IsFullCube(nbState) && !WoodState.IsDetached(nbState);
+
+    /// <summary>Whether a cell bevels at all: an attached full-cube trunk shell of a pixel-rim
+    /// species. Everything else keeps its plain shape and never reads its neighbours.</summary>
+    public static bool CanBevel(byte id, byte state) =>
+        BlockType.HasPixelRim(id) && WoodState.IsShell(state) && WoodState.IsFullCube(state)
+        && !WoodState.IsDetached(state);
+
+    /// <summary>
+    /// The bevelled corners of a pixel-rim shell, as <see cref="CornerMinXMinZ"/>-style bits; 0
+    /// for any cell that cannot bevel (<see cref="CanBevel"/>). The spans hold the six neighbour
+    /// ids and states in CubeFaces order, of which only the four horizontal ones (0..3) are read.
+    ///
+    /// A corner is carved when neither of its two edge neighbours (the X-side and the Z-side one)
+    /// is rim mass (<see cref="IsRimMass"/>). That is the marching-squares outcome for the
+    /// trunk's outline: with the cell present, the 2x2 sample square around a corner has the
+    /// convex-corner case exactly when both edge neighbours are absent, and the diagonal sample
+    /// never changes it. A present diagonal with both edges absent is the saddle, which each cell
+    /// resolves by carving only its own material, so the diagonal cell rounds its own corner and
+    /// the two quarter rounds face each other. Because a cell only ever removes its own material,
+    /// the diagonal never matters and no diagonal neighbour has to be read or remeshed.
+    /// </summary>
+    public static int RimCornerMask(byte id, byte state, ReadOnlySpan<byte> nbIds, ReadOnlySpan<byte> nbStates)
+    {
+        if (!CanBevel(id, state)) return 0;
+        var minZ = IsRimMass(id, nbIds[0], nbStates[0]);
+        var maxZ = IsRimMass(id, nbIds[1], nbStates[1]);
+        var minX = IsRimMass(id, nbIds[2], nbStates[2]);
+        var maxX = IsRimMass(id, nbIds[3], nbStates[3]);
+        var mask = 0;
+        if (!minX && !minZ) mask |= CornerMinXMinZ;
+        if (!maxX && !minZ) mask |= CornerMaxXMinZ;
+        if (!minX && !maxZ) mask |= CornerMinXMaxZ;
+        if (!maxX && !maxZ) mask |= CornerMaxXMaxZ;
+        return mask;
+    }
+
+    /// <summary>
+    /// Whether a rim cell with corner mask <paramref name="mask"/> fills its whole face toward
+    /// <paramref name="dirFromCellToViewer"/> (CubeFaces order). A top or bottom face is whole
+    /// only with no corner carved; a side face is whole unless one of the two corners on that
+    /// side is carved. This is the culling predicate a neighbour uses: a face that butts onto a
+    /// whole rim face is hidden, one that butts onto a carved face is drawn.
+    /// </summary>
+    public static bool RimSideFull(int mask, int dirFromCellToViewer) => dirFromCellToViewer switch
+    {
+        0 => (mask & (CornerMinXMinZ | CornerMaxXMinZ)) == 0,
+        1 => (mask & (CornerMinXMaxZ | CornerMaxXMaxZ)) == 0,
+        2 => (mask & (CornerMinXMinZ | CornerMinXMaxZ)) == 0,
+        3 => (mask & (CornerMaxXMinZ | CornerMaxXMaxZ)) == 0,
+        _ => mask == 0,
+    };
+
+    /// <summary>
+    /// How many pixels the bevel cuts into a carved corner's X extent at pixel row
+    /// <paramref name="row"/>, counted from the corner's Z edge: the pixel-stepped quarter round
+    /// of radius <see cref="WorldGenerationConfig.TreeRimBevelPx"/>, sampled at the row's
+    /// centre. 0 from row r on, so a round never reaches past half the cell.
+    /// </summary>
+    public static int RimInsetPx(int row)
+    {
+        const int r = WorldGenerationConfig.TreeRimBevelPx;
+        if (row < 0 || row >= r) return 0;
+        var d = r - row - 0.5f;
+        return (int)MathF.Round(r - MathF.Sqrt(r * r - d * d));
+    }
+
+    /// <summary>
+    /// Fills <paramref name="dst"/> with the full-height boxes of a rim cell with corner mask
+    /// <paramref name="mask"/> and returns how many it wrote (at most <see cref="MaxRimBoxes"/>).
+    /// Each of the 16 Z pixel rows spans from the deepest -X corner inset reaching it to 16 minus
+    /// the deepest +X one; consecutive equal rows merge into one box, in increasing Z. Mask 0 is
+    /// one full cube.
+    /// </summary>
+    public static int RimBoxes(int mask, Span<BlockHitbox> dst)
+    {
+        var count = 0;
+        var runStart = 0;
+        RowSpan(mask, 0, out var runLo, out var runHi);
+        for (var z = 1; z <= CellPx; z++)
+        {
+            int lo = 0, hi = 0;
+            if (z < CellPx) RowSpan(mask, z, out lo, out hi);
+            if (z < CellPx && lo == runLo && hi == runHi) continue;
+            dst[count++] = new BlockHitbox(
+                new Vector3(runLo / (float)CellPx, 0f, runStart / (float)CellPx),
+                new Vector3(runHi / (float)CellPx, 1f, z / (float)CellPx));
+            runStart = z;
+            runLo = lo;
+            runHi = hi;
+        }
+
+        return count;
+    }
+
+    // One Z pixel row's covered X pixel span [lo, hi) under the corner mask
+    private static void RowSpan(int mask, int z, out int lo, out int hi)
+    {
+        var fromMinZ = RimInsetPx(z);
+        var fromMaxZ = RimInsetPx(CellPx - 1 - z);
+        lo = Math.Max((mask & CornerMinXMinZ) != 0 ? fromMinZ : 0, (mask & CornerMinXMaxZ) != 0 ? fromMaxZ : 0);
+        hi = CellPx - Math.Max((mask & CornerMaxXMinZ) != 0 ? fromMinZ : 0, (mask & CornerMaxXMaxZ) != 0 ? fromMaxZ : 0);
+    }
+
     /// <summary>
     /// Cell-local hitboxes matching the drawn shape. A full-thickness or detached cell, and
     /// anything that is not tree wood, returns its registered hitboxes without allocating; a
-    /// thin cell returns its node box plus one tube box per connection.
+    /// thin cell returns its node box plus one tube box per connection; a bevelled pixel-rim
+    /// shell returns its <see cref="RimBoxes"/>.
     /// </summary>
     public static BlockHitbox[] GetBoxes(byte id, byte state, ReadOnlySpan<byte> nbIds, ReadOnlySpan<byte> nbStates)
     {
         var type = BlockType.ById[id];
         if (type == null) return FullCubeBoxes;
-        if (!BlockType.IsTreeWood(id) || !IsThin(state)) return type.Hitboxes;
+        if (!BlockType.IsTreeWood(id)) return type.Hitboxes;
+        if (!IsThin(state))
+        {
+            var rim = RimCornerMask(id, state, nbIds, nbStates);
+            if (rim == 0) return type.Hitboxes;
+            Span<BlockHitbox> scratch = stackalloc BlockHitbox[MaxRimBoxes];
+            return scratch[..RimBoxes(rim, scratch)].ToArray();
+        }
 
         var mask = ConnectionMask(id, state, nbIds, nbStates);
         var half = HalfWidth(WoodState.Thickness(state));
@@ -128,7 +268,8 @@ public static class TreeWoodShape
 
     /// <summary>
     /// <see cref="GetBoxes"/> for a world cell, reading its state and six neighbours from the
-    /// chunk manager. A full cube reads nothing beyond its own state and allocates nothing.
+    /// chunk manager. A full cube that cannot bevel reads nothing beyond its own state and
+    /// allocates nothing.
     /// </summary>
     public static BlockHitbox[] GetBoxesAt(byte id, ChunkManager chunks, int x, int y, int z)
     {
@@ -137,7 +278,7 @@ public static class TreeWoodShape
         if (!BlockType.IsTreeWood(id)) return type.Hitboxes;
 
         var state = chunks.GetStateGlobal(x, y, z);
-        if (!IsThin(state)) return type.Hitboxes;
+        if (!IsThin(state) && !CanBevel(id, state)) return type.Hitboxes;
 
         Span<byte> ids = stackalloc byte[6];
         Span<byte> states = stackalloc byte[6];
@@ -148,15 +289,17 @@ public static class TreeWoodShape
     /// <summary>
     /// Whether a world-space body box touches the cell's drawn shape. Non-tree blocks and full
     /// cubes test their registered hitboxes (the mould slab path), thin wood its node and tube
-    /// boxes, all without allocating. Touching a face exactly counts, matching the
-    /// cell-granular collision test this refines.
+    /// boxes and a bevelled pixel-rim shell its rim boxes, all without allocating. Only thin
+    /// wood and bevel-capable shells read their neighbours. Touching a face exactly counts,
+    /// matching the cell-granular collision test this refines.
     /// </summary>
     public static bool OverlapsShape(byte id, ChunkManager chunks, int x, int y, int z, Vector3 min, Vector3 max)
     {
         var cell = new Vector3(x, y, z);
         var type = BlockType.ById[id];
         var state = BlockType.IsTreeWood(id) ? chunks.GetStateGlobal(x, y, z) : (byte)0;
-        if (type == null || !BlockType.IsTreeWood(id) || !IsThin(state))
+        var bevels = type != null && BlockType.IsTreeWood(id) && CanBevel(id, state);
+        if (type == null || !BlockType.IsTreeWood(id) || (!IsThin(state) && !bevels))
         {
             foreach (var box in type?.Hitboxes ?? FullCubeBoxes)
                 if (Touches(cell + box.Min, cell + box.Max, min, max))
@@ -167,6 +310,16 @@ public static class TreeWoodShape
         Span<byte> ids = stackalloc byte[6];
         Span<byte> states = stackalloc byte[6];
         ReadNeighbours(chunks, x, y, z, ids, states);
+        if (bevels)
+        {
+            Span<BlockHitbox> rimBoxes = stackalloc BlockHitbox[MaxRimBoxes];
+            var count = RimBoxes(RimCornerMask(id, state, ids, states), rimBoxes);
+            for (var i = 0; i < count; i++)
+                if (Touches(cell + rimBoxes[i].Min, cell + rimBoxes[i].Max, min, max))
+                    return true;
+            return false;
+        }
+
         var half = HalfWidth(WoodState.Thickness(state));
         NodeBox(half, out var nodeMin, out var nodeMax);
         if (Touches(cell + nodeMin, cell + nodeMax, min, max)) return true;

@@ -1610,6 +1610,20 @@ public class Chunk : IDisposable
                     continue;
                 }
 
+                // A pixel-rim trunk shell with an exposed corner is bevelled from its four edge
+                // neighbours (TreeWoodShape.RimCornerMask; the diagonals never change it, since a
+                // cell only carves its own material); see EmitRimWood. Mask 0 is a plain cube.
+                if (BlockType.HasPixelRim(blockId))
+                {
+                    var rimMask = RimMaskInSnapshot(padded, paddedState, pIdx, blockId);
+                    if (rimMask != 0)
+                    {
+                        EmitRimWood(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight,
+                            blockLight, x, y, z, type, basePos, rimMask);
+                        continue;
+                    }
+                }
+
                 cullSameFullWood = true;
             }
 
@@ -1696,9 +1710,15 @@ public class Chunk : IDisposable
                     // so no coplanar double quad z-fights). CullSelf additionally hides a
                     // face against the same block, the way glass panes fuse.
                     if (BlockType.Occludes(neighbour) || (type.CullSelf && neighbour == blockId)) continue;
-                    // Stacked full-thickness tree wood hides its shared faces itself
+                    // Stacked full-thickness tree wood hides its shared faces itself - unless the
+                    // neighbour is a bevelled pixel-rim shell whose face toward this cell is
+                    // carved, which would open a hole (a core, a detached log or a mask-0 shell
+                    // beside a rounded corner keeps its face). Non-rim species never read a mask.
                     if (cullSameFullWood && neighbour == blockId
-                        && WoodState.IsFullCube(paddedState[pIdx + FaceNeighborDelta[cullFace]])) continue;
+                        && WoodState.IsFullCube(paddedState[pIdx + FaceNeighborDelta[cullFace]])
+                        && (!BlockType.HasPixelRim(blockId)
+                            || RimFaceFull(padded, paddedState, pIdx + FaceNeighborDelta[cullFace], blockId,
+                                TreeWoodShape.Opposite(cullFace)))) continue;
 
                     // Light of the air cell in front of the face, from the wide light volume
                     // (so lamps across the chunk border still reach): the flat fallback for
@@ -2768,6 +2788,241 @@ public class Chunk : IDisposable
                     type.Side, ShadeLut[(face << 2) | 3], lights[face]);
             }
         }
+    }
+
+    private const int RimPx = WoodState.PixelsPerBlock;
+
+    // Upper bound on the quads one bevelled shell emits: each cap is at most two segments per
+    // pixel row, each box at most two X walls, and each Z boundary at most four wall segments
+    private const int MaxRimQuads = 4 * RimPx + 6 * TreeWoodShape.MaxRimBoxes;
+
+    /// <summary>
+    /// <see cref="TreeWoodShape.RimCornerMask"/> of the cell at padded index
+    /// <paramref name="idx"/>, read out of the snapshot. Only the four horizontal neighbours are
+    /// read (the diagonals never change a cell's bevel, because a cell only ever carves its own
+    /// material), so <paramref name="idx"/> must be a cell whose horizontal neighbours lie inside
+    /// the 18^3 snapshot: the meshed cell itself or its vertical neighbours.
+    /// </summary>
+    private static int RimMaskInSnapshot(byte[] padded, byte[] paddedState, int idx, byte id)
+    {
+        if (!TreeWoodShape.CanBevel(id, paddedState[idx])) return 0;
+        Span<byte> ids = stackalloc byte[6];
+        Span<byte> states = stackalloc byte[6];
+        for (var i = 0; i < 4; i++)
+        {
+            ids[i] = padded[idx + FaceNeighborDelta[i]];
+            states[i] = paddedState[idx + FaceNeighborDelta[i]];
+        }
+
+        return TreeWoodShape.RimCornerMask(id, paddedState[idx], ids, states);
+    }
+
+    /// <summary>
+    /// Whether the full-cube <paramref name="id"/> cell at padded index <paramref name="nbIdx"/>
+    /// fills its whole face toward <paramref name="side"/> (the direction from it to the viewing
+    /// cell): <see cref="TreeWoodShape.RimSideFull"/> of its rim mask, read without leaving the
+    /// snapshot. A side face is carved only at a corner whose two edge neighbours are both
+    /// missing, and the viewing cell is one of the two for both corners on that side, so the
+    /// neighbour's far side is never read; a cap needs the whole mask, whose horizontal reads
+    /// stay inside the snapshot for a vertical neighbour.
+    /// </summary>
+    private static bool RimFaceFull(byte[] padded, byte[] paddedState, int nbIdx, byte id, int side)
+    {
+        if (!TreeWoodShape.CanBevel(id, paddedState[nbIdx])) return true;
+        if (side >= 4) return RimMaskInSnapshot(padded, paddedState, nbIdx, id) == 0;
+        var toward = nbIdx + FaceNeighborDelta[side];
+        if (TreeWoodShape.IsRimMass(id, padded[toward], paddedState[toward])) return true;
+        // The two edge neighbours across the other axis: X for a Z side, Z for an X side
+        var across = side < 2 ? 2 : 0;
+        var a = nbIdx + FaceNeighborDelta[across];
+        var b = nbIdx + FaceNeighborDelta[across + 1];
+        return TreeWoodShape.IsRimMass(id, padded[a], paddedState[a])
+               && TreeWoodShape.IsRimMass(id, padded[b], paddedState[b]);
+    }
+
+    /// <summary>
+    /// Whether the rim cell at <paramref name="pIdx"/> hides its cell-boundary face toward
+    /// side <paramref name="face"/>: an occluder does, and so does a same-wood full cube whose
+    /// face toward this cell is whole (<see cref="RimFaceFull"/>; this cell is rim mass for it,
+    /// so a horizontal one always is, and a detached log is never carved).
+    /// </summary>
+    private static bool RimBoundaryHidden(byte[] padded, byte[] paddedState, int pIdx, byte id, int face)
+    {
+        var nbIdx = pIdx + FaceNeighborDelta[face];
+        var nb = padded[nbIdx];
+        if (BlockType.Occludes(nb)) return true;
+        return nb == id && WoodState.IsFullCube(paddedState[nbIdx])
+               && RimFaceFull(padded, paddedState, nbIdx, id, TreeWoodShape.Opposite(face));
+    }
+
+    // Per Z pixel row, the covered X pixel span [lo, hi) of a rim cell's boxes
+    private static void RimRows(ReadOnlySpan<BlockHitbox> boxes, Span<int> lo, Span<int> hi)
+    {
+        foreach (var box in boxes)
+        {
+            var z0 = (int)MathF.Round(box.Min.Z * RimPx);
+            var z1 = (int)MathF.Round(box.Max.Z * RimPx);
+            var x0 = (int)MathF.Round(box.Min.X * RimPx);
+            var x1 = (int)MathF.Round(box.Max.X * RimPx);
+            for (var z = z0; z < z1; z++)
+            {
+                lo[z] = x0;
+                hi[z] = x1;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Emits a bevelled pixel-rim trunk shell (<see cref="TreeWoodShape.CanBevel"/> with a
+    /// non-zero corner <paramref name="mask"/>): the full-height <see cref="TreeWoodShape.RimBoxes"/>
+    /// stair-stepping each carved corner, which are exactly the cell's hitboxes, so the raycast,
+    /// the outline and collision match what is drawn. Faces on the cell boundary cull like a
+    /// cube's (<see cref="RimBoundaryHidden"/>); the X walls inside the cell and the Z steps
+    /// between two boxes are always drawn, the steps only where one box sticks out past its
+    /// neighbour. Top and bottom draw only the part of the footprint that the same-wood cell
+    /// above or below does not cover, so a stack of equal bevels shows no buried caps and a
+    /// shell under a narrower one keeps its exposed rim.
+    /// </summary>
+    private static void EmitRimWood(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+        int x, int y, int z, BlockType type, Vector3 basePos, int mask)
+    {
+        if (vertices.Count > ushort.MaxValue - 4 * MaxRimQuads) return;
+        var id = type.Id;
+        Span<FaceLight> lights = stackalloc FaceLight[6];
+        var lightBase = LightIdx(x, y, z);
+        for (var i = 0; i < 6; i++)
+            lights[i] = EmitterFaceLight(i, padded, pIdx, sunLight, blockLight, lightBase, lightBase);
+
+        Span<BlockHitbox> boxes = stackalloc BlockHitbox[TreeWoodShape.MaxRimBoxes];
+        var count = TreeWoodShape.RimBoxes(mask, boxes);
+        boxes = boxes[..count];
+        Span<int> rowLo = stackalloc int[RimPx];
+        Span<int> rowHi = stackalloc int[RimPx];
+        RimRows(boxes, rowLo, rowHi);
+
+        // Top and bottom: this cell's rows minus the rows of the same-wood cell beyond the cap
+        Span<BlockHitbox> coverBoxes = stackalloc BlockHitbox[TreeWoodShape.MaxRimBoxes];
+        Span<int> coverLo = stackalloc int[RimPx];
+        Span<int> coverHi = stackalloc int[RimPx];
+        for (var face = 4; face <= 5; face++)
+        {
+            var nbIdx = pIdx + FaceNeighborDelta[face];
+            var nb = padded[nbIdx];
+            if (BlockType.Occludes(nb)) continue;
+            var covered = false;
+            if (nb == id && WoodState.IsFullCube(paddedState[nbIdx]))
+            {
+                var coverMask = RimMaskInSnapshot(padded, paddedState, nbIdx, id);
+                if (coverMask == 0) continue; // a whole cube face buries the cap entirely
+                RimRows(coverBoxes[..TreeWoodShape.RimBoxes(coverMask, coverBoxes)], coverLo, coverHi);
+                covered = true;
+            }
+
+            var tile = face == 4 ? type.Top : type.Bottom;
+            var shade = ShadeLut[(face << 2) | 3];
+            var runStart = 0;
+            int a0 = 0, a1 = 0, b0 = 0, b1 = 0;
+            for (var row = 0; row <= RimPx; row++)
+            {
+                int s0 = 0, s1 = 0, t0 = 0, t1 = 0;
+                if (row < RimPx)
+                {
+                    var lo = rowLo[row];
+                    var hi = rowHi[row];
+                    if (!covered)
+                    {
+                        s0 = lo;
+                        s1 = hi;
+                    }
+                    else
+                    {
+                        // Up to two exposed segments: left of the cover and right of it
+                        s0 = lo;
+                        s1 = Math.Min(hi, coverLo[row]);
+                        t0 = Math.Max(lo, coverHi[row]);
+                        t1 = hi;
+                    }
+
+                    if (s1 <= s0) s0 = s1 = 0;
+                    if (t1 <= t0) t0 = t1 = 0;
+                    if (row > 0 && s0 == a0 && s1 == a1 && t0 == b0 && t1 == b1) continue;
+                }
+
+                if (row > 0)
+                {
+                    var z0 = runStart / (float)RimPx;
+                    var z1 = row / (float)RimPx;
+                    if (a1 > a0)
+                        EmitBoxFace(vertices, indices, ref indexOffset, basePos,
+                            new Vector3(a0 / (float)RimPx, 0f, z0), new Vector3(a1 / (float)RimPx, 1f, z1),
+                            face, tile, shade, lights[face]);
+                    if (b1 > b0)
+                        EmitBoxFace(vertices, indices, ref indexOffset, basePos,
+                            new Vector3(b0 / (float)RimPx, 0f, z0), new Vector3(b1 / (float)RimPx, 1f, z1),
+                            face, tile, shade, lights[face]);
+                }
+
+                runStart = row;
+                a0 = s0;
+                a1 = s1;
+                b0 = t0;
+                b1 = t1;
+            }
+        }
+
+        // X walls: a wall on the cell boundary culls like a cube face, one inside never does
+        var hideMinX = RimBoundaryHidden(padded, paddedState, pIdx, id, 2);
+        var hideMaxX = RimBoundaryHidden(padded, paddedState, pIdx, id, 3);
+        var sideShadeMinX = ShadeLut[(2 << 2) | 3];
+        var sideShadeMaxX = ShadeLut[(3 << 2) | 3];
+        foreach (var box in boxes)
+        {
+            if (box.Min.X > 0f || !hideMinX)
+                EmitBoxFace(vertices, indices, ref indexOffset, basePos, box.Min, box.Max, 2,
+                    type.Side, sideShadeMinX, lights[2]);
+            if (box.Max.X < 1f || !hideMaxX)
+                EmitBoxFace(vertices, indices, ref indexOffset, basePos, box.Min, box.Max, 3,
+                    type.Side, sideShadeMaxX, lights[3]);
+        }
+
+        // Z walls: the first and last are on the cell boundary; between two boxes only the part
+        // of each box's wall that sticks out past the other is exposed
+        var shadeMinZ = ShadeLut[(0 << 2) | 3];
+        var shadeMaxZ = ShadeLut[(1 << 2) | 3];
+        if (!RimBoundaryHidden(padded, paddedState, pIdx, id, 0))
+            EmitBoxFace(vertices, indices, ref indexOffset, basePos, boxes[0].Min, boxes[0].Max, 0,
+                type.Side, shadeMinZ, lights[0]);
+        if (!RimBoundaryHidden(padded, paddedState, pIdx, id, 1))
+            EmitBoxFace(vertices, indices, ref indexOffset, basePos, boxes[count - 1].Min, boxes[count - 1].Max, 1,
+                type.Side, shadeMaxZ, lights[1]);
+        for (var i = 0; i + 1 < count; i++)
+        {
+            var near = boxes[i];
+            var far = boxes[i + 1];
+            var zb = near.Max.Z;
+            // The near box's +Z wall where the far box does not continue it, and vice versa
+            EmitWallRemainder(vertices, indices, ref indexOffset, basePos, near.Min.X, near.Max.X,
+                far.Min.X, far.Max.X, zb, 1, type.Side, shadeMaxZ, lights[1]);
+            EmitWallRemainder(vertices, indices, ref indexOffset, basePos, far.Min.X, far.Max.X,
+                near.Min.X, near.Max.X, zb, 0, type.Side, shadeMinZ, lights[0]);
+        }
+    }
+
+    // A Z wall at depth zb spanning [x0, x1) minus the span [c0, c1) the adjacent box covers:
+    // 0, 1 or 2 full-height segments
+    private static void EmitWallRemainder(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        Vector3 basePos, float x0, float x1, float c0, float c1, float zb, int face,
+        ushort tile, byte shade, in FaceLight light)
+    {
+        var leftHi = MathF.Min(x1, c0);
+        if (leftHi > x0)
+            EmitBoxFace(vertices, indices, ref indexOffset, basePos,
+                new Vector3(x0, 0f, zb), new Vector3(leftHi, 1f, zb), face, tile, shade, light);
+        var rightLo = MathF.Max(x0, c1);
+        if (x1 > rightLo)
+            EmitBoxFace(vertices, indices, ref indexOffset, basePos,
+                new Vector3(rightLo, 0f, zb), new Vector3(x1, 1f, zb), face, tile, shade, light);
     }
 
     /// <summary>One axis-aligned face of the [min, max] box (cell-local), with flat shading

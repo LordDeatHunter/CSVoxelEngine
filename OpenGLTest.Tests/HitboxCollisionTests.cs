@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Numerics;
 using Silk.NET.Input;
 using Xunit;
@@ -132,5 +133,44 @@ public sealed class HitboxCollisionTests
             new Vector3(8.2f, 1.1f, 8.2f), new Vector3(8.8f, 1.9f, 8.8f)));
         Assert.True(TreeWoodShape.OverlapsShape(stone, manager, 9, 1, 8,
             new Vector3(9.2f, 1.3f, 8.2f), new Vector3(9.8f, 1.9f, 8.8f)));
+    }
+
+    [Fact]
+    public void PixelRimShellsCollideWithTheirRimBoxes()
+    {
+        var pixel = TreeSpeciesRegistry.All.First(s => s.Rim == TrunkRim.Pixel);
+        var block = TreeSpeciesRegistry.All.First(s => s.Rim == TrunkRim.Block && !BlockType.HasPixelRim(s.WoodId));
+        var shell = WoodState.Encode(WoodState.FullCube, 3, shell: true);
+
+        // A box strictly inside the (-X, -Z) corner's carved row 0, and one in the solid middle
+        var px = 1f / WoodState.PixelsPerBlock;
+        var cornerMin = new Vector3(8.001f, 1.2f, 8.001f);
+        var cornerMax = new Vector3(8f + TreeWoodShape.RimInsetPx(0) * px * 0.5f, 1.8f, 8f + px * 0.5f);
+        var middleMin = new Vector3(8.4f, 1.2f, 8.4f);
+        var middleMax = new Vector3(8.6f, 1.8f, 8.6f);
+
+        // A lone pixel-rim shell has all four corners exposed: the body slips into a carved corner
+        var manager = FlatFloor(out var chunk);
+        chunk.SetBlockRaw(8, 1, 8, pixel.WoodId, shell);
+        Assert.False(TreeWoodShape.OverlapsShape(pixel.WoodId, manager, 8, 1, 8, cornerMin, cornerMax));
+        Assert.True(TreeWoodShape.OverlapsShape(pixel.WoodId, manager, 8, 1, 8, middleMin, middleMax));
+        Assert.True(TreeWoodShape.GetBoxesAt(pixel.WoodId, manager, 8, 1, 8).Length > 1);
+
+        // Rim mass on all four edges leaves nothing exposed: a plain cube again
+        foreach (var (dx, dz) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+            chunk.SetBlockRaw(8 + dx, 1, 8 + dz, pixel.WoodId, shell);
+        Assert.True(TreeWoodShape.OverlapsShape(pixel.WoodId, manager, 8, 1, 8, cornerMin, cornerMax));
+        Assert.Equal(new[] { BlockHitbox.FullCube }, TreeWoodShape.GetBoxesAt(pixel.WoodId, manager, 8, 1, 8));
+
+        // A block-rim species' lone shell never bevels
+        var other = FlatFloor(out var otherChunk);
+        otherChunk.SetBlockRaw(8, 1, 8, block.WoodId, shell);
+        Assert.True(TreeWoodShape.OverlapsShape(block.WoodId, other, 8, 1, 8, cornerMin, cornerMax));
+        Assert.Equal(new[] { BlockHitbox.FullCube }, TreeWoodShape.GetBoxesAt(block.WoodId, other, 8, 1, 8));
+
+        // A pixel-rim core (not a shell) never bevels either
+        var core = FlatFloor(out var coreChunk);
+        coreChunk.SetBlockRaw(8, 1, 8, pixel.WoodId, WoodState.Encode(WoodState.FullCube, WoodState.ParentRoot, shell: false));
+        Assert.True(TreeWoodShape.OverlapsShape(pixel.WoodId, core, 8, 1, 8, cornerMin, cornerMax));
     }
 }

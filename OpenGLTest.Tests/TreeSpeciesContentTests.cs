@@ -47,6 +47,19 @@ public sealed class TreeSpeciesContentTests
     }
 
     [Fact]
+    public void PixelRimFlagFollowsTheSpecies()
+    {
+        foreach (var s in TreeSpeciesRegistry.All)
+            Assert.Equal(s.Rim == TrunkRim.Pixel, BlockType.HasPixelRim(s.WoodId));
+
+        // Nothing but a species' wood ever carries the flag
+        var woods = TreeSpeciesRegistry.All.Select(s => s.WoodId).ToHashSet();
+        for (var id = 0; id < 256; id++)
+            if (!woods.Contains((byte)id))
+                Assert.False(BlockType.HasPixelRim((byte)id), BlockType.ById[id]?.Name ?? id.ToString());
+    }
+
+    [Fact]
     public void SpeciesWithLeavesHaveAClusterThatFitsTheirTrunk()
     {
         foreach (var s in TreeSpeciesRegistry.All.Where(s => s.HasLeaves))

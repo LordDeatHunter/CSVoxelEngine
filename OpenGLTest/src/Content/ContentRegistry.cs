@@ -534,6 +534,7 @@ public static class ContentRegistry
         BlockLightPalette.Reset();
         Array.Clear(BlockType.PassesLightById);
         Array.Clear(BlockType.TreeWoodById);
+        Array.Clear(BlockType.PixelRimById);
         Array.Clear(BlockType.SolidById);
         Array.Clear(BlockType.CollidesByHitboxById);
         Array.Clear(BlockType.MovementSpeedById);
@@ -959,15 +960,29 @@ public static class ContentRegistry
     /// Compiles every tree species under <c>assets/data/trees</c> into
     /// <see cref="TreeSpeciesRegistry"/>. Runs after the blocks, so block ids and
     /// <see cref="BlockType.ById"/> are settled; nothing from <see cref="BakeModels"/> is read. A
-    /// missing folder is tolerated (an empty registry), like the recipe folders.
+    /// missing folder is tolerated (an empty registry), like the recipe folders. Also fills
+    /// <see cref="BlockType.PixelRimById"/> from each species' rim, throwing naming both files
+    /// when two species sharing a wood block disagree.
     /// </summary>
     private static void LoadTreeSpecies(string folder)
     {
         var species = new Dictionary<string, TreeSpecies>(StringComparer.Ordinal);
+        // The rim is a property of the wood block (the mesher and collision only see the id), so
+        // two species sharing one wood must agree on it
+        var rimByWood = new Dictionary<byte, (TrunkRim Rim, string Path)>();
         if (Directory.Exists(folder))
         {
             foreach (var (name, path) in JsonFilesIn(folder))
-                species[name] = CompileTreeSpeciesFile(name, path);
+            {
+                var s = CompileTreeSpeciesFile(name, path);
+                species[name] = s;
+                if (rimByWood.TryGetValue(s.WoodId, out var seen) && seen.Rim != s.Rim)
+                    throw new InvalidOperationException(
+                        $"Tree species '{path}' and '{seen.Path}' share wood '{BlockType.ById[s.WoodId]!.Name}' " +
+                        $"but disagree on thickness.rim ({s.Rim} vs {seen.Rim}).");
+                rimByWood[s.WoodId] = (s.Rim, path);
+                BlockType.PixelRimById[s.WoodId] = s.Rim == TrunkRim.Pixel;
+            }
         }
 
         TreeSpeciesRegistry.Publish(species);
