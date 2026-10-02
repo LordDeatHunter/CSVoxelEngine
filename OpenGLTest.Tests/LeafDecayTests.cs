@@ -466,4 +466,162 @@ public sealed class LeafDecayTests
 
         Assert.True(checkedAny, "no worldgen species grew a limb with children");
     }
+
+    /// <summary>Stamps the species loaded wide enough for every scan box and support search, with
+    /// real ground (rock) in every free cell one below the root across the tree's footprint, so
+    /// a wide trunk's root-level shells stand on ground exactly as they would in the world.</summary>
+    private static StampedTree StampGrounded(TreeSpecies species, LeafDecayManager manager)
+    {
+        var tree = StampedTree.Stamp(species, Seed, RootX, RootY, RootZ);
+        tree.LoadAround(Math.Max(2 * manager.ScheduleReach, TreeRasterizer.MaxShellRadius + 2));
+        var (min, max) = (tree.Min, tree.Max);
+        for (var x = min.X - 1; x <= max.X + 1; x++)
+        for (var z = min.Z - 1; z <= max.Z + 1; z++)
+        {
+            var cell = (x, RootY - 1, z);
+            if (!tree.Wood.ContainsKey(cell) && !tree.Leaves.ContainsKey(cell))
+                tree.Write(cell, TerrainGenerator.RockBlock, 0);
+        }
+
+        return tree;
+    }
+
+    /// <summary>
+    /// The cells of the lowest shell-ringed trunk slice above the root (whose slices below and
+    /// above are ringed too) in cut order, with one on-axis shell standing in all three slices
+    /// last: cutting all but that last cell leaves the slice partly standing, cutting all of
+    /// them severs it whole.
+    /// </summary>
+    private static List<(int X, int Y, int Z)> SliceCuts(StampedTree tree)
+    {
+        var chain = new List<int>();
+        TreeRasterizer.TrunkChain(tree.Graph, chain);
+        for (var i = 1; i + 1 < chain.Count; i++)
+        {
+            var core = tree.Graph[chain[i]];
+            if (TreeRasterizer.BlockRadius(core.ThicknessPx) < 1
+                || TreeRasterizer.BlockRadius(tree.Graph[chain[i + 1]].ThicknessPx) < 1)
+                continue;
+
+            for (var dir = 0; dir < TreeDirections.Count; dir++)
+            {
+                if (TreeDirections.IsVertical(dir))
+                    continue;
+                var (ox, oz) = (core.X + TreeDirections.Dx[dir], core.Z + TreeDirections.Dz[dir]);
+                var column = Enumerable.Range(core.Y - 1, 3).Select(y => (ox, y, oz)).ToList();
+                if (!column.All(c => tree.Wood.TryGetValue(c, out var w) && WoodState.IsShell(w.State)))
+                    continue;
+
+                var kept = column[1];
+                return tree.Wood.Keys.Where(k => k.Y == core.Y && k != kept)
+                    .OrderBy(k => k.X).ThenBy(k => k.Z).Append(kept).ToList();
+            }
+        }
+
+        throw new InvalidOperationException($"{tree.Species.Name} has no shell-ringed slice above its root");
+    }
+
+    /// <summary>The wood a sequence of fells drops besides the cut cells themselves: each cut is
+    /// felled through <see cref="TopplingTree.Collect"/> and everything it took is cleared, as
+    /// <c>World.FellWood</c> would, before the next cut.</summary>
+    private static HashSet<(int X, int Y, int Z)> FelledBy(StampedTree tree, List<(int X, int Y, int Z)> cuts)
+    {
+        var felled = new HashSet<(int X, int Y, int Z)>();
+        foreach (var cut in cuts)
+        {
+            var (id, state) = tree.Read(cut);
+            if (!BlockType.IsTreeWood(id))
+                continue;
+
+            foreach (var block in TopplingTree.Collect(tree.Chunks, new Vector3(cut.X, cut.Y, cut.Z), id, state))
+            {
+                if (!BlockType.IsTreeWood(block.Id))
+                    continue;
+                var cell = ((int)block.Cell.X, (int)block.Cell.Y, (int)block.Cell.Z);
+                felled.Add(cell);
+                tree.Write(cell, 0, 0);
+            }
+        }
+
+        felled.ExceptWith(cuts);
+        return felled;
+    }
+
+    /// <summary>Runs ticks until nothing is scheduled any more, failing past a bound that covers
+    /// one crumbled layer per tick plus every removal under the per-tick budget.</summary>
+    private static void RunUntilSettled(LeafDecayManager m, StampedTree tree, DropManager d, string what)
+    {
+        var guard = m.TickIndex + tree.Wood.Count + Bound(tree.Wood.Count + tree.Leaves.Count);
+        while (m.PendingCells > 0)
+        {
+            Assert.True(m.TickIndex < guard, $"{what}: the decay never settled");
+            RunTicks(m, tree.Chunks, d, 1);
+        }
+    }
+
+    [Fact]
+    public void OrphanCrumbleAgreesWithFelling()
+    {
+        var cases = new List<(string What, TreeSpecies Species, Func<StampedTree, List<(int X, int Y, int Z)>> Cuts, bool ExpectFall)>();
+
+        var thin = StampedTree.WorldgenSpecies.First(s => StampedTree.PickLimb(
+            TreeGrower.GrowToMaturity(s, RootX, RootY, RootZ, new VirtualTreeSpace((_, _) => RootY - 1), Seed)) >= 0);
+        cases.Add(($"{thin.Name} limb", thin, t =>
+        {
+            var limb = StampedTree.PickLimb(t.Graph);
+            return [(t.Graph[limb].X, t.Graph[limb].Y, t.Graph[limb].Z)];
+        }, true));
+
+        foreach (var wide in WideTreeSpecies.AllShapes)
+        {
+            cases.Add(($"{wide.Name} whole slice", wide, SliceCuts, true));
+            cases.Add(($"{wide.Name} partial slice", wide, t => SliceCuts(t).SkipLast(1).ToList(), false));
+        }
+
+        foreach (var (what, species, cutsOf, expectFall) in cases)
+        {
+            var manager = new LeafDecayManager();
+            var drops = new DropManager();
+
+            var felledCopy = StampGrounded(species, manager);
+            var expected = FelledBy(felledCopy, cutsOf(felledCopy));
+            Assert.True(expectFall == expected.Count > 0,
+                $"{what}: the fells dropped {expected.Count} wood cells besides the cuts");
+
+            var tree = StampGrounded(species, manager);
+            var cuts = cutsOf(tree);
+            foreach (var cut in cuts)
+                tree.Write(cut, 0, 0);
+            var (min, max) = StampedTree.Bounds(tree.Wood.Keys.Concat(tree.Leaves.Keys));
+            manager.ScheduleBox(min, max);
+            RunUntilSettled(manager, tree, drops, what);
+
+            var crumbled = tree.Wood.Keys.Where(c => !cuts.Contains(c) && tree.Read(c) != tree.Wood[c]).ToHashSet();
+            Assert.True(expected.SetEquals(crumbled),
+                $"{what}: the decay crumbled {crumbled.Count} wood cells, felling the same cuts drops {expected.Count}"
+                + $" ({crumbled.Except(expected).Count()} extra, {expected.Except(crumbled).Count()} missing)");
+            foreach (var cell in crumbled)
+                Assert.True(IsAir(tree.Chunks, cell), $"{what}: crumbled wood at {cell} was rewritten, not removed");
+        }
+    }
+
+    [Fact]
+    public void ShellsOfAStandingWideTrunkNeverCrumble()
+    {
+        foreach (var species in WideTreeSpecies.AllShapes)
+        {
+            var manager = new LeafDecayManager();
+            var drops = new DropManager();
+            var tree = StampGrounded(species, manager);
+            Assert.Contains(tree.Wood.Values, w => WoodState.IsShell(w.State));
+
+            var (min, max) = StampedTree.Bounds(tree.Wood.Keys.Concat(tree.Leaves.Keys));
+            manager.ScheduleBox(min, max);
+            RunUntilSettled(manager, tree, drops, species.Name);
+
+            foreach (var (cell, wood) in tree.Wood)
+                Assert.True(wood == tree.Read(cell),
+                    $"{species.Name}: standing wood at {cell} ({(WoodState.IsShell(wood.State) ? "shell" : "node")}) became {tree.Read(cell)}");
+        }
+    }
 }

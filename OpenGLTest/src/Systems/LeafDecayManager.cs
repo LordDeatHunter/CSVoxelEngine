@@ -36,16 +36,25 @@ namespace silkgltriangle;
 /// Persistent leaves (player-placed) are never touched.</para>
 ///
 /// <para><b>Orphaned wood.</b> A scheduled tree-wood cell that has a parent cell (not a root,
-/// not detached, not a phase-7 shell) whose loaded parent no longer
-/// <see cref="TreeWoodShape.Connects"/> to it crumbles too, under the same budget, dropping its
-/// thickness-band loot through the (id, state) loot path. Each crumbled cell schedules its own
-/// reach box, so a blasted subtree crumbles from the cut outward one layer per tick. Mining-driven
-/// felling stays <see cref="TopplingTree"/>'s job.</para>
+/// not detached; shells included) crumbles when it has lost every path to an anchor: exactly
+/// <see cref="TreeSupport"/>'s rule, the one <see cref="TopplingTree.Collect"/> fells by, so the
+/// crumble takes what a fell at the same cut would drop and nothing else (paths over parent edges
+/// plus vertical shell-to-shell adjacency; anchors are roots and shells standing on real ground,
+/// so a wide trunk with one shell of a slice still standing never crumbles). A cell first walks
+/// its own parent chain, which on an intact tree reaches an anchor in about its height; only a
+/// broken chain pays for the full support search. Both answers are memoised for the frame
+/// (cleared at the top of every <see cref="Update"/>): inside a frame only decay removals edit
+/// the world, and removing a cell of an unsupported component never changes whether another
+/// component is anchored, so later cells of the same trunk stop after a step or two. Crumbling
+/// runs under the same budget, dropping the cell's thickness-band loot through the (id, state)
+/// loot path, and each crumbled cell schedules its own reach box, so a blasted subtree crumbles
+/// from the cut outward one layer per tick. Mining-driven felling stays
+/// <see cref="TopplingTree"/>'s job.</para>
 ///
 /// <para><b>Freezing.</b> Cells are read through <see cref="TryGetCell"/>, never
 /// <c>GetBlockGlobal</c>, which reports unloaded chunks as air. Whenever a decision needs a cell
 /// in an unloaded chunk — the cell itself, any candidate tip or a tip's neighbour in a leaf's
-/// cluster box, or an orphan candidate's parent — the scheduled cell is dropped silently and
+/// cluster box, or any cell an orphan candidate's support walk or search reads — the scheduled cell is dropped silently and
 /// never decayed; the next nearby edit reschedules it.</para>
 ///
 /// <para><b>Remeshing.</b> A hydration rewrite remeshes nothing: the mesher never reads
@@ -118,6 +127,18 @@ public class LeafDecayManager
     private readonly Chunk?[] _chunkCache = new Chunk?[ChunkCacheSize];
     private readonly long[] _chunkCacheKeys = new long[ChunkCacheSize];
 
+    // The orphan rule: TreeSupport's search over this manager's cached reads, shared with felling
+    private readonly TreeCellReader _read;
+    private readonly TreeSupport _support = new(WorldGenerationConfig.TreeFellWoodCap);
+
+    // Wood cells (TreeCellKey) known anchored or known unanchored this frame; cleared at the top
+    // of every Update, since an edit outside the decay can change either between frames
+    private readonly HashSet<long> _supported = [];
+    private readonly HashSet<long> _unsupported = [];
+
+    // The parent-chain fast path's walked cells, reused
+    private readonly List<long> _chain = [];
+
     /// <summary>
     /// How far around an edit cells are scheduled: the largest leaf radius of any leafy species
     /// plus one, the extra cell covering a parent that an edit turns into a tip (its own leaves
@@ -127,6 +148,8 @@ public class LeafDecayManager
 
     public LeafDecayManager()
     {
+        _read = TryGetCell;
+
         var maxRadius = 0;
         foreach (var species in TreeSpeciesRegistry.All)
         {
@@ -216,6 +239,11 @@ public class LeafDecayManager
         // The chunk cache is valid for one frame only: an unload can replace a chunk between
         // frames, and a reference cached before it must never be handed back
         _chunkCacheKeys.AsSpan().Fill(-1L);
+
+        // The support memos hold for one frame: only decay removals happen inside it, and
+        // removing an unsupported cell never changes another component's anchoring
+        _supported.Clear();
+        _unsupported.Clear();
 
         var ticks = 0;
         var processed = 0;
@@ -393,7 +421,9 @@ public class LeafDecayManager
     private bool IsLiveTip(TreeSpecies species, int tx, int ty, int tz, byte tstate, out bool unloaded)
     {
         unloaded = false;
-        if (WoodState.IsDetached(tstate) || WoodState.DiameterPx(tstate) > species.TipMaxPx) return false;
+        // A shell rings a wide trunk core and is never a branch end
+        if (WoodState.IsDetached(tstate) || WoodState.IsShell(tstate)
+            || WoodState.DiameterPx(tstate) > species.TipMaxPx) return false;
 
         for (var dir = 0; dir < TreeDirections.Count; dir++)
         {
@@ -417,17 +447,32 @@ public class LeafDecayManager
     }
 
     /// <summary>
-    /// Crumbles a tree-wood cell whose loaded parent no longer connects to it. Roots, detached
-    /// (player-placed) cells and shells are exempt; an unloaded parent freezes the cell.
+    /// Crumbles a tree-wood cell that has lost every path to an anchor (<see cref="TreeSupport"/>'s
+    /// rule, shared with <see cref="TopplingTree.Collect"/>). Roots and detached (player-placed)
+    /// cells are exempt; shells are not. Any read that hits an unloaded chunk freezes the cell.
     /// </summary>
     private void TickWood(int x, int y, int z, byte id, byte state, long key)
     {
-        if (!WoodState.HasParentCell(state) || WoodState.IsShell(state)) return;
+        if (!WoodState.HasParentCell(state) || WoodState.IsDetached(state)) return;
 
-        var dir = WoodState.Parent(state);
-        WoodState.TryParentOffset(state, out var px, out var py, out var pz);
-        if (!TryGetCell(x + px, y + py, z + pz, out var pid, out var pstate)) return;
-        if (TreeWoodShape.Connects(id, state, pid, pstate, dir)) return;
+        if (!_unsupported.Contains(TreeCellKey.Pack(x, y, z)))
+        {
+            var chain = WalkParentChain(x, y, z, id, state);
+            if (chain != TreeSupportResult.Unsupported) return;
+
+            // The chain broke: only the full search can tell a held cell from an orphan
+            var result = _support.Search(_read, x, y, z, hasExcluded: false, 0, 0, 0,
+                unloadedIsUnknown: true, knownSupported: _supported);
+            if (result == TreeSupportResult.Unknown) return;
+            if (result == TreeSupportResult.Supported)
+            {
+                // Every visited cell is linked to this one, so it reaches the same anchor
+                foreach (var visited in _support.VisitedKeys) _supported.Add(visited);
+                return;
+            }
+
+            foreach (var c in _support.Component) _unsupported.Add(TreeCellKey.Pack(c.X, c.Y, c.Z));
+        }
 
         if (_removalsThisTick >= WorldGenerationConfig.LeafDecayMaxRemovalsPerTick)
         {
@@ -436,6 +481,50 @@ public class LeafDecayManager
         }
 
         Remove(x, y, z, id, state);
+    }
+
+    /// <summary>
+    /// The fast half of the orphan test: follows the cell's parent chain while every step links
+    /// (<see cref="TreeSupport.Links"/>). <see cref="TreeSupportResult.Supported"/> when it reaches
+    /// an anchor or a cell already known anchored this frame (every walked cell is then memoised
+    /// as anchored, since it reaches the same anchor), <see cref="TreeSupportResult.Unknown"/>
+    /// when a read hit an unloaded chunk, and <see cref="TreeSupportResult.Unsupported"/> when the
+    /// chain broke or ran past the cap, which only means the full search has to decide.
+    /// </summary>
+    private TreeSupportResult WalkParentChain(int x, int y, int z, byte id, byte state)
+    {
+        _chain.Clear();
+        for (var step = 0; step < WorldGenerationConfig.TreeFellWoodCap; step++)
+        {
+            var cellKey = TreeCellKey.Pack(x, y, z);
+            _chain.Add(cellKey);
+
+            var anchored = WoodState.IsRoot(state) || _supported.Contains(cellKey);
+            if (!anchored && WoodState.IsShell(state))
+            {
+                if (!TryGetCell(x, y - 1, z, out var belowId, out _)) return TreeSupportResult.Unknown;
+                anchored = TreeSupport.IsAnchor(state, belowId);
+            }
+
+            if (anchored)
+            {
+                foreach (var walked in _chain) _supported.Add(walked);
+                return TreeSupportResult.Supported;
+            }
+
+            if (!WoodState.HasParentCell(state)) return TreeSupportResult.Unsupported;
+
+            var dir = WoodState.Parent(state);
+            var px = x + TreeDirections.Dx[dir];
+            var py = y + TreeDirections.Dy[dir];
+            var pz = z + TreeDirections.Dz[dir];
+            if (!TryGetCell(px, py, pz, out var pid, out var pstate)) return TreeSupportResult.Unknown;
+            if (!TreeSupport.Links(id, state, pid, pstate, dir)) return TreeSupportResult.Unsupported;
+
+            (x, y, z, id, state) = (px, py, pz, pid, pstate);
+        }
+
+        return TreeSupportResult.Unsupported;
     }
 
     /// <summary>

@@ -7,7 +7,7 @@ using Silk.NET.OpenGL;
 namespace silkgltriangle;
 
 /// <summary>
-/// A felled tree: the subtree of a mined tree-wood cell (see <see cref="Collect"/>) and the
+/// A felled tree: the wood a mined tree-wood cell held up (see <see cref="Collect"/>) and the
 /// canopy around it, swinging from upright to flat around the cut and popping out item drops
 /// after coming to rest. The mesh is baked
 /// once from the real chunk mesher (correct node and tube boxes, AO and crop UVs) rebased to
@@ -52,53 +52,66 @@ public class TopplingTree : IDisposable
     }
 
     /// <summary>
-    /// Collects what falls when a tree-wood cell is mined: the cell plus its whole subtree in the
-    /// tree graph, walked over child edges only (a same-block, non-detached neighbour whose
-    /// <see cref="WoodState"/> parent pointer lands on the current cell). Cutting the root takes
-    /// the whole tree, root-walk cells included (they point up at the base); cutting a limb takes
-    /// only its descendants, so the trunk and every other limb stay standing; detached
-    /// (player-placed) wood is never anyone's child. There is no height limit: a drooping limb's
-    /// subtree may dip below the cut. Canopy leaves within Chebyshev 2 of the falling wood come
-    /// along, each with its own state byte. Mining anything that is not tree wood, or detached
-    /// wood, collects just that cell. An unloaded chunk reads as nothing. Bounded by the fell
-    /// caps; anything past them stays standing. Pure CPU over live chunk data, main thread, and
-    /// safe whether or not the broken cell was already cleared (it is seeded from the passed id
-    /// and state).
+    /// Collects what falls when a tree-wood cell is mined: every component of tree wood that
+    /// loses every path to an anchor once the cut cell is gone (<see cref="TreeSupport"/>'s rule,
+    /// shared with the orphan crumble: paths over parent edges plus vertical shell-to-shell
+    /// adjacency, anchors are roots and shells on real ground). On a thin tree that is exactly
+    /// the subtree walk: cutting a limb takes only its descendants, so the trunk and every other
+    /// limb stay standing, and cutting the root takes the whole tree, root-walk cells included
+    /// (they point up at the base). A wide trunk falls only once a whole slice is cut: while any
+    /// shell of the slice still stands, the ring above links down through it. There is no height
+    /// limit: a drooping limb's subtree may dip below the cut. Canopy leaves within Chebyshev 2
+    /// of the falling wood come along, each with its own state byte; shells add no sweep of their
+    /// own, since the nodes they ring already cover the canopy around them. Mining anything that
+    /// is not tree wood, or detached wood, collects just that cell. An unloaded chunk reads as no
+    /// link. Bounded by the fell caps: a component that would pass
+    /// <see cref="WorldGenerationConfig.TreeFellWoodCap"/>, or whose search hits it, stays
+    /// standing (and still drops normally when mined). Pure CPU over live chunk data, main
+    /// thread, and safe whether or not the broken cell was already cleared (it is seeded from
+    /// the passed id and state, and the search reads it as absent).
     /// </summary>
     public static List<FellBlock> Collect(ChunkManager chunks, Vector3 breakCell, byte brokenId, byte brokenState)
     {
         if (!BlockType.IsTreeWood(brokenId) || WoodState.IsDetached(brokenState))
             return [new FellBlock(breakCell, brokenId, brokenState)];
 
+        var cx = (int)breakCell.X;
+        var cy = (int)breakCell.Y;
+        var cz = (int)breakCell.Z;
         var fallingWood = new List<FellBlock> { new(breakCell, brokenId, brokenState) };
-        var taken = new HashSet<Vector3> { breakCell };
+        var taken = new HashSet<long> { TreeCellKey.Pack(cx, cy, cz) };
+        var standing = new HashSet<long>();
+        var support = new TreeSupport(WorldGenerationConfig.TreeFellWoodCap);
 
-        // Breadth-first over child edges: the list doubles as the queue, so the wood comes out
-        // in walk order (the cut cell first, then outward through the subtree)
-        for (var head = 0;
-             head < fallingWood.Count && fallingWood.Count < WorldGenerationConfig.TreeFellWoodCap;
-             head++)
+        // Each neighbour the cut cell linked to heads a candidate component: it falls exactly
+        // when the search from it, with the cut cell gone, finds no anchor
+        for (var dir = 0; dir < TreeDirections.Count; dir++)
         {
-            var current = fallingWood[head].Cell;
-            for (var dir = 0; dir < TreeDirections.Count; dir++)
+            var nx = cx + TreeDirections.Dx[dir];
+            var ny = cy + TreeDirections.Dy[dir];
+            var nz = cz + TreeDirections.Dz[dir];
+            if (!chunks.TryGetCell(nx, ny, nz, out var nid, out var nstate)
+                || !TreeSupport.Links(brokenId, brokenState, nid, nstate, dir))
+                continue;
+            var key = TreeCellKey.Pack(nx, ny, nz);
+            if (standing.Contains(key) || taken.Contains(key))
+                continue;
+
+            var result = support.Search(chunks.TryGetCell, nx, ny, nz,
+                hasExcluded: true, cx, cy, cz, unloadedIsUnknown: false);
+            if (result == TreeSupportResult.Unsupported
+                && fallingWood.Count + support.Component.Count <= WorldGenerationConfig.TreeFellWoodCap)
             {
-                if (fallingWood.Count >= WorldGenerationConfig.TreeFellWoodCap)
-                    break;
-
-                var nx = (int)current.X + TreeDirections.Dx[dir];
-                var ny = (int)current.Y + TreeDirections.Dy[dir];
-                var nz = (int)current.Z + TreeDirections.Dz[dir];
-                if (!chunks.TryGetCell(nx, ny, nz, out var id, out var state)
-                    || id != brokenId
-                    || WoodState.IsDetached(state)
-                    || !WoodState.TryParentOffset(state, out var px, out var py, out var pz)
-                    || nx + px != (int)current.X || ny + py != (int)current.Y || nz + pz != (int)current.Z)
-                    continue;
-
-                var next = new Vector3(nx, ny, nz);
-                if (!taken.Add(next))
-                    continue;
-                fallingWood.Add(new FellBlock(next, id, state));
+                foreach (var (x, y, z, state) in support.Component)
+                {
+                    taken.Add(TreeCellKey.Pack(x, y, z));
+                    fallingWood.Add(new FellBlock(new Vector3(x, y, z), nid, state));
+                }
+            }
+            else
+            {
+                foreach (var visited in support.VisitedKeys)
+                    standing.Add(visited);
             }
         }
 
@@ -115,6 +128,14 @@ public class TopplingTree : IDisposable
         }
 
         foreach (var wood in fallingWood)
+        {
+            // A wide trunk's shells sit inside the sweep of the node they ring
+            if (WoodState.IsShell(wood.State))
+                continue;
+
+            var wx = (int)wood.Cell.X;
+            var wy = (int)wood.Cell.Y;
+            var wz = (int)wood.Cell.Z;
             for (var dx = -2; dx <= 2; dx++)
             for (var dy = -2; dy <= 2; dy++)
             for (var dz = -2; dz <= 2; dz++)
@@ -122,15 +143,16 @@ public class TopplingTree : IDisposable
                 if (collected.Count >= WorldGenerationConfig.TreeFellTotalCap)
                     return collected;
 
-                var leaf = wood.Cell + new Vector3(dx, dy, dz);
-                if (!taken.Add(leaf))
+                int lx = wx + dx, ly = wy + dy, lz = wz + dz;
+                if (!taken.Add(TreeCellKey.Pack(lx, ly, lz)))
                     continue;
-                if (!chunks.TryGetCell((int)leaf.X, (int)leaf.Y, (int)leaf.Z, out var leafId, out var leafState)
+                if (!chunks.TryGetCell(lx, ly, lz, out var leafId, out var leafState)
                     || !TreeGenerator.IsLeaf(leafId))
                     continue;
 
-                collected.Add(new FellBlock(leaf, leafId, leafState));
+                collected.Add(new FellBlock(new Vector3(lx, ly, lz), leafId, leafState));
             }
+        }
 
         return collected;
     }
