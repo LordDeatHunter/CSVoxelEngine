@@ -1,13 +1,17 @@
 {
   "wood": "block/cactus",
+  // Pitchfork tuning (CactusGrowthLogic, measured over 48 flat-ground mature trees): stem
+  // 9-10 cells, 2 arms on 38 of 48 (1 on the rest), 22 of those 38 pairs on opposite sides,
+  // level runs 2-3, prongs 2-5 cells with tops 2-3 below the stem top (a few 4), and a one-cell
+  // air gap between every prong and the stem. tipPx 7 keeps the arms nearly as thick as the stem.
   "growth": {
     "logic": "cactus",
-    "signalEnergy": 5,
+    "signalEnergy": 9,
     "upProbability": 3,
     "lowestBranchHeight": 2,
-    "maturitySteps": [20, 35]
+    "maturitySteps": [30, 50]
   },
-  "thickness": { "tipPx": 4, "pipeExponent": 1.5, "maxPx": 12, "trunkShape": "square" },
+  "thickness": { "tipPx": 7, "pipeExponent": 1.5, "maxPx": 12, "trunkShape": "square" },
   "features": [ { "type": "roots", "depth": 2 } ],
   // lod unused: a leafless species never shows a canopy, so this block only has to stay valid
   "lod": { "crownHeight": [3, 6], "crownRadius": 1, "profile": "column" },

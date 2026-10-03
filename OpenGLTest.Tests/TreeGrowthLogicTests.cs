@@ -6,10 +6,13 @@ using Xunit;
 namespace silkgltriangle.Tests;
 
 /// <summary>
-/// Shape rules of the umbrella (stone pine) and baobab growth logics, plus the wide-trunk gate:
-/// the bounds the logics enforce through zeroed weights (trunk tops, limb reach, climbing limbs
-/// never turning back out) and the crown shapes they are for. Species are picked by their
-/// logic's name, never by species name, and nothing pins a height, a count or a JSON number.
+/// Shape rules of the umbrella (stone pine), baobab and cactus growth logics, plus the wide-trunk
+/// gate: the bounds the logics enforce through zeroed weights (trunk tops, limb reach, climbing
+/// limbs never turning back out, the umbrella's unforked bare limbs on distinct sides with bare
+/// wood under their pads, the cactus's level arm runs turning straight up into prongs that stand
+/// clear of the stem and below its top) and the crown shapes they are for. Species are
+/// picked by their logic's name, never by species name, and nothing pins a height, a count or a
+/// JSON number.
 /// </summary>
 public sealed class TreeGrowthLogicTests
 {
@@ -134,6 +137,137 @@ public sealed class TreeGrowthLogicTests
             var top = graph[chain[^1]].Y - graph.RootY;
             Assert.True(top <= species.LowestBranchHeight + BaobabGrowthLogic.CrownLift,
                 $"{species.Name}: trunk climbs to {top}");
+        }
+    }
+
+    /// <summary>One cactus arm: the stem node it leaves, its side and its nodes in growth order.</summary>
+    private readonly record struct CactusArm(int StemNode, int Side, List<int> Nodes);
+
+    /// <summary>
+    /// Every arm of a cactus: each non-feature side child of a stem node, walked outward. An arm
+    /// never forks, which the walk asserts, so its nodes are a single path.
+    /// </summary>
+    private static List<CactusArm> CactusArms(TreeGraph graph, TreeSpecies species, List<int> stem)
+    {
+        var arms = new List<CactusArm>();
+        foreach (var stemNode in stem)
+        {
+            for (var side = 0; side < TreeDirections.Up; side++)
+            {
+                var start = graph.ChildIn(stemNode, side);
+                if (start < 0 || graph[start].IsFeature)
+                    continue;
+
+                var nodes = new List<int> { start };
+                for (var node = start;;)
+                {
+                    var next = -1;
+                    for (var c = graph[node].FirstChild; c >= 0; c = graph[c].NextSibling)
+                    {
+                        if (graph[c].IsFeature)
+                            continue;
+                        Assert.True(next < 0, $"{species.Name} at ({graph.RootX}, {graph.RootZ}): arm node {node} forks");
+                        next = c;
+                    }
+                    if (next < 0)
+                        break;
+                    nodes.Add(next);
+                    node = next;
+                }
+                arms.Add(new CactusArm(stemNode, side, nodes));
+            }
+        }
+        return arms;
+    }
+
+    [Fact]
+    public void CactusArmsRunLevelThenClimbParallelToTheStem()
+    {
+        foreach (var species in WithLogic("cactus"))
+        {
+            var longestProng = 0;
+            foreach (var (graph, _, _) in Grown(species))
+            {
+                var stem = TrunkChain(graph);
+                var where = $"{species.Name} at ({graph.RootX}, {graph.RootZ})";
+                foreach (var arm in CactusArms(graph, species, stem))
+                {
+                    // The growth direction of a node is the opposite of the way back to its parent.
+                    var level = 0;
+                    while (level < arm.Nodes.Count
+                           && TreeDirections.Opposite(graph[arm.Nodes[level]].ParentDir) == arm.Side)
+                        level++;
+                    for (var i = level; i < arm.Nodes.Count; i++)
+                    {
+                        Assert.True(graph[arm.Nodes[i]].ParentDir == TreeDirections.Down,
+                            $"{where}: arm cell {i} of side {arm.Side} neither runs level along its side nor climbs");
+                    }
+
+                    var prong = arm.Nodes.Count - level;
+                    Assert.True(level <= CactusGrowthLogic.ArmRunMax, $"{where}: a level run of {level} cells");
+                    if (prong == 0)
+                        continue;
+                    Assert.True(level >= CactusGrowthLogic.ArmRunMin,
+                        $"{where}: an arm turns up after only {level} level cells");
+                    longestProng = Math.Max(longestProng, prong);
+
+                    var turn = graph[arm.Nodes[level - 1]];
+                    for (var i = level; i < arm.Nodes.Count; i++)
+                    {
+                        var cell = graph[arm.Nodes[i]];
+                        Assert.True(cell.X == turn.X && cell.Z == turn.Z, $"{where}: a prong leaves its column");
+                        foreach (var s in stem)
+                        {
+                            var d = Math.Abs(cell.X - graph[s].X) + Math.Abs(cell.Y - graph[s].Y)
+                                    + Math.Abs(cell.Z - graph[s].Z);
+                            Assert.True(d > 1, $"{where}: a prong cell touches the stem");
+                        }
+                    }
+                }
+            }
+            Assert.True(longestProng >= CactusGrowthLogic.MinProng,
+                $"{species.Name}: no sampled prong reaches {CactusGrowthLogic.MinProng} cells (longest {longestProng})");
+        }
+    }
+
+    [Fact]
+    public void CactusArmsLeaveAtDistinctSidesAndSpacedHeights()
+    {
+        foreach (var species in WithLogic("cactus"))
+        {
+            var multiArmed = 0;
+            foreach (var (graph, _, _) in Grown(species))
+            {
+                var arms = CactusArms(graph, species, TrunkChain(graph));
+                if (arms.Count > 1)
+                    multiArmed++;
+                for (var a = 0; a < arms.Count; a++)
+                for (var b = a + 1; b < arms.Count; b++)
+                {
+                    var where = $"{species.Name} at ({graph.RootX}, {graph.RootZ})";
+                    Assert.True(arms[a].Side != arms[b].Side, $"{where}: two arms leave on side {arms[a].Side}");
+                    var gap = Math.Abs(graph[arms[a].StemNode].Y - graph[arms[b].StemNode].Y);
+                    Assert.True(gap >= CactusGrowthLogic.ArmSpacing, $"{where}: two arms {gap} stem cells apart");
+                }
+            }
+            Assert.True(multiArmed > 0, $"{species.Name}: no sampled cactus grew a second arm");
+        }
+    }
+
+    [Fact]
+    public void CactusProngsStayBelowTheStem()
+    {
+        foreach (var species in WithLogic("cactus"))
+        foreach (var (graph, _, _) in Grown(species))
+        {
+            var stem = TrunkChain(graph);
+            var stemTop = graph[stem[^1]].Y;
+            foreach (var arm in CactusArms(graph, species, stem))
+            {
+                var top = graph[arm.Nodes[^1]].Y;
+                Assert.True(top < stemTop,
+                    $"{species.Name} at ({graph.RootX}, {graph.RootZ}): an arm reaches y {top}, the stem tops out at {stemTop}");
+            }
         }
     }
 
