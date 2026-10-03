@@ -84,6 +84,147 @@ public sealed class TreeGrowthLogicTests
         }
     }
 
+    /// <summary>The limb sides of a trunk node: a bit per side holding a non-feature child.</summary>
+    private static int LimbSides(TreeGraph graph, int node)
+    {
+        var mask = 0;
+        for (var dir = 0; dir < TreeDirections.Up; dir++)
+        {
+            var child = graph.ChildIn(node, dir);
+            if (child >= 0 && !graph[child].IsFeature)
+                mask |= 1 << dir;
+        }
+        return mask;
+    }
+
+    /// <summary>The node's non-feature children.</summary>
+    private static List<int> GrowthChildren(TreeGraph graph, int node)
+    {
+        var children = new List<int>();
+        for (var c = graph[node].FirstChild; c >= 0; c = graph[c].NextSibling)
+        {
+            if (!graph[c].IsFeature)
+                children.Add(c);
+        }
+        return children;
+    }
+
+    [Fact]
+    public void UmbrellaLimbsNeverForkNearTheTrunk()
+    {
+        foreach (var species in WithLogic("umbrella"))
+        {
+            var bareNodes = 0;
+            foreach (var (graph, _, _) in Grown(species))
+            {
+                var trunk = TrunkChain(graph).ToHashSet();
+                for (var i = 0; i < graph.Count; i++)
+                {
+                    var n = graph[i];
+                    if (n.IsFeature || trunk.Contains(i) || Chebyshev(graph, i) >= UmbrellaGrowthLogic.BareReach)
+                        continue;
+                    bareNodes++;
+                    var where = $"{species.Name} at ({graph.RootX}, {graph.RootZ}): node {i} " +
+                                $"({n.X - graph.RootX}, {n.Y - graph.RootY}, {n.Z - graph.RootZ})";
+                    Assert.True(GrowthChildren(graph, i).Count <= 1, $"{where} forks inside the bare zone");
+                    Assert.True((n.X == graph.RootX) != (n.Z == graph.RootZ), $"{where} turned off its axis");
+                }
+            }
+            Assert.True(bareNodes > 0, $"{species.Name} grew no limb out of the trunk");
+        }
+    }
+
+    [Fact]
+    public void UmbrellaLimbsShowBareWoodUnderTheirPads()
+    {
+        foreach (var species in WithLogic("umbrella"))
+        foreach (var (graph, cells, woodCount) in Grown(species))
+        {
+            var leaves = new HashSet<long>();
+            for (var i = woodCount; i < cells.Count; i++)
+                leaves.Add(TreeCellKey.Pack(cells[i].X, cells[i].Y, cells[i].Z));
+            Assert.NotEmpty(leaves);
+
+            bool IsBare(int node)
+            {
+                var n = graph[node];
+                for (var dir = 0; dir < TreeDirections.Count; dir++)
+                {
+                    if (leaves.Contains(TreeCellKey.Pack(n.X + TreeDirections.Dx[dir], n.Y + TreeDirections.Dy[dir],
+                            n.Z + TreeDirections.Dz[dir])))
+                        return false;
+                }
+                return true;
+            }
+
+            var where = $"{species.Name} at ({graph.RootX}, {graph.RootZ})";
+            var trunk = TrunkChain(graph);
+            var limbs = 0;
+            foreach (var t in trunk)
+            {
+                for (var dir = 0; dir < TreeDirections.Up; dir++)
+                {
+                    var limb = graph.ChildIn(t, dir);
+                    if (limb < 0 || graph[limb].IsFeature)
+                        continue;
+                    limbs++;
+
+                    // Walk the limb's single path out until it forks or ends: the first cell that
+                    // touches a leaf must have bare wood before it.
+                    var bare = 0;
+                    for (var node = limb; ;)
+                    {
+                        if (!IsBare(node))
+                        {
+                            Assert.True(bare >= 1,
+                                $"{where}: the limb leaving trunk height {graph[t].Y - graph.RootY} on side {dir} " +
+                                "touches leaves at its first cell");
+                            break;
+                        }
+                        bare++;
+                        var next = GrowthChildren(graph, node);
+                        if (next.Count != 1)
+                            break;
+                        node = next[0];
+                    }
+                }
+            }
+            Assert.True(limbs > 0, $"{where} grew no limbs");
+
+            var lowestTip = int.MaxValue;
+            for (var i = 0; i < graph.Count; i++)
+            {
+                if (LeafCluster.IsLiveTip(graph, species, i))
+                    lowestTip = Math.Min(lowestTip, graph[i].Y);
+            }
+            Assert.True(lowestTip < int.MaxValue, $"{where} has no live tip");
+            foreach (var t in trunk)
+            {
+                if (graph[t].Y < lowestTip - 1)
+                    Assert.True(IsBare(t), $"{where}: the trunk at height {graph[t].Y - graph.RootY} touches leaves");
+            }
+        }
+    }
+
+    [Fact]
+    public void UmbrellaTrunkNodesCarryAtMostTheirLimbs()
+    {
+        foreach (var species in WithLogic("umbrella"))
+        foreach (var (graph, _, _) in Grown(species))
+        {
+            var used = 0;
+            foreach (var t in TrunkChain(graph))
+            {
+                var sides = LimbSides(graph, t);
+                var where = $"{species.Name} at ({graph.RootX}, {graph.RootZ}): trunk height {graph[t].Y - graph.RootY}";
+                Assert.True(System.Numerics.BitOperations.PopCount((uint)sides) <= UmbrellaGrowthLogic.LimbsPerTrunkNode,
+                    $"{where} carries more limbs than a trunk node may");
+                Assert.True((used & sides) == 0, $"{where} stacks a limb over another one on the same side");
+                used |= sides;
+            }
+        }
+    }
+
     [Fact]
     public void BaobabLimbsStayWithinTheirReach()
     {

@@ -3,23 +3,32 @@
   "leaves": "block/stone_pine_leaves",
   "growth": {
     "logic": "umbrella",
-    "signalEnergy": 14,
+    "signalEnergy": 22,
     "upProbability": 2,
-    "lowestBranchHeight": 9,
-    "maturitySteps": [70, 100]
+    "lowestBranchHeight": 8,
+    "maturitySteps": [70, 95]
   },
-  // Tuned against 8 flat-ground seeds: trunk 11 cells, root 11-14 px, nodes 48-89; the crown
-  // above lowestBranchHeight spans 9-13 blocks across and 4-5 blocks tall.
+  // Shape tuned against 48 flat-ground mature trees (the 8 test samples plus 40 more): a bare trunk
+  // of 11 cells, 65-69 % of the tree's 16-17-block height, splitting into 4 limbs (one per side)
+  // that climb out through the bare zone as staircases, 4-8 bare wood cells each before the first
+  // leaf, then flat pads only at the outer limb ends; the tree is 19-26 blocks across (1.1-1.6x,
+  // median 1.35x its height), 12-26 live tips, 283-508 leaves. pipeExponent 1.5 with the 3.0 base
+  // girth grows the root to 16 px on every mature tree (5-7 / 7-8 / 8-10 / 10-16 px at
+  // 15/25/50/75 %), so the full pad radius (fullRadiusPx 14) waits for a mature trunk; the shorter
+  // maturitySteps keep the outer crown from closing into one mat over the limbs.
   "thickness": {
     "tipPx": 1,
-    "pipeExponent": 2.0,
+    "pipeExponent": 1.5,
     "maxPx": 24,
-    "girthProfile": [[0, 2.4], [0.6, 1.6], [1, 1.0]],
+    "girthProfile": [[0, 3.0], [0.6, 1.6], [1, 1.0]],
     "trunkShape": "circle",
     "rim": "block"
   },
-  "leafCluster": { "shape": "blob", "radius": 2, "hydration": 4, "tipMaxPx": 3 },
+  "leafCluster": { "shape": "pad", "radius": 3, "hydration": 6, "tipMaxPx": 3, "minRadius": 1, "fullRadiusPx": 14 },
   "features": [ { "type": "roots", "depth": 4 } ],
-  "lod": { "crownHeight": [4, 6], "crownRadius": 6, "profile": "dome" }
+  // lod tuned against 48 flat-ground mature trees (no worldgen block, so no batch crowns): crown
+  // apex above base p20/p50/p80 15/16/16, leaf radius from the trunk column p50/p80 11/12,
+  // footprint-equivalent radius (sqrt(leaf columns / pi)) median 8.2
+  "lod": { "crownHeight": [15, 16], "crownRadius": 8, "profile": "dome" }
   // no worldgen block: grown in-world only (TreeGrowthWriter, the `grow` scenario op)
 }
