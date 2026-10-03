@@ -223,6 +223,7 @@ public static class TreeGrower
 
         var floor = n.FloorPx;
         var sumPipe = 0f;
+        var maxChildPipe = 0f;
         var maxChildThick = 0f;
         var nonFeatureChildren = 0;
         for (var c = n.FirstChild; c >= 0; c = graph[c].NextSibling)
@@ -232,11 +233,17 @@ public static class TreeGrower
                 continue;
             nonFeatureChildren++;
             sumPipe += MathF.Pow(child.PipePx, species.PipeExponent);
+            maxChildPipe = MathF.Max(maxChildPipe, child.PipePx);
             maxChildThick = MathF.Max(maxChildThick, child.ThicknessPx);
         }
 
         float tip = species.TipPx;
-        var pipe = nonFeatureChildren == 0 ? tip : MathF.Max(tip, MathF.Pow(sumPipe, 1f / species.PipeExponent));
+        // (sum p^e)^(1/e) is never below the largest child's p for e >= 1, but the float round
+        // trip through a non-integer exponent can land an ulp under it; the clamp keeps the
+        // parent >= child invariant exact.
+        var pipe = nonFeatureChildren == 0
+            ? tip
+            : MathF.Max(MathF.Max(tip, maxChildPipe), MathF.Pow(sumPipe, 1f / species.PipeExponent));
         var h01 = Math.Clamp((float)(n.Y - graph.RootY) / Math.Max(1, graph.MaxY - graph.RootY), 0f, 1f);
         var thick = MathF.Min(species.MaxPx, MathF.Max(tip, pipe * Girth(species, h01)));
         thick = MathF.Max(thick, maxChildThick);

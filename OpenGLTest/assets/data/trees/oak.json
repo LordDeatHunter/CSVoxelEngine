@@ -8,18 +8,26 @@
     "lowestBranchHeight": 5,
     "maturitySteps": [60, 90]
   },
+  // The trunk carries the crown: the low pipe exponent and strong base girth grow the root to a
+  // full block by maturity, so the leaf cluster (minRadius..radius over fullRadiusPx) widens with
+  // it. Measured over 8 flat-ground seeds at 15/25/50/75/100 % of maturity: root 5-8 / 9-12 /
+  // 14-16 / 16 / 16 px, cluster radius 1 up to 25 % and 2 at maturity, the lowest third of the
+  // trunk a full 16 px log at maturity, 28-37 live tips.
   "thickness": {
     "tipPx": 1,
-    "pipeExponent": 2.0,
+    "pipeExponent": 1.5,
     "maxPx": 16,
-    "girthProfile": [[0, 2.0], [0.5, 1.4], [1, 1.0]],
+    "girthProfile": [[0, 2.4], [0.4, 1.6], [1, 1.0]],
     "trunkShape": "circle",
     "rim": "block"
   },
-  "leafCluster": { "shape": "blob", "radius": 2, "hydration": 4, "tipMaxPx": 3 },
+  "leafCluster": { "shape": "blob", "radius": 2, "hydration": 4, "tipMaxPx": 3, "minRadius": 1, "fullRadiusPx": 16 },
   "features": [ { "type": "roots", "depth": 4 } ],
-  // lod tuned against grown batch crowns near (-80, 8): crown apex above base p20/p80 5/12, leaf radius p50/p80 6/6
-  "lod": { "crownHeight": [9, 9], "crownRadius": 4, "profile": "dome" },
+  // lod tuned against the 155 grown batch crowns of the 3x3 cells around (-80, 8): crown apex
+  // above base p20/p50/p80 4/11/12 (suppressed trees pull the low tail down, so the height
+  // brackets the median), leaf radius from the trunk column p50/p80 6/7, footprint-equivalent
+  // radius (sqrt(leaf columns / pi)) median 4.7
+  "lod": { "crownHeight": [10, 12], "crownRadius": 5, "profile": "dome" },
   "worldgen": {
     "biomes": ["forest"],
     "density": 0.02,

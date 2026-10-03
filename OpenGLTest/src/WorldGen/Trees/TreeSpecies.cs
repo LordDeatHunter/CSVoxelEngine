@@ -69,6 +69,18 @@ public sealed class TreeSpecies
     /// <summary>Largest branch diameter still growing a cluster (meaningful only when <see cref="HasLeaves"/>).</summary>
     public required int TipMaxPx { get; init; }
 
+    /// <summary>
+    /// Cluster radius of a tree whose root is 1 px thick; the radius grows with the root diameter up to
+    /// <see cref="LeafRadius"/> (meaningful only when <see cref="HasLeaves"/>).
+    /// </summary>
+    public required int LeafMinRadius { get; init; }
+
+    /// <summary>
+    /// Root diameter (pixels) at which the cluster reaches <see cref="LeafRadius"/> (meaningful only
+    /// when <see cref="HasLeaves"/>).
+    /// </summary>
+    public required int LeafFullRadiusPx { get; init; }
+
     /// <summary>Post-growth features, each type at most once.</summary>
     public required IReadOnlyList<TreeFeatureSpec> Features { get; init; }
 

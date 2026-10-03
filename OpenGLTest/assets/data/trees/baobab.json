@@ -21,8 +21,13 @@
     "trunkShape": "circle",
     "rim": "pixel"
   },
-  "leafCluster": { "shape": "blob", "radius": 2, "hydration": 3, "tipMaxPx": 4 },
+  // the root passes one block within its first pulses, so the crown scaling only shrinks a
+  // seedling's crown; support caps at one block, and wide-trunk support is out of scope
+  "leafCluster": { "shape": "blob", "radius": 2, "hydration": 3, "tipMaxPx": 4, "minRadius": 1, "fullRadiusPx": 16 },
   "features": [ { "type": "buttress" } ],
-  "lod": { "crownHeight": [4, 7], "crownRadius": 5, "profile": "dome" }
+  // lod tuned against 48 flat-ground mature trees (no worldgen block, so no batch crowns): crown
+  // apex above base p20/p50/p80 14/16/17, leaf radius from the trunk column p50/p80 5/5,
+  // footprint-equivalent radius (sqrt(leaf columns / pi)) median 4.4
+  "lod": { "crownHeight": [15, 17], "crownRadius": 4, "profile": "dome" }
   // no worldgen block: grown in-world only (TreeGrowthWriter, the `grow` scenario op)
 }

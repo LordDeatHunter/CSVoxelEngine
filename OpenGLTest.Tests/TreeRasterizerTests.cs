@@ -98,6 +98,7 @@ public sealed class TreeRasterizerTests
                 var h = LeafState.Hydration(c.State);
                 Assert.InRange(h, 1, LeafState.MaxHydration);
 
+                var radius = LeafCluster.ClusterRadius(species, graph);
                 var expected = int.MinValue;
                 var nearest = int.MaxValue;
                 for (var t = 0; t < graph.Count; t++)
@@ -106,10 +107,8 @@ public sealed class TreeRasterizerTests
                         continue;
                     var tip = graph[t];
                     int dx = c.X - tip.X, dy = c.Y - tip.Y, dz = c.Z - tip.Z;
-                    var distance = LeafCluster.Distance(dx, dy, dz);
-                    nearest = Math.Min(nearest, distance);
-                    if (LeafCluster.InShape(species.LeafShape, species.LeafRadius, dx, dy, dz))
-                        expected = Math.Max(expected, species.LeafHydration - distance);
+                    nearest = Math.Min(nearest, LeafCluster.Distance(dx, dy, dz));
+                    expected = Math.Max(expected, LeafCluster.HydrationFromTip(species, radius, dx, dy, dz));
                 }
 
                 Assert.Equal(expected, h);

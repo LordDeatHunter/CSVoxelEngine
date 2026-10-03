@@ -8,11 +8,17 @@
     "lowestBranchHeight": 3,
     "maturitySteps": [70, 110]
   },
-  "thickness": { "tipPx": 1, "pipeExponent": 2.0, "maxPx": 16, "girthProfile": [[0, 2.5], [1, 1.0]] },
-  "leafCluster": { "shape": "cone", "radius": 3, "hydration": 6, "tipMaxPx": 3 },
+  // Measured over 8 flat-ground seeds at 15/25/50/75/100 % of maturity: root 6-11 / 10-12 /
+  // 15-16 / 15-16 / 15-16 px, so the cone is radius 1-2 while young and the full radius from
+  // about half-grown (fullRadiusPx 14); lowest third 12-14 px at maturity, 13-17 live tips.
+  "thickness": { "tipPx": 1, "pipeExponent": 1.6, "maxPx": 16, "girthProfile": [[0, 3.0], [1, 1.0]] },
+  "leafCluster": { "shape": "cone", "radius": 3, "hydration": 6, "tipMaxPx": 3, "minRadius": 1, "fullRadiusPx": 14 },
   "features": [ { "type": "roots", "depth": 4 } ],
-  // lod tuned against grown batch crowns near (-312, -120): crown apex above base p20/p80 0/11, leaf radius p50/p80 5/6
-  "lod": { "crownHeight": [7, 7], "crownRadius": 4, "profile": "cone" },
+  // lod tuned against the 714 grown batch crowns of the 3x3 cells around (-312, -120): crown
+  // apex above base p20/p50/p80 0/9/11 (crowded late trees grow bare posts, so the height
+  // brackets the median), leaf radius from the trunk column p50/p80 5/6, footprint-equivalent
+  // radius (sqrt(leaf columns / pi)) median 4.3
+  "lod": { "crownHeight": [8, 10], "crownRadius": 4, "profile": "cone" },
   "worldgen": {
     "biomes": ["taiga"],
     "density": 0.03,

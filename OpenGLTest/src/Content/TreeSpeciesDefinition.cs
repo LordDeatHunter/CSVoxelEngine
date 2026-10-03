@@ -81,7 +81,7 @@ public sealed class TreeSpeciesDefinition
     /// <summary>The <c>leafCluster</c> object.</summary>
     public sealed class LeafClusterDefinition
     {
-        /// <summary><c>blob</c> (default) or <c>cone</c>; see <see cref="LeafClusterShape"/>.</summary>
+        /// <summary><c>blob</c> (default), <c>cone</c> or <c>pad</c>; see <see cref="LeafClusterShape"/>.</summary>
         public string? Shape { get; set; }
 
         /// <summary>Cluster radius in blocks, 1..8. Required.</summary>
@@ -92,6 +92,20 @@ public sealed class TreeSpeciesDefinition
 
         /// <summary>Largest branch diameter (pixels) that still grows a cluster, 1..maxPx. Required.</summary>
         public int? TipMaxPx { get; set; }
+
+        /// <summary>
+        /// Cluster radius of a tree whose root is 1 px thick, 1..radius. The radius grows with the
+        /// root diameter from here to <see cref="Radius"/> at <see cref="FullRadiusPx"/>. Defaults to
+        /// <see cref="Radius"/>, which means the crown never scales.
+        /// </summary>
+        public int? MinRadius { get; set; }
+
+        /// <summary>
+        /// Root diameter (pixels) at which the cluster reaches its full <see cref="Radius"/>,
+        /// 1..min(maxPx, 16): the world stores at most a full cube per wood cell. Defaults to 16
+        /// (<see cref="WoodState.PixelsPerBlock"/>).
+        /// </summary>
+        public int? FullRadiusPx { get; set; }
     }
 
     /// <summary>One entry of the <c>features</c> array.</summary>

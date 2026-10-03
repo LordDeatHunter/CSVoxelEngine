@@ -236,7 +236,12 @@ public sealed class TreeGrowthTests
         {
             var rootX = RootXOf(test++);
             var reach = TreeRasterizer.ReachOf(species);
-            var tree = StampLoaded(species, rootX, 3 * reach.Horizontal);
+            // A quarter-grown tree: a mature one, or even a half-grown low-energy conifer whose
+            // leader and whorls all ran out of energy, may already fill its whole reach, and then
+            // the grow is a no-op.
+            var young = TreeGrower.MaturityStepsAt(species, rootX, RootY, RootZ, Seed) / 4;
+            var tree = StampedTree.Stamp(species, Seed, rootX, RootY, RootZ, young);
+            tree.LoadAround(3 * reach.Horizontal);
             var before = SnapshotReach(tree, rootX);
 
             var result = Grow(new TreeGrowthWriter(), tree, rootX, 40);
@@ -267,6 +272,98 @@ public sealed class TreeGrowthTests
                 var expected = Math.Min(LeafCluster.HydrationAt(graph, species, cell.X, cell.Y, cell.Z), LeafState.MaxHydration);
                 Assert.True(expected >= 1, $"{species.Name}: leaf {cell} survived decay with no tip holding it");
                 Assert.Equal(expected, LeafState.Hydration(value.State));
+            }
+        }
+    }
+
+    [Fact]
+    public void GrowthThatThickensTheTrunkWidensEveryCluster()
+    {
+        // Enough calls for a young tree's root to reach the diameter of a wider crown
+        const int maxCalls = 12;
+        var test = 260;
+        foreach (var species in LeafySpecies.Where(s => s.LeafMinRadius < s.LeafRadius))
+        {
+            var rootX = RootXOf(test++);
+            var young = StampedTree.YoungStep(species, Seed, rootX, RootY, RootZ);
+            Assert.True(young != null, $"{species.Name}: no growth step wears a crown below its full radius");
+
+            var reach = TreeRasterizer.ReachOf(species);
+            var tree = StampedTree.Stamp(species, Seed, rootX, RootY, RootZ, young);
+            tree.LoadAround(3 * reach.Horizontal);
+            var stampedRadius = LeafCluster.ClusterRadius(species, Rebuild(tree, rootX));
+
+            var writer = new TreeGrowthWriter();
+            var graph = Rebuild(tree, rootX);
+            var calls = 0;
+            while (LeafCluster.ClusterRadius(species, graph) <= stampedRadius)
+            {
+                Assert.True(calls++ < maxCalls,
+                    $"{species.Name}: {maxCalls} grow calls never thickened the trunk into a wider crown");
+                var before = SnapshotReach(tree, rootX);
+                Grow(writer, tree, rootX, WorldGenerationConfig.TreeGrowMaxPulsesPerCall);
+                graph = Rebuild(tree, rootX);
+
+                // No leaf this call wrote hangs off wood that never landed: each lies in the
+                // cluster of a live tip standing in the world
+                var radius = LeafCluster.ClusterRadius(species, graph);
+                var tips = Enumerable.Range(0, graph.Count).Where(i => LeafCluster.IsLiveTip(graph, species, i)).ToList();
+                foreach (var cell in Diff(before, SnapshotReach(tree, rootX)))
+                {
+                    if (tree.Read(cell).Id != species.LeavesId)
+                        continue;
+                    Assert.True(tips.Any(t =>
+                            tree.Read((graph[t].X, graph[t].Y, graph[t].Z)).Id == species.WoodId
+                            && LeafCluster.HydrationFromTip(species, radius,
+                                cell.X - graph[t].X, cell.Y - graph[t].Y, cell.Z - graph[t].Z) >= 1),
+                        $"{species.Name}: leaf {cell} was written outside every live tip's cluster");
+                }
+            }
+
+            // The wider crown reached every live tip's cluster, old tips included
+            foreach (var (cell, value) in SnapshotReach(tree, rootX))
+            {
+                if (value.Id == species.WoodId || !(value.Id == 0 || (value.Id == species.LeavesId && !LeafState.IsPersistent(value.State))))
+                    continue;
+                var expected = Math.Min(LeafCluster.HydrationAt(graph, species, cell.X, cell.Y, cell.Z), LeafState.MaxHydration);
+                if (expected < 1)
+                    continue;
+                Assert.True(value.Id == species.LeavesId,
+                    $"{species.Name}: {cell} lies in the widened crown but holds no leaf");
+                Assert.True(LeafState.Hydration(value.State) >= expected,
+                    $"{species.Name}: leaf {cell} holds hydration {LeafState.Hydration(value.State)} under the widened crown's {expected}");
+            }
+
+            // Decay prunes what the old tips fed and re-derives exactly the rebuilt rule
+            var decay = new LeafDecayManager();
+            var drops = new DropManager();
+            var (min, max) = ReachBox(species, rootX);
+            decay.ScheduleBox(new Vector3(min.X, min.Y, min.Z), new Vector3(max.X, max.Y, max.Z));
+            for (var tick = 0; tick < 200 && decay.PendingCells > 0; tick++)
+            {
+                decay.Update(WorldGenerationConfig.LeafDecayTickSeconds, tree.Chunks, drops);
+                while (decay.TickInProgress)
+                    decay.Update(0f, tree.Chunks, drops);
+            }
+            Assert.Equal(0, decay.PendingCells);
+
+            graph = Rebuild(tree, rootX);
+            var settled = SnapshotReach(tree, rootX);
+            foreach (var (cell, value) in settled)
+            {
+                var expected = Math.Min(LeafCluster.HydrationAt(graph, species, cell.X, cell.Y, cell.Z), LeafState.MaxHydration);
+                if (value.Id == species.LeavesId && !LeafState.IsPersistent(value.State))
+                {
+                    Assert.True(expected >= 1, $"{species.Name}: leaf {cell} survived decay with no tip holding it");
+                    Assert.Equal(expected, LeafState.Hydration(value.State));
+                    continue;
+                }
+
+                var besideWood = Enumerable.Range(0, TreeDirections.Count).Any(d =>
+                    settled.TryGetValue((cell.X + TreeDirections.Dx[d], cell.Y + TreeDirections.Dy[d], cell.Z + TreeDirections.Dz[d]),
+                        out var n) && n.Id == species.WoodId);
+                if (value.Id == 0 && expected >= 1 && besideWood)
+                    Assert.Fail($"{species.Name}: {cell} beside the wood lost the leaf the widened crown gives it");
             }
         }
     }

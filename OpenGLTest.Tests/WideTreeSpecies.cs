@@ -47,6 +47,8 @@ internal static class WideTreeSpecies
             LeafRadius = baseSpecies.LeafRadius,
             LeafHydration = baseSpecies.LeafHydration,
             TipMaxPx = baseSpecies.TipMaxPx,
+            LeafMinRadius = baseSpecies.LeafMinRadius,
+            LeafFullRadiusPx = baseSpecies.LeafFullRadiusPx,
             Features = feats,
             CrownHeightMin = baseSpecies.CrownHeightMin,
             CrownHeightMax = baseSpecies.CrownHeightMax,
@@ -55,6 +57,42 @@ internal static class WideTreeSpecies
             Worldgen = baseSpecies.Worldgen,
         };
     }
+
+    /// <summary>
+    /// <paramref name="baseSpecies"/> copied field for field with only the crown-scaling knobs
+    /// (<see cref="TreeSpecies.LeafMinRadius"/>, <see cref="TreeSpecies.LeafFullRadiusPx"/>) replaced.
+    /// Never registered; its block ids are the base species' own.
+    /// </summary>
+    internal static TreeSpecies WithLeafScaling(TreeSpecies baseSpecies, int minRadius, int fullRadiusPx) => new()
+    {
+        Name = baseSpecies.Name + "_scaled",
+        WoodId = baseSpecies.WoodId,
+        LeavesId = baseSpecies.LeavesId,
+        Logic = baseSpecies.Logic,
+        SignalEnergy = baseSpecies.SignalEnergy,
+        UpProbability = baseSpecies.UpProbability,
+        LowestBranchHeight = baseSpecies.LowestBranchHeight,
+        MaturityStepsMin = baseSpecies.MaturityStepsMin,
+        MaturityStepsMax = baseSpecies.MaturityStepsMax,
+        TipPx = baseSpecies.TipPx,
+        PipeExponent = baseSpecies.PipeExponent,
+        MaxPx = baseSpecies.MaxPx,
+        GirthProfile = baseSpecies.GirthProfile,
+        TrunkShape = baseSpecies.TrunkShape,
+        Rim = baseSpecies.Rim,
+        LeafShape = baseSpecies.LeafShape,
+        LeafRadius = baseSpecies.LeafRadius,
+        LeafHydration = baseSpecies.LeafHydration,
+        TipMaxPx = baseSpecies.TipMaxPx,
+        LeafMinRadius = minRadius,
+        LeafFullRadiusPx = fullRadiusPx,
+        Features = baseSpecies.Features,
+        CrownHeightMin = baseSpecies.CrownHeightMin,
+        CrownHeightMax = baseSpecies.CrownHeightMax,
+        CrownRadius = baseSpecies.CrownRadius,
+        LodProfile = baseSpecies.LodProfile,
+        Worldgen = baseSpecies.Worldgen,
+    };
 
     /// <summary>The first leafy worldgen species (ordinal name order).</summary>
     public static TreeSpecies LeafyBase => StampedTree.WorldgenSpecies.First(s => s.HasLeaves);

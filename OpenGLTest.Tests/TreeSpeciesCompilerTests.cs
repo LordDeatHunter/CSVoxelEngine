@@ -114,6 +114,9 @@ public sealed class TreeSpeciesCompilerTests
         Assert.Equal([Biome.Taiga, Biome.Frozen], species.Worldgen!.Biomes);
         Assert.True(species.Worldgen.GrowsIn(Biome.Taiga));
         Assert.False(species.Worldgen.GrowsIn(Biome.Forest));
+
+        dto.LeafCluster.Shape = "Pad";
+        Assert.Equal(LeafClusterShape.Pad, Compile(dto).LeafShape);
     }
 
     [Fact]
@@ -187,6 +190,46 @@ public sealed class TreeSpeciesCompilerTests
         dto.LeafCluster!.Hydration = LeafState.MaxHydration;
         dto.LeafCluster.TipMaxPx = dto.Thickness!.MaxPx;
         Assert.Equal(LeafState.MaxHydration, Compile(dto).LeafHydration);
+    }
+
+    [Fact]
+    public void RejectsOutOfRangeCrownScaling()
+    {
+        Rejects(d => d.LeafCluster!.MinRadius = 0);
+        Rejects(d => d.LeafCluster!.MinRadius = d.LeafCluster.Radius + 1);
+        Rejects(d => d.LeafCluster!.FullRadiusPx = 0);
+        Rejects(d => d.LeafCluster!.FullRadiusPx = WoodState.PixelsPerBlock + 1);
+        // Above a thin species' own trunk cap: its root could never reach the full radius.
+        Rejects(d =>
+        {
+            d.Thickness!.MaxPx = WoodState.PixelsPerBlock / 2;
+            d.LeafCluster!.FullRadiusPx = d.Thickness.MaxPx + 1;
+        });
+
+        // The bounds themselves are legal, for a trunk capped at one block and for a thinner one.
+        foreach (var maxPx in new[] { WoodState.PixelsPerBlock, WoodState.PixelsPerBlock / 2 })
+        {
+            var dto = Valid();
+            dto.Thickness!.MaxPx = maxPx;
+            dto.LeafCluster!.MinRadius = dto.LeafCluster.Radius;
+            dto.LeafCluster.FullRadiusPx = Math.Min(maxPx, WoodState.PixelsPerBlock);
+            var species = Compile(dto);
+            Assert.Equal(dto.LeafCluster.FullRadiusPx, species.LeafFullRadiusPx);
+            Assert.Equal(species.LeafRadius, species.LeafMinRadius);
+
+            dto.LeafCluster.MinRadius = 1;
+            Assert.Equal(1, Compile(dto).LeafMinRadius);
+        }
+    }
+
+    [Fact]
+    public void ACrownWithoutScalingKnobsNeverScales()
+    {
+        var dto = Valid();
+        dto.LeafCluster!.MinRadius = null;
+        dto.LeafCluster.FullRadiusPx = null;
+        var species = Compile(dto);
+        Assert.Equal(species.LeafRadius, species.LeafMinRadius);
     }
 
     [Fact]

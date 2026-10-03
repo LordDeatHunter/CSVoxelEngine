@@ -100,7 +100,9 @@ public sealed class TreeGraphFromWorldTests
             }
 
             // The recovered floor never encodes thicker than the trunk grew, yet keeps its shell
-            // radius; a wide core's floor (recovered from its shells) never exceeds the grown float.
+            // radius wherever the core stands in shells; a wide core's floor (recovered from its
+            // shells) never exceeds the grown float. A core whose whole ring is taken by limb
+            // nodes has no shell to measure, so only the upper bound holds for it.
             TreeRasterizer.TrunkChain(graph, trunk);
             var wideCores = 0;
             foreach (var i in trunk)
@@ -109,6 +111,17 @@ public sealed class TreeGraphFromWorldTests
                 var floor = graph[i].FloorPx;
                 Assert.True(TreeRasterizer.ThicknessCode(floor) <= TreeRasterizer.ThicknessCode(grown),
                     $"{species.Name}: trunk node {i} floors at {floor} px above its grown {grown} px");
+                var n = graph[i];
+                var standsInShells = false;
+                for (var dx = -1; dx <= 1; dx++)
+                for (var dz = -1; dz <= 1; dz++)
+                    standsInShells |= tree.Wood.TryGetValue((n.X + dx, n.Y, n.Z + dz), out var w) && WoodState.IsShell(w.State);
+                if (!standsInShells)
+                {
+                    Assert.True(TreeRasterizer.BlockRadius(floor) <= TreeRasterizer.BlockRadius(grown),
+                        $"{species.Name}: shell-less trunk node {i} floors wider than it grew");
+                    continue;
+                }
                 Assert.Equal(TreeRasterizer.BlockRadius(grown), TreeRasterizer.BlockRadius(floor));
                 if (TreeRasterizer.BlockRadius(grown) < 1)
                     continue;

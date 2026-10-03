@@ -132,11 +132,14 @@ internal sealed class StampedTree
         Wood.Where(kv => !WoodState.IsShell(kv.Value.State)).Select(kv => kv.Key);
 
     /// <summary>Grows the species on flat ground and stamps it like worldgen: wood (nodes, then a
-    /// wide trunk's shells) first, then leaves into air only.</summary>
-    internal static StampedTree Stamp(TreeSpecies species, int seed, int rootX, int rootY, int rootZ)
+    /// wide trunk's shells) first, then leaves into air only. With <paramref name="steps"/> the
+    /// tree is grown for exactly that many pulses, without features, instead of to maturity.</summary>
+    internal static StampedTree Stamp(TreeSpecies species, int seed, int rootX, int rootY, int rootZ, int? steps = null)
     {
         var space = new VirtualTreeSpace((_, _) => rootY - 1);
-        var graph = TreeGrower.GrowToMaturity(species, rootX, rootY, rootZ, space, seed);
+        var graph = steps is { } n
+            ? TreeGrower.GrowSteps(species, rootX, rootY, rootZ, space, seed, n, applyFeatures: false)
+            : TreeGrower.GrowToMaturity(species, rootX, rootY, rootZ, space, seed);
         var cells = TreeRasterizer.Rasterize(graph, species, space, out _);
 
         var chunks = new ChunkManager(null!);
@@ -161,6 +164,29 @@ internal sealed class StampedTree
 
         Assert.True(graph.Count > 1, $"{species.Name} grew a single cell; nothing to fell");
         return new StampedTree { Species = species, Graph = graph, Chunks = chunks, Wood = wood, Leaves = leaves };
+    }
+
+    /// <summary>
+    /// The young step of a species' crown scaling: the smallest pulse count whose flat-ground,
+    /// feature-free graph has a live tip other than the root while its
+    /// <see cref="LeafCluster.ClusterRadius(TreeSpecies, TreeGraph)"/> is still below the full
+    /// <see cref="TreeSpecies.LeafRadius"/>. Null when no step up to maturity has one.
+    /// </summary>
+    internal static int? YoungStep(TreeSpecies species, int seed, int rootX, int rootY, int rootZ)
+    {
+        var space = new VirtualTreeSpace((_, _) => rootY - 1);
+        var maturity = TreeGrower.MaturityStepsAt(species, rootX, rootY, rootZ, seed);
+        for (var steps = 1; steps <= maturity; steps++)
+        {
+            var graph = TreeGrower.GrowSteps(species, rootX, rootY, rootZ, space, seed, steps, applyFeatures: false);
+            if (LeafCluster.ClusterRadius(species, graph) >= species.LeafRadius)
+                continue;
+            for (var i = 1; i < graph.Count; i++)
+                if (LeafCluster.IsLiveTip(graph, species, i))
+                    return steps;
+        }
+
+        return null;
     }
 
     /// <summary>Node indices of the subtree under <paramref name="node"/>, itself included.</summary>

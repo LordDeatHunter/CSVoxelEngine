@@ -81,7 +81,7 @@ internal static class TreeSpeciesCompiler
 
         // Leaf cluster: present exactly when the species has leaves.
         var leafShape = LeafClusterShape.Blob;
-        int leafRadius = 0, leafHydration = 0, tipMaxPx = 0;
+        int leafRadius = 0, leafHydration = 0, tipMaxPx = 0, leafMinRadius = 0, leafFullRadiusPx = 0;
         if (leavesId == 0)
         {
             if (dto.LeafCluster != null)
@@ -100,6 +100,14 @@ internal static class TreeSpeciesCompiler
             tipMaxPx = Require(path, "leafCluster.tipMaxPx", cluster.TipMaxPx);
             if (tipMaxPx < 1 || tipMaxPx > maxPx)
                 throw Fail(path, $"leafCluster.tipMaxPx must be 1..thickness.maxPx ({maxPx}), got {tipMaxPx}.");
+            leafMinRadius = cluster.MinRadius ?? leafRadius;
+            if (leafMinRadius < 1 || leafMinRadius > leafRadius)
+                throw Fail(path, $"leafCluster.minRadius must be 1..leafCluster.radius ({leafRadius}), got {leafMinRadius}.");
+            // The world stores at most a full cube per wood cell, so the support signal caps at one block.
+            var fullRadiusCap = Math.Min(maxPx, WoodState.PixelsPerBlock);
+            leafFullRadiusPx = cluster.FullRadiusPx ?? WoodState.PixelsPerBlock;
+            if (leafFullRadiusPx < 1 || leafFullRadiusPx > fullRadiusCap)
+                throw Fail(path, $"leafCluster.fullRadiusPx must be 1..{fullRadiusCap} (min of thickness.maxPx and one block), got {leafFullRadiusPx}.");
         }
 
         // Features.
@@ -161,6 +169,8 @@ internal static class TreeSpeciesCompiler
             LeafRadius = leafRadius,
             LeafHydration = leafHydration,
             TipMaxPx = tipMaxPx,
+            LeafMinRadius = leafMinRadius,
+            LeafFullRadiusPx = leafFullRadiusPx,
             Features = features.ToArray(),
             CrownHeightMin = crownMin,
             CrownHeightMax = crownMax,

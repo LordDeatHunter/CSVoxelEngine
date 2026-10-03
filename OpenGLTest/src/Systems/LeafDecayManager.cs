@@ -19,7 +19,10 @@ namespace silkgltriangle;
 /// <para><b>Hydration.</b> A scheduled, non-persistent leaf re-derives its hydration with the
 /// exact rule worldgen stamped it with: the best <see cref="LeafCluster.HydrationFromTip"/> over
 /// every live tip of its species whose cluster shape holds the cell, capped at
-/// <see cref="LeafState.MaxHydration"/>. A live tip in the world is a non-detached cell of the
+/// <see cref="LeafState.MaxHydration"/>. The cluster's radius follows the tree's support
+/// (<see cref="LeafCluster.ClusterRadius(TreeSpecies, int)"/>): the world re-derives it as the
+/// <see cref="WoodState.DiameterPx"/> of the root cell the tip's parent chain ends at, the very
+/// number <see cref="LeafCluster.SupportPx"/> reads off the graph. A live tip in the world is a non-detached cell of the
 /// species' wood block no thicker than its <c>tipMaxPx</c> that no face neighbour of the same
 /// wood names as its parent (it has no child). Because this reproduces the stamped value bit for
 /// bit, an intact canopy re-derives to exactly what it holds and is never rewritten, and a leaf
@@ -139,6 +142,14 @@ public class LeafDecayManager
     // The parent-chain fast path's walked cells, reused
     private readonly List<long> _chain = [];
 
+    // Wood cells (TreeCellKey) whose parent chain's support is known this frame: the root
+    // diameter a live tip's cluster radius scales with. Cleared at the top of every Update, like
+    // the support memos; every cell of one walked chain shares its end and therefore its answer
+    private readonly Dictionary<long, int> _tipSupport = [];
+
+    // The support walk's visited cells, reused
+    private readonly List<long> _supportChain = [];
+
     /// <summary>
     /// How far around an edit cells are scheduled: the largest leaf radius of any leafy species
     /// plus one, the extra cell covering a parent that an edit turns into a tip (its own leaves
@@ -164,7 +175,11 @@ public class LeafDecayManager
     }
 
     // Every offset a tip of the species hydrates, best first (a leaf is never its own tip);
-    // OrderByDescending is stable, so ties keep the fixed x, y, z scan order
+    // OrderByDescending is stable, so ties keep the fixed x, y, z scan order. Built at the full
+    // LeafRadius, the largest cluster any tree of the species wears: a smaller tree's cluster is
+    // a subset of it (shapes are nested) with the same h on every shared offset, so
+    // TryHydrationAt only has to drop the offsets outside the tip's own radius
+    // and the best-first order stays exact
     private static TipOffset[] TipOffsets(TreeSpecies species)
     {
         var radius = species.LeafRadius;
@@ -244,6 +259,7 @@ public class LeafDecayManager
         // removing an unsupported cell never changes another component's anchoring
         _supported.Clear();
         _unsupported.Clear();
+        _tipSupport.Clear();
 
         var ticks = 0;
         var processed = 0;
@@ -406,6 +422,14 @@ public class LeafDecayManager
                 continue;
             }
 
+            // The table is the full-radius cluster; this tree's cluster may be smaller. The
+            // best-first exit stays exact: a smaller radius only drops offsets (shapes are
+            // nested) and never changes h, so the first tip whose own cluster holds the cell is
+            // still the best one
+            if (!TryTipSupport(species, tx, ty, tz, tstate, out var support)) return false;
+            if (!LeafCluster.InShape(species.LeafShape, LeafCluster.ClusterRadius(species, support), dx, dy, dz))
+                continue;
+
             hydration = Math.Min(h, LeafState.MaxHydration);
             return true;
         }
@@ -443,6 +467,50 @@ public class LeafDecayManager
                 return false;
         }
 
+        return true;
+    }
+
+    /// <summary>
+    /// The support a live tip's tree gives its cluster: the <see cref="WoodState.DiameterPx"/> of
+    /// the root cell its parent chain reaches, following the links <see cref="WalkParentChain"/>
+    /// follows (<see cref="TreeSupport.Links"/>) for at most
+    /// <see cref="WorldGenerationConfig.TreeFellWoodCap"/> steps. A chain that stops first (no
+    /// parent cell, a broken link, the cap) answers with the last cell it reached, which only an
+    /// orphaned branch does. Memoised for the frame on every walked cell, since they all end at
+    /// the same cell. False when a read hit an unloaded chunk, which freezes the leaf.
+    /// </summary>
+    private bool TryTipSupport(TreeSpecies species, int tx, int ty, int tz, byte tstate, out int supportPx)
+    {
+        _supportChain.Clear();
+        int x = tx, y = ty, z = tz;
+        var id = species.WoodId;
+        var state = tstate;
+        supportPx = WoodState.DiameterPx(state);
+
+        for (var step = 0; step < WorldGenerationConfig.TreeFellWoodCap; step++)
+        {
+            var cellKey = TreeCellKey.Pack(x, y, z);
+            if (_tipSupport.TryGetValue(cellKey, out var known))
+            {
+                supportPx = known;
+                break;
+            }
+
+            _supportChain.Add(cellKey);
+            supportPx = WoodState.DiameterPx(state);
+            if (WoodState.IsRoot(state) || !WoodState.HasParentCell(state)) break;
+
+            var dir = WoodState.Parent(state);
+            var px = x + TreeDirections.Dx[dir];
+            var py = y + TreeDirections.Dy[dir];
+            var pz = z + TreeDirections.Dz[dir];
+            if (!TryGetCell(px, py, pz, out var pid, out var pstate)) return false;
+            if (!TreeSupport.Links(id, state, pid, pstate, dir)) break;
+
+            (x, y, z, id, state) = (px, py, pz, pid, pstate);
+        }
+
+        foreach (var walked in _supportChain) _tipSupport[walked] = supportPx;
         return true;
     }
 

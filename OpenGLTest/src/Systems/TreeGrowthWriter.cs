@@ -35,8 +35,10 @@ namespace silkgltriangle;
 /// existing feature node.</para>
 ///
 /// <para><b>Leaves regrow only around changed tips</b>: a live tip that is new this call, or whose
-/// wood state the call rewrote. Leaf cells outside every changed tip's cluster are never written,
-/// so a hole mined in an untouched part of the crown stays mined. A written leaf carries the full
+/// wood state the call rewrote, plus every original tip still in the world when the call widened
+/// the tree's <see cref="LeafCluster.ClusterRadius(TreeSpecies, TreeGraph)"/> (it follows the root
+/// diameter, so a thickening trunk widens the whole crown). Leaf cells outside every changed tip's
+/// cluster are never written, so a hole mined in an untouched part of the crown stays mined. A written leaf carries the full
 /// rasterised hydration (the best over every live tip), which is exactly what
 /// <see cref="LeafDecayManager"/> re-derives.</para>
 ///
@@ -214,6 +216,10 @@ public sealed class TreeGrowthWriter
                 oldRadius[t] = TreeRasterizer.BlockRadius(graph[t].FloorPx);
         }
 
+        // The tree's cluster radius before growth: FromWorld loads the root at its world
+        // diameter, so this is the radius the leaves in the world were grown with
+        var radiusBefore = species.HasLeaves ? LeafCluster.ClusterRadius(species, graph) : 0;
+
         var added = TreeGrower.GrowFurther(graph, species, space, rng, energy,
             Math.Clamp(steps, 0, WorldGenerationConfig.TreeGrowMaxPulsesPerCall), WorldGenerationConfig.TreeGrowNodeCap,
             applyFeatures: status == TreeGrowthStatus.Planted);
@@ -306,18 +312,25 @@ public sealed class TreeGrowthWriter
             }
         }
 
-        // Leaves regrow only inside the clusters of tips this call changed
+        // Leaves regrow only inside the clusters of tips this call changed, plus, when the trunk
+        // thickened enough to widen the crown, every original tip still in the world: the radius
+        // is one per tree, so a thicker root widens every cluster at once. A skipped original
+        // node (its cell unloaded, or its parent never reached the world) is left out, because
+        // Rasterize still yields it as a live tip and leaves around it would hang off wood that
+        // is not there. New nodes are covered by changed[i], as before
         var regrow = new HashSet<long>();
-        var radius = species.HasLeaves ? species.LeafRadius : 0;
+        var radius = species.HasLeaves ? LeafCluster.ClusterRadius(species, graph) : 0;
+        var crownWidened = originalCount > 0 && radius != radiusBefore;
         for (var i = 0; i < graph.Count && species.HasLeaves; i++)
         {
-            if (!changed[i] || !LeafCluster.IsLiveTip(graph, species, i))
+            if (!(changed[i] || (crownWidened && i < originalCount && !skipped[i]))
+                || !LeafCluster.IsLiveTip(graph, species, i))
                 continue;
             int tx = graph[i].X, ty = graph[i].Y, tz = graph[i].Z;
             for (var dx = -radius; dx <= radius; dx++)
             for (var dy = -radius; dy <= radius; dy++)
             for (var dz = -radius; dz <= radius; dz++)
-                if (LeafCluster.HydrationFromTip(species, dx, dy, dz) >= 1)
+                if (LeafCluster.HydrationFromTip(species, radius, dx, dy, dz) >= 1)
                     regrow.Add(TreeCellKey.Pack(tx + dx, ty + dy, tz + dz));
         }
 

@@ -66,9 +66,11 @@ public sealed class LeafDecayTests
 
     private static int ExpectedHydration(TreeGraph g, TreeSpecies s, List<int> tips, (int X, int Y, int Z) cell)
     {
+        // The root is never cut away, so the tree's cluster radius still reads from g
+        var radius = LeafCluster.ClusterRadius(s, g);
         var best = 0;
         foreach (var t in tips)
-            best = Math.Max(best, LeafCluster.HydrationFromTip(s, cell.X - g[t].X, cell.Y - g[t].Y, cell.Z - g[t].Z));
+            best = Math.Max(best, LeafCluster.HydrationFromTip(s, radius, cell.X - g[t].X, cell.Y - g[t].Y, cell.Z - g[t].Z));
         return Math.Min(best, LeafState.MaxHydration);
     }
 
@@ -169,6 +171,43 @@ public sealed class LeafDecayTests
             RunTicks(manager, tree.Chunks, drops, 1);
             Assert.True(manager.PendingCells == 0, $"{species.Name}: a settled canopy scheduled more work");
             AssertIntact("on a settled tick");
+        }
+    }
+
+    [Fact]
+    public void AYoungOrMatureCanopyIsExactlyWhatDecayRederives()
+    {
+        // Every leafy species, worldgen or not: the cluster radius follows the trunk, and the
+        // world side has to re-derive that radius from the root the tip's chain ends at
+        foreach (var species in TreeSpeciesRegistry.All.Where(s => s.HasLeaves).OrderBy(s => s.Name, StringComparer.Ordinal))
+        {
+            var young = StampedTree.YoungStep(species, Seed, RootX, RootY, RootZ);
+            if (species.LeafMinRadius < species.LeafRadius)
+                Assert.True(young != null, $"{species.Name}: no growth step wears a crown below its full radius");
+
+            foreach (var steps in young is { } y ? new int?[] { y, null } : new int?[] { null })
+            {
+                var what = $"{species.Name} at {(steps is { } n ? $"step {n}" : "maturity")}";
+                var manager = new LeafDecayManager();
+                var drops = new DropManager();
+                var tree = StampedTree.Stamp(species, Seed, RootX, RootY, RootZ, steps);
+                tree.LoadAround(2 * manager.ScheduleReach);
+                Assert.True(tree.Leaves.Count > 0, $"{what}: the stamped tree has no leaves to re-derive");
+
+                var (min, max) = StampedTree.Bounds(tree.Wood.Keys.Concat(tree.Leaves.Keys));
+                manager.ScheduleBox(min, max);
+                var guard = manager.TickIndex + 32;
+                while (manager.PendingCells > 0)
+                {
+                    Assert.True(manager.TickIndex < guard, $"{what}: the canopy never settled");
+                    RunTicks(manager, tree.Chunks, drops, 1);
+                }
+
+                foreach (var (cell, expected) in tree.Wood.Concat(tree.Leaves))
+                    Assert.True(expected == tree.Read(cell),
+                        $"{what}: {cell} changed under decay: stamped {expected}, now {tree.Read(cell)}");
+                Assert.True(drops.Drops.Count == 0, $"{what}: decay removed part of an intact tree");
+            }
         }
     }
 
