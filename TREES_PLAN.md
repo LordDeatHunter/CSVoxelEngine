@@ -2,9 +2,10 @@
 
 ## Status
 
-All phases (1-8) done (content + codecs; headless growth engine; cutover to engine-grown trees;
+All phases (1-9) done (content + codecs; headless growth engine; cutover to engine-grown trees;
 tree-vs-tree cell batches + LOD canopy proxy + perf; leaf decay; reactive growth; wide trunks +
-baobab/stone pine; ItemDebugger TREES tab + docs). Each phase landed as its own commit on
+baobab/stone pine; ItemDebugger TREES tab + docs; shape tuning: crowns that scale with the
+trunk, the pitchfork cactus and the bare-limbed stone pine). Each phase landed as its own commit on
 `tree-rework`; finished phases are collapsed into short summaries here. The residue left open is
 tracked in `TODO.md` (`M-10`, `M-13`, `M-14`).
 
@@ -516,6 +517,107 @@ bands }`:
    `CellBatchMesherTests` (world-space output, no exposed cell dropped, every touched chunk
    meshed, determinism), `TreePreviewStateTests` (determinism, scrubbing, clamping, maturity,
    seed, bounds, ground, framing, name lookup, version).
+9. **Done — shape tuning.** User feedback after looking at the trees: crowns grew full-size on a
+   twig of a trunk (a 15-25 % oak carried a radius 3-4 crown on a 4-6 px root, and a mature oak
+   root was only 11-13 px), the cactus was a stub with side knobs, and the stone pine's blob crown
+   swallowed every limb. **The crown follows the trunk.** The support signal is the root cell's
+   stored diameter: `LeafCluster.SupportPx(graph)` = `ThicknessCode(graph[Root].ThicknessPx) + 1`,
+   exactly the `WoodState.DiameterPx` the rasteriser writes for the root, so it is capped at one
+   block (16 px). `LeafCluster.ClusterRadius(species, supportPx)` (and the `TreeGraph` overload) is
+   `minRadius + (radius - minRadius) * min(support, fullRadiusPx) / fullRadiusPx` in integer math,
+   from the two new optional `leafCluster` knobs `minRadius` (1..`radius`, default `radius`, i.e.
+   no scaling) and `fullRadiusPx` (1..`min(maxPx, 16)`, default 16), compiled into
+   `TreeSpecies.LeafMinRadius`/`LeafFullRadiusPx`. Every tip of a tree shares that one radius.
+   `HydrationFromTip(species, radius, dx, dy, dz)` is the radius overload; the old four-argument
+   form is the full-radius cluster. The scaling changes shape **membership only** — hydration is
+   still `hydration - Manhattan` — and every shape is nested (a smaller radius is a subset of a
+   larger one), so `LeafDecayManager`'s full-radius, best-first `TipOffsets` table stays exact: it
+   only gains a membership re-check, and the first accepted tip is still the best one. `HydrationAt`
+   and `Collect` take the radius once (Collect also loops only over it, so a young crown is
+   cheaper). Decay re-derives the support in the world through `LeafDecayManager.TryTipSupport`,
+   which walks the live tip's parent chain under the same link rules as `WalkParentChain`, at most
+   `TreeFellWoodCap` steps, to a `WoodState.IsRoot` cell (a broken chain answers the last cell
+   reached; an unloaded read freezes the leaf), memoising every walked cell in a per-`Update`
+   `_tipSupport` table. `TreeGrowthWriter.GrowAndWrite` compares the radius before and after
+   `GrowFurther`: when it changed, every **original** live tip still in the world regrows its
+   cluster at the new radius, but never a node the wood pass skipped (unloaded cell, skipped
+   parent, blocked new cell), because `Rasterize` still yields live tips for those and their leaves
+   would hang off wood that never landed; new nodes are covered by `changed[i]` as before. **Wood
+   retune** so the mature root reaches `fullRadiusPx` (all with `minRadius` 1): oak
+   `pipeExponent` 1.5, `girthProfile` `[[0, 2.4], [0.4, 1.6], [1, 1]]`, `fullRadiusPx` 16 (root
+   5-8 / 9-12 / 14-16 / 16 / 16 px at 15/25/50/75/100 %, lower third a full cube at maturity,
+   radius 1 up to 25 % and 2 at maturity, 28-37 live tips against 26-39 before); spruce
+   exponent 1.6, girth `[[0, 3.0], [1, 1]]`, `fullRadiusPx` 14 (root 6-11 / 10-12 / 15-16 /
+   15-16 / 15-16, radius 3 from half-grown, 13-17 tips); baobab untouched apart from the knobs
+   (`fullRadiusPx` 16). `TreeGrower.Recompute` now clamps a node's pipe to at least its largest
+   child's, since with a non-integer exponent the single-child round trip landed one ulp under it.
+   **Cactus pitchfork** (`CactusGrowthLogic`): an arm leaves the stem level, runs `ArmRun(rootX,
+   rootZ, y, dir)` cells (`ArmRunMin..ArmRunMax`, 2..3, a pure `SplitMix64.Hash` of the root
+   position, height and side — no RNG draw, so the stream order, the prefix property and
+   `GrowSteps(MaturityStepsAt, true) == GrowToMaturity` hold; `GrowthSignal` carries no world seed,
+   so a cactus at a given position gets the same run lengths in every world, which is accepted),
+   then climbs only up as a prong parallel to the stem, never reaching level with the stem's
+   current top. Arms take distinct sides at least `ArmSpacing` (2) stem cells apart, the side
+   opposite an existing arm gets `OppositeArmBonus` (4), and an arm leaves only where the energy
+   covers the run plus a `MinProng` (2) prong. Turns no longer halve the energy. `cactus.json`:
+   `signalEnergy` 9, `lowestBranchHeight` 2, `maturitySteps` `[30, 50]`, `tipPx` 7 (measured over
+   48 trees: stem 9-10 cells, two arms on 38 and one on 10, 22 of the pairs opposite, runs 2-3,
+   prongs 2-5, prong tops 2-4 under the stem top, one empty cell between every prong and the
+   stem). **Pad leaves.** `LeafClusterShape.Pad`: a disc of radius `max(1, r - 1)` at the tip's
+   level and one of radius `r` above it, nothing below, so the limb under it stays bare; nested in
+   its radius like the others. **Umbrella bare limbs** (`UmbrellaGrowthLogic`): inside `BareReach`
+   (5) Chebyshev cells of the trunk column a limb never forks or turns and climbs as a staircase
+   (`RiseWeight` 40 after every level step, never twice in a row); outer limbs keep the old rules
+   and never re-enter the bare zone; a trunk node carries at most `LimbsPerTrunkNode` (2) limbs, a
+   side is used by one limb over the whole trunk, and the nodes below the top level keep sides free
+   for it, so every tree throws four limbs. Tips, and so pads, exist only at the outer limb ends.
+   `stone_pine.json`: `signalEnergy` 22, `lowestBranchHeight` 8, `maturitySteps` `[70, 95]`,
+   exponent 1.5, girth `[[0, 3.0], [0.6, 1.6], [1, 1]]`, `pad` radius 3, hydration 6,
+   `fullRadiusPx` 14 (48 trees: trunk 11 cells, 65-69 % of a 16-17 tall tree, 4 limbs with 4-8 bare
+   wood cells each before the first leaf, 19-26 wide, w/h 1.12-1.62, every mature root 16 px).
+   **LOD retune**, measured with the scratch harness (oak and spruce over every batch tree of the
+   3x3 `TreeGenerator.BatchOf` cells around (-80, 8) and (-312, -120), n = 155 and 714; baobab and
+   stone pine over 48 flat-ground mature trees): `crownHeight` brackets the median leaf apex and
+   `crownRadius` is the median footprint-equivalent radius `sqrt(leaf columns / pi)` — oak dome
+   `[10, 12]` r5 (was `[9, 9]` r4), spruce cone `[8, 10]` r4, baobab dome `[15, 17]` r4, stone pine
+   dome `[15, 16]` r8; the cactus is unchanged. `ProxyReach` rose from 4 to 5 with the oak.
+   **trees.json** was re-probed against the new shapes (a scratch probe replaying the batches and
+   the writer's plants): the oak cut is a new thin limb node (-79, 19, -4) with a 4-cell subtree,
+   aimed from 3.2 blocks through exactly one leaf; the cactus subject moved to (601, 1282), a
+   two-armed pitchfork filmed broadside (the old one grows a single arm now); the stone pine shot
+   moved its eye; spruce, `base_aim` and the baobab slice rows were re-verified unchanged; and a
+   `stone_pine_limbs` shot ("bare limbs must show under the pads") is appended after every grow, so
+   the writer's call counter for the baobab and stone pine is unchanged. The before/after
+   ItemDebugger captures of every species at about 25 %, 50 % and mature and both scenario runs
+   were read side by side: young oak, spruce and stone pine crowns are visibly smaller on their
+   trunks (oak at step 23: 36 leaves against 129), mature oak trunks read as logs, the cactus is a
+   pitchfork, the stone pine shows bare limbs under flat pads, the limb cut still decays its
+   leaves and the saplings go from a tuft on a stick to a full crown on a log. Tests:
+   `TreeSpeciesCompilerTests` (the knob ranges, a cluster without them never scales, `pad`
+   compiles), `LeafClusterScalingTests` (the radius grows with the trunk inside its range, every
+   shape nests, the full-radius overload is the largest cluster, a pad never reaches below its tip
+   and always covers the cells above and beside it), `TreeCrownSupportTests` (a mature tree carries
+   its full crown and has leaves, the crown never shrinks as the tree grows, a young tree carries
+   no more leaves per root pixel than a mature one, a young tree wears a smaller crown — the last
+   skips wide-trunk species), `LeafDecayTests` (a young or mature canopy is exactly what decay
+   re-derives), `TreeGrowthTests` (growth that thickens the trunk widens every cluster, and decay
+   agrees afterwards; `GrownLeavesAreWhatDecayRederives` now stamps a quarter-grown tree, since a
+   low-energy spruce fills its reach early), `TreeGrowthLogicTests` (cactus arms run level then
+   climb parallel to the stem, leave at distinct sides and spaced heights, prongs stay below the
+   stem; umbrella limbs never fork near the trunk, show bare wood under their pads, trunk nodes
+   carry at most their limbs on distinct sides). Known residue: the support caps at one block, so
+   the baobab (raw root 33-80 px from its first pulses) only scales as a seedling; wide-trunk ring
+   support was deliberately rejected because decay would need a shell walk plus a tree-wide
+   reschedule whenever a shell is mined, and a future fix would store a per-cell value in the wood
+   state. `baobab.json` was **not** retuned: its young crown sits on a full-block stump, which reads
+   no worse than a mature oak. Saved trees from before this phase change: every saved mature oak,
+   spruce and stone pine has a root below its new `fullRadiusPx`, so on the next nearby edit decay
+   re-judges it at a smaller radius and strips its outer crown ring, and a tree crossing a border
+   between a saved and a regenerated chunk mixes old and new shapes; no migration was written.
+   Suppressed worldgen trees with thin roots carry smaller crowns, which thins dense forests a
+   little. `TreeGraphFromWorldTests.FromWorldRoundTripsAWideTrunk` now applies its equal-shell-
+   radius premise only to cores that stand in shells, since the retuned oak-based wide species
+   grows a shell-less core whose radius `FromWorld` cannot recover.
 
 ## Perf baseline
 
@@ -590,6 +692,28 @@ flying gives no sign of thrash. Measured batch size: forest ~21 trees and ~5250 
 average, max ~250 KB; taiga ~79 trees and ~18400 cells (~288 KB), max ~350 KB. Capacity 336 bounds
 an all-taiga cache at ~95 MB.
 
+Phase 9 result (same machine and command, run with `dotnet run --no-build` after a Release build;
+*before* is this branch at the end of phase 8, since phases 5-8 landed after the p4 table):
+
+| run | chunks | ms/chunk | tree ms/chunk | tree ms/s | grows | grow ms/tree | grow ms/s | misses/s | batch/dup/brot |
+|---|---|---|---|---|---|---|---|---|---|
+| before 1 | 188362 | 0.64 | 0.058 | 10.6 | 116965 | 0.288 | 366.6 | 692 | 1711/136/22 |
+| before 2 | 187923 | 0.66 | 0.052 | 14.1 | 113973 | 0.300 | 413.2 | 738 | 1682/113/21 |
+| before 3 | 188898 | 0.69 | 0.062 | 12.4 | 112059 | 0.324 | 496.8 | 767 | 1661/117/20 |
+| p9 1 | 189538 | 0.60 | 0.049 | 12.6 | 123075 | 0.269 | 363.3 | 687 | 1711/106/23 |
+| p9 2 | 188076 | 0.64 | 0.056 | 13.6 | 118639 | 0.295 | 384.8 | 701 | 1698/127/21 |
+| p9 3 | 187435 | 0.66 | 0.062 | 11.8 | 118203 | 0.314 | 425.4 | 767 | 1692/129/21 |
+
+No measurable worldgen cost change: median ms/chunk 0.64 against 0.66 and median grow ms/tree
+0.295 against 0.300, both far inside the 25 % gates (0.83 and 0.375). Mature crown radii and cell
+counts are what they were (oak, spruce and stone pine reach their full `radius` on a full-cube
+root), young and suppressed crowns got cheaper because `Collect` loops only over the scaled
+radius, and the cactus's doubled cell count (about 19 cells a tree) and the umbrella's O(height)
+trunk walks are lost in the noise; the stone pine and baobab are not worldgen species. Warm
+in-process harness runs agree (oak 0.34 -> 0.33 ms/tree, spruce 0.12 -> 0.14, cactus about
+0.09). Batch misses, `dup` and `brot` are unchanged; the one-step larger `ProxyReach` (4 -> 5)
+widens the far rings' proxy sweep slightly and shows no cost in the totals above.
+
 ## Critical files
 - `OpenGLTest/src/WorldGen/TreeGenerator.cs`: becomes the placement and stamping front-end
   over the new engine.
@@ -626,3 +750,8 @@ From phase 3 on:
 
 Phase 8: `ITEM_DEBUGGER_SELECT=<species>` + `ITEM_DEBUGGER_SHOT` captures of the TREES tab were
 run (oak, baobab, and `tree/cactus` with `ITEM_DEBUGGER_TREE_STEP=10`) and inspected.
+
+Phase 9: before/after TREES-tab captures of every species at about 25 %, 50 % and mature
+(`ITEM_DEBUGGER_SELECT=tree/<species>`, `ITEM_DEBUGGER_TREE_STEP=<n|mature>`), both
+`trees.json` runs, three `tree-perf.json` runs each side, and a scratch harness (never committed)
+that grows the `TreeGrowthLogicTests` samples at 15/25/50/75/100 % of maturity.

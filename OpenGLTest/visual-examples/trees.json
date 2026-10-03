@@ -9,16 +9,25 @@
   // earlier trees of the batch and the neighbour cells' solo shapes), so the coordinates below
   // were probed through TreeGenerator.BatchShapeOf / BatchOf, which is what the chunks stamp.
   // Coordinates (default seed, headless probe over TreeGenerator.TryGetTree / BatchShapeOf):
-  //   oak    base (-79, 14, -2), 12 tall, crown x -83..-73, z -8..3; nearest other trunk 9 away.
-  //          Limb: node (-79, 19, -6), 2 px thick with two children (3 wood cells in its
-  //          subtree), seen from (-80.48, 19.64, -5.29) through exactly one leaf cell (the ray
-  //          was checked against every cell box grown and shrunk by 0.03, so no corner grazes).
+  //   oak    base (-79, 14, -2), 12 tall, 69 wood cells and 278 leaves, crown x -84..-74,
+  //          z -8..4; nearest other trunk 9 away; the root and the three cells over it are a full
+  //          16 px log (phase 9). Limb: node (-79, 19, -4), 3 px thick, hanging off the 5 px stub
+  //          (-79, 19, -3) with two children, (-79, 19, -5) and (-79, 20, -4), so 4 wood cells in
+  //          its subtree, all on the -Z side away from its parent. Seen from under the crown at
+  //          (-81.13, 17.84, -4.09), 3.2 blocks away, through exactly one leaf cell (-80, 19, -4)
+  //          (the ray was checked against every cell box grown and shrunk by 0.03, so no corner
+  //          grazes; no wood within one cell of the eye). base_aim's first hit is the root cell.
   //   spruce base (-291, 13, -252), top leaf 11 above it, 35 wood cells, about 130 blocks south of
   //          tree-perf.json's taiga vantage: one of the few spruces of that dense wood standing
   //          clear of its neighbours. Filmed from 14 blocks west at base + 6.5, where every
   //          sampled cell of the tree is seen with no other tree's cell and no terrain on the
   //          sight line; its own conical crown reaches the ground and hides the trunk.
-  //   cactus base (582, 16, 1279), arms along z, by the desert vantage of tree-perf.json.
+  //   cactus base (601, 17, 1282), 9 above its base, by the desert vantage of tree-perf.json: a
+  //          two-armed pitchfork (phase 9) with both arms along x, the west one leaving at
+  //          base + 2 for a 3-cell level run and a 4-cell prong (top base + 6), the east one at
+  //          base + 4 for 2 cells and a 3-cell prong (top base + 7). Filmed broadside from
+  //          11.5 blocks south so both arms read in profile, with nothing within two cells of
+  //          the eye and no other cactus on any sight line to its cells.
   // Every vantage was chosen so that no block stands within two cells of the eye and nothing
   // but the subject crosses the sight line; the limb cut is filmed from the -Z side it hangs on.
   // The camera flies the whole time, which implies creative: every `mine` of one frame
@@ -52,8 +61,9 @@
   // Wide trunks (phase 7): the last block plants a baobab and a stone pine, neither of which
   // has a worldgen block, on open flat forest about 40 blocks south-west of the oak. Both columns
   // were probed headless: the generated ground is level over the 9x9 around each root (grass,
-  // dry), no worldgen tree stands within 34 blocks of either (baobab reach plus a worldgen tree's
-  // reach), every sight line below crosses only air before the subject, and the grows were
+  // dry), no worldgen tree cell stands inside either grown tree's crown box grown by one (re-probed
+  // in phase 9 for the wider stone pine), every sight line below crosses only air before the
+  // subject, and the grows were
   // replayed with the writer's call counter at 4 and 5 (the four earlier grows of this scenario
   // advance it; a new grow inserted before them reshapes both trees).
   //   baobab     root (-121, 11, 40), planted with 120 steps: 186 wood cells (nodes, shells and
@@ -62,13 +72,22 @@
   //              buttress fins on the root level run west to x -124, north to z 37 and south to
   //              z 44. The cut slice is y 12 (root + 1, above the fins): 21 cells, rows z 39..41
   //              five wide (x -123..-119), the outer rows z 38 and z 42 three wide (x -122..-120).
-  //   stone pine root (-90, 14, 43), planted with 90 steps: an 11-cell trunk under a flat crown
-  //              13 blocks wide (x -96..-84, z 37..49) and about 5 tall.
+  //   stone pine root (-90, 14, 43), planted with 90 steps (phase 9 shape): 88 wood cells and
+  //              451 leaves, an 11-cell bare trunk (top y 24) splitting into four bare limbs,
+  //              one per side, that stair-step out and up (limb wood y 22..29), with flat leaf
+  //              pads only at their ends (y 25..30); crown x -100..-79, z 33..53, 16 tall. Filmed
+  //              from 24 blocks south at y 22, where the whole tree fits the frame; open ground,
+  //              no worldgen tree cell inside its crown box grown by one.
   // baobab_grown should show a wide round trunk with stair-stepped bevelled corners on its outer
   // shells and the fins resting on the ground; baobab_rim is the close look at the trunk base:
   // each rim must match its outline (aim at it in a manual run), with no hole above or below a
   // bevelled shell and full faces where a shell meets the core or another shell. stone_pine_grown
-  // shows the flat, wide umbrella crown on its bare trunk.
+  // shows the wide umbrella crown on its bare trunk. stone_pine_limbs, appended after every
+  // grow and cut so the writer's call counter for the two grows above is unchanged, looks up
+  // 20 degrees at the trunk from 9 blocks out on the south-east diagonal at y 22.5 (root + 8.5,
+  // between lowestBranchHeight and the pads, nothing within two cells of the eye): bare limbs
+  // must show under the pads, with the leaves only as caps at the limb ends (18 of the 30 bare
+  // limb cells are on a clear sight line).
   // The cut follows the limb idiom: every cell is aimed from 4 blocks west along its own row (eye
   // at the cell's z + 0.5 and y 12.5, yaw 0, pitch 0, inside InteractionReach), so the ray crosses
   // only the row's cells already cut, and one single-frame creative `mine` removes exactly that
@@ -94,7 +113,7 @@
     { "op": "wait", "seconds": 8 },
     { "op": "screenshot", "name": "oak", "hideHud": true },
 
-    { "op": "teleport", "pos": [-80.48, 19.64, -5.29], "yaw": -6.1, "pitch": -4 },
+    { "op": "teleport", "pos": [-81.13, 17.84, -4.09], "yaw": 12.6, "pitch": 31.6 },
     { "op": "wait", "seconds": 1 },
     { "op": "screenshot", "name": "limb_aim" },
     { "op": "mine", "seconds": 0.001 },
@@ -140,7 +159,7 @@
     { "op": "wait", "seconds": 8 },
     { "op": "screenshot", "name": "spruce", "hideHud": true },
 
-    { "op": "teleport", "pos": [594.3, 19.5, 1281.8], "yaw": -168.8, "pitch": -4.8 },
+    { "op": "teleport", "pos": [601.5, 20.5, 1293.5], "yaw": -90, "pitch": 6.7 },
     { "op": "wait", "seconds": 8 },
     { "op": "screenshot", "name": "cactus", "hideHud": true },
 
@@ -153,7 +172,7 @@
     { "op": "wait", "seconds": 0.5 },
     { "op": "screenshot", "name": "baobab_rim", "hideHud": true },
 
-    { "op": "teleport", "pos": [-89.5, 21.0, 59.5], "yaw": -90, "pitch": 0 },
+    { "op": "teleport", "pos": [-89.5, 22.0, 67.5], "yaw": -90, "pitch": 2 },
     { "op": "wait", "seconds": 1 },
     { "op": "grow", "species": "stone_pine", "pos": [-90, 43], "steps": 90 },
     { "op": "wait", "seconds": 3 },
@@ -211,6 +230,10 @@
     { "op": "wait", "seconds": 0.7 },
     { "op": "screenshot", "name": "baobab_felled_falling", "hideHud": true },
     { "op": "wait", "seconds": 1.3 },
-    { "op": "screenshot", "name": "baobab_felled_down", "hideHud": true }
+    { "op": "screenshot", "name": "baobab_felled_down", "hideHud": true },
+
+    { "op": "teleport", "pos": [-83.1, 22.5, 49.9], "yaw": -135, "pitch": 20 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "stone_pine_limbs", "hideHud": true }
   ]
 }
