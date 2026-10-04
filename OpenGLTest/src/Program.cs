@@ -48,6 +48,7 @@ public static class Program
     private static bool visualScriptFailed;
     // The live multiplayer connection, null in singleplayer and on the menu
     private static NetworkClient? netClient;
+    private static ClientChunkStreamer? clientStreamer;
     private static ConnectTarget pendingConnect;
     private static int netPlayerId = -1;
     private static readonly List<RemotePlayerSnapshot> remoteScratch = new();
@@ -416,18 +417,23 @@ public static class Program
         var server = client.Server!.Value;
         try
         {
-            WorldSeed.Apply(server.Seed);
-            // A client renders, so it is a real world with the renderer's pools and the window,
-            // just with no save store (the server owns persistence).
+            // A multiplayer client renders, so it is a real world with the renderer's pools and the
+            // window - but client mode: no worldgen (chunks stream from the server), no far LOD and
+            // no local simulation, so a custom or premade server world is exactly what is shown.
             world = new World(renderManager.gl, renderManager.OpaqueChunkGeometry,
                 renderManager.TranslucentChunkGeometry, renderManager.LodGeometry,
-                windowManager.Window, inputManager.InputContext, sfx);
+                windowManager.Window, inputManager.InputContext, sfx, null,
+                serverMode: false, clientMode: true);
             world.Player.Rig = renderManager.PlayerRig;
             world.BlockEdited = SendBlockEdit;
             renderManager.LightSource = world.GetChunkManager();
             var fb = windowManager.Window.FramebufferSize;
             if (fb.Y > 0)
                 world.Camera.SetAspectRatio(fb.X / (float)fb.Y);
+
+            clientStreamer = new ClientChunkStreamer(world.GetChunkManager(), SendChunkRequest, SendColumnRequest);
+            // Start where the server says; the client sinks onto the streamed terrain there.
+            world.Camera.TestTeleport(server.Spawn, world.Camera.Yaw, world.Camera.Pitch);
         }
         catch (Exception e)
         {
@@ -457,6 +463,7 @@ public static class Program
     private static void UpdateNetwork(NetworkClient client, float deltaTime)
     {
         var w = world!;
+        clientStreamer?.Update(w.Camera.Position, deltaTime);
         netStateTimer += deltaTime;
         if (netStateTimer >= WorldGenerationConfig.NetPlayerStateSeconds)
         {
@@ -525,9 +532,47 @@ public static class Program
                 w.ApplyNetworkBlockEdit(x, y, z, blockId, state);
                 break;
             }
+            case NetMessage.ChunkData:
+            {
+                var cx = reader.ReadInt();
+                var cy = reader.ReadInt();
+                var cz = reader.ReadInt();
+                clientStreamer?.ApplyChunk(cx, cy, cz, reader.ReadBytes());
+                break;
+            }
+            case NetMessage.ColumnHeights:
+            {
+                var cx = reader.ReadInt();
+                var cz = reader.ReadInt();
+                clientStreamer?.ApplyColumn(cx, cz, reader.ReadBytes());
+                break;
+            }
             default:
                 break;
         }
+    }
+
+    /// <summary>Asks the server for one chunk (a streamed client loads no chunks itself).</summary>
+    private static void SendChunkRequest(int cx, int cy, int cz)
+    {
+        if (netClient is not { Status: NetworkStatus.Handshaken } client)
+            return;
+        using var writer = new PacketWriter(NetMessage.ChunkRequest);
+        writer.Write(cx);
+        writer.Write(cy);
+        writer.Write(cz);
+        client.Send(writer.ToArray());
+    }
+
+    /// <summary>Asks the server for one chunk column's terrain heights (the client's light seeding).</summary>
+    private static void SendColumnRequest(int cx, int cz)
+    {
+        if (netClient is not { Status: NetworkStatus.Handshaken } client)
+            return;
+        using var writer = new PacketWriter(NetMessage.ColumnRequest);
+        writer.Write(cx);
+        writer.Write(cz);
+        client.Send(writer.ToArray());
     }
 
     /// <summary>Forwards one local block change to the server while connected.</summary>
@@ -562,6 +607,7 @@ public static class Program
     {
         netClient?.Dispose();
         netClient = null;
+        clientStreamer = null;
         netPlayerId = -1;
         netStateTimer = 0;
         netKeepAliveTimer = 0;

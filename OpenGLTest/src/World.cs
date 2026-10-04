@@ -115,6 +115,9 @@ public class World : IItemUseWorld
     // True for a dedicated server: no local player, a headless chunk manager and no far LOD.
     private readonly bool _serverMode;
 
+    // True for a multiplayer client: no worldgen and no local simulation; chunks stream from the server.
+    private readonly bool _clientMode;
+
     // The window clock, or the headless one: every gameplay time read goes through this
     private double Now => _window?.Time ?? _headlessTime;
     private bool _hasSelectedBlock;
@@ -306,7 +309,7 @@ public class World : IItemUseWorld
     /// </remarks>
     public World(GL gl, ChunkGeometryPool opaqueGeometry, ChunkGeometryPool translucentGeometry,
         ChunkGeometryPool lodGeometry, IWindow window, IInputContext input, SfxManager? sfx = null,
-        ChunkSaveStore? saveStore = null, bool serverMode = false)
+        ChunkSaveStore? saveStore = null, bool serverMode = false, bool clientMode = false)
     {
         WorldSeed.BeginWorld();
         ChunkGenerationWorker? generationWorker = null;
@@ -317,6 +320,7 @@ public class World : IItemUseWorld
             _sfx = sfx;
             _saveStore = saveStore;
             _serverMode = serverMode;
+            _clientMode = clientMode;
             Camera = new Camera(window, input);
             _savedPlayer = PlayerSaveCodec.TryParse(saveStore?.ReadFile(PlayerSaveCodec.FileName));
             if (_savedPlayer != null)
@@ -345,6 +349,12 @@ public class World : IItemUseWorld
                 // follows it and has a stable target until real players connect.
                 Camera.RestoreState(Camera.Position, Camera.Yaw, Camera.Pitch, creative: true, flying: true);
             }
+            if (clientMode)
+            {
+                // A client settles onto the server's spawn (Program teleports it), so its own
+                // worldgen spawn search never runs - which would compute columns the server owns.
+                _spawnSettled = true;
+            }
             generationWorker = _generationWorker = new ChunkGenerationWorker(_chunkManager, Camera);
             lodManager = _lodManager = new LodManager(lodGeometry);
             _canAcceptDrop = Inventory.CanAccept;
@@ -367,13 +377,16 @@ public class World : IItemUseWorld
                 Camera.SuppressLook = true;
             }
 
-            _generationWorker.Start();
+            // A client never generates: its chunks stream from the server (ClientChunkStreamer).
+            if (!clientMode)
+                _generationWorker.Start();
             // Before the LOD workers start, so the first region builds already see the saved
             // caps, surface overrides and felled canopies; a missing or corrupt file imports nothing.
             LodEditState.TryParse(_saveStore?.ReadFile(LodEditState.FileName))?.Import();
             // A server never renders the far LOD, so it does not start the LodGen threads; the
-            // imported edit state still round-trips through a save untouched.
-            if (!serverMode)
+            // imported edit state still round-trips through a save untouched. A client gets its
+            // far LOD from the server (S2), so it starts none either.
+            if (!serverMode && !clientMode)
                 _lodManager.Start(Camera);
             RefreshMobs();
         }
@@ -714,16 +727,47 @@ public class World : IItemUseWorld
     }
 
     /// <summary>
+    /// One multiplayer-client frame: no local simulation, only the camera (and only once the chunk
+    /// under it has streamed in, so it cannot fall through a world that has not arrived), the mesh
+    /// pass, remote player interpolation and the selection raycast. Mobs, drops, fluids,
+    /// explosions and edits are the server's.
+    /// </summary>
+    private void UpdateClient(double deltaTime, IKeyboard? keyboard)
+    {
+        _chunkManager.Update(Camera);
+
+        var feet = Camera.Position - new Vector3(0f, Camera.EyeHeight, 0f);
+        if (_chunkManager.ChunkAt(MathUtils.FloorToInt(feet.X), MathUtils.FloorToInt(feet.Y),
+                MathUtils.FloorToInt(feet.Z)) != null)
+            Camera.Update((float)deltaTime, keyboard, _chunkManager);
+
+        for (var i = 0; i < _remotePlayers.Count; i++)
+            _remotePlayers[i].Update(deltaTime);
+
+        FrameProfiler.Begin(ProfileSection.Raycast);
+        _hasSelectedBlock = Camera.Raycast(InteractionReach, _chunkManager,
+            out _selectedBlockPosition, out _selectedFaceNormal, out _selectedBoxIndex,
+            includeFluids: ItemRegistry.TryGet(Inventory.SelectedBlockId)?.TargetsFluids ?? false);
+        FrameProfiler.End(ProfileSection.Raycast);
+    }
+
+    /// <summary>
     /// One gameplay frame. Each block of work runs under its own profiler section; the autosave
     /// runs under <see cref="ProfileSection.Save"/>, which never nests inside another section.
     /// While <see cref="WorldPhase.Loading"/> only the streaming runs (<see cref="UpdateLoading"/>),
     /// and once <see cref="WorldPhase.Disposed"/> it does nothing.
     /// </summary>
     public void Update(double deltaTime, IKeyboard? keyboard)
-    {        if (_window == null)
+    {
+        if (_window == null)
             _headlessTime += deltaTime;
         if (Phase == WorldPhase.Disposed)
             return;
+        if (_clientMode)
+        {
+            UpdateClient(deltaTime, keyboard);
+            return;
+        }
         if (Phase == WorldPhase.Loading)
         {
             UpdateLoading(deltaTime);
