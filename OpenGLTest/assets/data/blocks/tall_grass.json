@@ -1,0 +1,19 @@
+{
+  "name": "Tall Grass",
+  "model": {
+    "parent": "block/cross",
+    "textures": { "cross": "tall_grass_textureless" }
+  },
+  "modelTint": "grass",
+  "hardness": 0,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "cutout": true,
+  "sway": true,
+  "light": { "passes": true },
+  "hasItem": false,
+  "needsSupport": true,
+  "loot": "tall_grass",
+  "hitbox": { "min": [0.2, 0, 0.2], "max": [0.8, 1, 0.8] }
+}

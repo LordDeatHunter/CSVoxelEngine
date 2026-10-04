@@ -13,7 +13,10 @@ namespace silkgltriangle;
 ///
 /// Three shapes exist. A thin cell is a centred node box <see cref="HalfWidth"/> wide plus one
 /// tube per connected neighbour, running from the node face out to the cell face at the thinner
-/// of the two cells' widths, so the neighbour's tube meets it flush. A full-thickness (or
+/// of the two cells' widths, so the neighbour's tube meets it flush; toward a solid occluding
+/// neighbour that is not wood - the ground, a wall - it instead runs a same-width plug out to the
+/// cell face (<see cref="PlugMask"/>), so a thin trunk or root rooted on the ground meets it
+/// rather than floating the node clear of it. A full-thickness (or
 /// detached) cell is a plain cube. A trunk shell of a <c>rim: "pixel"</c> species
 /// (<see cref="BlockType.HasPixelRim"/>) is a cube with each exposed corner bevelled into a
 /// pixel-stepped quarter round: the stair-stepped full-height <see cref="RimBoxes"/> of its
@@ -78,6 +81,27 @@ public static class TreeWoodShape
         for (var dir = 0; dir < 6; dir++)
             if (Connects(id, state, nbIds[dir], nbStates[dir], dir))
                 mask |= 1 << dir;
+        return mask;
+    }
+
+    /// <summary>
+    /// Bit <c>i</c> set when a thin cell plugs into its neighbour in direction <c>i</c>: the
+    /// neighbour is a solid occluding block that is not tree wood (the ground, a wall), so the
+    /// node geometry runs out to the cell face there instead of ending in mid-air. The plug is
+    /// the node's own width, so it continues the node face; a full-cube or detached cell never
+    /// plugs, and a tree-wood neighbour is handled by <see cref="Connects"/> instead.
+    /// </summary>
+    public static int PlugMask(byte state, ReadOnlySpan<byte> nbIds)
+    {
+        if (!IsThin(state)) return 0;
+        var mask = 0;
+        for (var dir = 0; dir < 6; dir++)
+        {
+            var nb = nbIds[dir];
+            if (nb != 0 && !BlockType.IsTreeWood(nb) && BlockType.Occludes(nb))
+                mask |= 1 << dir;
+        }
+
         return mask;
     }
 
@@ -251,15 +275,18 @@ public static class TreeWoodShape
         }
 
         var mask = ConnectionMask(id, state, nbIds, nbStates);
+        var plugs = PlugMask(state, nbIds);
         var half = HalfWidth(WoodState.Thickness(state));
-        var boxes = new BlockHitbox[1 + System.Numerics.BitOperations.PopCount((uint)mask)];
+        var boxes = new BlockHitbox[1 + System.Numerics.BitOperations.PopCount((uint)(mask | plugs))];
         NodeBox(half, out var nodeMin, out var nodeMax);
         boxes[0] = new BlockHitbox(nodeMin, nodeMax);
         var next = 1;
         for (var dir = 0; dir < 6; dir++)
         {
-            if ((mask & 1 << dir) == 0) continue;
-            TubeBox(dir, half, TubeHalf(state, nbStates[dir]), out var min, out var max);
+            var connected = (mask & 1 << dir) != 0;
+            if (!connected && (plugs & 1 << dir) == 0) continue;
+            var tubeHalf = connected ? TubeHalf(state, nbStates[dir]) : half;
+            TubeBox(dir, half, tubeHalf, out var min, out var max);
             boxes[next++] = new BlockHitbox(min, max);
         }
 
@@ -325,10 +352,13 @@ public static class TreeWoodShape
         if (Touches(cell + nodeMin, cell + nodeMax, min, max)) return true;
 
         var mask = ConnectionMask(id, state, ids, states);
+        var plugs = PlugMask(state, ids);
         for (var dir = 0; dir < 6; dir++)
         {
-            if ((mask & 1 << dir) == 0) continue;
-            TubeBox(dir, half, TubeHalf(state, states[dir]), out var tubeMin, out var tubeMax);
+            var connected = (mask & 1 << dir) != 0;
+            if (!connected && (plugs & 1 << dir) == 0) continue;
+            var tubeHalf = connected ? TubeHalf(state, states[dir]) : half;
+            TubeBox(dir, half, tubeHalf, out var tubeMin, out var tubeMax);
             if (Touches(cell + tubeMin, cell + tubeMax, min, max)) return true;
         }
 

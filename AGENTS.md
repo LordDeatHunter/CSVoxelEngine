@@ -770,6 +770,7 @@ trailing commas.
 | `translucent` | false | drawn blended in the sorted translucent pass with the fluids (glass); forces occludes off; never casts a shadow |
 | `sway` | false | leaf-wind sway in the vertex shader |
 | `biomeTint` | none | colour the block by climate (see "Biome-tinted grass and leaves"): `{"palette": p, "faces": {face: entry}}`, where `palette` is `grass` (default) or `foliage`, a face key is `north`..`down`, `side` or `all`, and an entry is `{"tile": t}` or `{"overlay": t, "base": b}`. `tile` replaces the face with a tinted tile, `overlay` draws a tinted cutout tile over it (`base` optionally swapping the tile beneath). Only on a block that bakes to a plain full cube and is not translucent; `overlay` not on a cutout block. `FaceTiles` stay the default tiles for icons, drops and the held block |
+| `modelTint` | none | the sub-cell sibling of `biomeTint`: a palette name (`grass` default, or `foliage`) that tints **every** quad of the block's own baked model (`shade * the field`, bit 4 set) instead of per cube face. Only on a non-full-cube `model`-renderer block that is not translucent (a cross-shaped plant), and the model must wear a grey `_textureless` tile, since the tint multiplies the texel. The `tall_grass` / `dead_shrub` plants use it |
 | `material` | none | reflective surface tuning for the ores: `metallic` (0..1, default 0 - an ordinary diffuse block), `roughness` (0..1, default 1, lower being a tighter highlight) and `normalStrength` (0..4, default 1, scaling the tile's normal map). Omitting the object costs nothing at render time. Keyed by *texture*, not by block - see the material atlas below |
 | `light.emission` | 0 | 0..15 (`LightEmission`) |
 | `light.color` | warm torch colour | sRGB `[r, g, b]`, 0..255 each, of the block's light; only legal with `emission` > 0. Colours within 0.5/255 share a `BlockLightPalette` slot, and at most 8 distinct colours exist (the default included) - a ninth throws naming the file. `blue_lamp` is the example |
@@ -1075,7 +1076,10 @@ index order; a wide limb elsewhere renders as a 16 px full cube, and a species t
 
 **Mesh, collision and the pixel rim.** `tree_wood` meshes on the per-voxel path, never greedy:
 `Chunk.EmitTreeWood` draws a thin cell as a node box sized `TreeWoodShape.HalfWidth(t)` plus one
-capless tube toward every connection at the thinner of the two widths (`TubeHalf`), with cropped
+capless tube toward every connection at the thinner of the two widths (`TubeHalf`) and a same-width
+capless plug toward every adjacent solid occluding non-wood block (`TreeWoodShape.PlugMask`: the
+ground, a wall), so a thin trunk or root meets the ground it rests on instead of floating the node
+clear of it, with cropped
 UVs and smooth light; a full-thickness or detached cell takes the model path and culls against a
 same-id full cube. A wood block whose species sets `rim: "pixel"` (`BlockType.PixelRimById`, filled
 by `ContentRegistry.LoadTreeSpecies`) gets its outer shells bevelled from their eight horizontal

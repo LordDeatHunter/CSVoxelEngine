@@ -175,6 +175,17 @@ public struct Vertex
     /// multiplies its texel by <see cref="BiomeTint.Gain"/>.</summary>
     public readonly bool IsBiomeTinted => (Normal & BiomeTintBit) != 0;
 
+    /// <summary>This vertex recoloured to <paramref name="r"/>/<paramref name="g"/>/
+    /// <paramref name="b"/> with the biome-tint flag set, alpha unchanged: the mesher's
+    /// <c>modelTint</c> path turns a sub-cell model quad's shade into shade * the palette field.</summary>
+    internal Vertex WithBiomeTint(byte r, byte g, byte b)
+    {
+        var v = this;
+        v.PackedColor = (uint)(r | (g << 8) | (b << 16)) | (PackedColor & 0xFF000000u);
+        v.Normal |= BiomeTintBit;
+        return v;
+    }
+
     /// <summary><see cref="Normal"/> bit 5: the leaf-wave shader sways this vertex.</summary>
     public readonly bool IsSwaying => (Normal & SwayBit) != 0;
 

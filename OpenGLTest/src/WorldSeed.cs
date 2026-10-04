@@ -63,6 +63,7 @@ public static class WorldSeed
         LavaGenerator.Reseed();
         PebbleGenerator.Reseed();
         SnowGenerator.Reseed();
+        FoliageGenerator.Reseed();
 
         // Every cached value is a function of (key, seed), so all of them are wrong now.
         Chunk.ResetColumnCache();

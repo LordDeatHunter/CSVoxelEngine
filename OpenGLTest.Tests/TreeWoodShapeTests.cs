@@ -264,6 +264,57 @@ public sealed class TreeWoodShapeTests
         Assert.Contains(mesh.Vertices, v => (v.Normal & 7) == 5 && MathF.Abs(v.Position.Y - Cy) <= Eps);
     }
 
+    [Fact]
+    public void AThinCellPlugsIntoAnOccluderButFloatsOverAir()
+    {
+        var oak = Oak;
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var state = WoodState.Encode(5, WoodState.ParentRoot, false);
+        var half = TreeWoodShape.HalfWidth(WoodState.Thickness(state));
+
+        Span<byte> ids = stackalloc byte[6];
+        Span<byte> nbStates = stackalloc byte[6];
+        var floating = TreeWoodShape.GetBoxes(oak, state, ids, nbStates);
+        Assert.Equal(0.5f - half, floating.Min(b => b.Min.Y), Eps);
+
+        ids[5] = stone;
+        var grounded = TreeWoodShape.GetBoxes(oak, state, ids, nbStates);
+        Assert.Equal(0f, grounded.Min(b => b.Min.Y), Eps);
+    }
+
+    [Fact]
+    public void AThinCellRootedOnSolidGroundDrawsDownToTheGroundInBothMeshAndHitboxes()
+    {
+        var oak = Oak;
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var state = WoodState.Encode(5, WoodState.ParentRoot, false);
+        var (manager, chunk) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
+        // The wood sits in the centre chunk's bottom row and the ground in the chunk below it, so
+        // the centre chunk's mesh holds only the wood and the check is not confused by the ground.
+        chunk.SetBlockRaw(Cx, 0, Cz, oak, state);
+        manager.Chunks[MeshTestWorld.HighAbove + new Vector3(0, -1, 0)]
+            .SetBlockRaw(Cx, Chunk.Size - 1, Cz, stone, 0);
+
+        Span<byte> ids = stackalloc byte[6];
+        Span<byte> nbStates = stackalloc byte[6];
+        ids[5] = stone;
+        var boxes = TreeWoodShape.GetBoxes(oak, state, ids, nbStates);
+
+        var mesh = chunk.GenerateMeshData(manager, greedy: false);
+        Assert.NotNull(mesh);
+        var vertices = mesh.Vertices.Concat(mesh.TranslucentVertices).Select(v => v.Position).ToList();
+        Assert.NotEmpty(vertices);
+
+        var origin = new Vector3(Cx, 0, Cz);
+        var boxMin = boxes.Aggregate(new Vector3(float.MaxValue), (m, b) => Vector3.Min(m, origin + b.Min));
+        var boxMax = boxes.Aggregate(new Vector3(float.MinValue), (m, b) => Vector3.Max(m, origin + b.Max));
+        var meshMin = vertices.Aggregate(new Vector3(float.MaxValue), Vector3.Min);
+        var meshMax = vertices.Aggregate(new Vector3(float.MinValue), Vector3.Max);
+        Assert.True(Near(meshMin, boxMin), $"mesh min {meshMin} vs hitbox min {boxMin}");
+        Assert.True(Near(meshMax, boxMax), $"mesh max {meshMax} vs hitbox max {boxMax}");
+        Assert.Equal(origin.Y, boxMin.Y, Eps);
+    }
+
     // One placed tree-wood cell of a rim test configuration, chunk-local
     private readonly record struct RimCell(int X, int Y, int Z, byte State);
 

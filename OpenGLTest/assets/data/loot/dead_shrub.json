@@ -1,0 +1,6 @@
+{
+  // Dead shrub: 0-2 sticks (branch items)
+  "pools": [
+    { "rolls": { "min": 0, "max": 2 }, "entries": [ { "item": "item/branch" } ] }
+  ]
+}

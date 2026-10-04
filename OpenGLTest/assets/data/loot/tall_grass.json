@@ -1,0 +1,6 @@
+{
+  // Tall grass: 0-2 vines
+  "pools": [
+    { "rolls": { "min": 0, "max": 2 }, "entries": [ { "item": "item/vine" } ] }
+  ]
+}

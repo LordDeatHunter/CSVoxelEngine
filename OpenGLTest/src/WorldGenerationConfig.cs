@@ -1170,6 +1170,17 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float FlowerPatchThreshold = 0.2f;
     public const float FlowerDensity = 0.06f;
 
+    // --- Foliage (FoliageGenerator) ---
+    // Ground cover on the biome's own surface: forest grass tufts are common, desert dead shrubs
+    // sparse. Each is gated by a low-frequency patch and then a position-hash density roll.
+    public const bool FoliageEnabled = true;
+    public const float GrassPatchFrequency = 1f / 48f;
+    public const float GrassPatchThreshold = 0.05f;
+    public const float GrassDensity = 0.35f;
+    public const float ShrubPatchFrequency = 1f / 64f;
+    public const float ShrubPatchThreshold = 0.2f;
+    public const float ShrubDensity = 0.04f;
+
     // --- Tree felling (TopplingTree) ---
     // Seconds for a felled tree to swing from upright to flat (cubic ease-in: slow tip,
     // accelerating slam), then rest before its wood pops out as item drops

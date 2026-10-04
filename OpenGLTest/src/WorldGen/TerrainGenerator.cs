@@ -260,6 +260,9 @@ public static class TerrainGenerator
     /// <summary>Whether world column (x, z) is forest; vegetation and spawn rules ask here.</summary>
     public static bool IsForest(int x, int z) => BiomeAt(x, z) == Biome.Forest;
 
+    /// <summary>Whether world column (x, z) is desert; the dead-shrub scatter asks here.</summary>
+    public static bool IsDesert(int x, int z) => BiomeAt(x, z) == Biome.Desert;
+
     /// <summary>Water level of a column that holds no water at all.</summary>
     public const int NoWater = int.MinValue;
 

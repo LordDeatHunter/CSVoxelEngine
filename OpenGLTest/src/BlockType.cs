@@ -173,6 +173,14 @@ public sealed record BlockType
     public BiomeTintFaces? BiomeTint { get; internal set; }
 
     /// <summary>
+    /// Climate palette for a sub-cell model block whose file declared <c>modelTint</c>, or null.
+    /// Unlike <see cref="BiomeTint"/>'s per-face tiles, this tints every quad of the block's own
+    /// model in place (shade * the palette's field, bit 4 set). Set in
+    /// <c>ContentRegistry.ResolveModelTints</c>.
+    /// </summary>
+    public BiomeTintPalette? ModelBiomeTint { get; internal set; }
+
+    /// <summary>
     /// How reflective the block's surface is, or null for the ordinary diffuse blocks (all but
     /// the ores). The renderer never reads this per block: <see cref="TileMaterials"/> spreads it
     /// across the block's <see cref="FaceTiles"/> at bake time and the shader looks it up by

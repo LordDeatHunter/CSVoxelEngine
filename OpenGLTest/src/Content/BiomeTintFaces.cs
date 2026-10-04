@@ -77,14 +77,7 @@ public sealed class BiomeTintFaces
     internal static (BiomeTintPalette Palette, BlockDefinition.BiomeTintFaceDefinition?[] Faces) Expand(
         BlockDefinition.BiomeTintDefinition dto, string path)
     {
-        BiomeTintPalette palette;
-        if (dto.Palette == null || string.Equals(dto.Palette, "grass", StringComparison.OrdinalIgnoreCase))
-            palette = BiomeTintPalette.Grass;
-        else if (string.Equals(dto.Palette, "foliage", StringComparison.OrdinalIgnoreCase))
-            palette = BiomeTintPalette.Foliage;
-        else
-            throw new InvalidOperationException(
-                $"Block '{path}' names biomeTint palette '{dto.Palette}'; valid palettes are 'grass' and 'foliage'.");
+        var palette = ParsePalette(dto.Palette, path);
 
         if (dto.Faces == null || dto.Faces.Count == 0)
             throw new InvalidOperationException(
@@ -119,5 +112,17 @@ public sealed class BiomeTintFaces
         }
 
         return (palette, faces);
+    }
+
+    /// <summary>Parses a palette name, case-blind: null or <c>"grass"</c> is the default,
+    /// <c>"foliage"</c> the other; anything else throws naming the block's file.</summary>
+    internal static BiomeTintPalette ParsePalette(string? name, string path)
+    {
+        if (name == null || string.Equals(name, "grass", StringComparison.OrdinalIgnoreCase))
+            return BiomeTintPalette.Grass;
+        if (string.Equals(name, "foliage", StringComparison.OrdinalIgnoreCase))
+            return BiomeTintPalette.Foliage;
+        throw new InvalidOperationException(
+            $"Block '{path}' names biome tint palette '{name}'; valid palettes are 'grass' and 'foliage'.");
     }
 }

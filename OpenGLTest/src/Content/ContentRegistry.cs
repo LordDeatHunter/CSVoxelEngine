@@ -63,6 +63,10 @@ public static class ContentRegistry
     private static readonly List<(byte Id, BiomeTintPalette Palette, BlockDefinition.BiomeTintFaceDefinition?[] Faces, string Path)>
         BiomeTintPending = [];
 
+    // Blocks declaring a "modelTint": a sub-cell model block whose own quads are climate-tinted,
+    // validated and resolved in BakeModels beside the cube-face biomeTint list.
+    private static readonly List<(byte Id, string? Palette, string Path)> ModelTintPending = [];
+
     private static string _assetsRoot = "assets";
     private static ModelLoader? _models;
 
@@ -217,6 +221,7 @@ public static class ContentRegistry
 
         // Needs every block's greedy flag and face tiles, settled just above.
         ResolveBiomeTints();
+        ResolveModelTints();
 
         // An item that declares a model bakes exactly like a block's, minus every cell-shaped
         // conclusion (occlusion, light, greedy): it is drawn as an entity mesh, never as a cell.
@@ -307,6 +312,27 @@ public static class ContentRegistry
         {
             throw new InvalidOperationException(
                 $"Block '{path}' biomeTint names texture '{tile}', which is not an atlas tile.", e);
+        }
+    }
+
+    /// <summary>
+    /// Resolves each <c>modelTint</c> (a sub-cell model block tinted by the climate on every
+    /// quad) into <see cref="BlockType.ModelBiomeTint"/>. Only a non-full-cube <c>model</c>
+    /// renderer qualifies: a full cube belongs to <see cref="BiomeTint"/>'s per-face path, and a
+    /// procedural renderer has no model quads. The check needs the greedy flag settled by the
+    /// bake loop, so it runs beside <see cref="ResolveBiomeTints"/>.
+    /// </summary>
+    private static void ResolveModelTints()
+    {
+        foreach (var (id, paletteName, path) in ModelTintPending)
+        {
+            var type = BlockType.ById[id]!;
+            if (type.Renderer != BlockRenderer.Model || type.Translucent
+                || BlockType.GreedyById[id] || type.BakedModel is not { IsFullCube: false })
+                throw new InvalidOperationException(
+                    $"Block '{path}' declares modelTint but its model is not a plain non-full-cube model; a full cube uses biomeTint's per-face tiles instead.");
+
+            type.ModelBiomeTint = BiomeTintFaces.ParsePalette(paletteName, path);
         }
     }
 
@@ -523,6 +549,7 @@ public static class ContentRegistry
         ItemModels.Clear();
         BlockDefinitions.Clear();
         BiomeTintPending.Clear();
+        ModelTintPending.Clear();
         _sfxGroups = new Dictionary<string, IReadOnlyList<string>>();
         ItemRegistry.Reset();
         EntityRegistry.Reset();
@@ -1458,6 +1485,9 @@ public static class ContentRegistry
                 var (palette, faces) = BiomeTintFaces.Expand(definition.BiomeTint, path);
                 BiomeTintPending.Add((id, palette, faces, path));
             }
+
+            if (definition.ModelTint != null)
+                ModelTintPending.Add((id, definition.ModelTint, path));
 
             BlockModels[id] = ResolveModel(definition.Model, path);
             BlockDefinitions[id] = definition;

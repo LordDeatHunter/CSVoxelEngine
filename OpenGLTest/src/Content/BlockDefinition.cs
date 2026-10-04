@@ -75,6 +75,17 @@ public sealed class BlockDefinition
     /// </summary>
     public BiomeTintDefinition? BiomeTint { get; set; }
 
+    /// <summary>
+    /// Climate palette applied to <em>every</em> quad of the block's own model: <c>"grass"</c>
+    /// (the default) or <c>"foliage"</c>. This is the sub-cell sibling of
+    /// <see cref="BiomeTint"/>: a cross-shaped plant has no cube faces to map per face, so it
+    /// names the one palette and the mesher multiplies each of its model quads by the
+    /// <see cref="silkgltriangle.BiomeTint"/> field. Only legal on a non-full-cube
+    /// <c>model</c>-renderer block, and the model must wear a grey textureless tile (see
+    /// <c>tools/generate-leaf-textureless.ps1</c>), since the tint multiplies the texel.
+    /// </summary>
+    public string? ModelTint { get; set; }
+
     public bool? HasItem { get; set; }
     public bool? NeedsSupport { get; set; }
 

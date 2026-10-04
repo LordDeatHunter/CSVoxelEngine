@@ -778,6 +778,9 @@ public class Chunk : IDisposable
         if (WorldGenerationConfig.FlowersEnabled)
             FlowerGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
+        if (WorldGenerationConfig.FoliageEnabled)
+            FoliageGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
+
         // Carving removed an unknown number of blocks; a recount is cheaper than bookkeeping.
         // Counting AIR and subtracting beats counting non-air: BlockType.Air is
         // `public const byte Air = 0`, so this binds to the vectorised
@@ -1753,14 +1756,21 @@ public class Chunk : IDisposable
                 var positions = quad.Positions;
                 var uvs = quad.Uvs;
                 var normal = quad.Normal;
+                // A sub-cell model block (a cross-shaped plant) can be climate-tinted on every
+                // quad; a greedy block here is the per-voxel replay and reads type.BiomeTint
+                // instead (see below), so the two never apply at once.
+                var modelTint = type.ModelBiomeTint;
 
                 if (!quad.Shade)
                 {
                     // Minecraft's per-element "shade": false — full brightness, no face
                     // brightness and no ambient occlusion
                     for (var j = 0; j < 4; j++)
-                        dstVertices.Add(new Vertex(basePos + positions[j], 255, 255, 255, 255, uvs[j], quad.Tile,
-                            sun, block, normal, sway, submerged, waterSurface, flatTint));
+                    {
+                        var vertex = new Vertex(basePos + positions[j], 255, 255, 255, 255, uvs[j], quad.Tile,
+                            sun, block, normal, sway, submerged, waterSurface, flatTint);
+                        dstVertices.Add(modelTint is { } palette ? ApplyModelTint(vertex, fields.Field(palette)) : vertex);
+                    }
                 }
                 else if (quad.IsFullFace)
                 {
@@ -1815,8 +1825,9 @@ public class Chunk : IDisposable
                             vTint = (ushort)(code >> 12);
                         }
 
-                        dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j], quad.Tile,
-                            vSun, vBlock, normal, sway, submerged, waterSurface, vTint));
+                        var vertex = new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j], quad.Tile,
+                            vSun, vBlock, normal, sway, submerged, waterSurface, vTint);
+                        dstVertices.Add(modelTint is { } palette ? ApplyModelTint(vertex, fields.Field(palette)) : vertex);
                     }
                 }
                 else
@@ -1825,8 +1836,11 @@ public class Chunk : IDisposable
                     // darken it by neighbours it does not touch: shade it flat and unoccluded
                     var shade = ShadeLut[(face << 2) | 3];
                     for (var j = 0; j < 4; j++)
-                        dstVertices.Add(new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j], quad.Tile,
-                            sun, block, normal, sway, submerged, waterSurface, flatTint));
+                    {
+                        var vertex = new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j], quad.Tile,
+                            sun, block, normal, sway, submerged, waterSurface, flatTint);
+                        dstVertices.Add(modelTint is { } palette ? ApplyModelTint(vertex, fields.Field(palette)) : vertex);
+                    }
                 }
 
                 dstIndices.Add((ushort)(dstOffset + 0));
@@ -2313,6 +2327,19 @@ public class Chunk : IDisposable
     }
 
     /// <summary>
+    /// Recolours one quad vertex of a <c>modelTint</c> block: its rgb becomes the vertex's shade
+    /// times the palette's field at the vertex, flagged so the world fragment shader applies
+    /// <see cref="BiomeTint.Gain"/>. The vertex's rgb standing in for its shade (three equal
+    /// channels, 255 on an unshaded quad) is what makes the shade recoverable here.
+    /// </summary>
+    private static Vertex ApplyModelTint(Vertex vertex, in BiomeTintField field)
+    {
+        var shade = (byte)(vertex.PackedColor & 0xFF);
+        BiomeTint.Shade(shade, field.Sample(vertex.Position.X, vertex.Position.Z), out var r, out var g, out var b);
+        return vertex.WithBiomeTint(r, g, b);
+    }
+
+    /// <summary>
     /// Emits one fluid cell's surface into the translucent lists. The top face is a quad whose
     /// four corners sit at <see cref="CornerHeight"/>, so a flow slopes away from its source
     /// and - the average being symmetric between neighbours - adjacent tops meet exactly with
@@ -2739,9 +2766,11 @@ public class Chunk : IDisposable
     /// <summary>
     /// Emits a thin <see cref="BlockRenderer.TreeWood"/> cell: a centred node box sized by its
     /// <see cref="WoodState"/> thickness and one square tube toward every neighbour it connects
-    /// to (<see cref="TreeWoodShape.Connects"/>), at the thinner of the two widths. Tubes carry
+    /// to (<see cref="TreeWoodShape.Connects"/>), at the thinner of the two widths, plus a
+    /// same-width plug toward every solid occluding neighbour (<see cref="TreeWoodShape.PlugMask"/>)
+    /// so a root or trunk on the ground meets it. Tubes and plugs carry
     /// only their four walls - the neighbour emits the matching tube from its side, so the two
-    /// meet flush with no cap between them - and a node face is dropped where a tube of its
+    /// meet flush with no cap between them - and a node face is dropped where a tube or plug of its
     /// own full width leaves it. The geometry is exactly <see cref="TreeWoodShape.GetBoxes"/>,
     /// so the hitboxes cover what is drawn. UVs are cropped (<see cref="CropUv"/>), so bark
     /// keeps the atlas texel density at every thickness.
@@ -2765,11 +2794,13 @@ public class Chunk : IDisposable
         }
 
         var mask = TreeWoodShape.ConnectionMask(type.Id, state, nbIds, nbStates);
+        var plugs = TreeWoodShape.PlugMask(state, nbIds);
         var half = TreeWoodShape.HalfWidth(WoodState.Thickness(state));
         TreeWoodShape.NodeBox(half, out var nodeMin, out var nodeMax);
         for (var face = 0; face < 6; face++)
         {
-            // A tube as wide as the node continues its face, so that face is the tube's mouth
+            // A tube or plug as wide as the node continues its face, so that face is its mouth
+            if ((plugs & 1 << face) != 0) continue;
             if ((mask & 1 << face) != 0 && TreeWoodShape.TubeHalf(state, nbStates[face]) >= half) continue;
             var tile = face == 4 ? type.Top : face == 5 ? type.Bottom : type.Side;
             EmitBoxFace(vertices, indices, ref indexOffset, basePos, nodeMin, nodeMax, face,
@@ -2778,8 +2809,10 @@ public class Chunk : IDisposable
 
         for (var dir = 0; dir < 6; dir++)
         {
-            if ((mask & 1 << dir) == 0) continue;
-            TreeWoodShape.TubeBox(dir, half, TreeWoodShape.TubeHalf(state, nbStates[dir]), out var min, out var max);
+            var connected = (mask & 1 << dir) != 0;
+            if (!connected && (plugs & 1 << dir) == 0) continue;
+            var tubeHalf = connected ? TreeWoodShape.TubeHalf(state, nbStates[dir]) : half;
+            TreeWoodShape.TubeBox(dir, half, tubeHalf, out var min, out var max);
             var opposite = TreeWoodShape.Opposite(dir);
             for (var face = 0; face < 6; face++)
             {
