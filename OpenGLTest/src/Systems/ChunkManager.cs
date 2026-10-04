@@ -922,6 +922,35 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     }
 
     /// <summary>
+    /// Registers a chunk streamed from the server, restored with no worldgen (see
+    /// <see cref="Chunk.RestoreFrom(ChunkSnapshot, bool)"/>), and schedules it and its neighbours
+    /// for meshing. Main thread only. An already-present chunk is left alone: a client-side edit
+    /// must not be overwritten by a snapshot that merely arrived late.
+    /// </summary>
+    public void ApplyStreamedChunk(Vector3 pos, ChunkSnapshot snapshot)
+    {
+        var key = ChunkKey.Pack(pos);
+        if (Chunks.ContainsPacked(key))
+            return;
+
+        var chunk = new Chunk(gl, pos, generateBlockData: false);
+        chunk.RestoreFrom(snapshot, streamedColumns: true);
+        Chunks.SetPacked(key, chunk);
+        Interlocked.Increment(ref _loadedChunkCount);
+        _loadedChunks.Enqueue(chunk);
+        _dirtyChunks.TryAdd(key, 0);
+
+        var px = MathUtils.FloorToInt(pos.X);
+        var py = MathUtils.FloorToInt(pos.Y);
+        var pz = MathUtils.FloorToInt(pos.Z);
+        foreach (var d in Vector3Directions.CardinalOffsets)
+        {
+            if (Chunks.ContainsKey(px + d.X, py + d.Y, pz + d.Z))
+                _dirtyChunks.TryAdd(ChunkKey.Pack(px + d.X, py + d.Y, pz + d.Z), 0);
+        }
+    }
+
+    /// <summary>
     /// Marks a chunk as dirty (needs remeshing).
     /// </summary>
     public void MarkDirty(Vector3 pos)
