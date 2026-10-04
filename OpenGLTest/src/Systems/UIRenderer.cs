@@ -1390,10 +1390,43 @@ public class UIRenderer : IDisposable
         }
     }
 
+    /// <summary>
+    /// The chat HUD over a playing world: the most recent lines bottom-left over a translucent
+    /// backdrop (sender and text together, one line per message) and, while the input is open, the
+    /// single-line input field above the hotbar. Geometry comes from <see cref="ChatLayout"/>.
+    /// </summary>
+    public void DrawChat(ChatView view, float time)
+    {
+        var screen = _screenSize;
+        var messages = view.Messages;
+        if (messages.Count > 0)
+        {
+            var visible = Math.Min(messages.Count, ChatLayout.VisibleMessages);
+            var bottom = ChatLayout.LogBottom(screen, view.IsOpen);
+            var blockCentre = new Vector2(ChatLayout.Left + ChatLayout.MaxWidth * 0.5f,
+                bottom - visible * ChatLayout.LineHeight * 0.5f);
+            DrawRect(blockCentre, new Vector2(ChatLayout.MaxWidth + 16f, visible * ChatLayout.LineHeight + 8f),
+                Rgba.Grey(0f, 0.35f));
+
+            for (var i = 0; i < visible; i++)
+            {
+                var message = messages[messages.Count - visible + i];
+                var text = message.Kind == ChatKind.Player ? $"{message.Sender}: {message.Text}" : message.Text;
+                var color = message.Kind == ChatKind.Player ? Rgba.White : AccentGold;
+                DrawText(FittedText(text, _countScale, ChatLayout.MaxWidth),
+                    new Vector2(ChatLayout.Left, ChatLayout.LineTop(screen, view.IsOpen, visible - 1 - i)),
+                    _countScale, color);
+            }
+        }
+
+        if (view.IsOpen)
+            DrawInputField(ChatLayout.InputCentre(screen), ChatLayout.InputSize, view.Input, true,
+                "Say something...", time);
+    }
+
     /// <summary>Main-menu widget under a window-pixel point (top-left origin).</summary>
     public MainMenuHit MainMenuHitAt(Vector2 windowPoint, MainMenuView view) =>
         MainMenuLayout.HitAt(ToCanvas(windowPoint), _screenSize, view);
-
     /// <summary>Whether a window-pixel point is over the worlds list (the mouse-wheel target).</summary>
     public bool IsOverWorldList(Vector2 windowPoint) =>
         MainMenuLayout.IsOverList(ToCanvas(windowPoint), _screenSize);

@@ -51,8 +51,10 @@ public static class Program
     private static bool rightWasDown;
     private static bool middleWasPressed;
     private static bool eWasPressed;
+    private static bool tWasPressed;
     private static bool escWasPressed;
     private static readonly InventoryView inventoryView = new();
+    private static readonly ChatView chatView = new();
     private static readonly PauseMenuView pauseMenuView = new();
     private static readonly SettingsMenuView settingsMenuView = new();
     private static bool appliedVSync;
@@ -264,6 +266,8 @@ public static class Program
             {
                 if (screen == AppScreen.Menu)
                     menu.Type(c);
+                else if (screen == AppScreen.Playing && chatView.IsOpen && !pauseMenuView.IsOpen)
+                    chatView.Type(c);
                 else if (screen == AppScreen.Playing && inventoryView.IsOpen && !pauseMenuView.IsOpen)
                     HandleInventoryType(c);
             };
@@ -271,7 +275,9 @@ public static class Program
             {
                 if (screen == AppScreen.Playing)
                 {
-                    if (inventoryView.IsOpen && !pauseMenuView.IsOpen)
+                    if (chatView.IsOpen && !pauseMenuView.IsOpen)
+                        HandleChatKey(key);
+                    else if (inventoryView.IsOpen && !pauseMenuView.IsOpen)
                         HandleInventoryKey(key);
                     return;
                 }
@@ -655,8 +661,17 @@ public static class Program
         FrameProfiler.Begin(ProfileSection.ProgramUpdate);
 
         placeTimer = Math.Min(MAX_PLACE_TIMER, placeTimer + deltaTime);
+
+        // T opens the chat: only from a clean play state, so it is never a hotkey while a panel,
+        // the pause menu or the chat itself already owns the keyboard.
+        var tPressed = inputManager.Keyboard?.IsKeyPressed(Key.T) == true;
+        if (tPressed && !tWasPressed && !chatView.IsOpen && !pauseMenuView.IsOpen
+            && !inventoryView.IsOpen)
+            chatView.Open();
+        tWasPressed = tPressed;
+
         var xPressed = inputManager.Keyboard?.IsKeyPressed(Key.X) == true;
-        if (xPressed && !xWasPressed && inventoryView.Focus == InventoryFocus.None)
+        if (xPressed && !xWasPressed && !chatView.IsOpen && inventoryView.Focus == InventoryFocus.None)
         {
             debugEnabled = !debugEnabled;
             Log.WriteLine($"Debug {(debugEnabled ? "ON" : "OFF")}");
@@ -665,11 +680,13 @@ public static class Program
 
         // ESC toggles the pause menu instead of closing the game: first press opens it,
         // ESC on the settings page steps back to the main page, ESC there resumes the game.
-        // An open [E] panel is closed first so the two never overlap.
+        // An open [E] panel or chat is closed first so they never overlap the menu.
         var escPressed = inputManager.Keyboard?.IsKeyPressed(Key.Escape) == true;
         if (escPressed && !escWasPressed)
         {
-            if (inventoryView.IsOpen)
+            if (chatView.IsOpen)
+                chatView.Close();
+            else if (inventoryView.IsOpen)
                 SetInventoryOpen(false);
             else if (pauseMenuView.Page == PauseMenuPage.Closed)
                 SetPauseMenu(PauseMenuPage.Main);
@@ -697,12 +714,12 @@ public static class Program
         // The [E] panel owns the mouse: clicks equip, hotbar keys rest, and the world runs on.
         // While a text field has focus, E is typing, not a close.
         var ePressed = inputManager.Keyboard?.IsKeyPressed(Key.E) == true;
-        if (ePressed && !eWasPressed && !pauseMenuView.IsOpen
+        if (ePressed && !eWasPressed && !pauseMenuView.IsOpen && !chatView.IsOpen
             && inventoryView.Focus == InventoryFocus.None)
             SetInventoryOpen(!inventoryView.IsOpen);
         eWasPressed = ePressed;
 
-        if (!inventoryView.IsOpen && !pauseMenuView.IsOpen)
+        if (!inventoryView.IsOpen && !pauseMenuView.IsOpen && !chatView.IsOpen)
         {
             // 1-10 grabs the hotbar slot directly; scroll still walks it one step at a time
             for (var i = 0; i < NumberKeys.Length; i++)
@@ -728,7 +745,7 @@ public static class Program
         // so a mudball cooks on a lit campfire instead of sailing over it. Hold to charge,
         // release to throw.
         var rightDown = inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true;
-        var rightHeld = rightDown && !inventoryView.IsOpen && !pauseMenuView.IsOpen;
+        var rightHeld = rightDown && !inventoryView.IsOpen && !pauseMenuView.IsOpen && !chatView.IsOpen;
         var rightPressed = rightHeld && !rightWasDown;
         if (rightHeld && w.IsThrowCharging)
         {
@@ -751,7 +768,7 @@ public static class Program
             FrameProfiler.End(ProfileSection.UsePlace);
         }
         rightWasDown = rightDown;
-        if (!rightHeld && (inventoryView.IsOpen || pauseMenuView.IsOpen) && w.IsThrowCharging)
+        if (!rightHeld && (inventoryView.IsOpen || pauseMenuView.IsOpen || chatView.IsOpen) && w.IsThrowCharging)
             w.CancelThrowCharge();
 
         // The menu freezes the simulation: the world keeps rendering behind the overlay
@@ -760,18 +777,20 @@ public static class Program
         if (!pauseMenuView.IsOpen)
         {
             // A focused text field owns the keyboard: pass no board so the camera cannot act on
-            // the very keys being typed (E, C, Space, WASD) while the panel is up.
-            var board = inventoryView.IsOpen && inventoryView.Focus != InventoryFocus.None
+            // the very keys being typed (E, C, Space, WASD) while the panel or chat is up.
+            var board = (inventoryView.IsOpen && inventoryView.Focus != InventoryFocus.None)
+                || chatView.IsOpen
                 ? null
                 : inputManager.Keyboard;
             w.Update((float)deltaTime, board);
 
             FrameProfiler.Begin(ProfileSection.Breaking);
             w.UpdateBlockBreaking(deltaTime,
-                !inventoryView.IsOpen && inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true);
+                !inventoryView.IsOpen && !chatView.IsOpen
+                && inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true);
             FrameProfiler.End(ProfileSection.Breaking);
 
-            var middlePressed = !inventoryView.IsOpen
+            var middlePressed = !inventoryView.IsOpen && !chatView.IsOpen
                 && inputManager.Mouse?.IsButtonPressed(MouseButton.Middle) == true;
             if (middlePressed && !middleWasPressed)
                 w.TryPickTargetedBlock();
@@ -1014,6 +1033,40 @@ public static class Program
                 MoveSearchHighlight(1);
                 break;
         }
+    }
+
+    /// <summary>The keys the chat input reacts to while it is open. ESC is left to the polled
+    /// handler, so closing chat and the pause menu never both fire on one press.</summary>
+    private static void HandleChatKey(Key key)
+    {
+        switch (key)
+        {
+            case Key.Backspace:
+                chatView.Backspace();
+                break;
+            case Key.Enter or Key.KeypadEnter:
+                SubmitChat();
+                break;
+            case Key.Up:
+                chatView.HistoryUp();
+                break;
+            case Key.Down:
+                chatView.HistoryDown();
+                break;
+        }
+    }
+
+    private static void SubmitChat()
+    {
+        var text = chatView.Submit();
+        if (!string.IsNullOrEmpty(text))
+            SendChat(text);
+    }
+
+    /// <summary>Sends one chat line: a local echo in singleplayer, the server in multiplayer.</summary>
+    private static void SendChat(string text)
+    {
+        chatView.AddMessage(ChatKind.Player, chatView.LocalName, text);
     }
 
     private static void MoveSearchHighlight(int delta)
@@ -1298,6 +1351,9 @@ public static class Program
             world.RenderUI(renderManager, inventoryView,
                 (float)world.LightingTime, shownFps, debugEnabled,
                 showCoordinates: true, menu: pauseMenuView, settings: settingsMenuView);
+        // The chat log and input draw over the HUD; hidden with the HUD and behind the pause menu.
+        if (!hideHud && !pauseMenuView.IsOpen)
+            renderManager.RenderChat(windowManager.Window, chatView, windowManager.Window.Time);
         // The loading screen fades out over the world's first playing frames
         if (!loadingView.IsFinished)
             renderManager.RenderLoadingOverlay(windowManager.Window, loadingView, windowManager.Window.Time);

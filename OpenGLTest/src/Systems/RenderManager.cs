@@ -3925,6 +3925,17 @@ public class RenderManager : IDisposable
         InvalidateTextureUnits();
     }
 
+    /// <summary>Draws the chat HUD (the log and, while open, the input line) in its own UI pass over the world.</summary>
+    public void RenderChat(IWindow window, ChatView chat, double time)
+    {
+        var windowSize = new Vector2(window.Size.X, window.Size.Y);
+        ui.Begin(window.Size, window.FramebufferSize,
+            UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
+        ui.DrawChat(chat, (float)time);
+        ui.End();
+        InvalidateTextureUnits();
+    }
+
     // Clear colour of a menu frame; the menu and loading backdrops cover it anyway.
     private static readonly Vector4 MenuClearColor = new(0.06f, 0.07f, 0.09f, 1f);
 
