@@ -73,8 +73,13 @@ void main() {
     col = mix(col, LinearToSrgb(min(mix(SkySample(V), uFogColor, uFogWet), vec3(1.0))), f * f);
     float a = uOpacity * (1.0 - f * f * f);
     // The tonemap is a plain clamp at exposure 1, so the encode alone is the display value of
-    // anything up to 1; whatever lies above (the sun disc) keeps its overflow, faded like the rest.
+    // anything up to 1. The background is clamped to that range before the mix: the sun disc is
+    // additively drawn well above 1 in the target behind us, and preserving that overflow here
+    // would add a fraction ((1 - a) of 2.5x, never zero while the cloud is translucent) of pure
+    // sun on top of the cloud body, saturating it and making the sun read as if it stood in front
+    // of the cloud. The cloud owns its own sun term (uSunColor/uAmbient below), so it must occlude
+    // the disc rather than leak it; the post pass clamps the rest of the scene anyway.
     vec3 dst = texelFetch(uScene, ivec2(gl_FragCoord.xy), 0).rgb;
     vec3 body = min(dst, vec3(1.0));
-    FragColor = vec4(SrgbToLinear(mix(LinearToSrgb(body), col, a)) + (dst - body) * (1.0 - a), 1.0);
+    FragColor = vec4(SrgbToLinear(mix(LinearToSrgb(body), col, a)), 1.0);
 }
