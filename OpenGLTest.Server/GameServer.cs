@@ -150,6 +150,7 @@ public sealed class GameServer : IDisposable
             _clients[client.Id] = client;
             _players[client.Id] = new PlayerSnapshot(client.Name, _world.Camera.Position, 0f, 0f, 0);
             SendServerHello(client);
+            SendInventory(client);
             BroadcastPlayerList();
             BroadcastSystem($"{client.Name} joined the game");
             Log.WriteLine($"net: {client.Name} (#{client.Id}) joined from {client.Remote}");
@@ -237,6 +238,27 @@ public sealed class GameServer : IDisposable
                 break;
             }
 
+            case NetMessage.InventoryRequest:
+            {
+                var action = (NetInventoryAction)reader.ReadByte();
+                var arg = reader.ReadInt();
+                switch (action)
+                {
+                    case NetInventoryAction.SelectSlot:
+                        _world.Inventory.Select(arg);
+                        break;
+                    case NetInventoryAction.DropSelected:
+                        _world.ThrowSelected(wholeStack: false);
+                        break;
+                    case NetInventoryAction.DropAllSelected:
+                        _world.ThrowSelected(wholeStack: true);
+                        break;
+                }
+
+                SendInventory(client);
+                break;
+            }
+
             default:
                 Log.Warn($"net: ignoring {message} from {client.Name} (#{client.Id})");
                 break;
@@ -252,6 +274,13 @@ public sealed class GameServer : IDisposable
         writer.Write(_seed);
         writer.Write(_world.LightingTime);
         writer.Write(_world.Camera.Position);
+        client.Send(writer.ToArray());
+    }
+
+    private void SendInventory(ClientConnection client)
+    {
+        using var writer = new PacketWriter(NetMessage.InventoryState);
+        writer.WriteBytes(InventoryNetCodec.Encode(_world.Inventory.Export()));
         client.Send(writer.ToArray());
     }
 

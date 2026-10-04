@@ -595,6 +595,9 @@ public static class Program
                 w.ApplyNetworkBlockChanges(netCellsScratch);
                 break;
             }
+            case NetMessage.InventoryState:
+                w.Inventory.Import(InventoryNetCodec.Decode(reader.ReadBytes()));
+                break;
             default:
                 break;
         }
@@ -632,6 +635,32 @@ public static class Program
         writer.Write(level);
         writer.Write(rx);
         writer.Write(rz);
+        client.Send(writer.ToArray());
+    }
+
+    /// <summary>Selects a hotbar slot: a server intent while connected, a local select otherwise.</summary>
+    private static void RequestSelectHotbar(int index)
+    {
+        if (netClient is { Status: NetworkStatus.Handshaken } client)
+            SendInventoryIntent(client, NetInventoryAction.SelectSlot, index);
+        else
+            world!.Inventory.Select(index);
+    }
+
+    /// <summary>Throws the held item: a server intent while connected, a local throw otherwise.</summary>
+    private static void RequestThrowSelected(bool wholeStack)
+    {
+        if (netClient is { Status: NetworkStatus.Handshaken } client)
+            SendInventoryIntent(client, wholeStack ? NetInventoryAction.DropAllSelected : NetInventoryAction.DropSelected, 0);
+        else
+            world!.ThrowSelected(wholeStack);
+    }
+
+    private static void SendInventoryIntent(NetworkClient client, NetInventoryAction action, int arg)
+    {
+        using var writer = new PacketWriter(NetMessage.InventoryRequest);
+        writer.Write((byte)action);
+        writer.Write(arg);
         client.Send(writer.ToArray());
     }
 
@@ -1064,7 +1093,7 @@ public static class Program
             // 1-10 grabs the hotbar slot directly; scroll still walks it one step at a time
             for (var i = 0; i < NumberKeys.Length; i++)
                 if (inputManager.Keyboard?.IsKeyPressed(NumberKeys[i]) == true)
-                    w.Inventory.Select(i);
+                    RequestSelectHotbar(i);
 
             // One throw per press, so holding Q doesn't empty the slot; Ctrl+Q throws the stack
             var qPressed = inputManager.Keyboard?.IsKeyPressed(Key.Q) == true;
@@ -1072,7 +1101,7 @@ public static class Program
             {
                 var wholeStack = inputManager.Keyboard?.IsKeyPressed(Key.ControlLeft) == true
                     || inputManager.Keyboard?.IsKeyPressed(Key.ControlRight) == true;
-                w.ThrowSelected(wholeStack);
+                RequestThrowSelected(wholeStack);
             }
             qWasPressed = qPressed;
         }

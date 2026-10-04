@@ -29,6 +29,16 @@ public enum NetMessage : byte
     LodRegionData = 55,
     BlockChanges = 56,
     EntityList = 60,
+    InventoryState = 70,
+    InventoryRequest = 71,
+}
+
+/// <summary>A client's inventory intent the server applies authoritatively.</summary>
+public enum NetInventoryAction : byte
+{
+    SelectSlot = 0,
+    DropSelected = 1,
+    DropAllSelected = 2,
 }
 
 /// <summary>
