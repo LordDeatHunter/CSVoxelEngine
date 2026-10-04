@@ -679,9 +679,28 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
     /// Registers a region in both the lookup table and <see cref="RegionList"/>.
     /// Main thread only.
     /// </summary>
-    internal void AddRegion((int Level, int X, int Z) key, LodRegion region)
+    /// <summary>
+    /// Binds the camera without starting any LodGen worker: a multiplayer client's regions arrive
+    /// over the network (<see cref="AddStreamedRegion"/>), so it needs the removal/cover passes of
+    /// <see cref="Update"/> but never builds anything itself.
+    /// </summary>
+    public void BindCamera(Camera camera) => _camera = camera;
+
+    /// <summary>
+    /// Adds a far-LOD region built by the server, uploading its mesh to this client's LOD pool and
+    /// handing it to the same lifetime/burial machinery as a locally built one. A key already
+    /// present is left alone (a rebuild the client did not ask for is stale).
+    /// </summary>
+    public void AddStreamedRegion(LodMeshData data)
     {
-        Regions[key] = region;
+        var key = (data.Level, data.X, data.Z);
+        if (Regions.ContainsKey(key))
+            return;
+        AddRegion(key, new LodRegion(_lodGeometry, data));
+    }
+
+    internal void AddRegion((int Level, int X, int Z) key, LodRegion region)
+    {        Regions[key] = region;
         region.ListIndex = RegionList.Count;
         RegionList.Add(region);
         region.PendingCoverIndex = _pendingCover.Count;

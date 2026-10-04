@@ -388,6 +388,8 @@ public class World : IItemUseWorld
             // far LOD from the server (S2), so it starts none either.
             if (!serverMode && !clientMode)
                 _lodManager.Start(Camera);
+            else if (clientMode)
+                _lodManager.BindCamera(Camera);
             RefreshMobs();
         }
         catch
@@ -735,6 +737,7 @@ public class World : IItemUseWorld
     private void UpdateClient(double deltaTime, IKeyboard? keyboard)
     {
         _chunkManager.Update(Camera);
+        _lodManager.Update(_chunkManager);
 
         var feet = Camera.Position - new Vector3(0f, Camera.EyeHeight, 0f);
         if (_chunkManager.ChunkAt(MathUtils.FloorToInt(feet.X), MathUtils.FloorToInt(feet.Y),
