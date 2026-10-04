@@ -36,6 +36,13 @@ public sealed class GameServer : IDisposable
     private int _nextId;
     private double _listTimer;
     private double _timeTimer;
+    private double _entityTimer;
+
+    // Stable network ids for the live mobs and drops, keyed by object identity (reference equality).
+    private readonly Dictionary<object, int> _entityIds = new(ReferenceEqualityComparer.Instance);
+    private readonly HashSet<object> _entitySeen = new(ReferenceEqualityComparer.Instance);
+    private readonly List<object> _entityStale = [];
+    private int _nextEntityId = 1;
 
     public GameServer(World world, string worldName, int seed, int port)
     {
@@ -77,6 +84,7 @@ public sealed class GameServer : IDisposable
 
         _listTimer += deltaTime;
         _timeTimer += deltaTime;
+        _entityTimer += deltaTime;
         if (_listTimer >= WorldGenerationConfig.NetPlayerListSeconds)
         {
             _listTimer = 0;
@@ -86,6 +94,11 @@ public sealed class GameServer : IDisposable
         {
             _timeTimer = 0;
             BroadcastTime();
+        }
+        if (_entityTimer >= WorldGenerationConfig.NetEntitySyncSeconds)
+        {
+            _entityTimer = 0;
+            BroadcastEntities();
         }
     }
 
@@ -251,6 +264,66 @@ public sealed class GameServer : IDisposable
         using var writer = new PacketWriter(NetMessage.TimeSync);
         writer.Write(_world.LightingTime);
         Broadcast(writer.ToArray());
+    }
+
+    private void BroadcastEntities()
+    {
+        var mobs = _world.Mobs;
+        var drops = _world.Drops;
+        _entitySeen.Clear();
+
+        using var writer = new PacketWriter(NetMessage.EntityList);
+        writer.Write(mobs.Count + drops.Count);
+        for (var i = 0; i < mobs.Count; i++)
+        {
+            var mob = mobs[i];
+            var kind = mob is Slime ? NetEntityKind.Slime : NetEntityKind.Goblin;
+            var ammo = mob is Goblin goblin ? goblin.Ammo : 0;
+            writer.Write((byte)kind);
+            writer.Write(IdFor(mob));
+            writer.Write(mob.Position);
+            writer.Write(mob.Facing);
+            writer.Write(mob.Health);
+            writer.Write(ammo);
+            writer.Write((byte)0);
+            writer.Write(mob.Velocity);
+        }
+
+        for (var i = 0; i < drops.Count; i++)
+        {
+            var drop = drops[i];
+            writer.Write((byte)NetEntityKind.Drop);
+            writer.Write(IdFor(drop));
+            writer.Write(drop.Position);
+            writer.Write(0f);
+            writer.Write(0);
+            writer.Write(0);
+            writer.Write(drop.BlockId);
+            writer.Write(drop.Velocity);
+        }
+
+        Broadcast(writer.ToArray());
+        PruneEntityIds();
+    }
+
+    private int IdFor(object entity)
+    {
+        _entitySeen.Add(entity);
+        if (_entityIds.TryGetValue(entity, out var id))
+            return id;
+        id = _nextEntityId++;
+        _entityIds[entity] = id;
+        return id;
+    }
+
+    private void PruneEntityIds()
+    {
+        _entityStale.Clear();
+        foreach (var key in _entityIds.Keys)
+            if (!_entitySeen.Contains(key))
+                _entityStale.Add(key);
+        foreach (var key in _entityStale)
+            _entityIds.Remove(key);
     }
 
     private void BroadcastChat(ChatKind kind, string sender, string text)

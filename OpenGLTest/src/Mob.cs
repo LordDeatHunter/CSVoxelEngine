@@ -77,4 +77,17 @@ public abstract class Mob
         Facing = facing;
         SetVelocity(velocity);
     }
+
+    /// <summary>
+    /// Adopts a server broadcast on a client: the authoritative position, facing, health and
+    /// velocity, without the spawn clamps <see cref="RestoreState"/> applies (a client may see a
+    /// mob at 0 health for the frame before the death broadcast removes it).
+    /// </summary>
+    internal void NetworkSetState(Vector3 position, float facing, int health, Vector3 velocity)
+    {
+        Position = position;
+        Facing = facing;
+        Health = Math.Clamp(health, 0, Math.Max(1, Type.MaxHealth));
+        SetVelocity(velocity);
+    }
 }

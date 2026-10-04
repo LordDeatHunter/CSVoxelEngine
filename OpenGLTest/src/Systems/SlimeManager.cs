@@ -20,6 +20,9 @@ public sealed class SlimeManager
 
     public IReadOnlyList<Slime> Slimes => _slimes;
 
+    /// <summary>Removes a slime the server no longer reports (a client's network reconcile).</summary>
+    public bool Remove(Slime slime) => _slimes.Remove(slime);
+
     /// <summary>Health the slimes took off the player during the most recent
     /// <see cref="Update"/>; the caller applies it to <see cref="PlayerHealth"/> and shakes.</summary>
     public int DamageDealtThisFrame { get; private set; }

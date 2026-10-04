@@ -1317,6 +1317,8 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const double NetPlayerListSeconds = 0.1;
     public const double NetPlayerStateSeconds = 0.05;
     public const double NetTimeSyncSeconds = 1.0;
+    // How often the server broadcasts the live mobs and drops.
+    public const double NetEntitySyncSeconds = 0.1;
     // How long a connect attempt may hang before the client gives up and returns to the menu.
     public const double NetConnectTimeoutSeconds = 10.0;
     // Sent roughly this often so an idle connection is not mistaken for a dead one.

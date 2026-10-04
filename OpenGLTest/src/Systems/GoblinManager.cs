@@ -31,6 +31,9 @@ public sealed class GoblinManager
 
     public IReadOnlyList<Goblin> Goblins => _goblins;
 
+    /// <summary>Removes a goblin the server no longer reports (a client's network reconcile).</summary>
+    public bool Remove(Goblin goblin) => _goblins.Remove(goblin);
+
     /// <summary>Stones in flight; drawn and mirrored like the player's own throws.</summary>
     public IReadOnlyList<ThrownProjectile> Stones => _stones;
 

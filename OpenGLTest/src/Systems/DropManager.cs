@@ -24,6 +24,9 @@ public class DropManager
 
     public IReadOnlyList<ItemDrop> Drops => _drops;
 
+    /// <summary>Drops every tracked drop (a client rebuilds its list from a server snapshot).</summary>
+    public void Clear() => _drops.Clear();
+
     /// <summary>
     /// Block ids collected during the most recent <see cref="Update"/>. Valid until the next one.
     /// </summary>

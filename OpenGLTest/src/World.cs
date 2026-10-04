@@ -108,6 +108,11 @@ public class World : IItemUseWorld
     private readonly List<RemotePlayer> _remotePlayers = [];
     private readonly HashSet<int> _remoteIdsSeen = [];
 
+    // Multiplayer client: server-authoritative mobs by network id, and the reconcile scratch.
+    private readonly Dictionary<int, Mob> _netMobs = [];
+    private readonly HashSet<int> _netMobsSeen = [];
+    private readonly List<int> _netMobRemovals = [];
+
     // Null on the headless path (tests), where Now runs off the summed Update deltas instead
     private readonly IWindow? _window;
     private double _headlessTime;
@@ -683,6 +688,76 @@ public class World : IItemUseWorld
         _fluidManager.ScheduleAround(cell);
         _leafDecay.ScheduleAround(cell);
         _falling.TryTopple(_chunkManager, _lodManager, _fluidManager, x, y, z);
+    }
+
+    /// <summary>
+    /// Reconciles the client's mobs and drops with a server snapshot: mobs are spawned, updated or
+    /// removed by network id, drops are rebuilt wholesale. Only a client calls this; it never ticks
+    /// the mob AI, so the entities it holds are server state drawn in place.
+    /// </summary>
+    public void ApplyNetworkEntities(IReadOnlyList<NetEntity> entities)
+    {
+        _netMobsSeen.Clear();
+        for (var i = 0; i < entities.Count; i++)
+        {
+            var entry = entities[i];
+            if (entry.Kind == NetEntityKind.Drop)
+                continue;
+            _netMobsSeen.Add(entry.Id);
+            if (_netMobs.TryGetValue(entry.Id, out var existing) && KindMatches(existing, entry.Kind))
+            {
+                existing.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
+                continue;
+            }
+
+            if (existing != null)
+                RemoveNetMob(entry.Id);
+            if (SpawnNetMob(entry) is { } mob)
+                _netMobs[entry.Id] = mob;
+        }
+
+        _netMobRemovals.Clear();
+        foreach (var id in _netMobs.Keys)
+            if (!_netMobsSeen.Contains(id))
+                _netMobRemovals.Add(id);
+        foreach (var id in _netMobRemovals)
+            RemoveNetMob(id);
+
+        _dropManager.Clear();
+        for (var i = 0; i < entities.Count; i++)
+        {
+            var entry = entities[i];
+            if (entry.Kind == NetEntityKind.Drop)
+                _dropManager.SpawnRestored(entry.ItemId, entry.Position, entry.Velocity, 0f);
+        }
+
+        RefreshMobs();
+    }
+
+    private static bool KindMatches(Mob mob, NetEntityKind kind) =>
+        kind == NetEntityKind.Slime ? mob is Slime : kind == NetEntityKind.Goblin && mob is Goblin;
+
+    private Mob? SpawnNetMob(NetEntity entry)
+    {
+        Mob? mob = entry.Kind switch
+        {
+            NetEntityKind.Slime => _slimes?.Spawn(entry.Position),
+            NetEntityKind.Goblin => _goblins?.Spawn(entry.Position, entry.Ammo),
+            _ => null,
+        };
+        mob?.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
+        return mob;
+    }
+
+    private void RemoveNetMob(int id)
+    {
+        if (!_netMobs.Remove(id, out var mob))
+            return;
+        switch (mob)
+        {
+            case Slime slime: _slimes?.Remove(slime); break;
+            case Goblin goblin: _goblins?.Remove(goblin); break;
+        }
     }
 
     /// <summary>
