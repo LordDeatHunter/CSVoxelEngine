@@ -1256,11 +1256,11 @@ public class World : IItemUseWorld
         var slimes = Slimes;
         for (var i = 0; i < slimes.Count; i++)
             if (!slimes[i].IsDead)
-                mobs.Add(CaptureMob(slimes[i], null));
+                mobs.Add(MobSaveCodec.Capture(slimes[i], null));
         var goblins = Goblins;
         for (var i = 0; i < goblins.Count; i++)
             if (!goblins[i].IsDead)
-                mobs.Add(CaptureMob(goblins[i], goblins[i].Ammo));
+                mobs.Add(MobSaveCodec.Capture(goblins[i], goblins[i].Ammo));
         mobs.AddRange(_pendingMobs);
 
         _dropSort.Clear();
@@ -1297,16 +1297,6 @@ public class World : IItemUseWorld
             Log.Warn($"Entity save: skipped {unnamed} drop(s) of an item with no save name");
         return new EntitySaveData { Mobs = mobs, Drops = drops };
     }
-
-    private static EntitySaveData.MobData CaptureMob(Mob mob, int? ammo) => new()
-    {
-        Type = mob.Type.Name,
-        Position = [mob.Position.X, mob.Position.Y, mob.Position.Z],
-        Health = mob.Health,
-        Facing = mob.Facing,
-        Velocity = [mob.Velocity.X, mob.Velocity.Y, mob.Velocity.Z],
-        Ammo = ammo
-    };
 
     /// <summary>Enqueues <see cref="EntitySaveCodec.FileName"/>; does nothing without a save store.</summary>
     private void SaveEntityState()
