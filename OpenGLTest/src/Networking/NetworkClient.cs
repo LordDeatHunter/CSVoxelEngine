@@ -99,9 +99,11 @@ public sealed class NetworkClient(ServerAddress address, string playerName, doub
             _reader.Start();
             Status = NetworkStatus.Handshaken;
         }
-        catch (Exception e) when (e is SocketException or System.IO.IOException or ObjectDisposedException or InvalidOperationException)
+        catch (Exception e)
         {
-            Fail(e.Message);
+            // Runs on a dedicated thread: any escape would tear the process down, so a refused,
+            // unreachable or timed-out server is reported through Status instead.
+            Fail(e is AggregateException ? e.InnerException?.Message ?? e.Message : e.Message);
         }
     }
 

@@ -417,9 +417,17 @@ public static class Program
         try
         {
             WorldSeed.Apply(server.Seed);
-            world = new World(null!, null!, null!, null!, null!, null!, null, null);
+            // A client renders, so it is a real world with the renderer's pools and the window,
+            // just with no save store (the server owns persistence).
+            world = new World(renderManager.gl, renderManager.OpaqueChunkGeometry,
+                renderManager.TranslucentChunkGeometry, renderManager.LodGeometry,
+                windowManager.Window, inputManager.InputContext, sfx);
             world.Player.Rig = renderManager.PlayerRig;
             world.BlockEdited = SendBlockEdit;
+            renderManager.LightSource = world.GetChunkManager();
+            var fb = windowManager.Window.FramebufferSize;
+            if (fb.Y > 0)
+                world.Camera.SetAspectRatio(fb.X / (float)fb.Y);
         }
         catch (Exception e)
         {
@@ -432,6 +440,7 @@ public static class Program
         // A client follows the server's day clock from the hello.
         world.SetLightingTime(server.Time);
         netPlayerId = server.PlayerId;
+        ResetWorldViews();
         loadingView.Begin(LoadingScreenKind.Loading, server.WorldName, "Loading world...");
         Log.WriteLine($"Multiplayer: connected to {client.Address} as '{chatView.LocalName}' (#{server.PlayerId}) on '{server.WorldName}'");
     }

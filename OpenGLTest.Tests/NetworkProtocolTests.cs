@@ -51,6 +51,18 @@ public sealed class NetFramingTests
         Assert.Equal(-10f, reader.ReadFloat());
         Assert.Equal((byte)3, reader.ReadByte());
     }
+
+    [Fact]
+    public void ConnectingToAClosedPortFailsWithoutThrowing()
+    {
+        // The connect runs on a dedicated thread and any escape would crash the game, so a refused
+        // port must come back as a Failed status with a reason, never an exception.
+        using var client = new NetworkClient(new ServerAddress("127.0.0.1", 1), "Tester", 2.0);
+        client.Connect();
+
+        Assert.Equal(NetworkStatus.Failed, client.Status);
+        Assert.False(string.IsNullOrEmpty(client.Error));
+    }
 }
 
 /// <summary>
