@@ -15,7 +15,7 @@ provides it, but **macOS (stuck at GL 4.1) is no longer supported**. The optiona
 `MESHER_PLAN.md` (a compute cull writing the indirect buffer) would add
 `glMultiDrawElementsIndirectCount`.
 
-There is a single executable project. Historical naming quirks to be aware of:
+The game is one project under `OpenGLTest/`; the item debugger (`OpenGLTest.ItemDebugger/`) and the dedicated server (`OpenGLTest.Server/`) are separate executables that reference it. Historical naming quirks to be aware of:
 
 - The solution is `OpenGLTest.sln`, the project folder is `OpenGLTest/`, the csproj is `OpenGLTest/silkgltriangle.csproj`, and **all code lives in the `silkgltriangle` namespace**. Keep new files in that namespace unless deliberately renaming everything.
 - Verification is by building and running the game **and** by the xUnit tests in `OpenGLTest.Tests/` (headless, no window: `dotnet test OpenGLTest.Tests/silkgltriangle.Tests.csproj -c Release`) plus the scripted visual scenarios under `OpenGLTest/visual-examples/` (see `VOXEL_SCRIPT` below). There is no CI.
@@ -128,7 +128,8 @@ Environment variables for scripted captures:
 - `ITEM_DEBUGGER_VIEW=first` starts the ITEMS view in first person.
 - `ITEM_DEBUGGER_LOOK=yaw,pitch` pins the first-person look angles.
 
-The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, `C` to toggle creative mode (placing costs nothing, breaking drops nothing; double-tap Space toggles flight, but only while creative — flight is noclip and Space/Left Ctrl move up/down while flying), Left Shift to sprint (1.5x on foot, 10x while flying), hold left-click to punch first, then mine: a mob (a slime or a goblin) inside the forward punch cone (3 blocks, 30° half-angle, line of sight required; only the nearest is hit) takes the held item's `entityDamage` (1 bare-hand, 3 for the primitive tools, 5 for the copper tools, 6 for the obsidian blade) and a knockback shove instead of being mined through (an item declaring `attack: "slice"` — the obsidian blade — instead swings a two-phase blade sweep: each click hits the nearest two mobs in the forward hemisphere of the same reach, the buffered return swing lands at half power, and the arm and blade are carried across the front), while a clear cone mines the targeted block (hit-based: one hit per the held item's `tool.hitDelayMs`, deals the item's `blockDamage`, 0.5 bare-hand, against the block's float `hardness`, declared in its JSON - 5 for most blocks, 8 for malachite ore, 24 for a full-cube trunk of the `tree_wood` logs and 1 for leaves; a tree-wood cell scales its block's `hardness` by the thickness in its `WoodState` (`Mining.HardnessOf`: `hardness * (tipHardness + (1 - tipHardness) * thickness / WoodState.FullCube)`, so the thinnest wood keeps `wood.tipHardness` of it and placed, detached wood is as hard as a trunk), and `0` means it pops on first contact like a pebble; a block with `requiresTool` and a `tools` dict needs a listed tool tag at or above its required tier, and the wrong tool whiffs for 0 damage and no progress; damage resets if you release, switch target or switch tool; instant while creative, which ignores the gate; a click with no block under the crosshair still swings the fist); a stepped crack-sprite overlay drawn on the block's faces via `break-*.glsl` from `assets/textures/environment/break_progress.png` (8 stacked 32x32 frames, the top one blank); each hit pops the block out and back via `RenderManager.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), 1-10 to pick one of the 10 hotbar slots, `E` for the list inventory (a search field sits over the tabs: typing names the owned items and the recipes that make or consume a matching thing, ranked with prefix hits and owned items first, and clicking a result picks the item or opens its recipe; blocks/tools/misc tabs with shared caps of 2048/8/2048; click a row to preview, click a hotbar slot to equip, same item again to unequip; the world keeps running and `E`/Escape closes it, and a focused field takes the keyboard so typing never moves the player). A new survival world starts with **nothing** (`Inventory.Empty`); `C` creative mode turns the same Blocks/Tools/Misc tabs into the **whole item catalog** (`CreativeCatalog`) - clicking a row grants one, each row's `[+1]` / `[+10]` / `[+100]` button grants that many, and a red `[X]` clears the id's counts (`Inventory.RemoveAll`), all through the ordinary `Inventory.Add` - while the Craft tab keeps listing every recipe. `X` to toggle debug logging (FPS/position/water state to console), Escape to open the pause menu (RESUME / SETTINGS / SAVE & QUIT; Escape on its settings page steps back to it, and on the main page resumes). SAVE & QUIT presents a `Saving...` frame, calls `World.SaveAndDispose` on the next update and returns to the main menu's worlds page. None of these keys act while a world is still loading.
+The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, `C` to toggle creative mode (placing costs nothing, breaking drops nothing; double-tap Space toggles flight, but only while creative — flight is noclip and Space/Left Ctrl move up/down while flying), Left Shift to sprint (1.5x on foot, 10x while flying), hold left-click to punch first, then mine: a mob (a slime or a goblin) inside the forward punch cone (3 blocks, 30° half-angle, line of sight required; only the nearest is hit) takes the held item's `entityDamage` (1 bare-hand, 3 for the primitive tools, 5 for the copper tools, 6 for the obsidian blade) and a knockback shove instead of being mined through (an item declaring `attack: "slice"` — the obsidian blade — instead swings a two-phase blade sweep: each click hits the nearest two mobs in the forward hemisphere of the same reach, the buffered return swing lands at half power, and the arm and blade are carried across the front), while a clear cone mines the targeted block (hit-based: one hit per the held item's `tool.hitDelayMs`, deals the item's `blockDamage`, 0.5 bare-hand, against the block's float `hardness`, declared in its JSON - 5 for most blocks, 8 for malachite ore, 24 for a full-cube trunk of the `tree_wood` logs and 1 for leaves; a tree-wood cell scales its block's `hardness` by the thickness in its `WoodState` (`Mining.HardnessOf`: `hardness * (tipHardness + (1 - tipHardness) * thickness / WoodState.FullCube)`, so the thinnest wood keeps `wood.tipHardness` of it and placed, detached wood is as hard as a trunk), and `0` means it pops on first contact like a pebble; a block with `requiresTool` and a `tools` dict needs a listed tool tag at or above its required tier, and the wrong tool whiffs for 0 damage and no progress; damage resets if you release, switch target or switch tool; instant while creative, which ignores the gate; a click with no block under the crosshair still swings the fist); a stepped crack-sprite overlay drawn on the block's faces via `break-*.glsl` from `assets/textures/environment/break_progress.png` (8 stacked 32x32 frames, the top one blank); each hit pops the block out and back via `RenderManager.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), 1-10 to pick one of the 10 hotbar slots, `E` for the list inventory (a search field sits over the tabs: typing names the owned items and the recipes that make or consume a matching thing, ranked with prefix hits and owned items first, and clicking a result picks the item or opens its recipe; blocks/tools/misc tabs with shared caps of 2048/8/2048; click a row to preview, click a hotbar slot to equip, same item again to unequip; the world keeps running and `E`/Escape closes it, and a focused field takes the keyboard so typing never moves the player). A new survival world starts with **nothing** (`Inventory.Empty`); `C` creative mode turns the same Blocks/Tools/Misc tabs into the **whole item catalog** (`CreativeCatalog`) - clicking a row grants one, each row's `[+1]` / `[+10]` / `[+100]` button grants that many, and a red `[X]` clears the id's counts (`Inventory.RemoveAll`), all through the ordinary            `Inventory.Add` - while the Craft tab keeps listing every recipe. `T` opens the chat (type, Enter sends, Escape closes, the arrow keys walk sent messages; while it is open the keyboard is captured so the player never moves while typing) and works in singleplayer and on a server. `X` to toggle debug logging               
+           (FPS/position/water state to console), Escape to open the pause menu (RESUME / SETTINGS / SAVE & QUIT;        Escape on its settings page steps back to it, and on the main page resumes). SAVE & QUIT presents a `Saving...` frame, calls `World.SaveAndDispose` on the next update and returns to the main menu's worlds page. None of these keys act while a world is still loading.
 
 `X` also raises the **frame profiler overlay** under the FPS counter, and prints the same
 snapshot to the console once a second so a headless run's log carries it. Console writes go
@@ -559,6 +560,13 @@ OpenGLTest/
       PlayerSaveCodec.cs       # reads/writes player.json
       EntitySaveData.cs        # the entities.json shape: mobs (health/facing/velocity/ammo) and drops
       EntitySaveCodec.cs       # reads/writes entities.json
+      ServerInfo.cs            # one saved server: display name, host, port, last connected (servers.json)
+      ServerStore.cs           # servers.json: list, add, delete, touch (unique names, most recent first)
+    Networking/                # GL-free multiplayer protocol and client (see "Multiple players and chat")
+      NetProtocol.cs           # NetMessage ids, length-prefixed framing, PacketWriter/PacketReader
+      ServerAddress.cs         # host[:port] parsing and formatting (the default port)
+      NetworkClient.cs         # the client: connect + handshake, reader thread, inbound queue, sends
+      RemotePlayer.cs          # another player as the client sees them: pose smoothing + a PlayerModel
     UI/                        # UI state, layout and rules, mostly GL-free (UIRenderer draws them)
       PauseMenu.cs             # pause menu pages, hit kinds, view and PauseMenuLayout (RESUME/SETTINGS/SAVE & QUIT)
       SettingsMenu.cs          # settings page rows, tabs, sliders and SettingsLayout (shared by both menus)
@@ -582,6 +590,7 @@ OpenGLTest/
       TextWrap.cs              # GL-free word wrap against a measure delegate
       GameSettings.cs          # player settings with JSON persistence (settings.json)
       Compass.cs               # HUD compass heading math
+      Chat.cs                  # ChatKind/ChatMessage, ChatView (log/input/history) and ChatLayout
       Primitives.cs            # Vertex-layout mesh factories for simple shapes
     Items/                     # the Item class hierarchy ItemFactory hands out per use action
       Item.cs, ItemFactory.cs  # the abstract item; the per-use.action factory building the singletons
@@ -714,6 +723,10 @@ OpenGLTest.ItemDebugger/              # the item/entity/tree preview tool (ITEMS
   EntityPreviewState.cs               # GL-free state of the ENTITIES tab
   TreePreviewState.cs                 # GL-free state of the TREES tab: species, seed, step, per-step
                                       #   snapshots, ground plane and framing bounds
+OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple players and chat")
+  ServerProgram.cs                    # content load, world/port prompts, headless World + tick loop
+  GameServer.cs                       # TCP listener, per-connection reader threads, main-thread Pump
+  AssetRoot.cs                        # locate assets/ walking up from the server's working directory
 tools/generate-goblin-skin.ps1        # deterministic generator of goblin.png; its header pins the UV layout
 tools/generate-leaf-textureless.ps1   # deterministic grey leaf tiles for the biome tint (scaled to BiomeTintTextureGrey)
 tools/generate-tree-textures.ps1      # placeholder baobab / stone pine log and leaf tiles tinted from the oak art
@@ -1385,6 +1398,88 @@ pure function of the seed: only **deltas** and the seed are written.
   kiln, casting — a reloaded kiln is plain blocks plus its multiblock state bytes until a
   right-click re-registers it through `KilnManager.Ensure`, with no fuel or crucible), primed
   TNT, falling blocks, projectiles in flight and toppling trees.
+
+## Multiple players and chat
+
+A dedicated **server** is a fourth project (`OpenGLTest.Server/`, `dotnet run --project
+OpenGLTest.Server/Server.csproj -c Release`, working directory with `assets/` up the tree — the
+program sets its own current directory to the assets parent so `FileUtils`' relative `assets/...`
+paths resolve). It is a **CLI**: it loads content headlessly (`ContentRegistry.Load` +
+`TextureAtlas.RegisterTilesWithoutUpload` + `ContentRegistry.BakeModels`, the `TestContent`
+recipe), lists `WorldStore.List()` and asks for a world number or `N` for a new one (name and
+optional seed), asks for a port (default `ServerAddress.DefaultPort`, 25566), then builds a
+**server-mode** `World` (`new World(..., store, serverMode: true)`) over that world's
+`ChunkSaveStore` and runs `World.Update(dt, null)` in a ~1 ms loop with `GameServer.Pump(dt)`.
+Ctrl+C or a typed `stop` shuts down through `SaveAndDispose`, so a server session persists its
+edits. Server mode sets `ChunkManager.Headless` (finished meshes are marked and their light
+published by `Chunk.MarkMeshedHeadless`, the geometry dropped — a headless world has no pools),
+hovers the camera creative+flying so mobs cannot hurt it, and skips the LodGen threads; the
+global `WorldSeed` still applies, and the six `GenerationalCache` sites behave exactly as in the
+game, which is what lets a headless World run `Update` over real terrain (the LOD builder already
+drops real builds when its pool is null). `ServerWorldTests` locks this down.
+
+**The main menu** grew a fourth button, MULTIPLAYER (the main page no longer shares
+`PauseMenuLayout`'s three-button stack; `MainMenuLayout.MainButtonCentre`/`MainTitleTop` own the
+four-button page). It opens the multiplayer page, which is shaped exactly like the worlds page
+(`MainMenuPage.Multiplayer`): a scrolled list of `ServerStore.List()` (name over address) with
+CONNECT / DELETE per row, ADD SERVER / DIRECT CONNECT / BACK across the bottom, and an empty
+state. ADD SERVER (`MainMenuPage.AddServer`) takes a NAME and an ADDRESS; DIRECT CONNECT
+(`MainMenuPage.DirectConnect`) takes just an ADDRESS. `ServerAddress.TryParse` accepts
+`host`, `host:port`, `[ipv6]:port` and a bare IPv6, defaulting the port; a bad address keeps the
+page up with `MainMenuController.BadAddressNotice`. Servers live in one JSON file,
+`%APPDATA%/CSVoxelEngine/servers.json`, owned by `ServerStore` (unique case-insensitive names via
+`WorldNames.Unique`, most-recently-connected first, a temp-file write); a row CONNECT touches it
+and returns a `ConnectTarget` through `MainMenuAction.Connect`, which Program turns into a real
+session.
+
+**The wire protocol** is in `OpenGLTest/src/Networking/NetProtocol.cs`: `NetFraming` writes a
+4-byte little-endian length then the payload whose first byte is a `NetMessage`, and
+`PacketWriter`/`PacketReader` carry the fields (`BinaryWriter`/`BinaryReader`, strings 7-bit
+length prefixed, `Vector3` as three floats). `NetFraming.ProtocolVersion` must match in both
+hellos. Messages: `ClientHello` (version, name), `ServerHello` (version, player id, world name,
+seed, day clock, spawn), `KeepAlive`, `ChatSend`/`ChatMessage` (kind, sender, text),
+`PlayerState` (eye, yaw, pitch, flags), `PlayerList` (id, name, eye, yaw, pitch, flags) and
+`BlockEdit`/`BlockChange` (cell, id, state).
+
+**The server** (`OpenGLTest.Server/GameServer.cs`) is a `TcpListener` with one reader thread per
+connection that only frames inbound bytes onto a `ConcurrentQueue`; `Pump` (main thread) drains it
+and owns every piece of `World` state, so the simulation stays single-threaded exactly like the
+client. On `ClientHello` it assigns an id, replies `ServerHello`, and broadcasts a system chat
+and the player list; thereafter it relays chat, records `PlayerState` into the player list (sent
+every `NetPlayerListSeconds`, 10 Hz), syncs the day clock (`NetTimeSyncSeconds`), and on
+`BlockEdit` applies `World.ApplyNetworkBlockEdit` then broadcasts `BlockChange` to everyone. The
+severed player is removed on disconnect. The camera focus follows the **centroid** of the
+connected players (`World.SetServerFocus`, a `Camera.TestTeleport`), so chunks stream around
+everyone.
+
+**The client** (`OpenGLTest/src/Networking/NetworkClient.cs`) connects on a background thread from
+`Program.BeginConnect` (the CONNECT click records `PendingWork.Connect` and presents the
+"Connecting..." loading screen, like PLAY), handshakes, then a reader thread queues frames.
+`Program.UpdateConnecting` waits for `NetworkStatus.Handshaken`, applies `WorldSeed.Apply(seed)` and
+builds a **storeless** client `World` from the shared seed (worldgen is a pure function of the
+seed, so both terrains match without streaming chunk bytes), teleports to the server's clock and
+plays. `UpdateNetwork` sends `PlayerState` every `NetPlayerStateSeconds` and drains the queue:
+chat feeds `ChatView`, `TimeSync` calls `World.SetLightingTime`, `PlayerList` reconciles
+`World.SyncRemotePlayers`, and `BlockChange` calls `World.ApplyNetworkBlockEdit`. Remote players
+are `RemotePlayer`s whose `PlayerModel` walk cycle runs off the distance they moved; `World`
+updates them each frame and `RenderManager.RenderRemotePlayers` draws each as the player body at
+its broadcast eye (before the contact-AO pass, so they receive it). A lost connection, or SAVE &
+QUIT while connected, disposes the storeless client world and returns to the multiplayer page.
+
+**Chat** is universal: `ChatView`/`ChatLayout` (`OpenGLTest/src/UI/Chat.cs`, GL-free, tested) hold
+a 100-line log, a 200-char input, arrow-key history and the open flag. `T` opens it from a clean
+play state, `Enter` sends, `Escape` closes; while it is open the keyboard is withheld from the
+camera exactly like a focused inventory field, and the log sits bottom-left above the hotbar
+(`UIRenderer.DrawChat`, its own `RenderManager.RenderChat` UI pass). In singleplayer `Program.
+SendChat` echoes locally; in multiplayer it sends `ChatSend` and the server's broadcast is the
+only copy, so a line never appears twice.
+
+**Known gaps** (open): block edits only sync the **directly edited cell**, so a felled crown, a
+tree's decay, TNT craters, fluids, falling blocks and mobs are simulated independently on both
+ends and can diverge (mobs are not synced at all yet, and each side spawns its own); the client
+does not send its inventory or health; there is no authentication, encryption or server-side
+validation; and a client's local `BlockEdited` is only wired while connected (null in
+singleplayer and on the server, so server-applied changes never echo).
 
 ## Biomes
 
