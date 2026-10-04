@@ -53,7 +53,7 @@ public static class WorldGenerationConfig
     //
     // Why so far below linear, and the reason a bigger pool must not be re-proposed: a LOD build
     // is terrain generation in disguise. LodRegion.BuildMeshData prefetches 36 / 100 / 324 chunk
-    // columns at levels 0 / 1 / 2 through Chunk.GetColumnHeights, and a column that misses
+    // columns at levels 0 / 1 / 2 through ColumnCache.GetHeights, and a column that misses
     // Chunk.ColumnCache is generated on the spot (measured medians 17.7 / 17.6 / 65.3 ms per
     // build, tracking the column count, not the mesh). The four chunk-gen threads are doing that
     // same work on that same cache at that same moment, so LodGen workers do not add throughput to
@@ -387,7 +387,7 @@ public const float DayLengthSeconds = 1200f;
     public const int LoadingSpinnerDots = 8;
 
     // --- Deterministic worldgen caches (GenerationalCache) ---
-    // Chunk.GetColumnData's cache. Column data depends only on (x, z), so one entry serves the whole
+    // ColumnCache.Get's cache. Column data depends only on (x, z), so one entry serves the whole
     // vertical chunk stack and the far LOD alike.
     //
     // CAPACITY is unchanged from the wholesale-Clear() era on purpose: the residency ceiling does not

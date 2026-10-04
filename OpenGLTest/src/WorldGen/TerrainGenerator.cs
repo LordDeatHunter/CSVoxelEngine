@@ -5,7 +5,7 @@ namespace silkgltriangle;
 /// <summary>
 /// The 2D half of world generation: terrain heights with ravines cut in, dirt depth and the
 /// per-column cave inputs (entrance zones, cave intensity). Everything is a pure function of
-/// (x, z) and the seed, so results are cached per chunk column by <see cref="Chunk.GetColumnData"/>
+/// (x, z) and the seed, so results are cached per chunk column by <see cref="ColumnCache.Get"/>
 /// and shared by the vertical chunk stack and the far LOD. Noise instances are built by
 /// <see cref="Reseed"/>, once at startup and again only by <see cref="WorldSeed.Apply"/> while no
 /// worker runs, and are only read otherwise, which keeps this safe to call from any worker thread.

@@ -731,7 +731,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// in the completed queue; nothing is applied here.
     /// <para>
     /// A mesh build reads worldgen state (<c>Chunk.SubmergedSurfaceCode</c> falls back to
-    /// <see cref="Chunk.GetColumnData"/>), so a world-seed swap must wait for this as well as
+    /// <see cref="ColumnCache.Get"/>), so a world-seed swap must wait for this as well as
     /// for the worker joins. <c>World.SaveAndDispose</c> calls <see cref="ChunkGenerationWorker.Stop"/>,
     /// then <see cref="LodManager.Stop"/>, then this, and only when all three return true does it
     /// free the chunks through <see cref="ReleaseAll"/> and call <see cref="WorldSeed.EndWorld"/>

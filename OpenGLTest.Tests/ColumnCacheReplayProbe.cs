@@ -145,7 +145,7 @@ public sealed class ColumnCacheReplayProbe
 
     /// <summary>
     /// TODAY'S POLICY, reimplemented as a reference oracle: probe, compute on a miss, and drop the
-    /// WHOLE table when it reaches the cap. This is <c>Chunk.GetColumnData</c> exactly as it stood at
+    /// WHOLE table when it reaches the cap. This is <c>ColumnCache.Get</c> exactly as it stood at
     /// HEAD 5124d26 - <c>TryGetValue</c>, then <c>if (Count &gt;= limit) Clear()</c>, then insert -
     /// with the <c>ConcurrentDictionary</c> swapped for a plain one because the probe is
     /// single-threaded and the policy, not the container, is what is being measured.

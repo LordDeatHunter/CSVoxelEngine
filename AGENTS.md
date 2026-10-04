@@ -461,7 +461,8 @@ OpenGLTest/
     WorldSeed.cs               # the runtime world seed: Apply reseeds worldgen + resets caches/LOD edits; BeginWorld/EndWorld
     WorldPhase.cs              # Loading / Playing / Disposed
     WorldLoadGate.cs           # GL-free: when a loading world may play (ready sphere meshed, or timeout); load progress
-    Chunk.cs                   # 16^3 block storage (byte IDs), block/column fill + cave carving via WorldGen/, mesh data generation (greedy pass + per-quad emitters) + AO
+    Chunk.cs                   # 16^3 block storage (byte IDs), state/snapshot save-restore and mesh upload; worldgen
+                               #   column fill and mesh/light generation live in Systems/Chunks/ (ColumnCache/ChunkMesher/ChunkLighting)
     MeshScratch.cs             # per-thread scratch buffers of the binary greedy mesh pass
     CellBatchMesher.cs         # GL-free: meshes any TreeCell set with the real chunk mesher over scratch chunks
                                #   at their real positions inside an empty ring (the item debugger's TREES tab)
@@ -473,7 +474,8 @@ OpenGLTest/
     LightFlicker.cs            # GL-free per-cell flicker phase + curve for the campfire point lights
     SelectionOutlineMesh.cs    # GL-free selection outline: the 12 box edges as thin beams (no glLineWidth)
     ChunkGenerationWorker.cs   # background threads creating chunks around the camera
-    Camera.cs                  # FPS camera, physics (gravity/jump/collision), DDA raycast
+    Camera.cs                  # FPS camera pose, view/proj cache, shoulder/orbit modes; movement+physics and the DDA
+                               #   raycast live in Player/PlayerPhysics.cs and Systems/Interaction/BlockRaycaster.cs
     LodRegion.cs               # far-terrain LOD: region columns meshed at reduced resolution from heightmaps; per-column chunk-Y ranges for burial
     LodSkyExposure.cs          # GL-free coarse sky exposure the LOD mesher bakes into Vertex.Sun from its column-top grids
     LodSurface.cs              # per-column far-LOD surface overrides (edited top height + tile), beside LodRegion's caps
@@ -485,6 +487,9 @@ OpenGLTest/
     Combat.cs                  # GL-free punch rules: the forward cone (3 blocks, 30° half-angle)
                                #   and entity damage, shared by the punch loop and the tests
     SliceCombo.cs              # the blade's two-phase slice combo: press/queue/advance state
+    Player/                    # the player's rig shape and movement simulation
+      PlayerRig.cs             # the posed shape: pivots, cuboids, skin palette, mesh building (Blockbench or Steve)
+      PlayerPhysics.cs         # walk/fly/swim input -> body position, voxel collision, auto-step, knockback, water state
     Mob.cs                     # abstract base of every hostile (Slime, Goblin): position, health,
                                #   facing, hit flash, body box, TakeDamage/Shove
     Goblin.cs                  # the goblin: body physics, throw-then-melee AI, clip/event contract
@@ -560,6 +565,7 @@ OpenGLTest/
       PlayerSaveCodec.cs       # reads/writes player.json
       EntitySaveData.cs        # the entities.json shape: mobs (health/facing/velocity/ammo) and drops
       EntitySaveCodec.cs       # reads/writes entities.json
+      MobSaveCodec.cs          # a live Mob -> its EntitySaveData form (per-kind ammo)
       ServerInfo.cs            # one saved server: display name, host, port, last connected (servers.json)
       ServerStore.cs           # servers.json: list, add, delete, touch (unique names, most recent first)
     Networking/                # GL-free multiplayer protocol and client (see "Multiple players and chat")
@@ -659,6 +665,12 @@ OpenGLTest/
       ChunkDrawBatch.cs        # persistent-mapped 3-slot ring of DrawElementsIndirectCommands +
                                #   the vec4(origin, alpha) ChunkInfo SSBO read via gl_DrawID
       ChunkManager.cs          # chunk lifecycle: load/unload, dirty tracking, mesh scheduling
+      Interaction/             # GL-free interaction logic
+        BlockRaycaster.cs      # the DDA block raycast + line-of-sight segment test, split out of Camera.cs
+      Chunks/                  # GL-free chunk mesh/light/column generation, split out of Chunk.cs
+        ChunkMesher.cs         # the greedy pass + per-voxel procedural emitters + water-surface codes
+        ChunkLighting.cs       # the wide light-volume flood (sun + coloured lamp) + corner light queries
+        ColumnCache.cs         # the process-global column-data cache, its accessors and the column fill
       LodManager.cs            # LOD region lifecycle: worker thread builds, main thread uploads/unloads, burial flags
       FluidManager.cs          # the fluid tick: scheduled cells, level recompute + spread, batched remeshes
       LeafDecayManager.cs      # leaf decay + orphaned-wood crumble: a fixed tick over scheduled cells,
@@ -1592,8 +1604,8 @@ clips). The entity, the renderer and the item debugger all share that one parse.
 therefore fails content load, and with it every test through `TestContent`. Entity models reuse
 `BbmodelLoader`, which takes an optional required-group list: the player rig passes `RequiredParts`,
 entities pass none. The slime draws through `EntityModel`, which bakes the whole project into one mesh
-plus its skin. The goblin draws per part: `PlayerModel.PlayerRig.FromBbmodel(type.Model)` +
-`PlayerModel.BuildMeshes`, one mesh per group, each placed by its `EntityAnimator`.
+plus its skin. The goblin draws per part: `PlayerRig.FromBbmodel(type.Model)` +
+`PlayerRig.BuildMeshes`, one mesh per group, each placed by its `EntityAnimator`.
 
 Every hostile derives from the abstract **`Mob`** (`Mob.cs`). It exposes `Type`, `Position` (the body
 centre), `Health`/`IsDead`, `Facing` (yaw, the model faces -Z at 0), `HitFlash`, and the body box as

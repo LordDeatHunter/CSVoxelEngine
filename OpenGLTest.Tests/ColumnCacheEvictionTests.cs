@@ -28,7 +28,7 @@ namespace silkgltriangle.Tests;
 ///
 /// <para><b>How the same file runs on both trees.</b> This file must compile and run UNCHANGED
 /// against a pristine <c>git archive HEAD</c> export, so it touches only API that exists on both:
-/// <see cref="Chunk.GetColumnData"/>, <see cref="Chunk.GetColumnHeights"/>, a generated
+/// <see cref="ColumnCache.Get"/>, <see cref="ColumnCache.GetHeights"/>, a generated
 /// <see cref="Chunk"/> read through <see cref="Chunk.GetLocalBlock"/>,
 /// <see cref="LodRegion.BuildMeshData"/> and <c>TestContent</c>. It never names
 /// <c>GenerationalCache</c> and never reads a rotation counter, because the baseline has neither.

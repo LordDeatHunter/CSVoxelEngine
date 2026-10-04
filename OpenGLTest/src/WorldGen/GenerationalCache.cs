@@ -6,7 +6,7 @@ namespace silkgltriangle;
 
 /// <summary>
 /// The shared eviction policy behind the deterministic worldgen caches (PERF_TODO D2). Replaces the
-/// wholesale <c>Clear()</c>-at-the-cap that <see cref="Chunk.GetColumnData"/> and
+/// wholesale <c>Clear()</c>-at-the-cap that <see cref="ColumnCache.Get"/> and
 /// <c>WormCarver.GetCellWorms</c> both used, which threw away chunk generation's small,
 /// permanently-hot working set every time the far-LOD builder's one-shot column sweep tripped the
 /// limit. Entries are aged out one generation at a time instead, and anything read while it sits in

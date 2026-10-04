@@ -2,7 +2,7 @@ namespace silkgltriangle;
 
 /// <summary>
 /// The 2D world generation inputs for one chunk column, every array indexed by
-/// (x &lt;&lt; Chunk.SizeShift) | z. Computed once per column (see Chunk.GetColumnData) and shared
+/// (x &lt;&lt; Chunk.SizeShift) | z. Computed once per column (see ColumnCache.Get) and shared
 /// by the whole vertical chunk stack and the far LOD, so 2D noise is never re-evaluated per chunk.
 /// </summary>
 public sealed class ColumnData
