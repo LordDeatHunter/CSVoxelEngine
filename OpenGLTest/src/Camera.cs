@@ -18,6 +18,9 @@ public enum CameraMode
 
 public class Camera
 {
+    private readonly PlayerPhysics _physics = new();
+    private readonly IWindow? window;
+    private readonly IMouse? mouse;
     public Vector3 Position { get; private set; } = SpawnPosition();
     public float Yaw { get; private set; } = SpawnLook.X;
     public float Pitch { get; private set; } = SpawnLook.Y;
@@ -73,7 +76,7 @@ public class Camera
     public Vector3 ViewDirection => _shoulderViewDir.NormalizeSafeOr(GetForwardVector(), 1e-8f);
     [Obsolete("Renamed to IsCreative.")]
     public bool IsNoclip => IsCreative;
-    public float VerticalVelocity => _verticalVelocity;
+    public float VerticalVelocity => _physics.VerticalVelocity;
 
     /// <summary>
     /// Movement-speed multiplier from the pass-through blocks the body overlaps this frame: the
@@ -83,7 +86,7 @@ public class Camera
     /// </summary>
     public float MovementFactor { get; private set; } = 1f;
     public float GroundFriction { get; private set; } = BlockType.DefaultFriction;
-    public Vector2 HorizontalVelocity => _horizontalVelocity;
+    public Vector2 HorizontalVelocity => _physics.HorizontalVelocity;
 
     /// <summary>
     /// Whether the player is deep enough in a fluid to swim: some cell of the body's footprint
@@ -187,9 +190,9 @@ public class Camera
     private const float DoubleTapWindow = 0.3f;
 
     // F5 transition: the camera glides and the head fades over this long, eased.
-    private const float ShoulderTransitionSeconds = 0.5f;
+    internal const float ShoulderTransitionSeconds = 0.5f;
     // Orbit player turn speed, in exponential-damp units per second: fast but visibly lerped.
-    private const float OrbitTurnRate = 10f;
+    internal const float OrbitTurnRate = 10f;
     // Lateral glide rate for the shoulder<->orbit side offset, same ballpark as the F5 glide.
     private const float OrbitSideRate = 8f;
 
@@ -235,32 +238,11 @@ public class Camera
     private Matrix4x4 _viewProj;
     private Frustum _viewFrustum;
     private bool _vpValid;
-    private float _verticalVelocity;
     private Vector2 _lastMousePosition;
     private bool _firstMouseMovement = true;
     private bool _spaceWasPressed;
     private bool _creativeWasPressed;
     private float _timeSinceSpacePress = float.MaxValue;
-    // Averaged flow of the fluid cells the body is in, refreshed by UpdateWaterState
-    private Vector3 _waterFlow;
-
-    // Decaying horizontal shove from a mob hit, integrated into the walk each frame
-    private Vector3 _knockback;
-    private Vector2 _horizontalVelocity;
-
-    // Damage shake: trauma 0..1, fed by AddShake and decayed in Update. The view offset
-    // and roll ride trauma-squared, so small hits tremble and big hits lurch.
-    private float _trauma;
-    private float _shakeTime;
-    private Vector3 _shakeOffset = Vector3.Zero;
-    private float _shakeRoll;
-    private const float ShakeDecaySeconds = 0.7f;
-    private const float ShakeMaxOffset = 0.3f;
-    private const float ShakeMaxRoll = 0.04f;
-
-    private readonly IWindow? window;
-    private readonly IMouse? mouse;
-
     // Eye position standing on the terrain at the origin, so the player never starts buried
     private static Vector3 SpawnPosition()
     {
@@ -412,9 +394,7 @@ public class Camera
         Pitch = MathUtils.ClampPitch(pitch);
         // A teleport is not a fall: without this a scenario dropped at altitude keeps the
         // speed it built up before the jump and plummets through the frame it wanted
-        _verticalVelocity = 0f;
-        _knockback = Vector3.Zero;
-        _horizontalVelocity = Vector2.Zero;
+        _physics.ResetMotion();
         _shoulderOffset = Vector3.Zero;
         _shoulderViewDir = Vector3.Zero;
         _shoulderBlendT = IsShoulderSurf ? 1f : 0f;
@@ -453,8 +433,8 @@ public class Camera
         if (bobStrafe.HasValue) _bobStrafe = bobStrafe.Value;
         if (shoulderOffset.HasValue) _shoulderOffset = shoulderOffset.Value;
         if (shoulderViewDir.HasValue) _shoulderViewDir = shoulderViewDir.Value;
-        if (shakeOffset.HasValue) _shakeOffset = shakeOffset.Value;
-        if (shakeRoll.HasValue) _shakeRoll = shakeRoll.Value;
+        if (shakeOffset.HasValue) _physics.SetShakeOffset(shakeOffset.Value);
+        if (shakeRoll.HasValue) _physics.SetShakeRoll(shakeRoll.Value);
     }
 
     /// <summary>
@@ -477,7 +457,7 @@ public class Camera
     public void AddShake(float amount)
     {
         if (amount <= 0f) return;
-        _trauma = Math.Min(1f, _trauma + amount);
+        _physics.AddShake(amount);
     }
 
     /// <summary>
@@ -485,42 +465,6 @@ public class Camera
     /// a second — the normal collision still stops it, so a hit can never push the player through
     /// a wall — plus a small upward pop. Flight ignores both (and cannot be hit).
     /// </summary>
-    public void AddKnockback(Vector3 horizontalDirection, float horizontalSpeed, float lift)
-    {
-        horizontalDirection.Y = 0f;
-        if (horizontalDirection.LengthSquared() > 1e-6f)
-        {
-            horizontalDirection = Vector3.Normalize(horizontalDirection);
-            _knockback.X = horizontalDirection.X * horizontalSpeed;
-            _knockback.Z = horizontalDirection.Z * horizontalSpeed;
-        }
-        if (!IsFlying && lift > 0f)
-            _verticalVelocity = MathF.Max(_verticalVelocity, lift);
-    }
-
-    private void UpdateShake(float deltaTime)
-    {
-        _shakeTime += Math.Max(0f, deltaTime);
-        if (_trauma <= 0f)
-        {
-            _shakeOffset = Vector3.Zero;
-            _shakeRoll = 0f;
-            return;
-        }
-
-        _trauma = Math.Max(0f, _trauma - Math.Max(0f, deltaTime) / ShakeDecaySeconds);
-        // Squared falloff plus mismatched sines per axis, so the view shudders instead of
-        // swaying on one clean frequency.
-        var t = _trauma * _trauma;
-        var time = _shakeTime;
-        _shakeOffset = new Vector3(
-            MathF.Sin(time * 39.7f) * ShakeMaxOffset * t,
-            MathF.Sin(time * 44.3f + 1.3f) * ShakeMaxOffset * 0.6f * t,
-            MathF.Sin(time * 31.9f + 2.1f) * ShakeMaxOffset * t);
-        _shakeRoll = MathF.Sin(time * 47.7f + 0.7f) * ShakeMaxRoll * t;
-    }
-
-    /// <summary>
     /// While set, mouse movement no longer turns the view (the [E] panel owns the cursor).
     /// Position still updates so reopening the game never jumps the look.
     /// </summary>
@@ -550,273 +494,8 @@ public class Camera
         Pitch = MathUtils.ClampPitch(Pitch);
     }
 
-    public void Update(float deltaTime, IKeyboard? keyboard, ChunkManager chunkManager)
-    {
-        if (keyboard == null || chunkManager == null)
-            return;
-
-        UpdateCreativeToggle(keyboard);
-        UpdateFlightToggle(deltaTime, keyboard);
-        UpdateShoulderToggle(keyboard);
-        _shoulderBlendT = Math.Clamp(_shoulderBlendT
-            + (IsShoulderSurf ? deltaTime : -deltaTime) / ShoulderTransitionSeconds, 0f, 1f);
-        UpdateWaterState(chunkManager);
-        _knockback.X = MathUtils.Damp(_knockback.X, 0f, KnockbackDamping, deltaTime);
-        _knockback.Z = MathUtils.Damp(_knockback.Z, 0f, KnockbackDamping, deltaTime);
-
-        var sprinting = keyboard.IsKeyPressed(Key.ShiftLeft);
-        var moveSpeed = BaseSpeed * (sprinting ? (IsFlying ? FlyBoostMultiplier : SprintMultiplier) : 1f);
-        var direction = IsOrbit ? ViewDirection : GetForwardVector();
-        var right = Vector3.Normalize(Vector3.Cross(direction, Vector3.UnitY));
-        var forward = Vector3.Normalize(new Vector3(direction.X, 0f, direction.Z));
-
-        Vector3 moveInput = Vector3.Zero;
-        if (keyboard.IsKeyPressed(Key.W)) moveInput += forward;
-        if (keyboard.IsKeyPressed(Key.S)) moveInput -= forward;
-        if (keyboard.IsKeyPressed(Key.A)) moveInput -= right;
-        if (keyboard.IsKeyPressed(Key.D)) moveInput += right;
-
-        if (moveInput.LengthSquared() > 1f)
-            moveInput = Vector3.Normalize(moveInput);
-
-        // Orbit faces its motion, so it is always walking forward, never backing up.
-        var backing = !IsOrbit && keyboard.IsKeyPressed(Key.S) && !keyboard.IsKeyPressed(Key.W);
-        if (backing && !IsFlying) moveSpeed *= 0.3f;
-
-        // In orbit the body turns toward the motion (or, after a click, toward the aim)
-        // while the camera orbits freely; everywhere else it already faces the camera.
-        var moving = moveInput.LengthSquared() > 0.01f;
-        if (IsOrbit)
-        {
-            if (moving)
-            {
-                var motionYaw = MathUtils.ToDegrees(MathF.Atan2(moveInput.Z, moveInput.X));
-                _orbitPlayerYaw = MathUtils.DampAngle(_orbitPlayerYaw, motionYaw, OrbitTurnRate, deltaTime);
-            }
-            else if (_hasActionTarget)
-            {
-                _orbitPlayerYaw = MathUtils.DampAngle(_orbitPlayerYaw, _actionYaw, OrbitTurnRate, deltaTime);
-                var remaining = _actionYaw - _orbitPlayerYaw;
-                remaining -= MathF.Round(remaining / 360f) * 360f;
-                if (Math.Abs(remaining) < 0.5f)
-                    _hasActionTarget = false;
-            }
-        }
-        else
-        {
-            _orbitPlayerYaw = Yaw;
-        }
-
-        // Flight ignores the water entirely, so a submerged player can still fly out.
-        // Creative mode on foot swims like survival.
-        var swimming = IsInWater && !IsFlying;
-        IsSprinting = sprinting && moving && !IsFlying && !swimming && IsGrounded;
-        if (swimming) moveSpeed *= SwimSpeedFactor;
-        // Pass-through blocks scale the walk instead of blocking it; flight is noclip.
-        MovementFactor = BlockMoveFactor(chunkManager);
-        if (!IsFlying) moveSpeed *= MovementFactor;
-        var wish = new Vector2(moveInput.X * moveSpeed, moveInput.Z * moveSpeed);
-        float accelRate;
-        if (IsFlying)
-            accelRate = FlyAccelRate;
-        else if (swimming)
-            accelRate = SwimAccelRate;
-        else if (IsGrounded)
-        {
-            GroundFriction = SampleGroundFriction(chunkManager);
-            accelRate = GroundAccelRate(GroundFriction);
-        }
-        else
-        {
-            accelRate = AirAccelRate;
-        }
-        _horizontalVelocity.X = MathUtils.Damp(_horizontalVelocity.X, wish.X, accelRate, deltaTime);
-        _horizontalVelocity.Y = MathUtils.Damp(_horizontalVelocity.Y, wish.Y, accelRate, deltaTime);
-
-        var intendedSpeed = _horizontalVelocity.Length();
-        UpdateHeadMotion(deltaTime, intendedSpeed, moving, swimming);
-        UpdateShake(deltaTime);
-
-        var frameMovement = new Vector3(_horizontalVelocity.X * deltaTime, 0f, _horizontalVelocity.Y * deltaTime);
-
-        // Mob knockback rides the walk like the water flow below: a decaying horizontal shove that
-        // the same axis moves still stop against a wall. Flight clears it (it cannot be hit).
-        if (IsFlying)
-        {
-            _knockback = Vector3.Zero;
-        }
-        else
-        {
-            frameMovement.X += _knockback.X * deltaTime;
-            frameMovement.Z += _knockback.Z * deltaTime;
-        }
-
-        // Flowing water carries the player with it. Added before the horizontal moves below, so
-        // the push is still stopped by a wall rather than shoving the player through it.
-        if (swimming)
-        {
-            frameMovement.X += _waterFlow.X * FlowPushSpeed * deltaTime;
-            frameMovement.Z += _waterFlow.Z * FlowPushSpeed * deltaTime;
-        }
-
-        if (IsFlying)
-        {
-            var verticalInput = 0f;
-            if (keyboard.IsKeyPressed(Key.Space)) verticalInput += 1f;
-            if (keyboard.IsKeyPressed(Key.ControlLeft)) verticalInput -= 1f;
-            frameMovement.Y = verticalInput * moveSpeed * deltaTime;
-        }
-        else if (swimming)
-        {
-            // Standing on the bottom of a shallow puddle still jumps, so wading out of one works
-            if (IsGrounded && keyboard.IsKeyPressed(Key.Space))
-            {
-                _verticalVelocity = JumpSpeed;
-                IsGrounded = false;
-            }
-            else
-            {
-                _verticalVelocity = MathUtils.Damp(_verticalVelocity,
-                    keyboard.IsKeyPressed(Key.Space) ? SwimUpSpeed : SinkSpeed, WaterDrag, deltaTime);
-            }
-
-            frameMovement.Y = _verticalVelocity * deltaTime;
-        }
-        else
-        {
-            if (IsGrounded && keyboard.IsKeyPressed(Key.Space))
-            {
-                _verticalVelocity = JumpSpeed;
-                IsGrounded = false;
-            }
-
-            _verticalVelocity -= Gravity * deltaTime;
-            frameMovement.Y = _verticalVelocity * deltaTime;
-        }
-
-        // Flight is noclip: it moves straight through walls, so no axis stepping.
-        if (IsFlying)
-        {
-            Position += frameMovement;
-            IsGrounded = false;
-            UpdateShoulderOffset(chunkManager, deltaTime);
-            RefreshEyeWaterState(chunkManager);
-            return;
-        }
-
-        var horizontalStart = Position;
-        Position = MoveOnAxis(Position, frameMovement.X, 0, chunkManager, out var collidedX);
-        Position = MoveOnAxis(Position, frameMovement.Z, 2, chunkManager, out var collidedZ);
-
-        // Auto-step: on foot and grounded, a low ledge is climbed instead of stopping the
-        // move — sprinting clears a full block, walking only half. The raised attempt replays
-        // the frame's horizontal move from the pre-move spot, so the climb never overshoots.
-        var steppedThisFrame = false;
-        if (!swimming && IsGrounded && (collidedX || collidedZ)
-            && TryStepUp(horizontalStart, frameMovement,
-                IsSprinting ? SprintStepHeight : WalkStepHeight, chunkManager) is { } stepped)
-        {
-            Position = stepped;
-            steppedThisFrame = true;
-        }
-        if (!steppedThisFrame)
-        {
-            if (collidedX) _horizontalVelocity.X = 0f;
-            if (collidedZ) _horizontalVelocity.Y = 0f;
-        }
-
-        // Swimming into a wall while holding Space climbs it. The boost is applied before the
-        // vertical move so the lift lands in the same frame as the collision.
-        if (swimming && (collidedX || collidedZ) && keyboard.IsKeyPressed(Key.Space))
-        {
-            _verticalVelocity = MathF.Max(_verticalVelocity, SwimExitBoost);
-            frameMovement.Y = _verticalVelocity * deltaTime;
-        }
-
-        Position = MoveOnAxis(Position, frameMovement.Y, 1, chunkManager, out var collidedY);
-
-        if (collidedY)
-        {
-            if (frameMovement.Y < 0f)
-                IsGrounded = true;
-
-            _verticalVelocity = 0f;
-        }
-        else
-        {
-            IsGrounded = false;
-        }
-
-        UpdateShoulderOffset(chunkManager, deltaTime);
-        RefreshEyeWaterState(chunkManager);
-    }
-
-    /// <summary>
-    /// Recomputes <see cref="IsInWater"/> and <see cref="IsEyeInWater"/> from the fluid cells the
-    /// body overlaps, and averages those cells' flow directions into the push applied while
-    /// swimming. A fluid surface sits below its cell top (8/9 of a block for a source, less
-    /// for a flowing skirt), so both tests compare real surface heights instead of merely asking
-    /// whether the cell holds water.
     /// </summary>
-    private void UpdateWaterState(ChunkManager chunkManager)
-    {
-        var feetY = Position.Y - EyeHeight;
-
-        var swimMin = new Vector3(Position.X - PlayerRadius, feetY, Position.Z - PlayerRadius);
-        var swimMax = new Vector3(Position.X + PlayerRadius, feetY + SwimDepth, Position.Z + PlayerRadius);
-        VoxelCoords.CellRange(swimMin, swimMax, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
-
-        // One pass over the footprint answers both questions: whether any cell is deep enough
-        // to swim in, and which way the ones that are actually flow
-        var inWater = false;
-        var flowSum = Vector3.Zero;
-        var flowCells = 0;
-        for (var x = minX; x <= maxX; x++)
-        for (var y = minY; y <= maxY; y++)
-        for (var z = minZ; z <= maxZ; z++)
-        {
-            if (chunkManager.GetFluidSurfaceGlobal(x, y, z) <= feetY) continue;
-
-            inWater = true;
-
-            var cellFlow = chunkManager.GetFluidFlowGlobal(x, y, z);
-            if (cellFlow == Vector3.Zero) continue; // a still cell must not dilute the average
-
-            flowSum += cellFlow;
-            flowCells++;
-        }
-
-        _waterFlow = flowCells > 0 ? flowSum / flowCells : Vector3.Zero;
-        IsInWater = inWater;
-        var (eyeX, eyeY, eyeZ) = Position.BlockCell();
-        IsEyeInWater = Position.Y < chunkManager.GetFluidSurfaceGlobal(eyeX, eyeY, eyeZ);
-        IsEyeInLava = false;
-        if (IsEyeInWater && chunkManager.TryGetCell(eyeX, eyeY, eyeZ, out var eyeId, out _)
-            && BlockType.IsFluid(eyeId))
-        {
-            IsEyeInLava = BlockType.Emission[eyeId] > 0;
-        }
-
-        UpdateEyeWaterSurface(chunkManager, eyeX, eyeY, eyeZ);
-
-        // Lava burns on body contact, not just eye contact: a wade through a shallow pool
-        // keeps the eye dry but still has to hurt.
-        var lava = false;
-        var lavaMin = new Vector3(Position.X - PlayerRadius, feetY, Position.Z - PlayerRadius);
-        var lavaMax = new Vector3(Position.X + PlayerRadius, feetY + PlayerHeight, Position.Z + PlayerRadius);
-        VoxelCoords.CellRange(lavaMin, lavaMax, out var bodyMinX, out var bodyMinY, out var bodyMinZ, out var bodyMaxX, out var bodyMaxY, out var bodyMaxZ);
-        for (var x = bodyMinX; x <= bodyMaxX && !lava; x++)
-        for (var y = bodyMinY; y <= bodyMaxY && !lava; y++)
-        for (var z = bodyMinZ; z <= bodyMaxZ && !lava; z++)
-        {
-            var id = chunkManager.GetBlockGlobal(x, y, z);
-            if (BlockType.IsFluid(id) && BlockType.Emission[id] > 0)
-                lava = true;
-        }
-        IsInLava = lava;
-    }
-
-    private void UpdateHeadMotion(float deltaTime, float intendedSpeed, bool moving, bool swimming)
+    internal void UpdateHeadMotion(float deltaTime, float intendedSpeed, bool moving, bool swimming)
     {
         var fovTarget = DefaultFov + SprintFovBoost *
             MathUtils.Clamp01((intendedSpeed - BaseSpeed) / (BaseSpeed * (SprintMultiplier - 1f)));
@@ -835,7 +514,7 @@ public class Camera
         _roll = MathF.Sin(_bobPhase) * RunRoll * _runBlend * _bobBlend;
     }
 
-    private void UpdateCreativeToggle(IKeyboard keyboard)
+    internal void UpdateCreativeToggle(IKeyboard keyboard)
     {
         var creativePressed = keyboard.IsKeyPressed(Key.C);
         if (creativePressed && !_creativeWasPressed)
@@ -843,14 +522,14 @@ public class Camera
             IsCreative = !IsCreative;
             if (!IsCreative)
                 IsFlying = false;
-            _verticalVelocity = 0f;
+            _physics.ResetMotion();
             Log.WriteLine($"Creative {(IsCreative ? "ON" : "OFF")}");
         }
 
         _creativeWasPressed = creativePressed;
     }
 
-    private void UpdateFlightToggle(float deltaTime, IKeyboard keyboard)
+    internal void UpdateFlightToggle(float deltaTime, IKeyboard keyboard)
     {
         _timeSinceSpacePress += deltaTime;
 
@@ -863,7 +542,7 @@ public class Camera
                 if (IsCreative)
                 {
                     IsFlying = !IsFlying;
-                    _verticalVelocity = 0f;
+                    _physics.ResetMotion();
                     Log.WriteLine($"Flight {(IsFlying ? "ON" : "OFF")}");
                 }
                 _timeSinceSpacePress = float.MaxValue; // a toggle requires a fresh double tap
@@ -877,7 +556,7 @@ public class Camera
         _spaceWasPressed = spacePressed;
     }
 
-    private void UpdateShoulderToggle(IKeyboard keyboard)
+    internal void UpdateShoulderToggle(IKeyboard keyboard)
     {
         var pressed = keyboard.IsKeyPressed(Key.F5);
         if (pressed && !_f5WasPressed)
@@ -894,7 +573,7 @@ public class Camera
         _f5WasPressed = pressed;
     }
 
-    private void UpdateShoulderOffset(ChunkManager chunkManager, float deltaTime)
+    internal void UpdateShoulderOffset(ChunkManager chunkManager, float deltaTime)
     {
         var forward = GetForwardVector();
         if (!IsShoulderSurf && _shoulderBlendT <= 0f)
@@ -947,7 +626,7 @@ public class Camera
 
     // Refreshes EyeWaterSurfaceY while the eye is in water (not lava, which draws no rays);
     // a non-finite result (the eye cell stopped being loaded fluid) keeps the last value
-    private void UpdateEyeWaterSurface(ChunkManager chunkManager, int eyeX, int eyeY, int eyeZ)
+    internal void UpdateEyeWaterSurface(ChunkManager chunkManager, int eyeX, int eyeY, int eyeZ)
     {
         if (!IsEyeInWater || IsEyeInLava)
             return;
@@ -957,7 +636,7 @@ public class Camera
             EyeWaterSurfaceY = surface;
     }
 
-    private void RefreshEyeWaterState(ChunkManager chunkManager)
+    internal void RefreshEyeWaterState(ChunkManager chunkManager)
     {
         if (!IsShoulderSurf)
             return;
@@ -981,167 +660,44 @@ public class Camera
     /// the full frame movement. Returns null when the obstacle is taller than <paramref name="stepHeight"/>
     /// (or the head is boxed in), leaving the caller's normally blocked position in place.
     /// </summary>
-    private Vector3? TryStepUp(Vector3 start, Vector3 frameMovement, float stepHeight,
-        ChunkManager chunkManager)
-    {
-        if (stepHeight <= 0f)
-            return null;
+    /// </summary>
+    /// </summary>
+    /// against the body does not count, exactly like <see cref="OverlapsPlayer"/>.
+    /// </summary>
 
-        var steps = Math.Max(1, (int)MathF.Ceiling(stepHeight / CollisionStepSize));
-        for (var i = 1; i <= steps; i++)
-        {
-            var lift = MathF.Min(i * CollisionStepSize, stepHeight) + StepClearance;
-            var lifted = OffsetAxis(start, 1, lift);
-            if (IsColliding(lifted, chunkManager))
-                continue;
+    /// <summary>Runs the per-frame movement simulation (see <see cref="PlayerPhysics"/>).</summary>
+    public void Update(float deltaTime, IKeyboard? keyboard, ChunkManager chunkManager) =>
+        _physics.Update(this, deltaTime, keyboard, chunkManager);
 
-            var stepped = MoveOnAxis(lifted, frameMovement.X, 0, chunkManager, out var blockedX);
-            stepped = MoveOnAxis(stepped, frameMovement.Z, 2, chunkManager, out var blockedZ);
-            if (blockedX || blockedZ)
-                continue;
+    /// <summary>Test seam for the physics state; the game reaches these through PlayerPhysics.</summary>
+    internal void SetPosition(Vector3 position) => Position = position;
+    internal void MoveBy(Vector3 delta) => Position += delta;
+    internal void SetGrounded(bool grounded) => IsGrounded = grounded;
+    internal void SetSprinting(bool sprinting) => IsSprinting = sprinting;
+    internal void SetMovementFactor(float factor) => MovementFactor = factor;
+    internal void SetGroundFriction(float friction) => GroundFriction = friction;
+    internal void SetInWater(bool inWater) => IsInWater = inWater;
+    internal void SetEyeInWater(bool inWater) => IsEyeInWater = inWater;
+    internal void SetInLava(bool inLava) => IsInLava = inLava;
+    internal void SetEyeInLava(bool inLava) => IsEyeInLava = inLava;
+    internal void SetShoulderBlendT(float t) => _shoulderBlendT = t;
+    internal float ShoulderBlendT => _shoulderBlendT;
+    internal void SetOrbitPlayerYaw(float yaw) => _orbitPlayerYaw = yaw;
+    internal float OrbitPlayerYaw => _orbitPlayerYaw;
+    internal bool HasActionTarget => _hasActionTarget;
+    internal float ActionYaw => _actionYaw;
+    internal void ClearActionTarget() => _hasActionTarget = false;
 
-            // A lift that clears nothing must not teleport the body straight up; only accept
-            // it when the horizontal move actually advanced past the start.
-            if (MathF.Abs(stepped.X - start.X) < 1e-4f && MathF.Abs(stepped.Z - start.Z) < 1e-4f)
-                continue;
-
-            return stepped;
-        }
-
-        return null;
-    }
-
-    private Vector3 MoveOnAxis(Vector3 start, float delta, int axis, ChunkManager chunkManager, out bool collided)
-    {
-        collided = false;
-        if (MathF.Abs(delta) < float.Epsilon)
-            return start;
-
-        var position = start;
-        var remaining = delta;
-
-        while (MathF.Abs(remaining) > float.Epsilon)
-        {
-            var step = MathUtils.ClampStep(remaining, CollisionStepSize);
-            var candidate = OffsetAxis(position, axis, step);
-
-            if (IsColliding(candidate, chunkManager))
-            {
-                collided = true;
-                break;
-            }
-
-            position = candidate;
-            remaining -= step;
-        }
-
-        return position;
-    }
-
-    private static Vector3 OffsetAxis(Vector3 value, int axis, float delta)
-    {
-        return axis switch
-        {
-            0 => new Vector3(value.X + delta, value.Y, value.Z),
-            1 => new Vector3(value.X, value.Y + delta, value.Z),
-            2 => new Vector3(value.X, value.Y, value.Z + delta),
-            _ => value
-        };
-    }
-
-    private bool IsColliding(Vector3 eyePosition, ChunkManager chunkManager)
-    {
-        var min = new Vector3(
-            eyePosition.X - PlayerRadius,
-            eyePosition.Y - EyeHeight,
-            eyePosition.Z - PlayerRadius);
-        var max = new Vector3(
-            eyePosition.X + PlayerRadius,
-            eyePosition.Y - EyeHeight + PlayerHeight,
-            eyePosition.Z + PlayerRadius);
-
-        VoxelCoords.CellRange(min, max, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
-
-        for (var x = minX; x <= maxX; x++)
-        for (var y = minY; y <= maxY; y++)
-        for (var z = minZ; z <= maxZ; z++)
-        {
-            var blockId = chunkManager.GetBlockGlobal(x, y, z);
-            // A layered-snow cell only collides once its stack fills the cell; every other
-            // block answers as before. See BlockType.IsSolidCell.
-            if (!BlockType.IsSolidCell(blockId, chunkManager.GetStateGlobal(x, y, z))) continue;
-            // A pass-through block (leaves) never blocks the body; it only scales the walk
-            // while the body overlaps it (see BlockMoveFactor).
-            if (BlockType.MovementSpeedOf(blockId) > 0f) continue;
-            // Tree wood collides with its drawn node-and-tubes shape and a collidesByHitbox
-            // block (a mold slab) with its declared hitboxes, so the body slips past thin limbs,
-            // under high branches and onto a low slab; every other solid block keeps the
-            // full-cube test it always had.
-            if (!BlockType.IsTreeWood(blockId) && !BlockType.CollidesByHitboxOf(blockId)) return true;
-            if (TreeWoodShape.OverlapsShape(blockId, chunkManager, x, y, z, min, max))
-                return true;
-        }
-
-        return false;
-    }
+    /// <summary>Ground acceleration response for a top-face friction, 0..1 (see <see cref="PlayerPhysics"/>).</summary>
+    internal static float GroundAccelRate(float friction) => PlayerPhysics.GroundAccelRate(friction);
 
     /// <summary>
-    /// Movement speed multiplier from the pass-through blocks the body currently occupies: the
-    /// smallest <see cref="BlockType.MovementSpeed"/> among them, or 1 when none. A block with a
-    /// positive movement speed does not collide (see <see cref="IsColliding"/>) but scales the
-    /// player's speed while they wade through it, so leaves slow a walk without stopping it.
+    /// Knocks the player back from a mob hit: a horizontal shove that decays over a few tenths of
+    /// a second — the normal collision still stops it, so a hit can never push the player through
+    /// a wall — plus a small upward pop. Flight ignores both (and cannot be hit).
     /// </summary>
-    private float BlockMoveFactor(ChunkManager chunkManager)
-    {
-        var min = new Vector3(Position.X - PlayerRadius, Position.Y - EyeHeight, Position.Z - PlayerRadius);
-        var max = new Vector3(Position.X + PlayerRadius, Position.Y - EyeHeight + PlayerHeight, Position.Z + PlayerRadius);
-        VoxelCoords.CellRange(min, max, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
-
-        var factor = 1f;
-        for (var x = minX; x <= maxX; x++)
-        for (var y = minY; y <= maxY; y++)
-        for (var z = minZ; z <= maxZ; z++)
-        {
-            var speed = BlockType.MovementSpeedOf(chunkManager.GetBlockGlobal(x, y, z));
-            if (speed > 0f && speed < factor)
-                factor = speed;
-        }
-
-        return factor;
-    }
-
-    internal static float GroundAccelRate(float friction)
-    {
-        var clamped = Math.Clamp(friction, 0f, 1f);
-        var tau = GroundMinResponse + (1f - clamped) * GroundSlideScale;
-        tau = Math.Clamp(tau, GroundMinResponse, GroundSlideScale);
-        return Math.Clamp(1f / tau, 0.1f, 50f);
-    }
-
-    private float SampleGroundFriction(ChunkManager chunkManager)
-    {
-        var feetY = Position.Y - EyeHeight;
-        var groundY = MathUtils.FloorToInt(feetY - 0.02f);
-        var minX = MathUtils.FloorToInt(Position.X - PlayerRadius);
-        var maxX = MathUtils.FloorToInt(Position.X + PlayerRadius);
-        var minZ = MathUtils.FloorToInt(Position.Z - PlayerRadius);
-        var maxZ = MathUtils.FloorToInt(Position.Z + PlayerRadius);
-
-        var friction = BlockType.DefaultFriction;
-        var found = false;
-        for (var x = minX; x <= maxX; x++)
-        for (var z = minZ; z <= maxZ; z++)
-        {
-            var id = chunkManager.GetBlockGlobal(x, groundY, z);
-            if (!BlockType.IsSolidCell(id, chunkManager.GetStateGlobal(x, groundY, z))) continue;
-            var candidate = BlockType.FrictionOf(id);
-            if (!found || candidate < friction)
-                friction = candidate;
-            found = true;
-        }
-
-        return found ? friction : BlockType.DefaultFriction;
-    }
+    public void AddKnockback(Vector3 horizontalDirection, float horizontalSpeed, float lift) =>
+        _physics.AddKnockback(this, horizontalDirection, horizontalSpeed, lift);
 
     /// <summary>
     /// Whether a block cell at <paramref name="blockPos"/> overlaps the player's body. The cell
@@ -1151,13 +707,13 @@ public class Camera
     public bool OverlapsPlayer(Vector3 blockPos)
     {
         var min = new Vector3(
-            Position.X - PlayerRadius,
+            Position.X - PlayerPhysics.PlayerRadius,
             Position.Y - EyeHeight,
-            Position.Z - PlayerRadius);
+            Position.Z - PlayerPhysics.PlayerRadius);
         var max = new Vector3(
-            Position.X + PlayerRadius,
-            Position.Y - EyeHeight + PlayerHeight,
-            Position.Z + PlayerRadius);
+            Position.X + PlayerPhysics.PlayerRadius,
+            Position.Y - EyeHeight + PlayerPhysics.PlayerHeight,
+            Position.Z + PlayerPhysics.PlayerRadius);
         var cellMin = blockPos.Floor();
         var cellMax = cellMin + Vector3.One;
 
@@ -1177,13 +733,13 @@ public class Camera
         if (IsFlying) return;
 
         var min = new Vector3(
-            Position.X - PlayerRadius,
+            Position.X - PlayerPhysics.PlayerRadius,
             Position.Y - EyeHeight,
-            Position.Z - PlayerRadius);
+            Position.Z - PlayerPhysics.PlayerRadius);
         var max = new Vector3(
-            Position.X + PlayerRadius,
-            Position.Y - EyeHeight + PlayerHeight,
-            Position.Z + PlayerRadius);
+            Position.X + PlayerPhysics.PlayerRadius,
+            Position.Y - EyeHeight + PlayerPhysics.PlayerHeight,
+            Position.Z + PlayerPhysics.PlayerRadius);
         var eMin = center - new Vector3(halfExtent);
         var eMax = center + new Vector3(halfExtent);
 
@@ -1194,7 +750,7 @@ public class Camera
 
         // Signed shove per axis that moves the body fully clear of the cube; ties go negative.
         // Shallowest first, so the shove moves the player the least.
-        var bodyCenterY = Position.Y - EyeHeight + PlayerHeight * 0.5f;
+        var bodyCenterY = Position.Y - EyeHeight + PlayerPhysics.PlayerHeight * 0.5f;
         Span<float> pushes = [
             Position.X <= center.X ? eMin.X - max.X : eMax.X - min.X,
             bodyCenterY <= center.Y ? eMin.Y - max.Y : eMax.Y - min.Y,
@@ -1215,7 +771,7 @@ public class Camera
                 _ => Position + new Vector3(0f, 0f, pushes[2]),
             };
 
-            if (!IsColliding(candidate, chunkManager))
+            if (!_physics.IsColliding(candidate, chunkManager))
             {
                 Position = candidate;
                 return;
@@ -1231,13 +787,13 @@ public class Camera
     public bool BodyTouches(Vector3 center, float halfExtent)
     {
         var min = new Vector3(
-            Position.X - PlayerRadius,
+            Position.X - PlayerPhysics.PlayerRadius,
             Position.Y - EyeHeight,
-            Position.Z - PlayerRadius);
+            Position.Z - PlayerPhysics.PlayerRadius);
         var max = new Vector3(
-            Position.X + PlayerRadius,
-            Position.Y - EyeHeight + PlayerHeight,
-            Position.Z + PlayerRadius);
+            Position.X + PlayerPhysics.PlayerRadius,
+            Position.Y - EyeHeight + PlayerPhysics.PlayerHeight,
+            Position.Z + PlayerPhysics.PlayerRadius);
         var eMin = center - new Vector3(halfExtent);
         var eMax = center + new Vector3(halfExtent);
 
@@ -1251,8 +807,8 @@ public class Camera
         var viewDir = ViewDirection;
         var right = Vector3.Normalize(Vector3.Cross(viewDir, Vector3.UnitY));
         var up = Vector3.Transform(Vector3.UnitY,
-            Matrix4x4.CreateFromAxisAngle(viewDir, _roll + _shakeRoll));
-        var eye = Position + Vector3.UnitY * _bobHeight + right * _bobStrafe + _shoulderOffset + _shakeOffset;
+            Matrix4x4.CreateFromAxisAngle(viewDir, _roll + _physics.ShakeRoll));
+        var eye = Position + Vector3.UnitY * _bobHeight + right * _bobStrafe + _shoulderOffset + _physics.ShakeOffset;
         return Matrix4x4.CreateLookAt(eye, eye + viewDir, up);
     }
 
@@ -1326,7 +882,7 @@ public class Camera
     /// </summary>
     private ViewProjKey CurrentViewProjKey() =>
         new(Position, _shoulderViewDir, _shoulderOffset, Yaw, Pitch, _roll, _bobHeight, _bobStrafe,
-            _shakeOffset, _shakeRoll, _currentFov, _aspectRatio);
+            _physics.ShakeOffset, _physics.ShakeRoll, _currentFov, _aspectRatio);
 
     /// <summary>
     /// Bit-for-bit key comparison. Deliberately not <c>==</c> or the record's generated
@@ -1377,7 +933,7 @@ public class Camera
     /// <summary>View direction, for aiming the shadow camera ahead of the player.</summary>
     public Vector3 Forward => GetForwardVector();
 
-    private Vector3 GetForwardVector() => Vector3Utils.FromYawPitch(Yaw, Pitch);
+    internal Vector3 GetForwardVector() => Vector3Utils.FromYawPitch(Yaw, Pitch);
 
     /// <summary>
     /// Walks the view ray cell by cell (DDA) and reports the first cell it can target. The ray
