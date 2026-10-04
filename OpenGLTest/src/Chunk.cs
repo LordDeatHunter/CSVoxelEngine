@@ -3192,6 +3192,20 @@ public class Chunk : IDisposable
     }
 
     /// <summary>
+    /// Headless (no geometry pool) twin of <see cref="UpdateMesh"/>: marks the chunk meshed and
+    /// publishes its light and fluid vents, but drops the vertex data instead of uploading it.
+    /// Used only by a server world, whose chunks are never drawn, so the usual
+    /// non-empty-mesh-without-a-pool throw never applies.
+    /// </summary>
+    public void MarkMeshedHeadless(ChunkMeshData meshData)
+    {
+        IsMeshed = true;
+        PublishLight(meshData.Light);
+        HasWaterMesh = meshData.HasWater && meshData.TranslucentVertices.Count > 0;
+        HotFluidVents = meshData.HotFluidVents;
+    }
+
+    /// <summary>
     /// Hands both slices back to the pools they came from and forgets them. Freeing twice
     /// throws inside the allocator, so each slice is nulled the moment it is released.
     /// </summary>

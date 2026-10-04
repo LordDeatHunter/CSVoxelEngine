@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net9.0</TargetFramework>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <LangVersion>default</LangVersion>
+        <Nullable>annotations</Nullable>
+        <AssemblyName>Server</AssemblyName>
+        <RootNamespace>silkgltriangle</RootNamespace>
+        <RollForward>LatestMajor</RollForward>
+        <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+        <TieredPGO>true</TieredPGO>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Reuses the engine headlessly: worldgen, saves, the content registry and the game
+             simulation. The World runs with no GL context and no window. -->
+        <ProjectReference Include="..\OpenGLTest\silkgltriangle.csproj" />
+    </ItemGroup>
+
+</Project>

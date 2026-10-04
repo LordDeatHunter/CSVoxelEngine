@@ -1310,4 +1310,17 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float ThrowMinCharge = 0.5f;
     public const float ThrowSpeed = 40f;
     public const float ThrowLifetimeSeconds = 5f;
+
+    // --- Multiplayer networking (NetProtocol, GameServer, NetworkClient) ---
+    // The server broadcasts the player list on this cadence; clients send their own state at the
+    // state cadence. The day clock syncs once a second, which is far below a visible sun step.
+    public const double NetPlayerListSeconds = 0.1;
+    public const double NetPlayerStateSeconds = 0.05;
+    public const double NetTimeSyncSeconds = 1.0;
+    // How long a connect attempt may hang before the client gives up and returns to the menu.
+    public const double NetConnectTimeoutSeconds = 10.0;
+    // Sent roughly this often so an idle connection is not mistaken for a dead one.
+    public const double NetKeepAliveSeconds = 5.0;
+    // Largest squash/distance a remote player model is drawn from before it is culled.
+    public const float NetRemotePlayerReachBlocks = 4000f;
 }

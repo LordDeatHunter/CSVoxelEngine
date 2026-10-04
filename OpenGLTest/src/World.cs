@@ -108,6 +108,9 @@ public class World : IItemUseWorld
     private readonly IWindow? _window;
     private double _headlessTime;
 
+    // True for a dedicated server: no local player, a headless chunk manager and no far LOD.
+    private readonly bool _serverMode;
+
     // The window clock, or the headless one: every gameplay time read goes through this
     private double Now => _window?.Time ?? _headlessTime;
     private bool _hasSelectedBlock;
@@ -299,7 +302,7 @@ public class World : IItemUseWorld
     /// </remarks>
     public World(GL gl, ChunkGeometryPool opaqueGeometry, ChunkGeometryPool translucentGeometry,
         ChunkGeometryPool lodGeometry, IWindow window, IInputContext input, SfxManager? sfx = null,
-        ChunkSaveStore? saveStore = null)
+        ChunkSaveStore? saveStore = null, bool serverMode = false)
     {
         WorldSeed.BeginWorld();
         ChunkGenerationWorker? generationWorker = null;
@@ -309,6 +312,7 @@ public class World : IItemUseWorld
             _window = window;
             _sfx = sfx;
             _saveStore = saveStore;
+            _serverMode = serverMode;
             Camera = new Camera(window, input);
             _savedPlayer = PlayerSaveCodec.TryParse(saveStore?.ReadFile(PlayerSaveCodec.FileName));
             if (_savedPlayer != null)
@@ -327,6 +331,16 @@ public class World : IItemUseWorld
             if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("VOXEL_SPAWN")))
                 _spawnSettled = true;
             _chunkManager = new ChunkManager(gl, opaqueGeometry, translucentGeometry, saveStore);
+            // A server never draws: finished meshes are marked and their light published, but the
+            // geometry is discarded instead of uploaded to pools it does not have.
+            _chunkManager.Headless = serverMode;
+            if (serverMode)
+            {
+                // No local player on a server: hover the camera (creative and flying, so mobs
+                // cannot hurt it and gravity cannot drop it) at the spawn focus so chunk streaming
+                // follows it and has a stable target until real players connect.
+                Camera.RestoreState(Camera.Position, Camera.Yaw, Camera.Pitch, creative: true, flying: true);
+            }
             generationWorker = _generationWorker = new ChunkGenerationWorker(_chunkManager, Camera);
             lodManager = _lodManager = new LodManager(lodGeometry);
             _canAcceptDrop = Inventory.CanAccept;
@@ -353,7 +367,10 @@ public class World : IItemUseWorld
             // Before the LOD workers start, so the first region builds already see the saved
             // caps, surface overrides and felled canopies; a missing or corrupt file imports nothing.
             LodEditState.TryParse(_saveStore?.ReadFile(LodEditState.FileName))?.Import();
-            _lodManager.Start(Camera);
+            // A server never renders the far LOD, so it does not start the LodGen threads; the
+            // imported edit state still round-trips through a save untouched.
+            if (!serverMode)
+                _lodManager.Start(Camera);
             RefreshMobs();
         }
         catch
@@ -593,14 +610,25 @@ public class World : IItemUseWorld
     public double LightingTime => Now + TimeOffset;
 
     /// <summary>
+    /// Moves a server world's chunk-streaming focus (its headless camera) to
+    /// <paramref name="position"/>, so chunks load around the connected players. No-op for a
+    /// normal world, whose camera is driven by input.
+    /// </summary>
+    public void SetServerFocus(Vector3 position)
+    {
+        if (!_serverMode)
+            return;
+        Camera.TestTeleport(position, Camera.Yaw, Camera.Pitch);
+    }
+
+    /// <summary>
     /// One gameplay frame. Each block of work runs under its own profiler section; the autosave
     /// runs under <see cref="ProfileSection.Save"/>, which never nests inside another section.
     /// While <see cref="WorldPhase.Loading"/> only the streaming runs (<see cref="UpdateLoading"/>),
     /// and once <see cref="WorldPhase.Disposed"/> it does nothing.
     /// </summary>
     public void Update(double deltaTime, IKeyboard? keyboard)
-    {
-        if (_window == null)
+    {        if (_window == null)
             _headlessTime += deltaTime;
         if (Phase == WorldPhase.Disposed)
             return;

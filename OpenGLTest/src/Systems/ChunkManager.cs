@@ -104,6 +104,13 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     public int MeshUploadBudget { get; set; } = WorldGenerationConfig.MaxMeshUploadsPerFrame;
 
     /// <summary>
+    /// A server world sets this: finished meshes are marked and their light published but their
+    /// geometry is discarded (<see cref="Chunk.MarkMeshedHeadless"/>), since a headless world has
+    /// no pools and never draws. False for the game, whose meshes upload to the shared pools.
+    /// </summary>
+    public bool Headless { get; set; }
+
+    /// <summary>
     /// Mesh builds <see cref="ProcessDirtyChunks"/> starts per frame. Defaults to
     /// <see cref="WorldGenerationConfig.MaxDirtyChunksPerFrame"/>; raised by World while loading and
     /// restored at the flip to playing, like <see cref="MeshUploadBudget"/>. Main thread only.
@@ -550,7 +557,10 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     private void ApplyMesh(Chunk chunk, ChunkMeshData meshData)
     {
         var wasMeshed = chunk.IsMeshed;
-        chunk.UpdateMesh(meshData, opaqueGeometry, translucentGeometry);
+        if (Headless)
+            chunk.MarkMeshedHeadless(meshData);
+        else
+            chunk.UpdateMesh(meshData, opaqueGeometry, translucentGeometry);
         // BufferSubData copies synchronously, so the lists can be recycled at once.
         MeshBuffers.Return(meshData);
         SyncRenderable(chunk);
