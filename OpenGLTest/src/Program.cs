@@ -419,6 +419,7 @@ public static class Program
             WorldSeed.Apply(server.Seed);
             world = new World(null!, null!, null!, null!, null!, null!, null, null);
             world.Player.Rig = renderManager.PlayerRig;
+            world.BlockEdited = SendBlockEdit;
         }
         catch (Exception e)
         {
@@ -505,9 +506,33 @@ public static class Program
                 w.SyncRemotePlayers(remoteScratch, netPlayerId);
                 break;
             }
+            case NetMessage.BlockChange:
+            {
+                var x = reader.ReadInt();
+                var y = reader.ReadInt();
+                var z = reader.ReadInt();
+                var blockId = reader.ReadByte();
+                var state = reader.ReadByte();
+                w.ApplyNetworkBlockEdit(x, y, z, blockId, state);
+                break;
+            }
             default:
                 break;
         }
+    }
+
+    /// <summary>Forwards one local block change to the server while connected.</summary>
+    private static void SendBlockEdit(int x, int y, int z, byte blockId, byte state)
+    {
+        if (netClient is not { Status: NetworkStatus.Handshaken } client)
+            return;
+        using var writer = new PacketWriter(NetMessage.BlockEdit);
+        writer.Write(x);
+        writer.Write(y);
+        writer.Write(z);
+        writer.Write(blockId);
+        writer.Write(state);
+        client.Send(writer.ToArray());
     }
 
     /// <summary>Tears the connection down and returns to the server list with a notice.</summary>
@@ -531,7 +556,11 @@ public static class Program
         netPlayerId = -1;
         netStateTimer = 0;
         netKeepAliveTimer = 0;
-        world?.ClearRemotePlayers();
+        if (world != null)
+        {
+            world.ClearRemotePlayers();
+            world.BlockEdited = null;
+        }
     }
 
     /// <summary>

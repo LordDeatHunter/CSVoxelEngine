@@ -633,6 +633,44 @@ public class World : IItemUseWorld
     public IReadOnlyList<RemotePlayer> RemotePlayers => _remotePlayers;
 
     /// <summary>
+    /// Raised after a player-driven block change with the cell and its new id and state (id 0 for a
+    /// removal). A multiplayer client forwards it to the server; null in singleplayer and on the
+    /// server, so a server-applied change never echoes back.
+    /// </summary>
+    public Action<int, int, int, byte, byte>? BlockEdited { get; set; }
+
+    /// <summary>
+    /// Applies a block change that came from elsewhere (a server broadcasting to a client, or a
+    /// client's edit on the server): raw set, remesh and the same fluid/leaf/falling scheduling an
+    /// ordinary edit gets. Never raises <see cref="BlockEdited"/>, so it cannot loop.
+    /// </summary>
+    public void ApplyNetworkBlockEdit(int x, int y, int z, byte blockId, byte state)
+    {
+        var cell = new Vector3(x, y, z);
+        var chunkPos = VoxelCoords.ChunkPosOf(cell);
+        if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk))
+            return;
+
+        if (blockId == 0)
+        {
+            if (!BlockType.IsFluid(BlockIdAt(cell)))
+                chunk.RemoveBlockAt(cell, _chunkManager);
+        }
+        else
+        {
+            chunk.PlaceBlockAt(cell, blockId, _chunkManager, state);
+            if (LodSurface.IsSurfaceSolid(blockId))
+                NotifyLodEdit(x, y, z);
+            if (BlockType.ById[blockId]?.Renderer == BlockRenderer.Quern)
+                _querns.Ensure(x, y, z);
+        }
+
+        _fluidManager.ScheduleAround(cell);
+        _leafDecay.ScheduleAround(cell);
+        _falling.TryTopple(_chunkManager, _lodManager, _fluidManager, x, y, z);
+    }
+
+    /// <summary>
     /// Reconciles the remote player set with a server broadcast: upserts each entry (skipping the
     /// client's own id), then removes anyone no longer listed.
     /// </summary>
@@ -1999,6 +2037,11 @@ public class World : IItemUseWorld
         // and its own check chains the rest of the column
         _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
             (int)above.X, (int)above.Y, (int)above.Z);
+        // The mined cell ends as air on every path (plain break, felling, a multiblock revert);
+        // report it so a multiplayer client forwards the removal. Tree crowns and cascades do not
+        // travel this way yet - only the directly edited cell.
+        if (BlockIdAt(blockPos) == 0)
+            BlockEdited?.Invoke((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, 0, 0);
     }
 
     /// <summary>
@@ -2845,6 +2888,7 @@ public class World : IItemUseWorld
         // A block placed into water displaces it, so the neighbours recompute their levels
         _fluidManager.ScheduleAround(placePos);
         _leafDecay.ScheduleAround(placePos);
+        BlockEdited?.Invoke((int)placePos.X, (int)placePos.Y, (int)placePos.Z, blockId, state);
         return true;
     }
     

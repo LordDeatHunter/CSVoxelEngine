@@ -159,6 +159,18 @@ public sealed class GameServer : IDisposable
                 break;
             }
 
+            case NetMessage.BlockEdit:
+            {
+                var x = reader.ReadInt();
+                var y = reader.ReadInt();
+                var z = reader.ReadInt();
+                var blockId = reader.ReadByte();
+                var state = reader.ReadByte();
+                _world.ApplyNetworkBlockEdit(x, y, z, blockId, state);
+                BroadcastBlockChange(x, y, z, blockId, state);
+                break;
+            }
+
             default:
                 Log.Warn($"net: ignoring {message} from {client.Name} (#{client.Id})");
                 break;
@@ -210,6 +222,17 @@ public sealed class GameServer : IDisposable
     }
 
     private void BroadcastSystem(string text) => BroadcastChat(ChatKind.System, "", text);
+
+    private void BroadcastBlockChange(int x, int y, int z, byte blockId, byte state)
+    {
+        using var writer = new PacketWriter(NetMessage.BlockChange);
+        writer.Write(x);
+        writer.Write(y);
+        writer.Write(z);
+        writer.Write(blockId);
+        writer.Write(state);
+        Broadcast(writer.ToArray());
+    }
 
     private void Broadcast(byte[] payload)
     {
