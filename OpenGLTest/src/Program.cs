@@ -49,6 +49,7 @@ public static class Program
     // The live multiplayer connection, null in singleplayer and on the menu
     private static NetworkClient? netClient;
     private static ClientChunkStreamer? clientStreamer;
+    private static ClientLodStreamer? clientLodStreamer;
     private static ConnectTarget pendingConnect;
     private static int netPlayerId = -1;
     private static readonly List<RemotePlayerSnapshot> remoteScratch = new();
@@ -432,6 +433,7 @@ public static class Program
                 world.Camera.SetAspectRatio(fb.X / (float)fb.Y);
 
             clientStreamer = new ClientChunkStreamer(world.GetChunkManager(), SendChunkRequest, SendColumnRequest);
+            clientLodStreamer = new ClientLodStreamer(world.GetLodManager(), SendLodRequest);
             // Start where the server says; the client sinks onto the streamed terrain there.
             world.Camera.TestTeleport(server.Spawn, world.Camera.Yaw, world.Camera.Pitch);
         }
@@ -464,6 +466,7 @@ public static class Program
     {
         var w = world!;
         clientStreamer?.Update(w.Camera.Position, deltaTime);
+        clientLodStreamer?.Update(w.Camera.Position, deltaTime);
         netStateTimer += deltaTime;
         if (netStateTimer >= WorldGenerationConfig.NetPlayerStateSeconds)
         {
@@ -547,6 +550,14 @@ public static class Program
                 clientStreamer?.ApplyColumn(cx, cz, reader.ReadBytes());
                 break;
             }
+            case NetMessage.LodRegionData:
+            {
+                reader.ReadInt();
+                reader.ReadInt();
+                reader.ReadInt();
+                clientLodStreamer?.Apply(reader.ReadBytes());
+                break;
+            }
             default:
                 break;
         }
@@ -572,6 +583,18 @@ public static class Program
         using var writer = new PacketWriter(NetMessage.ColumnRequest);
         writer.Write(cx);
         writer.Write(cz);
+        client.Send(writer.ToArray());
+    }
+
+    /// <summary>Asks the server to build and send one far-LOD region (a client builds none itself).</summary>
+    private static void SendLodRequest(int level, int rx, int rz)
+    {
+        if (netClient is not { Status: NetworkStatus.Handshaken } client)
+            return;
+        using var writer = new PacketWriter(NetMessage.LodRegionRequest);
+        writer.Write(level);
+        writer.Write(rx);
+        writer.Write(rz);
         client.Send(writer.ToArray());
     }
 
@@ -608,6 +631,7 @@ public static class Program
         netClient?.Dispose();
         netClient = null;
         clientStreamer = null;
+        clientLodStreamer = null;
         netPlayerId = -1;
         netStateTimer = 0;
         netKeepAliveTimer = 0;

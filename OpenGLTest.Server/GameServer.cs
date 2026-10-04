@@ -195,6 +195,23 @@ public sealed class GameServer : IDisposable
                 break;
             }
 
+            case NetMessage.LodRegionRequest:
+            {
+                var level = reader.ReadInt();
+                var rx = reader.ReadInt();
+                var rz = reader.ReadInt();
+                if (level < 0 || level >= LodRegion.Levels.Length)
+                    break;
+                var data = LodRegion.BuildMeshData(level, rx, rz);
+                using var writer = new PacketWriter(NetMessage.LodRegionData);
+                writer.Write(level);
+                writer.Write(rx);
+                writer.Write(rz);
+                writer.WriteBytes(LodNetCodec.Encode(data));
+                client.Send(writer.ToArray());
+                break;
+            }
+
             default:
                 Log.Warn($"net: ignoring {message} from {client.Name} (#{client.Id})");
                 break;

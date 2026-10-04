@@ -142,4 +142,74 @@ public sealed class ChunkStreamingTests : IDisposable
             world.SaveAndDispose();
         }
     }
+
+    [Fact]
+    public void TheServerBuildsAndStreamsAnLodRegion()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        var store = new ChunkSaveStore(_dir);
+        var world = new World(null!, null!, null!, null!, null!, null!, null, store, serverMode: true);
+        try
+        {
+            var sw = Stopwatch.StartNew();
+            while (!world.IsLoaded && sw.Elapsed.TotalSeconds < 45)
+            {
+                world.Update(0.05, null);
+                Thread.Sleep(1);
+            }
+
+            Assert.True(world.IsLoaded);
+
+            using var server = new GameServer(world, "Test", WorldSeed.Default, 0);
+            server.Start();
+            using var client = new NetworkClient(new ServerAddress("127.0.0.1", server.BoundPort), "Tester", 5);
+            var connect = new Thread(client.Connect) { IsBackground = true, Name = "lod-test-connect" };
+            connect.Start();
+            sw.Restart();
+            while (client.Status == NetworkStatus.Connecting && sw.Elapsed.TotalSeconds < 5)
+            {
+                server.Pump(0.01);
+                Thread.Sleep(5);
+            }
+
+            Assert.Equal(NetworkStatus.Handshaken, client.Status);
+
+            using (var request = new PacketWriter(NetMessage.LodRegionRequest))
+            {
+                request.Write(0);
+                request.Write(0);
+                request.Write(0);
+                client.Send(request.ToArray());
+            }
+
+            LodMeshData? region = null;
+            sw.Restart();
+            while (region == null && sw.Elapsed.TotalSeconds < 10)
+            {
+                server.Pump(0.01);
+                while (client.Inbound.TryDequeue(out var payload))
+                {
+                    using var reader = new PacketReader(payload);
+                    if (reader.Message != NetMessage.LodRegionData)
+                        continue;
+                    reader.ReadInt();
+                    reader.ReadInt();
+                    reader.ReadInt();
+                    region = LodNetCodec.Decode(reader.ReadBytes());
+                }
+
+                Thread.Sleep(5);
+            }
+
+            Assert.NotNull(region);
+            Assert.Equal(0, region!.Level);
+            Assert.Equal(0, region.X);
+            Assert.Equal(0, region.Z);
+            Assert.NotEmpty(region.Vertices);
+        }
+        finally
+        {
+            world.SaveAndDispose();
+        }
+    }
 }

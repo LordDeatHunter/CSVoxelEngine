@@ -25,6 +25,8 @@ public enum NetMessage : byte
     ChunkData = 51,
     ColumnRequest = 52,
     ColumnHeights = 53,
+    LodRegionRequest = 54,
+    LodRegionData = 55,
 }
 
 /// <summary>
