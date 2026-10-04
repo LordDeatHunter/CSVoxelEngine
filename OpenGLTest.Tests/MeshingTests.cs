@@ -296,7 +296,7 @@ public sealed class MeshingTests
 
         // Every surface code names a higher surface than the one before it
         for (var code = 2; code <= 127; code++)
-            Assert.True(Chunk.DecodeSurfaceCode(-32, code) > Chunk.DecodeSurfaceCode(-32, code - 1), $"code {code}");
+            Assert.True(ChunkMesher.DecodeSurfaceCode(-32, code) > ChunkMesher.DecodeSurfaceCode(-32, code - 1), $"code {code}");
     }
 
     /// <summary>Decoded water surface of every submerged top face at world Y
@@ -464,11 +464,11 @@ public sealed class MeshingTests
         var (cx, cz, level) = FindWetColumn();
         var chunkY = (int)MathF.Floor(level / (float)Chunk.Size) - 3;
         var baseY = chunkY * Chunk.Size;
-        var snapshotTop = Chunk.DecodeSurfaceCode(baseY, 69);
+        var snapshotTop = ChunkMesher.DecodeSurfaceCode(baseY, 69);
         Assert.True(level + FluidState.SourceHeight > snapshotTop + 1f);
 
         var surface = SurfaceOfAColumnLeavingTheSnapshot(new Vector3(cx, chunkY, cz));
-        var expected = MathF.Min(level + FluidState.SourceHeight, Chunk.DecodeSurfaceCode(baseY, 127));
+        var expected = MathF.Min(level + FluidState.SourceHeight, ChunkMesher.DecodeSurfaceCode(baseY, 127));
         Assert.True(MathF.Abs(surface - expected) <= 0.5f, $"{surface} vs {expected}");
         Assert.True(surface > snapshotTop);
     }
@@ -480,10 +480,10 @@ public sealed class MeshingTests
         var position = MeshTestWorld.HighAbove;
         var baseY = (int)position.Y * Chunk.Size;
         var level = WaterLevelOfColumn((int)position.X, (int)position.Z);
-        Assert.True(level == TerrainGenerator.NoWater || level + FluidState.SourceHeight < Chunk.DecodeSurfaceCode(baseY, 69));
+        Assert.True(level == TerrainGenerator.NoWater || level + FluidState.SourceHeight < ChunkMesher.DecodeSurfaceCode(baseY, 69));
 
         var surface = SurfaceOfAColumnLeavingTheSnapshot(position);
-        Assert.Equal(Chunk.DecodeSurfaceCode(baseY, 69), surface);
+        Assert.Equal(ChunkMesher.DecodeSurfaceCode(baseY, 69), surface);
     }
 
     private static (int ChunkX, int ChunkZ, int Level) FindWetColumn()
