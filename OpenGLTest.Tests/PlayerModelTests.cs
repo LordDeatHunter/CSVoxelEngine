@@ -239,7 +239,7 @@ public sealed class PlayerModelTests
         // Torso origin sits at hip height above the feet.
         var hip = Vector3.Transform(Vector3.Zero, torso);
         Assert.Equal(feet.X, hip.X, 3);
-        Assert.Equal(feet.Y + PlayerModel.HipY, hip.Y, 3);
+        Assert.Equal(feet.Y + PlayerRig.HipY, hip.Y, 3);
         Assert.Equal(feet.Z, hip.Z, 3);
     }
 
@@ -262,14 +262,14 @@ public sealed class PlayerModelTests
         var hip = Vector3.Transform(Vector3.Zero, shifted);
         Assert.Equal(eye.X, hip.X, 3);
         Assert.Equal(eye.Z + PlayerModel.FirstPersonBodyBack, hip.Z, 3);
-        Assert.True(PlayerModel.FirstPersonBodyBack > PlayerModel.TorsoDepth * 0.5f);
+        Assert.True(PlayerModel.FirstPersonBodyBack > PlayerRig.TorsoDepth * 0.5f);
     }
 
     [Fact]
     public void HandHangsBelowTheEyeOnTheRightSide()
     {
         var player = new PlayerModel();
-        Assert.Equal(-PlayerModel.ForearmLength, player.HandDepth());
+        Assert.Equal(-PlayerRig.ForearmLength, player.HandDepth());
 
         // Yaw -90 faces -Z, so the right hand sits at +X and forward at -Z.
         var eye = new Vector3(0.5f, 70f, 0.5f);
@@ -305,9 +305,9 @@ public sealed class PlayerModelTests
     [Fact]
     public void PaletteHasOneOpaqueSwatchPerSlot()
     {
-        var pixels = PlayerModel.PalettePixels();
-        Assert.Equal(PlayerModel.PaletteCols * PlayerModel.PaletteRows * 4, pixels.Length);
-        for (var i = 0; i < PlayerModel.PaletteCols * PlayerModel.PaletteRows; i++)
+        var pixels = PlayerRig.PalettePixels();
+        Assert.Equal(PlayerRig.PaletteCols * PlayerRig.PaletteRows * 4, pixels.Length);
+        for (var i = 0; i < PlayerRig.PaletteCols * PlayerRig.PaletteRows; i++)
             Assert.Equal(255, pixels[i * 4 + 3]);
     }
 

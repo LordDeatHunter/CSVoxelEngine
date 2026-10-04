@@ -195,7 +195,7 @@ public sealed class EntityAnimator
     /// first. The part's cubes are pivot-relative, so this is their model matrix. An unknown part
     /// or a parent cycle yields identity.
     /// </summary>
-    public Matrix4x4 GetPartMatrix(string part, PlayerModel.PlayerRig rig, Vector3 feet, float facingYaw)
+    public Matrix4x4 GetPartMatrix(string part, PlayerRig rig, Vector3 feet, float facingYaw)
     {
         if (!rig.Parts.ContainsKey(part)) return Matrix4x4.Identity;
         var root = Matrix4x4.CreateRotationY(facingYaw) * Matrix4x4.CreateTranslation(feet);
@@ -207,7 +207,7 @@ public sealed class EntityAnimator
     /// bottom of its lowest cube (the <see cref="PlayerModel.HandDepth"/> rule, 0 for a part
     /// without cubes), so a held item follows the swing of that limb.
     /// </summary>
-    public Matrix4x4 HandAnchor(string part, PlayerModel.PlayerRig rig, Vector3 feet, float facingYaw)
+    public Matrix4x4 HandAnchor(string part, PlayerRig rig, Vector3 feet, float facingYaw)
     {
         var depth = 0f;
         if (rig.Parts.TryGetValue(part, out var p))
@@ -216,7 +216,7 @@ public sealed class EntityAnimator
         return Matrix4x4.CreateTranslation(0f, depth, 0f) * GetPartMatrix(part, rig, feet, facingYaw);
     }
 
-    private bool TryCompose(string name, PlayerModel.PlayerRig rig, Matrix4x4 root, int depth,
+    private bool TryCompose(string name, PlayerRig rig, Matrix4x4 root, int depth,
         out Matrix4x4 matrix)
     {
         matrix = Matrix4x4.Identity;

@@ -20,7 +20,7 @@ public sealed class RemotePlayer
     private Vector3 _prev;
     private bool _hasPrev;
 
-    public RemotePlayer(int id, string name, PlayerModel.PlayerRig rig)
+    public RemotePlayer(int id, string name, PlayerRig rig)
     {
         Id = id;
         Name = name;

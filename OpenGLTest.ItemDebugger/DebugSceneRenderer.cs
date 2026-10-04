@@ -49,14 +49,14 @@ public sealed class DebugSceneRenderer : IDisposable
     private readonly Dictionary<string, EntityPreview> _entityPreviews = new();
 
     // One entity's per-part meshes (ordinal-sorted names, index-aligned), rig and skin.
-    private sealed record EntityPreview(string[] PartNames, Mesh[] Parts, PlayerModel.PlayerRig Rig, uint Texture);
+    private sealed record EntityPreview(string[] PartNames, Mesh[] Parts, PlayerRig Rig, uint Texture);
 
     // The TREES tab's meshes (one per touched scratch chunk, in world cell coordinates) and the
     // TreePreviewState.Version they were built for; -1 forces the first build.
     private readonly List<Mesh> _treeMeshes = new();
     private int _treeVersion = -1;
 
-    public PlayerModel.PlayerRig Rig { get; }
+    public PlayerRig Rig { get; }
     public UIRenderer Ui { get; }
 
     public DebugSceneRenderer(GL gl)
@@ -108,16 +108,16 @@ public sealed class DebugSceneRenderer : IDisposable
 
         try
         {
-            Rig = PlayerModel.PlayerRig.FromBbmodel(BbmodelLoader.Load(RenderManager.PlayerModelPath));
+            Rig = PlayerRig.FromBbmodel(BbmodelLoader.Load(RenderManager.PlayerModelPath));
         }
         catch (Exception e)
         {
             Log.WriteLine($"Player model '{RenderManager.PlayerModelPath}' not used ({e.Message}); using built-in Steve.");
-            Rig = PlayerModel.PlayerRig.BuiltIn();
+            Rig = PlayerRig.BuiltIn();
         }
 
         _paletteTex = TextureLoader.Upload(gl, Rig.TexturePixels, Rig.TextureWidth, Rig.TextureHeight);
-        _playerMeshes = PlayerModel.BuildMeshes(gl, Rig);
+        _playerMeshes = PlayerRig.BuildMeshes(gl, Rig);
         _blockCubes = new BlockCubeCache(gl);
         _itemMeshes = new ItemMeshCache(gl);
         Ui = new UIRenderer(gl, _atlasTexture, _blockCubes, _itemMeshes, atlasIsSrgb: false);
@@ -276,8 +276,8 @@ public sealed class DebugSceneRenderer : IDisposable
     {
         if (_entityPreviews.TryGetValue(type.Name, out var cached)) return cached;
 
-        var rig = PlayerModel.PlayerRig.FromBbmodel(type.Model);
-        var byName = PlayerModel.BuildMeshes(_gl, rig);
+        var rig = PlayerRig.FromBbmodel(type.Model);
+        var byName = PlayerRig.BuildMeshes(_gl, rig);
         var names = new string[byName.Count];
         byName.Keys.CopyTo(names, 0);
         Array.Sort(names, StringComparer.Ordinal);

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Silk.NET.OpenGL;
@@ -96,7 +96,7 @@ public class RenderManager : IDisposable
     // EntityAnimator. The names are every rig part, ordinal-sorted, so a group the file adds
     // beyond Goblin.RequiredParts draws too; _goblinMeshes is index-aligned with them.
     // Null only when no 'goblin' entity kind is registered, in which case the passes are no-ops.
-    private PlayerModel.PlayerRig? _goblinRig;
+    private PlayerRig? _goblinRig;
     private string[]? _goblinPartNames;
     private Mesh[]? _goblinMeshes;
     private uint _goblinTexture;
@@ -107,7 +107,7 @@ public class RenderManager : IDisposable
     public const string PlayerModelPath = "assets/models/player/player.bbmodel";
 
     /// <summary>The player shape being drawn: the Blockbench file when it loads, built-in Steve otherwise.</summary>
-    public PlayerModel.PlayerRig PlayerRig { get; private set; } = PlayerModel.PlayerRig.BuiltIn();
+    public PlayerRig PlayerRig { get; private set; } = PlayerRig.BuiltIn();
     private uint textureAtlas;
     /// <summary>Index-parallel to <see cref="textureAtlas"/>: per-tile normal + metallic mask.</summary>
     private uint materialAtlas;
@@ -744,7 +744,7 @@ public class RenderManager : IDisposable
         _crucibleMesh = BuildCrucibleMesh();
         try
         {
-            PlayerRig = PlayerModel.PlayerRig.FromBbmodel(BbmodelLoader.Load(PlayerModelPath));
+            PlayerRig = PlayerRig.FromBbmodel(BbmodelLoader.Load(PlayerModelPath));
         }
         catch (Exception e)
         {
@@ -752,7 +752,7 @@ public class RenderManager : IDisposable
         }
         _playerPaletteTex = TextureLoader.Upload(gl, PlayerRig.TexturePixels,
             PlayerRig.TextureWidth, PlayerRig.TextureHeight, srgb: true);
-        _playerMeshes = PlayerModel.BuildMeshes(gl, PlayerRig);
+        _playerMeshes = PlayerRig.BuildMeshes(gl, PlayerRig);
         if (EntityRegistry.TryGet("slime") is { } slimeType)
         {
             var slimeModel = EntityModel.Load(slimeType.ModelPath);
@@ -763,8 +763,8 @@ public class RenderManager : IDisposable
         if (EntityRegistry.TryGet("goblin") is { } goblinType)
         {
             // The parse happened once at content load (EntityType.Model); only GL work is left.
-            _goblinRig = PlayerModel.PlayerRig.FromBbmodel(goblinType.Model);
-            var byName = PlayerModel.BuildMeshes(gl, _goblinRig);
+            _goblinRig = PlayerRig.FromBbmodel(goblinType.Model);
+            var byName = PlayerRig.BuildMeshes(gl, _goblinRig);
             _goblinPartNames = new string[byName.Count];
             byName.Keys.CopyTo(_goblinPartNames, 0);
             Array.Sort(_goblinPartNames, StringComparer.Ordinal);

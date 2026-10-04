@@ -48,16 +48,16 @@ public sealed class EntityAnimatorTests
             },
         });
 
-    private static PlayerModel.PlayerRig Rig()
+    private static PlayerRig Rig()
     {
-        var rig = new PlayerModel.PlayerRig();
-        var torso = new PlayerModel.PlayerRig.RigPart { Pivot = new Vector3(0f, 1f, 0f) };
-        torso.Cubes.Add(new PlayerModel.PlayerRig.RigCube { Min = new Vector3(-0.25f, 0f, -0.1f), Max = new Vector3(0.25f, 0.5f, 0.1f) });
+        var rig = new PlayerRig();
+        var torso = new PlayerRig.RigPart { Pivot = new Vector3(0f, 1f, 0f) };
+        torso.Cubes.Add(new PlayerRig.RigCube { Min = new Vector3(-0.25f, 0f, -0.1f), Max = new Vector3(0.25f, 0.5f, 0.1f) });
         rig.Parts["Torso"] = torso;
-        rig.Parts["Head"] = new PlayerModel.PlayerRig.RigPart { Pivot = new Vector3(0f, 2f, 0f), Parent = "Torso" };
-        var arm = new PlayerModel.PlayerRig.RigPart { Pivot = new Vector3(0.4f, 1.5f, 0f), Parent = "Torso" };
-        arm.Cubes.Add(new PlayerModel.PlayerRig.RigCube { Min = new Vector3(-0.1f, -0.3f, -0.1f), Max = new Vector3(0.1f, 0f, 0.1f) });
-        arm.Cubes.Add(new PlayerModel.PlayerRig.RigCube { Min = new Vector3(-0.05f, -0.6f, -0.05f), Max = new Vector3(0.05f, -0.3f, 0.05f) });
+        rig.Parts["Head"] = new PlayerRig.RigPart { Pivot = new Vector3(0f, 2f, 0f), Parent = "Torso" };
+        var arm = new PlayerRig.RigPart { Pivot = new Vector3(0.4f, 1.5f, 0f), Parent = "Torso" };
+        arm.Cubes.Add(new PlayerRig.RigCube { Min = new Vector3(-0.1f, -0.3f, -0.1f), Max = new Vector3(0.1f, 0f, 0.1f) });
+        arm.Cubes.Add(new PlayerRig.RigCube { Min = new Vector3(-0.05f, -0.6f, -0.05f), Max = new Vector3(0.05f, -0.3f, 0.05f) });
         rig.Parts["ArmR"] = arm;
         return rig;
     }
