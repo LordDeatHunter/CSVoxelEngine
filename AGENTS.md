@@ -567,6 +567,13 @@ OpenGLTest/
       ServerAddress.cs         # host[:port] parsing and formatting (the default port)
       NetworkClient.cs         # the client: connect + handshake, reader thread, inbound queue, sends
       RemotePlayer.cs          # another player as the client sees them: pose smoothing + a PlayerModel
+      ChunkNetCodec.cs         # chunk blocks/state and column heights, Deflate-compressed
+      ClientChunkStreamer.cs   # requests streamed chunks/columns and applies them, no worldgen
+      LodNetCodec.cs           # a far-LOD region's mesh on the wire
+      ClientLodStreamer.cs     # requests and applies server-built far regions
+      NetEntity.cs             # NetEntityKind/NetEntity and NetCellChange
+      InventoryNetCodec.cs     # the server-owned inventory on the wire (the save JSON shape)
+      NetValidation.cs         # server movement and edit-reach sanity rules
     UI/                        # UI state, layout and rules, mostly GL-free (UIRenderer draws them)
       PauseMenu.cs             # pause menu pages, hit kinds, view and PauseMenuLayout (RESUME/SETTINGS/SAVE & QUIT)
       SettingsMenu.cs          # settings page rows, tabs, sliders and SettingsLayout (shared by both menus)
@@ -1438,33 +1445,51 @@ session.
 length prefixed, `Vector3` as three floats). `NetFraming.ProtocolVersion` must match in both
 hellos. Messages: `ClientHello` (version, name), `ServerHello` (version, player id, world name,
 seed, day clock, spawn), `KeepAlive`, `ChatSend`/`ChatMessage` (kind, sender, text),
-`PlayerState` (eye, yaw, pitch, flags), `PlayerList` (id, name, eye, yaw, pitch, flags) and
-`BlockEdit`/`BlockChange` (cell, id, state).
+`PlayerState` (eye, yaw, pitch, flags), `PlayerList` (id, name, eye, yaw, pitch, flags),
+`BlockEdit`/`BlockChange` (cell, id, state), `ChunkRequest`/`ChunkData` and
+`ColumnRequest`/`ColumnHeights` (the streamed world, `ChunkNetCodec`), `LodRegionRequest`/
+`LodRegionData` (a streamed far region, `LodNetCodec`), `EntityList` (the live mobs/drops,
+`NetEntity`), `BlockChanges` (a batch of server cell changes, `NetCellChange`) and
+`InventoryState`/`InventoryRequest` (the server-owned inventory and its intents, `NetInventoryCodec`).
 
 **The server** (`OpenGLTest.Server/GameServer.cs`) is a `TcpListener` with one reader thread per
 connection that only frames inbound bytes onto a `ConcurrentQueue`; `Pump` (main thread) drains it
 and owns every piece of `World` state, so the simulation stays single-threaded exactly like the
-client. On `ClientHello` it assigns an id, replies `ServerHello`, and broadcasts a system chat
-and the player list; thereafter it relays chat, records `PlayerState` into the player list (sent
-every `NetPlayerListSeconds`, 10 Hz), syncs the day clock (`NetTimeSyncSeconds`), and on
-`BlockEdit` applies `World.ApplyNetworkBlockEdit` then broadcasts `BlockChange` to everyone. The
-severed player is removed on disconnect. The camera focus follows the **centroid** of the
-connected players (`World.SetServerFocus`, a `Camera.TestTeleport`), so chunks stream around
-everyone.
+client. On `ClientHello` it assigns an id, replies `ServerHello`, sends the inventory, and
+broadcasts a system chat and the player list; thereafter it relays chat, records `PlayerState`
+into the player list (sent every `NetPlayerListSeconds`, 10 Hz), syncs the day clock
+(`NetTimeSyncSeconds`), serves `ChunkRequest`/`ColumnRequest`/`LodRegionRequest` from the loaded
+world (`ChunkManager.TryCaptureChunk`, `Chunk.GetColumnHeights`, `LodRegion.BuildMeshData`),
+applies `InventoryRequest` intents (`Inventory.Select`/`World.ThrowSelected`) and echoes the
+inventory, and on `BlockEdit` applies `World.ApplyNetworkBlockEdit`. It **journals every raw cell
+write** (`Chunk.CellWritten`, set in `Start`, cleared in `Stop`) and broadcasts the coalesced
+batch as `BlockChanges` each `Pump`, so its own simulation — explosions, fluid flow, leaf decay,
+felling, tree growth — reaches clients too. It broadcasts the live mobs and drops every
+`NetEntitySyncSeconds` (`EntityList`, with stable ids by object identity). Client input is
+validated by `NetValidation`: a `PlayerState` beyond `NetMaxMoveBlocksPerSecond` is treated as a
+teleport and the authoritative position stays put, and a `BlockEdit` outside
+`NetMaxEditReachBlocks` of the player's eye is refused with a `BlockChange` correction (the
+optimistic client then reverts). The severed player is removed on disconnect. The camera focus
+follows the **centroid** of the connected players (`World.SetServerFocus`, a `Camera.Teleport`),
+so chunks stream around everyone.
 
 **The client** (`OpenGLTest/src/Networking/NetworkClient.cs`) connects on a background thread from
 `Program.BeginConnect` (the CONNECT click records `PendingWork.Connect` and presents the
 "Connecting..." loading screen, like PLAY), handshakes, then a reader thread queues frames.
-`Program.UpdateConnecting` waits for `NetworkStatus.Handshaken`, applies `WorldSeed.Apply(seed)` and
-builds a **storeless** client `World` from the shared seed (worldgen is a pure function of the
-seed, so both terrains match without streaming chunk bytes), teleports to the server's clock and
-plays. `UpdateNetwork` sends `PlayerState` every `NetPlayerStateSeconds` and drains the queue:
-chat feeds `ChatView`, `TimeSync` calls `World.SetLightingTime`, `PlayerList` reconciles
-`World.SyncRemotePlayers`, and `BlockChange` calls `World.ApplyNetworkBlockEdit`. Remote players
-are `RemotePlayer`s whose `PlayerModel` walk cycle runs off the distance they moved; `World`
-updates them each frame and `RenderManager.RenderRemotePlayers` draws each as the player body at
-its broadcast eye (before the contact-AO pass, so they receive it). A lost connection, or SAVE &
-QUIT while connected, disposes the storeless client world and returns to the multiplayer page.
+`Program.UpdateConnecting` waits for `NetworkStatus.Handshaken`, then builds a **client-mode**
+`World` (`clientMode: true`) with the renderer's pools and the window — no worldgen, no LOD
+threads and no local simulation — teleports to the server's spawn and plays (`WorldSeed` is never
+applied on a client). A `ClientChunkStreamer` requests the chunks and column heights around the
+camera (`ChunkData`/`ColumnHeights`), a `ClientLodStreamer` requests far regions
+(`LodRegionData`), and `World.ApplyNetworkEntities`/`ApplyNetworkBlockChanges`/
+`Inventory.Import` apply the server's entities, cell changes and inventory mirror.
+`UpdateNetwork` sends `PlayerState` every `NetPlayerStateSeconds`; chat feeds `ChatView`,
+`TimeSync` calls `World.SetLightingTime`, `PlayerList` reconciles `World.SyncRemotePlayers`, and
+`Hotbar`/`Q` become `InventoryRequest` intents. Remote players are `RemotePlayer`s whose
+`PlayerModel` walk cycle runs off the distance they moved; `World` updates them each frame and
+`RenderManager.RenderRemotePlayers` draws each as the player body at its broadcast eye. A lost
+connection, or SAVE & QUIT while connected, disposes the client world and returns to the
+multiplayer page.
 
 **Chat** is universal: `ChatView`/`ChatLayout` (`OpenGLTest/src/UI/Chat.cs`, GL-free, tested) hold
 a 100-line log, a 200-char input, arrow-key history and the open flag. `T` opens it from a clean
@@ -1474,12 +1499,14 @@ camera exactly like a focused inventory field, and the log sits bottom-left abov
 SendChat` echoes locally; in multiplayer it sends `ChatSend` and the server's broadcast is the
 only copy, so a line never appears twice.
 
-**Known gaps** (open): block edits only sync the **directly edited cell**, so a felled crown, a
-tree's decay, TNT craters, fluids, falling blocks and mobs are simulated independently on both
-ends and can diverge (mobs are not synced at all yet, and each side spawns its own); the client
-does not send its inventory or health; there is no authentication, encryption or server-side
-validation; and a client's local `BlockEdited` is only wired while connected (null in
-singleplayer and on the server, so server-applied changes never echo).
+**Known gaps** (open): the server holds **one** `World.Inventory`, so every client mirrors the same
+inventory and true per-player inventories are not implemented; the client's mining/placement still
+consumes its own mirror between syncs (mining loot and placement cost are not yet server-rolled),
+so item counts can drift from the server between an intent and the next sync; projectiles, primed
+TNT, falling blocks and toppling trees are not in `EntityList` (their cells still sync via
+`BlockChanges`); there is no authentication or encryption; and a client's local `BlockEdited` is
+only wired while connected (null in singleplayer and on the server, so server-applied changes
+never echo).
 
 ## Biomes
 
