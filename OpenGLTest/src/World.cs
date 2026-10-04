@@ -112,6 +112,7 @@ public class World : IItemUseWorld
     private readonly Dictionary<int, Mob> _netMobs = [];
     private readonly HashSet<int> _netMobsSeen = [];
     private readonly List<int> _netMobRemovals = [];
+    private readonly HashSet<Vector3> _netTouchedChunks = [];
 
     // Null on the headless path (tests), where Now runs off the summed Update deltas instead
     private readonly IWindow? _window;
@@ -688,6 +689,31 @@ public class World : IItemUseWorld
         _fluidManager.ScheduleAround(cell);
         _leafDecay.ScheduleAround(cell);
         _falling.TryTopple(_chunkManager, _lodManager, _fluidManager, x, y, z);
+    }
+
+    /// <summary>
+    /// Applies a batch of server cell changes (an explosion, a fluid step, a fell) in one pass: raw
+    /// writes with no per-cell remesh, then a dirty mark on each touched chunk and its six
+    /// neighbours, so a burst rebuilds in the normal asynchronous pass instead of hitching.
+    /// </summary>
+    public void ApplyNetworkBlockChanges(IReadOnlyList<NetCellChange> changes)
+    {
+        _netTouchedChunks.Clear();
+        for (var i = 0; i < changes.Count; i++)
+        {
+            var change = changes[i];
+            var chunk = _chunkManager.ChunkAt(change.X, change.Y, change.Z);
+            if (chunk == null)
+                continue;
+            chunk.SetBlockRaw(change.X & Chunk.SizeMask, change.Y & Chunk.SizeMask, change.Z & Chunk.SizeMask,
+                change.Id, change.State);
+            _netTouchedChunks.Add(chunk.Position);
+            foreach (var d in Vector3Directions.CardinalOffsets)
+                _netTouchedChunks.Add(chunk.Position + new Vector3(d.X, d.Y, d.Z));
+        }
+
+        foreach (var pos in _netTouchedChunks)
+            _chunkManager.MarkDirty(pos);
     }
 
     /// <summary>

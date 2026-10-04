@@ -32,6 +32,14 @@ public sealed class GameServer : IDisposable
     private readonly Dictionary<int, PlayerSnapshot> _players = new();
 
     private Thread? _acceptThread;
+    // Long-lived, coalesced cell changes the server's own simulation produced (explosions, fluid
+    // flow, decay, felling), drained and broadcast in batches.
+    private readonly ConcurrentQueue<CellChange> _cellJournal = new();
+    private readonly Dictionary<(int X, int Y, int Z), (byte Id, byte State)> _cellCoalesce = new();
+    private const int MaxCellChangesPerBroadcast = 8192;
+
+    private readonly record struct CellChange(int X, int Y, int Z, byte Id, byte State);
+
     private volatile bool _running;
     private int _nextId;
     private double _listTimer;
@@ -64,6 +72,9 @@ public sealed class GameServer : IDisposable
     {
         _listener.Start();
         _running = true;
+        // Every raw cell write on the server (an edit or a simulation step) is journaled and sent
+        // to clients, so explosions, fluid flow, decay and felling all reach them.
+        Chunk.CellWritten = OnCellWritten;
         _acceptThread = new Thread(AcceptLoop) { IsBackground = true, Name = "net-accept" };
         _acceptThread.Start();
     }
@@ -78,6 +89,8 @@ public sealed class GameServer : IDisposable
             else
                 Handle(item.Client, item.Payload);
         }
+
+        DrainCellJournal();
 
         if (_players.Count > 0)
             _world.SetServerFocus(Centroid());
@@ -180,7 +193,6 @@ public sealed class GameServer : IDisposable
                 var blockId = reader.ReadByte();
                 var state = reader.ReadByte();
                 _world.ApplyNetworkBlockEdit(x, y, z, blockId, state);
-                BroadcastBlockChange(x, y, z, blockId, state);
                 break;
             }
 
@@ -337,15 +349,40 @@ public sealed class GameServer : IDisposable
 
     private void BroadcastSystem(string text) => BroadcastChat(ChatKind.System, "", text);
 
-    private void BroadcastBlockChange(int x, int y, int z, byte blockId, byte state)
+    private void OnCellWritten(int x, int y, int z, byte id, byte state) =>
+        _cellJournal.Enqueue(new CellChange(x, y, z, id, state));
+
+    // Coalesces this frame's journaled writes by cell (the last write wins) and sends one
+    // BlockChanges batch; a burst past the cap leaves the rest for the next frame.
+    private void DrainCellJournal()
     {
-        using var writer = new PacketWriter(NetMessage.BlockChange);
-        writer.Write(x);
-        writer.Write(y);
-        writer.Write(z);
-        writer.Write(blockId);
-        writer.Write(state);
+        if (_cellJournal.IsEmpty)
+            return;
+
+        _cellCoalesce.Clear();
+        var drained = 0;
+        while (drained < MaxCellChangesPerBroadcast && _cellJournal.TryDequeue(out var change))
+        {
+            _cellCoalesce[(change.X, change.Y, change.Z)] = (change.Id, change.State);
+            drained++;
+        }
+
+        if (_cellCoalesce.Count == 0)
+            return;
+
+        using var writer = new PacketWriter(NetMessage.BlockChanges);
+        writer.Write(_cellCoalesce.Count);
+        foreach (var (cell, value) in _cellCoalesce)
+        {
+            writer.Write(cell.X);
+            writer.Write(cell.Y);
+            writer.Write(cell.Z);
+            writer.Write(value.Id);
+            writer.Write(value.State);
+        }
+
         Broadcast(writer.ToArray());
+        _cellCoalesce.Clear();
     }
 
     private static void SendChunk(ClientConnection client, int cx, int cy, int cz, ChunkSnapshot snapshot)
@@ -431,6 +468,7 @@ public sealed class GameServer : IDisposable
         if (!_running)
             return;
         _running = false;
+        Chunk.CellWritten = null;
 
         try { _listener.Stop(); } catch (SocketException) { }
 

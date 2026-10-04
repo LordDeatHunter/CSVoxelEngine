@@ -27,6 +27,7 @@ public enum NetMessage : byte
     ColumnHeights = 53,
     LodRegionRequest = 54,
     LodRegionData = 55,
+    BlockChanges = 56,
     EntityList = 60,
 }
 

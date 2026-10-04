@@ -1154,8 +1154,17 @@ public class Chunk : IDisposable
         }
 
         MarkModified();
+        if (CellWritten is { } written)
+            written((int)Position.X * Size + x, (int)Position.Y * Size + y, (int)Position.Z * Size + z, id, state);
         return previous;
     }
+
+    /// <summary>
+    /// A server sets this to observe every raw cell write (an edit or a simulation step) in world
+    /// coordinates, so it can broadcast the change to clients. Null on a client and in singleplayer;
+    /// worldgen never fires it, because it writes the block array directly.
+    /// </summary>
+    public static Action<int, int, int, byte, byte>? CellWritten { get; set; }
 
     /// <summary>Flags the chunk as holding unsaved edits (see <see cref="ModifiedSinceSave"/>).
     /// The test keeps the hot fluid-tick path from rewriting a field it already set.</summary>
@@ -1260,6 +1269,7 @@ public class Chunk : IDisposable
         chunkManager.UnmarkPlayerPlaced((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
         chunkManager.ImmediateRemeshWithBorders(Position, worldPos);
         MarkNeighborsDirty(worldPos, chunkManager);
+        CellWritten?.Invoke((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z, 0, 0);
         return true;
     }
 
@@ -1333,6 +1343,7 @@ public class Chunk : IDisposable
         _solidCount--;
         ClearState(Idx(localX, localY, localZ));
         MarkModified();
+        CellWritten?.Invoke((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z, 0, 0);
         return removed;
     }
 

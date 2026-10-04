@@ -53,6 +53,8 @@ public static class Program
     private static ConnectTarget pendingConnect;
     private static int netPlayerId = -1;
     private static readonly List<RemotePlayerSnapshot> remoteScratch = new();
+    private static readonly List<NetEntity> netEntitiesScratch = new();
+    private static readonly List<NetCellChange> netCellsScratch = new();
     private static double netStateTimer;
     private static double netKeepAliveTimer;
     private static bool debugEnabled;
@@ -556,6 +558,41 @@ public static class Program
                 reader.ReadInt();
                 reader.ReadInt();
                 clientLodStreamer?.Apply(reader.ReadBytes());
+                break;
+            }
+            case NetMessage.EntityList:
+            {
+                var count = reader.ReadInt();
+                netEntitiesScratch.Clear();
+                for (var i = 0; i < count; i++)
+                {
+                    var kind = (NetEntityKind)reader.ReadByte();
+                    var id = reader.ReadInt();
+                    var position = reader.ReadVector3();
+                    var yaw = reader.ReadFloat();
+                    var health = reader.ReadInt();
+                    var ammo = reader.ReadInt();
+                    var itemId = reader.ReadByte();
+                    var velocity = reader.ReadVector3();
+                    netEntitiesScratch.Add(new NetEntity(kind, id, position, yaw, health, ammo, itemId, velocity));
+                }
+                w.ApplyNetworkEntities(netEntitiesScratch);
+                break;
+            }
+            case NetMessage.BlockChanges:
+            {
+                var count = reader.ReadInt();
+                netCellsScratch.Clear();
+                for (var i = 0; i < count; i++)
+                {
+                    var x = reader.ReadInt();
+                    var y = reader.ReadInt();
+                    var z = reader.ReadInt();
+                    var blockId = reader.ReadByte();
+                    var state = reader.ReadByte();
+                    netCellsScratch.Add(new NetCellChange(x, y, z, blockId, state));
+                }
+                w.ApplyNetworkBlockChanges(netCellsScratch);
                 break;
             }
             default:

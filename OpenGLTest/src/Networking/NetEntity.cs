@@ -18,3 +18,6 @@ public enum NetEntityKind : byte
 /// </summary>
 public readonly record struct NetEntity(NetEntityKind Kind, int Id, Vector3 Position, float Yaw,
     int Health, int Ammo, byte ItemId, Vector3 Velocity);
+
+/// <summary>One server cell change: world coordinates and the new block id and state.</summary>
+public readonly record struct NetCellChange(int X, int Y, int Z, byte Id, byte State);
