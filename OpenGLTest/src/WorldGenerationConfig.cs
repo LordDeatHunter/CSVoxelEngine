@@ -1319,6 +1319,11 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const double NetTimeSyncSeconds = 1.0;
     // How often the server broadcasts the live mobs and drops.
     public const double NetEntitySyncSeconds = 0.1;
+    // The largest speed the server accepts from a client (blocks/s) before treating a state as a
+    // teleport; generous so sprint-flying is never rejected.
+    public const float NetMaxMoveBlocksPerSecond = 80f;
+    // How far from the player's eye a client may edit a block.
+    public const float NetMaxEditReachBlocks = 6f;
     // How long a connect attempt may hang before the client gives up and returns to the menu.
     public const double NetConnectTimeoutSeconds = 10.0;
     // Sent roughly this often so an idle connection is not mistaken for a dead one.

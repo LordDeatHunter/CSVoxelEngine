@@ -45,6 +45,7 @@ public sealed class GameServer : IDisposable
     private double _listTimer;
     private double _timeTimer;
     private double _entityTimer;
+    private double _elapsed;
 
     // Stable network ids for the live mobs and drops, keyed by object identity (reference equality).
     private readonly Dictionary<object, int> _entityIds = new(ReferenceEqualityComparer.Instance);
@@ -82,6 +83,7 @@ public sealed class GameServer : IDisposable
     /// <summary>Main thread: applies every queued client message and runs the periodic broadcasts.</summary>
     public void Pump(double deltaTime)
     {
+        _elapsed += deltaTime;
         while (_inbound.TryDequeue(out var item))
         {
             if (item.Payload == null)
@@ -148,7 +150,7 @@ public sealed class GameServer : IDisposable
             client.Name = CleanName(reader.ReadString());
             client.Hello = true;
             _clients[client.Id] = client;
-            _players[client.Id] = new PlayerSnapshot(client.Name, _world.Camera.Position, 0f, 0f, 0);
+            _players[client.Id] = new PlayerSnapshot(client.Name, _world.Camera.Position, 0f, 0f, 0, _elapsed);
             SendServerHello(client);
             SendInventory(client);
             BroadcastPlayerList();
@@ -182,7 +184,24 @@ public sealed class GameServer : IDisposable
                 var pitch = reader.ReadFloat();
                 var flags = reader.ReadByte();
                 if (_players.TryGetValue(client.Id, out var current))
-                    _players[client.Id] = current with { Position = position, Yaw = yaw, Pitch = pitch, Flags = flags };
+                {
+                    // Reject a teleport-scale move: the authoritative position stays put. The
+                    // timestamp always advances, so rejected states cannot accumulate time until a
+                    // teleport fits.
+                    var delta = _elapsed - current.LastStateAt;
+                    var ok = NetValidation.AcceptMove(current.Position, position, delta,
+                        WorldGenerationConfig.NetMaxMoveBlocksPerSecond, out var bounded);
+                    if (!ok)
+                        Log.Warn($"net: rejected a move from {client.Name} (#{client.Id})");
+                    _players[client.Id] = current with
+                    {
+                        Position = ok ? bounded : current.Position,
+                        Yaw = yaw,
+                        Pitch = pitch,
+                        Flags = flags,
+                        LastStateAt = _elapsed,
+                    };
+                }
                 break;
             }
 
@@ -193,7 +212,11 @@ public sealed class GameServer : IDisposable
                 var z = reader.ReadInt();
                 var blockId = reader.ReadByte();
                 var state = reader.ReadByte();
-                _world.ApplyNetworkBlockEdit(x, y, z, blockId, state);
+                if (_players.TryGetValue(client.Id, out var player) &&
+                    NetValidation.InEditReach(player.Position, x, y, z, WorldGenerationConfig.NetMaxEditReachBlocks))
+                    _world.ApplyNetworkBlockEdit(x, y, z, blockId, state);
+                else
+                    SendBlockCorrection(client, x, y, z);
                 break;
             }
 
@@ -381,6 +404,19 @@ public sealed class GameServer : IDisposable
     private void OnCellWritten(int x, int y, int z, byte id, byte state) =>
         _cellJournal.Enqueue(new CellChange(x, y, z, id, state));
 
+    // Reverts a client's optimistic edit the server refused by sending the authoritative cell.
+    private void SendBlockCorrection(ClientConnection client, int x, int y, int z)
+    {
+        var manager = _world.GetChunkManager();
+        using var writer = new PacketWriter(NetMessage.BlockChange);
+        writer.Write(x);
+        writer.Write(y);
+        writer.Write(z);
+        writer.Write(manager.GetBlockGlobal(x, y, z));
+        writer.Write(manager.GetStateGlobal(x, y, z));
+        client.Send(writer.ToArray());
+    }
+
     // Coalesces this frame's journaled writes by cell (the last write wins) and sends one
     // BlockChanges batch; a burst past the cap leaves the rest for the next frame.
     private void DrainCellJournal()
@@ -517,7 +553,8 @@ public sealed class GameServer : IDisposable
 
     private readonly record struct Inbound(ClientConnection Client, byte[]? Payload);
 
-    private readonly record struct PlayerSnapshot(string Name, Vector3 Position, float Yaw, float Pitch, byte Flags);
+    private readonly record struct PlayerSnapshot(string Name, Vector3 Position, float Yaw, float Pitch,
+        byte Flags, double LastStateAt);
 
     /// <summary>One connected socket: its id and name, and a lock-guarded framed send.</summary>
     private sealed class ClientConnection(TcpClient tcp, int id)
