@@ -266,12 +266,12 @@ public sealed class ContentTests
         var min = new Vector3(1.25f, 0f, 1.25f);
         var max = new Vector3(1.75f, 1f, 1.75f);
         var origin = new Vector3(1.5f, 2f, 1.5f);
-        Assert.True(Camera.RayIntersectsBox(origin, -Vector3.UnitY, min, max, 10f, out var t, out var normal));
+        Assert.True(BlockRaycaster.RayIntersectsBox(origin, -Vector3.UnitY, min, max, 10f, out var t, out var normal));
         Assert.Equal(1f, t, precision: 4);
         Assert.Equal(Vector3.UnitY, normal);
 
         var rimOrigin = new Vector3(1.1f, 2f, 1.5f);
-        Assert.False(Camera.RayIntersectsBox(rimOrigin, -Vector3.UnitY, min, max, 10f, out _, out _));
+        Assert.False(BlockRaycaster.RayIntersectsBox(rimOrigin, -Vector3.UnitY, min, max, 10f, out _, out _));
     }
 
     private static Vector3? DeclaredSrgb(byte id) =>

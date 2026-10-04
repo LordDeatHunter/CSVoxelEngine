@@ -259,7 +259,7 @@ public sealed class Goblin : Mob
             if (IsGrounded && _throwCooldown <= 0f && _losRetry <= 0f)
             {
                 var chest = ChestOf(player);
-                if (!player.SegmentHitsBlock(ThrowOrigin, chest, chunks))
+                if (!BlockRaycaster.SegmentHitsBlock(ThrowOrigin, chest, chunks))
                 {
                     _losBlocked = false;
                     _aimTarget = chest;

@@ -1,4 +1,4 @@
-ï»¿using System;
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
@@ -1739,7 +1739,7 @@ public class World : IItemUseWorld
     
     /// <summary>
     /// Drives the left-click action, attack-first. A mob inside the forward punch cone
-    /// (see <see cref="Combat"/>) takes the swing â€” <c>entityDamage</c> plus a shove â€” and the
+    /// (see <see cref="Combat"/>) takes the swing — <c>entityDamage</c> plus a shove — and the
     /// block under the crosshair is left alone for as long as one is there; with the cone clear
     /// the block is mined. Mining itself is hit-based: the first hit on a block lands the instant
     /// it is targeted, so a quick tap counts as one hit, then one hit per the held item's pace
@@ -1843,7 +1843,7 @@ public class World : IItemUseWorld
 
         // Zero hardness covers two cases: a real block of hardness 0 (pebbles) pops on first
         // contact with no hold-to-mine, while air or an unloaded chunk has nothing to mine
-        // at all â€” the id being a registered block is what tells them apart. A refused tool
+        // at all — the id being a registered block is what tells them apart. A refused tool
         // whiffs instead of popping the block.
         if (_breakHardness <= 0f)
         {
@@ -1968,7 +1968,7 @@ public class World : IItemUseWorld
             var mob = mobs[i];
             if (!Combat.InPunchCone(origin, direction, mob.Position, out var distance))
                 continue;
-            if (Camera.SegmentHitsBlock(origin, mob.Position, _chunkManager))
+            if (BlockRaycaster.SegmentHitsBlock(origin, mob.Position, _chunkManager))
                 continue;
             if (distance < bestDistance)
             {
@@ -2043,7 +2043,7 @@ public class World : IItemUseWorld
             var mob = mobs[i];
             if (!Combat.InFrontHemisphere(origin, direction, mob.Position, out var distance))
                 continue;
-            if (Camera.SegmentHitsBlock(origin, mob.Position, _chunkManager))
+            if (BlockRaycaster.SegmentHitsBlock(origin, mob.Position, _chunkManager))
                 continue;
 
             // Keep the two closest, shifting the old nearest down when a closer one arrives.
@@ -2147,7 +2147,7 @@ public class World : IItemUseWorld
                 _campfires.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, _dropManager);
             if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.Quern)
                 _querns.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, _dropManager);
-            // A mined mold throws out a cast that had already set, even in creative â€” the mold
+            // A mined mold throws out a cast that had already set, even in creative — the mold
             // block itself is what creative withholds, not the metal someone poured into it
             if (ContentRegistry.IsCastMold(brokenId))
                 _casting.NotifyBlockRemoved(blockPos, _dropManager);
@@ -2164,7 +2164,7 @@ public class World : IItemUseWorld
         NotifyLodEdit((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
 
         // Wood and leaves are never surface-solid and sit above the terrain, so the surface
-        // record above never fires for them â€” yet the far LOD draws their canopy. Disturb it
+        // record above never fires for them — yet the far LOD draws their canopy. Disturb it
         // and rebuild regardless.
         if (TreeGenerator.IsTreeBlock(brokenId))
         {
@@ -2194,7 +2194,7 @@ public class World : IItemUseWorld
 
     /// <summary>
     /// Fells the wood a mined wood block was holding up: collects the severed part (the break
-    /// plus its children â€” a branch cut leaves the trunk standing), clears it in one batch
+    /// plus its children — a branch cut leaves the trunk standing), clears it in one batch
     /// (same pattern as a TNT blast), and launches a toppling entity that drops its blocks
     /// once it has lain still. Player-placed (detached) logs are not trees: they pop out as a
     /// plain drop with no entity and no animation. A lone block with no children just drops
@@ -2435,13 +2435,13 @@ public class World : IItemUseWorld
     }
 
     /// <summary>
-    /// Right-click: runs the first thing that claims the click â€” a campfire, quern, kiln or cast
+    /// Right-click: runs the first thing that claims the click — a campfire, quern, kiln or cast
     /// mold interaction, then the selected slot's own <see cref="Item.OnUse"/> (a bucket scoops
     /// or pours, flint grounds a pile, a firestarter strikes), otherwise places the selected
     /// block. A successful tool use morphs the instance in place, so every hotbar slot holding
     /// that bucket flips with it and scooping and pouring alternate on one button. Returns
     /// whether the click was claimed, so a plain throwable only starts charging when nothing
-    /// here owned it â€” a mudball aimed at a lit campfire cooks instead of being thrown.
+    /// here owned it — a mudball aimed at a lit campfire cooks instead of being thrown.
     /// False unless the world is playing: nothing may edit an unloaded world.
     /// </summary>
     public bool TryUseSelected(float maxDistance)
@@ -2929,7 +2929,7 @@ public class World : IItemUseWorld
 
     /// <summary>
     /// Places the hotbar's selected block against the face the player is looking at and spends
-    /// one from that slot â€” except in creative mode, where placing is free. Does nothing
+    /// one from that slot — except in creative mode, where placing is free. Does nothing
     /// when the slot is empty or holds no blocks. Returns whether one was placed; false unless the
     /// world is playing, since nothing may edit an unloaded world.
     /// </summary>
@@ -2970,7 +2970,7 @@ public class World : IItemUseWorld
 
         Player.Punch();
         // Sand placed into thin air falls at once instead of hovering (stackable piles never
-        // fall â€” the registry forbids the combination â€” so only the block path topples)
+        // fall — the registry forbids the combination — so only the block path topples)
         _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
             (int)placePos.X, (int)placePos.Y, (int)placePos.Z);
         return true;
