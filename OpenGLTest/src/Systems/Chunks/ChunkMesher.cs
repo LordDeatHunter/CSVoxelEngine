@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Numerics;
 using static silkgltriangle.Chunk;
+using static silkgltriangle.ChunkLighting;
 
 namespace silkgltriangle;
 

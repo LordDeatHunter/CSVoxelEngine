@@ -23,14 +23,14 @@ public sealed class LightVolumeHeightTests
         // loop body, so building it per position would grow the frame on every iteration).
         Span<int> mapChunk = stackalloc int[Chunk.LightSize];
         Span<int> mapLocal = stackalloc int[Chunk.LightSize];
-        Chunk.BuildLightAxisMap(mapChunk, mapLocal);
+        ChunkLighting.BuildLightAxisMap(mapChunk, mapLocal);
 
         int[]?[] columns = new int[9][];
 
         // Chunk columns chosen to cover both FloorDiv branches and columns straddling x/z = 0.
         foreach (var (cx, cz) in new[] { (0, 0), (1, 2), (-1, -1), (0, -1), (-3, 5), (7, -4) })
         {
-            Chunk.FillLightColumnHeights(cx, cz, columns, null);
+            ChunkLighting.FillLightColumnHeights(cx, cz, columns, null);
 
             var worldX0 = cx * Chunk.Size - Chunk.LightBorder;
             var worldZ0 = cz * Chunk.Size - Chunk.LightBorder;
@@ -59,7 +59,7 @@ public sealed class LightVolumeHeightTests
 
         Span<int> mapChunk = stackalloc int[Chunk.LightSize];
         Span<int> mapLocal = stackalloc int[Chunk.LightSize];
-        Chunk.BuildLightAxisMap(mapChunk, mapLocal);
+        ChunkLighting.BuildLightAxisMap(mapChunk, mapLocal);
 
         Assert.Equal(0, mapChunk[0]);
         Assert.Equal(2, mapChunk[Chunk.LightSize - 1]);
@@ -101,7 +101,7 @@ public sealed class LightVolumeHeightTests
             return (cx, cz) == (4, -2) ? provided : null;
         };
 
-        Chunk.FillLightColumnHeights(4, -2, columns, source);
+        ChunkLighting.FillLightColumnHeights(4, -2, columns, source);
 
         // The centre column of the 3x3 (dx=1, dz=1) is (4, -2): the provided heights.
         Assert.Same(provided, columns[4]);
