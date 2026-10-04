@@ -1182,6 +1182,13 @@ public class Chunk : IDisposable
     }
 
     /// <summary>
+    /// A snapshot of this chunk's blocks and state for the network, without
+    /// <see cref="TakeSnapshot"/>'s save-dirty side effect: a server hands chunks to clients
+    /// without pretending it just saved them. Main thread, like every read of the arrays.
+    /// </summary>
+    public ChunkSnapshot CaptureForNetwork() => new(_blocks, _state, playerPlaced: null);
+
+    /// <summary>
     /// Fills this chunk from a save instead of generating it: the blocks, the state bytes and
     /// the player-placed cells (handed to the chunk manager through
     /// <see cref="RestoredPlayerPlaced"/>) come from <paramref name="snapshot"/>, and everything

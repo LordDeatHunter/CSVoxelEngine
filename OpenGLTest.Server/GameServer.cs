@@ -171,6 +171,30 @@ public sealed class GameServer : IDisposable
                 break;
             }
 
+            case NetMessage.ChunkRequest:
+            {
+                var cx = reader.ReadInt();
+                var cy = reader.ReadInt();
+                var cz = reader.ReadInt();
+                // Only loaded chunks are sent: a request never forces generation, so it cannot
+                // make the server build chunks it would not already have loaded around the players.
+                if (_world.GetChunkManager().TryCaptureChunk(cx, cy, cz, out var snapshot))
+                    SendChunk(client, cx, cy, cz, snapshot);
+                break;
+            }
+
+            case NetMessage.ColumnRequest:
+            {
+                var cx = reader.ReadInt();
+                var cz = reader.ReadInt();
+                using var writer = new PacketWriter(NetMessage.ColumnHeights);
+                writer.Write(cx);
+                writer.Write(cz);
+                writer.WriteBytes(ChunkNetCodec.EncodeHeights(Chunk.GetColumnHeights(cx, cz)));
+                client.Send(writer.ToArray());
+                break;
+            }
+
             default:
                 Log.Warn($"net: ignoring {message} from {client.Name} (#{client.Id})");
                 break;
@@ -232,6 +256,16 @@ public sealed class GameServer : IDisposable
         writer.Write(blockId);
         writer.Write(state);
         Broadcast(writer.ToArray());
+    }
+
+    private static void SendChunk(ClientConnection client, int cx, int cy, int cz, ChunkSnapshot snapshot)
+    {
+        using var writer = new PacketWriter(NetMessage.ChunkData);
+        writer.Write(cx);
+        writer.Write(cy);
+        writer.Write(cz);
+        writer.WriteBytes(ChunkNetCodec.Encode(snapshot));
+        client.Send(writer.ToArray());
     }
 
     private void Broadcast(byte[] payload)

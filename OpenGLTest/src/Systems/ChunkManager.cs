@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Threading;
 using Silk.NET.OpenGL;
@@ -905,6 +906,20 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// happen between the enqueue and the drain.
     /// </summary>
     public bool TryDequeueLoaded(out Chunk chunk) => _loadedChunks.TryDequeue(out chunk);
+
+    /// <summary>
+    /// A network snapshot of the loaded chunk at a position, for a server streaming it to a client.
+    /// False when that chunk is not loaded (it is never generated here, so a client request cannot
+    /// force extra generation). Main thread only, like every chunk-table read.
+    /// </summary>
+    public bool TryCaptureChunk(int cx, int cy, int cz, [MaybeNullWhen(false)] out ChunkSnapshot snapshot)
+    {
+        snapshot = null;
+        if (!Chunks.TryGetValue(cx, cy, cz, out var chunk) || !chunk.IsBlockDataReady)
+            return false;
+        snapshot = chunk.CaptureForNetwork();
+        return true;
+    }
 
     /// <summary>
     /// Marks a chunk as dirty (needs remeshing).

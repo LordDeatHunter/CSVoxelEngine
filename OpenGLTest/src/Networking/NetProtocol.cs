@@ -95,6 +95,14 @@ public sealed class PacketWriter : IDisposable
     public PacketWriter Write(string value) { _writer.Write(value); return this; }
     public PacketWriter Write(Vector3 value) { _writer.Write(value.X); _writer.Write(value.Y); _writer.Write(value.Z); return this; }
 
+    /// <summary>Writes a length-prefixed byte array (the chunk/column payloads).</summary>
+    public PacketWriter WriteBytes(byte[] value)
+    {
+        _writer.Write(value.Length);
+        _writer.Write(value, 0, value.Length);
+        return this;
+    }
+
     public byte[] ToArray() => _stream.ToArray();
 
     public void Dispose()
@@ -125,6 +133,9 @@ public sealed class PacketReader : IDisposable
     public double ReadDouble() => _reader.ReadDouble();
     public string ReadString() => _reader.ReadString();
     public Vector3 ReadVector3() => new(_reader.ReadSingle(), _reader.ReadSingle(), _reader.ReadSingle());
+
+    /// <summary>Reads a length-prefixed byte array written by <see cref="PacketWriter.WriteBytes"/>.</summary>
+    public byte[] ReadBytes() => _reader.ReadBytes(_reader.ReadInt32());
 
     public void Dispose()
     {
