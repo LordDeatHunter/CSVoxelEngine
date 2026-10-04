@@ -15,6 +15,7 @@
     <ItemGroup>
         <ProjectReference Include="..\OpenGLTest\silkgltriangle.csproj" />
         <ProjectReference Include="..\OpenGLTest.ItemDebugger\ItemDebugger.csproj" />
+        <ProjectReference Include="..\OpenGLTest.Server\Server.csproj" />
     </ItemGroup>
 
 </Project>

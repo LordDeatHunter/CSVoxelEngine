@@ -1,0 +1,129 @@
+using System;
+using System.Buffers.Binary;
+using System.Diagnostics;
+using System.IO;
+using System.Numerics;
+using System.Threading;
+using Xunit;
+
+namespace silkgltriangle.Tests;
+
+public sealed class NetFramingTests
+{
+    [Fact]
+    public void FramesRoundTripInOrderAndEndCleanly()
+    {
+        using var stream = new MemoryStream();
+        var first = new byte[] { 1, 2, 3, 4, 5 };
+        var second = new byte[] { 9 };
+
+        NetFraming.WriteFrame(stream, first);
+        NetFraming.WriteFrame(stream, second);
+        stream.Position = 0;
+
+        Assert.Equal(first, NetFraming.ReadFrame(stream));
+        Assert.Equal(second, NetFraming.ReadFrame(stream));
+        Assert.Null(NetFraming.ReadFrame(stream));
+    }
+
+    [Fact]
+    public void AnOversizedLengthIsRefused()
+    {
+        using var stream = new MemoryStream();
+        Span<byte> length = stackalloc byte[4];
+        BinaryPrimitives.WriteInt32LittleEndian(length, NetFraming.MaxPayload + 1);
+        stream.Write(length);
+        stream.Position = 0;
+
+        Assert.Null(NetFraming.ReadFrame(stream));
+    }
+
+    [Fact]
+    public void PacketsRoundTripTheirFields()
+    {
+        using var writer = new PacketWriter(NetMessage.PlayerState);
+        writer.Write(new Vector3(1f, 2f, 3f)).Write(45f).Write(-10f).Write((byte)3);
+
+        using var reader = new PacketReader(writer.ToArray());
+        Assert.Equal(NetMessage.PlayerState, reader.Message);
+        Assert.Equal(new Vector3(1f, 2f, 3f), reader.ReadVector3());
+        Assert.Equal(45f, reader.ReadFloat());
+        Assert.Equal(-10f, reader.ReadFloat());
+        Assert.Equal((byte)3, reader.ReadByte());
+    }
+}
+
+/// <summary>
+/// A real <see cref="GameServer"/> and <see cref="NetworkClient"/> over loopback: the handshake
+/// delivers the world seed, and a chat line goes out and comes back to the sender.
+/// </summary>
+[Collection("Worldgen seed")]
+public sealed class NetworkLoopbackTests : IDisposable
+{
+    public NetworkLoopbackTests() => TestContent.EnsureLoaded();
+
+    public void Dispose()
+    {
+        try
+        {
+            WorldSeed.Apply(WorldSeed.Default);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    [Fact]
+    public void HandshakeDeliversTheWorldAndChatComesBack()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        var world = new World(null!, null!, null!, null!, null!, null!, null, null, serverMode: true);
+        using var server = new GameServer(world, "Test World", WorldSeed.Default, 0);
+        server.Start();
+
+        using var client = new NetworkClient(
+            new ServerAddress("127.0.0.1", server.BoundPort), "Tester", 5.0);
+        var connectThread = new Thread(client.Connect) { IsBackground = true, Name = "test-connect" };
+        connectThread.Start();
+
+        var sw = Stopwatch.StartNew();
+        while (client.Status == NetworkStatus.Connecting && sw.Elapsed.TotalSeconds < 5)
+        {
+            server.Pump(0.01);
+            Thread.Sleep(5);
+        }
+
+        Assert.Equal(NetworkStatus.Handshaken, client.Status);
+        Assert.True(client.Server.HasValue);
+        Assert.Equal("Test World", client.Server!.Value.WorldName);
+        Assert.Equal(WorldSeed.Default, client.Server.Value.Seed);
+
+        using (var chat = new PacketWriter(NetMessage.ChatSend))
+        {
+            chat.Write("hello");
+            client.Send(chat.ToArray());
+        }
+
+        var seen = false;
+        sw.Restart();
+        while (!seen && sw.Elapsed.TotalSeconds < 5)
+        {
+            server.Pump(0.01);
+            while (client.Inbound.TryDequeue(out var payload))
+            {
+                using var reader = new PacketReader(payload);
+                if (reader.Message != NetMessage.ChatMessage)
+                    continue;
+                var kind = (ChatKind)reader.ReadByte();
+                var sender = reader.ReadString();
+                var text = reader.ReadString();
+                if (kind == ChatKind.Player && sender == "Tester" && text == "hello")
+                    seen = true;
+            }
+            Thread.Sleep(5);
+        }
+
+        Assert.True(seen, "the chat line never came back from the server");
+        world.SaveAndDispose();
+    }
+}

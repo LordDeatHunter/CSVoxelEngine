@@ -48,6 +48,9 @@ public sealed class GameServer : IDisposable
 
     public int Port { get; }
 
+    /// <summary>The port actually bound (resolves an ephemeral port 0), for tests and logs.</summary>
+    public int BoundPort => ((IPEndPoint)_listener.LocalEndpoint).Port;
+
     public int ClientCount => _clients.Count;
 
     public void Start()

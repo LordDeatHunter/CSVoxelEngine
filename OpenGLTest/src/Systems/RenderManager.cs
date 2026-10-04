@@ -3384,6 +3384,38 @@ public class RenderManager : IDisposable
         goblin.Position - new Vector3(0f, Goblin.Height * 0.5f, 0f);
 
     /// <summary>
+    /// Draws every remote player as the player body posed at their broadcast eye, using the client's
+    /// own player rig and textures so all players look alike. Restores the world textures on the way
+    /// out, like <see cref="RenderGoblins"/>.
+    /// </summary>
+    public void RenderRemotePlayers(Camera camera, IReadOnlyList<RemotePlayer> players)
+    {
+        if (camera == null || _playerMeshes.Count == 0 || players.Count == 0)
+            return;
+
+        worldShader.Use();
+        BindEntityTextures(false);
+        BindUnit(0, TextureTarget.Texture2DArray, _playerPaletteTex);
+        var viewProj = camera.GetViewProjection();
+        foreach (var remote in players)
+        {
+            var light = LightAt(remote.Eye);
+            foreach (var part in PlayerModel.BodyParts)
+            {
+                var model = remote.Model.GetPartMatrix(part, remote.Eye, remote.Yaw, 0f);
+                SetDrawUniforms(model, model * viewProj, 1f, light);
+                _playerMeshes[part].Render();
+            }
+
+            var head = remote.Model.GetPartMatrix("Head", remote.Eye, remote.Yaw, 0f);
+            SetDrawUniforms(head, head * viewProj, 1f, light);
+            _playerMeshes["Head"].Render();
+        }
+
+        BindEntityTextures(false);
+    }
+
+    /// <summary>
     /// Draws the five-heart healthbar above every live mob (see
     /// <see cref="EntityHealthbarRenderer"/>), right after the bodies so the row tracks them.
     /// </summary>

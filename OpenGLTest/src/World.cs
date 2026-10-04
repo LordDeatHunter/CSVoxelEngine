@@ -104,6 +104,10 @@ public class World : IItemUseWorld
     // Trees currently toppling over after their base log was mined
     private readonly List<TopplingTree> _toppling = [];
 
+    // Other players on this client's server (multiplayer only); empty in singleplayer.
+    private readonly List<RemotePlayer> _remotePlayers = [];
+    private readonly HashSet<int> _remoteIdsSeen = [];
+
     // Null on the headless path (tests), where Now runs off the summed Update deltas instead
     private readonly IWindow? _window;
     private double _headlessTime;
@@ -621,6 +625,56 @@ public class World : IItemUseWorld
         Camera.TestTeleport(position, Camera.Yaw, Camera.Pitch);
     }
 
+    /// <summary>Sets the lighting clock so <see cref="LightingTime"/> reads <paramref name="time"/>
+    /// (a client following the server's day clock).</summary>
+    public void SetLightingTime(double time) => TimeOffset = time - Now;
+
+    /// <summary>The other players on this client's server, drawn each frame. Empty in singleplayer.</summary>
+    public IReadOnlyList<RemotePlayer> RemotePlayers => _remotePlayers;
+
+    /// <summary>
+    /// Reconciles the remote player set with a server broadcast: upserts each entry (skipping the
+    /// client's own id), then removes anyone no longer listed.
+    /// </summary>
+    public void SyncRemotePlayers(IReadOnlyList<RemotePlayerSnapshot> snapshot, int selfId)
+    {
+        _remoteIdsSeen.Clear();
+        for (var i = 0; i < snapshot.Count; i++)
+        {
+            var entry = snapshot[i];
+            if (entry.Id == selfId)
+                continue;
+            _remoteIdsSeen.Add(entry.Id);
+            var index = IndexOfRemote(entry.Id);
+            if (index < 0)
+            {
+                var remote = new RemotePlayer(entry.Id, entry.Name, Player.Rig);
+                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch);
+                _remotePlayers.Add(remote);
+            }
+            else
+            {
+                var remote = _remotePlayers[index];
+                remote.Name = entry.Name;
+                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch);
+            }
+        }
+
+        for (var i = _remotePlayers.Count - 1; i >= 0; i--)
+            if (!_remoteIdsSeen.Contains(_remotePlayers[i].Id))
+                _remotePlayers.RemoveAt(i);
+    }
+
+    public void ClearRemotePlayers() => _remotePlayers.Clear();
+
+    private int IndexOfRemote(int id)
+    {
+        for (var i = 0; i < _remotePlayers.Count; i++)
+            if (_remotePlayers[i].Id == id)
+                return i;
+        return -1;
+    }
+
     /// <summary>
     /// One gameplay frame. Each block of work runs under its own profiler section; the autosave
     /// runs under <see cref="ProfileSection.Save"/>, which never nests inside another section.
@@ -751,6 +805,9 @@ public class World : IItemUseWorld
         UpdateToppling((float)deltaTime);
         UpdateThrown((float)deltaTime);
         RefreshProjectiles();
+        // Remote player poses ease toward the last broadcast and drive their own walk cycles.
+        for (var i = 0; i < _remotePlayers.Count; i++)
+            _remotePlayers[i].Update(deltaTime);
         FrameProfiler.End(ProfileSection.Entities);
 
         // Chunks that streamed in this frame hand over their water/air frontier, so a sea a
@@ -1372,6 +1429,7 @@ public class World : IItemUseWorld
         renderManager.RenderFallingBlocks(Camera, _falling.Falling);
         renderManager.RenderSlimes(Camera, Slimes);
         renderManager.RenderGoblins(Camera, Goblins);
+        renderManager.RenderRemotePlayers(Camera, _remotePlayers);
         renderManager.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);
 

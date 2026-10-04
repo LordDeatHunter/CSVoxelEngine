@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Runtime;
+using System.Threading;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 
@@ -22,7 +23,7 @@ public static class Program
     private enum AppScreen { Menu, Loading, Playing, Saving }
 
     /// <summary>Blocking work recorded by a click and run on the update after its screen was presented.</summary>
-    private enum PendingWork { None, OpenWorld, SaveAndQuit }
+    private enum PendingWork { None, OpenWorld, SaveAndQuit, Connect }
 
     private static WindowManager windowManager;
     private static InputManager inputManager;
@@ -45,6 +46,13 @@ public static class Program
     private static bool pendingFramePresented;
     private static VisualDirector? visualDirector;
     private static bool visualScriptFailed;
+    // The live multiplayer connection, null in singleplayer and on the menu
+    private static NetworkClient? netClient;
+    private static ConnectTarget pendingConnect;
+    private static int netPlayerId = -1;
+    private static readonly List<RemotePlayerSnapshot> remoteScratch = new();
+    private static double netStateTimer;
+    private static double netKeepAliveTimer;
     private static bool debugEnabled;
     private static bool xWasPressed;
     private static bool qWasPressed;
@@ -349,7 +357,7 @@ public static class Program
             case MainMenuAction.Connect:
                 var target = menu.TakeConnectRequest();
                 if (target is { } connect)
-                    StartMultiplayer(connect);
+                    RequestConnect(connect);
                 break;
             case MainMenuAction.Exit:
                 windowManager.Window.Close();
@@ -358,13 +366,172 @@ public static class Program
     }
 
     /// <summary>
-    /// Opens a multiplayer session to the chosen server: the client connects, the world streams from
-    /// the server and plays like a saved world. Wired to the networking layer in the next milestone.
+    /// Records a server to connect to and switches to the connecting screen; the connection starts
+    /// on the update after that screen was presented, exactly like a world open.
     /// </summary>
-    private static void StartMultiplayer(ConnectTarget target)
+    private static void RequestConnect(ConnectTarget target)
     {
-        Log.WriteLine($"Multiplayer: connect {target.Address} ({target.Name})");
-        menu.ShowNotice("Multiplayer is not connected yet");
+        pending = PendingWork.Connect;
+        pendingConnect = target;
+        pendingFramePresented = false;
+        loadingView.Begin(LoadingScreenKind.Loading, target.Name, "Connecting...");
+        screen = AppScreen.Loading;
+    }
+
+    /// <summary>Starts the connect + handshake on a background thread; the loading screen polls it.</summary>
+    private static void BeginConnect()
+    {
+        netClient?.Dispose();
+        netClient = new NetworkClient(pendingConnect.Address, chatView.LocalName,
+            WorldGenerationConfig.NetConnectTimeoutSeconds);
+        var client = netClient;
+        new Thread(() => client.Connect()) { IsBackground = true, Name = "net-connect" }.Start();
+    }
+
+    /// <summary>
+    /// The connecting screen's frame: waits for the handshake, then builds the client world from the
+    /// server's seed and lets the normal loading path take over. A failure returns to the server list
+    /// with the reason.
+    /// </summary>
+    private static void UpdateConnecting(float deltaTime)
+    {
+        var client = netClient;
+        if (client == null)
+            return;
+
+        if (client.Status == NetworkStatus.Failed)
+        {
+            var reason = client.Error ?? "Could not connect";
+            DisconnectNetwork();
+            AbortConnect(reason);
+            return;
+        }
+
+        if (client.Status != NetworkStatus.Handshaken)
+        {
+            loadingView.Update(0f, false, deltaTime);
+            return;
+        }
+
+        var server = client.Server!.Value;
+        try
+        {
+            WorldSeed.Apply(server.Seed);
+            world = new World(null!, null!, null!, null!, null!, null!, null, null);
+            world.Player.Rig = renderManager.PlayerRig;
+        }
+        catch (Exception e)
+        {
+            Log.Warn($"Multiplayer: could not build the world: {e.Message}");
+            DisconnectNetwork();
+            AbortConnect("Could not start the world - see the console");
+            return;
+        }
+
+        // A client follows the server's day clock from the hello.
+        world.SetLightingTime(server.Time);
+        netPlayerId = server.PlayerId;
+        loadingView.Begin(LoadingScreenKind.Loading, server.WorldName, "Loading world...");
+        Log.WriteLine($"Multiplayer: connected to {client.Address} as '{chatView.LocalName}' (#{server.PlayerId}) on '{server.WorldName}'");
+    }
+
+    private static void AbortConnect(string notice)
+    {
+        loadingView.Finish();
+        ShowMenu();
+        menu.OpenMultiplayer();
+        menu.ShowNotice(notice);
+    }
+
+    /// <summary>Sends periodics and drains every server message onto the world and the chat.</summary>
+    private static void UpdateNetwork(NetworkClient client, float deltaTime)
+    {
+        var w = world!;
+        netStateTimer += deltaTime;
+        if (netStateTimer >= WorldGenerationConfig.NetPlayerStateSeconds)
+        {
+            netStateTimer = 0;
+            var camera = w.Camera;
+            using var writer = new PacketWriter(NetMessage.PlayerState);
+            writer.Write(camera.Position);
+            writer.Write(camera.Yaw);
+            writer.Write(camera.Pitch);
+            writer.Write((byte)((camera.IsCreative ? 1 : 0) | (camera.IsFlying ? 2 : 0)));
+            client.Send(writer.ToArray());
+        }
+
+        netKeepAliveTimer += deltaTime;
+        if (netKeepAliveTimer >= WorldGenerationConfig.NetKeepAliveSeconds)
+        {
+            netKeepAliveTimer = 0;
+            using var writer = new PacketWriter(NetMessage.KeepAlive);
+            client.Send(writer.ToArray());
+        }
+
+        while (client.Inbound.TryDequeue(out var payload))
+            HandleNetworkMessage(w, payload);
+    }
+
+    private static void HandleNetworkMessage(World w, byte[] payload)
+    {
+        using var reader = new PacketReader(payload);
+        switch (reader.Message)
+        {
+            case NetMessage.ChatMessage:
+            {
+                var kind = (ChatKind)reader.ReadByte();
+                var sender = reader.ReadString();
+                var text = reader.ReadString();
+                chatView.AddMessage(kind, sender, text);
+                break;
+            }
+            case NetMessage.TimeSync:
+                w.SetLightingTime(reader.ReadDouble());
+                break;
+            case NetMessage.PlayerList:
+            {
+                var count = reader.ReadInt();
+                remoteScratch.Clear();
+                for (var i = 0; i < count; i++)
+                {
+                    var id = reader.ReadInt();
+                    var name = reader.ReadString();
+                    var eye = reader.ReadVector3();
+                    var yaw = reader.ReadFloat();
+                    var pitch = reader.ReadFloat();
+                    reader.ReadByte();
+                    remoteScratch.Add(new RemotePlayerSnapshot(id, name, eye, yaw, pitch));
+                }
+                w.SyncRemotePlayers(remoteScratch, netPlayerId);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    /// <summary>Tears the connection down and returns to the server list with a notice.</summary>
+    private static void DisconnectToMenu(string notice)
+    {
+        DisconnectNetwork();
+        // A client world is storeless; dispose it so its workers stop before the menu.
+        if (currentWorld == null && world != null)
+        {
+            var clientWorld = world;
+            world = null;
+            clientWorld.SaveAndDispose(renderManager);
+        }
+        AbortConnect(notice);
+    }
+
+    private static void DisconnectNetwork()
+    {
+        netClient?.Dispose();
+        netClient = null;
+        netPlayerId = -1;
+        netStateTimer = 0;
+        netKeepAliveTimer = 0;
+        world?.ClearRemotePlayers();
     }
 
     /// <summary>
@@ -407,6 +574,9 @@ public static class Program
                 break;
             case PendingWork.SaveAndQuit:
                 SaveAndQuit();
+                break;
+            case PendingWork.Connect:
+                BeginConnect();
                 break;
         }
     }
@@ -479,6 +649,10 @@ public static class Program
 
     private static void SaveAndQuit()
     {
+        // A multiplayer client leaves the server and returns to the server list; a singleplayer
+        // world saves and returns to the worlds page.
+        var wasMultiplayer = netClient != null;
+        DisconnectNetwork();
         var w = world;
         var ok = true;
         if (w != null)
@@ -492,6 +666,11 @@ public static class Program
         ResetWorldViews();
         loadingView.Finish();
         ShowMenu();
+        if (wasMultiplayer)
+        {
+            menu.OpenMultiplayer();
+            return;
+        }
         menu.OpenWorlds();
         // The lock follows WorldSeed rather than the return value: a writer timeout also returns
         // false but frees the seed, and PLAY keeps working then.
@@ -636,12 +815,19 @@ public static class Program
 
         if (screen == AppScreen.Loading)
         {
-            // The world streams on its own raised budgets; no key, mouse, pause menu or panel
-            // reaches it, so Camera.SuppressLook stays the World's until its Playing flip.
-            var loading = world!;
             FrameProfiler.Begin(ProfileSection.ProgramUpdate);
             SyncWindowSettings();
             FrameProfiler.End(ProfileSection.ProgramUpdate);
+            // Connecting to a server: no world exists yet; the handshake builds it.
+            if (world == null)
+            {
+                UpdateConnecting((float)deltaTime);
+                return;
+            }
+
+            // The world streams on its own raised budgets; no key, mouse, pause menu or panel
+            // reaches it, so Camera.SuppressLook stays the World's until its Playing flip.
+            var loading = world;
             loading.Update((float)deltaTime, inputManager.Keyboard);
             loadingView.Update(loading.LoadProgress, loading.IsLoaded, (float)deltaTime);
             if (loading.IsLoaded)
@@ -654,6 +840,15 @@ public static class Program
 
         if (screen != AppScreen.Playing) return;
         var w = world!;
+        // The server connection, if any: send our state and apply what it broadcast.
+        if (netClient is { Status: NetworkStatus.Handshaken } connectedClient)
+            UpdateNetwork(connectedClient, (float)deltaTime);
+        else if (netClient is { Status: NetworkStatus.Disconnected or NetworkStatus.Failed } lostClient)
+        {
+            lostClient.Dispose();
+            DisconnectToMenu("Lost connection to the server");
+            return;
+        }
         // The loading overlay fades out over the first playing frames
         if (!loadingView.IsFinished)
             loadingView.Update(1f, true, (float)deltaTime);
@@ -1063,9 +1258,18 @@ public static class Program
             SendChat(text);
     }
 
-    /// <summary>Sends one chat line: a local echo in singleplayer, the server in multiplayer.</summary>
+    /// <summary>Sends one chat line: a local echo in singleplayer, the server in multiplayer
+    /// (which broadcasts it back to every client, so it is never echoed twice).</summary>
     private static void SendChat(string text)
     {
+        if (netClient is { Status: NetworkStatus.Handshaken } client)
+        {
+            using var writer = new PacketWriter(NetMessage.ChatSend);
+            writer.Write(text);
+            client.Send(writer.ToArray());
+            return;
+        }
+
         chatView.AddMessage(ChatKind.Player, chatView.LocalName, text);
     }
 
@@ -1386,6 +1590,8 @@ public static class Program
 
     private static void OnClosing()
     {
+        // A multiplayer client drops its connection; the server owns the save, not the client.
+        DisconnectNetwork();
         // A saved world is saved on close exactly like SAVE & QUIT (no frame to announce it;
         // GL is still current here). A storeless dev-override world is left to process exit.
         if (world != null && currentWorld != null)
