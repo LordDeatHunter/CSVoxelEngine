@@ -23,11 +23,12 @@ public sealed class MainMenuLayoutTests
     public void MainPageButtonsHitInOrderAndGapsMiss()
     {
         var view = new MainMenuView();
-        Assert.Equal(MainMenuHitKind.Start, KindAt(PauseMenuLayout.MainButtonCentre(Screen, 0), view));
-        Assert.Equal(MainMenuHitKind.Settings, KindAt(PauseMenuLayout.MainButtonCentre(Screen, 1), view));
-        Assert.Equal(MainMenuHitKind.Exit, KindAt(PauseMenuLayout.MainButtonCentre(Screen, 2), view));
+        Assert.Equal(MainMenuHitKind.Start, KindAt(MainMenuLayout.MainButtonCentre(Screen, 0), view));
+        Assert.Equal(MainMenuHitKind.Multiplayer, KindAt(MainMenuLayout.MainButtonCentre(Screen, 1), view));
+        Assert.Equal(MainMenuHitKind.Settings, KindAt(MainMenuLayout.MainButtonCentre(Screen, 2), view));
+        Assert.Equal(MainMenuHitKind.Exit, KindAt(MainMenuLayout.MainButtonCentre(Screen, 3), view));
 
-        var gap = (PauseMenuLayout.MainButtonCentre(Screen, 0) + PauseMenuLayout.MainButtonCentre(Screen, 1)) * 0.5f;
+        var gap = (MainMenuLayout.MainButtonCentre(Screen, 0) + MainMenuLayout.MainButtonCentre(Screen, 1)) * 0.5f;
         Assert.Equal(MainMenuHitKind.None, KindAt(gap, view));
     }
 

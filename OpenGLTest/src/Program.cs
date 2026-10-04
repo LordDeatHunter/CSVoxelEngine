@@ -32,6 +32,7 @@ public static class Program
     private static AppScreen screen;
     private static World? world;
     private static WorldStore worldStore = null!;
+    private static ServerStore serverStore = null!;
     private static MainMenuController menu = null!;
     private static readonly LoadingScreenView loadingView = new();
     // The saved world being played; null on the menu and for a storeless dev-override world
@@ -125,7 +126,8 @@ public static class Program
         renderManager = new RenderManager(windowManager.Window);
         sfx = new SfxManager();
         worldStore = new WorldStore(WorldStore.DefaultRoot);
-        menu = new MainMenuController(worldStore, Random.Shared.Next);
+        serverStore = new ServerStore(ServerStore.DefaultPath);
+        menu = new MainMenuController(worldStore, serverStore, Random.Shared.Next);
 
         // A dev override (VOXEL_SCRIPT/SPAWN/LOOK) takes the old path unchanged: a storeless world
         // built right here, no seed change, no persistence and no menu, so scripted runs stay
@@ -215,8 +217,11 @@ public static class Program
             if (screen == AppScreen.Menu)
             {
                 // wheel.Y > 0 is toward the top, i.e. a smaller offset
-                if (menu.View.Page == MainMenuPage.Worlds && inputManager.Mouse != null
+                if (inputManager.Mouse != null && menu.View.Page == MainMenuPage.Worlds
                     && renderManager.UiIsOverWorldList(inputManager.Mouse.Position))
+                    menu.Scroll(-wheel.Y * MainMenuLayout.WheelStepRows, renderManager.UiCanvasSize);
+                else if (inputManager.Mouse != null && menu.View.Page == MainMenuPage.Multiplayer
+                    && renderManager.UiIsOverServerList(inputManager.Mouse.Position))
                     menu.Scroll(-wheel.Y * MainMenuLayout.WheelStepRows, renderManager.UiCanvasSize);
                 return;
             }
@@ -335,10 +340,25 @@ public static class Program
                 if (request != null)
                     RequestOpenWorld(request, menu.PlayRequestIsNew);
                 break;
+            case MainMenuAction.Connect:
+                var target = menu.TakeConnectRequest();
+                if (target is { } connect)
+                    StartMultiplayer(connect);
+                break;
             case MainMenuAction.Exit:
                 windowManager.Window.Close();
                 break;
         }
+    }
+
+    /// <summary>
+    /// Opens a multiplayer session to the chosen server: the client connects, the world streams from
+    /// the server and plays like a saved world. Wired to the networking layer in the next milestone.
+    /// </summary>
+    private static void StartMultiplayer(ConnectTarget target)
+    {
+        Log.WriteLine($"Multiplayer: connect {target.Address} ({target.Name})");
+        menu.ShowNotice("Multiplayer is not connected yet");
     }
 
     /// <summary>

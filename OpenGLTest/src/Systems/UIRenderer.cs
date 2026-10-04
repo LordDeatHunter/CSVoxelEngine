@@ -1086,9 +1086,41 @@ public class UIRenderer : IDisposable
             case MainMenuPage.Main:
                 DrawTextCentred("CSVOXELENGINE", screen.X * 0.5f,
                     MainMenuLayout.TitleTop(screen, MainMenuPage.Main), _headScale, Rgba.White);
-                DrawMenuButton(PauseMenuLayout.MainButtonCentre(screen, 0), "START");
-                DrawMenuButton(PauseMenuLayout.MainButtonCentre(screen, 1), "SETTINGS");
-                DrawMenuButton(PauseMenuLayout.MainButtonCentre(screen, 2), "EXIT");
+                DrawMenuButton(MainMenuLayout.MainButtonCentre(screen, 0), "START");
+                DrawMenuButton(MainMenuLayout.MainButtonCentre(screen, 1), "MULTIPLAYER");
+                DrawMenuButton(MainMenuLayout.MainButtonCentre(screen, 2), "SETTINGS");
+                DrawMenuButton(MainMenuLayout.MainButtonCentre(screen, 3), "EXIT");
+                break;
+
+            case MainMenuPage.Multiplayer:
+                DrawMultiplayerPage(view, screen);
+                break;
+
+            case MainMenuPage.AddServer:
+                DrawTextCentred("ADD SERVER", screen.X * 0.5f,
+                    MainMenuLayout.TitleTop(screen, MainMenuPage.AddServer), _headScale, Rgba.White);
+                DrawLabelledField(MainMenuLayout.NameFieldCentre(screen), "NAME", view.ServerName,
+                    view.Focus == MenuField.ServerName, WorldNames.DefaultName, time);
+                DrawLabelledField(MainMenuLayout.SeedFieldCentre(screen), "ADDRESS", view.Address,
+                    view.Focus == MenuField.Address, "192.168.1.10 or host:25566", time);
+                DrawNotice(view, screen);
+                DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 0), "ADD");
+                DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 1), "BACK");
+                break;
+
+            case MainMenuPage.DirectConnect:
+                DrawTextCentred("DIRECT CONNECT", screen.X * 0.5f,
+                    MainMenuLayout.TitleTop(screen, MainMenuPage.DirectConnect), _headScale, Rgba.White);
+                DrawLabelledField(MainMenuLayout.NameFieldCentre(screen), "ADDRESS", view.Address,
+                    view.Focus == MenuField.Address, "192.168.1.10 or host:25566", time);
+                DrawNotice(view, screen);
+                DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 0), "CONNECT");
+                DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 1), "BACK");
+                break;
+
+            case MainMenuPage.ConfirmDeleteServer:
+                DrawMultiplayerPage(view, screen);
+                DrawConfirmDeleteServer(view, screen);
                 break;
 
             case MainMenuPage.Worlds:
@@ -1197,6 +1229,100 @@ public class UIRenderer : IDisposable
         DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 1), "BACK");
     }
 
+    // The multiplayer list, shaped exactly like the worlds list: title, panel, the scissored rows
+    // (name over address) with CONNECT / DELETE, the empty state, the notice and the three bottom
+    // buttons ADD SERVER / DIRECT CONNECT / BACK.
+    private void DrawMultiplayerPage(MainMenuView view, Vector2 screen)
+    {
+        DrawTextCentred("MULTIPLAYER", screen.X * 0.5f,
+            MainMenuLayout.TitleTop(screen, MainMenuPage.Multiplayer), _headScale, Rgba.White);
+
+        var left = MainMenuLayout.PanelLeft(screen);
+        var top = MainMenuLayout.ListTop(screen);
+        var listHeight = MainMenuLayout.ListHeight(screen);
+        var panelCentre = new Vector2(left + MainMenuLayout.PanelWidth * 0.5f, top + listHeight * 0.5f);
+        var panelSize = new Vector2(MainMenuLayout.PanelWidth, listHeight);
+        DrawRect(panelCentre, panelSize, SlotBackground);
+        DrawBorder(panelCentre, panelSize, SlotBorder, SlotBorderColor);
+
+        var count = view.Servers.Count;
+        if (count == 0)
+        {
+            DrawTextCentred("No servers yet - add one", panelCentre.X, panelCentre.Y - 8f,
+                _countScale, TextDim);
+        }
+        else
+        {
+            var offset = MainMenuLayout.ClampedOffset(view.ServerScrollOffset, count, screen);
+            var (first, end) = MainMenuLayout.VisibleRows(offset, count, screen);
+            var nameLeft = MainMenuLayout.NameLeft(screen);
+            var nameWidth = MainMenuLayout.NameMaxWidth(screen);
+
+            var (sx, sy, sw, sh) = UiCanvas.ScissorRect(new Vector2(left, top), panelSize,
+                _scale, _windowSize, _framebufferSize);
+            _gl.Enable(EnableCap.ScissorTest);
+            _gl.Scissor(sx, sy, (uint)sw, (uint)sh);
+            try
+            {
+                for (var i = first; i < end; i++)
+                {
+                    var server = view.Servers[i];
+                    var rowTop = MainMenuLayout.RowTop(i, offset, screen);
+                    if (i > 0)
+                        DrawRect(new Vector2(panelCentre.X, rowTop),
+                            new Vector2(MainMenuLayout.PanelWidth - 2f * MainMenuLayout.RowPad, 1.5f),
+                            SlotBorderColor);
+                    DrawText(FittedText(server.Name, _countScale, nameWidth),
+                        new Vector2(nameLeft, rowTop + 8f), _countScale, Rgba.White);
+                    DrawText(server.Address.ToString(), new Vector2(nameLeft, rowTop + 36f), _countScale, TextDim);
+                    DrawSmallButton(MainMenuLayout.RowButtonCentre(screen, i, offset, 0, 2),
+                        MainMenuLayout.RowButtonSize, "CONNECT");
+                    DrawSmallButton(MainMenuLayout.RowButtonCentre(screen, i, offset, 1, 2),
+                        MainMenuLayout.RowButtonSize, "DELETE", DangerRed);
+                }
+            }
+            finally
+            {
+                _gl.Disable(EnableCap.ScissorTest);
+            }
+        }
+
+        DrawNotice(view, screen);
+
+        DrawSmallButton(MainMenuLayout.TripleButtonCentre(screen, 0), MainMenuLayout.TripleButtonSize, "ADD SERVER");
+        DrawSmallButton(MainMenuLayout.TripleButtonCentre(screen, 1), MainMenuLayout.TripleButtonSize, "DIRECT CONNECT");
+        DrawSmallButton(MainMenuLayout.TripleButtonCentre(screen, 2), MainMenuLayout.TripleButtonSize, "BACK");
+    }
+
+    private void DrawNotice(MainMenuView view, Vector2 screen)
+    {
+        if (!string.IsNullOrEmpty(view.Notice))
+            DrawTextCentred(FittedText(view.Notice, _countScale, MainMenuLayout.PanelWidth),
+                screen.X * 0.5f, MainMenuLayout.NoticeTop(screen), _countScale, AccentGold);
+    }
+
+    // The delete confirmation over the dimmed multiplayer page: question, the server's name on its
+    // own line, DELETE / CANCEL.
+    private void DrawConfirmDeleteServer(MainMenuView view, Vector2 screen)
+    {
+        DrawRect(screen * 0.5f, screen, Rgba.Grey(0f, 0.62f));
+
+        var centre = MainMenuLayout.ConfirmBoxCentre(screen);
+        var size = MainMenuLayout.ConfirmBoxSize;
+        DrawRect(centre, size, CardBackground);
+        DrawBorder(centre, size, SlotBorder, SelectedBorderColor);
+
+        var top = centre.Y - size.Y * 0.5f;
+        DrawTextCentred("Delete this server?", centre.X, top + 32f, _headScale, Rgba.White);
+        if (view.SelectedServer is { } server)
+            DrawTextCentred(FittedText(server.Name, _countScale, size.X - 48f),
+                centre.X, top + 84f, _countScale, AccentGold);
+
+        DrawSmallButton(MainMenuLayout.ConfirmYesCentre(screen), MainMenuLayout.ConfirmButtonSize,
+            "DELETE", DangerRed);
+        DrawSmallButton(MainMenuLayout.ConfirmNoCentre(screen), MainMenuLayout.ConfirmButtonSize, "CANCEL");
+    }
+
     // The delete confirmation over the dimmed worlds page: question, the world's name on its own
     // line, DELETE / CANCEL.
     private void DrawConfirmDelete(MainMenuView view, Vector2 screen)
@@ -1270,6 +1396,10 @@ public class UIRenderer : IDisposable
 
     /// <summary>Whether a window-pixel point is over the worlds list (the mouse-wheel target).</summary>
     public bool IsOverWorldList(Vector2 windowPoint) =>
+        MainMenuLayout.IsOverList(ToCanvas(windowPoint), _screenSize);
+
+    /// <summary>Whether a window-pixel point is over the multiplayer server list (the mouse-wheel target).</summary>
+    public bool IsOverServerList(Vector2 windowPoint) =>
         MainMenuLayout.IsOverList(ToCanvas(windowPoint), _screenSize);
 
     /// <summary>

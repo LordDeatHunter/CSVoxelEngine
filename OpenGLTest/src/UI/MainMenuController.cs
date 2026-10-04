@@ -6,21 +6,25 @@ namespace silkgltriangle;
 
 /// <summary>
 /// Every rule of the main menu in one GL-free place: page transitions, the four non-character
-/// keys, typing into the focused field and every <see cref="WorldStore"/> call (list, create,
-/// rename, delete). Program cannot be tested, so the whole flow is pinned here and Program only
-/// feeds it hits and keys and acts on the <see cref="MainMenuAction"/> it gets back (a
-/// <see cref="MainMenuAction.Play"/> carries its world in <see cref="PlayRequest"/>).
+/// keys, typing into the focused field and every <see cref="WorldStore"/> / <see cref="ServerStore"/>
+/// call (list, create, rename, delete, add server). Program cannot be tested, so the whole flow is
+/// pinned here and Program only feeds it hits and keys and acts on the <see cref="MainMenuAction"/>
+/// it gets back (a <see cref="MainMenuAction.Play"/> carries its world in <see cref="PlayRequest"/>,
+/// a <see cref="MainMenuAction.Connect"/> its server in <see cref="ConnectRequest"/>).
 /// <para>
 /// It never touches GL, the cursor or Silk. The settings page is only opened and closed here;
 /// Program owns that page's own clicks and slider drags through <see cref="SettingsLayout"/>,
 /// shared with the pause menu. Store errors never escape: they are logged in full and shown as
-/// the one-line <see cref="StoreErrorNotice"/> on the worlds page. Main thread only.
+/// the one-line <see cref="StoreErrorNotice"/> on the world/server page. Main thread only.
 /// </para>
 /// </summary>
-public sealed class MainMenuController(WorldStore store, Func<int> randomSeed)
+public sealed class MainMenuController(WorldStore store, ServerStore serverStore, Func<int> randomSeed)
 {
     /// <summary>The notice shown after a failed store call (well under <see cref="BitmapFont.MaxLayoutChars"/>).</summary>
     public const string StoreErrorNotice = "Saves folder error - see the console";
+
+    /// <summary>The notice shown when a typed server address cannot be parsed.</summary>
+    public const string BadAddressNotice = "Enter an address like 192.168.1.10 or host:25566";
 
     public MainMenuView View { get; } = new();
 
@@ -30,6 +34,9 @@ public sealed class MainMenuController(WorldStore store, Func<int> randomSeed)
     /// <summary>Whether the latest request came from CREATE (a fresh world); readable until the next request.</summary>
     public bool PlayRequestIsNew { get; private set; }
 
+    /// <summary>The server a CONNECT asked Program to open, until <see cref="TakeConnectRequest"/>.</summary>
+    public ConnectTarget? ConnectRequest { get; private set; }
+
     /// <summary>Returns the pending play request and clears it.</summary>
     public WorldInfo? TakePlayRequest()
     {
@@ -38,10 +45,19 @@ public sealed class MainMenuController(WorldStore store, Func<int> randomSeed)
         return request;
     }
 
+    /// <summary>Returns the pending connect request and clears it.</summary>
+    public ConnectTarget? TakeConnectRequest()
+    {
+        var request = ConnectRequest;
+        ConnectRequest = null;
+        return request;
+    }
+
     public void OpenMain()
     {
         View.Page = MainMenuPage.Main;
         View.SelectedRow = -1;
+        View.SelectedServerRow = -1;
         View.Focus = MenuField.None;
     }
 
@@ -59,6 +75,18 @@ public sealed class MainMenuController(WorldStore store, Func<int> randomSeed)
         View.Page = MainMenuPage.Worlds;
     }
 
+    /// <summary>Re-reads the saved servers and shows the multiplayer list from the top.</summary>
+    public void OpenMultiplayer()
+    {
+        View.Notice = null;
+        View.Servers.Clear();
+        Guarded(() => View.Servers.AddRange(serverStore.List()));
+        View.ServerScrollOffset = 0f;
+        View.SelectedServerRow = -1;
+        View.Focus = MenuField.None;
+        View.Page = MainMenuPage.Multiplayer;
+    }
+
     public void OpenSettings() => View.Page = MainMenuPage.Settings;
 
     /// <summary>Back from the settings page to the main page; Program clears the slider drag itself.</summary>
@@ -72,7 +100,7 @@ public sealed class MainMenuController(WorldStore store, Func<int> randomSeed)
         View.Notice = notice;
     }
 
-    /// <summary>Shows a one-line notice under the worlds list until the next <see cref="OpenWorlds"/>.</summary>
+    /// <summary>Shows a one-line notice under the current list until the next open of that list.</summary>
     public void ShowNotice(string? notice) => View.Notice = notice;
 
     public MainMenuAction Click(MainMenuHit hit)
@@ -83,6 +111,7 @@ public sealed class MainMenuController(WorldStore store, Func<int> randomSeed)
                 switch (hit.Kind)
                 {
                     case MainMenuHitKind.Start: OpenWorlds(); break;
+                    case MainMenuHitKind.Multiplayer: OpenMultiplayer(); break;
                     case MainMenuHitKind.Settings: OpenSettings(); break;
                     case MainMenuHitKind.Exit: return MainMenuAction.Exit;
                 }
@@ -118,6 +147,23 @@ public sealed class MainMenuController(WorldStore store, Func<int> randomSeed)
                 }
                 return MainMenuAction.None;
 
+            case MainMenuPage.Multiplayer:
+                return ClickMultiplayer(hit);
+
+            case MainMenuPage.AddServer:
+                return ClickAddServer(hit);
+
+            case MainMenuPage.DirectConnect:
+                return ClickDirectConnect(hit);
+
+            case MainMenuPage.ConfirmDeleteServer:
+                switch (hit.Kind)
+                {
+                    case MainMenuHitKind.ConfirmDeleteServer: ConfirmDeleteServer(); break;
+                    case MainMenuHitKind.CancelDeleteServer: CancelDeleteServer(); break;
+                }
+                return MainMenuAction.None;
+
             default:
                 return MainMenuAction.None;
         }
@@ -134,18 +180,30 @@ public sealed class MainMenuController(WorldStore store, Func<int> randomSeed)
             case MenuKey.Tab:
                 if (View.Page == MainMenuPage.Create)
                     View.Focus = View.Focus == MenuField.Name ? MenuField.Seed : MenuField.Name;
+                else if (View.Page == MainMenuPage.AddServer)
+                    View.Focus = View.Focus == MenuField.ServerName ? MenuField.Address : MenuField.ServerName;
                 return MainMenuAction.None;
 
             case MenuKey.Enter:
                 // Enter never confirms a delete: that popup needs its own click.
-                return View.Page is MainMenuPage.Create or MainMenuPage.Edit ? Confirm() : MainMenuAction.None;
+                return View.Page switch
+                {
+                    MainMenuPage.Create or MainMenuPage.Edit => Confirm(),
+                    MainMenuPage.AddServer => ClickAddServer(new MainMenuHit(MainMenuHitKind.Confirm)),
+                    MainMenuPage.DirectConnect => ClickDirectConnect(new MainMenuHit(MainMenuHitKind.Connect)),
+                    _ => MainMenuAction.None,
+                };
 
             case MenuKey.Escape:
                 switch (View.Page)
                 {
                     case MainMenuPage.ConfirmDelete: CancelDelete(); break;
+                    case MainMenuPage.ConfirmDeleteServer: CancelDeleteServer(); break;
                     case MainMenuPage.Create:
                     case MainMenuPage.Edit: OpenWorlds(); break; // unsaved edits are discarded
+                    case MainMenuPage.AddServer:
+                    case MainMenuPage.DirectConnect:
+                    case MainMenuPage.Multiplayer: OpenMain(); break;
                     case MainMenuPage.Worlds:
                     case MainMenuPage.Settings: OpenMain(); break;
                     // Main: ESC never exits the game.
@@ -160,13 +218,20 @@ public sealed class MainMenuController(WorldStore store, Func<int> randomSeed)
     /// <summary>Types one character into the focused field; refused characters and an unfocused page do nothing.</summary>
     public void Type(char c) => View.FocusedField?.TryAppend(c);
 
-    /// <summary>Scrolls the worlds list by <paramref name="rows"/> rows, clamped to the list; other pages ignore it.</summary>
+    /// <summary>Scrolls the active list by <paramref name="rows"/> rows, clamped to the list; other pages ignore it.</summary>
     public void Scroll(float rows, Vector2 screenSize)
     {
-        if (View.Page != MainMenuPage.Worlds)
-            return;
-        View.ScrollOffset = MainMenuLayout.ClampedOffset(
-            View.ScrollOffset + rows * MainMenuLayout.RowHeight, View.Worlds.Count, screenSize);
+        switch (View.Page)
+        {
+            case MainMenuPage.Worlds:
+                View.ScrollOffset = MainMenuLayout.ClampedOffset(
+                    View.ScrollOffset + rows * MainMenuLayout.RowHeight, View.Worlds.Count, screenSize);
+                break;
+            case MainMenuPage.Multiplayer:
+                View.ServerScrollOffset = MainMenuLayout.ClampedOffset(
+                    View.ServerScrollOffset + rows * MainMenuLayout.RowHeight, View.Servers.Count, screenSize);
+                break;
+        }
     }
 
     private MainMenuAction ClickWorlds(MainMenuHit hit)
@@ -220,7 +285,94 @@ public sealed class MainMenuController(WorldStore store, Func<int> randomSeed)
         }
     }
 
+    private MainMenuAction ClickMultiplayer(MainMenuHit hit)
+    {
+        switch (hit.Kind)
+        {
+            case MainMenuHitKind.Connect when IsServerRow(hit.Row):
+            {
+                var server = View.Servers[hit.Row];
+                Guarded(() => serverStore.TouchLastPlayed(server));
+                ConnectRequest = new ConnectTarget(server.Name, server.Address);
+                return MainMenuAction.Connect;
+            }
+
+            case MainMenuHitKind.DeleteServer when IsServerRow(hit.Row):
+                View.SelectedServerRow = hit.Row;
+                View.Page = MainMenuPage.ConfirmDeleteServer;
+                return MainMenuAction.None;
+
+            case MainMenuHitKind.AddServer:
+                View.ServerName.Clear();
+                View.Address.Clear();
+                View.Focus = MenuField.ServerName;
+                View.Page = MainMenuPage.AddServer;
+                return MainMenuAction.None;
+
+            case MainMenuHitKind.DirectConnect:
+                View.Address.Clear();
+                View.Focus = MenuField.Address;
+                View.Page = MainMenuPage.DirectConnect;
+                return MainMenuAction.None;
+
+            case MainMenuHitKind.Back:
+                OpenMain();
+                return MainMenuAction.None;
+
+            default:
+                return MainMenuAction.None;
+        }
+    }
+
+    private MainMenuAction ClickAddServer(MainMenuHit hit)
+    {
+        switch (hit.Kind)
+        {
+            case MainMenuHitKind.ServerNameField: View.Focus = MenuField.ServerName; return MainMenuAction.None;
+            case MainMenuHitKind.AddressField: View.Focus = MenuField.Address; return MainMenuAction.None;
+            case MainMenuHitKind.Confirm:
+                if (!ServerAddress.TryParse(View.Address.Text, out var address))
+                {
+                    View.Notice = BadAddressNotice;
+                    return MainMenuAction.None;
+                }
+                if (Guarded(() => serverStore.Add(View.ServerName.Text, address.Host, address.Port)))
+                    OpenMultiplayer();
+                else
+                    SetErrorNotice();
+                return MainMenuAction.None;
+            case MainMenuHitKind.Back:
+                OpenMultiplayer();
+                return MainMenuAction.None;
+            default:
+                return MainMenuAction.None;
+        }
+    }
+
+    private MainMenuAction ClickDirectConnect(MainMenuHit hit)
+    {
+        switch (hit.Kind)
+        {
+            case MainMenuHitKind.AddressField: View.Focus = MenuField.Address; return MainMenuAction.None;
+            case MainMenuHitKind.Connect:
+                if (!ServerAddress.TryParse(View.Address.Text, out var address))
+                {
+                    View.Notice = BadAddressNotice;
+                    return MainMenuAction.None;
+                }
+                ConnectRequest = new ConnectTarget(address.Host, address);
+                return MainMenuAction.Connect;
+            case MainMenuHitKind.Back:
+                OpenMultiplayer();
+                return MainMenuAction.None;
+            default:
+                return MainMenuAction.None;
+        }
+    }
+
     private bool IsRow(int row) => row >= 0 && row < View.Worlds.Count;
+
+    private bool IsServerRow(int row) => row >= 0 && row < View.Servers.Count;
 
     private MainMenuAction Confirm()
     {
@@ -265,6 +417,28 @@ public sealed class MainMenuController(WorldStore store, Func<int> randomSeed)
     {
         View.SelectedRow = -1;
         View.Page = MainMenuPage.Worlds;
+    }
+
+    private void ConfirmDeleteServer()
+    {
+        if (View.SelectedServer is not { } server)
+        {
+            CancelDeleteServer();
+            return;
+        }
+        if (Guarded(() => serverStore.Delete(server)))
+            OpenMultiplayer();
+        else
+        {
+            OpenMultiplayer();
+            SetErrorNotice();
+        }
+    }
+
+    private void CancelDeleteServer()
+    {
+        View.SelectedServerRow = -1;
+        View.Page = MainMenuPage.Multiplayer;
     }
 
     // OpenWorlds clears the notice, so a failure re-raises it after the list is re-read.

@@ -11,23 +11,28 @@ public sealed class MainMenuControllerTests : IDisposable
     private static readonly Vector2 Screen = UiCanvas.ReferenceSize;
 
     private readonly string _root = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+    private readonly string _serverPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".json");
     private readonly WorldStore _store;
+    private readonly ServerStore _servers;
     private long _now = 1_000;
 
     public MainMenuControllerTests()
     {
         // A strictly advancing clock so the store's most-recent-first order is deterministic.
         _store = new WorldStore(_root) { Clock = () => _now++ };
+        _servers = new ServerStore(_serverPath) { Clock = () => _now++ };
     }
 
     public void Dispose()
     {
         if (Directory.Exists(_root))
             Directory.Delete(_root, recursive: true);
+        if (File.Exists(_serverPath))
+            File.Delete(_serverPath);
     }
 
     private MainMenuController NewController(Func<int>? random = null) =>
-        new(_store, random ?? (() => throw new InvalidOperationException("no random seed expected")));
+        new(_store, _servers, random ?? (() => throw new InvalidOperationException("no random seed expected")));
 
     private static void TypeText(MainMenuController controller, string text)
     {
@@ -316,5 +321,106 @@ public sealed class MainMenuControllerTests : IDisposable
         controller.View.ScrollOffset = 0f;
         controller.Scroll(5f, Screen);
         Assert.Equal(0f, controller.View.ScrollOffset);
+    }
+
+    [Fact]
+    public void MultiplayerOpensTheServerListAndBackReturns()
+    {
+        _servers.Add("Alpha", "10.0.0.1", ServerAddress.DefaultPort);
+        _servers.Add("Beta", "example.com", 30000);
+        var controller = NewController();
+
+        controller.Click(Hit(MainMenuHitKind.Multiplayer));
+        Assert.Equal(MainMenuPage.Multiplayer, controller.View.Page);
+        Assert.Equal(_servers.List().Select(s => s.Id), controller.View.Servers.Select(s => s.Id));
+
+        controller.Click(Hit(MainMenuHitKind.Back));
+        Assert.Equal(MainMenuPage.Main, controller.View.Page);
+    }
+
+    [Fact]
+    public void AddServerStoresTheAddressAndReturnsToTheList()
+    {
+        var controller = NewController();
+        controller.Click(Hit(MainMenuHitKind.Multiplayer));
+        controller.Click(Hit(MainMenuHitKind.AddServer));
+        Assert.Equal(MainMenuPage.AddServer, controller.View.Page);
+
+        TypeText(controller, "My Server");
+        controller.Click(Hit(MainMenuHitKind.AddressField));
+        TypeText(controller, "192.168.0.5:25599");
+        controller.Click(Hit(MainMenuHitKind.Confirm));
+
+        Assert.Equal(MainMenuPage.Multiplayer, controller.View.Page);
+        var saved = Assert.Single(_servers.List());
+        Assert.Equal("My Server", saved.Name);
+        Assert.Equal("192.168.0.5", saved.Host);
+        Assert.Equal(25599, saved.Port);
+        Assert.Null(controller.TakeConnectRequest());
+    }
+
+    [Fact]
+    public void AddServerWithAnEmptyAddressKeepsThePageAndNotices()
+    {
+        var controller = NewController();
+        controller.Click(Hit(MainMenuHitKind.Multiplayer));
+        controller.Click(Hit(MainMenuHitKind.AddServer));
+        controller.Click(Hit(MainMenuHitKind.Confirm));
+
+        Assert.Equal(MainMenuPage.AddServer, controller.View.Page);
+        Assert.Equal(MainMenuController.BadAddressNotice, controller.View.Notice);
+        Assert.Empty(_servers.List());
+    }
+
+    [Fact]
+    public void DirectConnectReturnsTheTypedTarget()
+    {
+        var controller = NewController();
+        controller.Click(Hit(MainMenuHitKind.Multiplayer));
+        controller.Click(Hit(MainMenuHitKind.DirectConnect));
+        Assert.Equal(MainMenuPage.DirectConnect, controller.View.Page);
+
+        TypeText(controller, "play.example.net");
+        Assert.Equal(MainMenuAction.Connect, controller.Click(Hit(MainMenuHitKind.Connect)));
+
+        var target = controller.TakeConnectRequest();
+        Assert.True(target.HasValue);
+        Assert.Equal("play.example.net", target!.Value.Address.Host);
+        Assert.Equal(ServerAddress.DefaultPort, target.Value.Address.Port);
+        Assert.Null(controller.TakeConnectRequest());
+    }
+
+    [Fact]
+    public void ConnectOnARowCarriesTheServerAndTouchesIt()
+    {
+        _servers.Add("Alpha", "10.0.0.1", 25566);
+        var controller = NewController();
+        controller.Click(Hit(MainMenuHitKind.Multiplayer));
+
+        Assert.Equal(MainMenuAction.Connect, controller.Click(Hit(MainMenuHitKind.Connect, 0)));
+        var target = controller.TakeConnectRequest();
+        Assert.True(target.HasValue);
+        Assert.Equal("10.0.0.1", target!.Value.Address.Host);
+        Assert.Equal(25566, target.Value.Address.Port);
+    }
+
+    [Fact]
+    public void DeletingAServerConfirmsThenRemovesIt()
+    {
+        _servers.Add("Alpha", "10.0.0.1", 25566);
+        _servers.Add("Beta", "10.0.0.2", 25566);
+        var controller = NewController();
+        controller.Click(Hit(MainMenuHitKind.Multiplayer));
+
+        controller.Click(Hit(MainMenuHitKind.DeleteServer, 0));
+        Assert.Equal(MainMenuPage.ConfirmDeleteServer, controller.View.Page);
+        controller.Click(Hit(MainMenuHitKind.CancelDeleteServer));
+        Assert.Equal(MainMenuPage.Multiplayer, controller.View.Page);
+        Assert.Equal(2, _servers.List().Count);
+
+        controller.Click(Hit(MainMenuHitKind.DeleteServer, 0));
+        controller.Click(Hit(MainMenuHitKind.ConfirmDeleteServer));
+        Assert.Equal(MainMenuPage.Multiplayer, controller.View.Page);
+        Assert.Single(_servers.List());
     }
 }

@@ -30,6 +30,24 @@ public static class MainMenuLayout
 
     public static float PanelLeft(Vector2 screenSize) => (screenSize.X - PanelWidth) * 0.5f;
 
+    // --- Main page: a four-button stack (START, MULTIPLAYER, SETTINGS, EXIT). The pause menu keeps
+    // PauseMenuLayout's three-button stack, so the two pages no longer share a layout. ---
+    public static Vector2 MainButtonCentre(Vector2 screenSize, int index)
+    {
+        const int count = 4;
+        var total = count * PauseMenuLayout.ButtonHeight + (count - 1) * PauseMenuLayout.ButtonGap;
+        var top = screenSize.Y * 0.5f - total * 0.5f + PauseMenuLayout.ButtonHeight * 0.5f;
+        return new Vector2(screenSize.X * 0.5f,
+            top + index * (PauseMenuLayout.ButtonHeight + PauseMenuLayout.ButtonGap));
+    }
+
+    public static float MainTitleTop(Vector2 screenSize)
+    {
+        const int count = 4;
+        var total = count * PauseMenuLayout.ButtonHeight + (count - 1) * PauseMenuLayout.ButtonGap;
+        return screenSize.Y * 0.5f - total * 0.5f - 80f;
+    }
+
     public static float ListTop(Vector2 screenSize) => PanelTop;
 
     public static float ListHeight(Vector2 screenSize) => screenSize.Y - PanelTop - ListBottomMargin;
@@ -51,10 +69,17 @@ public static class MainMenuLayout
     /// Centre of a row's button: <paramref name="which"/> 0 = PLAY, 1 = EDIT, 2 = DELETE, right
     /// aligned inside the row.
     /// </summary>
-    public static Vector2 RowButtonCentre(Vector2 screenSize, int row, float offset, int which)
+    public static Vector2 RowButtonCentre(Vector2 screenSize, int row, float offset, int which) =>
+        RowButtonCentre(screenSize, row, offset, which, 3);
+
+    /// <summary>
+    /// Centre of a row's button for a row of <paramref name="buttonCount"/> right-aligned buttons
+    /// (the server rows use two: CONNECT, DELETE).
+    /// </summary>
+    public static Vector2 RowButtonCentre(Vector2 screenSize, int row, float offset, int which, int buttonCount)
     {
         var x = PanelLeft(screenSize) + PanelWidth - RowPad
-                - (2 - which) * (RowButtonWidth + RowButtonGap) - RowButtonWidth * 0.5f;
+                - (buttonCount - 1 - which) * (RowButtonWidth + RowButtonGap) - RowButtonWidth * 0.5f;
         return new Vector2(x, RowTop(row, offset, screenSize) + RowHeight * 0.5f);
     }
 
@@ -96,6 +121,21 @@ public static class MainMenuLayout
             screenSize.Y - ListBottomMargin * 0.5f);
     }
 
+    /// <summary>
+    /// Centre of one of three bottom buttons (0, 1, 2 left to right): ADD SERVER / DIRECT CONNECT /
+    /// BACK on the multiplayer page. Slightly narrower than <see cref="PauseMenuLayout.ButtonWidth"/>
+    /// so the three still fit the panel.
+    /// </summary>
+    public static Vector2 TripleButtonCentre(Vector2 screenSize, int index)
+    {
+        const float width = 280f;
+        var total = 3 * width + 2 * BottomButtonGap;
+        var left = screenSize.X * 0.5f - total * 0.5f + width * 0.5f;
+        return new Vector2(left + index * (width + BottomButtonGap), screenSize.Y - ListBottomMargin * 0.5f);
+    }
+
+    public static Vector2 TripleButtonSize => new(280f, PauseMenuLayout.ButtonHeight);
+
     /// <summary>Top of the notice line, between the list bottom and the bottom buttons.</summary>
     public static float NoticeTop(Vector2 screenSize)
     {
@@ -134,20 +174,21 @@ public static class MainMenuLayout
 
     /// <summary>Top edge (Y) of a page's title text.</summary>
     public static float TitleTop(Vector2 screenSize, MainMenuPage page) =>
-        page == MainMenuPage.Main ? PauseMenuLayout.TitleTop(screenSize, PauseMenuPage.Main) : TitleTopY;
+        page == MainMenuPage.Main ? MainTitleTop(screenSize) : TitleTopY;
 
     public static MainMenuHit HitAt(Vector2 point, Vector2 screenSize, MainMenuView view)
     {
         switch (view.Page)
         {
             case MainMenuPage.Main:
-                return PauseMenuLayout.HitAt(point, screenSize, PauseMenuPage.Main) switch
+            {
+                for (var i = 0; i < 4; i++)
                 {
-                    PauseMenuHit.Resume => new(MainMenuHitKind.Start),
-                    PauseMenuHit.Settings => new(MainMenuHitKind.Settings),
-                    PauseMenuHit.Exit => new(MainMenuHitKind.Exit),
-                    _ => new(MainMenuHitKind.None),
-                };
+                    if (InBox(point, MainButtonCentre(screenSize, i), PauseMenuLayout.ButtonSize))
+                        return new((MainMenuHitKind)((int)MainMenuHitKind.Start + i));
+                }
+                return new(MainMenuHitKind.None);
+            }
 
             case MainMenuPage.Worlds:
             {
@@ -180,6 +221,43 @@ public static class MainMenuLayout
                     return new(MainMenuHitKind.ConfirmDelete);
                 if (InBox(point, ConfirmNoCentre(screenSize), ConfirmButtonSize))
                     return new(MainMenuHitKind.CancelDelete);
+                return new(MainMenuHitKind.None);
+
+            case MainMenuPage.Multiplayer:
+            {
+                var count = view.Servers.Count;
+                var offset = ClampedOffset(view.ServerScrollOffset, count, screenSize);
+                if (RowAt(point, screenSize, offset, count) is { } row)
+                {
+                    if (InBox(point, RowButtonCentre(screenSize, row, offset, 0, 2), RowButtonSize))
+                        return new(MainMenuHitKind.Connect, row);
+                    if (InBox(point, RowButtonCentre(screenSize, row, offset, 1, 2), RowButtonSize))
+                        return new(MainMenuHitKind.DeleteServer, row);
+                    return new(MainMenuHitKind.None);
+                }
+                if (InBox(point, TripleButtonCentre(screenSize, 0), TripleButtonSize))
+                    return new(MainMenuHitKind.AddServer);
+                if (InBox(point, TripleButtonCentre(screenSize, 1), TripleButtonSize))
+                    return new(MainMenuHitKind.DirectConnect);
+                if (InBox(point, TripleButtonCentre(screenSize, 2), TripleButtonSize))
+                    return new(MainMenuHitKind.Back);
+                return new(MainMenuHitKind.None);
+            }
+
+            case MainMenuPage.AddServer:
+                if (InBox(point, NameFieldCentre(screenSize), FieldSize)) return new(MainMenuHitKind.ServerNameField);
+                if (InBox(point, SeedFieldCentre(screenSize), FieldSize)) return new(MainMenuHitKind.AddressField);
+                return BottomHit(point, screenSize, MainMenuHitKind.Confirm);
+
+            case MainMenuPage.DirectConnect:
+                if (InBox(point, NameFieldCentre(screenSize), FieldSize)) return new(MainMenuHitKind.AddressField);
+                return BottomHit(point, screenSize, MainMenuHitKind.Connect);
+
+            case MainMenuPage.ConfirmDeleteServer:
+                if (InBox(point, ConfirmYesCentre(screenSize), ConfirmButtonSize))
+                    return new(MainMenuHitKind.ConfirmDeleteServer);
+                if (InBox(point, ConfirmNoCentre(screenSize), ConfirmButtonSize))
+                    return new(MainMenuHitKind.CancelDeleteServer);
                 return new(MainMenuHitKind.None);
 
             default:

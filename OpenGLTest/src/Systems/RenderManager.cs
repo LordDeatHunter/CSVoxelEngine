@@ -3988,6 +3988,7 @@ public class RenderManager : IDisposable
     public SettingsHit UiSettingsHitAt(Vector2 point, SettingsMenuView settings) => ui.SettingsHitAt(point, settings);
     public MainMenuHit UiMainMenuHitAt(Vector2 point, MainMenuView view) => ui.MainMenuHitAt(point, view);
     public bool UiIsOverWorldList(Vector2 point) => ui.IsOverWorldList(point);
+    public bool UiIsOverServerList(Vector2 point) => ui.IsOverServerList(point);
 
     // The compass item id, resolved once: null when no item named "compass" is registered,
     // in which case the HUD compass never shows rather than throwing every frame.
