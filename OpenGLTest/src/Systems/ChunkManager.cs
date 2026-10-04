@@ -111,6 +111,14 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     public bool Headless { get; set; }
 
     /// <summary>
+    /// A multiplayer client sets this so streamed chunks light from server-supplied column heights
+    /// instead of worldgen (see <see cref="Chunk.RestoreFrom(ChunkSnapshot, bool)"/>): it takes
+    /// (chunkX, chunkZ) and returns the 256 heights or null when that column has not arrived.
+    /// Null in singleplayer, where worldgen is the source.
+    /// </summary>
+    public Func<int, int, int[]?>? ColumnHeightSource { get; set; }
+
+    /// <summary>
     /// Mesh builds <see cref="ProcessDirtyChunks"/> starts per frame. Defaults to
     /// <see cref="WorldGenerationConfig.MaxDirtyChunksPerFrame"/>; raised by World while loading and
     /// restored at the flip to playing, like <see cref="MeshUploadBudget"/>. Main thread only.

@@ -30,7 +30,7 @@ public sealed class LightVolumeHeightTests
         // Chunk columns chosen to cover both FloorDiv branches and columns straddling x/z = 0.
         foreach (var (cx, cz) in new[] { (0, 0), (1, 2), (-1, -1), (0, -1), (-3, 5), (7, -4) })
         {
-            Chunk.FillLightColumnHeights(cx, cz, columns);
+            Chunk.FillLightColumnHeights(cx, cz, columns, null);
 
             var worldX0 = cx * Chunk.Size - Chunk.LightBorder;
             var worldZ0 = cz * Chunk.Size - Chunk.LightBorder;
@@ -82,4 +82,32 @@ public sealed class LightVolumeHeightTests
     }
 
     private static int FloorDiv(int a, int b) => a >= 0 ? a / b : -((-a + b - 1) / b);
+
+    /// <summary>
+    /// A multiplayer client's streamed height source replaces worldgen: a known column returns the
+    /// server's heights and an unknown one falls back to the all-dark placeholder, never to a
+    /// worldgen probe - which is what lets a custom or premade world light without client worldgen.
+    /// </summary>
+    [Fact]
+    public void AStreamedHeightSourceOverridesWorldgenAndFillsMissingColumnsDark()
+    {
+        int[]?[] columns = new int[9][];
+        var provided = new int[Chunk.Size * Chunk.Size];
+        Array.Fill(provided, 123);
+        var calls = 0;
+        Func<int, int, int[]?> source = (cx, cz) =>
+        {
+            calls++;
+            return (cx, cz) == (4, -2) ? provided : null;
+        };
+
+        Chunk.FillLightColumnHeights(4, -2, columns, source);
+
+        // The centre column of the 3x3 (dx=1, dz=1) is (4, -2): the provided heights.
+        Assert.Same(provided, columns[4]);
+        Assert.Equal(123, columns[4]![0]);
+        // Every other column the source does not know is the dark placeholder, not worldgen.
+        Assert.Same(Chunk.NoStreamedHeights, columns[0]);
+        Assert.Equal(9, calls);
+    }
 }

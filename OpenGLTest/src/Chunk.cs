@@ -360,11 +360,14 @@ public class Chunk : IDisposable
     /// fetching them once replaces LightSize^2 cache probes (PERF_TODO C2) while resolving to the
     /// exact same ColumnData instances.
     /// </summary>
-    internal static void FillLightColumnHeights(int chunkX, int chunkZ, int[]?[] columns)
+    internal static void FillLightColumnHeights(int chunkX, int chunkZ, int[]?[] columns,
+        Func<int, int, int[]?>? streamed)
     {
         for (var dx = 0; dx < 3; dx++)
         for (var dz = 0; dz < 3; dz++)
-            columns[dx * 3 + dz] = GetColumnHeights(chunkX - 1 + dx, chunkZ - 1 + dz);
+            columns[dx * 3 + dz] = streamed is { } source
+                ? source(chunkX - 1 + dx, chunkZ - 1 + dz) ?? NoStreamedHeights
+                : GetColumnHeights(chunkX - 1 + dx, chunkZ - 1 + dz);
     }
 
     /// <summary>
@@ -420,7 +423,8 @@ public class Chunk : IDisposable
     /// slot is 0 and the byte is exactly the old level.
     /// </para>
     /// </summary>
-    private bool ComputeLight(byte[] light, byte[] sun, byte[] block, int[] queue)
+    private bool ComputeLight(byte[] light, byte[] sun, byte[] block, int[] queue,
+        Func<int, int, int[]?>? streamedHeights)
     {
         var worldY0 = LowerBoundY - LightBorder;
 
@@ -437,7 +441,7 @@ public class Chunk : IDisposable
 
         var scratch = MeshScratch.Current;
         var columns = scratch.LightColumnHeights;
-        FillLightColumnHeights((int)Position.X, (int)Position.Z, columns);
+        FillLightColumnHeights((int)Position.X, (int)Position.Z, columns, streamedHeights);
 
         // Sunlight seeds: air cells at or above the terrain height see the sky directly.
         // Leaves seed too: canopies pass light, so the sky reaches straight through them
@@ -975,6 +979,17 @@ public class Chunk : IDisposable
     /// </summary>
     public static int[] GetColumnHeights(int chunkX, int chunkZ) => GetColumnData(chunkX, chunkZ).Heights;
 
+    // Below any real height, so none of a missing streamed column's cells seed sunlight; a chunk
+    // whose column has not arrived stays dark until it does and the chunk re-meshes.
+    internal static readonly int[] NoStreamedHeights = CreateNoStreamedHeights();
+
+    private static int[] CreateNoStreamedHeights()
+    {
+        var heights = new int[Size * Size];
+        Array.Fill(heights, int.MinValue);
+        return heights;
+    }
+
     /// <summary>Per-column biomes for a chunk column, indexed like
     /// <see cref="GetColumnHeights"/>. The far LOD reads this to pick biome surface tiles.</summary>
     public static Biome[] GetColumnBiomes(int chunkX, int chunkZ) => GetColumnData(chunkX, chunkZ).Biomes;
@@ -1175,7 +1190,15 @@ public class Chunk : IDisposable
     /// chunk built with <c>generateBlockData: false</c>, before any other thread can see it;
     /// <see cref="IsBlockDataReady"/> goes true last, which is what publishes the rest.
     /// </summary>
-    internal void RestoreFrom(ChunkSnapshot snapshot)
+    internal void RestoreFrom(ChunkSnapshot snapshot) => RestoreFrom(snapshot, streamedColumns: false);
+
+    /// <summary>
+    /// <see cref="RestoreFrom(ChunkSnapshot)"/> with the block source chosen: a streamed
+    /// multiplayer chunk (<paramref name="streamedColumns"/> true) carries no worldgen column, so
+    /// its surface floor is derived from its own cells and no fluid frontier is scanned (the server
+    /// owns fluids). A save restore uses the column cache as before, for the fluid frontier.
+    /// </summary>
+    internal void RestoreFrom(ChunkSnapshot snapshot, bool streamedColumns)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
@@ -1183,16 +1206,34 @@ public class Chunk : IDisposable
         _state = snapshot.State is { } state ? (byte[])state.Clone() : null;
         _solidCount = BlockCount - _blocks.AsSpan().Count(BlockType.Air);
 
-        var column = GetColumnData((int)Position.X, (int)Position.Z);
-        SurfaceMinY = column.MinHeight;
+        if (streamedColumns)
+        {
+            SurfaceMinY = LowestSolidY();
+        }
+        else
+        {
+            var column = GetColumnData((int)Position.X, (int)Position.Z);
+            SurfaceMinY = column.MinHeight;
+            // A restored chunk can hold fluid anywhere, so it always scans (a chunk with no fluid
+            // cell simply reports nothing)
+            ScanFluidFrontier(column, LowerBoundY);
+        }
+
         IsRestored = true;
         RestoredPlayerPlaced = snapshot.PlayerPlaced is { } placed ? (ushort[])placed.Clone() : null;
 
-        // A restored chunk can hold fluid anywhere, so it always scans (a chunk with no fluid
-        // cell simply reports nothing)
-        ScanFluidFrontier(column, LowerBoundY);
-
         IsBlockDataReady = true;
+    }
+
+    // The world Y of this chunk's lowest non-air cell, or int.MinValue when it is all air.
+    private int LowestSolidY()
+    {
+        for (var y = 0; y < Size; y++)
+        for (var x = 0; x < Size; x++)
+        for (var z = 0; z < Size; z++)
+            if (_blocks[Idx(x, y, z)] != 0)
+                return LowerBoundY + y;
+        return int.MinValue;
     }
 
     /// <summary>Clears a block. Returns false if the cell is outside this chunk or already air.</summary>
@@ -1382,7 +1423,7 @@ public class Chunk : IDisposable
             scratch.ClearNeighbors();
             Array.Clear(sunLight, 0, LightCount);
             Array.Clear(blockLight, 0, LightCount);
-            var anyTinted = ComputeLight(lightBlocks, sunLight, blockLight, queue);
+            var anyTinted = ComputeLight(lightBlocks, sunLight, blockLight, queue, chunkManager.ColumnHeightSource);
             // Keep the chunk's own cells of the flood for entity lighting: a fresh array owned
             // by this build alone, published by UpdateMesh with the mesh it belongs to. A chunk
             // lit by coloured light appends a second half holding each cell's colour slot.

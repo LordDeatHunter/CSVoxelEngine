@@ -21,6 +21,10 @@ public enum NetMessage : byte
     BlockEdit = 30,
     BlockChange = 31,
     TimeSync = 40,
+    ChunkRequest = 50,
+    ChunkData = 51,
+    ColumnRequest = 52,
+    ColumnHeights = 53,
 }
 
 /// <summary>
