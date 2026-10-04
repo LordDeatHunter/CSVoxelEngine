@@ -112,6 +112,22 @@ public static class InventoryPanelLayout
     public static bool QuantityBoxAt(Vector2 point, Vector2 screen) =>
         InBox(point, QuantityBoxRect(screen));
 
+    /// <summary>Side of the creative catalog row's "+" bulk button, in canvas units.</summary>
+    public const float CatalogPlusSize = 26f;
+
+    /// <summary>Centre of a catalog row's "+" button: a square in the row's right end.</summary>
+    public static Vector2 CatalogPlusCentre(int row, float offset, Vector2 screen, int rowCount) =>
+        new(RowRight(screen, rowCount) - 6f - CatalogPlusSize * 0.5f,
+            RowCentreY(row, offset, screen));
+
+    /// <summary>Whether a canvas point is over the "+" button of the catalog row it names.</summary>
+    public static bool CatalogPlusAt(Vector2 point, int row, float offset, int rowCount, Vector2 screen)
+    {
+        var centre = CatalogPlusCentre(row, offset, screen, rowCount);
+        return MathF.Abs(point.X - centre.X) <= CatalogPlusSize * 0.5f
+            && MathF.Abs(point.Y - centre.Y) <= CatalogPlusSize * 0.5f;
+    }
+
     /// <summary>
     /// Right edge of the row hit area: the row rectangle's edge normally, the scrollbar hit band's
     /// left edge while the list overflows, so a point is never both a row and a scrollbar hit.

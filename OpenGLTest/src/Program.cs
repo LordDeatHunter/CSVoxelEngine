@@ -233,7 +233,7 @@ public static class Program
                 {
                     var searching = !inventoryView.Search.IsEmpty;
                     var rowCount = searching
-                        ? InventorySearch.Search(inventoryView.Search.Query, w.Inventory).Count
+                        ? InventorySearch.Search(inventoryView.Search.Query, w.Inventory, w.Camera.IsCreative).Count
                         : RowCountFor(inventoryView.Tab);
                     var delta = -wheel.Y * InventoryPanelLayout.WheelStepRows * InventoryPanelLayout.RowHeight;
                     SetListScroll(InventoryPanelLayout.ClampedOffset(
@@ -914,13 +914,18 @@ public static class Program
         }
     }
 
-    /// <summary>Number of list rows the given panel tab shows this frame.</summary>
-    private static int RowCountFor(InventoryCategory tab) => tab switch
+    /// <summary>Number of list rows the given panel tab shows this frame. In creative the
+    /// Blocks/Tools/Misc tabs list the whole catalog; the Craft tab always lists every recipe.</summary>
+    private static int RowCountFor(InventoryCategory tab)
     {
-        InventoryCategory.Tools => world!.Inventory.ToolEntries().Count,
-        InventoryCategory.Crafting => ContentRegistry.CraftingRecipes.Count,
-        _ => world!.Inventory.StackEntries(tab).Count,
-    };
+        if (tab == InventoryCategory.Crafting)
+            return ContentRegistry.CraftingRecipes.Count;
+        if (world?.Camera.IsCreative == true)
+            return CreativeCatalog.Entries(tab, world.Inventory).Count;
+        return tab == InventoryCategory.Tools
+            ? world!.Inventory.ToolEntries().Count
+            : world!.Inventory.StackEntries(tab).Count;
+    }
 
     /// <summary>
     /// A left press on the open panel's scrollbar: the thumb starts a drag (the grab offset
@@ -933,7 +938,7 @@ public static class Program
         var p = renderManager.UiToCanvas(position);
         var searching = !inventoryView.Search.IsEmpty;
         var rowCount = searching
-            ? InventorySearch.Search(inventoryView.Search.Query, world!.Inventory).Count
+            ? InventorySearch.Search(inventoryView.Search.Query, world!.Inventory, world.Camera.IsCreative).Count
             : RowCountFor(inventoryView.Tab);
         var offset = searching
             ? InventoryPanelLayout.ClampedOffset(inventoryView.Search.ScrollOffset, rowCount, canvas)
@@ -1064,10 +1069,26 @@ public static class Program
             return;
         }
 
+        if (world!.Camera.IsCreative)
+        {
+            GrantFromCreative(hit.Id, 1);
+            return;
+        }
+
         inventoryView.SelectedId = hit.ToolInstance > 0 ? (byte)0 : hit.Id;
         inventoryView.SelectedToolInstance = hit.ToolInstance;
         if (hit.ToolInstance == 0 && inventoryView.Craft.Recipe != null)
-            inventoryView.Craft.FeedFromInventory(hit.Id, world!.Inventory);
+            inventoryView.Craft.FeedFromInventory(hit.Id, world.Inventory);
+    }
+
+    /// <summary>Grants a catalog id to the player, popping the hotbar slot a fresh pickup lands
+    /// in; clicking a row grants one, its "+" button the quantity field's amount.</summary>
+    private static void GrantFromCreative(byte id, int amount)
+    {
+        var inventory = world!.Inventory;
+        if (!inventory.Add(id, amount)) return;
+        if (Inventory.CategoryOf(id) is InventoryCategory.Blocks or InventoryCategory.Misc)
+            inventoryView.SelectedId = id;
     }
 
     private static void SetListScroll(float offset, bool searching)
@@ -1110,7 +1131,7 @@ public static class Program
 
         var searching = !inventoryView.Search.IsEmpty;
         IReadOnlyList<SearchHit>? hits = searching
-            ? InventorySearch.Search(inventoryView.Search.Query, inventory)
+            ? InventorySearch.Search(inventoryView.Search.Query, inventory, creative)
             : null;
         var rowCount = hits?.Count ?? RowCountFor(inventoryView.Tab);
         var offset = searching
@@ -1128,6 +1149,19 @@ public static class Program
             {
                 if (row.Value < hits.Count)
                     ApplySearchHit(hits[row.Value]);
+            }
+            else if (creative && inventoryView.Tab != InventoryCategory.Crafting)
+            {
+                var entries = CreativeCatalog.Entries(inventoryView.Tab, inventory);
+                if (row.Value < entries.Count)
+                {
+                    var onPlus = InventoryPanelLayout.CatalogPlusAt(renderManager.UiToCanvas(position),
+                        row.Value, offset, rowCount, renderManager.UiCanvasSize);
+                    var amount = onPlus
+                        ? CreativeCatalog.ParseAmount(inventoryView.Quantity.Text)
+                        : 1;
+                    GrantFromCreative(entries[row.Value].Id, amount);
+                }
             }
             else if (inventoryView.Tab == InventoryCategory.Tools)
             {

@@ -40,14 +40,19 @@ public readonly record struct SearchHit(
 public static class InventorySearch
 {
     /// <summary>Rows for <paramref name="query"/> over <paramref name="inventory"/>'s stock and
-    /// every compiled recipe, best match first; an empty query matches nothing.</summary>
-    public static IReadOnlyList<SearchHit> Search(string? query, Inventory inventory)
+    /// every compiled recipe, best match first; an empty query matches nothing. In creative mode
+    /// <paramref name="includeCatalog"/> widens the inventory side to every item that exists, so
+    /// a query reaches something the player has not collected yet.</summary>
+    public static IReadOnlyList<SearchHit> Search(string? query, Inventory inventory, bool includeCatalog = false)
     {
         var q = query?.Trim() ?? "";
         if (q.Length == 0) return [];
 
         var hits = new List<SearchHit>();
-        AddInventoryHits(q, inventory, hits);
+        var owned = new HashSet<byte>();
+        AddInventoryHits(q, inventory, hits, owned);
+        if (includeCatalog)
+            AddCatalogHits(q, inventory, hits, owned);
         AddRecipeHits(q, hits);
 
         hits.Sort((a, b) =>
@@ -63,10 +68,11 @@ public static class InventorySearch
         return hits;
     }
 
-    private static void AddInventoryHits(string query, Inventory inventory, List<SearchHit> hits)
+    private static void AddInventoryHits(string query, Inventory inventory, List<SearchHit> hits,
+        HashSet<byte> owned)
     {
-        AddStacks(query, inventory, InventoryCategory.Blocks, hits);
-        AddStacks(query, inventory, InventoryCategory.Misc, hits);
+        AddStacks(query, inventory, InventoryCategory.Blocks, hits, owned);
+        AddStacks(query, inventory, InventoryCategory.Misc, hits, owned);
 
         // One row per tool kind, pointing at its first live instance: tools are instances, but
         // a search should offer "Bucket", not one row per duplicate.
@@ -74,6 +80,7 @@ public static class InventorySearch
         foreach (var tool in inventory.ToolEntries())
         {
             if (!seen.Add(tool.ItemId)) continue;
+            owned.Add(tool.ItemId);
             if (!Matches(tool.Name, query)) continue;
             hits.Add(new SearchHit(SearchHitKind.Inventory, tool.ItemId, tool.Name,
                 InventoryCategory.Tools, tool.InstanceId, inventory.CountFor(tool.ItemId), null));
@@ -81,12 +88,26 @@ public static class InventorySearch
     }
 
     private static void AddStacks(string query, Inventory inventory, InventoryCategory category,
-        List<SearchHit> hits)
+        List<SearchHit> hits, HashSet<byte> owned)
     {
         foreach (var row in inventory.StackEntries(category))
         {
+            owned.Add(row.Id);
             if (!Matches(row.Name, query)) continue;
             hits.Add(new SearchHit(SearchHitKind.Inventory, row.Id, row.Name, category, 0, row.Count, null));
+        }
+    }
+
+    private static void AddCatalogHits(string query, Inventory inventory, List<SearchHit> hits,
+        HashSet<byte> owned)
+    {
+        foreach (var item in ItemRegistry.All)
+        {
+            if (Inventory.CategoryOf(item.Id) is not { } category) continue;
+            if (!owned.Add(item.Id)) continue;
+            if (!Matches(item.Name, query)) continue;
+            hits.Add(new SearchHit(SearchHitKind.Inventory, item.Id, item.Name, category, 0,
+                inventory.CountFor(item.Id), null));
         }
     }
 

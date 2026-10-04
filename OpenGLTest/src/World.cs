@@ -169,8 +169,9 @@ public class World : IItemUseWorld
     private readonly float _spawnX;
     private readonly float _spawnZ;
 
-    /// <summary>The player's hotbar; its selected slot decides what block placing puts down.</summary>
-    public Inventory Inventory { get; } = new();
+    /// <summary>The player's hotbar; its selected slot decides what block placing puts down.
+    /// A new survival player starts with nothing; creative mode grants from the catalog.</summary>
+    public Inventory Inventory { get; } = Inventory.Empty();
 
     // First-cut survival: the HP pool plus the fall state feeding it. Landings of 5+
     // blocks bill (blocks-4)*10 HP, lava burns 10 HP/s on body contact, and death

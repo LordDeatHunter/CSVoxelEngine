@@ -32,11 +32,13 @@ public readonly record struct HotbarSlot(bool IsTool, byte Id, int ToolInstance)
 /// bucket scooped in one slot becomes a water bucket in every slot holding that instance.
 ///
 /// Pickups go through <see cref="Add"/>, which refuses what does not fit — the caller must
-/// leave a refused drop on the ground (see <see cref="CanAccept"/>). A NEW world's player
-/// spawns with the constructor's test stock (50 of every block plus a bucket, the copper tools,
-/// a compass, an obsidian blade, a multiblock converter and a few station materials); a saved
-/// inventory replaces that stock wholesale through <see cref="Import"/>, and
-/// <see cref="Export"/> is its save-side twin.
+/// leave a refused drop on the ground (see <see cref="CanAccept"/>). A new survival player
+/// spawns with nothing (<see cref="Empty"/>), and finds what to carry from the world; in
+/// creative mode the panel browses every item and grants it on click. The test/dev constructor
+/// stock (50 of every block plus a bucket, the copper tools, a compass, an obsidian blade, a
+/// multiblock converter and a few station materials) is what tests and the item debugger open
+/// with; a saved inventory replaces whatever the pool held wholesale through <see cref="Import"/>,
+/// and <see cref="Export"/> is its save-side twin.
 /// </summary>
 public class Inventory
 {
@@ -798,11 +800,22 @@ public class Inventory
         return pops;
     }
 
-    public Inventory()
+    /// <summary>
+    /// The debug/test inventory: 50 of every placeable block plus the handful of starting tools
+    /// and materials below. A new survival player owns none of it — <see cref="World"/> builds
+    /// an <see cref="Empty"/> pool — so this stock is only what tests and the item debugger open
+    /// with, and the pools it fills are the ones the category-cap tests measure against.
+    /// </summary>
+    public Inventory() : this(seedTestStock: true)
     {
-        // Test stock: 50 of every placeable block, so placing and the category caps can
-        // be tried without mining first; one each of the starting bucket, axe, compass,
-        // obsidian blade and multiblock converter.
+    }
+
+    /// <summary>A stockless pool, which is what a new survival player owns.</summary>
+    public static Inventory Empty() => new(seedTestStock: false);
+
+    private Inventory(bool seedTestStock)
+    {
+        if (!seedTestStock) return;
         foreach (var type in BlockType.Types.Values)
             if (type.HasItem && !type.Fluid)
                 _blocks[type.Id] = StartingStock;

@@ -109,12 +109,15 @@ public sealed class WorldLifecycleTests : IDisposable
         return data;
     }
 
-    /// <summary>Equips stone on hotbar slot 0 and selects it: the Inventory constructor stocks the
-    /// pools but equips nothing, so a throw or a consume is a no-op until a slot is equipped.</summary>
+    /// <summary>Grants a few stone, equips it on hotbar slot 0 and selects it: a new survival
+    /// world starts empty, so a throw or a consume is a no-op until something is granted and
+    /// equipped. Add may already have auto-equipped slot 0, hence the guard against toggling.</summary>
     private static byte EquipRock(World world)
     {
         var id = TerrainGenerator.RockBlock;
-        world.Inventory.EquipStackable(0, id);
+        world.Inventory.Add(id, 10);
+        if (world.Inventory.IdAt(0) != id)
+            world.Inventory.EquipStackable(0, id);
         world.Inventory.Select(0);
         return id;
     }
@@ -126,6 +129,7 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Equal(WorldPhase.Playing, world.Phase);
         Assert.True(world.IsLoaded);
         Assert.Equal(1f, world.LoadProgress);
+        Assert.Empty(world.Inventory.StackEntries(InventoryCategory.Blocks));
 
         var result = world.SaveAndDispose();
         Assert.True(result);

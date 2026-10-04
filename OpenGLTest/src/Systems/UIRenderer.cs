@@ -834,16 +834,20 @@ public class UIRenderer : IDisposable
         // call, so the drawn rows and the click always agree.
         IReadOnlyList<SearchHit>? hits = view.Search.IsEmpty
             ? null
-            : InventorySearch.Search(view.Search.Query, inventory);
+            : InventorySearch.Search(view.Search.Query, inventory, creative);
 
         // One list per frame for the active tab (never re-query StackEntries/ToolEntries for
-        // the visible range: that would double the LINQ sort).
+        // the visible range: that would double the LINQ sort). In creative the Blocks/Tools/Misc
+        // tabs list the whole catalog instead of the player's stock.
+        IReadOnlyList<CreativeCatalog.CatalogEntry>? catalog = null;
         IReadOnlyList<Inventory.ToolRow>? tools = null;
         IReadOnlyList<CraftingRecipe>? recipes = null;
         IReadOnlyList<Inventory.StackRow>? rows = null;
         int rowCount;
         if (hits != null)
             rowCount = hits.Count;
+        else if (creative && view.Tab != InventoryCategory.Crafting)
+            rowCount = (catalog = CreativeCatalog.Entries(view.Tab, inventory)).Count;
         else if (view.Tab == InventoryCategory.Tools)
             rowCount = (tools = inventory.ToolEntries()).Count;
         else if (view.Tab == InventoryCategory.Crafting)
@@ -880,6 +884,11 @@ public class UIRenderer : IDisposable
             {
                 for (var i = first; i < end; i++)
                     DrawSearchRow(i, offset, hits[i], i == view.Search.Highlight, headingDegrees, time);
+            }
+            else if (catalog != null)
+            {
+                for (var i = first; i < end; i++)
+                    DrawCatalogRow(i, offset, rowCount, catalog[i], headingDegrees, time);
             }
             else if (tools != null)
             {
@@ -1400,7 +1409,8 @@ public class UIRenderer : IDisposable
             : $"{inventory.UsedOf(tab)}/{Inventory.CapacityOf(tab)}";
 
     private void DrawEntryRow(int row, float offset, byte id, string name, string count, bool selected,
-        bool dim, float headingDegrees, float timeSeconds, Rgba? accent = null, float? durability = null)
+        bool dim, float headingDegrees, float timeSeconds, Rgba? accent = null, float? durability = null,
+        float countInset = 0f)
     {
         var centreY = InventoryPanelLayout.RowCentreY(row, offset, _screenSize);
         var centre = new Vector2(PanelLeft + PanelWidth * 0.5f, centreY);
@@ -1417,14 +1427,14 @@ public class UIRenderer : IDisposable
         else
             DrawBlockIcon(iconCentre, RowIcon, id);
 
-        DrawText(FitText(name, _countScale, RowNameAvail(count)), new Vector2(iconCentre.X + RowIcon * 0.5f + 8f, centreY - 9f),
+        DrawText(FitText(name, _countScale, RowNameAvail(count, countInset)), new Vector2(iconCentre.X + RowIcon * 0.5f + 8f, centreY - 9f),
             _countScale, dim && !selected ? TextDim : Rgba.White);
 
         if (_font != null)
         {
             var size = _font.MeasureSize(count.AsSpan(), _countScale);
             DrawText(count,
-                new Vector2(PanelLeft + PanelWidth - PanelPad - 8f - size.X, centreY - 9f),
+                new Vector2(PanelLeft + PanelWidth - PanelPad - 8f - countInset - size.X, centreY - 9f),
                 _countScale, dim && !selected ? TextDim : Rgba.White);
         }
 
@@ -1445,6 +1455,18 @@ public class UIRenderer : IDisposable
             : hit.Count.ToString();
         DrawEntryRow(row, offset, hit.Id, hit.Name, detail, selected, false,
             headingDegrees, timeSeconds, hit.IsRecipe ? AccentGold : null);
+    }
+
+    private void DrawCatalogRow(int row, float offset, int rowCount, CreativeCatalog.CatalogEntry entry,
+        float headingDegrees, float timeSeconds)
+    {
+        DrawEntryRow(row, offset, entry.Id, entry.Name, entry.Count.ToString(), false, false,
+            headingDegrees, timeSeconds, null, null, InventoryPanelLayout.CatalogPlusSize + 12f);
+        var centre = InventoryPanelLayout.CatalogPlusCentre(row, offset, _screenSize, rowCount);
+        var size = new Vector2(InventoryPanelLayout.CatalogPlusSize);
+        DrawRect(centre, size, ChipBackground);
+        DrawBorder(centre, size, SlotBorder, AccentGold);
+        DrawTextCentred("+", centre.X, centre.Y - 9f, _countScale, Rgba.White);
     }
 
     private void DrawPreview(Inventory inventory, InventoryView view, float time, float headingDegrees)
@@ -1866,11 +1888,11 @@ public class UIRenderer : IDisposable
         DrawTextCentred(FitText(text, s, maxWidth), centreX, topY, s, color);
     }
 
-    private float RowNameAvail(string count)
+    private float RowNameAvail(string count, float countInset)
     {
         var nameX = PanelLeft + PanelPad + RowIcon + 16f;
         var countW = TextWidth(count, _countScale);
-        return PanelLeft + PanelWidth - PanelPad - 8f - countW - nameX - 8f;
+        return PanelLeft + PanelWidth - PanelPad - 8f - countInset - countW - nameX - 8f;
     }
 
     /// <summary>
