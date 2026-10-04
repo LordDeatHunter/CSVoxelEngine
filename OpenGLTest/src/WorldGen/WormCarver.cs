@@ -219,7 +219,7 @@ public static class WormCarver
     {
         var bx = MathUtils.FloorToInt(x);
         var bz = MathUtils.FloorToInt(z);
-        return Chunk.GetColumnData(VoxelCoords.WorldToChunk(bx), VoxelCoords.WorldToChunk(bz))
+        return ColumnCache.Get(VoxelCoords.WorldToChunk(bx), VoxelCoords.WorldToChunk(bz))
             .Heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(bx), VoxelCoords.WorldToLocal(bz))];
     }
 
@@ -227,7 +227,7 @@ public static class WormCarver
     {
         var bx = MathUtils.FloorToInt(x);
         var bz = MathUtils.FloorToInt(z);
-        return Chunk.GetColumnData(VoxelCoords.WorldToChunk(bx), VoxelCoords.WorldToChunk(bz))
+        return ColumnCache.Get(VoxelCoords.WorldToChunk(bx), VoxelCoords.WorldToChunk(bz))
             .EntranceWeight[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(bx), VoxelCoords.WorldToLocal(bz))];
     }
 }

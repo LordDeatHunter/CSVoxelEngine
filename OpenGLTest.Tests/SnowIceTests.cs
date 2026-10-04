@@ -191,7 +191,7 @@ public sealed class SnowIceTests
     {
         if (TerrainGenerator.BiomeAt(x, z) != Biome.Ocean) return false;
         if (TerrainGenerator.WaterLevelAt(x, z) != WorldGenerationConfig.SeaLevel) return false;
-        var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+        var column = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
         return TerrainGenerator.IsWaterColumn(x, z,
             column.Bed[VoxelCoords.ColumnIndex(x & Chunk.SizeMask, z & Chunk.SizeMask)]);
     }
@@ -221,7 +221,7 @@ public sealed class SnowIceTests
             if (IceSpikeGenerator.TryGetSpike(wx, wz, out _, out _)) continue;
             if (SnowGenerator.DepthAt(wx, wz) <= 0) continue;
 
-            var column = Chunk.GetColumnData(cx, cz);
+            var column = ColumnCache.Get(cx, cz);
             var height = column.Heights[(x << Chunk.SizeShift) | z];
             if (TerrainGenerator.IsWaterColumn(wx, wz, height)) continue;
 
@@ -241,7 +241,7 @@ public sealed class SnowIceTests
         Assert.True(TryFindColumn(
             (x, z) => TerrainGenerator.ColdWeight(x, z) > 0.9f
                       && !TerrainGenerator.IsWaterColumn(x, z,
-                          Chunk.GetColumnHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
+                          ColumnCache.GetHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
                               [((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)]),
             out var x2, out var z2));
         Assert.True(SnowGenerator.DepthAt(x2, z2) > 0);

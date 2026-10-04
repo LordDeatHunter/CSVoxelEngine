@@ -1171,7 +1171,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         if (!ceiling)
             return walked;
 
-        var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+        var column = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
         var level = column.WaterLevel[((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
         if (level == TerrainGenerator.NoWater)
             return walked;

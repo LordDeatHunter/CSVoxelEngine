@@ -76,7 +76,7 @@ public sealed class LakeTests
         {
             var nx = cell.X + (d == 0 ? 1 : d == 1 ? -1 : 0);
             var nz = cell.Z + (d == 2 ? 1 : d == 3 ? -1 : 0);
-            var column = Chunk.GetColumnData(nx >> Chunk.SizeShift, nz >> Chunk.SizeShift);
+            var column = ColumnCache.Get(nx >> Chunk.SizeShift, nz >> Chunk.SizeShift);
             var local = ((nx & Chunk.SizeMask) << Chunk.SizeShift) | (nz & Chunk.SizeMask);
             var neighbourLevel = column.WaterLevel[local];
             if (neighbourLevel == level) continue;
@@ -151,7 +151,7 @@ public sealed class LakeTests
         for (var cx = -ScanChunks; cx <= ScanChunks; cx++)
         for (var cz = -ScanChunks; cz <= ScanChunks; cz++)
         {
-            var column = Chunk.GetColumnData(cx, cz);
+            var column = ColumnCache.Get(cx, cz);
             for (var i = 0; i < column.Heights.Length; i++)
             {
                 var level = column.WaterLevel[i];

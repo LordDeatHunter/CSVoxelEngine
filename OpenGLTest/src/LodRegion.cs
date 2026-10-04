@@ -391,7 +391,7 @@ public class LodRegion : IDisposable
         for (var cx = 0; cx < chunkSpan; cx++)
         for (var cz = 0; cz < chunkSpan; cz++)
         {
-            heightmaps[cx * chunkSpan + cz] = Chunk.GetColumnHeights(baseChunkX + cx, baseChunkZ + cz);
+            heightmaps[cx * chunkSpan + cz] = ColumnCache.GetHeights(baseChunkX + cx, baseChunkZ + cz);
             if (capmaps != null && ColumnCaps.TryGetValue((baseChunkX + cx, baseChunkZ + cz), out var bucket))
             {
                 capmaps[cx * chunkSpan + cz] = bucket;

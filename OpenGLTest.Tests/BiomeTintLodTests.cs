@@ -56,7 +56,7 @@ public sealed class BiomeTintLodTests
         {
             if (Math.Max(Math.Abs(cx), Math.Abs(cz)) != ring) continue;
             if (TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8) != biome) continue;
-            var height = Chunk.GetColumnHeights(cx, cz)[(8 << Chunk.SizeShift) | 8];
+            var height = ColumnCache.GetHeights(cx, cz)[(8 << Chunk.SizeShift) | 8];
             if (TerrainGenerator.IsBeachHeight(height)) continue;
 
             var region = (FloorDiv(cx, RegionChunkSpan), FloorDiv(cz, RegionChunkSpan));

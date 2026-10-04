@@ -189,7 +189,7 @@ public class FluidManager
             // border would never wake when the generated side streams in last.
             // Note this is not the same test as an empty frontier: a chunk can be solid water
             // inside and still face air across a border.
-            var column = Chunk.GetColumnData((int)chunk.Position.X, (int)chunk.Position.Z);
+            var column = ColumnCache.Get((int)chunk.Position.X, (int)chunk.Position.Z);
             if (!chunk.IsRestored && !HasRestoredFaceNeighbour(chunk, chunks)
                 && chunk.LowerBoundY > Math.Max(column.MaxWaterLevel, WorldGenerationConfig.SeaLevel))
                 continue;
@@ -212,7 +212,7 @@ public class FluidManager
     private void WakeBorders(Chunk chunk, ChunkManager chunks)
     {
         var pos = chunk.Position;
-        var ownColumn = Chunk.GetColumnData((int)pos.X, (int)pos.Z);
+        var ownColumn = ColumnCache.Get((int)pos.X, (int)pos.Z);
         var ownHeights = ownColumn.Heights;
         var ownWater = ownColumn.WaterLevel;
 
@@ -231,7 +231,7 @@ public class FluidManager
             // axis the face cuts, the neighbour's directly across at `far`
             var near = dx + dz > 0 ? Chunk.SizeMask : 0;
             var far = Chunk.SizeMask - near;
-            var neighbourColumn = Chunk.GetColumnData((int)neighbour.Position.X, (int)neighbour.Position.Z);
+            var neighbourColumn = ColumnCache.Get((int)neighbour.Position.X, (int)neighbour.Position.Z);
             var neighbourHeights = neighbourColumn.Heights;
             var neighbourWater = neighbourColumn.WaterLevel;
 
@@ -798,7 +798,7 @@ public class FluidManager
 
     /// <summary>Whether world cell (x, y, z) sits above its column's generated water level.</summary>
     private static bool AboveGeneratedWater(int x, int y, int z) =>
-        y > Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
+        y > ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
             .WaterLevel[VoxelCoords.ColumnIndex(x & Chunk.SizeMask, z & Chunk.SizeMask)];
 
     /// <summary>Whether fluid may replace what is in a cell: loaded, not already fluid, and

@@ -32,7 +32,7 @@ public sealed class LodHeightSamplingTests
         var floor = int.MaxValue;
         for (var cx = -1; cx <= span; cx++)
         for (var cz = -1; cz <= span; cz++)
-            foreach (var h in Chunk.GetColumnHeights(rx * span + cx, rz * span + cz))
+            foreach (var h in ColumnCache.GetHeights(rx * span + cx, rz * span + cz))
                 if (h < floor) floor = h;
         return floor;
     }
@@ -60,7 +60,7 @@ public sealed class LodHeightSamplingTests
         var ceiling = int.MinValue;
         for (var cx = -1; cx <= span; cx++)
         for (var cz = -1; cz <= span; cz++)
-            foreach (var h in Chunk.GetColumnHeights(rx * span + cx, rz * span + cz))
+            foreach (var h in ColumnCache.GetHeights(rx * span + cx, rz * span + cz))
                 if (h > ceiling) ceiling = h;
         return ceiling;
     }

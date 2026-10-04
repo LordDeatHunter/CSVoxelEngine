@@ -149,7 +149,7 @@ public sealed class MudTests
         for (var cz = -r; cz <= r && !found; cz++)
         {
             if (cx != -r && cx != r && cz != -r && cz != r) continue;
-            var column = Chunk.GetColumnData(cx, cz);
+            var column = ColumnCache.Get(cx, cz);
             for (var i = 0; i < column.Heights.Length && !found; i++)
             {
                 var lx = i >> Chunk.SizeShift;

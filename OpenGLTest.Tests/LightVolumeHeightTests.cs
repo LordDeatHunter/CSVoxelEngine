@@ -77,7 +77,7 @@ public sealed class LightVolumeHeightTests
     {
         var cx = FloorDiv(worldX, Chunk.Size);
         var cz = FloorDiv(worldZ, Chunk.Size);
-        return Chunk.GetColumnHeights(cx, cz)
+        return ColumnCache.GetHeights(cx, cz)
             [((worldX - cx * Chunk.Size) << Chunk.SizeShift) | (worldZ - cz * Chunk.Size)];
     }
 
@@ -107,7 +107,7 @@ public sealed class LightVolumeHeightTests
         Assert.Same(provided, columns[4]);
         Assert.Equal(123, columns[4]![0]);
         // Every other column the source does not know is the dark placeholder, not worldgen.
-        Assert.Same(Chunk.NoStreamedHeights, columns[0]);
+        Assert.Same(ColumnCache.NoStreamedHeights, columns[0]);
         Assert.Equal(9, calls);
     }
 }

@@ -25,7 +25,7 @@ public sealed class LodSurfaceTests
     private const int CentreChunk = 4;
 
     private static int HeightAt(int x, int z) =>
-        Chunk.GetColumnHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
+        ColumnCache.GetHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
             [((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
 
     /// <summary>
@@ -111,7 +111,7 @@ public sealed class LodSurfaceTests
         var rx = FindQuietFrozenRx(rz);
         var cx = rx * ChunksPerLevel1Region + CentreChunk;
         var cz = rz * ChunksPerLevel1Region + CentreChunk;
-        var y = Chunk.GetColumnHeights(cx, cz).Max() + 8;
+        var y = ColumnCache.GetHeights(cx, cz).Max() + 8;
 
         var (manager, chunk) = EmptyReadyChunk(new Vector3(cx, y >> Chunk.SizeShift, cz));
         for (var lx = 0; lx < Chunk.Size; lx++)
@@ -215,7 +215,7 @@ public sealed class LodSurfaceTests
         var (seaRx, seaBaseline) = FindSeaRegion(SeaRz);
         var scx = seaRx * ChunksPerLevel1Region + CentreChunk;
         var scz = SeaRz * ChunksPerLevel1Region + CentreChunk;
-        var column = Chunk.GetColumnData(scx, scz);
+        var column = ColumnCache.Get(scx, scz);
         for (var lx = 0; lx < Chunk.Size; lx++)
         for (var lz = 0; lz < Chunk.Size; lz++)
         {
@@ -237,7 +237,7 @@ public sealed class LodSurfaceTests
         var cx = 777 * ChunksPerLevel1Region + CentreChunk;
         var cz = 782 * ChunksPerLevel1Region + CentreChunk;
         var manager = new ChunkManager(null!);
-        var heights = Chunk.GetColumnHeights(cx, cz);
+        var heights = ColumnCache.GetHeights(cx, cz);
         var cyMin = (heights.Min() - 2) >> Chunk.SizeShift;
         var cyMax = (heights.Max() + 8) >> Chunk.SizeShift;
         for (var cy = cyMin; cy <= cyMax; cy++)
@@ -334,7 +334,7 @@ public sealed class LodSurfaceTests
     {
         var cx = 777 * ChunksPerLevel1Region + CentreChunk;
         var cz = 783 * ChunksPerLevel1Region + CentreChunk;
-        var cy = (Chunk.GetColumnHeights(cx, cz).Max() >> Chunk.SizeShift) + 2;
+        var cy = (ColumnCache.GetHeights(cx, cz).Max() >> Chunk.SizeShift) + 2;
         var (manager, chunk) = EmptyReadyChunk(new Vector3(cx, cy, cz));
         var x = (cx << Chunk.SizeShift) + 5;
         var z = (cz << Chunk.SizeShift) + 7;
@@ -408,7 +408,7 @@ public sealed class LodSurfaceTests
     {
         for (var rx = 777; rx < 777 + 400; rx++)
         {
-            var column = Chunk.GetColumnData(rx * ChunksPerLevel1Region + CentreChunk, rz * ChunksPerLevel1Region + CentreChunk);
+            var column = ColumnCache.Get(rx * ChunksPerLevel1Region + CentreChunk, rz * ChunksPerLevel1Region + CentreChunk);
             var wet = 0;
             for (var i = 0; i < column.Heights.Length; i++)
                 if (column.WaterLevel[i] > column.Heights[i]) wet++;

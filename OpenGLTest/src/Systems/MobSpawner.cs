@@ -29,7 +29,7 @@ public static class MobSpawner
             var chunkZ = VoxelCoords.WorldToChunk(z);
             var localX = VoxelCoords.WorldToLocal(x);
             var localZ = VoxelCoords.WorldToLocal(z);
-            var height = Chunk.GetColumnHeights(chunkX, chunkZ)[VoxelCoords.ColumnIndex(localX, localZ)];
+            var height = ColumnCache.GetHeights(chunkX, chunkZ)[VoxelCoords.ColumnIndex(localX, localZ)];
 
             // Surface spawns only: dry forest ground with two clear cells above, all of them in
             // loaded chunks (TryGetCell reports unloaded as absent, not as air). A lake bed counts

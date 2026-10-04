@@ -18,7 +18,7 @@ public sealed class BiomeTests
     /// <summary>The surface chunk of a world column and the height's local Y inside it.</summary>
     private static (Chunk Chunk, int Ly) SurfaceChunk(int x, int z, out int height)
     {
-        height = Chunk.GetColumnHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
+        height = ColumnCache.GetHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
             [((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
         var cy = height >> Chunk.SizeShift;
         var chunk = new Chunk(null!, new Vector3(x >> Chunk.SizeShift, cy, z >> Chunk.SizeShift),
@@ -120,7 +120,7 @@ public sealed class BiomeTests
         for (var cx = -64; cx <= 64 && verified < 3; cx++)
         for (var cz = -64; cz <= 64 && verified < 3; cz++)
         {
-            var column = Chunk.GetColumnData(cx, cz);
+            var column = ColumnCache.Get(cx, cz);
             for (var x = 0; x < Chunk.Size && verified < 3; x++)
             for (var z = 0; z < Chunk.Size && verified < 3; z++)
             {
@@ -154,7 +154,7 @@ public sealed class BiomeTests
         for (var cx = -8; cx <= 8 && verified < 3; cx++)
         for (var cz = -8; cz <= 8 && verified < 3; cz++)
         {
-            var column = Chunk.GetColumnData(cx, cz);
+            var column = ColumnCache.Get(cx, cz);
             for (var x = 0; x < Chunk.Size && verified < 3; x++)
             for (var z = 0; z < Chunk.Size && verified < 3; z++)
             {
@@ -189,7 +189,7 @@ public sealed class BiomeTests
             if (TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8) != Biome.Forest)
                 continue;
 
-            var column = Chunk.GetColumnData(cx, cz);
+            var column = ColumnCache.Get(cx, cz);
             for (var x = 0; x < Chunk.Size; x++)
             for (var z = 0; z < Chunk.Size; z++)
             {
@@ -221,7 +221,7 @@ public sealed class BiomeTests
         for (var cx = -radius; cx <= radius; cx++)
         for (var cz = -radius; cz <= radius; cz++)
         {
-            var column = Chunk.GetColumnData(cx, cz);
+            var column = ColumnCache.Get(cx, cz);
             for (var x = 0; x < Chunk.Size; x++)
             for (var z = 0; z < Chunk.Size; z++)
             {
@@ -261,7 +261,7 @@ public sealed class BiomeTests
                 continue;
 
             forestColumns++;
-            if (Chunk.GetColumnData(cx, cz).MaxHeight > mountainHeight) mountainColumns++;
+            if (ColumnCache.Get(cx, cz).MaxHeight > mountainHeight) mountainColumns++;
         }
 
         Assert.True(mountainColumns > 0,
@@ -400,7 +400,7 @@ public sealed class BiomeTests
         for (var cx = -64; cx <= 64 && wetBand < 8; cx++)
         for (var cz = -64; cz <= 64 && wetBand < 8; cz++)
         {
-            var column = Chunk.GetColumnData(cx, cz);
+            var column = ColumnCache.Get(cx, cz);
             for (var i = 0; i < column.Heights.Length && wetBand < 8; i++)
             {
                 var x = cx * Chunk.Size + (i >> Chunk.SizeShift);
@@ -430,7 +430,7 @@ public sealed class BiomeTests
             TerrainGenerator.BiomeWeights(x, z, out var oceanWeight, out _);
             if (oceanWeight < WorldGenerationConfig.OceanShoreWeight) continue;
 
-            var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+            var column = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
             var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
             Assert.Equal(0f, column.EntranceWeight[local]);
             oceanColumns++;
@@ -452,14 +452,14 @@ public sealed class BiomeTests
             TerrainGenerator.BiomeWeights(x, z, out _, out var desertWeight);
             if (MathF.Abs(desertWeight - 0.5f) >= WorldGenerationConfig.BiomeBorderDither) continue;
 
-            var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+            var column = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
             var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
             var here = column.Biomes[local];
             if (here is not (Biome.Forest or Biome.Desert)) continue;
             band++;
 
             var nx = x + step;
-            var neighbour = Chunk.GetColumnData(nx >> Chunk.SizeShift, z >> Chunk.SizeShift);
+            var neighbour = ColumnCache.Get(nx >> Chunk.SizeShift, z >> Chunk.SizeShift);
             var neighbourLocal = ((nx & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
             if (neighbour.Biomes[neighbourLocal] != here) differingNeighbour++;
         }

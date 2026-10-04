@@ -195,7 +195,7 @@ public static class TreeGenerator
     // allocates no delegate. Pure: reads only the deterministic column data.
     private static readonly Func<int, int, int> GrowthGround = static (x, z) =>
     {
-        var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+        var column = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
         var li = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
         var height = column.Heights[li];
         var level = column.WaterLevel[li];
@@ -507,7 +507,7 @@ public static class TreeGenerator
                 return false;
         }
 
-        var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+        var column = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
         var li = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
         var height = column.Heights[li];
         // Nothing grows in water; a trunk in a lake or river would still poke its crown out of
@@ -562,7 +562,7 @@ public static class TreeGenerator
     internal static int CellOf(int coord) => coord >> WorldGenerationConfig.TreeCellShift;
 
     private static int HeightAt(int x, int z) =>
-        Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
+        ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
             .Heights[((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
 
     /// <summary>Whether a block id is the leaves of any tree species.</summary>

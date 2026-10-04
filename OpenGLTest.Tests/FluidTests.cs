@@ -199,7 +199,7 @@ public sealed class FluidTests
             Assert.False(generated.IsRestored);
             // Preconditions: the source really is poured water (above both its column's terrain
             // top and water level), and the enclosure leaves the border as its only wake path
-            var column = Chunk.GetColumnData((int)RestoredPos.X, (int)RestoredPos.Z);
+            var column = ColumnCache.Get((int)RestoredPos.X, (int)RestoredPos.Z);
             Assert.True(restored.LowerBoundY > Math.Max(column.MaxHeight, column.MaxWaterLevel));
             var frontier = restored.FluidFrontier;
             Assert.True(frontier == null
@@ -256,9 +256,9 @@ public sealed class FluidTests
         for (var az = -radius; az <= radius && !found; az++)
         {
             if (Math.Max(Math.Abs(ax), Math.Abs(az)) != radius) continue;
-            var a = Chunk.GetColumnData(ax, az);
+            var a = ColumnCache.Get(ax, az);
             if (a.MaxWaterLevel == TerrainGenerator.NoWater) continue;
-            var b = Chunk.GetColumnData(ax + 1, az);
+            var b = ColumnCache.Get(ax + 1, az);
             for (var z = 1; z < Chunk.SizeMask && !found; z++)
             {
                 var li = (Chunk.SizeMask << Chunk.SizeShift) | z;

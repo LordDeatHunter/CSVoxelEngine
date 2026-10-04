@@ -66,7 +66,7 @@ public static class IceSpikeGenerator
         if (TerrainGenerator.BiomeAt(x, z) != Biome.Frozen)
             return false;
 
-        var column = Chunk.GetColumnData(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
+        var column = ColumnCache.Get(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
         var li = VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z));
         var ground = column.Heights[li];
         if (TerrainGenerator.IsWaterColumn(x, z, ground))

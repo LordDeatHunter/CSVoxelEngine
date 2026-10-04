@@ -103,7 +103,7 @@ public static class LodSurface
     internal static int TopOrHeight(int x, int z) =>
         TryGet(x, z, out var top, out _)
             ? top
-            : Chunk.GetColumnHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)[LocalIndex(x, z)];
+            : ColumnCache.GetHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)[LocalIndex(x, z)];
 
     /// <summary>
     /// Whether a block counts as the LOD surface: a full, solid, occluding cube, the same notion

@@ -26,7 +26,7 @@ public sealed class LodColumnCapTests
         var floor = int.MaxValue;
         for (var cx = -1; cx <= span; cx++)
         for (var cz = -1; cz <= span; cz++)
-            foreach (var h in Chunk.GetColumnHeights(rx * span + cx, rz * span + cz))
+            foreach (var h in ColumnCache.GetHeights(rx * span + cx, rz * span + cz))
                 if (h < floor) floor = h;
         return floor;
     }
@@ -50,7 +50,7 @@ public sealed class LodColumnCapTests
         var fx = baseFineX + 64;   // chunk column (4, 4) of this region (regionChunkSpan 8)
         var fz = baseFineZ + 64;
 
-        var h = Chunk.GetColumnHeights(fx >> Chunk.SizeShift, fz >> Chunk.SizeShift)
+        var h = ColumnCache.GetHeights(fx >> Chunk.SizeShift, fz >> Chunk.SizeShift)
             [((fx & Chunk.SizeMask) << Chunk.SizeShift) | (fz & Chunk.SizeMask)];
 
         var before = LodRegion.BuildMeshData(1, rx, rz);

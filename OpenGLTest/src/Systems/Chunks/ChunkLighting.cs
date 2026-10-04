@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using static silkgltriangle.Chunk;
+using static silkgltriangle.ColumnCache;
 
 namespace silkgltriangle;
 
@@ -135,7 +136,7 @@ internal static class ChunkLighting
         for (var dz = 0; dz < 3; dz++)
             columns[dx * 3 + dz] = streamed is { } source
                 ? source(chunkX - 1 + dx, chunkZ - 1 + dz) ?? NoStreamedHeights
-                : GetColumnHeights(chunkX - 1 + dx, chunkZ - 1 + dz);
+                : ColumnCache.GetHeights(chunkX - 1 + dx, chunkZ - 1 + dz);
     }
 
     /// <summary>

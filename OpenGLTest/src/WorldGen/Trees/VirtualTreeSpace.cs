@@ -31,7 +31,7 @@ public sealed class VirtualTreeSpace : ITreeSpace
 
     // The same expression as TreeGenerator.HeightAt: a static method group, so no closure.
     private static int TerrainHeight(int x, int z) =>
-        Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
+        ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
             .Heights[((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
 
     /// <summary>The column's top solid block.</summary>

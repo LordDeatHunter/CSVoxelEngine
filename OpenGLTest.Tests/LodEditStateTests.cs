@@ -27,7 +27,7 @@ public sealed class LodEditStateTests
     private const int CentreChunk = 4;
 
     private static int HeightAt(int x, int z) =>
-        Chunk.GetColumnHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
+        ColumnCache.GetHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
             [((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
 
     private static int LocalIndex(int x, int z) =>
@@ -247,7 +247,7 @@ public sealed class LodEditStateTests
         var rx = LodSurfaceTests.FindQuietFrozenRx(Rz);
         var cx = rx * ChunksPerLevel1Region + CentreChunk;
         var cz = Rz * ChunksPerLevel1Region + CentreChunk;
-        var y = Chunk.GetColumnHeights(cx, cz).Max() + 8;
+        var y = ColumnCache.GetHeights(cx, cz).Max() + 8;
 
         var before = LodRegion.BuildMeshData(1, rx, Rz);
 

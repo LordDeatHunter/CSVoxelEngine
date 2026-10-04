@@ -28,7 +28,7 @@ public sealed class LodEditHookTests
         ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
 
     private static int HeightAt(int x, int z) =>
-        Chunk.GetColumnHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)[LocalIndex(x, z)];
+        ColumnCache.GetHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)[LocalIndex(x, z)];
 
     /// <summary>Generates the vertical chunk stack of chunk column (cx, cz) spanning world y
     /// <paramref name="yMin"/>..<paramref name="yMax"/> through the real factory.</summary>
@@ -171,7 +171,7 @@ public sealed class LodEditHookTests
         for (var rx = 777; rx < 777 + 400 && !found; rx++)
         {
             cx = rx * ChunksPerLevel1Region + CentreChunk;
-            var column = Chunk.GetColumnData(cx, cz);
+            var column = ColumnCache.Get(cx, cz);
             waterLevel = column.WaterLevel[LocalIndex(8, 8)];
             // Any generated water will do (sea level is 0, so the chunk under it may sit at
             // negative y), as long as the crust cell of (A) stands above the generated terrain:
@@ -190,7 +190,7 @@ public sealed class LodEditHookTests
         Assert.False(LodSurface.TryGet(x, z, out _, out _), "a crust under the water moved the LOD");
 
         // (B) The same column above both the terrain and the water line records the crust.
-        var heights = Chunk.GetColumnHeights(cx, cz);
+        var heights = ColumnCache.GetHeights(cx, cz);
         var aboveCy = (Math.Max(heights.Max(), waterLevel) >> Chunk.SizeShift) + 3;
         var (x2, y2, z2, _, above) = HardenLavaAt(cx, cz, aboveCy, attachLod: true);
         Assert.True(y2 > waterLevel);
@@ -207,7 +207,7 @@ public sealed class LodEditHookTests
     private static (int X, int Y, int Z, byte Cobble, ChunkManager Chunks) HardenLavaAbove(
         int cx, int cz, bool attachLod)
     {
-        var cy = (Chunk.GetColumnHeights(cx, cz).Max() >> Chunk.SizeShift) + 3;
+        var cy = (ColumnCache.GetHeights(cx, cz).Max() >> Chunk.SizeShift) + 3;
         var result = HardenLavaAt(cx, cz, cy, attachLod);
         Assert.True(result.Y > HeightAt(result.X, result.Z), "the chunk is not above the terrain");
         return result;
@@ -274,7 +274,7 @@ public sealed class LodEditHookTests
 
     private static bool IsDryChunkColumn(int cx, int cz)
     {
-        var column = Chunk.GetColumnData(cx, cz);
+        var column = ColumnCache.Get(cx, cz);
         for (var i = 0; i < column.Heights.Length; i++)
             if (column.WaterLevel[i] >= column.Heights[i])
                 return false;

@@ -216,7 +216,7 @@ public class ChunkSaveCodecTests
     {
         TestContent.EnsureLoaded();
         var max = int.MinValue;
-        foreach (var h in Chunk.GetColumnHeights(0, 0)) max = Math.Max(max, h);
+        foreach (var h in ColumnCache.GetHeights(0, 0)) max = Math.Max(max, h);
 
         // The surface chunk goes through every column fill, carver and surface stamp
         var surface = new Chunk(null!, new Vector3(0, max >> Chunk.SizeShift, 0), generateBlockData: true);
@@ -234,7 +234,7 @@ public class ChunkSaveCodecTests
 
         // (a) High above the terrain: a source there can only have been poured
         var high = MeshTestWorld.HighAbove;
-        var highColumn = Chunk.GetColumnData((int)high.X, (int)high.Z);
+        var highColumn = ColumnCache.Get((int)high.X, (int)high.Z);
         var highFloor = (int)high.Y * Chunk.Size;
         Assert.True(highFloor > highColumn.MaxHeight && highFloor > highColumn.MaxWaterLevel,
             "HighAbove must sit above every terrain top and water level of its column");
@@ -253,7 +253,7 @@ public class ChunkSaveCodecTests
                 out var y),
             "no wet column with a neighbour no higher than itself within the search radius");
 
-        var column = Chunk.GetColumnData(cx, cz);
+        var column = ColumnCache.Get(cx, cz);
         var i = (lx << Chunk.SizeShift) | lz;
         var n = (nx << Chunk.SizeShift) | nz;
         Assert.True(column.Heights[i] < y && y <= column.WaterLevel[i]);
@@ -315,7 +315,7 @@ public class ChunkSaveCodecTests
         for (cz = -r; cz <= r; cz++)
         {
             if (Math.Max(Math.Abs(cx), Math.Abs(cz)) != r) continue;
-            var column = Chunk.GetColumnData(cx, cz);
+            var column = ColumnCache.Get(cx, cz);
             if (column.MaxWaterLevel <= column.MinHeight) continue;
 
             for (lx = 1; lx < Chunk.SizeMask; lx++)

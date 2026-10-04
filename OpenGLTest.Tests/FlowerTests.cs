@@ -17,7 +17,7 @@ public sealed class FlowerTests
         for (var cx = -4; cx <= 4; cx++)
         for (var cz = -4; cz <= 4; cz++)
         {
-            var heights = Chunk.GetColumnHeights(cx, cz);
+            var heights = ColumnCache.GetHeights(cx, cz);
             var max = 0;
             foreach (var h in heights)
                 if (h > max) max = h;

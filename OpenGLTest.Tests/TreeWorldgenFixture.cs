@@ -12,7 +12,7 @@ namespace silkgltriangle.Tests;
 internal static class TreeWorldgenFixture
 {
     public static int HeightAt(int x, int z) =>
-        Chunk.GetColumnHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
+        ColumnCache.GetHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
             [((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
 
     /// <summary>
@@ -54,7 +54,7 @@ internal static class TreeWorldgenFixture
         for (var dx = -1; dx <= 1; dx++)
         for (var dz = -1; dz <= 1; dz++)
         {
-            var column = Chunk.GetColumnData(cx + dx, cz + dz);
+            var column = ColumnCache.Get(cx + dx, cz + dz);
             minHeight = Math.Min(minHeight, column.MinHeight);
             maxHeight = Math.Max(maxHeight, column.MaxHeight);
         }

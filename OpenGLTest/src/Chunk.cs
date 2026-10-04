@@ -6,6 +6,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using static silkgltriangle.ChunkLighting;
+using static silkgltriangle.ColumnCache;
 
 namespace silkgltriangle;
 
@@ -194,38 +195,6 @@ public class Chunk : IDisposable
     /// </summary>
     internal ushort[]? RestoredPlayerPlaced { get; set; }
 
-    // Column data only depends on (x, z), so vertical chunk stacks share one entry. Sizing (capacity,
-    // generations and the memory arithmetic behind both) lives in WorldGenerationConfig; the safety
-    // argument - why an eviction, a race or a duplicate can only ever cost a recompute - is the
-    // numbered invariant list on GenerationalCache. Neither is restated here.
-    //
-    // What the old wholesale Clear()-at-the-cap actually cost (item D2): chunk generation's own
-    // working set is small - ChunkRadius = 16 is a disc of roughly 800 distinct columns, re-asked
-    // constantly by the vertical stack - while ONE level-2 LOD ring sweeps roughly 51k columns
-    // through LodRegion.BuildMeshData's 324-column prefetch. So the sweep tripped the 16384 cap
-    // about three times per pass, and every trip threw away chunk-gen's permanently-hot columns
-    // along with the sweep's one-shot ones. With four generations the sweep can only age out the
-    // oldest quarter at a time, and anything read while it sits in that oldest quarter is carried
-    // forward instead of dropped.
-    //
-    // Second, separate cost removed: the cap test was `ColumnCache.Count >= limit`, and
-    // ConcurrentDictionary.Count acquires EVERY lock in the table. It was evaluated on every single
-    // miss - i.e. on the exact path the four chunk-gen threads and the LOD builder share.
-    // GenerationalCache counts its own inserts with Interlocked instead.
-    private static readonly GenerationalCache<(int X, int Z), ColumnData> ColumnCache =
-        new(WorldGenerationConfig.ColumnCacheCapacity, WorldGenerationConfig.ColumnCacheGenerations);
-
-    // Static, so a miss on any of the four chunk-gen threads does not allocate a closure per call
-    private static readonly Func<(int X, int Z), ColumnData> ComputeColumn =
-        static key => TerrainGenerator.Compute(key.X, key.Z);
-
-    /// <summary>
-    /// Drops every cached column. Only <see cref="WorldSeed.Apply"/> calls it: the columns are a
-    /// function of the seed, so a swap makes all of them wrong.
-    /// </summary>
-    internal static void ResetColumnCache() => ColumnCache.Clear();
-
-    // Meshing lookup tables, flattened from CubeFaces/AONeighbors into padded-snapshot index deltas
     internal static readonly int[] FaceNeighborDelta = new int[6];
     internal static readonly int[][] AODeltas = new int[6][]; // 12 per face: (side1, side2, corner) x 4 corners
     internal const float SmoothLightDivisor = 60f; // 4 samples x level 15
@@ -433,7 +402,7 @@ public class Chunk : IDisposable
     {
         // Worldgen timing for the X/VOXEL_DEBUG console line (WorldgenStats, the `wgen` token)
         var genStart = System.Diagnostics.Stopwatch.GetTimestamp();
-        var column = GetColumnData((int)Position.X, (int)Position.Z);
+        var column = ColumnCache.Get((int)Position.X, (int)Position.Z);
         var lowerBoundY = LowerBoundY;
         SurfaceMinY = column.MinHeight;
 
@@ -450,7 +419,7 @@ public class Chunk : IDisposable
             for (var dx = -reach; dx <= reach; dx++)
             for (var dz = -reach; dz <= reach; dz++)
             {
-                var neighbourMax = GetColumnData(cx + dx, cz + dz).MaxHeight;
+                var neighbourMax = ColumnCache.Get(cx + dx, cz + dz).MaxHeight;
                 if (neighbourMax > maxHeight) maxHeight = neighbourMax;
             }
             maxHeight += TreeGenerator.ReachUp + 1;
@@ -473,7 +442,7 @@ public class Chunk : IDisposable
             for (var z = 0; z < Size; z++)
             {
                 var i = (x << SizeShift) | z;
-                GenerateColumn(x, z, column.Heights[i], column.Bed[i], column.DirtDepth[i],
+                ColumnCache.GenerateColumn(_blocks, (int)Position.X, (int)Position.Z, x, z, column.Heights[i], column.Bed[i], column.DirtDepth[i],
                     lowerBoundY, column.Biomes[i]);
             }
         }
@@ -719,7 +688,7 @@ public class Chunk : IDisposable
             var wx = worldX0 + x + dx;
             var wy = lowerBoundY + y + dy;
             var wz = worldZ0 + z + dz;
-            var neighbour = GetColumnData(wx >> SizeShift, wz >> SizeShift);
+            var neighbour = ColumnCache.Get(wx >> SizeShift, wz >> SizeShift);
             var local = ((wx & SizeMask) << SizeShift) | (wz & SizeMask);
             if (wy > neighbour.Heights[local] && wy <= neighbour.WaterLevel[local])
                 return true;
@@ -728,35 +697,6 @@ public class Chunk : IDisposable
         return false;
     }
 
-    /// <summary>
-    /// Returns the 2D generation inputs for a chunk column. Nothing generated is ever solid
-    /// above Heights[x, z]; the block at that height is solid unless a cave or entrance carved
-    /// it. Cached, deterministic, and safe to call from any thread.
-    /// </summary>
-    public static ColumnData GetColumnData(int chunkX, int chunkZ) =>
-        ColumnCache.GetOrAdd((chunkX, chunkZ), ComputeColumn);
-
-    /// <summary>
-    /// The terrain heightmap for a chunk column, indexed by (x &lt;&lt; SizeShift) | z. Ravines
-    /// are already cut in; caves are not (they are 3D). See <see cref="GetColumnData"/>.
-    /// </summary>
-    public static int[] GetColumnHeights(int chunkX, int chunkZ) => GetColumnData(chunkX, chunkZ).Heights;
-
-    // Below any real height, so none of a missing streamed column's cells seed sunlight; a chunk
-    // whose column has not arrived stays dark until it does and the chunk re-meshes.
-    internal static readonly int[] NoStreamedHeights = CreateNoStreamedHeights();
-
-    private static int[] CreateNoStreamedHeights()
-    {
-        var heights = new int[Size * Size];
-        Array.Fill(heights, int.MinValue);
-        return heights;
-    }
-
-    /// <summary>Per-column biomes for a chunk column, indexed like
-    /// <see cref="GetColumnHeights"/>. The far LOD reads this to pick biome surface tiles.</summary>
-    public static Biome[] GetColumnBiomes(int chunkX, int chunkZ) => GetColumnData(chunkX, chunkZ).Biomes;
-
     // Solid from the chunk floor up to the terrain height: grass on top, dirt for dirtDepth
     // blocks under it, stone below that. dirtDepth == 0 marks a bare stone column
     // (see ColumnData.DirtDepth) - deep ravine walls, where the top block is stone as well.
@@ -764,74 +704,6 @@ public class Chunk : IDisposable
     // Shoreline columns (see TerrainGenerator.IsBeachHeight) build from sand instead, capped
     // with gravel where TerrainGenerator.IsGravelPatch holds. `terrainHeight` (ravines cut in)
     // decides how deep to fill; `bed` (ravines not cut) decides whether the column is water.
-    private void GenerateColumn(int x, int z, int terrainHeight, int bed, int dirtDepth, int lowerBoundY,
-        Biome biome)
-    {
-        var worldX = (int)Position.X * Size + x;
-        var worldZ = (int)Position.Z * Size + z;
-
-        var topBlock = TerrainGenerator.IsWaterColumn(worldX, worldZ, bed)
-            ? TerrainGenerator.SoilBlock
-            : TerrainGenerator.SurfaceBlock;
-        var soilBlock = TerrainGenerator.SoilBlock;
-        var soilDepth = dirtDepth;
-
-        switch (biome)
-        {
-            case Biome.Desert:
-                // Dune sand over sandstone. A ravine that stripped the soil (dirtDepth 0)
-                // still reads as bare rock, the same rule the forest column uses.
-                topBlock = TerrainGenerator.SandBlock;
-                soilBlock = TerrainGenerator.SandstoneBlock;
-                soilDepth = dirtDepth == 0 ? 0 : WorldGenerationConfig.SandstoneDepth;
-                break;
-
-            case Biome.Ocean:
-                // Depth below the waterline picks the floor: shelf sand, slope gravel, deep
-                // basin stone. Each material fills its own band, so there is no soil gradient.
-                (topBlock, soilBlock) =
-                    terrainHeight >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanSandDepth
-                        ? (TerrainGenerator.SandBlock, TerrainGenerator.SandBlock)
-                        : terrainHeight >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanGravelDepth
-                            ? (TerrainGenerator.GravelBlock, TerrainGenerator.GravelBlock)
-                            : (TerrainGenerator.RockBlock, TerrainGenerator.RockBlock);
-                soilDepth = 2;
-                break;
-
-            case Biome.Frozen:
-                // Barren rock rather than grass: the snow pass lays a drift on top, so the plains
-                // read as rock-and-snow instead of a white field over soil.
-                topBlock = TerrainGenerator.RockBlock;
-                soilBlock = TerrainGenerator.RockBlock;
-                soilDepth = 2;
-                break;
-
-            default:
-                // Sand and gravel ring actual water only: the height band plus a lake or river rim.
-                // Without the weight test a dry ravine floor in the band would wear sand in the
-                // middle of the forest, which is what made random patches before.
-                if (dirtDepth != 0 && TerrainGenerator.IsBeachHeight(terrainHeight)
-                    && TerrainGenerator.SurfaceWaterWeight(worldX, worldZ) > 0f)
-                {
-                    topBlock = TerrainGenerator.IsGravelPatch(worldX, worldZ)
-                        ? TerrainGenerator.GravelBlock
-                        : TerrainGenerator.SandBlock;
-                    soilBlock = TerrainGenerator.SandBlock;
-                }
-                break;
-        }
-
-        for (var y = 0; y < Size; y++)
-        {
-            var depth = terrainHeight - (lowerBoundY + y);
-            if (depth < 0) break;
-
-            _blocks[Idx(x, y, z)] = soilDepth == 0 ? TerrainGenerator.RockBlock
-                : depth == 0 ? topBlock
-                : depth <= soilDepth ? soilBlock
-                : TerrainGenerator.RockBlock;
-        }
-    }
 
     public int LowerBoundY => (int)Position.Y * Size;
     public int UpperBoundY => (int)Position.Y * Size + Size;
@@ -991,7 +863,7 @@ public class Chunk : IDisposable
         }
         else
         {
-            var column = GetColumnData((int)Position.X, (int)Position.Z);
+            var column = ColumnCache.Get((int)Position.X, (int)Position.Z);
             SurfaceMinY = column.MinHeight;
             // A restored chunk can hold fluid anywhere, so it always scans (a chunk with no fluid
             // cell simply reports nothing)

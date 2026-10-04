@@ -82,7 +82,7 @@ public class FluidSurfaceTests
 
         var cell = World(center, X, 4, Z);
         var bounded = manager.GetFluidSurfaceGlobal(cell.X, cell.Y + 4, cell.Z);
-        var column = Chunk.GetColumnData(cx, cz);
+        var column = ColumnCache.Get(cx, cz);
         var generated = column.WaterLevel[(X << Chunk.SizeShift) | Z];
         var expected = MathF.Max(bounded, generated + FluidState.SourceHeight);
 
@@ -111,7 +111,7 @@ public class FluidSurfaceTests
         for (var r = 0; r < 256; r += 4)
         foreach (var (cx, cz) in new[] { (r, 0), (-r, 0), (0, r), (0, -r), (r, r), (-r, -r) })
         {
-            var level = Chunk.GetColumnData(cx, cz).WaterLevel[(X << Chunk.SizeShift) | Z];
+            var level = ColumnCache.Get(cx, cz).WaterLevel[(X << Chunk.SizeShift) | Z];
             if (level != TerrainGenerator.NoWater) return (cx, cz, level);
         }
         throw new InvalidOperationException("no generated water found near the origin");

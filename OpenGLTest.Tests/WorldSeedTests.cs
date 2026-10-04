@@ -96,18 +96,18 @@ public class WorldSeedTests
         (int X, int Z)[] columns = [(0, 0), (-7, 3), (40, -40)];
         try
         {
-            var a = columns.Select(c => Chunk.GetColumnData(c.X, c.Z)).ToArray();
+            var a = columns.Select(c => ColumnCache.Get(c.X, c.Z)).ToArray();
             var surface = new Vector3(0, SurfaceChunkY(), 0);
             var blocksBefore = BlocksOf(new Chunk(null!, surface, generateBlockData: true));
 
             WorldSeed.Apply(WorldSeed.Default + 7);
-            var b = columns.Select(c => Chunk.GetColumnData(c.X, c.Z)).ToArray();
+            var b = columns.Select(c => ColumnCache.Get(c.X, c.Z)).ToArray();
             for (var i = 0; i < columns.Length; i++)
                 Assert.False(ReferenceEquals(a[i], b[i]), $"column {columns[i]} was served from the old seed's cache");
             Assert.Contains(Enumerable.Range(0, columns.Length), i => !b[i].Heights.SequenceEqual(a[i].Heights));
 
             WorldSeed.Apply(WorldSeed.Default);
-            var c = columns.Select(col => Chunk.GetColumnData(col.X, col.Z)).ToArray();
+            var c = columns.Select(col => ColumnCache.Get(col.X, col.Z)).ToArray();
             for (var i = 0; i < columns.Length; i++)
             {
                 Assert.False(ReferenceEquals(a[i], c[i]), $"column {columns[i]} survived two cache clears");
@@ -137,7 +137,7 @@ public class WorldSeedTests
             var fx = 3300 * spec.RegionBlocks + 5;
             var fz = 3300 * spec.RegionBlocks + 9;
             var local = ((fx & Chunk.SizeMask) << Chunk.SizeShift) | (fz & Chunk.SizeMask);
-            var y = Chunk.GetColumnHeights(fx >> Chunk.SizeShift, fz >> Chunk.SizeShift)[local] - 40;
+            var y = ColumnCache.GetHeights(fx >> Chunk.SizeShift, fz >> Chunk.SizeShift)[local] - 40;
             Assert.True(LodRegion.LowerColumnBelow(fx, y, fz));
             Assert.False(LodRegion.LowerColumnBelow(fx, y, fz)); // the equal cap is refused while it stands
 
@@ -166,7 +166,7 @@ public class WorldSeedTests
     private static int SurfaceChunkY()
     {
         var max = 0;
-        foreach (var h in Chunk.GetColumnHeights(0, 0))
+        foreach (var h in ColumnCache.GetHeights(0, 0))
             if (h > max) max = h;
         return max >> Chunk.SizeShift;
     }

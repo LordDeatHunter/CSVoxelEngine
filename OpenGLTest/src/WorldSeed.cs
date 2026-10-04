@@ -66,7 +66,7 @@ public static class WorldSeed
         FoliageGenerator.Reseed();
 
         // Every cached value is a function of (key, seed), so all of them are wrong now.
-        Chunk.ResetColumnCache();
+        ColumnCache.Reset();
         WormCarver.ResetCellCache();
         TreeGenerator.ResetCaches();
 

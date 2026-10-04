@@ -44,7 +44,7 @@ internal static class MobTestWorld
         for (var cx = -3; cx <= 3; cx++)
         for (var cz = -3; cz <= 3; cz++)
         {
-            var heights = Chunk.GetColumnHeights(cx, cz);
+            var heights = ColumnCache.GetHeights(cx, cz);
             for (var lx = 0; lx < Chunk.Size; lx++)
             for (var lz = 0; lz < Chunk.Size; lz++)
             {

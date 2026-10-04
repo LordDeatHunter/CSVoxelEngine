@@ -278,7 +278,7 @@ public class Camera
 
         // On the water surface where the origin column is flooded, so the player never starts
         // submerged (or, once swimming exists, sinking)
-        var surface = Math.Max(Chunk.GetColumnHeights(0, 0)[0], WorldGenerationConfig.SeaLevel) + 1;
+        var surface = Math.Max(ColumnCache.GetHeights(0, 0)[0], WorldGenerationConfig.SeaLevel) + 1;
         return new Vector3(0.5f, surface + EyeHeight, 0.5f);
     }
 

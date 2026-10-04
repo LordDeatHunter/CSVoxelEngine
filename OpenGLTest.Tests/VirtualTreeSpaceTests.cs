@@ -98,7 +98,7 @@ public sealed class VirtualTreeSpaceTests
         foreach (var x in new[] { -17, -1, 0, 15, 16 })
         foreach (var z in new[] { -1, 0, 16 })
         {
-            var expected = Chunk.GetColumnHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
+            var expected = ColumnCache.GetHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
                 [((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
             Assert.Equal(expected, space.GroundHeight(x, z));
             Assert.False(space.IsFree(x, expected, z));

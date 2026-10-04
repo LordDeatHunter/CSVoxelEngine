@@ -121,7 +121,7 @@ public sealed class TreeWorldgenTests
             species.Add(tree.Name);
 
             var rules = tree.Worldgen!;
-            var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+            var column = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
             var li = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
             var height = column.Heights[li];
 

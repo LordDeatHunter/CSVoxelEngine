@@ -20,7 +20,7 @@ public sealed class WaterRavineTests
             var cx = x >> Chunk.SizeShift;
             var cz = z >> Chunk.SizeShift;
             var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
-            var column = Chunk.GetColumnData(cx, cz);
+            var column = ColumnCache.Get(cx, cz);
             if (column.Heights[local] >= WorldGenerationConfig.SeaLevel) continue;
             if (column.Bed[local] < WorldGenerationConfig.SeaLevel) continue;
 
@@ -54,7 +54,7 @@ public sealed class WaterRavineTests
             var cx = x >> Chunk.SizeShift;
             var cz = z >> Chunk.SizeShift;
             var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
-            var column = Chunk.GetColumnData(cx, cz);
+            var column = ColumnCache.Get(cx, cz);
             if (column.Bed[local] >= WorldGenerationConfig.SeaLevel) continue;
             if (column.Heights[local] >= column.Bed[local]) continue;
             // A cold column's surface water freezes to ice; only open water proves the fill.
@@ -85,7 +85,7 @@ public sealed class WaterRavineTests
             TerrainGenerator.BiomeWeights(x, z, out var oceanWeight, out _);
             if (oceanWeight < 0.5f) continue;
 
-            var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+            var column = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
             var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
             Assert.Equal(column.Bed[local], column.Heights[local]);
             oceanColumns++;
@@ -102,7 +102,7 @@ public sealed class WaterRavineTests
         for (var x = -1024; x < 1024; x += 2)
         for (var z = -1024; z < 1024; z += 2)
         {
-            var column = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+            var column = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
             var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
             var level = column.WaterLevel[local];
             if (level == TerrainGenerator.NoWater) continue;
@@ -143,8 +143,8 @@ public sealed class WaterRavineTests
         for (var ax = 0; ax <= 16 && !found; ax++)
         for (var az = 0; az <= 16 && !found; az++)
         {
-            var a = Chunk.GetColumnData(ax, az);
-            var b = Chunk.GetColumnData(ax + 1, az);
+            var a = ColumnCache.Get(ax, az);
+            var b = ColumnCache.Get(ax + 1, az);
             // Both chunks dry and above the waterline: no generated water can interfere.
             if (a.MinHeight < 1 || b.MinHeight < 1) continue;
 

@@ -15,7 +15,7 @@ public sealed class WorldgenTests
 
     private static int SurfaceChunkY()
     {
-        var heights = Chunk.GetColumnHeights(0, 0);
+        var heights = ColumnCache.GetHeights(0, 0);
         var max = 0;
         foreach (var h in heights)
             if (h > max) max = h;
@@ -78,7 +78,7 @@ public sealed class WorldgenTests
         for (var cz = -r; cz <= r && checkedColumns < 4; cz++)
         {
             if (r > 0 && cx != -r && cx != r && cz != -r && cz != r) continue;
-            var heights = Chunk.GetColumnHeights(cx, cz);
+            var heights = ColumnCache.GetHeights(cx, cz);
             for (var i = 0; i < heights.Length && checkedColumns < 4; i++)
             {
                 var h = heights[i];
@@ -111,7 +111,7 @@ public sealed class WorldgenTests
         var cy = SurfaceChunkY();
         var pos = new Vector3(0, cy, 0);
         var chunk = new Chunk(null!, pos, generateBlockData: true);
-        var heights = Chunk.GetColumnHeights(0, 0);
+        var heights = ColumnCache.GetHeights(0, 0);
 
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
@@ -138,7 +138,7 @@ public sealed class WorldgenTests
         for (var cx = 0; cx < 24 && !found; cx++)
         for (var cz = 0; cz < 24 && !found; cz++)
         {
-            var heights = Chunk.GetColumnHeights(cx, cz);
+            var heights = ColumnCache.GetHeights(cx, cz);
             for (var x = 0; x < Chunk.Size && !found; x++)
             for (var z = 0; z < Chunk.Size && !found; z++)
             {
@@ -150,7 +150,7 @@ public sealed class WorldgenTests
                 {
                     var nx = wx + dx;
                     var nz = wz + dz;
-                    var nh = Chunk.GetColumnHeights(nx >> Chunk.SizeShift, nz >> Chunk.SizeShift)
+                    var nh = ColumnCache.GetHeights(nx >> Chunk.SizeShift, nz >> Chunk.SizeShift)
                         [((nx & Chunk.SizeMask) << Chunk.SizeShift) | (nz & Chunk.SizeMask)];
                     if (!TerrainGenerator.IsBeachHeight(nh)) allBeach = false;
                 }
@@ -212,7 +212,7 @@ public sealed class WorldgenTests
         for (var cx = 0; cx < 40 && !found; cx++)
         for (var cz = 0; cz < 40 && !found; cz++)
         {
-            var heights = Chunk.GetColumnHeights(cx, cz);
+            var heights = ColumnCache.GetHeights(cx, cz);
             for (var x = 0; x < Chunk.Size && !found; x++)
             for (var z = 0; z < Chunk.Size && !found; z++)
             {
@@ -228,7 +228,7 @@ public sealed class WorldgenTests
                 {
                     var nx = x0 + dx;
                     var nz = z0 + dz;
-                    var nh = Chunk.GetColumnHeights(nx >> Chunk.SizeShift, nz >> Chunk.SizeShift)
+                    var nh = ColumnCache.GetHeights(nx >> Chunk.SizeShift, nz >> Chunk.SizeShift)
                         [((nx & Chunk.SizeMask) << Chunk.SizeShift) | (nz & Chunk.SizeMask)];
                     if (!TerrainGenerator.IsBeachHeight(nh)) allBeach = false;
                 }
@@ -270,7 +270,7 @@ public sealed class WorldgenTests
         {
             if (TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8) != Biome.Ocean)
                 continue;
-            if (Chunk.GetColumnData(cx, cz).MaxHeight < WorldGenerationConfig.SeaLevel)
+            if (ColumnCache.Get(cx, cz).MaxHeight < WorldGenerationConfig.SeaLevel)
                 return (cx, cz);
         }
 
@@ -285,7 +285,7 @@ public sealed class WorldgenTests
         // floor, both carvers are pure no-ops. The probe starts all-solid so NoiseCaves'
         // `blocks[idx] == BlockType.Air` continue cannot mask a write.
         var (cx, cz) = FindSubmergedChunkColumn();
-        var column = Chunk.GetColumnData(cx, cz);
+        var column = ColumnCache.Get(cx, cz);
         var probe = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
         Array.Fill(probe, TerrainGenerator.RockBlock);
 
@@ -304,7 +304,7 @@ public sealed class WorldgenTests
         for (var cx = 0; cx < 24 && !found; cx++)
         for (var cz = 0; cz < 24 && !found; cz++)
         {
-            var column = Chunk.GetColumnData(cx, cz);
+            var column = ColumnCache.Get(cx, cz);
             var cy = (column.MinHeight - 48) >> Chunk.SizeShift;
             var probe = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
             Array.Fill(probe, TerrainGenerator.RockBlock);
@@ -325,7 +325,7 @@ public sealed class WorldgenTests
         // actually fires on: fully submerged, so the carvers are skipped and only the
         // needsWater body runs.
         var (cx, cz) = FindSubmergedChunkColumn();
-        Assert.True(Chunk.GetColumnData(cx, cz).MaxHeight < WorldGenerationConfig.SeaLevel);
+        Assert.True(ColumnCache.Get(cx, cz).MaxHeight < WorldGenerationConfig.SeaLevel);
 
         var pos = new Vector3(cx, 0, cz);
         var a = new Chunk(null!, pos, generateBlockData: true);
@@ -361,7 +361,7 @@ public sealed class WorldgenTests
         for (var x = -radius; x <= radius; x += step)
         {
             var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
-            var biome = Chunk.GetColumnData(x >> Chunk.SizeShift, z >> Chunk.SizeShift).Biomes[local];
+            var biome = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift).Biomes[local];
             foundCold |= biome is Biome.Taiga or Biome.Frozen || SnowGenerator.DepthAt(x, z) > 0;
             if (biome != Biome.Desert) continue;
             foundDesert = true;

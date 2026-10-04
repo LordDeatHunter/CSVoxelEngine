@@ -455,7 +455,7 @@ public sealed class MeshingTests
     }
 
     private static int WaterLevelOfColumn(int chunkX, int chunkZ) =>
-        Chunk.GetColumnData(chunkX, chunkZ).WaterLevel[(8 << Chunk.SizeShift) | 8];
+        ColumnCache.Get(chunkX, chunkZ).WaterLevel[(8 << Chunk.SizeShift) | 8];
 
     [Fact]
     public void ColumnLeavingTheSnapshotUsesTheGeneratedLevel()
@@ -679,7 +679,7 @@ public sealed class MeshingTests
         // Bracket the column's own surface instead of assuming it sits in chunk-Y 0..8: with
         // lakes and rivers a column can now be a dry basin whose floor is well below 0, and a
         // fixed range would then see only the air above it.
-        var column = Chunk.GetColumnData(3, -5);
+        var column = ColumnCache.Get(3, -5);
         var cyLo = (column.MinHeight >> Chunk.SizeShift) - 1;
         // +TreeGenerator.ReachUp clears every tree canopy above the terrain, so a high chunk
         // is genuinely empty (the early-return branch) rather than full of leaves.

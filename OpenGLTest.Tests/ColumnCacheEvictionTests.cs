@@ -110,7 +110,7 @@ public sealed class ColumnCacheEvictionTests
         // 1. ANTI-VACUITY ON THE PROBE ITSELF, before anything else. A legitimately flat or
         //    uniform probe would compare equal trivially and this fact would pass while proving
         //    nothing about the generator.
-        var probeBefore = Chunk.GetColumnData(ProbeX, ProbeZ);
+        var probeBefore = ColumnCache.Get(ProbeX, ProbeZ);
         Assert.True(probeBefore.MinHeight != probeBefore.MaxHeight,
             $"probe column ({ProbeX}, {ProbeZ}) is flat (MinHeight == MaxHeight == " +
             $"{probeBefore.MinHeight}); pick another column - a flat probe cannot show a " +
@@ -134,7 +134,7 @@ public sealed class ColumnCacheEvictionTests
         var elapsed = RunSweep();
 
         // 4. AFTER: the eviction really happened - on either tree...
-        var probeAfter = Chunk.GetColumnData(ProbeX, ProbeZ);
+        var probeAfter = ColumnCache.Get(ProbeX, ProbeZ);
         Assert.False(ReferenceEquals(probeBefore, probeAfter),
             $"the probe column survived a {SweepColumns}-column sweep, so nothing was evicted and " +
             "this gate proved nothing - see SweepColumns' doc comment");
@@ -165,7 +165,7 @@ public sealed class ColumnCacheEvictionTests
 
         for (var i = 0; i < LatticeSide; i++)
         for (var j = 0; j < LatticeSide; j++)
-            h = FoldColumn(h, Chunk.GetColumnData(ProbeX + i * LatticeStride, ProbeZ + j * LatticeStride));
+            h = FoldColumn(h, ColumnCache.Get(ProbeX + i * LatticeStride, ProbeZ + j * LatticeStride));
 
         foreach (var (cx, cz) in new[] { (ProbeX, ProbeZ), (ProbeX + 5, ProbeZ + 7) })
         {
@@ -261,7 +261,7 @@ public sealed class ColumnCacheEvictionTests
                 {
                     for (var i = from; i < to; i++)
                     {
-                        var heights = Chunk.GetColumnHeights(
+                        var heights = ColumnCache.GetHeights(
                             SweepBaseX + i % SweepWidth, SweepBaseZ + i / SweepWidth);
                         if (heights.Length != Chunk.Size * Chunk.Size)
                             failures.Add($"swept column {i} returned {heights.Length} heights");
@@ -292,7 +292,7 @@ public sealed class ColumnCacheEvictionTests
     /// helper type beyond <c>TestContent</c>).</summary>
     private static Chunk SurfaceChunk(int x, int z)
     {
-        var height = Chunk.GetColumnHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
+        var height = ColumnCache.GetHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
             [((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
         var cy = height >> Chunk.SizeShift;
         return new Chunk(null!, new Vector3(x >> Chunk.SizeShift, cy, z >> Chunk.SizeShift),

@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Numerics;
 using static silkgltriangle.Chunk;
 using static silkgltriangle.ChunkLighting;
+using static silkgltriangle.ColumnCache;
 
 namespace silkgltriangle;
 
@@ -56,7 +57,7 @@ internal static class ChunkMesher
         // Still fluid in the snapshot's top row: the surface lies above what this build sees
         var wx = worldX0 + px - 1;
         var wz = worldZ0 + pz - 1;
-        var level = GetColumnData(wx >> SizeShift, wz >> SizeShift)
+        var level = ColumnCache.Get(wx >> SizeShift, wz >> SizeShift)
             .WaterLevel[((wx & SizeMask) << SizeShift) | (wz & SizeMask)];
         var cap = chunkBaseY + Padded - 1;
         var surface = level != TerrainGenerator.NoWater && level + FluidState.SourceHeight > cap
