@@ -54,6 +54,8 @@ public class UIRenderer : IDisposable
     private const float CountCapHeight = 14f;
     private const float CountPadRight = 5f;
     private const float CountPadBottom = 4f;
+    // Catalog button labels are smaller than the count font, and shrink further to fit "+100".
+    private const float CatalogButtonCapHeight = 12f;
     private static readonly Rgba CountShadow = new(0, 0, 0, 180);
 
     // The FPS counter's top-left corner, in pixels; the profiler table starts one line below it
@@ -1472,7 +1474,19 @@ public class UIRenderer : IDisposable
         var size = new Vector2(InventoryPanelLayout.CatalogButtonWidth, RowHeight - 12f);
         DrawRect(centre, size, ChipBackground);
         DrawBorder(centre, size, SlotBorder, danger ? DangerRed : AccentGold);
-        DrawTextCentred(label, centre.X, centre.Y - 9f, _countScale, danger ? DangerRed : Rgba.White);
+        if (_font == null) return;
+
+        // Cap-sized, then shrunk to fit the button's inner width so "+100" never spills into
+        // its neighbour; the measured ink size centres the label on both axes.
+        var scale = _font.ScaleForCapHeight(CatalogButtonCapHeight);
+        var maxWidth = InventoryPanelLayout.CatalogButtonWidth - 8f;
+        var width = _font.MeasureSize(label.AsSpan(), scale).X;
+        if (width > maxWidth)
+            scale *= maxWidth / width;
+        var textSize = _font.MeasureSize(label.AsSpan(), scale);
+        DrawText(label,
+            new Vector2(centre.X - textSize.X * 0.5f, centre.Y - textSize.Y * 0.5f),
+            scale, danger ? DangerRed : Rgba.White);
     }
 
     private void DrawPreview(Inventory inventory, InventoryView view, float time, float headingDegrees)
