@@ -252,7 +252,7 @@ public static class Program
         // Menu text input: characters through KeyChar, the four control keys through KeyDown. Both
         // act only while the main menu is showing, and ESC for the menu lives here alone (the
         // polled ESC below is world-only), so one press never makes two transitions. While a world
-        // plays, the same events feed the [E] panel's search and quantity fields instead.
+        // plays, the same events feed the [E] panel's search field instead.
         if (inputManager.Keyboard is { } keyboard)
         {
             keyboard.KeyChar += (_, c) =>
@@ -961,23 +961,13 @@ public static class Program
         }
     }
 
-    /// <summary>Types one printable character into whichever inventory field has focus.</summary>
+    /// <summary>Types one printable character into the focused inventory field.</summary>
     private static void HandleInventoryType(char c)
     {
-        switch (inventoryView.Focus)
-        {
-            case InventoryFocus.Search:
-                if (inventoryView.Search.Text.TryAppend(c))
-                {
-                    inventoryView.Search.Highlight = -1;
-                    inventoryView.Search.ScrollOffset = 0f;
-                }
-                break;
-            case InventoryFocus.Quantity:
-                if (char.IsAsciiDigit(c))
-                    inventoryView.Quantity.TryAppend(c);
-                break;
-        }
+        if (inventoryView.Focus != InventoryFocus.Search) return;
+        if (!inventoryView.Search.Text.TryAppend(c)) return;
+        inventoryView.Search.Highlight = -1;
+        inventoryView.Search.ScrollOffset = 0f;
     }
 
     /// <summary>The non-character keys a focused inventory field reacts to. ESC is left to the
@@ -987,16 +977,12 @@ public static class Program
         switch (key)
         {
             case Key.Backspace:
-                if (inventoryView.Focus == InventoryFocus.Search)
-                {
-                    inventoryView.Search.Text.Backspace();
-                    inventoryView.Search.Highlight = -1;
-                }
-                else if (inventoryView.Focus == InventoryFocus.Quantity)
-                    inventoryView.Quantity.Backspace();
+                if (inventoryView.Focus != InventoryFocus.Search) break;
+                inventoryView.Search.Text.Backspace();
+                inventoryView.Search.Highlight = -1;
                 break;
             case Key.Tab:
-                CycleInventoryFocus();
+                inventoryView.Focus = InventoryFocus.Search;
                 break;
             case Key.Enter or Key.KeypadEnter:
                 ApplyHighlightedSearchHit();
@@ -1008,17 +994,6 @@ public static class Program
                 MoveSearchHighlight(1);
                 break;
         }
-    }
-
-    private static void CycleInventoryFocus()
-    {
-        var creative = world?.Camera.IsCreative == true;
-        inventoryView.Focus = inventoryView.Focus switch
-        {
-            InventoryFocus.Search when creative => InventoryFocus.Quantity,
-            InventoryFocus.Quantity => InventoryFocus.Search,
-            _ => InventoryFocus.Search,
-        };
     }
 
     private static void MoveSearchHighlight(int delta)
@@ -1082,13 +1057,43 @@ public static class Program
     }
 
     /// <summary>Grants a catalog id to the player, popping the hotbar slot a fresh pickup lands
-    /// in; clicking a row grants one, its "+" button the quantity field's amount.</summary>
+    /// in; the catalog's +1/+10/+100 buttons and the row body go through here.</summary>
     private static void GrantFromCreative(byte id, int amount)
     {
         var inventory = world!.Inventory;
         if (!inventory.Add(id, amount)) return;
         if (Inventory.CategoryOf(id) is InventoryCategory.Blocks or InventoryCategory.Misc)
             inventoryView.SelectedId = id;
+    }
+
+    /// <summary>
+    /// Acts on one creative catalog row click: a button grants its amount or clears the id's
+    /// counts, the row body grants one.
+    /// </summary>
+    private static void ApplyCatalogButton(byte id, int row, float offset, int rowCount,
+        System.Numerics.Vector2 position)
+    {
+        var button = InventoryPanelLayout.CatalogButtonAt(renderManager.UiToCanvas(position),
+            row, offset, rowCount, renderManager.UiCanvasSize);
+        switch (button)
+        {
+            case InventoryPanelLayout.CatalogButton.AddOne:
+                GrantFromCreative(id, 1);
+                break;
+            case InventoryPanelLayout.CatalogButton.AddTen:
+                GrantFromCreative(id, 10);
+                break;
+            case InventoryPanelLayout.CatalogButton.AddHundred:
+                GrantFromCreative(id, 100);
+                break;
+            case InventoryPanelLayout.CatalogButton.Clear:
+                if (world!.Inventory.RemoveAll(id))
+                    inventoryView.ClearSelection();
+                break;
+            default:
+                GrantFromCreative(id, 1);
+                break;
+        }
     }
 
     private static void SetListScroll(float offset, bool searching)
@@ -1107,15 +1112,10 @@ public static class Program
         var inventory = world!.Inventory;
         var creative = world.Camera.IsCreative;
 
-        // The field boxes take the click before anything else; clicking elsewhere drops focus.
-        if (renderManager.UiSearchBoxAt(position, creative))
+        // The search box takes the click before anything else; clicking elsewhere drops focus.
+        if (renderManager.UiSearchBoxAt(position))
         {
             inventoryView.Focus = InventoryFocus.Search;
-            return;
-        }
-        if (creative && renderManager.UiQuantityBoxAt(position))
-        {
-            inventoryView.Focus = InventoryFocus.Quantity;
             return;
         }
         inventoryView.Focus = InventoryFocus.None;
@@ -1154,14 +1154,7 @@ public static class Program
             {
                 var entries = CreativeCatalog.Entries(inventoryView.Tab, inventory);
                 if (row.Value < entries.Count)
-                {
-                    var onPlus = InventoryPanelLayout.CatalogPlusAt(renderManager.UiToCanvas(position),
-                        row.Value, offset, rowCount, renderManager.UiCanvasSize);
-                    var amount = onPlus
-                        ? CreativeCatalog.ParseAmount(inventoryView.Quantity.Text)
-                        : 1;
-                    GrantFromCreative(entries[row.Value].Id, amount);
-                }
+                    ApplyCatalogButton(entries[row.Value].Id, row.Value, offset, rowCount, position);
             }
             else if (inventoryView.Tab == InventoryCategory.Tools)
             {

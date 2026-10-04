@@ -196,6 +196,29 @@ public class Inventory
         return true;
     }
 
+    /// <summary>
+    /// Removes every unit or instance of an id and empties the hotbar slots that showed it.
+    /// The creative catalog's clear button uses this; false when nothing was held.
+    /// </summary>
+    public bool RemoveAll(byte id)
+    {
+        if (CategoryOf(id) == InventoryCategory.Tools)
+        {
+            var instances = _tools.Where(t => t.DefinitionId == id)
+                .Select(t => t.InstanceId)
+                .ToArray();
+            var removed = false;
+            foreach (var instance in instances)
+                removed |= RemoveTool(instance);
+            return removed;
+        }
+
+        var store = StoreOf(id);
+        if (store == null || !store.Remove(id)) return false;
+        ClearSlotsShowing(id);
+        return true;
+    }
+
     /// <summary>Spends one unit from the selected slot. Tools are never spent — they morph.
     /// When the last unit goes, every hotbar slot showing it is cleared rather than left
     /// displaying a zero count.</summary>

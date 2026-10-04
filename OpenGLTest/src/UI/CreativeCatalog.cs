@@ -11,11 +11,6 @@ namespace silkgltriangle;
 /// </summary>
 public static class CreativeCatalog
 {
-    /// <summary>Amount the bulk "+" button grants when the quantity field is empty or invalid.</summary>
-    public const int DefaultAmount = 64;
-
-    private const int MaxAmount = Inventory.BlockCapacity;
-
     /// <summary>One catalog row: the id to grant, its display name and how many the player owns.</summary>
     public readonly record struct CatalogEntry(byte Id, string Name, int Count);
 
@@ -39,17 +34,5 @@ public static class CreativeCatalog
             return name != 0 ? name : a.Id.CompareTo(b.Id);
         });
         return entries;
-    }
-
-    /// <summary>
-    /// The bulk amount a quantity field holds: its positive integer, clamped to the block pool
-    /// cap, or <see cref="DefaultAmount"/> for empty/garbage text (the field only accepts digits,
-    /// so garbage is really only an empty edit).
-    /// </summary>
-    public static int ParseAmount(string? text)
-    {
-        if (string.IsNullOrWhiteSpace(text)) return DefaultAmount;
-        if (!int.TryParse(text.Trim(), out var value) || value <= 0) return DefaultAmount;
-        return Math.Min(value, MaxAmount);
     }
 }

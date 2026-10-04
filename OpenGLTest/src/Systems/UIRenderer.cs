@@ -819,15 +819,9 @@ public class UIRenderer : IDisposable
                 centre.X, top + PanelPad + 30f, _countScale, Rgba.White, tabWidth - 8f);
         }
 
-        var (searchCentre, searchSize) = InventoryPanelLayout.SearchBoxRect(_screenSize, creative);
+        var (searchCentre, searchSize) = InventoryPanelLayout.SearchBoxRect(_screenSize);
         DrawInputField(searchCentre, searchSize, view.Search.Text,
             view.Focus == InventoryFocus.Search, "Search items and recipes", time);
-        if (creative)
-        {
-            var (quantityCentre, quantitySize) = InventoryPanelLayout.QuantityBoxRect(_screenSize);
-            DrawInputField(quantityCentre, quantitySize, view.Quantity,
-                view.Focus == InventoryFocus.Quantity, "Qty", time);
-        }
 
         // A query replaces the tab's list with search results; the list region below doubles as
         // the field's dropdown, and Program.HandleInventoryClick reads the same InventorySearch
@@ -1244,8 +1238,8 @@ public class UIRenderer : IDisposable
     /// <summary>
     /// A one-line text field: the text left-aligned, the placeholder dimmed while it is empty,
     /// and while focused a caret after the text blinking twice a second on the window clock.
-    /// Shared by the main menu, the inventory search field and the creative quantity field;
-    /// callers size the text to the box's length cap.
+    /// Shared by the main menu and the inventory search field; callers size the text to the
+    /// box's length cap.
     /// </summary>
     public void DrawInputField(Vector2 centre, Vector2 size, TextFieldState field, bool focused,
         string placeholder, float time)
@@ -1388,12 +1382,8 @@ public class UIRenderer : IDisposable
     }
 
     /// <summary>Whether a window-pixel point is over the panel's search field box.</summary>
-    public bool SearchBoxAt(Vector2 windowPoint, bool creative) =>
-        InventoryPanelLayout.SearchBoxAt(ToCanvas(windowPoint), _screenSize, creative);
-
-    /// <summary>Whether a window-pixel point is over the creative bulk-quantity field box.</summary>
-    public bool QuantityBoxAt(Vector2 windowPoint) =>
-        InventoryPanelLayout.QuantityBoxAt(ToCanvas(windowPoint), _screenSize);
+    public bool SearchBoxAt(Vector2 windowPoint) =>
+        InventoryPanelLayout.SearchBoxAt(ToCanvas(windowPoint), _screenSize);
 
     private static string TabTitle(InventoryCategory tab) => tab switch
     {
@@ -1461,12 +1451,28 @@ public class UIRenderer : IDisposable
         float headingDegrees, float timeSeconds)
     {
         DrawEntryRow(row, offset, entry.Id, entry.Name, entry.Count.ToString(), false, false,
-            headingDegrees, timeSeconds, null, null, InventoryPanelLayout.CatalogPlusSize + 12f);
-        var centre = InventoryPanelLayout.CatalogPlusCentre(row, offset, _screenSize, rowCount);
-        var size = new Vector2(InventoryPanelLayout.CatalogPlusSize);
+            headingDegrees, timeSeconds, null, null, InventoryPanelLayout.CatalogButtonGroupWidth + 12f);
+        for (var which = 0; which < InventoryPanelLayout.CatalogButtonCount; which++)
+        {
+            var centre = InventoryPanelLayout.CatalogButtonCentre(row, offset, _screenSize, rowCount, which);
+            var label = (InventoryPanelLayout.CatalogButton)which switch
+            {
+                InventoryPanelLayout.CatalogButton.AddOne => "+1",
+                InventoryPanelLayout.CatalogButton.AddTen => "+10",
+                InventoryPanelLayout.CatalogButton.AddHundred => "+100",
+                _ => "X",
+            };
+            var danger = (InventoryPanelLayout.CatalogButton)which == InventoryPanelLayout.CatalogButton.Clear;
+            DrawCatalogButton(centre, label, danger);
+        }
+    }
+
+    private void DrawCatalogButton(Vector2 centre, string label, bool danger)
+    {
+        var size = new Vector2(InventoryPanelLayout.CatalogButtonWidth, RowHeight - 12f);
         DrawRect(centre, size, ChipBackground);
-        DrawBorder(centre, size, SlotBorder, AccentGold);
-        DrawTextCentred("+", centre.X, centre.Y - 9f, _countScale, Rgba.White);
+        DrawBorder(centre, size, SlotBorder, danger ? DangerRed : AccentGold);
+        DrawTextCentred(label, centre.X, centre.Y - 9f, _countScale, danger ? DangerRed : Rgba.White);
     }
 
     private void DrawPreview(Inventory inventory, InventoryView view, float time, float headingDegrees)

@@ -3978,8 +3978,7 @@ public class RenderManager : IDisposable
     /// <summary>The UI canvas size of the last UI pass, in canvas units.</summary>
     public Vector2 UiCanvasSize => ui.ScreenSize;
     public InventoryCategory? UiPanelTabAt(Vector2 point) => ui.PanelTabAt(point);
-    public bool UiSearchBoxAt(Vector2 point, bool creative) => ui.SearchBoxAt(point, creative);
-    public bool UiQuantityBoxAt(Vector2 point) => ui.QuantityBoxAt(point);
+    public bool UiSearchBoxAt(Vector2 point) => ui.SearchBoxAt(point);
     public int? UiPanelRowAt(Vector2 point, float scrollOffset, int rowCount) =>
         ui.PanelRowAt(point, scrollOffset, rowCount);
     public CraftHit UiCraftHitAt(Vector2 point, InventoryView view) => ui.CraftHitAt(point, view);

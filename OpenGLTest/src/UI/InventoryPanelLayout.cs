@@ -30,12 +30,10 @@ public static class InventoryPanelLayout
     public const float TabHeight = 60f;
     public const float RowHeight = 42f;
 
-    // The search field (and, in creative, the bulk-quantity field beside it) sits between the
-    // tab strip and the list viewport, so the list starts below the field row instead of the tabs.
+    // The search field sits between the tab strip and the list viewport, so the list starts
+    // below the field row instead of the tabs.
     public const float SearchHeight = 36f;
     public const float SearchGap = 8f;
-    public const float QuantityWidth = 84f;
-    public const float QuantityGap = 8f;
 
     /// <summary>Top of the search field's box, a gap under the tab strip.</summary>
     public const float SearchTop = PanelTop + PanelPad + TabHeight + SearchGap;
@@ -89,43 +87,53 @@ public static class InventoryPanelLayout
     /// <summary>Left edge of the search field box.</summary>
     public static float SearchLeft => PanelLeft + PanelPad;
 
-    /// <summary>
-    /// Width of the search field box: the panel inside its pads, minus the quantity field and
-    /// its gap in creative mode.
-    /// </summary>
-    public static float SearchWidth(Vector2 screen, bool creative) =>
-        PanelWidth(screen) - PanelPad * 2f - (creative ? QuantityWidth + QuantityGap : 0f);
+    /// <summary>Width of the search field box: the panel inside its pads.</summary>
+    public static float SearchWidth(Vector2 screen) => PanelWidth(screen) - PanelPad * 2f;
 
-    public static (Vector2 Centre, Vector2 Size) SearchBoxRect(Vector2 screen, bool creative) =>
-        (new Vector2(SearchLeft + SearchWidth(screen, creative) * 0.5f, SearchTop + SearchHeight * 0.5f),
-            new Vector2(SearchWidth(screen, creative), SearchHeight));
-
-    public static (Vector2 Centre, Vector2 Size) QuantityBoxRect(Vector2 screen) =>
-        (new Vector2(SearchLeft + SearchWidth(screen, false) + QuantityGap + QuantityWidth * 0.5f,
-            SearchTop + SearchHeight * 0.5f), new Vector2(QuantityWidth, SearchHeight));
+    public static (Vector2 Centre, Vector2 Size) SearchBoxRect(Vector2 screen) =>
+        (new Vector2(SearchLeft + SearchWidth(screen) * 0.5f, SearchTop + SearchHeight * 0.5f),
+            new Vector2(SearchWidth(screen), SearchHeight));
 
     /// <summary>Whether a canvas point is over the search field box.</summary>
-    public static bool SearchBoxAt(Vector2 point, Vector2 screen, bool creative) =>
-        InBox(point, SearchBoxRect(screen, creative));
+    public static bool SearchBoxAt(Vector2 point, Vector2 screen) =>
+        InBox(point, SearchBoxRect(screen));
 
-    /// <summary>Whether a canvas point is over the creative bulk-quantity field box.</summary>
-    public static bool QuantityBoxAt(Vector2 point, Vector2 screen) =>
-        InBox(point, QuantityBoxRect(screen));
+    // The creative catalog row's four action buttons, right-aligned: +1, +10, +100, X.
+    public const int CatalogButtonCount = 4;
+    public const float CatalogButtonWidth = 38f;
+    public const float CatalogButtonGap = 4f;
 
-    /// <summary>Side of the creative catalog row's "+" bulk button, in canvas units.</summary>
-    public const float CatalogPlusSize = 26f;
+    /// <summary>What a catalog row's button does; the last one clears the id's counts.</summary>
+    public enum CatalogButton
+    {
+        AddOne,
+        AddTen,
+        AddHundred,
+        Clear,
+    }
 
-    /// <summary>Centre of a catalog row's "+" button: a square in the row's right end.</summary>
-    public static Vector2 CatalogPlusCentre(int row, float offset, Vector2 screen, int rowCount) =>
-        new(RowRight(screen, rowCount) - 6f - CatalogPlusSize * 0.5f,
+    /// <summary>Total width of a catalog row's button group.</summary>
+    public static float CatalogButtonGroupWidth =>
+        CatalogButtonCount * CatalogButtonWidth + (CatalogButtonCount - 1) * CatalogButtonGap;
+
+    /// <summary>Centre of a catalog row's button <paramref name="which"/> (0..3), right-aligned.</summary>
+    public static Vector2 CatalogButtonCentre(int row, float offset, Vector2 screen, int rowCount, int which) =>
+        new(RowRight(screen, rowCount) - 6f
+            - (CatalogButtonCount - 1 - which) * (CatalogButtonWidth + CatalogButtonGap)
+            - CatalogButtonWidth * 0.5f,
             RowCentreY(row, offset, screen));
 
-    /// <summary>Whether a canvas point is over the "+" button of the catalog row it names.</summary>
-    public static bool CatalogPlusAt(Vector2 point, int row, float offset, int rowCount, Vector2 screen)
+    /// <summary>The button of the catalog row it names under a canvas point, if any.</summary>
+    public static CatalogButton? CatalogButtonAt(Vector2 point, int row, float offset, int rowCount, Vector2 screen)
     {
-        var centre = CatalogPlusCentre(row, offset, screen, rowCount);
-        return MathF.Abs(point.X - centre.X) <= CatalogPlusSize * 0.5f
-            && MathF.Abs(point.Y - centre.Y) <= CatalogPlusSize * 0.5f;
+        for (var which = 0; which < CatalogButtonCount; which++)
+        {
+            var centre = CatalogButtonCentre(row, offset, screen, rowCount, which);
+            if (MathF.Abs(point.X - centre.X) <= CatalogButtonWidth * 0.5f
+                && MathF.Abs(point.Y - centre.Y) <= InventoryPanelLayout.RowHeight * 0.5f)
+                return (CatalogButton)which;
+        }
+        return null;
     }
 
     /// <summary>

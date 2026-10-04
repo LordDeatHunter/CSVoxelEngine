@@ -71,20 +71,45 @@ public sealed class CreativeCatalogTests
     }
 
     [Fact]
-    public void ParseAmountFallsBackToTheBulkDefault()
+    public void RemoveAllClearsAStackableAndItsHotbarSlots()
     {
-        Assert.Equal(CreativeCatalog.DefaultAmount, CreativeCatalog.ParseAmount(null));
-        Assert.Equal(CreativeCatalog.DefaultAmount, CreativeCatalog.ParseAmount(""));
-        Assert.Equal(CreativeCatalog.DefaultAmount, CreativeCatalog.ParseAmount("  "));
-        Assert.Equal(CreativeCatalog.DefaultAmount, CreativeCatalog.ParseAmount("0"));
-        Assert.Equal(CreativeCatalog.DefaultAmount, CreativeCatalog.ParseAmount("nonsense"));
+        var inventory = Inventory.Empty();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        Assert.True(inventory.Add(stone, 5));
+        if (inventory.IdAt(0) != stone)
+            inventory.EquipStackable(0, stone);
+
+        Assert.True(inventory.RemoveAll(stone));
+        Assert.Equal(0, inventory.CountFor(stone));
+        Assert.Equal(0, inventory.IdAt(0));
+        Assert.False(inventory.RemoveAll(stone));
     }
 
     [Fact]
-    public void ParseAmountReadsAPositiveIntegerAndClampsToThePoolCap()
+    public void RemoveAllClearsEveryToolInstance()
     {
-        Assert.Equal(12, CreativeCatalog.ParseAmount("12"));
-        Assert.Equal(Inventory.BlockCapacity, CreativeCatalog.ParseAmount("99999"));
+        var inventory = Inventory.Empty();
+        var bucket = ContentRegistry.RequireItem("bucket").Id;
+        Assert.True(inventory.Add(bucket, 3));
+        Assert.Equal(3, inventory.CountFor(bucket));
+
+        Assert.True(inventory.RemoveAll(bucket));
+        Assert.Equal(0, inventory.CountFor(bucket));
+        Assert.Empty(inventory.ToolEntries());
+    }
+
+    [Fact]
+    public void CatalogButtonHitTestFindsEachButton()
+    {
+        var screen = new System.Numerics.Vector2(1920f, 1080f);
+        const int rowCount = 4;
+
+        for (var which = 0; which < InventoryPanelLayout.CatalogButtonCount; which++)
+        {
+            var centre = InventoryPanelLayout.CatalogButtonCentre(0, 0f, screen, rowCount, which);
+            Assert.Equal((InventoryPanelLayout.CatalogButton)which,
+                InventoryPanelLayout.CatalogButtonAt(centre, 0, 0f, rowCount, screen));
+        }
     }
 
     [Fact]
