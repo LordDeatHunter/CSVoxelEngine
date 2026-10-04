@@ -1,5 +1,13 @@
 namespace silkgltriangle;
 
+/// <summary>Which inventory text field has keyboard focus, if any.</summary>
+public enum InventoryFocus
+{
+    None,
+    Search,
+    Quantity,
+}
+
 /// <summary>
 /// Selection state of the [E] inventory panel: which tab is open and which list row is
 /// picked for preview (a stackable id, or a tool instance). Owned by <see cref="Program"/>;
@@ -7,8 +15,20 @@ namespace silkgltriangle;
 /// </summary>
 public sealed class InventoryView
 {
+    /// <summary>Most digits the creative bulk-quantity field accepts (three: up to 999).</summary>
+    public const int QuantityMaxDigits = 3;
+
     public bool IsOpen { get; set; }
     public InventoryCategory Tab { get; set; } = InventoryCategory.Blocks;
+
+    /// <summary>The panel's dropdown search field; an empty query shows the tab's own list.</summary>
+    public SearchFieldState Search { get; } = new();
+
+    /// <summary>Creative mode's bulk-amount field; empty or invalid falls back to the default.</summary>
+    public TextFieldState Quantity { get; } = new(QuantityMaxDigits);
+
+    /// <summary>Which text field keys go to; clicking a box focuses it, clicking elsewhere clears it.</summary>
+    public InventoryFocus Focus { get; set; }
 
     /// <summary>Picked stackable id for the blocks/misc tabs, or 0 for none.</summary>
     public byte SelectedId { get; set; }
@@ -72,6 +92,14 @@ public sealed class InventoryView
         ThumbDragGrab = null;
     }
 
+    /// <summary>Empties the search and quantity fields and drops keyboard focus (panel close).</summary>
+    public void ClearInput()
+    {
+        Search.Clear();
+        Quantity.Clear();
+        Focus = InventoryFocus.None;
+    }
+
     /// <summary>
     /// Returns the panel to its fresh state when a world is opened or closed: the crafting session
     /// must not keep pointing at a dead world's <see cref="Inventory"/>, and no tab may carry the
@@ -81,6 +109,7 @@ public sealed class InventoryView
     {
         IsOpen = false;
         ClearSelection();
+        ClearInput();
         Craft.Clear();
         EndThumbDrag();
         ThumbDragRowCount = 0;

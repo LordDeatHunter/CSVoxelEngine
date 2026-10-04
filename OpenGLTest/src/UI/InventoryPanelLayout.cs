@@ -30,8 +30,18 @@ public static class InventoryPanelLayout
     public const float TabHeight = 60f;
     public const float RowHeight = 42f;
 
-    /// <summary>Top of the row list viewport, just under the tab strip.</summary>
-    public const float ListTop = PanelTop + PanelPad * 2f + TabHeight;
+    // The search field (and, in creative, the bulk-quantity field beside it) sits between the
+    // tab strip and the list viewport, so the list starts below the field row instead of the tabs.
+    public const float SearchHeight = 36f;
+    public const float SearchGap = 8f;
+    public const float QuantityWidth = 84f;
+    public const float QuantityGap = 8f;
+
+    /// <summary>Top of the search field's box, a gap under the tab strip.</summary>
+    public const float SearchTop = PanelTop + PanelPad + TabHeight + SearchGap;
+
+    /// <summary>Top of the row list viewport, under the search field.</summary>
+    public const float ListTop = SearchTop + SearchHeight + SearchGap;
 
     /// <summary>Left edge of the row rectangles (and of their hit area).</summary>
     public const float RowLeft = PanelLeft + PanelPad;
@@ -75,6 +85,32 @@ public static class InventoryPanelLayout
 
     public static float RowCentreY(int row, float offset, Vector2 screen) =>
         ListTop + ScrollList.RowTop(row, offset, RowHeight) + RowHeight * 0.5f;
+
+    /// <summary>Left edge of the search field box.</summary>
+    public static float SearchLeft => PanelLeft + PanelPad;
+
+    /// <summary>
+    /// Width of the search field box: the panel inside its pads, minus the quantity field and
+    /// its gap in creative mode.
+    /// </summary>
+    public static float SearchWidth(Vector2 screen, bool creative) =>
+        PanelWidth(screen) - PanelPad * 2f - (creative ? QuantityWidth + QuantityGap : 0f);
+
+    public static (Vector2 Centre, Vector2 Size) SearchBoxRect(Vector2 screen, bool creative) =>
+        (new Vector2(SearchLeft + SearchWidth(screen, creative) * 0.5f, SearchTop + SearchHeight * 0.5f),
+            new Vector2(SearchWidth(screen, creative), SearchHeight));
+
+    public static (Vector2 Centre, Vector2 Size) QuantityBoxRect(Vector2 screen) =>
+        (new Vector2(SearchLeft + SearchWidth(screen, false) + QuantityGap + QuantityWidth * 0.5f,
+            SearchTop + SearchHeight * 0.5f), new Vector2(QuantityWidth, SearchHeight));
+
+    /// <summary>Whether a canvas point is over the search field box.</summary>
+    public static bool SearchBoxAt(Vector2 point, Vector2 screen, bool creative) =>
+        InBox(point, SearchBoxRect(screen, creative));
+
+    /// <summary>Whether a canvas point is over the creative bulk-quantity field box.</summary>
+    public static bool QuantityBoxAt(Vector2 point, Vector2 screen) =>
+        InBox(point, QuantityBoxRect(screen));
 
     /// <summary>
     /// Right edge of the row hit area: the row rectangle's edge normally, the scrollbar hit band's
@@ -154,4 +190,8 @@ public static class InventoryPanelLayout
 
     private static bool Overflows(int rowCount, Vector2 screen) =>
         ScrollList.Overflows(ContentHeight(rowCount), ListHeight(screen));
+
+    private static bool InBox(Vector2 point, (Vector2 Centre, Vector2 Size) rect) =>
+        MathF.Abs(point.X - rect.Centre.X) <= rect.Size.X * 0.5f
+        && MathF.Abs(point.Y - rect.Centre.Y) <= rect.Size.Y * 0.5f;
 }

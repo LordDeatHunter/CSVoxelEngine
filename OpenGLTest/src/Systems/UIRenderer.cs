@@ -796,7 +796,7 @@ public class UIRenderer : IDisposable
     /// at slots. <paramref name="time"/> spins the preview.
     /// </summary>
     public void DrawInventoryPanel(Inventory inventory, InventoryView view, float time,
-        float headingDegrees)
+        float headingDegrees, bool creative)
     {
         var top = PanelTop;
         var height = InventoryPanelLayout.PanelHeight(_screenSize);
@@ -819,22 +819,43 @@ public class UIRenderer : IDisposable
                 centre.X, top + PanelPad + 30f, _countScale, Rgba.White, tabWidth - 8f);
         }
 
+        var (searchCentre, searchSize) = InventoryPanelLayout.SearchBoxRect(_screenSize, creative);
+        DrawInputField(searchCentre, searchSize, view.Search.Text,
+            view.Focus == InventoryFocus.Search, "Search items and recipes", time);
+        if (creative)
+        {
+            var (quantityCentre, quantitySize) = InventoryPanelLayout.QuantityBoxRect(_screenSize);
+            DrawInputField(quantityCentre, quantitySize, view.Quantity,
+                view.Focus == InventoryFocus.Quantity, "Qty", time);
+        }
+
+        // A query replaces the tab's list with search results; the list region below doubles as
+        // the field's dropdown, and Program.HandleInventoryClick reads the same InventorySearch
+        // call, so the drawn rows and the click always agree.
+        IReadOnlyList<SearchHit>? hits = view.Search.IsEmpty
+            ? null
+            : InventorySearch.Search(view.Search.Query, inventory);
+
         // One list per frame for the active tab (never re-query StackEntries/ToolEntries for
         // the visible range: that would double the LINQ sort).
         IReadOnlyList<Inventory.ToolRow>? tools = null;
         IReadOnlyList<CraftingRecipe>? recipes = null;
         IReadOnlyList<Inventory.StackRow>? rows = null;
         int rowCount;
-        if (view.Tab == InventoryCategory.Tools)
+        if (hits != null)
+            rowCount = hits.Count;
+        else if (view.Tab == InventoryCategory.Tools)
             rowCount = (tools = inventory.ToolEntries()).Count;
         else if (view.Tab == InventoryCategory.Crafting)
             rowCount = (recipes = ContentRegistry.CraftingRecipes).Count;
         else
             rowCount = (rows = inventory.StackEntries(view.Tab)).Count;
 
-        // Clamp the tab's stored offset with this frame's row count, exactly as
+        // Clamp the stored offset with this frame's row count, exactly as
         // Program.HandleInventoryClick does, so the drawn list and the click always agree.
-        var offset = InventoryPanelLayout.ClampedOffset(view.ScrollOffset, rowCount, _screenSize);
+        var offset = hits != null
+            ? InventoryPanelLayout.ClampedOffset(view.Search.ScrollOffset, rowCount, _screenSize)
+            : InventoryPanelLayout.ClampedOffset(view.ScrollOffset, rowCount, _screenSize);
         var listHeight = InventoryPanelLayout.ListHeight(_screenSize);
         var (first, end) = ScrollList.VisibleRange(offset, RowHeight, rowCount, listHeight);
 
@@ -855,7 +876,12 @@ public class UIRenderer : IDisposable
         _gl.Scissor(sx, sy, (uint)sw, (uint)sh);
         try
         {
-            if (tools != null)
+            if (hits != null)
+            {
+                for (var i = first; i < end; i++)
+                    DrawSearchRow(i, offset, hits[i], i == view.Search.Highlight, headingDegrees, time);
+            }
+            else if (tools != null)
             {
                 for (var i = first; i < end; i++)
                 {
@@ -1195,7 +1221,7 @@ public class UIRenderer : IDisposable
     {
         DrawText(label, new Vector2(centre.X - MainMenuLayout.FieldSize.X * 0.5f,
             MainMenuLayout.FieldLabelTop(centre)), _countScale, TextDim);
-        DrawTextField(centre, MainMenuLayout.FieldSize, field, focused, placeholder, time);
+        DrawInputField(centre, MainMenuLayout.FieldSize, field, focused, placeholder, time);
     }
 
     /// <summary>A <see cref="DrawMenuButton"/> of any size, with an optional border colour.</summary>
@@ -1209,9 +1235,10 @@ public class UIRenderer : IDisposable
     /// <summary>
     /// A one-line text field: the text left-aligned, the placeholder dimmed while it is empty,
     /// and while focused a caret after the text blinking twice a second on the window clock.
-    /// Both fields' length caps keep their text inside the box at the count scale.
+    /// Shared by the main menu, the inventory search field and the creative quantity field;
+    /// callers size the text to the box's length cap.
     /// </summary>
-    private void DrawTextField(Vector2 centre, Vector2 size, TextFieldState field, bool focused,
+    public void DrawInputField(Vector2 centre, Vector2 size, TextFieldState field, bool focused,
         string placeholder, float time)
     {
         const float pad = 12f;
@@ -1351,6 +1378,14 @@ public class UIRenderer : IDisposable
         return InventoryPanelLayout.RowAt(point, _screenSize, scrollOffset, rowCount);
     }
 
+    /// <summary>Whether a window-pixel point is over the panel's search field box.</summary>
+    public bool SearchBoxAt(Vector2 windowPoint, bool creative) =>
+        InventoryPanelLayout.SearchBoxAt(ToCanvas(windowPoint), _screenSize, creative);
+
+    /// <summary>Whether a window-pixel point is over the creative bulk-quantity field box.</summary>
+    public bool QuantityBoxAt(Vector2 windowPoint) =>
+        InventoryPanelLayout.QuantityBoxAt(ToCanvas(windowPoint), _screenSize);
+
     private static string TabTitle(InventoryCategory tab) => tab switch
     {
         InventoryCategory.Blocks => "Blocks",
@@ -1400,6 +1435,16 @@ public class UIRenderer : IDisposable
             DrawDurabilityBar(new Vector2(barLeft + barWidth * 0.5f, centreY + 11f),
                 barWidth, durability.Value);
         }
+    }
+
+    private void DrawSearchRow(int row, float offset, SearchHit hit, bool selected,
+        float headingDegrees, float timeSeconds)
+    {
+        var detail = hit.IsRecipe ? $"recipe x{hit.Count}"
+            : hit.ToolInstance != 0 ? "tool"
+            : hit.Count.ToString();
+        DrawEntryRow(row, offset, hit.Id, hit.Name, detail, selected, false,
+            headingDegrees, timeSeconds, hit.IsRecipe ? AccentGold : null);
     }
 
     private void DrawPreview(Inventory inventory, InventoryView view, float time, float headingDegrees)

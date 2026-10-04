@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -230,11 +231,14 @@ public static class Program
                 var p = renderManager.UiToCanvas(inputManager.Mouse.Position);
                 if (InventoryPanelLayout.IsOverList(p, canvas))
                 {
-                    var rowCount = RowCountFor(inventoryView.Tab);
-                    inventoryView.ScrollOffset = InventoryPanelLayout.ClampedOffset(
-                        inventoryView.ScrollOffset
-                            - wheel.Y * InventoryPanelLayout.WheelStepRows * InventoryPanelLayout.RowHeight,
-                        rowCount, canvas);
+                    var searching = !inventoryView.Search.IsEmpty;
+                    var rowCount = searching
+                        ? InventorySearch.Search(inventoryView.Search.Query, w.Inventory).Count
+                        : RowCountFor(inventoryView.Tab);
+                    var delta = -wheel.Y * InventoryPanelLayout.WheelStepRows * InventoryPanelLayout.RowHeight;
+                    SetListScroll(InventoryPanelLayout.ClampedOffset(
+                        (searching ? inventoryView.Search.ScrollOffset : inventoryView.ScrollOffset) + delta,
+                        rowCount, canvas), searching);
                 }
                 else if (inventoryView.Tab == InventoryCategory.Crafting
                          && renderManager.UiIsOverCraftCard(inputManager.Mouse.Position))
@@ -247,16 +251,25 @@ public static class Program
 
         // Menu text input: characters through KeyChar, the four control keys through KeyDown. Both
         // act only while the main menu is showing, and ESC for the menu lives here alone (the
-        // polled ESC below is world-only), so one press never makes two transitions.
+        // polled ESC below is world-only), so one press never makes two transitions. While a world
+        // plays, the same events feed the [E] panel's search and quantity fields instead.
         if (inputManager.Keyboard is { } keyboard)
         {
             keyboard.KeyChar += (_, c) =>
             {
                 if (screen == AppScreen.Menu)
                     menu.Type(c);
+                else if (screen == AppScreen.Playing && inventoryView.IsOpen && !pauseMenuView.IsOpen)
+                    HandleInventoryType(c);
             };
             keyboard.KeyDown += (_, key, _) =>
             {
+                if (screen == AppScreen.Playing)
+                {
+                    if (inventoryView.IsOpen && !pauseMenuView.IsOpen)
+                        HandleInventoryKey(key);
+                    return;
+                }
                 if (screen != AppScreen.Menu) return;
                 var menuKey = key switch
                 {
@@ -623,7 +636,7 @@ public static class Program
 
         placeTimer = Math.Min(MAX_PLACE_TIMER, placeTimer + deltaTime);
         var xPressed = inputManager.Keyboard?.IsKeyPressed(Key.X) == true;
-        if (xPressed && !xWasPressed)
+        if (xPressed && !xWasPressed && inventoryView.Focus == InventoryFocus.None)
         {
             debugEnabled = !debugEnabled;
             Log.WriteLine($"Debug {(debugEnabled ? "ON" : "OFF")}");
@@ -656,13 +669,16 @@ public static class Program
         {
             var canvas = renderManager.UiCanvasSize;
             var p = renderManager.UiToCanvas(inputManager.Mouse.Position);
-            inventoryView.ScrollOffset = InventoryPanelLayout.OffsetForThumbTop(
+            var value = InventoryPanelLayout.OffsetForThumbTop(
                 p.Y - grab, inventoryView.ThumbDragRowCount, canvas);
+            SetListScroll(value, !inventoryView.Search.IsEmpty);
         }
 
-        // The [E] panel owns the mouse: clicks equip, hotbar keys rest, and the world runs on
+        // The [E] panel owns the mouse: clicks equip, hotbar keys rest, and the world runs on.
+        // While a text field has focus, E is typing, not a close.
         var ePressed = inputManager.Keyboard?.IsKeyPressed(Key.E) == true;
-        if (ePressed && !eWasPressed && !pauseMenuView.IsOpen)
+        if (ePressed && !eWasPressed && !pauseMenuView.IsOpen
+            && inventoryView.Focus == InventoryFocus.None)
             SetInventoryOpen(!inventoryView.IsOpen);
         eWasPressed = ePressed;
 
@@ -723,7 +739,12 @@ public static class Program
         // The update below times itself; the shell spans above and below stay outside it.
         if (!pauseMenuView.IsOpen)
         {
-            w.Update((float)deltaTime, inputManager.Keyboard);
+            // A focused text field owns the keyboard: pass no board so the camera cannot act on
+            // the very keys being typed (E, C, Space, WASD) while the panel is up.
+            var board = inventoryView.IsOpen && inventoryView.Focus != InventoryFocus.None
+                ? null
+                : inputManager.Keyboard;
+            w.Update((float)deltaTime, board);
 
             FrameProfiler.Begin(ProfileSection.Breaking);
             w.UpdateBlockBreaking(deltaTime,
@@ -758,6 +779,7 @@ public static class Program
         if (!open)
         {
             inventoryView.ClearSelection();
+            inventoryView.ClearInput();
             inventoryView.Craft.Clear();
             inventoryView.EndThumbDrag();
         }
@@ -909,8 +931,13 @@ public static class Program
     {
         var canvas = renderManager.UiCanvasSize;
         var p = renderManager.UiToCanvas(position);
-        var rowCount = RowCountFor(inventoryView.Tab);
-        var offset = InventoryPanelLayout.ClampedOffset(inventoryView.ScrollOffset, rowCount, canvas);
+        var searching = !inventoryView.Search.IsEmpty;
+        var rowCount = searching
+            ? InventorySearch.Search(inventoryView.Search.Query, world!.Inventory).Count
+            : RowCountFor(inventoryView.Tab);
+        var offset = searching
+            ? InventoryPanelLayout.ClampedOffset(inventoryView.Search.ScrollOffset, rowCount, canvas)
+            : InventoryPanelLayout.ClampedOffset(inventoryView.ScrollOffset, rowCount, canvas);
         switch (InventoryPanelLayout.ScrollbarHitAt(p, canvas, offset, rowCount))
         {
             case ScrollbarHit.Thumb:
@@ -919,36 +946,176 @@ public static class Program
                 inventoryView.ThumbDragRowCount = rowCount;
                 break;
             case ScrollbarHit.TrackAbove:
-                inventoryView.ScrollOffset = InventoryPanelLayout.ClampedOffset(
-                    offset - InventoryPanelLayout.ListHeight(canvas), rowCount, canvas);
+                SetListScroll(InventoryPanelLayout.ClampedOffset(
+                    offset - InventoryPanelLayout.ListHeight(canvas), rowCount, canvas), searching);
                 break;
             case ScrollbarHit.TrackBelow:
-                inventoryView.ScrollOffset = InventoryPanelLayout.ClampedOffset(
-                    offset + InventoryPanelLayout.ListHeight(canvas), rowCount, canvas);
+                SetListScroll(InventoryPanelLayout.ClampedOffset(
+                    offset + InventoryPanelLayout.ListHeight(canvas), rowCount, canvas), searching);
                 break;
         }
     }
 
+    /// <summary>Types one printable character into whichever inventory field has focus.</summary>
+    private static void HandleInventoryType(char c)
+    {
+        switch (inventoryView.Focus)
+        {
+            case InventoryFocus.Search:
+                if (inventoryView.Search.Text.TryAppend(c))
+                {
+                    inventoryView.Search.Highlight = -1;
+                    inventoryView.Search.ScrollOffset = 0f;
+                }
+                break;
+            case InventoryFocus.Quantity:
+                if (char.IsAsciiDigit(c))
+                    inventoryView.Quantity.TryAppend(c);
+                break;
+        }
+    }
+
+    /// <summary>The non-character keys a focused inventory field reacts to. ESC is left to the
+    /// polled panel toggle, so one press never does two things.</summary>
+    private static void HandleInventoryKey(Key key)
+    {
+        switch (key)
+        {
+            case Key.Backspace:
+                if (inventoryView.Focus == InventoryFocus.Search)
+                {
+                    inventoryView.Search.Text.Backspace();
+                    inventoryView.Search.Highlight = -1;
+                }
+                else if (inventoryView.Focus == InventoryFocus.Quantity)
+                    inventoryView.Quantity.Backspace();
+                break;
+            case Key.Tab:
+                CycleInventoryFocus();
+                break;
+            case Key.Enter or Key.KeypadEnter:
+                ApplyHighlightedSearchHit();
+                break;
+            case Key.Up:
+                MoveSearchHighlight(-1);
+                break;
+            case Key.Down:
+                MoveSearchHighlight(1);
+                break;
+        }
+    }
+
+    private static void CycleInventoryFocus()
+    {
+        var creative = world?.Camera.IsCreative == true;
+        inventoryView.Focus = inventoryView.Focus switch
+        {
+            InventoryFocus.Search when creative => InventoryFocus.Quantity,
+            InventoryFocus.Quantity => InventoryFocus.Search,
+            _ => InventoryFocus.Search,
+        };
+    }
+
+    private static void MoveSearchHighlight(int delta)
+    {
+        if (inventoryView.Search.IsEmpty) return;
+        var count = InventorySearch.Search(inventoryView.Search.Query, world!.Inventory).Count;
+        if (count == 0) return;
+        inventoryView.Search.Highlight = inventoryView.Search.Highlight < 0
+            ? (delta > 0 ? 0 : count - 1)
+            : Math.Clamp(inventoryView.Search.Highlight + delta, 0, count - 1);
+        EnsureSearchHighlightVisible(count);
+    }
+
+    private static void EnsureSearchHighlightVisible(int count)
+    {
+        var screen = renderManager.UiCanvasSize;
+        var viewport = InventoryPanelLayout.ListHeight(screen);
+        var rowTop = inventoryView.Search.Highlight * InventoryPanelLayout.RowHeight;
+        var offset = inventoryView.Search.ScrollOffset;
+        if (rowTop < offset)
+            offset = rowTop;
+        else if (rowTop + InventoryPanelLayout.RowHeight > offset + viewport)
+            offset = rowTop + InventoryPanelLayout.RowHeight - viewport;
+        inventoryView.Search.ScrollOffset = InventoryPanelLayout.ClampedOffset(offset, count, screen);
+    }
+
+    private static void ApplyHighlightedSearchHit()
+    {
+        if (inventoryView.Search.IsEmpty) return;
+        var hits = InventorySearch.Search(inventoryView.Search.Query, world!.Inventory);
+        if (hits.Count == 0) return;
+        ApplySearchHit(hits[inventoryView.Search.Highlight < 0 ? 0 : inventoryView.Search.Highlight]);
+    }
+
     /// <summary>
-    /// Routes one left-click inside the open panel: tabs switch, rows pick for preview,
-    /// crafting controls feed the open recipe, and hotbar slots equip the pick (clicking
-    /// what the slot already shows clears it).
+    /// Acts on one search result: an owned item becomes the panel's pick (a recipe that is open
+    /// is fed it), while a recipe opens on the Craft tab and clears the query.
+    /// </summary>
+    private static void ApplySearchHit(SearchHit hit)
+    {
+        if (hit.IsRecipe)
+        {
+            inventoryView.Tab = InventoryCategory.Crafting;
+            inventoryView.Craft.Select(hit.Recipe);
+            inventoryView.CraftScrollOffset = 0f;
+            inventoryView.Search.Clear();
+            inventoryView.Focus = InventoryFocus.None;
+            return;
+        }
+
+        inventoryView.SelectedId = hit.ToolInstance > 0 ? (byte)0 : hit.Id;
+        inventoryView.SelectedToolInstance = hit.ToolInstance;
+        if (hit.ToolInstance == 0 && inventoryView.Craft.Recipe != null)
+            inventoryView.Craft.FeedFromInventory(hit.Id, world!.Inventory);
+    }
+
+    private static void SetListScroll(float offset, bool searching)
+    {
+        if (searching) inventoryView.Search.ScrollOffset = offset;
+        else inventoryView.ScrollOffset = offset;
+    }
+
+    /// <summary>
+    /// Routes one left-click inside the open panel: the field boxes focus, tabs switch, rows
+    /// pick for preview (or act on a search result), crafting controls feed the open recipe, and
+    /// hotbar slots equip the pick (clicking what the slot already shows clears it).
     /// </summary>
     private static void HandleInventoryClick(System.Numerics.Vector2 position)
     {
         var inventory = world!.Inventory;
+        var creative = world.Camera.IsCreative;
+
+        // The field boxes take the click before anything else; clicking elsewhere drops focus.
+        if (renderManager.UiSearchBoxAt(position, creative))
+        {
+            inventoryView.Focus = InventoryFocus.Search;
+            return;
+        }
+        if (creative && renderManager.UiQuantityBoxAt(position))
+        {
+            inventoryView.Focus = InventoryFocus.Quantity;
+            return;
+        }
+        inventoryView.Focus = InventoryFocus.None;
 
         var tab = renderManager.UiPanelTabAt(position);
         if (tab.HasValue)
         {
             inventoryView.Tab = tab.Value;
+            inventoryView.Search.Clear();
             inventoryView.ClearSelection();
             return;
         }
 
-        var rowCount = RowCountFor(inventoryView.Tab);
-        var offset = InventoryPanelLayout.ClampedOffset(
-            inventoryView.ScrollOffset, rowCount, renderManager.UiCanvasSize);
+        var searching = !inventoryView.Search.IsEmpty;
+        IReadOnlyList<SearchHit>? hits = searching
+            ? InventorySearch.Search(inventoryView.Search.Query, inventory)
+            : null;
+        var rowCount = hits?.Count ?? RowCountFor(inventoryView.Tab);
+        var offset = searching
+            ? InventoryPanelLayout.ClampedOffset(inventoryView.Search.ScrollOffset, rowCount, renderManager.UiCanvasSize)
+            : InventoryPanelLayout.ClampedOffset(inventoryView.ScrollOffset, rowCount, renderManager.UiCanvasSize);
         // The scrollbar is handled on press; its release must not fall through to the
         // crafting card or hotbar tests below.
         if (InventoryPanelLayout.ScrollbarHitAt(renderManager.UiToCanvas(position),
@@ -957,7 +1124,12 @@ public static class Program
         var row = renderManager.UiPanelRowAt(position, offset, rowCount);
         if (row.HasValue)
         {
-            if (inventoryView.Tab == InventoryCategory.Tools)
+            if (hits != null)
+            {
+                if (row.Value < hits.Count)
+                    ApplySearchHit(hits[row.Value]);
+            }
+            else if (inventoryView.Tab == InventoryCategory.Tools)
             {
                 inventoryView.SelectedToolInstance = inventory.ToolEntries()[row.Value].InstanceId;
                 inventoryView.SelectedId = 0;
