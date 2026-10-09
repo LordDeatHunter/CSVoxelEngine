@@ -2,6 +2,7 @@
 
 > Performance work lives in **PERF_TODO.md**; this file is gameplay and content only.
 > Architecture, content schema and threading rules live in **AGENTS.md**.
+> Tree work lives in **TREES_PLAN.md**.
 
 ## North star
 
@@ -17,28 +18,70 @@ same world, and a player can move between them freely — neither arc gates the 
 - **Arc A — Magicraft adventure RPG** (Skyrim-flavoured): dungeons, towers, spellcraft,
   skills, boss encounters.
 - **Arc B — Expert automation** (modded-Minecraft "expert" pack x Factorio): power,
-  logistics, machine chains, up to fusion reactors.
+  logistics, machine chains, up to fusion reactors and off-world colonies.
+
+### The dual-identity contract (design rule)
+
+The whole pitch is that the two arcs share a world and **dabbling in one makes the other
+easier** — not that they are two games glued together. That only happens if cross-links are
+designed in, not retrofitted. Keep these four rules in mind whenever adding content:
+
+1. **Shared inputs.** Some resource must matter to both arcs (a crystal that is a spell
+   reagent *and* a machine/reactor component; food that is both survival and a potion base).
+2. **Cross-tools.** Each arc should build something the other wants: magic that moves/mines/
+   smelts mass material, and automation that mass-produces RPG consumables (potions, ammo,
+   enchanted blanks, gear).
+3. **Gated destinations.** Dungeons are the natural place to gate an automation input (a
+   reactor catalyst, a blueprint), so an RPG run feeds an automation bottleneck, and a machine
+   build opens access to deeper RPG content.
+4. **No forced crossover.** Every gating above must have a slow, manual fallback, so a pure
+   Arc A or pure Arc B player can always finish their arc alone.
 
 ## How to read
 
 - Priority: **P0** foundation/do first · **P1** next · **P2** later · **P3** someday/XL.
 - Effort: **S** under a session · **M** a few sessions · **L** a week+ · **XL** weeks.
 - IDs (`P-1`, `U-3`, ...) are stable references; keep them when reordering.
-- **Current priority:** `M-1`'s core (save/load) and `U-6`'s main menu have landed; what is left
-  of them is `M-12` (station block entities and in-flight TNT/falling blocks/projectiles) and
-  `U-6`'s world type/difficulty options.
+- **Current priority:** finish the **Act I survival floor** (Milestone 1 below), then ship one
+  vertical slice per arc to prove the dual identity. The engine is far ahead of the content;
+  the next wins are content and progression, not systems.
 
-### Suggested first wave
+## Suggested milestones
 
-1. `M-1` save/load — core landed (chunk edits, LOD edit state, player, inventory, time,
-   entities); what is left is `M-12`.
-2. `P-1` real tools — the mechanic landed (tool tags, `requiresTool` gate, pace/damage);
-   what is left is tool durability and the shovel/hoe/sword kinds.
-3. `M-2` SFX + `U-1` tooltips + `V-3` footstep dust — cheap, high-feel wins.
-4. `P-10` health + `P-11` hunger + `P-13` fall damage/drowning — the survival skeleton.
-5. `P-24` biomes + `P-25` ores + `V-1` weather — make the world worth exploring.
-6. `U-6` main menu/world select (landed; world options left) + `U-7` dev commands — needed to
-   test everything after.
+### Milestone 1 — Act I survival floor (do first)
+
+The smallest bundle that makes the world a *game*: stakes, food, and an advance. Mostly content
+JSON plus small systems; high feel, low engine risk.
+
+1. **`P-11` food + hunger + eating** — add the first edibles and repoint the campfire from
+   mud bricks to food. (No edibles exist today.)
+2. **`P-10` death done properly + `U-5` death screen** — decide and ship the drop rule (default
+   drop-everything for the hardcore framing), a respawn point / bed, and the death UI.
+3. **`P-4` complete the copper chain + `P-1` tool durability** — assembly recipes (head + handle
+   -> tool) and per-tool wear; the bronze-age payoff currently dead-ends.
+4. **`P-3` a real furnace / smelter** — `sand -> glass`, `mud -> brick`, generic smelting with
+   fuel; generalizes the kiln pattern and becomes the automation seed.
+5. **`P-7` / `P-25` tier-2 ores + armor** — iron/tin at real depth bands, and armor (part of
+   `P-7`) as a defense stat. The first difficulty curve and the first reason to descend.
+
+### Milestone 2 — Arc A vertical slice: the first dungeon
+
+Prove the fantasy half. Needs `M-15` (structure templates), `P-16` (dungeons), `P-17` (a boss),
+`P-14` (one spell — fireball), and `F-3` spawners. A single hand-authored crypt with loot, a
+spawner room and a boss is enough to make health, combat and loot matter and to give survival a
+destination.
+
+### Milestone 3 — Arc B vertical slice: first power
+
+Prove the automation half. Needs `P-19` (hand crank -> water wheel -> one powered machine),
+`P-21` (one multi-step chain with a byproduct) and `P-20` (the crudest item movement). This also
+validates "machine tick" as a reusable concept beyond the quern/kiln/casting one-offs.
+
+### Milestone 4 — cross-pollination proof
+
+Ship one link from the **Cross-pollination** section end-to-end (`P-47` shared exotic resource,
+`P-52` dungeons as gated resource nodes) and confirm either arc can reach its own endgame without
+the other while still being faster together.
 
 ---
 
@@ -46,186 +89,247 @@ same world, and a player can move between them freely — neither arc gates the 
 
 ### Act I — the shared primitive-tech spine
 
-- [ ] **`P-1` · Real tools: tool tags, required-tool gating, mining speed, durability** — P1, M.
-  `primitive_pickaxe` currently has no effect; mining is pure block hardness. Add a tool kind
-  (pickaxe/axe/shovel/hoe/sword) and tier to items, `harvestTool`/`harvestTier` to blocks, a
-  speed multiplier while mining, and per-instance durability (the `Inventory.DamageTool` /
-  `MaxDurability` machinery already exists for the firestarter). Unlocks axe/shovel/hoe and the
-  whole metal tier ladder.
-  - Progress: tool tags (`assets/data/tags/pickaxe.json`, `axe.json`), the `requiresTool` +
-    per-block `tools` tier gate, per-item `tool.power` / `hitDelayMs` mining pace and
-    `blockDamage` all landed (`Mining`, `MiningTests`); `entityDamage` and `attack` came with
-    them (see `F-4`). Flint and copper axe/pickaxe exist and log hardness was raised so the axe
-    matters. Still open: per-tool durability (only the firestarter spends uses today) and the
-    shovel/hoe/sword kinds.
+- [ ] **`P-1` · Finish real tools: durability + shovel/hoe/sword kinds** — P1, M.
+  Tool tags, the `requiresTool` + per-block `tools` tier gate, `tool.power` / `hitDelayMs`
+  mining pace and `blockDamage` landed (`Mining`, `MiningTests`). Still open: **per-instance
+  durability** (only the firestarter spends uses today; `Inventory.DamageTool` / `MaxDurability`
+  already exist) and the **shovel/hoe/sword** kinds.
 - [ ] **`P-2` · Crafting stations gate recipes** — P1, M.
-  The `E` panel today crafts any recipe in the list from anywhere. Add a `station` field to
-  recipes and require the player to be at the matching station (crafting table, campfire, quern,
-  furnace). A station may reuse the same list-and-feed UI, get a unique UI later, or — like the
-  campfire and quern today — craft in the world itself. The shapeless feeding model stays; this is
-  gating, not a grid rewrite (see `U-3`).
-- [ ] **`P-3` · Furnace / kiln + smelting** — P1, M.
+  The `E` panel crafts any recipe from anywhere. Add a `station` field and require the matching
+  station (crafting table, campfire, quern, furnace). The shapeless list-and-feed model stays;
+  this is gating, not a grid rewrite (see `U-3`).
+- [ ] **`P-3` · Generic furnace / smelter** — P1, M.
   A timed, fuel-consuming station modelled on the campfire's `cookSeconds` and the quern's
-  block-entity pattern. First jobs: `malachite → copper`, `sand → glass`, `mud → brick`.
-- [ ] **`P-4` · Finish the copper chain** — P1, M.
-  `crushed_copper` currently dead-ends. Wire it to a copper ingot and copper tools/blocks, a tier
-  above flint. This is the first real "I advanced" moment.
-  - Progress: the quern's `malachite → crushed_copper` crush is in, and the Copper Ingot plus
-    copper pickaxe/axe items exist with correct tiers and art. Nothing crafts the ingot from
-    crushed copper or the tools from the ingot yet, so `crushed_copper` still dead-ends.
-- [ ] **`P-5` · Light progression: torch → lamp → fire as fuel** — P1, S–M.
-  Torch block (cheap, emission ~14, `needsSupport` on walls/floor) before the existing
-  `lamp` (emission 15). Wire placed lights into the shader's 8 point-light budget so a torch
-  actually casts dynamic light, not just voxel light.
+  block-entity pattern. First jobs: `sand -> glass`, `mud -> brick`, and a plain
+  `crushed_copper -> copper_ingot` route that does not need the full kiln. Feeds `P-6` and is
+  step zero of the automation chain.
+- [ ] **`P-4` · Complete the copper chain** — P1, M.
+  The quern crushes `malachite -> crushed_copper`, and the metalworks (kiln crucible + fired
+  molds) already **casts** the ingot and the pickaxe/axe **heads**. What is missing is the
+  head -> tool **assembly** recipe, so the heads dead-end. Add `copper_pickaxe` / `copper_axe`
+  from head + handle (`P-42` branch), plus the durability from `P-1`. This is the first real
+  "I advanced" moment.
+- [ ] **`P-5` · Light progression: torch -> lamp -> fire as fuel** — P1, S–M.
+  A cheap **torch** block (emission ~14, `needsSupport`) before the existing `lamp` (emission
+  15). Wire placed lights into the shader's 8 point-light budget so a torch casts dynamic light,
+  not just voxel light.
 - [ ] **`P-6` · Fuel & fire economy** — P2, M.
-  Fire as station fuel; per-wood burn times; campfire already burns ~30 s. Feeds furnaces and
-  `P-3`.
+  Fire as station fuel; per-wood burn times; campfire already burns ~30 s. Add `P-41` charcoal
+  as the renewable, portable fuel. Feeds `P-3` and the kiln.
 - [ ] **`P-7` · Metal tiers beyond copper** — P2, L.
-  Bronze/iron/steel, anvil/forge station, tool tiers 2–4, richer ore gating.
+  Bronze (`P-44`), iron, steel; anvil/forge (`P-43`), tool tiers 2–4, richer ore gating
+  (`P-25`).
 - [ ] **`P-8` · Advancements / "beats" list** — P1, S–M.
   In-world goals (first flint, first fire, first copper, first spell, first fusion) give a
-  session direction without requiring combat. Also good onboarding.
+  session direction without requiring combat, and double as onboarding. Needs the `M-19` backend.
 - [ ] **`P-9` · Character progression (shared RPG spine)** — P2, L.
-  XP from gathering/crafting/killing; perks that feed both Arc A and Arc B. See `P-15`.
+  XP from gathering/crafting/killing; perks that feed both Arc A and Arc B (`P-15`).
 - [ ] **`P-30` · Universal mining tool (power glove / drill)** — P3, S–M.
-  A tool that passes every block's `tools` gate no matter its kind, so nothing is ever refused
-  (a powered mining glove or drill). Built on `P-1`'s tool-tag + `requiresTool` gating: either a
-  flag that bypasses the gate or one item that belongs to every tool tag.
+  A tool that passes every block's `tools` gate no matter its kind (a powered glove or drill),
+  built on `P-1`'s tag gating. Also an Arc B -> Arc A crossover (`P-53`).
 
 ### Survival basics
 
-- [ ] **`P-10` · Player health + damage + death/respawn** — P1, M–L.
-  Health pool, damage sources (fall, drowning, lava, mobs, starvation), death screen, respawn at
-  spawn/bed. Default death drops **everything**; the items that soften that come later (`P-29`).
-  Prerequisite for hostiles and for Arc A.
-  - Progress (first cut): 100 HP pool (`PlayerHealth`), 10-heart HUD above the hotbar
-    (`heart` over `heart_empty`, 1px side padding cropped, half-heart steps), damage
-    vignette + trauma-based screen shake, fall damage ((blocks-4)*10 HP from 5+ blocks,
-    water landings cushion, creative/flight immune), lava DoT (10 HP/s in half-second
-    ticks, body contact via emissive-fluid check, no burning yet), simple respawn at spawn
-    keeping inventory. Slimes now deal contact damage (12 HP) and knockback, so mob damage is
-    live too. Still open: death screen (`U-5`), drop-everything on death,
-    drowning/hunger/starvation, regen.
-- [ ] **`P-11` · Hunger / food** — P1, M.
-  Food items, eating, hunger/saturation drain. Note cooking currently produces a building
-  material (`mudball → mud_brick`), so no edibles exist yet; add the first real foods here.
+- [ ] **`P-10` · Death + respawn, done properly** — P1, M.
+  Health, fall damage, lava DoT, mob damage, the damage vignette/shake and simple respawn landed.
+  Still open: a **death screen** (`U-5`), the **drop rule** (default drop-everything for the
+  hardcore framing, relieved later by `P-29`), a **respawn point / bed**, and health regen.
+- [ ] **`P-11` · Hunger / food / eating** — P1, M.
+  Food items, eating, hunger/saturation drain. Cooking currently only makes a building material,
+  so **no edibles exist yet** — add the first real foods here (`P-38`, `P-12`, `P-42`).
 - [ ] **`P-12` · Farming** — P2, M.
-  Seeds, tilled soil, growth stages, harvest → food and crafting ingredients.
-- [ ] **`P-13` · Fall damage + drowning** — P1, S.
-  Turn swimming into a real hazard. Depends on `P-10`; the water systems already expose
-  `IsInWater` / `IsEyeInWater` / `IsSubmerged`.
-  - Progress: fall damage landed with `P-10` (5+ blocks, water cushions, creative/flight
-    immune). Drowning is still open, so swimming is currently harmless.
+  Seeds, tilled soil, growth stages, harvest -> food and crafting ingredients. Cross-links
+  `P-38`, `P-42`, `P-45`.
+- [ ] **`P-13` · Drowning** — P1, S.
+  Fall damage landed with `P-10`; **drowning is still open**, so swimming is harmless. The water
+  systems already expose `IsInWater` / `IsEyeInWater` / `IsSubmerged`.
 - [ ] **`P-29` · Death-mitigation gear** — P2, M.
-  Counter `P-10`'s drop-everything rule once it starts to hurt: a **backpack** that expands
-  inventory and, on death, drops as a single item holding its whole contents; **binding**
-  enchantments that keep the enchanted item through death. Ties into `P-18`.
+  Counter `P-10`'s drop-everything rule: a **backpack** that expands inventory and drops as one
+  item on death; **binding** enchantments that keep an enchanted item through death. Ties into
+  `P-18`.
+- [ ] **`P-38` · Animal husbandry & butchering** — P2, L.
+  Tame/breed farm animals (`F-2`), produce **meat** (food), **leather** (`P-39`) and **wool**
+  (clothing/bedding). The missing Act I food source.
+- [ ] **`P-39` · Leatherworking & clothing** — P2, M.
+  Leather/cloth clothing that gives warmth and the first *defense* layer before metal armor.
+  Vintage Story flavour; feeds `P-7` armor and `F-5` cold.
+- [ ] **`P-40` · Clay, pottery & bricks** — P2, M.
+  Clay deposits + a pottery wheel/crucible craft, so crucibles and molds have a real supply
+  chain instead of one recipe each. Feeds `P-3`, `P-44`.
+- [ ] **`P-41` · Charcoal & fuel economy** — P2, S–M.
+  A charcoal kiln (log pile -> charcoal) as the renewable fuel, plus burn-time data per wood.
+- [ ] **`P-42` · Branch / handle / tool-economy** — P2, S.
+  Branches as the tool handle and a general cheap component: makes the flint and copper tool
+  recipes need a handle, and gives `P-4` its assembly step.
+- [ ] **`P-45` · Food spoilage & preservation** — P3, M. *(taste call; can be dropped)*
+  Ageing food, salt/smoking/drying, an ice box. Vintage Story depth; only worth it if survival
+  is meant to be a long act.
+- [ ] **`P-46` · Research / tech-tree unlock** — P2, L.
+  Factorio-style unlock progression: some recipes are discovered rather than free. Shared spine —
+  an RPG can find schematics in dungeons (`P-55`) where an automation player researches them.
 
 ### Arc A — magicraft adventure RPG
 
 - [ ] **`P-14` · Magic system core** — P2, L.
-  Mana (or an equivalent resource), spell slots, casting from a staff/tome, schools
-  (fire/frost/arcane), spell scrolls as dungeon loot. First spell to ship is a **fireball**,
-  shared with the combat first cut (`F-4`).
+  Mana (or equivalent), spell slots, casting from a staff/tome, schools (fire/frost/arcane),
+  spell scrolls as dungeon loot. First spell to ship is a **fireball**, shared with `F-4`.
 - [ ] **`P-15` · Skill tree / character build** — P2, L.
-  Spend XP across branches; informs both combat and non-combat perks (`P-9`).
+  Spend XP (`P-9`) across branches; informs both combat and non-combat perks. Needs `U-12`.
 - [ ] **`P-16` · Dungeons & towers (structured POIs)** — P2, L.
   Deterministic multi-room structures (vaults, towers, crypts) with loot and spawners; overlaps
-  `P-26`.
+  `P-26` and needs `M-15`. **Milestone 2.**
 - [ ] **`P-17` · Boss encounters** — P2, XL.
-  Scripted multi-phase fights whose loot gates progression.
+  Scripted multi-phase fights whose loot gates progression (`P-52`). Needs `V-15`.
 - [ ] **`P-18` · Enchanting / item magic** — P3, L.
-  Spell effects bound to gear; a crafting-station cousin of the magic system.
+  Spell effects bound to gear; a crafting-station cousin of the magic system. Cross-links `P-29`,
+  `P-48`.
+- [ ] **`P-43` · Forge & anvil (metal shaping)** — P2, M.
+  After casting: hammer ingots into shaped parts, the gate to iron/steel tiers (`P-7`).
+- [ ] **`P-44` · Alloys** — P2, M.
+  Bronze from copper + tin, and later steel; the alloy step that makes mixed mining worthwhile.
+  Combines with `P-25`.
 
 ### Arc B — expert automation
 
 - [ ] **`P-19` · Power & rotation** — P2, L.
-  Hand crank → water wheel → windmill → steam; drives machines. Generalizes the quern and worm
-  patterns into a reusable "machine tick" concept.
+  Hand crank -> water wheel -> windmill -> steam; drives machines. Generalizes the quern and
+  worm patterns into a reusable **machine tick** concept. **Milestone 3.**
 - [ ] **`P-20` · Logistics: belts / pipes / carts** — P2, L.
   Move items and fluids between machines. Belts and pipes are new systems; carts touch moving
   collision (`F-10`).
 - [ ] **`P-21` · Machine chains & processing** — P2, L.
   Crusher, sawmill, smeltery, assembler; multi-step recipes with byproducts. The quern is step
-  zero of this chain.
+  zero; `P-3` is step one.
 - [ ] **`P-22` · Electronics / logic (redstone-ish)** — P2, L.
-  Scheduled-tick logic on top of the `FluidManager` pattern: sensors, gates, and moving collision
-  (pistons). Carries the old "redstone/pistons" item.
-- [ ] **`P-23` · Late game: chemistry → reactors → fusion** — P3, XL.
-  Tiered energy and processing; fusion as the automation endgame.
+  Scheduled-tick logic on top of the `FluidManager` pattern: sensors, gates, moving collision
+  (pistons).
+- [ ] **`P-23` · Late game: chemistry -> reactors -> fusion** — P3, XL.
+  Tiered energy and processing; fusion as the automation endgame. Depends on `P-31`–`P-35`.
+- [ ] **`P-31` · Storage & logistics network** — P2, L.
+  Chests/barrels/crates, mass storage and a routed inventory network; the substrate that makes
+  automation legible.
+- [ ] **`P-32` · Chemistry & materials** — P3, L.
+  Acids, plastics, composites; byproduct chains (`P-21`) that feed tools, armor and machines.
+- [ ] **`P-33` · Oil & refining** — P3, L.
+  Pumped/refined fuel as the bridge from steam to electric; lights, plastics, lubricant.
+- [ ] **`P-34` · Electronics & circuits** — P3, L.
+  Circuit-board tier sitting above `P-22`; gates electric machines and control systems.
+- [ ] **`P-35` · Robotics & drones** — P3, XL.
+  Mobile automation: drones for mining/farming/defense, and golem-style workers (`P-54`).
+- [ ] **`P-36` · Space, stations & other worlds** — P3, XL.
+  On top of `P-27`: launch vehicles, orbital stations, planetfall, per-planet resource sets.
+  The automation endgame's destination.
+- [ ] **`P-37` · Terraforming & off-world bases** — P3, XL.
+  Shape a hostile world into a habitable one; combines `P-36` and worldgen control.
+
+### Cross-pollination — the hybrid spine
+
+The section that makes the game *this* game rather than "Minecraft plus mods." Every entry here
+must respect the dual-identity contract: mandatory for the hybrid player, optional for a
+single-arc player.
+
+- [ ] **`P-47` · Shared exotic resource** — P2, M.
+  One rare crystal/reagent that is both a spell reagent and a reactor/machine component (and a
+  potion base). The single most important cross-link; gate it behind `P-52` with a manual
+  slow-farm fallback.
+- [ ] **`P-48` · Enchanting via automation** — P3, M.
+  A machine-run imbuing/enchanting station that mass-produces the blanks a mage hand-makes
+  slowly (`P-18`), so a factory player can gear an RPG character faster.
+- [ ] **`P-49` · Mana as power** — P3, L.
+  Arcane generators convert mana/reagents into rotation or electricity, and machines back-feed
+  spell charging. The deepest magic <-> tech fusion.
+- [ ] **`P-50` · Magical logistics** — P3, L.
+  Portals, teleport belts, rune-routed item flow as a late alternative to `P-20` belts; also a
+  fast-travel network for Arc A (`P-27`).
+- [ ] **`P-51` · Automation of RPG consumables** — P3, M.
+  Production lines for potions (`P-42`), ammo (`F-4`), food (`P-11`) and gear, so a factory
+  trivializes the RPG's supply grind — the intended "dabbling helps" payoff.
+- [ ] **`P-52` · Dungeons as gated resource nodes** — P2, M.
+  A reactor catalyst / blueprint drops **only** in POIs, so an automation bottleneck routes
+  through exploration. Pair with a slow manual fallback (a rare overworld node or a costly
+  synthesis) so pure automateers still advance.
+- [ ] **`P-53` · Tech-enhanced adventuring** — P3, M.
+  Alloy weapons (`P-44`), mining drill (`P-30`), jetpack/flight assist, powered armor. The
+  automation player's answer to a dungeon.
+- [ ] **`P-54` · RPG-enhanced tech** — P3, L.
+  Enchanted machines, summoned helpers, golem/drone labor (`P-35`), wards that protect a base.
+  The magic player's answer to a factory.
+- [ ] **`P-55` · Blueprint / schematic economy** — P3, M.
+  Tech trees learned by research (`P-46`) or found as dungeon schematics (`P-16`); the portable
+  knowledge that ties exploration to construction.
 
 ### Exploration & world content
 
 - [ ] **`P-24` · Biomes** — P1, M.
-  2D noise masks in `TerrainGenerator` (desert/snow/swamp/…). Palette and LOD are already
-  data-driven, so per-biome surfaces, wood, plants and water colour are mostly content.
-  - Progress: grass, `leaves` and `spruce_leaves` are tinted by climate (the `biomeTint` block
-    field, a grass and a foliage palette over `TerrainGenerator.Climate`; see AGENTS.md "Biome-tinted
-    grass and leaves"), in the chunks, the far LOD, felled trees, the mining pop and the debris.
-    Item drops, inventory icons and the held block keep the default grass/leaf tiles on purpose.
-    Open: falling-leaf particles (`LeafParticleRenderer`) still wear the default leaf colour and
-    read yellower than a tinted canopy, and could sample the foliage field at the burst cell;
-    flowers and water could opt into `biomeTint`'s `tile` form later.
+  Grass, leaves and spruce leaves are already climate-tinted through the `biomeTint` block field.
+  Open: falling-leaf particles should sample the foliage field; flowers and water can opt into
+  `biomeTint`'s `tile` form; and the biome roster itself can grow (swamp, jungle, savanna,
+  volcanic, underground biomes).
 - [ ] **`P-25` · More ores + deeper strata** — P1, M.
-  Coal/iron/gold/… veins placed deterministically like trees/pebbles/Malachite; tiers gate tools
-  (`P-1`, `P-7`).
+  Tin/iron/gold/… veins placed deterministically like trees/pebbles/malachite; tiers gate tools
+  (`P-1`, `P-7`, `P-44`).
 - [ ] **`P-26` · Structures & ruins** — P2, L.
-  Huts, mineshaft scraps, camps, towers; routes through `DropManager` like everything else.
+  Huts, mineshaft scraps, camps, towers; routes through `DropManager` and needs `M-15`.
 - [ ] **`P-27` · Second dimension + portals** — P3, XL.
-  Separate seed/noise sets on the same chunk pipeline; new LOD palette.
+  Separate seed/noise sets on the same chunk pipeline; new LOD palette. Base for `P-36`.
 - [ ] **`P-28` · Caves as destinations** — P2, M.
   Larger caverns, underground biomes, rare crystals and hazard zones; builds on the existing
-  cave/worm/lava generation.
+  cave/worm/lava generation. A natural home for `P-47`'s crystal.
+- [ ] **`P-56` · Ocean & island content** — P3, M.
+  Islands, shipwrecks, reefs, deep-sea POIs; makes the ocean a destination rather than a border.
+  Ties `F-19`.
+- [ ] **`P-57` · World events** — P2, M.
+  Blood moons, raids, meteors, wandering bosses, seasonal changes; drives `F-5` and gives the
+  base a reason to be defended (`P-54`).
+- [ ] **`P-58` · Landmarks & navigation** — P3, S–M.
+  Rare named landmarks, obelisks, map fragments; feeds `U-17` waypoints and exploration goals.
 
 ---
 
 ## 2. Fun
 
 - [ ] **`F-1` · Mobs — ambient critters** — P2, M.
-  Fireflies, butterflies, birds. Could share the particle infrastructure, so it is a cheap first
-  step into entities.
+  Fireflies, butterflies, birds. Could share the particle infrastructure — a cheap first step
+  into entities.
 - [ ] **`F-2` · Mobs — friendly / neutral (farm animals)** — P2, L.
-  Cows/sheep/chickens; wandering, breeding, drops, leads. Needs entity AI + spawning.
+  Cows/sheep/chickens; wandering, breeding, drops, leads. Needs `P-38`. Depends on entity AI.
 - [ ] **`F-3` · Mobs — hostiles (night / caves)** — P2, XL.
-  Spawn rules keyed to light and time, simple voxel pathing, attacks, loot. Depends on `P-10`.
-  - Progress (first cut): the slime landed — data-driven entity with a Blockbench model, hop AI
-    that homes on the player, airborne contact damage and knockback, a shove when grounded,
-    floats on water, death loot (`slimeball`), despawn and a spawn cap. It spawns on dry forest
-    surface in a 20-40 block ring only: not yet light/time-keyed, no cave spawns, hop-chase
-    rather than voxel pathing.
-  - Progress: the goblin landed as the second hostile, and slimes and goblins now share a `Mob`
-    base class. It is a ranged-then-melee raider: it carries 3-6 flint and lobs them on a solved
-    ballistic arc from a 4-12 block band, then chases the player for a club swing once they are gone.
-    Carried stones drop on death; missed stones shatter. It spawns like the slime (dry forest surface,
-    20-40 block ring, cap and despawn radius, shared `MobSpawner`). Still open for both hostiles:
-    light/time-keyed and cave spawns, and voxel pathing. The goblin walks straight at the player and
-    only auto-jumps one-block steps.
-- [ ] **`F-4` · Combat** — P2, L.
-  First cut: a **sword** — left-click swings, and left-clicking mid-swing chains a swing-back
-  left-to-right combo — plus **right-click to shield/block**. A **bow** with arrows covers ranged,
-  and **one magic spell (fireball)** bridges into Arc A (`P-14`). Later passes add attack
-  cooldown, armor, knockback and mob drops. Watch the right-click conflict with place/use and
-  `World.ThrowSelected`.
-  - Progress (first cut): melee landed. Left-click punches the nearest slime in the forward cone
-    for the held item's `entityDamage` (bare hand 1, flint tools 3, copper 5) with knockback; the
-    obsidian blade (`attack: "slice"`) swings the two-phase, two-target sweep (`SliceCombo`) and
-    the arm carries it across the front. Still open: right-click shield/block, bow + arrows, and
-    the fireball bridging to `P-14`; attack cooldown and armor also remain.
-  - Progress: mobs now hit back at range. Goblins throw flint stones at the player, then close for
-    a melee swing whose damage lands on the clip's impact frame; creative and flight are immune.
-    The punch, the slice and the player's thrown items all target every `Mob`. Throws test each
-    mob's body box rather than a centre sphere, so a tall goblin is hit through its head and shins.
+  The slime (hop AI, contact damage) and goblin (throw-then-melee raider, shared `Mob` base,
+  `MobSpawner`) landed. Still open: **light/time-keyed and cave spawns**, **voxel pathing**
+  (both currently walk/auto-jump straight at the player), more hostile kinds, and spawners
+  (`M-17`). Depends on `P-10`.
+- [ ] **`F-4` · Combat depth** — P2, L.
+  Melee landed: punch, the two-phase obsidian-blade slice (`SliceCombo`), knockback, per-item
+  `entityDamage`, and mobs that hit back. Still open: a **bow + arrows**, **right-click
+  shield/block**, the **fireball** bridging to `P-14`, attack cooldown, and armor (`P-7`).
 - [ ] **`F-5` · Weather & day/night threat** — P1, M.
-  Rain/snow, thunder, cold at night so shelter matters; drives the visual pass (`V-1`).
+  Rain/snow, thunder, cold at night so shelter matters; drives `V-1` and `P-39`. Pairs `P-57`.
 - [ ] **`F-6` · Fire spread & extinguishing** — P2, M.
-  Leaves/logs catch, water/rain puts out. Emergent danger; the campfire is the seed.
+  Leaves/logs catch, water/rain puts out; emergent danger. The campfire is the seed.
 - [ ] **`F-7` · Climbing — ladders, vines, ropes** — P2, M.
 - [ ] **`F-8` · Sandbox toys — bounce, launch pads, fans** — P3, M.
-- [ ] **`F-9` · Fishing** — P3, M.
+- [ ] **`F-9` · Fishing** — P3, M. Ties `P-56` and food (`P-11`).
 - [ ] **`F-10` · Boats / minecarts / transport** — P3, L.
-  Moving collision and passenger handling; engine-heavy.
+  Moving collision and passenger handling; engine-heavy. Feeds `P-20` carts.
 - [ ] **`F-11` · Ambience moments** — P2, S.
   Rare animal calls, wind, cave drips; ties into `M-2`.
+- [ ] **`F-12` · Mounts** — P3, L.
+  Rideable horses/creatures (Skyrim-flavour); needs moving collision (`F-10`).
+- [ ] **`F-13` · Taming & companions** — P3, M.
+  Tame wild animals/pets that follow and fight; a non-tech combat support for Arc A.
+- [ ] **`F-14` · Villages & NPC traders** — P2, L.
+  Generated villages with static NPCs and barter/shops; the RPG's social layer and an item sink.
+- [ ] **`F-15` · Factions & reputation** — P3, L.
+  Standing with groups that gates quests, prices and safe zones; fed by `F-14`, `F-16`.
+- [ ] **`F-16` · Quests / bounty board** — P2, L.
+  Radiant and hand-authored quests (fetch, hunt, clear a dungeon) as session direction. Needs
+  `U-15`.
+- [ ] **`F-17` · Music & instruments** — P3, S–M.
+  Playable instruments, biome/day-night music layers, jukebox-style discs.
+- [ ] **`F-18` · Village raids & defense** — P3, L.
+  Hostile waves against player bases/villages; gives `P-54` wards and `F-3` a purpose.
+- [ ] **`F-19` · Ocean life & hazards** — P3, M.
+  Fish schools, hostile sea mobs, currents, drowning depth (`P-13`); pairs `P-56`.
 
 ---
 
@@ -234,22 +338,15 @@ same world, and a player can move between them freely — neither arc gates the 
 - [ ] **`U-1` · Item tooltips** — P1, S.
   Name, durability, what it is for. `ItemType.Name` already carries the "future tooltips" note.
 - [ ] **`U-2` · Health & hunger HUD** — P1, M.
-  Bars plus damage feedback; depends on `P-10` / `P-11`.
+  Health hearts landed; add the hunger bar and clearer damage feedback. Depends on `P-10`/`P-11`.
 - [ ] **`U-3` · Crafting UI polish** — P1, M.
-  Keep the shapeless list-and-hand-feed model; polish it (recipe search, "what this makes / what
-  uses this", clearer fed/needed counts) and add QoL. Stations reuse this UI, get a unique one
-  later, or craft in-world as the campfire and quern already do (see `P-2`).
+  Keep the shapeless list-and-hand-feed model; polish it (search, "what this makes / what uses
+  this", clearer fed/needed counts). Stations reuse this UI, get their own, or craft in-world as
+  the campfire/quern do (see `P-2`).
 - [ ] **`U-4` · Inventory QoL** — P1, M.
-  Shift-click, stack move/split, drag, and a bound drop key (`World.ThrowSelected` already
-  exists but appears unbound).
-- [ ] **`U-5` · Death / respawn screen** — P1, S. Pairs with `P-10`.
-- [ ] **`U-6` · Main menu / world select / seed entry** — P1, M.
-  - Progress: the game boots to a main menu (START / SETTINGS / EXIT); START opens a worlds page
-    listing the saves with PLAY / EDIT (rename) / DELETE (confirm popup) per row plus CREATE
-    (name field with the store's unique-suffix rule, seed field: empty = random) and BACK; opening
-    a world shows an animated loading screen, and the pause menu's third button is SAVE & QUIT
-    (`MainMenuController`, `LoadingScreenView`, see AGENTS.md "Launch flow"). Still open: world
-    type and difficulty options (`M-5`).
+  Shift-click, stack move/split, drag, and a bound drop key (`World.ThrowSelected` exists but
+  appears unbound).
+- [ ] **`U-5` · Death / respawn screen** — P1, S. Pairs `P-10`. **Milestone 1.**
 - [ ] **`U-7` · Creative palette + dev commands** — P1, M.
   Searchable all-blocks inventory; `/give`, `/tp`, `/time`, `/gamemode`, `/seed` for testing and
   content authoring. Huge for iteration speed.
@@ -258,177 +355,133 @@ same world, and a player can move between them freely — neither arc gates the 
   Biome, light level, chunk coords, facing, targeted block. Coordinates already exist.
 - [ ] **`U-10` · Map / minimap** — P3, L. Needs a top-down render of explored chunks.
 - [ ] **`U-11` · Help screen** — P2, S.
-  Key list plus a short "how to survive your first night". Carries the old help-screen item.
+  Key list plus a short "how to survive your first night".
+- [ ] **`U-12` · Skill / perk tree UI** — P3, L. For `P-15`/`P-9`.
+- [ ] **`U-13` · Spell wheel / magic hotbar** — P3, M. For `P-14`.
+- [ ] **`U-14` · Tech / research tree UI** — P3, L. For `P-46`, Factorio-style.
+- [ ] **`U-15` · Quest journal** — P3, M. For `F-16`.
+- [ ] **`U-16` · Bestiary / codex** — P3, M. Mobs, blocks, recipes, lore as discoverable entries.
+- [ ] **`U-17` · Waypoints & compass markers** — P3, S–M. Feeds `P-58`, `P-50`.
+- [ ] **`U-18` · Storage / logistics UI** — P3, M. Chests, sorting, filters; for `P-31`.
+- [ ] **`U-19` · Dedicated station UIs** — P3, M. Furnace, anvil, kiln, casting, enchanting.
+- [ ] **`U-20` · Accessibility options** — P2, M.
+  Colour-blind palettes, subtitles, FOV/motion toggles, UI scale, difficulty assists.
+- [ ] **`U-21` · Crafting grid (optional)** — P3, M.
+  Decide whether a shaped grid is ever wanted; the current system is deliberately shapeless.
+  Parked, not planned — revisit only if content demands it.
 
 ---
 
 ## 4. Visual & particles
 
 - [ ] **`V-1` · Weather visuals — rain/snow particles, darkening, lightning** — P1, M.
-  Pairs with `F-5`; the particle ring and cloud/day-night passes are the base.
+  Pairs `F-5`; the particle ring and cloud/day-night passes are the base.
 - [ ] **`V-2` · Water particles** — P1, M.
   Entry/exit splash, shore foam, walking wake, rain ripples. The water passes already expose the
   surface and thickness data this needs.
-- [ ] **`V-3` · Footstep dust & landing puffs** — P1, S.
-  Cheap, high feel; texture-tinted per surface.
-- [ ] **`V-4` · Torch & fire particles** — P1, S.
-  Flame and smoke on torches and campfires; the fire/campfire systems already produce these.
+- [ ] **`V-3` · Footstep dust & landing puffs** — P1, S. Cheap, high feel; texture-tinted per
+  surface.
+- [ ] **`V-4` · Torch & fire particles** — P1, S. Flame and smoke; the fire/campfire systems
+  already produce these.
 - [ ] **`V-5` · Item pickup sparkle & interaction feedback** — P2, S.
 - [ ] **`V-6` · Sky: stars, moon phases, shooting stars, aurora** — P1, M.
   Clouds and the sun disc exist; finish the sky.
 - [ ] **`V-7` · Sunrise/sunset colour grading** — P2, M.
-- [ ] **`V-8` · Post-processing: bloom (lamps/campfire/sun), underwater fog gradient, damage/heal flash** — P2, L.
+- [ ] **`V-8` · Post-processing: bloom, underwater fog gradient, damage/heal flash** — P2, L.
+  Bloom for lamps/campfire/sun.
 - [ ] **`V-9` · Third-person camera** — P1, M.
   `PlayerModel` exists and is currently never seen; also helps showcase shots.
 - [ ] **`V-10` · Mob / entity rendering** — P2, L.
-  Models and animation for `F-1`–`F-3`.
-  - Progress: the goblin is the first articulated mob. It is a nested-group Blockbench rig drawn
-    per part, animated from keyframe clips authored in the `.bbmodel` (idle, walk, throw, melee).
-    `BbmodelLoader` parses the clips into `AnimationClip`s, and a generic `EntityAnimator` layers
-    speed-crossfaded locomotion under one-shot actions that fire gameplay events. The item
-    debugger's ENTITIES tab previews every entity with one button per clip plus HURT
-    (`ITEM_DEBUGGER_ANIM`). Still open: the slime is still one baked mesh with a procedural squash, there is no
-    death animation, and the goblin shows no hurt pose beyond the hit-flash tint.
+  The goblin is the first articulated rig (nested Blockbench groups, keyframe clips, layered
+  `EntityAnimator`), and the item debugger previews every clip. Still open: the slime is one
+  baked mesh with a procedural squash, **no death animation**, and no hurt pose beyond the flash.
 - [ ] **`V-11` · Ambient critter particles (fireflies, insects)** — P2, S.
+- [ ] **`V-12` · Spell & ability VFX** — P3, L. Projectiles, cast gestures, impact, wards; for
+  `P-14`, `P-18`.
+- [ ] **`V-13` · Machine & station animation** — P3, M.
+  Spinning wheels, belts, pistons, smoke/steam particles, running lights; for `P-19`–`P-22`.
+- [ ] **`V-14` · Armor & weapon models** — P3, M. Worn armor layers, held-weapon meshes.
+- [ ] **`V-15` · Boss intro & death animations** — P3, M. For `P-17`.
+- [ ] **`V-16` · Weather depth** — P3, M. Lightning bolts, thunder flash, storm clouds, snow
+  accumulation; builds on `V-1`.
+- [ ] **`V-17` · Camera & movement feedback** — P2, S. Sprint FOV, head-bob, landing camera
+  dip, hurt kick; builds on the existing trauma shake.
+- [ ] **`V-18` · Block & environment detail pass** — P3, M.
+  Connected textures, more material atlas entries, emissive/flicker variants.
 
 ---
 
 ## 5. Misc / foundations
 
-- [ ] **`M-1` · Save/load — region files, seed + block deltas** — **P0, L. Core landed; the rest is `M-12`.**
-  Persist block edits, inventory, position, time of day and block-entity state (campfires,
-  querns, TNT). Worldgen stays a pure function; only deltas + the seed are written. Nothing above
-  this line has lasting meaning until it ships.
-  - Progress: chunk edits (modified chunks only, per-world `chunks/*.bin`), the far-LOD edit state
-    (`lod-edits.bin`: caps, surface overrides, canopy markers), the player (pose, modes, health,
-    time of day, inventory + hotbar) and nearby entities (mobs + drops) are persisted, with
-    autosave and save & quit (AGENTS.md "Saves"). Still open: station block entities
-    (campfire/quern/kiln/casting) and in-flight TNT/falling blocks/projectiles, split out as
-    `M-12`.
 - [ ] **`M-2` · Gameplay SFX** — P1, M.
-  Break/place/step/splash/fire/UI sounds on the existing NAudio stack (day/night ambience already
-  crossfades there). Note: the old plan said "Silk.NET audio" — the code actually uses
-  NAudio + NLayer, so build on that.
-  - Progress (first cut): `SfxManager` + `SfxMixer` play a random clip of a group on block hits
-    (per-block `sfx` groups `hit_rock` / `hit_wood` / `hit_default`) and item pickup, with an SFX
-    volume slider beside the ambience one. Still open: place/step/splash/fire/UI.
+  `SfxManager`/`SfxMixer` play per-block hit groups and pickup, with an SFX volume slider. Still
+  open: **place/step/splash/fire/UI** sounds. Note: audio is NAudio + NLayer, not Silk.NET.
 - [ ] **`M-3` · Keep content JSON-only** — ongoing.
   New blocks/items/recipes/structures stay data, not code, per AGENTS.md. Add schema fields as
-  the systems above need them (tool, station, harvest tier, food, biome...).
+  the systems above need them (tool, station, harvest tier, food, spell, machine...).
 - [ ] **`M-4` · Multiplayer (headless server + chunk packets)** — P3, XL.
   The threading model already isolates sim from GL; still weeks (auth, prediction, edit
   conflicts).
 - [ ] **`M-5` · World options on new game** — P2, S.
-  Seed picker, world type, difficulty, survival/creative.
-  - Progress: the seed picker landed with the create-world page (`WorldSeedParser`). World type,
-    difficulty and a survival/creative choice are still open.
-- [ ] **`M-6` · Per-world config + settings persistence** — P2, S.
-  - Progress: each world's name, seed, timestamps and format version live in its `world.json`
-    (`WorldStore`), and the player settings already persist in `settings.json`. Still open: any
-    other per-world config (game rules, difficulty).
+  The seed picker landed with the create-world page; still open: **world type, difficulty, and a
+  survival/creative choice** (the old main-menu/seed-entry item landed).
+- [ ] **`M-6` · Per-world config + game rules** — P2, S.
+  World name/seed/timestamps/format already live in `world.json`, and player settings persist.
+  Still open: per-world game rules and difficulty (`M-5`, `M-18`).
 - [ ] **`M-7` · Localisation / text pipeline** — P3, M.
 - [ ] **`M-8` · Fix: falling blocks do not slide off a single block** — P2, S. Carried from the
   old TODO.
 - [ ] **`M-9` · Mod / data-pack behavior hooks** — P3, XL.
-  Data packs already exist; consider a scripting/behavior hook.
+  Data packs already exist; consider a scripting/behavior hook (`M-21`).
 - [ ] **`M-10` · Fix: `TreeGenerator.CanopyDisturbed` loses felled-canopy markers at its cap** —
-  P2, S. **It is edit state, not a cache.** `TreeGenerator.PoisonCanopy` (`TreeGenerator.cs:477-488`)
-  records that a player cleared canopy so the far LOD stops drawing a bump there, writing
-  `(2 * TreeCanopyPoisonRadius + 1)^2` = **289 entries per edited wood/leaf block**
-  (`TreeCanopyPoisonRadius = 8`) and wholesale-`Clear()`ing the whole dictionary at 16384 entries.
-  So after roughly **57 felled trees** every marker is thrown away at once and the LOD starts
-  drawing canopy bumps back over ground the player has already cleared — a visible correctness bug,
-  not a cost. There is a second, smaller defect in the same method: the `Count >= limit` test sits
-  **inside** the 289-iteration loop, so every mined leaf block evaluates
-  `ConcurrentDictionary.Count` — which acquires *every lock in the table* — 289 times, on the main
-  thread, during mining. **This must NOT be "fixed" by moving it onto `GenerationalCache`** (the
-  type introduced by PERF_TODO item D2): that type is for values which are a pure function of their
-  key, where an eviction costs only a recompute. Here nothing can regenerate a marker from the key,
-  so any eviction is data loss. The real fix derives the disturbed set from stored block data, and
-  is therefore entangled with `M-1` (save/load); the cheap interim is to stop the unbounded growth
-  at the source (store one entry per edited chunk column rather than 289 per block) and to hoist
-  the `Count` test out of the loop. The same argument applies to `LodRegion.ColumnCaps`, tracked
-  below as `M-11`.
-  - Progress: the markers are now persisted per world (`LodEditState`, `lod-edits.bin`) and reset
-    between worlds by `WorldSeed.Apply`, so they survive a restart; the 16384-entry wholesale
-    `Clear()` at the cap is still there, so the bug above is unchanged within a session.
-- [ ] **`M-13` · Far-LOD canopy for grown trees** — P3, M. `TreeGenerator.PoisonCanopy` only
-  removes canopy, so a tree grown by `TreeGrowthWriter` (TREES_PLAN phase 6, the `grow` scenario
-  op) shows no far canopy until reload; needs an add-canopy override (`LodSurface`-style) keyed by
-  column. Every grow also spends `CanopyDisturbedLimit` budget (radius 0 per column), so heavy
-  growth brings `M-10`'s wholesale `Clear()` closer.
-- [ ] **`M-14` · Wide-trunk residue (TREES_PLAN phase 7)** — P3, M. Three known gaps left by the
-  core/shell trunks: (1) a felled tree is meshed by `TopplingTree.BuildMeshData` inside one 16³
-  scratch chunk, so a wide or tall tree's falling mesh is truncated to that box (the drops are
-  intact) — needs a multi-chunk scratch or a bounds-sized mesh build. `CellBatchMesher.Build`
-  (TREES_PLAN phase 8, the item debugger's TREES tab) is a ready replacement for that single
-  window: it meshes any cell list with the real chunk mesher across tiled scratch chunks at their
-  real positions, padded by an empty ring with the edge and corner diagonals; (2) cutting a wide trunk's
-  core while its slice's shells stand leaves the crown unreachable for reactive growth, because
-  `TreeGraph.FromWorld` stops at the missing core and `TreeGrowthWriter` cannot refill it (the
-  core above still names it as its parent, so the cell reads as an orphan's missing parent) —
-  needs `FromWorld` to bridge a cut core through its shell ring, or the writer to re-core it;
-  (3) a bevelled pixel-rim shell's cap cull reads the edge neighbours of the cell above or below,
-  which can lie in an edge-diagonal chunk that face-adjacent dirtying (`ChunkManager.MarkDirty`)
-  does not remesh, so an edit there can leave a rare stale cap hole or overdraw until the chunk is
-  next rebuilt — needs the edit paths to dirty edge-diagonal chunks for pixel-rim wood.
-- [ ] **`M-11` · `LodRegion.ColumnCaps` grows unbounded, and it must NOT take D2's scheme** —
-  P2, L, blocked on a design. **It is edit state, not a cache**, and it is the sibling of `M-10`
-  above. `LodRegion.ColumnCaps` (`LodRegion.cs:130`) is a **process-global** `ConcurrentDictionary`
-  holding one dense `Chunk.Size * Chunk.Size` `int[]` — 256 ints, **~1 KB, per *edited chunk
-  column*** with `Chunk.Size = 16` — written by `LowerColumnBelow` (`:147-172`) whenever a removal
-  would expose buried LOD, and **never removed by anything**. Over a long editing session it only
-  grows. The fix PERF_TODO's `D2` shipped for the worldgen caches (`GenerationalCache`) is actively
-  wrong here, because this is a **different problem: growth, not eviction**.
-  - **It cannot go on `GenerationalCache`.** A cap entry encodes an *irreproducible player edit*; no
-    generator can rebuild one from its key. Evicting a cap while its column is still LOD-relevant
-    makes mined terrain **pop back** in the far rings — a visible correctness bug, not a recompute.
-    `GenerationalCache`'s invariant 10 names this site explicitly as one that must never be stored
-    there, and AGENTS.md carries the same standing rule.
-  - **Nor can eviction ride chunk unload.** LOD regions cover terrain far outside the loaded chunk
-    sphere (`ChunkRadius` 16 chunks vs rings out to 2048 blocks), so a cap must **outlive** its
-    chunk. "Drop the cap when the chunk unloads" is the obvious fix and it is wrong.
-  - **Whatever is done must preserve `LowerColumnBelow`'s publish ordering** (`LodRegion.cs:165-172`):
-    the bucket is published into the `ConcurrentDictionary` first and the value written with
-    `Volatile.Write` after, which the code's own comment records as load-bearing for a future
-    multi-threaded LodGen. A fix that replaces the container must carry that ordering across.
-  - **A real fix needs caps re-derivable from stored block data** — i.e. it is entangled with
-    save/load (`M-1` above), because only persisted edits let a cap be dropped and recomputed on
-    demand. That makes this a **correctness item waiting on a design**, not a perf item, and larger
-    than it looks.
-  **Observed cost today, not hypothetical:** because `ColumnCaps` is global with no reset hook and
-  `BuildMeshData` gates on `hasCaps = !ColumnCaps.IsEmpty` (`:302`, read at `:312`), any test class
-  that mines or drops a block near the origin flips a *later* build of the same region, which is what
-  makes `LodBuildPoolTests.RegionBuildsAreIdenticalWhicheverThreadRunsThem` and
-  `LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel` **intermittent in
-  full-suite runs** (reproduced on pristine HEAD, so not a regression from any perf round — see
-  PERF_TODO's "Measurement: D2"). `LodColumnCapTests.cs` and `LodHeightSamplingTests.cs` already dodge
-  it with far region coordinates ((777, 777) and (555, -555)) and say so in comments; those two
-  classes do not. **Expect the two intermittents; never "fix" them by touching `ColumnCaps`.**
-  Arrived here from PERF_TODO's `D2b` when that file was closed out: its entries are irreproducible
-  player edits, which makes it a **correctness** item entangled with save/load, not a perf item.
-  - Progress: the caps are now persisted per world (`LodEditState`), imported before the first
-    LOD region builds and reset between worlds by `WorldSeed.Apply`. They are still one
-    process-global, never-shrinking table within a world, so the growth problem above stands.
-- [ ] **`M-12` · Persist station block entities (campfire/quern/kiln/casting) and in-flight
-  TNT/falling blocks/projectiles** — P1, M.
-  The save format covers chunks, the far-LOD edit state, the player and mobs/drops, but not the
-  in-memory station registries (a lit campfire, a spinning quern, a kiln's fuel and crucible, a
-  mold's cast progress), primed TNT, falling blocks, projectiles or toppling trees. A reloaded
-  kiln is plain blocks plus state bytes until a right-click re-registers it. Add a side-car per
-  registry or one `block-entities.json`, restored like the mobs once the cell's chunk loads (see
-  AGENTS.md "Saves").
-
----
-
-## Done (kept for context)
-
-- [x] Pause menu, settings and F3-style coordinates HUD.
-- [x] Clouds (translucent layer with reflection reuse).
-- [x] Leaf particles.
-- [x] JSON-only content drop: malachite ore, flowers, pebbles, branch piles.
-- [x] Crafting system, campfire cooking and the quern (old "crafting + furnace" item, partly).
-- [x] Day/night ambience audio (looping, crossfaded).
-
-> Old TODO item 1 (perf: PERF_TODO 8/10, `SustainedLowLatency`, PGO, delta-time) now lives in
-> **PERF_TODO.md** only.
+  P2, S. It is edit state, not a cache: 289 entries per edited block and a wholesale `Clear()` at
+  16384 entries, so after roughly 57 felled trees the LOD redraws cleared canopy, and the `Count`
+  test sits inside the 289-iteration loop (a per-block lock storm). The markers now persist per
+  world (`LodEditState`) but the in-session `Clear()` bug stands. **Must NOT** move to
+  `GenerationalCache` (eviction = data loss). The real fix derives the set from stored block data
+  and is entangled with save/load; the interim is one entry per chunk column and hoisting the
+  `Count` test. Sibling of `M-11`.
+- [ ] **`M-11` · `LodRegion.ColumnCaps` grows unbounded** — P2, L, blocked on a design.
+  A process-global, never-shrinking `ConcurrentDictionary` of ~1 KB per edited chunk column.
+  Edit state, not a cache (eviction pops mined terrain back into the far LOD); cannot ride chunk
+  unload (LOD outlives chunks). A real fix re-derives caps from stored block data, so it is
+  entangled with save/load. Caps now persist per world (`LodEditState`); the growth stands. Must
+  preserve `LowerColumnBelow`'s publish ordering. **Expect `LodBuildPoolTests` /
+  `LodHeightSamplingTests` intermittents; never "fix" them by touching `ColumnCaps`.**
+- [ ] **`M-12` · Persist station block entities + in-flight entities** — P1, M.
+  The save format covers chunks, LOD edit state, the player and mobs/drops, but not the in-memory
+  station registries (campfire, quern, kiln, casting), primed TNT, falling blocks, projectiles or
+  toppling trees. Add a side-car per registry or one `block-entities.json`, restored like mobs
+  once the cell's chunk loads.
+- [ ] **`M-13` · Far-LOD canopy for grown trees** — P3, M.
+  `PoisonCanopy` only removes canopy, so a grown tree shows no far canopy until reload; needs an
+  add-canopy override keyed by column. Also spends `CanopyDisturbedLimit` budget per grow.
+- [ ] **`M-14` · Wide-trunk residue (TREES_PLAN phase 7)** — P3, M.
+  (1) a felled tree's mesh is truncated to one 16³ scratch chunk (`CellBatchMesher.Build` is a
+  ready multi-chunk replacement); (2) cutting a wide core while its shells stand strands the
+  crown for reactive growth; (3) a bevelled shell's cap can go stale when an edit lands in an
+  edge-diagonal chunk that face-adjacent dirtying does not remesh.
+- [ ] **`M-15` · Structure templates / schematic system** — P2, L.
+  A loadable, placeable blueprint format (jigsaw or simple offsets) that `P-16`, `P-26`, `F-14`
+  and `P-37` all build on. Prerequisite for all generated POIs.
+- [ ] **`M-16` · Loot table depth** — P2, M.
+  Conditions (biome, luck, tool), nested tables, guaranteed/weighted pools, and dungeon-tier
+  loot; generalizes the current pools.
+- [ ] **`M-17` · Spawner block / entity** — P2, M.
+  A placeable spawner the dungeon and structure generators can seed; keyed by light/time and
+  mob kind. Needed by `P-16`, `F-3`.
+- [ ] **`M-18` · Difficulty & game rules** — P2, M.
+  Peaceful/normal/hard, mob multiplier, day-night length, keep-inventory, weather toggles;
+  per-world (`M-6`).
+- [ ] **`M-19` · Advancements / achievements backend** — P2, M. Data-defined goals + triggers
+  for `P-8`.
+- [ ] **`M-20` · Photo mode / screenshot tools** — P3, S.
+  Free camera, HUD hide (the screenshot op already supports `hideHud`), filters; helps marketing.
+- [ ] **`M-21` · Scripting / behavior hook API** — P3, XL. Extends `M-9`; the real mod story.
+- [ ] **`M-22` · Save migration & versioning** — P2, M.
+  `world.json` carries a format version; add migration paths so old saves survive schema growth
+  (critical once `M-12` lands).
+- [ ] **`M-23` · Dedicated-server hosting** — P3, XL. Depends on `M-4`.
+- [ ] **`M-24` · Data-driven AI behaviors** — P3, L.
+  Compose mob behaviors (goals, tasks, senses) from JSON so new hostiles need no C#; backs
+  `F-3`, `F-13`, `F-14`.

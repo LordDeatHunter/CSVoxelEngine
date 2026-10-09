@@ -239,7 +239,7 @@ public sealed class GameServer : IDisposable
                 using var writer = new PacketWriter(NetMessage.ColumnHeights);
                 writer.Write(cx);
                 writer.Write(cz);
-                writer.WriteBytes(ChunkNetCodec.EncodeHeights(Chunk.GetColumnHeights(cx, cz)));
+                writer.WriteBytes(ChunkNetCodec.EncodeHeights(ColumnCache.GetHeights(cx, cz)));
                 client.Send(writer.ToArray());
                 break;
             }
