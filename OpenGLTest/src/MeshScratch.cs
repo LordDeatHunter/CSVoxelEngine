@@ -63,11 +63,14 @@ internal sealed class MeshScratch
         Array.Clear(NeighborStates, 0, NeighborStates.Length);
     }
 
-    /// <summary>The nine chunk-column heightmaps the light volume spans (see
-    /// <c>Chunk.FillLightColumnHeights</c>), in (dx * 3 + dz) order. Reused per build instead of
-    /// probing the ColumnData cache once per light-volume column (PERF_TODO C2); cleared once the
-    /// sun seeds are placed, like <see cref="ClearNeighbors"/>.</summary>
-    internal readonly int[]?[] LightColumnHeights = new int[9][];
+    /// <summary>The 3x3 chunk-column terrain of the current build, in <c>dx * 3 + dz</c> order for
+    /// column (cx - 1 + dx, cz - 1 + dz), resolved once by <see cref="ChunkLighting.FillColumns"/>
+    /// from <c>Chunk.GenerateMeshData</c> (worldgen or streamed, through
+    /// <see cref="ChunkManager.ColumnSource"/>). Read by the sun seeding,
+    /// <see cref="ChunkMesher.SubmergedSurfaceCode"/> and the biome tint fields; cleared at the end
+    /// of the build like <see cref="ClearNeighbors"/>, so pooled threads hold no column references
+    /// at rest.</summary>
+    internal readonly ColumnTerrain[] Columns = new ColumnTerrain[9];
 
-    internal void ClearLightColumns() => Array.Clear(LightColumnHeights, 0, LightColumnHeights.Length);
+    internal void ClearColumns() => Array.Clear(Columns, 0, Columns.Length);
 }

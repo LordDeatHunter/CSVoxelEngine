@@ -279,8 +279,7 @@ public class Chunk : IDisposable
     /// slot is 0 and the byte is exactly the old level.
     /// </para>
     /// </summary>
-    private bool ComputeLight(byte[] light, byte[] sun, byte[] block, int[] queue,
-        Func<int, int, int[]?>? streamedHeights)
+    private bool ComputeLight(byte[] light, byte[] sun, byte[] block, int[] queue)
     {
         var worldY0 = LowerBoundY - LightBorder;
 
@@ -288,16 +287,14 @@ public class Chunk : IDisposable
         var tail = 0;
 
         // The LightSize^2 volume columns only ever land in the 3x3 chunk columns around this one
-        // (LightBorder < Size), so their heightmaps are fetched once here instead of probing the
-        // ColumnData cache per column (PERF_TODO C2). Same nine ColumnData instances, same heights -
-        // only the number of dictionary probes changes.
+        // (LightBorder < Size), so their heightmaps are fetched once by GenerateMeshData into
+        // MeshScratch.Columns (ChunkLighting.FillColumns) instead of probing the column source per
+        // column (PERF_TODO C2). Same nine columns, same heights - only the number of probes changes.
         Span<int> mapChunk = stackalloc int[LightSize];
         Span<int> mapLocal = stackalloc int[LightSize];
         BuildLightAxisMap(mapChunk, mapLocal);
 
-        var scratch = MeshScratch.Current;
-        var columns = scratch.LightColumnHeights;
-        FillLightColumnHeights((int)Position.X, (int)Position.Z, columns, streamedHeights);
+        var columns = MeshScratch.Current.Columns;
 
         // Sunlight seeds: air cells at or above the terrain height see the sky directly.
         // Leaves seed too: canopies pass light, so the sky reaches straight through them
@@ -309,7 +306,7 @@ public class Chunk : IDisposable
             var heightRow = mapLocal[lx] << SizeShift;
             for (var lz = 0; lz < LightSize; lz++)
             {
-                var height = columns[columnRow + mapChunk[lz]]![heightRow | mapLocal[lz]];
+                var height = columns[columnRow + mapChunk[lz]].Heights[heightRow | mapLocal[lz]];
                 var columnBase = (lx * LightSize) * LightSize + lz;
                 for (var ly = 0; ly < LightSize; ly++)
                 {
@@ -323,8 +320,6 @@ public class Chunk : IDisposable
                 }
             }
         }
-
-        scratch.ClearLightColumns();
 
         SpreadLight(light, sun, queue, ref head, ref tail);
 
@@ -1021,7 +1016,9 @@ public class Chunk : IDisposable
         => x >= 0 && y >= 0 && z >= 0 && x < Size && y < Size && z < Size;
 
     /// <summary>
-    /// Builds this chunk's mesh, or returns null when a face neighbour is missing.
+    /// Builds this chunk's mesh, or returns null when a face neighbour, or one of the nine chunk
+    /// columns' terrain (<see cref="ChunkManager.ColumnSource"/>, a streamed column that has not
+    /// arrived), is missing.
     /// The whole 3x3x3 neighbourhood is resolved once, up front: the caller checked for face
     /// neighbours before scheduling, but this runs on a pool thread behind a semaphore and can
     /// start seconds later, by which time an unload may have taken one away. Meshing against
@@ -1037,8 +1034,8 @@ public class Chunk : IDisposable
     /// a static flag because test classes run in parallel and pool threads read it.
     /// <paramref name="tintFields"/> overrides the biome tint field: a build whose chunk is not
     /// where its blocks really stand (TopplingTree.BuildMeshData's scratch chunk at (256, 0, 256))
-    /// passes the field of the real footprint; null means the chunk's own
-    /// <see cref="BiomeTint.FieldsFor"/>.
+    /// passes the field of the real footprint; null means the chunk's own fields, from the stored
+    /// corner climate of its lattice columns (<see cref="BiomeTint.FieldsFromNeighbourhood"/>).
     /// </summary>
     internal ChunkMeshData? GenerateMeshData(ChunkManager chunkManager, bool greedy,
         BiomeTintFields? tintFields = null)
@@ -1060,6 +1057,17 @@ public class Chunk : IDisposable
         if (_solidCount == 0 || IsFullyEnclosed(neighbors))
             return new ChunkMeshData([], [], [], [], false);
 
+        // The nine chunk columns' terrain (heights, water levels, corner climate), resolved once
+        // for the light flood, the water-surface codes and the tint. False is a streamed column
+        // that has not arrived: the caller re-dirties exactly as for a vanished neighbour. Nothing
+        // has been rented yet, so this exit needs no finally.
+        if (!ChunkLighting.FillColumns(chunkManager.ColumnSource, (int)Position.X, (int)Position.Z, scratch.Columns))
+        {
+            scratch.ClearNeighbors();
+            scratch.ClearColumns();
+            return null;
+        }
+
         var padded = ArrayPool<byte>.Shared.Rent(PaddedCount);
         var paddedState = ArrayPool<byte>.Shared.Rent(PaddedCount);
         // Rented arrays arrive dirty: the light snapshot is fully overwritten by the fill,
@@ -1076,7 +1084,7 @@ public class Chunk : IDisposable
             scratch.ClearNeighbors();
             Array.Clear(sunLight, 0, LightCount);
             Array.Clear(blockLight, 0, LightCount);
-            var anyTinted = ComputeLight(lightBlocks, sunLight, blockLight, queue, chunkManager.ColumnHeightSource);
+            var anyTinted = ComputeLight(lightBlocks, sunLight, blockLight, queue);
             // Keep the chunk's own cells of the flood for entity lighting: a fresh array owned
             // by this build alone, published by UpdateMesh with the mesh it belongs to. A chunk
             // lit by coloured light appends a second half holding each cell's colour slot.
@@ -1102,6 +1110,7 @@ public class Chunk : IDisposable
             ArrayPool<byte>.Shared.Return(sunLight);
             ArrayPool<byte>.Shared.Return(blockLight);
             ArrayPool<int>.Shared.Return(queue);
+            scratch.ClearColumns();
         }
     }
 
@@ -1258,16 +1267,18 @@ public class Chunk : IDisposable
         // Exposed hot-fluid cells (lava open to the air), allocated only when one turns up
         List<ushort>? vents = null;
 
-        // World origin of this chunk, for resolving a submerged face's water surface when its
-        // column leaves the padded snapshot (SubmergedSurfaceCode)
+        // World origin of this chunk, for the procedural emitters' per-cell world position; a
+        // submerged face whose column leaves the padded snapshot reads its water level from the
+        // build's resolved columns instead (SubmergedSurfaceCode)
         var chunkBaseY = LowerBoundY;
         var worldX0 = (int)Position.X * Size;
         var worldZ0 = (int)Position.Z * Size;
+        var columns = MeshScratch.Current.Columns;
 
-        // Biome tint of grass and leaves, both palettes from one climate evaluation per lattice
-        // corner (8 noise evaluations per build). A scratch build away from its blocks' real
+        // Biome tint of grass and leaves, both palettes from the stored corner climate of the
+        // four lattice columns (no noise evaluation). A scratch build away from its blocks' real
         // position (a felled tree) passes the field of the real footprint instead.
-        var fields = tintFields ?? BiomeTint.FieldsFor((int)Position.X, (int)Position.Z);
+        var fields = tintFields ?? BiomeTint.FieldsFromNeighbourhood(columns);
         // Corner scratch of a biome-tinted face in the per-voxel loop below
         Span<byte> tShade = stackalloc byte[4];
         Span<float> tSun = stackalloc float[4];
@@ -1275,7 +1286,7 @@ public class Chunk : IDisposable
         Span<ushort> tTint = stackalloc ushort[4];
 
         if (greedy)
-            ChunkMesher.EmitGreedyFaces(MeshScratch.Current, padded, paddedState, chunkBaseY, worldX0, worldZ0,
+            ChunkMesher.EmitGreedyFaces(MeshScratch.Current, padded, paddedState, chunkBaseY,
                 sunLight, blockLight, vertices, indices, ref indexOffset, tVertices, tIndices, ref tIndexOffset, in fields);
 
         for (var x = 0; x < Size; x++)
@@ -1428,7 +1439,7 @@ public class Chunk : IDisposable
                     // of water, resolved exactly as the greedy pass keys it
                     if (submerged)
                         waterSurface = ChunkMesher.BakedWaterSurface(padded, paddedState, pIdx + FaceNeighborDelta[cullFace],
-                            chunkBaseY, worldX0, worldZ0);
+                            chunkBaseY, columns);
                 }
                 else
                 {

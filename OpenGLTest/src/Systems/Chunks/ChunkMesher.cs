@@ -4,7 +4,6 @@ using System.Runtime.InteropServices;
 using System.Numerics;
 using static silkgltriangle.Chunk;
 using static silkgltriangle.ChunkLighting;
-using static silkgltriangle.ColumnCache;
 
 namespace silkgltriangle;
 
@@ -26,14 +25,16 @@ internal static class ChunkMesher
     /// <see cref="ChunkManager.GetFluidColumnTopGlobal"/> finds, resolved from the padded snapshot
     /// alone: the fluid column is walked up from <paramref name="fluidPIdx"/> (the fluid cell the
     /// face looks into). A column that tops out inside the snapshot codes its surface in quarter
-    /// blocks (1..68). One that leaves the snapshot's top row still in fluid reads the generated
-    /// column's <c>WaterLevel</c> (pure and worker-safe) and codes whole blocks above the snapshot
-    /// top (69..127, clamped ~58 blocks above it, where the caustic fade is already ~0.01); a
-    /// column whose generated level is lower than that (a player-built tower) caps at the
-    /// snapshot top. <see cref="DecodeSurfaceCode"/> turns the code back into a world Y.
+    /// blocks (1..68). One that leaves the snapshot's top row still in fluid reads the column's
+    /// <c>WaterLevel</c> from the build's resolved <see cref="ColumnTerrain"/>
+    /// (<paramref name="columns"/>, the 3x3 in <c>dx * 3 + dz</c> order, worldgen or streamed) and
+    /// codes whole blocks above the snapshot top (69..127, clamped ~58 blocks above it, where the
+    /// caustic fade is already ~0.01); a column whose level is lower than that (a player-built
+    /// tower) caps at the snapshot top. <see cref="DecodeSurfaceCode"/> turns the code back into
+    /// a world Y.
     /// </summary>
     internal static int SubmergedSurfaceCode(byte[] padded, byte[] paddedState, int fluidPIdx,
-        int chunkBaseY, int worldX0, int worldZ0)
+        int chunkBaseY, ColumnTerrain[] columns)
     {
         // FillPaddedSnapshot's layout: px * PaddedSq + py * Padded + pz (z innermost)
         var px = fluidPIdx / PaddedSq;
@@ -54,11 +55,12 @@ internal static class ChunkMesher
             return Math.Clamp((int)MathF.Round((ls + 1f) * 4f), 1, SurfaceCodeInsideMax);
         }
 
-        // Still fluid in the snapshot's top row: the surface lies above what this build sees
-        var wx = worldX0 + px - 1;
-        var wz = worldZ0 + pz - 1;
-        var level = ColumnCache.Get(wx >> SizeShift, wz >> SizeShift)
-            .WaterLevel[((wx & SizeMask) << SizeShift) | (wz & SizeMask)];
+        // Still fluid in the snapshot's top row: the surface lies above what this build sees.
+        // Arithmetic shift: padded 0 is the -X/-Z neighbour column (-1 >> 4 = -1), 1..16 this
+        // one, 17 the +X/+Z one; the mask then picks the cell inside that column.
+        var dx = ((px - 1) >> SizeShift) + 1;
+        var dz = ((pz - 1) >> SizeShift) + 1;
+        var level = columns[dx * 3 + dz].WaterLevel[(((px - 1) & SizeMask) << SizeShift) | ((pz - 1) & SizeMask)];
         var cap = chunkBaseY + Padded - 1;
         var surface = level != TerrainGenerator.NoWater && level + FluidState.SourceHeight > cap
             ? level + FluidState.SourceHeight
@@ -77,9 +79,9 @@ internal static class ChunkMesher
     /// <summary>The baked <see cref="Vertex.WaterSurface"/> of a face looking into the fluid
     /// cell at <paramref name="fluidPIdx"/>; the per-voxel twin of the greedy key's code.</summary>
     internal static ushort BakedWaterSurface(byte[] padded, byte[] paddedState, int fluidPIdx,
-        int chunkBaseY, int worldX0, int worldZ0) =>
+        int chunkBaseY, ColumnTerrain[] columns) =>
         Vertex.EncodeWaterSurface(DecodeSurfaceCode(chunkBaseY,
-            SubmergedSurfaceCode(padded, paddedState, fluidPIdx, chunkBaseY, worldX0, worldZ0)));
+            SubmergedSurfaceCode(padded, paddedState, fluidPIdx, chunkBaseY, columns)));
 
     // Axis each face's plane is perpendicular to (0 = X, 1 = Y, 2 = Z), in CubeFaces order,
     // and whether the face looks along +axis. Rows and columns of a face's bit plane are the two
@@ -107,7 +109,7 @@ internal static class ChunkMesher
     /// REPEAT tiles the texture per cell.
     /// </summary>
     internal static void EmitGreedyFaces(MeshScratch scratch, byte[] padded, byte[] paddedState,
-        int chunkBaseY, int worldX0, int worldZ0, byte[] sunLight, byte[] blockLight,
+        int chunkBaseY, byte[] sunLight, byte[] blockLight,
         List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         List<Vertex> tVertices, List<ushort> tIndices, ref ushort tIndexOffset, in BiomeTintFields fields)
     {
@@ -158,6 +160,8 @@ internal static class ChunkMesher
         var planeLightKeys = scratch.PlaneLightKeys;
         var planeTintKeys = scratch.PlaneTintKeys;
         var planeRows = scratch.PlaneRows;
+        // The build's resolved 3x3 column terrain, for a submerged face's water surface
+        var columns = scratch.Columns;
 
         for (var f = 0; f < 6; f++)
         {
@@ -239,7 +243,7 @@ internal static class ChunkMesher
                     var key = id | ao << 8;
                     if (BlockType.IsFluid(neighbour))
                         key |= 1 << 24 | SubmergedSurfaceCode(padded, paddedState, pIdx + faceDelta,
-                            chunkBaseY, worldX0, worldZ0) << 25;
+                            chunkBaseY, columns) << 25;
 
                     // Find or open the key's plane
                     var h = ((ulong)(uint)key ^ light * 0x9E3779B97F4A7C15UL ^ tint * 0xC2B2AE3D27D4EB4FUL)

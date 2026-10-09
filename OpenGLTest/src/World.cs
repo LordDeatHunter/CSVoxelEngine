@@ -373,10 +373,17 @@ public class World : IItemUseWorld
     /// workers and calls <see cref="WorldSeed.EndWorld"/> last. A constructor that throws stops what
     /// it started and ends the world itself.
     /// </para>
+    /// <para>
+    /// <paramref name="spawn"/> is the eye to start at, which a multiplayer client passes from the
+    /// server hello; null means the worldgen spawn (<c>VOXEL_SPAWN</c>, else the surface at the
+    /// origin), except in client mode, where it means <see cref="Camera.PlaceholderSpawn"/>, since a
+    /// client never reads worldgen.
+    /// </para>
     /// </remarks>
     public World(GL gl, ChunkGeometryPool opaqueGeometry, ChunkGeometryPool translucentGeometry,
         ChunkGeometryPool lodGeometry, IWindow window, IInputContext input, SfxManager? sfx = null,
-        ChunkSaveStore? saveStore = null, bool serverMode = false, bool clientMode = false)
+        ChunkSaveStore? saveStore = null, bool serverMode = false, bool clientMode = false,
+        Vector3? spawn = null)
     {
         WorldSeed.BeginWorld();
         ChunkGenerationWorker? generationWorker = null;
@@ -388,7 +395,9 @@ public class World : IItemUseWorld
             _saveStore = saveStore;
             _serverMode = serverMode;
             _clientMode = clientMode;
-            Camera = new Camera(window, input);
+            // A client never searches the worldgen spawn: it has no terrain of its own, so it
+            // starts at the server's spawn (or a fixed placeholder until one is known).
+            Camera = new Camera(window, input, clientMode ? spawn ?? Camera.PlaceholderSpawn : spawn);
             _localContext = new PlayerContext(Inventory) { Camera = Camera };
             _savedPlayer = PlayerSaveCodec.TryParse(saveStore?.ReadFile(PlayerSaveCodec.FileName));
             if (_savedPlayer != null)
@@ -426,8 +435,8 @@ public class World : IItemUseWorld
             }
             if (clientMode)
             {
-                // A client settles onto the server's spawn (Program teleports it), so its own
-                // worldgen spawn search never runs - which would compute columns the server owns.
+                // A client starts at the server's spawn (the spawn argument), so its own worldgen
+                // spawn search never runs - which would compute columns the server owns.
                 _spawnSettled = true;
                 // Nor does it tick fluids or leaf decay (the server's broadcast carries both), so
                 // the edit paths' scheduling would only pile up cells nothing ever drains.
@@ -2205,7 +2214,8 @@ public class World : IItemUseWorld
 
             if (_breakDamage < _breakHardness)
             {
-                _debris.Burst(_breakingBlockPosition, _breakingBlockId, WorldGenerationConfig.BlockDebrisPerHit);
+                _debris.Burst(_breakingBlockPosition, _breakingBlockId, WorldGenerationConfig.BlockDebrisPerHit,
+                    columns: _chunkManager.ColumnSource);
                 continue;
             }
 
@@ -2481,7 +2491,8 @@ public class World : IItemUseWorld
         // otherwise pop it on first contact)
         if (BlockType.IsFluid(brokenId)) return;
 
-        _debris.Burst(blockPos, brokenId, WorldGenerationConfig.BlockDebrisOnBreak);
+        _debris.Burst(blockPos, brokenId, WorldGenerationConfig.BlockDebrisOnBreak,
+            columns: _chunkManager.ColumnSource);
 
         // Creative breaks drop nothing, but trees still fall. A client rolls no loot at all: what
         // a break drops is the server's, and reaches the client as drops it can pick up.
@@ -2530,11 +2541,15 @@ public class World : IItemUseWorld
 
         // Wood and leaves are never surface-solid and sit above the terrain, so the surface
         // record above never fires for them - yet the far LOD draws their canopy. Disturb it
-        // and rebuild regardless.
+        // and rebuild regardless. A client's far LOD is the server's (streamed through
+        // LodNetCodec), so it disturbs no canopy table of its own and only bursts the leaves.
         if (TreeGenerator.IsTreeBlock(brokenId))
         {
-            TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z, TreeGenerator.SingleEditPoisonRadius);
-            _lodManager.MarkEditedColumn((int)blockPos.X, (int)blockPos.Z);
+            if (!_clientMode)
+            {
+                TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z, TreeGenerator.SingleEditPoisonRadius);
+                _lodManager.MarkEditedColumn((int)blockPos.X, (int)blockPos.Z);
+            }
             _leaves.Burst(blockPos, WorldGenerationConfig.LeafParticleBurstMined);
         }
 
@@ -2641,11 +2656,15 @@ public class World : IItemUseWorld
 
         // The whole canopy came down above the caps: disturb it once at the break (its reach
         // covers the crown) and rebuild every touched column so no ghost lingers at range. A
-        // cactus has no canopy, so it only needs the column rebuild.
-        if (TreeGenerator.IsTreeBlock(brokenId))
-            TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z, TreeGenerator.FellPoisonRadius);
-        foreach (var ((lx, lz), _) in lowestY)
-            _lodManager.MarkEditedColumn(lx, lz);
+        // cactus has no canopy, so it only needs the column rebuild. A client's far LOD is the
+        // server's, so it touches neither the canopy table nor its regions.
+        if (!_clientMode)
+        {
+            if (TreeGenerator.IsTreeBlock(brokenId))
+                TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z, TreeGenerator.FellPoisonRadius);
+            foreach (var ((lx, lz), _) in lowestY)
+                _lodManager.MarkEditedColumn(lx, lz);
+        }
 
         List<Vector3>? felledLeaves = null;
         foreach (var block in collected)
@@ -3209,10 +3228,14 @@ public class World : IItemUseWorld
     /// Keeps the far LOD on the current terrain after the cell (x, y, z) was edited: records the
     /// column's new surface (or its sub-surface removal cap) through
     /// <see cref="LodSurface.RecordEdit"/> and rebuilds the regions that sample the column on
-    /// every level when it moved. Main thread only, called after the edit.
+    /// every level when it moved. Main thread only, called after the edit. A no-op on a client.
     /// </summary>
     private void NotifyLodEdit(int x, int y, int z)
     {
+        // A client's far LOD is the server's, streamed as finished regions through LodNetCodec:
+        // LodSurface, LodRegion.ColumnCaps and TreeGenerator.CanopyDisturbed are worldgen-side
+        // tables a client must never touch.
+        if (_clientMode) return;
         if (LodSurface.RecordEdit(_chunkManager, x, y, z))
             _lodManager.MarkEditedColumn(x, z);
     }

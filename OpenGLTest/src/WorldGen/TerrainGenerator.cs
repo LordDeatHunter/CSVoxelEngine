@@ -251,6 +251,7 @@ public static class TerrainGenerator
     /// </summary>
     public static void Climate(float x, float z, out float warmth01, out float wetness01)
     {
+        WorldgenReads.Note();
         var t = TemperatureNoise.GetNoise(x, z);
         warmth01 = 0.5f * (1f - ColdOf(t)) + 0.5f * WarmOf(t);
         wetness01 = MathUtils.SmoothStep(WorldGenerationConfig.HumidityDryStart,
@@ -787,7 +788,14 @@ public static class TerrainGenerator
             }
         }
 
-        return new ColumnData(heights, dirtDepth, entrance, intensity, biomes, bed, waterLevel);
+        // The biome-tint lattice climate of this column's minimum corner, evaluated once here so
+        // the chunk mesher reads it instead of noise. The int arguments convert to float exactly
+        // as BiomeTint.TintsAt(chunkX << LatticeShift, ...) receives them on the direct path (the
+        // far LOD, the felled tree), so both paths see the same bits; do not reuse baseX/baseZ.
+        Climate(chunkX << Chunk.SizeShift, chunkZ << Chunk.SizeShift, out var cornerWarmth, out var cornerWetness);
+
+        return new ColumnData(heights, dirtDepth, entrance, intensity, biomes, bed, waterLevel,
+            cornerWarmth, cornerWetness);
     }
 
     /// <summary>

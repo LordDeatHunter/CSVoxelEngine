@@ -8,8 +8,9 @@ namespace silkgltriangle.Tests;
 
 /// <summary>
 /// The client's streamed-chunk path: an applied snapshot becomes readable blocks, the streamer
-/// asks for the chunks and columns around the camera without duplicating a request, and a streamed
-/// column feeds the lighting height source.
+/// asks for the chunks around the camera and the 3x3 columns around each without duplicating a
+/// request, re-asks an unanswered column like a chunk, and a streamed column (heights, water levels
+/// and climate) is served as the client's column source.
 /// </summary>
 public sealed class ClientChunkStreamerTests
 {
@@ -58,19 +59,72 @@ public sealed class ClientChunkStreamerTests
     }
 
     [Fact]
-    public void AColumnPayloadFeedsTheLightingHeightSource()
+    public void UpdateAsksForTheColumnsAroundEveryRequestedChunk()
+    {
+        // A build needs the 3x3 columns around its chunk, and a chunk at the load sphere's rim has
+        // diagonal columns no chunk inside the sphere asks for on its own.
+        var manager = new ChunkManager(null!);
+        var chunks = new List<(int X, int Y, int Z)>();
+        var columns = new List<(int X, int Z)>();
+        var streamer = new ClientChunkStreamer(manager, (x, y, z) => chunks.Add((x, y, z)), (x, z) => columns.Add((x, z)));
+
+        streamer.Update(Vector3.Zero, 0.016);
+
+        Assert.NotEmpty(chunks);
+        foreach (var (cx, _, cz) in chunks)
+        for (var dx = -1; dx <= 1; dx++)
+        for (var dz = -1; dz <= 1; dz++)
+            Assert.Contains((cx + dx, cz + dz), columns);
+        // A column shared by several requested chunks is asked for once
+        Assert.Equal(columns.Count, columns.Distinct().Count());
+    }
+
+    [Fact]
+    public void AnUnansweredColumnIsAskedForAgainAfterTheResendDelay()
+    {
+        var manager = new ChunkManager(null!);
+        var columns = new List<(int X, int Z)>();
+        var streamer = new ClientChunkStreamer(manager, (_, _, _) => { }, (x, z) => columns.Add((x, z)));
+
+        streamer.Update(Vector3.Zero, 0.016);
+        streamer.Update(Vector3.Zero, ClientChunkStreamer.ResendSeconds * 0.5);
+        Assert.Equal(1, columns.Count(c => c == (0, 0)));
+
+        streamer.Update(Vector3.Zero, ClientChunkStreamer.ResendSeconds);
+        Assert.Equal(2, columns.Count(c => c == (0, 0)));
+
+        // Once it is answered it is never asked again, however long its chunks stay missing
+        streamer.ApplyColumn(0, 0, ChunkNetCodec.EncodeColumn(Terrain(0)));
+        columns.Clear();
+        for (var i = 0; i < 5; i++)
+            streamer.Update(Vector3.Zero, ClientChunkStreamer.ResendSeconds * 2);
+        Assert.DoesNotContain((0, 0), columns);
+    }
+
+    [Fact]
+    public void AColumnPayloadIsServedThroughTheManagersColumnSource()
     {
         var manager = new ChunkManager(null!);
         var streamer = new ClientChunkStreamer(manager, (_, _, _) => { }, (_, _) => { });
-        var heights = new int[Chunk.Size * Chunk.Size];
-        Array.Fill(heights, 42);
+        var terrain = Terrain(42, water: 50, warmth: 0.25f, wetness: 0.75f);
 
-        streamer.ApplyColumn(2, -3, ChunkNetCodec.EncodeHeights(heights));
+        // Before anything arrived, the manager's source (which every mesh build, the fluid-surface
+        // query and the mining pop read) knows no column: nothing falls back to worldgen
+        var source = manager.ColumnSource;
+        Assert.False(source.IsReady(2, -3));
+        Assert.False(source.TryGet(2, -3, out _));
 
-        var source = manager.ColumnHeightSource;
-        Assert.NotNull(source);
-        Assert.Equal(heights, source!(2, -3));
-        Assert.Null(source(0, 0));
+        streamer.ApplyColumn(2, -3, ChunkNetCodec.EncodeColumn(terrain));
+
+        // The whole column - heights, water levels and climate - is served as the server sent it
+        Assert.True(source.IsReady(2, -3));
+        Assert.True(source.TryGet(2, -3, out var served));
+        Assert.Equal(terrain.Heights, served.Heights);
+        Assert.Equal(terrain.WaterLevel, served.WaterLevel);
+        Assert.True(served.ContentEquals(terrain));
+        // A column that never arrived is still unknown
+        Assert.False(source.IsReady(0, 0));
+        Assert.False(source.TryGet(0, 0, out _));
     }
 
     [Fact]
@@ -82,7 +136,7 @@ public sealed class ClientChunkStreamerTests
         streamer.Update(Vector3.Zero, 0.016);
         Assert.Contains((0, 0), columns);
 
-        streamer.ApplyColumn(0, 0, ChunkNetCodec.EncodeHeights(new int[Chunk.Size * Chunk.Size]));
+        streamer.ApplyColumn(0, 0, ChunkNetCodec.EncodeColumn(Terrain(0)));
         columns.Clear();
         // Long past every resend interval, with the column's chunks still missing
         for (var i = 0; i < 20; i++)
@@ -94,19 +148,51 @@ public sealed class ClientChunkStreamerTests
     [Fact]
     public void OnlyAChangedColumnCountsAsNew()
     {
-        var manager = new ChunkManager(null!);
-        var streamer = new ClientChunkStreamer(manager, (_, _, _) => { }, (_, _) => { });
+        var stored = Terrain(12, water: 20, warmth: 0.3f, wetness: 0.6f);
+
+        var raised = Terrain(12, water: 20, warmth: 0.3f, wetness: 0.6f);
+        raised.Heights[5] += 3;
+        var flooded = Terrain(12, water: 20, warmth: 0.3f, wetness: 0.6f);
+        flooded.WaterLevel[7] = 21;
+        var drained = Terrain(12, water: 20, warmth: 0.3f, wetness: 0.6f);
+        drained.WaterLevel[7] = TerrainGenerator.NoWater;
+
+        var answers = new (string Name, ColumnTerrain Answer, bool Changed)[]
+        {
+            // A duplicate answer changes nothing and re-dirties nothing
+            ("duplicate", Terrain(12, water: 20, warmth: 0.3f, wetness: 0.6f), false),
+            ("heights", raised, true),
+            ("water level", flooded, true),
+            ("water drained", drained, true),
+            ("warmth", Terrain(12, water: 20, warmth: 0.31f, wetness: 0.6f), true),
+            ("wetness", Terrain(12, water: 20, warmth: 0.3f, wetness: 0.59f), true),
+        };
+
+        foreach (var (name, answer, changed) in answers)
+        {
+            var manager = new ChunkManager(null!);
+            var streamer = new ClientChunkStreamer(manager, (_, _, _) => { }, (_, _) => { });
+            Assert.True(streamer.ApplyColumn(1, 1, ChunkNetCodec.EncodeColumn(stored)));
+            // A loaded chunk over the column, not dirty yet
+            var pos = new Vector3(1, 0, 1);
+            manager.Chunks.SetPacked(ChunkKey.Pack(pos), new Chunk(null!, pos, generateBlockData: false));
+            Assert.Equal(0, manager.DirtyCount);
+
+            Assert.True(changed == streamer.ApplyColumn(1, 1, ChunkNetCodec.EncodeColumn(answer)), name);
+            Assert.True(changed == (manager.DirtyCount > 0), $"{name}: {manager.DirtyCount} chunks re-dirtied");
+            Assert.True(streamer.TryGet(1, 1, out var now));
+            Assert.True(now.ContentEquals(answer), name);
+        }
+    }
+
+    // A column of one height and one water level everywhere, with the given corner climate
+    private static ColumnTerrain Terrain(int height, int water = TerrainGenerator.NoWater, float warmth = 0.5f, float wetness = 0.5f)
+    {
         var heights = new int[Chunk.Size * Chunk.Size];
-        Array.Fill(heights, 12);
-
-        Assert.True(streamer.ApplyColumn(1, 1, ChunkNetCodec.EncodeHeights(heights)));
-        // The same heights again (a duplicate answer) change nothing and re-dirty nothing
-        Assert.False(streamer.ApplyColumn(1, 1, ChunkNetCodec.EncodeHeights(heights)));
-
-        var raised = (int[])heights.Clone();
-        raised[5] += 3;
-        Assert.True(streamer.ApplyColumn(1, 1, ChunkNetCodec.EncodeHeights(raised)));
-        Assert.Equal(raised, manager.ColumnHeightSource!(1, 1));
+        Array.Fill(heights, height);
+        var levels = new int[Chunk.Size * Chunk.Size];
+        Array.Fill(levels, water);
+        return new ColumnTerrain(heights, levels, warmth, wetness);
     }
 
     [Fact]

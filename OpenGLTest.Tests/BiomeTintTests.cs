@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Xunit;
 
@@ -136,6 +139,108 @@ public sealed class BiomeTintTests
             Assert.Equal(BiomeTint.LatticeTint(BiomeTintPalette.Grass, lx, lz), grass);
             Assert.Equal(BiomeTint.LatticeTint(BiomeTintPalette.Foliage, lx, lz), foliage);
         }
+    }
+
+    [Fact]
+    public void TheStoredCornerClimateReproducesTheDirectLatticeEvaluation()
+    {
+        // The chunk mesher reads the climate stored per column, the far LOD and the felled tree
+        // evaluate it directly; the two meet at chunk borders, so they must be the same bits.
+        (int X, int Z)[] more = [(-1, 1), (1, -1), (-200, -150), (97, -311)];
+        foreach (var (cx, cz) in Chunks.Concat(more))
+        {
+            var column = ColumnCache.Get(cx, cz);
+            TerrainGenerator.Climate(cx << BiomeTint.LatticeShift, cz << BiomeTint.LatticeShift,
+                out var warmth, out var wetness);
+            Assert.Equal(BitConverter.SingleToInt32Bits(warmth), BitConverter.SingleToInt32Bits(column.CornerWarmth));
+            Assert.Equal(BitConverter.SingleToInt32Bits(wetness), BitConverter.SingleToInt32Bits(column.CornerWetness));
+
+            var stored = BiomeTint.FieldsFor(cx, cz);
+            var direct = BiomeTint.FieldsAt(cx << BiomeTint.LatticeShift, cz << BiomeTint.LatticeShift);
+            foreach (var palette in Palettes)
+            {
+                var s = stored.Field(palette);
+                var d = direct.Field(palette);
+                Assert.Equal(d.C00, s.C00);
+                Assert.Equal(d.C10, s.C10);
+                Assert.Equal(d.C01, s.C01);
+                Assert.Equal(d.C11, s.C11);
+            }
+        }
+    }
+
+    [Fact]
+    public void TryFieldsForReportsAMissingCornerInsteadOfGuessing()
+    {
+        const int cx = 5, cz = -3;
+        (int X, int Z)[] corners = [(cx, cz), (cx + 1, cz), (cx, cz + 1), (cx + 1, cz + 1)];
+
+        // A distinct climate per column, so a corner read from the wrong column shows
+        var all = new FakeColumnSource();
+        for (var i = 0; i < corners.Length; i++)
+            all.Columns[corners[i]] = Terrain(0.1f + 0.25f * i, 0.9f - 0.2f * i);
+
+        foreach (var missing in corners)
+        {
+            var partial = new FakeColumnSource();
+            foreach (var corner in corners)
+                if (corner != missing) partial.Columns[corner] = all.Columns[corner];
+
+            Assert.False(BiomeTint.TryFieldsFor(partial, cx, cz, out _));
+            Assert.False(BiomeTint.TryCellTint(partial, BiomeTintPalette.Grass, cx * 16 + 3, cz * 16 + 9, out _));
+        }
+
+        // The four corners are all a chunk's tint needs
+        Assert.True(BiomeTint.TryFieldsFor(all, cx, cz, out var fields));
+
+        var neighbourhood = new ColumnTerrain[9];
+        for (var dx = 0; dx < 3; dx++)
+        for (var dz = 0; dz < 3; dz++)
+            all.TryGet(cx - 1 + dx, cz - 1 + dz, out neighbourhood[dx * 3 + dz]);
+        Assert.Equal(fields, BiomeTint.FieldsFromNeighbourhood(neighbourhood));
+
+        // Each local corner of the field is exactly the tint of the column owning that corner
+        (float X, float Z)[] local = [(0f, 0f), (16f, 0f), (0f, 16f), (16f, 16f)];
+        for (var i = 0; i < corners.Length; i++)
+        {
+            var column = all.Columns[corners[i]];
+            BiomeTint.TintsFromClimate(column.Warmth, column.Wetness, out var grass, out var foliage);
+            Assert.Equal(grass, fields.Grass.Sample(local[i].X, local[i].Z));
+            Assert.Equal(foliage, fields.Foliage.Sample(local[i].X, local[i].Z));
+        }
+
+        Assert.True(BiomeTint.TryCellTint(all, BiomeTintPalette.Foliage, cx * 16 + 3, cz * 16 + 9, out var tint));
+        Assert.Equal(fields.Foliage.Sample(3.5f, 9.5f), tint);
+    }
+
+    [Fact]
+    public void TheWorldgenReadCounterIsSilentUnlessEnabled()
+    {
+        // The counter is a test hook; production leaves it off and must never pay for it
+        Assert.False(WorldgenReads.Enabled);
+        var before = WorldgenReads.Count;
+        TerrainGenerator.Climate(12345f, -6789f, out _, out _);
+        ColumnCache.Get(5_001, -5_003);
+        Assert.Equal(before, WorldgenReads.Count);
+    }
+
+    private static ColumnTerrain Terrain(float warmth, float wetness)
+    {
+        var heights = new int[Chunk.Size * Chunk.Size];
+        var water = new int[Chunk.Size * Chunk.Size];
+        Array.Fill(water, TerrainGenerator.NoWater);
+        return new ColumnTerrain(heights, water, warmth, wetness);
+    }
+
+    /// <summary>An <see cref="IColumnSource"/> that knows exactly the columns it was given.</summary>
+    private sealed class FakeColumnSource : IColumnSource
+    {
+        public readonly Dictionary<(int X, int Z), ColumnTerrain> Columns = new();
+
+        public bool IsReady(int chunkX, int chunkZ) => Columns.ContainsKey((chunkX, chunkZ));
+
+        public bool TryGet(int chunkX, int chunkZ, out ColumnTerrain terrain) =>
+            Columns.TryGetValue((chunkX, chunkZ), out terrain);
     }
 
     [Fact]

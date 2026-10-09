@@ -261,7 +261,8 @@ sampler's REPEAT tiles it, so UVs are never atlas-absolute), sun/block bytes at 
 WaterSurface` at 30 (attribute location 8, also integer): the baked water surface over a
 submerged face in quarter blocks (`Vertex.EncodeWaterSurface`, 0 on every dry face). The mesher
 gets it from `ChunkMesher.SubmergedSurfaceCode`, which walks the fluid column in the padded snapshot and
-resolves a column that leaves the snapshot from the generated `WaterLevel`; it rides the greedy key
+resolves a column that leaves the snapshot from the build's resolved `ColumnTerrain.WaterLevel`
+(`MeshScratch.Columns`, worldgen or streamed, see "Chunk meshing"); it rides the greedy key
 as a 7-bit code in bits 25-31 (bits 16-23 are unused), so a merge never crosses two water surfaces. On a **fluid** quad
 (alpha 254) the same ushort means something else: the per-corner flow code
 (`Vertex.EncodeWaterFlow` of `FluidFlow.Corner`, signed 7-bit X and Z plus a falling bit, 0 =
@@ -305,7 +306,16 @@ lifts an add on the near-black body far more than it did in display space and sm
 specks into grey. Every other (non-ore, non-water) tile is plain diffuse: the SH-23 grazing sky
 rim was removed because it tinted grazing foliage teal.
 
-**Chunk meshing.** `Chunk.GenerateMeshDataFromSnapshot` runs two passes over the padded 18³
+**Chunk meshing.** The column terrain a build reads (heights for the sun seeding, water levels,
+the tint climate) comes from the 3x3 chunk columns around it, resolved once:
+`Chunk.GenerateMeshData` (the one caller of `GenerateMeshDataFromSnapshot`), right after the neighbour resolve and the empty/enclosed early
+return, fills `MeshScratch.Columns` (`dx * 3 + dz` order) through
+`ChunkLighting.FillColumns(chunkManager.ColumnSource, ...)`, and the sun seeding, the water-surface
+codes and the tint fields all read that array (only the pebble, branch-pile and untouched-snow
+emitters still read seed-hashed worldgen per cell, see the multiplayer "Known gaps"); a missing
+streamed column makes the build return `null`, which the caller treats like a vanished neighbour
+(see the threading rules).
+`Chunk.GenerateMeshDataFromSnapshot` runs two passes over the padded 18³
 block snapshot. The binary greedy pass (`EmitGreedyFaces`, scratch in the `[ThreadStatic]`
 `MeshScratch`) takes every block flagged `BlockType.IsGreedy`: a `Model`-renderer block whose
 baked model is exactly the six untransformed cube faces (`ContentRegistry.BakesGreedy`; all four
@@ -377,10 +387,21 @@ The alpha-tested tint tiles (every overlay, and a cutout block's replacement til
 to warmth 0..1 (exactly 0.5 across the temperate band) and wetness 0..1, so the palette's four
 sRGB corners (`WorldGenerationConfig.GrassColorColdDry/ColdWet/WarmDry/WarmWet` and the slightly
 darker `FoliageColor*`) sit on the biome lines. `BiomeTint` samples it on a 16-block lattice of
-chunk-column corners: `TintsAt` reads the climate once and returns both palettes, `FieldsFor(cx, cz)`
-gives a chunk column's `BiomeTintFields` (a grass and a foliage `BiomeTintField`, four corners each)
-and `BiomeTintField.Sample` interpolates bilinearly in weighted-sum form, which makes two columns
-sharing lattice points agree bit for bit, so the colour is continuous across chunk borders. Because
+chunk-column corners: `TintsAt` reads the climate once and returns both palettes (through
+`TintsFromClimate`), `FieldsFor(cx, cz)` gives a chunk column's `BiomeTintFields` (a grass and a
+foliage `BiomeTintField`, four corners each) and `BiomeTintField.Sample` interpolates bilinearly in
+weighted-sum form, which makes two columns sharing lattice points agree bit for bit, so the colour
+is continuous across chunk borders. The lattice climate is stored per column:
+`TerrainGenerator.Compute` evaluates `Climate` once at the column's minimum corner into
+`ColumnData.CornerWarmth/CornerWetness`, and the chunk mesher reads that through
+`ChunkManager.ColumnSource` (`BiomeTint.FieldsFromNeighbourhood` over the build's resolved 3x3
+`ColumnTerrain`; `TryFieldsFor`/`TryCellTint` for any `IColumnSource`, false when a streamed corner
+column is missing; `FieldsFor`/`CellTint` are those over `WorldgenColumnSource`), so a build
+evaluates no noise and a multiplayer client tints from the server's streamed climate.
+`FieldsAt`/`LatticeTints` still evaluate `Climate` directly (the felled tree's arbitrary origin, the
+far LOD); the stored value is the same call at the same int-to-float lattice arguments, so both are
+the same bits, which `BiomeTintTests.TheStoredCornerClimateReproducesTheDirectLatticeEvaluation`
+pins. Because
 it is a function of the vertex *position*, not of the cell, the greedy key is unchanged and a
 merge never splits (a merged quad interpolates per triangle on the GPU where the field is bilinear;
 over 16 blocks of a field with a wavelength of thousands that cross term is far below a byte step,
@@ -410,8 +431,11 @@ of world (4096, 4096). The mining pop and the break debris are standalone copies
 cells from streamed or cached geometry, so they wear the `BiomeTint` tiles (`PopBoxEmitter.EmitBox`'s
 `biomeTint` argument; `BlockCubeCache.GetTinted`/`BuildTintedCube`, one cached debris mesh per
 block, which only the debris asks for) with grey shade-only rgb, and the cell's colour comes from
-the plain program's per-draw `uBiomeTint` uniform (`BiomeTint.CellTint` at the mined cell, carried by
-`BlockDebris.Tint` for each cube), multiplied into bit-4 vertices in the vertex shader. Its white
+the plain program's per-draw `uBiomeTint` uniform (`BiomeTint.TryCellTint` at the mined cell over the
+world's `ColumnSource` — the pop reads `RenderManager.LightSource.ColumnSource`, the debris gets
+`BlockDebrisSystem.Burst`'s `columns:` argument — carried by `BlockDebris.Tint` for each cube, and
+untinted white when a streamed column is missing), multiplied into bit-4 vertices in the vertex
+shader. Its white
 default is written in `RenderManager.InitWorldProgram`, which binds the program first;
 `Shader.SetUniform` writes to whatever program is bound, so every per-draw set sits after
 `worldShader.Use()` and is reset to white straight after the pop or debris draw for the plain
@@ -585,8 +609,10 @@ OpenGLTest/
       ServerAddress.cs         # host[:port] parsing and formatting (the default port)
       NetworkClient.cs         # the client: connect + handshake, reader thread, inbound queue, sends
       RemotePlayer.cs          # another player as the client sees them: pose smoothing + a PlayerModel
-      ChunkNetCodec.cs         # chunk blocks/state and column heights, Deflate-compressed
-      ClientChunkStreamer.cs   # requests streamed chunks/columns and applies them, no worldgen
+      ChunkNetCodec.cs         # chunk blocks/state and column terrain (heights, water levels, corner climate),
+                               #   Deflate-compressed
+      ClientChunkStreamer.cs   # requests streamed chunks/columns and applies them, no worldgen; the
+                               #   client's IColumnSource
       LodNetCodec.cs           # a far-LOD region's mesh on the wire
       ClientLodStreamer.cs     # requests and applies server-built far regions
       NetEntity.cs             # NetEntityKind/NetEntity and NetCellChange
@@ -705,6 +731,11 @@ OpenGLTest/
         ChunkMesher.cs         # the greedy pass + per-voxel procedural emitters + water-surface codes
         ChunkLighting.cs       # the wide light-volume flood (sun + coloured lamp) + corner light queries
         ColumnCache.cs         # the process-global column-data cache, its accessors and the column fill
+        IColumnSource.cs       # the seam a mesh build, the fluid-surface query and the pop/debris tint read
+                               #   chunk-column terrain through (ChunkManager.ColumnSource): IsReady + TryGet
+        ColumnTerrain.cs       # one chunk column's terrain: heights, water levels, corner climate (warmth, wetness)
+        WorldgenColumnSource.cs # the singleplayer/server IColumnSource over ColumnCache; the client's is
+                               #   the ClientChunkStreamer
       LodManager.cs            # LOD region lifecycle: worker thread builds, main thread uploads/unloads, burial flags
       FluidManager.cs          # the fluid tick: scheduled cells, level recompute + spread, batched remeshes
       LeafDecayManager.cs      # leaf decay + orphaned-wood crumble: a fixed tick over scheduled cells,
@@ -725,7 +756,10 @@ OpenGLTest/
       TerrainGenerator.cs      # the 2D half: owns every 2D noise channel and the biome split; Compute -> ColumnData
       Biome.cs                 # the Forest / Desert / Ocean / Taiga / Frozen enum
       ColumnData.cs            # per-chunk-column arrays: Heights (ravines cut in), DirtDepth, EntranceWeight,
-                               #   CaveIntensity, Biomes, Bed (pre-ravine profile: decides wetness)
+                               #   CaveIntensity, Biomes, Bed (pre-ravine profile: decides wetness), WaterLevel,
+                               #   CornerWarmth/CornerWetness (the climate at the column's tint lattice point)
+      WorldgenReads.cs         # test hook: a flag-gated counter of worldgen entries, noted on a ColumnCache
+                               #   miss and in TerrainGenerator.Climate (off in production)
       TreeGenerator.cs         # the tree worldgen front end: which columns root which species (worldgen
                                #   rules), stamping the rasterised cells into chunks, the far-LOD canopy
                                #   lookups (TryGetCanopy, the crown proxy) and the felled-canopy markers
@@ -1347,7 +1381,7 @@ Chunk work is split across threads, and OpenGL calls are only legal on the main 
 Rules that follow from this:
 
 - **Never call GL functions (buffer uploads, `Mesh` creation/disposal, pool uploads/frees through `ChunkGeometryPool`, shader use) off the main thread.** Background work must only produce plain data handed over via the concurrent queues.
-- A chunk is only meshed when its block data is ready **and all 6 cardinal neighbors exist with ready data** (`HasAllNeighbors`) — meshing reads neighbor blocks for face culling and cross-chunk AO. Breaking this reintroduces holes/seams at chunk borders (see git history). That scheduling check can go stale (the mesh task waits on the semaphore and an unload may take a neighbor away meanwhile), so `Chunk.GenerateMeshData` re-resolves the whole 3x3x3 neighbourhood once up front and returns `null` when a face neighbor is gone; callers must then re-mark the chunk dirty rather than apply anything. Only the edge/corner neighbors may be absent, and those read as air (they feed light and fluid corner heights only).
+- A chunk is only meshed when its block data is ready **and all 6 cardinal neighbors exist with ready data** (`HasAllNeighbors`) — meshing reads neighbor blocks for face culling and cross-chunk AO. Breaking this reintroduces holes/seams at chunk borders (see git history). That scheduling check can go stale (the mesh task waits on the semaphore and an unload may take a neighbor away meanwhile), so `Chunk.GenerateMeshData` re-resolves the whole 3x3x3 neighbourhood once up front and returns `null` when a face neighbor is gone; callers must then re-mark the chunk dirty rather than apply anything. Only the edge/corner neighbors may be absent, and those read as air (they feed light and fluid corner heights only). The same holds for the 3x3 chunk **columns** a build reads (`ChunkManager.ColumnSource`, see "Chunk meshing"): `ProcessDirtyChunks` drops, and `ImmediateRemesh` re-adds once, a chunk whose nine columns are not all `IColumnSource.IsReady` (an all-air chunk, whose build reads no column, is exempt; a fully enclosed one cannot be told apart without its columns and waits too), `ClientChunkStreamer.ApplyColumn` re-dirties the 3x3 chunk columns on arrival, which is what wakes it, and a build that still finds a column missing returns `null` like a vanished neighbour. The worldgen source is always ready, so singleplayer and the server never wait. A mesh build reaches worldgen only through `WorldgenColumnSource` and the seed-hashed pebble, branch-pile and snow emitters, which is why a seed swap still waits for `ChunkManager.DrainMeshWork`.
 - Shared state uses `ConcurrentDictionary`/`ConcurrentQueue`; `Chunk.IsBlockDataReady` is `volatile`. Keep new shared state lock-free in the same style. `ChunkManager.Chunks` is a `ChunkMap` (`Systems/ChunkMap.cs`) wrapping a `ConcurrentDictionary<long, Chunk>` — it is a wrapper, never a `Dictionary` behind a lock, because chunk-gen workers write it and mesh-build pool workers read it.
 - Editing a block on a chunk border must also remesh the affected neighbor chunk(s) — block edits use `ChunkManager.ImmediateRemesh` / `MarkDirty`.
 - Performance tuning knobs all live in `WorldGenerationConfig`; change constants there rather than hardcoding budgets elsewhere.
@@ -1372,7 +1406,7 @@ Other invariants:
   - Caves fade out within ~`CaveSurfaceFadeEnd` blocks of the surface (`WormSurfaceMargin` for worms), except inside entrance zones — sparse patches where `ColumnData.EntranceWeight` lifts the fade and caves reach the sky. The entrance weight fades out before the shore band (`EntranceShoreFade`, see `OceanShoreWeight`), so a cave never breaches a beach or the sea floor into a water-filled hole.
   - Worldgen is a **pure function of world position**: each chunk generates its own blocks with no cross-chunk writes, so neighbours agree at their borders without shared state. Worm paths are cached per 64-block XZ cell in `WormCarver` exactly the way column data is cached per chunk column in `ColumnCache.Get`, and so are the four tree caches in `TreeGenerator` (see `### Trees`): the cell batches (`BatchCache`, every tree rooted in one 64x64 XZ cell grown together, shared by `Stamp` on the generation workers and the first LOD ring's canopy on the LOD builder), the solo tree shapes (`ShapeCache`, which `BuildBatch` reads as the neighbouring cells' obstacles), the grown canopy tops (`CanopyCache`) and the far rings' crown-proxy canopy (`ProxyCanopyCache`), the last two read by their one engine caller `LodRegion.BuildMeshData` once per *fine* column of a region. All six go through `GenerationalCache<TKey, TValue>` (`WorldGen/GenerationalCache.cs`): the cache is split into G generation dictionaries published as one immutable node swapped by `Interlocked.CompareExchange`, a read probes the newest first, a miss computes into the newest, and when the newest fills its `capacity / G` insert budget the node rotates and the *oldest* generation is dropped — so eviction retains the most recently used generations instead of clearing wholesale, and an entry read while it sits in the oldest generation is promoted forward (a second chance). Entries are deterministic, so a race, an eviction or a duplicate yields identical values, and the worst an evicted entry can ever cost is a recompute. Capacities and generation counts all live in `WorldGenerationConfig`, one pair per site: `ColumnCacheCapacity`/`ColumnCacheGenerations`, `CellCacheCapacity`/`CellCacheGenerations`, `TreeBatchCacheCapacity`/`TreeBatchCacheGenerations`, `TreeShapeCacheCapacity`/`TreeShapeCacheGenerations`, `TreeCanopyCacheCapacity`/`TreeCanopyCacheGenerations` and `TreeProxyCanopyCacheCapacity`/`TreeProxyCanopyCacheGenerations` — every site ships at 4 generations, and that count is a re-pricing lever that may only be moved against a real capture, never blind. The factory a site passes to `GetOrAdd` must be a `static`, non-capturing delegate *field* (`ColumnCache.Compute`, `WormCarver.BuildCellFor`, `TreeGenerator.BuildShapeFor`, `BuildBatchFor`, `BuildCanopyFor`, `BuildProxyCanopyFor`), because the factory takes the key alone: a lambda written at the call site that captured locals would allocate a closure on every call, hits included, on the generation workers — recomputing those values from the key on a miss is the cheaper trade. **Standing rule: only values that are a pure function of the key may live in that type.** State carrying *player edits* must never be moved into it, because there eviction is data loss rather than a recompute — `LodRegion.ColumnCaps` (mined-column LOD caps) and `TreeGenerator.CanopyDisturbed` (felled-canopy markers) are the two current examples, and both are tracked as their own items rather than converted. They are still plain process-global tables; `LodEditState` exports and imports them per world (with the `LodSurface` overrides) and `WorldSeed.Apply` resets them between worlds.
   - 3D cave noise is sampled on a `CaveNoiseStride` lattice (aligned to world coordinates so adjacent chunks share boundary samples) and trilinearly interpolated per block before thresholding.
-- **Far-terrain LOD**: full-detail chunks load to `ChunkRadius` (16 chunks = 256 blocks); a cascade of LOD rings defined in `LodRegion.Levels` extends the render distance (level 1: 2-block cells to 512, level 2: 4-block cells to 1024, level 3: 8-block cells to 2048 blocks). Regions are columns meshed at reduced resolution straight from the heightmap cache (no block data). Each level's heights are eroded (min over a widened fine-column window) and biased downward so its mesh sits strictly inside real terrain *and* strictly below the next finer level — finer geometry always buries coarser via the depth buffer, so no masking or camera-driven remeshing exists. Because those shells are stacked, only one level may actually be drawn per area — otherwise they are all visible once the camera is inside the terrain — so `LodManager.UpdateBuriedFlags` marks each region whose footprint is fully covered by *loaded* finer-level regions (region grids nest exactly: one region = ratio×ratio regions of the finer level) and `RenderLod` skips those. Testing loaded regions rather than each level's radius means an unbuilt finer region can never open a hole in the horizon. The finest level (0) has no finer level to hide it, so it is additionally marked buried wherever the full-detail chunks its shell could show through are loaded *and* meshed (`LodManager.IsCoveredByChunks`, using the per-column inclusive chunk-Y ranges recorded at region build in `LodRegion.ColumnCyMin/ColumnCyMax` and `Chunk.IsMeshed`, which unlike `HasMesh` is true for all-air and fully enclosed chunks too). This is needed because caves cut into the band the shell occupies and would otherwise show it from inside; presence is tested per chunk rather than by horizontal distance because the load volume is a sphere. LOD side faces use grass at the top cell, dirt above `NominalDirtDepth` and the stone tile below it, so far cliffs match near ones; a desert cell wears sand over sandstone and a sea-floor cell the sand/gravel/stone band its depth picks (`LodRegion.BuildMeshData` reads `ColumnCache.GetBiomes`). The nesting invariants (`SampleMargin(L+1) >= SampleMargin(L) + CellSize(L) - 1`, `HeightBias(L+1) >= HeightBias(L) + CellSize(L)`) must hold when adding levels, and `Camera.NearPlane`/`FarPlane` are tuned to keep those separations from z-fighting at the outermost ring. LOD draws before chunks, coarsest level first (`RenderManager.RenderLod`). Destroying a block would expose the buried LOD, so removals cap that column's LOD height below the removed block (`LodRegion.LowerColumnBelow`) and affected regions on every level rebuild (`LodManager.MarkEditedColumn`); placements need nothing. Canopy bumps come from `TreeGenerator.TryGetCanopy(x, z, proxy, out top, out leaf)`, read once per fine column with the level's `LodLevelSpec.ProxyCanopy`: the first ring reads the grown canopy of the same cell batches the chunks stamp, and the farther rings read each species' `lod` crown proxy (`LodCrownProxy.TopOffset` over its `LodCrownProfile`), which never grows a tree. Either way a bump wears the leaf block that owns its top cell (the species' `LeavesId`, resolved generically via `BlockType.ById` in `LodRegion.BuildMeshData`, falling back to `TreeGenerator.LeavesBlock`), so a new tree species only needs its species file — never a new LOD branch. An edited canopy reads as open sky: mining or blasting a wood or leaf cell, every fell, every column `LeafDecayManager` clears or `TreeGrowthWriter` writes call `TreeGenerator.PoisonCanopy`, whose `CanopyDisturbed` markers `TryGetCanopy` and `CanopyLeafBlock` consult before either cache. LOD vertices bake a coarse sky exposure from those same column heights into `Vertex.Sun` (`LodSkyExposure`, tuned by the `LodSky*`/`LodValleyShade`/`LodCanopyShade` constants): a vertex darkens by how far the columns in front of or around it rise above it, and a canopy bump darkens toward its base, while open ground, straight walls under open sky and the water sheet keep full sun so the ring matches the near chunks.
+- **Far-terrain LOD**: full-detail chunks load to `ChunkRadius` (16 chunks = 256 blocks); a cascade of LOD rings defined in `LodRegion.Levels` extends the render distance (level 1: 2-block cells to 512, level 2: 4-block cells to 1024, level 3: 8-block cells to 2048 blocks). Regions are columns meshed at reduced resolution straight from the heightmap cache (no block data). Each level's heights are eroded (min over a widened fine-column window) and biased downward so its mesh sits strictly inside real terrain *and* strictly below the next finer level — finer geometry always buries coarser via the depth buffer, so no masking or camera-driven remeshing exists. Because those shells are stacked, only one level may actually be drawn per area — otherwise they are all visible once the camera is inside the terrain — so `LodManager.UpdateBuriedFlags` marks each region whose footprint is fully covered by *loaded* finer-level regions (region grids nest exactly: one region = ratio×ratio regions of the finer level) and `RenderLod` skips those. Testing loaded regions rather than each level's radius means an unbuilt finer region can never open a hole in the horizon. The finest level (0) has no finer level to hide it, so it is additionally marked buried wherever the full-detail chunks its shell could show through are loaded *and* meshed (`LodManager.IsCoveredByChunks`, using the per-column inclusive chunk-Y ranges recorded at region build in `LodRegion.ColumnCyMin/ColumnCyMax` and `Chunk.IsMeshed`, which unlike `HasMesh` is true for all-air and fully enclosed chunks too). This is needed because caves cut into the band the shell occupies and would otherwise show it from inside; presence is tested per chunk rather than by horizontal distance because the load volume is a sphere. LOD side faces use grass at the top cell, dirt above `NominalDirtDepth` and the stone tile below it, so far cliffs match near ones; a desert cell wears sand over sandstone and a sea-floor cell the sand/gravel/stone band its depth picks (`LodRegion.BuildMeshData` reads `ColumnCache.GetBiomes`). The nesting invariants (`SampleMargin(L+1) >= SampleMargin(L) + CellSize(L) - 1`, `HeightBias(L+1) >= HeightBias(L) + CellSize(L)`) must hold when adding levels, and `Camera.NearPlane`/`FarPlane` are tuned to keep those separations from z-fighting at the outermost ring. LOD draws before chunks, coarsest level first (`RenderManager.RenderLod`). Destroying a block would expose the buried LOD, so removals cap that column's LOD height below the removed block (`LodRegion.LowerColumnBelow`) and affected regions on every level rebuild (`LodManager.MarkEditedColumn`); placements need nothing. All of this runs where the LOD is built (singleplayer and the server): a multiplayer client's far LOD is the server's, streamed as finished vertices, so its edits return before these hooks (see "Multiple players and chat"). Canopy bumps come from `TreeGenerator.TryGetCanopy(x, z, proxy, out top, out leaf)`, read once per fine column with the level's `LodLevelSpec.ProxyCanopy`: the first ring reads the grown canopy of the same cell batches the chunks stamp, and the farther rings read each species' `lod` crown proxy (`LodCrownProxy.TopOffset` over its `LodCrownProfile`), which never grows a tree. Either way a bump wears the leaf block that owns its top cell (the species' `LeavesId`, resolved generically via `BlockType.ById` in `LodRegion.BuildMeshData`, falling back to `TreeGenerator.LeavesBlock`), so a new tree species only needs its species file — never a new LOD branch. An edited canopy reads as open sky: mining or blasting a wood or leaf cell, every fell, every column `LeafDecayManager` clears or `TreeGrowthWriter` writes call `TreeGenerator.PoisonCanopy`, whose `CanopyDisturbed` markers `TryGetCanopy` and `CanopyLeafBlock` consult before either cache. LOD vertices bake a coarse sky exposure from those same column heights into `Vertex.Sun` (`LodSkyExposure`, tuned by the `LodSky*`/`LodValleyShade`/`LodCanopyShade` constants): a vertex darkens by how far the columns in front of or around it rise above it, and a canopy bump darkens toward its base, while open ground, straight walls under open sky and the water sheet keep full sun so the ring matches the near chunks.
 
 ## Saves
 
@@ -1527,17 +1561,19 @@ one; sent at join, whenever it changed, and once when a mode request was refused
 `PlayerCorrection` (a numbered eye the client must snap to: an illegal move undone, or a
 respawn), `PlayerList` (id, name, eye, yaw, pitch, flags), `WorldIntent` (a client's world action, `WorldIntentCodec`), `IntentResult` (sequence id,
 accepted), `BlockCorrection` (sequence id, then the authoritative cells around the intent's target),
-`ChunkRequest`/`ChunkData` and `ColumnRequest`/`ColumnHeights` (the streamed world,
-`ChunkNetCodec`), `LodRegionRequest`/`LodRegionData` (a streamed far region, `LodNetCodec`),
+`ChunkRequest`/`ChunkData` and `ColumnRequest`/`ColumnTerrain` (the streamed world,
+`ChunkNetCodec`; a column answer is the whole `ColumnTerrain`, `EncodeColumn`), `LodRegionRequest`/`LodRegionData` (a streamed far region, `LodNetCodec`),
 `EntityList` (the live mobs/drops, `NetEntity`), `StationState` (the campfires, querns, kilns and
 cast molds, `StationNetCodec`), `BlockChanges` (a batch of server cell changes, `NetCellChange`)
 and `InventoryState`/`InventoryRequest` (a player's server-owned inventory, `InventoryNetCodec`,
 and its intents, `InventoryIntentCodec`). The intent protocol came with version 3: a client
 never writes a cell (the old raw `BlockEdit` is retired and refused), every intent carries a
 per-player sequence id, and `InventoryState` carries the id of the newest intent it reflects.
-`ProtocolVersion` 4 is the current one: it adds the status payload of `PlayerStatus`, the
-`PlayerCorrection` message (id 25), the correction ack in `PlayerState` and the `Respawn` intent,
-so an older client is refused at hello. A
+Version 4 added the status payload of `PlayerStatus`, the
+`PlayerCorrection` message (id 25), the correction ack in `PlayerState` and the `Respawn` intent.
+`ProtocolVersion` 5 is the current one: a column answer is the whole `ColumnTerrain` (heights,
+water levels and the corner climate) instead of the heights alone, so a client derives nothing
+from worldgen, and an older client is refused at hello. A
 `WorldIntent` is the sequence id, a `NetIntentKind` byte, the eye and the unit aim the action was
 made from, then that kind's fields (`WorldIntent`): `BreakStart`/`BreakComplete(cell)`,
 `Place(hit cell, face normal)`, `Use(cell under the crosshair, optional)`, `Throw(charge 0..1)`,
@@ -1588,7 +1624,8 @@ shuts the store) and every `AutosaveIntervalSeconds`. Thereafter it relays chat,
 only while `GameServer.MayBeCreative` holds for that player, and flight only with it, and its
 position goes through the movement rubberband (both below) — syncs the day clock
 (`NetTimeSyncSeconds`), serves `ChunkRequest`/`ColumnRequest` from the loaded world
-(`ChunkManager.TryCaptureChunk`, `ColumnCache.GetHeights`), queues `LodRegionRequest`s (deduped
+(`ChunkManager.TryCaptureChunk`; a column through `WorldgenColumnSource`, exactly what its own
+mesher reads, encoded by `ChunkNetCodec.EncodeColumn`), queues `LodRegionRequest`s (deduped
 per connection, `ClientConnection.LodQueued`) and builds at most `NetLodBuildsPerPump` of them a
 `Pump` (`LodRegion.BuildMeshData`, skipping any whose client has gone), replays each
 `InventoryRequest` intent against **the sender's** inventory only — `InventoryIntentRules.Apply`
@@ -1804,18 +1841,36 @@ disposed on every failure path, the connect timeout included, and `Status`/`Serv
 published through volatile fields; `Handshaken` is set before the reader starts and the reader's
 final `Disconnected` is unconditional, so a server that closes at once can never leave
 `Handshaken` standing. `Program.UpdateConnecting` aborts to the server list on `Failed` **or**
-`Disconnected`, waits for `NetworkStatus.Handshaken`, then applies the server's seed
-(`WorldSeed.Apply(server.Seed)`, refused with the locked-worlds notice while `WorldSeed.WorldIsLive`)
-— the biome tint (`BiomeTint` -> `TerrainGenerator.Climate`) and the deep-water surface codes
-(`ColumnCache`) read worldgen locally, and must match the server's far LOD at the seam — and
-builds a **client-mode** `World` (`clientMode: true`) with the renderer's pools and the window —
-no worldgen, no LOD threads and no local simulation — teleports to the server's spawn and plays.
-A `ClientChunkStreamer` requests the chunks and column heights around the camera
-(`ChunkData`/`ColumnHeights`; a column already received is never asked again, a repeat answer with
-the same heights re-dirties nothing, and the heights map is a `ConcurrentDictionary` because mesh
-builds on the thread pool read it through `ChunkManager.ColumnHeightSource`), a
-`ClientLodStreamer` requests far regions (`LodRegionData`, at most `NetLodInFlightMax`
-outstanding, an unanswered one re-sent only after `NetLodResendSeconds`), and
+`Disconnected`, waits for `NetworkStatus.Handshaken`, then builds a **client-mode** `World`
+(`clientMode: true`, `spawn: server.Spawn`, so the camera starts at the server's spawn — a client
+camera never runs `Camera.SpawnPosition`'s surface search, and stands at
+`Camera.PlaceholderSpawn` when no spawn is given) with the renderer's pools and the window — no
+worldgen, no LOD threads and no local simulation — and plays. The client derives nothing from the
+seed: terrain, water levels and the biome tint all stream from the server, so it never calls
+`WorldSeed.Apply` and a connect is never refused by the seed lock (the client world still calls
+`WorldSeed.BeginWorld`, so a client teardown that times out keeps the lock like a singleplayer
+one). A `ClientChunkStreamer` requests the chunks around the camera and, with every chunk it asks
+for, the 3x3 chunk columns around it (`ChunkData`/`ColumnTerrain`; a chunk at the load sphere's rim
+needs diagonal columns no chunk inside it would ask for). It is the client's `IColumnSource`
+(installed as `ChunkManager.ColumnSource`, a `ConcurrentDictionary` because mesh builds on the
+thread pool read it): a column already received is never asked again, an unanswered one is re-sent
+after `ResendSeconds` like a chunk (a column is a hard dependency), and an arriving column
+re-dirties the loaded chunks of the 3x3 chunk columns around it unless it equals the stored one in
+heights, water levels and climate (`ColumnTerrain.ContentEquals`). A client chunk never meshes
+until its nine columns are in (the dirty gate in the threading rules; all-air chunks exempt), and
+the eye's water surface (`ChunkManager.GetFluidColumnTopGlobal`, `Camera.EyeWaterSurfaceY`) reads
+the streamed water level too. The far LOD is the server's: a `ClientLodStreamer` requests far
+regions (`LodRegionData`, at most `NetLodInFlightMax` outstanding, an unanswered one re-sent only
+after `NetLodResendSeconds`), whose `LodNetCodec` payload is the server's finished vertices with
+the tint and the canopy bumps already baked, so the client's `LodManager` never reads `ColumnCache`
+or `TreeGenerator`; for the same reason `World.NotifyLodEdit` and the inline
+`TreeGenerator.PoisonCanopy`/`LodManager.MarkEditedColumn` sites in `RemoveBlock` and `FellWood`
+return early in client mode, so a client edit never touches `LodSurface`, `LodRegion.ColumnCaps`
+or `TreeGenerator.CanopyDisturbed`. `WorldgenReads` (off in production) is the counter
+`ClientWorldgenIsolationTests` turns on to prove a client world under a poisoned seed streams and
+meshes with no worldgen call and edits without moving the far-LOD tables, and
+`StreamedTerrainMeshTests` that a mesh built from streamed columns is byte-identical to the
+worldgen one (a tinted surface and a submerged floor).
 `World.ApplyNetworkEntities`/`ApplyNetworkBlockChanges`/`Inventory.Import` apply the server's
 entities, cell changes and inventory mirror. `ApplyNetworkBlockChanges` writes raw, then rebuilds
 each touched chunk once with the light-radius `Chunk.RemeshAfterBatchEdit` (so a remote lamp or
@@ -1889,7 +1944,16 @@ trees are not in `EntityList` (their cells still sync via `BlockChanges`, and a 
 them locally, so a fall or a blast shows as cells changing rather than as a moving entity; a
 client's own throw is drawn as a cosmetic copy only); station mirrors update at the entity cadence
 (10 Hz); every player is named "Player", because `ChatView.LocalName` is never set from a
-setting; and there is no authentication or encryption. From the server-owned status and movement:
+setting; and there is no authentication or encryption. From the worldgen-free client: the
+pebble, branch-pile and snow-layer emitters still read seed-keyed worldgen per cell for an
+untouched cell (state byte 0: the `PebbleGenerator`/`BranchPileGenerator` position hashes and
+noise keyed on `WorldGenerationConfig.Seed`, and `SnowShape.CountWithState` -> `SnowGenerator.DepthAt`, which
+sets the drawn depth of a snow cell; collision reads the state byte alone), and since a client no longer applies the server's seed
+it draws those with its own process seed (`WorldSeed.Default`, or the last singleplayer world's),
+so untouched pebbles, branch piles and snow depths can differ from the server's
+(`ClientWorldgenIsolationTests` picks chunks without them, and `WorldgenReads` does not count
+those reads); and `ServerHello` still carries the seed although no client uses it. From the
+server-owned status and movement:
 a hovering cheater is frozen in place by repeated corrections rather than dropped to the ground;
 collision is judged at a state's endpoint only, so one state may pass through a thin wall within
 its speed allowance, a body already inside a solid may move anywhere, and a descent slower than

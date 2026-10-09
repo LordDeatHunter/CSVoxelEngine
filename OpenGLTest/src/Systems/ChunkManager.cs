@@ -112,12 +112,17 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     public bool Headless { get; set; }
 
     /// <summary>
-    /// A multiplayer client sets this so streamed chunks light from server-supplied column heights
-    /// instead of worldgen (see <see cref="Chunk.RestoreFrom(ChunkSnapshot, bool)"/>): it takes
-    /// (chunkX, chunkZ) and returns the 256 heights or null when that column has not arrived.
-    /// Null in singleplayer, where worldgen is the source.
+    /// The terrain a mesh build, <see cref="GetFluidColumnTopGlobal"/> and the mining pop read per
+    /// chunk column beyond the blocks (<see cref="ColumnTerrain"/>: heights, water levels, corner
+    /// climate). Worldgen by default (<see cref="WorldgenColumnSource"/>, singleplayer and the
+    /// server); a multiplayer client installs its <see cref="ClientChunkStreamer"/>, so streamed
+    /// chunks (restored without worldgen, see <see cref="Chunk.RestoreFrom(ChunkSnapshot, bool)"/>)
+    /// light, resolve their water surfaces and take their tint from server-supplied columns, and
+    /// a chunk whose streamed columns have not arrived is not meshed yet (see
+    /// <see cref="ProcessDirtyChunks"/>). Read by pool mesh builds
+    /// (<see cref="ChunkLighting.FillColumns"/>), so an implementation must be thread-safe.
     /// </summary>
-    public Func<int, int, int[]?>? ColumnHeightSource { get; set; }
+    public IColumnSource ColumnSource { get; set; } = WorldgenColumnSource.Instance;
 
     /// <summary>
     /// Mesh builds <see cref="ProcessDirtyChunks"/> starts per frame. Defaults to
@@ -557,11 +562,17 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             // back up. Removing first closes the race where that TryAdd would be a no-op
             // because this entry still existed. This is what lets _dirtyChunks reach empty at
             // rest: the rim chunks of the load sphere never get their outer neighbour until
-            // the camera moves, and used to be rescanned every single frame.
+            // the camera moves, and used to be rescanned every single frame. A chunk whose
+            // streamed columns have not arrived is dropped the same way:
+            // ClientChunkStreamer.ApplyColumn re-dirties the 3x3 chunk columns around every
+            // column it stores, which is what wakes it.
             if (!_dirtyChunks.TryRemove(key, out _))
                 continue;
 
             if (!HasAllNeighbors(pos))
+                continue;
+
+            if (!HasColumnNeighbourhood(chunk, cx, cz))
                 continue;
 
             _dirtyCandidates.Add((key, pos, chunk, distSq));
@@ -760,9 +771,11 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// only fires on work that is still queued, which this waits out too. Finished results stay
     /// in the completed queue; nothing is applied here.
     /// <para>
-    /// A mesh build reads worldgen state (<c>Chunk.SubmergedSurfaceCode</c> falls back to
-    /// <see cref="ColumnCache.Get"/>), so a world-seed swap must wait for this as well as
-    /// for the worker joins. <c>World.SaveAndDispose</c> calls <see cref="ChunkGenerationWorker.Stop"/>,
+    /// A mesh build reads worldgen state - the nine chunk columns around it through
+    /// <see cref="ColumnSource"/> (<see cref="WorldgenColumnSource"/> outside a client, resolved up
+    /// front), plus the seed-keyed position hashes and the snow-depth noise the pebble, branch-pile
+    /// and snow-layer emitters read for untouched cells - so a world-seed swap must wait for this
+    /// as well as for the worker joins. <c>World.SaveAndDispose</c> calls <see cref="ChunkGenerationWorker.Stop"/>,
     /// then <see cref="LodManager.Stop"/>, then this, and only when all three return true does it
     /// free the chunks through <see cref="ReleaseAll"/> and call <see cref="WorldSeed.EndWorld"/>
     /// (after which <see cref="WorldSeed.Apply"/> is legal again).
@@ -855,7 +868,8 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             if (meshData == null)
             {
                 // A face neighbour was unloaded between the scheduling check and this
-                // snapshot; meshing across that hole would bake border artifacts, so the
+                // snapshot, or one of the nine streamed columns is missing; meshing across
+                // that hole would bake border artifacts (or dark light and no water), so the
                 // build is dropped and the chunk retried once the world settles
                 _dirtyChunks.TryAdd(key, 0);
                 return;
@@ -1040,6 +1054,15 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         if (!chunk.IsBlockDataReady) return;
         if (!HasAllNeighbors(pos)) return;
 
+        // A streamed column is missing: mesh once it arrives instead of baking dark light and
+        // no water now. The entry is re-added once per edit, never per frame, and the next
+        // ProcessDirtyChunks drops it until ApplyColumn wakes it, so nothing spins.
+        if (!HasColumnNeighbourhood(chunk, (int)pos.X, (int)pos.Z))
+        {
+            _dirtyChunks.TryAdd(key, 0);
+            return;
+        }
+
         var meshData = chunk.GenerateMeshData(this);
         if (meshData == null)
         {
@@ -1177,8 +1200,10 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// <see cref="GetFluidSurfaceGlobal"/> only resolves one cell up; this walks the column to its
     /// top (at most <see cref="WorldGenerationConfig.FluidSurfaceSearchCells"/> cells, reading the
     /// cap's upper edge beyond that) and, when the walk ends under a solid ceiling (an overhang,
-    /// a placed block, a flooded sea cave), sees through it to the column's generated water
-    /// level, so the rays under a ledge still march against the sea or lake above it.
+    /// a placed block, a flooded sea cave), sees through it to the column's water level from
+    /// <see cref="ColumnSource"/> (generated, or streamed from the server), so the rays under a
+    /// ledge still march against the sea or lake above it. A client whose column has not arrived
+    /// sees only what it walked.
     /// </summary>
     public float GetFluidColumnTopGlobal(int x, int y, int z)
     {
@@ -1209,7 +1234,8 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         if (!ceiling)
             return walked;
 
-        var column = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+        if (!ColumnSource.TryGet(x >> Chunk.SizeShift, z >> Chunk.SizeShift, out var column))
+            return walked;
         var level = column.WaterLevel[((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
         if (level == TerrainGenerator.NoWater)
             return walked;
@@ -1261,6 +1287,31 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         {
             if (!Chunks.TryGetValue(cx + d.X, cy + d.Y, cz + d.Z, out var neighbor)
                 || !neighbor.IsBlockDataReady)
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Whether <see cref="ColumnSource"/> has the nine chunk columns around (<paramref name="cx"/>,
+    /// <paramref name="cz"/>) that a build of <paramref name="chunk"/> resolves: the light volume's
+    /// heights, the water surface codes and the +1 tint corners. The worldgen source always says
+    /// yes, so singleplayer pays nine trivial virtual calls per dirty entry. An all-air chunk is
+    /// exempt, since its build returns before it reads any column and a sky chunk at a client's
+    /// rim must keep meshing at once; a fully enclosed chunk cannot be told apart without its
+    /// neighbours and so waits for its columns too, which only delays <see cref="Chunk.IsMeshed"/>
+    /// for <c>LodManager.IsCoveredByChunks</c> at a client's load-sphere rim.
+    /// </summary>
+    private bool HasColumnNeighbourhood(Chunk chunk, int cx, int cz)
+    {
+        if (chunk.SolidCount == 0)
+            return true;
+
+        var source = ColumnSource;
+        for (var dx = -1; dx <= 1; dx++)
+        for (var dz = -1; dz <= 1; dz++)
+        {
+            if (!source.IsReady(cx + dx, cz + dz))
                 return false;
         }
         return true;

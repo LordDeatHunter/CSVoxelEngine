@@ -104,7 +104,7 @@ public sealed class ClientIntentFlowTests : IDisposable
                     _streamer!.ApplyChunk(cx, cy, cz, reader.ReadBytes());
                     break;
                 }
-                case NetMessage.ColumnHeights:
+                case NetMessage.ColumnTerrain:
                 {
                     var cx = reader.ReadInt();
                     var cz = reader.ReadInt();

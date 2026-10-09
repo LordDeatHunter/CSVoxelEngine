@@ -446,10 +446,13 @@ public sealed class GameServer : IDisposable
             {
                 var cx = reader.ReadInt();
                 var cz = reader.ReadInt();
-                using var writer = new PacketWriter(NetMessage.ColumnHeights);
+                // Exactly what this server's own mesher reads for the column (heights, water
+                // levels, corner climate), so a client derives nothing from worldgen.
+                WorldgenColumnSource.Instance.TryGet(cx, cz, out var terrain);
+                using var writer = new PacketWriter(NetMessage.ColumnTerrain);
                 writer.Write(cx);
                 writer.Write(cz);
-                writer.WriteBytes(ChunkNetCodec.EncodeHeights(ColumnCache.GetHeights(cx, cz)));
+                writer.WriteBytes(ChunkNetCodec.EncodeColumn(terrain));
                 client.Send(writer.ToArray());
                 break;
             }

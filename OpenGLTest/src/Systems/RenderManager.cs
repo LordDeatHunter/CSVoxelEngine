@@ -2759,9 +2759,14 @@ public class RenderManager : IDisposable
         SetDrawUniforms(matrix, matrix * camera.GetViewProjection(), 1f,
             LightAt(blockPosition + new Vector3(0.5f)));
         // A biome-tinted block's pop takes the field at the mined cell, so it matches the
-        // terrain it jumps out of (the emitter flags the tinted quads and keeps the rgb shade only)
+        // terrain it jumps out of (the emitter flags the tinted quads and keeps the rgb shade only).
+        // The field comes from the world's column source (a client's is streamed, and a column
+        // that has not arrived draws untinted); no world (the item debugger) means worldgen.
+        var columns = LightSource?.ColumnSource ?? WorldgenColumnSource.Instance;
         worldShader.SetUniform(_locBiomeTint, type.BiomeTint is { } bt
-            ? BiomeTint.CellTint(bt.Palette, (int)MathF.Floor(blockPosition.X), (int)MathF.Floor(blockPosition.Z))
+            && BiomeTint.TryCellTint(columns, bt.Palette, (int)MathF.Floor(blockPosition.X),
+                (int)MathF.Floor(blockPosition.Z), out var cellTint)
+            ? cellTint
             : Vector3.One);
         unsafe
         {

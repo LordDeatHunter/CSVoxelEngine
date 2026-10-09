@@ -21,7 +21,7 @@ public class Camera : IMobTarget
     private readonly PlayerPhysics _physics = new();
     private readonly IWindow? window;
     private readonly IMouse? mouse;
-    public Vector3 Position { get; private set; } = SpawnPosition();
+    public Vector3 Position { get; private set; }
     public float Yaw { get; private set; } = SpawnLook.X;
     public float Pitch { get; private set; } = SpawnLook.Y;
     public bool IsGrounded { get; private set; }
@@ -326,10 +326,26 @@ public class Camera : IMobTarget
         return true;
     }
 
-    // Headless tests pass nulls: no window to resize with and no mouse to capture.
-    // The game always passes both, so its behaviour is unchanged.
-    public Camera(IWindow? window, IInputContext? input)
+    /// <summary>
+    /// Where a multiplayer client's camera stands until the server's spawn is known: a fixed
+    /// point over the origin that reads nothing from worldgen (a client has no terrain of its own).
+    /// </summary>
+    internal static readonly Vector3 PlaceholderSpawn =
+        new(0.5f, WorldGenerationConfig.SeaLevel + 1 + EyeHeight, 0.5f);
+
+    /// <summary>
+    /// Builds the camera. Headless tests pass nulls: no window to resize with and no mouse to
+    /// capture. The game always passes both, so its behaviour is unchanged.
+    /// </summary>
+    /// <param name="window">The window to follow for the aspect ratio, or null headless.</param>
+    /// <param name="input">The input context whose mouse turns the view, or null headless.</param>
+    /// <param name="startPosition">
+    /// The eye to start at; null searches the worldgen spawn (<c>VOXEL_SPAWN</c>, else the surface
+    /// at the origin). A multiplayer client always passes one, so it never reads worldgen here.
+    /// </param>
+    public Camera(IWindow? window, IInputContext? input, Vector3? startPosition = null)
     {
+        Position = startPosition ?? SpawnPosition();
         this.window = window;
         mouse = input?.Mice.FirstOrDefault();
 

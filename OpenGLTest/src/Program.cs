@@ -412,8 +412,8 @@ public static class Program
     }
 
     /// <summary>
-    /// The connecting screen's frame: waits for the handshake, then builds the client world from the
-    /// server's seed and lets the normal loading path take over. A failure returns to the server list
+    /// The connecting screen's frame: waits for the handshake, then builds the client world at the
+    /// server's spawn and lets the normal loading path take over. A failure returns to the server list
     /// with the reason.
     /// </summary>
     private static void UpdateConnecting(float deltaTime)
@@ -444,28 +444,18 @@ public static class Program
 
         var server = client.Server!.Value;
 
-        // The client renders with the server's seed: the biome tint (BiomeTint ->
-        // TerrainGenerator.Climate) and the water-surface codes (ColumnCache) read worldgen
-        // locally, and must agree with the server's far LOD at the seam. Legal only while no
-        // world is live, exactly like a singleplayer open.
-        if (WorldSeed.WorldIsLive)
-        {
-            DisconnectNetwork();
-            AbortConnect(SeedLockedNotice);
-            menu.LockWorlds(SeedLockedNotice);
-            return;
-        }
-
+        // The client derives nothing from the seed (terrain, water levels and tint all stream from
+        // the server), so it needs neither WorldSeed.Apply nor the seed lock.
         try
         {
-            WorldSeed.Apply(server.Seed);
             // A multiplayer client renders, so it is a real world with the renderer's pools and the
             // window - but client mode: no worldgen (chunks stream from the server), no far LOD and
-            // no local simulation, so a custom or premade server world is exactly what is shown.
+            // no local simulation, so a custom or premade server world is exactly what is shown. It
+            // starts where the server says and sinks onto the streamed terrain there.
             world = new World(renderManager.gl, renderManager.OpaqueChunkGeometry,
                 renderManager.TranslucentChunkGeometry, renderManager.LodGeometry,
                 windowManager.Window, inputManager.InputContext, sfx, null,
-                serverMode: false, clientMode: true);
+                serverMode: false, clientMode: true, spawn: server.Spawn);
             world.Player.Rig = renderManager.PlayerRig;
             // Every action is predicted locally and sent as an intent; the cells it changed are
             // tagged with that intent, so the server's answer to it is told from older messages
@@ -478,8 +468,6 @@ public static class Program
 
             clientStreamer = new ClientChunkStreamer(world.GetChunkManager(), SendChunkRequest, SendColumnRequest);
             clientLodStreamer = new ClientLodStreamer(world.GetLodManager(), SendLodRequest);
-            // Start where the server says; the client sinks onto the streamed terrain there.
-            world.Camera.TestTeleport(server.Spawn, world.Camera.Yaw, world.Camera.Pitch);
         }
         catch (Exception e)
         {
@@ -675,7 +663,7 @@ public static class Program
                 clientStreamer?.ApplyChunk(cx, cy, cz, reader.ReadBytes());
                 break;
             }
-            case NetMessage.ColumnHeights:
+            case NetMessage.ColumnTerrain:
             {
                 var cx = reader.ReadInt();
                 var cz = reader.ReadInt();

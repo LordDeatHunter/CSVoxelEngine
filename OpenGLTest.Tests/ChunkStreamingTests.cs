@@ -8,7 +8,7 @@ namespace silkgltriangle.Tests;
 
 /// <summary>
 /// End-to-end chunk streaming over a real loopback connection: a server-mode world serves a loaded
-/// chunk and its column heights, and a client chunk manager restores them from the wire - the path
+/// chunk and its column terrain, and a client chunk manager restores them from the wire - the path
 /// a multiplayer client uses instead of worldgen.
 /// </summary>
 [Collection("Worldgen seed")]
@@ -118,7 +118,7 @@ public sealed class ChunkStreamingTests : IDisposable
                         streamer.ApplyChunk(rx, ry, rz, reader.ReadBytes());
                         gotChunk = true;
                     }
-                    else if (message == NetMessage.ColumnHeights)
+                    else if (message == NetMessage.ColumnTerrain)
                     {
                         var rx = reader.ReadInt();
                         var rz = reader.ReadInt();
@@ -131,11 +131,15 @@ public sealed class ChunkStreamingTests : IDisposable
             }
 
             Assert.True(gotChunk, $"no chunk data came back from the server (ids: {string.Join(",", ids)})");
-            Assert.True(gotColumn, $"no column heights came back from the server (ids: {string.Join(",", ids)})");
+            Assert.True(gotColumn, $"no column terrain came back from the server (ids: {string.Join(",", ids)})");
             Assert.Equal(serverChunk.GetLocalBlock(0, 0, 0),
                 manager.GetBlockGlobal(cx * Chunk.Size, cy * Chunk.Size, cz * Chunk.Size));
-            Assert.NotNull(manager.ColumnHeightSource);
-            Assert.NotNull(manager.ColumnHeightSource!(cx, cz));
+            // The streamed column is what the client's mesh builds read (the manager's column
+            // source), and exactly what the server's own worldgen reads for it: heights, water
+            // levels and corner climate
+            Assert.True(manager.ColumnSource.TryGet(cx, cz, out var got));
+            Assert.True(WorldgenColumnSource.Instance.TryGet(cx, cz, out var expected));
+            Assert.True(got.ContentEquals(expected), "the streamed column differs from the server's worldgen column");
         }
         finally
         {

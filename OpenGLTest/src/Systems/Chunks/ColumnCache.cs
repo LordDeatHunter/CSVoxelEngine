@@ -18,9 +18,14 @@ public static class ColumnCache
     private static readonly GenerationalCache<(int X, int Z), ColumnData> Cache =
         new(WorldGenerationConfig.ColumnCacheCapacity, WorldGenerationConfig.ColumnCacheGenerations);
 
-    // Static, so a miss on any of the four chunk-gen threads does not allocate a closure per call
+    // Static, so a miss on any of the four chunk-gen threads does not allocate a closure per call.
+    // The miss is where WorldgenReads counts a column (once per column, uncontended).
     private static readonly Func<(int X, int Z), ColumnData> Compute =
-        static key => TerrainGenerator.Compute(key.X, key.Z);
+        static key =>
+        {
+            WorldgenReads.Note();
+            return TerrainGenerator.Compute(key.X, key.Z);
+        };
 
     /// <summary>
     /// Drops every cached column. Only <see cref="WorldSeed.Apply"/> calls it: the columns are a
@@ -28,6 +33,9 @@ public static class ColumnCache
     /// </summary>
     internal static void Reset() => Cache.Clear();
 
+    // WorldgenReads deliberately counts the miss (Compute), never a hit: Get is called per cell or
+    // probe by the tree, fluid, carver and LOD code on the gen workers. After a WorldSeed.Apply
+    // the cache is empty, so every read that follows is a counted miss.
     /// <summary>
     /// Returns the 2D generation inputs for a chunk column. Nothing generated is ever solid
     /// above Heights[x, z]; the block at that height is solid unless a cave or entrance carved
@@ -45,17 +53,6 @@ public static class ColumnCache
     /// <summary>Per-column biomes for a chunk column, indexed like
     /// <see cref="GetHeights"/>. The far LOD reads this to pick biome surface tiles.</summary>
     public static Biome[] GetBiomes(int chunkX, int chunkZ) => Get(chunkX, chunkZ).Biomes;
-
-    // Below any real height, so none of a missing streamed column's cells seed sunlight; a chunk
-    // whose column has not arrived stays dark until it does and the chunk re-meshes.
-    internal static readonly int[] NoStreamedHeights = CreateNoStreamedHeights();
-
-    private static int[] CreateNoStreamedHeights()
-    {
-        var heights = new int[Size * Size];
-        Array.Fill(heights, int.MinValue);
-        return heights;
-    }
 
     /// <summary>
     /// Fills one column of a chunk's block array from the chunk floor up to the terrain height:

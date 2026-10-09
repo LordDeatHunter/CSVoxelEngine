@@ -51,11 +51,28 @@ public sealed class ColumnData
     /// </summary>
     public readonly int MaxWaterLevel;
 
+    /// <summary>
+    /// The <see cref="TerrainGenerator.Climate"/> warmth at the column's minimum corner, which is
+    /// the biome-tint lattice point of this chunk column. Stored so the chunk mesher reads it
+    /// instead of evaluating noise, and so the server can stream it (<see cref="ColumnTerrain"/>).
+    /// </summary>
+    public readonly float CornerWarmth;
+
+    /// <summary>The <see cref="TerrainGenerator.Climate"/> wetness at the same corner as
+    /// <see cref="CornerWarmth"/>.</summary>
+    public readonly float CornerWetness;
+
     public readonly int MinHeight;
     public readonly int MaxHeight;
 
+    /// <remarks>
+    /// <paramref name="cornerWarmth"/> and <paramref name="cornerWetness"/> default to the
+    /// temperate midpoint; that default is for hand-built test columns only, since
+    /// <see cref="TerrainGenerator.Compute"/> always passes the real corner climate.
+    /// </remarks>
     public ColumnData(int[] heights, byte[] dirtDepth, float[] entranceWeight, float[] caveIntensity,
-        Biome[]? biomes = null, int[]? bed = null, int[]? waterLevel = null)
+        Biome[]? biomes = null, int[]? bed = null, int[]? waterLevel = null,
+        float cornerWarmth = 0.5f, float cornerWetness = 0.5f)
     {
         Heights = heights;
         DirtDepth = dirtDepth;
@@ -64,6 +81,8 @@ public sealed class ColumnData
         Biomes = biomes ?? ForestBiomes(heights.Length);
         Bed = bed ?? heights;
         WaterLevel = waterLevel ?? NoWaterLevels(heights.Length);
+        CornerWarmth = cornerWarmth;
+        CornerWetness = cornerWetness;
 
         var maxWater = TerrainGenerator.NoWater;
         foreach (var level in WaterLevel)

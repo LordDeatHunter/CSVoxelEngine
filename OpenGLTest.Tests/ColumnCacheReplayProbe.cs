@@ -281,7 +281,7 @@ public sealed class ColumnCacheReplayProbe
 
     /// <summary>
     /// (i) CHUNK-GEN. Every chunk column of the radius-16 disc, closest-first, each contributing the
-    /// 3x3 heightmap neighbourhood a chunk build actually asks for (<c>Chunk.FillLightColumnHeights</c>,
+    /// 3x3 column neighbourhood a chunk build actually asks for (<c>ChunkLighting.FillColumns</c>,
     /// dx outer / dz inner), replayed <see cref="ChunkGenPasses"/> times. This is the small,
     /// permanently-hot set D2 says the sweep was throwing away.
     /// </summary>

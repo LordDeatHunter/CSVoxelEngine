@@ -2,7 +2,6 @@ using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using static silkgltriangle.Chunk;
-using static silkgltriangle.ColumnCache;
 
 namespace silkgltriangle;
 
@@ -123,20 +122,23 @@ internal static class ChunkLighting
     }
 
     /// <summary>
-    /// The nine chunk-column heightmaps the light volume centred on chunk (chunkX, chunkZ) spans,
-    /// written to columns[dx * 3 + dz] for chunk column (chunkX - 1 + dx, chunkZ - 1 + dz). Because
-    /// LightBorder (15) is smaller than Size (16) the volume never reaches past those nine, so
-    /// fetching them once replaces LightSize^2 cache probes (PERF_TODO C2) while resolving to the
-    /// exact same ColumnData instances.
+    /// The nine chunk columns' terrain around chunk (chunkX, chunkZ), written to
+    /// columns[dx * 3 + dz] for chunk column (chunkX - 1 + dx, chunkZ - 1 + dz). Because
+    /// LightBorder (15) is smaller than Size (16) the light volume never reaches past those nine,
+    /// and neither does the padded snapshot's water-surface lookup or the +1 tint corners, so
+    /// fetching them once replaces LightSize^2 cache probes (PERF_TODO C2) and serves every
+    /// terrain read of the build. Returns false when <paramref name="source"/> lacks one (a
+    /// streamed column that has not arrived): the build must then be abandoned, never fed a
+    /// substitute, and the dirty gate in <see cref="ChunkManager"/> keeps such a build from being
+    /// scheduled in the first place. The worldgen source always fills all nine.
     /// </summary>
-    internal static void FillLightColumnHeights(int chunkX, int chunkZ, int[]?[] columns,
-        Func<int, int, int[]?>? streamed)
+    internal static bool FillColumns(IColumnSource source, int chunkX, int chunkZ, ColumnTerrain[] columns)
     {
         for (var dx = 0; dx < 3; dx++)
         for (var dz = 0; dz < 3; dz++)
-            columns[dx * 3 + dz] = streamed is { } source
-                ? source(chunkX - 1 + dx, chunkZ - 1 + dz) ?? NoStreamedHeights
-                : ColumnCache.GetHeights(chunkX - 1 + dx, chunkZ - 1 + dz);
+            if (!source.TryGet(chunkX - 1 + dx, chunkZ - 1 + dz, out columns[dx * 3 + dz]))
+                return false;
+        return true;
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Xunit;
 
@@ -93,6 +94,58 @@ public class FluidSurfaceTests
         // Without the ceiling the column is open to the air and reads its own top
         center.SetBlockRaw(X, 9, Z, 0, 0);
         Assert.Equal(bounded, manager.GetFluidColumnTopGlobal(cell.X, cell.Y, cell.Z));
+    }
+
+    [Fact]
+    public void AStreamedWaterLevelIsWhatAClientSeesThroughACeiling()
+    {
+        // A capped column at negative X, so the column and in-column indices go through the
+        // arithmetic shift and mask the way a client's camera can stand anywhere.
+        var (manager, center) = MeshTestWorld.WalledArea(new Vector3(-2, 1, 3));
+        for (var y = 4; y <= 8; y++) center.SetBlockRaw(X, y, Z, _water, FluidState.Source);
+        center.SetBlockRaw(X, 9, Z, _stone, 0);
+
+        var cell = World(center, X, 4, Z);
+        var walked = manager.GetFluidSurfaceGlobal(cell.X, cell.Y + 4, cell.Z);
+        var columnX = cell.X >> Chunk.SizeShift;
+        var columnZ = cell.Z >> Chunk.SizeShift;
+        var index = ((cell.X & Chunk.SizeMask) << Chunk.SizeShift) | (cell.Z & Chunk.SizeMask);
+
+        // The source knows only this cell's column, and only this cell of it holds water, well
+        // above the ceiling: the query must read exactly that entry.
+        var level = cell.Y + 40;
+        var source = new FakeColumnSource();
+        source.Columns[(columnX, columnZ)] = DryColumn();
+        source.Columns[(columnX, columnZ)].WaterLevel[index] = level;
+        manager.ColumnSource = source;
+
+        Assert.Equal(level + FluidState.SourceHeight, manager.GetFluidColumnTopGlobal(cell.X, cell.Y, cell.Z));
+
+        // A column that has not arrived: only the walked surface is known
+        source.Columns.Clear();
+        Assert.Equal(walked, manager.GetFluidColumnTopGlobal(cell.X, cell.Y, cell.Z));
+
+        // A column holding no water there: the walked surface again
+        source.Columns[(columnX, columnZ)] = DryColumn();
+        Assert.Equal(walked, manager.GetFluidColumnTopGlobal(cell.X, cell.Y, cell.Z));
+    }
+
+    private static ColumnTerrain DryColumn()
+    {
+        var water = new int[Chunk.Size * Chunk.Size];
+        Array.Fill(water, TerrainGenerator.NoWater);
+        return new ColumnTerrain(new int[Chunk.Size * Chunk.Size], water, 0.5f, 0.5f);
+    }
+
+    /// <summary>An <see cref="IColumnSource"/> that knows exactly the columns it was given.</summary>
+    private sealed class FakeColumnSource : IColumnSource
+    {
+        public readonly Dictionary<(int X, int Z), ColumnTerrain> Columns = new();
+
+        public bool IsReady(int chunkX, int chunkZ) => Columns.ContainsKey((chunkX, chunkZ));
+
+        public bool TryGet(int chunkX, int chunkZ, out ColumnTerrain terrain) =>
+            Columns.TryGetValue((chunkX, chunkZ), out terrain);
     }
 
     [Fact]

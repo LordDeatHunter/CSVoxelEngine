@@ -19,9 +19,12 @@ public class BlockDebrisSystem
 
     /// <summary>
     /// Chips <paramref name="count"/> cubes off the block at <paramref name="cell"/>.
-    /// Air and unknown ids spawn nothing.
+    /// Air and unknown ids spawn nothing. A biome-tinted block's chips wear the tint field at the
+    /// cell, read from <paramref name="columns"/> (the world's <see cref="ChunkManager.ColumnSource"/>;
+    /// null means worldgen); a column that source does not have yet (a client's streamed column
+    /// that has not arrived) leaves them untinted.
     /// </summary>
-    public void Burst(Vector3 cell, byte blockId, int count, Random? random = null)
+    public void Burst(Vector3 cell, byte blockId, int count, Random? random = null, IColumnSource? columns = null)
     {
         if (count <= 0) return;
         if (blockId == BlockType.Air || BlockType.ById[blockId] == null) return;
@@ -29,7 +32,9 @@ public class BlockDebrisSystem
         var center = cell + new Vector3(0.5f);
         // One tint per burst: every chip of a biome-tinted block wears the field at its cell
         var tint = BlockType.ById[blockId]!.BiomeTint is { } bt
-            ? BiomeTint.CellTint(bt.Palette, (int)MathF.Floor(cell.X), (int)MathF.Floor(cell.Z))
+            && BiomeTint.TryCellTint(columns ?? WorldgenColumnSource.Instance, bt.Palette,
+                (int)MathF.Floor(cell.X), (int)MathF.Floor(cell.Z), out var cellTint)
+            ? cellTint
             : Vector3.One;
         for (var i = 0; i < count; i++)
         {

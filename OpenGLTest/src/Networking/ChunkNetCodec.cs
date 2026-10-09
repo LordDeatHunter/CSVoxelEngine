@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
+using System.Text;
 
 namespace silkgltriangle;
 
@@ -9,7 +9,9 @@ namespace silkgltriangle;
 /// Compact wire form of one chunk's block data: the <see cref="Chunk.BlockCount"/> block ids and,
 /// when any cell carries one, the same number of state bytes, Deflate-compressed. The multiplayer
 /// client restores streamed chunks from this instead of generating them; player-placed bookkeeping
-/// is not sent, since a client never fells, decays or saves. GL-free and content-free.
+/// is not sent, since a client never fells, decays or saves. It also carries one chunk column's
+/// terrain (<see cref="ColumnTerrain"/>: heights, water levels and corner climate), which is all a
+/// client needs from the terrain beyond the blocks. GL-free and content-free.
 /// </summary>
 public static class ChunkNetCodec
 {
@@ -55,24 +57,66 @@ public static class ChunkNetCodec
         return new ChunkSnapshot(blocks, state, playerPlaced: null);
     }
 
-    /// <summary>Encodes one column's 16x16 terrain heights (256 ints) for the client's light seeding.</summary>
-    public static byte[] EncodeHeights(int[] heights)
+    /// <summary>
+    /// Encodes one chunk column's <see cref="ColumnTerrain"/>: the 256 heights and the 256 water
+    /// levels as int32, then the corner warmth and wetness as float32, Deflate-compressed. Throws
+    /// <see cref="ArgumentException"/> when either array is not one value per column of the chunk.
+    /// </summary>
+    public static byte[] EncodeColumn(in ColumnTerrain terrain)
     {
-        var bytes = new byte[heights.Length * sizeof(int)];
-        for (var i = 0; i < heights.Length; i++)
-            BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(i * sizeof(int)), heights[i]);
-        return bytes;
+        if (terrain.Heights is not { Length: ColumnLength })
+            throw new ArgumentException($"A column carries {ColumnLength} heights, got {terrain.Heights?.Length ?? 0}.", nameof(terrain));
+        if (terrain.WaterLevel is not { Length: ColumnLength })
+            throw new ArgumentException($"A column carries {ColumnLength} water levels, got {terrain.WaterLevel?.Length ?? 0}.", nameof(terrain));
+
+        using var output = new MemoryStream();
+        using (var deflate = new DeflateStream(output, CompressionLevel.Fastest, leaveOpen: true))
+        using (var writer = new BinaryWriter(deflate, Encoding.UTF8, leaveOpen: true))
+        {
+            foreach (var height in terrain.Heights)
+                writer.Write(height);
+            foreach (var level in terrain.WaterLevel)
+                writer.Write(level);
+            writer.Write(terrain.Warmth);
+            writer.Write(terrain.Wetness);
+        }
+
+        return output.ToArray();
     }
 
-    /// <summary>Decodes a <see cref="EncodeHeights"/> payload; throws on a wrong length.</summary>
-    public static int[] DecodeHeights(byte[] payload)
+    /// <summary>
+    /// Decodes what <see cref="EncodeColumn"/> wrote. A truncated or corrupt payload throws
+    /// <see cref="InvalidDataException"/>, the one malformed-frame type the client's message loop
+    /// already handles. Reads nothing from worldgen.
+    /// </summary>
+    public static ColumnTerrain DecodeColumn(byte[] payload)
     {
-        if (payload.Length % sizeof(int) != 0)
-            throw new ArgumentException($"Heights payload must be a multiple of 4, got {payload.Length}.", nameof(payload));
-        var heights = new int[payload.Length / sizeof(int)];
-        for (var i = 0; i < heights.Length; i++)
-            heights[i] = BinaryPrimitives.ReadInt32LittleEndian(payload.AsSpan(i * sizeof(int)));
-        return heights;
+        try
+        {
+            using var input = new MemoryStream(payload, writable: false);
+            using var deflate = new DeflateStream(input, CompressionMode.Decompress);
+            using var reader = new BinaryReader(deflate, Encoding.UTF8, leaveOpen: true);
+            var heights = ReadColumnInts(reader);
+            var waterLevel = ReadColumnInts(reader);
+            var warmth = reader.ReadSingle();
+            var wetness = reader.ReadSingle();
+            return new ColumnTerrain(heights, waterLevel, warmth, wetness);
+        }
+        catch (EndOfStreamException e)
+        {
+            throw new InvalidDataException("Column payload ended early.", e);
+        }
+    }
+
+    // One int per column of a chunk (heights or water levels).
+    private const int ColumnLength = Chunk.Size * Chunk.Size;
+
+    private static int[] ReadColumnInts(BinaryReader reader)
+    {
+        var values = new int[ColumnLength];
+        for (var i = 0; i < values.Length; i++)
+            values[i] = reader.ReadInt32();
+        return values;
     }
 
     private static void ReadFully(Stream stream, Span<byte> buffer)

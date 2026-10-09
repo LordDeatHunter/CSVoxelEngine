@@ -43,7 +43,9 @@ public enum NetMessage : byte
     ChunkRequest = 50,
     ChunkData = 51,
     ColumnRequest = 52,
-    ColumnHeights = 53,
+    /// <summary>Server to one client: <c>(int cx, int cz, bytes ColumnTerrain payload)</c>, one
+    /// chunk column's heights, water levels and corner climate (<see cref="ChunkNetCodec.EncodeColumn"/>).</summary>
+    ColumnTerrain = 53,
     LodRegionRequest = 54,
     LodRegionData = 55,
     BlockChanges = 56,
@@ -97,8 +99,10 @@ public static class NetFraming
     /// mob hit's knockback; the server corrects illegal moves with a
     /// <see cref="NetMessage.PlayerCorrection"/> that every following
     /// <see cref="NetMessage.PlayerState"/> acks; and a respawn is a
-    /// <see cref="NetIntentKind.Respawn"/> world intent.</summary>
-    public const int ProtocolVersion = 4;
+    /// <see cref="NetIntentKind.Respawn"/> world intent. 5: a column answer is the whole
+    /// <see cref="silkgltriangle.ColumnTerrain"/> (heights, water levels, corner climate), so a
+    /// client derives nothing from worldgen.</summary>
+    public const int ProtocolVersion = 5;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

@@ -152,6 +152,79 @@ public sealed class BiomeTintPopTests
             Assert.Equal(Vector3.One, debris.Tint);
     }
 
+    /// <summary>
+    /// A column source for the debris tint: answers from <see cref="Answer"/> (null = the column is
+    /// missing, as a client's streamed column before it arrived) and records every column asked.
+    /// </summary>
+    private sealed class FakeColumnSource(Func<int, int, ColumnTerrain?> answer) : IColumnSource
+    {
+        public readonly HashSet<(int X, int Z)> Asked = new();
+        private Func<int, int, ColumnTerrain?> Answer { get; } = answer;
+
+        public bool IsReady(int chunkX, int chunkZ) => Answer(chunkX, chunkZ) != null;
+
+        public bool TryGet(int chunkX, int chunkZ, out ColumnTerrain terrain)
+        {
+            Asked.Add((chunkX, chunkZ));
+            var got = Answer(chunkX, chunkZ);
+            terrain = got ?? default;
+            return got != null;
+        }
+    }
+
+    [Theory]
+    [InlineData("grass")]
+    [InlineData("oak_leaves")]
+    public void DebrisFallsBackToUntintedWhenTheColumnIsMissing(string blockName)
+    {
+        var type = ContentRegistry.RequireBlock(blockName);
+        var bt = TintOf(type);
+        var cell = new Vector3(-37f, 12f, -5f);
+        var x = (int)MathF.Floor(cell.X);
+        var z = (int)MathF.Floor(cell.Z);
+        var cx = x >> Chunk.SizeShift;
+        var cz = z >> Chunk.SizeShift;
+        var lattice = new HashSet<(int, int)> { (cx, cz), (cx + 1, cz), (cx, cz + 1), (cx + 1, cz + 1) };
+
+        // A column the source does not have yet leaves every chip untinted, never a guess
+        var missing = new FakeColumnSource((_, _) => null);
+        var untinted = new BlockDebrisSystem();
+        untinted.Burst(cell, type.Id, WorldGenerationConfig.BlockDebrisPerHit, new Random(1), columns: missing);
+        Assert.NotEmpty(untinted.Debris);
+        Assert.All(untinted.Debris, d => Assert.Equal(Vector3.One, d.Tint));
+        Assert.NotEmpty(missing.Asked);
+
+        // The real terrain, served through the source, gives exactly the worldgen cell tint, read
+        // from the cell's four lattice columns and nothing else
+        var real = new FakeColumnSource((qx, qz) =>
+            WorldgenColumnSource.Instance.TryGet(qx, qz, out var t) ? t : null);
+        var tinted = new BlockDebrisSystem();
+        tinted.Burst(cell, type.Id, WorldGenerationConfig.BlockDebrisPerHit, new Random(1), columns: real);
+        Assert.NotEmpty(tinted.Debris);
+        var expected = BiomeTint.CellTint(bt.Palette, x, z);
+        Assert.All(tinted.Debris, d => Assert.Equal(expected, d.Tint));
+        Assert.True(lattice.SetEquals(real.Asked), "the debris read columns other than the cell's lattice corners");
+
+        // And it is the passed source that decides, not worldgen behind it: a climate opposite to
+        // the real one at every corner tints the chips with that climate's palette colour
+        Assert.True(WorldgenColumnSource.Instance.TryGet(cx, cz, out var here));
+        var warmth = here.Warmth < 0.5f ? 1f : 0f;
+        var wetness = here.Wetness < 0.5f ? 1f : 0f;
+        var opposite = new FakeColumnSource((_, _) => new ColumnTerrain(
+            new int[Chunk.Size * Chunk.Size], new int[Chunk.Size * Chunk.Size], warmth, wetness));
+        var swapped = new BlockDebrisSystem();
+        swapped.Burst(cell, type.Id, WorldGenerationConfig.BlockDebrisPerHit, new Random(1), columns: opposite);
+        BiomeTint.TintsFromClimate(warmth, wetness, out var grass, out var foliage);
+        var uniform = bt.Palette == BiomeTintPalette.Foliage ? foliage : grass;
+        Assert.NotEmpty(swapped.Debris);
+        foreach (var debris in swapped.Debris)
+        {
+            Assert.True(Vector3.Distance(uniform, debris.Tint) < 1e-5f,
+                $"a uniform climate's field is that climate's tint everywhere, got {debris.Tint} for {uniform}");
+            Assert.NotEqual(expected, debris.Tint);
+        }
+    }
+
     [Fact]
     public void TintedCubeMeshIsCentredAndFlagsOnlyTintedQuads()
     {
