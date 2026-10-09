@@ -242,7 +242,15 @@ public static class Program
             if (screen != AppScreen.Playing) return;
             var w = world!;
 
-            if (!inventoryView.IsOpen && !pauseMenuView.IsOpen) w.Inventory.Scroll(wheel.Y);
+            if (chatView.IsOpen) return;
+            if (!inventoryView.IsOpen && !pauseMenuView.IsOpen)
+            {
+                w.Inventory.Scroll(wheel.Y);
+                // While connected the server owns the selection: mirror the step as an intent, or
+                // the next inventory sync would put the slot straight back.
+                if (netClient is { Status: NetworkStatus.Handshaken } client)
+                    SendInventoryIntent(client, NetInventoryAction.SelectSlot, w.Inventory.SelectedIndex);
+            }
             else if (inventoryView.IsOpen && !pauseMenuView.IsOpen && inputManager.Mouse != null)
             {
                 // The wheel scrolls the list only while hovering it; wheel.Y > 0 is toward the top.
@@ -689,6 +697,7 @@ public static class Program
             world = null;
             clientWorld.SaveAndDispose(renderManager);
         }
+        ResetWorldViews();
         AbortConnect(notice);
     }
 
@@ -876,6 +885,7 @@ public static class Program
         pauseMenuView.Page = PauseMenuPage.Closed;
         settingsMenuView.DragRow = null;
         inventoryView.ResetForNewWorld();
+        chatView.Reset();
         escWasPressed = eWasPressed = qWasPressed = rightWasDown = middleWasPressed = false;
         placeTimer = MAX_PLACE_TIMER;
     }
@@ -1088,6 +1098,7 @@ public static class Program
             SetInventoryOpen(!inventoryView.IsOpen);
         eWasPressed = ePressed;
 
+        var qPressed = inputManager.Keyboard?.IsKeyPressed(Key.Q) == true;
         if (!inventoryView.IsOpen && !pauseMenuView.IsOpen && !chatView.IsOpen)
         {
             // 1-10 grabs the hotbar slot directly; scroll still walks it one step at a time
@@ -1096,15 +1107,16 @@ public static class Program
                     RequestSelectHotbar(i);
 
             // One throw per press, so holding Q doesn't empty the slot; Ctrl+Q throws the stack
-            var qPressed = inputManager.Keyboard?.IsKeyPressed(Key.Q) == true;
             if (qPressed && !qWasPressed)
             {
                 var wholeStack = inputManager.Keyboard?.IsKeyPressed(Key.ControlLeft) == true
                     || inputManager.Keyboard?.IsKeyPressed(Key.ControlRight) == true;
                 RequestThrowSelected(wholeStack);
             }
-            qWasPressed = qPressed;
         }
+        // The latch tracks the key every frame, gated or not: a Q typed into the chat or the search
+        // field must not read as a fresh press the moment the field lets the keyboard go.
+        qWasPressed = qPressed;
         FrameProfiler.End(ProfileSection.ProgramUpdate);
 
         // Right-click use/place does real work (raycast plus a synchronous remesh on bucket
@@ -1450,7 +1462,7 @@ public static class Program
     private static void MoveSearchHighlight(int delta)
     {
         if (inventoryView.Search.IsEmpty) return;
-        var count = InventorySearch.Search(inventoryView.Search.Query, world!.Inventory).Count;
+        var count = InventorySearch.Search(inventoryView.Search.Query, world!.Inventory, world.Camera.IsCreative).Count;
         if (count == 0) return;
         inventoryView.Search.Highlight = inventoryView.Search.Highlight < 0
             ? (delta > 0 ? 0 : count - 1)
@@ -1474,9 +1486,14 @@ public static class Program
     private static void ApplyHighlightedSearchHit()
     {
         if (inventoryView.Search.IsEmpty) return;
-        var hits = InventorySearch.Search(inventoryView.Search.Query, world!.Inventory);
+        var hits = InventorySearch.Search(inventoryView.Search.Query, world!.Inventory, world.Camera.IsCreative);
         if (hits.Count == 0) return;
-        ApplySearchHit(hits[inventoryView.Search.Highlight < 0 ? 0 : inventoryView.Search.Highlight]);
+        // The highlight is only clamped by the arrow keys; the list can shrink under it (an owned
+        // item crafted away, a server inventory sync), so Enter falls back to the first hit.
+        var highlight = inventoryView.Search.Highlight;
+        if (highlight < 0 || highlight >= hits.Count)
+            highlight = 0;
+        ApplySearchHit(hits[highlight]);
     }
 
     /// <summary>
@@ -1503,6 +1520,9 @@ public static class Program
 
         inventoryView.SelectedId = hit.ToolInstance > 0 ? (byte)0 : hit.Id;
         inventoryView.SelectedToolInstance = hit.ToolInstance;
+        // The hotbar equip and the preview read the pick through the current tab, so a tool
+        // picked from the Blocks tab's search has to land on the Tools tab to be equippable.
+        inventoryView.Tab = hit.Category;
         if (hit.ToolInstance == 0 && inventoryView.Craft.Recipe != null)
             inventoryView.Craft.FeedFromInventory(hit.Id, world.Inventory);
     }

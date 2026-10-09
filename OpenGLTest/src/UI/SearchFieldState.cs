@@ -15,7 +15,9 @@ public sealed class SearchFieldState
 
     public string Query => Text.Text;
 
-    public bool IsEmpty => Text.IsEmpty;
+    /// <summary>True for no query, including an all-space one, which <see cref="InventorySearch"/>
+    /// trims to nothing: the list then shows the tab's own rows instead of an empty result.</summary>
+    public bool IsEmpty => string.IsNullOrWhiteSpace(Text.Text);
 
     /// <summary>Canvas pixels the suggestion list is scrolled by; the draw and hit-test clamp on read.</summary>
     public float ScrollOffset { get; set; }

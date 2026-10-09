@@ -89,4 +89,16 @@ public sealed class InventorySearchTests
         Assert.NotEmpty(hits);
         Assert.StartsWith(stone.DisplayName, hits[0].Name, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void AnAllSpaceQueryReadsAsEmpty()
+    {
+        var field = new SearchFieldState();
+        Assert.True(field.IsEmpty);
+        field.Text.TryAppend(' ');
+        field.Text.TryAppend(' ');
+        Assert.True(field.IsEmpty);
+        field.Text.TryAppend('a');
+        Assert.False(field.IsEmpty);
+    }
 }

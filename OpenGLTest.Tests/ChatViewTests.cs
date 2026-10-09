@@ -110,4 +110,22 @@ public sealed class ChatViewTests
         Assert.Equal("Alice", chat.Messages[0].Sender);
         Assert.Equal(ChatKind.System, chat.Messages[1].Kind);
     }
+
+    [Fact]
+    public void ResetClosesAndForgetsTheLogAndHistory()
+    {
+        var chat = new ChatView();
+        chat.AddSystem("welcome");
+        chat.Open();
+        foreach (var c in "hello") chat.Type(c);
+        chat.Submit();
+        chat.Open();
+
+        chat.Reset();
+        Assert.False(chat.IsOpen);
+        Assert.Empty(chat.Messages);
+        chat.Open();
+        chat.HistoryUp();
+        Assert.True(chat.Input.IsEmpty, "a sent line survived the reset");
+    }
 }

@@ -101,6 +101,9 @@ public static class InventoryPanelLayout
     // The creative catalog row's four action buttons, right-aligned: +1, +10, +100, X.
     public const int CatalogButtonCount = 4;
     public const float CatalogButtonWidth = 38f;
+    /// <summary>Drawn and hit-tested height of a catalog button: the row minus a margin, so a
+    /// click just above or below the red X lands on the row, not on the clear.</summary>
+    public const float CatalogButtonHeight = RowHeight - 12f;
     public const float CatalogButtonGap = 4f;
 
     /// <summary>What a catalog row's button does; the last one clears the id's counts.</summary>
@@ -130,7 +133,7 @@ public static class InventoryPanelLayout
         {
             var centre = CatalogButtonCentre(row, offset, screen, rowCount, which);
             if (MathF.Abs(point.X - centre.X) <= CatalogButtonWidth * 0.5f
-                && MathF.Abs(point.Y - centre.Y) <= InventoryPanelLayout.RowHeight * 0.5f)
+                && MathF.Abs(point.Y - centre.Y) <= CatalogButtonHeight * 0.5f)
                 return (CatalogButton)which;
         }
         return null;

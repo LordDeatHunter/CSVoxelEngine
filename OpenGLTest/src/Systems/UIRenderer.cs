@@ -1370,7 +1370,7 @@ public class UIRenderer : IDisposable
     /// box's length cap.
     /// </summary>
     public void DrawInputField(Vector2 centre, Vector2 size, TextFieldState field, bool focused,
-        string placeholder, float time)
+        string placeholder, float time, bool showTail = false)
     {
         const float pad = 12f;
         DrawRect(centre, size, SlotBackground);
@@ -1378,16 +1378,30 @@ public class UIRenderer : IDisposable
 
         var textLeft = centre.X - size.X * 0.5f + pad;
         var textTop = centre.Y - 9f;
+        // A field whose cap exceeds what fits (the chat line) shows the tail being typed, so the
+        // caret and the newest characters never leave the box; the short fields show it all.
+        var shown = showTail ? TailThatFits(field.Text, _countScale, size.X - pad * 2f - 6f) : field.Text;
         if (field.IsEmpty)
             DrawText(placeholder, new Vector2(textLeft, textTop), _countScale, TextDim);
         else
-            DrawText(field.Text, new Vector2(textLeft, textTop), _countScale, Rgba.White);
+            DrawText(shown, new Vector2(textLeft, textTop), _countScale, Rgba.White);
 
         if (focused && ((int)(time * 2f)) % 2 == 0)
         {
-            var caretX = textLeft + (field.IsEmpty ? 0f : TextWidth(field.Text, _countScale)) + 3f;
+            var caretX = textLeft + (field.IsEmpty ? 0f : TextWidth(shown, _countScale)) + 3f;
             DrawRect(new Vector2(caretX, centre.Y), new Vector2(2f, 22f), Rgba.White);
         }
+    }
+
+    /// <summary>The longest suffix of <paramref name="text"/> that fits <paramref name="maxWidth"/>
+    /// and one text run (<see cref="BitmapFont.MaxLayoutChars"/>).</summary>
+    private string TailThatFits(string text, float scale, float maxWidth)
+    {
+        if (_font == null || string.IsNullOrEmpty(text)) return text;
+        var start = Math.Max(0, text.Length - BitmapFont.MaxLayoutChars);
+        while (start < text.Length - 1 && _font.MeasureSize(text.AsSpan(start), scale).X > maxWidth)
+            start++;
+        return start == 0 ? text : text[start..];
     }
 
     /// <summary>
@@ -1401,28 +1415,47 @@ public class UIRenderer : IDisposable
         var messages = view.Messages;
         if (messages.Count > 0)
         {
-            var visible = Math.Min(messages.Count, ChatLayout.VisibleMessages);
+            // A message may be longer than one text run (BitmapFont.MaxLayoutChars) or wider than
+            // the log, so it is word-wrapped and the log shows the last VisibleMessages *lines*,
+            // newest at the bottom, rather than cutting a long line off at the run cap.
+            _chatLines.Clear();
+            for (var m = messages.Count - 1; m >= 0 && _chatLines.Count < ChatLayout.VisibleMessages; m--)
+            {
+                var message = messages[m];
+                var text = message.Kind == ChatKind.Player ? $"{message.Sender}: {message.Text}" : message.Text;
+                var color = message.Kind == ChatKind.Player ? Rgba.White : AccentGold;
+                _chatWrap.Clear();
+                if (_font != null)
+                    TextWrap.Wrap(text, ChatLayout.MaxWidth, s => _font.MeasureSize(s, _countScale).X, _chatWrap);
+                else
+                    _chatWrap.Add(text);
+                // Wrapped top to bottom, collected bottom-up: push the message's last line first
+                for (var l = _chatWrap.Count - 1; l >= 0 && _chatLines.Count < ChatLayout.VisibleMessages; l--)
+                    _chatLines.Add((_chatWrap[l], color));
+            }
+
+            var visible = _chatLines.Count;
             var bottom = ChatLayout.LogBottom(screen, view.IsOpen);
             var blockCentre = new Vector2(ChatLayout.Left + ChatLayout.MaxWidth * 0.5f,
                 bottom - visible * ChatLayout.LineHeight * 0.5f);
             DrawRect(blockCentre, new Vector2(ChatLayout.MaxWidth + 16f, visible * ChatLayout.LineHeight + 8f),
                 Rgba.Grey(0f, 0.35f));
 
+            // _chatLines[0] is the newest line and sits at the bottom
             for (var i = 0; i < visible; i++)
-            {
-                var message = messages[messages.Count - visible + i];
-                var text = message.Kind == ChatKind.Player ? $"{message.Sender}: {message.Text}" : message.Text;
-                var color = message.Kind == ChatKind.Player ? Rgba.White : AccentGold;
-                DrawText(FittedText(text, _countScale, ChatLayout.MaxWidth),
-                    new Vector2(ChatLayout.Left, ChatLayout.LineTop(screen, view.IsOpen, visible - 1 - i)),
-                    _countScale, color);
-            }
+                DrawText(_chatLines[i].Text,
+                    new Vector2(ChatLayout.Left, ChatLayout.LineTop(screen, view.IsOpen, i)),
+                    _countScale, _chatLines[i].Color);
         }
 
         if (view.IsOpen)
             DrawInputField(ChatLayout.InputCentre(screen), ChatLayout.InputSize, view.Input, true,
-                "Say something...", time);
+                "Say something...", time, showTail: true);
     }
+
+    // Scratch for DrawChat's wrapping, reused every frame
+    private readonly List<string> _chatWrap = new();
+    private readonly List<(string Text, Rgba Color)> _chatLines = new();
 
     /// <summary>Main-menu widget under a window-pixel point (top-left origin).</summary>
     public MainMenuHit MainMenuHitAt(Vector2 windowPoint, MainMenuView view) =>
@@ -1634,7 +1667,7 @@ public class UIRenderer : IDisposable
 
     private void DrawCatalogButton(Vector2 centre, string label, bool danger)
     {
-        var size = new Vector2(InventoryPanelLayout.CatalogButtonWidth, RowHeight - 12f);
+        var size = new Vector2(InventoryPanelLayout.CatalogButtonWidth, InventoryPanelLayout.CatalogButtonHeight);
         DrawRect(centre, size, ChipBackground);
         DrawBorder(centre, size, SlotBorder, danger ? DangerRed : AccentGold);
         if (_font == null) return;

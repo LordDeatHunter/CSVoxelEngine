@@ -75,10 +75,12 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
         View.Page = MainMenuPage.Worlds;
     }
 
-    /// <summary>Re-reads the saved servers and shows the multiplayer list from the top.</summary>
+    /// <summary>Re-reads the saved servers and shows the multiplayer list from the top. Clears the
+    /// notice unless the worlds are locked, whose notice must stay up for the worlds page.</summary>
     public void OpenMultiplayer()
     {
-        View.Notice = null;
+        if (!View.WorldsLocked)
+            View.Notice = null;
         View.Servers.Clear();
         Guarded(() => View.Servers.AddRange(serverStore.List()));
         View.ServerScrollOffset = 0f;
@@ -202,7 +204,7 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
                     case MainMenuPage.Create:
                     case MainMenuPage.Edit: OpenWorlds(); break; // unsaved edits are discarded
                     case MainMenuPage.AddServer:
-                    case MainMenuPage.DirectConnect:
+                    case MainMenuPage.DirectConnect: OpenMultiplayer(); break; // one page back, like BACK
                     case MainMenuPage.Multiplayer: OpenMain(); break;
                     case MainMenuPage.Worlds:
                     case MainMenuPage.Settings: OpenMain(); break;
@@ -303,6 +305,7 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
                 return MainMenuAction.None;
 
             case MainMenuHitKind.AddServer:
+                ClearPageNotice();
                 View.ServerName.Clear();
                 View.Address.Clear();
                 View.Focus = MenuField.ServerName;
@@ -310,6 +313,7 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
                 return MainMenuAction.None;
 
             case MainMenuHitKind.DirectConnect:
+                ClearPageNotice();
                 View.Address.Clear();
                 View.Focus = MenuField.Address;
                 View.Page = MainMenuPage.DirectConnect;
@@ -439,6 +443,14 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
     {
         View.SelectedServerRow = -1;
         View.Page = MainMenuPage.Multiplayer;
+    }
+
+    // A page's notice is about that page (a lost connection on the server list, a bad address on
+    // the form), so opening a form drops it; the worlds lock is the one notice that outlives pages.
+    private void ClearPageNotice()
+    {
+        if (!View.WorldsLocked)
+            View.Notice = null;
     }
 
     // OpenWorlds clears the notice, so a failure re-raises it after the list is re-read.

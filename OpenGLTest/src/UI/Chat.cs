@@ -67,6 +67,16 @@ public sealed class ChatView
         _historyCursor = _history.Count;
     }
 
+    /// <summary>Closes the input and forgets the log and the sent history: chat is per world, so
+    /// nothing said in one world (or on one server) shows up in the next.</summary>
+    public void Reset()
+    {
+        Close();
+        _messages.Clear();
+        _history.Clear();
+        _historyCursor = 0;
+    }
+
     /// <summary>Appends a line, dropping the oldest once the log is full.</summary>
     public void AddMessage(ChatKind kind, string sender, string text)
     {

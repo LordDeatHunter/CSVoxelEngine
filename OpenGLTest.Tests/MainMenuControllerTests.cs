@@ -423,4 +423,39 @@ public sealed class MainMenuControllerTests : IDisposable
         Assert.Equal(MainMenuPage.Multiplayer, controller.View.Page);
         Assert.Single(_servers.List());
     }
+
+    [Fact]
+    public void EscapeOnAServerFormStepsBackToTheServerList()
+    {
+        var controller = NewController();
+        controller.Click(Hit(MainMenuHitKind.Multiplayer));
+        controller.Click(Hit(MainMenuHitKind.AddServer));
+        controller.Key(MenuKey.Escape);
+        Assert.Equal(MainMenuPage.Multiplayer, controller.View.Page);
+
+        controller.Click(Hit(MainMenuHitKind.DirectConnect));
+        controller.Key(MenuKey.Escape);
+        Assert.Equal(MainMenuPage.Multiplayer, controller.View.Page);
+    }
+
+    [Fact]
+    public void OpeningAServerFormDropsTheListsNoticeButNeverTheWorldsLock()
+    {
+        var controller = NewController();
+        controller.OpenMultiplayer();
+        controller.ShowNotice("Lost connection to the server");
+        controller.Click(Hit(MainMenuHitKind.AddServer));
+        Assert.Null(controller.View.Notice);
+
+        var locked = NewController();
+        locked.LockWorlds("locked");
+        locked.OpenMultiplayer();
+        Assert.Equal("locked", locked.View.Notice);
+        locked.Click(Hit(MainMenuHitKind.DirectConnect));
+        Assert.Equal("locked", locked.View.Notice);
+        locked.Key(MenuKey.Escape);
+        locked.Key(MenuKey.Escape);
+        locked.OpenWorlds();
+        Assert.Equal("locked", locked.View.Notice);
+    }
 }

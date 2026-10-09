@@ -115,4 +115,29 @@ public sealed class ServerStoreTests : IDisposable
         var only = Assert.Single(_store.List());
         Assert.Equal("Good", only.Name);
     }
+
+    [Fact]
+    public void ABrokenFileIsSetAsideInsteadOfOverwritten()
+    {
+        File.WriteAllText(_path, "[{\"Name\":\"Home\",\"Host\":\"10.0.0.1\",\"Port\":\"not a number\"}]");
+        Assert.Empty(_store.List());
+
+        _store.Add("New", "10.0.0.2", 25566);
+        Assert.True(File.Exists(_path + ".bak"), "the unreadable file was not kept");
+        Assert.Contains("10.0.0.1", File.ReadAllText(_path + ".bak"));
+        File.Delete(_path + ".bak");
+        var only = Assert.Single(_store.List());
+        Assert.Equal("New", only.Name);
+    }
+
+    [Fact]
+    public void OddEntriesNeverThrowAndAnIdlessEntryStaysDeletable()
+    {
+        File.WriteAllText(_path, "[null, {\"Name\":\"Old\",\"Host\":\"10.0.0.1\",\"Port\":25566}]");
+        var old = Assert.Single(_store.List());
+        Assert.Equal("Old", old.Name);
+
+        _store.Delete(old);
+        Assert.Empty(_store.List());
+    }
 }

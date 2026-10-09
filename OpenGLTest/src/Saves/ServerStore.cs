@@ -47,9 +47,17 @@ public sealed class ServerStore(string path)
         {
             dtos = JsonSerializer.Deserialize<ServerDto[]>(File.ReadAllText(Path), JsonOptions);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             Log.Warn($"Could not read saved servers '{Path}': {e.Message}");
+            return [];
+        }
+        catch (JsonException e)
+        {
+            // The next Add/Delete writes the list back, which would turn one bad field into an
+            // empty file: set the broken file aside instead so the entries can be recovered by hand.
+            Log.Warn($"Could not parse saved servers '{Path}': {e.Message}");
+            SetAsideBrokenFile();
             return [];
         }
 
@@ -59,15 +67,18 @@ public sealed class ServerStore(string path)
         var servers = new List<ServerInfo>(dtos.Length);
         foreach (var dto in dtos)
         {
-            if (string.IsNullOrWhiteSpace(dto.Host) || dto.Port is not (>= ServerAddress.MinPort and <= ServerAddress.MaxPort))
+            if (dto == null || string.IsNullOrWhiteSpace(dto.Host)
+                || dto.Port is not (>= ServerAddress.MinPort and <= ServerAddress.MaxPort))
             {
                 Log.Warn($"Skipping saved server with a bad address in '{Path}'");
                 continue;
             }
 
             var name = string.IsNullOrWhiteSpace(dto.Name) ? WorldNames.DefaultName : dto.Name;
-            servers.Add(new ServerInfo(dto.Id ?? Guid.NewGuid().ToString("N"), name, dto.Host, dto.Port,
-                dto.LastPlayed ?? 0));
+            // An entry written without an id gets one derived from its address, so Delete and
+            // TouchLastPlayed can match it on every List() rather than a fresh random id each time.
+            var id = string.IsNullOrWhiteSpace(dto.Id) ? $"{dto.Host}:{dto.Port}" : dto.Id;
+            servers.Add(new ServerInfo(id, name, dto.Host, dto.Port, dto.LastPlayed ?? 0));
         }
 
         return servers
@@ -105,6 +116,19 @@ public sealed class ServerStore(string path)
             }
         }
         Write(servers);
+    }
+
+    private void SetAsideBrokenFile()
+    {
+        try
+        {
+            File.Move(Path, Path + ".bak", overwrite: true);
+            Log.Warn($"Moved the broken servers file to '{Path}.bak'");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Log.Warn($"Could not set aside '{Path}': {e.Message}");
+        }
     }
 
     private void Write(IEnumerable<ServerInfo> servers)
