@@ -91,6 +91,12 @@ internal sealed class PlayerPhysics
     }
 
     /// <summary>
+    /// Drops only the vertical speed: a creative or flight toggle must not stop a run or a
+    /// knockback mid-stride, it only has to forget the fall it was in.
+    /// </summary>
+    public void ResetVerticalVelocity() => _verticalVelocity = 0f;
+
+    /// <summary>
     /// Kicks the damage shake: <paramref name="amount"/> adds to trauma (0..1, clamped),
     /// which <see cref="UpdateShake"/> decays back to still over <c>ShakeDecaySeconds</c>.
     /// Callers scale it by the hit — World bills fall and lava ticks through here.
@@ -144,6 +150,8 @@ internal sealed class PlayerPhysics
     /// </summary>
     public void Update(Camera camera, float deltaTime, IKeyboard? keyboard, ChunkManager chunkManager)
     {
+        if (keyboard == null)
+            camera.MarkTogglesHeld();
         if (keyboard == null || chunkManager == null)
             return;
 

@@ -1,6 +1,5 @@
 using System;
 using System.Numerics;
-using Silk.NET.OpenGL;
 using static silkgltriangle.Chunk;
 
 namespace silkgltriangle;

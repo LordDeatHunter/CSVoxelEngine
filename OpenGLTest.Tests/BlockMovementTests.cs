@@ -204,4 +204,26 @@ public sealed class BlockMovementTests
         Assert.True(camera.Position.X > 5f, $"did not clear the step: {camera.Position.X}");
         Assert.InRange(camera.Position.Y - Camera.EyeHeight, 1.99f, 2.01f);
     }
+
+    [Fact]
+    public void CreativeToggleKeepsTheRunGoing()
+    {
+        // Toggling creative forgets the fall the player was in, never the run: the horizontal
+        // velocity (and a knockback shove) must carry straight through the toggle frame.
+        var manager = Field(BlockType.Air, out var camera);
+        RunForward(camera, manager);
+        var before = camera.HorizontalVelocity.Length();
+        Assert.True(before > 1f, $"not running before the toggle ({before})");
+
+        var keys = new ScriptedKeyboard();
+        keys.Press([Key.W, Key.C]);
+        var x0 = camera.Position.X;
+        camera.Update(Dt, keys, manager);
+        keys.ReleaseAll();
+
+        Assert.True(camera.IsCreative);
+        var after = camera.HorizontalVelocity.Length();
+        Assert.True(after >= before * 0.9f, $"the toggle frame dropped the run from {before} to {after}");
+        Assert.True(camera.Position.X - x0 >= before * Dt * 0.9f, "the toggle frame stalled the walk");
+    }
 }

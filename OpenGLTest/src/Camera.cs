@@ -514,6 +514,18 @@ public class Camera
         _roll = MathF.Sin(_bobPhase) * RunRoll * _runBlend * _bobBlend;
     }
 
+    /// <summary>
+    /// Called instead of the toggle updates while a text field owns the keyboard: the edge
+    /// latches read as held, so a C, Space or F5 typed into the field and still down when the
+    /// field lets go is not taken for a fresh press on the first free frame.
+    /// </summary>
+    internal void MarkTogglesHeld()
+    {
+        _creativeWasPressed = true;
+        _spaceWasPressed = true;
+        _f5WasPressed = true;
+    }
+
     internal void UpdateCreativeToggle(IKeyboard keyboard)
     {
         var creativePressed = keyboard.IsKeyPressed(Key.C);
@@ -522,7 +534,7 @@ public class Camera
             IsCreative = !IsCreative;
             if (!IsCreative)
                 IsFlying = false;
-            _physics.ResetMotion();
+            _physics.ResetVerticalVelocity();
             Log.WriteLine($"Creative {(IsCreative ? "ON" : "OFF")}");
         }
 
@@ -542,7 +554,7 @@ public class Camera
                 if (IsCreative)
                 {
                     IsFlying = !IsFlying;
-                    _physics.ResetMotion();
+                    _physics.ResetVerticalVelocity();
                     Log.WriteLine($"Flight {(IsFlying ? "ON" : "OFF")}");
                 }
                 _timeSinceSpacePress = float.MaxValue; // a toggle requires a fresh double tap
