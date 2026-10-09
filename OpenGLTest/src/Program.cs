@@ -61,6 +61,13 @@ public static class Program
     private static ClientPrediction prediction = new();
     private static double netStateTimer;
     private static double netKeepAliveTimer;
+    // The sequence id of the newest PlayerCorrection applied, echoed in every PlayerState so the
+    // server knows the states it reads were sent from the corrected position
+    private static int netCorrectionAck;
+    // Whether the server's status says this player is dead, and the time since the last Respawn
+    // intent sent while it does
+    private static bool netDead;
+    private static float netRespawnTimer;
     private static bool debugEnabled;
     private static bool xWasPressed;
     private static bool qWasPressed;
@@ -519,7 +526,17 @@ public static class Program
             // creative (and with it, whether its catalog grants are accepted)
             writer.Write((byte)((camera.IsCreative ? NetPlayerFlags.Creative : NetPlayerFlags.None)
                 | (camera.IsFlying ? NetPlayerFlags.Flying : NetPlayerFlags.None)));
+            writer.Write(netCorrectionAck);
             client.Send(writer.ToArray());
+        }
+
+        // A dead player comes back only through a Respawn intent: the first goes out when the
+        // status says so, and it is asked again while the server still reports the player dead
+        if (netDead)
+        {
+            netRespawnTimer += deltaTime;
+            if (netRespawnTimer >= WorldGenerationConfig.NetRespawnRetrySeconds)
+                SendRespawn(w.Camera);
         }
 
         netKeepAliveTimer += deltaTime;
@@ -615,9 +632,39 @@ public static class Program
                 break;
             case NetMessage.PlayerStatus:
             {
-                // The server refused a creative or flight request: take the modes it granted
-                var flags = (NetPlayerFlags)reader.ReadByte();
-                w.Camera.SetModes(flags.HasFlag(NetPlayerFlags.Creative), flags.HasFlag(NetPlayerFlags.Flying));
+                // The server owns this player's status: take the modes it granted, mirror its
+                // health, let this client's physics apply a mob hit's shove, and ask to respawn
+                // as soon as it reports the player dead
+                var status = PlayerStatusCodec.Read(reader);
+                w.Camera.SetModes(status.Modes.HasFlag(NetPlayerFlags.Creative),
+                    status.Modes.HasFlag(NetPlayerFlags.Flying));
+                w.ApplyNetworkHealth(status.Health);
+                var knockback = status.Knockback;
+                // AddKnockback normalises the direction itself and keeps a lift-only hit's pop
+                if (knockback.LengthSquared() > 0f || status.Lift > 0f)
+                    w.Camera.AddKnockback(knockback, knockback.Length(), status.Lift);
+                if (status.Dead && !netDead)
+                {
+                    netDead = true;
+                    SendRespawn(w.Camera);
+                }
+                else if (!status.Dead)
+                {
+                    netDead = false;
+                }
+                break;
+            }
+            case NetMessage.PlayerCorrection:
+            {
+                // The server put this player back (an illegal move, or a respawn): snap there and
+                // ack it, at once, so the server takes positions again from the next state
+                var seq = reader.ReadInt();
+                var eye = reader.ReadVector3();
+                if (!float.IsFinite(eye.X) || !float.IsFinite(eye.Y) || !float.IsFinite(eye.Z))
+                    throw new System.IO.InvalidDataException("player correction eye is not finite");
+                w.Camera.TestTeleport(eye, w.Camera.Yaw, w.Camera.Pitch);
+                netCorrectionAck = seq;
+                netStateTimer = WorldGenerationConfig.NetPlayerStateSeconds;
                 break;
             }
             case NetMessage.ChunkData:
@@ -800,6 +847,16 @@ public static class Program
         client.Send(writer.ToArray());
     }
 
+    /// <summary>
+    /// Asks the server to respawn this (dead) player and restarts the retry clock. The server
+    /// answers with a correction to the respawn point and a status that no longer reads dead.
+    /// </summary>
+    private static void SendRespawn(Camera camera)
+    {
+        netRespawnTimer = 0f;
+        SendWorldIntent(WorldIntent.Respawn(camera.Position, camera.LastAimDirection));
+    }
+
     /// <summary>Tears the connection down and returns to the server list with a notice.</summary>
     private static void DisconnectToMenu(string notice)
     {
@@ -824,6 +881,9 @@ public static class Program
         netPlayerId = -1;
         netStateTimer = 0;
         netKeepAliveTimer = 0;
+        netCorrectionAck = 0;
+        netDead = false;
+        netRespawnTimer = 0f;
         prediction = new ClientPrediction();
         if (world != null)
         {

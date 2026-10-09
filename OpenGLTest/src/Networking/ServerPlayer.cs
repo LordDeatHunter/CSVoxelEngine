@@ -6,14 +6,26 @@ namespace silkgltriangle;
 /// <summary>
 /// One connected player as the server tracks it: its own <see cref="Inventory"/> (never shared with
 /// another player or with the world's own), the server-owned creative and flight flags (survival by
-/// default), the pose its last accepted <see cref="NetMessage.PlayerState"/> put it at and when that
-/// arrived, and what judging its intents needs: the <see cref="PlayerContext"/> the world runs them
+/// default), the pose its last accepted <see cref="NetMessage.PlayerState"/> put it at (judged by
+/// <see cref="MovementRules"/>, with the corrections it must ack) and when that arrived, and what
+/// judging its intents needs: the <see cref="PlayerContext"/> the world runs them
 /// through, the newest sequence id, the mining progress, the edit rate limiter and the attack pace.
 /// The server persists it per player (<see cref="ServerPlayerSaves"/>) and the world's drop pickup
 /// credits it directly (<see cref="World.ServerPlayers"/>). GL-free; main thread only, like the
 /// rest of the server's state.
+///
+/// <para>
+/// Its survival status is server-owned too, by the singleplayer rules: a <see cref="PlayerHealth"/>
+/// pool (<see cref="Status"/>) billed by falls observed from its accepted states
+/// (<see cref="ObserveAcceptedState"/>, through a <see cref="FallTracker"/>), by lava the body
+/// stands in (<see cref="TickStatus"/>, read through <see cref="PlayerBodyProbe"/>) and by mob hits
+/// (it is an <see cref="IMobTarget"/>, so the mob managers bill it directly and queue the
+/// knockback for its client). A dead player stays dead, and immune, until it is
+/// <see cref="Respawn"/>ed at its <see cref="RespawnEye"/>. Every change sets
+/// <see cref="StatusDirty"/>, so the server knows to tell the client.
+/// </para>
 /// </summary>
-public sealed class ServerPlayer
+public sealed class ServerPlayer : IMobTarget
 {
     public ServerPlayer(int id, string name, Vector3 position)
     {
@@ -126,11 +138,161 @@ public sealed class ServerPlayer
     /// <summary>Server-owned flight flag; only ever set together with <see cref="Creative"/>.</summary>
     public bool Flying { get; set; }
 
-    /// <summary>Kept and persisted for the player; nothing on the server damages it yet.</summary>
-    public int Health { get; set; } = PlayerHealth.MaxHealth;
+    /// <summary>
+    /// The player's health pool, owned by the server: falls, lava and mob hits land here, and the
+    /// client only mirrors it. Persisted with the player.
+    /// </summary>
+    public PlayerHealth Status { get; } = new();
+
+    /// <summary>The player's current health, 0..<see cref="PlayerHealth.MaxHealth"/>.</summary>
+    public int Health => Status.Health;
+
+    /// <summary>Whether the player is dead: held, immune and ignored until <see cref="Respawn"/>.</summary>
+    public bool IsDead => Status.IsDead;
+
+    /// <summary>
+    /// The eye this player respawns at, or null for the server's spawn (the fallback
+    /// <see cref="Respawn"/> is given). Persisted with the player.
+    /// </summary>
+    public Vector3? RespawnEye { get; set; }
+
+    /// <summary>
+    /// Set whenever the status the client mirrors changed (health, death, a knockback to apply), so
+    /// the server sends it a fresh status; the server clears it once one is sent.
+    /// </summary>
+    public bool StatusDirty { get; set; }
+
+    // The fall state, fed only from accepted states and reset by the server's own teleports
+    private readonly FallTracker _fall = new();
+
+    // A mob hit's shove, queued for the client's own physics to apply (the server never simulates
+    // a player's body): the newest horizontal impulse wins, the strongest lift is kept
+    private Vector3 _pendingKnockback;
+    private float _pendingLift;
+
+    // The newest PlayerCorrection issued to this player, and the one its states must ack before
+    // their positions count again
+    private int _correctionSeq, _awaitedCorrection;
+
+    /// <summary>
+    /// Numbers a new <see cref="NetMessage.PlayerCorrection"/> the server is about to send this
+    /// player and makes it the one awaited: from here on a state's position is ignored until the
+    /// client acks this id (<see cref="AcceptsStatePosition"/>), since states it sent before
+    /// snapping still carry the position the correction undid.
+    /// </summary>
+    public int IssueCorrection() => _awaitedCorrection = ++_correctionSeq;
+
+    /// <summary>
+    /// Whether a <see cref="NetMessage.PlayerState"/> acking correction <paramref name="ack"/> may
+    /// move the player: only once the client has applied the newest correction it was sent.
+    /// </summary>
+    public bool AcceptsStatePosition(int ack) => ack >= _awaitedCorrection;
+
+    /// <summary>What the movement rules remember between this player's states (its hover time).</summary>
+    public MovementState Movement { get; } = new();
 
     /// <summary>The accepted camera eye position.</summary>
     public Vector3 Position { get; set; }
+
+    /// <summary>The mobs chase and hit this player at its accepted eye.</summary>
+    Vector3 IMobTarget.Eye => Position;
+
+    /// <summary>No mob hurts a creative, flying or dead player.</summary>
+    public bool IsImmune => Creative || Flying || IsDead;
+
+    /// <summary>
+    /// A mob hit landed on this player: the damage comes off <see cref="Status"/> at once, and the
+    /// shove is queued (<see cref="TakePendingKnockback"/>) for the client to apply, since only the
+    /// client simulates its body. A zero direction leaves the queued impulse as it was.
+    /// </summary>
+    public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift)
+    {
+        Status.TakeDamage(damage);
+        awayHorizontal.Y = 0f;
+        if (awayHorizontal.LengthSquared() > 1e-6f)
+            _pendingKnockback = Vector3.Normalize(awayHorizontal) * knockbackSpeed;
+        _pendingLift = MathF.Max(_pendingLift, lift);
+        StatusDirty = true;
+    }
+
+    /// <summary>
+    /// Hands over the knockback queued since the last call (a horizontal impulse in blocks/s and an
+    /// upward lift) and clears it. Returns whether any was queued.
+    /// </summary>
+    public bool TakePendingKnockback(out Vector3 impulse, out float lift)
+    {
+        impulse = _pendingKnockback;
+        lift = _pendingLift;
+        _pendingKnockback = Vector3.Zero;
+        _pendingLift = 0f;
+        return impulse.LengthSquared() > 0f || lift > 0f;
+    }
+
+    /// <summary>
+    /// Feeds the fall rule one accepted <see cref="NetMessage.PlayerState"/> (called only when the
+    /// state's position was taken), billing a landing to <see cref="Status"/>. The teleport bound is
+    /// the distance the accepted position itself may move over <paramref name="stateGapSeconds"/>
+    /// (<see cref="NetValidation.AllowedDistance"/>), so nothing an accepted state can do is ever
+    /// mistaken for a teleport; only the server's own teleports reset the fall. A dead player, or
+    /// one whose surroundings are not loaded (<see cref="PlayerBodyProbe.IsKnown"/>), is not judged.
+    /// </summary>
+    public void ObserveAcceptedState(ChunkManager chunks, double stateGapSeconds)
+    {
+        if (IsDead || !PlayerBodyProbe.IsKnown(Position, chunks))
+            return;
+        var feet = Position.Y - Camera.EyeHeight;
+        var fall = _fall.Observe(feet, PlayerBodyProbe.Grounded(Position, chunks), Flying,
+            PlayerBodyProbe.InWater(Position, chunks), Creative,
+            NetValidation.AllowedDistance(stateGapSeconds, WorldGenerationConfig.NetMaxMoveBlocksPerSecond));
+        if (fall > 0)
+        {
+            Status.TakeDamage(fall);
+            StatusDirty = true;
+        }
+    }
+
+    /// <summary>
+    /// The per-tick half of the status: lava burns a body standing in it (creative and flight are
+    /// immune, an unloaded body is not judged) and the damage flash decays. A dead player is left
+    /// as it is until <see cref="Respawn"/>.
+    /// </summary>
+    public void TickStatus(float dt, ChunkManager chunks)
+    {
+        if (IsDead)
+            return;
+        var before = Status.Health;
+        var inLava = PlayerBodyProbe.IsKnown(Position, chunks) && PlayerBodyProbe.InLava(Position, chunks);
+        Status.UpdateLava(dt, inLava, Creative || Flying);
+        Status.Update(dt);
+        if (Status.Health != before || Status.IsDead)
+            StatusDirty = true;
+    }
+
+    /// <summary>
+    /// The server moves the player: the accepted eye jumps to <paramref name="eye"/> and the fall
+    /// and the hover time are forgotten, since a teleport is never a fall or a hover.
+    /// </summary>
+    public void Teleport(Vector3 eye)
+    {
+        Position = eye;
+        Aim(eye, Forward);
+        _fall.Reset(eye.Y - Camera.EyeHeight, grounded: false);
+        Movement.AirborneStillSeconds = 0;
+    }
+
+    /// <summary>Forgets the fall built up so far, at the current position (after a correction).</summary>
+    public void ResetFall() => _fall.Reset(Position.Y - Camera.EyeHeight, grounded: false);
+
+    /// <summary>
+    /// Brings a dead player back: full health, at its <see cref="RespawnEye"/> or else
+    /// <paramref name="fallbackEye"/> (the server's spawn), with the fall forgotten.
+    /// </summary>
+    public void Respawn(Vector3 fallbackEye)
+    {
+        Status.Respawn();
+        Teleport(RespawnEye ?? fallbackEye);
+        StatusDirty = true;
+    }
 
     public float Yaw { get; set; }
 
@@ -155,9 +317,9 @@ public sealed class ServerPlayer
     public Vector3 Forward => Vector3Utils.FromYawPitch(Yaw, Pitch);
 
     /// <summary>
-    /// Applies a saved player file: the pose when it has one, the inventory, the health, and the
-    /// modes only as far as <paramref name="allowCreative"/> lets this server grant them. Returns
-    /// whether a position was restored, so the caller can spawn the player where they left.
+    /// Applies a saved player file: the pose when it has one, the inventory, the health, the respawn
+    /// eye, and the modes only as far as <paramref name="allowCreative"/> lets this server grant them.
+    /// Returns whether a position was restored, so the caller can spawn the player where they left.
     /// </summary>
     public bool Restore(PlayerSaveData? saved, bool allowCreative)
     {
@@ -166,7 +328,9 @@ public sealed class ServerPlayer
         if (saved.Inventory is { } inventory)
             Inventory.Import(inventory);
         if (saved.Health is { } health)
-            Health = Math.Clamp(health, 0, PlayerHealth.MaxHealth);
+            Status.Restore(health);
+        if (saved.RespawnEye is { Length: 3 } r)
+            RespawnEye = new Vector3(r[0], r[1], r[2]);
         Creative = allowCreative && saved.Creative == true;
         Flying = Creative && saved.Flying == true;
         Yaw = saved.Yaw ?? Yaw;
@@ -185,7 +349,8 @@ public sealed class ServerPlayer
         Pitch = Pitch,
         Creative = Creative,
         Flying = Flying,
-        Health = Health,
+        Health = Status.Health,
+        RespawnEye = RespawnEye is { } r ? [r.X, r.Y, r.Z] : null,
         Inventory = Inventory.Export(),
     };
 }

@@ -16,7 +16,7 @@ public enum CameraMode
     Orbit,
 }
 
-public class Camera
+public class Camera : IMobTarget
 {
     private readonly PlayerPhysics _physics = new();
     private readonly IWindow? window;
@@ -802,23 +802,23 @@ public class Camera
     /// the player's body box. Bodies only touch when they genuinely overlap: a face flush
     /// against the body does not count, exactly like <see cref="OverlapsPlayer"/>.
     /// </summary>
-    public bool BodyTouches(Vector3 center, float halfExtent)
-    {
-        var min = new Vector3(
-            Position.X - PlayerPhysics.PlayerRadius,
-            Position.Y - EyeHeight,
-            Position.Z - PlayerPhysics.PlayerRadius);
-        var max = new Vector3(
-            Position.X + PlayerPhysics.PlayerRadius,
-            Position.Y - EyeHeight + PlayerPhysics.PlayerHeight,
-            Position.Z + PlayerPhysics.PlayerRadius);
-        var eMin = center - new Vector3(halfExtent);
-        var eMax = center + new Vector3(halfExtent);
+    public bool BodyTouches(Vector3 center, float halfExtent) =>
+        MobTargets.BodyTouches(Position, center, halfExtent);
 
-        return min.X < eMax.X && max.X > eMin.X
-            && min.Y < eMax.Y && max.Y > eMin.Y
-            && min.Z < eMax.Z && max.Z > eMin.Z;
-    }
+    /// <inheritdoc />
+    Vector3 IMobTarget.Eye => Position;
+
+    /// <inheritdoc />
+    public bool IsImmune => IsCreative || IsFlying;
+
+    /// <summary>
+    /// A mob hit on the local player: only the knockback is applied here. The
+    /// <paramref name="damage"/> is deliberately ignored, because <see cref="World"/> applies the
+    /// mob manager's <c>DamageDealtThisFrame</c> to its own health pool (and shakes the view)
+    /// exactly as before mobs had targets.
+    /// </summary>
+    public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift) =>
+        AddKnockback(awayHorizontal, knockbackSpeed, lift);
 
     public Matrix4x4 GetViewMatrix()
     {

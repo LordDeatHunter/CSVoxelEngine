@@ -473,7 +473,8 @@ OpenGLTest/
     CutoutMipmap.cs            # GL-free coverage-preserving mip chain for cutout tiles (alpha rescaled per level)
     LightFlicker.cs            # GL-free per-cell flicker phase + curve for the campfire point lights
     SelectionOutlineMesh.cs    # GL-free selection outline: the 12 box edges as thin beams (no glLineWidth)
-    ChunkGenerationWorker.cs   # background threads creating chunks around the camera
+    ChunkGenerationWorker.cs   # background threads creating chunks around every streaming focus (one
+                               #   ChunkScanFrontier per focus, served round-robin)
     Camera.cs                  # FPS camera pose, view/proj cache, shoulder/orbit modes; movement+physics and the DDA
                                #   raycast live in Player/PlayerPhysics.cs and Systems/Interaction/BlockRaycaster.cs
     LodRegion.cs               # far-terrain LOD: region columns meshed at reduced resolution from heightmaps; per-column chunk-Y ranges for burial
@@ -490,11 +491,18 @@ OpenGLTest/
     Combat.cs                  # GL-free punch rules: the forward cone (3 blocks, 30° half-angle)
                                #   and entity damage, shared by the punch loop and the tests
     SliceCombo.cs              # the blade's two-phase slice combo: press/queue/advance state
+    FallTracker.cs             # GL-free fall-damage rule: peak/grounded chain fed one feet height at a time
+                               #   (singleplayer's UpdateHealth and each ServerPlayer's accepted states)
     Player/                    # the player's rig shape and movement simulation
       PlayerRig.cs             # the posed shape: pivots, cuboids, skin palette, mesh building (Blockbench or Steve)
-      PlayerPhysics.cs         # walk/fly/swim input -> body position, voxel collision, auto-step, knockback, water state
+      PlayerPhysics.cs         # walk/fly/swim input -> body position, voxel collision (static BodyCollides),
+                               #   auto-step, knockback, water state
+      PlayerBodyProbe.cs       # GL-free body probes over the live chunk map: known (loaded), grounded,
+                               #   in water, in lava; what the server judges a remote player's body by
     Mob.cs                     # abstract base of every hostile (Slime, Goblin): position, health,
                                #   facing, hit flash, body box, TakeDamage/Shove
+    IMobTarget.cs              # what a mob chases and hurts: eye, immunity, TakeHit (Camera, ServerPlayer)
+    MobTargets.cs              # GL-free target rules: body contact, nearest non-immune target, min distance
     Goblin.cs                  # the goblin: body physics, throw-then-melee AI, clip/event contract
                                #   (ValidateContent), animation-driven release/impact events
     GoblinAim.cs               # GL-free low-arc ballistic solver for the thrown stones
@@ -587,9 +595,15 @@ OpenGLTest/
       InventoryIntentCodec.cs  # its bounds-checked wire form
       InventoryIntentRules.cs  # GL-free: what the server accepts of an intent, against that player's inventory
       ServerPlayer.cs          # a connected player on the server: own Inventory, creative/flight flags, pose,
-                               #   its PlayerContext, newest sequence id, mining progress, edit rate, attack pace
+                               #   its PlayerContext, newest sequence id, mining progress, edit rate, attack pace,
+                               #   its PlayerHealth/fall tracking/respawn eye, mob-hit sink, correction numbers
       NetPlayerFlags.cs        # the PlayerState flags byte (creative, flying), a request to the server
+      PlayerStatusCodec.cs     # PlayerStatusData (modes, health, dead, knockback) and its bounds-checked wire form
       NetValidation.cs         # server movement, edit-reach, intent-eye and visible-face sanity rules
+      MovementRules.cs         # GL-free movement rubberband: speed clamp, then collision, rise and hover checks
+      MoveVerdict.cs           # Accepted / Clamped / Rejected
+      MovementState.cs         # a player's per-connection movement memory (airborne-still time)
+      OperatorList.cs          # who may be creative: ops.json in the world folder plus --op, matched by save slug
       WorldIntent.cs           # one client world intent (break start/complete, place, use, throw, attack)
       WorldIntentCodec.cs      # its bounds-checked wire form, with the sequence id
       BreakProgress.cs         # GL-free: a player's mining on the server, judged against the held item's hits
@@ -681,7 +695,10 @@ OpenGLTest/
                                #   64 vertices / 96 indices; hands out the pools' GeometrySlices
       ChunkDrawBatch.cs        # persistent-mapped 3-slot ring of DrawElementsIndirectCommands +
                                #   the vec4(origin, alpha) ChunkInfo SSBO read via gl_DrawID
-      ChunkManager.cs          # chunk lifecycle: load/unload, dirty tracking, mesh scheduling
+      ChunkManager.cs          # chunk lifecycle: load/unload, dirty tracking, mesh scheduling, all against
+                               #   a focus list (unload only outside every focus's radius)
+      StreamingFocus.cs        # the published focus chunks (camera, or every connected player on a server):
+                               #   an immutable array swapped only when a focus changes chunk
       Interaction/             # GL-free interaction logic
         BlockRaycaster.cs      # the DDA block raycast + line-of-sight segment test, split out of Camera.cs
       Chunks/                  # GL-free chunk mesh/light/column generation, split out of Chunk.cs
@@ -1323,7 +1340,7 @@ each other.
 
 Chunk work is split across threads, and OpenGL calls are only legal on the main thread:
 
-1. `ChunkGenerationWorker` runs dedicated background threads that scan positions around the camera (closest first) and call `ChunkManager.QueueChunk`, which creates the `Chunk` and generates its block data **on that background thread**.
+1. `ChunkGenerationWorker` runs dedicated background threads that scan positions around each streaming focus (closest first; `World.Focus` is the camera, or every connected player on a server, and the workers round-robin over the foci with one `ChunkScanFrontier` each) and call `ChunkManager.QueueChunk`, which creates the `Chunk` and generates its block data **on that background thread**.
 2. Meshing is scheduled by `ChunkManager.ProcessDirtyChunks` (main thread, per-frame budget `MaxDirtyChunksPerFrame`) and runs on the thread pool via `Task.Run`, throttled by a `SemaphoreSlim` (`MaxConcurrentMeshGenerations`). Mesh generation produces CPU-side `ChunkMeshData` only.
 3. Completed mesh data lands in `_completedMeshQueue` and is uploaded to the GPU on the **main thread** in `ApplyCompletedMeshes`, sorted closest-first and capped at `MaxMeshUploadsPerFrame` per frame.
 
@@ -1456,7 +1473,9 @@ paths resolve). It is a **CLI**: it loads content headlessly (`ContentRegistry.L
 recipe), lists `WorldStore.List()` and asks for a world number or `N` for a new one (name and
 optional seed), asks for a port (default `ServerAddress.DefaultPort`, 25566; `--allow-creative` on
 the command line sets `GameServer.AllowCreative`, default `WorldGenerationConfig.ServerAllowCreative`,
-off), then builds a
+off, and every repeatable `--op <name>` joins `GameServer.Operators` with the names in the world
+folder's `ops.json` — see the creative permission below — and the server prints one line saying
+who may be creative), then builds a
 **server-mode** `World` (`new World(..., store, serverMode: true)`) over that world's
 `ChunkSaveStore` and runs `World.Update(dt, null)` in a ~1 ms loop with `GameServer.Pump(dt)`.
 The world list marks a world whose `WorldInfo.Version` is not `WorldStore.CurrentVersion` as
@@ -1476,7 +1495,7 @@ as the player: `CapturePlayer` writes back the `player.json` the world was opene
 `_hostedPlayer`, with only the lighting clock refreshed — its inventory too is written back as it
 was opened, since every connected player carries their own — or for a world that had none no pose,
 no creative or flight, no respawn eye and no inventory, so a survival world opened after hosting is
-not in creative flight at the last centroid), and skips the LodGen threads; the
+not in creative flight at the server camera's hover), and skips the LodGen threads; the
 global `WorldSeed` still applies, and the six `GenerationalCache` sites behave exactly as in the
 game, which is what lets a headless World run `Update` over real terrain (the LOD builder already
 drops real builds when its pool is null). `ServerWorldTests` locks this down.
@@ -1501,22 +1520,29 @@ session.
 length prefixed, `Vector3` as three floats). `NetFraming.ProtocolVersion` must match in both
 hellos. Messages: `ClientHello` (version, name), `ServerHello` (version, player id, world name,
 seed, day clock, spawn), `KeepAlive`, `ChatSend`/`ChatMessage` (kind, sender, text),
-`PlayerState` (eye, yaw, pitch, flags), `PlayerStatus` (the creative/flight flags the server
-actually granted, sent once when a request was refused), `PlayerList` (id, name, eye, yaw, pitch,
-flags), `WorldIntent` (a client's world action, `WorldIntentCodec`), `IntentResult` (sequence id,
+`PlayerState` (eye, yaw, pitch, flags, the newest correction it acks), `PlayerStatus` (the
+player's server-owned status, `PlayerStatusCodec`: the creative/flight flags the server actually
+granted, health, a dead flag, and the knockback impulse and lift of the mob hits since the last
+one; sent at join, whenever it changed, and once when a mode request was refused),
+`PlayerCorrection` (a numbered eye the client must snap to: an illegal move undone, or a
+respawn), `PlayerList` (id, name, eye, yaw, pitch, flags), `WorldIntent` (a client's world action, `WorldIntentCodec`), `IntentResult` (sequence id,
 accepted), `BlockCorrection` (sequence id, then the authoritative cells around the intent's target),
 `ChunkRequest`/`ChunkData` and `ColumnRequest`/`ColumnHeights` (the streamed world,
 `ChunkNetCodec`), `LodRegionRequest`/`LodRegionData` (a streamed far region, `LodNetCodec`),
 `EntityList` (the live mobs/drops, `NetEntity`), `StationState` (the campfires, querns, kilns and
 cast molds, `StationNetCodec`), `BlockChanges` (a batch of server cell changes, `NetCellChange`)
 and `InventoryState`/`InventoryRequest` (a player's server-owned inventory, `InventoryNetCodec`,
-and its intents, `InventoryIntentCodec`). `ProtocolVersion` 3 is the intent protocol: a client
+and its intents, `InventoryIntentCodec`). The intent protocol came with version 3: a client
 never writes a cell (the old raw `BlockEdit` is retired and refused), every intent carries a
-per-player sequence id, and `InventoryState` carries the id of the newest intent it reflects. A
+per-player sequence id, and `InventoryState` carries the id of the newest intent it reflects.
+`ProtocolVersion` 4 is the current one: it adds the status payload of `PlayerStatus`, the
+`PlayerCorrection` message (id 25), the correction ack in `PlayerState` and the `Respawn` intent,
+so an older client is refused at hello. A
 `WorldIntent` is the sequence id, a `NetIntentKind` byte, the eye and the unit aim the action was
 made from, then that kind's fields (`WorldIntent`): `BreakStart`/`BreakComplete(cell)`,
-`Place(hit cell, face normal)`, `Use(cell under the crosshair, optional)`, `Throw(charge 0..1)` and
-`Attack(punch | slice | slice return)`. Its reader refuses an unknown kind or attack, a
+`Place(hit cell, face normal)`, `Use(cell under the crosshair, optional)`, `Throw(charge 0..1)`,
+`Attack(punch | slice | slice return)` and `Respawn` (nothing more; never rate-limited, edits no
+cell). Its reader refuses an unknown kind or attack, a
 non-finite or far-out eye, an aim that is not close to a unit vector and a normal component
 outside -1..1 as an `InvalidDataException`, renormalises the aim and clamps the charge. An
 `InventoryRequest` is the sequence id, then a `NetInventoryAction` byte and only that action's fields
@@ -1545,18 +1571,22 @@ connection, hello'd or pending, whose reader saw no frame for `NetIdleTimeoutSec
 connected player is a **`ServerPlayer`** (`OpenGLTest/src/Networking/ServerPlayer.cs`): id, a name
 unique among the players online by its save slug (a second "Player" joins as "Player 2"), its
 **own** `Inventory` (`Inventory.Empty()` for a newcomer), server-owned `Creative`/`Flying` flags
-(survival by default), health, the accepted pose and `LastStateAt`. On `ClientHello` it assigns an
+(survival by default), its own health and respawn eye (see "Player status" below), the accepted
+pose and `LastStateAt`. On `ClientHello` it assigns an
 id, loads the player's file (`ServerPlayerSaves`: `players/<slug of the name>.json` in the world
-folder, the `PlayerSaveCodec` shape, written through the world's `ChunkSaveStore` —
-`World.SaveStore` — which accepts that one subfolder), replies `ServerHello` with the saved
-position or else the **join spawn** (the server camera's position captured at the first hello,
-before any player moved the focus, so a later joiner never spawns at the centroid of whoever is
-online, possibly inside rock), sends that player's inventory, and broadcasts a system chat and the
+folder, the `PlayerSaveCodec` shape — health and respawn eye included — written through the
+world's `ChunkSaveStore` — `World.SaveStore` — which accepts that one subfolder), replies
+`ServerHello` with the saved position or else the **join spawn** (the server camera's position
+captured at the first hello; the camera never follows the players, so a later joiner never spawns
+wherever the players online have wandered, possibly inside rock), teleports the player there
+(`ServerPlayer.Teleport`, which starts its fall tracking; a player with no saved respawn eye gets
+that spot as one), sends that player's inventory and status, and broadcasts a system chat and the
 player list; players are saved again on leaving, in `Stop` (before the world's `SaveAndDispose`
 shuts the store) and every `AutosaveIntervalSeconds`. Thereafter it relays chat, records
 `PlayerState` into the player list (sent every `NetPlayerListSeconds`, 10 Hz) — its flags
 (`NetPlayerFlags`, the client's `C` toggle) are only a request: `ServerPlayer.Creative` is set
-only while `GameServer.AllowCreative`, and flight only with it — syncs the day clock
+only while `GameServer.MayBeCreative` holds for that player, and flight only with it, and its
+position goes through the movement rubberband (both below) — syncs the day clock
 (`NetTimeSyncSeconds`), serves `ChunkRequest`/`ColumnRequest` from the loaded world
 (`ChunkManager.TryCaptureChunk`, `ColumnCache.GetHeights`), queues `LodRegionRequest`s (deduped
 per connection, `ClientConnection.LodQueued`) and builds at most `NetLodBuildsPerPump` of them a
@@ -1583,7 +1613,10 @@ replays for the sending player through the singleplayer rules. Each `ServerPlaye
 server creative flag) that `World` runs every interaction path through instead of the camera
 (singleplayer builds one from its camera, whose raycasts keep the third-person rules). An intent
 is refused (and nothing applied) when its sequence id is not above the player's last
-(`ServerPlayer.AcceptSeq`), the world is not playing, its eye is more than
+(`ServerPlayer.AcceptSeq`); a **dead** player's intent is judged right after that, before every
+rule below — only a `Respawn` is accepted, however far its eye drifted, and anything else is
+refused (see "Player status"), while a living player's `Respawn` is refused. Otherwise an intent
+is refused when the world is not playing, its eye is more than
 `NetMaxIntentEyeDriftBlocks` from the player's accepted position (`NetValidation.EyeWithin`: one
 state interval of movement plus slack), or, for an edit (break completion, place, use, throw),
 the player's `EditLimiter` (`RateLimiter`, `NetEditIntentsPerSecond`/`NetEditIntentBurst`) is
@@ -1641,9 +1674,108 @@ clamped, the authoritative position moving toward it by exactly the allowed dist
 of fast states converges at the cap instead of freezing at a stale point that would get every later
 state rejected too); the cap is 130 b/s, the sprint-flight diagonal (`BaseSpeed *
 FlyBoostMultiplier` = 80 b/s on each of the horizontal and vertical axes, ~113 b/s together) plus
-slack. The severed player is removed on disconnect (its context marked absent, so a pour bound
-to it pauses). The camera focus follows the **centroid** of the connected players
-(`World.SetServerFocus`, a `Camera.TestTeleport`), so chunks stream around everyone.
+slack. On top of that clamp the movement rubberband rejects an illegal move (below). The severed
+player is removed on disconnect (its context marked absent, so a pour bound to it pauses).
+
+**Streaming around every player.** Chunks load around **every** connected player, not around the
+server camera: `World.Focus` (`Systems/StreamingFocus.cs`) publishes an immutable array of focus
+chunks — every `ServerPlayer`'s chunk on a server with players online (players sharing a chunk
+count once), the camera otherwise (singleplayer, a client, and a server while nobody is online) —
+swapped with `Volatile.Write` only when a focus changes chunk or the set changes, so a still frame
+allocates nothing. `World.UpdateFocus` refreshes it right before each `ChunkManager.Update(foci)`
+(and once in the World constructor, before the generation workers start). `ChunkManager` unloads a
+chunk only outside **all** foci's radii (`StreamingFocus.WithinRadius`), orders and drops mesh
+uploads and dirty rebuilds by the distance to the nearest focus (`MinDistanceSquared`), and keys
+its unload gate on the focus array's reference (plus the 120-frame fallback); an empty focus list
+unloads, applies and builds nothing. `ChunkManager.Update(Camera)` stays as a thin overload over
+its own single-focus `StreamingFocus` for the tests. `ChunkGenerationWorker` keeps one
+`ChunkScanFrontier` per focus index (an array grown by compare-and-swap, since every worker
+thread calls it) and round-robins the scans over the foci. `GameServer` no longer moves the
+camera (`World.SetServerFocus` remains, for tests): the camera stays at the world spawn, is the
+focus only while nobody is online and remains the join spawn. Two far-apart players therefore
+cost roughly two load spheres of generation, meshing and memory, sharing the same per-frame
+budgets (`MaxDirtyScanPerFrame`, `MaxMeshUploadsPerFrame`), which are not retuned for it. The far LOD stays
+camera-bound: the server builds far regions per client request.
+
+**Player status** is server-owned. Each `ServerPlayer` owns a `PlayerHealth` (`Status`, with
+`Health`/`IsDead`), a `FallTracker` (`FallTracker.cs`, the GL-free peak/grounded chain lifted out
+of singleplayer's `World.UpdateHealth`, which still uses it with `DefaultMaxStepBlocks`), a
+`RespawnEye` and a mob-hit sink. The server never simulates a player's body; it probes its own
+loaded chunks around the reported position (`Player/PlayerBodyProbe.cs`: `IsKnown` — the feet
+cell's chunk and the one `NetGroundProbeBlocks` below are loaded —, `Grounded` — the body lowered
+by `NetGroundProbeBlocks` collides, through the static `PlayerPhysics.BodyCollides` the client's
+own collision now delegates to —, `InWater`, mirroring `UpdateWaterState`'s swim test, and
+`InLava`, the one lava rule `UpdateWaterState` also calls). The fall tracker is fed once per
+**accepted** `PlayerState` (`ServerPlayer.ObserveAcceptedState`), with the state gap's allowed
+distance (`NetValidation.AllowedDistance(gap, NetMaxMoveBlocksPerSecond)`) as its teleport bound —
+exactly what the accepted position already obeys, so only the server's own teleports (join,
+respawn, a correction: `Teleport`/`ResetFall`) reset it and lag errs toward no damage, never extra
+damage; a body over unloaded chunks is not judged. Lava and the damage flash tick once per `Pump`
+(`ServerPlayer.TickStatus` from `GameServer.TickPlayers`), creative or flying being immune as in
+singleplayer. Mob hits land through `IMobTarget.TakeHit` (below), which bills the player's own
+pool and queues the knockback. Whatever changed the status marks `StatusDirty`, and `TickPlayers`
+then sends that player a `PlayerStatus` (modes, health, dead, and the queued knockback, handed
+over and cleared by `TakePendingKnockback`); one more goes out at join, so a returning player's
+health (or death) is mirrored at once. The status is saved with the player (health and respawn
+eye in `players/<slug>.json`). A **dead** player stays where it died: its states still record
+look, flags and modes but never move it, and every intent but `Respawn` is refused. The client
+mirrors all of it: `World.ApplyNetworkHealth` (client mode only; lower health is taken as damage
+with the flash and a singleplayer-sized shake, higher is restored outright), `UpdateClient`
+fading the flash, `Camera.AddKnockback` for the shove (the client's own physics applies it) and
+`SetModes`; a client never bills itself damage. On the first dead status the client sends a
+`Respawn` intent at once (`Program.SendRespawn`, from its eye and aim) and re-sends it every
+`NetRespawnRetrySeconds` while the status still reads dead; the server judges it before the
+eye-drift and rate rules, so a corpse that kept falling on the client can always come back, brings
+the player back at full health at its `RespawnEye` (else the join spawn, `ServerPlayer.Respawn`),
+snaps the client there with a `PlayerCorrection` and sends the fresh status. There is no death
+screen: the respawn is automatic, as in singleplayer.
+
+**The movement rubberband.** Every accepted-for-position `PlayerState` goes through
+`MovementRules.Judge` (`Networking/MovementRules.cs`, GL-free, verdict `MoveVerdict` Accepted /
+Clamped / Rejected, per-player memory in `ServerPlayer.Movement`, a `MovementState`): first the
+converging speed clamp above (`Clamped`, never a correction), then, on the bounded point and only
+without the flight flag and over loaded chunks (`PlayerBodyProbe.IsKnown`; unknown means accept):
+a body that would collide with a solid cell while the previous position did not is rejected (a
+player already inside a solid may move, so it can leave), and, when the state gap is at most
+`NetMaxJudgedStateGapSeconds`, a climb faster than `NetMaxRiseBlocksPerSecond * gap +
+NetRiseSlackBlocks` is rejected, and so is a hover: airborne, not in water and not sinking for
+longer than `NetHoverGraceSeconds` in total. The numbers are generous on purpose — a jump, a sprint
+jump, a sprint auto-step of a whole block inside one state, swimming up and out of water, a mob's
+knockback lift, a fall and standing idle never trip them (`MovementRulesTests` asserts the
+relations against `PlayerPhysics`' own constants). A rejection keeps the player where it stood,
+resets its fall tracking and sends a numbered `PlayerCorrection(seq, eye)`
+(`ServerPlayer.IssueCorrection`); the client snaps there (`Camera.TestTeleport`, motion reset),
+echoes the number in every following `PlayerState`, and the server ignores state positions until
+one acks the newest correction (`AcceptsStatePosition`), so the states the client sent before it
+snapped can never trip a second correction. A respawn uses the same correction.
+
+**Creative permission** is per player: a client's creative bit is only a request, granted (with
+flight only alongside it, and flight is noclip to the movement rules) while
+`GameServer.MayBeCreative(name)` holds — everyone when `AllowCreative` (`--allow-creative`) is on,
+otherwise only an operator. `OperatorList` (`Networking/OperatorList.cs`, GL-free) holds the
+operators by save slug (`WorldNames.Slug`, the same normalisation that names a player's file, so
+a name matches exactly when it would load the same save file — case and punctuation fold away —
+and a duplicate joiner's "Name 2" is not an operator); `ServerProgram` builds it from every repeatable `--op <name>` plus
+`ops.json` in the hosted world's folder (a JSON array of names, read once at start through
+`ChunkSaveStore.ReadFile`; no file means nobody, a broken one warns and means nobody), and nobody
+is an operator by default. Both enforcement points use it — the restored modes at hello and every
+`PlayerState` — creative grants and clears follow `ServerPlayer.Creative`, and a refused request
+is answered once with a `PlayerStatus` carrying the modes the player really has.
+
+**Mobs follow real players.** A mob chases and hurts an `IMobTarget` (`IMobTarget.cs`: `Eye`,
+`IsImmune`, `TakeHit(damage, away, speed, lift)`), never the camera directly. `World` rebuilds the
+target list each frame right before the slime and goblin managers run: singleplayer's is the
+`Camera` (immune while creative or flying; its `TakeHit` applies only the knockback, since World
+still bills the managers' `DamageDealtThisFrame` to its own pool, so singleplayer is unchanged),
+and a server's is every `ServerPlayer` (immune while creative, flying or dead; `TakeHit` bills its
+own pool and queues the knockback for its status), so a server with nobody online chases, spawns
+and despawns nothing. `MobTargets` (GL-free) holds the rules: each mob chases the horizontally
+nearest non-immune target (the nearest immune one only when every target is), contact and stones
+hit whichever non-immune target they touch (a stone stops at any target) and a goblin's melee
+impact every non-immune target still in reach, a mob despawns only when it is past its despawn radius from **every** target, and the one shared
+spawn timer tries its ring around each target in turn (round-robin, `_spawnCursor`) under the
+unchanged global caps. `Goblin.Update` takes the target, and a null one means no chase.
+
 `GameServerTests` (loopback) and `ServerWorldTests` lock the frame, spawn, LOD-queue,
 hosted-player, per-player inventory (independent inventories, refused equips corrected, creative
 gating and its status report, crafting spends only the crafter's), nearest-player pickup and
@@ -1651,9 +1783,18 @@ intent rules down (a tool-less break refused and corrected, a break faster than 
 an unowned placement refused, a placement spending exactly one under the placement rules, a
 forged overwrite refused, the server-computed state byte, a blast one player primed reaching
 another client, mined loot landing with the breaker only, an intent from a far eye or a replayed
-id refused, no placement into another connected player's body), with `InventoryIntentTests`,
+id refused, no placement into another connected player's body), the status rules (a joiner told
+its health, death held until a respawn intent from a drifted eye brings the player home), the
+rubberband (an illegal move corrected and ignored until acked, a legal walk never corrected), the
+operator permission, per-player streaming (a moving player becomes a focus and the camera stays
+put; two players 500 blocks apart both stream terrain and edit beside themselves, and a departed
+player's chunks unload), with `InventoryIntentTests`,
 `ServerPlayerTests`, `DropPickupTests`, `WorldIntentRuleTests` (codec, `BreakProgress`, edit rate,
-visible face), `ClientPredictionTests` and `StationNetCodecTests` for the GL-free rules.
+visible face, the respawn intent), `ClientPredictionTests`, `StationNetCodecTests`,
+`NetworkProtocolTests` (the status and correction payloads), `FallTrackerTests`,
+`ServerPlayerStatusTests`, `MovementRulesTests`, `OperatorListTests`, `MobTargetTests`,
+`StreamingFocusTests`, `ChunkManagerTests.UnloadKeepsAChunkInsideAnyFocusRadius` and
+`ChunkGenerationWorkerTests.TwoFociAreBothServed` for the GL-free rules.
 
 **The client** (`OpenGLTest/src/Networking/NetworkClient.cs`) connects on a background thread from
 `Program.BeginConnect` (the CONNECT click records `PendingWork.Connect` and presents the
@@ -1708,9 +1849,12 @@ loot arrives as drops it picks up into the player's server inventory, and a thro
 only as a cosmetic copy. The purely cosmetic leaf particles and mining debris, the player model,
 the station mirrors' quern animation and fire particles, and the cosmetic throws tick in
 `World.UpdateClient` so nothing hangs in mid-air. `UpdateNetwork` sends `PlayerState` every
-`NetPlayerStateSeconds`; chat feeds `ChatView`, `TimeSync` calls `World.SetLightingTime`,
+`NetPlayerStateSeconds`, carrying the newest correction it applied (`netCorrectionAck`); chat
+feeds `ChatView`, `TimeSync` calls `World.SetLightingTime`,
 `PlayerList` reconciles `World.SyncRemotePlayers`, `StationState` replaces the station mirrors
-(`World.ApplyNetworkStations`), `PlayerStatus` sets the camera's modes, and `InventoryState` is
+(`World.ApplyNetworkStations`), `PlayerStatus` sets the camera's modes and mirrors health, death
+and knockback (and starts the automatic respawn, see "Player status"), `PlayerCorrection` snaps
+the camera and makes the next state go out at once with its ack, and `InventoryState` is
 imported as the truth when it is current.
 Inventory edits are predicted then sent (`Program.SendInventoryIntent`): the hotbar keys and `Q`
 are intents only, while the wheel (`Program.MirrorSelection`), a middle-click pick
@@ -1734,24 +1878,30 @@ camera exactly like a focused inventory field, and the log sits bottom-left abov
 SendChat` echoes locally; in multiplayer it sends `ChatSend` and the server's broadcast is the
 only copy, so a line never appears twice.
 
-**Known gaps** (open): player status is still the client's — health, fall and lava damage,
-respawn and mob damage to players run nowhere on the server, and mobs still target the server
-camera (the centroid) rather than real players; movement is only speed-clamped (no collision or
-noclip check); the server's creative flag follows the client's request whenever `AllowCreative`
-is on (there is no per-player permission); players are keyed by name with no authentication, so
-whoever joins first under a name gets that name's inventory; a slice's return-swing flag and a
-throw's charge are taken from the client (both are paced, neither verified); a third-person
-placement may land on a face other than the one the client predicted (any face of the hit cell
-turned toward the eye is accepted) and is then corrected; a correction covers the 3x3x3 cells
-around the named cell, so a prediction outside it waits for the journal; projectiles, primed TNT,
-falling blocks and toppling trees are not in `EntityList` (their cells still sync via
-`BlockChanges`, and a client never fakes them locally, so a fall or a blast shows as cells
-changing rather than as a moving entity; a client's own throw is drawn as a cosmetic copy only);
-station mirrors update at the entity cadence (10 Hz); chunks stream around the **centroid** of
-the connected players, so players more than a load radius (`ChunkRadius` chunks) apart are each
-outside the loaded sphere and get no terrain streamed (their intents there are refused and
-corrected, since the chunks are not loaded); every player is named "Player", because
-`ChatView.LocalName` is never set from a setting; and there is no authentication or encryption.
+**Known gaps** (open): players are keyed by name with no authentication, so whoever joins first
+under a name gets that name's inventory, status and operator rights (`ops.json` is read once at
+start, and there is no in-game op command); a slice's return-swing flag and a throw's charge are
+taken from the client (both are paced, neither verified); a third-person placement may land on a
+face other than the one the client predicted (any face of the hit cell turned toward the eye is
+accepted) and is then corrected; a correction covers the 3x3x3 cells around the named cell, so a
+prediction outside it waits for the journal; projectiles, primed TNT, falling blocks and toppling
+trees are not in `EntityList` (their cells still sync via `BlockChanges`, and a client never fakes
+them locally, so a fall or a blast shows as cells changing rather than as a moving entity; a
+client's own throw is drawn as a cosmetic copy only); station mirrors update at the entity cadence
+(10 Hz); every player is named "Player", because `ChatView.LocalName` is never set from a
+setting; and there is no authentication or encryption. From the server-owned status and movement:
+a hovering cheater is frozen in place by repeated corrections rather than dropped to the ground;
+collision is judged at a state's endpoint only, so one state may pass through a thin wall within
+its speed allowance, a body already inside a solid may move anywhere, and a descent slower than
+the hover rule's sink tolerance is never caught; knockback is applied by the client's own physics
+(the server only queues it in the status), so a modified client can ignore it; respawn is
+automatic with no death screen, and a dead player's model stays where it died for others until
+the respawn; a player's lava and fall state is judged from its 20 Hz positions, so a long fall
+across a lag gap can go unbilled (lag errs toward no damage, never extra); two far-apart players
+cost roughly two load spheres of generation and memory under the one set of per-frame budgets;
+and while a store-backed server world is still loading, an early joiner is already the streaming
+focus but `WorldLoadGate` still measures around the server camera, so a joiner who walks off
+before the spawn settles makes the load fall back to its timeout.
 
 ## Biomes
 
@@ -1852,6 +2002,11 @@ kind's cap) all read that one list. A new mob kind must be added to `MobsMaxAliv
 past the cap. The render passes keep one list per kind, because the meshes differ; `ReflectionEntities`
 carries both. Ring spawning on dry, loaded forest surface goes through `Systems/MobSpawner.cs`
 (`TryFindSurfaceSpawn`), and each manager wraps it with its own radii and body-centre offset.
+The managers never read the camera: they take a list of `IMobTarget`s (the camera in
+singleplayer, every connected player on a server), chase the nearest non-immune one, spawn rings
+round-robin over them under the global caps and despawn by the distance to the nearest (see "Mobs
+follow real players" under "Multiple players and chat"); the `Update(..., Camera)` overloads wrap
+the camera as a one-target list.
 
 The first entity is the **slime** (`Slime` + `Systems/SlimeManager.cs`), owned by `World`. It hops
 toward the player, damages on contact only while airborne (a slime merely bobbing in water is

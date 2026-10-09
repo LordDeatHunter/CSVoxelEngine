@@ -39,6 +39,8 @@ public class World : IItemUseWorld
     private readonly FallingBlockManager _falling = new();
     private readonly SlimeManager? _slimes;
     private readonly GoblinManager? _goblins;
+    // The players the mob managers chase this frame, rebuilt right before they run.
+    private readonly List<IMobTarget> _mobTargets = [];
     private readonly FluidManager _fluidManager = new();
     private readonly LeafDecayManager _leafDecay = new();
     private readonly TreeGrowthWriter _treeGrowth = new();
@@ -233,6 +235,18 @@ public class World : IItemUseWorld
     private readonly List<DropCollector> _dropCollectors = [];
 
     /// <summary>
+    /// Where chunks stream: around every connected player on a server (<see cref="ServerPlayers"/>),
+    /// and around the camera otherwise - in singleplayer, on a client, and on a server while nobody
+    /// is online. Refreshed every frame right before the chunk update (<see cref="UpdateFocus"/>);
+    /// the chunk manager and the generation workers both read it, so chunks load around each player
+    /// and unload only outside every player's radius.
+    /// </summary>
+    public StreamingFocus Focus { get; } = new();
+
+    // Scratch for the server's player eyes handed to Focus, so a frame allocates nothing
+    private Vector3[] _focusEyes = new Vector3[4];
+
+    /// <summary>
     /// The save store this world writes through, or null for a storeless world. A server keeps its
     /// players' files in it (<see cref="ServerPlayerSaves"/>); the world still owns its shutdown
     /// (<see cref="SaveAndDispose"/>), so nothing may be queued after that.
@@ -246,10 +260,7 @@ public class World : IItemUseWorld
 
     /// <summary>Current HP, 0-100, drawn as 10 hearts in the HUD.</summary>
     public int Health => _health.Health;
-    private bool _wasGrounded = true;
-    private float _fallPeakFeet;
-    private float _prevFeet;
-    private bool _hasFallState;
+    private readonly FallTracker _fall = new();
     private Vector3 _respawnEye;
     private bool _hasRespawnEye;
 
@@ -423,7 +434,10 @@ public class World : IItemUseWorld
                 _fluidManager.Enabled = false;
                 _leafDecay.Enabled = false;
             }
-            generationWorker = _generationWorker = new ChunkGenerationWorker(_chunkManager, Camera);
+            // Seeded before the workers start, so they generate around the spawn from the first
+            // scan rather than idling until the first frame publishes a focus
+            UpdateFocus();
+            generationWorker = _generationWorker = new ChunkGenerationWorker(_chunkManager, Focus);
             lodManager = _lodManager = new LodManager(lodGeometry);
             _canAcceptDrop = Inventory.CanAccept;
             if (EntityRegistry.TryGet("slime") is { } slimeType)
@@ -697,15 +711,37 @@ public class World : IItemUseWorld
     public double LightingTime => Now + TimeOffset;
 
     /// <summary>
-    /// Moves a server world's chunk-streaming focus (its headless camera) to
-    /// <paramref name="position"/>, so chunks load around the connected players. No-op for a
-    /// normal world, whose camera is driven by input.
+    /// Moves a server world's headless camera to <paramref name="position"/>. The camera is the
+    /// chunk-streaming focus only while no player is connected (see <see cref="Focus"/>); once
+    /// players are, chunks stream around each of them instead. No-op for a normal world, whose
+    /// camera is driven by input.
     /// </summary>
     public void SetServerFocus(Vector3 position)
     {
         if (!_serverMode)
             return;
         Camera.TestTeleport(position, Camera.Yaw, Camera.Pitch);
+    }
+
+    /// <summary>
+    /// Publishes this frame's streaming foci: every connected player's position on a server with
+    /// players online, the camera otherwise. <see cref="StreamingFocus"/> republishes only when a
+    /// focus changed chunk or the set changed, so a still frame allocates nothing.
+    /// </summary>
+    private void UpdateFocus()
+    {
+        var players = ServerPlayers;
+        if (!_serverMode || players.Count == 0)
+        {
+            Focus.SetEye(Camera.Position);
+            return;
+        }
+
+        if (_focusEyes.Length < players.Count)
+            _focusEyes = new Vector3[Math.Max(players.Count, _focusEyes.Length * 2)];
+        for (var i = 0; i < players.Count; i++)
+            _focusEyes[i] = players[i].Position;
+        Focus.SetEyes(_focusEyes.AsSpan(0, players.Count));
     }
 
     /// <summary>Sets the lighting clock so <see cref="LightingTime"/> reads <paramref name="time"/>
@@ -933,6 +969,29 @@ public class World : IItemUseWorld
     public void ApplyNetworkStations(PacketReader reader) =>
         StationNetCodec.Read(reader, _campfires, _querns, _kilns, _casting);
 
+    /// <summary>
+    /// A client mirrors the health the server's <see cref="NetMessage.PlayerStatus"/> reports: the
+    /// server alone bills falls, lava and mob hits, so a lower value is taken as damage (the flash
+    /// and a shake sized like singleplayer's) and a higher one (a respawn) is restored outright.
+    /// Only a client calls this; anywhere else the world owns its own pool.
+    /// </summary>
+    public void ApplyNetworkHealth(int health)
+    {
+        if (!_clientMode)
+            return;
+        var current = _health.Health;
+        if (health < current)
+        {
+            var damage = current - health;
+            _health.TakeDamage(damage);
+            Camera.AddShake(Math.Clamp(damage / 40f, 0.2f, 1f));
+        }
+        else if (health > current)
+        {
+            _health.Restore(health);
+        }
+    }
+
     private static bool KindMatches(Mob mob, NetEntityKind kind) =>
         kind == NetEntityKind.Slime ? mob is Slime : kind == NetEntityKind.Goblin && mob is Goblin;
 
@@ -1010,7 +1069,8 @@ public class World : IItemUseWorld
     /// </summary>
     private void UpdateClient(double deltaTime, IKeyboard? keyboard)
     {
-        _chunkManager.Update(Camera);
+        UpdateFocus();
+        _chunkManager.Update(Focus.Chunks);
         _lodManager.Update(_chunkManager);
 
         var feet = Camera.Position - new Vector3(0f, Camera.EyeHeight, 0f);
@@ -1043,6 +1103,9 @@ public class World : IItemUseWorld
         FrameProfiler.End(ProfileSection.Entities);
 
         Inventory.Update((float)deltaTime);
+        // The pool itself is the server's (ApplyNetworkHealth mirrors it); only the damage flash
+        // fades here
+        _health.Update((float)deltaTime);
 
         FrameProfiler.Begin(ProfileSection.Raycast);
         _hasSelectedBlock = Camera.Raycast(InteractionReach, _chunkManager,
@@ -1111,14 +1174,19 @@ public class World : IItemUseWorld
 
         FrameProfiler.Begin(ProfileSection.Player);
 
-        UpdateHealth((float)deltaTime);
+        // A server's hovering camera is nobody: its pool never changes, and each connected
+        // player's status is ticked by the server (ServerPlayer.TickStatus)
+        if (!_serverMode)
+            UpdateHealth((float)deltaTime);
         UpdatePlayerModel(deltaTime);
 
         // The chunk update below times itself, so the player span closes here.
         FrameProfiler.End(ProfileSection.Player);
 
-        // Times itself, as ChunkUnload / ChunkApply / ChunkDirty
-        _chunkManager.Update(Camera);
+        // After the camera moved this frame, as the chunk update always read it; the chunk update
+        // times itself, as ChunkUnload / ChunkApply / ChunkDirty
+        UpdateFocus();
+        _chunkManager.Update(Focus.Chunks);
 
         FrameProfiler.Begin(ProfileSection.Lod);
         _lodManager.Update(_chunkManager);
@@ -1173,12 +1241,29 @@ public class World : IItemUseWorld
         foreach (var block in _falling.Falling)
             Camera.PushOutOf(block.Position, FallingBlock.HalfExtent, _chunkManager);
 
+        // The players the mobs chase, rebuilt each frame. Singleplayer: the local camera, whose
+        // TakeHit applies only the knockback, since the damage below still lands on this world's
+        // own pool. A server: every connected player, each taking its hits on its own pool
+        // (ServerPlayer.TakeHit), never the hovering camera, so nobody online means nobody chased.
+        _mobTargets.Clear();
+        if (_serverMode)
+        {
+            var players = ServerPlayers;
+            for (var i = 0; i < players.Count; i++)
+                _mobTargets.Add(players[i]);
+        }
+        else
+        {
+            _mobTargets.Add(Camera);
+        }
+
         // Slimes hop at the player: an airborne touch bills damage, a grounded one is just
-        // shoved aside. The manager only reports the amount; the health pool stays here.
+        // shoved aside. The manager only reports the amount; the health pool stays here (a
+        // server's players already took theirs through TakeHit).
         if (_slimes != null)
         {
-            _slimes.Update((float)deltaTime, _chunkManager, _dropManager, Camera);
-            if (_slimes.DamageDealtThisFrame > 0)
+            _slimes.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets);
+            if (!_serverMode && _slimes.DamageDealtThisFrame > 0)
             {
                 _health.TakeDamage(_slimes.DamageDealtThisFrame);
                 Camera.AddShake(Math.Clamp(_slimes.DamageDealtThisFrame / 20f, 0.2f, 1f));
@@ -1189,9 +1274,9 @@ public class World : IItemUseWorld
         // manager only reports the damage and the health pool stays here.
         if (_goblins != null)
         {
-            _goblins.Update((float)deltaTime, _chunkManager, _dropManager, Camera);
+            _goblins.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets);
             var goblinDamage = _goblins.DamageDealtThisFrame;
-            if (goblinDamage > 0)
+            if (!_serverMode && goblinDamage > 0)
             {
                 _health.TakeDamage(goblinDamage);
                 Camera.AddShake(Math.Clamp(goblinDamage / 20f, 0.2f, 1f));
@@ -1291,8 +1376,10 @@ public class World : IItemUseWorld
         EnsureSpawnSettled();
         FrameProfiler.End(ProfileSection.Player);
 
-        // Times itself, as ChunkUnload / ChunkApply / ChunkDirty
-        _chunkManager.Update(Camera);
+        // After the spawn settled this frame; the chunk update times itself, as ChunkUnload /
+        // ChunkApply / ChunkDirty
+        UpdateFocus();
+        _chunkManager.Update(Focus.Chunks);
 
         FrameProfiler.Begin(ProfileSection.Lod);
         _lodManager.Update(_chunkManager);
@@ -1754,44 +1841,10 @@ public class World : IItemUseWorld
 
         var beforeHp = _health.Health;
         var feet = Camera.Position.Y - Camera.EyeHeight;
-        if (!_hasFallState)
-        {
-            _fallPeakFeet = feet;
-            _prevFeet = feet;
-            _wasGrounded = Camera.IsGrounded;
-            _hasFallState = true;
-        }
-
-        if (MathF.Abs(feet - _prevFeet) > 4f)
-        {
-            _fallPeakFeet = feet;
-            _wasGrounded = Camera.IsGrounded;
-        }
-        else if (Camera.IsFlying)
-        {
-            _fallPeakFeet = feet;
-            _wasGrounded = Camera.IsGrounded;
-        }
-        else if (!Camera.IsGrounded)
-        {
-            if (_wasGrounded)
-                _fallPeakFeet = MathF.Max(_fallPeakFeet, _prevFeet);
-            _fallPeakFeet = MathF.Max(_fallPeakFeet, feet);
-            _wasGrounded = false;
-        }
-        else if (!_wasGrounded)
-        {
-            var drop = _fallPeakFeet - feet;
-            if (!Camera.IsCreative && !Camera.IsInWater)
-                _health.TakeDamage(PlayerHealth.FallDamage(drop));
-            _fallPeakFeet = feet;
-            _wasGrounded = true;
-        }
-        else
-        {
-            _fallPeakFeet = feet;
-        }
-        _prevFeet = feet;
+        var damage = _fall.Observe(feet, Camera.IsGrounded, Camera.IsFlying, Camera.IsInWater, Camera.IsCreative,
+            FallTracker.DefaultMaxStepBlocks);
+        if (damage > 0)
+            _health.TakeDamage(damage);
 
         _health.UpdateLava(deltaTime, Camera.IsInLava, Camera.IsCreative || Camera.IsFlying);
         _health.Update(deltaTime);
@@ -1805,9 +1858,7 @@ public class World : IItemUseWorld
         _health.Respawn();
         var home = _hasRespawnEye ? _respawnEye : Camera.Position;
         Camera.TestTeleport(home, Camera.Yaw, Camera.Pitch);
-        _fallPeakFeet = home.Y - Camera.EyeHeight;
-        _prevFeet = _fallPeakFeet;
-        _wasGrounded = false;
+        _fall.Reset(home.Y - Camera.EyeHeight, grounded: false);
         Log.WriteLine("Respawned");
     }
 

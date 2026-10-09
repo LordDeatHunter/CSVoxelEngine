@@ -5,16 +5,21 @@ using System.Numerics;
 namespace silkgltriangle;
 
 /// <summary>
-/// Owns the live slimes: ticks their hop AI and physics, shoves the ones the player walks into,
+/// Owns the live slimes: ticks their hop AI and physics, shoves the ones a player walks into,
 /// bills contact damage while they are airborne, rolls death loot, and spawns new ones on dry
-/// forest surface in a ring around the player. Main thread only.
+/// forest surface in a ring around a player. Every rule runs against a list of
+/// <see cref="IMobTarget"/>s (the local camera, or a server's connected players), each slime
+/// chasing its nearest one. Main thread only.
 /// </summary>
 public sealed class SlimeManager
 {
     private readonly EntityType _type;
     private readonly List<Slime> _slimes = [];
     private readonly List<byte> _loot = [];
+    // The camera overload's one-element target list, reused so it allocates nothing per frame.
+    private readonly List<IMobTarget> _singleTarget = new(1);
     private float _spawnTimer;
+    private int _spawnCursor;
 
     public SlimeManager(EntityType type) => _type = type;
 
@@ -23,8 +28,9 @@ public sealed class SlimeManager
     /// <summary>Removes a slime the server no longer reports (a client's network reconcile).</summary>
     public bool Remove(Slime slime) => _slimes.Remove(slime);
 
-    /// <summary>Health the slimes took off the player during the most recent
-    /// <see cref="Update"/>; the caller applies it to <see cref="PlayerHealth"/> and shakes.</summary>
+    /// <summary>Health the slimes took off every target together during the most recent
+    /// <c>Update</c>; each hit also reached its target through <see cref="IMobTarget.TakeHit"/>.
+    /// The singleplayer caller applies it to its <see cref="PlayerHealth"/> and shakes.</summary>
     public int DamageDealtThisFrame { get; private set; }
 
     /// <summary>Adds a slime at an exact body-centre position (used by spawns and tests).</summary>
@@ -35,20 +41,42 @@ public sealed class SlimeManager
         return slime;
     }
 
+    /// <summary>Ticks the slimes against the one local player (singleplayer and the tests); see
+    /// <see cref="Update(float, ChunkManager, DropManager, IReadOnlyList{IMobTarget})"/>.</summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, Camera camera)
     {
-        DamageDealtThisFrame = 0;
-        if (chunks == null || camera == null) return;
+        if (camera == null)
+        {
+            DamageDealtThisFrame = 0;
+            return;
+        }
 
-        var playerPosition = camera.Position;
-        var immune = camera.IsCreative || camera.IsFlying;
+        _singleTarget.Clear();
+        _singleTarget.Add(camera);
+        Update(deltaTime, chunks, drops, _singleTarget);
+    }
+
+    /// <summary>
+    /// Ticks every slime against <paramref name="targets"/>: each hops at its nearest target
+    /// (<see cref="MobTargets.Nearest"/>), an airborne touch hurts whichever non-immune target it
+    /// touches (<see cref="IMobTarget.TakeHit"/>, also summed into <see cref="DamageDealtThisFrame"/>),
+    /// a grounded touch is shoved off by that target, a slime past the despawn radius of every
+    /// target is culled, and the spawn ring cycles over the targets under the one shared cap and
+    /// timer. With no targets nothing chases, despawns or spawns.
+    /// </summary>
+    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, IReadOnlyList<IMobTarget> targets)
+    {
+        DamageDealtThisFrame = 0;
+        if (chunks == null || targets == null) return;
+
         var despawnSquared = WorldGenerationConfig.SlimeDespawnRadiusBlocks
             * WorldGenerationConfig.SlimeDespawnRadiusBlocks;
 
         for (var i = _slimes.Count - 1; i >= 0; i--)
         {
             var slime = _slimes[i];
-            slime.Update(deltaTime, chunks, playerPosition);
+            var chased = MobTargets.Nearest(targets, slime.Position);
+            slime.Update(deltaTime, chunks, chased >= 0 ? targets[chased].Eye : null);
 
             if (slime.IsDead)
             {
@@ -57,33 +85,34 @@ public sealed class SlimeManager
                 continue;
             }
 
-            if (camera.BodyTouches(slime.Position, Slime.HalfExtent))
+            for (var t = 0; t < targets.Count; t++)
             {
-                if (!immune && slime.CanDealContactDamage)
+                var target = targets[t];
+                var eye = target.Eye;
+                if (!MobTargets.BodyTouches(eye, slime.Position, Slime.HalfExtent)) continue;
+
+                if (!target.IsImmune && slime.CanDealContactDamage)
                 {
                     slime.NotifyContactDamage();
-                    DamageDealtThisFrame += WorldGenerationConfig.SlimeContactDamage;
-                    var away = new Vector3(
-                        playerPosition.X - slime.Position.X, 0f, playerPosition.Z - slime.Position.Z);
-                    camera.AddKnockback(away, WorldGenerationConfig.SlimeKnockbackSpeed,
+                    var damage = WorldGenerationConfig.SlimeContactDamage;
+                    DamageDealtThisFrame += damage;
+                    var away = new Vector3(eye.X - slime.Position.X, 0f, eye.Z - slime.Position.Z);
+                    target.TakeHit(damage, away, WorldGenerationConfig.SlimeKnockbackSpeed,
                         WorldGenerationConfig.SlimeKnockbackLift);
                 }
                 else if (slime.IsGrounded)
                 {
                     // Grounded contact is harmless: the player shoves the slime off instead.
-                    var away = new Vector3(
-                        slime.Position.X - playerPosition.X, 0f, slime.Position.Z - playerPosition.Z);
+                    var away = new Vector3(slime.Position.X - eye.X, 0f, slime.Position.Z - eye.Z);
                     slime.Shove(away, WorldGenerationConfig.SlimeShoveSpeed);
                 }
             }
 
-            var dx = slime.Position.X - playerPosition.X;
-            var dz = slime.Position.Z - playerPosition.Z;
-            if (dx * dx + dz * dz > despawnSquared)
+            if (targets.Count > 0 && MobTargets.MinHorizontalDistanceSquared(targets, slime.Position) > despawnSquared)
                 _slimes.RemoveAt(i);
         }
 
-        UpdateSpawning(deltaTime, chunks, playerPosition);
+        UpdateSpawning(deltaTime, chunks, targets);
     }
 
     private void DropLoot(Slime slime, DropManager drops)
@@ -98,7 +127,8 @@ public sealed class SlimeManager
             drops.SpawnAt(id, slime.Position);
     }
 
-    private void UpdateSpawning(float deltaTime, ChunkManager chunks, Vector3 playerPosition)
+    // One shared timer and cap; each expiry tries the ring round the next target in turn.
+    private void UpdateSpawning(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
     {
         if (_slimes.Count >= WorldGenerationConfig.SlimeMaxAlive) return;
 
@@ -106,7 +136,11 @@ public sealed class SlimeManager
         if (_spawnTimer < WorldGenerationConfig.SlimeSpawnIntervalSeconds) return;
         _spawnTimer = 0f;
 
-        if (TryFindSpawn(chunks, playerPosition, out var position))
+        if (targets.Count == 0) return;
+        var index = _spawnCursor % targets.Count;
+        _spawnCursor = index + 1;
+
+        if (TryFindSpawn(chunks, targets[index].Eye, out var position))
             Spawn(position);
     }
 

@@ -13,8 +13,10 @@ namespace silkgltriangle;
 /// creates a new one), asks for a port, then runs a headless <see cref="World"/> with a
 /// <see cref="GameServer"/> until Ctrl+C or a typed <c>stop</c>. The world is saved on shutdown
 /// exactly like a game world, so a server session persists its edits. <c>--allow-creative</c> lets
-/// players turn creative on (<see cref="GameServer.AllowCreative"/>); without it everyone stays in
-/// survival.
+/// every player turn creative on (<see cref="GameServer.AllowCreative"/>). Without it only the
+/// operators may (<see cref="GameServer.Operators"/>): the players named by each <c>--op &lt;name&gt;</c>
+/// argument (repeatable) and by the hosted world folder's <see cref="OperatorList.FileName"/>, a
+/// JSON array of names; everyone else stays in survival.
 /// </summary>
 public static class ServerProgram
 {
@@ -64,9 +66,18 @@ public static class ServerProgram
             return;
         }
 
+        // Read through the store, which owns the folder (and validates the file name): the command
+        // line's operators plus the world's own list
+        var operators = OperatorList.FromArgs(args);
+        operators.AddAll(OperatorList.Parse(save.ReadFile(OperatorList.FileName)));
+
         WorldSeed.Apply(world.Seed);
         var gameWorld = new World(null!, null!, null!, null!, null!, null!, null, save, serverMode: true);
-        using var server = new GameServer(gameWorld, world.Name, world.Seed, port) { AllowCreative = allowCreative };
+        using var server = new GameServer(gameWorld, world.Name, world.Seed, port)
+        {
+            AllowCreative = allowCreative,
+            Operators = operators,
+        };
         try
         {
             server.Start();
@@ -83,7 +94,7 @@ public static class ServerProgram
 
         Console.WriteLine();
         Console.WriteLine($"Serving '{world.Name}' (seed {world.Seed}) on port {server.BoundPort} (IPv4 and IPv6).");
-        Console.WriteLine(allowCreative ? "Creative mode is allowed." : "Creative mode is off (start with --allow-creative to allow it).");
+        Console.WriteLine(CreativeLine(allowCreative, operators));
         Console.WriteLine("Type 'stop' or press Ctrl+C to shut down.");
 
         var stop = new ManualResetEventSlim(false);
@@ -210,6 +221,17 @@ public static class ServerProgram
             Console.WriteLine("Enter a listed number or N.");
             Console.WriteLine();
         }
+    }
+
+    // The startup line saying who may be creative: everyone, the listed operators, or nobody
+    private static string CreativeLine(bool allowCreative, OperatorList operators)
+    {
+        if (allowCreative)
+            return "Creative mode is allowed for everyone.";
+        if (operators.Count > 0)
+            return $"Creative mode is off; operators: {string.Join(", ", operators.Names)}";
+        return "Creative mode is off; operators: none; start with --allow-creative or --op <name>, "
+               + $"or list names in the world folder's {OperatorList.FileName}.";
     }
 
     // Whether this build reads the world's save format (MainMenuController's PLAY gate)

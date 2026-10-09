@@ -6,16 +6,25 @@ using System.Threading;
 namespace silkgltriangle;
 
 /// <summary>
-/// Handles continuous chunk generation in background threads.
-/// Each worker thread independently finds and generates the closest needed chunk.
+/// Handles continuous chunk generation in background threads, around every focus of a
+/// <see cref="StreamingFocus"/> (the camera in singleplayer, each connected player on a server).
+/// Each worker thread independently finds and generates the closest needed chunk around one focus,
+/// taking the foci in turn, so every focus is served even while another still has work.
 /// </summary>
-public class ChunkGenerationWorker(ChunkManager chunkManager, Camera camera)
+public class ChunkGenerationWorker(ChunkManager chunkManager, StreamingFocus focus)
 {
     private volatile bool _isRunning;
 
-    // One frontier for all MaxConcurrentBlockDataGenerations threads this instance starts; see
-    // ChunkScanFrontier for the invariant the four threads share (PERF_TODO C3).
-    private readonly ChunkScanFrontier _frontier = new(SortedOffsets);
+    // One frontier per focus index, shared by all MaxConcurrentBlockDataGenerations threads this
+    // instance starts; see ChunkScanFrontier for the invariant the threads share (PERF_TODO C3).
+    // Grown on demand (FrontiersFor) to the focus count and never shrunk: a slot whose focus moved
+    // or now belongs to another player simply resets by centre mismatch. Replaced, never mutated,
+    // so a thread that read the array can index it without a lock.
+    private ChunkScanFrontier[] _frontiers = [];
+
+    // Which focus the next scan starts at, advanced by every call on every thread, so the foci
+    // take turns being scanned first.
+    private int _rotor;
 
     // Cached once: the scan calls this per offset, and a method group would allocate a delegate
     // per call. Same shape as the World.Update drop predicate (PERF_TODO C7).
@@ -149,8 +158,8 @@ public class ChunkGenerationWorker(ChunkManager chunkManager, Camera camera)
     // Offsets within the view radius, sorted closest-first, so the scan below can
     // return at the first needed chunk instead of testing the whole 33^3 box. The scan no
     // longer restarts here on every call either: all of this instance's worker threads resume
-    // from the shared ChunkScanFrontier below (PERF_TODO C3). Internal so the tests can build a
-    // frontier over the real array.
+    // from the shared per-focus ChunkScanFrontiers above (PERF_TODO C3). Internal so the tests can
+    // build a frontier over the real array.
     internal static readonly Vector3[] SortedOffsets = BuildSortedOffsets();
 
     private static Vector3[] BuildSortedOffsets()
@@ -178,16 +187,61 @@ public class ChunkGenerationWorker(ChunkManager chunkManager, Camera camera)
     }
 
     /// <summary>
-    /// The closest chunk inside the view radius that is not loaded and not already claimed, or null
-    /// if there is none. Internal so the tests can drive one scan without starting a thread.
-    /// The centre and the removal version are both sampled once, up front, before any probe: a
+    /// The closest chunk inside the view radius of one focus that is not loaded and not already
+    /// claimed, or null if no focus has one (or there is no focus). The foci are tried in turn,
+    /// starting one further along on every call, and the first focus with a needed chunk wins, so a
+    /// focus whose sphere is complete never starves another. Internal so the tests can drive one
+    /// scan without starting a thread.
+    /// The foci and the removal version are both sampled once, up front, before any probe: a
     /// version bump that lands mid-scan is missed by this call and caught by the next, which is
-    /// exactly what the pre-C3 full scan did with a chunk freed behind its read head.
+    /// exactly what the pre-C3 full scan did with a chunk freed behind its read head. A later
+    /// focus's frontier is probed after an earlier one's with that same early version sample, which
+    /// is the same conservative case: a node it publishes for a stale version is discarded by the
+    /// first reader that sampled the bump.
     /// </summary>
     internal Vector3? FindClosestNeededChunk()
     {
-        var camChunk = (camera.Position / Chunk.Size).Floor();
-        return _frontier.FindNext(camChunk, chunkManager.ChunkRemovalVersion, _needsChunk);
+        var foci = focus.Chunks;
+        var version = chunkManager.ChunkRemovalVersion;
+        var count = foci.Length;
+        if (count == 0) return null;
+
+        var frontiers = FrontiersFor(count);
+        var start = (int)((uint)Interlocked.Increment(ref _rotor) % (uint)count);
+        for (var n = 0; n < count; n++)
+        {
+            var i = start + n;
+            if (i >= count) i -= count;
+
+            var next = frontiers[i].FindNext(foci[i], version, _needsChunk);
+            if (next.HasValue) return next;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The frontier array, grown to at least <paramref name="count"/> slots. Every worker thread
+    /// calls this, so the growth is a copy-and-swap: a thread allocates a longer copy with fresh
+    /// frontiers in the new slots and publishes it only if nobody replaced the array meanwhile,
+    /// re-reading on a lost race. The existing frontiers move into the copy by reference, so their
+    /// published prefixes survive the growth.
+    /// </summary>
+    private ChunkScanFrontier[] FrontiersFor(int count)
+    {
+        while (true)
+        {
+            var current = Volatile.Read(ref _frontiers);
+            if (current.Length >= count) return current;
+
+            var grown = new ChunkScanFrontier[count];
+            Array.Copy(current, grown, current.Length);
+            for (var i = current.Length; i < count; i++)
+                grown[i] = new ChunkScanFrontier(SortedOffsets);
+
+            if (ReferenceEquals(Interlocked.CompareExchange(ref _frontiers, grown, current), current))
+                return grown;
+        }
     }
 }
 

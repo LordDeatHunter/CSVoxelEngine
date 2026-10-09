@@ -154,7 +154,7 @@ public sealed class PlayerPlacedUnloadReplayProbe
     /// happened.</para>
     ///
     /// <para><b>The pass structure.</b> The first <c>Update</c> after construction always runs the
-    /// scan because <c>_lastUnloadCamChunk</c> starts null; a second <c>Update</c> from the same
+    /// scan because <c>_lastUnloadFoci</c> starts null; a second <c>Update</c> from the same
     /// camera chunk would NOT rescan until the camera crosses a chunk border or the 120-frame
     /// fallback fires, so pass two teleports rather than just calling <c>Update</c> again. Pass 2's
     /// camera chunk is (9,0,9) rather than (8,0,8) deliberately: from (8,0,8) the chunk at

@@ -10,15 +10,20 @@ using Xunit;
 namespace silkgltriangle.Tests;
 
 /// <summary>
-/// A real <see cref="GameServer"/> over loopback: a malformed frame drops only its sender, every
-/// joiner spawns at the world spawn rather than at the players' centroid, far-LOD requests
+/// A real <see cref="GameServer"/> over loopback: a malformed frame drops only its sender, chunks
+/// stream around each moving player while every joiner still spawns at the world spawn, far-LOD requests
 /// are built a bounded number per Pump with a repeated request served once, and every player's
 /// inventory is its own: intents are replayed against the sender's inventory only, refused ones
 /// are corrected by the snapshot the sender gets back, and creative grants need the server's
-/// creative flag. World intents are judged by the server for the sending player: a break needs the
+/// creative flag, which a server that does not allow creative for everyone grants its operators
+/// only. World intents are judged by the server for the sending player: a break needs the
 /// tool the block asks for and the time its hits take, a placement spends exactly one owned block
 /// under the placement rules with a state the server computes, a raw cell write is refused, a
-/// blast one player set off reaches every client, and mined loot lands with the breaker.
+/// blast one player set off reaches every client, and mined loot lands with the breaker. A player's
+/// status is the server's: a joiner is told its health, and a dead player acts on nothing until a
+/// respawn intent, judged ahead of the eye rule, brings it home. So is its position: a move into a
+/// solid cell is corrected and the client's states are ignored until it acks the correction, while
+/// a legal walk is never corrected.
 /// </summary>
 [Collection("Worldgen seed")]
 public sealed class GameServerTests : IDisposable
@@ -60,6 +65,9 @@ public sealed class GameServerTests : IDisposable
         public readonly List<(int Seq, NetCellChange Cell)> Corrections = [];
         public readonly List<NetCellChange> Broadcast = [];
         public NetPlayerFlags? Status;
+        public int? Health;
+        public bool Dead;
+        public readonly List<(int Seq, Vector3 Eye)> PlayerCorrections = [];
 
         public void Drain(NetworkClient client)
         {
@@ -90,8 +98,19 @@ public sealed class GameServerTests : IDisposable
                         Broadcast.AddRange(ReadCells(reader));
                         break;
                     case NetMessage.PlayerStatus:
-                        Status = (NetPlayerFlags)reader.ReadByte();
+                    {
+                        var status = PlayerStatusCodec.Read(reader);
+                        Status = status.Modes;
+                        Health = status.Health;
+                        Dead = status.Dead;
                         break;
+                    }
+                    case NetMessage.PlayerCorrection:
+                    {
+                        var seq = reader.ReadInt();
+                        PlayerCorrections.Add((seq, reader.ReadVector3()));
+                        break;
+                    }
                 }
             }
         }
@@ -195,13 +214,15 @@ public sealed class GameServerTests : IDisposable
     private static void SendModes(NetworkClient client, NetPlayerFlags flags) =>
         SendState(client, client.Server!.Value.Spawn, flags);
 
-    private static void SendState(NetworkClient client, Vector3 eye, NetPlayerFlags flags)
+    // A PlayerState at eye with the given mode request, acking the newest correction applied
+    private static void SendState(NetworkClient client, Vector3 eye, NetPlayerFlags flags, int correctionAck = 0)
     {
         using var writer = new PacketWriter(NetMessage.PlayerState);
         writer.Write(eye);
         writer.Write(0f);
         writer.Write(0f);
         writer.Write((byte)flags);
+        writer.Write(correctionAck);
         client.Send(writer.ToArray());
     }
 
@@ -408,6 +429,58 @@ public sealed class GameServerTests : IDisposable
     }
 
     [Fact]
+    public void AnOperatorMayBeCreativeWhileOthersAreRefused()
+    {
+        _server.AllowCreative = false;
+        _server.Operators.Add("Op");
+        using var op = Connect("Op");
+        using var guest = Connect("Guest");
+        Assert.True(_server.MayBeCreative("Op"));
+        Assert.False(_server.MayBeCreative("Guest"));
+
+        // Both are told their status at join; forget it, so a status from here on can only be the
+        // answer to the mode request
+        foreach (var client in new[] { op, guest })
+        {
+            var inbox = InboxOf(client);
+            var sw = Stopwatch.StartNew();
+            while (inbox.Health == null && sw.Elapsed.TotalSeconds < 15)
+            {
+                _server.Pump(0.01);
+                Thread.Sleep(5);
+                inbox.Drain(client);
+            }
+            Assert.NotNull(inbox.Health);
+            inbox.Status = null;
+        }
+
+        // Both ask for creative flight and a creative grant; the state is handled before the grant
+        SendModes(op, NetPlayerFlags.Creative | NetPlayerFlags.Flying);
+        SendModes(guest, NetPlayerFlags.Creative | NetPlayerFlags.Flying);
+        SendIntent(op, InventoryIntent.CreativeGrant(Stone, 5));
+        var opGrant = InboxOf(op).Seq;
+        SendIntent(guest, InventoryIntent.CreativeGrant(Stone, 5));
+        var guestGrant = InboxOf(guest).Seq;
+        var opAccepted = AwaitResult(op, opGrant);
+        var guestAccepted = AwaitResult(guest, guestGrant);
+
+        // The operator has what it asked for, and was told nothing (there was nothing to refuse)
+        Assert.True(PlayerOf(op).Creative);
+        Assert.True(PlayerOf(op).Flying);
+        Assert.Null(InboxOf(op).Status);
+        Assert.True(opAccepted);
+        Assert.Equal(5, PlayerOf(op).Inventory.CountFor(Stone));
+
+        // The guest stays in survival, is told so, and its grant is refused
+        Assert.False(PlayerOf(guest).Creative);
+        Assert.False(PlayerOf(guest).Flying);
+        Assert.Equal(NetPlayerFlags.None, InboxOf(guest).Status);
+        Assert.False(guestAccepted);
+        Assert.Equal(0, PlayerOf(guest).Inventory.CountFor(Stone));
+        Assert.Equal(0, InboxOf(guest).Mirror().CountFor(Stone));
+    }
+
+    [Fact]
     public void CraftingSpendsOnlyTheCraftingPlayersIngredients()
     {
         var (recipe, members, grants) = FirstGrantableRecipe();
@@ -525,23 +598,37 @@ public sealed class GameServerTests : IDisposable
     }
 
     [Fact]
-    public void ALaterJoinerSpawnsAtTheWorldSpawnNotTheCentroid()
+    public void AMovingPlayerBecomesAStreamingFocusAndALaterJoinerStillSpawnsAtTheWorldSpawn()
     {
         using var first = Connect("First");
         var spawn = first.Server!.Value.Spawn;
+        var camera = _world.Camera.Position;
 
-        // The first player walks off; the server's chunk focus follows them
+        // The first player moves two chunks off. It flies (noclip), so the move is never judged
+        // against whatever terrain stands beside the spawn, and the speed cap only paces it.
+        _server.AllowCreative = true;
         PumpFor(0.1);
-        var moved = spawn + new Vector3(1.5f, 0f, 0f);
-        SendState(first, moved, NetPlayerFlags.None);
+        var moved = spawn + new Vector3(2f * Chunk.Size, 0f, 0f);
+        var movedChunk = (moved / Chunk.Size).Floor();
+        Assert.NotEqual((spawn / Chunk.Size).Floor(), movedChunk);
 
         var sw = Stopwatch.StartNew();
-        while (Vector3.Distance(_world.Camera.Position, moved) > 0.01f && sw.Elapsed.TotalSeconds < 15)
+        while (PlayerOf(first).Position != moved && sw.Elapsed.TotalSeconds < 15)
         {
-            _server.Pump(0.01);
-            Thread.Sleep(5);
+            SendState(first, moved, NetPlayerFlags.Creative | NetPlayerFlags.Flying);
+            Tick(0.05);
         }
-        Assert.True(Vector3.Distance(_world.Camera.Position, moved) <= 0.01f, "the focus never followed the player");
+        Assert.Equal(moved, PlayerOf(first).Position);
+
+        for (var i = 0; i < 5; i++)
+            Tick(0.05);
+
+        // Chunks now stream around the player alone, while the server camera stays put: it is the
+        // focus only while nobody is online. (The spawn search may still settle the camera
+        // vertically, so only its horizontal position is compared.)
+        Assert.Equal(new[] { movedChunk }, _world.Focus.Chunks);
+        Assert.Equal(camera.X, _world.Camera.Position.X);
+        Assert.Equal(camera.Z, _world.Camera.Position.Z);
 
         using var second = Connect("Second");
         Assert.Equal(spawn, second.Server!.Value.Spawn);
@@ -660,10 +747,12 @@ public sealed class GameServerTests : IDisposable
         var arena = PrepareArena(breaker.Server!.Value.Spawn);
         SetCell(arena.Front, Dirt);
 
-        // The bystander flies well out of pickup range first (a few states, each within the cap)
+        // The bystander flies well out of pickup range first (a few states, each within the speed
+        // cap); the flight flag is what makes a ten-block climb in one state legal
+        _server.AllowCreative = true;
         for (var lift = 10; lift <= 40; lift += 10)
         {
-            SendState(bystander, arena.Eye + new Vector3(0f, lift, 0f), NetPlayerFlags.None);
+            SendState(bystander, arena.Eye + new Vector3(0f, lift, 0f), NetPlayerFlags.Creative | NetPlayerFlags.Flying);
             for (var i = 0; i < 3; i++)
                 Tick(0.1);
         }
@@ -856,5 +945,154 @@ public sealed class GameServerTests : IDisposable
         var fresh = SendWorld(client, WorldIntent.BreakComplete(arena.Eye, arena.AimAtFront, arena.Front));
         Assert.True(AwaitResult(client, fresh));
         Assert.Equal(0, CellAt(arena.Front).Id);
+    }
+
+    [Fact]
+    public void AJoiningPlayerIsToldItsHealth()
+    {
+        using var client = Connect("Newcomer");
+        var inbox = InboxOf(client);
+        var sw = Stopwatch.StartNew();
+        while (inbox.Health == null && sw.Elapsed.TotalSeconds < 15)
+        {
+            _server.Pump(0.01);
+            Thread.Sleep(5);
+            inbox.Drain(client);
+        }
+
+        // Without anything having happened to it yet: the server's own pool, a fresh player's full one
+        Assert.NotNull(inbox.Health);
+        Assert.Equal(PlayerOf(client).Health, inbox.Health);
+        Assert.Equal(PlayerHealth.MaxHealth, inbox.Health);
+        Assert.False(inbox.Dead);
+    }
+
+    [Fact]
+    public void DeathHoldsThePlayerUntilARespawnIntentReturnsItHome()
+    {
+        using var client = Connect("Mortal");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        GrantAsSurvival(client, Dirt, 3);
+        var player = PlayerOf(client);
+        var home = arena.Eye + new Vector3(-2f, 0f, 1f);
+        player.RespawnEye = home;
+        var inbox = InboxOf(client);
+
+        // A killing blow through the mob-hit sink; the client hears it is dead
+        player.TakeHit(PlayerHealth.MaxHealth, Vector3.Zero, 0f, 0f);
+        var sw = Stopwatch.StartNew();
+        while (!inbox.Dead && sw.Elapsed.TotalSeconds < 15)
+            Tick(0.05);
+        Assert.True(inbox.Dead, "the client was never told it died");
+        var corpse = player.Position;
+
+        // Dead, it acts on nothing: the very placement a living player makes is refused and spends nothing
+        var place = SendWorld(client, WorldIntent.Place(arena.Eye, arena.AimAtFloorAhead, arena.FloorAhead, Vector3.UnitY));
+        Assert.False(AwaitResult(client, place));
+        Assert.Equal(0, CellAt(arena.FloorAhead + Vector3.UnitY).Id);
+        Assert.Equal(3, player.Inventory.CountFor(Dirt));
+
+        // ...and its states no longer move it
+        SendState(client, corpse + new Vector3(1f, 0f, 0f), NetPlayerFlags.None);
+        PumpFor(0.1);
+        Assert.Equal(corpse, player.Position);
+
+        // A respawn from an eye that drifted past the intent eye rule (the corpse kept falling on the
+        // client) is still accepted, and brings the player back home at full health
+        var drifted = corpse - new Vector3(0f, WorldGenerationConfig.NetMaxIntentEyeDriftBlocks + 5f, 0f);
+        Assert.False(NetValidation.EyeWithin(corpse, drifted, WorldGenerationConfig.NetMaxIntentEyeDriftBlocks));
+        var respawn = SendWorld(client, WorldIntent.Respawn(drifted, -Vector3.UnitY));
+        Assert.True(AwaitResult(client, respawn));
+        Assert.Contains(inbox.PlayerCorrections, c => c.Eye == home);
+        Assert.Equal(home, player.Position);
+        Assert.False(inbox.Dead);
+        Assert.Equal(PlayerHealth.MaxHealth, inbox.Health);
+        Assert.Equal(player.Health, inbox.Health);
+
+        // Alive, there is nothing to respawn from: a second respawn is refused and moves nothing
+        var corrections = inbox.PlayerCorrections.Count;
+        var again = SendWorld(client, WorldIntent.Respawn(home, -Vector3.UnitY));
+        Assert.False(AwaitResult(client, again));
+        Assert.Equal(corrections, inbox.PlayerCorrections.Count);
+        Assert.Equal(home, player.Position);
+    }
+
+    [Fact]
+    public void AnIllegalMoveIsCorrectedAndStatesAreIgnoredUntilTheAck()
+    {
+        using var client = Connect("Walker");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        var manager = _world.GetChunkManager();
+        var inbox = InboxOf(client);
+
+        // Settle on the arena floor a hair above its top, where the client's physics rests a body
+        var start = new Vector3(arena.Eye.X, arena.Y + Camera.EyeHeight + 0.01f, arena.Eye.Z);
+        Assert.False(PlayerPhysics.BodyCollides(start, manager));
+        SendState(client, start, NetPlayerFlags.None);
+        var sw = Stopwatch.StartNew();
+        while (PlayerOf(client).Position != start && sw.Elapsed.TotalSeconds < 15)
+            Tick(0.05);
+        Assert.Equal(start, PlayerOf(client).Position);
+
+        // A two-high stone column ahead, and a state reporting the body inside it
+        SetCell(arena.Front, Stone);
+        SetCell(arena.Front - Vector3.UnitY, Stone);
+        var inside = new Vector3(arena.Front.X + 0.5f, start.Y, arena.Front.Z + 0.5f);
+        Assert.True(PlayerPhysics.BodyCollides(inside, manager));
+        Tick(0.05);
+        SendState(client, inside, NetPlayerFlags.None);
+        sw.Restart();
+        while (inbox.PlayerCorrections.Count == 0 && sw.Elapsed.TotalSeconds < 15)
+            Tick(0.05);
+
+        // Snapped back to where the player stood before the move
+        var correction = Assert.Single(inbox.PlayerCorrections);
+        Assert.Equal(start, correction.Eye);
+        Assert.Equal(start, PlayerOf(client).Position);
+
+        // A legal step the client sent before it applied the correction is ignored...
+        var step = start + new Vector3(-0.4f, 0f, 0f);
+        SendState(client, step, NetPlayerFlags.None);
+        for (var i = 0; i < 6; i++)
+            Tick(0.05);
+        Assert.Equal(start, PlayerOf(client).Position);
+
+        // ...and the same step acking the correction is taken, with no second correction
+        SendState(client, step, NetPlayerFlags.None, correction.Seq);
+        sw.Restart();
+        while (PlayerOf(client).Position != step && sw.Elapsed.TotalSeconds < 15)
+            Tick(0.05);
+        Assert.Equal(step, PlayerOf(client).Position);
+        Assert.Single(inbox.PlayerCorrections);
+    }
+
+    [Fact]
+    public void ALegalWalkAcrossTheArenaIsNeverCorrected()
+    {
+        using var client = Connect("Walker");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        var inbox = InboxOf(client);
+
+        // Back and forth along the cleared row at walking pace (a state every 50 ms) for 2 s,
+        // never leaving the cleared cells
+        var stride = PlayerPhysics.BaseSpeed * (float)WorldGenerationConfig.NetPlayerStateSeconds;
+        var offset = 0f;
+        var direction = 1f;
+        var last = arena.Eye;
+        for (var t = 0.0; t < 2.0; t += WorldGenerationConfig.NetPlayerStateSeconds)
+        {
+            if (MathF.Abs(offset + direction * stride) > 2f)
+                direction = -direction;
+            offset += direction * stride;
+            last = arena.Eye + new Vector3(offset, 0f, 0f);
+            SendState(client, last, NetPlayerFlags.None);
+            Tick(WorldGenerationConfig.NetPlayerStateSeconds);
+        }
+
+        var sw = Stopwatch.StartNew();
+        while (PlayerOf(client).Position != last && sw.Elapsed.TotalSeconds < 15)
+            Tick(0.05);
+        Assert.Equal(last, PlayerOf(client).Position);
+        Assert.Empty(inbox.PlayerCorrections);
     }
 }

@@ -128,15 +128,20 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
 
     private int _loadedChunkCount;
 
-    // The camera chunk the last unload scan ran for, and how many frames ago that was. See
-    // Update: chunks only leave the load sphere when the camera crosses a chunk border.
-    private Vector3? _lastUnloadCamChunk;
+    // The focus array the last unload scan ran for, and how many frames ago that was. See
+    // Update: chunks only leave the load sphere when a focus crosses a chunk border, and
+    // StreamingFocus publishes a new array exactly then, so the reference is the whole test.
+    private Vector3[]? _lastUnloadFoci;
     private int _framesSinceUnloadScan;
 
-    // Frames after which the unload scan runs even though the camera has not changed chunk.
-    // Covers a chunk a generation worker registered just after the camera moved, which the
+    // Frames after which the unload scan runs even though no focus has changed chunk.
+    // Covers a chunk a generation worker registered just after a focus moved, which the
     // scan for that move could have missed.
     private const int UnloadScanFallbackFrames = 120;
+
+    // The single camera focus the Update(Camera) overload streams around: it republishes only on
+    // a chunk crossing, which keeps the reference-keyed unload gate quiet while the camera is still.
+    private readonly StreamingFocus _cameraFocus = new();
 
     // The sequence number stamps each result with the order it finished in. ApplyCompletedMeshes
     // sorts by distance, and two results for the same chunk (an older one re-queued by the
@@ -243,39 +248,63 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     internal int PlayerPlacedChunkCount => _playerPlacedByChunk.Count;
 
+    /// <summary>
+    /// One frame streaming around <paramref name="camera"/> alone: the single-focus form of
+    /// <see cref="Update(Vector3[])"/>, for callers with one camera and no
+    /// <see cref="StreamingFocus"/> of their own. A null camera does nothing.
+    /// </summary>
     public void Update(Camera camera)
     {
         if (camera == null) return;
 
+        _cameraFocus.SetEye(camera.Position);
+        Update(_cameraFocus.Chunks);
+    }
+
+    /// <summary>
+    /// One frame of chunk lifecycle around every focus in <paramref name="foci"/> (chunk positions,
+    /// a <see cref="StreamingFocus.Chunks"/> snapshot): chunks outside the load radius of all of
+    /// them unload, and finished meshes and dirty chunks are taken nearest-focus first. Pass the
+    /// same array reference for as long as the foci are unchanged - a new reference is what runs the
+    /// unload scan. An empty array streams nothing: no unload, no upload, no new build, and every
+    /// queue is kept for the frame a focus comes back. Main thread only.
+    /// </summary>
+    public void Update(Vector3[] foci)
+    {
         // Before the unload scan, so a chunk restored and then unloaded again is snapshotted
         // with its placements already in the index (PlacedIndicesOf also merges any still held
         // on the chunk, so neither order loses them)
         AdoptRestoredPlacements();
 
-        var camChunk = (camera.Position / Chunk.Size).Floor();
+        if (foci.Length == 0) return;
 
-        // A loaded chunk can only fall out of range when the camera crosses a chunk border,
-        // so scanning every loaded chunk on the frames in between finds nothing. The periodic
-        // fallback covers a chunk registered by a generation worker just after a move.
+        // A loaded chunk can only fall out of range when a focus crosses a chunk border (or one
+        // leaves), which is exactly when a new focus array is published, so scanning every loaded
+        // chunk on the frames in between finds nothing. The periodic fallback covers a chunk
+        // registered by a generation worker just after a move.
         FrameProfiler.Begin(ProfileSection.ChunkUnload);
-        if (camChunk != _lastUnloadCamChunk || ++_framesSinceUnloadScan >= UnloadScanFallbackFrames)
+        if (!ReferenceEquals(foci, _lastUnloadFoci) || ++_framesSinceUnloadScan >= UnloadScanFallbackFrames)
         {
-            _lastUnloadCamChunk = camChunk;
+            _lastUnloadFoci = foci;
             _framesSinceUnloadScan = 0;
-            UnloadDistantChunks(camChunk);
+            UnloadDistantChunks(foci);
         }
         FrameProfiler.End(ProfileSection.ChunkUnload);
 
         FrameProfiler.Begin(ProfileSection.ChunkApply);
-        ApplyCompletedMeshes(camChunk);
+        ApplyCompletedMeshes(foci);
         FrameProfiler.End(ProfileSection.ChunkApply);
 
         FrameProfiler.Begin(ProfileSection.ChunkDirty);
-        ProcessDirtyChunks(camChunk);
+        ProcessDirtyChunks(foci);
         FrameProfiler.End(ProfileSection.ChunkDirty);
     }
 
-    private void UnloadDistantChunks(Vector3 camChunk)
+    /// <summary>
+    /// Drops every loaded chunk that lies outside the load radius of every focus: a chunk stays
+    /// while ANY focus keeps it, so two players far apart each keep their own sphere.
+    /// </summary>
+    private void UnloadDistantChunks(Vector3[] foci)
     {
         var removed = 0;
 
@@ -287,7 +316,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         {
             var key = kvp.Key;
             var pos = ChunkKey.ToVector3(key);
-            if (Vector3.DistanceSquared(pos, camChunk) <= WorldGenerationConfig.ChunkRadiusSq)
+            if (StreamingFocus.WithinRadius(foci, pos, WorldGenerationConfig.ChunkRadiusSq))
                 continue;
 
             if (!Chunks.TryRemovePacked(key, out var chunk)) continue;
@@ -407,15 +436,15 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         return written;
     }
 
-    private void ApplyCompletedMeshes(Vector3 camChunk)
+    private void ApplyCompletedMeshes(Vector3[] foci)
     {
-        // Drain into the reusable scratch to sort by distance. Distances are computed once
-        // on drain: the old per-compare DistanceSquared plus the sort lambda's closure
-        // allocated every frame the queue was non-empty.
+        // Drain into the reusable scratch to sort by distance to the nearest focus. Distances
+        // are computed once on drain: the old per-compare DistanceSquared plus the sort lambda's
+        // closure allocated every frame the queue was non-empty.
         while (_completedMeshQueue.TryDequeue(out var item))
         {
             _applyScratch.Add((item.pos, item.chunk, item.meshData, item.seq,
-                Vector3.DistanceSquared(item.pos, camChunk)));
+                StreamingFocus.MinDistanceSquared(foci, item.pos)));
         }
 
         if (_applyScratch.Count == 0) return;
@@ -433,12 +462,13 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
 
             var appliedCount = 0;
 
-            foreach (var (pos, chunk, meshData, seq, _) in _applyScratch)
+            foreach (var (pos, chunk, meshData, seq, distSq) in _applyScratch)
             {
-                // Skip chunks that moved out of range, were unloaded, or were replaced by a
-                // freshly generated chunk at the same position while this build ran: uploading
-                // into the dead one would leave a mesh in Renderable that no unload ever removes
-                if (Vector3.DistanceSquared(pos, camChunk) > WorldGenerationConfig.ChunkRadiusSq ||
+                // Skip chunks that moved out of range of every focus, were unloaded, or were
+                // replaced by a freshly generated chunk at the same position while this build ran:
+                // uploading into the dead one would leave a mesh in Renderable that no unload ever
+                // removes
+                if (distSq > WorldGenerationConfig.ChunkRadiusSq ||
                     !Chunks.TryGetValue(pos, out var live) || !ReferenceEquals(live, chunk))
                 {
                     MeshBuffers.Return(meshData);
@@ -476,7 +506,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     // upload budget sorts on. Same clear-after-pass contract as _dirtyCandidates.
     private readonly List<(Vector3 pos, Chunk chunk, ChunkMeshData meshData, long seq, float distSq)> _applyScratch = new(64);
 
-    private void ProcessDirtyChunks(Vector3 camChunk)
+    private void ProcessDirtyChunks(Vector3[] foci)
     {
         if (_dirtyChunks.IsEmpty) return;
 
@@ -501,9 +531,9 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             // the packed key directly - it is the same key this entry is stored under.
             ChunkKey.Unpack(key, out var cx, out var cy, out var cz);
             var pos = new Vector3(cx, cy, cz);
-            var distSq = Vector3.DistanceSquared(pos, camChunk);
+            var distSq = StreamingFocus.MinDistanceSquared(foci, pos);
 
-            // Out of range, or unloaded — just drop the entry
+            // Out of range of every focus, or unloaded — just drop the entry
             if (distSq > WorldGenerationConfig.ChunkRadiusSq || !Chunks.TryGetPacked(key, out var chunk))
             {
                 _dirtyChunks.TryRemove(key, out _);
@@ -800,7 +830,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         Interlocked.Exchange(ref _loadedChunkCount, 0);
         MeshVersion++;
         Interlocked.Increment(ref _chunkRemovalVersion);
-        _lastUnloadCamChunk = null;
+        _lastUnloadFoci = null;
     }
 
     /// <summary>

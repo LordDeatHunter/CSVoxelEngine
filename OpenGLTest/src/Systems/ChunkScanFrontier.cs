@@ -7,8 +7,9 @@ namespace silkgltriangle;
 /// <summary>
 /// The shared resume point for the chunk-generation workers' closest-first offset scan
 /// (PERF_TODO C3). All <see cref="WorldGenerationConfig.MaxConcurrentBlockDataGenerations"/>
-/// threads of one <see cref="ChunkGenerationWorker"/> share a single instance, so the ~17k-entry
-/// sorted-offset list is walked roughly once per camera centre instead of once per call per thread.
+/// threads of one <see cref="ChunkGenerationWorker"/> share one instance per streaming focus, so the
+/// ~17k-entry sorted-offset list is walked roughly once per focus centre instead of once per call
+/// per thread.
 ///
 /// <para><b>1. The invariant.</b> The whole state is one immutable node
 /// <c>(Center C, Version V, Index K)</c>, swapped as a unit so a centre, a version and an index can
@@ -61,11 +62,15 @@ namespace silkgltriangle;
 /// current node is published. And <c>index &lt;= start</c> publishes nothing at all, so a converged
 /// worker polling every 200 ms allocates no node and executes no loop body.</para>
 ///
-/// <para><b>7. Threads disagreeing about the centre.</b> <c>Camera.Position</c> is an unsynchronised
-/// property (Camera.cs:20) read by all four workers, so they can sample different centres within a
-/// frame. Each mismatch just resets that call to index 0 - the behaviour this class replaced - so
-/// disagreement degrades to the pre-C3 full scan and never below it. A NaN centre never compares
-/// equal and therefore always full-scans.</para>
+/// <para><b>7. One frontier per focus, and threads disagreeing about the centre.</b> The worker keeps
+/// one frontier per index of the <see cref="StreamingFocus.Chunks"/> array (the camera in
+/// singleplayer, each connected player on a server), and each call hands a frontier the centre at
+/// that index of the focus snapshot it sampled. The main thread republishes that snapshot between
+/// frames, so the workers can sample different snapshots - a focus that crossed a chunk border, or a
+/// slot that now belongs to another player because someone joined or left. Either way the slot's
+/// centre no longer matches its node and the call resets to index 0 - the behaviour this class
+/// replaced - so disagreement degrades to the pre-C3 full scan and never below it. A NaN centre
+/// never compares equal and therefore always full-scans.</para>
 ///
 /// <para><b>8. Safe publication.</b> The node's three fields are readonly and written before the
 /// exchange, and <c>Interlocked.CompareExchange</c> is a full fence, so a

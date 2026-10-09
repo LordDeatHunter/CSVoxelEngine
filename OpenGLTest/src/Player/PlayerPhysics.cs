@@ -17,8 +17,10 @@ internal sealed class PlayerPhysics
     // Shift while walking is a regular sprint; the giga boost is flight-only.
     public const float SprintMultiplier = 1.5f;
     private const float FlyBoostMultiplier = 10f;
-    private const float Gravity = 34f;
-    private const float JumpSpeed = 11f;
+    // Internal, like the swim speeds below, so the server's movement rules are tested against the
+    // very motion the client simulates (MovementRulesTests)
+    internal const float Gravity = 34f;
+    internal const float JumpSpeed = 11f;
     public const float PlayerHeight = 1.8f;
     public const float PlayerRadius = 0.30f;
     private const float CollisionStepSize = 0.05f;
@@ -35,20 +37,21 @@ internal sealed class PlayerPhysics
     // is a hair of extra lift so a block top the feet land exactly on is not read as a
     // collision because of float rounding.
     private const float WalkStepHeight = 0.5f;
-    private const float SprintStepHeight = 1f;
+    internal const float SprintStepHeight = 1f;
     private const float StepClearance = 0.001f;
 
     // Swimming. Water has no gravity term: vertical speed eases toward a target instead, so it
     // stays capped by SwimUpSpeed/SinkSpeed however long the player stays under.
     private const float SwimSpeedFactor = 0.5f;
-    private const float SwimUpSpeed = 4f;
+    internal const float SwimUpSpeed = 4f;
     private const float SinkSpeed = -2f;
     private const float WaterDrag = 6f;
     // Pushing into a bank while holding Space lifts the player over it, so getting out of
     // water never needs a ramp
-    private const float SwimExitBoost = 6f;
-    // How far above the feet a fluid surface has to reach before it counts as swimmable
-    private const float SwimDepth = 0.9f;
+    internal const float SwimExitBoost = 6f;
+    // How far above the feet a fluid surface has to reach before it counts as swimmable; the
+    // server's PlayerBodyProbe.InWater reads the same depth
+    internal const float SwimDepth = 0.9f;
     // How hard a flow carries a swimmer along it, in blocks/s
     private const float FlowPushSpeed = 2f;
 
@@ -403,20 +406,9 @@ internal sealed class PlayerPhysics
         camera.UpdateEyeWaterSurface(chunkManager, eyeX, eyeY, eyeZ);
 
         // Lava burns on body contact, not just eye contact: a wade through a shallow pool
-        // keeps the eye dry but still has to hurt.
-        var lava = false;
-        var lavaMin = new Vector3(position.X - PlayerRadius, feetY, position.Z - PlayerRadius);
-        var lavaMax = new Vector3(position.X + PlayerRadius, feetY + PlayerHeight, position.Z + PlayerRadius);
-        VoxelCoords.CellRange(lavaMin, lavaMax, out var bodyMinX, out var bodyMinY, out var bodyMinZ, out var bodyMaxX, out var bodyMaxY, out var bodyMaxZ);
-        for (var x = bodyMinX; x <= bodyMaxX && !lava; x++)
-        for (var y = bodyMinY; y <= bodyMaxY && !lava; y++)
-        for (var z = bodyMinZ; z <= bodyMaxZ && !lava; z++)
-        {
-            var id = chunkManager.GetBlockGlobal(x, y, z);
-            if (BlockType.IsFluid(id) && BlockType.Emission[id] > 0)
-                lava = true;
-        }
-        camera.SetInLava(lava);
+        // keeps the eye dry but still has to hurt. The one rule lives in PlayerBodyProbe, which
+        // the server also reads for every connected player.
+        camera.SetInLava(PlayerBodyProbe.InLava(position, chunkManager));
     }
 
     private Vector3? TryStepUp(Vector3 start, Vector3 frameMovement, float stepHeight,
@@ -491,7 +483,15 @@ internal sealed class PlayerPhysics
     /// Whether the body box at <paramref name="eyePosition"/> overlaps a solid or collidesByHitbox
     /// cell. Player body only: drops, slimes and falling blocks still see the full cell.
     /// </summary>
-    public bool IsColliding(Vector3 eyePosition, ChunkManager chunkManager)
+    public bool IsColliding(Vector3 eyePosition, ChunkManager chunkManager) =>
+        BodyCollides(eyePosition, chunkManager);
+
+    /// <summary>
+    /// The player-body collision rule behind <see cref="IsColliding"/>, with no simulation state,
+    /// so the server can judge a connected player's body (<see cref="PlayerBodyProbe"/>) by the
+    /// very rule the client's own physics moves it under. An unloaded cell reads as air.
+    /// </summary>
+    public static bool BodyCollides(Vector3 eyePosition, ChunkManager chunkManager)
     {
         var min = new Vector3(
             eyePosition.X - PlayerRadius,

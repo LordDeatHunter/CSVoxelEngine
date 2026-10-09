@@ -10,9 +10,10 @@ namespace silkgltriangle.Tests;
 /// <summary>
 /// End-to-end cover for the chunk-generation scan after PERF_TODO C3 replaced its per-call full
 /// walk of <see cref="ChunkGenerationWorker.SortedOffsets"/> with a resume from the shared
-/// <c>ChunkScanFrontier</c>. These facts run against the real <see cref="ChunkManager.NeedsChunk"/>
-/// and a real <see cref="Camera"/>; the worker is constructed but <see cref="ChunkGenerationWorker.Start"/>
-/// is never called, so no thread exists and the facts drive <c>FindClosestNeededChunk</c> directly.
+/// <c>ChunkScanFrontier</c>s (one per streaming focus). These facts run against the real
+/// <see cref="ChunkManager.NeedsChunk"/> and a real <see cref="StreamingFocus"/>; the worker is
+/// constructed but <see cref="ChunkGenerationWorker.Start"/> is never called (bar the stop fact), so
+/// no thread exists and the facts drive <c>FindClosestNeededChunk</c> directly.
 ///
 /// <para><c>ChunkManager.QueueChunk</c> is deliberately NOT driven: it runs real worldgen
 /// synchronously, which would turn a 400-round equivalence sweep into a several-minute terrain
@@ -48,15 +49,15 @@ public sealed class ChunkGenerationWorkerTests
 
     /// <summary>
     /// The frontier-backed scan picks the same chunk the old full scan would have, round after
-    /// round, including across camera moves. Equivalence is asserted on the CHOICE, which is the
+    /// round, including across focus moves. Equivalence is asserted on the CHOICE, which is the
     /// property C3 had to preserve - not on how the scan reached it.
     /// </summary>
     [Fact]
     public void WorkerPicksTheSameChunkTheFullScanWould()
     {
         var manager = new ChunkManager(null!);
-        var camera = new Camera(null, null);
-        var worker = new ChunkGenerationWorker(manager, camera);
+        var focus = new StreamingFocus();
+        var worker = new ChunkGenerationWorker(manager, focus);
 
         // Chunk-aligned and away from the origin, so a sign or a Floor() mistake cannot hide.
         var poses = new[]
@@ -65,18 +66,17 @@ public sealed class ChunkGenerationWorkerTests
             new Vector3(80f, 96f, -48f),
             new Vector3(-160f, 32f, 208f)
         };
-        camera.TestTeleport(poses[0], 0f, 0f);
+        focus.SetEye(poses[0]);
 
         var nonNull = 0;
         for (var round = 0; round < 400; round++)
         {
             // Two moves during the run: the frontier must reset to the closest offset for the new
             // centre rather than resuming someone else's prefix.
-            if (round == 150) camera.TestTeleport(poses[1], 0f, 0f);
-            if (round == 300) camera.TestTeleport(poses[2], 0f, 0f);
+            if (round == 150) focus.SetEye(poses[1]);
+            if (round == 300) focus.SetEye(poses[2]);
 
-            var camChunk = (camera.Position / Chunk.Size).Floor();
-            var expected = ReferenceScan(manager, camChunk);
+            var expected = ReferenceScan(manager, focus.Chunks[0]);
             var actual = worker.FindClosestNeededChunk();
 
             Assert.Equal(expected, actual);
@@ -89,6 +89,54 @@ public sealed class ChunkGenerationWorkerTests
 
         // Guard: a scan that always returned null would satisfy every assertion above.
         Assert.Equal(400, nonNull);
+    }
+
+    /// <summary>
+    /// Two foci whose load spheres do not touch are generated around together: every claim is the
+    /// chunk the full scan would pick for one of the two foci (so it lies inside that focus's
+    /// radius), and both foci receive claims long before either sphere is complete, so one player's
+    /// streaming never waits for another's to finish.
+    /// </summary>
+    [Fact]
+    public void TwoFociAreBothServed()
+    {
+        var manager = new ChunkManager(null!);
+        var focus = new StreamingFocus();
+        var worker = new ChunkGenerationWorker(manager, focus);
+
+        // Further apart than two load radii, so no chunk is inside both spheres and each claim
+        // belongs to exactly one focus.
+        const int apartChunks = 40;
+        Assert.True(apartChunks > 2 * WorldGenerationConfig.ChunkRadius);
+        var near = new Vector3(80f, 96f, -64f);
+        var far = near + new Vector3(apartChunks * Chunk.Size, 0f, 0f);
+        focus.SetEyes([near, far]);
+        var foci = focus.Chunks;
+        Assert.Equal(2, foci.Length);
+
+        var claims = new int[foci.Length];
+        for (var round = 0; round < 400; round++)
+        {
+            var expectedNear = ReferenceScan(manager, foci[0]);
+            var expectedFar = ReferenceScan(manager, foci[1]);
+            var actual = worker.FindClosestNeededChunk();
+
+            Assert.True(actual.HasValue, $"round {round}: no chunk claimed while both spheres were incomplete");
+            var claimed = actual!.Value;
+            Assert.True(claimed == expectedNear || claimed == expectedFar,
+                $"round {round}: {claimed} is neither focus's closest needed chunk");
+
+            var owner = claimed == expectedNear ? 0 : 1;
+            Assert.True(Vector3.DistanceSquared(claimed, foci[owner]) <= WorldGenerationConfig.ChunkRadiusSq,
+                $"round {round}: {claimed} lies outside its focus's radius");
+            Assert.True(StreamingFocus.WithinRadius(foci, claimed, WorldGenerationConfig.ChunkRadiusSq));
+            claims[owner]++;
+
+            manager.Chunks[claimed] = new Chunk(null!, claimed, generateBlockData: false);
+        }
+
+        Assert.True(claims[0] > 0, "the first focus never received a claim");
+        Assert.True(claims[1] > 0, "the second focus never received a claim");
     }
 
     /// <summary>
@@ -136,16 +184,16 @@ public sealed class ChunkGenerationWorkerTests
     /// <summary>
     /// <see cref="ChunkGenerationWorker.Stop"/> joins every thread it started, so once it
     /// returns true nothing generates any more (the precondition a world-seed swap needs), and
-    /// the worker can be started and stopped again. The camera sits far above the terrain, so
+    /// the worker can be started and stopped again. The focus sits far above the terrain, so
     /// every chunk the pool claims takes the above-terrain early return and the run stays cheap.
     /// </summary>
     [Fact]
     public void StopJoinsEveryWorkerThread()
     {
         var manager = new ChunkManager(null!);
-        var camera = new Camera(null, null);
-        camera.TestTeleport(new Vector3(0f, 1e6f, 0f), yaw: 0f, pitch: 0f);
-        var worker = new ChunkGenerationWorker(manager, camera);
+        var focus = new StreamingFocus();
+        focus.SetEye(new Vector3(0f, 1e6f, 0f));
+        var worker = new ChunkGenerationWorker(manager, focus);
 
         for (var round = 0; round < 2; round++)
         {

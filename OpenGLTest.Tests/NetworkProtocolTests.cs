@@ -66,6 +66,83 @@ public sealed class NetFramingTests
 }
 
 /// <summary>
+/// The protocol-4 player messages: a <see cref="NetMessage.PlayerStatus"/> carries the granted
+/// modes, the health (clamped to the pool), the dead flag and a knockback through
+/// <see cref="PlayerStatusCodec"/>, refusing a non-finite shove as a malformed frame, and a
+/// <see cref="NetMessage.PlayerCorrection"/> carries its sequence id and eye.
+/// </summary>
+public sealed class NetworkProtocolTests
+{
+    private static PlayerStatusData RoundTrip(in PlayerStatusData status)
+    {
+        using var writer = new PacketWriter(NetMessage.PlayerStatus);
+        PlayerStatusCodec.Write(writer, status);
+        using var reader = new PacketReader(writer.ToArray());
+        Assert.Equal(NetMessage.PlayerStatus, reader.Message);
+        return PlayerStatusCodec.Read(reader);
+    }
+
+    private static byte[] StatusFrame(Action<PacketWriter> body)
+    {
+        using var writer = new PacketWriter(NetMessage.PlayerStatus);
+        body(writer);
+        return writer.ToArray();
+    }
+
+    [Fact]
+    public void PlayerStatusAndCorrectionRoundTripTheirFields()
+    {
+        var hurt = new PlayerStatusData(NetPlayerFlags.Creative | NetPlayerFlags.Flying, PlayerHealth.MaxHealth / 2,
+            Dead: false, new Vector3(3.5f, 0f, -2f), 4.25f);
+        Assert.Equal(hurt, RoundTrip(hurt));
+
+        var dead = new PlayerStatusData(NetPlayerFlags.None, 0, Dead: true, Vector3.Zero, 0f);
+        Assert.Equal(dead, RoundTrip(dead));
+
+        // A health outside the pool is clamped into it, and mode bits the protocol does not define
+        // are dropped rather than handed to the camera
+        var overfull = RoundTrip(new PlayerStatusData((NetPlayerFlags)0xFF, PlayerHealth.MaxHealth + 50, false,
+            Vector3.Zero, 0f));
+        Assert.Equal(PlayerHealth.MaxHealth, overfull.Health);
+        Assert.Equal(NetPlayerFlags.Creative | NetPlayerFlags.Flying, overfull.Modes);
+        Assert.Equal(0, RoundTrip(dead with { Health = -10 }).Health);
+
+        // A correction: the sequence id the client acks, then the eye it snaps to
+        var eye = new Vector3(12.5f, 70.62f, -8.5f);
+        using var writer = new PacketWriter(NetMessage.PlayerCorrection);
+        writer.Write(7).Write(eye);
+        using var reader = new PacketReader(writer.ToArray());
+        Assert.Equal(NetMessage.PlayerCorrection, reader.Message);
+        Assert.Equal(7, reader.ReadInt());
+        Assert.Equal(eye, reader.ReadVector3());
+    }
+
+    [Fact]
+    public void ANonFiniteKnockbackIsAMalformedStatus()
+    {
+        static void AssertBad<T>(byte[] frame) where T : Exception
+        {
+            using var reader = new PacketReader(frame);
+            _ = reader.Message;
+            Assert.Throws<T>(() => PlayerStatusCodec.Read(reader));
+        }
+
+        // A NaN shove, an infinite one and an infinite lift are malformed frames
+        AssertBad<InvalidDataException>(StatusFrame(w =>
+            PlayerStatusCodec.Write(w, new PlayerStatusData(NetPlayerFlags.None, 50, false,
+                new Vector3(float.NaN, 0f, 1f), 0f))));
+        AssertBad<InvalidDataException>(StatusFrame(w =>
+            PlayerStatusCodec.Write(w, new PlayerStatusData(NetPlayerFlags.None, 50, false,
+                new Vector3(0f, 0f, float.PositiveInfinity), 0f))));
+        AssertBad<InvalidDataException>(StatusFrame(w =>
+            PlayerStatusCodec.Write(w, new PlayerStatusData(NetPlayerFlags.None, 50, false,
+                Vector3.UnitX, float.NegativeInfinity))));
+        // A status cut short before its knockback is a short frame
+        AssertBad<EndOfStreamException>(StatusFrame(w => { w.Write((byte)0); w.Write(50); w.Write(false); }));
+    }
+}
+
+/// <summary>
 /// A real <see cref="GameServer"/> and <see cref="NetworkClient"/> over loopback: the handshake
 /// delivers the world seed, and a chat line goes out and comes back to the sender.
 /// </summary>

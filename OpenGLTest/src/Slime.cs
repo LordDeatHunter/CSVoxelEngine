@@ -108,8 +108,9 @@ public sealed class Slime : Mob
     protected override void SetVelocity(Vector3 velocity) => _velocity = velocity;
 
     /// <summary>Advances the hop AI and the physics. <paramref name="playerPosition"/> is the
-    /// camera eye; the slime hops toward the player's feet so it climbs toward them.</summary>
-    public void Update(float deltaTime, ChunkManager chunks, Vector3 playerPosition)
+    /// chased player's eye; the slime hops toward the player's feet so it climbs toward them.
+    /// Null (nobody to chase) still runs the physics but never hops.</summary>
+    public void Update(float deltaTime, ChunkManager chunks, Vector3? playerPosition)
     {
         if (deltaTime <= 0f || chunks == null) return;
 
@@ -123,13 +124,14 @@ public sealed class Slime : Mob
         // Hop while grounded, or while floating in water where the buoyancy and drag applied
         // above damp the hop into a weak paddle at the player instead of a full leap.
         if (!IsGrounded && !_inWater) return;
+        if (playerPosition is not { } target) return;
 
         _hopTimer += deltaTime;
         if (_hopTimer < _nextHop) return;
 
         _hopTimer = 0f;
         _nextHop = HopIntervalSeconds + (Random.Shared.NextSingle() - 0.5f) * 2f * HopIntervalJitter;
-        HopToward(playerPosition);
+        HopToward(target);
     }
 
     private void HopToward(Vector3 playerPosition)

@@ -62,6 +62,35 @@ public sealed class WorldIntentRuleTests
     }
 
     [Fact]
+    public void ARespawnIntentCarriesNoCellAndIsNeverRateLimited()
+    {
+        var direction = Vector3.Normalize(new Vector3(0.25f, -1f, 0.5f));
+        var respawn = WorldIntent.Respawn(Eye, direction);
+        var back = RoundTrip(9, respawn, out var readSeq);
+        Assert.Equal(9, readSeq);
+        Assert.Equal(NetIntentKind.Respawn, back.Kind);
+        Assert.Equal(Eye, back.Eye);
+        Assert.True(Vector3.Distance(direction, back.Direction) < 1e-5f);
+        Assert.False(back.HasCell);
+
+        // A dead player's way back must never be held by the edit rate, edit cells or wait on an
+        // inventory answer
+        Assert.False(back.EditsCells);
+        Assert.False(back.PredictsInventory);
+        Assert.False(back.IsRateLimited);
+
+        // The kind past the last one is unknown
+        using var writer = new PacketWriter(NetMessage.WorldIntent);
+        writer.Write(1);
+        writer.Write((byte)(NetIntentKind.Respawn + 1));
+        writer.Write(Eye);
+        writer.Write(Vector3.UnitX);
+        using var reader = new PacketReader(writer.ToArray());
+        _ = reader.Message;
+        Assert.Throws<InvalidDataException>(() => WorldIntentCodec.Read(reader, out _));
+    }
+
+    [Fact]
     public void TheAimIsRenormalisedAndTheChargeClamped()
     {
         var back = RoundTrip(1, WorldIntent.Throw(Eye, new Vector3(0f, 0f, -1.3f), 7f), out _);

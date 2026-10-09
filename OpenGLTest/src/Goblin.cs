@@ -112,8 +112,9 @@ public sealed class Goblin : Mob
     /// shoulder height.</summary>
     public Vector3 ThrowOrigin => Position + Forward * 0.4f + new Vector3(0f, 0.35f, 0f);
 
-    /// <summary>Where a stone is aimed on the player: the chest, a little under the eye.</summary>
-    public static Vector3 ChestOf(Camera camera) => camera.Position - new Vector3(0f, 0.4f, 0f);
+    /// <summary>Where a stone is aimed on a player whose eye is at <paramref name="eye"/>: the
+    /// chest, a little under the eye.</summary>
+    public static Vector3 ChestOf(Vector3 eye) => eye - new Vector3(0f, 0.4f, 0f);
 
     /// <summary>
     /// Whether a goblin body centred at <paramref name="goblinPosition"/> can land a swing on a
@@ -191,25 +192,30 @@ public sealed class Goblin : Mob
     /// <see cref="WorldGenerationConfig.GoblinThrowMaxRange"/>) and starts a throw whenever it
     /// stands on the ground with a clear line to the player's chest; out of stones it closes to
     /// the standoff distance and starts a swing when in reach. It stands still while a throw or
-    /// swing plays.
+    /// swing plays. A null <paramref name="player"/> (nobody to chase) leaves the goblin standing
+    /// where it is, still falling, floating and animating.
     /// </summary>
-    public void Update(float deltaTime, ChunkManager chunks, Camera player)
+    public void Update(float deltaTime, ChunkManager chunks, IMobTarget? player)
     {
-        if (deltaTime <= 0f || chunks == null || player == null) return;
+        if (deltaTime <= 0f || chunks == null) return;
 
         _hitFlash = MathF.Max(0f, _hitFlash - deltaTime / HitFlashSeconds);
         _throwCooldown = MathF.Max(0f, _throwCooldown - deltaTime);
         _meleeCooldown = MathF.Max(0f, _meleeCooldown - deltaTime);
         _losRetry = MathF.Max(0f, _losRetry - deltaTime);
 
-        var target = player.Position;
-        var to = new Vector3(target.X - Position.X, 0f, target.Z - Position.Z);
-        var dist = to.Length();
-        var toward = dist > 1e-3f ? to / dist : Vector3.Zero;
-        // The model faces -Z at yaw 0, so this rotation points -Z at the player.
-        if (dist > 1e-3f) Facing = MathF.Atan2(-to.X, -to.Z);
+        var move = Vector3.Zero;
+        if (player != null)
+        {
+            var target = player.Eye;
+            var to = new Vector3(target.X - Position.X, 0f, target.Z - Position.Z);
+            var dist = to.Length();
+            var toward = dist > 1e-3f ? to / dist : Vector3.Zero;
+            // The model faces -Z at yaw 0, so this rotation points -Z at the player.
+            if (dist > 1e-3f) Facing = MathF.Atan2(-to.X, -to.Z);
 
-        var move = Decide(dist, toward, chunks, player);
+            move = Decide(dist, toward, chunks, player);
+        }
 
         // Walking: ease the horizontal velocity toward the chosen move (or friction toward a
         // stop), on the ground at full speed and afloat at a paddle.
@@ -245,7 +251,7 @@ public sealed class Goblin : Mob
 
     // Chooses this frame's horizontal move (a unit vector or zero) and starts a throw or swing
     // when one is due.
-    private Vector3 Decide(float dist, Vector3 toward, ChunkManager chunks, Camera player)
+    private Vector3 Decide(float dist, Vector3 toward, ChunkManager chunks, IMobTarget player)
     {
         if (Animation.IsActionPlaying) return Vector3.Zero;
 
@@ -258,7 +264,7 @@ public sealed class Goblin : Mob
             // goblin is walking into; the LOS test is throttled while it stays blocked.
             if (IsGrounded && _throwCooldown <= 0f && _losRetry <= 0f)
             {
-                var chest = ChestOf(player);
+                var chest = ChestOf(player.Eye);
                 if (!BlockRaycaster.SegmentHitsBlock(ThrowOrigin, chest, chunks))
                 {
                     _losBlocked = false;
@@ -278,7 +284,7 @@ public sealed class Goblin : Mob
             return _losBlocked ? toward : Vector3.Zero;
         }
 
-        if (InMeleeReach(Position, player.Position) && _meleeCooldown <= 0f)
+        if (InMeleeReach(Position, player.Eye) && _meleeCooldown <= 0f)
         {
             Animation.Play(MeleeClip);
             _meleeCooldown = WorldGenerationConfig.GoblinMeleeCooldownSeconds;

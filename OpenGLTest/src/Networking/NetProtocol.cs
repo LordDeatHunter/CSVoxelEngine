@@ -14,13 +14,24 @@ public enum NetMessage : byte
     KeepAlive = 3,
     ChatSend = 10,
     ChatMessage = 11,
+    /// <summary>Client to server: <c>(Vector3 eye, float yaw, float pitch, byte flags, int
+    /// correctionAck)</c>. The flags are a creative/flight request (<see cref="NetPlayerFlags"/>);
+    /// the ack is the sequence id of the newest <see cref="PlayerCorrection"/> the client has
+    /// applied (0 before any), and the server ignores the position until it acks the newest one.</summary>
     PlayerState = 20,
     PlayerList = 21,
     PlayerJoined = 22,
     PlayerLeft = 23,
-    /// <summary>Server to one client: the creative and flight modes the server actually granted
-    /// (a <see cref="NetPlayerFlags"/> byte), sent when the client's request was refused.</summary>
+    /// <summary>Server to one client: the player's server-owned status,
+    /// <c>(byte flags, int health, bool dead, Vector3 knockbackImpulse, float lift)</c>
+    /// (<see cref="PlayerStatusCodec"/>): the creative and flight modes the server granted, the
+    /// health pool, whether the player is dead, and a mob hit's shove for the client's own physics
+    /// to apply (zero when none). Sent when the status changed and when a mode request was refused.</summary>
     PlayerStatus = 24,
+    /// <summary>Server to one client: <c>(int seq, Vector3 eye)</c>, an illegal move (or a respawn)
+    /// put the player back at <c>eye</c>. The client snaps there and acks <c>seq</c> in every
+    /// following <see cref="PlayerState"/>.</summary>
+    PlayerCorrection = 25,
     /// <summary>Retired in protocol 3: a raw client-authored cell write. A server refuses it and
     /// answers with the cell's authoritative state; clients send <see cref="WorldIntent"/>s.</summary>
     BlockEdit = 30,
@@ -81,8 +92,13 @@ public static class NetFraming
     /// inventories and the extended <see cref="NetInventoryAction"/> intents. 3: world intents
     /// replace raw block edits, every intent carries a sequence id answered by an
     /// <see cref="NetMessage.IntentResult"/>, corrections and inventory snapshots carry the id they
-    /// answer, and station state and player status are broadcast.</summary>
-    public const int ProtocolVersion = 3;
+    /// answer, and station state and player status are broadcast. 4: the server owns each player's
+    /// status, so <see cref="NetMessage.PlayerStatus"/> carries the health, the dead flag and a
+    /// mob hit's knockback; the server corrects illegal moves with a
+    /// <see cref="NetMessage.PlayerCorrection"/> that every following
+    /// <see cref="NetMessage.PlayerState"/> acks; and a respawn is a
+    /// <see cref="NetIntentKind.Respawn"/> world intent.</summary>
+    public const int ProtocolVersion = 4;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

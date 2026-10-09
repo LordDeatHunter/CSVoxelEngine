@@ -6,10 +6,12 @@ namespace silkgltriangle;
 
 /// <summary>
 /// Owns the live goblins and the stones they throw: ticks their AI and physics, spawns a stone
-/// at each throw's release event, bills the club swing at each melee impact that still finds the
-/// player in reach, shoves grounded goblins the player walks into, rolls death loot plus the
-/// stones a goblin still carried, and spawns new ones on dry forest surface in a ring around the
-/// player. A stone that misses shatters: it never becomes a pickup. Main thread only.
+/// at each throw's release event, bills the club swing at each melee impact that still finds a
+/// player in reach, shoves grounded goblins a player walks into, rolls death loot plus the
+/// stones a goblin still carried, and spawns new ones on dry forest surface in a ring around a
+/// player. Every rule runs against a list of <see cref="IMobTarget"/>s (the local camera, or a
+/// server's connected players), each goblin chasing its nearest one. A stone that misses
+/// shatters: it never becomes a pickup. Main thread only.
 /// </summary>
 public sealed class GoblinManager
 {
@@ -18,7 +20,10 @@ public sealed class GoblinManager
     private readonly List<ThrownProjectile> _stones = [];
     private readonly List<byte> _loot = [];
     private readonly byte _flintId;
+    // The camera overload's one-element target list, reused so it allocates nothing per frame.
+    private readonly List<IMobTarget> _singleTarget = new(1);
     private float _spawnTimer;
+    private int _spawnCursor;
 
     /// <summary>Validates the goblin content first, so a model missing a part, clip or event
     /// fails at startup naming its file.</summary>
@@ -37,8 +42,9 @@ public sealed class GoblinManager
     /// <summary>Stones in flight; drawn and mirrored like the player's own throws.</summary>
     public IReadOnlyList<ThrownProjectile> Stones => _stones;
 
-    /// <summary>Health the goblins took off the player during the most recent
-    /// <see cref="Update"/>; the caller applies it to <see cref="PlayerHealth"/> and shakes.</summary>
+    /// <summary>Health the goblins took off every target together during the most recent
+    /// <c>Update</c>; each hit also reached its target through <see cref="IMobTarget.TakeHit"/>.
+    /// The singleplayer caller applies it to its <see cref="PlayerHealth"/> and shakes.</summary>
     public int DamageDealtThisFrame { get; private set; }
 
     /// <summary>Adds a goblin at an exact body-centre position (used by spawns, scenarios and
@@ -52,20 +58,44 @@ public sealed class GoblinManager
         return goblin;
     }
 
+    /// <summary>Ticks the goblins against the one local player (singleplayer and the tests); see
+    /// <see cref="Update(float, ChunkManager, DropManager, IReadOnlyList{IMobTarget})"/>.</summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, Camera camera)
     {
-        DamageDealtThisFrame = 0;
-        if (chunks == null || camera == null) return;
+        if (camera == null)
+        {
+            DamageDealtThisFrame = 0;
+            return;
+        }
 
-        var playerPosition = camera.Position;
-        var immune = camera.IsCreative || camera.IsFlying;
+        _singleTarget.Clear();
+        _singleTarget.Add(camera);
+        Update(deltaTime, chunks, drops, _singleTarget);
+    }
+
+    /// <summary>
+    /// Ticks every goblin and stone against <paramref name="targets"/>: each goblin throws at and
+    /// closes on its nearest target (<see cref="MobTargets.Nearest"/>), a swing's impact hurts every
+    /// non-immune target still in reach, a stone hurts the non-immune target it touches (any
+    /// touched target stops it), a grounded goblin is shoved off by whoever walks into it, one past
+    /// the despawn radius of every target is culled, and the spawn ring cycles over the targets
+    /// under the one shared cap and timer. Every hit reaches its target through
+    /// <see cref="IMobTarget.TakeHit"/> and is summed into <see cref="DamageDealtThisFrame"/>. With
+    /// no targets nothing chases, despawns or spawns.
+    /// </summary>
+    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, IReadOnlyList<IMobTarget> targets)
+    {
+        DamageDealtThisFrame = 0;
+        if (chunks == null || targets == null) return;
+
         var despawnSquared = WorldGenerationConfig.GoblinDespawnRadiusBlocks
             * WorldGenerationConfig.GoblinDespawnRadiusBlocks;
 
         for (var i = _goblins.Count - 1; i >= 0; i--)
         {
             var goblin = _goblins[i];
-            goblin.Update(deltaTime, chunks, camera);
+            var chased = MobTargets.Nearest(targets, goblin.Position);
+            goblin.Update(deltaTime, chunks, chased >= 0 ? targets[chased] : null);
 
             if (goblin.IsDead)
             {
@@ -79,34 +109,44 @@ public sealed class GoblinManager
 
             // The swing is decided at its impact frame, so a player who backed off during the
             // wind-up dodges it.
-            if (goblin.TryTakeMeleeImpact() && !immune && Goblin.InMeleeReach(goblin.Position, playerPosition))
+            if (goblin.TryTakeMeleeImpact())
             {
-                DamageDealtThisFrame += WorldGenerationConfig.GoblinMeleeDamage;
-                var away = new Vector3(
-                    playerPosition.X - goblin.Position.X, 0f, playerPosition.Z - goblin.Position.Z);
-                camera.AddKnockback(away, WorldGenerationConfig.GoblinKnockbackSpeed,
-                    WorldGenerationConfig.GoblinKnockbackLift);
+                for (var t = 0; t < targets.Count; t++)
+                {
+                    var target = targets[t];
+                    var eye = target.Eye;
+                    if (target.IsImmune || !Goblin.InMeleeReach(goblin.Position, eye)) continue;
+
+                    var damage = WorldGenerationConfig.GoblinMeleeDamage;
+                    DamageDealtThisFrame += damage;
+                    var away = new Vector3(eye.X - goblin.Position.X, 0f, eye.Z - goblin.Position.Z);
+                    target.TakeHit(damage, away, WorldGenerationConfig.GoblinKnockbackSpeed,
+                        WorldGenerationConfig.GoblinKnockbackLift);
+                }
             }
 
-            if (goblin.IsGrounded && camera.BodyTouches(goblin.Position, Goblin.HalfExtent))
+            if (goblin.IsGrounded)
             {
-                // Walking into a goblin is harmless: the player shoves it aside.
-                var away = new Vector3(
-                    goblin.Position.X - playerPosition.X, 0f, goblin.Position.Z - playerPosition.Z);
-                goblin.Shove(away, WorldGenerationConfig.GoblinShoveSpeed);
+                for (var t = 0; t < targets.Count; t++)
+                {
+                    var eye = targets[t].Eye;
+                    if (!MobTargets.BodyTouches(eye, goblin.Position, Goblin.HalfExtent)) continue;
+
+                    // Walking into a goblin is harmless: the player shoves it aside.
+                    var away = new Vector3(goblin.Position.X - eye.X, 0f, goblin.Position.Z - eye.Z);
+                    goblin.Shove(away, WorldGenerationConfig.GoblinShoveSpeed);
+                }
             }
 
-            var dx = goblin.Position.X - playerPosition.X;
-            var dz = goblin.Position.Z - playerPosition.Z;
-            if (dx * dx + dz * dz > despawnSquared)
+            if (targets.Count > 0 && MobTargets.MinHorizontalDistanceSquared(targets, goblin.Position) > despawnSquared)
                 _goblins.RemoveAt(i);
         }
 
-        UpdateStones(deltaTime, chunks, camera, immune);
-        UpdateSpawning(deltaTime, chunks, playerPosition);
+        UpdateStones(deltaTime, chunks, targets);
+        UpdateSpawning(deltaTime, chunks, targets);
     }
 
-    private void UpdateStones(float deltaTime, ChunkManager chunks, Camera camera, bool immune)
+    private void UpdateStones(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
     {
         for (var i = _stones.Count - 1; i >= 0; i--)
         {
@@ -114,15 +154,31 @@ public sealed class GoblinManager
             // Stones pass through mobs: goblins never hit each other or a slime.
             var alive = stone.Update(deltaTime, chunks, null, out _);
 
-            if (camera.BodyTouches(stone.Position, ThrownProjectile.HalfExtent))
+            // Any touched target stops the stone; it hurts the first touched one that is not
+            // immune, so a hovering player beside a survival one never shields them.
+            var touched = false;
+            IMobTarget? hurt = null;
+            for (var t = 0; t < targets.Count; t++)
             {
-                if (!immune)
+                var target = targets[t];
+                if (!MobTargets.BodyTouches(target.Eye, stone.Position, ThrownProjectile.HalfExtent)) continue;
+                touched = true;
+                if (!target.IsImmune)
                 {
-                    DamageDealtThisFrame += WorldGenerationConfig.GoblinStoneDamage;
-                    var playerPosition = camera.Position;
-                    var away = new Vector3(
-                        playerPosition.X - stone.Position.X, 0f, playerPosition.Z - stone.Position.Z);
-                    camera.AddKnockback(away, WorldGenerationConfig.GoblinStoneKnockbackSpeed, 0f);
+                    hurt = target;
+                    break;
+                }
+            }
+
+            if (touched)
+            {
+                if (hurt != null)
+                {
+                    var damage = WorldGenerationConfig.GoblinStoneDamage;
+                    DamageDealtThisFrame += damage;
+                    var eye = hurt.Eye;
+                    var away = new Vector3(eye.X - stone.Position.X, 0f, eye.Z - stone.Position.Z);
+                    hurt.TakeHit(damage, away, WorldGenerationConfig.GoblinStoneKnockbackSpeed, 0f);
                 }
                 _stones.RemoveAt(i);
             }
@@ -152,7 +208,8 @@ public sealed class GoblinManager
             drops.SpawnAt(_flintId, goblin.Position);
     }
 
-    private void UpdateSpawning(float deltaTime, ChunkManager chunks, Vector3 playerPosition)
+    // One shared timer and cap; each expiry tries the ring round the next target in turn.
+    private void UpdateSpawning(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
     {
         if (_goblins.Count >= WorldGenerationConfig.GoblinMaxAlive) return;
 
@@ -160,7 +217,11 @@ public sealed class GoblinManager
         if (_spawnTimer < WorldGenerationConfig.GoblinSpawnIntervalSeconds) return;
         _spawnTimer = 0f;
 
-        if (TryFindSpawn(chunks, playerPosition, out var position))
+        if (targets.Count == 0) return;
+        var index = _spawnCursor % targets.Count;
+        _spawnCursor = index + 1;
+
+        if (TryFindSpawn(chunks, targets[index].Eye, out var position))
             Spawn(position);
     }
 

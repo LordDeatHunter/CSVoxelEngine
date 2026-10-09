@@ -186,7 +186,7 @@ public sealed class ChunkRekeyReplayProbe
     /// the passes that removed something.</para>
     ///
     /// <para><b>The pass structure.</b> The first <c>Update</c> after construction always scans,
-    /// because <c>_lastUnloadCamChunk</c> starts null; a second <c>Update</c> from the same camera
+    /// because <c>_lastUnloadFoci</c> starts null; a second <c>Update</c> from the same camera
     /// chunk would not rescan until the camera crosses a chunk border, so pass two teleports. Pass
     /// 2's camera chunk is (9,0,9) rather than (8,0,8) deliberately: from (8,0,8) the chunk at
     /// (-8,0,8) sits at squared distance exactly 256, i.e. exactly on the inclusive boundary, and a

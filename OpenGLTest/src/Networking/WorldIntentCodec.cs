@@ -48,6 +48,8 @@ public static class WorldIntentCodec
             case NetIntentKind.Attack:
                 writer.Write((byte)intent.Attack);
                 break;
+            case NetIntentKind.Respawn:
+                break;
             default:
                 throw new ArgumentException($"Unknown world intent {intent.Kind}.", nameof(intent));
         }
@@ -58,7 +60,7 @@ public static class WorldIntentCodec
     {
         seq = reader.ReadInt();
         var kind = (NetIntentKind)reader.ReadByte();
-        if (kind is < NetIntentKind.BreakStart or > NetIntentKind.Attack)
+        if (kind is < NetIntentKind.BreakStart or > NetIntentKind.Respawn)
             throw new InvalidDataException($"unknown world intent {(byte)kind}");
 
         var eye = reader.ReadVector3();
@@ -103,13 +105,17 @@ public static class WorldIntentCodec
                     throw new InvalidDataException("world intent charge is not finite");
                 return new WorldIntent(kind, eye, direction, Charge: Math.Clamp(charge, 0f, 1f));
             }
-            default:
+            case NetIntentKind.Attack:
             {
                 var attack = (NetAttackKind)reader.ReadByte();
                 if (attack is < NetAttackKind.Punch or > NetAttackKind.SliceReturn)
                     throw new InvalidDataException($"unknown attack {(byte)attack}");
                 return new WorldIntent(kind, eye, direction, Attack: attack);
             }
+            case NetIntentKind.Respawn:
+                return new WorldIntent(kind, eye, direction);
+            default:
+                throw new InvalidDataException($"unknown world intent {(byte)kind}");
         }
     }
 

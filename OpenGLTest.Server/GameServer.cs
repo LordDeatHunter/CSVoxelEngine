@@ -40,6 +40,37 @@ namespace silkgltriangle;
 /// in the world folder (<see cref="ServerPlayerSaves"/>) on leaving, on stop and on the autosave
 /// interval, and restored when they join again.
 /// </para>
+/// <para>
+/// A player's status is server-owned too: its health (<see cref="ServerPlayer.Status"/>), billed by
+/// falls, lava and mob hits, its death and its respawn. Each <see cref="Pump"/> ticks every
+/// player's status and sends a <see cref="NetMessage.PlayerStatus"/> (modes, health, dead, the
+/// queued knockback) to whoever's changed, and one at join, so the client only mirrors it. A dead
+/// player stays where it died and every intent of its is refused until it sends a
+/// <see cref="NetIntentKind.Respawn"/>, which is judged ahead of every other rule (its eye may
+/// have drifted with a corpse that kept falling on the client): the player is brought back at its
+/// respawn eye, and a <see cref="NetMessage.PlayerCorrection"/> snaps the client there.
+/// </para>
+/// <para>
+/// A player's position is the server's to accept: each <see cref="NetMessage.PlayerState"/> is
+/// judged by <see cref="MovementRules"/>. A too-fast move is clamped toward the report at the speed
+/// cap; a move into a solid cell, a climb too steep or a hover without the flight flag is rejected,
+/// and the client is sent a numbered <see cref="NetMessage.PlayerCorrection"/> back to where the
+/// player stood. Until a state acks that number its position is ignored, so the states the client
+/// sent before it snapped can never trip a second correction.
+/// </para>
+/// <para>
+/// Creative (and with it flight, which the movement rules treat as noclip) is a per-player
+/// permission: a client's creative bit is only a request, granted to everyone while
+/// <see cref="AllowCreative"/> is on and otherwise only to the <see cref="Operators"/>
+/// (<see cref="MayBeCreative"/>), at join and on every state. A refused request is answered once
+/// with a <see cref="NetMessage.PlayerStatus"/> carrying the modes the player really has.
+/// </para>
+/// <para>
+/// The world streams chunks around every connected player (<see cref="World.Focus"/>, fed from
+/// <see cref="World.ServerPlayers"/>), so players far apart each get their own terrain and a chunk
+/// unloads only once it is outside every player's radius. The server's own camera stays at the
+/// world spawn: it is the streaming focus only while nobody is online, and where joiners appear.
+/// </para>
 /// </summary>
 public sealed class GameServer : IDisposable
 {
@@ -67,9 +98,10 @@ public sealed class GameServer : IDisposable
     // connection's own set dedupes a region it re-asked for while still queued.
     private readonly Queue<(ClientConnection Client, int Level, int Rx, int Rz)> _lodQueue = new();
 
-    // Where joiners spawn: the server camera's position at the first hello, before any player
-    // moved the chunk focus (SetServerFocus only runs with players present). Later joiners must
-    // not inherit the centroid of whoever is online, which can sit inside rock.
+    // Where joiners spawn: the server camera's position at the first hello. The camera never
+    // follows the players (chunks stream around each of them through World.Focus; the camera is
+    // the focus only while nobody is online), so it still stands at the world spawn, and later
+    // joiners never inherit where whoever is online happens to be, which can sit inside rock.
     private Vector3? _joinSpawn;
 
     private Thread? _acceptThread;
@@ -115,12 +147,26 @@ public sealed class GameServer : IDisposable
     public int Port { get; }
 
     /// <summary>
-    /// Whether players may be creative here: a player's creative flag (requested through the
-    /// flags of its <see cref="NetMessage.PlayerState"/>, restored from its save) is only ever set
-    /// while this is on, and creative grants and clears are refused without it. Defaults to
-    /// <see cref="WorldGenerationConfig.ServerAllowCreative"/>.
+    /// Whether every player may be creative here. Without it only the <see cref="Operators"/> may
+    /// (<see cref="MayBeCreative"/>). Defaults to <see cref="WorldGenerationConfig.ServerAllowCreative"/>.
     /// </summary>
     public bool AllowCreative { get; set; } = WorldGenerationConfig.ServerAllowCreative;
+
+    /// <summary>
+    /// The players who may be creative while <see cref="AllowCreative"/> is off: the world
+    /// folder's <see cref="OperatorList.FileName"/> plus every <c>--op</c> on the command line.
+    /// Empty by default, so nobody is.
+    /// </summary>
+    public OperatorList Operators { get; set; } = new();
+
+    /// <summary>
+    /// Whether the player joining as <paramref name="name"/> may be creative: everyone while
+    /// <see cref="AllowCreative"/> is on, otherwise only an operator. A player's creative flag
+    /// (requested through the flags of its <see cref="NetMessage.PlayerState"/>, restored from its
+    /// save) is only ever set while this holds, flight only with creative, and creative grants and
+    /// clears are refused without it.
+    /// </summary>
+    public bool MayBeCreative(string name) => AllowCreative || Operators.Contains(name);
 
     /// <summary>The connected player with this id (tests and diagnostics; main thread only).</summary>
     public bool TryGetPlayer(int id, out ServerPlayer player) => _players.TryGetValue(id, out player!);
@@ -185,6 +231,7 @@ public sealed class GameServer : IDisposable
         ServeLodRequests();
         DrainCellJournal();
         SendChangedInventories();
+        TickPlayers(deltaTime);
 
         _playerSaveTimer += deltaTime;
         if (_playerSaveTimer >= WorldGenerationConfig.AutosaveIntervalSeconds)
@@ -199,9 +246,6 @@ public sealed class GameServer : IDisposable
             _sweepTimer = 0;
             SweepIdleConnections();
         }
-
-        if (_players.Count > 0)
-            _world.SetServerFocus(Centroid());
 
         _listTimer += deltaTime;
         _timeTimer += deltaTime;
@@ -222,14 +266,6 @@ public sealed class GameServer : IDisposable
             BroadcastEntities();
             BroadcastStations();
         }
-    }
-
-    private Vector3 Centroid()
-    {
-        var sum = Vector3.Zero;
-        foreach (var player in _playerList)
-            sum += player.Position;
-        return sum / _playerList.Count;
     }
 
     private void Handle(ClientConnection client, byte[] payload)
@@ -260,19 +296,24 @@ public sealed class GameServer : IDisposable
             client.Name = UniqueName(CleanName(reader.ReadString()));
             client.Hello = true;
             _pending.Remove(client);
-            // Captured before this player is added: with nobody online the server camera still
-            // stands at the world spawn, so every joiner starts there, never at the centroid.
+            // The server camera stands at the world spawn and never follows the players, so every
+            // joiner starts there, never wherever the players online have wandered.
             var joinSpawn = _joinSpawn ??= _world.Camera.Position;
             var player = new ServerPlayer(client.Id, client.Name, joinSpawn) { LastStateAt = _elapsed };
             // A returning player gets back their inventory and modes, and starts where they left
-            var restored = player.Restore(ServerPlayerSaves.Load(_world.SaveStore, client.Name), AllowCreative);
+            var restored = player.Restore(ServerPlayerSaves.Load(_world.SaveStore, client.Name), MayBeCreative(client.Name));
             var spawn = restored ? player.Position : joinSpawn;
-            player.Aim(player.Position, player.Forward);
+            // A player with no saved respawn eye comes back where it first stood, like singleplayer's
+            // first settled position; the teleport starts its fall tracking there
+            player.RespawnEye ??= spawn;
+            player.Teleport(spawn);
             _clients[client.Id] = client;
             _players[client.Id] = player;
             _playerList.Add(player);
             SendServerHello(client, spawn);
             SendInventory(client, player);
+            // A returning player's health (or death) is mirrored at once
+            SendPlayerStatus(client, player);
             BroadcastPlayerList();
             BroadcastSystem($"{client.Name} joined the game");
             Log.WriteLine($"net: {client.Name} (#{client.Id}) joined from {client.Remote}");
@@ -303,28 +344,57 @@ public sealed class GameServer : IDisposable
                 var yaw = reader.ReadFloat();
                 var pitch = reader.ReadFloat();
                 var flags = reader.ReadByte();
+                // The newest PlayerCorrection the client has applied: until it acks the newest one
+                // it was sent, its states still carry the positions the correction undid
+                var correctionAck = reader.ReadInt();
                 if (_players.TryGetValue(client.Id, out var current))
                 {
-                    // A teleport-scale move is clamped: the authoritative position advances toward
-                    // it at the speed cap (NetValidation.AcceptMove), so a burst of fast states
-                    // converges instead of freezing the player at a stale point. The timestamp
-                    // always advances, so rejected states cannot accumulate time until a teleport
-                    // fits.
-                    var delta = _elapsed - current.LastStateAt;
-                    var ok = NetValidation.AcceptMove(current.Position, position, delta,
-                        WorldGenerationConfig.NetMaxMoveBlocksPerSecond, out var bounded);
-                    if (!ok)
-                        Log.Warn($"net: rejected a move from {client.Name} (#{client.Id})");
-                    current.Position = bounded;
+                    // The client's creative bit (its C toggle) is only a request: this server
+                    // grants it to everyone while it allows creative, otherwise to its operators
+                    // only, and flight only with it. Granted first, so this very state's move is
+                    // judged under the flight it was made in.
+                    var requested = (NetPlayerFlags)flags;
+                    current.Creative = MayBeCreative(client.Name) && requested.HasFlag(NetPlayerFlags.Creative);
+                    current.Flying = current.Creative && requested.HasFlag(NetPlayerFlags.Flying);
                     current.Yaw = yaw;
                     current.Pitch = pitch;
                     current.Flags = flags;
+
+                    // A dead player stays where it died until it respawns, whatever its client
+                    // simulated meanwhile, and a corrected one where it was snapped to until its
+                    // client acks the correction; the look, flags and modes are still recorded.
+                    if (!current.IsDead && current.AcceptsStatePosition(correctionAck))
+                    {
+                        // A teleport-scale move is clamped toward the report at the speed cap, so a
+                        // burst of fast states converges instead of freezing the player at a stale
+                        // point; an illegal one (into a solid cell, a climb or hover without flight)
+                        // is rejected and the client snapped back (MovementRules). The timestamp
+                        // always advances, so refused states cannot accumulate time until a
+                        // teleport fits.
+                        var chunks = _world.GetChunkManager();
+                        var gap = _elapsed - current.LastStateAt;
+                        var verdict = MovementRules.Judge(current.Position, position, gap, current.Flying, chunks,
+                            current.Movement, out var accepted);
+                        current.Position = accepted;
+                        switch (verdict)
+                        {
+                            case MoveVerdict.Rejected:
+                                // Once per correction: the states that follow are ignored until
+                                // the client acks it
+                                Log.Warn($"net: corrected an illegal move from {client.Name} (#{client.Id})");
+                                current.ResetFall();
+                                SendPlayerCorrection(client, current.IssueCorrection(), accepted);
+                                break;
+                            case MoveVerdict.Clamped:
+                                Log.Warn($"net: clamped a move from {client.Name} (#{client.Id})");
+                                current.ObserveAcceptedState(chunks, gap);
+                                break;
+                            default:
+                                current.ObserveAcceptedState(chunks, gap);
+                                break;
+                        }
+                    }
                     current.LastStateAt = _elapsed;
-                    // The client's creative bit (its C toggle) is only a request: this server
-                    // grants it while it allows creative at all, and flight only with it.
-                    var requested = (NetPlayerFlags)flags;
-                    current.Creative = AllowCreative && requested.HasFlag(NetPlayerFlags.Creative);
-                    current.Flying = current.Creative && requested.HasFlag(NetPlayerFlags.Flying);
                     // Between intents the context stands where the player does (a pour bound to
                     // the player follows it)
                     current.Aim(current.Position, current.Forward);
@@ -407,7 +477,7 @@ public sealed class GameServer : IDisposable
                     break;
                 // Replayed against this player's own inventory only, and only when it is newer than
                 // everything the player sent before. A Q-drop leaves from the player's eye along
-                // their look, never from the server's own camera (the centroid of everyone online).
+                // their look, never from the server's own camera (which stands at the world spawn).
                 var accepted = player.AcceptSeq(seq);
                 if (accepted)
                 {
@@ -441,10 +511,15 @@ public sealed class GameServer : IDisposable
     /// Judges and applies one world intent for <paramref name="player"/>, then answers it: the
     /// authoritative cells around its target when it could edit cells (in reach of the player),
     /// the inventory when it could change it or was refused, and its result, in that order.
+    /// A dead player is judged before every other rule: only a respawn is accepted, however far
+    /// its eye drifted, and anything else is refused.
     /// </summary>
     private void HandleWorldIntent(ClientConnection client, ServerPlayer player, int seq, in WorldIntent intent)
     {
-        var accepted = player.AcceptSeq(seq) && ApplyWorldIntent(player, intent);
+        var accepted = player.AcceptSeq(seq)
+                       && (player.IsDead
+                           ? intent.Kind == NetIntentKind.Respawn && RespawnFor(client, player)
+                           : ApplyWorldIntent(client, player, intent));
         if (intent.EditsCells && intent.HasCell
             && NetValidation.InEditReach(player.Position, intent.X, intent.Y, intent.Z, WorldGenerationConfig.NetMaxEditReachBlocks))
             SendCellCorrection(client, seq, intent.X, intent.Y, intent.Z, radius: 1);
@@ -454,11 +529,14 @@ public sealed class GameServer : IDisposable
     }
 
     /// <summary>
-    /// The rules every world intent passes before the world replays it: the world is playing, the
-    /// intent was aimed from (near) where the player is, and an edit fits the player's edit rate.
+    /// The rules every world intent of a living player passes before the world replays it: the
+    /// world is playing, the intent was aimed from (near) where the player is, and an edit fits the
+    /// player's edit rate. A living player has nothing to respawn from, so its respawn is refused.
     /// </summary>
-    private bool ApplyWorldIntent(ServerPlayer player, in WorldIntent intent)
+    private bool ApplyWorldIntent(ClientConnection client, ServerPlayer player, in WorldIntent intent)
     {
+        if (intent.Kind == NetIntentKind.Respawn)
+            return false;
         if (!_world.IsPlaying)
             return false;
         if (!NetValidation.EyeWithin(player.Position, intent.Eye, WorldGenerationConfig.NetMaxIntentEyeDriftBlocks))
@@ -554,6 +632,20 @@ public sealed class GameServer : IDisposable
         return true;
     }
 
+    /// <summary>
+    /// Brings a dead <paramref name="player"/> back (full health, at its respawn eye or else the
+    /// join spawn), snaps its client there with a <see cref="NetMessage.PlayerCorrection"/> whose
+    /// ack its states must carry before they move it again, and tells it its fresh status.
+    /// </summary>
+    private bool RespawnFor(ClientConnection client, ServerPlayer player)
+    {
+        player.Respawn(_joinSpawn ?? _world.Camera.Position);
+        SendPlayerCorrection(client, player.IssueCorrection(), player.Position);
+        SendPlayerStatus(client, player);
+        Log.WriteLine($"net: {client.Name} (#{client.Id}) respawned");
+        return true;
+    }
+
     private static void SendIntentResult(ClientConnection client, int seq, bool accepted)
     {
         using var writer = new PacketWriter(NetMessage.IntentResult);
@@ -562,10 +654,31 @@ public sealed class GameServer : IDisposable
         client.Send(writer.ToArray());
     }
 
+    /// <summary>
+    /// Tells <paramref name="client"/> its player's server-owned status: the granted modes, the
+    /// health, whether it is dead, and the knockback queued since the last status (handed over and
+    /// cleared here, zero when none). Clears <see cref="ServerPlayer.StatusDirty"/>.
+    /// </summary>
     private static void SendPlayerStatus(ClientConnection client, ServerPlayer player)
     {
+        player.TakePendingKnockback(out var knockback, out var lift);
         using var writer = new PacketWriter(NetMessage.PlayerStatus);
-        writer.Write((byte)player.GrantedModes);
+        PlayerStatusCodec.Write(writer,
+            new PlayerStatusData(player.GrantedModes, player.Status.Health, player.IsDead, knockback, lift));
+        client.Send(writer.ToArray());
+        player.StatusDirty = false;
+    }
+
+    /// <summary>
+    /// Tells <paramref name="client"/> to snap its camera to <paramref name="eye"/>, numbered
+    /// <paramref name="seq"/> (<see cref="ServerPlayer.IssueCorrection"/>) so its later states can
+    /// ack it.
+    /// </summary>
+    private static void SendPlayerCorrection(ClientConnection client, int seq, Vector3 eye)
+    {
+        using var writer = new PacketWriter(NetMessage.PlayerCorrection);
+        writer.Write(seq);
+        writer.Write(eye);
         client.Send(writer.ToArray());
     }
 
@@ -651,6 +764,19 @@ public sealed class GameServer : IDisposable
         {
             if (player.InventoryChanged && _clients.TryGetValue(player.Id, out var client))
                 SendInventory(client, player);
+        }
+    }
+
+    // Every player's per-tick status (lava, the damage flash), then a fresh status to each one whose
+    // status changed since its last, whether here or by a mob hit or a fall during the frame
+    private void TickPlayers(double deltaTime)
+    {
+        var chunks = _world.GetChunkManager();
+        foreach (var player in _playerList)
+        {
+            player.TickStatus((float)deltaTime, chunks);
+            if (player.StatusDirty && _clients.TryGetValue(player.Id, out var client))
+                SendPlayerStatus(client, player);
         }
     }
 

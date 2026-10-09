@@ -25,6 +25,10 @@ public enum NetIntentKind : byte
 
     /// <summary>A punch or a slice swing landed its hit.</summary>
     Attack = 6,
+
+    /// <summary>A dead player asks to come back: the only intent the server accepts from a dead
+    /// player, and the only one it refuses from a living one. It carries no cell.</summary>
+    Respawn = 7,
 }
 
 /// <summary>Which left-click attack an <see cref="NetIntentKind.Attack"/> intent carries.</summary>
@@ -50,6 +54,7 @@ public enum NetAttackKind : byte
 /// (<see cref="HasCell"/>); only used to scope the correction the server sends back.</item>
 /// <item><see cref="NetIntentKind.Throw"/>: the charge, 0..1.</item>
 /// <item><see cref="NetIntentKind.Attack"/>: the attack kind.</item>
+/// <item><see cref="NetIntentKind.Respawn"/>: nothing beyond the eye and aim.</item>
 /// </list>
 /// GL-free and content-free.
 /// </summary>
@@ -106,4 +111,7 @@ public readonly record struct WorldIntent(
 
     public static WorldIntent AttackWith(Vector3 eye, Vector3 direction, NetAttackKind attack) =>
         new(NetIntentKind.Attack, eye, direction, Attack: attack);
+
+    public static WorldIntent Respawn(Vector3 eye, Vector3 direction) =>
+        new(NetIntentKind.Respawn, eye, direction);
 }

@@ -41,7 +41,7 @@ public sealed class GoblinManagerTests
         var manager = Manager();
         var camera = StandingPlayer(9.5f, Z);
         manager.Spawn(GroundBody(2.5f, Z), ammo: 3);
-        var chest = Goblin.ChestOf(camera);
+        var chest = Goblin.ChestOf(camera.Position);
 
         var sawStone = false;
         var hit = false;

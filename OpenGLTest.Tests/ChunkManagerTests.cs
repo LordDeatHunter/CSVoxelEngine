@@ -124,7 +124,7 @@ public sealed class ChunkManagerTests
         camera.TestTeleport(Vector3.Zero, yaw: 0f, pitch: 0f);
         var before = manager.ChunkRemovalVersion;
 
-        // _lastUnloadCamChunk starts null, so this first Update really does run the unload scan -
+        // _lastUnloadFoci starts null, so this first Update really does run the unload scan -
         // it just finds nothing out of range.
         manager.Update(camera);
         Assert.True(manager.Chunks.ContainsKey(Vector3.Zero));
@@ -140,13 +140,62 @@ public sealed class ChunkManagerTests
     }
 
     /// <summary>
+    /// With several streaming foci a chunk stays loaded while ANY focus keeps it inside the load
+    /// radius, and leaves only once it is outside all of them; that pass still bumps
+    /// <see cref="ChunkManager.ChunkRemovalVersion"/> once, after the whole loop, so the dropped
+    /// position is needed again by the time the bump is visible. A later pass whose foci no longer
+    /// include the second player drops that player's chunk too.
+    /// </summary>
+    [Fact]
+    public void UnloadKeepsAChunkInsideAnyFocusRadius()
+    {
+        var manager = new ChunkManager(null!);
+        var first = Vector3.Zero;
+        var second = new Vector3(100f, 0f, 0f);
+        // Inside the second focus's radius only, and inside neither: the second focus alone must
+        // keep the first, and nothing keeps the other.
+        var nearSecond = second + new Vector3(1f, 0f, 1f);
+        var nearNeither = new Vector3(50f, 0f, 0f);
+        Assert.True(Vector3.DistanceSquared(nearSecond, first) > WorldGenerationConfig.ChunkRadiusSq);
+        Assert.True(Vector3.DistanceSquared(nearNeither, first) > WorldGenerationConfig.ChunkRadiusSq);
+        Assert.True(Vector3.DistanceSquared(nearNeither, second) > WorldGenerationConfig.ChunkRadiusSq);
+
+        foreach (var pos in new[] { first, nearSecond, nearNeither })
+        {
+            var chunk = new Chunk(null!, pos, generateBlockData: false);
+            chunk.IsBlockDataReady = true;
+            manager.Chunks[pos] = chunk;
+        }
+
+        var focus = new StreamingFocus();
+        var centre = new Vector3(Chunk.Size / 2f);
+        focus.SetEyes([first * Chunk.Size + centre, second * Chunk.Size + centre]);
+        var before = manager.ChunkRemovalVersion;
+
+        manager.Update(focus.Chunks);
+
+        Assert.True(manager.Chunks.ContainsKey(first));
+        Assert.True(manager.Chunks.ContainsKey(nearSecond), "a chunk inside the second focus's radius left");
+        Assert.False(manager.Chunks.ContainsKey(nearNeither), "a chunk outside every focus's radius stayed");
+        Assert.Equal(before + 1, manager.ChunkRemovalVersion);
+        Assert.True(manager.NeedsChunk(nearNeither));
+
+        // The second player leaves: its chunk is now outside every remaining focus.
+        focus.SetEye(first * Chunk.Size + centre);
+        manager.Update(focus.Chunks);
+
+        Assert.True(manager.Chunks.ContainsKey(first));
+        Assert.False(manager.Chunks.ContainsKey(nearSecond), "the departed focus's chunk stayed loaded");
+    }
+
+    /// <summary>
     /// An unload forgets exactly the placements inside the chunk that left, and nothing else
     /// (PERF_TODO C6: the flat set scanned per unload became one bucket per chunk position).
     /// <para>
     /// The ordering below is load-bearing, because the fact would pass vacuously if no unload
     /// ever happened: both chunks are registered and every placement is marked BEFORE the camera
     /// is teleported, and only then does a single Update run. That first Update really does run
-    /// the unload scan — _lastUnloadCamChunk starts null (ChunkManager.cs:96), the same reason
+    /// the unload scan — _lastUnloadFoci starts null, the same reason
     /// the removal-version fact above carries this comment — and the two guard assertions on
     /// Chunks prove the pass actually dropped the far chunk before any placement is probed.
     /// </para>

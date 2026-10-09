@@ -7,8 +7,9 @@ namespace silkgltriangle.Tests;
 
 /// <summary>
 /// A hosted world keeps each multiplayer player in its own file: a player saved and loaded again
-/// comes back with its inventory and pose, two names never share a file, creative only comes back
-/// where the server allows it, and the store accepts the players subfolder but no other directory.
+/// comes back with its inventory, pose, health and respawn eye, two names never share a file,
+/// creative only comes back where the server allows it, and the store accepts the players
+/// subfolder but no other directory.
 /// </summary>
 public sealed class ServerPlayerTests : IDisposable
 {
@@ -102,6 +103,29 @@ public sealed class ServerPlayerTests : IDisposable
         lenient.Restore(saved, allowCreative: true);
         Assert.True(lenient.Creative);
         Assert.True(lenient.Flying);
+    }
+
+    [Fact]
+    public void HealthAndRespawnEyeRoundTripThroughTheSave()
+    {
+        var hurt = new ServerPlayer(1, "Alice", new Vector3(4.5f, 70f, 4.5f))
+        {
+            RespawnEye = new Vector3(-12.5f, 66.62f, 30.5f),
+        };
+        hurt.Status.TakeDamage(PlayerHealth.MaxHealth / 3);
+        Assert.True(hurt.Health < PlayerHealth.MaxHealth);
+
+        var back = new ServerPlayer(2, "Alice", Vector3.Zero);
+        back.Restore(PlayerSaveCodec.TryParse(PlayerSaveCodec.ToBytes(hurt.Capture())), allowCreative: false);
+        Assert.Equal(hurt.Health, back.Health);
+        Assert.Equal(hurt.RespawnEye, back.RespawnEye);
+
+        // A player who never had a respawn eye comes back without one, so it respawns at the spawn
+        var fresh = new ServerPlayer(3, "Bob", Vector3.Zero);
+        var freshBack = new ServerPlayer(4, "Bob", Vector3.Zero);
+        freshBack.Restore(PlayerSaveCodec.TryParse(PlayerSaveCodec.ToBytes(fresh.Capture())), allowCreative: false);
+        Assert.Null(freshBack.RespawnEye);
+        Assert.Equal(fresh.Health, freshBack.Health);
     }
 
     [Fact]
