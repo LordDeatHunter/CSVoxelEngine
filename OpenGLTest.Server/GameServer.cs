@@ -31,6 +31,22 @@ public sealed class GameServer : IDisposable
     private readonly Dictionary<int, ClientConnection> _clients = new();
     private readonly Dictionary<int, PlayerSnapshot> _players = new();
 
+    // Connections the accept thread opened, handed to Pump, which keeps the ones that have not
+    // said hello yet in _pending so the idle sweep can drop a peer that never does.
+    private readonly ConcurrentQueue<ClientConnection> _accepted = new();
+    private readonly List<ClientConnection> _pending = [];
+    private readonly List<ClientConnection> _idleScratch = [];
+    private double _sweepTimer;
+
+    // Far-LOD region requests waiting to be built, served NetLodBuildsPerPump per Pump. Each
+    // connection's own set dedupes a region it re-asked for while still queued.
+    private readonly Queue<(ClientConnection Client, int Level, int Rx, int Rz)> _lodQueue = new();
+
+    // Where joiners spawn: the server camera's position at the first hello, before any player
+    // moved the chunk focus (SetServerFocus only runs with players present). Later joiners must
+    // not inherit the centroid of whoever is online, which can sit inside rock.
+    private Vector3? _joinSpawn;
+
     private Thread? _acceptThread;
     // Long-lived, coalesced cell changes the server's own simulation produced (explosions, fluid
     // flow, decay, felling), drained and broadcast in batches.
@@ -59,7 +75,8 @@ public sealed class GameServer : IDisposable
         _worldName = worldName;
         _seed = seed;
         Port = port;
-        _listener = new TcpListener(IPAddress.Any, port);
+        // Dual-mode (IPv6 any, with IPv4 mapped), so [::1]:port works like 127.0.0.1:port.
+        _listener = TcpListener.Create(port);
     }
 
     public int Port { get; }
@@ -84,15 +101,52 @@ public sealed class GameServer : IDisposable
     public void Pump(double deltaTime)
     {
         _elapsed += deltaTime;
+
+        // Before the inbound frames: a connection is always queued here before its reader starts,
+        // so its hello can never be handled before it is known. One that already said hello (its
+        // hello landed between an earlier drain and this one) or was already removed is skipped.
+        while (_accepted.TryDequeue(out var accepted))
+        {
+            if (!accepted.Hello && !accepted.Removed)
+                _pending.Add(accepted);
+        }
+
         while (_inbound.TryDequeue(out var item))
         {
             if (item.Payload == null)
+            {
                 RemoveClient(item.Client);
-            else
+                continue;
+            }
+
+            if (item.Client.Removed)
+                continue;
+
+            // A short or malformed frame from one client must never take the server down: drop
+            // that client and keep serving everyone else.
+            try
+            {
                 Handle(item.Client, item.Payload);
+            }
+            catch (Exception e) when (e is System.IO.EndOfStreamException or System.IO.IOException
+                                          or System.IO.InvalidDataException or FormatException
+                                          or ArgumentException or ObjectDisposedException)
+            {
+                Log.Warn($"net: dropping {item.Client.Name} (#{item.Client.Id}) after a bad message: {e.Message}");
+                item.Client.Close();
+                RemoveClient(item.Client);
+            }
         }
 
+        ServeLodRequests();
         DrainCellJournal();
+
+        _sweepTimer += deltaTime;
+        if (_sweepTimer >= 1.0)
+        {
+            _sweepTimer = 0;
+            SweepIdleConnections();
+        }
 
         if (_players.Count > 0)
             _world.SetServerFocus(Centroid());
@@ -144,14 +198,19 @@ public sealed class GameServer : IDisposable
             {
                 Log.Warn($"net: client on protocol {version}, server on {NetFraming.ProtocolVersion}");
                 client.Close();
+                RemoveClient(client);
                 return;
             }
 
             client.Name = CleanName(reader.ReadString());
             client.Hello = true;
+            _pending.Remove(client);
+            // Captured before this player is added: with nobody online the server camera still
+            // stands at the world spawn, so every joiner starts there, never at the centroid.
+            var spawn = _joinSpawn ??= _world.Camera.Position;
             _clients[client.Id] = client;
-            _players[client.Id] = new PlayerSnapshot(client.Name, _world.Camera.Position, 0f, 0f, 0, _elapsed);
-            SendServerHello(client);
+            _players[client.Id] = new PlayerSnapshot(client.Name, spawn, 0f, 0f, 0, _elapsed);
+            SendServerHello(client, spawn);
             SendInventory(client);
             BroadcastPlayerList();
             BroadcastSystem($"{client.Name} joined the game");
@@ -185,9 +244,11 @@ public sealed class GameServer : IDisposable
                 var flags = reader.ReadByte();
                 if (_players.TryGetValue(client.Id, out var current))
                 {
-                    // Reject a teleport-scale move: the authoritative position stays put. The
-                    // timestamp always advances, so rejected states cannot accumulate time until a
-                    // teleport fits.
+                    // A teleport-scale move is clamped: the authoritative position advances toward
+                    // it at the speed cap (NetValidation.AcceptMove), so a burst of fast states
+                    // converges instead of freezing the player at a stale point. The timestamp
+                    // always advances, so rejected states cannot accumulate time until a teleport
+                    // fits.
                     var delta = _elapsed - current.LastStateAt;
                     var ok = NetValidation.AcceptMove(current.Position, position, delta,
                         WorldGenerationConfig.NetMaxMoveBlocksPerSecond, out var bounded);
@@ -195,7 +256,7 @@ public sealed class GameServer : IDisposable
                         Log.Warn($"net: rejected a move from {client.Name} (#{client.Id})");
                     _players[client.Id] = current with
                     {
-                        Position = ok ? bounded : current.Position,
+                        Position = bounded,
                         Yaw = yaw,
                         Pitch = pitch,
                         Flags = flags,
@@ -212,10 +273,13 @@ public sealed class GameServer : IDisposable
                 var z = reader.ReadInt();
                 var blockId = reader.ReadByte();
                 var state = reader.ReadByte();
-                if (_players.TryGetValue(client.Id, out var player) &&
-                    NetValidation.InEditReach(player.Position, x, y, z, WorldGenerationConfig.NetMaxEditReachBlocks))
-                    _world.ApplyNetworkBlockEdit(x, y, z, blockId, state);
-                else
+                // Out of reach, or an edit the world did not apply (unloaded chunk, occupied cell):
+                // send the authoritative cell, so the client never keeps an optimistic edit the
+                // server does not have.
+                var applied = _players.TryGetValue(client.Id, out var player)
+                    && NetValidation.InEditReach(player.Position, x, y, z, WorldGenerationConfig.NetMaxEditReachBlocks)
+                    && _world.ApplyNetworkBlockEdit(x, y, z, blockId, state);
+                if (!applied)
                     SendBlockCorrection(client, x, y, z);
                 break;
             }
@@ -251,13 +315,11 @@ public sealed class GameServer : IDisposable
                 var rz = reader.ReadInt();
                 if (level < 0 || level >= LodRegion.Levels.Length)
                     break;
-                var data = LodRegion.BuildMeshData(level, rx, rz);
-                using var writer = new PacketWriter(NetMessage.LodRegionData);
-                writer.Write(level);
-                writer.Write(rx);
-                writer.Write(rz);
-                writer.WriteBytes(LodNetCodec.Encode(data));
-                client.Send(writer.ToArray());
+                // Queued, not built here: a joining client asks for hundreds of regions, and
+                // ServeLodRequests builds a bounded number per Pump. A region already queued for
+                // this client is not queued twice.
+                if (client.LodQueued.Add((level, rx, rz)))
+                    _lodQueue.Enqueue((client, level, rx, rz));
                 break;
             }
 
@@ -265,16 +327,21 @@ public sealed class GameServer : IDisposable
             {
                 var action = (NetInventoryAction)reader.ReadByte();
                 var arg = reader.ReadInt();
+                // A Q-drop leaves from the requesting player's eye along their look, never from
+                // the server's own camera (the centroid of everyone online).
+                var hasThrower = _players.TryGetValue(client.Id, out var thrower);
                 switch (action)
                 {
                     case NetInventoryAction.SelectSlot:
                         _world.Inventory.Select(arg);
                         break;
-                    case NetInventoryAction.DropSelected:
-                        _world.ThrowSelected(wholeStack: false);
+                    case NetInventoryAction.DropSelected when hasThrower:
+                        _world.ThrowSelected(false, thrower.Position,
+                            Vector3Utils.FromYawPitch(thrower.Yaw, thrower.Pitch));
                         break;
-                    case NetInventoryAction.DropAllSelected:
-                        _world.ThrowSelected(wholeStack: true);
+                    case NetInventoryAction.DropAllSelected when hasThrower:
+                        _world.ThrowSelected(true, thrower.Position,
+                            Vector3Utils.FromYawPitch(thrower.Yaw, thrower.Pitch));
                         break;
                 }
 
@@ -288,7 +355,7 @@ public sealed class GameServer : IDisposable
         }
     }
 
-    private void SendServerHello(ClientConnection client)
+    private void SendServerHello(ClientConnection client, Vector3 spawn)
     {
         using var writer = new PacketWriter(NetMessage.ServerHello);
         writer.Write(NetFraming.ProtocolVersion);
@@ -296,8 +363,59 @@ public sealed class GameServer : IDisposable
         writer.Write(_worldName);
         writer.Write(_seed);
         writer.Write(_world.LightingTime);
-        writer.Write(_world.Camera.Position);
+        writer.Write(spawn);
         client.Send(writer.ToArray());
+    }
+
+    /// <summary>
+    /// Builds and sends at most <see cref="WorldGenerationConfig.NetLodBuildsPerPump"/> queued
+    /// far-LOD regions, oldest first; an entry whose client has gone since is dropped unbuilt.
+    /// </summary>
+    private void ServeLodRequests()
+    {
+        var built = 0;
+        while (built < WorldGenerationConfig.NetLodBuildsPerPump && _lodQueue.TryDequeue(out var request))
+        {
+            var client = request.Client;
+            client.LodQueued.Remove((request.Level, request.Rx, request.Rz));
+            if (client.Removed || !_clients.ContainsKey(client.Id))
+                continue;
+
+            var data = LodRegion.BuildMeshData(request.Level, request.Rx, request.Rz);
+            using var writer = new PacketWriter(NetMessage.LodRegionData);
+            writer.Write(request.Level);
+            writer.Write(request.Rx);
+            writer.Write(request.Rz);
+            writer.WriteBytes(LodNetCodec.Encode(data));
+            client.Send(writer.ToArray());
+            built++;
+        }
+    }
+
+    /// <summary>
+    /// Drops every connection, hello'd or still pending, that sent nothing for
+    /// <see cref="WorldGenerationConfig.NetIdleTimeoutSeconds"/>: a peer that vanished without a
+    /// FIN, or one that connected and never said hello. Runs about once a second.
+    /// </summary>
+    private void SweepIdleConnections()
+    {
+        var now = Environment.TickCount64;
+        var limitMs = (long)(WorldGenerationConfig.NetIdleTimeoutSeconds * 1000.0);
+        _idleScratch.Clear();
+        foreach (var client in _clients.Values)
+            if (now - client.LastInboundAt > limitMs)
+                _idleScratch.Add(client);
+        foreach (var client in _pending)
+            if (now - client.LastInboundAt > limitMs)
+                _idleScratch.Add(client);
+
+        foreach (var client in _idleScratch)
+        {
+            Log.Warn($"net: dropping {client.Name} (#{client.Id}) from {client.Remote}: idle for {WorldGenerationConfig.NetIdleTimeoutSeconds:0} s");
+            client.Close();
+            RemoveClient(client);
+        }
+        _idleScratch.Clear();
     }
 
     private void SendInventory(ClientConnection client)
@@ -469,6 +587,8 @@ public sealed class GameServer : IDisposable
     private void RemoveClient(ClientConnection client)
     {
         client.Close();
+        client.Removed = true;
+        _pending.Remove(client);
         if (!_clients.Remove(client.Id))
             return;
         _players.Remove(client.Id);
@@ -490,14 +610,41 @@ public sealed class GameServer : IDisposable
             {
                 break;
             }
+            catch (SocketException e)
+            {
+                // A transient accept failure (a peer reset mid-handshake, a resource hiccup) must
+                // not end the accept thread, which would leave the server deaf for the session.
+                Log.Warn($"net: accept failed: {e.Message}");
+                Thread.Sleep(100);
+                continue;
+            }
             catch (ObjectDisposedException)
             {
                 break;
             }
 
-            tcp.NoDelay = true;
-            var client = new ClientConnection(tcp, ++_nextId);
-            client.StartReader(() => ReadLoop(client), _inbound);
+            ClientConnection client;
+            try
+            {
+                tcp.NoDelay = true;
+                // A stalled peer must not freeze the main thread inside a blocking write: past the
+                // timeout the send throws and the connection is faulted and removed.
+                tcp.SendTimeout = WorldGenerationConfig.NetSendTimeoutMs;
+                client = new ClientConnection(tcp, Interlocked.Increment(ref _nextId), _inbound);
+                client.Stream.WriteTimeout = WorldGenerationConfig.NetSendTimeoutMs;
+            }
+            catch (Exception e) when (e is SocketException or ObjectDisposedException or InvalidOperationException
+                                          or System.IO.IOException)
+            {
+                // The peer went away between the accept and the setup.
+                try { tcp.Close(); } catch (SocketException) { }
+                continue;
+            }
+
+            // Queued before the reader starts, so Pump always knows the connection before its
+            // first frame (the idle sweep needs it even if no hello ever comes).
+            _accepted.Enqueue(client);
+            client.StartReader(() => ReadLoop(client));
         }
     }
 
@@ -510,6 +657,7 @@ public sealed class GameServer : IDisposable
                 var payload = NetFraming.ReadFrame(client.Stream);
                 if (payload == null)
                     break;
+                client.TouchInbound();
                 _inbound.Enqueue(new Inbound(client, payload));
             }
         }
@@ -545,6 +693,15 @@ public sealed class GameServer : IDisposable
 
         _acceptThread?.Join(WorldGenerationConfig.WorkerStopJoinTimeoutMs);
         _acceptThread = null;
+
+        // Connections that never said hello, including any the accept thread queued after the
+        // last Pump, are closed too, or their reader threads would outlive the server.
+        while (_accepted.TryDequeue(out var accepted))
+            accepted.Close();
+        foreach (var client in _pending)
+            client.Close();
+        _pending.Clear();
+        _lodQueue.Clear();
         _clients.Clear();
         _players.Clear();
     }
@@ -556,11 +713,17 @@ public sealed class GameServer : IDisposable
     private readonly record struct PlayerSnapshot(string Name, Vector3 Position, float Yaw, float Pitch,
         byte Flags, double LastStateAt);
 
-    /// <summary>One connected socket: its id and name, and a lock-guarded framed send.</summary>
-    private sealed class ClientConnection(TcpClient tcp, int id)
+    /// <summary>
+    /// One connected socket: its id and name, a lock-guarded framed send, the last time a frame
+    /// arrived (written by the reader thread, read by the main thread's idle sweep) and the
+    /// far-LOD regions queued for it.
+    /// </summary>
+    private sealed class ClientConnection(TcpClient tcp, int id, ConcurrentQueue<Inbound> inbound)
     {
         private readonly object _writeGate = new();
         private Thread? _reader;
+        private long _lastInboundAt = Environment.TickCount64;
+        private int _faulted;
 
         public int Id { get; } = id;
         public TcpClient Tcp { get; } = tcp;
@@ -569,7 +732,19 @@ public sealed class GameServer : IDisposable
         public bool Hello { get; set; }
         public string Remote { get; } = tcp.Client.RemoteEndPoint?.ToString() ?? "?";
 
-        public void StartReader(Action readLoop, ConcurrentQueue<Inbound> queue)
+        /// <summary>Set by <see cref="GameServer.RemoveClient"/>; main thread only.</summary>
+        public bool Removed { get; set; }
+
+        /// <summary>Far-LOD regions queued for this connection (main thread only).</summary>
+        public HashSet<(int Level, int Rx, int Rz)> LodQueued { get; } = [];
+
+        /// <summary><see cref="Environment.TickCount64"/> of the last inbound frame (or the accept).</summary>
+        public long LastInboundAt => Volatile.Read(ref _lastInboundAt);
+
+        /// <summary>Reader thread: records that a frame just arrived.</summary>
+        public void TouchInbound() => Volatile.Write(ref _lastInboundAt, Environment.TickCount64);
+
+        public void StartReader(Action readLoop)
         {
             _reader = new Thread(() => readLoop()) { IsBackground = true, Name = $"net-read-{Id}" };
             _reader.Start();
@@ -577,6 +752,8 @@ public sealed class GameServer : IDisposable
 
         public void Send(byte[] payload)
         {
+            if (Volatile.Read(ref _faulted) != 0)
+                return;
             lock (_writeGate)
             {
                 try
@@ -585,8 +762,18 @@ public sealed class GameServer : IDisposable
                 }
                 catch (Exception e) when (e is System.IO.IOException or SocketException or ObjectDisposedException or InvalidOperationException)
                 {
+                    Fault();
                 }
             }
+        }
+
+        // A failed (or timed-out) send leaves the stream in an unknown state: stop sending and
+        // queue this connection's removal once. Only enqueues, so it is safe while Pump iterates
+        // the client table.
+        private void Fault()
+        {
+            if (Interlocked.Exchange(ref _faulted, 1) == 0)
+                inbound.Enqueue(new Inbound(this, null));
         }
 
         public void Close()

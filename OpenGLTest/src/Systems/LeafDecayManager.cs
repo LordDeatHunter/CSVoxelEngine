@@ -205,6 +205,12 @@ public class LeafDecayManager
     /// <summary>Test seam: whether the current tick still has cells to visit.</summary>
     internal bool TickInProgress => _tickCursor < _tickCells.Count;
 
+    /// <summary>
+    /// False on a multiplayer client, which never ticks the decay (the server's broadcast carries
+    /// it): scheduling then returns at once instead of filling a backlog nothing drains.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
     /// <summary>Schedules every cell within <see cref="ScheduleReach"/> of an edited cell.</summary>
     public void ScheduleAround(Vector3 cell) => ScheduleBox(cell, cell);
 
@@ -219,6 +225,7 @@ public class LeafDecayManager
     /// </summary>
     public void ScheduleBox(Vector3 min, Vector3 max)
     {
+        if (!Enabled) return;
         var reach = ScheduleReach;
         var x0 = (int)MathF.Floor(min.X) - reach;
         var y0 = (int)MathF.Floor(min.Y) - reach;

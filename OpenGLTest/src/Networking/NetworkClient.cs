@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Net.Sockets;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace silkgltriangle;
@@ -32,11 +33,18 @@ public sealed class NetworkClient(ServerAddress address, string playerName, doub
     private volatile bool _running;
     private Thread? _reader;
 
+    // Written by the connect and reader threads, read by the main thread every frame: published
+    // through volatile fields (the hello info is boxed so the reference write is atomic). Error and
+    // Server are always written before the Status that announces them.
+    private volatile NetworkStatus _status = NetworkStatus.Connecting;
+    private volatile string? _error;
+    private volatile StrongBox<ServerHelloInfo>? _server;
+
     public ServerAddress Address { get; } = address;
     public string PlayerName { get; } = playerName;
-    public NetworkStatus Status { get; private set; } = NetworkStatus.Connecting;
-    public string? Error { get; private set; }
-    public ServerHelloInfo? Server { get; private set; }
+    public NetworkStatus Status => _status;
+    public string? Error => _error;
+    public ServerHelloInfo? Server => _server?.Value;
 
     /// <summary>Framed payloads (message id first) read by the reader thread for the main thread.</summary>
     public ConcurrentQueue<byte[]> Inbound { get; } = new();
@@ -50,14 +58,19 @@ public sealed class NetworkClient(ServerAddress address, string playerName, doub
         try
         {
             var tcp = new TcpClient { NoDelay = true };
+            // Owned from here on, so every failure path below (Fail) disposes it, the connect
+            // timeout included: the pending ConnectAsync is abandoned with its socket closed.
+            _tcp = tcp;
             if (!tcp.ConnectAsync(Address.Host, Address.Port).Wait(TimeSpan.FromSeconds(timeoutSeconds)))
             {
                 Fail($"Timed out connecting to {Address}");
                 return;
             }
 
-            _tcp = tcp;
             _stream = tcp.GetStream();
+            // The handshake read is bounded: a server that accepts but never answers fails the
+            // connect instead of leaving the connecting screen up forever.
+            _stream.ReadTimeout = (int)Math.Min(int.MaxValue, timeoutSeconds * 1000.0);
 
             using (var hello = new PacketWriter(NetMessage.ClientHello))
             {
@@ -92,12 +105,21 @@ public sealed class NetworkClient(ServerAddress address, string playerName, doub
             var seed = reader.ReadInt();
             var time = reader.ReadDouble();
             var spawn = reader.ReadVector3();
-            Server = new ServerHelloInfo(worldName, seed, time, spawn, playerId);
+            _server = new StrongBox<ServerHelloInfo>(new ServerHelloInfo(worldName, seed, time, spawn, playerId));
 
+            // Play reads block for as long as the server is quiet; the idle sweep and KeepAlive
+            // cover a dead peer from here on.
+            _stream.ReadTimeout = Timeout.Infinite;
             _running = true;
+            // Handshaken before the reader starts, so a server that closes at once cannot have
+            // its Disconnected overwritten by a late Handshaken.
+            _status = NetworkStatus.Handshaken;
             _reader = new Thread(ReadLoop) { IsBackground = true, Name = "net-client-read" };
             _reader.Start();
-            Status = NetworkStatus.Handshaken;
+        }
+        catch (System.IO.IOException e) when (e.InnerException is SocketException { SocketErrorCode: SocketError.TimedOut })
+        {
+            Fail("Timed out waiting for the server's handshake");
         }
         catch (Exception e)
         {
@@ -123,8 +145,9 @@ public sealed class NetworkClient(ServerAddress address, string playerName, doub
         {
         }
 
-        if (Status == NetworkStatus.Handshaken)
-            Status = NetworkStatus.Disconnected;
+        // Unconditional: the reader only ever runs after the handshake, so its end is always a
+        // disconnect (Handshaken was published before it started).
+        _status = NetworkStatus.Disconnected;
     }
 
     public void Send(byte[] payload)
@@ -146,9 +169,9 @@ public sealed class NetworkClient(ServerAddress address, string playerName, doub
 
     private void Fail(string message)
     {
-        Error = message;
-        Status = NetworkStatus.Failed;
-        try { _tcp?.Close(); } catch (SocketException) { }
+        _error = message;
+        _status = NetworkStatus.Failed;
+        try { _tcp?.Dispose(); } catch (SocketException) { }
     }
 
     public void Dispose()

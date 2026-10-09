@@ -1319,11 +1319,34 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const double NetTimeSyncSeconds = 1.0;
     // How often the server broadcasts the live mobs and drops.
     public const double NetEntitySyncSeconds = 0.1;
-    // The largest speed the server accepts from a client (blocks/s) before treating a state as a
-    // teleport; generous so sprint-flying is never rejected.
-    public const float NetMaxMoveBlocksPerSecond = 80f;
-    // How far from the player's eye a client may edit a block.
-    public const float NetMaxEditReachBlocks = 6f;
+    // The largest speed the server accepts from a client (blocks/s) before clamping a state toward
+    // it. Sprint flight moves PlayerPhysics.BaseSpeed * FlyBoostMultiplier = 8 * 10 = 80 b/s
+    // horizontally and the same 80 b/s vertically (Space/Ctrl reuse the move speed), so the
+    // flight diagonal is 80 * sqrt(2) ~ 113 b/s; 130 leaves slack for frame jitter.
+    public const float NetMaxMoveBlocksPerSecond = 130f;
+    // How far from the player's eye a client may edit a block: the client's own raycast reach,
+    // one block of cell-centre slack, and one state interval of movement, since the eye the server
+    // judges from can lag the eye that aimed the edit by up to one PlayerState.
+    public const float NetMaxEditReachBlocks =
+        World.InteractionReach + 1f + (float)(NetMaxMoveBlocksPerSecond * NetPlayerStateSeconds);
+    // How long a blocking send to one client may stall the server's main thread before the
+    // connection is treated as dead (NetworkStream.WriteTimeout), in milliseconds.
+    public const int NetSendTimeoutMs = 5000;
+    // A connection (said hello or not) that sent nothing for this long is dropped. Clients send a
+    // KeepAlive every NetKeepAliveSeconds and their PlayerState at 20 Hz, so this only fires for a
+    // dead or stalled peer.
+    public const double NetIdleTimeoutSeconds = 30.0;
+    // Far-LOD regions the server builds per Pump. A joining client asks for hundreds; building
+    // them all inside one message handler stalled the tick for seconds.
+    public const int NetLodBuildsPerPump = 4;
+    // Far-LOD region requests a client keeps outstanding at once, and how long before an
+    // unanswered one is asked again (TCP is reliable: the resend only covers a server that
+    // dropped the request, e.g. because its asker disconnected meanwhile).
+    public const int NetLodInFlightMax = 64;
+    public const double NetLodResendSeconds = 15.0;
+    // How long a shutdown signal (SIGTERM, SIGHUP, process exit) waits for the server's main loop
+    // to save the world before the handler gives up and lets the process end.
+    public const double ServerShutdownWaitSeconds = 30.0;
     // How long a connect attempt may hang before the client gives up and returns to the menu.
     public const double NetConnectTimeoutSeconds = 10.0;
     // Sent roughly this often so an idle connection is not mistaken for a dead one.

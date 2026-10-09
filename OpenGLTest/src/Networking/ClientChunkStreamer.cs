@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
 
@@ -25,7 +26,10 @@ public sealed class ClientChunkStreamer
     private readonly Action<int, int> _requestColumn;
     private readonly Dictionary<(int X, int Y, int Z), double> _chunkAsked = new();
     private readonly Dictionary<(int X, int Z), double> _columnAsked = new();
-    private readonly Dictionary<(int X, int Z), int[]> _columns = new();
+    // Read by mesh builds on the thread pool (ColumnHeightSource -> ChunkLighting), written here
+    // on the main thread, hence concurrent. A stored array is never edited: a changed column
+    // replaces it.
+    private readonly ConcurrentDictionary<(int X, int Z), int[]> _columns = new();
     private double _time;
 
     public ClientChunkStreamer(ChunkManager chunks, Action<int, int, int> requestChunk, Action<int, int> requestColumn)
@@ -62,7 +66,9 @@ public sealed class ClientChunkStreamer
                 break;
 
             // Ask for the column once per chunk column; the mesher needs all nine around a chunk.
-            if (NotAsked(_columnAsked, (cx, cz)))
+            // A column that already arrived is never asked again, however many of its chunks
+            // are still missing (every answer re-dirties the chunks around it).
+            if (!_columns.ContainsKey((cx, cz)) && NotAsked(_columnAsked, (cx, cz)))
             {
                 _columnAsked[(cx, cz)] = _time;
                 _requestColumn(cx, cz);
@@ -88,12 +94,16 @@ public sealed class ClientChunkStreamer
     /// <summary>
     /// Stores a column's heights from a <c>ColumnHeights</c> payload and re-meshes the loaded chunks
     /// whose light volume covers it (its own column and the eight neighbours), so their sunlight is
-    /// re-seeded now that the height is known.
+    /// re-seeded now that the height is known. A repeat answer carrying the heights already stored
+    /// changes nothing and re-meshes nothing. Returns whether the stored heights changed.
     /// </summary>
-    public void ApplyColumn(int cx, int cz, byte[] payload)
+    public bool ApplyColumn(int cx, int cz, byte[] payload)
     {
-        _columns[(cx, cz)] = ChunkNetCodec.DecodeHeights(payload);
+        var heights = ChunkNetCodec.DecodeHeights(payload);
         _columnAsked.Remove((cx, cz));
+        if (_columns.TryGetValue((cx, cz), out var stored) && stored.AsSpan().SequenceEqual(heights))
+            return false;
+        _columns[(cx, cz)] = heights;
 
         foreach (var chunk in _chunks.Chunks.Values)
         {
@@ -102,6 +112,8 @@ public sealed class ClientChunkStreamer
             if (Math.Abs(chunkX - cx) <= 1 && Math.Abs(chunkZ - cz) <= 1)
                 _chunks.MarkDirty(chunk.Position);
         }
+
+        return true;
     }
 
     private bool AskedRecently(int cx, int cy, int cz) =>

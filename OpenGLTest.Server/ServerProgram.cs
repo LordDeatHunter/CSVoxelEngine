@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace silkgltriangle;
@@ -42,42 +45,107 @@ public static class ServerProgram
             return;
         }
 
+        ChunkSaveStore save;
+        try
+        {
+            // The store takes the folder's session lock: a world the game or another server still
+            // has open is refused here, before anything could race its writer.
+            save = new ChunkSaveStore(world.Directory);
+        }
+        catch (IOException e)
+        {
+            Console.WriteLine("That world is open in another session (the game or another server); close it first.");
+            Console.WriteLine($"  ({e.Message})");
+            return;
+        }
+
         WorldSeed.Apply(world.Seed);
-        var save = new ChunkSaveStore(world.Directory);
         var gameWorld = new World(null!, null!, null!, null!, null!, null!, null, save, serverMode: true);
         using var server = new GameServer(gameWorld, world.Name, world.Seed, port);
-        server.Start();
+        try
+        {
+            server.Start();
+        }
+        catch (SocketException e)
+        {
+            // Most often the port is already in use. Nothing was served yet, but the world was
+            // opened, so it is closed cleanly before exiting.
+            Console.WriteLine($"Could not listen on port {port}: {e.Message}");
+            gameWorld.SaveAndDispose();
+            Log.Shutdown();
+            return;
+        }
+
         Console.WriteLine();
-        Console.WriteLine($"Serving '{world.Name}' (seed {world.Seed}) on 0.0.0.0:{port}.");
+        Console.WriteLine($"Serving '{world.Name}' (seed {world.Seed}) on port {server.BoundPort} (IPv4 and IPv6).");
         Console.WriteLine("Type 'stop' or press Ctrl+C to shut down.");
 
         var stop = new ManualResetEventSlim(false);
+        // Set by the main loop's finally once the world is saved, so a shutdown signal can wait
+        // for the save before letting the process end.
+        var stopped = new ManualResetEventSlim(false);
+        var shutdownWait = TimeSpan.FromSeconds(WorldGenerationConfig.ServerShutdownWaitSeconds);
         Console.CancelKeyPress += (_, e) =>
         {
             e.Cancel = true;
             stop.Set();
         };
+        // A process exit (a service stop, the last foreground thread ending) and the POSIX
+        // terminate/hang-up signals (a closed terminal, `kill`, a container stop; on Windows the
+        // console close and shutdown events) all save first.
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            stop.Set();
+            stopped.Wait(shutdownWait);
+        };
+        var signals = new List<PosixSignalRegistration>();
+        foreach (var signal in new[] { PosixSignal.SIGTERM, PosixSignal.SIGHUP })
+        {
+            try
+            {
+                signals.Add(PosixSignalRegistration.Create(signal, ctx =>
+                {
+                    ctx.Cancel = true;
+                    stop.Set();
+                    stopped.Wait(shutdownWait);
+                }));
+            }
+            catch (PlatformNotSupportedException)
+            {
+            }
+        }
+
         var input = new Thread(() => ReadStop(stop)) { IsBackground = true, Name = "server-stdin" };
         input.Start();
 
-        var last = Stopwatch.GetTimestamp();
-        while (!stop.IsSet)
+        try
         {
-            var now = Stopwatch.GetTimestamp();
-            var delta = (now - last) / (double)Stopwatch.Frequency;
-            last = now;
-            delta = Math.Clamp(delta, 0.0, 0.25);
+            var last = Stopwatch.GetTimestamp();
+            while (!stop.IsSet)
+            {
+                var now = Stopwatch.GetTimestamp();
+                var delta = (now - last) / (double)Stopwatch.Frequency;
+                last = now;
+                delta = Math.Clamp(delta, 0.0, 0.25);
 
-            gameWorld.Update(delta, null);
-            server.Pump(delta);
-            Thread.Sleep(1);
+                gameWorld.Update(delta, null);
+                server.Pump(delta);
+                Thread.Sleep(1);
+            }
         }
-
-        Console.WriteLine("Shutting down...");
-        server.Stop();
-        gameWorld.SaveAndDispose();
-        Log.Shutdown();
-        Console.WriteLine("Server stopped.");
+        finally
+        {
+            // Runs on a clean stop and on an unexpected exception alike, so the world is saved
+            // either way.
+            Console.WriteLine("Shutting down...");
+            server.Stop();
+            gameWorld.SaveAndDispose();
+            Log.Shutdown();
+            Console.WriteLine("Server stopped.");
+            stopped.Set();
+            foreach (var registration in signals)
+                registration.Dispose();
+        }
     }
 
     private static void ReadStop(ManualResetEventSlim stop)
@@ -107,7 +175,8 @@ public static class ServerProgram
             var worlds = store.List();
             Console.WriteLine(worlds.Count == 0 ? "No saved worlds yet." : "Saved worlds:");
             for (var i = 0; i < worlds.Count; i++)
-                Console.WriteLine($"  {i + 1}. {worlds[i].Name} (seed {worlds[i].Seed})");
+                Console.WriteLine($"  {i + 1}. {worlds[i].Name} (seed {worlds[i].Seed})"
+                    + (IsHostable(worlds[i]) ? "" : " (old format, cannot be hosted)"));
             Console.Write("Choose a world number, or N for a new world: ");
 
             var line = Console.ReadLine();
@@ -118,7 +187,17 @@ public static class ServerProgram
             if (line.Equals("n", StringComparison.OrdinalIgnoreCase))
                 return CreateWorld(store);
             if (int.TryParse(line, out var index) && index >= 1 && index <= worlds.Count)
-                return worlds[index - 1];
+            {
+                var chosen = worlds[index - 1];
+                if (IsHostable(chosen))
+                    return chosen;
+                // The same refusal the main menu makes: a world in another save format would be
+                // half-loaded and its chunks regenerated over, so it is never opened.
+                Console.WriteLine($"'{chosen.Name}' was saved by an older version (format {chosen.Version}, " +
+                                  $"this build reads {WorldStore.CurrentVersion}); it cannot be hosted.");
+                Console.WriteLine();
+                continue;
+            }
             if (line.Length == 0 && worlds.Count == 0)
                 return CreateWorld(store);
 
@@ -126,6 +205,9 @@ public static class ServerProgram
             Console.WriteLine();
         }
     }
+
+    // Whether this build reads the world's save format (MainMenuController's PLAY gate)
+    private static bool IsHostable(WorldInfo world) => world.Version == WorldStore.CurrentVersion;
 
     private static WorldInfo CreateWorld(WorldStore store)
     {

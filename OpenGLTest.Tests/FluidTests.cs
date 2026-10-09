@@ -10,6 +10,20 @@ public sealed class FluidTests
     public FluidTests() => TestContent.EnsureLoaded();
 
     [Fact]
+    public void ADisabledManagerSchedulesNothing()
+    {
+        // A multiplayer client never ticks fluids, so its edits must not grow the schedule
+        var disabled = new FluidManager { Enabled = false };
+        disabled.ScheduleAround(3, 40, -7);
+        disabled.ScheduleBox(new Vector3(0, 0, 0), new Vector3(4, 4, 4));
+        Assert.Equal(0, disabled.PendingCells);
+
+        var enabled = new FluidManager();
+        enabled.ScheduleAround(3, 40, -7);
+        Assert.True(enabled.PendingCells > 0);
+    }
+
+    [Fact]
     public void SourceIsFullHeightAndFallingIsToo()
     {
         Assert.True(FluidState.IsSource(FluidState.Source));

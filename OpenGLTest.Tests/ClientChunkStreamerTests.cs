@@ -72,4 +72,51 @@ public sealed class ClientChunkStreamerTests
         Assert.Equal(heights, source!(2, -3));
         Assert.Null(source(0, 0));
     }
+
+    [Fact]
+    public void AReceivedColumnIsNeverAskedForAgain()
+    {
+        var manager = new ChunkManager(null!);
+        var columns = new List<(int X, int Z)>();
+        var streamer = new ClientChunkStreamer(manager, (_, _, _) => { }, (x, z) => columns.Add((x, z)));
+        streamer.Update(Vector3.Zero, 0.016);
+        Assert.Contains((0, 0), columns);
+
+        streamer.ApplyColumn(0, 0, ChunkNetCodec.EncodeHeights(new int[Chunk.Size * Chunk.Size]));
+        columns.Clear();
+        // Long past every resend interval, with the column's chunks still missing
+        for (var i = 0; i < 20; i++)
+            streamer.Update(Vector3.Zero, 1.0);
+
+        Assert.DoesNotContain((0, 0), columns);
+    }
+
+    [Fact]
+    public void OnlyAChangedColumnCountsAsNew()
+    {
+        var manager = new ChunkManager(null!);
+        var streamer = new ClientChunkStreamer(manager, (_, _, _) => { }, (_, _) => { });
+        var heights = new int[Chunk.Size * Chunk.Size];
+        Array.Fill(heights, 12);
+
+        Assert.True(streamer.ApplyColumn(1, 1, ChunkNetCodec.EncodeHeights(heights)));
+        // The same heights again (a duplicate answer) change nothing and re-dirty nothing
+        Assert.False(streamer.ApplyColumn(1, 1, ChunkNetCodec.EncodeHeights(heights)));
+
+        var raised = (int[])heights.Clone();
+        raised[5] += 3;
+        Assert.True(streamer.ApplyColumn(1, 1, ChunkNetCodec.EncodeHeights(raised)));
+        Assert.Equal(raised, manager.ColumnHeightSource!(1, 1));
+    }
+
+    [Fact]
+    public void AStreamedChunkIsNotQueuedForTheWorldgenWaterWake()
+    {
+        // The wake queue is only drained by FluidManager.WakeLoadedChunks, which a client never
+        // runs; a streamed chunk left in it would stay referenced for the whole session.
+        var manager = new ChunkManager(null!);
+        manager.ApplyStreamedChunk(Vector3.Zero, new ChunkSnapshot(new byte[Chunk.BlockCount], null, null));
+
+        Assert.False(manager.TryDequeueLoaded(out _));
+    }
 }

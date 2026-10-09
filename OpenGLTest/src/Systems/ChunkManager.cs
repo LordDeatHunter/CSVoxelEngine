@@ -861,6 +861,11 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         Chunks.SetPacked(key, chunk);
         Interlocked.Increment(ref _loadedChunkCount);
         _loadedChunks.Enqueue(chunk);
+        // Only once published: AdoptRestoredPlacements skips a chunk that is not the live one at
+        // its position, so a restored chunk queued before SetPacked could be dequeued early, read
+        // as stale and lose its player-placed cells for the session.
+        if (chunk.IsRestored)
+            _restoredChunks.Enqueue(chunk);
 
         // Mark this chunk and neighbors dirty for meshing
         _dirtyChunks.TryAdd(key, 0);
@@ -884,8 +889,10 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// Builds the chunk at <paramref name="pos"/> with its block data ready: restored from the
     /// save store when it holds one for <paramref name="key"/> (a pending snapshot the writer
     /// has not landed yet counts, which is what makes an immediate fly-back safe), generated
-    /// from worldgen otherwise. A restored chunk is also queued for the main thread to adopt its
-    /// player-placed cells. Runs on a generation worker; registering the chunk is the caller's.
+    /// from worldgen otherwise (<see cref="Chunk.IsRestored"/> tells them apart). Runs on a
+    /// generation worker; registering the chunk is the caller's, and so is queueing a restored
+    /// one for the main thread to adopt its player-placed cells, which must happen after the
+    /// chunk is published (see <see cref="QueueChunk"/>).
     /// </summary>
     internal Chunk CreateChunk(Vector3 pos, long key)
     {
@@ -893,7 +900,6 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         {
             var restored = new Chunk(gl, pos, generateBlockData: false);
             restored.RestoreFrom(snapshot);
-            _restoredChunks.Enqueue(restored);
             return restored;
         }
 
@@ -937,7 +943,9 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         chunk.RestoreFrom(snapshot, streamedColumns: true);
         Chunks.SetPacked(key, chunk);
         Interlocked.Increment(ref _loadedChunkCount);
-        _loadedChunks.Enqueue(chunk);
+        // Not queued on _loadedChunks: that queue feeds the worldgen water wake
+        // (FluidManager.WakeLoadedChunks), which a client never runs, so every streamed chunk
+        // would sit in it for the rest of the session.
         _dirtyChunks.TryAdd(key, 0);
 
         var px = MathUtils.FloorToInt(pos.X);

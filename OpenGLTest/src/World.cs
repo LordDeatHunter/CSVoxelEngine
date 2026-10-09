@@ -77,6 +77,11 @@ public class World : IItemUseWorld
     // applied its lighting clock; null when the world has no saved player
     private PlayerSaveData? _savedPlayer;
 
+    // Server mode only: the player.json the hosted world was opened with (null for a new world),
+    // kept for the whole session because the server camera is no player and must never be saved
+    // as one. CapturePlayer writes it back with only the clock and the inventory refreshed.
+    private readonly PlayerSaveData? _hostedPlayer;
+
     // What the first SaveAndDispose returned, so a repeated call reports the same thing
     private bool _disposeResult;
 
@@ -355,11 +360,22 @@ public class World : IItemUseWorld
                 // follows it and has a stable target until real players connect.
                 Camera.RestoreState(Camera.Position, Camera.Yaw, Camera.Pitch, creative: true, flying: true);
             }
+            if (serverMode)
+            {
+                // The camera is the server's chunk focus, not a player: the player.json this world
+                // was opened with is kept and written back unchanged (see CapturePlayer), so a
+                // survival world hosted once does not reopen in creative flight at the centroid.
+                _hostedPlayer = _savedPlayer;
+            }
             if (clientMode)
             {
                 // A client settles onto the server's spawn (Program teleports it), so its own
                 // worldgen spawn search never runs - which would compute columns the server owns.
                 _spawnSettled = true;
+                // Nor does it tick fluids or leaf decay (the server's broadcast carries both), so
+                // the edit paths' scheduling would only pile up cells nothing ever drains.
+                _fluidManager.Enabled = false;
+                _leafDecay.Enabled = false;
             }
             generationWorker = _generationWorker = new ChunkGenerationWorker(_chunkManager, Camera);
             lodManager = _lodManager = new LodManager(lodGeometry);
@@ -662,24 +678,63 @@ public class World : IItemUseWorld
 
     /// <summary>
     /// Applies a block change that came from elsewhere (a server broadcasting to a client, or a
-    /// client's edit on the server): raw set, remesh and the same fluid/leaf/falling scheduling an
-    /// ordinary edit gets. Never raises <see cref="BlockEdited"/>, so it cannot loop.
+    /// client's edit on the server): the write, its remesh and the same fluid/leaf scheduling an
+    /// ordinary edit gets. Id 0 removes the cell, a fluid included (a client's bucket scoop: its
+    /// mining path never sends id 0 for a fluid); a fluid id pours like a bucket; the cell's own id
+    /// rewrites its state byte (a pile growing); a placeable cell is placed into; and an occupied
+    /// cell is replaced outright (a multiblock conversion, or a correction the server sent). On a
+    /// server a removal then has a mined cell's consequences (see <see cref="AfterNetworkRemoval"/>);
+    /// on a client those arrive in the server's own broadcast. Returns whether the cell changed:
+    /// false when its chunk is not loaded or the write was refused, so the server can correct the
+    /// sender. Never raises <see cref="BlockEdited"/>, so it cannot loop.
     /// </summary>
-    public void ApplyNetworkBlockEdit(int x, int y, int z, byte blockId, byte state)
+    public bool ApplyNetworkBlockEdit(int x, int y, int z, byte blockId, byte state)
     {
         var cell = new Vector3(x, y, z);
         var chunkPos = VoxelCoords.ChunkPosOf(cell);
         if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk))
-            return;
+            return false;
 
+        var existing = BlockIdAt(cell);
+        var existingState = _chunkManager.GetStateGlobal(x, y, z);
+        bool changed;
         if (blockId == 0)
         {
-            if (!BlockType.IsFluid(BlockIdAt(cell)))
-                chunk.RemoveBlockAt(cell, _chunkManager);
+            // The bucket path, so the fluid tick around the scooped cell is scheduled
+            changed = BlockType.IsFluid(existing)
+                ? _fluidManager.SetCellImmediate(cell, 0, 0, _chunkManager)
+                : chunk.RemoveBlockAt(cell, _chunkManager);
+        }
+        else if (BlockType.IsFluid(blockId))
+        {
+            // A poured bucket: written like the local bucket path does
+            changed = _fluidManager.SetCellImmediate(cell, blockId, state, _chunkManager);
+        }
+        else if (existing == blockId)
+        {
+            // Same block, new state byte: a pile or snow stack built up
+            changed = chunk.SetStateAt(cell, state, _chunkManager);
+        }
+        else if (existing == 0 || Placement.CanOccupy(existing, existingState))
+        {
+            changed = chunk.PlaceBlockAt(cell, blockId, _chunkManager, state);
         }
         else
         {
-            chunk.PlaceBlockAt(cell, blockId, _chunkManager, state);
+            // Occupied by another block: a structure converted over its source blocks, or the
+            // authoritative cell after a refused optimistic edit. One raw write, the edited chunk
+            // remeshed now and everything in light radius through the async budget.
+            chunk.SetBlockRaw(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask, blockId, state);
+            _chunkManager.ImmediateRemeshWithBorders(chunkPos, cell);
+            chunk.RemeshAfterBatchEdit(_chunkManager);
+            changed = true;
+        }
+
+        if (!changed)
+            return false;
+
+        if (blockId != 0)
+        {
             if (LodSurface.IsSurfaceSolid(blockId))
                 NotifyLodEdit(x, y, z);
             if (BlockType.ById[blockId]?.Renderer == BlockRenderer.Quern)
@@ -688,13 +743,59 @@ public class World : IItemUseWorld
 
         _fluidManager.ScheduleAround(cell);
         _leafDecay.ScheduleAround(cell);
-        _falling.TryTopple(_chunkManager, _lodManager, _fluidManager, x, y, z);
+        if (blockId == 0)
+        {
+            if (_serverMode)
+                AfterNetworkRemoval(cell, existing);
+        }
+        else if (!_clientMode)
+        {
+            // Sand placed into thin air falls at once, exactly as a local placement does (a
+            // client ticks no falling blocks; the server's fall arrives as cell changes)
+            _falling.TryTopple(_chunkManager, _lodManager, _fluidManager, x, y, z);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// What a mined cell sets off beyond its own write, run on a server after a client's removal
+    /// arrived: a fragile block resting on it pops (through <see cref="RemoveBlock"/>, as a local
+    /// break does), sand above it topples, the far LOD's surface and caps follow, and a tree
+    /// block disturbs the far canopy. A client runs none of this: the server's journal broadcasts
+    /// every consequence to it.
+    /// </summary>
+    private void AfterNetworkRemoval(Vector3 cell, byte removedId)
+    {
+        // A station the remote player broke hands back what it held, as a local break does
+        var renderer = BlockType.ById[removedId]?.Renderer;
+        if (renderer == BlockRenderer.BranchPile)
+            _campfires.NotifyBlockRemoved((int)cell.X, (int)cell.Y, (int)cell.Z, _dropManager);
+        if (renderer == BlockRenderer.Quern)
+            _querns.NotifyBlockRemoved((int)cell.X, (int)cell.Y, (int)cell.Z, _dropManager);
+        if (ContentRegistry.IsCastMold(removedId))
+            _casting.NotifyBlockRemoved(cell, _dropManager);
+
+        var above = cell + Vector3.UnitY;
+        if (BlockType.ById[BlockIdAt(above)]?.NeedsSupport == true)
+            RemoveBlock(above);
+        _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
+            (int)above.X, (int)above.Y, (int)above.Z);
+
+        NotifyLodEdit((int)cell.X, (int)cell.Y, (int)cell.Z);
+        if (TreeGenerator.IsTreeBlock(removedId))
+        {
+            TreeGenerator.PoisonCanopy((int)cell.X, (int)cell.Z, TreeGenerator.SingleEditPoisonRadius);
+            _lodManager.MarkEditedColumn((int)cell.X, (int)cell.Z);
+        }
     }
 
     /// <summary>
     /// Applies a batch of server cell changes (an explosion, a fluid step, a fell) in one pass: raw
-    /// writes with no per-cell remesh, then a dirty mark on each touched chunk and its six
-    /// neighbours, so a burst rebuilds in the normal asynchronous pass instead of hitching.
+    /// writes with no per-cell remesh, then one light-radius area rebuild per touched chunk
+    /// (<see cref="Chunk.RemeshAfterBatchEdit"/>, the same dirtying a local batch edit uses, so a
+    /// remote lamp or roof edit relights the edge and corner chunks too), each chunk once however
+    /// many of its cells changed. A quern that arrives registers its block entity so it draws.
     /// </summary>
     public void ApplyNetworkBlockChanges(IReadOnlyList<NetCellChange> changes)
     {
@@ -708,12 +809,15 @@ public class World : IItemUseWorld
             chunk.SetBlockRaw(change.X & Chunk.SizeMask, change.Y & Chunk.SizeMask, change.Z & Chunk.SizeMask,
                 change.Id, change.State);
             _netTouchedChunks.Add(chunk.Position);
-            foreach (var d in Vector3Directions.CardinalOffsets)
-                _netTouchedChunks.Add(chunk.Position + new Vector3(d.X, d.Y, d.Z));
+            if (BlockType.ById[change.Id]?.Renderer == BlockRenderer.Quern)
+                _querns.Ensure(change.X, change.Y, change.Z);
         }
 
         foreach (var pos in _netTouchedChunks)
-            _chunkManager.MarkDirty(pos);
+        {
+            if (_chunkManager.Chunks.TryGetValue(pos, out var touched))
+                touched.RemeshAfterBatchEdit(_chunkManager);
+        }
     }
 
     /// <summary>
@@ -847,6 +951,15 @@ public class World : IItemUseWorld
 
         for (var i = 0; i < _remotePlayers.Count; i++)
             _remotePlayers[i].Update(deltaTime);
+
+        // The purely cosmetic systems a client's own edits still feed (mining debris, leaf
+        // bursts and the ambient leaf fall) run locally, or what Render draws would hang in
+        // mid-air. Falling blocks, TNT and toppling trees are never created on a client (see
+        // RemoveBlock), so their ticks stay the server's.
+        FrameProfiler.Begin(ProfileSection.Entities);
+        _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager);
+        _debris.Update((float)deltaTime, _chunkManager);
+        FrameProfiler.End(ProfileSection.Entities);
 
         FrameProfiler.Begin(ProfileSection.Raycast);
         _hasSelectedBlock = Camera.Raycast(InteractionReach, _chunkManager,
@@ -1219,6 +1332,9 @@ public class World : IItemUseWorld
     /// </summary>
     private PlayerSaveData CapturePlayer()
     {
+        if (_serverMode)
+            return CaptureHostedPlayer();
+
         var pos = Camera.Position;
         return new PlayerSaveData
         {
@@ -1230,6 +1346,31 @@ public class World : IItemUseWorld
             Health = _health.Health,
             LightingClock = Phase == WorldPhase.Loading ? _savedPlayer?.LightingClock ?? LightingTime : LightingTime,
             RespawnEye = _hasRespawnEye ? [_respawnEye.X, _respawnEye.Y, _respawnEye.Z] : null,
+            Inventory = Inventory.Export()
+        };
+    }
+
+    /// <summary>
+    /// The player a server writes: never its own camera (forced creative and flying, parked at
+    /// the players' centroid), but the player.json the world was opened with, with only the
+    /// lighting clock and the shared inventory refreshed. A world that had none gets no pose, no
+    /// creative or flight and no respawn eye, so opening it in singleplayer later searches the
+    /// surface for a survival spawn as a new world would.
+    /// </summary>
+    private PlayerSaveData CaptureHostedPlayer()
+    {
+        var hosted = _hostedPlayer;
+        return new PlayerSaveData
+        {
+            Position = hosted?.Position,
+            Yaw = hosted?.Yaw,
+            Pitch = hosted?.Pitch,
+            Creative = hosted?.Creative ?? false,
+            Flying = hosted?.Flying ?? false,
+            Health = hosted?.Health ?? _health.Health,
+            // Like a game world: until the flip has applied the saved clock, keep the saved one
+            LightingClock = Phase == WorldPhase.Loading ? hosted?.LightingClock ?? LightingTime : LightingTime,
+            RespawnEye = hosted?.RespawnEye,
             Inventory = Inventory.Export()
         };
     }
@@ -2118,8 +2259,10 @@ public class World : IItemUseWorld
         var creative = Camera.IsCreative;
 
         // A mined wood block fells whatever it was holding up instead of dropping one
-        // block (see FellWood): a trunk cut drops the crown, a branch cut only its children
-        if (BlockType.IsTreeWood(brokenId))
+        // block (see FellWood): a trunk cut drops the crown, a branch cut only its children.
+        // A multiplayer client fells nothing itself: it clears the cut cell like any other block
+        // and forwards it, and what the server makes of the cut arrives in its broadcast.
+        if (BlockType.IsTreeWood(brokenId) && !_clientMode)
             FellWood(blockPos, brokenId, brokenState, chunk, creative);
         // Mining any cell of a multiblock takes the whole structure apart instead of leaving
         // invisible part cells standing (see RevertMultiblock)
@@ -2172,9 +2315,11 @@ public class World : IItemUseWorld
 
         // Sand and its kind need the block under them too, but they topple into a falling
         // cube instead of popping: a no-op unless a falls block sits right above the break,
-        // and its own check chains the rest of the column
-        _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
-            (int)above.X, (int)above.Y, (int)above.Z);
+        // and its own check chains the rest of the column. A client simulates no falling
+        // blocks: the server topples them and broadcasts the cells.
+        if (!_clientMode)
+            _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
+                (int)above.X, (int)above.Y, (int)above.Z);
         // The mined cell ends as air on every path (plain break, felling, a multiblock revert);
         // report it so a multiplayer client forwards the removal. Tree crowns and cascades do not
         // travel this way yet - only the directly edited cell.
@@ -2320,7 +2465,20 @@ public class World : IItemUseWorld
         }
 
         OnMultiblockConverted(anchor, facing, anchorType);
+        // A client forwards all eight cells (the anchor and its parts, each with the facing and
+        // offset in its state byte), so the server holds the same structure
+        RaiseBlockEditedMultiblock(anchor);
         return true;
+    }
+
+    /// <summary><see cref="RaiseBlockEdited"/> over every cell of the 2x2x2 structure at
+    /// <paramref name="anchor"/>.</summary>
+    private void RaiseBlockEditedMultiblock(Vector3 anchor)
+    {
+        if (BlockEdited == null)
+            return;
+        foreach (var (dx, dy, dz) in Multiblock.Offsets)
+            RaiseBlockEdited(anchor + new Vector3(dx, dy, dz));
     }
 
     /// <summary>
@@ -2353,6 +2511,14 @@ public class World : IItemUseWorld
             _dropManager.SpawnLoot(brokenId, blockPos);
 
         OnMultiblockBroken(anchor, anchorType, blockPos);
+        // The other seven cells went back to the source block: a client forwards them too, or
+        // the server would keep invisible part cells standing (RemoveBlock reports the mined one)
+        foreach (var (dx, dy, dz) in Multiblock.Offsets)
+        {
+            var cell = anchor + new Vector3(dx, dy, dz);
+            if (cell != blockPos)
+                RaiseBlockEdited(cell);
+        }
     }
 
     /// <summary>Runs right after a structure went up, so the managers that own its behaviour
@@ -2396,10 +2562,17 @@ public class World : IItemUseWorld
     /// scatters (every drop rolls its own random pop) and picks back up one unit at a time.
     /// Does nothing unless the world is playing: nothing may edit an unloaded world.
     /// </summary>
-    public void ThrowSelected(bool wholeStack = false)
+    public void ThrowSelected(bool wholeStack = false) =>
+        ThrowSelected(wholeStack, Camera.Position, Camera.ViewDirection);
+
+    /// <summary>
+    /// <see cref="ThrowSelected(bool)"/> from an explicit <paramref name="eye"/> along
+    /// <paramref name="forward"/> (a unit vector): what a server runs for a client's Q-drop, which
+    /// must leave from that player, not from the server's own camera.
+    /// </summary>
+    public void ThrowSelected(bool wholeStack, Vector3 eye, Vector3 forward)
     {
         if (!IsPlaying) return;
-        var forward = Camera.ViewDirection;
 
         // A held tool is one instance: it leaves the pool and every hotbar slot holding it
         if (Inventory.SelectedToolInstance is var instance and > 0)
@@ -2407,7 +2580,7 @@ public class World : IItemUseWorld
             var id = Inventory.SelectedBlockId;
             if (id == 0) return;
             if (!Inventory.RemoveTool(instance)) return;
-            _dropManager.SpawnAt(id, Camera.Position + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f);
+            _dropManager.SpawnAt(id, eye + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f);
             return;
         }
 
@@ -2420,7 +2593,7 @@ public class World : IItemUseWorld
             // Spend first so a failed spend never duplicates the drop
             if (!Inventory.ConsumeSelected()) break;
 
-            _dropManager.SpawnAt(stackId, Camera.Position + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f);
+            _dropManager.SpawnAt(stackId, eye + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f);
         }
     }
 
@@ -2608,7 +2781,11 @@ public class World : IItemUseWorld
         var changed = _fluidManager.SetCellImmediate(pos, 0, 0, _chunkManager);
         // Scheduled for uniformity with every other edit path; a flow itself never overwrites a
         // leaf, since leaves are not replaceable
-        if (changed) _leafDecay.ScheduleAround(pos);
+        if (changed)
+        {
+            _leafDecay.ScheduleAround(pos);
+            RaiseBlockEdited(pos);
+        }
         return changed;
     }
 
@@ -2617,17 +2794,38 @@ public class World : IItemUseWorld
         var changed = _fluidManager.SetCellImmediate(pos, fluidId, FluidState.Source, _chunkManager);
         // Scheduled for uniformity with every other edit path; a flow itself never overwrites a
         // leaf, since leaves are not replaceable
-        if (changed) _leafDecay.ScheduleAround(pos);
+        if (changed)
+        {
+            _leafDecay.ScheduleAround(pos);
+            RaiseBlockEdited(pos);
+        }
         return changed;
+    }
+
+    /// <summary>
+    /// Reports a player-driven edit of <paramref name="cell"/> through <see cref="BlockEdited"/>
+    /// with the id and state the cell holds now, so a multiplayer client forwards the final result
+    /// of the edit whatever path made it. Nothing is subscribed in singleplayer or on a server.
+    /// </summary>
+    private void RaiseBlockEdited(Vector3 cell)
+    {
+        if (BlockEdited is not { } edited)
+            return;
+        int x = (int)cell.X, y = (int)cell.Y, z = (int)cell.Z;
+        edited(x, y, z, _chunkManager.GetBlockGlobal(x, y, z), _chunkManager.GetStateGlobal(x, y, z));
     }
 
     bool IItemUseWorld.PlaceBlockAtFace(Vector3 hit, Vector3 normal, byte blockId, byte state,
         out Vector3 placedCell) =>
         PlaceBlockAtFace(hit, normal, blockId, state, out placedCell);
 
-    void IItemUseWorld.AfterPlaced(Vector3 pos) =>
+    void IItemUseWorld.AfterPlaced(Vector3 pos)
+    {
+        // As in TryPlaceBlockFromRaycast: a client leaves the fall to the server
+        if (_clientMode) return;
         _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
             (int)pos.X, (int)pos.Y, (int)pos.Z);
+    }
 
     int IItemUseWorld.PileCountFor(byte blockId, int x, int y, int z, byte state)
     {
@@ -2645,7 +2843,9 @@ public class World : IItemUseWorld
     bool IItemUseWorld.SetPileCount(Vector3 pos, byte count)
     {
         var chunk = _chunkManager.ChunkAt((int)pos.X, (int)pos.Y, (int)pos.Z);
-        return chunk != null && chunk.SetStateAt(pos, count, _chunkManager);
+        var changed = chunk != null && chunk.SetStateAt(pos, count, _chunkManager);
+        if (changed) RaiseBlockEdited(pos);
+        return changed;
     }
 
     int IItemUseWorld.PileSecondaryFor(byte blockId, int x, int y, int z, byte state)
@@ -2664,7 +2864,9 @@ public class World : IItemUseWorld
         byte state = BlockType.ById[blockId]?.Renderer == BlockRenderer.Pebbles
             ? PebbleGenerator.StateFor(total, secondary)
             : (byte)total;
-        return chunk.SetStateAt(pos, state, _chunkManager);
+        var changed = chunk.SetStateAt(pos, state, _chunkManager);
+        if (changed) RaiseBlockEdited(pos);
+        return changed;
     }
 
     void IItemUseWorld.UnmarkPlayerPlaced(int x, int y, int z) =>
@@ -2696,12 +2898,22 @@ public class World : IItemUseWorld
     {
         var removed = _chunkManager.ChunkAt((int)cell.X, (int)cell.Y, (int)cell.Z)?.RemoveBlockAt(cell, _chunkManager) == true;
         // Scheduled for uniformity with every other edit path
-        if (removed) _leafDecay.ScheduleAround(cell);
+        if (removed)
+        {
+            _leafDecay.ScheduleAround(cell);
+            RaiseBlockEdited(cell);
+        }
         return removed;
     }
 
-    void IItemUseWorld.SpawnPrimedTnt(Vector3 cell, byte blockId) =>
+    void IItemUseWorld.SpawnPrimedTnt(Vector3 cell, byte blockId)
+    {
+        // A client simulates no TNT: the removed cell was forwarded, and anything the server
+        // makes of it arrives in its broadcast. A local fuse would blow a crater only this
+        // client sees.
+        if (_clientMode) return;
         _tntManager.Spawn(cell, blockId, TntManager.PlayerFuseSeconds);
+    }
 
     void IItemUseWorld.ScheduleFluidAround(Vector3 cell) => _fluidManager.ScheduleAround(cell);
 
@@ -2960,9 +3172,12 @@ public class World : IItemUseWorld
 
         Player.Punch();
         // Sand placed into thin air falls at once instead of hovering (stackable piles never
-        // fall � the registry forbids the combination � so only the block path topples)
-        _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
-            (int)placePos.X, (int)placePos.Y, (int)placePos.Z);
+        // fall � the registry forbids the combination � so only the block path topples). A
+        // client never ticks falling blocks, so it leaves the fall to the server, which topples
+        // the forwarded placement and broadcasts the cells.
+        if (!_clientMode)
+            _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
+                (int)placePos.X, (int)placePos.Y, (int)placePos.Z);
         return true;
     }
 

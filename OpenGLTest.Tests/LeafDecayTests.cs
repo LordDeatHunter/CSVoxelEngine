@@ -29,6 +29,20 @@ public sealed class LeafDecayTests
 
     public LeafDecayTests() => TestContent.EnsureLoaded();
 
+    [Fact]
+    public void ADisabledManagerSchedulesNothing()
+    {
+        // A multiplayer client never ticks the decay, so its edits must not fill the backlog
+        var disabled = new LeafDecayManager { Enabled = false };
+        disabled.ScheduleAround(new Vector3(BaseX, RootY, BaseZ));
+        disabled.ScheduleBox(new Vector3(BaseX, RootY, BaseZ), new Vector3(BaseX + 3, RootY + 3, BaseZ + 3));
+        Assert.Equal(0, disabled.PendingCells);
+
+        var enabled = new LeafDecayManager();
+        enabled.ScheduleAround(new Vector3(BaseX, RootY, BaseZ));
+        Assert.True(enabled.PendingCells > 0);
+    }
+
     private static IEnumerable<TreeSpecies> LeafySpecies => StampedTree.WorldgenSpecies.Where(s => s.HasLeaves);
 
     /// <summary>Runs exactly <paramref name="ticks"/> whole ticks: one tick's worth of time

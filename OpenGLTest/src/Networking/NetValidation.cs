@@ -13,22 +13,29 @@ public static class NetValidation
     /// <summary>
     /// Accepts a move whose distance is within <paramref name="maxSpeed"/> blocks per second over
     /// <paramref name="deltaSeconds"/> plus a small margin (dropped packets, a laggy frame). A
-    /// rejected move leaves <paramref name="accepted"/> at <paramref name="from"/>.
+    /// rejected move sets <paramref name="accepted"/> to <paramref name="from"/> moved toward
+    /// <paramref name="to"/> by exactly the allowed distance, so the authoritative position
+    /// converges on the client at the speed cap instead of freezing at a stale point (which would
+    /// get every later state rejected too).
     /// </summary>
     public static bool AcceptMove(Vector3 from, Vector3 to, double deltaSeconds, float maxSpeed,
         out Vector3 accepted)
     {
         var distance = Vector3.Distance(from, to);
-        var allowed = maxSpeed * MathF.Max((float)deltaSeconds, 0.001f) + 2f;
+        var allowed = AllowedDistance(deltaSeconds, maxSpeed);
         if (distance <= allowed)
         {
             accepted = to;
             return true;
         }
 
-        accepted = from;
+        accepted = from + (to - from) * (allowed / distance);
         return false;
     }
+
+    /// <summary>The distance <see cref="AcceptMove"/> allows over <paramref name="deltaSeconds"/>.</summary>
+    public static float AllowedDistance(double deltaSeconds, float maxSpeed) =>
+        maxSpeed * MathF.Max((float)deltaSeconds, 0.001f) + 2f;
 
     /// <summary>Whether a block cell's centre is within <paramref name="reach"/> blocks of the eye.</summary>
     public static bool InEditReach(Vector3 eye, int x, int y, int z, float reach)

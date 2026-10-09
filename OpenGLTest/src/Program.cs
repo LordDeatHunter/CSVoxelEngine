@@ -248,8 +248,7 @@ public static class Program
                 w.Inventory.Scroll(wheel.Y);
                 // While connected the server owns the selection: mirror the step as an intent, or
                 // the next inventory sync would put the slot straight back.
-                if (netClient is { Status: NetworkStatus.Handshaken } client)
-                    SendInventoryIntent(client, NetInventoryAction.SelectSlot, w.Inventory.SelectedIndex);
+                MirrorSelection(w.Inventory.SelectedIndex);
             }
             else if (inventoryView.IsOpen && !pauseMenuView.IsOpen && inputManager.Mouse != null)
             {
@@ -411,23 +410,43 @@ public static class Program
         if (client == null)
             return;
 
-        if (client.Status == NetworkStatus.Failed)
+        // Read once: the connect and reader threads publish it concurrently. A server that closes
+        // right after its hello reaches Disconnected before this screen ever saw Handshaken, which
+        // is a failed connect too, not a reason to wait forever.
+        var status = client.Status;
+        if (status is NetworkStatus.Failed or NetworkStatus.Disconnected)
         {
-            var reason = client.Error ?? "Could not connect";
+            var reason = client.Error ?? (status == NetworkStatus.Disconnected
+                ? "The server closed the connection"
+                : "Could not connect");
             DisconnectNetwork();
             AbortConnect(reason);
             return;
         }
 
-        if (client.Status != NetworkStatus.Handshaken)
+        if (status != NetworkStatus.Handshaken)
         {
             loadingView.Update(0f, false, deltaTime);
             return;
         }
 
         var server = client.Server!.Value;
+
+        // The client renders with the server's seed: the biome tint (BiomeTint ->
+        // TerrainGenerator.Climate) and the water-surface codes (ColumnCache) read worldgen
+        // locally, and must agree with the server's far LOD at the seam. Legal only while no
+        // world is live, exactly like a singleplayer open.
+        if (WorldSeed.WorldIsLive)
+        {
+            DisconnectNetwork();
+            AbortConnect(SeedLockedNotice);
+            menu.LockWorlds(SeedLockedNotice);
+            return;
+        }
+
         try
         {
+            WorldSeed.Apply(server.Seed);
             // A multiplayer client renders, so it is a real world with the renderer's pools and the
             // window - but client mode: no worldgen (chunks stream from the server), no far LOD and
             // no local simulation, so a custom or premade server world is exactly what is shown.
@@ -471,8 +490,10 @@ public static class Program
         menu.ShowNotice(notice);
     }
 
-    /// <summary>Sends periodics and drains every server message onto the world and the chat.</summary>
-    private static void UpdateNetwork(NetworkClient client, float deltaTime)
+    /// <summary>Sends periodics and drains every server message onto the world and the chat.
+    /// False when a bad message dropped the connection and returned to the menu (the world is
+    /// gone then, so the caller must stop the frame).</summary>
+    private static bool UpdateNetwork(NetworkClient client, float deltaTime)
     {
         var w = world!;
         clientStreamer?.Update(w.Camera.Position, deltaTime);
@@ -499,7 +520,24 @@ public static class Program
         }
 
         while (client.Inbound.TryDequeue(out var payload))
-            HandleNetworkMessage(w, payload);
+        {
+            // A truncated or malformed message from the server must not crash the game: leave
+            // the server and say why instead.
+            try
+            {
+                HandleNetworkMessage(w, payload);
+            }
+            catch (Exception e) when (e is System.IO.EndOfStreamException or System.IO.IOException
+                                          or System.IO.InvalidDataException or FormatException
+                                          or ArgumentException)
+            {
+                Log.Warn($"Multiplayer: bad message from the server: {e.Message}");
+                DisconnectToMenu("The server sent bad data");
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static void HandleNetworkMessage(World w, byte[] payload)
@@ -653,6 +691,17 @@ public static class Program
             SendInventoryIntent(client, NetInventoryAction.SelectSlot, index);
         else
             world!.Inventory.Select(index);
+    }
+
+    /// <summary>
+    /// After a local selection change (the wheel, a middle-click pick), tells the server about it
+    /// while connected, since the server owns the selection and its next inventory sync would
+    /// otherwise revert the slot. Nothing to do in singleplayer.
+    /// </summary>
+    private static void MirrorSelection(int index)
+    {
+        if (netClient is { Status: NetworkStatus.Handshaken } client)
+            SendInventoryIntent(client, NetInventoryAction.SelectSlot, index);
     }
 
     /// <summary>Throws the held item: a server intent while connected, a local throw otherwise.</summary>
@@ -1026,7 +1075,10 @@ public static class Program
         var w = world!;
         // The server connection, if any: send our state and apply what it broadcast.
         if (netClient is { Status: NetworkStatus.Handshaken } connectedClient)
-            UpdateNetwork(connectedClient, (float)deltaTime);
+        {
+            if (!UpdateNetwork(connectedClient, (float)deltaTime))
+                return;
+        }
         else if (netClient is { Status: NetworkStatus.Disconnected or NetworkStatus.Failed } lostClient)
         {
             lostClient.Dispose();
@@ -1174,7 +1226,14 @@ public static class Program
             var middlePressed = !inventoryView.IsOpen && !chatView.IsOpen
                 && inputManager.Mouse?.IsButtonPressed(MouseButton.Middle) == true;
             if (middlePressed && !middleWasPressed)
-                w.TryPickTargetedBlock();
+            {
+                // A pick that jumps to the slot already holding the block changes the selection;
+                // while connected that is the server's, so it is mirrored as an intent like the
+                // wheel, or the next inventory sync would put the old slot straight back.
+                var before = w.Inventory.SelectedIndex;
+                if (w.TryPickTargetedBlock() && w.Inventory.SelectedIndex != before)
+                    MirrorSelection(w.Inventory.SelectedIndex);
+            }
             middleWasPressed = middlePressed;
         }
         else

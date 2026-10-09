@@ -1356,7 +1356,16 @@ pure function of the seed: only **deltas** and the seed are written.
   `SaveMoveRetries` times), adds the key to the on-disk index and only **then** removes the
   pending entry — and only if it is still the snapshot it wrote, so a newer enqueue survives. A
   lookup therefore always finds the chunk in one of the two, and a move that finally fails keeps
-  its pending entry, so the chunk stays readable for the session and the next flush retries.
+  its pending entry and is remembered as failed, so the chunk stays readable for the session,
+  the next flush of it retries, and `Shutdown` re-queues every failed write once more
+  (`ChunkSaveStore.RetryFailed`) before the writer stops. A file a read gave up on (an
+  `IOException` after a few retries, or a corrupt file) is moved to `.bad` before the writer
+  first replaces it, so what the player had is never overwritten by a regenerated chunk or an
+  empty player file, and the temp file is flushed to disk before the rename. The store holds
+  `session.lock` (`FileShare.None`) from construction until its writer thread exits, so a second
+  store over the same folder — this process after a writer overran its shutdown timeout, or the
+  dedicated server beside the game — throws `IOException` from the constructor: `Program` shows
+  the could-not-open notice and the server prints a line and exits.
   The index is built once at open; leftover temp files from a crash are deleted then.
 - **What marks a chunk dirty.** `Chunk.ModifiedSinceSave` is set by the three raw writers every
   edit goes through (`SetBlockRaw` — which placement, state writes and the fluid tick use —
@@ -1401,7 +1410,9 @@ pure function of the seed: only **deltas** and the seed are written.
   meshes disposed and `WorldSeed.EndWorld` run; `RenderManager.ForgetWorld` drops its references
   (and the eased underwater/lava eye state). A timed-out join leaves `WorldSeed.WorldIsLive` true,
   so the seed stays locked for the rest of the process and the menu refuses PLAY/CREATE with a
-  notice; a false return with the seed free (a writer timeout) is only a warning. The World owns
+  notice; a false return with the seed free (a writer timeout) is only a warning, but the folder
+  stays locked until that writer finishes, so a PLAY on the same world before then is refused
+  with the could-not-open notice. The World owns
   the store's `Shutdown`: never shut it down again, and give the next World a **new**
   `ChunkSaveStore` over the same folder.
 - **Autosave** runs every `AutosaveIntervalSeconds` (at most `MaxAutosaveSnapshotsPerCall`
@@ -1429,10 +1440,23 @@ recipe), lists `WorldStore.List()` and asks for a world number or `N` for a new 
 optional seed), asks for a port (default `ServerAddress.DefaultPort`, 25566), then builds a
 **server-mode** `World` (`new World(..., store, serverMode: true)`) over that world's
 `ChunkSaveStore` and runs `World.Update(dt, null)` in a ~1 ms loop with `GameServer.Pump(dt)`.
-Ctrl+C or a typed `stop` shuts down through `SaveAndDispose`, so a server session persists its
-edits. Server mode sets `ChunkManager.Headless` (finished meshes are marked and their light
+The world list marks a world whose `WorldInfo.Version` is not `WorldStore.CurrentVersion` as
+"(old format, cannot be hosted)" and refuses to select it (the menu's PLAY gate), and a world
+folder another session still holds (the store's `session.lock`, an `IOException` from the
+`ChunkSaveStore` constructor) is refused with a message before any World is built. A port already
+in use (`SocketException` from `GameServer.Start`) prints a line, closes the world and exits.
+Ctrl+C, a typed `stop`, `AppDomain.ProcessExit` and the `SIGTERM`/`SIGHUP` `PosixSignalRegistration`s
+(each in a try/catch for `PlatformNotSupportedException`) all set the stop event; the loop's
+`finally` runs `GameServer.Stop`, `SaveAndDispose` and `Log.Shutdown` on a clean stop and on an
+unexpected exception alike, and the signal handlers wait for it (bounded by
+`ServerShutdownWaitSeconds`) before letting the process end, so a server session persists its
+edits however it is stopped. Server mode sets `ChunkManager.Headless` (finished meshes are marked and their light
 published by `Chunk.MarkMeshedHeadless`, the geometry dropped — a headless world has no pools),
-hovers the camera creative+flying so mobs cannot hurt it, and skips the LodGen threads; the
+hovers the camera creative+flying so mobs cannot hurt it (and therefore never saves that camera
+as the player: `CapturePlayer` writes back the `player.json` the world was opened with, kept as
+`_hostedPlayer`, with only the lighting clock and the shared inventory refreshed, or for a world
+that had none no pose, no creative or flight and no respawn eye, so a survival world opened after
+hosting is not in creative flight at the last centroid), and skips the LodGen threads; the
 global `WorldSeed` still applies, and the six `GenerationalCache` sites behave exactly as in the
 game, which is what lets a headless World run `Update` over real terrain (the LOD builder already
 drops real builds when its pool is null). `ServerWorldTests` locks this down.
@@ -1464,40 +1488,104 @@ seed, day clock, spawn), `KeepAlive`, `ChatSend`/`ChatMessage` (kind, sender, te
 `NetEntity`), `BlockChanges` (a batch of server cell changes, `NetCellChange`) and
 `InventoryState`/`InventoryRequest` (the server-owned inventory and its intents, `NetInventoryCodec`).
 
-**The server** (`OpenGLTest.Server/GameServer.cs`) is a `TcpListener` with one reader thread per
+**The server** (`OpenGLTest.Server/GameServer.cs`) is a dual-mode `TcpListener.Create(port)`
+(IPv6 any with IPv4 mapped, so `[::1]:port` works like `127.0.0.1:port`) with one reader thread per
 connection that only frames inbound bytes onto a `ConcurrentQueue`; `Pump` (main thread) drains it
 and owns every piece of `World` state, so the simulation stays single-threaded exactly like the
-client. On `ClientHello` it assigns an id, replies `ServerHello`, sends the inventory, and
+client. A transient `SocketException` from the accept is logged and retried rather than ending the
+accept thread. Each `Handle` runs inside a try/catch: a short or malformed frame
+(`EndOfStreamException`, `IOException`, `InvalidDataException`, `FormatException`,
+`ArgumentException`, `ObjectDisposedException`) logs, closes and removes only that client. Sends
+are blocking writes on the main thread, so every socket gets a `NetSendTimeoutMs` write timeout,
+and a failed or timed-out send faults the connection (no further sends) and queues its removal
+once. The accept thread queues each new connection on `_accepted` before its reader starts; `Pump`
+moves the ones that have not said hello into `_pending`, and once a second sweeps every
+connection, hello'd or pending, whose reader saw no frame for `NetIdleTimeoutSeconds`
+(`ClientConnection.LastInboundAt`, `Volatile` ticks; clients send `KeepAlive` every
+`NetKeepAliveSeconds` and their state at 20 Hz). `Stop` closes the pending ones too. On
+`ClientHello` it assigns an id, replies `ServerHello` with the **join spawn** (the server camera's
+position captured at the first hello, before any player moved the focus, so a later joiner never
+spawns at the centroid of whoever is online, possibly inside rock), sends the inventory, and
 broadcasts a system chat and the player list; thereafter it relays chat, records `PlayerState`
 into the player list (sent every `NetPlayerListSeconds`, 10 Hz), syncs the day clock
-(`NetTimeSyncSeconds`), serves `ChunkRequest`/`ColumnRequest`/`LodRegionRequest` from the loaded
-world (`ChunkManager.TryCaptureChunk`, `ColumnCache.GetHeights`, `LodRegion.BuildMeshData`),
-applies `InventoryRequest` intents (`Inventory.Select`/`World.ThrowSelected`) and echoes the
-inventory, and on `BlockEdit` applies `World.ApplyNetworkBlockEdit`. It **journals every raw cell
+(`NetTimeSyncSeconds`), serves `ChunkRequest`/`ColumnRequest` from the loaded world
+(`ChunkManager.TryCaptureChunk`, `ColumnCache.GetHeights`), queues `LodRegionRequest`s (deduped
+per connection, `ClientConnection.LodQueued`) and builds at most `NetLodBuildsPerPump` of them a
+`Pump` (`LodRegion.BuildMeshData`, skipping any whose client has gone), applies `InventoryRequest`
+intents (`Inventory.Select`, and a Q-drop through `World.ThrowSelected(wholeStack, eye, forward)`
+from the requesting player's eye and look, never the server camera) and echoes the inventory, and
+on `BlockEdit` applies `World.ApplyNetworkBlockEdit`. That returns whether the cell changed (its
+chunk was loaded and the write was accepted), and a false return is answered with a
+`BlockChange` correction exactly like an out-of-reach edit, so a client never keeps an optimistic
+edit the server does not have. The apply removes a fluid on id 0 (a client's bucket scoop, through
+`FluidManager.SetCellImmediate`; its mining path never sends id 0 for a fluid), pours a fluid id
+the same way, rewrites the state byte when the id matches (a pile built up), places into a
+placeable cell and replaces an occupied one outright (a converted multiblock, or a correction).
+In server mode a removal then has a mined cell's consequences (`World.AfterNetworkRemoval`): a
+station's `NotifyBlockRemoved`, a `NeedsSupport` block above popped through `RemoveBlock`, the
+falls block above toppled, `NotifyLodEdit`, and for a tree block `PoisonCanopy` plus
+`MarkEditedColumn`; it does not fell (a cut trunk's orphaned wood crumbles through the leaf decay
+the edit schedules instead of toppling). It **journals every raw cell
 write** (`Chunk.CellWritten`, set in `Start`, cleared in `Stop`) and broadcasts the coalesced
 batch as `BlockChanges` each `Pump`, so its own simulation — explosions, fluid flow, leaf decay,
 felling, tree growth — reaches clients too. It broadcasts the live mobs and drops every
 `NetEntitySyncSeconds` (`EntityList`, with stable ids by object identity). Client input is
-validated by `NetValidation`: a `PlayerState` beyond `NetMaxMoveBlocksPerSecond` is treated as a
-teleport and the authoritative position stays put, and a `BlockEdit` outside
-`NetMaxEditReachBlocks` of the player's eye is refused with a `BlockChange` correction (the
-optimistic client then reverts). The severed player is removed on disconnect. The camera focus
-follows the **centroid** of the connected players (`World.SetServerFocus`, a `Camera.TestTeleport`),
-so chunks stream around everyone.
+validated by `NetValidation`: a `PlayerState` farther than `NetMaxMoveBlocksPerSecond` allows is
+clamped, the authoritative position moving toward it by exactly the allowed distance (so a burst
+of fast states converges at the cap instead of freezing at a stale point that would get every later
+state rejected too); the cap is 130 b/s, the sprint-flight diagonal (`BaseSpeed *
+FlyBoostMultiplier` = 80 b/s on each of the horizontal and vertical axes, ~113 b/s together) plus
+slack. A `BlockEdit` outside `NetMaxEditReachBlocks` of the player's eye — `World.InteractionReach`
+plus a block of cell-centre slack plus one `NetPlayerStateSeconds` of movement — is refused with a
+`BlockChange` correction (the optimistic client then reverts). The severed player is removed on
+disconnect. The camera focus follows the **centroid** of the connected players
+(`World.SetServerFocus`, a `Camera.TestTeleport`), so chunks stream around everyone.
+`GameServerTests` (loopback) and `ServerWorldTests` lock the frame, spawn, LOD-queue, apply and
+hosted-player rules down.
 
 **The client** (`OpenGLTest/src/Networking/NetworkClient.cs`) connects on a background thread from
 `Program.BeginConnect` (the CONNECT click records `PendingWork.Connect` and presents the
-"Connecting..." loading screen, like PLAY), handshakes, then a reader thread queues frames.
-`Program.UpdateConnecting` waits for `NetworkStatus.Handshaken`, then builds a **client-mode**
-`World` (`clientMode: true`) with the renderer's pools and the window — no worldgen, no LOD
-threads and no local simulation — teleports to the server's spawn and plays (`WorldSeed` is never
-applied on a client). A `ClientChunkStreamer` requests the chunks and column heights around the
-camera (`ChunkData`/`ColumnHeights`), a `ClientLodStreamer` requests far regions
-(`LodRegionData`), and `World.ApplyNetworkEntities`/`ApplyNetworkBlockChanges`/
-`Inventory.Import` apply the server's entities, cell changes and inventory mirror.
-`UpdateNetwork` sends `PlayerState` every `NetPlayerStateSeconds`; chat feeds `ChatView`,
-`TimeSync` calls `World.SetLightingTime`, `PlayerList` reconciles `World.SyncRemotePlayers`, and
-`Hotbar`/`Q` become `InventoryRequest` intents. Remote players are `RemotePlayer`s whose
+"Connecting..." loading screen, like PLAY), handshakes, then a reader thread queues frames. The
+handshake read is bounded by `NetConnectTimeoutSeconds` (cleared before play), the socket is
+disposed on every failure path, the connect timeout included, and `Status`/`Server`/`Error` are
+published through volatile fields; `Handshaken` is set before the reader starts and the reader's
+final `Disconnected` is unconditional, so a server that closes at once can never leave
+`Handshaken` standing. `Program.UpdateConnecting` aborts to the server list on `Failed` **or**
+`Disconnected`, waits for `NetworkStatus.Handshaken`, then applies the server's seed
+(`WorldSeed.Apply(server.Seed)`, refused with the locked-worlds notice while `WorldSeed.WorldIsLive`)
+— the biome tint (`BiomeTint` -> `TerrainGenerator.Climate`) and the deep-water surface codes
+(`ColumnCache`) read worldgen locally, and must match the server's far LOD at the seam — and
+builds a **client-mode** `World` (`clientMode: true`) with the renderer's pools and the window —
+no worldgen, no LOD threads and no local simulation — teleports to the server's spawn and plays.
+A `ClientChunkStreamer` requests the chunks and column heights around the camera
+(`ChunkData`/`ColumnHeights`; a column already received is never asked again, a repeat answer with
+the same heights re-dirties nothing, and the heights map is a `ConcurrentDictionary` because mesh
+builds on the thread pool read it through `ChunkManager.ColumnHeightSource`), a
+`ClientLodStreamer` requests far regions (`LodRegionData`, at most `NetLodInFlightMax`
+outstanding, an unanswered one re-sent only after `NetLodResendSeconds`), and
+`World.ApplyNetworkEntities`/`ApplyNetworkBlockChanges`/`Inventory.Import` apply the server's
+entities, cell changes and inventory mirror. `ApplyNetworkBlockChanges` writes raw, then rebuilds
+each touched chunk once with the light-radius `Chunk.RemeshAfterBatchEdit` (so a remote lamp or
+roof edit relights the edge and corner chunks) and registers an arriving quern
+(`QuernManager.Ensure`). `ChunkManager.ApplyStreamedChunk` does not queue streamed chunks on the
+worldgen water-wake queue, and a client world disables `FluidManager` and `LeafDecayManager`
+scheduling (`Enabled = false`), since it never ticks either. Every player-driven edit raises
+`World.BlockEdited` with the cell's final id and state — mining (`RemoveBlock`, plus the seven
+cells a multiblock revert gives back), placement, the bucket's `ScoopFluidCell`/`PourFluidCell`,
+the stack writers `SetPileCount`/`SetPileComposition`, all eight cells of a
+`TryConvertMultiblock` and `RemoveCellForPrime` — and the client forwards it as a `BlockEdit`. A
+client fells nothing, topples nothing and primes no TNT itself (`RemoveBlock`,
+`TryPlaceBlockFromRaycast`, `IItemUseWorld.AfterPlaced`, `SpawnPrimedTnt` and the apply path are
+guarded by `_clientMode`): the edited cell is sent and the server's broadcast carries every
+consequence, while the purely cosmetic leaf particles and mining debris tick in
+`World.UpdateClient` so nothing hangs in mid-air. `UpdateNetwork` sends `PlayerState` every
+`NetPlayerStateSeconds`; chat feeds `ChatView`, `TimeSync` calls `World.SetLightingTime`,
+`PlayerList` reconciles `World.SyncRemotePlayers`, and `Hotbar`/`Q` become `InventoryRequest`
+intents, as does every selection change made locally (the wheel and a middle-click pick that
+jumps to another slot, `Program.MirrorSelection`). Each server message is handled inside a
+try/catch, and a malformed one (`EndOfStreamException`, `IOException`, `InvalidDataException`,
+`FormatException`, `ArgumentException`) leaves the server with "The server sent bad data" instead
+of crashing the game. Remote players are `RemotePlayer`s whose
 `PlayerModel` walk cycle runs off the distance they moved; `World` updates them each frame and
 `RenderManager.RenderRemotePlayers` draws each as the player body at its broadcast eye. A lost
 connection, or SAVE & QUIT while connected, disposes the client world and returns to the
@@ -1514,11 +1602,18 @@ only copy, so a line never appears twice.
 **Known gaps** (open): the server holds **one** `World.Inventory`, so every client mirrors the same
 inventory and true per-player inventories are not implemented; the client's mining/placement still
 consumes its own mirror between syncs (mining loot and placement cost are not yet server-rolled),
-so item counts can drift from the server between an intent and the next sync; projectiles, primed
-TNT, falling blocks and toppling trees are not in `EntityList` (their cells still sync via
-`BlockChanges`); there is no authentication or encryption; and a client's local `BlockEdited` is
-only wired while connected (null in singleplayer and on the server, so server-applied changes
-never echo).
+so item counts can drift from the server between an intent and the next sync, and a hotbar
+equip from the [E] panel is a local edit with no intent, so the next inventory sync reverts it;
+projectiles, primed TNT, falling blocks and toppling trees are not in `EntityList` (their cells
+still sync via `BlockChanges`, and a client now never fakes them locally, so a fall or a blast
+shows as cells changing rather than as a moving entity); igniting TNT on a client only removes the
+block on the server, because a `BlockEdit` cannot tell a prime from a mine and the server does not
+prime on a removal; chunks stream around the **centroid** of the connected players, so players
+more than a load radius (`ChunkRadius` chunks) apart are each outside the loaded sphere and get no
+terrain streamed (their edits there are refused and corrected, since the chunks are not loaded);
+every player is named "Player", because `ChatView.LocalName` is never set from a setting; there
+is no authentication or encryption; and a client's local `BlockEdited` is only wired while
+connected (null in singleplayer and on the server, so server-applied changes never echo).
 
 ## Biomes
 

@@ -104,6 +104,13 @@ public class FluidManager
     private byte _waterId;
     private bool _mudIdsResolved;
 
+    /// <summary>
+    /// False on a multiplayer client, which never ticks the fluids (the server simulates them and
+    /// broadcasts the result): scheduling then returns at once, so the edit paths that still call
+    /// it cannot grow a schedule nothing drains for the whole session.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
     /// <summary>Schedules a cell and its six face neighbours for the next tick. Every path that
     /// changes a block must call this, or water beside the edit will not notice it.</summary>
     public void ScheduleAround(Vector3 cell) => ScheduleAround((int)cell.X, (int)cell.Y, (int)cell.Z);
@@ -111,6 +118,7 @@ public class FluidManager
     /// <summary>Schedules a cell and its six face neighbours for the next tick.</summary>
     public void ScheduleAround(int x, int y, int z)
     {
+        if (!Enabled) return;
         _next.Add(Pack(x, y, z));
         _next.Add(Pack(x + 1, y, z));
         _next.Add(Pack(x - 1, y, z));
@@ -130,6 +138,7 @@ public class FluidManager
     /// </summary>
     public void ScheduleBox(Vector3 min, Vector3 max)
     {
+        if (!Enabled) return;
         for (var x = (int)min.X; x <= (int)max.X; x++)
         for (var y = (int)min.Y; y <= (int)max.Y; y++)
         for (var z = (int)min.Z; z <= (int)max.Z; z++)
