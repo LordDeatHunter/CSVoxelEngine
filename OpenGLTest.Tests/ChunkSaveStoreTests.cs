@@ -224,4 +224,106 @@ public sealed class ChunkSaveStoreTests : IDisposable
             ShutdownOrFail(reopened);
         }
     }
+
+    [Fact]
+    public void AFailedWriteIsRetriedAtShutdownWithoutANewEdit()
+    {
+        var key = ChunkKey.Pack(2, 0, 2);
+        var snapshot = Snapshot("stone", seed: 9);
+        var failures = 0;
+        var store = new ChunkSaveStore(_world);
+        // Every attempt of the first write fails (a scanner holding the file); the retry at
+        // shutdown finds the file free again.
+        store.MoveFile = (tmp, final) =>
+        {
+            if (failures <= WorldGenerationConfig.SaveMoveRetries)
+            {
+                failures++;
+                throw new IOException("locked");
+            }
+            File.Move(tmp, final, overwrite: true);
+        };
+
+        store.Enqueue(key, snapshot);
+        // Wait for the first write to give up
+        var deadline = DateTime.UtcNow + ShutdownTimeout;
+        while (store.FailedCount == 0 && DateTime.UtcNow < deadline)
+            System.Threading.Thread.Sleep(10);
+        Assert.Equal(1, store.FailedCount);
+
+        ShutdownOrFail(store);
+        Assert.Equal(0, store.FailedCount);
+        Assert.Equal(0, store.PendingCount);
+        Assert.True(store.IsIndexed(key));
+
+        var reopened = new ChunkSaveStore(_world);
+        try
+        {
+            Assert.True(reopened.TryLoad(key, out var loaded));
+            AssertSameData(snapshot, loaded);
+        }
+        finally
+        {
+            ShutdownOrFail(reopened);
+        }
+    }
+
+    [Fact]
+    public void AFolderWithALiveWriterCannotBeOpenedAgain()
+    {
+        var key = ChunkKey.Pack(1, 0, 1);
+        var release = new System.Threading.ManualResetEventSlim(false);
+        var store = new ChunkSaveStore(_world);
+        store.MoveFile = (tmp, final) =>
+        {
+            release.Wait();
+            File.Move(tmp, final, overwrite: true);
+        };
+        store.Enqueue(key, Snapshot("dirt", seed: 1));
+
+        // The writer is stuck inside the move: the shutdown overruns and the folder stays locked
+        Assert.False(store.Shutdown(TimeSpan.FromMilliseconds(100)));
+        Assert.Throws<IOException>(() => new ChunkSaveStore(_world));
+
+        release.Set();
+        ShutdownOrFail(store);
+        var reopened = new ChunkSaveStore(_world);
+        try
+        {
+            Assert.True(reopened.TryLoad(key, out _));
+        }
+        finally
+        {
+            ShutdownOrFail(reopened);
+        }
+    }
+
+    [Fact]
+    public void AnUnreadableChunkFileIsSetAsideNotOverwritten()
+    {
+        var key = ChunkKey.Pack(5, 1, 5);
+        var path = Path.Combine(ChunksDir, WorldStore.ChunkFileName(5, 1, 5));
+        Directory.CreateDirectory(ChunksDir);
+        var garbage = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
+        File.WriteAllBytes(path, garbage);
+
+        var store = new ChunkSaveStore(_world);
+        try
+        {
+            Assert.True(store.IsIndexed(key));
+            Assert.False(store.TryLoad(key, out _));
+
+            var fresh = Snapshot("stone", seed: 3);
+            store.Enqueue(key, fresh);
+            ShutdownOrFail(store);
+
+            Assert.Equal(garbage, File.ReadAllBytes(path + ".bad"));
+            Assert.True(store.TryLoad(key, out var written));
+            AssertSameData(fresh, written);
+        }
+        finally
+        {
+            store.Shutdown(ShutdownTimeout);
+        }
+    }
 }

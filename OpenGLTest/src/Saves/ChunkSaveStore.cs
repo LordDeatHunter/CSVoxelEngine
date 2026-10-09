@@ -28,17 +28,32 @@ namespace silkgltriangle;
 /// virus scanner may hold it for a moment), adds the key to the on-disk index and only THEN
 /// removes the pending entry — and only if it is still the snapshot it wrote, so a newer enqueue
 /// for the same key survives. A lookup therefore always finds the chunk in one of the two.</item>
-/// <item>A write that finally fails keeps its pending entry: the chunk stays readable for the rest
-/// of the session and the next flush of that chunk retries it.</item>
+/// <item>A write that finally fails keeps its pending entry and is remembered as failed: the chunk
+/// stays readable for the rest of the session, the next flush of that chunk retries it, and
+/// <see cref="Shutdown"/> re-queues every failed write once more before the writer stops, so an
+/// edit never silently misses the disk because of a moment's lock.</item>
+/// <item>A file that cannot be read (after a few retries, or because it is corrupt) is never
+/// overwritten in place: the writer moves it to <c>.bad</c> first, so what was there can still be
+/// recovered by hand instead of being replaced by a regenerated chunk or an empty player file.</item>
 /// </list>
 /// The index is built once at open from the files on disk, so a generation worker never probes the
 /// file system for a chunk that was never saved. Reads open with
 /// <see cref="FileShare.Delete"/> so they never block the writer's replace.
 /// </para>
+/// <para>
+/// One world folder has at most one live writer: the store holds <c>session.lock</c> open with
+/// <see cref="FileShare.None"/> from construction until the writer thread exits, so opening the same
+/// folder again — from this process after a writer that overran its shutdown timeout, or from a
+/// second process such as the dedicated server — throws <see cref="IOException"/> instead of letting
+/// two writers race over the same files.
+/// </para>
 /// </summary>
 public sealed class ChunkSaveStore
 {
     private const string TempExtension = ".tmp";
+    private const string UnreadableExtension = ".bad";
+    /// <summary>The lock file a live store holds in its world folder.</summary>
+    public const string LockFileName = "session.lock";
 
     // Exactly one of Chunk (a chunk job, keyed by Key) or FileName + Bytes (a whole-file job) is set
     private sealed record SaveJob(long Key, ChunkSnapshot? Chunk, string? FileName, byte[]? Bytes);
@@ -46,17 +61,37 @@ public sealed class ChunkSaveStore
     private readonly ConcurrentDictionary<long, ChunkSnapshot> _pending = new();
     private readonly ConcurrentDictionary<string, byte[]> _pendingFiles = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<long, byte> _index = new();
+    // Writes that could not land (kept pending), retried by RetryFailed and at Shutdown
+    private readonly ConcurrentDictionary<long, byte> _failedChunks = new();
+    private readonly ConcurrentDictionary<string, byte> _failedFiles = new(StringComparer.Ordinal);
+    // Files a read gave up on: set aside as .bad before the writer first replaces them
+    private readonly ConcurrentDictionary<long, byte> _unreadableChunks = new();
+    private readonly ConcurrentDictionary<string, byte> _unreadableFiles = new(StringComparer.Ordinal);
     private readonly BlockingCollection<SaveJob> _jobs = new();
     private readonly Thread _writer;
+    private readonly FileStream _lock;
 
     /// <summary>Opens (creating when absent) the chunk store of the world in
-    /// <paramref name="worldDirectory"/>: removes the temp files a crash mid-write left behind,
-    /// indexes the saved chunks and starts the writer thread.</summary>
+    /// <paramref name="worldDirectory"/>: takes the session lock, removes the temp files a crash
+    /// mid-write left behind, indexes the saved chunks and starts the writer thread. Throws
+    /// <see cref="IOException"/> when another store (this process or another) still holds the folder.</summary>
     public ChunkSaveStore(string worldDirectory)
     {
         WorldDirectory = Path.GetFullPath(worldDirectory);
         ChunksDirectory = Path.Combine(WorldDirectory, WorldStore.ChunksDirectoryName);
         Directory.CreateDirectory(ChunksDirectory);
+
+        // Taken before anything is touched: the leftover-temp sweep below would otherwise delete
+        // the temp file of a writer that is still running over this folder.
+        var lockPath = Path.Combine(WorldDirectory, LockFileName);
+        try
+        {
+            _lock = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        }
+        catch (IOException e)
+        {
+            throw new IOException($"The world folder '{WorldDirectory}' is still being written by another session: {e.Message}", e);
+        }
 
         DeleteLeftoverTemps(WorldDirectory);
         DeleteLeftoverTemps(ChunksDirectory);
@@ -82,6 +117,9 @@ public sealed class ChunkSaveStore
 
     /// <summary>Chunk snapshots enqueued but not yet (successfully) on disk.</summary>
     internal int PendingCount => _pending.Count;
+
+    /// <summary>Writes (chunks and files) whose last attempt could not land on disk.</summary>
+    public int FailedCount => _failedChunks.Count + _failedFiles.Count;
 
     /// <summary>Whether a chunk file for <paramref name="key"/> is known to be on disk.</summary>
     internal bool IsIndexed(long key) => _index.ContainsKey(key);
@@ -120,18 +158,30 @@ public sealed class ChunkSaveStore
             return false;
 
         var path = ChunkPath(key);
-        try
+        // A read can lose a race with a scanner or a backup holding the file for a moment; a
+        // transient failure must not become a regenerated chunk, so it is retried like the move.
+        for (var attempt = 0; ; attempt++)
         {
-            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
-            snapshot = ChunkSaveCodec.Read(stream,
-                static name => ContentRegistry.TryResolveBlock(name, out var id) ? id : null);
-            return true;
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
-        {
-            Log.Warn($"Could not read saved chunk '{path}', regenerating it: {e.Message}");
-            snapshot = null;
-            return false;
+            try
+            {
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+                snapshot = ChunkSaveCodec.Read(stream,
+                    static name => ContentRegistry.TryResolveBlock(name, out var id) ? id : null);
+                return true;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException && attempt < WorldGenerationConfig.SaveMoveRetries)
+            {
+                Thread.Sleep(WorldGenerationConfig.SaveMoveRetryDelayMs);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+            {
+                // Regenerate for this session, but never write over what is there: the writer
+                // sets the file aside as .bad first (see WriteChunk).
+                Log.Warn($"Could not read saved chunk '{path}', regenerating it: {e.Message}");
+                _unreadableChunks.TryAdd(key, 0);
+                snapshot = null;
+                return false;
+            }
         }
     }
 
@@ -160,18 +210,55 @@ public sealed class ChunkSaveStore
         if (!File.Exists(path))
             return null;
 
-        try
+        for (var attempt = 0; ; attempt++)
         {
-            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
-            var bytes = new byte[stream.Length];
-            stream.ReadExactly(bytes);
-            return bytes;
+            try
+            {
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+                var bytes = new byte[stream.Length];
+                stream.ReadExactly(bytes);
+                return bytes;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException && attempt < WorldGenerationConfig.SaveMoveRetries)
+            {
+                Thread.Sleep(WorldGenerationConfig.SaveMoveRetryDelayMs);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // The caller treats null as "no save" and will write a fresh one; keep the old
+                // bytes as .bad rather than letting that fresh write replace them.
+                Log.Warn($"Could not read save file '{path}': {e.Message}");
+                _unreadableFiles.TryAdd(fileName, 0);
+                return null;
+            }
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+    }
+
+    /// <summary>
+    /// Re-queues every write whose last attempt failed (its newest pending snapshot or bytes), so a
+    /// file that was briefly locked gets another try without the chunk having to be edited again.
+    /// Returns how many were re-queued. Shutdown calls it once before the writer stops.
+    /// </summary>
+    public int RetryFailed()
+    {
+        var retried = 0;
+        foreach (var key in _failedChunks.Keys)
         {
-            Log.Warn($"Could not read save file '{path}': {e.Message}");
-            return null;
+            if (_failedChunks.TryRemove(key, out _) && _pending.TryGetValue(key, out var snapshot))
+            {
+                TryAdd(new SaveJob(key, snapshot, null, null));
+                retried++;
+            }
         }
+        foreach (var fileName in _failedFiles.Keys)
+        {
+            if (_failedFiles.TryRemove(fileName, out _) && _pendingFiles.TryGetValue(fileName, out var bytes))
+            {
+                TryAdd(new SaveJob(0, null, fileName, bytes));
+                retried++;
+            }
+        }
+        return retried;
     }
 
     /// <summary>
@@ -184,12 +271,20 @@ public sealed class ChunkSaveStore
     /// </summary>
     public bool Shutdown(TimeSpan timeout)
     {
-        _jobs.CompleteAdding();
+        if (!_jobs.IsAddingCompleted)
+        {
+            // One more go at whatever could not land earlier in the session: the writer drains
+            // the queue in order, so these run after every flush already queued ahead of them.
+            var retried = RetryFailed();
+            if (retried > 0)
+                Log.Warn($"Chunk save store for '{WorldDirectory}': retrying {retried} failed write(s) at shutdown.");
+            _jobs.CompleteAdding();
+        }
         if (_writer.Join(timeout))
             return true;
 
         Log.Warn($"Chunk save writer for '{WorldDirectory}' did not finish within {timeout.TotalSeconds:0.#} s; " +
-                 $"{_jobs.Count} write(s) still queued.");
+                 $"{_jobs.Count} write(s) still queued. The folder stays locked until it finishes.");
         return false;
     }
 
@@ -207,21 +302,29 @@ public sealed class ChunkSaveStore
 
     private void WriteLoop()
     {
-        foreach (var job in _jobs.GetConsumingEnumerable())
+        try
         {
-            // The writer must survive anything a single job throws: dying would silently stop
-            // every later save of the session.
-            try
+            foreach (var job in _jobs.GetConsumingEnumerable())
             {
-                if (job.Chunk != null)
-                    WriteChunk(job.Key, job.Chunk);
-                else
-                    WriteWholeFile(job.FileName!, job.Bytes!);
+                // The writer must survive anything a single job throws: dying would silently stop
+                // every later save of the session.
+                try
+                {
+                    if (job.Chunk != null)
+                        WriteChunk(job.Key, job.Chunk);
+                    else
+                        WriteWholeFile(job.FileName!, job.Bytes!);
+                }
+                catch (Exception e)
+                {
+                    Log.Warn($"Chunk save writer: unexpected {e.GetType().Name}: {e.Message}");
+                }
             }
-            catch (Exception e)
-            {
-                Log.Warn($"Chunk save writer: unexpected {e.GetType().Name}: {e.Message}");
-            }
+        }
+        finally
+        {
+            // The folder is free for the next session only once no write can still be in flight
+            _lock.Dispose();
         }
     }
 
@@ -231,9 +334,16 @@ public sealed class ChunkSaveStore
         ChunkSaveCodec.Write(encoded, snapshot, static id => BlockType.ById[id]?.Name);
 
         var final = ChunkPath(key);
+        if (_unreadableChunks.TryRemove(key, out _))
+            SetAsideUnreadable(final);
         if (!TryWriteAndMove(final, encoded.GetBuffer().AsSpan(0, (int)encoded.Length)))
-            return; // Keep the pending entry: still readable, and the next flush retries
+        {
+            // Keep the pending entry: still readable, the next flush retries, and so does Shutdown
+            _failedChunks.TryAdd(key, 0);
+            return;
+        }
 
+        _failedChunks.TryRemove(key, out _);
         _index.TryAdd(key, 0);
         // Only if it is still THIS snapshot: a newer enqueue for the key must survive
         _pending.TryRemove(new KeyValuePair<long, ChunkSnapshot>(key, snapshot));
@@ -241,9 +351,33 @@ public sealed class ChunkSaveStore
 
     private void WriteWholeFile(string fileName, byte[] bytes)
     {
-        if (!TryWriteAndMove(Path.Combine(WorldDirectory, fileName), bytes))
+        var final = Path.Combine(WorldDirectory, fileName);
+        if (_unreadableFiles.TryRemove(fileName, out _))
+            SetAsideUnreadable(final);
+        if (!TryWriteAndMove(final, bytes))
+        {
+            _failedFiles.TryAdd(fileName, 0);
             return;
+        }
+        _failedFiles.TryRemove(fileName, out _);
         _pendingFiles.TryRemove(new KeyValuePair<string, byte[]>(fileName, bytes));
+    }
+
+    // Keeps a file a read gave up on as <final>.bad (the previous .bad, if any, is replaced), so the
+    // write about to replace it never destroys the only copy of what the player had.
+    private static void SetAsideUnreadable(string final)
+    {
+        if (!File.Exists(final))
+            return;
+        try
+        {
+            File.Move(final, final + UnreadableExtension, overwrite: true);
+            Log.Warn($"Kept the unreadable save file as '{final}{UnreadableExtension}'");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Log.Warn($"Could not set aside the unreadable save file '{final}': {e.Message}");
+        }
     }
 
     // Writes <final>.tmp and moves it over <final>, retrying the move. False (warned) on failure.
@@ -253,7 +387,12 @@ public sealed class ChunkSaveStore
         try
         {
             using (var stream = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
                 stream.Write(bytes);
+                // Pushed to the disk before the rename, or a power cut could keep the rename and
+                // lose the data, leaving an empty chunk file where a complete one used to be
+                stream.Flush(flushToDisk: true);
+            }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {

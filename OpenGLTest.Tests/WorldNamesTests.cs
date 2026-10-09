@@ -81,4 +81,17 @@ public sealed class WorldNamesTests
             Assert.True(unique.IndexOfAny(invalid) < 0);
         }
     }
+
+    [Theory]
+    [InlineData("CON")]
+    [InlineData("nul")]
+    [InlineData("com1")]
+    [InlineData("Lpt9")]
+    public void AReservedDeviceNameNeverBecomesABareSlug(string name)
+    {
+        var slug = WorldNames.Slug(name);
+        Assert.False(WorldNames.IsReservedDeviceName(slug), $"'{slug}' is a device name");
+        Assert.True(slug.Length <= WorldNames.MaxSlugLength);
+        Assert.StartsWith(name.ToLowerInvariant(), slug);
+    }
 }

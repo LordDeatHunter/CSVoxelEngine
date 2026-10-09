@@ -147,4 +147,16 @@ public sealed class WorldStoreTests : IDisposable
     {
         Assert.False(WorldStore.TryParseChunkFileName(fileName, out _, out _, out _));
     }
+
+    [Fact]
+    public void ASeedlessWorldFileFallsBackToTheDefaultSeedNotTheLastApplied()
+    {
+        var store = new WorldStore(_root);
+        var created = store.Create("Old", 7);
+        File.WriteAllText(Path.Combine(created.Directory, WorldStore.MetadataFileName),
+            "{ \"Name\": \"Old\", \"Created\": 1, \"LastPlayed\": 1, \"Version\": " + WorldStore.CurrentVersion + " }");
+
+        var listed = Assert.Single(store.List());
+        Assert.Equal(WorldSeed.Default, listed.Seed);
+    }
 }

@@ -162,7 +162,8 @@ public sealed class WorldStore(string root)
         return new WorldInfo(
             Path.GetFileName(folder),
             string.IsNullOrWhiteSpace(dto.Name) ? WorldNames.DefaultName : dto.Name,
-            dto.Seed ?? WorldGenerationConfig.Seed,
+            // A seedless world.json must not inherit whatever seed the last world applied
+            dto.Seed ?? WorldSeed.Default,
             created,
             dto.LastPlayed ?? created,
             dto.Version ?? 0,

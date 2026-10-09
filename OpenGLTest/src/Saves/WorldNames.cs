@@ -79,7 +79,26 @@ public static class WorldNames
         var slug = sb.ToString().Trim('-');
         if (slug.Length > MaxSlugLength)
             slug = slug[..MaxSlugLength].TrimEnd('-');
-        return slug.Length == 0 ? DefaultSlug : slug;
+        if (slug.Length == 0)
+            return DefaultSlug;
+        // "con", "nul", "com1"... resolve to devices on Windows, so a folder of that name can never
+        // be created; the suffix keeps the slug a plain folder name.
+        return IsReservedDeviceName(slug) ? slug + ReservedSuffix : slug;
+    }
+
+    private const string ReservedSuffix = "-world";
+
+    /// <summary>Whether <paramref name="slug"/> is a Windows reserved device name (case-insensitive).</summary>
+    public static bool IsReservedDeviceName(string slug)
+    {
+        if (slug.Length is 3 && (slug.Equals("con", StringComparison.OrdinalIgnoreCase)
+            || slug.Equals("prn", StringComparison.OrdinalIgnoreCase)
+            || slug.Equals("aux", StringComparison.OrdinalIgnoreCase)
+            || slug.Equals("nul", StringComparison.OrdinalIgnoreCase)))
+            return true;
+        return slug.Length == 4 && slug[3] is >= '0' and <= '9'
+            && (slug.StartsWith("com", StringComparison.OrdinalIgnoreCase)
+                || slug.StartsWith("lpt", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
