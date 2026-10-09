@@ -120,6 +120,9 @@ public sealed class ServerWorldTests : IDisposable
         // A survival player saved standing somewhere: hosting forces the server camera creative,
         // flying and onto the players' centroid, none of which may reach player.json
         Directory.CreateDirectory(_dir);
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var owned = Inventory.Empty();
+        owned.Add(stone, 4);
         var saved = new PlayerSaveData
         {
             Position = [12.5f, 90f, -3.5f],
@@ -129,6 +132,7 @@ public sealed class ServerWorldTests : IDisposable
             Flying = false,
             Health = 70,
             RespawnEye = [1f, 80f, 2f],
+            Inventory = owned.Export(),
         };
         File.WriteAllBytes(Path.Combine(_dir, PlayerSaveCodec.FileName), PlayerSaveCodec.ToBytes(saved));
 
@@ -136,6 +140,8 @@ public sealed class ServerWorldTests : IDisposable
         _world = new World(null!, null!, null!, null!, null!, null!, null, new ChunkSaveStore(_dir), serverMode: true);
         Assert.True(_world.Camera.IsCreative && _world.Camera.IsFlying);
         _world.SetServerFocus(new Vector3(500f, 120f, 500f));
+        // Whatever the world's own inventory does on a server, the owner's file keeps theirs
+        _world.Inventory.Add(stone, 50);
         _world.SaveAndDispose();
 
         var written = PlayerSaveCodec.TryParse(File.ReadAllBytes(Path.Combine(_dir, PlayerSaveCodec.FileName)));
@@ -149,6 +155,54 @@ public sealed class ServerWorldTests : IDisposable
         Assert.Equal(saved.RespawnEye, written.RespawnEye);
         Assert.NotNull(written.LightingClock);
         Assert.NotNull(written.Inventory);
+        var reread = Inventory.Empty();
+        reread.Import(written.Inventory!);
+        Assert.Equal(owned.CountFor(stone), reread.CountFor(stone));
+    }
+
+    [Fact]
+    public void AServerDropIsCollectedByTheNearestPlayerIntoTheirOwnInventory()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, new ChunkSaveStore(_dir), serverMode: true);
+        var sw = Stopwatch.StartNew();
+        var last = 0.0;
+        while (!_world.IsLoaded && sw.Elapsed.TotalSeconds < 45)
+        {
+            var now = sw.Elapsed.TotalSeconds;
+            _world.Update(Math.Min(now - last, 0.1), null);
+            last = now;
+            Thread.Sleep(1);
+        }
+        Assert.True(_world.IsLoaded);
+
+        // Two players by the loaded spawn, both within pickup range of what falls at the first
+        var eye = _world.Camera.Position;
+        var near = new ServerPlayer(1, "Near", eye);
+        var far = new ServerPlayer(2, "Far", eye + new Vector3(2.5f, 0f, 0f));
+        _world.ServerPlayers = [near, far];
+
+        // Someone else's stone dropped straight down at the near player's feet
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var dropper = Inventory.Empty();
+        dropper.Add(stone, 1);
+        Assert.True(_world.ThrowSelected(false, eye, -Vector3.UnitY, dropper));
+        Assert.Equal(0, dropper.CountFor(stone));
+
+        sw.Restart();
+        while (_world.Drops.Count > 0 && sw.Elapsed.TotalSeconds < 10)
+        {
+            _world.Update(1.0 / 60, null);
+            Thread.Sleep(1);
+        }
+
+        Assert.Empty(_world.Drops);
+        Assert.Equal(1, near.Inventory.CountFor(stone));
+        Assert.True(near.InventoryChanged);
+        Assert.Equal(0, far.Inventory.CountFor(stone));
+        Assert.False(far.InventoryChanged);
+        // The server camera is nobody: the world's own inventory never collects
+        Assert.Equal(0, _world.Inventory.CountFor(stone));
     }
 
     [Fact]

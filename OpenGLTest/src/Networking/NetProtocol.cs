@@ -33,12 +33,21 @@ public enum NetMessage : byte
     InventoryRequest = 71,
 }
 
-/// <summary>A client's inventory intent the server applies authoritatively.</summary>
+/// <summary>
+/// A client's inventory intent the server applies authoritatively to that player's own inventory
+/// (see <see cref="InventoryIntent"/> for each one's fields and <see cref="InventoryIntentRules"/>
+/// for what the server accepts).
+/// </summary>
 public enum NetInventoryAction : byte
 {
     SelectSlot = 0,
     DropSelected = 1,
     DropAllSelected = 2,
+    Equip = 3,
+    Craft = 4,
+    CreativeGrant = 5,
+    CreativeClear = 6,
+    PickBlock = 7,
 }
 
 /// <summary>
@@ -48,8 +57,9 @@ public enum NetInventoryAction : byte
 /// </summary>
 public static class NetFraming
 {
-    /// <summary>The protocol version both ends must agree on in their hellos.</summary>
-    public const int ProtocolVersion = 1;
+    /// <summary>The protocol version both ends must agree on in their hellos. 2: per-player
+    /// inventories and the extended <see cref="NetInventoryAction"/> intents.</summary>
+    public const int ProtocolVersion = 2;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

@@ -1347,6 +1347,10 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // How long a shutdown signal (SIGTERM, SIGHUP, process exit) waits for the server's main loop
     // to save the world before the handler gives up and lets the process end.
     public const double ServerShutdownWaitSeconds = 30.0;
+    // Whether a dedicated server lets players be creative by default (GameServer.AllowCreative;
+    // the server's --allow-creative argument turns it on). Off: every player stays survival and
+    // creative grants are refused whatever the client's C toggle says.
+    public const bool ServerAllowCreative = false;
     // How long a connect attempt may hang before the client gives up and returns to the menu.
     public const double NetConnectTimeoutSeconds = 10.0;
     // Sent roughly this often so an idle connection is not mistaken for a dead one.

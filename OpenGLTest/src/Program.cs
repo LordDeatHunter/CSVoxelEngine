@@ -507,7 +507,10 @@ public static class Program
             writer.Write(camera.Position);
             writer.Write(camera.Yaw);
             writer.Write(camera.Pitch);
-            writer.Write((byte)((camera.IsCreative ? 1 : 0) | (camera.IsFlying ? 2 : 0)));
+            // The modes ride along as a request: the server decides whether this player may be
+            // creative (and with it, whether its catalog grants are accepted)
+            writer.Write((byte)((camera.IsCreative ? NetPlayerFlags.Creative : NetPlayerFlags.None)
+                | (camera.IsFlying ? NetPlayerFlags.Flying : NetPlayerFlags.None)));
             client.Send(writer.ToArray());
         }
 
@@ -687,38 +690,38 @@ public static class Program
     /// <summary>Selects a hotbar slot: a server intent while connected, a local select otherwise.</summary>
     private static void RequestSelectHotbar(int index)
     {
-        if (netClient is { Status: NetworkStatus.Handshaken } client)
-            SendInventoryIntent(client, NetInventoryAction.SelectSlot, index);
-        else
+        if (!SendInventoryIntent(InventoryIntent.Select(index)))
             world!.Inventory.Select(index);
     }
 
     /// <summary>
-    /// After a local selection change (the wheel, a middle-click pick), tells the server about it
-    /// while connected, since the server owns the selection and its next inventory sync would
-    /// otherwise revert the slot. Nothing to do in singleplayer.
+    /// After a local selection change (the wheel), tells the server about it while connected,
+    /// since the server owns the selection and its next inventory sync would otherwise revert the
+    /// slot. Nothing to do in singleplayer.
     /// </summary>
-    private static void MirrorSelection(int index)
-    {
-        if (netClient is { Status: NetworkStatus.Handshaken } client)
-            SendInventoryIntent(client, NetInventoryAction.SelectSlot, index);
-    }
+    private static void MirrorSelection(int index) => SendInventoryIntent(InventoryIntent.Select(index));
 
     /// <summary>Throws the held item: a server intent while connected, a local throw otherwise.</summary>
     private static void RequestThrowSelected(bool wholeStack)
     {
-        if (netClient is { Status: NetworkStatus.Handshaken } client)
-            SendInventoryIntent(client, wholeStack ? NetInventoryAction.DropAllSelected : NetInventoryAction.DropSelected, 0);
-        else
+        if (!SendInventoryIntent(InventoryIntent.Drop(wholeStack)))
             world!.ThrowSelected(wholeStack);
     }
 
-    private static void SendInventoryIntent(NetworkClient client, NetInventoryAction action, int arg)
+    /// <summary>
+    /// Sends one inventory intent while connected and returns whether it went out. The server
+    /// replays it against this player's inventory there and answers with the snapshot this client
+    /// then imports as the truth, so a local change made optimistically alongside the intent stays
+    /// only if the server agreed. False (nothing sent) in singleplayer.
+    /// </summary>
+    private static bool SendInventoryIntent(InventoryIntent intent)
     {
+        if (netClient is not { Status: NetworkStatus.Handshaken } client)
+            return false;
         using var writer = new PacketWriter(NetMessage.InventoryRequest);
-        writer.Write((byte)action);
-        writer.Write(arg);
+        InventoryIntentCodec.Write(writer, intent);
         client.Send(writer.ToArray());
+        return true;
     }
 
     /// <summary>Forwards one local block change to the server while connected.</summary>
@@ -1227,12 +1230,11 @@ public static class Program
                 && inputManager.Mouse?.IsButtonPressed(MouseButton.Middle) == true;
             if (middlePressed && !middleWasPressed)
             {
-                // A pick that jumps to the slot already holding the block changes the selection;
-                // while connected that is the server's, so it is mirrored as an intent like the
-                // wheel, or the next inventory sync would put the old slot straight back.
-                var before = w.Inventory.SelectedIndex;
-                if (w.TryPickTargetedBlock() && w.Inventory.SelectedIndex != before)
-                    MirrorSelection(w.Inventory.SelectedIndex);
+                // A pick selects the slot already holding the block or equips it into the
+                // selected one; while connected the inventory is the server's, so the pick is
+                // also sent as an intent, or the next inventory sync would undo it.
+                if (w.TryPickTargetedBlock(w.Inventory, out var pickedId))
+                    SendInventoryIntent(InventoryIntent.PickBlock(pickedId));
             }
             middleWasPressed = middlePressed;
         }
@@ -1592,6 +1594,8 @@ public static class Program
     {
         var inventory = world!.Inventory;
         if (!inventory.Add(id, amount)) return;
+        // Applied here at once; on a server only a player it lets be creative keeps it
+        SendInventoryIntent(InventoryIntent.CreativeGrant(id, amount));
         if (Inventory.CategoryOf(id) is InventoryCategory.Blocks or InventoryCategory.Misc)
             inventoryView.SelectedId = id;
     }
@@ -1618,7 +1622,10 @@ public static class Program
                 break;
             case InventoryPanelLayout.CatalogButton.Clear:
                 if (world!.Inventory.RemoveAll(id))
+                {
+                    SendInventoryIntent(InventoryIntent.CreativeClear(id));
                     inventoryView.ClearSelection();
+                }
                 break;
             default:
                 GrantFromCreative(id, 1);
@@ -1731,20 +1738,37 @@ public static class Program
                     craft.FeedMore(hit.IngredientIndex, inventory);
                     return;
                 case CraftHitKind.CraftButton:
-                    craft.Craft(inventory);
+                {
+                    // The fed members are read before the craft, which spends the reservation
+                    var recipe = craft.Recipe;
+                    var batch = craft.Batch;
+                    var members = new byte[recipe?.Ingredients.Length ?? 0];
+                    for (var i = 0; i < members.Length; i++)
+                        members[i] = craft.FedAt(i).MemberId;
+                    if (craft.Craft(inventory) && recipe != null)
+                        SendInventoryIntent(InventoryIntent.Craft(recipe.Name, batch, members));
                     return;
+                }
                 case CraftHitKind.None:
                     break;
             }
         }
 
+        // Equipped here at once and, while connected, sent as an intent: the server applies the
+        // same equip to its copy (only for something this player owns), so the next sync keeps it.
         var hotbar = renderManager.UiHotbarSlotAt(position);
         if (hotbar.HasValue)
         {
             if (inventoryView.Tab == InventoryCategory.Tools && inventoryView.SelectedToolInstance != 0)
+            {
                 inventory.EquipTool(hotbar.Value, inventoryView.SelectedToolInstance);
+                SendInventoryIntent(InventoryIntent.EquipTool(hotbar.Value, inventoryView.SelectedToolInstance));
+            }
             else if (inventoryView.SelectedId != 0)
+            {
                 inventory.EquipStackable(hotbar.Value, inventoryView.SelectedId);
+                SendInventoryIntent(InventoryIntent.EquipStackable(hotbar.Value, inventoryView.SelectedId));
+            }
         }
     }
 

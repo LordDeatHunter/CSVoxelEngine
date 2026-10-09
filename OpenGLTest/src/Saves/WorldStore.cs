@@ -25,6 +25,10 @@ public sealed class WorldStore(string root)
     public const int CurrentVersion = 2;
     public const string MetadataFileName = "world.json";
     public const string ChunksDirectoryName = "chunks";
+
+    /// <summary>The subfolder a hosted world keeps one file per multiplayer player in
+    /// (<see cref="ServerPlayerSaves"/>), created on its first write.</summary>
+    public const string PlayersDirectoryName = "players";
     private const string ChunkFileExtension = ".bin";
 
     private static readonly JsonSerializerOptions JsonOptions = new()

@@ -79,7 +79,8 @@ public class World : IItemUseWorld
 
     // Server mode only: the player.json the hosted world was opened with (null for a new world),
     // kept for the whole session because the server camera is no player and must never be saved
-    // as one. CapturePlayer writes it back with only the clock and the inventory refreshed.
+    // as one. CapturePlayer writes it back with only the clock refreshed (players keep their own
+    // inventories, see ServerPlayer).
     private readonly PlayerSaveData? _hostedPlayer;
 
     // What the first SaveAndDispose returned, so a repeated call reports the same thing
@@ -182,6 +183,11 @@ public class World : IItemUseWorld
     // Main thread only, set and cleared around each OnUse call.
     private int _activeToolInstance;
 
+    // The inventory that use runs against (the IItemUseWorld tail's tool and stack spending), set
+    // and cleared with _activeToolInstance; null outside a dispatch, which falls back to Inventory.
+    private Inventory? _activeInventory;
+    private Inventory ActiveInventory => _activeInventory ?? Inventory;
+
     // True once the player rests exactly on real ground at the origin spawn. The camera's
     // initial position is only a heightmap guess (pre-carve, see Camera.SpawnPosition), and
     // physics starts before the spawn chunks stream in (unloaded cells read as air), so
@@ -191,8 +197,27 @@ public class World : IItemUseWorld
     private readonly float _spawnZ;
 
     /// <summary>The player's hotbar; its selected slot decides what block placing puts down.
-    /// A new survival player starts with nothing; creative mode grants from the catalog.</summary>
+    /// A new survival player starts with nothing; creative mode grants from the catalog. On a
+    /// server it belongs to no one: every connected player carries their own
+    /// (<see cref="ServerPlayer.Inventory"/>).</summary>
     public Inventory Inventory { get; } = Inventory.Empty();
+
+    /// <summary>
+    /// Server mode: the connected players, owned by the server and read once a frame by the drop
+    /// pickup, which credits each player's own inventory (flagging
+    /// <see cref="ServerPlayer.InventoryChanged"/>). Empty, and ignored, outside server mode.
+    /// </summary>
+    public IReadOnlyList<ServerPlayer> ServerPlayers { get; set; } = Array.Empty<ServerPlayer>();
+
+    // Scratch for the server's per-player pickup, rebuilt each frame from ServerPlayers
+    private readonly List<DropCollector> _dropCollectors = [];
+
+    /// <summary>
+    /// The save store this world writes through, or null for a storeless world. A server keeps its
+    /// players' files in it (<see cref="ServerPlayerSaves"/>); the world still owns its shutdown
+    /// (<see cref="SaveAndDispose"/>), so nothing may be queued after that.
+    /// </summary>
+    public ChunkSaveStore? SaveStore => _saveStore;
 
     // First-cut survival: the HP pool plus the fall state feeding it. Landings of 5+
     // blocks bill (blocks-4)*10 HP, lava burns 10 HP/s on body contact, and death
@@ -1040,13 +1065,21 @@ public class World : IItemUseWorld
         RestorePendingEntities(deltaTime);
 
         // Drops collected this tick land in the inventory pools. A full pool ignores the
-        // drop (it is never attracted), and an id with no pool is discarded.
-        _dropManager.Update((float)deltaTime, Camera.Position, _chunkManager, _canAcceptDrop);
-        var pickedUp = false;
-        foreach (var blockId in _dropManager.Collected)
-            pickedUp |= Inventory.Add(blockId);
-        if (pickedUp)
-            _sfx?.Play(SfxLibrary.PickupGroup);
+        // drop (it is never attracted), and an id with no pool is discarded. A server has no
+        // player of its own: each connected player collects into their own inventory instead.
+        if (_serverMode)
+        {
+            UpdateServerPickup((float)deltaTime);
+        }
+        else
+        {
+            _dropManager.Update((float)deltaTime, Camera.Position, _chunkManager, _canAcceptDrop);
+            var pickedUp = false;
+            foreach (var blockId in _dropManager.Collected)
+                pickedUp |= Inventory.Add(blockId);
+            if (pickedUp)
+                _sfx?.Play(SfxLibrary.PickupGroup);
+        }
 
         _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager, _falling, _leaves, _leafDecay);
         _falling.Update((float)deltaTime, _chunkManager, _dropManager, _fluidManager, _lodManager);
@@ -1150,6 +1183,30 @@ public class World : IItemUseWorld
             out _selectedBlockPosition, out _selectedFaceNormal, out _selectedBoxIndex,
             includeFluids: ItemRegistry.TryGet(Inventory.SelectedBlockId)?.TargetsFluids ?? false);
         FrameProfiler.End(ProfileSection.Raycast);
+    }
+
+    /// <summary>
+    /// The server's drop pickup: each connected player (<see cref="ServerPlayers"/>) is a collector
+    /// at their eye, a drop flies to the nearest one with room for it, and what lands is credited
+    /// to that player's own inventory, flagging it for a fresh snapshot. The server camera (the
+    /// chunk focus) never collects anything.
+    /// </summary>
+    private void UpdateServerPickup(float deltaTime)
+    {
+        var players = ServerPlayers;
+        _dropCollectors.Clear();
+        for (var i = 0; i < players.Count; i++)
+            _dropCollectors.Add(new DropCollector(players[i].Position, players[i].CanAcceptDrop));
+
+        _dropManager.Update(deltaTime, _dropCollectors, _chunkManager);
+        var collected = _dropManager.Collected;
+        var collectors = _dropManager.CollectedBy;
+        for (var i = 0; i < collected.Length; i++)
+        {
+            var player = players[collectors[i]];
+            if (player.Inventory.Add(collected[i]))
+                player.InventoryChanged = true;
+        }
     }
 
     /// <summary>
@@ -1353,9 +1410,11 @@ public class World : IItemUseWorld
     /// <summary>
     /// The player a server writes: never its own camera (forced creative and flying, parked at
     /// the players' centroid), but the player.json the world was opened with, with only the
-    /// lighting clock and the shared inventory refreshed. A world that had none gets no pose, no
-    /// creative or flight and no respawn eye, so opening it in singleplayer later searches the
-    /// surface for a survival spawn as a new world would.
+    /// lighting clock refreshed. Its inventory too is written back as it was opened: every
+    /// connected player carries their own (saved under <see cref="WorldStore.PlayersDirectoryName"/>),
+    /// so nothing a client picks up or spends reaches the singleplayer owner's file. A world that
+    /// had none gets no pose, no creative or flight, no respawn eye and no inventory, so opening it
+    /// in singleplayer later searches the surface for a survival spawn as a new world would.
     /// </summary>
     private PlayerSaveData CaptureHostedPlayer()
     {
@@ -1371,7 +1430,7 @@ public class World : IItemUseWorld
             // Like a game world: until the flip has applied the saved clock, keep the saved one
             LightingClock = Phase == WorldPhase.Loading ? hosted?.LightingClock ?? LightingTime : LightingTime,
             RespawnEye = hosted?.RespawnEye,
-            Inventory = Inventory.Export()
+            Inventory = hosted?.Inventory
         };
     }
 
@@ -2034,10 +2093,13 @@ public class World : IItemUseWorld
     }
 
     /// <summary>The item in hand, or null when the selected slot holds nothing.</summary>
-    private Item? HeldItem()
+    private Item? HeldItem() => HeldItem(Inventory);
+
+    /// <summary>The item in <paramref name="inventory"/>'s selected slot, or null when it holds nothing.</summary>
+    private static Item? HeldItem(Inventory inventory)
     {
-        var id = Inventory.SelectedBlockId;
-        return id != 0 && Inventory.SelectedCount > 0 ? ItemRegistry.TryGet(id) : null;
+        var id = inventory.SelectedBlockId;
+        return id != 0 && inventory.SelectedCount > 0 ? ItemRegistry.TryGet(id) : null;
     }
 
     /// <summary>
@@ -2563,38 +2625,42 @@ public class World : IItemUseWorld
     /// Does nothing unless the world is playing: nothing may edit an unloaded world.
     /// </summary>
     public void ThrowSelected(bool wholeStack = false) =>
-        ThrowSelected(wholeStack, Camera.Position, Camera.ViewDirection);
+        ThrowSelected(wholeStack, Camera.Position, Camera.ViewDirection, Inventory);
 
     /// <summary>
-    /// <see cref="ThrowSelected(bool)"/> from an explicit <paramref name="eye"/> along
-    /// <paramref name="forward"/> (a unit vector): what a server runs for a client's Q-drop, which
-    /// must leave from that player, not from the server's own camera.
+    /// <see cref="ThrowSelected(bool)"/> out of <paramref name="inventory"/>, from an explicit
+    /// <paramref name="eye"/> along <paramref name="forward"/> (a unit vector): what a server runs
+    /// for a client's Q-drop, which must leave from that player and out of that player's own
+    /// inventory, not from the server's camera. Returns whether anything was thrown.
     /// </summary>
-    public void ThrowSelected(bool wholeStack, Vector3 eye, Vector3 forward)
+    public bool ThrowSelected(bool wholeStack, Vector3 eye, Vector3 forward, Inventory inventory)
     {
-        if (!IsPlaying) return;
+        if (!IsPlaying) return false;
 
         // A held tool is one instance: it leaves the pool and every hotbar slot holding it
-        if (Inventory.SelectedToolInstance is var instance and > 0)
+        if (inventory.SelectedToolInstance is var instance and > 0)
         {
-            var id = Inventory.SelectedBlockId;
-            if (id == 0) return;
-            if (!Inventory.RemoveTool(instance)) return;
+            var id = inventory.SelectedBlockId;
+            if (id == 0) return false;
+            if (!inventory.RemoveTool(instance)) return false;
             _dropManager.SpawnAt(id, eye + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f);
-            return;
+            return true;
         }
 
-        var stackId = Inventory.SelectedBlockId;
-        if (stackId == 0 || Inventory.SelectedCount <= 0) return;
+        var stackId = inventory.SelectedBlockId;
+        if (stackId == 0 || inventory.SelectedCount <= 0) return false;
 
-        var units = wholeStack ? Inventory.SelectedCount : 1;
+        var units = wholeStack ? inventory.SelectedCount : 1;
+        var thrown = false;
         for (var i = 0; i < units; i++)
         {
             // Spend first so a failed spend never duplicates the drop
-            if (!Inventory.ConsumeSelected()) break;
+            if (!inventory.ConsumeSelected()) break;
 
             _dropManager.SpawnAt(stackId, eye + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f);
+            thrown = true;
         }
+        return thrown;
     }
 
     /// <summary>
@@ -2607,36 +2673,42 @@ public class World : IItemUseWorld
     /// here owned it � a mudball aimed at a lit campfire cooks instead of being thrown.
     /// False unless the world is playing: nothing may edit an unloaded world.
     /// </summary>
-    public bool TryUseSelected(float maxDistance)
+    public bool TryUseSelected(float maxDistance) => TryUseSelected(maxDistance, Inventory);
+
+    /// <summary>
+    /// <see cref="TryUseSelected(float)"/> spending from and crediting <paramref name="inventory"/>:
+    /// every station interaction, the item's own use (its tool morph, durability and cooldown) and
+    /// the placement cost run against it. Single player passes its own <see cref="Inventory"/>.
+    /// </summary>
+    public bool TryUseSelected(float maxDistance, Inventory inventory)
     {
         if (!IsPlaying) return false;
         if (_throwCharging) return false;
         Camera.NotifyPlayerAction();
-        if (TryCookOrCollect(maxDistance))
+        if (TryCookOrCollect(maxDistance, inventory))
         {
             Player.Punch();
             return true;
         }
-        if (TryQuernInteract(maxDistance))
+        if (TryQuernInteract(maxDistance, inventory))
         {
             Player.Punch();
             return true;
         }
-        if (TryKilnInteract(maxDistance))
+        if (TryKilnInteract(maxDistance, inventory))
         {
             Player.Punch();
             return true;
         }
-        if (TryCastInteract(maxDistance))
+        if (TryCastInteract(maxDistance, inventory))
         {
             Player.Punch();
             return true;
         }
-        var id = Inventory.SelectedBlockId;
-        var item = id != 0 && Inventory.SelectedCount > 0 ? ItemRegistry.TryGet(id) : null;
+        var item = HeldItem(inventory);
         if (item == null || item is BlockItem || item.UseAction == ItemUseAction.None)
-            return TryPlaceSelectedBlock(maxDistance);
-        return DispatchUse(item, maxDistance);
+            return TryPlaceSelectedBlock(maxDistance, inventory);
+        return DispatchUse(item, maxDistance, inventory);
     }
 
     /// <summary>Starts charging a throw of the selected throwable. False unless the world is
@@ -2689,22 +2761,34 @@ public class World : IItemUseWorld
         if (!_throwCharging) return false;
         _throwCharging = false;
         var charge01 = MathUtils.Clamp01(_throwChargeSeconds / WorldGenerationConfig.ThrowChargeSeconds);
-        var id = _throwItemId;
-        if (id == 0 || Inventory.SelectedBlockId != id || Inventory.SelectedCount <= 0)
+        if (!TryLaunchThrow(Inventory, _throwItemId, _throwBaseDamage, charge01, Camera.Position,
+                Camera.ViewDirection, Camera.IsCreative))
         {
             Player.CancelThrowCharge();
             return false;
         }
-        if (!Camera.IsCreative && !Inventory.ConsumeSelected())
-        {
-            Player.CancelThrowCharge();
-            return false;
-        }
-        var origin = Camera.Position + Camera.ViewDirection * 0.6f;
-        var velocity = ThrownProjectile.LaunchVelocity(Camera.ViewDirection, charge01);
-        _thrown.Add(new ThrownProjectile(id, origin, velocity, _throwBaseDamage, charge01));
         Camera.NotifyPlayerAction();
         Player.ReleaseThrow(charge01);
+        return true;
+    }
+
+    /// <summary>
+    /// Launches one <paramref name="id"/> out of <paramref name="inventory"/>'s selected slot from
+    /// <paramref name="eye"/> along <paramref name="forward"/> at <paramref name="charge01"/>,
+    /// spending the unit unless <paramref name="creative"/>. False, spending nothing, when the slot
+    /// no longer holds that item. The release half of a throw, apart from the local player's
+    /// charge and arm pose.
+    /// </summary>
+    private bool TryLaunchThrow(Inventory inventory, byte id, float baseDamage, float charge01,
+        Vector3 eye, Vector3 forward, bool creative)
+    {
+        if (id == 0 || inventory.SelectedBlockId != id || inventory.SelectedCount <= 0)
+            return false;
+        if (!creative && !inventory.ConsumeSelected())
+            return false;
+        var origin = eye + forward * 0.6f;
+        var velocity = ThrownProjectile.LaunchVelocity(forward, charge01);
+        _thrown.Add(new ThrownProjectile(id, origin, velocity, baseDamage, charge01));
         return true;
     }
 
@@ -2737,16 +2821,17 @@ public class World : IItemUseWorld
     /// in place (only when the use took effect) and punch. Durability, cooldowns and stack
     /// spending already happened inside the override. Returns whether the use took effect.
     /// </summary>
-    private bool DispatchUse(Item item, float maxDistance)
+    private bool DispatchUse(Item item, float maxDistance, Inventory inventory)
     {
-        var instance = Inventory.SelectedToolInstance;
+        var instance = inventory.SelectedToolInstance;
         _activeToolInstance = instance;
+        _activeInventory = inventory;
         try
         {
-            var stack = instance > 0 ? Inventory.GetToolStack(instance) : null;
+            var stack = instance > 0 ? inventory.GetToolStack(instance) : null;
             var result = item.OnUse(new ItemUseContext(this, maxDistance, instance), stack);
             if (result.Applied && result.MorphToId.HasValue && instance > 0)
-                Inventory.MorphTool(instance, result.MorphToId.Value);
+                inventory.MorphTool(instance, result.MorphToId.Value);
             if (result.Punch)
                 Player.Punch();
             return result.Applied;
@@ -2754,6 +2839,7 @@ public class World : IItemUseWorld
         finally
         {
             _activeToolInstance = 0;
+            _activeInventory = null;
         }
     }
 
@@ -2940,21 +3026,21 @@ public class World : IItemUseWorld
     }
 
     bool IItemUseWorld.ToolReady() =>
-        _activeToolInstance > 0 && Inventory.ToolReadyAt(_activeToolInstance, Now);
+        _activeToolInstance > 0 && ActiveInventory.ToolReadyAt(_activeToolInstance, Now);
 
     void IItemUseWorld.MarkToolUsed(float delaySeconds)
     {
         if (_activeToolInstance > 0)
-            Inventory.MarkToolUsed(_activeToolInstance, Now, delaySeconds);
+            ActiveInventory.MarkToolUsed(_activeToolInstance, Now, delaySeconds);
     }
 
     bool IItemUseWorld.DamageTool(int amount) =>
-        _activeToolInstance > 0 && Inventory.DamageTool(_activeToolInstance, amount);
+        _activeToolInstance > 0 && ActiveInventory.DamageTool(_activeToolInstance, amount);
 
-    void IItemUseWorld.ConsumeSelected() => Inventory.ConsumeSelected();
+    void IItemUseWorld.ConsumeSelected() => ActiveInventory.ConsumeSelected();
     #endregion
 
-    private bool TryCookOrCollect(float maxDistance)
+    private bool TryCookOrCollect(float maxDistance, Inventory inventory)
     {
         if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
         var hx = (int)hit.X;
@@ -2964,13 +3050,13 @@ public class World : IItemUseWorld
         if (BlockType.ById[hitId]?.Renderer != BlockRenderer.BranchPile) return false;
         if (!_campfires.IsLit(hx, hy, hz)) return false;
 
-        var selected = Inventory.SelectedBlockId;
-        if (selected != 0 && Inventory.SelectedCount > 0
+        var selected = inventory.SelectedBlockId;
+        if (selected != 0 && inventory.SelectedCount > 0
             && ContentRegistry.CookRecipeForInput(selected) != null
             && _campfires.TryPlaceFood(hx, hy, hz, selected))
         {
             if (!Camera.IsCreative)
-                Inventory.ConsumeSelected();
+                inventory.ConsumeSelected();
             return true;
         }
 
@@ -2978,7 +3064,7 @@ public class World : IItemUseWorld
         if (finished.Count == 0) return selected != 0 && ContentRegistry.CookRecipeForInput(selected) != null;
         foreach (var output in finished)
         {
-            if (!Inventory.Add(output))
+            if (!inventory.Add(output))
                 _dropManager.Spawn(output, new Vector3(hx, hy, hz));
         }
         return true;
@@ -2989,7 +3075,7 @@ public class World : IItemUseWorld
     /// anything else spins the plate through one full rotation (a quern already turning
     /// swallows the click). Returns whether a quern was aimed at.
     /// </summary>
-    private bool TryQuernInteract(float maxDistance)
+    private bool TryQuernInteract(float maxDistance, Inventory inventory)
     {
         if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
         var hx = (int)hit.X;
@@ -3000,13 +3086,13 @@ public class World : IItemUseWorld
 
         if (_querns.IsSpinning(hx, hy, hz)) return true;
 
-        var selected = Inventory.SelectedBlockId;
-        if (selected != 0 && Inventory.SelectedCount > 0
+        var selected = inventory.SelectedBlockId;
+        if (selected != 0 && inventory.SelectedCount > 0
             && ContentRegistry.CrushRecipeForInput(selected) != null
             && _querns.TryInsert(hx, hy, hz, selected))
         {
             if (!Camera.IsCreative)
-                Inventory.ConsumeSelected();
+                inventory.ConsumeSelected();
             return true;
         }
 
@@ -3039,7 +3125,7 @@ public class World : IItemUseWorld
     /// placement against the structure. Any other click on a kiln is spent. Returns whether the
     /// click belonged to the kiln.
     /// </summary>
-    private bool TryKilnInteract(float maxDistance)
+    private bool TryKilnInteract(float maxDistance, Inventory inventory)
     {
         if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
         var hx = (int)hit.X;
@@ -3049,7 +3135,7 @@ public class World : IItemUseWorld
         if (!Multiblock.IsMultiblockCell(hitId)) return false;
         if (!TryTrackKilnAt(hx, hy, hz, out var anchor)) return false;
 
-        var held = HeldItem();
+        var held = HeldItem(inventory);
 
         // The firestarter lights the kiln from its own OnUse, which also spends its durability
         if (held is { UseAction: ItemUseAction.IgniteCampfire }) return false;
@@ -3058,7 +3144,7 @@ public class World : IItemUseWorld
         if (held == null)
         {
             if (_kilns.TryTakeCrucible(anchor, out var takenId, out var takenContents)
-                && CrucibleInventory.Add(Inventory, takenId, takenContents) == null)
+                && CrucibleInventory.Add(inventory, takenId, takenContents) == null)
                 _kilns.TryPlaceCrucible(anchor, takenId, takenContents);
             return true;
         }
@@ -3066,10 +3152,10 @@ public class World : IItemUseWorld
         // A crucible in hand stands in the hearth, carrying whatever that instance held
         if (held is CrucibleItem crucible)
         {
-            var instance = Inventory.SelectedToolInstance;
-            var stack = instance > 0 ? Inventory.GetToolStack(instance) : null;
+            var instance = inventory.SelectedToolInstance;
+            var stack = instance > 0 ? inventory.GetToolStack(instance) : null;
             if (stack != null && _kilns.TryPlaceCrucible(anchor, crucible.Id, stack.Get<CrucibleComponent>()))
-                Inventory.RemoveTool(instance);
+                inventory.RemoveTool(instance);
             return true;
         }
 
@@ -3077,14 +3163,14 @@ public class World : IItemUseWorld
         if (ContentRegistry.MeltRecipeForInput(held.Id) != null && _kilns.TryInsertMelt(anchor, held.Id))
         {
             if (!Camera.IsCreative)
-                Inventory.ConsumeSelected();
+                inventory.ConsumeSelected();
             return true;
         }
 
         if (held is { FuelSeconds: > 0f } && _kilns.TryAddFuel(anchor, held))
         {
             if (!Camera.IsCreative)
-                Inventory.ConsumeSelected();
+                inventory.ConsumeSelected();
             return true;
         }
 
@@ -3098,7 +3184,7 @@ public class World : IItemUseWorld
     /// through to placing anything; a block in hand does fall through, so molds can still be
     /// stacked against each other. Returns whether the click belonged to the mold.
     /// </summary>
-    private bool TryCastInteract(float maxDistance)
+    private bool TryCastInteract(float maxDistance, Inventory inventory)
     {
         if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
         var hx = (int)hit.X;
@@ -3112,15 +3198,15 @@ public class World : IItemUseWorld
         if (finished.Count > 0)
         {
             foreach (var id in finished)
-                if (!Inventory.Add(id))
+                if (!inventory.Add(id))
                     _dropManager.Spawn(id, cell);
             return true;
         }
 
-        if (HeldItem() is CrucibleItem)
+        if (HeldItem(inventory) is CrucibleItem)
         {
-            var instance = Inventory.SelectedToolInstance;
-            var stack = instance > 0 ? Inventory.GetToolStack(instance) : null;
+            var instance = inventory.SelectedToolInstance;
+            var stack = instance > 0 ? inventory.GetToolStack(instance) : null;
             if (stack != null)
                 _casting.TryStartPour(cell, hitId, stack);
             return true;
@@ -3135,27 +3221,40 @@ public class World : IItemUseWorld
     /// when the slot is empty or holds no blocks. Returns whether one was placed; false unless the
     /// world is playing, since nothing may edit an unloaded world.
     /// </summary>
-    public bool TryPlaceSelectedBlock(float maxDistance)
+    public bool TryPlaceSelectedBlock(float maxDistance) => TryPlaceSelectedBlock(maxDistance, Inventory);
+
+    /// <summary><see cref="TryPlaceSelectedBlock(float)"/> placing from, and spending out of,
+    /// <paramref name="inventory"/>.</summary>
+    public bool TryPlaceSelectedBlock(float maxDistance, Inventory inventory)
     {
         if (!IsPlaying) return false;
-        if (!Inventory.CanPlaceSelected) return false;
+        if (!inventory.CanPlaceSelected) return false;
 
         // Only spend a block if one actually went down (and never in creative)
-        if (!TryPlaceBlockFromRaycast(maxDistance, Inventory.SelectedBlockId)) return false;
+        if (!TryPlaceBlockFromRaycast(maxDistance, inventory.SelectedBlockId)) return false;
         if (!Camera.IsCreative)
-            Inventory.ConsumeSelected();
+            inventory.ConsumeSelected();
         return true;
     }
 
     /// <summary>Picks the targeted block into the hotbar. False unless the world is playing:
     /// nothing may edit an unloaded world.</summary>
-    public bool TryPickTargetedBlock()
+    public bool TryPickTargetedBlock() => TryPickTargetedBlock(Inventory, out _);
+
+    /// <summary>
+    /// <see cref="TryPickTargetedBlock()"/> into <paramref name="inventory"/>, reporting the picked
+    /// block's id (0 when nothing is targeted), which a multiplayer client forwards as its
+    /// <see cref="NetInventoryAction.PickBlock"/> intent.
+    /// </summary>
+    public bool TryPickTargetedBlock(Inventory inventory, out byte pickedId)
     {
+        pickedId = 0;
         if (!IsPlaying) return false;
         if (!_hasSelectedBlock) return false;
         var id = BlockIdAt(_selectedBlockPosition);
         if (id == 0) return false;
-        return Inventory.PickBlock(id);
+        pickedId = id;
+        return inventory.PickBlock(id);
     }
 
     /// <summary>Places a block against the targeted face. Returns whether one was placed; false

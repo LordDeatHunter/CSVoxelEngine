@@ -566,6 +566,7 @@ OpenGLTest/
       EntitySaveData.cs        # the entities.json shape: mobs (health/facing/velocity/ammo) and drops
       EntitySaveCodec.cs       # reads/writes entities.json
       MobSaveCodec.cs          # a live Mob -> its EntitySaveData form (per-kind ammo)
+      ServerPlayerSaves.cs     # a hosted world's per-player files: players/<name slug>.json via the store
       ServerInfo.cs            # one saved server: display name, host, port, last connected (servers.json)
       ServerStore.cs           # servers.json: list, add, delete, touch (unique names, most recent first)
     Networking/                # GL-free multiplayer protocol and client (see "Multiple players and chat")
@@ -579,6 +580,11 @@ OpenGLTest/
       ClientLodStreamer.cs     # requests and applies server-built far regions
       NetEntity.cs             # NetEntityKind/NetEntity and NetCellChange
       InventoryNetCodec.cs     # the server-owned inventory on the wire (the save JSON shape)
+      InventoryIntent.cs       # one client inventory intent (select, drop, equip, craft, creative grant/clear, pick)
+      InventoryIntentCodec.cs  # its bounds-checked wire form
+      InventoryIntentRules.cs  # GL-free: what the server accepts of an intent, against that player's inventory
+      ServerPlayer.cs          # a connected player on the server: own Inventory, creative/flight flags, pose
+      NetPlayerFlags.cs        # the PlayerState flags byte (creative, flying), a request to the server
       NetValidation.cs         # server movement and edit-reach sanity rules
     UI/                        # UI state, layout and rules, mostly GL-free (UIRenderer draws them)
       PauseMenu.cs             # pause menu pages, hit kinds, view and PauseMenuLayout (RESUME/SETTINGS/SAVE & QUIT)
@@ -1437,7 +1443,9 @@ program sets its own current directory to the assets parent so `FileUtils`' rela
 paths resolve). It is a **CLI**: it loads content headlessly (`ContentRegistry.Load` +
 `TextureAtlas.RegisterTilesWithoutUpload` + `ContentRegistry.BakeModels`, the `TestContent`
 recipe), lists `WorldStore.List()` and asks for a world number or `N` for a new one (name and
-optional seed), asks for a port (default `ServerAddress.DefaultPort`, 25566), then builds a
+optional seed), asks for a port (default `ServerAddress.DefaultPort`, 25566; `--allow-creative` on
+the command line sets `GameServer.AllowCreative`, default `WorldGenerationConfig.ServerAllowCreative`,
+off), then builds a
 **server-mode** `World` (`new World(..., store, serverMode: true)`) over that world's
 `ChunkSaveStore` and runs `World.Update(dt, null)` in a ~1 ms loop with `GameServer.Pump(dt)`.
 The world list marks a world whose `WorldInfo.Version` is not `WorldStore.CurrentVersion` as
@@ -1454,9 +1462,10 @@ edits however it is stopped. Server mode sets `ChunkManager.Headless` (finished 
 published by `Chunk.MarkMeshedHeadless`, the geometry dropped — a headless world has no pools),
 hovers the camera creative+flying so mobs cannot hurt it (and therefore never saves that camera
 as the player: `CapturePlayer` writes back the `player.json` the world was opened with, kept as
-`_hostedPlayer`, with only the lighting clock and the shared inventory refreshed, or for a world
-that had none no pose, no creative or flight and no respawn eye, so a survival world opened after
-hosting is not in creative flight at the last centroid), and skips the LodGen threads; the
+`_hostedPlayer`, with only the lighting clock refreshed — its inventory too is written back as it
+was opened, since every connected player carries their own — or for a world that had none no pose,
+no creative or flight, no respawn eye and no inventory, so a survival world opened after hosting is
+not in creative flight at the last centroid), and skips the LodGen threads; the
 global `WorldSeed` still applies, and the six `GenerationalCache` sites behave exactly as in the
 game, which is what lets a headless World run `Update` over real terrain (the LOD builder already
 drops real builds when its pool is null). `ServerWorldTests` locks this down.
@@ -1486,7 +1495,15 @@ seed, day clock, spawn), `KeepAlive`, `ChatSend`/`ChatMessage` (kind, sender, te
 `ColumnRequest`/`ColumnHeights` (the streamed world, `ChunkNetCodec`), `LodRegionRequest`/
 `LodRegionData` (a streamed far region, `LodNetCodec`), `EntityList` (the live mobs/drops,
 `NetEntity`), `BlockChanges` (a batch of server cell changes, `NetCellChange`) and
-`InventoryState`/`InventoryRequest` (the server-owned inventory and its intents, `NetInventoryCodec`).
+`InventoryState`/`InventoryRequest` (a player's server-owned inventory, `InventoryNetCodec`, and
+its intents, `InventoryIntentCodec`). `ProtocolVersion` 2 is the per-player-inventory protocol.
+An `InventoryRequest` is a `NetInventoryAction` byte and only that action's fields
+(`InventoryIntent`): `SelectSlot(slot)`, `DropSelected`/`DropAllSelected`, `Equip(slot, isTool,
+id)` (a stackable's id or a tool's instance id), `Craft(recipe file name, batch, fed member per
+ingredient)`, `CreativeGrant(id, count)`, `CreativeClear(id)` and `PickBlock(id)`. The reader is
+bounds-checked: an unknown action, an overlong recipe name or more than
+`InventoryIntentCodec.MaxCraftMembers` members is an `InvalidDataException` (the sender is
+dropped like any malformed frame), while merely out-of-range values parse and are refused.
 
 **The server** (`OpenGLTest.Server/GameServer.cs`) is a dual-mode `TcpListener.Create(port)`
 (IPv6 any with IPv4 mapped, so `[::1]:port` works like `127.0.0.1:port`) with one reader thread per
@@ -1502,19 +1519,42 @@ once. The accept thread queues each new connection on `_accepted` before its rea
 moves the ones that have not said hello into `_pending`, and once a second sweeps every
 connection, hello'd or pending, whose reader saw no frame for `NetIdleTimeoutSeconds`
 (`ClientConnection.LastInboundAt`, `Volatile` ticks; clients send `KeepAlive` every
-`NetKeepAliveSeconds` and their state at 20 Hz). `Stop` closes the pending ones too. On
-`ClientHello` it assigns an id, replies `ServerHello` with the **join spawn** (the server camera's
-position captured at the first hello, before any player moved the focus, so a later joiner never
-spawns at the centroid of whoever is online, possibly inside rock), sends the inventory, and
-broadcasts a system chat and the player list; thereafter it relays chat, records `PlayerState`
-into the player list (sent every `NetPlayerListSeconds`, 10 Hz), syncs the day clock
+`NetKeepAliveSeconds` and their state at 20 Hz). `Stop` closes the pending ones too. Every
+connected player is a **`ServerPlayer`** (`OpenGLTest/src/Networking/ServerPlayer.cs`): id, a name
+unique among the players online by its save slug (a second "Player" joins as "Player 2"), its
+**own** `Inventory` (`Inventory.Empty()` for a newcomer), server-owned `Creative`/`Flying` flags
+(survival by default), health, the accepted pose and `LastStateAt`. On `ClientHello` it assigns an
+id, loads the player's file (`ServerPlayerSaves`: `players/<slug of the name>.json` in the world
+folder, the `PlayerSaveCodec` shape, written through the world's `ChunkSaveStore` —
+`World.SaveStore` — which accepts that one subfolder), replies `ServerHello` with the saved
+position or else the **join spawn** (the server camera's position captured at the first hello,
+before any player moved the focus, so a later joiner never spawns at the centroid of whoever is
+online, possibly inside rock), sends that player's inventory, and broadcasts a system chat and the
+player list; players are saved again on leaving, in `Stop` (before the world's `SaveAndDispose`
+shuts the store) and every `AutosaveIntervalSeconds`. Thereafter it relays chat, records
+`PlayerState` into the player list (sent every `NetPlayerListSeconds`, 10 Hz) — its flags
+(`NetPlayerFlags`, the client's `C` toggle) are only a request: `ServerPlayer.Creative` is set
+only while `GameServer.AllowCreative`, and flight only with it — syncs the day clock
 (`NetTimeSyncSeconds`), serves `ChunkRequest`/`ColumnRequest` from the loaded world
 (`ChunkManager.TryCaptureChunk`, `ColumnCache.GetHeights`), queues `LodRegionRequest`s (deduped
 per connection, `ClientConnection.LodQueued`) and builds at most `NetLodBuildsPerPump` of them a
-`Pump` (`LodRegion.BuildMeshData`, skipping any whose client has gone), applies `InventoryRequest`
-intents (`Inventory.Select`, and a Q-drop through `World.ThrowSelected(wholeStack, eye, forward)`
-from the requesting player's eye and look, never the server camera) and echoes the inventory, and
-on `BlockEdit` applies `World.ApplyNetworkBlockEdit`. That returns whether the cell changed (its
+`Pump` (`LodRegion.BuildMeshData`, skipping any whose client has gone), replays each
+`InventoryRequest` intent against **the sender's** inventory only — `InventoryIntentRules.Apply`
+(a slot must be on the hotbar; equip only what the player owns, or toggle off what the slot
+already shows; craft through `Inventory.TryCraft` with exactly the fed members, so a refused craft
+spends nothing; creative grants and clears only while `ServerPlayer.Creative`; pick-block through
+`Inventory.PickBlock`, which never grants) and a Q-drop through
+`World.ThrowSelected(wholeStack, eye, forward, inventory)` from that player's eye and look and out
+of that player's inventory, never the server camera — and **always** answers with a full
+`InventoryState` snapshot to that player alone, accepted or not, so a refused intent rubberbands
+the client's optimistic copy. Drops are picked up per player: a server-mode `World` reads the
+connected players from `World.ServerPlayers` (the server's list) and `DropManager.Update`'s
+multi-collector overload (`DropCollector`) flies each drop in a loaded chunk to the nearest player
+whose inventory has room (a drop in an unloaded chunk is neither collected nor simulated; one
+nobody can take lets go and falls), crediting that player's inventory and flagging
+`ServerPlayer.InventoryChanged`, which the next `Pump` answers with that player's snapshot; the
+server camera and `World.Inventory` never collect. The server applies `BlockEdit` through
+`World.ApplyNetworkBlockEdit`. That returns whether the cell changed (its
 chunk was loaded and the write was accepted), and a false return is answered with a
 `BlockChange` correction exactly like an out-of-reach edit, so a client never keeps an optimistic
 edit the server does not have. The apply removes a fluid on id 0 (a client's bucket scoop, through
@@ -1540,8 +1580,11 @@ plus a block of cell-centre slack plus one `NetPlayerStateSeconds` of movement �
 `BlockChange` correction (the optimistic client then reverts). The severed player is removed on
 disconnect. The camera focus follows the **centroid** of the connected players
 (`World.SetServerFocus`, a `Camera.TestTeleport`), so chunks stream around everyone.
-`GameServerTests` (loopback) and `ServerWorldTests` lock the frame, spawn, LOD-queue, apply and
-hosted-player rules down.
+`GameServerTests` (loopback) and `ServerWorldTests` lock the frame, spawn, LOD-queue, apply,
+hosted-player, per-player inventory (independent inventories, refused equips corrected, creative
+gating, crafting spends only the crafter's) and nearest-player pickup rules down, with
+`InventoryIntentTests`, `ServerPlayerTests` and `DropPickupTests` for the codec, the rules, the
+per-player files and the pickup.
 
 **The client** (`OpenGLTest/src/Networking/NetworkClient.cs`) connects on a background thread from
 `Program.BeginConnect` (the CONNECT click records `PendingWork.Connect` and presents the
@@ -1580,9 +1623,13 @@ guarded by `_clientMode`): the edited cell is sent and the server's broadcast ca
 consequence, while the purely cosmetic leaf particles and mining debris tick in
 `World.UpdateClient` so nothing hangs in mid-air. `UpdateNetwork` sends `PlayerState` every
 `NetPlayerStateSeconds`; chat feeds `ChatView`, `TimeSync` calls `World.SetLightingTime`,
-`PlayerList` reconciles `World.SyncRemotePlayers`, and `Hotbar`/`Q` become `InventoryRequest`
-intents, as does every selection change made locally (the wheel and a middle-click pick that
-jumps to another slot, `Program.MirrorSelection`). Each server message is handled inside a
+`PlayerList` reconciles `World.SyncRemotePlayers`, and `InventoryState` is imported as the truth.
+Inventory edits are predicted then sent (`Program.SendInventoryIntent`): the hotbar keys and `Q`
+are intents only, while the wheel (`Program.MirrorSelection`), a middle-click pick
+(`World.TryPickTargetedBlock(inventory, out id)` -> `PickBlock`), an [E]-panel hotbar equip, a
+craft (the fed members read before `CraftingSession.Craft` spends the reservation) and a creative
+catalog grant or clear apply locally at once and send their intent, so the server's answer keeps
+them or snaps them back. Each server message is handled inside a
 try/catch, and a malformed one (`EndOfStreamException`, `IOException`, `InvalidDataException`,
 `FormatException`, `ArgumentException`) leaves the server with "The server sent bad data" instead
 of crashing the game. Remote players are `RemotePlayer`s whose
@@ -1599,12 +1646,15 @@ camera exactly like a focused inventory field, and the log sits bottom-left abov
 SendChat` echoes locally; in multiplayer it sends `ChatSend` and the server's broadcast is the
 only copy, so a line never appears twice.
 
-**Known gaps** (open): the server holds **one** `World.Inventory`, so every client mirrors the same
-inventory and true per-player inventories are not implemented; the client's mining/placement still
-consumes its own mirror between syncs (mining loot and placement cost are not yet server-rolled),
-so item counts can drift from the server between an intent and the next sync, and a hotbar
-equip from the [E] panel is a local edit with no intent, so the next inventory sync reverts it;
-projectiles, primed TNT, falling blocks and toppling trees are not in `EntityList` (their cells
+**Known gaps** (open): the client's mining, placement, item use, stations and charged throws
+still spend or credit its own mirror with no intent (mining loot, placement cost, tool wear and
+station consumption are not yet server-rolled), so the next inventory snapshot reverts their
+inventory side while their cell edits still go through as raw `BlockEdit`s; an intent answered
+while a later local change is still in flight briefly snaps the mirror back (no sequence ids yet);
+the server's creative flag follows the client's request whenever `AllowCreative` is on (there is
+no per-player permission, and the client is never told its request was refused); players are
+keyed by name with no authentication, so whoever joins first under a name gets that name's
+inventory; projectiles, primed TNT, falling blocks and toppling trees are not in `EntityList` (their cells
 still sync via `BlockChanges`, and a client now never fakes them locally, so a fall or a blast
 shows as cells changing rather than as a moving entity); igniting TNT on a client only removes the
 block on the server, because a `BlockEdit` cannot tell a prime from a mine and the server does not

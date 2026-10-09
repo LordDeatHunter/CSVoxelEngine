@@ -19,6 +19,8 @@ public class DropManager
 
     private readonly List<ItemDrop> _drops = [];
     private readonly List<byte> _collected = [];
+    // Parallel to _collected after a multi-collector Update: the index of the collector each went to
+    private readonly List<int> _collectedBy = [];
     // Reused by SpawnLoot so a break does not allocate; main thread only, like the rest
     private readonly List<byte> _loot = [];
 
@@ -31,6 +33,13 @@ public class DropManager
     /// Block ids collected during the most recent <see cref="Update"/>. Valid until the next one.
     /// </summary>
     public ReadOnlySpan<byte> Collected => CollectionsMarshal.AsSpan(_collected);
+
+    /// <summary>
+    /// After the multi-collector <see cref="Update(float, IReadOnlyList{DropCollector}, ChunkManager)"/>:
+    /// for each entry of <see cref="Collected"/>, the index of the collector it went to. Empty after
+    /// the single-player overload. Valid until the next update.
+    /// </summary>
+    public ReadOnlySpan<int> CollectedBy => CollectionsMarshal.AsSpan(_collectedBy);
 
     /// <summary>
     /// Drops a block or item at the centre of the cell it occupied. Air and unknown ids drop
@@ -149,6 +158,7 @@ public class DropManager
         Func<byte, bool>? canCollect = null)
     {
         _collected.Clear();
+        _collectedBy.Clear();
         if (_drops.Count == 0) return;
 
         var target = playerPosition - Vector3.UnitY * CollectHeightOffset;
@@ -167,6 +177,61 @@ public class DropManager
             if (!wanted && !(canCollect?.Invoke(drop.BlockId) ?? true)) continue;
 
             _collected.Add(drop.BlockId);
+            _drops.RemoveAt(i);
+        }
+    }
+
+    /// <summary>
+    /// The multiplayer server's pickup: every drop flies to the nearest collector whose pool has
+    /// room for it (attracted once within <see cref="PickupRange"/>, as in single player), and a
+    /// collected drop is reported in <see cref="Collected"/> with its collector's index in
+    /// <see cref="CollectedBy"/>, so each player's own inventory is credited. A drop whose chunk is
+    /// not loaded is left untouched (neither collected nor simulated, so it cannot fall through the
+    /// unloaded air); one nobody can take lets go of any player it was flying at and falls back to
+    /// the ground.
+    /// </summary>
+    public void Update(float deltaTime, IReadOnlyList<DropCollector> collectors, ChunkManager chunks)
+    {
+        _collected.Clear();
+        _collectedBy.Clear();
+        if (_drops.Count == 0) return;
+
+        var rangeSquared = PickupRange * PickupRange;
+        var lift = Vector3.UnitY * CollectHeightOffset;
+
+        // Back to front so removing a collected drop doesn't skip the next one
+        for (var i = _drops.Count - 1; i >= 0; i--)
+        {
+            var drop = _drops[i];
+            var (cx, cy, cz) = drop.Position.BlockCell();
+            if (chunks.ChunkAt(cx, cy, cz) == null) continue;
+
+            var nearest = -1;
+            var nearestSquared = float.MaxValue;
+            var target = Vector3.Zero;
+            for (var c = 0; c < collectors.Count; c++)
+            {
+                var collector = collectors[c];
+                if (!(collector.CanCollect?.Invoke(drop.BlockId) ?? true)) continue;
+                var aim = collector.Eye - lift;
+                var distanceSquared = Vector3.DistanceSquared(drop.Position, aim);
+                if (distanceSquared >= nearestSquared) continue;
+                nearest = c;
+                nearestSquared = distanceSquared;
+                target = aim;
+            }
+
+            if (nearest < 0)
+            {
+                drop.Release();
+                drop.Update(deltaTime, drop.Position, false, chunks);
+                continue;
+            }
+
+            if (!drop.Update(deltaTime, target, nearestSquared <= rangeSquared, chunks)) continue;
+
+            _collected.Add(drop.BlockId);
+            _collectedBy.Add(nearest);
             _drops.RemoveAt(i);
         }
     }

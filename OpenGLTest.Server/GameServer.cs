@@ -18,6 +18,15 @@ namespace silkgltriangle;
 /// to its headless <see cref="World"/> and broadcasts the result (player list, chat, block
 /// changes, the day clock).
 /// </para>
+/// <para>
+/// Every connected player is a <see cref="ServerPlayer"/> with an inventory of its own. A client
+/// sends inventory intents (<see cref="InventoryIntent"/>), the server replays each against that
+/// player's inventory (<see cref="InventoryIntentRules"/>) and always answers with a full
+/// <see cref="NetMessage.InventoryState"/> snapshot to that player only, so a refused intent
+/// rubberbands the client's optimistic copy; a pickup sends one too. Players are saved per name
+/// in the world folder (<see cref="ServerPlayerSaves"/>) on leaving, on stop and on the autosave
+/// interval, and restored when they join again.
+/// </para>
 /// </summary>
 public sealed class GameServer : IDisposable
 {
@@ -29,7 +38,10 @@ public sealed class GameServer : IDisposable
     // Reader threads hand inbound frames here; only Pump (main thread) drains it.
     private readonly ConcurrentQueue<Inbound> _inbound = new();
     private readonly Dictionary<int, ClientConnection> _clients = new();
-    private readonly Dictionary<int, PlayerSnapshot> _players = new();
+    private readonly Dictionary<int, ServerPlayer> _players = new();
+    // The same players as a list, handed to the world once (World.ServerPlayers) for its pickup
+    private readonly List<ServerPlayer> _playerList = [];
+    private double _playerSaveTimer;
 
     // Connections the accept thread opened, handed to Pump, which keeps the ones that have not
     // said hello yet in _pending so the idle sweep can drop a peer that never does.
@@ -77,9 +89,21 @@ public sealed class GameServer : IDisposable
         Port = port;
         // Dual-mode (IPv6 any, with IPv4 mapped), so [::1]:port works like 127.0.0.1:port.
         _listener = TcpListener.Create(port);
+        _world.ServerPlayers = _playerList;
     }
 
     public int Port { get; }
+
+    /// <summary>
+    /// Whether players may be creative here: a player's creative flag (requested through the
+    /// flags of its <see cref="NetMessage.PlayerState"/>, restored from its save) is only ever set
+    /// while this is on, and creative grants and clears are refused without it. Defaults to
+    /// <see cref="WorldGenerationConfig.ServerAllowCreative"/>.
+    /// </summary>
+    public bool AllowCreative { get; set; } = WorldGenerationConfig.ServerAllowCreative;
+
+    /// <summary>The connected player with this id (tests and diagnostics; main thread only).</summary>
+    public bool TryGetPlayer(int id, out ServerPlayer player) => _players.TryGetValue(id, out player!);
 
     /// <summary>The port actually bound (resolves an ephemeral port 0), for tests and logs.</summary>
     public int BoundPort => ((IPEndPoint)_listener.LocalEndpoint).Port;
@@ -140,6 +164,14 @@ public sealed class GameServer : IDisposable
 
         ServeLodRequests();
         DrainCellJournal();
+        SendChangedInventories();
+
+        _playerSaveTimer += deltaTime;
+        if (_playerSaveTimer >= WorldGenerationConfig.AutosaveIntervalSeconds)
+        {
+            _playerSaveTimer = 0;
+            SaveAllPlayers();
+        }
 
         _sweepTimer += deltaTime;
         if (_sweepTimer >= 1.0)
@@ -174,9 +206,9 @@ public sealed class GameServer : IDisposable
     private Vector3 Centroid()
     {
         var sum = Vector3.Zero;
-        foreach (var player in _players.Values)
+        foreach (var player in _playerList)
             sum += player.Position;
-        return sum / _players.Count;
+        return sum / _playerList.Count;
     }
 
     private void Handle(ClientConnection client, byte[] payload)
@@ -202,16 +234,23 @@ public sealed class GameServer : IDisposable
                 return;
             }
 
-            client.Name = CleanName(reader.ReadString());
+            // Unique among the players online, since the name keys the player's save file: two
+            // clients both called "Player" must not load (and overwrite) the same inventory
+            client.Name = UniqueName(CleanName(reader.ReadString()));
             client.Hello = true;
             _pending.Remove(client);
             // Captured before this player is added: with nobody online the server camera still
             // stands at the world spawn, so every joiner starts there, never at the centroid.
-            var spawn = _joinSpawn ??= _world.Camera.Position;
+            var joinSpawn = _joinSpawn ??= _world.Camera.Position;
+            var player = new ServerPlayer(client.Id, client.Name, joinSpawn) { LastStateAt = _elapsed };
+            // A returning player gets back their inventory and modes, and starts where they left
+            var restored = player.Restore(ServerPlayerSaves.Load(_world.SaveStore, client.Name), AllowCreative);
+            var spawn = restored ? player.Position : joinSpawn;
             _clients[client.Id] = client;
-            _players[client.Id] = new PlayerSnapshot(client.Name, spawn, 0f, 0f, 0, _elapsed);
+            _players[client.Id] = player;
+            _playerList.Add(player);
             SendServerHello(client, spawn);
-            SendInventory(client);
+            SendInventory(client, player);
             BroadcastPlayerList();
             BroadcastSystem($"{client.Name} joined the game");
             Log.WriteLine($"net: {client.Name} (#{client.Id}) joined from {client.Remote}");
@@ -254,14 +293,16 @@ public sealed class GameServer : IDisposable
                         WorldGenerationConfig.NetMaxMoveBlocksPerSecond, out var bounded);
                     if (!ok)
                         Log.Warn($"net: rejected a move from {client.Name} (#{client.Id})");
-                    _players[client.Id] = current with
-                    {
-                        Position = bounded,
-                        Yaw = yaw,
-                        Pitch = pitch,
-                        Flags = flags,
-                        LastStateAt = _elapsed,
-                    };
+                    current.Position = bounded;
+                    current.Yaw = yaw;
+                    current.Pitch = pitch;
+                    current.Flags = flags;
+                    current.LastStateAt = _elapsed;
+                    // The client's creative bit (its C toggle) is only a request: this server
+                    // grants it while it allows creative at all, and flight only with it.
+                    var requested = (NetPlayerFlags)flags;
+                    current.Creative = AllowCreative && requested.HasFlag(NetPlayerFlags.Creative);
+                    current.Flying = current.Creative && requested.HasFlag(NetPlayerFlags.Flying);
                 }
                 break;
             }
@@ -325,27 +366,27 @@ public sealed class GameServer : IDisposable
 
             case NetMessage.InventoryRequest:
             {
-                var action = (NetInventoryAction)reader.ReadByte();
-                var arg = reader.ReadInt();
-                // A Q-drop leaves from the requesting player's eye along their look, never from
-                // the server's own camera (the centroid of everyone online).
-                var hasThrower = _players.TryGetValue(client.Id, out var thrower);
-                switch (action)
+                var intent = InventoryIntentCodec.Read(reader);
+                if (!_players.TryGetValue(client.Id, out var player))
+                    break;
+                // Replayed against this player's own inventory only. A Q-drop leaves from the
+                // player's eye along their look, never from the server's own camera (the centroid
+                // of everyone online).
+                switch (intent.Action)
                 {
-                    case NetInventoryAction.SelectSlot:
-                        _world.Inventory.Select(arg);
+                    case NetInventoryAction.DropSelected:
+                    case NetInventoryAction.DropAllSelected:
+                        _world.ThrowSelected(intent.Action == NetInventoryAction.DropAllSelected,
+                            player.Position, player.Forward, player.Inventory);
                         break;
-                    case NetInventoryAction.DropSelected when hasThrower:
-                        _world.ThrowSelected(false, thrower.Position,
-                            Vector3Utils.FromYawPitch(thrower.Yaw, thrower.Pitch));
-                        break;
-                    case NetInventoryAction.DropAllSelected when hasThrower:
-                        _world.ThrowSelected(true, thrower.Position,
-                            Vector3Utils.FromYawPitch(thrower.Yaw, thrower.Pitch));
+                    default:
+                        InventoryIntentRules.Apply(player.Inventory, intent, player.Creative);
                         break;
                 }
 
-                SendInventory(client);
+                // Always, accepted or not: the snapshot is the truth the client's optimistic copy
+                // snaps back to when the server refused what it did.
+                SendInventory(client, player);
                 break;
             }
 
@@ -418,11 +459,52 @@ public sealed class GameServer : IDisposable
         _idleScratch.Clear();
     }
 
-    private void SendInventory(ClientConnection client)
+    /// <summary>Sends <paramref name="player"/>'s whole inventory to its own client, and only to it.</summary>
+    private static void SendInventory(ClientConnection client, ServerPlayer player)
     {
+        player.InventoryChanged = false;
         using var writer = new PacketWriter(NetMessage.InventoryState);
-        writer.WriteBytes(InventoryNetCodec.Encode(_world.Inventory.Export()));
+        writer.WriteBytes(InventoryNetCodec.Encode(player.Inventory.Export()));
         client.Send(writer.ToArray());
+    }
+
+    // A pickup (or anything else the world credited) changed a player's inventory since its last
+    // snapshot: send that player a fresh one.
+    private void SendChangedInventories()
+    {
+        foreach (var player in _playerList)
+        {
+            if (player.InventoryChanged && _clients.TryGetValue(player.Id, out var client))
+                SendInventory(client, player);
+        }
+    }
+
+    // Queues every connected player's file (nothing without a save store)
+    private void SaveAllPlayers()
+    {
+        foreach (var player in _playerList)
+            ServerPlayerSaves.Save(_world.SaveStore, player);
+    }
+
+    /// <summary>
+    /// <paramref name="requested"/>, or "<c>requested n</c>" for the smallest n &gt;= 2 whose save
+    /// slug no player online has, so two connected players never share a save file.
+    /// </summary>
+    private string UniqueName(string requested)
+    {
+        var name = requested;
+        for (var n = 2; SlugTaken(name); n++)
+            name = $"{requested} {n}";
+        return name;
+    }
+
+    private bool SlugTaken(string name)
+    {
+        var slug = WorldNames.Slug(name);
+        foreach (var player in _playerList)
+            if (string.Equals(WorldNames.Slug(player.Name), slug, StringComparison.Ordinal))
+                return true;
+        return false;
     }
 
     private void BroadcastPlayerList()
@@ -591,7 +673,11 @@ public sealed class GameServer : IDisposable
         _pending.Remove(client);
         if (!_clients.Remove(client.Id))
             return;
-        _players.Remove(client.Id);
+        if (_players.Remove(client.Id, out var player))
+        {
+            _playerList.Remove(player);
+            ServerPlayerSaves.Save(_world.SaveStore, player);
+        }
         BroadcastSystem($"{client.Name} left the game");
         BroadcastPlayerList();
         Log.WriteLine($"net: {client.Name} (#{client.Id}) disconnected");
@@ -682,6 +768,8 @@ public sealed class GameServer : IDisposable
             return;
         _running = false;
         Chunk.CellWritten = null;
+        // Before the world's SaveAndDispose shuts its store down: everyone still online is saved
+        SaveAllPlayers();
 
         try { _listener.Stop(); } catch (SocketException) { }
 
@@ -704,14 +792,12 @@ public sealed class GameServer : IDisposable
         _lodQueue.Clear();
         _clients.Clear();
         _players.Clear();
+        _playerList.Clear();
     }
 
     public void Dispose() => Stop();
 
     private readonly record struct Inbound(ClientConnection Client, byte[]? Payload);
-
-    private readonly record struct PlayerSnapshot(string Name, Vector3 Position, float Yaw, float Pitch,
-        byte Flags, double LastStateAt);
 
     /// <summary>
     /// One connected socket: its id and name, a lock-guarded framed send, the last time a frame

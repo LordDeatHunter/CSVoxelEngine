@@ -126,6 +126,17 @@ public class ItemDrop
     internal float Age => _age;
 
     /// <summary>
+    /// Lets go of the player the drop was flying at, so it falls back to the ground under its idle
+    /// physics: a multiplayer server calls it when no player can take the drop any more (the one
+    /// it latched onto left, or every pool filled).
+    /// </summary>
+    internal void Release()
+    {
+        _attracted = false;
+        _attractElapsed = 0f;
+    }
+
+    /// <summary>
     /// Advances the drop, returning true once it reaches <paramref name="target"/> and should be
     /// collected. While idle the drop falls under gravity and collides with blocks;
     /// <paramref name="inRange"/> latches attraction on, so a drop already being

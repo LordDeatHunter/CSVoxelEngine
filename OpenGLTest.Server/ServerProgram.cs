@@ -12,12 +12,17 @@ namespace silkgltriangle;
 /// The dedicated server's entry point: loads content headlessly, asks which saved world to host (or
 /// creates a new one), asks for a port, then runs a headless <see cref="World"/> with a
 /// <see cref="GameServer"/> until Ctrl+C or a typed <c>stop</c>. The world is saved on shutdown
-/// exactly like a game world, so a server session persists its edits.
+/// exactly like a game world, so a server session persists its edits. <c>--allow-creative</c> lets
+/// players turn creative on (<see cref="GameServer.AllowCreative"/>); without it everyone stays in
+/// survival.
 /// </summary>
 public static class ServerProgram
 {
-    public static void Main()
+    public static void Main(string[] args)
     {
+        var allowCreative = WorldGenerationConfig.ServerAllowCreative
+            || Array.Exists(args, a => a.Equals("--allow-creative", StringComparison.OrdinalIgnoreCase));
+
         Console.WriteLine("CSVoxelEngine server");
         Console.WriteLine();
 
@@ -61,7 +66,7 @@ public static class ServerProgram
 
         WorldSeed.Apply(world.Seed);
         var gameWorld = new World(null!, null!, null!, null!, null!, null!, null, save, serverMode: true);
-        using var server = new GameServer(gameWorld, world.Name, world.Seed, port);
+        using var server = new GameServer(gameWorld, world.Name, world.Seed, port) { AllowCreative = allowCreative };
         try
         {
             server.Start();
@@ -78,6 +83,7 @@ public static class ServerProgram
 
         Console.WriteLine();
         Console.WriteLine($"Serving '{world.Name}' (seed {world.Seed}) on port {server.BoundPort} (IPv4 and IPv6).");
+        Console.WriteLine(allowCreative ? "Creative mode is allowed." : "Creative mode is off (start with --allow-creative to allow it).");
         Console.WriteLine("Type 'stop' or press Ctrl+C to shut down.");
 
         var stop = new ManualResetEventSlim(false);

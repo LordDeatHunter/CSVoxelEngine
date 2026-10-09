@@ -10,8 +10,9 @@ namespace silkgltriangle;
 /// <summary>
 /// One world's chunk files (<c>&lt;world&gt;/chunks/&lt;cx&gt;_&lt;cy&gt;_&lt;cz&gt;.bin</c>, see
 /// <see cref="ChunkSaveCodec"/>) plus a few whole-file side cars in the world folder
-/// (<c>lod-edits.bin</c>). GL-free; <see cref="Log"/> is used only for warnings, never for
-/// correctness.
+/// (<c>lod-edits.bin</c>) and the hosted players' files in its
+/// <see cref="WorldStore.PlayersDirectoryName"/> subfolder. GL-free; <see cref="Log"/> is used only
+/// for warnings, never for correctness.
 /// <para>
 /// Writes are asynchronous, in the shape of <see cref="Log"/>: <see cref="Enqueue"/> and
 /// <see cref="EnqueueFile"/> never block, and one background thread ("ChunkSaveWriter") encodes and
@@ -95,6 +96,9 @@ public sealed class ChunkSaveStore
 
         DeleteLeftoverTemps(WorldDirectory);
         DeleteLeftoverTemps(ChunksDirectory);
+        var players = Path.Combine(WorldDirectory, WorldStore.PlayersDirectoryName);
+        if (Directory.Exists(players))
+            DeleteLeftoverTemps(players);
         BuildIndex();
 
         _writer = new Thread(WriteLoop)
@@ -187,8 +191,10 @@ public sealed class ChunkSaveStore
 
     /// <summary>
     /// Queues <paramref name="bytes"/> to be written as <paramref name="fileName"/> in the world
-    /// folder (a plain file name, no directories). Never blocks; the bytes are owned by the store
-    /// from here on and must not be modified. <see cref="ReadFile"/> sees them at once.
+    /// folder: a plain file name, or one under the <see cref="WorldStore.PlayersDirectoryName"/>
+    /// subfolder (<c>players/&lt;name&gt;</c>, created on demand); no other directories. Never
+    /// blocks; the bytes are owned by the store from here on and must not be modified.
+    /// <see cref="ReadFile"/> sees them at once.
     /// </summary>
     public void EnqueueFile(string fileName, byte[] bytes)
     {
@@ -354,6 +360,15 @@ public sealed class ChunkSaveStore
         var final = Path.Combine(WorldDirectory, fileName);
         if (_unreadableFiles.TryRemove(fileName, out _))
             SetAsideUnreadable(final);
+        try
+        {
+            // A players/ file lands in a subfolder that a new world does not have yet
+            Directory.CreateDirectory(Path.GetDirectoryName(final)!);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Log.Warn($"Could not create the folder for save file '{final}': {e.Message}");
+        }
         if (!TryWriteAndMove(final, bytes))
         {
             _failedFiles.TryAdd(fileName, 0);
@@ -470,10 +485,13 @@ public sealed class ChunkSaveStore
         }
     }
 
+    // A plain file name, or "players/<plain file name>": the one subfolder whole files may use
     private static void ValidateFileName(string fileName)
     {
         ArgumentException.ThrowIfNullOrEmpty(fileName);
-        if (Path.GetFileName(fileName) != fileName || fileName is "." or "..")
+        var prefix = WorldStore.PlayersDirectoryName + "/";
+        var plain = fileName.StartsWith(prefix, StringComparison.Ordinal) ? fileName[prefix.Length..] : fileName;
+        if (plain.Length == 0 || Path.GetFileName(plain) != plain || plain.Contains('/') || plain is "." or "..")
             throw new ArgumentException($"'{fileName}' is not a plain file name.", nameof(fileName));
     }
 }
