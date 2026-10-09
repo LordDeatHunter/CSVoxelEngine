@@ -7,9 +7,11 @@ namespace silkgltriangle;
 /// One connected player as the server tracks it: its own <see cref="Inventory"/> (never shared with
 /// another player or with the world's own), the server-owned creative and flight flags (survival by
 /// default), the pose its last accepted <see cref="NetMessage.PlayerState"/> put it at and when that
-/// arrived. The server persists it per player (<see cref="ServerPlayerSaves"/>) and the world's drop
-/// pickup credits it directly (<see cref="World.ServerPlayers"/>). GL-free; main thread only, like
-/// the rest of the server's state.
+/// arrived, and what judging its intents needs: the <see cref="PlayerContext"/> the world runs them
+/// through, the newest sequence id, the mining progress, the edit rate limiter and the attack pace.
+/// The server persists it per player (<see cref="ServerPlayerSaves"/>) and the world's drop pickup
+/// credits it directly (<see cref="World.ServerPlayers"/>). GL-free; main thread only, like the
+/// rest of the server's state.
 /// </summary>
 public sealed class ServerPlayer
 {
@@ -20,6 +22,94 @@ public sealed class ServerPlayer
         Position = position;
         // Cached once, so the per-frame pickup loop never allocates a delegate
         CanAcceptDrop = Inventory.CanAccept;
+        Context = new PlayerContext(Inventory) { Name = name, Eye = position };
+    }
+
+    /// <summary>
+    /// The context every world intent of this player runs through: this player's own inventory and
+    /// server-owned creative flag, and the eye and aim of the intent being applied (the last
+    /// accepted pose between intents).
+    /// </summary>
+    public PlayerContext Context { get; }
+
+    /// <summary>
+    /// The sequence id of the newest intent (world or inventory) this player sent; an intent whose
+    /// id is not above it is a replay and is refused. Inventory snapshots carry it, so the client
+    /// can tell an answer to an older intent from one to its newest.
+    /// </summary>
+    public int LastSeq { get; private set; }
+
+    /// <summary>This player's mining progress (see <see cref="BreakProgress"/>).</summary>
+    public BreakProgress Breaking { get; } = new();
+
+    /// <summary>Paces this player's edits (breaks, placements, uses and throws).</summary>
+    public RateLimiter EditLimiter { get; } = new(WorldGenerationConfig.NetEditIntentsPerSecond,
+        WorldGenerationConfig.NetEditIntentBurst);
+
+    private double _lastAttackAt = double.NegativeInfinity;
+
+    // The flags of the last creative/flight request the server refused and reported, so a stream of
+    // states still carrying it (sent before the client heard back) is not answered again
+    private NetPlayerFlags? _refusedRequest;
+
+    /// <summary>
+    /// Takes <paramref name="seq"/> as this player's newest intent, or refuses it (false, nothing
+    /// recorded) when it is not newer than the last one: ids only ever increase.
+    /// </summary>
+    public bool AcceptSeq(int seq)
+    {
+        if (seq <= LastSeq) return false;
+        LastSeq = seq;
+        return true;
+    }
+
+    /// <summary>
+    /// Whether an attack of <paramref name="kind"/> with <paramref name="held"/> may land at
+    /// <paramref name="now"/>: the pace since the last one (<see cref="AttackPacing"/>), less
+    /// <paramref name="slackSeconds"/> of network jitter. An attack that may land is recorded.
+    /// </summary>
+    public bool TryAttack(NetAttackKind kind, Item? held, double now, double slackSeconds)
+    {
+        if (now - _lastAttackAt + slackSeconds < AttackPacing.MinGapSeconds(kind, held))
+            return false;
+        _lastAttackAt = now;
+        return true;
+    }
+
+    /// <summary>
+    /// Records the creative/flight request a <see cref="NetMessage.PlayerState"/> carried against
+    /// what the server granted, and returns whether the client should be told: true only the first
+    /// time a request is refused, so it learns its modes once instead of on every state.
+    /// </summary>
+    public bool ShouldReportModes(NetPlayerFlags requested)
+    {
+        var modes = requested & (NetPlayerFlags.Creative | NetPlayerFlags.Flying);
+        if (modes == GrantedModes)
+        {
+            _refusedRequest = null;
+            return false;
+        }
+        if (_refusedRequest == modes)
+            return false;
+        _refusedRequest = modes;
+        return true;
+    }
+
+    /// <summary>The modes the server grants this player, as player-state flags.</summary>
+    public NetPlayerFlags GrantedModes =>
+        (Creative ? NetPlayerFlags.Creative : NetPlayerFlags.None)
+        | (Flying ? NetPlayerFlags.Flying : NetPlayerFlags.None);
+
+    /// <summary>
+    /// Points <see cref="Context"/> at an intent's eye and aim, with this player's current creative
+    /// flag, before the world applies it.
+    /// </summary>
+    public void Aim(Vector3 eye, Vector3 direction)
+    {
+        Context.Eye = eye;
+        Context.Forward = direction;
+        Context.ViewDirection = direction;
+        Context.IsCreative = Creative;
     }
 
     public int Id { get; }

@@ -103,4 +103,55 @@ public sealed class ServerPlayerTests : IDisposable
         Assert.True(lenient.Creative);
         Assert.True(lenient.Flying);
     }
+
+    [Fact]
+    public void AnIntentIsOnlyTakenWhenItIsNewerThanEveryEarlierOne()
+    {
+        var player = new ServerPlayer(1, "Alice", Vector3.Zero);
+        Assert.True(player.AcceptSeq(1));
+        Assert.True(player.AcceptSeq(5));
+        // A replay, or one overtaken by a newer id, is refused and leaves the newest in place
+        Assert.False(player.AcceptSeq(5));
+        Assert.False(player.AcceptSeq(3));
+        Assert.Equal(5, player.LastSeq);
+        Assert.True(player.AcceptSeq(6));
+    }
+
+    [Fact]
+    public void AttacksLandNoFasterThanTheirPace()
+    {
+        var player = new ServerPlayer(1, "Alice", Vector3.Zero);
+        var punchGap = AttackPacing.MinGapSeconds(NetAttackKind.Punch, null);
+        Assert.True(player.TryAttack(NetAttackKind.Punch, null, 10.0, 0.0));
+        // A second punch inside the held item's pace is refused, and the refusal records nothing
+        Assert.False(player.TryAttack(NetAttackKind.Punch, null, 10.0 + punchGap * 0.5, 0.0));
+        Assert.True(player.TryAttack(NetAttackKind.Punch, null, 10.0 + punchGap, 0.0));
+
+        // A slice swing paces by the swing, which a buffered return swing cannot beat either
+        var sliceGap = AttackPacing.MinGapSeconds(NetAttackKind.Slice, null);
+        var start = 20.0;
+        Assert.True(player.TryAttack(NetAttackKind.Slice, null, start, 0.0));
+        Assert.False(player.TryAttack(NetAttackKind.SliceReturn, null, start + sliceGap * 0.5, 0.0));
+        Assert.True(player.TryAttack(NetAttackKind.SliceReturn, null, start + sliceGap, 0.0));
+    }
+
+    [Fact]
+    public void ARefusedModeRequestIsReportedOncePerRequest()
+    {
+        // Survival on a server that grants nothing: asking for creative is refused and reported,
+        // the states that still carry the same request (sent before the client heard) are not
+        var player = new ServerPlayer(1, "Alice", Vector3.Zero);
+        Assert.True(player.ShouldReportModes(NetPlayerFlags.Creative));
+        Assert.False(player.ShouldReportModes(NetPlayerFlags.Creative));
+        // A different refused request is news again
+        Assert.True(player.ShouldReportModes(NetPlayerFlags.Creative | NetPlayerFlags.Flying));
+
+        // Once the client asks for what it has, a later refusal of the first request is news again
+        Assert.False(player.ShouldReportModes(NetPlayerFlags.None));
+        Assert.True(player.ShouldReportModes(NetPlayerFlags.Creative));
+
+        // A granted request is never reported
+        player.Creative = true;
+        Assert.False(player.ShouldReportModes(NetPlayerFlags.Creative));
+    }
 }

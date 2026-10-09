@@ -183,10 +183,30 @@ public class World : IItemUseWorld
     // Main thread only, set and cleared around each OnUse call.
     private int _activeToolInstance;
 
-    // The inventory that use runs against (the IItemUseWorld tail's tool and stack spending), set
-    // and cleared with _activeToolInstance; null outside a dispatch, which falls back to Inventory.
-    private Inventory? _activeInventory;
-    private Inventory ActiveInventory => _activeInventory ?? Inventory;
+    // The player that use runs for (the IItemUseWorld tail's raycasts, creative flag, tool and
+    // stack spending), set and cleared with _activeToolInstance; null outside a dispatch, which
+    // falls back to the local player.
+    private PlayerContext? _activeContext;
+    private PlayerContext ActiveContext => _activeContext ?? LocalContext();
+    private Inventory ActiveInventory => ActiveContext.Inventory;
+
+    // The local player as a PlayerContext: this world's own inventory, aimed by its camera.
+    // Refreshed from the camera by LocalContext() before every use, so it never allocates.
+    private readonly PlayerContext _localContext;
+
+    // The head ray the selection raycast fired along (Camera.LastAimDirection), which a client's
+    // break intents carry so the server's first-person ray lands on the same cell.
+    private Vector3 _selectedAimDirection = -Vector3.UnitZ;
+
+    // The hit cell and face the last raycast placement went against, which a client's placement
+    // intent names so the server places against the same face
+    private Vector3 _lastPlaceHit;
+    private Vector3 _lastPlaceNormal;
+
+    // A connected client's creative mining pace: one block per ClientCreativeBreakSeconds while
+    // the button is held (singleplayer mines one per frame). Infinity while released, so a click
+    // breaks at once.
+    private float _creativeBreakTimer = float.PositiveInfinity;
 
     // True once the player rests exactly on real ground at the origin spawn. The camera's
     // initial position is only a heightmap guess (pre-carve, see Camera.SpawnPosition), and
@@ -358,6 +378,7 @@ public class World : IItemUseWorld
             _serverMode = serverMode;
             _clientMode = clientMode;
             Camera = new Camera(window, input);
+            _localContext = new PlayerContext(Inventory) { Camera = Camera };
             _savedPlayer = PlayerSaveCodec.TryParse(saveStore?.ReadFile(PlayerSaveCodec.FileName));
             if (_savedPlayer != null)
                 ApplySavedPlayer(_savedPlayer);
@@ -695,132 +716,136 @@ public class World : IItemUseWorld
     public IReadOnlyList<RemotePlayer> RemotePlayers => _remotePlayers;
 
     /// <summary>
-    /// Raised after a player-driven block change with the cell and its new id and state (id 0 for a
-    /// removal). A multiplayer client forwards it to the server; null in singleplayer and on the
-    /// server, so a server-applied change never echoes back.
+    /// Raised on a multiplayer client for every cell its own action just changed locally (id 0 for
+    /// a removal), with the id and state the cell now holds: the prediction the intent raised right
+    /// after it (<see cref="IntentRaised"/>) will be judged on, so the client can tell the server's
+    /// answer to it from an older message (<see cref="ClientPrediction"/>). Null in singleplayer
+    /// and on the server.
     /// </summary>
     public Action<int, int, int, byte, byte>? BlockEdited { get; set; }
 
     /// <summary>
-    /// Applies a block change that came from elsewhere (a server broadcasting to a client, or a
-    /// client's edit on the server): the write, its remesh and the same fluid/leaf scheduling an
-    /// ordinary edit gets. Id 0 removes the cell, a fluid included (a client's bucket scoop: its
-    /// mining path never sends id 0 for a fluid); a fluid id pours like a bucket; the cell's own id
-    /// rewrites its state byte (a pile growing); a placeable cell is placed into; and an occupied
-    /// cell is replaced outright (a multiblock conversion, or a correction the server sent). On a
-    /// server a removal then has a mined cell's consequences (see <see cref="AfterNetworkRemoval"/>);
-    /// on a client those arrive in the server's own broadcast. Returns whether the cell changed:
-    /// false when its chunk is not loaded or the write was refused, so the server can correct the
-    /// sender. Never raises <see cref="BlockEdited"/>, so it cannot loop.
+    /// Raised on a multiplayer client for every action the server has to replay: a mining start or
+    /// completion, a placement, a claimed right-click, a throw, a landed attack. The client applied
+    /// the action locally as a prediction first (its changed cells were reported through
+    /// <see cref="BlockEdited"/> just before); the server answers with what really happened. Null
+    /// in singleplayer and on the server.
     /// </summary>
-    public bool ApplyNetworkBlockEdit(int x, int y, int z, byte blockId, byte state)
+    public Action<WorldIntent>? IntentRaised { get; set; }
+
+    /// <summary>
+    /// The chance roll every random item use reads (a firestarter's spark), 0..1. A test seam:
+    /// tests make a roll succeed by returning 0.
+    /// </summary>
+    internal Func<float> UseRoll { get; set; } = static () => Random.Shared.NextSingle();
+
+    /// <summary>The local player as a <see cref="PlayerContext"/>, refreshed from the camera.</summary>
+    private PlayerContext LocalContext()
     {
-        var cell = new Vector3(x, y, z);
-        var chunkPos = VoxelCoords.ChunkPosOf(cell);
-        if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk))
+        _localContext.Eye = Camera.Position;
+        _localContext.Forward = Camera.ViewDirection;
+        _localContext.ViewDirection = Camera.ViewDirection;
+        _localContext.IsCreative = Camera.IsCreative;
+        return _localContext;
+    }
+
+    /// <summary>
+    /// The cell <paramref name="player"/> aims at within <see cref="InteractionReach"/> and the face
+    /// the aim entered it through: what a server checks a client's claimed target against, so an
+    /// intent can only touch a cell the player's own eye reaches and sees.
+    /// </summary>
+    public bool RaycastFor(PlayerContext player, bool includeFluids, out Vector3 hit, out Vector3 normal) =>
+        player.Raycast(InteractionReach, _chunkManager, out hit, out normal, includeFluids);
+
+    /// <summary>
+    /// Breaks the block in <paramref name="cell"/> for <paramref name="player"/> with every
+    /// consequence a local break has (<see cref="RemoveBlock"/>): wood fells what it held up, any
+    /// cell of a multiblock reverts the structure, loot drops unless the player is creative, a
+    /// station hands back what it held, fragile blocks above pop and sand above topples, and the
+    /// fluid, leaf-decay, far-LOD and canopy hooks all run. A server calls it once a player's mining
+    /// was judged complete. Returns whether the cell was cleared; false for an unloaded chunk, air
+    /// or a fluid (never mined), or while the world is not playing.
+    /// </summary>
+    public bool BreakBlockFor(PlayerContext player, Vector3 cell)
+    {
+        if (!IsPlaying) return false;
+        int x = (int)cell.X, y = (int)cell.Y, z = (int)cell.Z;
+        if (!_chunkManager.TryGetCell(x, y, z, out var id, out _) || id == 0 || BlockType.IsFluid(id))
             return false;
+        RemoveBlock(cell, player);
+        return _chunkManager.TryGetCell(x, y, z, out var after, out _) && after == 0;
+    }
 
-        var existing = BlockIdAt(cell);
-        var existingState = _chunkManager.GetStateGlobal(x, y, z);
-        bool changed;
-        if (blockId == 0)
-        {
-            // The bucket path, so the fluid tick around the scooped cell is scheduled
-            changed = BlockType.IsFluid(existing)
-                ? _fluidManager.SetCellImmediate(cell, 0, 0, _chunkManager)
-                : chunk.RemoveBlockAt(cell, _chunkManager);
-        }
-        else if (BlockType.IsFluid(blockId))
-        {
-            // A poured bucket: written like the local bucket path does
-            changed = _fluidManager.SetCellImmediate(cell, blockId, state, _chunkManager);
-        }
-        else if (existing == blockId)
-        {
-            // Same block, new state byte: a pile or snow stack built up
-            changed = chunk.SetStateAt(cell, state, _chunkManager);
-        }
-        else if (existing == 0 || Placement.CanOccupy(existing, existingState))
-        {
-            changed = chunk.PlaceBlockAt(cell, blockId, _chunkManager, state);
-        }
-        else
-        {
-            // Occupied by another block: a structure converted over its source blocks, or the
-            // authoritative cell after a refused optimistic edit. One raw write, the edited chunk
-            // remeshed now and everything in light radius through the async budget.
-            chunk.SetBlockRaw(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask, blockId, state);
-            _chunkManager.ImmediateRemeshWithBorders(chunkPos, cell);
-            chunk.RemeshAfterBatchEdit(_chunkManager);
-            changed = true;
-        }
-
-        if (!changed)
-            return false;
-
-        if (blockId != 0)
-        {
-            if (LodSurface.IsSurfaceSolid(blockId))
-                NotifyLodEdit(x, y, z);
-            if (BlockType.ById[blockId]?.Renderer == BlockRenderer.Quern)
-                _querns.Ensure(x, y, z);
-        }
-
-        _fluidManager.ScheduleAround(cell);
-        _leafDecay.ScheduleAround(cell);
-        if (blockId == 0)
-        {
-            if (_serverMode)
-                AfterNetworkRemoval(cell, existing);
-        }
-        else if (!_clientMode)
-        {
-            // Sand placed into thin air falls at once, exactly as a local placement does (a
-            // client ticks no falling blocks; the server's fall arrives as cell changes)
-            _falling.TryTopple(_chunkManager, _lodManager, _fluidManager, x, y, z);
-        }
-
+    /// <summary>
+    /// Places <paramref name="player"/>'s selected block against the face of
+    /// <paramref name="hitCell"/> with outward normal <paramref name="hitNormal"/> (a target a
+    /// server has already checked the player can see), spending one unless the player is creative.
+    /// The block comes from the player's own selected slot and must be owned and placeable; the
+    /// cell follows the placement rules (<see cref="Placement"/>, no player body or live falling
+    /// cube in the way, fragile blocks on solid ground) and the state byte is the world's own
+    /// (a placed log is detached, a placed leaf persistent). Returns whether one was placed.
+    /// </summary>
+    public bool TryPlaceSelectedBlockAt(PlayerContext player, Vector3 hitCell, Vector3 hitNormal)
+    {
+        if (!IsPlaying) return false;
+        var inventory = player.Inventory;
+        if (!inventory.CanPlaceSelected) return false;
+        if (!PlaceAgainstFace(hitCell, hitNormal, inventory.SelectedBlockId, player)) return false;
+        if (!player.IsCreative)
+            inventory.ConsumeSelected();
         return true;
     }
 
     /// <summary>
-    /// What a mined cell sets off beyond its own write, run on a server after a client's removal
-    /// arrived: a fragile block resting on it pops (through <see cref="RemoveBlock"/>, as a local
-    /// break does), sand above it topples, the far LOD's surface and caps follow, and a tree
-    /// block disturbs the far canopy. A client runs none of this: the server's journal broadcasts
-    /// every consequence to it.
+    /// Lands <paramref name="player"/>'s punch: the nearest mob inside the forward cone from the
+    /// player's eye with a clear line of sight takes the held item's <c>entityDamage</c> and a
+    /// shove. Returns whether a mob was struck.
     /// </summary>
-    private void AfterNetworkRemoval(Vector3 cell, byte removedId)
+    public bool PunchFor(PlayerContext player)
     {
-        // A station the remote player broke hands back what it held, as a local break does
-        var renderer = BlockType.ById[removedId]?.Renderer;
-        if (renderer == BlockRenderer.BranchPile)
-            _campfires.NotifyBlockRemoved((int)cell.X, (int)cell.Y, (int)cell.Z, _dropManager);
-        if (renderer == BlockRenderer.Quern)
-            _querns.NotifyBlockRemoved((int)cell.X, (int)cell.Y, (int)cell.Z, _dropManager);
-        if (ContentRegistry.IsCastMold(removedId))
-            _casting.NotifyBlockRemoved(cell, _dropManager);
-
-        var above = cell + Vector3.UnitY;
-        if (BlockType.ById[BlockIdAt(above)]?.NeedsSupport == true)
-            RemoveBlock(above);
-        _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
-            (int)above.X, (int)above.Y, (int)above.Z);
-
-        NotifyLodEdit((int)cell.X, (int)cell.Y, (int)cell.Z);
-        if (TreeGenerator.IsTreeBlock(removedId))
-        {
-            TreeGenerator.PoisonCanopy((int)cell.X, (int)cell.Z, TreeGenerator.SingleEditPoisonRadius);
-            _lodManager.MarkEditedColumn((int)cell.X, (int)cell.Z);
-        }
+        if (!IsPlaying) return false;
+        if (!TryFindPunchTarget(player.Eye, player.ViewDirection, out var target)) return false;
+        StrikeMob(target, Combat.PunchDamage(HeldItem(player.Inventory)), player.Eye);
+        return true;
     }
 
     /// <summary>
-    /// Applies a batch of server cell changes (an explosion, a fluid step, a fell) in one pass: raw
-    /// writes with no per-cell remesh, then one light-radius area rebuild per touched chunk
-    /// (<see cref="Chunk.RemeshAfterBatchEdit"/>, the same dirtying a local batch edit uses, so a
-    /// remote lamp or roof edit relights the edge and corner chunks too), each chunk once however
-    /// many of its cells changed. A quern that arrives registers its block entity so it draws.
+    /// Lands one of <paramref name="player"/>'s slice swings (<paramref name="returnSwing"/>: the
+    /// half-power return): the nearest two mobs in the forward hemisphere with a clear line of sight
+    /// are struck. Returns how many were.
+    /// </summary>
+    public int SliceFor(PlayerContext player, bool returnSwing)
+    {
+        if (!IsPlaying) return 0;
+        return ApplySliceDamage(player.Eye, player.ViewDirection, HeldItem(player.Inventory), returnSwing);
+    }
+
+    /// <summary>
+    /// Releases a throw of <paramref name="player"/>'s selected throwable at
+    /// <paramref name="charge01"/> from the player's eye along its view, spending the unit unless
+    /// the player is creative. False, spending nothing, when the selected slot holds nothing
+    /// throwable.
+    /// </summary>
+    public bool ThrowFor(PlayerContext player, float charge01)
+    {
+        if (!IsPlaying) return false;
+        var inventory = player.Inventory;
+        var id = inventory.SelectedBlockId;
+        if (id == 0 || inventory.SelectedCount <= 0) return false;
+        if (ItemRegistry.TryGet(id) is not { IsThrowable: true } item) return false;
+        return TryLaunchThrow(inventory, id, item.ThrowDamage ?? 0f, MathUtils.Clamp01(charge01), player.Eye,
+            player.ViewDirection, player.IsCreative);
+    }
+
+    /// <summary>
+    /// Applies a batch of server cell values (an explosion, a fluid step, a fell, or the correction
+    /// answering one of this client's intents) in one pass: raw writes with no per-cell remesh, then
+    /// one light-radius area rebuild per touched chunk (<see cref="Chunk.RemeshAfterBatchEdit"/>,
+    /// the same dirtying a local batch edit uses, so a remote lamp or roof edit relights the edge
+    /// and corner chunks too), each chunk once however many of its cells changed. A cell that
+    /// already holds the value is skipped, so a correction confirming a prediction costs nothing. A
+    /// quern that arrives registers its block entity so it draws. Never raises
+    /// <see cref="BlockEdited"/>, so it cannot loop.
     /// </summary>
     public void ApplyNetworkBlockChanges(IReadOnlyList<NetCellChange> changes)
     {
@@ -830,6 +855,9 @@ public class World : IItemUseWorld
             var change = changes[i];
             var chunk = _chunkManager.ChunkAt(change.X, change.Y, change.Z);
             if (chunk == null)
+                continue;
+            if (_chunkManager.TryGetCell(change.X, change.Y, change.Z, out var id, out var state)
+                && id == change.Id && state == change.State)
                 continue;
             chunk.SetBlockRaw(change.X & Chunk.SizeMask, change.Y & Chunk.SizeMask, change.Z & Chunk.SizeMask,
                 change.Id, change.State);
@@ -888,6 +916,22 @@ public class World : IItemUseWorld
 
         RefreshMobs();
     }
+
+    /// <summary>Whether any station block entity (campfire, quern, kiln, cast mold) is tracked,
+    /// so a server with none sends no station snapshots.</summary>
+    public bool HasStations => StationNetCodec.AnyStations(_campfires, _querns, _kilns, _casting);
+
+    /// <summary>Writes every station block entity for the server's broadcast
+    /// (<see cref="NetMessage.StationState"/>).</summary>
+    public void WriteStations(PacketWriter writer) =>
+        StationNetCodec.Write(writer, _campfires, _querns, _kilns, _casting);
+
+    /// <summary>
+    /// A client replaces its station mirrors with the server's snapshot: the fires, quern tops,
+    /// kilns and pours it draws are the server's, which alone runs them.
+    /// </summary>
+    public void ApplyNetworkStations(PacketReader reader) =>
+        StationNetCodec.Read(reader, _campfires, _querns, _kilns, _casting);
 
     private static bool KindMatches(Mob mob, NetEntityKind kind) =>
         kind == NetEntityKind.Slime ? mob is Slime : kind == NetEntityKind.Goblin && mob is Goblin;
@@ -974,23 +1018,64 @@ public class World : IItemUseWorld
                 MathUtils.FloorToInt(feet.Z)) != null)
             Camera.Update((float)deltaTime, keyboard, _chunkManager);
 
+        UpdatePlayerModel(deltaTime);
+
         for (var i = 0; i < _remotePlayers.Count; i++)
             _remotePlayers[i].Update(deltaTime);
 
         // The purely cosmetic systems a client's own edits still feed (mining debris, leaf
         // bursts and the ambient leaf fall) run locally, or what Render draws would hang in
         // mid-air. Falling blocks, TNT and toppling trees are never created on a client (see
-        // RemoveBlock), so their ticks stay the server's.
+        // RemoveBlock), so their ticks stay the server's. The station mirrors only animate (a quern
+        // top turning between snapshots) and feed the fire particles; the server runs the stations
+        // and its StationState snapshots replace them. A throw this client released flies as a
+        // cosmetic copy of the server's, which alone deals damage and lands as a drop.
         FrameProfiler.Begin(ProfileSection.Entities);
         _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager);
         _debris.Update((float)deltaTime, _chunkManager);
+        _querns.Animate((float)deltaTime);
+        _fireCells.Clear();
+        _fireCells.AddRange(_campfires.LitCells);
+        _fireCells.AddRange(_kilns.LitCells);
+        _fire.Update((float)deltaTime, _fireCells, Camera.RenderEye, wind: Wind.Direction(LightingTime));
+        UpdateThrown((float)deltaTime);
+        RefreshProjectiles();
         FrameProfiler.End(ProfileSection.Entities);
+
+        Inventory.Update((float)deltaTime);
 
         FrameProfiler.Begin(ProfileSection.Raycast);
         _hasSelectedBlock = Camera.Raycast(InteractionReach, _chunkManager,
             out _selectedBlockPosition, out _selectedFaceNormal, out _selectedBoxIndex,
             includeFluids: ItemRegistry.TryGet(Inventory.SelectedBlockId)?.TargetsFluids ?? false);
+        _selectedAimDirection = Camera.LastAimDirection;
         FrameProfiler.End(ProfileSection.Raycast);
+    }
+
+    /// <summary>
+    /// The local player's body for this frame: the held item, and the walk cycle driven by real
+    /// horizontal speed so the limbs keep up with sprint and swim instead of playing a fixed-rate
+    /// loop. Flying poses no stride, so it feeds zero speed and the limbs ease back to rest. The
+    /// punch, slice and throw animations run inside it.
+    /// </summary>
+    private void UpdatePlayerModel(double deltaTime)
+    {
+        var camPos = Camera.Position;
+        var horizontalSpeed = 0f;
+        if (_hasPrevCamPos && deltaTime > 0.0)
+        {
+            var step = camPos - _prevCamPos;
+            horizontalSpeed = new Vector3(step.X, 0f, step.Z).Length() / (float)deltaTime;
+        }
+        _prevCamPos = camPos;
+        _hasPrevCamPos = true;
+        _heldId = Inventory.SelectedBlockId;
+        _hasHeld = _heldId != 0 && (Inventory.SelectedCount > 0 || Inventory.SelectedToolInstance > 0);
+        Player.HoldingItem = _hasHeld;
+        var animSpeed = Camera.IsFlying ? 0f : horizontalSpeed;
+        var supported = Camera.IsGrounded || Camera.IsFlying || Camera.IsInWater;
+        Player.Update((float)deltaTime, animSpeed, Camera.IsSprinting, supported,
+            Camera.VerticalVelocity);
     }
 
     /// <summary>
@@ -1027,26 +1112,7 @@ public class World : IItemUseWorld
         FrameProfiler.Begin(ProfileSection.Player);
 
         UpdateHealth((float)deltaTime);
-
-        // The walk cycle runs off real horizontal speed, so the limbs keep up with sprint
-        // and swim instead of playing a fixed-rate loop. Flying poses no stride, so it
-        // feeds zero speed and the limbs ease back to rest.
-        var camPos = Camera.Position;
-        var horizontalSpeed = 0f;
-        if (_hasPrevCamPos && deltaTime > 0.0)
-        {
-            var step = camPos - _prevCamPos;
-            horizontalSpeed = new Vector3(step.X, 0f, step.Z).Length() / (float)deltaTime;
-        }
-        _prevCamPos = camPos;
-        _hasPrevCamPos = true;
-        _heldId = Inventory.SelectedBlockId;
-        _hasHeld = _heldId != 0 && (Inventory.SelectedCount > 0 || Inventory.SelectedToolInstance > 0);
-        Player.HoldingItem = _hasHeld;
-        var animSpeed = Camera.IsFlying ? 0f : horizontalSpeed;
-        var supported = Camera.IsGrounded || Camera.IsFlying || Camera.IsInWater;
-        Player.Update((float)deltaTime, animSpeed, Camera.IsSprinting, supported,
-            Camera.VerticalVelocity);
+        UpdatePlayerModel(deltaTime);
 
         // The chunk update below times itself, so the player span closes here.
         FrameProfiler.End(ProfileSection.Player);
@@ -1088,6 +1154,8 @@ public class World : IItemUseWorld
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
         _querns.Update((float)deltaTime, _chunkManager, _dropManager);
         _kilns.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
+        // A pour bound to a connected player (its PlayerContext) drains that player's crucible; the
+        // world's own inventory and camera stand for the local player
         _casting.Update((float)deltaTime, _chunkManager, _dropManager, Inventory,
             Inventory.SelectedToolInstance, Camera.Position, InteractionReach);
         _fireCells.Clear();
@@ -1182,6 +1250,7 @@ public class World : IItemUseWorld
         _hasSelectedBlock = Camera.Raycast(InteractionReach, _chunkManager,
             out _selectedBlockPosition, out _selectedFaceNormal, out _selectedBoxIndex,
             includeFluids: ItemRegistry.TryGet(Inventory.SelectedBlockId)?.TargetsFluids ?? false);
+        _selectedAimDirection = Camera.LastAimDirection;
         FrameProfiler.End(ProfileSection.Raycast);
     }
 
@@ -1950,13 +2019,14 @@ public class World : IItemUseWorld
         _attackWasPressed = isHolding;
 
         var held = HeldItem();
+        var player = LocalContext();
 
         // A slice weapon owns the left-click outright: every press swings the blade (and buffers
         // the return while one plays), so it never mines.
         if (held is { Attack: AttackPattern.Slice })
         {
             Camera.NotifyPlayerAction();
-            UpdateSlice((float)deltaTime, justPressed);
+            UpdateSlice((float)deltaTime, justPressed, player);
             StopBreaking();
             return;
         }
@@ -1970,6 +2040,7 @@ public class World : IItemUseWorld
         {
             StopBreaking();
             _punchTimer = float.PositiveInfinity;
+            _creativeBreakTimer = float.PositiveInfinity;
             return;
         }
 
@@ -1978,7 +2049,7 @@ public class World : IItemUseWorld
 
         // Attack-first: while a mob is in the punch cone it owns the swing, so no block is
         // mined through it (including while the punch itself is on cooldown).
-        if (UpdatePunch(deltaTime))
+        if (UpdatePunch(deltaTime, player))
         {
             StopBreaking();
             return;
@@ -2001,9 +2072,18 @@ public class World : IItemUseWorld
         if (Camera.IsCreative)
         {
             StopBreaking();
+            // A connected client mines at a pace the server's edit rate accepts; singleplayer
+            // keeps taking one block a frame
+            if (_clientMode)
+            {
+                _creativeBreakTimer += (float)deltaTime;
+                if (_creativeBreakTimer < WorldGenerationConfig.ClientCreativeBreakSeconds)
+                    return;
+                _creativeBreakTimer = 0f;
+            }
             Player.Punch();
             PlayHitSfx(BlockIdAt(_selectedBlockPosition));
-            RemoveBlock(_selectedBlockPosition);
+            BreakMined(_selectedBlockPosition, player);
             return;
         }
 
@@ -2029,11 +2109,14 @@ public class World : IItemUseWorld
             // it would have to survive.
             _hitTimer = _breakHitSeconds;
             _popElapsed = BlockPopSeconds;
+            // A connected client: the server starts its own count of this break here, and judges
+            // the completion against it (BreakProgress)
+            RaiseIntent(WorldIntent.BreakStart(Camera.Position, _selectedAimDirection, _breakingBlockPosition));
         }
 
         // Zero hardness covers two cases: a real block of hardness 0 (pebbles) pops on first
         // contact with no hold-to-mine, while air or an unloaded chunk has nothing to mine
-        // at all � the id being a registered block is what tells them apart. A refused tool
+        // at all - the id being a registered block is what tells them apart. A refused tool
         // whiffs instead of popping the block.
         if (_breakHardness <= 0f)
         {
@@ -2042,7 +2125,7 @@ public class World : IItemUseWorld
                 Player.Punch();
                 PlayHitSfx(_breakingBlockId);
                 if (_breakAllowed)
-                    RemoveBlock(_selectedBlockPosition);
+                    BreakMined(_selectedBlockPosition, player);
             }
             StopBreaking();
             return;
@@ -2075,11 +2158,25 @@ public class World : IItemUseWorld
                 continue;
             }
 
-            RemoveBlock(_breakingBlockPosition);
+            BreakMined(_breakingBlockPosition, player);
             StopBreaking();
             return;
         }
     }
+
+    /// <summary>
+    /// Breaks a block the local player's mining finished. On a connected client the break is only
+    /// a prediction: the completion goes out as an intent, and the server breaks the block only
+    /// when its own count of the hits got there too.
+    /// </summary>
+    private void BreakMined(Vector3 cell, PlayerContext player)
+    {
+        RemoveBlock(cell, player);
+        RaiseIntent(WorldIntent.BreakComplete(Camera.Position, _selectedAimDirection, cell));
+    }
+
+    /// <summary>Hands an intent to a connected client's sender; nothing in singleplayer or on a server.</summary>
+    private void RaiseIntent(in WorldIntent intent) => IntentRaised?.Invoke(intent);
 
     private void StopBreaking()
     {
@@ -2096,11 +2193,7 @@ public class World : IItemUseWorld
     private Item? HeldItem() => HeldItem(Inventory);
 
     /// <summary>The item in <paramref name="inventory"/>'s selected slot, or null when it holds nothing.</summary>
-    private static Item? HeldItem(Inventory inventory)
-    {
-        var id = inventory.SelectedBlockId;
-        return id != 0 && inventory.SelectedCount > 0 ? ItemRegistry.TryGet(id) : null;
-    }
+    private static Item? HeldItem(Inventory inventory) => inventory.HeldItem;
 
     /// <summary>
     /// The punch half of the left-click action. While a mob sits in the forward cone the
@@ -2108,25 +2201,26 @@ public class World : IItemUseWorld
     /// <c>entityDamage</c> and a knockback shove. Returns true when a mob owns the swing (the
     /// caller must not mine). With the cone clear the timer keeps running, so the first mob to
     /// enter is punched at once; and when there is no block targeted either, the fist still
-    /// swings on the same pace, so left-clicking the sky plays the animation.
+    /// swings on the same pace, so left-clicking the sky plays the animation. A connected client
+    /// never damages a mob itself: it sends the punch, and the server lands it on its own mobs.
     /// </summary>
-    private bool UpdatePunch(double deltaTime)
+    private bool UpdatePunch(double deltaTime, PlayerContext player)
     {
         var held = HeldItem();
         _punchGap = Mining.HitGapSeconds(held);
         _punchTimer += (float)deltaTime;
 
-        if (TryFindPunchTarget(out var target))
+        if (TryFindPunchTarget(player.Eye, player.ViewDirection, out var target))
         {
             if (_punchTimer < _punchGap)
                 return true;
 
             _punchTimer = 0f;
             Player.Punch();
-            target.TakeDamage(Combat.PunchDamage(held));
-            var away = new Vector3(
-                target.Position.X - Camera.Position.X, 0f, target.Position.Z - Camera.Position.Z);
-            target.Shove(away, WorldGenerationConfig.SlimePunchShoveSpeed);
+            if (_clientMode)
+                RaiseIntent(WorldIntent.AttackWith(player.Eye, player.ViewDirection, NetAttackKind.Punch));
+            else
+                StrikeMob(target, Combat.PunchDamage(held), player.Eye);
             return true;
         }
 
@@ -2140,19 +2234,18 @@ public class World : IItemUseWorld
     }
 
     /// <summary>
-    /// Nearest mob inside the forward punch cone with an unobstructed line of sight, or false
-    /// when none is in reach. The punch fires from the head along the aim, so a wall between the
-    /// player and a mob stops it.
+    /// Nearest mob inside the forward punch cone from <paramref name="origin"/> along
+    /// <paramref name="direction"/> with an unobstructed line of sight, or false when none is in
+    /// reach. The punch fires from the head along the aim, so a wall between the player and a mob
+    /// stops it.
     /// </summary>
-    private bool TryFindPunchTarget(out Mob target)
+    private bool TryFindPunchTarget(Vector3 origin, Vector3 direction, out Mob target)
     {
         target = null!;
         var mobs = _mobs;
         if (mobs.Count == 0)
             return false;
 
-        var origin = Camera.Position;
-        var direction = Camera.ViewDirection;
         var bestDistance = float.PositiveInfinity;
         Mob? best = null;
 
@@ -2182,9 +2275,10 @@ public class World : IItemUseWorld
     /// right-to-left swing; a press while one plays buffers the left-to-right return, which
     /// starts (at half power) once the current swing finishes. Damage lands once per swing at
     /// the impact frame (<see cref="PlayerModel.SliceImpactProgress"/>), so targets must still be
-    /// in the hemisphere then. The swing animation itself lives in <see cref="PlayerModel"/>.
+    /// in the hemisphere then; a connected client sends the swing to the server instead of
+    /// striking anything itself. The swing animation itself lives in <see cref="PlayerModel"/>.
     /// </summary>
-    private void UpdateSlice(double deltaTime, bool justPressed)
+    private void UpdateSlice(double deltaTime, bool justPressed, PlayerContext player)
     {
         if (justPressed && _sliceCombo.Press())
         {
@@ -2198,7 +2292,12 @@ public class World : IItemUseWorld
         if (!_sliceImpactDone && Player.SliceProgress >= PlayerModel.SliceImpactProgress)
         {
             _sliceImpactDone = true;
-            ApplySliceDamage(_sliceCombo.ReturnSwing);
+            var returnSwing = _sliceCombo.ReturnSwing;
+            if (_clientMode)
+                RaiseIntent(WorldIntent.AttackWith(player.Eye, player.ViewDirection,
+                    returnSwing ? NetAttackKind.SliceReturn : NetAttackKind.Slice));
+            else
+                ApplySliceDamage(player.Eye, player.ViewDirection, HeldItem(), returnSwing);
         }
 
         if (Player.IsSlicing)
@@ -2212,19 +2311,18 @@ public class World : IItemUseWorld
     }
 
     /// <summary>
-    /// Lands one slice swing: the nearest two mobs inside the forward hemisphere with an
+    /// Lands one slice swing from <paramref name="origin"/> along <paramref name="direction"/>
+    /// with <paramref name="held"/>: the nearest two mobs inside the forward hemisphere with an
     /// unobstructed line of sight each take the swing's damage and a knockback shove. The return
-    /// swing is at half power (<paramref name="returnSwing"/>).
+    /// swing is at half power (<paramref name="returnSwing"/>). Returns how many were struck.
     /// </summary>
-    private void ApplySliceDamage(bool returnSwing)
+    private int ApplySliceDamage(Vector3 origin, Vector3 direction, Item? held, bool returnSwing)
     {
         var mobs = _mobs;
         if (mobs.Count == 0)
-            return;
+            return 0;
 
-        var origin = Camera.Position;
-        var direction = Camera.ViewDirection;
-        var damage = Combat.SliceDamage(HeldItem(), returnSwing);
+        var damage = Combat.SliceDamage(held, returnSwing);
 
         Mob? first = null;
         Mob? second = null;
@@ -2254,16 +2352,26 @@ public class World : IItemUseWorld
             }
         }
 
-        StrikeSliceTarget(first, damage);
-        StrikeSliceTarget(second, damage);
+        var struck = 0;
+        if (first != null)
+        {
+            StrikeMob(first, damage, origin);
+            struck++;
+        }
+        if (second != null)
+        {
+            StrikeMob(second, damage, origin);
+            struck++;
+        }
+        return struck;
     }
 
-    private void StrikeSliceTarget(Mob? mob, int damage)
+    /// <summary>Deals <paramref name="damage"/> to <paramref name="mob"/> and shoves it away from
+    /// <paramref name="from"/> (the striker's eye, or where a thrown item left it).</summary>
+    private static void StrikeMob(Mob mob, int damage, Vector3 from)
     {
-        if (mob == null) return;
         mob.TakeDamage(damage);
-        var away = new Vector3(
-            mob.Position.X - Camera.Position.X, 0f, mob.Position.Z - Camera.Position.Z);
+        var away = new Vector3(mob.Position.X - from.X, 0f, mob.Position.Z - from.Z);
         mob.Shove(away, WorldGenerationConfig.SlimePunchShoveSpeed);
     }
 
@@ -2300,7 +2408,14 @@ public class World : IItemUseWorld
             (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
     }
 
-    private void RemoveBlock(Vector3 blockPos)
+    /// <summary>
+    /// Breaks the block at <paramref name="blockPos"/> for <paramref name="player"/>, with
+    /// everything a break sets off. A creative player's break drops nothing (trees still fall).
+    /// On a multiplayer client this is the local prediction only: no loot is rolled, no station
+    /// hands anything back and nothing fells or topples, since the server runs the real break and
+    /// broadcasts what it did.
+    /// </summary>
+    private void RemoveBlock(Vector3 blockPos, PlayerContext player)
     {
         var chunkPos = VoxelCoords.ChunkPosOf(blockPos);
 
@@ -2317,35 +2432,39 @@ public class World : IItemUseWorld
 
         _debris.Burst(blockPos, brokenId, WorldGenerationConfig.BlockDebrisOnBreak);
 
-        // Creative breaks drop nothing, but trees still fall.
-        var creative = Camera.IsCreative;
+        // Creative breaks drop nothing, but trees still fall. A client rolls no loot at all: what
+        // a break drops is the server's, and reaches the client as drops it can pick up.
+        var creative = player.IsCreative;
+        var dropsLoot = !creative && !_clientMode;
+        // Stations hand back what they held only where they really run
+        var stationDrops = _clientMode ? null : _dropManager;
 
         // A mined wood block fells whatever it was holding up instead of dropping one
         // block (see FellWood): a trunk cut drops the crown, a branch cut only its children.
         // A multiplayer client fells nothing itself: it clears the cut cell like any other block
         // and forwards it, and what the server makes of the cut arrives in its broadcast.
         if (BlockType.IsTreeWood(brokenId) && !_clientMode)
-            FellWood(blockPos, brokenId, brokenState, chunk, creative);
+            FellWood(blockPos, brokenId, brokenState, chunk, creative, player.Eye);
         // Mining any cell of a multiblock takes the whole structure apart instead of leaving
         // invisible part cells standing (see RevertMultiblock)
         else if (Multiblock.IsMultiblockCell(brokenId))
-            RevertMultiblock(blockPos, brokenId, chunk, creative);
+            RevertMultiblock(blockPos, brokenId, chunk, dropsLoot);
         // Everything else rolls its loot table, but only once a block was actually cleared
         else if (chunk.RemoveBlockAt(blockPos, _chunkManager))
         {
-            if (!creative)
+            if (dropsLoot)
                 _dropManager.SpawnLoot(brokenId, blockPos,
                     DropManager.PileCount(brokenId, (int)blockPos.X, (int)blockPos.Z, brokenState),
                     DropManager.PileSecondary(brokenId, (int)blockPos.X, (int)blockPos.Z, brokenState),
                     brokenState);
             if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.BranchPile)
-                _campfires.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, _dropManager);
+                _campfires.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, stationDrops);
             if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.Quern)
-                _querns.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, _dropManager);
-            // A mined mold throws out a cast that had already set, even in creative � the mold
+                _querns.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, stationDrops);
+            // A mined mold throws out a cast that had already set, even in creative - the mold
             // block itself is what creative withholds, not the metal someone poured into it
             if (ContentRegistry.IsCastMold(brokenId))
-                _casting.NotifyBlockRemoved(blockPos, _dropManager);
+                _casting.NotifyBlockRemoved(blockPos, stationDrops);
         }
 
         // Water beside or above the hole pours into it on the next fluid tick
@@ -2359,7 +2478,7 @@ public class World : IItemUseWorld
         NotifyLodEdit((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
 
         // Wood and leaves are never surface-solid and sit above the terrain, so the surface
-        // record above never fires for them � yet the far LOD draws their canopy. Disturb it
+        // record above never fires for them - yet the far LOD draws their canopy. Disturb it
         // and rebuild regardless.
         if (TreeGenerator.IsTreeBlock(brokenId))
         {
@@ -2373,7 +2492,7 @@ public class World : IItemUseWorld
         // check then no-ops on air, so the recursion always terminates.
         var above = blockPos + Vector3.UnitY;
         if (BlockType.ById[BlockIdAt(above)]?.NeedsSupport == true)
-            RemoveBlock(above);
+            RemoveBlock(above, player);
 
         // Sand and its kind need the block under them too, but they topple into a falling
         // cube instead of popping: a no-op unless a falls block sits right above the break,
@@ -2383,21 +2502,23 @@ public class World : IItemUseWorld
             _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
                 (int)above.X, (int)above.Y, (int)above.Z);
         // The mined cell ends as air on every path (plain break, felling, a multiblock revert);
-        // report it so a multiplayer client forwards the removal. Tree crowns and cascades do not
-        // travel this way yet - only the directly edited cell.
+        // a client tags it as predicted, so the server's answer to the break is told from older
+        // broadcasts
         if (BlockIdAt(blockPos) == 0)
             BlockEdited?.Invoke((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, 0, 0);
     }
 
     /// <summary>
     /// Fells the wood a mined wood block was holding up: collects the severed part (the break
-    /// plus its children � a branch cut leaves the trunk standing), clears it in one batch
+    /// plus its children - a branch cut leaves the trunk standing), clears it in one batch
     /// (same pattern as a TNT blast), and launches a toppling entity that drops its blocks
     /// once it has lain still. Player-placed (detached) logs are not trees: they pop out as a
     /// plain drop with no entity and no animation. A lone block with no children just drops
     /// as-is. A creative break (<paramref name="creative"/>) still topples, but drops nothing.
+    /// The tree tips away from <paramref name="feller"/>, the eye of whoever cut it.
     /// </summary>
-    private void FellWood(Vector3 blockPos, byte brokenId, byte brokenState, Chunk chunk, bool creative)
+    private void FellWood(Vector3 blockPos, byte brokenId, byte brokenState, Chunk chunk, bool creative,
+        Vector3 feller)
     {
         var x = (int)blockPos.X;
         var y = (int)blockPos.Y;
@@ -2487,8 +2608,8 @@ public class World : IItemUseWorld
 
         // The tree tips away from whoever felled it, pivoting on the mined cell's base
         var away = new Vector3(
-            blockPos.X + 0.5f - Camera.Position.X, 0f,
-            blockPos.Z + 0.5f - Camera.Position.Z);
+            blockPos.X + 0.5f - feller.X, 0f,
+            blockPos.Z + 0.5f - feller.Z);
         _toppling.Add(new TopplingTree(collected,
             new Vector3(blockPos.X + 0.5f, blockPos.Y, blockPos.Z + 0.5f), away, drops: !creative));
     }
@@ -2505,7 +2626,7 @@ public class World : IItemUseWorld
     {
         if (BlockType.ById[anchorId] is not { } anchorType) return false;
         if (!MultiblockPlacement.TryFindVolume(_chunkManager.GetBlockGlobal, sourceId, hitCell,
-                hitNormal, Camera.ViewDirection, out var anchor, out var facing))
+                hitNormal, ActiveContext.ViewDirection, out var anchor, out var facing))
             return false;
 
         // A live falling cube owns its cell: never bury one inside the structure
@@ -2545,15 +2666,16 @@ public class World : IItemUseWorld
 
     /// <summary>
     /// Mining any cell of a multiblock takes the whole structure down: the other seven cells go
-    /// back to the source block in one batch and the mined cell rolls the structure's loot. An
-    /// orphaned cell (its anchor already blasted away) just pops on its own.
+    /// back to the source block in one batch and the mined cell rolls the structure's loot when
+    /// <paramref name="dropsLoot"/> (not for a creative break, and never on a client, whose break
+    /// is a prediction). An orphaned cell (its anchor already blasted away) just pops on its own.
     /// </summary>
-    private void RevertMultiblock(Vector3 blockPos, byte brokenId, Chunk chunk, bool creative)
+    private void RevertMultiblock(Vector3 blockPos, byte brokenId, Chunk chunk, bool dropsLoot)
     {
         if (!Multiblock.TryResolveAnchor(_chunkManager, (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z,
                 out var anchor, out _, out var anchorType) || anchorType == null)
         {
-            if (chunk.RemoveBlockAt(blockPos, _chunkManager) && !creative)
+            if (chunk.RemoveBlockAt(blockPos, _chunkManager) && dropsLoot)
                 _dropManager.SpawnLoot(brokenId, blockPos);
             return;
         }
@@ -2569,7 +2691,7 @@ public class World : IItemUseWorld
                 touched.RemeshAfterBatchEdit(_chunkManager);
         }
 
-        if (!creative)
+        if (dropsLoot)
             _dropManager.SpawnLoot(brokenId, blockPos);
 
         OnMultiblockBroken(anchor, anchorType, blockPos);
@@ -2596,8 +2718,9 @@ public class World : IItemUseWorld
     /// contents drop.</summary>
     private void OnMultiblockBroken(Vector3 anchor, BlockType anchorType, Vector3 blockPos)
     {
+        // A client's kiln is a mirror of the server's: it forgets the structure but drops nothing
         if (anchorType.Kiln)
-            _kilns.NotifyBlockRemoved(anchor, blockPos, _dropManager);
+            _kilns.NotifyBlockRemoved(anchor, blockPos, _clientMode ? null : _dropManager);
     }
 
     /// <summary>Swings falling trees, then pops their wood out as item drops once rested.</summary>
@@ -2673,42 +2796,57 @@ public class World : IItemUseWorld
     /// here owned it � a mudball aimed at a lit campfire cooks instead of being thrown.
     /// False unless the world is playing: nothing may edit an unloaded world.
     /// </summary>
-    public bool TryUseSelected(float maxDistance) => TryUseSelected(maxDistance, Inventory);
+    public bool TryUseSelected(float maxDistance)
+    {
+        var claimed = TryUseSelected(maxDistance, LocalContext(), out var outcome);
+        // A connected client predicted the click; the server replays it for this player. A
+        // placement names the face it went against (the server checks the player can see it), any
+        // other claim only the cell under the crosshair, which scopes the correction sent back.
+        if (claimed && _clientMode)
+        {
+            if (outcome == RightClickOutcome.Place)
+                RaiseIntent(WorldIntent.Place(Camera.Position, Camera.LastAimDirection, _lastPlaceHit, _lastPlaceNormal));
+            else
+                RaiseIntent(WorldIntent.Use(Camera.Position, Camera.LastAimDirection,
+                    _hasSelectedBlock ? _selectedBlockPosition : null));
+        }
+        return claimed;
+    }
 
     /// <summary>
-    /// <see cref="TryUseSelected(float)"/> spending from and crediting <paramref name="inventory"/>:
-    /// every station interaction, the item's own use (its tool morph, durability and cooldown) and
-    /// the placement cost run against it. Single player passes its own <see cref="Inventory"/>.
+    /// <see cref="TryUseSelected(float)"/> for <paramref name="player"/>: every station
+    /// interaction, the item's own use (its tool morph, durability and cooldown) and the placement
+    /// cost run against that player's inventory, aim and creative flag. Single player passes its
+    /// own camera's context; a server passes the acting player's. <paramref name="outcome"/> says
+    /// what claimed the click; <paramref name="allowPlace"/> false stops the chain before the
+    /// placement fallback (a server replaying a click the client said was not a placement).
     /// </summary>
-    public bool TryUseSelected(float maxDistance, Inventory inventory)
+    public bool TryUseSelected(float maxDistance, PlayerContext player, out RightClickOutcome outcome,
+        bool allowPlace = true)
     {
+        outcome = RightClickOutcome.None;
         if (!IsPlaying) return false;
-        if (_throwCharging) return false;
-        Camera.NotifyPlayerAction();
-        if (TryCookOrCollect(maxDistance, inventory))
+        var local = player.Camera != null;
+        if (local && _throwCharging) return false;
+        if (local)
+            Camera.NotifyPlayerAction();
+        if (TryCookOrCollect(maxDistance, player) || TryQuernInteract(maxDistance, player)
+            || TryKilnInteract(maxDistance, player) || TryCastInteract(maxDistance, player))
         {
             Player.Punch();
+            outcome = RightClickOutcome.Station;
             return true;
         }
-        if (TryQuernInteract(maxDistance, inventory))
-        {
-            Player.Punch();
-            return true;
-        }
-        if (TryKilnInteract(maxDistance, inventory))
-        {
-            Player.Punch();
-            return true;
-        }
-        if (TryCastInteract(maxDistance, inventory))
-        {
-            Player.Punch();
-            return true;
-        }
-        var item = HeldItem(inventory);
+        var item = HeldItem(player.Inventory);
         if (item == null || item is BlockItem || item.UseAction == ItemUseAction.None)
-            return TryPlaceSelectedBlock(maxDistance, inventory);
-        return DispatchUse(item, maxDistance, inventory);
+        {
+            if (!allowPlace || !TryPlaceSelectedBlock(maxDistance, player)) return false;
+            outcome = RightClickOutcome.Place;
+            return true;
+        }
+        if (!DispatchUse(item, maxDistance, player)) return false;
+        outcome = RightClickOutcome.ItemUse;
+        return true;
     }
 
     /// <summary>Starts charging a throw of the selected throwable. False unless the world is
@@ -2754,7 +2892,8 @@ public class World : IItemUseWorld
     }
 
     /// <summary>Releases a charged throw. False unless the world is playing: nothing may edit an
-    /// unloaded world.</summary>
+    /// unloaded world. On a connected client the projectile is a cosmetic copy: the throw goes
+    /// out as an intent and the server launches the one that deals damage and lands as a drop.</summary>
     public bool ReleaseThrow()
     {
         if (!IsPlaying) return false;
@@ -2767,6 +2906,7 @@ public class World : IItemUseWorld
             Player.CancelThrowCharge();
             return false;
         }
+        RaiseIntent(WorldIntent.Throw(Camera.Position, Camera.ViewDirection, charge01));
         Camera.NotifyPlayerAction();
         Player.ReleaseThrow(charge01);
         return true;
@@ -2792,6 +2932,11 @@ public class World : IItemUseWorld
         return true;
     }
 
+    /// <summary>
+    /// Flies every thrown item: one that hits a mob deals its damage and shoves it away from where
+    /// it was thrown from, one that comes to rest becomes a drop. A client's throws are cosmetic
+    /// copies of the server's, so they only fly and vanish.
+    /// </summary>
     private void UpdateThrown(float deltaTime)
     {
         if (_thrown.Count == 0) return;
@@ -2801,31 +2946,32 @@ public class World : IItemUseWorld
             var alive = projectile.Update(deltaTime, _chunkManager, _mobs, out var hit);
             if (hit != null)
             {
-                hit.TakeDamage(projectile.Damage);
-                var away = new Vector3(
-                    hit.Position.X - Camera.Position.X, 0f, hit.Position.Z - Camera.Position.Z);
-                hit.Shove(away, WorldGenerationConfig.SlimePunchShoveSpeed);
+                if (!_clientMode)
+                    StrikeMob(hit, projectile.Damage, projectile.Origin);
                 _thrown.RemoveAt(i);
                 continue;
             }
             if (!alive)
             {
-                _dropManager.SpawnAt(projectile.ItemId, projectile.Position);
+                if (!_clientMode)
+                    _dropManager.SpawnAt(projectile.ItemId, projectile.Position);
                 _thrown.RemoveAt(i);
             }
         }
     }
 
     /// <summary>
-    /// Runs one item's <see cref="Item.OnUse"/> and applies its outcome: morph the tool instance
-    /// in place (only when the use took effect) and punch. Durability, cooldowns and stack
-    /// spending already happened inside the override. Returns whether the use took effect.
+    /// Runs one item's <see cref="Item.OnUse"/> for <paramref name="player"/> and applies its
+    /// outcome: morph the tool instance in place (only when the use took effect) and punch.
+    /// Durability, cooldowns and stack spending already happened inside the override, against the
+    /// player's own inventory. Returns whether the use took effect.
     /// </summary>
-    private bool DispatchUse(Item item, float maxDistance, Inventory inventory)
+    private bool DispatchUse(Item item, float maxDistance, PlayerContext player)
     {
+        var inventory = player.Inventory;
         var instance = inventory.SelectedToolInstance;
         _activeToolInstance = instance;
-        _activeInventory = inventory;
+        _activeContext = player;
         try
         {
             var stack = instance > 0 ? inventory.GetToolStack(instance) : null;
@@ -2839,7 +2985,7 @@ public class World : IItemUseWorld
         finally
         {
             _activeToolInstance = 0;
-            _activeInventory = null;
+            _activeContext = null;
         }
     }
 
@@ -2849,13 +2995,15 @@ public class World : IItemUseWorld
 
     double IItemUseWorld.NowSeconds => Now;
 
-    bool IItemUseWorld.IsCreative => Camera.IsCreative;
+    bool IItemUseWorld.IsCreative => ActiveContext.IsCreative;
+
+    float IItemUseWorld.NextUseRoll() => UseRoll();
 
     bool IItemUseWorld.RaycastFluidSource(float maxDistance, out Vector3 hit) =>
-        Camera.Raycast(maxDistance, _chunkManager, out hit, out _, includeFluids: true);
+        ActiveContext.Raycast(maxDistance, _chunkManager, out hit, out _, includeFluids: true);
 
     bool IItemUseWorld.RaycastSolid(float maxDistance, out Vector3 hit, out Vector3 normal) =>
-        Camera.Raycast(maxDistance, _chunkManager, out hit, out normal);
+        ActiveContext.Raycast(maxDistance, _chunkManager, out hit, out normal);
 
     bool IItemUseWorld.TryGetCell(int x, int y, int z, out byte id, out byte state) =>
         _chunkManager.TryGetCell(x, y, z, out id, out state);
@@ -2890,8 +3038,9 @@ public class World : IItemUseWorld
 
     /// <summary>
     /// Reports a player-driven edit of <paramref name="cell"/> through <see cref="BlockEdited"/>
-    /// with the id and state the cell holds now, so a multiplayer client forwards the final result
-    /// of the edit whatever path made it. Nothing is subscribed in singleplayer or on a server.
+    /// with the id and state the cell holds now, so a multiplayer client tags it as part of the
+    /// prediction its next intent carries, whatever path made it. Nothing is subscribed in
+    /// singleplayer or on a server.
     /// </summary>
     private void RaiseBlockEdited(Vector3 cell)
     {
@@ -3040,9 +3189,10 @@ public class World : IItemUseWorld
     void IItemUseWorld.ConsumeSelected() => ActiveInventory.ConsumeSelected();
     #endregion
 
-    private bool TryCookOrCollect(float maxDistance, Inventory inventory)
+    private bool TryCookOrCollect(float maxDistance, PlayerContext player)
     {
-        if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        var inventory = player.Inventory;
+        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
         var hx = (int)hit.X;
         var hy = (int)hit.Y;
         var hz = (int)hit.Z;
@@ -3055,7 +3205,7 @@ public class World : IItemUseWorld
             && ContentRegistry.CookRecipeForInput(selected) != null
             && _campfires.TryPlaceFood(hx, hy, hz, selected))
         {
-            if (!Camera.IsCreative)
+            if (!player.IsCreative)
                 inventory.ConsumeSelected();
             return true;
         }
@@ -3075,9 +3225,10 @@ public class World : IItemUseWorld
     /// anything else spins the plate through one full rotation (a quern already turning
     /// swallows the click). Returns whether a quern was aimed at.
     /// </summary>
-    private bool TryQuernInteract(float maxDistance, Inventory inventory)
+    private bool TryQuernInteract(float maxDistance, PlayerContext player)
     {
-        if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        var inventory = player.Inventory;
+        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
         var hx = (int)hit.X;
         var hy = (int)hit.Y;
         var hz = (int)hit.Z;
@@ -3091,7 +3242,7 @@ public class World : IItemUseWorld
             && ContentRegistry.CrushRecipeForInput(selected) != null
             && _querns.TryInsert(hx, hy, hz, selected))
         {
-            if (!Camera.IsCreative)
+            if (!player.IsCreative)
                 inventory.ConsumeSelected();
             return true;
         }
@@ -3125,9 +3276,10 @@ public class World : IItemUseWorld
     /// placement against the structure. Any other click on a kiln is spent. Returns whether the
     /// click belonged to the kiln.
     /// </summary>
-    private bool TryKilnInteract(float maxDistance, Inventory inventory)
+    private bool TryKilnInteract(float maxDistance, PlayerContext player)
     {
-        if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        var inventory = player.Inventory;
+        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
         var hx = (int)hit.X;
         var hy = (int)hit.Y;
         var hz = (int)hit.Z;
@@ -3162,14 +3314,14 @@ public class World : IItemUseWorld
         // Ore (or anything else that melts) charges the crucible standing inside
         if (ContentRegistry.MeltRecipeForInput(held.Id) != null && _kilns.TryInsertMelt(anchor, held.Id))
         {
-            if (!Camera.IsCreative)
+            if (!player.IsCreative)
                 inventory.ConsumeSelected();
             return true;
         }
 
         if (held is { FuelSeconds: > 0f } && _kilns.TryAddFuel(anchor, held))
         {
-            if (!Camera.IsCreative)
+            if (!player.IsCreative)
                 inventory.ConsumeSelected();
             return true;
         }
@@ -3184,9 +3336,10 @@ public class World : IItemUseWorld
     /// through to placing anything; a block in hand does fall through, so molds can still be
     /// stacked against each other. Returns whether the click belonged to the mold.
     /// </summary>
-    private bool TryCastInteract(float maxDistance, Inventory inventory)
+    private bool TryCastInteract(float maxDistance, PlayerContext player)
     {
-        if (!Camera.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        var inventory = player.Inventory;
+        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
         var hx = (int)hit.X;
         var hy = (int)hit.Y;
         var hz = (int)hit.Z;
@@ -3208,7 +3361,8 @@ public class World : IItemUseWorld
             var instance = inventory.SelectedToolInstance;
             var stack = instance > 0 ? inventory.GetToolStack(instance) : null;
             if (stack != null)
-                _casting.TryStartPour(cell, hitId, stack);
+                // A connected player's pour drains that player's crucible and follows its eye
+                _casting.TryStartPour(cell, hitId, stack, player.Camera == null ? player : null);
             return true;
         }
 
@@ -3221,18 +3375,19 @@ public class World : IItemUseWorld
     /// when the slot is empty or holds no blocks. Returns whether one was placed; false unless the
     /// world is playing, since nothing may edit an unloaded world.
     /// </summary>
-    public bool TryPlaceSelectedBlock(float maxDistance) => TryPlaceSelectedBlock(maxDistance, Inventory);
+    public bool TryPlaceSelectedBlock(float maxDistance) => TryPlaceSelectedBlock(maxDistance, LocalContext());
 
-    /// <summary><see cref="TryPlaceSelectedBlock(float)"/> placing from, and spending out of,
-    /// <paramref name="inventory"/>.</summary>
-    public bool TryPlaceSelectedBlock(float maxDistance, Inventory inventory)
+    /// <summary><see cref="TryPlaceSelectedBlock(float)"/> for <paramref name="player"/>: aimed by
+    /// its raycast, placing from and spending out of its inventory unless it is creative.</summary>
+    public bool TryPlaceSelectedBlock(float maxDistance, PlayerContext player)
     {
         if (!IsPlaying) return false;
+        var inventory = player.Inventory;
         if (!inventory.CanPlaceSelected) return false;
 
         // Only spend a block if one actually went down (and never in creative)
-        if (!TryPlaceBlockFromRaycast(maxDistance, inventory.SelectedBlockId)) return false;
-        if (!Camera.IsCreative)
+        if (!TryPlaceBlockFromRaycast(maxDistance, inventory.SelectedBlockId, player)) return false;
+        if (!player.IsCreative)
             inventory.ConsumeSelected();
         return true;
     }
@@ -3257,23 +3412,40 @@ public class World : IItemUseWorld
         return inventory.PickBlock(id);
     }
 
-    /// <summary>Places a block against the targeted face. Returns whether one was placed; false
-    /// unless the world is playing, since nothing may edit an unloaded world.</summary>
-    public bool TryPlaceBlockFromRaycast(float maxDistance, byte blockId)
+    /// <summary>Places a block against the face the local player targets. Returns whether one was
+    /// placed; false unless the world is playing, since nothing may edit an unloaded world.</summary>
+    public bool TryPlaceBlockFromRaycast(float maxDistance, byte blockId) =>
+        TryPlaceBlockFromRaycast(maxDistance, blockId, LocalContext());
+
+    /// <summary>Places a block against the face <paramref name="player"/> targets, recording the
+    /// hit (the face a client's placement intent names).</summary>
+    private bool TryPlaceBlockFromRaycast(float maxDistance, byte blockId, PlayerContext player)
     {
         if (!IsPlaying) return false;
         if (blockId == 0) return false;
 
-        if (!Camera.Raycast(maxDistance, _chunkManager, out var hitPos, out var hitNormal))
+        if (!player.Raycast(maxDistance, _chunkManager, out var hitPos, out var hitNormal))
             return false;
 
+        _lastPlaceHit = hitPos;
+        _lastPlaceNormal = hitNormal;
+        return PlaceAgainstFace(hitPos, hitNormal, blockId, player);
+    }
+
+    /// <summary>
+    /// Places <paramref name="blockId"/> against the face of <paramref name="hitPos"/> with outward
+    /// normal <paramref name="hitNormal"/> (see <see cref="PlaceBlockAtFace"/> for the rules), then
+    /// lets sand placed into thin air fall. Spends nothing.
+    /// </summary>
+    private bool PlaceAgainstFace(Vector3 hitPos, Vector3 hitNormal, byte blockId, PlayerContext player)
+    {
         if (!PlaceBlockAtFace(hitPos, hitNormal, blockId, state: 0, out var placePos)) return false;
 
         Player.Punch();
         // Sand placed into thin air falls at once instead of hovering (stackable piles never
-        // fall � the registry forbids the combination � so only the block path topples). A
+        // fall - the registry forbids the combination - so only the block path topples). A
         // client never ticks falling blocks, so it leaves the fall to the server, which topples
-        // the forwarded placement and broadcasts the cells.
+        // the placement it replays and broadcasts the cells.
         if (!_clientMode)
             _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
                 (int)placePos.X, (int)placePos.Y, (int)placePos.Z);
@@ -3281,7 +3453,23 @@ public class World : IItemUseWorld
     }
 
     /// <summary>
-    /// Guards and grounds one block against a raycast hit face: live cubes and the player's
+    /// Whether a solid block in <paramref name="cell"/> would trap a player: on a server every
+    /// connected player's body counts (the server's own camera is nobody), elsewhere the local
+    /// player's.
+    /// </summary>
+    private bool BodyBlocksPlacement(Vector3 cell)
+    {
+        if (!_serverMode)
+            return Camera.OverlapsPlayer(cell);
+        var players = ServerPlayers;
+        for (var i = 0; i < players.Count; i++)
+            if (PlayerContext.BodyOverlapsCell(players[i].Position, cell))
+                return true;
+        return false;
+    }
+
+    /// <summary>
+    /// Guards and grounds one block against a raycast hit face: live cubes and a player's
     /// body refuse solid entries, fragile blocks need solid ground, and a placement into
     /// water displaces it. The filled cell is the neighbour across the hit face, or the hit
     /// cell itself when it holds a stack a placement may take over (layered snow), which it
@@ -3304,12 +3492,11 @@ public class World : IItemUseWorld
         if (_falling.OverlapsAny((int)placePos.X, (int)placePos.Y, (int)placePos.Z))
             return false;
 
-        // A solid block inside the player's body would trap them (or force the physics to
+        // A solid block inside a player's body would trap them (or force the physics to
         // shove them out); non-solid blocks are fine to stand in. Flying is noclip but the
         // placement is still refused, so dropping out of flight never leaves the player buried.
-        if (BlockType.IsSolid(blockId) && Camera.OverlapsPlayer(placePos))
+        if (BlockType.IsSolid(blockId) && BodyBlocksPlacement(placePos))
             return false;
-
         // Fragile blocks need solid ground: a flower planted into mid-air would hover
         // until anything remeshed it, so the placement fails and the caller keeps its item
         if (BlockType.ById[blockId]?.NeedsSupport == true)

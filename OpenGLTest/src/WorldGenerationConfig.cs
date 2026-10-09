@@ -1329,6 +1329,23 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // judges from can lag the eye that aimed the edit by up to one PlayerState.
     public const float NetMaxEditReachBlocks =
         World.InteractionReach + 1f + (float)(NetMaxMoveBlocksPerSecond * NetPlayerStateSeconds);
+    // How far the eye a world intent claims may sit from the player's last accepted position: the
+    // eye that aimed the action can run ahead of the server's copy by one state interval of
+    // movement, plus the same slack a clamped move gets (NetValidation.AllowedDistance).
+    public const float NetMaxIntentEyeDriftBlocks =
+        (float)(NetMaxMoveBlocksPerSecond * NetPlayerStateSeconds) + 2f;
+    // Edits (break completions, placements, right-click uses, throws) one player may make per
+    // second, and how many may come in a burst above that before the server refuses them.
+    public const float NetEditIntentsPerSecond = 20f;
+    public const float NetEditIntentBurst = 20f;
+    // Seconds by which a break completion may beat the server's own count of its hits: the start
+    // can reach the server later than the completion, relative to when the client sent them.
+    public const double NetBreakSlackSeconds = 0.1;
+    // The same forgiveness for the pace between two attacks.
+    public const double NetAttackSlackSeconds = 0.1;
+    // A creative client mines one block per this many seconds while the button is held, rather than
+    // one per frame, so a held click stays inside the server's edit rate (singleplayer is unpaced).
+    public const float ClientCreativeBreakSeconds = 0.1f;
     // How long a blocking send to one client may stall the server's main thread before the
     // connection is treated as dead (NetworkStream.WriteTimeout), in milliseconds.
     public const int NetSendTimeoutMs = 5000;

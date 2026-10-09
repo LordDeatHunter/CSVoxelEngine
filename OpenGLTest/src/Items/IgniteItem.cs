@@ -42,7 +42,7 @@ public class IgniteItem : Item
         {
             world.MarkToolUsed(UseDelaySeconds);
             var primed = !world.IsCellSubmerged(hx, hy, hz)
-                && Random.Shared.NextSingle() < UseChance;
+                && world.NextUseRoll() < UseChance;
             if (primed)
             {
                 var cell = new System.Numerics.Vector3(hx, hy, hz);
@@ -66,7 +66,7 @@ public class IgniteItem : Item
         if (CanLightKiln && world.CanIgniteKiln(hx, hy, hz))
         {
             world.MarkToolUsed(UseDelaySeconds);
-            var kindled = Random.Shared.NextSingle() < UseChance && world.IgniteKiln(hx, hy, hz);
+            var kindled = world.NextUseRoll() < UseChance && world.IgniteKiln(hx, hy, hz);
             world.DamageTool();
             return new ItemUseResult(kindled, null, kindled);
         }
@@ -82,7 +82,7 @@ public class IgniteItem : Item
             return ItemUseResult.Ignored;
 
         world.MarkToolUsed(UseDelaySeconds);
-        var lit = Random.Shared.NextSingle() < UseChance && world.IgniteCampfire(hx, hy, hz);
+        var lit = world.NextUseRoll() < UseChance && world.IgniteCampfire(hx, hy, hz);
         world.DamageTool();
         return new ItemUseResult(lit, null, lit);
     }

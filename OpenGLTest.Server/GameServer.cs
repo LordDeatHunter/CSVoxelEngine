@@ -14,9 +14,22 @@ namespace silkgltriangle;
 /// touch the world - they only frame inbound bytes onto a concurrent queue, so the game simulation
 /// stays single-threaded exactly like the client. Outbound sends are lock-guarded per connection.
 /// <para>
-/// The server is authoritative: clients send their input state and edits, the server applies them
+/// The server is authoritative: clients send their input state and intents, the server applies them
 /// to its headless <see cref="World"/> and broadcasts the result (player list, chat, block
-/// changes, the day clock).
+/// changes, station state, the day clock).
+/// </para>
+/// <para>
+/// A client never writes a cell. Every world action it takes is a <see cref="WorldIntent"/> (mining
+/// start and completion, placement, a claimed right-click, a throw, a landed attack) carrying a
+/// per-player sequence id and the eye and aim it was made from. The server checks the eye against
+/// the player's authoritative position, that the aim reaches and sees the named cell
+/// (<see cref="World.RaycastFor"/>), the player's edit rate and, for a break, its own count of the
+/// hits since the start (<see cref="BreakProgress"/>), then replays the action for that player
+/// through the singleplayer rules (<see cref="ServerPlayer.Context"/>). Every intent is answered, in
+/// order: the authoritative cells around its target (<see cref="NetMessage.BlockCorrection"/>, for
+/// one that can edit cells), the player's inventory when the intent can change it or was refused,
+/// and an <see cref="NetMessage.IntentResult"/>; consequences beyond those cells (a felled crown, a
+/// blast) reach everyone through the cell journal.
 /// </para>
 /// <para>
 /// Every connected player is a <see cref="ServerPlayer"/> with an inventory of its own. A client
@@ -67,6 +80,13 @@ public sealed class GameServer : IDisposable
     private const int MaxCellChangesPerBroadcast = 8192;
 
     private readonly record struct CellChange(int X, int Y, int Z, byte Id, byte State);
+
+    // Scratch for one correction's cells
+    private readonly List<NetCellChange> _correctionScratch = [];
+
+    // Whether the last station broadcast carried anything, so the one after the last station went
+    // away still goes out and clears the clients' mirrors
+    private bool _stationsSent;
 
     private volatile bool _running;
     private int _nextId;
@@ -200,6 +220,7 @@ public sealed class GameServer : IDisposable
         {
             _entityTimer = 0;
             BroadcastEntities();
+            BroadcastStations();
         }
     }
 
@@ -246,6 +267,7 @@ public sealed class GameServer : IDisposable
             // A returning player gets back their inventory and modes, and starts where they left
             var restored = player.Restore(ServerPlayerSaves.Load(_world.SaveStore, client.Name), AllowCreative);
             var spawn = restored ? player.Position : joinSpawn;
+            player.Aim(player.Position, player.Forward);
             _clients[client.Id] = client;
             _players[client.Id] = player;
             _playerList.Add(player);
@@ -303,25 +325,38 @@ public sealed class GameServer : IDisposable
                     var requested = (NetPlayerFlags)flags;
                     current.Creative = AllowCreative && requested.HasFlag(NetPlayerFlags.Creative);
                     current.Flying = current.Creative && requested.HasFlag(NetPlayerFlags.Flying);
+                    // Between intents the context stands where the player does (a pour bound to
+                    // the player follows it)
+                    current.Aim(current.Position, current.Forward);
+                    // A refused request is answered once, so the client stops acting on modes it
+                    // does not have
+                    if (current.ShouldReportModes(requested))
+                        SendPlayerStatus(client, current);
                 }
                 break;
             }
 
             case NetMessage.BlockEdit:
             {
+                // Retired: a client never writes a cell. The edit is refused whatever it names, and
+                // a cell in reach is answered with its authoritative state.
                 var x = reader.ReadInt();
                 var y = reader.ReadInt();
                 var z = reader.ReadInt();
-                var blockId = reader.ReadByte();
-                var state = reader.ReadByte();
-                // Out of reach, or an edit the world did not apply (unloaded chunk, occupied cell):
-                // send the authoritative cell, so the client never keeps an optimistic edit the
-                // server does not have.
-                var applied = _players.TryGetValue(client.Id, out var player)
-                    && NetValidation.InEditReach(player.Position, x, y, z, WorldGenerationConfig.NetMaxEditReachBlocks)
-                    && _world.ApplyNetworkBlockEdit(x, y, z, blockId, state);
-                if (!applied)
-                    SendBlockCorrection(client, x, y, z);
+                reader.ReadByte();
+                reader.ReadByte();
+                Log.Warn($"net: refused a raw block edit from {client.Name} (#{client.Id})");
+                if (_players.TryGetValue(client.Id, out var player)
+                    && NetValidation.InEditReach(player.Position, x, y, z, WorldGenerationConfig.NetMaxEditReachBlocks))
+                    SendCellCorrection(client, player.LastSeq, x, y, z, radius: 0);
+                break;
+            }
+
+            case NetMessage.WorldIntent:
+            {
+                var intent = WorldIntentCodec.Read(reader, out var seq);
+                if (_players.TryGetValue(client.Id, out var player))
+                    HandleWorldIntent(client, player, seq, intent);
                 break;
             }
 
@@ -366,27 +401,33 @@ public sealed class GameServer : IDisposable
 
             case NetMessage.InventoryRequest:
             {
+                var seq = reader.ReadInt();
                 var intent = InventoryIntentCodec.Read(reader);
                 if (!_players.TryGetValue(client.Id, out var player))
                     break;
-                // Replayed against this player's own inventory only. A Q-drop leaves from the
-                // player's eye along their look, never from the server's own camera (the centroid
-                // of everyone online).
-                switch (intent.Action)
+                // Replayed against this player's own inventory only, and only when it is newer than
+                // everything the player sent before. A Q-drop leaves from the player's eye along
+                // their look, never from the server's own camera (the centroid of everyone online).
+                var accepted = player.AcceptSeq(seq);
+                if (accepted)
                 {
-                    case NetInventoryAction.DropSelected:
-                    case NetInventoryAction.DropAllSelected:
-                        _world.ThrowSelected(intent.Action == NetInventoryAction.DropAllSelected,
-                            player.Position, player.Forward, player.Inventory);
-                        break;
-                    default:
-                        InventoryIntentRules.Apply(player.Inventory, intent, player.Creative);
-                        break;
+                    switch (intent.Action)
+                    {
+                        case NetInventoryAction.DropSelected:
+                        case NetInventoryAction.DropAllSelected:
+                            accepted = _world.ThrowSelected(intent.Action == NetInventoryAction.DropAllSelected,
+                                player.Position, player.Forward, player.Inventory);
+                            break;
+                        default:
+                            accepted = InventoryIntentRules.Apply(player.Inventory, intent, player.Creative);
+                            break;
+                    }
                 }
 
                 // Always, accepted or not: the snapshot is the truth the client's optimistic copy
                 // snaps back to when the server refused what it did.
                 SendInventory(client, player);
+                SendIntentResult(client, seq, accepted);
                 break;
             }
 
@@ -394,6 +435,138 @@ public sealed class GameServer : IDisposable
                 Log.Warn($"net: ignoring {message} from {client.Name} (#{client.Id})");
                 break;
         }
+    }
+
+    /// <summary>
+    /// Judges and applies one world intent for <paramref name="player"/>, then answers it: the
+    /// authoritative cells around its target when it could edit cells (in reach of the player),
+    /// the inventory when it could change it or was refused, and its result, in that order.
+    /// </summary>
+    private void HandleWorldIntent(ClientConnection client, ServerPlayer player, int seq, in WorldIntent intent)
+    {
+        var accepted = player.AcceptSeq(seq) && ApplyWorldIntent(player, intent);
+        if (intent.EditsCells && intent.HasCell
+            && NetValidation.InEditReach(player.Position, intent.X, intent.Y, intent.Z, WorldGenerationConfig.NetMaxEditReachBlocks))
+            SendCellCorrection(client, seq, intent.X, intent.Y, intent.Z, radius: 1);
+        if (intent.PredictsInventory || !accepted)
+            SendInventory(client, player);
+        SendIntentResult(client, seq, accepted);
+    }
+
+    /// <summary>
+    /// The rules every world intent passes before the world replays it: the world is playing, the
+    /// intent was aimed from (near) where the player is, and an edit fits the player's edit rate.
+    /// </summary>
+    private bool ApplyWorldIntent(ServerPlayer player, in WorldIntent intent)
+    {
+        if (!_world.IsPlaying)
+            return false;
+        if (!NetValidation.EyeWithin(player.Position, intent.Eye, WorldGenerationConfig.NetMaxIntentEyeDriftBlocks))
+            return false;
+        if (intent.IsRateLimited && !player.EditLimiter.TryTake(_elapsed))
+            return false;
+
+        player.Aim(intent.Eye, intent.Direction);
+        var context = player.Context;
+        switch (intent.Kind)
+        {
+            case NetIntentKind.BreakStart:
+                return StartBreak(player, intent);
+            case NetIntentKind.BreakComplete:
+                return CompleteBreak(player, intent);
+            case NetIntentKind.Place:
+                return PlaceFor(player, intent);
+            case NetIntentKind.Use:
+                // The right-click chain short of its placement fallback: a click the client did
+                // not place with never places here either
+                return _world.TryUseSelected(World.InteractionReach, context, out _, allowPlace: false);
+            case NetIntentKind.Throw:
+                return _world.ThrowFor(context, intent.Charge);
+            case NetIntentKind.Attack:
+                return AttackFor(player, intent);
+            default:
+                return false;
+        }
+    }
+
+    // The player's own ray from the intent's eye along its aim lands on the cell the intent names:
+    // within reach, with nothing in the way
+    private bool AimsAt(ServerPlayer player, in WorldIntent intent, out Vector3 normal) =>
+        _world.RaycastFor(player.Context, includeFluids: false, out var hit, out normal) && hit == intent.Cell;
+
+    // A loaded cell holding a block that can be mined: not air, not a fluid
+    private bool TryMineable(in WorldIntent intent, out byte id, out byte state) =>
+        _world.GetChunkManager().TryGetCell(intent.X, intent.Y, intent.Z, out id, out state)
+        && id != 0 && !BlockType.IsFluid(id);
+
+    private bool StartBreak(ServerPlayer player, in WorldIntent intent)
+    {
+        player.Breaking.Reset();
+        if (!AimsAt(player, intent, out _) || !TryMineable(intent, out var id, out var state))
+            return false;
+        var inventory = player.Inventory;
+        player.Breaking.Start(intent.X, intent.Y, intent.Z, id, state, inventory.HeldItem,
+            inventory.SelectedBlockId, inventory.SelectedToolInstance, _elapsed);
+        return true;
+    }
+
+    private bool CompleteBreak(ServerPlayer player, in WorldIntent intent)
+    {
+        if (!AimsAt(player, intent, out _) || !TryMineable(intent, out var id, out _))
+        {
+            player.Breaking.Reset();
+            return false;
+        }
+
+        var inventory = player.Inventory;
+        var verdict = player.Breaking.Complete(intent.X, intent.Y, intent.Z, id, inventory.SelectedBlockId,
+            inventory.SelectedToolInstance, player.Creative, _elapsed, WorldGenerationConfig.NetBreakSlackSeconds);
+        return verdict == BreakVerdict.Break && _world.BreakBlockFor(player.Context, intent.Cell);
+    }
+
+    private bool PlaceFor(ServerPlayer player, in WorldIntent intent)
+    {
+        // The face placed against: the server ray's own, or another face of the same cell turned
+        // toward the eye (a third-person aim reports the camera ray's face). Never a face the eye
+        // cannot see, which would place through the block.
+        if (!AimsAt(player, intent, out var normal))
+            return false;
+        var face = intent.Normal;
+        if (face != normal && !NetValidation.FaceFacesEye(intent.Cell, face, intent.Eye))
+            return false;
+        return _world.TryPlaceSelectedBlockAt(player.Context, intent.Cell, face);
+    }
+
+    private bool AttackFor(ServerPlayer player, in WorldIntent intent)
+    {
+        // A slice needs a slicing weapon in hand, a punch anything else, and either one only at its
+        // own pace. A swing that strikes nothing is still a legal swing.
+        var held = player.Inventory.HeldItem;
+        var slicing = held is { Attack: AttackPattern.Slice };
+        if (slicing != (intent.Attack != NetAttackKind.Punch))
+            return false;
+        if (!player.TryAttack(intent.Attack, held, _elapsed, WorldGenerationConfig.NetAttackSlackSeconds))
+            return false;
+        if (intent.Attack == NetAttackKind.Punch)
+            _world.PunchFor(player.Context);
+        else
+            _world.SliceFor(player.Context, intent.Attack == NetAttackKind.SliceReturn);
+        return true;
+    }
+
+    private static void SendIntentResult(ClientConnection client, int seq, bool accepted)
+    {
+        using var writer = new PacketWriter(NetMessage.IntentResult);
+        writer.Write(seq);
+        writer.Write(accepted);
+        client.Send(writer.ToArray());
+    }
+
+    private static void SendPlayerStatus(ClientConnection client, ServerPlayer player)
+    {
+        using var writer = new PacketWriter(NetMessage.PlayerStatus);
+        writer.Write((byte)player.GrantedModes);
+        client.Send(writer.ToArray());
     }
 
     private void SendServerHello(ClientConnection client, Vector3 spawn)
@@ -459,11 +632,13 @@ public sealed class GameServer : IDisposable
         _idleScratch.Clear();
     }
 
-    /// <summary>Sends <paramref name="player"/>'s whole inventory to its own client, and only to it.</summary>
+    /// <summary>Sends <paramref name="player"/>'s whole inventory to its own client, and only to it,
+    /// tagged with the newest intent it reflects.</summary>
     private static void SendInventory(ClientConnection client, ServerPlayer player)
     {
         player.InventoryChanged = false;
         using var writer = new PacketWriter(NetMessage.InventoryState);
+        writer.Write(player.LastSeq);
         writer.WriteBytes(InventoryNetCodec.Encode(player.Inventory.Export()));
         client.Send(writer.ToArray());
     }
@@ -604,17 +779,52 @@ public sealed class GameServer : IDisposable
     private void OnCellWritten(int x, int y, int z, byte id, byte state) =>
         _cellJournal.Enqueue(new CellChange(x, y, z, id, state));
 
-    // Reverts a client's optimistic edit the server refused by sending the authoritative cell.
-    private void SendBlockCorrection(ClientConnection client, int x, int y, int z)
+    /// <summary>
+    /// Sends the authoritative state of every loaded cell within <paramref name="radius"/> (on each
+    /// axis) of (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>), tagged with the
+    /// intent <paramref name="seq"/> it answers: whatever the client predicted around that target
+    /// (the cell itself, the face neighbour it placed into, a popped pebble above, a structure's
+    /// cells) snaps to what the server has, accepted or not.
+    /// </summary>
+    private void SendCellCorrection(ClientConnection client, int seq, int x, int y, int z, int radius)
     {
         var manager = _world.GetChunkManager();
-        using var writer = new PacketWriter(NetMessage.BlockChange);
-        writer.Write(x);
-        writer.Write(y);
-        writer.Write(z);
-        writer.Write(manager.GetBlockGlobal(x, y, z));
-        writer.Write(manager.GetStateGlobal(x, y, z));
+        _correctionScratch.Clear();
+        for (var dx = -radius; dx <= radius; dx++)
+        for (var dy = -radius; dy <= radius; dy++)
+        for (var dz = -radius; dz <= radius; dz++)
+        {
+            if (manager.TryGetCell(x + dx, y + dy, z + dz, out var id, out var state))
+                _correctionScratch.Add(new NetCellChange(x + dx, y + dy, z + dz, id, state));
+        }
+
+        using var writer = new PacketWriter(NetMessage.BlockCorrection);
+        writer.Write(seq);
+        writer.Write(_correctionScratch.Count);
+        foreach (var cell in _correctionScratch)
+        {
+            writer.Write(cell.X);
+            writer.Write(cell.Y);
+            writer.Write(cell.Z);
+            writer.Write(cell.Id);
+            writer.Write(cell.State);
+        }
         client.Send(writer.ToArray());
+    }
+
+    /// <summary>
+    /// Broadcasts every campfire, quern, kiln and cast mold the server runs, which the clients draw
+    /// in place of their own; nothing while there are none (after one last empty snapshot).
+    /// </summary>
+    private void BroadcastStations()
+    {
+        var any = _world.HasStations;
+        if (!any && !_stationsSent)
+            return;
+        _stationsSent = any;
+        using var writer = new PacketWriter(NetMessage.StationState);
+        _world.WriteStations(writer);
+        Broadcast(writer.ToArray());
     }
 
     // Coalesces this frame's journaled writes by cell (the last write wins) and sends one
@@ -676,6 +886,9 @@ public sealed class GameServer : IDisposable
         if (_players.Remove(client.Id, out var player))
         {
             _playerList.Remove(player);
+            // Anything bound to the player (a pour from its crucible) pauses from here on
+            player.Context.Present = false;
+            player.Breaking.Reset();
             ServerPlayerSaves.Save(_world.SaveStore, player);
         }
         BroadcastSystem($"{client.Name} left the game");

@@ -74,6 +74,13 @@ public class Camera
     /// which is also the direction <see cref="Raycast"/> fires.
     /// </summary>
     public Vector3 ViewDirection => _shoulderViewDir.NormalizeSafeOr(GetForwardVector(), 1e-8f);
+    /// <summary>
+    /// The unit head ray the last <see cref="Raycast(float, ChunkManager, out Vector3, out Vector3, out int, bool)"/>
+    /// fired from <see cref="Position"/>: the facing in first person, the head's re-cast toward the
+    /// crosshair's surface point in third person. A multiplayer client sends it with an intent, so
+    /// the server's first-person ray from the same eye lands on the same cell.
+    /// </summary>
+    public Vector3 LastAimDirection { get; private set; } = -Vector3.UnitZ;
     [Obsolete("Renamed to IsCreative.")]
     public bool IsNoclip => IsCreative;
     public float VerticalVelocity => _physics.VerticalVelocity;
@@ -380,6 +387,21 @@ public class Camera
     {
         if (flying) IsCreative = true;
         IsFlying = flying;
+    }
+
+    /// <summary>
+    /// Puts the modes where an authority (a multiplayer server refusing a creative or flight
+    /// request) says they are, without moving the player. Flight implies creative; a change
+    /// resets the vertical velocity exactly like the keyboard toggles do.
+    /// </summary>
+    public void SetModes(bool creative, bool flying)
+    {
+        creative |= flying;
+        if (creative == IsCreative && flying == IsFlying)
+            return;
+        IsCreative = creative;
+        IsFlying = flying;
+        _physics.ResetVerticalVelocity();
     }
 
     /// <summary>
@@ -716,23 +738,7 @@ public class Camera
     /// spans one full cube from its floored corner; touching a face exactly does not count, so
     /// placing a block under the feet or beside the body stays legal.
     /// </summary>
-    public bool OverlapsPlayer(Vector3 blockPos)
-    {
-        var min = new Vector3(
-            Position.X - PlayerPhysics.PlayerRadius,
-            Position.Y - EyeHeight,
-            Position.Z - PlayerPhysics.PlayerRadius);
-        var max = new Vector3(
-            Position.X + PlayerPhysics.PlayerRadius,
-            Position.Y - EyeHeight + PlayerPhysics.PlayerHeight,
-            Position.Z + PlayerPhysics.PlayerRadius);
-        var cellMin = blockPos.Floor();
-        var cellMax = cellMin + Vector3.One;
-
-        return cellMin.X < max.X && cellMax.X > min.X
-            && cellMin.Y < max.Y && cellMax.Y > min.Y
-            && cellMin.Z < max.Z && cellMax.Z > min.Z;
-    }
+    public bool OverlapsPlayer(Vector3 blockPos) => PlayerContext.BodyOverlapsCell(Position, blockPos);
 
     /// <summary>
     /// Shoves the player out of a falling cube, along the smallest-penetration axis. Strictly
@@ -976,12 +982,14 @@ public class Camera
 
         if (!IsShoulderSurf)
         {
-            return BlockRaycaster.Raycast(Position, GetForwardVector(), maxDistance, 0f, stopAtRange: false,
+            LastAimDirection = GetForwardVector();
+            return BlockRaycaster.Raycast(Position, LastAimDirection, maxDistance, 0f, stopAtRange: false,
                 chunkManager, out hitPosition, out hitNormal, out hitBoxIndex, out _, includeFluids);
         }
 
         // Crosshair target from the shoulder camera. Its walk is longer than head reach
         // because it starts behind the head; the head check below cuts it back down.
+        LastAimDirection = ViewDirection;
         var camRange = maxDistance + _shoulderOffset.Length();
         if (!BlockRaycaster.Raycast(RenderEye, ViewDirection, camRange, camRange * 3 + 2, stopAtRange: true,
                 chunkManager, out var camHit, out var camNormal, out var camBox, out var camT, includeFluids))
@@ -999,7 +1007,8 @@ public class Camera
             (hitPosition, hitNormal, hitBoxIndex) = (camHit, camNormal, camBox);
             return true;
         }
-        if (!BlockRaycaster.Raycast(Position, toSurface / headDist, maxDistance, 0f, stopAtRange: false,
+        LastAimDirection = toSurface / headDist;
+        if (!BlockRaycaster.Raycast(Position, LastAimDirection, maxDistance, 0f, stopAtRange: false,
                 chunkManager, out var headHit, out _, out _, out _, includeFluids))
             return false;
         if (headHit != camHit)

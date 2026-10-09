@@ -439,4 +439,69 @@ public sealed class KilnManager
                 - FireParticleSystem.SpawnOffset);
         }
     }
+
+    /// <summary>Writes every tracked kiln (fuel, fire, crucible and melt), for the station
+    /// broadcast (<see cref="StationNetCodec"/>).</summary>
+    internal void WriteNet(PacketWriter writer)
+    {
+        // At most what a client accepts (StationNetCodec.MaxEntries)
+        var leftKilns = Math.Min(_kilns.Count, StationNetCodec.MaxEntries);
+        writer.Write(leftKilns);
+        foreach (var ((x, y, z), state) in _kilns)
+        {
+            if (leftKilns-- == 0) break;
+            StationNetCodec.WriteCell(writer, x, y, z);
+            writer.Write(state.AnchorId);
+            writer.Write((byte)state.Facing);
+            writer.Write((byte)state.Fuel);
+            writer.Write(state.FuelItemId);
+            writer.Write(state.FuelSeconds);
+            writer.Write(state.Lit);
+            writer.Write(state.BurnLeft);
+            writer.Write(state.HasCrucible);
+            writer.Write(state.CrucibleItemId);
+            writer.Write(state.Contents.MaterialId);
+            writer.Write(state.Contents.MoltenMl);
+            writer.Write(state.Contents.PendingMl);
+            writer.Write(state.Contents.PendingInputId);
+            writer.Write(state.MeltLeft);
+        }
+    }
+
+    /// <summary>
+    /// Replaces the tracked kilns with a snapshot written by <see cref="WriteNet"/>: a multiplayer
+    /// client's display-only mirror, which never runs <see cref="Update"/> (its integrity sweep
+    /// would revert cells only the server may write).
+    /// </summary>
+    internal void ReadNet(PacketReader reader)
+    {
+        _kilns.Clear();
+        var count = StationNetCodec.ReadCount(reader);
+        for (var i = 0; i < count; i++)
+        {
+            var key = StationNetCodec.ReadCell(reader);
+            var state = new KilnState
+            {
+                AnchorId = reader.ReadByte(),
+                Facing = reader.ReadByte(),
+                Fuel = reader.ReadByte(),
+                FuelItemId = reader.ReadByte(),
+                FuelSeconds = StationNetCodec.ReadFinite(reader),
+                Lit = reader.ReadBool(),
+                BurnLeft = StationNetCodec.ReadFinite(reader),
+                HasCrucible = reader.ReadBool(),
+                CrucibleItemId = reader.ReadByte(),
+            };
+            var material = reader.ReadByte();
+            var molten = reader.ReadInt();
+            var pending = reader.ReadInt();
+            var pendingInput = reader.ReadByte();
+            state.MeltLeft = StationNetCodec.ReadFinite(reader);
+            if (state.Facing > 3 || state.Fuel > MaxFuel || molten < 0 || pending < 0)
+                throw new System.IO.InvalidDataException("kiln snapshot out of range");
+            state.Contents = new CrucibleComponent(material, molten, pending, pendingInput);
+            _kilns[key] = state;
+        }
+        RefreshCells();
+    }
 }

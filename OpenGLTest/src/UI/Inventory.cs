@@ -82,6 +82,10 @@ public class Inventory
     /// <summary>Tool instance in the selected slot, or 0 when it holds no live tool.</summary>
     public int SelectedToolInstance => ToolInstanceAt(SelectedIndex);
 
+    /// <summary>The item in hand: the selected slot's item while it holds any, else null (a bare
+    /// hand). What mining, attacks and uses read for the player holding this inventory.</summary>
+    public Item? HeldItem => SelectedBlockId != 0 && SelectedCount > 0 ? ItemRegistry.TryGet(SelectedBlockId) : null;
+
     public HotbarSlot SlotAt(int index) => _hotbar[Wrap(index)];
 
     /// <summary>

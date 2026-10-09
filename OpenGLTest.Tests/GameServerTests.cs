@@ -15,13 +15,17 @@ namespace silkgltriangle.Tests;
 /// are built a bounded number per Pump with a repeated request served once, and every player's
 /// inventory is its own: intents are replayed against the sender's inventory only, refused ones
 /// are corrected by the snapshot the sender gets back, and creative grants need the server's
-/// creative flag.
+/// creative flag. World intents are judged by the server for the sending player: a break needs the
+/// tool the block asks for and the time its hits take, a placement spends exactly one owned block
+/// under the placement rules with a state the server computes, a raw cell write is refused, a
+/// blast one player set off reaches every client, and mined loot lands with the breaker.
 /// </summary>
 [Collection("Worldgen seed")]
 public sealed class GameServerTests : IDisposable
 {
     private readonly World _world;
     private readonly GameServer _server;
+    private readonly Dictionary<NetworkClient, Inbox> _inboxes = new(ReferenceEqualityComparer.Instance);
 
     public GameServerTests()
     {
@@ -45,6 +49,85 @@ public sealed class GameServerTests : IDisposable
         }
     }
 
+    /// <summary>What one test client received, decoded as it arrives.</summary>
+    private sealed class Inbox
+    {
+        public int Seq;
+        public PlayerSaveData.InventoryData? Inventory;
+        public int InventorySeq;
+        public bool FreshInventory;
+        public readonly Dictionary<int, bool> Results = new();
+        public readonly List<(int Seq, NetCellChange Cell)> Corrections = [];
+        public readonly List<NetCellChange> Broadcast = [];
+        public NetPlayerFlags? Status;
+
+        public void Drain(NetworkClient client)
+        {
+            while (client.Inbound.TryDequeue(out var payload))
+            {
+                using var reader = new PacketReader(payload);
+                switch (reader.Message)
+                {
+                    case NetMessage.InventoryState:
+                        InventorySeq = reader.ReadInt();
+                        Inventory = InventoryNetCodec.Decode(reader.ReadBytes());
+                        FreshInventory = true;
+                        break;
+                    case NetMessage.IntentResult:
+                    {
+                        var seq = reader.ReadInt();
+                        Results[seq] = reader.ReadBool();
+                        break;
+                    }
+                    case NetMessage.BlockCorrection:
+                    {
+                        var seq = reader.ReadInt();
+                        foreach (var cell in ReadCells(reader))
+                            Corrections.Add((seq, cell));
+                        break;
+                    }
+                    case NetMessage.BlockChanges:
+                        Broadcast.AddRange(ReadCells(reader));
+                        break;
+                    case NetMessage.PlayerStatus:
+                        Status = (NetPlayerFlags)reader.ReadByte();
+                        break;
+                }
+            }
+        }
+
+        private static List<NetCellChange> ReadCells(PacketReader reader)
+        {
+            var count = reader.ReadInt();
+            var cells = new List<NetCellChange>(count);
+            for (var i = 0; i < count; i++)
+                cells.Add(new NetCellChange(reader.ReadInt(), reader.ReadInt(), reader.ReadInt(),
+                    reader.ReadByte(), reader.ReadByte()));
+            return cells;
+        }
+
+        public Inventory Mirror()
+        {
+            Assert.NotNull(Inventory);
+            var mirror = silkgltriangle.Inventory.Empty();
+            mirror.Import(Inventory!);
+            return mirror;
+        }
+    }
+
+    private Inbox InboxOf(NetworkClient client)
+    {
+        if (!_inboxes.TryGetValue(client, out var inbox))
+            _inboxes[client] = inbox = new Inbox();
+        return inbox;
+    }
+
+    private void DrainAll()
+    {
+        foreach (var (client, inbox) in _inboxes)
+            inbox.Drain(client);
+    }
+
     private NetworkClient Connect(string name)
     {
         var client = new NetworkClient(new ServerAddress("127.0.0.1", _server.BoundPort), name, 5.0);
@@ -57,6 +140,7 @@ public sealed class GameServerTests : IDisposable
         }
 
         Assert.Equal(NetworkStatus.Handshaken, client.Status);
+        InboxOf(client);
         return client;
     }
 
@@ -70,18 +154,51 @@ public sealed class GameServerTests : IDisposable
         }
     }
 
-    private static void SendIntent(NetworkClient client, InventoryIntent intent)
+    /// <summary>One server frame with the world simulating, as the dedicated server runs it.</summary>
+    private void Tick(double dt)
+    {
+        _world.Update(dt, null);
+        _server.Pump(dt);
+        Thread.Sleep(2);
+        DrainAll();
+    }
+
+    private void SendIntent(NetworkClient client, InventoryIntent intent)
     {
         using var writer = new PacketWriter(NetMessage.InventoryRequest);
+        writer.Write(++InboxOf(client).Seq);
         InventoryIntentCodec.Write(writer, intent);
         client.Send(writer.ToArray());
     }
 
+    private int SendWorld(NetworkClient client, WorldIntent intent)
+    {
+        var seq = ++InboxOf(client).Seq;
+        using var writer = new PacketWriter(NetMessage.WorldIntent);
+        WorldIntentCodec.Write(writer, seq, intent);
+        client.Send(writer.ToArray());
+        return seq;
+    }
+
+    /// <summary>Ticks (the world too) until the server answered intent <paramref name="seq"/>.</summary>
+    private bool AwaitResult(NetworkClient client, int seq, double dt = 0.01)
+    {
+        var inbox = InboxOf(client);
+        var sw = Stopwatch.StartNew();
+        while (!inbox.Results.ContainsKey(seq) && sw.Elapsed.TotalSeconds < 15)
+            Tick(dt);
+        Assert.True(inbox.Results.ContainsKey(seq), $"intent #{seq} was never answered");
+        return inbox.Results[seq];
+    }
+
     // A PlayerState standing at the join spawn (so no move is clamped), with the given mode request
-    private static void SendModes(NetworkClient client, NetPlayerFlags flags)
+    private static void SendModes(NetworkClient client, NetPlayerFlags flags) =>
+        SendState(client, client.Server!.Value.Spawn, flags);
+
+    private static void SendState(NetworkClient client, Vector3 eye, NetPlayerFlags flags)
     {
         using var writer = new PacketWriter(NetMessage.PlayerState);
-        writer.Write(client.Server!.Value.Spawn);
+        writer.Write(eye);
         writer.Write(0f);
         writer.Write(0f);
         writer.Write((byte)flags);
@@ -89,29 +206,23 @@ public sealed class GameServerTests : IDisposable
     }
 
     /// <summary>
-    /// Pumps until <paramref name="client"/> has received at least one inventory snapshot (each
-    /// intent is answered by exactly one) and returns the newest as the mirror the client imports.
+    /// Pumps until <paramref name="client"/> has received an inventory snapshot it has not looked
+    /// at yet (each intent is answered by one) and returns the newest as the mirror the client imports.
     /// </summary>
     private Inventory AwaitInventory(NetworkClient client)
     {
-        PlayerSaveData.InventoryData? latest = null;
+        var inbox = InboxOf(client);
         var sw = Stopwatch.StartNew();
-        while (latest == null && sw.Elapsed.TotalSeconds < 15)
+        while (!inbox.FreshInventory && sw.Elapsed.TotalSeconds < 15)
         {
             _server.Pump(0.01);
             Thread.Sleep(5);
-            while (client.Inbound.TryDequeue(out var payload))
-            {
-                using var reader = new PacketReader(payload);
-                if (reader.Message == NetMessage.InventoryState)
-                    latest = InventoryNetCodec.Decode(reader.ReadBytes());
-            }
+            inbox.Drain(client);
         }
 
-        Assert.NotNull(latest);
-        var mirror = Inventory.Empty();
-        mirror.Import(latest!);
-        return mirror;
+        Assert.True(inbox.FreshInventory, "no inventory snapshot arrived");
+        inbox.FreshInventory = false;
+        return inbox.Mirror();
     }
 
     private ServerPlayer PlayerOf(NetworkClient client)
@@ -121,6 +232,87 @@ public sealed class GameServerTests : IDisposable
     }
 
     private static byte Stone => ContentRegistry.RequireBlock("stone").Id;
+    private static byte Dirt => ContentRegistry.RequireBlock("dirt").Id;
+
+    /// <summary>
+    /// A cleared pocket around the spawn eye: a dirt floor one row under the feet and air for four
+    /// rows above it, seven blocks across, so every aim below is a clean line of sight. Ticks the
+    /// world until the pocket's chunks have streamed in.
+    /// </summary>
+    private sealed record Arena(Vector3 Eye, int X, int Y, int Z)
+    {
+        /// <summary>The cell at eye height two blocks along +X, and the aim at its centre.</summary>
+        public Vector3 Front => new(X + 2, Y + 1, Z);
+        public Vector3 AimAtFront => Vector3.Normalize(Front + new Vector3(0.5f) - Eye);
+
+        /// <summary>The floor cell under <see cref="Front"/>'s column, and an aim landing on its top face.</summary>
+        public Vector3 FloorAhead => new(X + 2, Y - 1, Z);
+        public Vector3 AimAtFloorAhead =>
+            Vector3.Normalize(new Vector3(X + 2.5f, Y - 0.001f, Z + 0.5f) - Eye);
+
+        /// <summary>The floor cell under the player's own feet, aimed at straight down.</summary>
+        public Vector3 FloorBelow => new(X, Y - 1, Z);
+    }
+
+    private Arena PrepareArena(Vector3 eye)
+    {
+        var manager = _world.GetChunkManager();
+        // The feet row, robust to the eye height's float rounding
+        var fx = (int)MathF.Floor(eye.X);
+        var fy = (int)MathF.Floor(eye.Y - Camera.EyeHeight + 1e-3f);
+        var fz = (int)MathF.Floor(eye.Z);
+
+        bool Loaded()
+        {
+            for (var x = fx - 3; x <= fx + 3; x++)
+            for (var y = fy - 1; y <= fy + 4; y++)
+            for (var z = fz - 3; z <= fz + 3; z++)
+                if (!manager.TryGetCell(x, y, z, out _, out _))
+                    return false;
+            return true;
+        }
+
+        var sw = Stopwatch.StartNew();
+        while (!Loaded() && sw.Elapsed.TotalSeconds < 60)
+            Tick(0.05);
+        Assert.True(Loaded(), "the arena's chunks never loaded");
+
+        for (var x = fx - 3; x <= fx + 3; x++)
+        for (var y = fy - 1; y <= fy + 4; y++)
+        for (var z = fz - 3; z <= fz + 3; z++)
+            SetCell(new Vector3(x, y, z), y == fy - 1 ? Dirt : (byte)0);
+        return new Arena(eye, fx, fy, fz);
+    }
+
+    private void SetCell(Vector3 cell, byte id, byte state = 0)
+    {
+        var chunk = _world.GetChunkManager().ChunkAt((int)cell.X, (int)cell.Y, (int)cell.Z);
+        Assert.NotNull(chunk);
+        var (lx, ly, lz) = VoxelCoords.LocalOf((int)cell.X, (int)cell.Y, (int)cell.Z);
+        chunk!.SetBlockRaw(lx, ly, lz, id, state);
+    }
+
+    private (byte Id, byte State) CellAt(Vector3 cell)
+    {
+        Assert.True(_world.GetChunkManager().TryGetCell((int)cell.X, (int)cell.Y, (int)cell.Z, out var id, out var state));
+        return (id, state);
+    }
+
+    /// <summary>Grants <paramref name="id"/> through a creative request, then drops back to survival.</summary>
+    private void GrantAsSurvival(NetworkClient client, byte id, int count)
+    {
+        _server.AllowCreative = true;
+        SendModes(client, NetPlayerFlags.Creative);
+        SendIntent(client, InventoryIntent.CreativeGrant(id, count));
+        AwaitInventory(client);
+        SendModes(client, NetPlayerFlags.None);
+        PumpFor(0.05);
+        Assert.False(PlayerOf(client).Creative);
+    }
+
+    /// <summary>Seconds of server time the bare hand needs to mine <paramref name="block"/>.</summary>
+    private static double BareHandSeconds(byte block) =>
+        BreakProgress.RequiredSeconds(Mining.HardnessOf(block, 0), Mining.BlockDamage(null), Mining.HitGapSeconds(null));
 
     [Fact]
     public void EachPlayerHasAnInventoryOfItsOwn()
@@ -186,12 +378,14 @@ public sealed class GameServerTests : IDisposable
         using var client = Connect("Tester");
         AwaitInventory(client);
 
-        // A client asking for creative on a server that does not allow it stays survival
+        // A client asking for creative on a server that does not allow it stays survival, and is
+        // told so
         _server.AllowCreative = false;
         SendModes(client, NetPlayerFlags.Creative | NetPlayerFlags.Flying);
         SendIntent(client, InventoryIntent.CreativeGrant(Stone, 5));
         Assert.Equal(0, AwaitInventory(client).CountFor(Stone));
         Assert.False(PlayerOf(client).Creative);
+        Assert.Equal(NetPlayerFlags.None, InboxOf(client).Status);
 
         // Allowed, but this player never asked: still refused
         _server.AllowCreative = true;
@@ -339,14 +533,7 @@ public sealed class GameServerTests : IDisposable
         // The first player walks off; the server's chunk focus follows them
         PumpFor(0.1);
         var moved = spawn + new Vector3(1.5f, 0f, 0f);
-        using (var state = new PacketWriter(NetMessage.PlayerState))
-        {
-            state.Write(moved);
-            state.Write(0f);
-            state.Write(0f);
-            state.Write((byte)0);
-            first.Send(state.ToArray());
-        }
+        SendState(first, moved, NetPlayerFlags.None);
 
         var sw = Stopwatch.StartNew();
         while (Vector3.Distance(_world.Camera.Position, moved) > 0.01f && sw.Elapsed.TotalSeconds < 15)
@@ -415,5 +602,259 @@ public sealed class GameServerTests : IDisposable
 
         Assert.Equal(distinct, received.Count);
         Assert.Single(received, rx => rx == 0);
+    }
+
+    [Fact]
+    public void ABreakWithoutTheToolTheBlockNeedsIsRefusedAndTheBlockRestored()
+    {
+        using var client = Connect("Miner");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        SetCell(arena.Front, Stone);
+        Assert.False(Mining.CanMine(Stone, null));
+
+        // Bare-handed, however long the mining took
+        var start = SendWorld(client, WorldIntent.BreakStart(arena.Eye, arena.AimAtFront, arena.Front));
+        Assert.True(AwaitResult(client, start));
+        for (var i = 0; i < 20; i++)
+            Tick(0.5);
+        var complete = SendWorld(client, WorldIntent.BreakComplete(arena.Eye, arena.AimAtFront, arena.Front));
+        Assert.False(AwaitResult(client, complete));
+
+        // The stone stands, and the client was told so for that very intent
+        Assert.Equal(Stone, CellAt(arena.Front).Id);
+        Assert.Contains(InboxOf(client).Corrections,
+            c => c.Seq == complete && c.Cell.X == (int)arena.Front.X && c.Cell.Y == (int)arena.Front.Y
+                 && c.Cell.Z == (int)arena.Front.Z && c.Cell.Id == Stone);
+    }
+
+    [Fact]
+    public void BreakingFasterThanTheHitsAllowIsRefusedAndAtPaceBreaks()
+    {
+        using var client = Connect("Miner");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        SetCell(arena.Front, Dirt);
+        var required = BareHandSeconds(Dirt);
+        Assert.True(required > WorldGenerationConfig.NetBreakSlackSeconds, "dirt must take several hits");
+
+        // Start and completion together: far fewer hits than the hardness needs
+        SendWorld(client, WorldIntent.BreakStart(arena.Eye, arena.AimAtFront, arena.Front));
+        var hurried = SendWorld(client, WorldIntent.BreakComplete(arena.Eye, arena.AimAtFront, arena.Front));
+        Assert.False(AwaitResult(client, hurried));
+        Assert.Equal(Dirt, CellAt(arena.Front).Id);
+
+        // The same break after the time its hits take goes through
+        var start = SendWorld(client, WorldIntent.BreakStart(arena.Eye, arena.AimAtFront, arena.Front));
+        Assert.True(AwaitResult(client, start));
+        for (var waited = 0.0; waited < required + 0.05; waited += 0.25)
+            Tick(0.25);
+        var complete = SendWorld(client, WorldIntent.BreakComplete(arena.Eye, arena.AimAtFront, arena.Front));
+        Assert.True(AwaitResult(client, complete));
+        Assert.Equal(0, CellAt(arena.Front).Id);
+    }
+
+    [Fact]
+    public void MinedLootLandsInTheBreakersInventoryOnly()
+    {
+        using var breaker = Connect("Breaker");
+        using var bystander = Connect("Bystander");
+        var arena = PrepareArena(breaker.Server!.Value.Spawn);
+        SetCell(arena.Front, Dirt);
+
+        // The bystander flies well out of pickup range first (a few states, each within the cap)
+        for (var lift = 10; lift <= 40; lift += 10)
+        {
+            SendState(bystander, arena.Eye + new Vector3(0f, lift, 0f), NetPlayerFlags.None);
+            for (var i = 0; i < 3; i++)
+                Tick(0.1);
+        }
+        Assert.True(Vector3.Distance(PlayerOf(bystander).Position, arena.Eye) > DropManager.PickupRange * 4f);
+
+        var start = SendWorld(breaker, WorldIntent.BreakStart(arena.Eye, arena.AimAtFront, arena.Front));
+        Assert.True(AwaitResult(breaker, start));
+        for (var waited = 0.0; waited < BareHandSeconds(Dirt) + 0.05; waited += 0.25)
+            Tick(0.25);
+        var complete = SendWorld(breaker, WorldIntent.BreakComplete(arena.Eye, arena.AimAtFront, arena.Front));
+        Assert.True(AwaitResult(breaker, complete));
+
+        // The drop flies to the breaker and is credited to the breaker's own inventory
+        var sw = Stopwatch.StartNew();
+        while (PlayerOf(breaker).Inventory.CountFor(Dirt) == 0 && sw.Elapsed.TotalSeconds < 15)
+            Tick(1.0 / 30);
+        Assert.True(PlayerOf(breaker).Inventory.CountFor(Dirt) > 0, "the breaker never got the loot");
+        Assert.Equal(0, PlayerOf(bystander).Inventory.CountFor(Dirt));
+
+        // The breaker's client hears of it through a snapshot; nothing was rolled client side
+        sw.Restart();
+        while ((InboxOf(breaker).Inventory == null || InboxOf(breaker).Mirror().CountFor(Dirt) == 0)
+               && sw.Elapsed.TotalSeconds < 15)
+            Tick(0.05);
+        Assert.Equal(PlayerOf(breaker).Inventory.CountFor(Dirt), InboxOf(breaker).Mirror().CountFor(Dirt));
+    }
+
+    [Fact]
+    public void PlacingABlockThePlayerDoesNotOwnIsRefusedAndSpendsNothing()
+    {
+        using var client = Connect("Builder");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        AwaitInventory(client);
+        var placed = arena.FloorAhead + Vector3.UnitY;
+
+        var seq = SendWorld(client, WorldIntent.Place(arena.Eye, arena.AimAtFloorAhead, arena.FloorAhead, Vector3.UnitY));
+        Assert.False(AwaitResult(client, seq));
+        Assert.Equal(0, CellAt(placed).Id);
+
+        // The refusal is answered with the truth: the empty inventory and the empty cell
+        var inbox = InboxOf(client);
+        Assert.Equal(seq, inbox.InventorySeq);
+        Assert.Equal(0, inbox.Mirror().SelectedCount);
+        Assert.Contains(inbox.Corrections, c => c.Seq == seq && c.Cell.X == (int)placed.X
+            && c.Cell.Y == (int)placed.Y && c.Cell.Z == (int)placed.Z && c.Cell.Id == 0);
+    }
+
+    [Fact]
+    public void APlacementSpendsExactlyOneAndFollowsThePlacementRules()
+    {
+        using var client = Connect("Builder");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        GrantAsSurvival(client, Dirt, 3);
+        var player = PlayerOf(client);
+        Assert.Equal(3, player.Inventory.CountFor(Dirt));
+
+        var seq = SendWorld(client, WorldIntent.Place(arena.Eye, arena.AimAtFloorAhead, arena.FloorAhead, Vector3.UnitY));
+        Assert.True(AwaitResult(client, seq));
+        Assert.Equal(Dirt, CellAt(arena.FloorAhead + Vector3.UnitY).Id);
+        Assert.Equal(2, player.Inventory.CountFor(Dirt));
+        Assert.Equal(2, InboxOf(client).Mirror().CountFor(Dirt));
+
+        // Into the player's own body: a solid block there is refused, and nothing is spent
+        var body = arena.FloorBelow + Vector3.UnitY;
+        seq = SendWorld(client, WorldIntent.Place(arena.Eye, -Vector3.UnitY, arena.FloorBelow, Vector3.UnitY));
+        Assert.False(AwaitResult(client, seq));
+        Assert.Equal(0, CellAt(body).Id);
+        Assert.Equal(2, player.Inventory.CountFor(Dirt));
+    }
+
+    [Fact]
+    public void AForgedOverwriteOfAnOccupiedCellIsRefused()
+    {
+        using var client = Connect("Forger");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        SetCell(arena.Front, Stone);
+        GrantAsSurvival(client, Dirt, 3);
+        var behind = arena.Front + Vector3.UnitX;
+        SetCell(behind, Stone);
+
+        // A raw cell write (the retired protocol) replacing the stone: refused, answered with it
+        using (var writer = new PacketWriter(NetMessage.BlockEdit))
+        {
+            writer.Write((int)arena.Front.X);
+            writer.Write((int)arena.Front.Y);
+            writer.Write((int)arena.Front.Z);
+            writer.Write(Dirt);
+            writer.Write((byte)7);
+            client.Send(writer.ToArray());
+        }
+        var sw = Stopwatch.StartNew();
+        while (!InboxOf(client).Corrections.Exists(c => c.Cell.Id == Stone) && sw.Elapsed.TotalSeconds < 15)
+            Tick(0.01);
+        Assert.Equal((Stone, (byte)0), CellAt(arena.Front));
+        Assert.Contains(InboxOf(client).Corrections, c => c.Cell.X == (int)arena.Front.X && c.Cell.Id == Stone);
+
+        // A placement naming the far face of the stone (placing through it), or a cell the aim
+        // never reaches (the one behind), is refused and spends nothing
+        var throughFace = SendWorld(client, WorldIntent.Place(arena.Eye, arena.AimAtFront, arena.Front, Vector3.UnitX));
+        Assert.False(AwaitResult(client, throughFace));
+        var unseen = SendWorld(client, WorldIntent.Place(arena.Eye, arena.AimAtFront, behind, -Vector3.UnitX));
+        Assert.False(AwaitResult(client, unseen));
+        Assert.Equal(Stone, CellAt(behind).Id);
+        Assert.Equal(0, CellAt(behind + Vector3.UnitX).Id);
+        Assert.Equal(3, PlayerOf(client).Inventory.CountFor(Dirt));
+    }
+
+    [Fact]
+    public void TheServerComputesThePlacedStateByte()
+    {
+        using var client = Connect("Builder");
+        using var watcher = Connect("Watcher");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        var log = ContentRegistry.RequireBlock("oak_log").Id;
+        GrantAsSurvival(client, log, 1);
+
+        // A placement carries no state at all: a placed log is building material, detached
+        var seq = SendWorld(client, WorldIntent.Place(arena.Eye, arena.AimAtFloorAhead, arena.FloorAhead, Vector3.UnitY));
+        Assert.True(AwaitResult(client, seq));
+        var placed = arena.FloorAhead + Vector3.UnitY;
+        Assert.Equal((log, WoodState.Detached), CellAt(placed));
+
+        // Every client sees the server's state byte
+        var sw = Stopwatch.StartNew();
+        while (!InboxOf(watcher).Broadcast.Exists(c => c.X == (int)placed.X && c.Y == (int)placed.Y
+                   && c.Z == (int)placed.Z && c.Id == log) && sw.Elapsed.TotalSeconds < 15)
+            Tick(0.01);
+        Assert.Contains(InboxOf(watcher).Broadcast, c => c.X == (int)placed.X && c.Y == (int)placed.Y
+            && c.Z == (int)placed.Z && c.Id == log && c.State == WoodState.Detached);
+    }
+
+    [Fact]
+    public void TntOnePlayerPrimesDetonatesForEveryClient()
+    {
+        using var igniter = Connect("Igniter");
+        using var watcher = Connect("Watcher");
+        var arena = PrepareArena(igniter.Server!.Value.Spawn);
+        var tnt = ContentRegistry.RequireBlock("tnt").Id;
+        SetCell(arena.Front, tnt);
+        GrantAsSurvival(igniter, ContentRegistry.RequireItem("firestarter").Id, 1);
+        // The spark always catches, so the test is not a dice roll
+        _world.UseRoll = static () => 0f;
+
+        var seq = SendWorld(igniter, WorldIntent.Use(arena.Eye, arena.AimAtFront, arena.Front));
+        Assert.True(AwaitResult(igniter, seq));
+        Assert.Equal(0, CellAt(arena.Front).Id);
+        Assert.NotEmpty(_world.PrimedTnt);
+
+        // The fuse burns down on the server and the blast's cells reach the other client
+        var floor = arena.FloorAhead;
+        var sw = Stopwatch.StartNew();
+        while (!InboxOf(watcher).Broadcast.Exists(c => c.X == (int)floor.X && c.Y == (int)floor.Y
+                   && c.Z == (int)floor.Z && c.Id == 0) && sw.Elapsed.TotalSeconds < 30)
+            Tick(0.1);
+        Assert.Contains(InboxOf(watcher).Broadcast, c => c.X == (int)arena.Front.X && c.Y == (int)arena.Front.Y
+            && c.Z == (int)arena.Front.Z && c.Id == 0);
+        Assert.Contains(InboxOf(watcher).Broadcast, c => c.X == (int)floor.X && c.Y == (int)floor.Y
+            && c.Z == (int)floor.Z && c.Id == 0);
+        Assert.Equal(0, CellAt(floor).Id);
+    }
+
+    [Fact]
+    public void AnIntentAimedFromWhereThePlayerIsNotIsRefused()
+    {
+        using var client = Connect("Teleporter");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        SetCell(arena.Front, Dirt);
+
+        // The same break, claimed from an eye far from the player's authoritative position
+        var far = arena.Eye + new Vector3(0f, WorldGenerationConfig.NetMaxIntentEyeDriftBlocks * 3f, 0f);
+        var seq = SendWorld(client, WorldIntent.BreakComplete(far, Vector3.Normalize(arena.Front + new Vector3(0.5f) - far),
+            arena.Front));
+        Assert.False(AwaitResult(client, seq));
+        Assert.Equal(Dirt, CellAt(arena.Front).Id);
+
+        // A replayed sequence id is refused too, whatever it asks
+        _server.AllowCreative = true;
+        SendModes(client, NetPlayerFlags.Creative);
+        PumpFor(0.05);
+        var replay = InboxOf(client).Seq;
+        using (var writer = new PacketWriter(NetMessage.WorldIntent))
+        {
+            WorldIntentCodec.Write(writer, replay, WorldIntent.BreakComplete(arena.Eye, arena.AimAtFront, arena.Front));
+            client.Send(writer.ToArray());
+        }
+        PumpFor(0.2);
+        Assert.Equal(Dirt, CellAt(arena.Front).Id);
+
+        // The same creative break under a fresh id goes through
+        var fresh = SendWorld(client, WorldIntent.BreakComplete(arena.Eye, arena.AimAtFront, arena.Front));
+        Assert.True(AwaitResult(client, fresh));
+        Assert.Equal(0, CellAt(arena.Front).Id);
     }
 }

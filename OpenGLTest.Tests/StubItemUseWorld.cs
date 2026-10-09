@@ -30,6 +30,11 @@ internal sealed class StubItemUseWorld : IItemUseWorld
     public double NowSeconds => 0.0;
     public bool IsCreative => false;
 
+    /// <summary>A fixed chance roll, or null for a real random one.</summary>
+    public float? FixedRoll { get; set; }
+
+    public float NextUseRoll() => FixedRoll ?? System.Random.Shared.NextSingle();
+
     public bool RaycastFluidSource(float maxDistance, out Vector3 hit)
     {
         hit = RaycastHit;

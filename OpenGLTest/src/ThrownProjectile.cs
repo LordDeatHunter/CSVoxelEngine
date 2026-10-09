@@ -15,6 +15,8 @@ public sealed class ThrownProjectile
 
     public byte ItemId { get; }
     public Vector3 Position { get; private set; }
+    /// <summary>Where the projectile was launched from: a mob it hits is shoved away from here.</summary>
+    public Vector3 Origin { get; }
     public float BaseDamage { get; }
     public float Charge01 { get; }
     private Vector3 _velocity;
@@ -28,6 +30,7 @@ public sealed class ThrownProjectile
     {
         ItemId = itemId;
         Position = position;
+        Origin = position;
         _velocity = velocity;
         BaseDamage = baseDamage;
         Charge01 = MathUtils.Clamp01(charge01);

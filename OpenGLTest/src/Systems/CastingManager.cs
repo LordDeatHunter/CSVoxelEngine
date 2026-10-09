@@ -38,6 +38,13 @@ public sealed class CastingManager
         /// <summary>Tool instance currently pouring, or 0 while the pour is paused.</summary>
         public int PourInstance;
 
+        /// <summary>
+        /// The player pouring when it is not the one <see cref="Update"/> is handed (a server's
+        /// connected player): the pour drains that player's inventory, follows its selection and
+        /// its eye, and pauses once it left. Null for the local player.
+        /// </summary>
+        public PlayerContext? PourSource;
+
         /// <summary>Whether the full mold is cooling down.</summary>
         public bool Cooling;
 
@@ -74,8 +81,10 @@ public sealed class CastingManager
     /// resumes) the pour. Refuses anything that is not a crucible holding molten metal, a mold
     /// with no recipe for that metal, a cell already filled with a different cast, and a mold that
     /// is cooling or waiting to be collected — a refusal never disturbs the state standing there.
+    /// <paramref name="source"/> binds the pour to a player other than the one <see cref="Update"/>
+    /// is handed (a server's connected player, see <see cref="CastState.PourSource"/>).
     /// </summary>
-    public bool TryStartPour(Vector3 cell, byte moldId, ItemStack crucible)
+    public bool TryStartPour(Vector3 cell, byte moldId, ItemStack crucible, PlayerContext? source = null)
     {
         if (crucible.Item is not CrucibleItem) return false;
         var contents = crucible.Get<CrucibleComponent>();
@@ -97,6 +106,7 @@ public sealed class CastingManager
         }
 
         state.PourInstance = crucible.InstanceId;
+        state.PourSource = source;
         return true;
     }
 
@@ -132,7 +142,20 @@ public sealed class CastingManager
             }
 
             if (state.Pouring)
-                Pour(key, state, dt, inventory, selectedInstance, playerPos, reach);
+            {
+                // A pour bound to another player runs against that player, and pauses once it left
+                if (state.PourSource is { } source)
+                {
+                    if (source.Present)
+                        Pour(key, state, dt, source.Inventory, source.Inventory.SelectedToolInstance, source.Eye, reach);
+                    else
+                        state.PourInstance = 0;
+                }
+                else
+                {
+                    Pour(key, state, dt, inventory, selectedInstance, playerPos, reach);
+                }
+            }
             else if (state.Cooling)
                 Cool(state, dt);
         }
@@ -241,6 +264,63 @@ public sealed class CastingManager
         foreach (var (key, state) in _casts)
             yield return (new Vector3(key.X, key.Y, key.Z), state.Recipe.MaterialId,
                 state.Fill01, state.Cool01, state.Done, state.Recipe.ResultId);
+    }
+
+    /// <summary>Writes every mold cell holding a pour (its recipe by mold and metal, fill, cooling),
+    /// for the station broadcast (<see cref="StationNetCodec"/>).</summary>
+    internal void WriteNet(PacketWriter writer)
+    {
+        // At most what a client accepts (StationNetCodec.MaxEntries)
+        var leftCasts = Math.Min(_casts.Count, StationNetCodec.MaxEntries);
+        writer.Write(leftCasts);
+        foreach (var ((x, y, z), state) in _casts)
+        {
+            if (leftCasts-- == 0) break;
+            StationNetCodec.WriteCell(writer, x, y, z);
+            writer.Write(state.Recipe.MoldId);
+            writer.Write(state.Recipe.MaterialId);
+            writer.Write(state.FilledMl);
+            writer.Write(state.Pouring);
+            writer.Write(state.Cooling);
+            writer.Write(state.CoolLeft);
+            writer.Write(state.Done);
+        }
+    }
+
+    /// <summary>
+    /// Replaces the tracked molds with a snapshot written by <see cref="WriteNet"/>: a multiplayer
+    /// client's display-only mirror. An entry whose mold and metal name no cast recipe this client
+    /// knows is skipped.
+    /// </summary>
+    internal void ReadNet(PacketReader reader)
+    {
+        _casts.Clear();
+        var count = StationNetCodec.ReadCount(reader);
+        for (var i = 0; i < count; i++)
+        {
+            var key = StationNetCodec.ReadCell(reader);
+            var moldId = reader.ReadByte();
+            var materialId = reader.ReadByte();
+            var filled = reader.ReadInt();
+            var pouring = reader.ReadBool();
+            var cooling = reader.ReadBool();
+            var coolLeft = StationNetCodec.ReadFinite(reader);
+            var done = reader.ReadBool();
+            if (filled < 0)
+                throw new System.IO.InvalidDataException("cast snapshot with negative fill");
+            var recipe = ContentRegistry.CastRecipeFor(moldId, materialId);
+            if (recipe == null)
+                continue;
+            _casts[key] = new CastState(recipe)
+            {
+                FilledMl = Math.Min(filled, recipe.AmountMl),
+                // Display only: the mirror never drains anything, it just knows a pour is running
+                PourInstance = pouring ? 1 : 0,
+                Cooling = cooling,
+                CoolLeft = coolLeft,
+                Done = done,
+            };
+        }
     }
 
     private static void SpawnResult(CastState state, Vector3 cell, DropManager drops)

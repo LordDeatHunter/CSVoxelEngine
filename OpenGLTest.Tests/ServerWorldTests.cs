@@ -65,53 +65,60 @@ public sealed class ServerWorldTests : IDisposable
     }
 
     [Fact]
-    public void NetworkBlockEditChangesALoadedCell()
+    public void APlacementNeverBuriesAConnectedPlayerButTheServerCameraIsNobody()
     {
         WorldSeed.Apply(WorldSeed.Default);
-        var store = new ChunkSaveStore(_dir);
-        _world = new World(null!, null!, null!, null!, null!, null!, null, store, serverMode: true);
-
-        var sw = Stopwatch.StartNew();
-        var last = 0.0;
-        while (!_world.IsLoaded && sw.Elapsed.TotalSeconds < 45)
-        {
-            var now = sw.Elapsed.TotalSeconds;
-            _world.Update(Math.Min(now - last, 0.1), null);
-            last = now;
-            Thread.Sleep(1);
-        }
-
-        Assert.True(_world.IsLoaded);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null, serverMode: true);
         var manager = _world.GetChunkManager();
         var eye = _world.Camera.Position;
-        var x = (int)MathF.Floor(eye.X);
-        var y = (int)MathF.Floor(eye.Y);
-        var z = (int)MathF.Floor(eye.Z);
-        // The eye sits in air above the surface, so the cell is free to write.
-        Assert.Equal(0, manager.GetBlockGlobal(x, y, z));
+        var fx = (int)MathF.Floor(eye.X);
+        var fy = (int)MathF.Floor(eye.Y - Camera.EyeHeight + 1e-3f);
+        var fz = (int)MathF.Floor(eye.Z);
 
-        Assert.True(_world.ApplyNetworkBlockEdit(x, y, z, TerrainGenerator.RockBlock, 0));
-        Assert.Equal(TerrainGenerator.RockBlock, manager.GetBlockGlobal(x, y, z));
+        bool Loaded()
+        {
+            for (var x = fx - 3; x <= fx + 3; x++)
+            for (var y = fy - 1; y <= fy + 3; y++)
+                if (!manager.TryGetCell(x, y, fz, out _, out _))
+                    return false;
+            return true;
+        }
 
-        // An occupied cell is replaced outright (a converted structure, a correction)
-        Assert.True(_world.ApplyNetworkBlockEdit(x, y, z, TerrainGenerator.SoilBlock, 0));
-        Assert.Equal(TerrainGenerator.SoilBlock, manager.GetBlockGlobal(x, y, z));
+        var sw = Stopwatch.StartNew();
+        while (!Loaded() && sw.Elapsed.TotalSeconds < 45)
+        {
+            _world.Update(0.05, null);
+            Thread.Sleep(1);
+        }
+        Assert.True(Loaded());
 
-        Assert.True(_world.ApplyNetworkBlockEdit(x, y, z, 0, 0));
-        Assert.Equal(0, manager.GetBlockGlobal(x, y, z));
+        // A dirt floor under the feet row and air above it along the row
+        var dirt = ContentRegistry.RequireBlock("dirt").Id;
+        for (var x = fx - 3; x <= fx + 3; x++)
+        for (var y = fy - 1; y <= fy + 3; y++)
+        {
+            var chunk = manager.ChunkAt(x, y, fz)!;
+            var (lx, ly, lz) = VoxelCoords.LocalOf(x, y, fz);
+            chunk.SetBlockRaw(lx, ly, lz, y == fy - 1 ? dirt : (byte)0, 0);
+        }
 
-        // Removing what is already gone changed nothing, so the server corrects the sender
-        Assert.False(_world.ApplyNetworkBlockEdit(x, y, z, 0, 0));
+        // The builder stands at the eye, another player two blocks along +X
+        var builder = new ServerPlayer(1, "Builder", eye);
+        var other = new ServerPlayer(2, "Other", eye + new Vector3(2f, 0f, 0f));
+        _world.ServerPlayers = [builder, other];
+        builder.Inventory.Add(dirt, 2);
+        builder.Aim(eye, Vector3.UnitX);
 
-        // A poured fluid is taken out again by an id-0 edit: a client's bucket scoop
-        var water = ContentRegistry.RequireBlock("water").Id;
-        Assert.True(_world.ApplyNetworkBlockEdit(x, y, z, water, FluidState.Source));
-        Assert.Equal(water, manager.GetBlockGlobal(x, y, z));
-        Assert.True(_world.ApplyNetworkBlockEdit(x, y, z, 0, 0));
-        Assert.Equal(0, manager.GetBlockGlobal(x, y, z));
+        // The floor under the other player: the block would bury them, so nothing is placed or spent
+        Assert.False(_world.TryPlaceSelectedBlockAt(builder.Context, new Vector3(fx + 2, fy - 1, fz), Vector3.UnitY));
+        Assert.Equal(0, manager.GetBlockGlobal(fx + 2, fy, fz));
+        Assert.Equal(2, builder.Inventory.CountFor(dirt));
 
-        // A cell whose chunk is not loaded is never applied
-        Assert.False(_world.ApplyNetworkBlockEdit(x + 1_000_000, y, z, TerrainGenerator.RockBlock, 0));
+        // The server camera standing in the cell is nobody's body
+        _world.SetServerFocus(new Vector3(fx - 1.5f, fy + Camera.EyeHeight, fz + 0.5f));
+        Assert.True(_world.TryPlaceSelectedBlockAt(builder.Context, new Vector3(fx - 2, fy - 1, fz), Vector3.UnitY));
+        Assert.Equal(dirt, manager.GetBlockGlobal(fx - 2, fy, fz));
+        Assert.Equal(1, builder.Inventory.CountFor(dirt));
     }
 
     [Fact]

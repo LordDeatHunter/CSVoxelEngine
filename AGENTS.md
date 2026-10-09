@@ -484,6 +484,9 @@ OpenGLTest/
                                #   the mesher and gameplay read (ById, Emission, IsSolid/Occludes/...)
     Mining.cs                  # GL-free mining rules: the tools/requiresTool gate, block damage per
                                #   hit and hit pace shared by the break loop and the tests
+    PlayerContext.cs           # who an interaction runs for: eye, aim, inventory, creative (local camera or a
+                               #   server's connected player), threaded through every World interaction path
+    RightClickOutcome.cs       # what claimed a right-click: a station, the item's use, or a placement
     Combat.cs                  # GL-free punch rules: the forward cone (3 blocks, 30° half-angle)
                                #   and entity damage, shared by the punch loop and the tests
     SliceCombo.cs              # the blade's two-phase slice combo: press/queue/advance state
@@ -583,9 +586,17 @@ OpenGLTest/
       InventoryIntent.cs       # one client inventory intent (select, drop, equip, craft, creative grant/clear, pick)
       InventoryIntentCodec.cs  # its bounds-checked wire form
       InventoryIntentRules.cs  # GL-free: what the server accepts of an intent, against that player's inventory
-      ServerPlayer.cs          # a connected player on the server: own Inventory, creative/flight flags, pose
+      ServerPlayer.cs          # a connected player on the server: own Inventory, creative/flight flags, pose,
+                               #   its PlayerContext, newest sequence id, mining progress, edit rate, attack pace
       NetPlayerFlags.cs        # the PlayerState flags byte (creative, flying), a request to the server
-      NetValidation.cs         # server movement and edit-reach sanity rules
+      NetValidation.cs         # server movement, edit-reach, intent-eye and visible-face sanity rules
+      WorldIntent.cs           # one client world intent (break start/complete, place, use, throw, attack)
+      WorldIntentCodec.cs      # its bounds-checked wire form, with the sequence id
+      BreakProgress.cs         # GL-free: a player's mining on the server, judged against the held item's hits
+      RateLimiter.cs           # GL-free token bucket (a player's edit rate)
+      AttackPacing.cs          # GL-free: the shortest gap between two punches or slice swings
+      ClientPrediction.cs      # GL-free: a client's pending predictions vs the server's answers (sequence ids)
+      StationNetCodec.cs       # the StationState snapshot: campfires, querns, kilns, cast molds
     UI/                        # UI state, layout and rules, mostly GL-free (UIRenderer draws them)
       PauseMenu.cs             # pause menu pages, hit kinds, view and PauseMenuLayout (RESUME/SETTINGS/SAVE & QUIT)
       SettingsMenu.cs          # settings page rows, tabs, sliders and SettingsLayout (shared by both menus)
@@ -1330,7 +1341,7 @@ Other invariants:
 - World/chunk coordinates: `Chunk.Position` is in chunk units; world pos = chunk pos × `Chunk.Size` (16). Chunks are cubic and stacked vertically too (3D chunk grid, not 2D columns).
 - Blocks are `byte` IDs; `0` is air. Everything else about a block comes from `assets/data/blocks/<name>.json` through `ContentRegistry` (see "Content" above), never from a new `switch` on the id. Hot paths read the flat mirrors (`BlockType.IsSolid/Occludes/CastsAO`, `BlockType.Emission`, `BlockType.PassesLightById`) rather than `BlockType.ById[...]`, so keep new per-id flags in that shape.
 - **Per-block state byte**: alongside `Chunk._blocks` each chunk has a lazily allocated `volatile byte[]? _state` (null = all zero), read through `Chunk.GetLocalState` / `ChunkManager.GetStateGlobal` / `TryGetCell` and written only by `Chunk.SetBlockRaw` (no remesh, no scheduling — the fluid tick batches those). Five features share it, one per block: **fluid levels** (`FluidState` decodes it as source `0`, falling `8` or flowing level `1..7`), **stack counts** (a `stackMax` block's 0 = untouched worldgen, 1..`stackMax` an explicit pile), a **multiblock's facing and offset** (`Multiblock.EncodeState`, `facing | dx<<2 | dy<<3 | dz<<4`, written by `Multiblock.Convert` through `SetBlockRaw`), **tree wood** (`WoodState` on a `tree_wood` block: bits 0-3 the thickness code, `FullCube` = 15 being a whole 16 px cell, bits 4-6 the parent direction in `Chunk.CubeFaces` order or `ParentRoot`/`ParentDetached`, bit 7 the shell flag) and **leaves** (`LeafState` on a leaf block: bits 0-2 the hydration, bit 3 the persistent flag) — see `### Trees`. The tree states are written by `TreeGenerator.Stamp` into the generated state array, by `TreeGrowthWriter` and `LeafDecayManager` through `SetBlockRaw`, and by placement, which passes an explicit state to `PlaceBlockAt` (`World.PlaceBlockAtFace` gives a placed log `WoodState.Detached` and a placed leaf a persistent `LeafState`). Which meaning a byte carries is decided entirely by the block id that owns the cell, so a new user must pick a block kind, never a spare bit. **Every write that is not one of those zeroes it** (`RemoveBlockAt`, `ClearBlockAt` and `PlaceBlockAt` with its default state `0` — which also treats a fluid cell as replaceable), and `Multiblock.Revert` likewise writes its source block with an explicit `0`, so a stale level, count, offset, thickness or hydration can never outlive the block that owned it. Meshing gets it as a second padded snapshot from `FillPaddedSnapshot(padded, paddedState, neighbors, neighborStates)`, filled from the neighbourhood `TryResolveNeighbors` resolved for the build; the fluid simulation must read cells through `TryGetCell`/`ChunkAt`, never `GetBlockGlobal`, which reports unloaded chunks as air.
-- **Station block entities**: `CampfireManager`, `QuernManager`, `KilnManager` and `CastingManager` are all owned by `World`, all **main thread only** and all in-memory only — a lit campfire, a spinning quern, a kiln's fuel and crucible and a mold's cast progress are lost on a restart, a save & quit or a chunk reload, even though the chunk's blocks and state bytes around them are saved (see "Saves"). Each is keyed by the cell (the kiln by its structure's anchor), each is ticked from `World.Update` and each has a `NotifyBlockRemoved` that `World.RemoveBlock` calls so a broken station drops what it held. `World.FireCells` gathers every burning cell (campfires and lit kilns) once a frame and feeds both the fire billboards (`FireParticleSystem.SpawnOffset`) and the warm point lights (`RenderManager.FireLightOffset`), so a new fire source only has to appear in that list. Their render passes — `RenderQuerns`, `RenderKilns`, `RenderCastings` — sit inside the existing `entityPass` profiler span rather than adding sections of their own.
+- **Station block entities**: `CampfireManager`, `QuernManager`, `KilnManager` and `CastingManager` are all owned by `World`, all **main thread only** and all in-memory only — a lit campfire, a spinning quern, a kiln's fuel and crucible and a mold's cast progress are lost on a restart, a save & quit or a chunk reload, even though the chunk's blocks and state bytes around them are saved (see "Saves"). Each is keyed by the cell (the kiln by its structure's anchor), each is ticked from `World.Update` and each has a `NotifyBlockRemoved` that `World.RemoveBlock` calls so a broken station drops what it held. `World.FireCells` gathers every burning cell (campfires and lit kilns) once a frame and feeds both the fire billboards (`FireParticleSystem.SpawnOffset`) and the warm point lights (`RenderManager.FireLightOffset`), so a new fire source only has to appear in that list. Their render passes — `RenderQuerns`, `RenderKilns`, `RenderCastings` — sit inside the existing `entityPass` profiler span rather than adding sections of their own. On a multiplayer server they tick in the server's `World.Update` and a pour is bound to the pouring player (`CastState.PourSource`, its `PlayerContext`, which pauses once the player left); a client never ticks them: its managers are display-only mirrors replaced by the server's `StationState` snapshot (each manager's `WriteNet`/`ReadNet`, `StationNetCodec`), and only a quern top keeps turning between snapshots (`QuernManager.Animate`).
 - **Fluid tick**: `Systems/FluidManager.cs` (owned by `World`, main thread only) is a *scheduled-cell* simulation, not a scan. `World.Update` calls it once per frame after `UpdateToppling`; it runs whole ticks every `WorldGenerationConfig.FluidTickSeconds` (0.25 s), at most `MaxFluidTicksPerFrame` of them per frame, and drops the leftover time so a hitch never leaves it spiralling. Each tick takes the set of cells scheduled by the previous one (packed as `long`, 21 bits per axis — the same budget `ChunkKey` (`src/ChunkKey.cs`) uses to pack a **chunk** position for `ChunkMap` and for `ChunkManager`'s dirty/queued/generating/placement dictionaries; `FluidManager`'s packer is block-scale, `ChunkKey`'s is chunk-scale, and neither floors nor truncates differently from `VoxelCoords.ChunkPosOf`), recomputes every **non-source** fluid cell from its neighbours (Minecraft's `getNewLiquid`: two adjacent sources over ground that cannot drain become a source themselves, fluid directly above means falling, otherwise one level thinner than the fullest neighbour, and nothing left means the cell drains to air), then spreads it downwards, or sideways toward the nearest hole within `FluidSlopeSearchDistance` (ties spread evenly). The level rules are per-fluid data (`flow.*` on the block: lava updates every other tick, spreads 3 instead of 7 and never forms new sources). Contact hardening runs before all of it: a fluid cell touching its `hardensTouching` fluid becomes `hardensTo` (lava beside water becomes cobblestone), and a flow settling against a fluid that hardens on its touch crusts over the same way, so water reaching lava also yields cobblestone whichever side ticks first. Spreading only ever writes into non-fluid `IsReplaceable` cells, popping the fragile block it washes away through `DropManager.SpawnLoot`; a cell that already holds fluid recomputes itself on its own tick. Writes go through `Chunk.SetBlockRaw` and dirty only the cell's own chunk plus the face-adjacent chunk on each axis where the cell sits on a border, batched into `MarkDirty` at the end of the tick — not `ImmediateRemesh`, and never `MarkAreaDirty`, because a fluid passes light and casts no AO. A cell reschedules itself and its neighbourhood exactly when it changed or wrote into a neighbour, so settled water costs nothing.
 - **Waking worldgen water**: the sea is generated as static source cells, so a cave or entrance carved into a land column beside it would leave a wall of water standing against worldgen air that nothing ever schedules. `FluidManager.WakeLoadedChunks(chunks)` — called from `World.Update` each frame, immediately before the fluid tick — fixes that by scheduling the frontier of its water against a carved cavity when it loads, so the sea pours into whatever breached it exactly like Minecraft water does when you dig into an ocean. Only cells at or below their column's natural terrain top count (`FluidManager.IsCarvedFlowTarget`), so open air above the terrain — a ravine, a beach, a hillside — is never woken and generated water stays static across it. It has two halves: the **interior**, collected on the generation worker at the end of `Chunk.GenerateBlockData` into `Chunk.FluidFrontier` (local block indices of every fluid cell with a `FluidManager.IsCarvedFlowTarget` neighbour in -X/+X/-Z/+Z/-Y — never +Y, since water does not flow upward and every sea-surface cell has air above it; only its own `_blocks` are read, so worldgen stays a pure per-chunk function), and the **borders**, which need both chunks loaded and are therefore scanned on the main thread over the shared 16x16 plane of each face neighbour, scheduling whichever side holds the fluid when the other side is a carved cavity (the vertical faces only ever schedule the fluid above the hole). Chunks entirely above every level they could share with a neighbour (`ColumnData.MaxWaterLevel`, never below `SeaLevel`) skip the border scan — generated water cannot reach them, and player-placed water is woken by the edit paths. The queue of newly generated chunks is `ChunkManager.TryDequeueLoaded`; a consumer must re-check that the chunk is still the live one at its position, because an unload can race the queue. Once the frontier has settled, it costs nothing again. Deep lava pockets wake through the same path: the frontier scan is fluid-generic, and chunks at or below `LavaMaxY` report theirs even when they never held sea water.
 - **Every block edit path must call `FluidManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the water beside the edit will never notice it: `World.RemoveBlock`, `World.FellWood` (per cleared cell, and in both single-block branches), `World.TryPlaceBlockFromRaycast`, `TntManager.Detonate` (`ScheduleBox` over the blast box grown by one; the blast also **skips fluid cells**, since a dry crater under water would just refill from every side) and bucket edits through `FluidManager.SetCellImmediate`, which is the only fluid write that remeshes synchronously. Mining never takes a fluid out: `RemoveBlock` returns early on `BlockType.IsFluid`, so only a bucket removes fluids.
@@ -1490,14 +1501,25 @@ session.
 length prefixed, `Vector3` as three floats). `NetFraming.ProtocolVersion` must match in both
 hellos. Messages: `ClientHello` (version, name), `ServerHello` (version, player id, world name,
 seed, day clock, spawn), `KeepAlive`, `ChatSend`/`ChatMessage` (kind, sender, text),
-`PlayerState` (eye, yaw, pitch, flags), `PlayerList` (id, name, eye, yaw, pitch, flags),
-`BlockEdit`/`BlockChange` (cell, id, state), `ChunkRequest`/`ChunkData` and
-`ColumnRequest`/`ColumnHeights` (the streamed world, `ChunkNetCodec`), `LodRegionRequest`/
-`LodRegionData` (a streamed far region, `LodNetCodec`), `EntityList` (the live mobs/drops,
-`NetEntity`), `BlockChanges` (a batch of server cell changes, `NetCellChange`) and
-`InventoryState`/`InventoryRequest` (a player's server-owned inventory, `InventoryNetCodec`, and
-its intents, `InventoryIntentCodec`). `ProtocolVersion` 2 is the per-player-inventory protocol.
-An `InventoryRequest` is a `NetInventoryAction` byte and only that action's fields
+`PlayerState` (eye, yaw, pitch, flags), `PlayerStatus` (the creative/flight flags the server
+actually granted, sent once when a request was refused), `PlayerList` (id, name, eye, yaw, pitch,
+flags), `WorldIntent` (a client's world action, `WorldIntentCodec`), `IntentResult` (sequence id,
+accepted), `BlockCorrection` (sequence id, then the authoritative cells around the intent's target),
+`ChunkRequest`/`ChunkData` and `ColumnRequest`/`ColumnHeights` (the streamed world,
+`ChunkNetCodec`), `LodRegionRequest`/`LodRegionData` (a streamed far region, `LodNetCodec`),
+`EntityList` (the live mobs/drops, `NetEntity`), `StationState` (the campfires, querns, kilns and
+cast molds, `StationNetCodec`), `BlockChanges` (a batch of server cell changes, `NetCellChange`)
+and `InventoryState`/`InventoryRequest` (a player's server-owned inventory, `InventoryNetCodec`,
+and its intents, `InventoryIntentCodec`). `ProtocolVersion` 3 is the intent protocol: a client
+never writes a cell (the old raw `BlockEdit` is retired and refused), every intent carries a
+per-player sequence id, and `InventoryState` carries the id of the newest intent it reflects. A
+`WorldIntent` is the sequence id, a `NetIntentKind` byte, the eye and the unit aim the action was
+made from, then that kind's fields (`WorldIntent`): `BreakStart`/`BreakComplete(cell)`,
+`Place(hit cell, face normal)`, `Use(cell under the crosshair, optional)`, `Throw(charge 0..1)` and
+`Attack(punch | slice | slice return)`. Its reader refuses an unknown kind or attack, a
+non-finite or far-out eye, an aim that is not close to a unit vector and a normal component
+outside -1..1 as an `InvalidDataException`, renormalises the aim and clamps the charge. An
+`InventoryRequest` is the sequence id, then a `NetInventoryAction` byte and only that action's fields
 (`InventoryIntent`): `SelectSlot(slot)`, `DropSelected`/`DropAllSelected`, `Equip(slot, isTool,
 id)` (a stackable's id or a tool's instance id), `Craft(recipe file name, batch, fed member per
 ingredient)`, `CreativeGrant(id, count)`, `CreativeClear(id)` and `PickBlock(id)`. The reader is
@@ -1553,19 +1575,63 @@ multi-collector overload (`DropCollector`) flies each drop in a loaded chunk to 
 whose inventory has room (a drop in an unloaded chunk is neither collected nor simulated; one
 nobody can take lets go and falls), crediting that player's inventory and flagging
 `ServerPlayer.InventoryChanged`, which the next `Pump` answers with that player's snapshot; the
-server camera and `World.Inventory` never collect. The server applies `BlockEdit` through
-`World.ApplyNetworkBlockEdit`. That returns whether the cell changed (its
-chunk was loaded and the write was accepted), and a false return is answered with a
-`BlockChange` correction exactly like an out-of-reach edit, so a client never keeps an optimistic
-edit the server does not have. The apply removes a fluid on id 0 (a client's bucket scoop, through
-`FluidManager.SetCellImmediate`; its mining path never sends id 0 for a fluid), pours a fluid id
-the same way, rewrites the state byte when the id matches (a pile built up), places into a
-placeable cell and replaces an occupied one outright (a converted multiblock, or a correction).
-In server mode a removal then has a mined cell's consequences (`World.AfterNetworkRemoval`): a
-station's `NotifyBlockRemoved`, a `NeedsSupport` block above popped through `RemoveBlock`, the
-falls block above toppled, `NotifyLodEdit`, and for a tree block `PoisonCanopy` plus
-`MarkEditedColumn`; it does not fell (a cut trunk's orphaned wood crumbles through the leaf decay
-the edit schedules instead of toppling). It **journals every raw cell
+server camera and `World.Inventory` never collect.
+
+**World intents.** A client never writes a cell: every world action is a `WorldIntent` the server
+replays for the sending player through the singleplayer rules. Each `ServerPlayer` owns a
+`PlayerContext` (`OpenGLTest/src/PlayerContext.cs`: eye, aim, view direction, its inventory, its
+server creative flag) that `World` runs every interaction path through instead of the camera
+(singleplayer builds one from its camera, whose raycasts keep the third-person rules). An intent
+is refused (and nothing applied) when its sequence id is not above the player's last
+(`ServerPlayer.AcceptSeq`), the world is not playing, its eye is more than
+`NetMaxIntentEyeDriftBlocks` from the player's accepted position (`NetValidation.EyeWithin`: one
+state interval of movement plus slack), or, for an edit (break completion, place, use, throw),
+the player's `EditLimiter` (`RateLimiter`, `NetEditIntentsPerSecond`/`NetEditIntentBurst`) is
+empty. Then, by kind:
+- **Break** — `BreakStart` and `BreakComplete` both require the player's own first-person ray from
+  the intent's eye along its aim (`World.RaycastFor`, `InteractionReach`, fluids excluded) to hit
+  exactly the named cell, loaded and neither air nor fluid. The start records the target, the held
+  item (id and tool instance) and the server time in `ServerPlayer.Breaking` (`BreakProgress`); the
+  completion breaks only when the held item's hits since then reach the block's hardness the way
+  the client counts them (first hit at the start, then one per `Mining.HitGapSeconds`, each dealing
+  `Mining.BlockDamage`, summed in float — `BreakProgress.RequiredSeconds`), less
+  `NetBreakSlackSeconds` of jitter, never with a tool `Mining.CanMine` refuses, and never after the
+  target or the held item changed; a server-creative player breaks at once. The break itself is
+  `World.BreakBlockFor`, i.e. the full `RemoveBlock`: felling (`FellWood`, which now runs on the
+  server), multiblock revert, loot through `DropManager.SpawnLoot` (picked up by the nearest player
+  with room), a station's hand-back, needs-support pops, toppling and the fluid, leaf-decay, LOD
+  and canopy hooks.
+- **Place** — the ray must hit the named cell, and the named face must be the ray's own or another
+  face of that cell turned toward the eye (`NetValidation.FaceFacesEye`: a third-person aim reports
+  the camera ray's face; the far side of a wall never qualifies). `World.TryPlaceSelectedBlockAt`
+  then places the player's **selected** block (owned, placeable, one spent unless creative) under
+  the placement rules (`Placement`, no live falling cube, fragile blocks on solid ground, and no
+  connected player's body in the cell — `World.BodyBlocksPlacement` checks every `ServerPlayer`, the
+  server camera is nobody), with the world's own state byte (a placed log `WoodState.Detached`, a
+  placed leaf persistent).
+- **Use** — `World.TryUseSelected(InteractionReach, context, out outcome, allowPlace: false)`: the
+  right-click chain (campfire, quern, kiln, cast mold, then the held item's `OnUse` — bucket, pile,
+  firestarter on TNT or a kiln, converter) aimed by the player's ray and spending from its
+  inventory, short of the placement fallback. The item-use tail reads the dispatching player
+  (`World._activeContext`), and a chance roll goes through `IItemUseWorld.NextUseRoll`
+  (`World.UseRoll`, a test seam).
+- **Throw** — `World.ThrowFor` launches the selected throwable at the intent's charge from the eye.
+- **Attack** — a punch needs a non-slicing hand and a slice a slicing weapon, each at most once per
+  its pace (`ServerPlayer.TryAttack`, `AttackPacing`: the held item's hit gap, or
+  `PlayerModel.SliceDuration`, less `NetAttackSlackSeconds`); `World.PunchFor`/`SliceFor` find
+  the targets among the server's mobs from the intent's eye and aim with the `Combat` rules.
+
+Every intent is answered, in order: an intent that can edit cells gets a `BlockCorrection` with
+the authoritative state of the 3x3x3 cells around its named cell (within edit reach), so whatever
+the client predicted there snaps to the server's truth whether it was accepted or not; an intent
+whose prediction can change the inventory (place, use, throw), and any refused one, gets that
+player's `InventoryState`; then its `IntentResult`. Consequences beyond the corrected cells (a
+felled crown, a blast, a flow) reach everyone through the journal. A raw `BlockEdit` from an old
+client is read, logged and refused, answered with the named cell's state when it is in reach. A
+`PlayerState` whose creative or flight request the server does not grant is answered once per
+request with a `PlayerStatus` (`ServerPlayer.ShouldReportModes`), and the client takes those modes
+(`Camera.SetModes`). The server also broadcasts every station block entity it runs as a
+`StationState` on the entity cadence (and one empty snapshot after the last one goes). It **journals every raw cell
 write** (`Chunk.CellWritten`, set in `Start`, cleared in `Stop`) and broadcasts the coalesced
 batch as `BlockChanges` each `Pump`, so its own simulation — explosions, fluid flow, leaf decay,
 felling, tree growth — reaches clients too. It broadcasts the live mobs and drops every
@@ -1575,16 +1641,19 @@ clamped, the authoritative position moving toward it by exactly the allowed dist
 of fast states converges at the cap instead of freezing at a stale point that would get every later
 state rejected too); the cap is 130 b/s, the sprint-flight diagonal (`BaseSpeed *
 FlyBoostMultiplier` = 80 b/s on each of the horizontal and vertical axes, ~113 b/s together) plus
-slack. A `BlockEdit` outside `NetMaxEditReachBlocks` of the player's eye — `World.InteractionReach`
-plus a block of cell-centre slack plus one `NetPlayerStateSeconds` of movement — is refused with a
-`BlockChange` correction (the optimistic client then reverts). The severed player is removed on
-disconnect. The camera focus follows the **centroid** of the connected players
+slack. The severed player is removed on disconnect (its context marked absent, so a pour bound
+to it pauses). The camera focus follows the **centroid** of the connected players
 (`World.SetServerFocus`, a `Camera.TestTeleport`), so chunks stream around everyone.
-`GameServerTests` (loopback) and `ServerWorldTests` lock the frame, spawn, LOD-queue, apply,
+`GameServerTests` (loopback) and `ServerWorldTests` lock the frame, spawn, LOD-queue,
 hosted-player, per-player inventory (independent inventories, refused equips corrected, creative
-gating, crafting spends only the crafter's) and nearest-player pickup rules down, with
-`InventoryIntentTests`, `ServerPlayerTests` and `DropPickupTests` for the codec, the rules, the
-per-player files and the pickup.
+gating and its status report, crafting spends only the crafter's), nearest-player pickup and
+intent rules down (a tool-less break refused and corrected, a break faster than its hits refused,
+an unowned placement refused, a placement spending exactly one under the placement rules, a
+forged overwrite refused, the server-computed state byte, a blast one player primed reaching
+another client, mined loot landing with the breaker only, an intent from a far eye or a replayed
+id refused, no placement into another connected player's body), with `InventoryIntentTests`,
+`ServerPlayerTests`, `DropPickupTests`, `WorldIntentRuleTests` (codec, `BreakProgress`, edit rate,
+visible face), `ClientPredictionTests` and `StationNetCodecTests` for the GL-free rules.
 
 **The client** (`OpenGLTest/src/Networking/NetworkClient.cs`) connects on a background thread from
 `Program.BeginConnect` (the CONNECT click records `PendingWork.Connect` and presents the
@@ -1612,18 +1681,37 @@ each touched chunk once with the light-radius `Chunk.RemeshAfterBatchEdit` (so a
 roof edit relights the edge and corner chunks) and registers an arriving quern
 (`QuernManager.Ensure`). `ChunkManager.ApplyStreamedChunk` does not queue streamed chunks on the
 worldgen water-wake queue, and a client world disables `FluidManager` and `LeafDecayManager`
-scheduling (`Enabled = false`), since it never ticks either. Every player-driven edit raises
-`World.BlockEdited` with the cell's final id and state — mining (`RemoveBlock`, plus the seven
-cells a multiblock revert gives back), placement, the bucket's `ScoopFluidCell`/`PourFluidCell`,
-the stack writers `SetPileCount`/`SetPileComposition`, all eight cells of a
-`TryConvertMultiblock` and `RemoveCellForPrime` — and the client forwards it as a `BlockEdit`. A
-client fells nothing, topples nothing and primes no TNT itself (`RemoveBlock`,
-`TryPlaceBlockFromRaycast`, `IItemUseWorld.AfterPlaced`, `SpawnPrimedTnt` and the apply path are
-guarded by `_clientMode`): the edited cell is sent and the server's broadcast carries every
-consequence, while the purely cosmetic leaf particles and mining debris tick in
+scheduling (`Enabled = false`), since it never ticks either. **The client predicts, then the
+server answers.** Every action runs locally first as a prediction and raises
+`World.IntentRaised` (`Program.SendWorldIntent`): mining raises `BreakStart` when it starts a
+target (or the held item changes) and `BreakComplete` when its own hits reach the hardness (a
+creative client breaks once per `ClientCreativeBreakSeconds` rather than per frame, to stay
+inside the edit rate); a claimed right-click raises `Place` (the hit cell and face its placement
+used, `World._lastPlaceHit`) or `Use`; a released throw raises `Throw`; a landed punch or slice
+raises `Attack`. Intents carry `Camera.Position` and the head ray the camera aimed along
+(`Camera.LastAimDirection`), so the server's first-person ray lands on the same cell. Every cell
+the prediction changed is reported first through `World.BlockEdited` — mining (`RemoveBlock`, plus
+the seven cells a multiblock revert gives back), placement, the bucket's
+`ScoopFluidCell`/`PourFluidCell`, the stack writers `SetPileCount`/`SetPileComposition`, all eight
+cells of a `TryConvertMultiblock` and `RemoveCellForPrime` — and staged in `ClientPrediction`,
+which tags them (and, for place/use/throw and every inventory intent, the inventory) with the
+intent's sequence id. A server cell value for a predicted cell — a `BlockChanges` broadcast, or a
+`BlockCorrection` answering an older intent — is held back until that prediction's
+`IntentResult`, then applied (the newest one per cell); a correction answering the newest
+prediction applies at once; and an `InventoryState` older than the newest inventory-predicting
+intent is dropped, since the answer to that intent follows and includes it. A client fells
+nothing, topples nothing, primes no TNT, rolls no loot, lets no station hand anything back and
+damages no mob itself (`RemoveBlock`, `TryPlaceBlockFromRaycast`, `IItemUseWorld.AfterPlaced`,
+`SpawnPrimedTnt`, `UpdatePunch`, `UpdateSlice` and `UpdateThrown` are guarded by `_clientMode`):
+the server's broadcasts carry every consequence, its mobs' health arrives in `EntityList`, mined
+loot arrives as drops it picks up into the player's server inventory, and a throw flies locally
+only as a cosmetic copy. The purely cosmetic leaf particles and mining debris, the player model,
+the station mirrors' quern animation and fire particles, and the cosmetic throws tick in
 `World.UpdateClient` so nothing hangs in mid-air. `UpdateNetwork` sends `PlayerState` every
 `NetPlayerStateSeconds`; chat feeds `ChatView`, `TimeSync` calls `World.SetLightingTime`,
-`PlayerList` reconciles `World.SyncRemotePlayers`, and `InventoryState` is imported as the truth.
+`PlayerList` reconciles `World.SyncRemotePlayers`, `StationState` replaces the station mirrors
+(`World.ApplyNetworkStations`), `PlayerStatus` sets the camera's modes, and `InventoryState` is
+imported as the truth when it is current.
 Inventory edits are predicted then sent (`Program.SendInventoryIntent`): the hotbar keys and `Q`
 are intents only, while the wheel (`Program.MirrorSelection`), a middle-click pick
 (`World.TryPickTargetedBlock(inventory, out id)` -> `PickBlock`), an [E]-panel hotbar equip, a
@@ -1646,24 +1734,24 @@ camera exactly like a focused inventory field, and the log sits bottom-left abov
 SendChat` echoes locally; in multiplayer it sends `ChatSend` and the server's broadcast is the
 only copy, so a line never appears twice.
 
-**Known gaps** (open): the client's mining, placement, item use, stations and charged throws
-still spend or credit its own mirror with no intent (mining loot, placement cost, tool wear and
-station consumption are not yet server-rolled), so the next inventory snapshot reverts their
-inventory side while their cell edits still go through as raw `BlockEdit`s; an intent answered
-while a later local change is still in flight briefly snaps the mirror back (no sequence ids yet);
-the server's creative flag follows the client's request whenever `AllowCreative` is on (there is
-no per-player permission, and the client is never told its request was refused); players are
-keyed by name with no authentication, so whoever joins first under a name gets that name's
-inventory; projectiles, primed TNT, falling blocks and toppling trees are not in `EntityList` (their cells
-still sync via `BlockChanges`, and a client now never fakes them locally, so a fall or a blast
-shows as cells changing rather than as a moving entity); igniting TNT on a client only removes the
-block on the server, because a `BlockEdit` cannot tell a prime from a mine and the server does not
-prime on a removal; chunks stream around the **centroid** of the connected players, so players
-more than a load radius (`ChunkRadius` chunks) apart are each outside the loaded sphere and get no
-terrain streamed (their edits there are refused and corrected, since the chunks are not loaded);
-every player is named "Player", because `ChatView.LocalName` is never set from a setting; there
-is no authentication or encryption; and a client's local `BlockEdited` is only wired while
-connected (null in singleplayer and on the server, so server-applied changes never echo).
+**Known gaps** (open): player status is still the client's — health, fall and lava damage,
+respawn and mob damage to players run nowhere on the server, and mobs still target the server
+camera (the centroid) rather than real players; movement is only speed-clamped (no collision or
+noclip check); the server's creative flag follows the client's request whenever `AllowCreative`
+is on (there is no per-player permission); players are keyed by name with no authentication, so
+whoever joins first under a name gets that name's inventory; a slice's return-swing flag and a
+throw's charge are taken from the client (both are paced, neither verified); a third-person
+placement may land on a face other than the one the client predicted (any face of the hit cell
+turned toward the eye is accepted) and is then corrected; a correction covers the 3x3x3 cells
+around the named cell, so a prediction outside it waits for the journal; projectiles, primed TNT,
+falling blocks and toppling trees are not in `EntityList` (their cells still sync via
+`BlockChanges`, and a client never fakes them locally, so a fall or a blast shows as cells
+changing rather than as a moving entity; a client's own throw is drawn as a cosmetic copy only);
+station mirrors update at the entity cadence (10 Hz); chunks stream around the **centroid** of
+the connected players, so players more than a load radius (`ChunkRadius` chunks) apart are each
+outside the loaded sphere and get no terrain streamed (their intents there are refused and
+corrected, since the chunks are not loaded); every player is named "Player", because
+`ChatView.LocalName` is never set from a setting; and there is no authentication or encryption.
 
 ## Biomes
 

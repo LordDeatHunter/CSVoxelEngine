@@ -55,6 +55,10 @@ public static class Program
     private static readonly List<RemotePlayerSnapshot> remoteScratch = new();
     private static readonly List<NetEntity> netEntitiesScratch = new();
     private static readonly List<NetCellChange> netCellsScratch = new();
+    // The server values a message lets through to the world (the rest wait behind a prediction)
+    private static readonly List<NetCellChange> netApplyScratch = new();
+    // What this client predicted and the server has not answered yet; one per connection
+    private static ClientPrediction prediction = new();
     private static double netStateTimer;
     private static double netKeepAliveTimer;
     private static bool debugEnabled;
@@ -393,6 +397,7 @@ public static class Program
     private static void BeginConnect()
     {
         netClient?.Dispose();
+        prediction = new ClientPrediction();
         netClient = new NetworkClient(pendingConnect.Address, chatView.LocalName,
             WorldGenerationConfig.NetConnectTimeoutSeconds);
         var client = netClient;
@@ -455,7 +460,10 @@ public static class Program
                 windowManager.Window, inputManager.InputContext, sfx, null,
                 serverMode: false, clientMode: true);
             world.Player.Rig = renderManager.PlayerRig;
-            world.BlockEdited = SendBlockEdit;
+            // Every action is predicted locally and sent as an intent; the cells it changed are
+            // tagged with that intent, so the server's answer to it is told from older messages
+            world.BlockEdited = StagePredictedCell;
+            world.IntentRaised = SendWorldIntent;
             renderManager.LightSource = world.GetChunkManager();
             var fb = windowManager.Window.FramebufferSize;
             if (fb.Y > 0)
@@ -576,14 +584,40 @@ public static class Program
                 w.SyncRemotePlayers(remoteScratch, netPlayerId);
                 break;
             }
-            case NetMessage.BlockChange:
+            case NetMessage.BlockCorrection:
             {
-                var x = reader.ReadInt();
-                var y = reader.ReadInt();
-                var z = reader.ReadInt();
-                var blockId = reader.ReadByte();
-                var state = reader.ReadByte();
-                w.ApplyNetworkBlockEdit(x, y, z, blockId, state);
+                // The server's state of the cells around an intent's target, after judging it: it
+                // overrides the prediction that intent made, but never a newer one
+                var seq = reader.ReadInt();
+                ReadCellChanges(reader);
+                netApplyScratch.Clear();
+                foreach (var change in netCellsScratch)
+                    if (prediction.Offer(change, seq))
+                        netApplyScratch.Add(change);
+                w.ApplyNetworkBlockChanges(netApplyScratch);
+                break;
+            }
+            case NetMessage.IntentResult:
+            {
+                // The intent is settled either way: what was held back behind its prediction (the
+                // newest value the server sent for those cells) lands now
+                var seq = reader.ReadInt();
+                var accepted = reader.ReadBool();
+                netApplyScratch.Clear();
+                prediction.Resolve(seq, netApplyScratch);
+                w.ApplyNetworkBlockChanges(netApplyScratch);
+                if (!accepted && debugEnabled)
+                    Log.WriteLine($"Multiplayer: the server refused intent #{seq}");
+                break;
+            }
+            case NetMessage.StationState:
+                w.ApplyNetworkStations(reader);
+                break;
+            case NetMessage.PlayerStatus:
+            {
+                // The server refused a creative or flight request: take the modes it granted
+                var flags = (NetPlayerFlags)reader.ReadByte();
+                w.Camera.SetModes(flags.HasFlag(NetPlayerFlags.Creative), flags.HasFlag(NetPlayerFlags.Flying));
                 break;
             }
             case NetMessage.ChunkData:
@@ -630,25 +664,46 @@ public static class Program
             }
             case NetMessage.BlockChanges:
             {
-                var count = reader.ReadInt();
-                netCellsScratch.Clear();
-                for (var i = 0; i < count; i++)
-                {
-                    var x = reader.ReadInt();
-                    var y = reader.ReadInt();
-                    var z = reader.ReadInt();
-                    var blockId = reader.ReadByte();
-                    var state = reader.ReadByte();
-                    netCellsScratch.Add(new NetCellChange(x, y, z, blockId, state));
-                }
-                w.ApplyNetworkBlockChanges(netCellsScratch);
+                // The server's own writes (anyone's edits, blasts, flow, decay); a cell this client
+                // predicted waits until the server has answered that prediction
+                ReadCellChanges(reader);
+                netApplyScratch.Clear();
+                foreach (var change in netCellsScratch)
+                    if (prediction.Offer(change, null))
+                        netApplyScratch.Add(change);
+                w.ApplyNetworkBlockChanges(netApplyScratch);
                 break;
             }
             case NetMessage.InventoryState:
-                w.Inventory.Import(InventoryNetCodec.Decode(reader.ReadBytes()));
+            {
+                // A snapshot answering an older intent than the newest one that changed the
+                // inventory here would undo that change for a moment: the newer answer follows
+                var seq = reader.ReadInt();
+                var data = reader.ReadBytes();
+                if (prediction.AcceptsInventory(seq))
+                    w.Inventory.Import(InventoryNetCodec.Decode(data));
                 break;
+            }
             default:
                 break;
+        }
+    }
+
+    /// <summary>Reads a count-prefixed batch of cell changes into <c>netCellsScratch</c>.</summary>
+    private static void ReadCellChanges(PacketReader reader)
+    {
+        var count = reader.ReadInt();
+        if (count < 0)
+            throw new System.IO.InvalidDataException($"cell batch of {count}");
+        netCellsScratch.Clear();
+        for (var i = 0; i < count; i++)
+        {
+            var x = reader.ReadInt();
+            var y = reader.ReadInt();
+            var z = reader.ReadInt();
+            var blockId = reader.ReadByte();
+            var state = reader.ReadByte();
+            netCellsScratch.Add(new NetCellChange(x, y, z, blockId, state));
         }
     }
 
@@ -719,22 +774,29 @@ public static class Program
         if (netClient is not { Status: NetworkStatus.Handshaken } client)
             return false;
         using var writer = new PacketWriter(NetMessage.InventoryRequest);
+        // Every inventory intent may change the inventory here, so snapshots answering an older
+        // intent are dropped until this one's answer arrives
+        writer.Write(prediction.Commit(predictsInventory: true));
         InventoryIntentCodec.Write(writer, intent);
         client.Send(writer.ToArray());
         return true;
     }
 
-    /// <summary>Forwards one local block change to the server while connected.</summary>
-    private static void SendBlockEdit(int x, int y, int z, byte blockId, byte state)
+    /// <summary>A cell the world just changed as part of a predicted action (World.BlockEdited).</summary>
+    private static void StagePredictedCell(int x, int y, int z, byte blockId, byte state) =>
+        prediction.Stage(x, y, z);
+
+    /// <summary>
+    /// Sends one world intent (World.IntentRaised) with the next sequence id, which also tags the
+    /// cells the action predicted and, for an intent whose prediction spends or credits items, the
+    /// inventory. Dropped (the prediction is rubberbanded by nothing) when not connected.
+    /// </summary>
+    private static void SendWorldIntent(WorldIntent intent)
     {
         if (netClient is not { Status: NetworkStatus.Handshaken } client)
             return;
-        using var writer = new PacketWriter(NetMessage.BlockEdit);
-        writer.Write(x);
-        writer.Write(y);
-        writer.Write(z);
-        writer.Write(blockId);
-        writer.Write(state);
+        using var writer = new PacketWriter(NetMessage.WorldIntent);
+        WorldIntentCodec.Write(writer, prediction.Commit(intent.PredictsInventory), intent);
         client.Send(writer.ToArray());
     }
 
@@ -762,10 +824,12 @@ public static class Program
         netPlayerId = -1;
         netStateTimer = 0;
         netKeepAliveTimer = 0;
+        prediction = new ClientPrediction();
         if (world != null)
         {
             world.ClearRemotePlayers();
             world.BlockEdited = null;
+            world.IntentRaised = null;
         }
     }
 

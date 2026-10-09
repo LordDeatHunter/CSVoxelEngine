@@ -47,6 +47,9 @@ public sealed class CampfireManager
 
     public int LitCount => _lit.Count;
 
+    /// <summary>Whether any campfire burns or cooks (the station broadcast's early-out).</summary>
+    public bool HasAny => _lit.Count > 0 || _cooking.Count > 0;
+
     public IReadOnlyList<Vector3> LitCells => _cells;
 
     public bool IsLit(int x, int y, int z) => _lit.ContainsKey((x, y, z));
@@ -242,5 +245,78 @@ public sealed class CampfireManager
         _cells.Clear();
         foreach (var (x, y, z) in _lit.Keys)
             _cells.Add(new Vector3(x, y, z));
+    }
+
+    /// <summary>Writes every lit pile (with its burn timer) and every cooking slot, for the
+    /// station broadcast (<see cref="StationNetCodec"/>).</summary>
+    internal void WriteNet(PacketWriter writer)
+    {
+        // At most what a client accepts (StationNetCodec.MaxEntries)
+        var leftLit = Math.Min(_lit.Count, StationNetCodec.MaxEntries);
+        writer.Write(leftLit);
+        foreach (var ((x, y, z), left) in _lit)
+        {
+            if (leftLit-- == 0) break;
+            StationNetCodec.WriteCell(writer, x, y, z);
+            writer.Write(left);
+        }
+
+        // At most what a client accepts (StationNetCodec.MaxEntries)
+        var leftCooking = Math.Min(_cooking.Count, StationNetCodec.MaxEntries);
+        writer.Write(leftCooking);
+        foreach (var ((x, y, z), slots) in _cooking)
+        {
+            if (leftCooking-- == 0) break;
+            StationNetCodec.WriteCell(writer, x, y, z);
+            writer.Write((byte)slots.Count);
+            foreach (var slot in slots)
+            {
+                writer.Write(slot.InputId);
+                writer.Write(slot.OutputId);
+                writer.Write((byte)Math.Clamp(slot.OutputCount, 0, byte.MaxValue));
+                writer.Write(slot.TimeLeft);
+                writer.Write(slot.TotalTime);
+                writer.Write(slot.IsDone);
+            }
+        }
+    }
+
+    /// <summary>Replaces every lit pile and cooking slot with a snapshot written by
+    /// <see cref="WriteNet"/>: a multiplayer client's display-only mirror of the server's fires.</summary>
+    internal void ReadNet(PacketReader reader)
+    {
+        _lit.Clear();
+        _cooking.Clear();
+        var lit = StationNetCodec.ReadCount(reader);
+        for (var i = 0; i < lit; i++)
+        {
+            var key = StationNetCodec.ReadCell(reader);
+            _lit[key] = StationNetCodec.ReadFinite(reader);
+        }
+
+        var cooking = StationNetCodec.ReadCount(reader);
+        for (var i = 0; i < cooking; i++)
+        {
+            var key = StationNetCodec.ReadCell(reader);
+            var count = reader.ReadByte();
+            if (count > MaxCookSlots)
+                throw new System.IO.InvalidDataException($"campfire with {count} cooking slots");
+            var slots = new List<CookSlot>(MaxCookSlots);
+            for (var s = 0; s < count; s++)
+            {
+                slots.Add(new CookSlot
+                {
+                    InputId = reader.ReadByte(),
+                    OutputId = reader.ReadByte(),
+                    OutputCount = reader.ReadByte(),
+                    TimeLeft = StationNetCodec.ReadFinite(reader),
+                    TotalTime = StationNetCodec.ReadFinite(reader),
+                    IsDone = reader.ReadBool(),
+                });
+            }
+            if (slots.Count > 0)
+                _cooking[key] = slots;
+        }
+        RefreshCells();
     }
 }

@@ -154,6 +154,77 @@ public sealed class QuernManager
         }
     }
 
+    /// <summary>
+    /// A multiplayer client's quern frame: spinning tops keep turning between the server's
+    /// snapshots and come to rest after one rotation, but nothing is crushed or dropped - that is
+    /// the server's, and its next snapshot says what the quern holds.
+    /// </summary>
+    public void Animate(float deltaTime)
+    {
+        if (deltaTime <= 0f || _querns.Count == 0) return;
+        foreach (var state in _querns.Values)
+        {
+            if (!state.Spinning) continue;
+            state.Angle += TwoPi * deltaTime / FullRotationSeconds;
+            if (state.Angle < TwoPi) continue;
+            state.Angle %= TwoPi;
+            state.Spinning = false;
+        }
+    }
+
+    /// <summary>Writes every tracked quern (its input, top angle and spin), for the station
+    /// broadcast (<see cref="StationNetCodec"/>).</summary>
+    internal void WriteNet(PacketWriter writer)
+    {
+        // At most what a client accepts (StationNetCodec.MaxEntries)
+        var leftQuerns = Math.Min(_querns.Count, StationNetCodec.MaxEntries);
+        writer.Write(leftQuerns);
+        foreach (var ((x, y, z), state) in _querns)
+        {
+            if (leftQuerns-- == 0) break;
+            StationNetCodec.WriteCell(writer, x, y, z);
+            writer.Write(state.InputId);
+            writer.Write(state.Angle);
+            writer.Write(state.Spinning);
+        }
+    }
+
+    /// <summary>
+    /// Replaces the tracked querns with a snapshot written by <see cref="WriteNet"/>: a client's
+    /// display-only mirror. A top this client is already turning keeps its own angle while the
+    /// server's turns too, so the 10 Hz snapshots never yank a spin backwards by the latency.
+    /// </summary>
+    internal void ReadNet(PacketReader reader)
+    {
+        var count = StationNetCodec.ReadCount(reader);
+        _stale.Clear();
+        _stale.AddRange(_querns.Keys);
+        for (var i = 0; i < count; i++)
+        {
+            var key = StationNetCodec.ReadCell(reader);
+            var inputId = reader.ReadByte();
+            var angle = StationNetCodec.ReadFinite(reader);
+            var spinning = reader.ReadBool();
+            _stale.Remove(key);
+            if (!_querns.TryGetValue(key, out var state))
+            {
+                state = new QuernState();
+                _querns[key] = state;
+            }
+            else if (state.Spinning && spinning)
+            {
+                state.InputId = inputId;
+                continue;
+            }
+            state.InputId = inputId;
+            state.Angle = angle;
+            state.Spinning = spinning;
+        }
+        foreach (var key in _stale)
+            _querns.Remove(key);
+        _stale.Clear();
+    }
+
     private static void TryCrush((int X, int Y, int Z) key, QuernState state, DropManager drops)
     {
         var recipe = ContentRegistry.CrushRecipeForInput(state.InputId);

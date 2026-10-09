@@ -16,6 +16,9 @@ public interface IItemUseWorld
     /// <summary>Creative mode: uses succeed without spending stacks.</summary>
     bool IsCreative { get; }
 
+    /// <summary>A uniform roll in 0..1 for a use's success chance (a firestarter's spark).</summary>
+    float NextUseRoll();
+
     /// <summary>Aims at a fluid surface (sources only, so a bucket never scoops a skirt).</summary>
     bool RaycastFluidSource(float maxDistance, out Vector3 hit);
 

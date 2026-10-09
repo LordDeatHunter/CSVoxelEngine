@@ -18,8 +18,16 @@ public enum NetMessage : byte
     PlayerList = 21,
     PlayerJoined = 22,
     PlayerLeft = 23,
+    /// <summary>Server to one client: the creative and flight modes the server actually granted
+    /// (a <see cref="NetPlayerFlags"/> byte), sent when the client's request was refused.</summary>
+    PlayerStatus = 24,
+    /// <summary>Retired in protocol 3: a raw client-authored cell write. A server refuses it and
+    /// answers with the cell's authoritative state; clients send <see cref="WorldIntent"/>s.</summary>
     BlockEdit = 30,
-    BlockChange = 31,
+    /// <summary>Server to one client: the sequence id of the intent it answers, then the
+    /// authoritative state of the cells around that intent's target (a batch of
+    /// <see cref="NetCellChange"/>).</summary>
+    BlockCorrection = 31,
     TimeSync = 40,
     ChunkRequest = 50,
     ChunkData = 51,
@@ -29,8 +37,20 @@ public enum NetMessage : byte
     LodRegionData = 55,
     BlockChanges = 56,
     EntityList = 60,
+    /// <summary>Server broadcast: the campfire, quern, kiln and cast-mold block entities the clients
+    /// draw (<see cref="StationNetCodec"/>).</summary>
+    StationState = 61,
+    /// <summary>Server to one client: the sequence id of the last intent applied, then that
+    /// player's whole inventory.</summary>
     InventoryState = 70,
+    /// <summary>Client to server: a sequence id and an <see cref="InventoryIntent"/>.</summary>
     InventoryRequest = 71,
+    /// <summary>Client to server: a <see cref="silkgltriangle.WorldIntent"/> (break, place, use,
+    /// throw, attack) with its sequence id (<see cref="WorldIntentCodec"/>).</summary>
+    WorldIntent = 80,
+    /// <summary>Server to one client: the sequence id of an intent and whether it was accepted.
+    /// Every intent gets exactly one, in order, after its correction and inventory snapshot.</summary>
+    IntentResult = 81,
 }
 
 /// <summary>
@@ -58,8 +78,11 @@ public enum NetInventoryAction : byte
 public static class NetFraming
 {
     /// <summary>The protocol version both ends must agree on in their hellos. 2: per-player
-    /// inventories and the extended <see cref="NetInventoryAction"/> intents.</summary>
-    public const int ProtocolVersion = 2;
+    /// inventories and the extended <see cref="NetInventoryAction"/> intents. 3: world intents
+    /// replace raw block edits, every intent carries a sequence id answered by an
+    /// <see cref="NetMessage.IntentResult"/>, corrections and inventory snapshots carry the id they
+    /// answer, and station state and player status are broadcast.</summary>
+    public const int ProtocolVersion = 3;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;
