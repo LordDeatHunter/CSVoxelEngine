@@ -379,46 +379,44 @@ public sealed class PlayerModelTests
     }
 
     [Fact]
-    public void TheBladeTurnsWithTheSliceFromOneSideToTheOtherAndMirrorsForTheReturn()
+    public void TheBladeStaysFlatThroughTheWholeCutAndItsHeadingSweepsWithTheHand()
     {
-        var player = new PlayerModel { HoldingItem = true };
-        for (var i = 0; i < 120; i++)
-            player.Update(1f / 60f, 0f);
+        foreach (var direction in new[] { 1, -1 })
+        {
+            var player = new PlayerModel { HoldingItem = true };
+            for (var i = 0; i < 120; i++)
+                player.Update(1f / 60f, 0f);
+            var eye = new Vector3(0.5f, 70f, 0.5f);
+            // The blade's tip axis in the world (the body faces -Z, +X is its right).
+            Vector3 Tip() => Vector3.TransformNormal(Vector3.UnitY, player.GetHandAnchorMatrix(eye, -90f));
 
-        var eye = new Vector3(0.5f, 70f, 0.5f);
+            player.StartSlice(direction);
+            var flatWorst = 0f;
+            var samples = new System.Collections.Generic.List<Vector3>();
+            for (var i = 0; i < 42; i++)
+            {
+                player.Update(PlayerModel.SliceDuration / 42f, 0f);
+                var progress = player.SliceProgress;
+                var tip = Tip();
+                // From the end of the wind-up to the end of the strike the blade lies flat: it is never turned up
+                // in the middle of the cut (which read as slapping).
+                if (progress >= 0.26f && progress <= 0.49f)
+                {
+                    flatWorst = MathF.Max(flatWorst, MathF.Abs(tip.Y));
+                    samples.Add(tip);
+                }
+            }
 
-        // The blade's up axis measured on the body's right axis: 0 upright at rest, out to the right
-        // (positive) or the left (negative) as the wrist lays it flat.
-        float BladeOutward() =>
-            Vector3.TransformNormal(Vector3.UnitY, player.GetHandAnchorMatrix(eye, -90f)).X;
+            Assert.True(flatWorst < 0.35f, $"direction {direction}: the blade tipped {flatWorst} out of flat mid-cut.");
 
-        player.StartSlice(1);
-        var rest = BladeOutward();
-        player.Update(PlayerModel.SliceDuration * 0.26f, 0f);
-        var windup = BladeOutward();
-        player.Update(PlayerModel.SliceDuration * PlayerModel.SliceImpactProgress - PlayerModel.SliceDuration * 0.26f, 0f);
-        var middle = BladeOutward();
-        player.Update(PlayerModel.SliceDuration * 0.49f - PlayerModel.SliceDuration * PlayerModel.SliceImpactProgress, 0f);
-        var strikeEnd = BladeOutward();
-
-        // Right-to-left: it starts the cut facing right, passes upright, and ends facing left, but only
-        // part of the way: laid flat across the chest it would read as a slap, not a slice.
-        Assert.True(rest < 0.3f);
-        Assert.True(windup > 0.7f);
-        Assert.True(MathF.Abs(middle) < windup * 0.6f);
-        Assert.InRange(strikeEnd, -0.8f, -0.35f);
-
-        for (var i = 0; i < 60; i++)
-            player.Update(1f / 60f, 0f);
-
-        // The return mirrors it: starts facing left and ends facing right.
-        player.StartSlice(-1);
-        player.Update(PlayerModel.SliceDuration * 0.26f, 0f);
-        var returnWindup = BladeOutward();
-        player.Update(PlayerModel.SliceDuration * 0.23f, 0f);
-        var returnEnd = BladeOutward();
-        Assert.True(returnWindup < -0.7f);
-        Assert.True(returnEnd > 0.7f);
+            // Its heading sweeps round with the hand: out to the wind-up side, across the front, to the far side.
+            var first = samples[0];
+            var middle = samples[samples.Count / 2];
+            var last = samples[^1];
+            Assert.True(first.X * direction > 0.5f, $"direction {direction}: the cut does not start with the tip out to the wind-up side ({first}).");
+            Assert.True(middle.Z < -0.5f, $"direction {direction}: the tip is not forward mid-cut ({middle}).");
+            Assert.True(last.X * direction < -0.4f, $"direction {direction}: the cut does not end with the tip out to the far side ({last}).");
+        }
     }
 
     [Fact]
@@ -464,9 +462,9 @@ public sealed class PlayerModelTests
         player.Update(PlayerModel.SliceDuration * PlayerModel.SliceImpactProgress, 0f);
         var strike = ShoulderToTorso();
 
-        // The hand is lowered by re-posing the arm, so the shoulder joint itself never detaches
-        // from the torso.
-        Assert.Equal(rest, strike, 4);
+        // The hand is lowered by re-posing the arm, so the shoulder joint itself never detaches from the
+        // torso; it only slides in a little toward the body as the arm lifts (the shoulder socket, 0.09).
+        Assert.InRange(MathF.Abs(rest - strike), 0f, 0.1f);
     }
 
     // World positions with the body at the origin facing -Z (the default look), +X its right.

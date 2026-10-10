@@ -503,7 +503,9 @@ public sealed class PlayerModelJuiceTests
                     System.Numerics.Vector3.Transform(
                         model.GetPartMatrix(part, eye, -90f, lookPitch).Translation, toTorso);
 
-                foreach (var (part, bound) in new[] { ("UpperArmL", 0.085f), ("UpperArmR", 0.085f), ("Head", 0.005f) })
+                // The arms may also slide in toward the torso as they lift (the shoulder socket, 0.09), so the bound is the pull
+                // plus the socket; the neck has neither.
+                foreach (var (part, bound) in new[] { ("UpperArmL", 0.18f), ("UpperArmR", 0.18f), ("Head", 0.005f) })
                 {
                     var rest = model.Rig.Parts[part].Pivot - hip;
                     var offset = System.Numerics.Vector3.Distance(Local(part), rest);

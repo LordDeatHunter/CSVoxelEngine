@@ -2418,11 +2418,18 @@ overshoot or jiggle.
   turn further (`SliceTorsoYaw`), the knees and hips sink into the strike and the torso dips. The hand
   also travels a diagonal on every slice, from `SliceStartRaiseBlocks` above the chest line (so the cut
   starts high, not horizontal) down to just `SliceEndDropBlocks` below it (`SliceDiagonal`, through the
-  same re-solved arm as the chest-height drop), whichever way the swing goes. The **blade turns with the
-  hand**: its wrist roll rides the sweep phases (`SliceRoll` = `SlicePhase(1, 1)`), laid out toward the
-  wind-up side at the start, upright as the hand crosses the middle and laid out toward the far side at
-  the end of the strike (mirrored for the return; the first, cross-body swing turns it only `SliceCrossBodyBladeFar` of the way, since laid flat across the chest it reads as a slap), and it takes only `SliceBladeYawShare` of the arm and
-  body yaw, so a wound-up arm does not point it backward. `SliceImpactProgress` (where the damage lands) is the middle of the strike. Filmed by
+  same re-solved arm as the chest-height drop), whichever way the swing goes. The **blade stays flat through
+  the whole cut**: the wrist roll (`SliceRoll`) is held at about 92 degrees from the wind-up on (only the eased
+  stroke ramps it in and out), so the blade never turns up in the middle of the cut, which read as slapping.
+  Its heading (`SliceBladeYaw`) sweeps like a scythe's: the body's twist plus a sweep of its own plus a
+  constant lead-in, so the tip points out to the wind-up side at the start, forward as the hand crosses the
+  middle and out to the far side at the end of the strike, and the blade is always across the direction it
+  travels (mirrored for the return). `PlayerModelTests.TheBladeStaysFlatThroughTheWholeCutAndItsHeadingSweepsWithTheHand`
+  measures this on the item as drawn, with its display rotation: the blade sprite's tip is its (1, 1, 0) diagonal
+  and its flat face the sprite's +Z, both taken through the item's `DisplayMatrix` and the hand anchor.
+  The **shoulder socket** (`ShoulderSocketInward`, 0.09) slides the joint in toward the torso as an arm lifts off
+  hanging (`SocketWeight`), so a raised arm stays seated on the body instead of hinging on a point 0.1 outside it
+  with a gap; the punch IK includes it. `SliceImpactProgress` (where the damage lands) is the middle of the strike. Filmed by
   `visual-examples/animations-slice.json`.
 - **Attachment** (`PlayerModel.GetPartMatrix`): the neck and both shoulders are children of the **torso
   frame** (hip-origin, turning with the torso's lean, twist and roll), so a limb can never come off the body

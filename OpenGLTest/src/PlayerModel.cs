@@ -148,10 +148,16 @@ public class PlayerModel
     private const float SliceLegCounter = 0.6f;
     private const float SliceStartRaiseBlocks = 0.28f;
     private const float SliceEndDropBlocks = 0.10f;
-    // The blade turns with the wrist roll, not with the whole arm sweep: it takes only this share of the
-    // body and arm yaw, or a wound-up arm would point the blade backward instead of out to the side.
-    private const float SliceBladeYawShare = 0.25f;
-    private const float SliceCrossBodyBladeFar = 0.45f;
+    // The blade lies flat for the whole cut (SliceRoll holds it horizontal) and its heading sweeps with the
+    // hand, like a scythe: the tip points out to the right and slightly back at the wind-up, forward as the
+    // hand crosses the middle and out to the left at the end of the strike (mirrored for the return), so the
+    // blade is always across the direction it travels and never turns up. The heading is the body's turn plus a
+    // sweep of its own through the same phases plus a constant lead-in that swings the tip from out-to-the-side
+    // round to forward (SliceBladeBaseYaw): at the wind-up about -0.3 rad, mid-strike about +1.1, at the end
+    // about +2.4, measured from the tip pointing out to the side.
+    private const float SliceBladeWindupYaw = 0.9f;
+    private const float SliceBladeFarYaw = 1.05f;
+    private const float SliceBladeBaseYaw = 1.0f;
     private const float SliceBodyWindup = 1.0f;
     private const float SliceBodyFar = 0.85f;
 
@@ -224,6 +230,11 @@ public class PlayerModel
     private readonly Spring[] _pullR = [new(5f, 0.7f), new(5f, 0.7f), new(5f, 0.7f)];
     private readonly Spring[] _pullL = [new(5f, 0.7f), new(5f, 0.7f), new(5f, 0.7f)];
     private const float MaxShoulderPull = 0.08f;
+    // The shoulder joint sits on the torso's side face (the arm's pivot is ShoulderX - the torso's half width = 0.1
+    // outside it, so a hanging arm is flush). Swing the arm up and across and it would hinge on that outer point with a
+    // gap opening against the body, so the joint slides in toward the torso as the arm lifts off hanging
+    // (SocketInward at about 70 degrees), keeping the top of the arm seated on the body.
+    private const float ShoulderSocketInward = 0.09f;
     /// <summary>The farthest a shoulder is ever pulled off its rest place on the torso, in blocks.</summary>
     public const float MaxShoulderPullBlocks = MaxShoulderPull;
     private float _crouchBlend;
@@ -566,17 +577,19 @@ public class PlayerModel
         return (MathF.Atan2((b * y - a * z) / det, -(a * y + b * z) / det), elbow);
     }
 
-    // Wrist twist: the blade lies flat and turns with the hand. It starts the cut laid out toward the
-    // side the swing winds up on, stands upright as the hand crosses the middle and ends laid out
-    // toward the far side, so its tip follows the direction of the slice instead of staying pointed
-    // the same way throughout. It rides the same phases as the sweep (SlicePhase), which is 0 at both
-    // ends, so the blade is upright at rest and never jumps. The sign is because the body's -Z roll
-    // tips +Y toward -X: the sweep is negative on the wind-up side, which lays the blade out there.
-    // Applied in model space, before the body yaw, so the roll stays fixed to the body.
-    // The cut across the body (right to left, the first swing) lets the blade turn only part of the way
-    // at its end: laid flat to the left while the hand crosses the chest it reads as a slap with the
-    // flat of the blade, where the same turn on the outward cut (left to right) reads as a slice.
-    private float SliceRoll() => SliceRollRadians * SlicePhase(1f, _sliceDir > 0 ? SliceCrossBodyBladeFar : 1f);
+    // Wrist twist: the blade lies flat (a touch past horizontal) for the whole cut, laid out toward the side
+    // the swing winds up on, and stays that way. It is the same value through the wind-up, the strike and the
+    // recovery's start, so it never passes through upright mid-cut (which read as slapping upward); only the
+    // eased stroke ramps it in and out, so it is upright at rest and never jumps. The sign is because the
+    // body's -Z roll tips +Y toward -X: a right-to-left swing winds up on the right, laying the blade out to
+    // the right, and the return mirrors it. Applied in model space, before the body yaw.
+    private float SliceRoll() => -SliceRollRadians * _sliceDir * SliceStroke();
+
+    // The blade's heading about the vertical, in the same body frame as the arm's own yaw: the body's twist plus the
+    // blade's sweep (see SliceBladeWindupYaw).
+    private float SliceBladeYaw() =>
+        ComputeMods().RootYaw + SlicePhase(SliceBladeWindupYaw, SliceBladeFarYaw)
+        + SliceBladeBaseYaw * _sliceDir * SliceStroke();
 
     /// <summary>Joint angles in radians plus the vertical bob, for this frame.</summary>
     public readonly struct Pose
@@ -713,6 +726,14 @@ public class PlayerModel
             MathUtils.Lerp(pose.LeftKnee, knee, s), MathUtils.Lerp(pose.RightKnee, knee, s),
             pose.LeftShoulder, pose.RightShoulder, pose.LeftElbow, pose.RightElbow,
             MathUtils.Lerp(pose.TorsoPitch, 0f, s), MathUtils.Lerp(pose.Bob, bob, s));
+    }
+
+    // How far an arm has lifted off hanging, 0..1 (smooth over about 0.15 to 1.2 radians), from its upper-arm frame.
+    private static float SocketWeight(Quaternion upper)
+    {
+        var axis = Vector3.Transform(new Vector3(0f, -1f, 0f), upper);
+        var lift = MathF.Acos(Math.Clamp(-axis.Y, -1f, 1f));
+        return MathUtils.SmoothStep(0.15f, 1.2f, lift);
     }
 
     // ---- Shoulder pull -------------------------------------------------------------------
@@ -1014,7 +1035,10 @@ public class PlayerModel
         var cos = MathF.Cos(pitchRad);
         var sin = MathF.Sin(pitchRad);
         var hip = Rig.Parts.TryGetValue("Torso", out var torso) ? torso.Pivot : new Vector3(0f, HipY, 0f);
-        var shoulderNow = Vector3.Transform(new Vector3(ShoulderX, ShoulderY, 0f) - hip, TorsoRotation(torsoPitch)) + hip;
+        // The shoulder is slid in toward the body while the arm is lifted for the punch (the socket).
+        var punchWeights = PunchWeights(_mineT);
+        var socket = ShoulderSocketInward * punchWeights.Retract * (1f - punchWeights.Recover);
+        var shoulderNow = Vector3.Transform(new Vector3(ShoulderX - socket, ShoulderY, 0f) - hip, TorsoRotation(torsoPitch)) + hip;
         var target = new Vector3(
             viewFist.X,
             Camera.EyeHeight + viewFist.Y * cos + viewFist.Z * sin,
@@ -1171,10 +1195,12 @@ public class PlayerModel
                 upper = FrameOf(Matrix4x4.CreateFromQuaternion(upper) * Matrix4x4.CreateRotationY(-mods.TorsoYaw * authored));
         }
 
-        // A shoulder sits where it rests on the torso plus its pull toward the reaching arm, in the torso frame.
+        // A shoulder sits where it rests on the torso, slid in toward the body as the arm lifts (the socket), plus its
+        // pull toward the reaching arm, in the torso frame.
         Matrix4x4 UpperArm(Vector3 pivot, Quaternion upper) =>
             Matrix4x4.CreateFromQuaternion(upper)
-            * Matrix4x4.CreateTranslation(pivot - Pivot("Torso") + ShoulderPull(pivot.X > 0f)) * torsoFrame;
+            * Matrix4x4.CreateTranslation(pivot - Pivot("Torso") + ShoulderPull(pivot.X > 0f)
+                + new Vector3(pivot.X > 0f ? -1f : 1f, 0f, 0f) * ShoulderSocketInward * SocketWeight(upper)) * torsoFrame;
 
         // The legs turn back against the body's twist so the feet stay planted.
         Matrix4x4 Thigh(Vector3 pivot, float hip) =>
@@ -1269,7 +1295,7 @@ public class PlayerModel
         var punch = PunchActivity();
         return Matrix4x4.CreateRotationZ(SliceRoll())
             * Matrix4x4.CreateRotationX(pitchRad * punch)
-            * Matrix4x4.CreateRotationY(yawRad + SliceBladeYawShare * (ComputeMods().RootYaw + SliceSweep()) + PunchArmYaw(pitchRad, GetPose(pitchDeg).TorsoPitch) + _swayYaw.Value)
+            * Matrix4x4.CreateRotationY(yawRad + SliceBladeYaw() + PunchArmYaw(pitchRad, GetPose(pitchDeg).TorsoPitch) + _swayYaw.Value)
             * Matrix4x4.CreateTranslation(fist);
     }
 
