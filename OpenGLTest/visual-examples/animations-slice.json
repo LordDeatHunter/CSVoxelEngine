@@ -1,0 +1,46 @@
+{
+  // The obsidian blade's slice from the shoulder camera: run with
+  // VOXEL_SCRIPT=visual-examples/animations-slice.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/animations-slice/. A slice lasts 0.7 s: the wind-up ends at ~0.18 s, the
+  // strike is centred on the impact at ~0.26 s and ends at ~0.34 s, the rest is the recovery. Each
+  // shot lands a frame or two after its wait, so they are approximate. The second slice is the
+  // buffered return swing (right-to-left, then left-to-right).
+  "steps": [
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "give", "block": "item/obsidian_blade", "count": 1 },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "ready" },
+    { "op": "player", "action": "slice" },
+    { "op": "wait", "seconds": 0.03 },
+    { "op": "screenshot", "name": "f00", "hideHud": true },
+    { "op": "wait", "seconds": 0.03 },
+    { "op": "screenshot", "name": "f01", "hideHud": true },
+    { "op": "wait", "seconds": 0.03 },
+    { "op": "screenshot", "name": "f02", "hideHud": true },
+    { "op": "wait", "seconds": 0.03 },
+    { "op": "screenshot", "name": "f03", "hideHud": true },
+    { "op": "wait", "seconds": 0.03 },
+    { "op": "screenshot", "name": "f04", "hideHud": true },
+    { "op": "wait", "seconds": 0.03 },
+    { "op": "screenshot", "name": "f05", "hideHud": true },
+    { "op": "wait", "seconds": 0.03 },
+    { "op": "screenshot", "name": "f06", "hideHud": true },
+    { "op": "wait", "seconds": 0.03 },
+    { "op": "screenshot", "name": "f07", "hideHud": true },
+    { "op": "wait", "seconds": 0.03 },
+    { "op": "screenshot", "name": "f08", "hideHud": true },
+    { "op": "wait", "seconds": 0.03 },
+    { "op": "screenshot", "name": "f09", "hideHud": true },
+    { "op": "wait", "seconds": 0.03 },
+    { "op": "screenshot", "name": "f10", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "view", "mode": "first" },
+    { "op": "player", "action": "slice" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "first-person-windup" },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "first-person-strike" }
+  ]
+}

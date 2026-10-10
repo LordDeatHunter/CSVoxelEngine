@@ -121,8 +121,8 @@ public class PlayerModel
 
     // The wind-up cocks the arm further out than the strike carries it back, so the swing reads
     // as a wide arc; SliceSweepRadians is the follow-through past the aim.
-    private const float SliceWindupRadians = 1.55f;
-    private const float SliceSweepRadians = 1.25f;
+    private const float SliceWindupRadians = 1.0f;
+    private const float SliceSweepRadians = 0.8f;
     private const float SliceLiftRadians = 0.7f;
     private const float SliceRollRadians = 1.6f;
     // The forward lift would carry the hand up to eye height; the hand is solved this many blocks
@@ -131,8 +131,24 @@ public class PlayerModel
     private const float SliceDropBlocks = 0.35f;
     // Wind-up (0..WindupEnd) reaches the start side; the strike (..StrikeEnd) crosses to the far
     // side; the rest is the recovery back to the idle pose.
-    private const float SliceWindupEnd = 0.15f;
-    private const float SliceStrikeEnd = 0.6f;
+    //
+    // The phases are uneven on purpose, with the same total duration: a slower wind-up that coils the
+    // body (to 0.26), a short, sharp strike that is centred on the impact (0.26..0.49, about twice as
+    // fast as before) and a long, eased recovery, so the contrast reads as a snap.
+    private const float SliceWindupEnd = 0.26f;
+    private const float SliceStrikeEnd = 0.49f;
+
+    // The slice is a whole-body motion: the arm sweep is only part of it. The entire body turns about
+    // the feet (SliceBodyYaw, the legs counter-turning so the feet stay planted), the shoulders turn
+    // further (SliceTorsoYaw), the weight drops into the strike, and the hand travels a small
+    // diagonal from above the chest line down to below it (SliceDiagonalBlocks) on every slice,
+    // whichever way it swings.
+    private const float SliceBodyYaw = 0.42f;
+    private const float SliceTorsoYaw = 0.5f;
+    private const float SliceLegCounter = 0.6f;
+    private const float SliceDiagonalBlocks = 0.12f;
+    private const float SliceBodyWindup = 1.0f;
+    private const float SliceBodyFar = 0.85f;
 
     // Charged throw (right-click in the air with a throwable). While held, the right arm
     // rises forward-up overhead into a cocked pre-throw with the elbow extending on the
@@ -450,32 +466,61 @@ public class PlayerModel
     // wind-up, across the aim to the far side on the strike, then eased back to 0 on the recovery
     // so the arm never snaps back to its idle pose. The sign follows the swing's direction, so
     // the return mirrors the first swing.
-    private float SliceSweep()
+    private float SliceSweep() => SlicePhase(SliceWindupRadians, SliceSweepRadians);
+
+    // The whole body's turn through the same phases, normalised: about 1 at the wind-up (toward the
+    // swing's start side) and -0.85 at the follow-through, with the sign of the swing's direction.
+    private float SliceBodySweep() => SlicePhase(SliceBodyWindup, SliceBodyFar);
+
+    private float SlicePhase(float windupAmplitude, float farAmplitude)
     {
         var p = MathUtils.Clamp01(_sliceT);
         if (p <= 0f || p >= 1f) return 0f;
 
-        var startSide = -SliceWindupRadians * _sliceDir;
-        var farSide = SliceSweepRadians * _sliceDir;
+        var startSide = -windupAmplitude * _sliceDir;
+        var farSide = farAmplitude * _sliceDir;
         if (p < SliceWindupEnd)
             return MathUtils.Lerp(0f, startSide, MathUtils.SmoothStep(p / SliceWindupEnd));
+        // The strike accelerates hard through the middle (a steeper curve than the other phases).
         if (p < SliceStrikeEnd)
             return MathUtils.Lerp(startSide, farSide,
-                MathUtils.SmoothStep((p - SliceWindupEnd) / (SliceStrikeEnd - SliceWindupEnd)));
+                MathUtils.EaseInOutCubic((p - SliceWindupEnd) / (SliceStrikeEnd - SliceWindupEnd)));
         return MathUtils.Lerp(farSide, 0f,
             MathUtils.SmoothStep((p - SliceStrikeEnd) / (1f - SliceStrikeEnd)));
     }
 
-    // One-shot 0 -> 1 -> 0 across the swing, peaking at the strike: it drives the arm lift and
-    // the blade roll, and settles both back to the carrying pose by the end. It is 0 at both
-    // ends, so the swing never jumps when it starts or finishes.
-    private float SliceStroke() => MathUtils.Pulse(_sliceT, SliceImpactProgress);
+    // 0 -> 1 across the wind-up, 1 through the strike, back to 0 over the recovery: it drives the arm
+    // lift and the blade roll, which are raised before the strike starts and held through it. It is 0
+    // at both ends, so the swing never jumps when it starts or finishes.
+    private float SliceStroke()
+    {
+        var p = MathUtils.Clamp01(_sliceT);
+        if (p <= 0f || p >= 1f) return 0f;
+        if (p < SliceWindupEnd) return MathUtils.SmoothStep(p / SliceWindupEnd);
+        if (p < SliceStrikeEnd) return 1f;
+        return 1f - MathUtils.SmoothStep((p - SliceStrikeEnd) / (1f - SliceStrikeEnd));
+    }
+
+    // The small diagonal: the hand rises a little in the wind-up, is carried from above the chest line
+    // to below it through the strike and returns over the recovery. The same for either direction, so
+    // every slice cuts from the top toward the bottom.
+    private float SliceDiagonal()
+    {
+        var p = MathUtils.Clamp01(_sliceT);
+        if (p <= 0f || p >= 1f) return 0f;
+        if (p < SliceWindupEnd)
+            return SliceDiagonalBlocks * MathUtils.SmoothStep(p / SliceWindupEnd);
+        if (p < SliceStrikeEnd)
+            return MathUtils.Lerp(SliceDiagonalBlocks, -SliceDiagonalBlocks,
+                MathUtils.EaseInOutCubic((p - SliceWindupEnd) / (SliceStrikeEnd - SliceWindupEnd)));
+        return -SliceDiagonalBlocks * (1f - MathUtils.SmoothStep((p - SliceStrikeEnd) / (1f - SliceStrikeEnd)));
+    }
 
     private float SliceLift() => SliceLiftRadians * SliceStroke();
 
     // Downward Y translation applied to the right arm at the strike, tied to the same 0->1->0
     // stroke so the arm is back at its idle height by the end (no snap).
-    private float SliceDrop() => -SliceDropBlocks * SliceStroke();
+    private float SliceDrop() => -SliceDropBlocks * SliceStroke() + SliceDiagonal();
 
     // Hand offset from the shoulder in the arm's bend plane (y, z), before the sweep yaw, for a
     // given shoulder pitch and elbow. Matches GetPartMatrix's arm chain exactly, so the two-bone
@@ -749,6 +794,7 @@ public class PlayerModel
         public float HeadPitch { get; init; }
         public float HeadYaw { get; init; }
         public float SwimPitch { get; init; }
+        public float RootYaw { get; init; }
         public float SwimRoll { get; init; }
         public float DeathPitch { get; init; }
     }
@@ -761,8 +807,11 @@ public class PlayerModel
         var move = _moveBlend * ground * (1f - _swimBlend);
 
         // Slice: the shoulders twist with the sweep and the body shifts its weight onto the lead leg.
-        var sliceTwist = IsSlicing ? SliceSweep() * 0.2f : 0f;
+        var sliceBody = IsSlicing ? SliceBodySweep() : 0f;
+        var sliceTwist = sliceBody * SliceTorsoYaw;
         var sliceRoll = IsSlicing ? _sliceDir * 0.07f * SliceStroke() : 0f;
+        // The weight sinks into the strike: knees and hips bend and the torso dips toward the blow.
+        var sliceDip = IsSlicing ? MathUtils.Pulse(_sliceT, SliceImpactProgress) : 0f;
 
         // Throw: the shoulders wind back toward the throwing (right) side and lean back while the
         // arm is cocked, then whip forward through the release and settle.
@@ -786,12 +835,13 @@ public class PlayerModel
         var fall = DeathFall;
         return new Mods
         {
-            HipBend = dip * 0.55f + crouch * 0.7f,
-            KneeBend = dip * 1.1f + crouch * 1.4f,
+            HipBend = dip * 0.55f + crouch * 0.7f + sliceDip * 0.25f,
+            KneeBend = dip * 1.1f + crouch * 1.4f + sliceDip * 0.4f,
+            RootYaw = sliceBody * SliceBodyYaw,
             Shoulders = _swayPitch.Value + dip * 0.3f,
             RightShoulderExtra = -_equip.Value * 0.9f,
-            TorsoPitch = -dip * 0.2f - crouch * 0.25f + _flinch.Value * 0.3f + throwLean,
-            Drop = dip * 0.12f + crouch * 0.17f,
+            TorsoPitch = -dip * 0.2f - crouch * 0.25f + _flinch.Value * 0.3f + throwLean - sliceDip * 0.22f,
+            Drop = dip * 0.12f + crouch * 0.17f + sliceDip * 0.06f,
             TorsoYaw = MathF.Sin(_walkPhase) * 0.1f * move + sliceTwist + throwTwist
                        - PunchTwist * PunchWeights(_mineT).Extend,
             TorsoRoll = MathF.Cos(_walkPhase) * 0.035f * move + sliceRoll + _flinch.Value * 0.08f,
@@ -986,7 +1036,7 @@ public class PlayerModel
                     * Matrix4x4.CreateRotationZ(mods.SwimRoll) * Matrix4x4.CreateTranslation(0f, pelvisY, 0f);
         if (mods.DeathPitch != 0f)
             local *= Matrix4x4.CreateRotationX(mods.DeathPitch);
-        var root = local * Matrix4x4.CreateRotationY(yawRad) * Matrix4x4.CreateTranslation(feet + new Vector3(0f, pose.Bob, 0f));
+        var root = local * Matrix4x4.CreateRotationY(yawRad + mods.RootYaw) * Matrix4x4.CreateTranslation(feet + new Vector3(0f, pose.Bob, 0f));
         var swingAxis = Vector3.UnitX;
 
         Matrix4x4 Torso() =>
@@ -1018,8 +1068,10 @@ public class PlayerModel
         Matrix4x4 UpperArm(Vector3 pivot, Quaternion upper) =>
             Matrix4x4.CreateFromQuaternion(upper) * Matrix4x4.CreateTranslation(pivot) * root;
 
+        // The legs turn back against the body's twist so the feet stay planted.
         Matrix4x4 Thigh(Vector3 pivot, float hip) =>
             Matrix4x4.CreateFromAxisAngle(swingAxis, hip)
+            * Matrix4x4.CreateRotationY(-mods.RootYaw * SliceLegCounter)
             * Matrix4x4.CreateTranslation(pivot) * root;
 
         var sliceSweep = SliceSweep();
@@ -1109,7 +1161,7 @@ public class PlayerModel
         var punch = PunchActivity();
         return Matrix4x4.CreateRotationZ(SliceRoll())
             * Matrix4x4.CreateRotationX(pitchRad * punch)
-            * Matrix4x4.CreateRotationY(yawRad + SliceSweep() + PunchArmYaw(pitchRad) + _swayYaw.Value)
+            * Matrix4x4.CreateRotationY(yawRad + ComputeMods().RootYaw + SliceSweep() + PunchArmYaw(pitchRad) + _swayYaw.Value)
             * Matrix4x4.CreateTranslation(fist);
     }
 

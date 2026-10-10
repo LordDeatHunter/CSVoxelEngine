@@ -339,13 +339,13 @@ public sealed class PlayerModelTests
         player.StartSlice(1);
         var rest = HandX();
 
-        player.Update(PlayerModel.SliceDuration * 0.15f, 0f); // peak of the wind-up
+        player.Update(PlayerModel.SliceDuration * 0.26f, 0f); // peak of the wind-up
         var windup = HandX();
 
-        player.Update(PlayerModel.SliceDuration * 0.45f, 0f); // end of the strike
+        player.Update(PlayerModel.SliceDuration * 0.23f, 0f); // end of the strike
         var followThrough = HandX();
 
-        player.Update(PlayerModel.SliceDuration * 0.4f, 0f);  // settled back to the idle pose
+        player.Update(PlayerModel.SliceDuration * 0.51f, 0f);  // settled back to the idle pose
         var settled = HandX();
 
         // Right-to-left, against the body centre: wound up to the player's right, struck to the left.
@@ -367,10 +367,10 @@ public sealed class PlayerModelTests
         float HandX() => Vector3.Transform(Vector3.Zero, player.GetHandAnchorMatrix(eye, -90f)).X;
 
         player.StartSlice(-1);
-        player.Update(PlayerModel.SliceDuration * 0.15f, 0f);
+        player.Update(PlayerModel.SliceDuration * 0.26f, 0f);
         var windup = HandX();
 
-        player.Update(PlayerModel.SliceDuration * 0.45f, 0f);
+        player.Update(PlayerModel.SliceDuration * 0.23f, 0f);
         var followThrough = HandX();
 
         // The return mirrors the first swing: wound up to the left, struck through to the right.
@@ -435,15 +435,19 @@ public sealed class PlayerModelTests
             player.Update(1f / 60f, 0f);
 
         var eye = new Vector3(0.5f, 70f, 0.5f);
-        float ShoulderY() => player.GetPartMatrix("UpperArmR", eye, -90f, 0f).Translation.Y;
+        // The whole body moves in a slice (it turns and sinks into the blow), so the check is that the
+        // shoulder joint stays where it is on the torso rather than at a fixed place in the world.
+        float ShoulderToTorso() => Vector3.Distance(
+            player.GetPartMatrix("UpperArmR", eye, -90f, 0f).Translation,
+            player.GetPartMatrix("Torso", eye, -90f, 0f).Translation);
 
         player.StartSlice(1);
-        var rest = ShoulderY();
+        var rest = ShoulderToTorso();
         player.Update(PlayerModel.SliceDuration * PlayerModel.SliceImpactProgress, 0f);
-        var strike = ShoulderY();
+        var strike = ShoulderToTorso();
 
-        // The hand is lowered by re-posing the arm, so the shoulder joint itself never moves and
-        // stays attached to the torso.
+        // The hand is lowered by re-posing the arm, so the shoulder joint itself never detaches
+        // from the torso.
         Assert.Equal(rest, strike, 4);
     }
 

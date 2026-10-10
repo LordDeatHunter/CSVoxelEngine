@@ -2375,6 +2375,16 @@ overshoot or jiggle.
   the **throw charge** (the upper arm out to the right and a little behind the body, the forearm bent up
   at about a right angle, the shoulders wound back toward the throwing side, then a whip forward and a
   settle) and the **swim stroke**. The hand anchor follows the forearm frame, so the held item does too.
+- **Slice** (`PlayerModel.SlicePhase`): a whole-body motion in uneven phases of the same 0.7 s: a slow
+  wind-up that coils the body (to 0.26), a strike about twice as fast as before centred on the impact
+  (0.26..0.49, a steeper `EaseInOutCubic` through the middle) and a long eased recovery, so the contrast
+  reads as a snap. The arm sweep is only part of it: the whole body turns about the feet
+  (`SliceBodyYaw`, the legs counter-turning by `SliceLegCounter` so the feet stay planted), the shoulders
+  turn further (`SliceTorsoYaw`), the knees and hips sink into the strike and the torso dips. The hand
+  also travels a small diagonal on every slice, from `SliceDiagonalBlocks` above the chest line to as far
+  below it (`SliceDiagonal`, through the same re-solved arm as the chest-height drop), whichever way the
+  swing goes. `SliceImpactProgress` (where the damage lands) is the middle of the strike. Filmed by
+  `visual-examples/animations-slice.json`.
 - **Swim stroke animation**: `PlayerModel` runs the physics' stroke clock (`SwimStrokeProgress`, started
   by `TriggerSwimStroke`; a remote model with `AutoSwimStroke` starts its own while it moves): the arms
   reach forward together, thrust out to the sides (slightly behind the shoulders) in the first 20 %,

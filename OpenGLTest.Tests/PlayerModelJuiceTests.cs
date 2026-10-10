@@ -376,4 +376,105 @@ public sealed class PlayerModelJuiceTests
         var thrustElbow = Origin("ForearmR");
         Assert.True(thrustElbow.X < elbow.X - 0.05f);
     }
+
+    // ---- the slice ----
+
+    private static PlayerModel Slicer(int direction, out System.Numerics.Vector3 eye)
+    {
+        var model = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++) model.Update(Dt, 0f);
+        eye = new System.Numerics.Vector3(0.5f, 70f, 0.5f);
+        model.StartSlice(direction);
+        return model;
+    }
+
+    // Everything is sampled at a slice progress; the slice lasts SliceDuration.
+    private static void To(PlayerModel model, float progress) =>
+        model.Update(PlayerModel.SliceDuration * progress - model.SliceProgress * PlayerModel.SliceDuration, 0f);
+
+    [Fact]
+    public void TheStrikeIsMuchFasterThanTheWindupAndTheRecovery()
+    {
+        var model = Slicer(1, out var eye);
+        System.Numerics.Vector3 Hand() => System.Numerics.Vector3.Transform(System.Numerics.Vector3.Zero,
+            model.GetHandAnchorMatrix(eye, -90f));
+
+        To(model, 0.26f);
+        var windupEnd = Hand().X;
+        To(model, 0.49f);
+        var strikeEnd = Hand().X;
+        To(model, 1f);
+        var rest = Hand().X;
+
+        // Speed in blocks of sideways travel per unit of progress.
+        var strikeSpeed = MathF.Abs(strikeEnd - windupEnd) / 0.23f;
+        var recoverySpeed = MathF.Abs(rest - strikeEnd) / 0.51f;
+        Assert.True(strikeSpeed > recoverySpeed * 2f);
+        Assert.True(strikeSpeed > 0.5f);
+    }
+
+    [Fact]
+    public void EverySliceCutsFromTheTopTowardTheBottomWhicheverWayItSwings()
+    {
+        foreach (var direction in new[] { 1, -1 })
+        {
+            var model = Slicer(direction, out var eye);
+            float HandY() => System.Numerics.Vector3.Transform(System.Numerics.Vector3.Zero,
+                model.GetHandAnchorMatrix(eye, -90f)).Y;
+
+            To(model, 0.26f);
+            var start = HandY();
+            To(model, PlayerModel.SliceImpactProgress);
+            var middle = HandY();
+            To(model, 0.49f);
+            var end = HandY();
+
+            Assert.True(start > middle && middle > end, $"direction {direction}: {start} {middle} {end}");
+            // A small diagonal, not a chop: a couple of tenths of a block.
+            Assert.InRange(start - end, 0.15f, 0.5f);
+        }
+    }
+
+    [Fact]
+    public void TheWholeBodyTwistsIntoTheSliceAndMirrorsForTheReturn()
+    {
+        // The yaw of the body's right axis in the horizontal plane, positive toward the front.
+        float BodyTurn(PlayerModel model, System.Numerics.Vector3 eye, string part)
+        {
+            var axis = System.Numerics.Vector3.TransformNormal(System.Numerics.Vector3.UnitX,
+                model.GetPartMatrix(part, eye, -90f, 0f));
+            return MathF.Atan2(-axis.Z, axis.X);
+        }
+
+        foreach (var direction in new[] { 1, -1 })
+        {
+            var model = Slicer(direction, out var eye);
+            To(model, 0.26f);
+            var coiled = BodyTurn(model, eye, "Torso");
+            To(model, 0.49f);
+            var struck = BodyTurn(model, eye, "Torso");
+
+            // The shoulders swing through a large angle, in the direction of the cut ...
+            Assert.True((struck - coiled) * direction > 0.6f, $"direction {direction}: {coiled} -> {struck}");
+            // ... and it is not only the shoulders: the arm's root (the whole body) turns too.
+            Assert.True(MathF.Abs(BodyTurn(model, eye, "UpperArmR") - BodyTurn(model, eye, "ThighL")) > 0.05f
+                        || MathF.Abs(BodyTurn(model, eye, "UpperArmR")) > 0.15f);
+        }
+    }
+
+    [Fact]
+    public void TheSliceSinksTheBodyIntoTheStrikeAndTheFeetStayPlanted()
+    {
+        var model = Slicer(1, out var eye);
+        System.Numerics.Vector3 Foot() => System.Numerics.Vector3.Transform(
+            new System.Numerics.Vector3(0f, -0.7f, 0f), model.GetPartMatrix("ShinL", eye, -90f, 0f));
+        var restFoot = Foot();
+        var restKnee = model.GetPose().LeftKnee;
+
+        To(model, PlayerModel.SliceImpactProgress);
+        // The knees bend into the blow ...
+        Assert.True(model.GetPose().LeftKnee < restKnee - 0.2f);
+        // ... while the feet do not slide round the body.
+        Assert.True(System.Numerics.Vector3.Distance(Foot(), restFoot) < 0.25f);
+    }
 }
