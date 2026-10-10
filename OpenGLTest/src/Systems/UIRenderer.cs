@@ -36,6 +36,9 @@ public class UIRenderer : IDisposable
     private const float HeartDrawHeight = 32f;
     private const float HeartStride = 30f;
     private const float HeartGap = 10f;
+    // The selected item's name (DrawHotbarName) sits this far above the hearts row, leaving room
+    // for descenders.
+    private const float HotbarNameGap = 12f;
 
     // Hotbar metrics, in pixels
     // Aliases of the shared hotbar geometry (HotbarLayout), so the HUD draws read short names.
@@ -499,6 +502,29 @@ public class UIRenderer : IDisposable
                 DrawMesh(_heartHalfMesh,
                     RectTransform(centre with { X = centre.X - HeartDrawWidth * 0.25f }, halfSize),
                     Rgba.White, _heartTexture);
+        }
+    }
+
+    /// <summary>
+    /// The selected item's name centred over the hearts row (see <see cref="HotbarNameFade"/>),
+    /// at <paramref name="alpha"/>, fitted to the hotbar's width. The chat log sits bottom-left,
+    /// clear of the centred hotbar, so the two never overlap.
+    /// </summary>
+    public void DrawHotbarName(string name, float alpha)
+    {
+        var a = MathUtils.Clamp01(alpha);
+        if (_font == null || a <= 0.004f || string.IsNullOrEmpty(name)) return;
+
+        var heartsTop = HotbarLayout.Top(_screenSize) - HeartGap - HeartDrawHeight;
+        var top = heartsTop - HotbarNameGap - CountCapHeight;
+        _textFade = a;
+        try
+        {
+            DrawTextCentredFitted(name, _screenSize.X * 0.5f, top, _countScale, Rgba.White, HotbarLayout.RowWidth());
+        }
+        finally
+        {
+            _textFade = 1f;
         }
     }
 

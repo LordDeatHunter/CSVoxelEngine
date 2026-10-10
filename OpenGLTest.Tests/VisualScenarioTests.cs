@@ -139,8 +139,29 @@ public sealed class VisualScenarioTests
     {
         var ex = Assert.Throws<InvalidOperationException>(
             () => VisualScenario.Parse("""{ "steps": [{ "op": "dance" }] }""", "bad"));
-        foreach (var op in new[] { "teleport", "look", "wait", "walk", "mine", "place", "fly", "give", "spawn", "grow", "screenshot" })
+        foreach (var op in new[] { "teleport", "look", "wait", "walk", "mine", "place", "fly", "give", "spawn", "grow", "select", "screenshot" })
             Assert.Contains(op, ex.Message);
+    }
+
+    [Fact]
+    public void SelectTakesAOneBasedHotbarSlot()
+    {
+        var scenario = VisualScenario.Parse(
+            $$"""{ "steps": [{ "op": "select", "slot": 1 }, { "op": "select", "slot": {{Inventory.SlotCount}} }] }""", "tour");
+        Assert.Equal("select", scenario.Steps[0].Op);
+        Assert.Equal(1, scenario.Steps[0].Slot);
+        Assert.Equal(Inventory.SlotCount, scenario.Steps[1].Slot);
+    }
+
+    [Theory]
+    [InlineData("""{ "steps": [{ "op": "select" }] }""")]
+    [InlineData("""{ "steps": [{ "op": "select", "slot": 0 }] }""")]
+    [InlineData("""{ "steps": [{ "op": "select", "slot": 999 }] }""")]
+    public void SelectRefusesASlotOffTheHotbar(string json)
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() => VisualScenario.Parse(json, "bad"));
+        Assert.Contains("(select)", ex.Message);
+        Assert.Contains("'slot'", ex.Message);
     }
 
     [Fact]

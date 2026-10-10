@@ -52,6 +52,9 @@ public sealed class VisualStep
     /// <summary>What a <c>player</c> step makes the player's model do (<c>hurt</c>, <c>punch</c>,
     /// <c>slice</c>, <c>equip</c>, <c>charge</c>, <c>release</c>, <c>die</c> or <c>revive</c>).</summary>
     public string? Action { get; init; }
+
+    /// <summary>The hotbar slot a <c>select</c> step picks, 1-based like the number keys.</summary>
+    public int Slot { get; init; }
 }
 
 /// <summary>
@@ -184,6 +187,15 @@ public sealed class VisualScenario
                 Op = "player",
                 Action = ReadChoice(element, index, "player", "action", ["hurt", "punch", "slice", "equip", "charge", "release", "die", "revive"]),
             },
+            "select" => new VisualStep
+            {
+                Op = "select",
+                Slot = element.TryGetProperty("slot", out var slot) && slot.TryGetInt32(out var s)
+                       && s >= 1 && s <= Inventory.SlotCount
+                    ? s
+                    : throw new InvalidOperationException(
+                        $"Step {index} (select) needs 'slot' from 1 to {Inventory.SlotCount}."),
+            },
             "screenshot" => new VisualStep
             {
                 Op = "screenshot",
@@ -191,7 +203,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, fly, give, spawn, grow, damage, view, player or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, fly, give, spawn, grow, damage, view, player, select or screenshot."),
         };
     }
 

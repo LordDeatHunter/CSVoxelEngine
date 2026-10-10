@@ -82,4 +82,20 @@ public sealed class MathUtilsExtensionsTests
             yaw = MathUtils.DampAngle(yaw, 90f, 5f, 1f / 60f);
         Assert.Equal(90f, yaw, precision: 1);
     }
+
+    [Fact]
+    public void HoldThenFadeHoldsFullyThenOnlyFallsToZero()
+    {
+        const float hold = 0.8f, fade = 0.4f;
+        var previous = 1f;
+        for (var t = 0f; t <= hold + fade + 0.2f; t += 0.01f)
+        {
+            var alpha = MathUtils.HoldThenFade(t, hold, fade);
+            if (t <= hold) Assert.Equal(1f, alpha);
+            Assert.InRange(alpha, 0f, 1f);
+            Assert.True(alpha <= previous, $"alpha rose at t={t}");
+            previous = alpha;
+        }
+        Assert.Equal(0f, MathUtils.HoldThenFade(hold + fade, hold, fade));
+    }
 }

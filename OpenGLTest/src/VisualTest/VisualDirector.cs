@@ -156,6 +156,13 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 Advance();
                 break;
 
+            case "select":
+                // What a hotbar number key does in singleplayer
+                world.Inventory.Select(step.Slot - 1);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} select slot {step.Slot}");
+                Advance();
+                break;
+
             case "screenshot":
                 ScreenshotPath = Path.Combine(scenario.OutputDir, $"{_step + 1:D2}-{step.ShotName}.png");
                 ScreenshotHideHud = step.HideHud;

@@ -1,0 +1,43 @@
+{
+  // Hotbar feedback: run with VOXEL_SCRIPT=visual-examples/hotbar.json VOXEL_TIME=147 from
+  // OpenGLTest/. Shots land in visual/hotbar/.
+  // Survival player standing in the open forest clearing the goblins scenario uses (ground y 9..10),
+  // facing -Z with the HUD on.
+  // - The item name over the hearts: shown right after a switch (of slot, or of the item in the
+  //   selected slot), still there mid-hold, gone after ~1.5 s; an empty slot shows nothing.
+  // - The pickup pop: more of an item already on the hotbar makes its slot's icon bump.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-43.5, 12.5, 62.5], "yaw": -90, "pitch": -10 },
+    { "op": "wait", "seconds": 2 },
+    // The first pickup lands in slot 1, the selected slot: its name appears
+    { "op": "give", "block": "cobblestone", "count": 20 },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "cobblestone-name" },
+    // An empty slot shows no name
+    { "op": "select", "slot": 2 },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "empty-slot" },
+    // A pickup equips into the selected empty slot: the item there changed, so its name shows
+    { "op": "give", "block": "glass", "count": 10 },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "glass-name" },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "glass-hold" },
+    { "op": "wait", "seconds": 0.35 },
+    { "op": "screenshot", "name": "glass-fading" },
+    { "op": "wait", "seconds": 0.9 },
+    { "op": "screenshot", "name": "glass-gone" },
+    // Back to slot 1: a slot switch restarts the name
+    { "op": "select", "slot": 1 },
+    { "op": "wait", "seconds": 0.05 },
+    { "op": "screenshot", "name": "switch-back" },
+    { "op": "wait", "seconds": 2 },
+    // More cobblestone: slot 1's count rises and its icon pops
+    { "op": "give", "block": "cobblestone", "count": 5 },
+    { "op": "wait", "seconds": 0.07 },
+    { "op": "screenshot", "name": "pop" },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "pop-settled" }
+  ]
+}

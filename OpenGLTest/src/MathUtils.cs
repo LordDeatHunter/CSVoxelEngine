@@ -182,4 +182,16 @@ public static class MathUtils
             ? EaseOutCubic(t / peakAt)
             : 1f - SmoothStep((t - peakAt) / (1f - peakAt));
     }
+
+    /// <summary>
+    /// A timed label's opacity: fully on for <paramref name="holdSeconds"/> after it appeared,
+    /// then a smooth fade to 0 over <paramref name="fadeSeconds"/>, and 0 from then on. Never
+    /// increases with <paramref name="elapsed"/>, so a label only ever fades out.
+    /// </summary>
+    public static float HoldThenFade(float elapsed, float holdSeconds, float fadeSeconds)
+    {
+        if (elapsed <= holdSeconds) return 1f;
+        if (fadeSeconds <= 0f) return 0f;
+        return 1f - SmoothStep((elapsed - holdSeconds) / fadeSeconds);
+    }
 }

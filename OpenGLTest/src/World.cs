@@ -234,6 +234,9 @@ public class World : IItemUseWorld
     /// (<see cref="ServerPlayer.Inventory"/>).</summary>
     public Inventory Inventory { get; } = Inventory.Empty();
 
+    // The selected item's name over the hotbar, fed from Inventory's selection every frame
+    private readonly HotbarNameFade _hotbarName = new();
+
     /// <summary>
     /// Server mode: the connected players, owned by the server and read once a frame by the drop
     /// pickup, which credits each player's own inventory (flagging
@@ -1208,6 +1211,7 @@ public class World : IItemUseWorld
         FrameProfiler.End(ProfileSection.Entities);
 
         Inventory.Update((float)deltaTime);
+        _hotbarName.Update(Inventory, (float)deltaTime);
         // The pool itself is the server's (ApplyNetworkHealth mirrors it); only the damage flash
         // fades here
         _health.Update((float)deltaTime);
@@ -1564,6 +1568,7 @@ public class World : IItemUseWorld
         FrameProfiler.End(ProfileSection.Save);
 
         Inventory.Update((float)deltaTime);
+        _hotbarName.Update(Inventory, (float)deltaTime);
 
         // Water is aimed through unless the held item is out to scoop it, so a pond never
         // stops the player targeting the block under it
@@ -2298,7 +2303,7 @@ public class World : IItemUseWorld
         SettingsMenuView? settings = null)
     {
         renderManager.RenderUI(_window!, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings,
-            _health.Health, _health.DamageFlash);
+            _health.Health, _health.DamageFlash, _hotbarName);
     }
     
     /// <summary>

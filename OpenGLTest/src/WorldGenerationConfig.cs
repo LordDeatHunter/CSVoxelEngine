@@ -1393,6 +1393,12 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float ThrowSpeed = 40f;
     public const float ThrowLifetimeSeconds = 5f;
 
+    // --- HUD feedback (HotbarNameFade) ---
+    // Selecting a hotbar slot (or the selected slot changing item) shows the item's name above
+    // the hotbar: fully opaque for the hold, then faded out, about 1.5 s in all.
+    public const float HotbarNameHoldSeconds = 1.0f;
+    public const float HotbarNameFadeSeconds = 0.5f;
+
     // --- Multiplayer networking (NetProtocol, GameServer, NetworkClient) ---
     // The server broadcasts the player list on this cadence; clients send their own state at the
     // state cadence. The day clock syncs once a second, which is far below a visible sun step.

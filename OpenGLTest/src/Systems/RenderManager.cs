@@ -3926,7 +3926,7 @@ public class RenderManager : IDisposable
     public void RenderUI(IWindow window, Inventory inventory, InventoryView view, float time,
         int fps, bool showProfiler, Camera? camera = null, bool showCoordinates = true,
         PauseMenuView? menu = null, SettingsMenuView? settings = null,
-        int health = PlayerHealth.MaxHealth, float damageFlash = 0f)
+        int health = PlayerHealth.MaxHealth, float damageFlash = 0f, HotbarNameFade? hotbarName = null)
     {
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         ui.Begin(window.Size, window.FramebufferSize, UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
@@ -3955,7 +3955,11 @@ public class RenderManager : IDisposable
         var heading = camera != null ? Compass.HeadingFromYaw(camera.Yaw) : 0f;
         ui.DrawHotbar(inventory, heading, time);
         if (!view.IsOpen && (menu == null || !menu.IsOpen))
+        {
             ui.DrawHearts(health);
+            if (hotbarName != null)
+                ui.DrawHotbarName(hotbarName.Name, hotbarName.Alpha);
+        }
         if (view.IsOpen)
             ui.DrawInventoryPanel(inventory, view, time, heading, camera?.IsCreative == true);
         if (menu != null && settings != null)
