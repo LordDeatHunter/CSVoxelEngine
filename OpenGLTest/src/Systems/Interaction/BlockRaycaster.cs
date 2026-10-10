@@ -81,15 +81,9 @@ public static class BlockRaycaster
 
             if (targetsCell)
             {
-                // Tree wood aims at its drawn shape: the node follows its thickness and the
-                // tubes its connections, so the boxes are resolved from the live
-                // neighbourhood. Layered snow aims at the box its stack depth actually draws.
-                var cellType = BlockType.ById[cellId];
-                var boxes = BlockType.IsTreeWood(cellId)
-                    ? TreeWoodShape.GetBoxesAt(cellId, chunkManager, cellX, cellY, cellZ)
-                    : cellType?.Renderer == BlockRenderer.SnowLayers
-                        ? SnowShape.GetBoxes(cellX, cellZ, chunkManager.GetStateGlobal(cellX, cellY, cellZ), cellType.StackMax)
-                        : cellType?.Hitboxes;
+                // Every cell aims at its drawn shape: tree wood at its node and tubes, layered
+                // snow at its stack depth, a facing block at its turned boxes (see BlockShape)
+                var boxes = BlockShape.BoxesAt(cellId, chunkManager, cellX, cellY, cellZ);
                 if (boxes == null || boxes.Length == 0)
                 {
                     hitPosition = currentPosition;

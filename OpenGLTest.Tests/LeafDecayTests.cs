@@ -322,6 +322,32 @@ public sealed class LeafDecayTests
     }
 
     [Fact]
+    public void ATorchHungOnADecayingLeafPopsWithIt()
+    {
+        var torch = ContentRegistry.RequireBlock("torch");
+        var wallTorch = torch.WallBlockId;
+        var species = LeafySpecies.First();
+        var manager = new LeafDecayManager();
+        var drops = new DropManager();
+        var (chunks, leaf, tipA, tipB) = TwoTips(species, LeafState.Encode(species.LeafHydration - 1, false));
+
+        // Facing south, so the leaf north of it is the block it hangs on
+        var hung = (leaf.Item1, leaf.Item2, leaf.Item3 + 1);
+        StampedTree.WriteCell(chunks, hung, wallTorch, 1);
+        Assert.True(BlockSupport.IsHeldUpBy(wallTorch, 1, new Vector3(hung.Item1, hung.Item2, hung.Item3),
+            new Vector3(leaf.Item1, leaf.Item2, leaf.Item3)));
+
+        Clear(chunks, tipA);
+        Clear(chunks, tipB);
+        manager.ScheduleAround(leaf.Item1, leaf.Item2, leaf.Item3);
+        RunTicks(manager, chunks, drops, Bound(1));
+
+        Assert.True(IsAir(chunks, leaf), "the tipless leaf never decayed");
+        Assert.True(IsAir(chunks, hung), "the torch hung on the decayed leaf is still standing");
+        Assert.Contains(drops.Drops, d => d.BlockId == torch.Id);
+    }
+
+    [Fact]
     public void PersistentLeavesNeverDecay()
     {
         foreach (var species in LeafySpecies)

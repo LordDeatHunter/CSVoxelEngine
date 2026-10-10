@@ -1,0 +1,11 @@
+{
+  // A wall torch is a torch placed on a side, so breaking one gives the torch back
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "block/torch", "count": 1 }
+      ]
+    }
+  ]
+}

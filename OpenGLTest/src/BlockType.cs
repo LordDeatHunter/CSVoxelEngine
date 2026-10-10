@@ -246,10 +246,12 @@ public sealed record BlockType
     public bool Kiln { get; init; }
 
     /// <summary>
-    /// The anchor's baked model pre-rotated to each of the four horizontal facings, indexed by
-    /// facing 0..3 (<c>[0]</c> is <see cref="BakedModel"/> itself, the authored north-facing
-    /// bake). Null for every block but a <see cref="BlockRenderer.Multiblock"/> anchor; see
-    /// <see cref="MultiblockShape.Rotate"/>.
+    /// The baked model pre-rotated to each of the four horizontal facings, indexed by facing 0..3
+    /// (<c>[0]</c> is <see cref="BakedModel"/> itself, the authored north-facing bake), which the
+    /// mesher picks by the state byte's low two bits. Null for every block but a
+    /// <see cref="BlockRenderer.Multiblock"/> anchor (turned about its 2x2x2 volume, see
+    /// <see cref="MultiblockShape.Rotate"/>) and a <see cref="HasHorizontalFacing"/> block
+    /// (turned about its own cell, see <see cref="HorizontalFacing.RotateModel"/>).
     /// </summary>
     public BakedModel[]? RotatedModels { get; internal set; }
 
@@ -275,8 +277,38 @@ public sealed record BlockType
     /// <summary>Whether the block gets an inventory slot and can be held.</summary>
     public bool HasItem { get; init; } = true;
 
-    /// <summary>Whether the block pops (with its loot) when the block below is removed.</summary>
+    /// <summary>Whether the block pops (with its loot) when the block holding it up is removed:
+    /// the block below, or for a <see cref="SupportAttached"/> block the one behind its front
+    /// (see <see cref="BlockSupport"/>).</summary>
     public bool NeedsSupport { get; init; }
+
+    /// <summary>Whether a <see cref="NeedsSupport"/> block hangs off the cell behind its front
+    /// (a wall torch) instead of standing on the cell below; only ever set together with
+    /// <see cref="HasHorizontalFacing"/>, whose facing names that front.</summary>
+    public bool SupportAttached { get; init; }
+
+    /// <summary>Whether the state byte's low two bits are a horizontal facing (a wall torch):
+    /// the mesher draws <see cref="RotatedModels"/> and the shape resolvers read
+    /// <see cref="RotatedHitboxes"/> by it.</summary>
+    public bool HasHorizontalFacing { get; init; }
+
+    /// <summary>The <see cref="Hitboxes"/> turned to each horizontal facing, indexed like
+    /// <see cref="RotatedModels"/>; null unless <see cref="HasHorizontalFacing"/>.</summary>
+    public BlockHitbox[][]? RotatedHitboxes { get; internal set; }
+
+    /// <summary>The block a placement against a block's side becomes instead of this one (a
+    /// torch's wall torch), or 0 when the block only ever places as itself; see
+    /// <see cref="Placement.TryMount"/>.</summary>
+    public byte WallBlockId { get; internal set; }
+
+    /// <summary>The block whose item this one is picked as (a wall torch picks its torch), or 0
+    /// when it is picked as itself; see <see cref="PickId"/>.</summary>
+    public byte ItemBlockId { get; internal set; }
+
+    /// <summary>The id a pick-block of a cell holding <paramref name="blockId"/> asks the
+    /// inventory for: its <see cref="ItemBlockId"/> when it has one, else the block itself.</summary>
+    public static byte PickId(byte blockId) =>
+        ById[blockId] is { ItemBlockId: not 0 } type ? type.ItemBlockId : blockId;
 
     /// <summary>Whether a placement aimed at this block fills its own cell and discards it
     /// (layered snow) instead of filling the cell across the hit face. Only a non-solid state can

@@ -25,4 +25,31 @@ public static class Placement
         existingId == 0
         || BlockType.IsFluid(existingId)
         || BlockType.IsReplaceableByPlacement(existingId, existingState);
+
+    /// <summary>
+    /// The block and state a placement of <paramref name="blockId"/> against a face with outward
+    /// normal <paramref name="normal"/> writes. A block with a wall variant
+    /// (<see cref="BlockType.WallBlockId"/>, a torch) stays itself on top of a block, becomes the
+    /// wall variant on a side, facing along the normal so it leans away from the wall (the facing
+    /// is the normal's face index, which puts the wall behind its front, see
+    /// <see cref="BlockSupport"/>), and is refused under a ceiling, where nothing could hold it. A
+    /// placement that takes over the hit cell itself (<paramref name="fillsHitCell"/>, a partial
+    /// snow drift) stands on the floor whatever face was hit, since that face is no wall. Every
+    /// other block places as itself with <paramref name="state"/>. Returns false when refused.
+    /// </summary>
+    public static bool TryMount(byte blockId, byte state, Vector3 normal, bool fillsHitCell,
+        out byte placedId, out byte placedState)
+    {
+        placedId = blockId;
+        placedState = state;
+        var wall = BlockType.ById[blockId]?.WallBlockId ?? 0;
+        if (wall == 0 || fillsHitCell || normal.Y > 0.5f) return true;
+        if (normal.Y < -0.5f) return false;
+
+        var facing = HorizontalFacing.FacingOf(normal);
+        if (facing < 0) return false;
+        placedId = wall;
+        placedState = (byte)facing;
+        return true;
+    }
 }

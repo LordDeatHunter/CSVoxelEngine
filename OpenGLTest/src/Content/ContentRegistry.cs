@@ -232,6 +232,20 @@ public static class ContentRegistry
                 type.SwayTopY = maxY;
             }
 
+            // A facing block (a wall torch) is authored facing north and turned about its own cell
+            // to the other three; the mesher picks the model by the state byte's low two bits
+            if (type.HasHorizontalFacing)
+            {
+                ValidateFacingBake(type, baked);
+                type.RotatedModels =
+                [
+                    baked,
+                    HorizontalFacing.RotateModel(baked, 1, 1f),
+                    HorizontalFacing.RotateModel(baked, 2, 1f),
+                    HorizontalFacing.RotateModel(baked, 3, 1f),
+                ];
+            }
+
             BlockType.OccludesById[id] = type.OccludesNeighbours;
             BlockType.PassesLightById[id] = type.PassesLight;
             BlockType.GreedyById[id] = type.Renderer == BlockRenderer.Model && !type.Fluid && BakesGreedy(baked);
@@ -352,6 +366,19 @@ public static class ContentRegistry
 
             type.ModelBiomeTint = BiomeTintFaces.ParsePalette(paletteName, path);
         }
+    }
+
+    /// <summary>
+    /// Checks that a facing block's model turns cleanly: no quad may cover a whole cell face,
+    /// because a turned quad shades flat (see <see cref="HorizontalFacing.RotateModel"/>) while
+    /// the authored north bake would take per-corner AO, so one facing would shade unlike the rest.
+    /// </summary>
+    private static void ValidateFacingBake(BlockType type, BakedModel baked)
+    {
+        foreach (var quad in baked.Quads)
+            if (quad.IsFullFace)
+                throw new InvalidOperationException(
+                    $"The model of facing block '{type.Name}' has a face covering a whole cell face; a turned model shades flat on every facing, so no face may span a full cell side.");
     }
 
     /// <summary>
@@ -856,6 +883,73 @@ public static class ContentRegistry
     }
 
     /// <summary>
+    /// Reads a block's <c>facing</c> and <c>support</c>. A facing lives in the state byte, so it is
+    /// refused wherever something else owns that byte (a fluid's level, a stack's count, a falling
+    /// cube that would lose it) and on any renderer but <c>model</c> (a multiblock carries its own
+    /// facing); <c>support</c> means nothing without <c>needsSupport</c>, and <c>"attached"</c>
+    /// hangs off the cell behind the front, so it needs a facing to name that front.
+    /// </summary>
+    internal static (bool HorizontalFacing, bool SupportAttached) ParseFacingAndSupport(BlockDefinition definition,
+        BlockRenderer renderer, bool fluid, bool falls, int stackMax, bool needsSupport, string path)
+    {
+        var facing = definition.Facing switch
+        {
+            null => false,
+            "horizontal" => true,
+            _ => throw new InvalidOperationException(
+                $"Block '{path}' has unknown facing '{definition.Facing}'; expected horizontal."),
+        };
+        if (facing && renderer != BlockRenderer.Model)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets facing on renderer '{definition.Renderer}'; only a model block turns its model by the state byte.");
+        if (facing && (fluid || falls || stackMax >= 2))
+            throw new InvalidOperationException(
+                $"Block '{path}' sets facing with fluid, falls or stackMax; each of those owns the state byte the facing lives in.");
+
+        var attached = definition.Support switch
+        {
+            null or "below" => false,
+            "attached" => true,
+            _ => throw new InvalidOperationException(
+                $"Block '{path}' has unknown support '{definition.Support}'; expected below or attached."),
+        };
+        if (definition.Support != null && !needsSupport)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets support without needsSupport; only a support-fragile block is held up by anything.");
+        if (attached && !facing)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets support: \"attached\" without facing: \"horizontal\"; the attached face is the one behind its front.");
+        return (facing, attached);
+    }
+
+    /// <summary>
+    /// Resolves a block's <c>wallBlock</c>: the variant a placement against a block's side becomes.
+    /// It must be another block that faces horizontally and hangs off the wall behind it, and the
+    /// owner itself must stand on the floor (support below, no facing of its own), since a placement
+    /// on top keeps it. A wall block belongs to one owner, which is what it is picked and named as.
+    /// </summary>
+    private static byte ResolveWallBlock(string name, string path, byte ownerId)
+    {
+        if (!TryResolve(name, out var id) || id == BlockType.Air || ItemRegistry.IsItem(id))
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in wallBlock, which is not a registered block.");
+        var owner = BlockType.ById[ownerId]!;
+        var wall = BlockType.ById[id]!;
+        if (id == ownerId)
+            throw new InvalidOperationException($"Block '{path}' names itself in wallBlock.");
+        if (!owner.NeedsSupport || owner.SupportAttached || owner.HasHorizontalFacing)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets wallBlock but is not a floor block (needsSupport, support below, no facing); a placement on top keeps it.");
+        if (!wall.HasHorizontalFacing || !wall.SupportAttached)
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in wallBlock, which needs facing: \"horizontal\" and support: \"attached\".");
+        if (wall.ItemBlockId != 0)
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in wallBlock, which another block already names; a wall block belongs to one floor block.");
+        return id;
+    }
+
+    /// <summary>
     /// Checks each item's declared use against the finished tables: a fluid action needs a real
     /// fluid block to work on and an item to turn into (the hotbar swaps one for the other),
     /// while a stack action needs a real stackable block and no result (it spends from its
@@ -1281,6 +1375,7 @@ public static class ContentRegistry
         var types = new Dictionary<byte, BlockType>();
         var hardenPending = new List<(byte Id, string? To, string? Touching, string Path)>();
         var multiblockPending = new List<(byte Id, string? Part, string? Source, string Path)>();
+        var wallPending = new List<(byte Id, string Wall, string Path)>();
 
         foreach (var (name, path) in files)
         {
@@ -1388,6 +1483,8 @@ public static class ContentRegistry
             if (falls && needsSupport)
                 throw new InvalidOperationException(
                     $"Block '{path}' sets both falls and needsSupport: a falling block topples instead of popping.");
+            var (horizontalFacing, supportAttached) =
+                ParseFacingAndSupport(definition, renderer, fluid, falls, stackMax, needsSupport, path);
             var solid = !fluid && (definition.Solid ?? true);
             if (stackSolidAt > 0 && solid)
                 throw new InvalidOperationException(
@@ -1487,6 +1584,8 @@ public static class ContentRegistry
                 WoodLootBands = woodLootBands ?? [new WoodLootBand(0, null, true)],
                 HasItem = !fluid && (definition.HasItem ?? true),
                 NeedsSupport = needsSupport,
+                SupportAttached = supportAttached,
+                HasHorizontalFacing = horizontalFacing,
                 ReplaceableByPlacement = replaceableByPlacement,
                 Falls = falls,
                 Fluid = fluid,
@@ -1506,6 +1605,11 @@ public static class ContentRegistry
             hardenPending.Add((id, flow?.HardensTo, flow?.HardensTouching, path));
             if (definition.Multiblock != null)
                 multiblockPending.Add((id, definition.Multiblock.Part, definition.Multiblock.Source, path));
+            // A facing block's selection boxes turn with it, exactly like its model will in BakeModels
+            if (horizontalFacing)
+                type.RotatedHitboxes = HorizontalFacing.RotateBoxes(type.Hitboxes);
+            if (definition.WallBlock != null)
+                wallPending.Add((id, definition.WallBlock, path));
             if (definition.BiomeTint != null)
             {
                 var (palette, faces) = BiomeTintFaces.Expand(definition.BiomeTint, path);
@@ -1563,6 +1667,14 @@ public static class ContentRegistry
             var type = types[pendingId];
             type.MultiblockPartId = ResolveMultiblockPart(part, pendingPath);
             type.MultiblockSourceId = ResolveMultiblockSource(source, pendingPath, pendingId);
+        }
+
+        // Same reason again: a torch's wall block (wall_torch) loads after the torch itself.
+        foreach (var (pendingId, wall, pendingPath) in wallPending)
+        {
+            var wallId = ResolveWallBlock(wall, pendingPath, pendingId);
+            types[pendingId].WallBlockId = wallId;
+            types[wallId].ItemBlockId = pendingId;
         }
 
         BlockType.Types = types;

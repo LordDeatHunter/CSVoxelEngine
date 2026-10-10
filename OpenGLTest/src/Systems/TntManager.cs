@@ -173,25 +173,33 @@ public class TntManager
                 : (y, solidY);
         }
 
-        // Pebbles and their kind need support: pop survivors left floating where the blast
-        // took the ground from under them. The scan runs after all clearing, so a block found
-        // over air genuinely lost its support (or was already floating).
-        foreach (var ((x, z), (lowestY, _)) in blastedColumns)
+        // Pebbles, torches and their kind need support: pop survivors left hanging where the
+        // blast took their holder away - the ground under a floor block, the wall behind a wall
+        // torch (see BlockSupport). The blast box grown by one holds every cell a blasted cell
+        // could have held up, and the scan runs after all clearing, bottom-up, so a block found
+        // against air genuinely lost its support (or was already floating).
+        if (blastedColumns.Count > 0)
         {
-            for (var y = lowestY; y <= (int)max.Y + 1; y++)
+            for (var x = (int)min.X - 1; x <= (int)max.X + 1; x++)
+            for (var z = (int)min.Z - 1; z <= (int)max.Z + 1; z++)
+            for (var y = (int)min.Y - 1; y <= (int)max.Y + 1; y++)
             {
                 var standing = chunks.GetBlockGlobal(x, y, z);
-                if (BlockType.ById[standing]?.NeedsSupport != true) continue;
+                if (standing == 0) continue;
+                var standingState = chunks.GetStateGlobal(x, y, z);
+                if (!BlockSupport.TryGetSupportCell(standing, standingState, new Vector3(x, y, z), out var support))
+                    continue;
 
                 // Support in an unloaded chunk reads as air: leave those alone.
-                if (!chunks.Chunks.TryGetValue(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(y - 1),
-                        VoxelCoords.WorldToChunk(z), out _)) continue;
-                if (chunks.GetBlockGlobal(x, y - 1, z) != 0) continue;
+                int sx = (int)support.X, sy = (int)support.Y, sz = (int)support.Z;
+                if (!chunks.Chunks.TryGetValue(VoxelCoords.WorldToChunk(sx), VoxelCoords.WorldToChunk(sy),
+                        VoxelCoords.WorldToChunk(sz), out _)) continue;
+                if (chunks.GetBlockGlobal(sx, sy, sz) != 0) continue;
 
                 var pebbleChunkPos = VoxelCoords.ChunkPosOf(x, y, z);
                 if (!chunks.Chunks.TryGetValue(pebbleChunkPos, out var pebbleChunk)) continue;
-                var standingState = chunks.GetStateGlobal(x, y, z);
                 if (pebbleChunk.ClearBlockAt(new Vector3(x, y, z)) == 0) continue;
+                chunks.UnmarkPlayerPlaced(x, y, z);
                 touchedChunks.Add(pebbleChunkPos);
 
                 drops.SpawnLoot(standing, new Vector3(x, y, z),

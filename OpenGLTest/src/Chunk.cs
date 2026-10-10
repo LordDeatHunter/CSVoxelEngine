@@ -1409,8 +1409,9 @@ public class Chunk : IDisposable
             if (type.Renderer == BlockRenderer.MultiblockPart) continue;
 
             // ...and the anchor draws that whole model, pre-rotated to the facing its state
-            // byte's low two bits carry (see MultiblockShape).
-            var model = type.Renderer == BlockRenderer.Multiblock && type.RotatedModels != null
+            // byte's low two bits carry (see MultiblockShape), as does a facing block such as a
+            // wall torch, turned about its own cell (see HorizontalFacing).
+            var model = type.RotatedModels != null
                 ? type.RotatedModels[paddedState[pIdx] & 3]
                 : type.BakedModel;
             if (model == null) continue;

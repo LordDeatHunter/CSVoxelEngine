@@ -10,5 +10,7 @@
   "light": { "emission": 14 },
   // Pops (dropping itself) when the block it stands on goes, and a flow washes it away
   "needsSupport": true,
+  // Placed against a block's side it becomes the wall torch, leaning out from that wall
+  "wallBlock": "block/wall_torch",
   "hitbox": { "min": [0.375, 0, 0.375], "max": [0.625, 0.625, 0.625] }
 }

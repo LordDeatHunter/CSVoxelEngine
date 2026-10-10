@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 
 namespace silkgltriangle;
@@ -23,25 +22,15 @@ public static class MultiblockShape
     /// Rotates a point in the volume's local space (0..<see cref="Size"/> on every axis, the
     /// anchor cell's origin at 0) from the authored north facing to <paramref name="facing"/>.
     /// </summary>
-    public static Vector3 RotatePoint(Vector3 local, int facing) => facing switch
-    {
-        1 => new Vector3(Size - local.X, local.Y, Size - local.Z),
-        2 => new Vector3(local.Z, local.Y, Size - local.X),
-        3 => new Vector3(Size - local.Z, local.Y, local.X),
-        _ => local,
-    };
+    public static Vector3 RotatePoint(Vector3 local, int facing) =>
+        HorizontalFacing.RotatePoint(local, facing, Size);
 
     /// <summary>
     /// Rotates a direction the same way <see cref="RotatePoint"/> rotates a point: the same
     /// quarter turns without the translation that keeps the volume in place.
     /// </summary>
-    public static Vector3 RotateDirection(Vector3 direction, int facing) => facing switch
-    {
-        1 => new Vector3(-direction.X, direction.Y, -direction.Z),
-        2 => new Vector3(direction.Z, direction.Y, -direction.X),
-        3 => new Vector3(-direction.Z, direction.Y, direction.X),
-        _ => direction,
-    };
+    public static Vector3 RotateDirection(Vector3 direction, int facing) =>
+        HorizontalFacing.RotateDirection(direction, facing);
 
     /// <summary>Outward normal of the structure's front for a facing, i.e. the engine face
     /// normal of that face index (north -Z = 0, south +Z = 1, west -X = 2, east +X = 3).</summary>
@@ -51,46 +40,18 @@ public static class MultiblockShape
     /// Facing whose <see cref="FrontNormal"/> a normal points along, from its dominant
     /// horizontal axis; -1 when the normal is vertical (there is no vertical facing).
     /// </summary>
-    public static int FacingOf(Vector3 normal)
-    {
-        var ax = MathF.Abs(normal.X);
-        var az = MathF.Abs(normal.Z);
-        if (ax <= 0f && az <= 0f) return -1;
-        if (MathF.Abs(normal.Y) > ax && MathF.Abs(normal.Y) > az) return -1;
-        if (az >= ax) return normal.Z < 0f ? 0 : 1;
-        return normal.X < 0f ? 2 : 3;
-    }
+    public static int FacingOf(Vector3 normal) => HorizontalFacing.FacingOf(normal);
 
     /// <summary>
     /// Pre-rotates a whole baked model to <paramref name="facing"/>, so the mesher only indexes an array
-    /// instead of transforming quads per cell. Positions and normals turn, the face index is
-    /// recomputed from the turned normal, and UVs, tile, shade and cullface ride along unchanged.
+    /// instead of transforming quads per cell (see <see cref="HorizontalFacing.RotateModel"/>).
     ///
     /// Every output quad has <c>IsFullFace</c> cleared: the per-corner AO path indexes its
     /// neighbour deltas by <see cref="Chunk.CubeFaces"/> corner order, which a rotated quad's
     /// corners no longer follow, so a multiblock quad must always shade flat (the bake
     /// additionally rejects a full-face quad on a multiblock model, so facing 0 shades the same).
+    /// A multiblock carries no cullface, so the one the shared rotation turns never applies.
     /// </summary>
-    public static BakedModel Rotate(BakedModel model, int facing)
-    {
-        var quads = new BakedQuad[model.Quads.Length];
-        for (var i = 0; i < quads.Length; i++)
-        {
-            var quad = model.Quads[i];
-            var positions = new Vector3[quad.Positions.Length];
-            for (var j = 0; j < positions.Length; j++)
-                positions[j] = RotatePoint(quad.Positions[j], facing);
-
-            var normal = RotateDirection(quad.Normal, facing);
-            quads[i] = quad with
-            {
-                Positions = positions,
-                Normal = normal,
-                Face = ModelBaker.DominantFace(normal),
-                IsFullFace = false,
-            };
-        }
-
-        return model with { Quads = quads };
-    }
+    public static BakedModel Rotate(BakedModel model, int facing) =>
+        HorizontalFacing.RotateModel(model, facing, Size);
 }

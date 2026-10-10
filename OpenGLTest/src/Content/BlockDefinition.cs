@@ -97,6 +97,31 @@ public sealed class BlockDefinition
     public bool? NeedsSupport { get; set; }
 
     /// <summary>
+    /// Which neighbour holds a <see cref="NeedsSupport"/> block up: <c>"below"</c> (the default: a
+    /// flower, a floor torch) or <c>"attached"</c> (a wall torch): the cell behind the block's
+    /// front, opposite the horizontal facing its state byte carries. Only legal with
+    /// <c>needsSupport</c>, and <c>"attached"</c> also needs <c>facing</c>.
+    /// </summary>
+    public string? Support { get; set; }
+
+    /// <summary>
+    /// <c>"horizontal"</c> marks a block whose state byte's low two bits are a horizontal facing
+    /// (north -Z = 0, south +Z = 1, west -X = 2, east +X = 3): its model and hitbox are authored
+    /// with the front on north and pre-turned to all four (see <see cref="HorizontalFacing"/>).
+    /// Only on the <c>model</c> renderer, never with a fluid, falls or stackMax (each owns the
+    /// state byte). Omitted means the block has no facing.
+    /// </summary>
+    public string? Facing { get; set; }
+
+    /// <summary>
+    /// The block a placement against a block's side becomes instead of this one (a torch's
+    /// <c>"block/wall_torch"</c>), facing away from the wall it was placed on; a placement on top
+    /// keeps this block and one under a ceiling is refused. The wall block needs
+    /// <c>facing: "horizontal"</c> and <c>support: "attached"</c>, and is picked as this block.
+    /// </summary>
+    public string? WallBlock { get; set; }
+
+    /// <summary>
     /// Whether a block placement aimed at this block fills the block's own cell instead of the
     /// cell across the hit face, discarding whatever it held (layered snow: a block placed against
     /// a partial drift replaces it rather than hovering a layer above the ground). Only fires while

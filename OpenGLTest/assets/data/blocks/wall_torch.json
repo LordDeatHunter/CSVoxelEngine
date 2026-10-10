@@ -1,0 +1,19 @@
+{
+  // The torch placed against a block's side (torch.json's wallBlock): the same light, leaning out
+  // from the wall it hangs on. Its state byte holds the facing (the direction it leans), so the
+  // model and hitbox below are authored facing north and turned to the other three.
+  "name": "Torch",
+  "model": "block/wall_torch",
+  "hardness": 0,
+  "solid": false,
+  "castsAO": false,
+  "cutout": true,
+  "light": { "emission": 14 },
+  // Pops when the block behind it goes, not the one below; drops a torch (loot/wall_torch.json)
+  "needsSupport": true,
+  "support": "attached",
+  "facing": "horizontal",
+  // Never held: placing a torch on a side is what makes one, and picking one picks the torch
+  "hasItem": false,
+  "hitbox": { "min": [0.34375, 0.1875, 0.6875], "max": [0.65625, 0.8125, 1] }
+}

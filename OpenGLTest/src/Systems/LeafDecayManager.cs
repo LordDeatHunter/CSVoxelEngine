@@ -616,6 +616,7 @@ public class LeafDecayManager
         _chunks.UnmarkPlayerPlaced(x, y, z);
         var cell = new Vector3(x, y, z);
         _drops.SpawnLoot(id, cell, state: state);
+        PopUnsupportedAround(cell);
 
         if (TreeGenerator.IsTreeBlock(id)) _editedColumns.Add(Pack(x, 0, z));
 
@@ -629,6 +630,29 @@ public class LeafDecayManager
         }
 
         ScheduleAround(x, y, z);
+    }
+
+    /// <summary>
+    /// Pops, with its loot, every support-fragile block the removed cell <paramref name="holder"/>
+    /// held up (see <see cref="BlockSupport"/>): a torch hanging on a decayed leaf, or a pebble on
+    /// crumbled wood, would otherwise float. A popped block may emit light (a torch), so the light
+    /// radius around it rebuilds, not just its own chunk. An unloaded neighbour is left alone.
+    /// </summary>
+    private void PopUnsupportedAround(Vector3 holder)
+    {
+        for (var face = 0; face < 6; face++)
+        {
+            var cell = holder + Chunk.CubeFaces[face].normal;
+            int x = (int)cell.X, y = (int)cell.Y, z = (int)cell.Z;
+            if (!TryGetCell(x, y, z, out var id, out var state) || id == 0) continue;
+            if (!BlockSupport.IsHeldUpBy(id, state, cell, holder)) continue;
+
+            Write(x, y, z, 0, 0, remesh: true);
+            _chunks.UnmarkPlayerPlaced(x, y, z);
+            _chunks.MarkAreaDirty(cell, cell + Vector3.One, WorldGenerationConfig.LightPropagationRadius);
+            _drops.SpawnLoot(id, cell,
+                DropManager.PileCount(id, x, z, state), DropManager.PileSecondary(id, x, z, state), state);
+        }
     }
 
     /// <summary>

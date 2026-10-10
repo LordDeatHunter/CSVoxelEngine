@@ -2788,23 +2788,11 @@ public class World : IItemUseWorld
         _sfx?.Play(BlockType.ById[blockId]?.Sfx ?? SfxLibrary.DefaultGroup);
 
     /// <summary>
-    /// Hitboxes for the outline, break overlay and mining pop. Tree wood resolves
-    /// its drawn shape from the live neighbourhood (see <see cref="TreeWoodShape"/>) and layered
-    /// snow from its stack depth (see <see cref="SnowShape"/>); everything else uses its
-    /// registered boxes.
+    /// Hitboxes for the outline, break overlay and mining pop: the cell's drawn shape resolved
+    /// from the live world exactly as the raycast aims at it (see <see cref="BlockShape"/>).
     /// </summary>
-    private BlockHitbox[] HitboxesAt(Vector3 blockPos, byte blockId)
-    {
-        var type = BlockType.ById[blockId];
-        if (type?.Renderer == BlockRenderer.SnowLayers)
-            return SnowShape.GetBoxes((int)blockPos.X, (int)blockPos.Z,
-                _chunkManager.GetStateGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z),
-                type.StackMax);
-        if (!BlockType.IsTreeWood(blockId))
-            return type?.Hitboxes ?? [BlockHitbox.FullCube];
-        return TreeWoodShape.GetBoxesAt(blockId, _chunkManager,
-            (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
-    }
+    private BlockHitbox[] HitboxesAt(Vector3 blockPos, byte blockId) =>
+        BlockShape.BoxesAt(blockId, _chunkManager, (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
 
     /// <summary>
     /// Breaks the block at <paramref name="blockPos"/> for <paramref name="player"/>, with
@@ -2843,7 +2831,7 @@ public class World : IItemUseWorld
         // A multiplayer client fells nothing itself: it clears the cut cell like any other block
         // and forwards it, and what the server makes of the cut arrives in its broadcast.
         if (BlockType.IsTreeWood(brokenId) && !_clientMode)
-            FellWood(blockPos, brokenId, brokenState, chunk, creative, player.Eye);
+            FellWood(blockPos, brokenId, brokenState, chunk, creative, player.Eye, player);
         // Mining any cell of a multiblock takes the whole structure apart instead of leaving
         // invisible part cells standing (see RevertMultiblock)
         else if (Multiblock.IsMultiblockCell(brokenId))
@@ -2890,12 +2878,12 @@ public class World : IItemUseWorld
             _leaves.Burst(blockPos, WorldGenerationConfig.LeafParticleBurstMined);
         }
 
-        // Pebbles and their kind need the block under them: pop whatever sits right above the
-        // break. This routes through the normal break path, so it rolls its loot; its own
-        // check then no-ops on air, so the recursion always terminates.
+        // Pebbles, torches and their kind need the block holding them up: pop whatever the break
+        // held (the block right above, a wall torch on a side). This routes through the normal
+        // break path, so it rolls its loot; its own check then no-ops on air, so the recursion
+        // always terminates.
+        PopUnsupportedAround(blockPos, player);
         var above = blockPos + Vector3.UnitY;
-        if (BlockType.ById[BlockIdAt(above)]?.NeedsSupport == true)
-            RemoveBlock(above, player);
 
         // Sand and its kind need the block under them too, but they topple into a falling
         // cube instead of popping: a no-op unless a falls block sits right above the break,
@@ -2912,16 +2900,38 @@ public class World : IItemUseWorld
     }
 
     /// <summary>
+    /// Breaks every support-fragile block the emptied cell <paramref name="holder"/> was holding
+    /// up (see <see cref="BlockSupport"/>): the pebble or floor torch right above it and a wall
+    /// torch on any side, never a wall torch that merely stood over it. Each goes through
+    /// <see cref="RemoveBlock"/>, so it rolls its loot and its own dependants are checked in turn.
+    /// Nothing pops while the cell still holds something solid.
+    /// </summary>
+    private void PopUnsupportedAround(Vector3 holder, PlayerContext player)
+    {
+        if (BlockType.IsSolid(BlockIdAt(holder))) return;
+        for (var face = 0; face < 6; face++)
+        {
+            var cell = holder + Chunk.CubeFaces[face].normal;
+            var id = BlockIdAt(cell);
+            if (id == 0) continue;
+            var state = _chunkManager.GetStateGlobal((int)cell.X, (int)cell.Y, (int)cell.Z);
+            if (BlockSupport.IsHeldUpBy(id, state, cell, holder))
+                RemoveBlock(cell, player);
+        }
+    }
+
+    /// <summary>
     /// Fells the wood a mined wood block was holding up: collects the severed part (the break
     /// plus its children - a branch cut leaves the trunk standing), clears it in one batch
     /// (same pattern as a TNT blast), and launches a toppling entity that drops its blocks
     /// once it has lain still. Player-placed (detached) logs are not trees: they pop out as a
     /// plain drop with no entity and no animation. A lone block with no children just drops
     /// as-is. A creative break (<paramref name="creative"/>) still topples, but drops nothing.
-    /// The tree tips away from <paramref name="feller"/>, the eye of whoever cut it.
+    /// The tree tips away from <paramref name="feller"/>, the eye of whoever cut it, and anything
+    /// the felled cells held up (a torch on the trunk) pops for <paramref name="player"/>.
     /// </summary>
     private void FellWood(Vector3 blockPos, byte brokenId, byte brokenState, Chunk chunk, bool creative,
-        Vector3 feller)
+        Vector3 feller, PlayerContext player)
     {
         var x = (int)blockPos.X;
         var y = (int)blockPos.Y;
@@ -3019,6 +3029,11 @@ public class World : IItemUseWorld
             blockPos.Z + 0.5f - feller.Z);
         _toppling.Add(new TopplingTree(collected,
             new Vector3(blockPos.X + 0.5f, blockPos.Y, blockPos.Z + 0.5f), away, drops: !creative));
+
+        // A torch on the trunk, or a flower on a felled log, loses its support with the wood
+        // (RemoveBlock's own pop only looks around the cut cell)
+        foreach (var block in collected)
+            PopUnsupportedAround(block.Cell, player);
     }
 
     /// <summary>
@@ -3817,7 +3832,8 @@ public class World : IItemUseWorld
         pickedId = 0;
         if (!IsPlaying) return false;
         if (!_hasSelectedBlock) return false;
-        var id = BlockIdAt(_selectedBlockPosition);
+        // A wall torch is picked as the torch it was placed from (BlockType.PickId)
+        var id = BlockType.PickId(BlockIdAt(_selectedBlockPosition));
         if (id == 0) return false;
         pickedId = id;
         return inventory.PickBlock(id);
@@ -3898,6 +3914,11 @@ public class World : IItemUseWorld
 
         if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var chunk)) return false;
 
+        // A torch against a block's side becomes its wall torch, leaning out from that wall (the
+        // facing rides in the state byte); under a ceiling it has nothing to hang from
+        if (!Placement.TryMount(blockId, state, hitNormal, placePos == hitPos, out blockId, out state))
+            return false;
+
         // A live cube owns its cell until it lands: placing into one would cement the cube
         // inside the new block, so the placement fails and the caller keeps its item
         if (_falling.OverlapsAny((int)placePos.X, (int)placePos.Y, (int)placePos.Z))
@@ -3908,13 +3929,12 @@ public class World : IItemUseWorld
         // placement is still refused, so dropping out of flight never leaves the player buried.
         if (BlockType.IsSolid(blockId) && BodyBlocksPlacement(placePos))
             return false;
-        // Fragile blocks need solid ground: a flower planted into mid-air would hover
-        // until anything remeshed it, so the placement fails and the caller keeps its item
-        if (BlockType.ById[blockId]?.NeedsSupport == true)
-        {
-            var below = placePos - Vector3.UnitY;
-            if (!BlockType.IsSolid(BlockIdAt(below))) return false;
-        }
+        // Fragile blocks need something solid holding them up (the ground, or the wall a wall
+        // torch hangs on): a flower planted into mid-air would hover until anything remeshed it,
+        // so the placement fails and the caller keeps its item
+        if (BlockSupport.TryGetSupportCell(blockId, state, placePos, out var support)
+            && !BlockType.IsSolid(BlockIdAt(support)))
+            return false;
 
         // A placed log is building material, not part of a tree: it is a plain full cube that
         // never connects to tree wood around it and never fells (see TreeWoodShape.Connects)
