@@ -206,6 +206,115 @@ public sealed class LandingDustTests
     }
 
     [Fact]
+    public void ASlimeHopSplatsItsOwnGooAndNeverTheGroundsDust()
+    {
+        var chunks = MobTestWorld.Floor(Id("sand"));
+        var debris = new BlockDebrisSystem();
+        var dust = new GroundDust();
+        var type = EntityRegistry.Require("slime");
+        var slime = new Slime(type, new Vector3(2.5f, 1f + Slime.HalfExtent, 2.5f));
+        var player = new Vector3(8.5f, 1.62f, 2.5f);
+        Mob[] mobs = [slime];
+
+        var hopped = false;
+        for (var i = 0; i < 600 && debris.Debris.Count == 0; i++)
+        {
+            slime.Update(Dt, chunks, player);
+            hopped |= slime.IsAirborne && slime.Position.Y > 1.5f + Slime.HalfExtent;
+            dust.TakeMobLandings(mobs, chunks, debris, new Random(7));
+        }
+
+        // An ordinary hop is far under the ground dust's minimum fall, yet it splats
+        Assert.True(hopped);
+        Assert.NotEmpty(debris.Debris);
+        var expected = BiomeTint.VertexTint(LandingDust.SkinColour(type.Model, WorldGenerationConfig.SlimeSplatFallbackColor));
+        Assert.All(debris.Debris, chip =>
+        {
+            Assert.Equal(DebrisLook.Colour, chip.Look);
+            Assert.Equal(BlockType.Air, chip.BlockId);
+            Assert.Equal(expected, chip.Tint);
+        });
+    }
+
+    [Fact]
+    public void TheSplatGrowsWithTheImpactNeverUnderTheMinimumAndABiggerSlimeSplatsMore()
+    {
+        for (var speed = 0f; speed < WorldGenerationConfig.SlimeSplatMinImpact; speed += 0.05f)
+        {
+            Assert.Equal(0, LandingDust.SplatCount(speed));
+            Assert.Equal(0f, LandingDust.SplatSpeed(speed));
+        }
+
+        var lastCount = 0;
+        var lastSpeed = 0f;
+        for (var speed = 0f; speed <= 60f; speed += 0.05f)
+        {
+            var count = LandingDust.SplatCount(speed);
+            var fling = LandingDust.SplatSpeed(speed);
+            Assert.True(count >= lastCount, $"count fell to {count} at {speed} b/s");
+            Assert.True(fling >= lastSpeed, $"fling fell to {fling} at {speed} b/s");
+            Assert.InRange(count, 0, WorldGenerationConfig.SlimeSplatMaxCount);
+            Assert.InRange(fling, 0f, WorldGenerationConfig.SlimeSplatMaxLaunch);
+            Assert.True(LandingDust.SplatCount(speed, 2f) >= count);
+            Assert.True(LandingDust.SplatSpeed(speed, 2f) >= fling);
+            lastCount = count;
+            lastSpeed = fling;
+        }
+
+        var hard = WorldGenerationConfig.SlimeSplatFullImpact;
+        Assert.True(LandingDust.SplatCount(hard) > LandingDust.SplatCount(WorldGenerationConfig.SlimeSplatMinImpact));
+        Assert.True(LandingDust.SplatCount(hard, 2f) > LandingDust.SplatCount(hard));
+
+        // The scale reaches the spawned chips too: a bigger slime's goo is bigger
+        var small = new BlockDebrisSystem();
+        var big = new BlockDebrisSystem();
+        GroundDust.Splat(FloorFeet, hard, Vector3.One, 0.36f, small, scale: 1f, new Random(8));
+        GroundDust.Splat(FloorFeet, hard, Vector3.One, 0.36f, big, scale: 2f, new Random(8));
+        Assert.True(big.Debris.Count > small.Debris.Count);
+        Assert.True(MeanSize(big) > MeanSize(small));
+
+        static float MeanSize(BlockDebrisSystem system)
+        {
+            var sum = 0f;
+            foreach (var chip in system.Debris) sum += chip.Size;
+            return sum / system.Debris.Count;
+        }
+    }
+
+    [Fact]
+    public void TheSplatColourIsTheMeanOfTheOpaqueSkin()
+    {
+        var fallback = new Vector3(0.1f, 0.2f, 0.3f);
+        Assert.Equal(fallback, LandingDust.SkinColour(new BbmodelData(), fallback));
+
+        // Two opaque greens average; a transparent red texel never counts
+        var model = new BbmodelData
+        {
+            TexturePixels = [0, 200, 0, 255, 0, 100, 50, 255, 255, 0, 0, 0],
+            TextureWidth = 3,
+            TextureHeight = 1,
+        };
+        var colour = LandingDust.SkinColour(model, fallback);
+        Assert.Equal(0f, colour.X, 4);
+        Assert.Equal(150f / 255f, colour.Y, 4);
+        Assert.Equal(25f / 255f, colour.Z, 4);
+
+        var clear = new BbmodelData { TexturePixels = [255, 0, 0, 0], TextureWidth = 1, TextureHeight = 1 };
+        Assert.Equal(fallback, LandingDust.SkinColour(clear, fallback));
+    }
+
+    [Fact]
+    public void AColourChipIsOneTintedTileOnEveryFace()
+    {
+        const ushort tile = 3;
+        var (verts, _) = BlockCubeCache.BuildColourChip(tile);
+        Assert.All(verts, v => Assert.True(v.IsBiomeTinted));
+        Assert.All(verts, v => Assert.Equal(tile, v.Layer));
+        for (var face = 0; face < 6; face++)
+            Assert.Contains(verts, v => (v.Normal & 7) == face);
+    }
+
+    [Fact]
     public void AMobLandingFromHighRaisesItsDustThroughGroundDust()
     {
         var chunks = MobTestWorld.Floor(Id("gravel"));

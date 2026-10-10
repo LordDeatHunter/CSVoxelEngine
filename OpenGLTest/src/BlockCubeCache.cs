@@ -20,6 +20,7 @@ public class BlockCubeCache : IDisposable
     private readonly Dictionary<byte, Mesh> _meshes = new();
     private readonly Dictionary<byte, Mesh> _tintedMeshes = new();
     private readonly Dictionary<byte, Mesh> _surfaceMeshes = new();
+    private Mesh? _colourChip;
 
     public BlockCubeCache(GL gl) => _gl = gl;
 
@@ -125,6 +126,40 @@ public class BlockCubeCache : IDisposable
         return (vertices.ToArray(), indices.ToArray());
     }
 
+    /// <summary>
+    /// The one cube every plain-colour chip draws (<see cref="DebrisLook.Colour"/>, a slime's goo):
+    /// <see cref="BuildColourChip"/> over <see cref="WorldGenerationConfig.ColourChipTile"/>, painted per
+    /// draw by <c>uBiomeTint</c>.
+    /// </summary>
+    public Mesh GetColourChip()
+    {
+        if (_colourChip != null) return _colourChip;
+        var (vertices, indices) = BuildColourChip(TextureAtlas.TileOf(WorldGenerationConfig.ColourChipTile));
+        _colourChip = new Mesh(_gl, vertices, indices);
+        return _colourChip;
+    }
+
+    /// <summary>
+    /// A unit cube centred on the origin wearing <paramref name="greyTile"/> on every face, every quad
+    /// flagged biome-tinted, so the plain path's <c>uBiomeTint</c> paints the whole cube one colour.
+    /// GL-free.
+    /// </summary>
+    public static (Vertex[] Vertices, ushort[] Indices) BuildColourChip(ushort greyTile)
+    {
+        var tiles = new ushort[6];
+        Array.Fill(tiles, greyTile);
+        var baseTiles = new ushort[6];
+        Array.Fill(baseTiles, BiomeTintFaces.NoTile);
+        var tint = new BiomeTintFaces(BiomeTintPalette.Grass, baseTiles, tiles);
+
+        var vertices = new List<Vertex>(6 * 4);
+        var indices = new List<ushort>(6 * 6);
+        ushort offset = 0;
+        PopBoxEmitter.EmitBox(vertices, indices, ref offset, BlockHitbox.FullCube, BlockHitbox.FullCube,
+            new Vector3(-0.5f), tiles, tint);
+        return (vertices.ToArray(), indices.ToArray());
+    }
+
     /// <summary>Face tiles on a plain unit cube, shaded as fully unoccluded.</summary>
     private Mesh CreateFallbackCube(BlockType type)
     {
@@ -150,6 +185,8 @@ public class BlockCubeCache : IDisposable
         foreach (var mesh in _surfaceMeshes.Values)
             mesh.Dispose();
         _surfaceMeshes.Clear();
+        _colourChip?.Dispose();
+        _colourChip = null;
 
         GC.SuppressFinalize(this);
     }

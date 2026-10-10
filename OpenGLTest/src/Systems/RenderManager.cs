@@ -3514,9 +3514,12 @@ public class RenderManager : IDisposable
 
         foreach (var cube in debris)
         {
-            var mesh = cube.Look == DebrisLook.Surface
-                ? blockCubes.GetSurface(cube.BlockId)
-                : blockCubes.GetTinted(cube.BlockId);
+            var mesh = cube.Look switch
+            {
+                DebrisLook.Surface => blockCubes.GetSurface(cube.BlockId),
+                DebrisLook.Colour => blockCubes.GetColourChip(),
+                _ => blockCubes.GetTinted(cube.BlockId),
+            };
             if (mesh == null) continue;
 
             var model = Matrix4x4.CreateScale(cube.Size)

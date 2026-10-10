@@ -1161,6 +1161,24 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Edge length of a dust chip, smaller than a mining chip so it reads as grit
     public const float LandingDustSize = 0.08f;
 
+    // --- Slime splat (LandingDust.Splat*, GroundDust): a landing slime throws chips of its own
+    // green instead of the ground's dust. Every hop's landing splats, growing with the impact like
+    // its squash kick: nothing under the minimum (a bob in water, the hair a resting body settles),
+    // full at the kick's own clamp (Slime's 20 blocks/s). ---
+    public const float SlimeSplatMinImpact = 3f;
+    public const float SlimeSplatFullImpact = 20f;
+    public const int SlimeSplatMinCount = 3;
+    public const int SlimeSplatMaxCount = 10;
+    // Blocks per second the goo flies out at
+    public const float SlimeSplatMinLaunch = 1.2f;
+    public const float SlimeSplatMaxLaunch = 3.2f;
+    public const float SlimeSplatSize = 0.1f;
+    // sRGB colour of the goo when the slime's model has no skin to read its green from
+    public static readonly Vector3 SlimeSplatFallbackColor = new(0.45f, 0.78f, 0.35f);
+    // A grey textureless block tile (its mean grey is BiomeTintTextureGrey) that a plain-colour chip
+    // wears on every face, so BiomeTint.VertexTint lands the chip on its target colour
+    public const string ColourChipTile = "grass_top_textureless";
+
     // --- Wind (Wind.cs, SH-27) ---
     // One slowly turning wind shared by leaf sway, fire smoke and the cloud drift.
     /// <summary>Wind heading at lighting time 0, degrees from +X toward +Z.</summary>

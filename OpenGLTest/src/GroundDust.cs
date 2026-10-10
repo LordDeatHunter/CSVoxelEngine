@@ -7,7 +7,8 @@ namespace silkgltriangle;
 /// <summary>
 /// The cosmetic ground dust: a landing from a real fall kicks up a puff of chips of the block
 /// landed on, decided by <see cref="LandingDust"/> and drawn as <see cref="BlockDebris"/> through
-/// <see cref="BlockDebrisSystem.Puff"/>. Owned by <see cref="World"/>, which feeds it the local
+/// <see cref="BlockDebrisSystem.Puff"/>, and a landing slime splats chips of its own green instead
+/// (<see cref="BlockDebrisSystem.Splat"/>). Owned by <see cref="World"/>, which feeds it the local
 /// player each frame (singleplayer and a client, whose own physics runs locally) and the mobs'
 /// landings in singleplayer; a headless server never calls it. Main thread only.
 /// </summary>
@@ -30,17 +31,55 @@ public sealed class GroundDust
             Land(feet, _landing.LandedDrop, PlayerPhysics.PlayerRadius, chunks, debris, random);
     }
 
-    /// <summary>Takes every landing the <paramref name="mobs"/> noted this frame and raises its dust.</summary>
+    /// <summary>
+    /// Takes every landing the <paramref name="mobs"/> noted this frame and raises its dust: a slime
+    /// splats its own goo on every real landing (<see cref="Splat"/>), any other mob kicks up the
+    /// ground's dust after a real fall (<see cref="Land"/>).
+    /// </summary>
     public void TakeMobLandings(IReadOnlyList<Mob> mobs, ChunkManager chunks, BlockDebrisSystem debris,
         Random? random = null)
     {
         for (var i = 0; i < mobs.Count; i++)
         {
             var mob = mobs[i];
-            if (!mob.TryTakeLanding(out _, out var fallBlocks)) continue;
+            if (!mob.TryTakeLanding(out var impactSpeed, out var fallBlocks)) continue;
             var feet = mob.Position - new Vector3(0f, mob.BodyHalfHeight, 0f);
-            Land(feet, fallBlocks, mob.BodyHalfExtent, chunks, debris, random);
+            if (mob is Slime)
+                Splat(feet, impactSpeed, SplatColourOf(mob.Type), mob.BodyHalfExtent, debris, random: random);
+            else
+                Land(feet, fallBlocks, mob.BodyHalfExtent, chunks, debris, random);
         }
+    }
+
+    // Each splatting kind's skin colour, read once from its model
+    private readonly Dictionary<EntityType, Vector3> _splatColours = new();
+
+    private Vector3 SplatColourOf(EntityType type)
+    {
+        if (!_splatColours.TryGetValue(type, out var colour))
+        {
+            colour = LandingDust.SkinColour(type.Model, WorldGenerationConfig.SlimeSplatFallbackColor);
+            _splatColours[type] = colour;
+        }
+        return colour;
+    }
+
+    /// <summary>
+    /// A slime whose feet are at <paramref name="feet"/> landed at <paramref name="impactSpeed"/>
+    /// blocks per second: throws the goo <see cref="LandingDust.SplatCount"/> sizes, in
+    /// <paramref name="colourSrgb"/>, from under a body <paramref name="halfWidth"/> across.
+    /// <paramref name="scale"/> is the slime's size (1 today), growing the count, the fling and the
+    /// chips. Returns how many chips it spawned.
+    /// </summary>
+    public static int Splat(Vector3 feet, float impactSpeed, Vector3 colourSrgb, float halfWidth,
+        BlockDebrisSystem debris, float scale = 1f, Random? random = null)
+    {
+        var count = LandingDust.SplatCount(impactSpeed, scale);
+        if (count <= 0) return 0;
+        var size = WorldGenerationConfig.SlimeSplatSize * scale;
+        debris.Splat(feet + new Vector3(0f, size, 0f), colourSrgb, halfWidth * scale, count,
+            LandingDust.SplatSpeed(impactSpeed, scale), size, random);
+        return count;
     }
 
     /// <summary>

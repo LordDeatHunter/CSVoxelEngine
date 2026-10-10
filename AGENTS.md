@@ -2563,7 +2563,11 @@ overshoot or jiggle.
   grass dust is tinted green. The local player's landings come from `GroundDust`'s own
   `FallTracker.LandedDrop` (singleplayer and a client); a mob reports its landing with
   `Mob.NoteLanding` (the goblin's and slime's physics do) and `World` takes them after `RefreshMobs`
-  (singleplayer only: a client's mobs are mirrors and never land).
+  (singleplayer only: a client's mobs are mirrors and never land). A slime splats its own goo instead,
+  on every hop (`LandingDust.SplatCount`/`SplatSpeed`, linear in the impact like its squash kick, with
+  a `scale` for a bigger slime): `DebrisLook.Colour` chips with an air id, one grey cube
+  (`BlockCubeCache.GetColourChip`, `WorldGenerationConfig.ColourChipTile`) painted through `uBiomeTint`
+  with `BiomeTint.VertexTint` of the mean opaque skin colour (`LandingDust.SkinColour`).
 - **Remote players** (protocol 7): the `PlayerState` flags carry cosmetic `Sneaking`, `Swimming`,
   `Sprinting` and `Airborne` bits (rebroadcast untrusted, never acted on) and every `PlayerList`
   entry ends with the player's last `NetPlayerAction` and a counter that moves per swing, so

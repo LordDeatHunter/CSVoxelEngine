@@ -50,6 +50,39 @@
     { "op": "wait", "seconds": 0.72 },
     { "op": "screenshot", "name": "goblin-landing-a", "hideHud": true },
     { "op": "wait", "seconds": 0.1 },
-    { "op": "screenshot", "name": "goblin-landing-b", "hideHud": true }
+    { "op": "screenshot", "name": "goblin-landing-b", "hideHud": true },
+
+    // LEG 5 — a slime hopping at the hovering camera over the same open sand splats its own green
+    // goo on every landing, never sand. The goblin is killed off first. The camera hangs 5 blocks up
+    // looking steeply down, so the slime's hops toward the spot under it all land in frame; their
+    // timing is jittered, so a burst of shots spans the first landing.
+    { "op": "damage", "amount": 100 },
+    { "op": "teleport", "pos": [168.5, 16.0, 136.5], "yaw": 0, "pitch": -62 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "spawn", "entity": "slime", "pos": [173.5, 136.5] },
+    { "op": "wait", "seconds": 1.7 },
+    { "op": "screenshot", "name": "slime-1", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "slime-2", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "slime-3", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "slime-4", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "slime-5", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "slime-6", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "slime-7", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "slime-8", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "slime-9", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "slime-10", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "slime-11", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "slime-12", "hideHud": true }
   ]
 }
