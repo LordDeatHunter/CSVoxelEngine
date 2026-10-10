@@ -19,7 +19,7 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
 
 ## Feel and feedback
 
-- [ ] **Landing dust puffs.** An entity landing from a fall of more than ~3 blocks kicks up a
+- [x] **Landing dust puffs.** *Done:* `GroundDust` + `LandingDust` (`MathUtils.ImpactStrength`), chips through `BlockDebrisSystem.Puff` wearing the block's top; player and mobs (`ground-dust.json`). An entity landing from a fall of more than ~3 blocks kicks up a
   small burst of particles tinted by the block landed on. Both the particle count and their
   launch velocity scale with the entity's fall velocity (equivalently its fall distance), so a
   long drop throws more, faster dust than a short one.
@@ -27,12 +27,12 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
   `BlockDebrisSystem.Burst` already makes tinted debris. Tuning constants (minimum fall, count
   and velocity curves) go in `WorldGenerationConfig`, with the curve in `MathUtils`.
   Test: a fall under the minimum spawns nothing; count and speed never decrease as the fall grows.
-  - *Follow-up tweak (slimes):* a landing slime should throw slime-coloured particles
+  - [x] *Follow-up tweak (slimes):* *Done:* `GroundDust.Splat`, chips of the mean skin colour on every hop, scaled by `SlimeSize.Scale`. a landing slime should throw slime-coloured particles
     (its green, not the ground's tint), ideally a small splat that matches its landing squash
     (`Slime._squash` landing kick). Do this after the generic puffs exist: it is only a different
     colour/count source fed into the same burst.
 
-- [ ] **Sprint footstep puffs.** While sprinting on a dry, loose surface (sand, snow, dirt,
+- [x] **Sprint footstep puffs.** *Done:* new `footstepDust` block flag (sand, snow, dirt, gravel), one puff per `PlayerModel.WalkPhase` footfall while sprinting. While sprinting on a dry, loose surface (sand, snow, dirt,
   gravel) each footfall kicks up a tiny puff of particles tinted by the block underfoot.
   *Hook:* the same `BlockDebrisSystem.Burst` the landing puffs use, fired from the gait's
   footfall (`PlayerModel`'s walk cycle phase). A slice of `V-3` in TODO.md; build it right after
@@ -96,7 +96,7 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
   weight from the model's own base rather than a bare `fract`. Verify with a `VOXEL_SCRIPT`
   close-up of a grass patch at two `VOXEL_TIME`s.
 
-- [ ] **Leaf particles follow the wind.** Ambient and burst leaf particles should drift along
+- [x] **Leaf particles follow the wind.** *Done:* falling leaves ease toward `Wind.Direction` x `WindLeafDrift` x the new `Wind.Gust` (`leaf-wind.json`). Ambient and burst leaf particles should drift along
   `Wind` like smoke, embers and the canopy sway already do.
   *Hook:* `LeafParticle`/`LeafParticleSystem` (see `FireParticle.Update`'s `wind` argument for the
   pattern; `RenderManager.WindDirection` exposes the unit direction). Check first how much of it
@@ -109,17 +109,17 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
   thickness goes to zero. Animate it with the existing wave/flow phase so it moves, and keep the
   Snell-window view from below foam-free. One term, no new pass; verify with
   `visual-examples/water.json` (`VOXEL_TIME=360`).
-- [ ] **Stars.** A field of stars on the night sky, fading in at dusk and out at dawn.
+- [x] **Stars.** *Done:* procedural field in the dome's main only, turned with the sun, faded by its height, hidden behind clouds cell-exactly (`night-sky.json`). A field of stars on the night sky, fading in at dusk and out at dawn.
   *Hook:* `SkyRenderer` / `sky-fragment.glsl`, where the dome currently samples one flat colour
   (see "Water rendering" in AGENTS.md: `SkySample` is duplicated in four shaders, so a star term
   in the dome only should not touch those copies; confirm before editing and use the
   `shader-sync` skill). Fade by the sun's height from the lighting clock; hide stars behind the sun
   disc and under clouds. Stars must stay out of the reflection and Snell-window views in a way
   that still looks right. A slice of `V-6`.
-  - *Follow-up (twinkle):* each star's brightness flickers on its own phase and rate. Needs the
+  - [x] *Follow-up (twinkle):* *Done:* two hashed sines per star cell (`StarTwinkleDepth`). each star's brightness flickers on its own phase and rate. Needs the
     stars first; keep the phase a hash of the star's cell so it is stable per star.
 
-- [ ] **Sun lens glare.** A soft radial glow when you look toward the sun, scaled by how
+- [x] **Sun lens glare.** *Done:* `SunGlare.Intensity` (CPU twin, tested) from alignment, sun height and cloud cover across the disc, drawn in the main dome pass only. A soft radial glow when you look toward the sun, scaled by how
   directly you face it and fading with the sun's height and with cloud cover over it.
   *Hook:* the sun disc is already drawn additively by `RenderSun`; this is a second, larger and
   fainter additive quad or a term in the sky pass, driven by the dot of view direction and sun
