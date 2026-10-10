@@ -9,11 +9,15 @@ namespace silkgltriangle;
 /// bills contact damage while they are airborne, rolls death loot, and spawns new ones on dry
 /// forest surface in a ring around a player. Every rule runs against a list of
 /// <see cref="IMobTarget"/>s (the local camera, or a server's connected players), each slime
-/// chasing its nearest one. Every spawn is judged by the global <see cref="MobCaps"/> it shares
-/// with the other mob kinds. Main thread only.
+/// chasing its nearest one. A slime a hit took across its half line splits into smaller ones
+/// here, in the authoritative simulation only (a client merely mirrors). Every spawn is judged by
+/// the global <see cref="MobCaps"/> it shares with the other mob kinds. Main thread only.
 /// </summary>
 public sealed class SlimeManager : IMobPopulation
 {
+    // Blocks a split child's body is kept inside its parent's, so rounding never sinks it into a block.
+    private const float SplitInset = 0.01f;
+
     private readonly EntityType _type;
     private readonly MobCaps _caps;
     private readonly List<Slime> _slimes = [];
@@ -132,6 +136,12 @@ public sealed class SlimeManager : IMobPopulation
                 continue;
             }
 
+            // A hit since the last update crossed the half line: the slime survived it, so its
+            // children spawn even if a later hit killed it before this update. They are appended
+            // past i, so this backward walk does not tick them until the next update.
+            if (slime.TakeSplit())
+                Split(slime);
+
             if (slime.IsDead)
             {
                 DropLoot(slime, drops);
@@ -167,6 +177,33 @@ public sealed class SlimeManager : IMobPopulation
         }
 
         UpdateSpawning(deltaTime, chunks, targets, night);
+    }
+
+    // The children of a split: the next smaller size, each spawned inside the parent's body (which
+    // stood clear of every block) resting on its feet and shoved outward along its own spoke. They
+    // are forced spawns, so only as many as the hard cap still has room for, and none at the cap.
+    private void Split(Slime parent)
+    {
+        var count = Math.Min(WorldGenerationConfig.SlimeSplitChildren, _caps.ForcedRoom);
+        if (count <= 0) return;
+
+        var childSize = SlimeSize.ChildSize(parent.Size);
+        var childHalf = Slime.HalfExtentFor(childSize);
+        // How far a child's centre may sit from the parent's while its body stays inside the
+        // parent's, kept a hair inside on every side so float rounding never pushes a child's face
+        // into the floor or a wall the parent was resting flush against
+        var reach = MathF.Max(0f, parent.BodyHalfExtent - childHalf - SplitInset);
+        var feetY = parent.Position.Y - parent.BodyHalfHeight + SplitInset;
+        var start = Random.Shared.NextSingle() * MathF.Tau;
+        for (var k = 0; k < count; k++)
+        {
+            var angle = start + k * MathF.Tau / count;
+            var spoke = new Vector3(MathF.Cos(angle), 0f, MathF.Sin(angle));
+            var centre = new Vector3(parent.Position.X + spoke.X * reach, feetY + childHalf,
+                parent.Position.Z + spoke.Z * reach);
+            Spawn(centre, childSize)?.Pop(spoke, WorldGenerationConfig.SlimeSplitShoveSpeed,
+                WorldGenerationConfig.SlimeSplitLift);
+        }
     }
 
     // A larger slime rolls its kind's loot table once per LootRolls, so its yield grows with it.

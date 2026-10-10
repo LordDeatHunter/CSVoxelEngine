@@ -85,6 +85,14 @@ public sealed class NetworkEntitySyncTests : IDisposable
         _world.ApplyNetworkEntities([new NetEntity(NetEntityKind.Slime, 7, pos, 1f, 2, large.Size, 0, Vector3.Zero)]);
         Assert.Same(mirrored, Assert.Single(_world.Slimes));
 
+        // A client never splits: its mirror's health arrives from the server, so a snapshot that
+        // drops it across the half line, and client frames after it, leave it one slime
+        _world.ApplyNetworkEntities([new NetEntity(NetEntityKind.Slime, 7, pos, 1f, large.MaxHealth, large.Size, 0, Vector3.Zero)]);
+        _world.ApplyNetworkEntities([new NetEntity(NetEntityKind.Slime, 7, pos, 1f, 1, large.Size, 0, Vector3.Zero)]);
+        for (var i = 0; i < 10; i++)
+            _world.Update(Dt, null);
+        Assert.Same(mirrored, Assert.Single(_world.Slimes));
+
         // An older server's 0 reads as the smallest size, which replaces the mirror (a size is for life)
         _world.ApplyNetworkEntities([new NetEntity(NetEntityKind.Slime, 7, pos, 1f, 2, 0, 0, Vector3.Zero)]);
         var replaced = Assert.Single(_world.Mobs);

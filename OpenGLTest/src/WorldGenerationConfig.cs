@@ -1290,6 +1290,13 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float SlimeLargeChanceDay = 0.1f;
     public const float SlimeLargeChanceNight = 0.4f;
     public const int SlimeUndergroundDepthBlocks = 4;
+    // A slime above the smallest size splits when a hit takes it from above half its health to at
+    // or below half while it survives (SlimeSize.SplitsOnHit): this many children of the next
+    // smaller size pop out of its body, shoved outward with a small hop. They are forced spawns, so a
+    // split near the hard mob cap makes only as many as still fit, and none at the cap.
+    public const int SlimeSplitChildren = 2;
+    public const float SlimeSplitShoveSpeed = 4f;
+    public const float SlimeSplitLift = 5f;
 
     // --- Goblins (GoblinManager) ---
     // Short forest raiders that throw the flint they carry at the player from a standoff band,

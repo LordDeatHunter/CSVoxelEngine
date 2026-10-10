@@ -1,0 +1,35 @@
+{
+  // Slime splitting: run with VOXEL_SCRIPT=visual-examples/slime-split.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/slime-split/.
+  // Same flat forest clearing and hovering (immune) camera as slime-sizes.json. One largest slime
+  // stands in front of the camera; `damage` hits every live mob through Mob.TakeDamage, the path a
+  // punch or a slice lands through. The first hit takes the large slime across half its health, so
+  // it splits into two of the next smaller size that pop out of it ("split", "children"). The second
+  // hit leaves the parent alive below half (no second split) but takes each child across its own
+  // half line, so they split again into the smallest size ("cascade"). The amounts suit the shipped
+  // tuning (slime hp 8, health step 1, three sizes: 24 / 16 / 8 hp).
+  "steps": [
+    // Higher than slime-sizes.json and looking down, since the slimes gather under the camera
+    { "op": "teleport", "pos": [-43.5, 16.0, 61.5], "yaw": -90, "pitch": -32 },
+    { "op": "fly" },
+    // Chunks must be loaded before anything can stand on them
+    { "op": "wait", "seconds": 5 },
+    { "op": "spawn", "entity": "slime", "pos": [-43.5, 54.5], "size": 3 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "before" },
+    // 24 -> 10: above half before, at or below half after, still alive
+    { "op": "damage", "amount": 14 },
+    { "op": "wait", "seconds": 0.35 },
+    { "op": "screenshot", "name": "split" },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "screenshot", "name": "children" },
+    // Parent 10 -> 1 (already below half: no split); each child 16 -> 7 (splits)
+    { "op": "damage", "amount": 9 },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "cascade" },
+    // Back and up for an overview of the whole family gathering under where the camera hovered
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "teleport", "pos": [-43.5, 21.0, 68.5], "yaw": -90, "pitch": -42 },
+    { "op": "screenshot", "name": "swarm" }
+  ]
+}

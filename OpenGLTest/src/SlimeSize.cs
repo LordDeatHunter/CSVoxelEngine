@@ -68,6 +68,19 @@ public static class SlimeSize
         return size;
     }
 
+    /// <summary>
+    /// Whether a hit splits a slime of <paramref name="size"/>: the rule is on the transition, not on
+    /// being low. The health before the hit was above half of <paramref name="maxHealth"/>, the health
+    /// after it is at or below half and above zero (the slime survives), and the slime is larger than
+    /// <see cref="Min"/>. So a killing blow never splits, a slime already at or below half never splits
+    /// again, and the smallest slime never splits at all.
+    /// </summary>
+    public static bool SplitsOnHit(int healthBefore, int healthAfter, int maxHealth, int size) =>
+        size > Min && healthAfter > 0 && healthBefore * 2 > maxHealth && healthAfter * 2 <= maxHealth;
+
+    /// <summary>The size of the children a slime of <paramref name="size"/> splits into.</summary>
+    public static int ChildSize(int size) => Clamp(size - 1);
+
     /// <summary>Whether a spawn standing on <paramref name="groundY"/> is below ground: at least
     /// <see cref="WorldGenerationConfig.SlimeUndergroundDepthBlocks"/> under its column's terrain
     /// height <paramref name="surfaceHeight"/> (a cave floor, not the open surface).</summary>

@@ -72,6 +72,7 @@ public sealed class Slime : Mob
     private float _damageCooldown;
     private float _nextHop;
     private bool _inWater;
+    private bool _splitPending;
 
     /// <summary>A slime of <paramref name="size"/> (clamped into <see cref="SlimeSize.Min"/>..
     /// <see cref="SlimeSize.Max"/>) at full health; <paramref name="position"/> is the body centre,
@@ -145,6 +146,35 @@ public sealed class Slime : Mob
 
     /// <summary>Records that contact damage just landed, starting the per-hop cooldown.</summary>
     public void NotifyContactDamage() => _damageCooldown = ContactDamageCooldownSeconds;
+
+    /// <summary>Applies the hit, and marks a split when it crossed the half line while the slime
+    /// survived (<see cref="SlimeSize.SplitsOnHit"/>); the owning manager spawns the children on its
+    /// next update (<see cref="TakeSplit"/>). Only the authoritative simulation deals damage, so a
+    /// client's mirror, whose health arrives from its server, never splits.</summary>
+    public override void TakeDamage(int amount)
+    {
+        var before = Health;
+        base.TakeDamage(amount);
+        if (SlimeSize.SplitsOnHit(before, Health, MaxHealth, Size))
+            _splitPending = true;
+    }
+
+    /// <summary>True once after a hit that split the slime, then false until another one does.</summary>
+    internal bool TakeSplit()
+    {
+        if (!_splitPending) return false;
+        _splitPending = false;
+        return true;
+    }
+
+    /// <summary>Launches a slime just split off a larger one: a horizontal shove along
+    /// <paramref name="horizontalDirection"/> plus a small upward <paramref name="lift"/>.</summary>
+    internal void Pop(Vector3 horizontalDirection, float speed, float lift)
+    {
+        Shove(horizontalDirection, speed);
+        _velocity.Y = lift;
+        IsGrounded = false;
+    }
 
     /// <summary>Sets the horizontal shove a grounded player contact imparts, leaving vertical
     /// motion alone. Setting (not adding) keeps a sustained touch from accelerating the slime.</summary>

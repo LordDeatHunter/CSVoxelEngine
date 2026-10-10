@@ -2313,7 +2313,15 @@ chance again, which eases from `SlimeLargeChanceDay` to `SlimeLargeChanceNight` 
 `DayCycle.NightFactor(World.LightingTime)` — the same sun `RenderManager.SetLighting` lights the world
 by — and is the night value for ground at least `SlimeUndergroundDepthBlocks` under its column's
 surface (`SlimeSize.IsUnderground`; the surface-only ring never finds such a spot today). A rolled body
-that would overlap a block beside the cleared column steps down a size until it fits. The player fights back with
+that would overlap a block beside the cleared column steps down a size until it fits. A slime larger
+than the smallest **splits** on the transition, never on being low (`SlimeSize.SplitsOnHit`): a hit that
+takes it from above half its health to at or below half while it survives marks it in
+`Slime.TakeDamage`, and `SlimeManager.Update` then spawns `SlimeSplitChildren` of the next smaller size
+inside its body, shoved outward with a small hop, as forced spawns (only as many as the hard cap has
+room for). The parent lives on, so a killing blow, a second hit below half and the smallest slime never
+split. Only the authoritative simulation deals damage, so a client's mirror never splits.
+`visual-examples/slime-split.json` (`VOXEL_TIME=147`) hits a large slime across its half line and films
+the children and their own split. The player fights back with
 the left-click punch (`World.UpdatePunch` + `Combat`): a mob inside the forward 3-block, 30°-half-angle
 cone with line of sight takes the held item's `entityDamage` and a knockback shove, and while one is in
 the cone mining stands down (attack-first). `Mining.EntityDamage` is the bare-hand baseline (1) an item
