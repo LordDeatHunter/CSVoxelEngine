@@ -219,6 +219,13 @@ public class PlayerModel
     private Spring _swayYaw = new(3.5f, 0.5f);
     private Spring _swayPitch = new(3.5f, 0.5f);
     private Spring _equip = new(3.2f, 0.55f);
+    // The shoulders' rubber-band: each shoulder joint is pulled a little toward where its arm is reaching
+    // (see PullTarget), through a spring so a sudden thrust or release trails and settles. x, y, z in torso space.
+    private readonly Spring[] _pullR = [new(5f, 0.7f), new(5f, 0.7f), new(5f, 0.7f)];
+    private readonly Spring[] _pullL = [new(5f, 0.7f), new(5f, 0.7f), new(5f, 0.7f)];
+    private const float MaxShoulderPull = 0.08f;
+    /// <summary>The farthest a shoulder is ever pulled off its rest place on the torso, in blocks.</summary>
+    public const float MaxShoulderPullBlocks = MaxShoulderPull;
     private float _crouchBlend;
     private float _swimBlend;
     // Seconds since the last swim stroke began; the stroke is over (the arms rest in front) once it
@@ -382,6 +389,13 @@ public class PlayerModel
         _swayYaw.Step(0f, deltaTime);
         _swayPitch.Step(0f, deltaTime);
         _equip.Step(0f, deltaTime);
+        var pullR = PullTarget(right: true);
+        var pullL = PullTarget(right: false);
+        for (var i = 0; i < 3; i++)
+        {
+            _pullR[i].Step(pullR[i], deltaTime);
+            _pullL[i].Step(pullL[i], deltaTime);
+        }
         _crouchBlend = MathUtils.Damp(_crouchBlend, sneaking ? 1f : 0f, 12f, deltaTime);
         _swimBlend = MathUtils.Damp(_swimBlend, swimming ? 1f : 0f, 6f, deltaTime);
         _swimBobTime += deltaTime;
@@ -701,6 +715,58 @@ public class PlayerModel
             MathUtils.Lerp(pose.TorsoPitch, 0f, s), MathUtils.Lerp(pose.Bob, bob, s));
     }
 
+    // ---- Shoulder pull -------------------------------------------------------------------
+    // The shoulders ride on the torso (they are children of its frame), so they can never detach from it.
+    // On top of that a heavily extended arm drags its shoulder a little toward where it reaches, instead of
+    // the limb stretching away from a body that stays put: torso-space offsets (x right, y up, z back)
+    // driven by how far each action has taken the arm out, never more than MaxShoulderPull.
+    private Vector3 PullTarget(bool right)
+    {
+        var side = right ? 1f : -1f;
+        var pull = Vector3.Zero;
+
+        // Arms thrown out in a jump lift and widen their shoulders.
+        var air = _airBlend * (1f - _swimBlend);
+        pull += new Vector3(0.015f * side, 0.025f, 0f) * air;
+        // The swim stroke throws both shoulders out with the arms.
+        pull += new Vector3(0.025f * side, 0.015f, -0.02f) * (_swimBlend * StrokeOut());
+
+        if (right)
+        {
+            // A cocked throw reaches out to the right and back and lifts the shoulder.
+            pull += new Vector3(0.035f, 0.025f, 0.035f) * ThrowArmWeight();
+            // A slice drags the shoulder across with the sweep.
+            pull += new Vector3(-0.035f * SliceBodySweep(), 0f, 0f);
+            if (_mineT < 1f)
+            {
+                var w = PunchWeights(_mineT);
+                // The chambered elbow flares out, the thrust pushes the shoulder forward after the fist.
+                pull += new Vector3(0.03f, 0f, 0f) * (w.Retract * (1f - w.Extend) * (1f - w.Recover));
+                pull += new Vector3(0f, 0.01f, -0.05f) * (w.Extend * (1f - w.Recover));
+            }
+        }
+        else if (_mineT < 1f)
+        {
+            // The off hand swings back as the fist drives out and takes its shoulder with it.
+            pull += new Vector3(0f, 0f, 0.03f) * PunchWeights(_mineT).Extend;
+        }
+
+        var length = pull.Length();
+        return length > MaxShoulderPull ? pull * (MaxShoulderPull / length) : pull;
+    }
+
+    /// <summary>
+    /// Where a shoulder joint sits relative to its rest place on the torso: the spring-smoothed pull toward where the
+    /// arm reaches, in torso space (x right, y up, z back), at most <see cref="MaxShoulderPull"/> long.
+    /// </summary>
+    public Vector3 ShoulderPull(bool right)
+    {
+        var springs = right ? _pullR : _pullL;
+        var pull = new Vector3(springs[0].Value, springs[1].Value, springs[2].Value);
+        var length = pull.Length();
+        return length > MaxShoulderPull ? pull * (MaxShoulderPull / length) : pull;
+    }
+
     // ---- Arm frames ----------------------------------------------------------------------
     // The base arm is a forward flex about X plus a yaw about the vertical: both of its bones stay in
     // one plane, so it cannot reach out to the side. Poses that need that (the airborne arms, the
@@ -853,7 +919,9 @@ public class PlayerModel
             Drop = dip * 0.12f + crouch * 0.17f + sliceDip * 0.06f,
             TorsoYaw = MathF.Sin(_walkPhase) * 0.1f * move + sliceTwist + throwTwist
                        - PunchTwist * PunchWeights(_mineT).Extend,
-            TorsoRoll = MathF.Cos(_walkPhase) * 0.035f * move + sliceRoll + _flinch.Value * 0.08f,
+            // The body also leans a little toward whichever side its shoulders are being pulled out to.
+            TorsoRoll = MathF.Cos(_walkPhase) * 0.035f * move + sliceRoll + _flinch.Value * 0.08f
+                        - (_pullR[0].Value + _pullL[0].Value) * 0.8f,
             HeadPitch = _flinch.Value * 0.45f - crouch * 0.1f,
             HeadYaw = BodyYawLags && _lookKnown ? -MathUtils.ToRadians(WrapDegrees(_lookYaw - _bodyYaw)) : 0f,
             // The whole body (legs included) tips toward the heading: forward when swimming ahead, back
@@ -926,27 +994,40 @@ public class PlayerModel
         return (1f, 1f - settle, settle);
     }
 
-    // A fist position in the view frame as an offset from the shoulder in body space. The
-    // shoulder does not rotate with the look — it sits ShoulderX to the side, ShoulderY above
-    // the feet and FirstPersonBodyBack behind the eye — so the view-frame point has to be turned
-    // back out by the pitch before the arm can be solved to it. Y is the up axis and Z points
-    // forward out of the eye, so a point in front has a negative Z here.
-    private static Vector3 PunchTargetFromShoulder(Vector3 viewFist, float pitchRad)
+    // The torso's rotation (about the hips) for a given forward pitch: what the shoulders ride on.
+    private Matrix4x4 TorsoRotation(float torsoPitch)
+    {
+        var mods = ComputeMods();
+        return Matrix4x4.CreateRotationX(torsoPitch) * Matrix4x4.CreateRotationY(mods.TorsoYaw)
+               * Matrix4x4.CreateRotationZ(mods.TorsoRoll);
+    }
+
+    // A fist position in the view frame as an offset from the shoulder in body space. The shoulder
+    // does not rotate with the look - it sits ShoulderX to the side, ShoulderY above the feet and
+    // FirstPersonBodyBack behind the eye - so the view-frame point has to be turned back out by the
+    // pitch before the arm can be solved to it. The shoulder is where the torso's lean and twist
+    // actually carry it (it rides on the torso), not where it rests, or the fist would miss the aim by
+    // the few centimetres the torso moved it. Y is the up axis and Z points forward out of the eye, so a
+    // point in front has a negative Z here.
+    private Vector3 PunchTargetFromShoulder(Vector3 viewFist, float pitchRad, float torsoPitch)
     {
         var cos = MathF.Cos(pitchRad);
         var sin = MathF.Sin(pitchRad);
-        return new Vector3(
-            viewFist.X - ShoulderX,
-            viewFist.Y * cos + viewFist.Z * sin - (ShoulderY - Camera.EyeHeight),
+        var hip = Rig.Parts.TryGetValue("Torso", out var torso) ? torso.Pivot : new Vector3(0f, HipY, 0f);
+        var shoulderNow = Vector3.Transform(new Vector3(ShoulderX, ShoulderY, 0f) - hip, TorsoRotation(torsoPitch)) + hip;
+        var target = new Vector3(
+            viewFist.X,
+            Camera.EyeHeight + viewFist.Y * cos + viewFist.Z * sin,
             viewFist.Y * sin - viewFist.Z * cos - FirstPersonBodyBack);
+        return target - shoulderNow;
     }
 
     // Shoulder and elbow that put the fist on a view-frame point, for a camera pitched by
     // pitchRad. Beyond the arm's reach the solver pins the elbow straight, which leaves the jab
     // pointing at the target and merely falling short of it.
-    private static (float Shoulder, float Elbow) PunchTargetJoints(Vector3 viewFist, float pitchRad)
+    private (float Shoulder, float Elbow) PunchTargetJoints(Vector3 viewFist, float pitchRad, float torsoPitch)
     {
-        var target = PunchTargetFromShoulder(viewFist, pitchRad);
+        var target = PunchTargetFromShoulder(viewFist, pitchRad, torsoPitch);
         var lateral = MathF.Sqrt(target.X * target.X + target.Z * target.Z);
         return SolveArm(target.Y, -lateral);
     }
@@ -954,20 +1035,20 @@ public class PlayerModel
     // Azimuth of the fist on a view-frame point: the arm yaws to swing across to the aim's own
     // side of the shoulder. Absolute, so the caller subtracts the fixed ArmInwardYaw that
     // UpperArm adds by itself.
-    private static float PunchTargetYaw(Vector3 viewFist, float pitchRad)
+    private float PunchTargetYaw(Vector3 viewFist, float pitchRad, float torsoPitch)
     {
-        var target = PunchTargetFromShoulder(viewFist, pitchRad);
+        var target = PunchTargetFromShoulder(viewFist, pitchRad, torsoPitch);
         return MathF.Atan2(-target.X, -target.Z);
     }
 
     // Right shoulder and elbow through the jab: chamber the fist against the aim line, drive it
     // out to full extension (the elbow is the joint that actually does the punching), then ease
     // back to the base pose.
-    private static (float Shoulder, float Elbow) PunchJoints(in Pose pose, float p, float pitchRad)
+    private (float Shoulder, float Elbow) PunchJoints(in Pose pose, float p, float pitchRad, float torsoPitch)
     {
         var w = PunchWeights(p);
-        var (chamberShoulder, chamberElbow) = PunchTargetJoints(PunchChamberFist, pitchRad);
-        var (extendShoulder, extendElbow) = PunchTargetJoints(PunchExtendFist, pitchRad);
+        var (chamberShoulder, chamberElbow) = PunchTargetJoints(PunchChamberFist, pitchRad, torsoPitch);
+        var (extendShoulder, extendElbow) = PunchTargetJoints(PunchExtendFist, pitchRad, torsoPitch);
         var shoulder = MathUtils.Lerp(pose.RightShoulder, chamberShoulder, w.Retract);
         var elbow = MathUtils.Lerp(pose.RightElbow, chamberElbow, w.Retract);
         shoulder = MathUtils.Lerp(shoulder, extendShoulder, w.Extend);
@@ -990,13 +1071,13 @@ public class PlayerModel
     // The jab's own arm yaw in radians, absolute in body space, riding the same weights as the
     // joints. Depends only on the swing timer and the pitch, so GetPartMatrix and the hand anchor
     // can both ask for it without re-deriving the pose.
-    private float PunchArmYaw(float pitchRad)
+    private float PunchArmYaw(float pitchRad, float torsoPitch)
     {
         if (_mineT >= 1f)
             return 0f;
         var w = PunchWeights(_mineT);
-        var yaw = MathUtils.Lerp(0f, PunchTargetYaw(PunchChamberFist, pitchRad), w.Retract);
-        yaw = MathUtils.Lerp(yaw, PunchTargetYaw(PunchExtendFist, pitchRad), w.Extend);
+        var yaw = MathUtils.Lerp(0f, PunchTargetYaw(PunchChamberFist, pitchRad, torsoPitch), w.Retract);
+        yaw = MathUtils.Lerp(yaw, PunchTargetYaw(PunchExtendFist, pitchRad, torsoPitch), w.Extend);
         return MathUtils.Lerp(yaw, 0f, w.Recover);
     }
 
@@ -1005,10 +1086,15 @@ public class PlayerModel
         if (_mineT >= 1f)
             return pose;
         var pitchRad = MathUtils.ToRadians(pitchDeg);
-        var (shoulder, elbow) = PunchJoints(pose, _mineT, pitchRad);
+        var w = PunchWeights(_mineT);
+        var torsoPitch = pose.TorsoPitch - PunchLean * (1f + _mineWeight * 1.5f) * w.Extend;
+        var (shoulder, elbow) = PunchJoints(pose, _mineT, pitchRad, torsoPitch);
+        // The arm hangs off the torso, so the torso's lean tilts it too: take that out of the flexion so the
+        // fist still lands where the solve put it.
+        shoulder -= torsoPitch * w.Retract * (1f - w.Recover);
         return new Pose(pose.LeftHip, pose.RightHip, pose.LeftKnee, pose.RightKnee,
-            pose.LeftShoulder - PunchLeftCounter * PunchWeights(_mineT).Extend, shoulder, pose.LeftElbow, elbow,
-            pose.TorsoPitch - PunchLean * (1f + _mineWeight * 1.5f) * PunchWeights(_mineT).Extend, pose.Bob);
+            pose.LeftShoulder - PunchLeftCounter * w.Extend, shoulder, pose.LeftElbow, elbow,
+            torsoPitch, pose.Bob);
     }
 
     /// <summary>
@@ -1048,15 +1134,19 @@ public class PlayerModel
         var root = local * Matrix4x4.CreateRotationY(yawRad + mods.RootYaw) * Matrix4x4.CreateTranslation(feet + new Vector3(0f, pose.Bob, 0f));
         var swingAxis = Vector3.UnitX;
 
-        Matrix4x4 Torso() =>
-            Matrix4x4.CreateFromAxisAngle(swingAxis, pose.TorsoPitch)
-            * Matrix4x4.CreateRotationY(mods.TorsoYaw) * Matrix4x4.CreateRotationZ(mods.TorsoRoll)
-            * Matrix4x4.CreateTranslation(Pivot("Torso")) * root;
+        // The torso frame: hip-origin, so it turns about the hips. The neck and both shoulders are its
+        // children (their pivots are expressed relative to the hips), so whatever the torso does - lean,
+        // twist, roll - they ride on it and can never come off it or sink into it.
+        var torsoFrame = Matrix4x4.CreateFromAxisAngle(swingAxis, pose.TorsoPitch)
+                         * Matrix4x4.CreateRotationY(mods.TorsoYaw) * Matrix4x4.CreateRotationZ(mods.TorsoRoll)
+                         * Matrix4x4.CreateTranslation(Pivot("Torso")) * root;
+
+        Matrix4x4 Torso() => torsoFrame;
 
         Matrix4x4 Head() =>
             Matrix4x4.CreateFromAxisAngle(swingAxis, pitchDeg * MathF.PI / 180f * 0.8f + mods.HeadPitch)
             * Matrix4x4.CreateRotationY(mods.HeadYaw)
-            * Matrix4x4.CreateTranslation(Pivot("Head")) * root;
+            * Matrix4x4.CreateTranslation(Pivot("Head") - Pivot("Torso")) * torsoFrame;
 
         // The arm's two frames: the base flexion and yaw, then the pose-specific overlays.
         void ArmFrames(Vector3 pivot, float shoulder, float sweep, float elbow,
@@ -1072,10 +1162,19 @@ public class PlayerModel
                             * Matrix4x4.CreateFromAxisAngle(Vector3.UnitY, side * ArmInwardYaw + sweep + _swayYaw.Value));
             fore = FrameOf(Matrix4x4.CreateFromAxisAngle(swingAxis, elbow));
             ApplyArmFrames(side, ref upper, ref fore);
+            // The arm now hangs off the torso, so the torso's twist turns it too. The authored poses (the
+            // slice sweep, the cocked throw, the punch) were tuned in body space, so while one is showing the twist
+            // is taken back out of the arm's yaw and its hand path stays where it was; an idle arm simply follows
+            // the torso round.
+            var authored = side > 0f ? MathUtils.Clamp01(MathF.Max(SliceStroke(), MathF.Max(ThrowArmWeight(), PunchActivity()))) : 0f;
+            if (authored > 0f && mods.TorsoYaw != 0f)
+                upper = FrameOf(Matrix4x4.CreateFromQuaternion(upper) * Matrix4x4.CreateRotationY(-mods.TorsoYaw * authored));
         }
 
+        // A shoulder sits where it rests on the torso plus its pull toward the reaching arm, in the torso frame.
         Matrix4x4 UpperArm(Vector3 pivot, Quaternion upper) =>
-            Matrix4x4.CreateFromQuaternion(upper) * Matrix4x4.CreateTranslation(pivot) * root;
+            Matrix4x4.CreateFromQuaternion(upper)
+            * Matrix4x4.CreateTranslation(pivot - Pivot("Torso") + ShoulderPull(pivot.X > 0f)) * torsoFrame;
 
         // The legs turn back against the body's twist so the feet stay planted.
         Matrix4x4 Thigh(Vector3 pivot, float hip) =>
@@ -1087,7 +1186,7 @@ public class PlayerModel
         // The jab swings the arm across to the aim's own side as it extends, and back out on the
         // recovery. PunchArmYaw is absolute while UpperArm adds ArmInwardYaw on its own, so that
         // fixed term is taken back out here.
-        var rightArmYaw = sliceSweep + PunchArmYaw(pitchRad) - ArmInwardYaw;
+        var rightArmYaw = sliceSweep + PunchArmYaw(pitchRad, pose.TorsoPitch) - ArmInwardYaw;
         var rightShoulder = pose.RightShoulder + SliceLift();
         var rightElbow = pose.RightElbow;
 
@@ -1170,7 +1269,7 @@ public class PlayerModel
         var punch = PunchActivity();
         return Matrix4x4.CreateRotationZ(SliceRoll())
             * Matrix4x4.CreateRotationX(pitchRad * punch)
-            * Matrix4x4.CreateRotationY(yawRad + SliceBladeYawShare * (ComputeMods().RootYaw + SliceSweep()) + PunchArmYaw(pitchRad) + _swayYaw.Value)
+            * Matrix4x4.CreateRotationY(yawRad + SliceBladeYawShare * (ComputeMods().RootYaw + SliceSweep()) + PunchArmYaw(pitchRad, GetPose(pitchDeg).TorsoPitch) + _swayYaw.Value)
             * Matrix4x4.CreateTranslation(fist);
     }
 

@@ -477,4 +477,62 @@ public sealed class PlayerModelJuiceTests
         // ... while the feet do not slide round the body.
         Assert.True(System.Numerics.Vector3.Distance(Foot(), restFoot) < 0.25f);
     }
+
+    // ---- attachment ----
+
+    [Fact]
+    public void TheShouldersAndTheNeckStayOnTheTorsoThroughEveryAnimation()
+    {
+        var eye = new System.Numerics.Vector3(0f, 1.62f, 0f);
+        foreach (var mode in PlayerPreviewState.AllModes)
+        foreach (var lookPitch in new[] { 0f, 35f })
+        {
+            var model = new PlayerModel();
+            var state = new PlayerPreviewState(model);
+            Assert.True(state.SetMode(mode));
+            var hip = model.Rig.Parts["Torso"].Pivot;
+
+            for (var frame = 0; frame < 420; frame++)
+            {
+                state.Update(Dt);
+                if (frame % 3 != 0) continue;
+
+                System.Numerics.Matrix4x4.Invert(model.GetPartMatrix("Torso", eye, -90f, lookPitch), out var toTorso);
+                // A joint's place in the torso's own frame, against where it rests on the torso.
+                System.Numerics.Vector3 Local(string part) =>
+                    System.Numerics.Vector3.Transform(
+                        model.GetPartMatrix(part, eye, -90f, lookPitch).Translation, toTorso);
+
+                foreach (var (part, bound) in new[] { ("UpperArmL", 0.085f), ("UpperArmR", 0.085f), ("Head", 0.005f) })
+                {
+                    var rest = model.Rig.Parts[part].Pivot - hip;
+                    var offset = System.Numerics.Vector3.Distance(Local(part), rest);
+                    // The arms may be pulled a little toward where they reach (the rubber band), never off the body.
+                    Assert.True(offset <= bound,
+                        $"{mode} frame {frame} (look pitch {lookPitch}): {part} is {offset:F3} blocks off its place on the torso.");
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void ARetractedArmPullsItsShoulderOutAndTheShoulderSettlesBack()
+    {
+        var model = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++) model.Update(Dt, 0f);
+        Assert.Equal(0f, model.ShoulderPull(true).Length(), 3);
+
+        model.StartThrowCharge();
+        model.UpdateThrowCharge(1f);
+        for (var i = 0; i < 60; i++) model.Update(Dt, 0f);
+        var cocked = model.ShoulderPull(true);
+        // Reaching out to the right and back drags the shoulder that way, within the bound, and not the idle one.
+        Assert.True(cocked.X > 0.02f);
+        Assert.True(cocked.Length() <= PlayerModel.MaxShoulderPullBlocks + 1e-4f);
+        Assert.True(model.ShoulderPull(false).Length() < 0.01f);
+
+        model.CancelThrowCharge();
+        for (var i = 0; i < 180; i++) model.Update(Dt, 0f);
+        Assert.True(model.ShoulderPull(true).Length() < 0.005f);
+    }
 }

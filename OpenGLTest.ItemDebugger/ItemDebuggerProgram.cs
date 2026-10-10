@@ -172,6 +172,23 @@ public static class ItemDebuggerProgram
                 StringComparison.OrdinalIgnoreCase))
             _firstPerson = true;
 
+        // The orbit camera's yaw and pitch in degrees: yaw 0 looks at the player's back (the model faces -Z),
+        // 90 from its right side... 180 from the front, which is where a limb coming off the body shows.
+        var orbit = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_ORBIT")?.Trim();
+        if (!string.IsNullOrEmpty(orbit))
+        {
+            var parts = orbit.Split(',');
+            if (parts.Length == 2
+                && float.TryParse(parts[0].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var oy)
+                && float.TryParse(parts[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var op))
+            {
+                _orbitYaw = oy;
+                _orbitPitch = Math.Clamp(op, -85f, 85f);
+            }
+            else
+                Log.Warn($"ITEM_DEBUGGER_ORBIT: '{orbit}' is not 'yaw,pitch' in degrees.");
+        }
+
         var look = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_LOOK")?.Trim();
         if (!string.IsNullOrEmpty(look) && TryParseLook(look, out var lookYaw, out var lookPitch))
         {
