@@ -31,6 +31,8 @@ public class Camera : IMobTarget
     /// <summary>True while crouched on foot (Left Ctrl): slower, a lowered view and the model's crouch pose.
     /// The body and its collision keep their size, so the server's movement rules are unaffected.</summary>
     public bool IsSneaking { get; private set; }
+    /// <summary>Strokes the swimmer has started so far; moves on each one (see <c>PlayerPhysics.SwimStrokeSeconds</c>).</summary>
+    public int SwimStrokeCount => _physics.SwimStrokeCount;
     /// <summary>Current vertical FOV in degrees; eases toward sprint boost with speed.</summary>
     public float CurrentFov => _currentFov;
     /// <summary>

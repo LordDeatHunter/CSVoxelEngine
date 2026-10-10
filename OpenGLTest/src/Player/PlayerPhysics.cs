@@ -46,6 +46,26 @@ internal sealed class PlayerPhysics
     // Crouched walking speed as a share of the base walk.
     private const float SneakSpeedFactor = 0.4f;
     internal const float SwimUpSpeed = 4f;
+
+    // Swimming is a series of strokes rather than a steady paddle. A stroke is the arms thrusting out
+    // from in front of the body to the sides, and it kicks the swimmer in the direction of the
+    // movement input: the speed is *set* to SwimBurstSpeed at that instant and then glides off under
+    // SwimGlideDrag until the next stroke is ready, SwimStrokeSeconds after the last (the arms
+    // recover slowly to the front in the meantime; PlayerModel runs the same clock). Space and Ctrl
+    // stroke straight up and down. The first stroke after entering the water is ready at once.
+    internal const float SwimStrokeSeconds = 1.15f;
+    internal const float SwimBurstSpeed = 6.5f;
+    internal const float SwimBurstUp = 9f;
+    internal const float SwimBurstDown = -6f;
+    internal const float SwimGlideDrag = 1.6f;
+    // Reaching a bank still lifts the swimmer out through SwimExitBoost below, which is the one
+    // vertical speed here the server's rise rule is documented against; a stroke stays under it.
+
+    private float _swimStrokeTimer = SwimStrokeSeconds;
+    private float _pendingSwimVertical;
+
+    /// <summary>Counts strokes started, so the body can start its stroke animation on the same frame.</summary>
+    public int SwimStrokeCount { get; private set; }
     private const float SinkSpeed = -2f;
     private const float WaterDrag = 6f;
     // Pushing into a bank while holding Space lifts the player over it, so getting out of
@@ -229,7 +249,25 @@ internal sealed class PlayerPhysics
         if (camera.IsFlying)
             accelRate = FlyAccelRate;
         else if (swimming)
-            accelRate = SwimAccelRate;
+        {
+            // No steady paddle: the speed only changes at a stroke and glides off in between.
+            accelRate = SwimGlideDrag;
+            wish = Vector2.Zero;
+            _swimStrokeTimer += deltaTime;
+            var strokeUp = keyboard.IsKeyPressed(Key.Space);
+            var strokeDown = keyboard.IsKeyPressed(Key.ControlLeft);
+            if (_swimStrokeTimer >= SwimStrokeSeconds && (moving || strokeUp || strokeDown))
+            {
+                _swimStrokeTimer = 0f;
+                SwimStrokeCount++;
+                if (moving)
+                {
+                    var burst = SwimBurstSpeed * (backing ? 0.6f : 1f) * camera.MovementFactor;
+                    _horizontalVelocity = new Vector2(moveInput.X, moveInput.Z) * burst;
+                }
+                _pendingSwimVertical = strokeUp ? SwimBurstUp : strokeDown ? SwimBurstDown : 0f;
+            }
+        }
         else if (camera.IsGrounded)
         {
             camera.SetGroundFriction(SampleGroundFriction(camera, chunkManager));
@@ -239,6 +277,7 @@ internal sealed class PlayerPhysics
         {
             accelRate = AirAccelRate;
         }
+        if (!swimming) _swimStrokeTimer = SwimStrokeSeconds;
         _horizontalVelocity.X = MathUtils.Damp(_horizontalVelocity.X, wish.X, accelRate, deltaTime);
         _horizontalVelocity.Y = MathUtils.Damp(_horizontalVelocity.Y, wish.Y, accelRate, deltaTime);
 
@@ -285,8 +324,15 @@ internal sealed class PlayerPhysics
             }
             else
             {
-                _verticalVelocity = MathUtils.Damp(_verticalVelocity,
-                    keyboard.IsKeyPressed(Key.Space) ? SwimUpSpeed : SinkSpeed, WaterDrag, deltaTime);
+                // A vertical stroke sets the speed, which then glides toward the gentle sink.
+                if (_pendingSwimVertical != 0f)
+                {
+                    _verticalVelocity = _pendingSwimVertical > 0f
+                        ? MathF.Max(_verticalVelocity, _pendingSwimVertical)
+                        : MathF.Min(_verticalVelocity, _pendingSwimVertical);
+                    _pendingSwimVertical = 0f;
+                }
+                _verticalVelocity = MathUtils.Damp(_verticalVelocity, SinkSpeed, SwimGlideDrag, deltaTime);
             }
 
             frameMovement.Y = _verticalVelocity * deltaTime;
