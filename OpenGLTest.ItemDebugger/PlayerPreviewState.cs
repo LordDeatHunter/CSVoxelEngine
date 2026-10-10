@@ -13,7 +13,7 @@ namespace silkgltriangle;
 /// so a swing can be watched repeatedly. Nothing here is a second implementation of an animation: it only
 /// calls <see cref="PlayerModel.Update"/> and the triggers the world calls, with the same inputs.
 /// </summary>
-public sealed class PlayerPreviewState
+public sealed class PlayerPreviewState : IPreviewDriver
 {
     public const string Idle = "idle";
     public const string Walk = "walk";
@@ -68,7 +68,7 @@ public sealed class PlayerPreviewState
     private const float DeathHoldSeconds = 0.7f;
     private const float DeathFallSeconds = 0.9f;
 
-    private readonly PlayerModel _model;
+    private PlayerModel _model;
     private float _rest;
     private float _clock;
     private float _airTime;
@@ -83,6 +83,44 @@ public sealed class PlayerPreviewState
         _model = model;
         Mode = Idle;
     }
+
+    /// <summary>The model being posed. It is replaced by a fresh one on <see cref="Restart"/> (so a restart reproduces
+    /// the same frames), so a renderer must read it every frame rather than keep it.</summary>
+    public PlayerModel Model => _model;
+
+    /// <summary>Whether a one-shot (and the jump loops) replay by themselves after a rest. Off, each plays once and
+    /// holds; the <see cref="AnimationClock"/> turns it off and owns the replay.</summary>
+    public bool Replay { get; set; } = true;
+
+    /// <summary>True for the poses with no start or end (idle, walk, run, sneak, swim): a clock wraps them.</summary>
+    public bool IsContinuous => Mode is Idle or Walk or Run or Sneak or Swim or SwimIdle;
+
+    /// <summary>Seconds one play of the active mode lasts (a cycle for a continuous pose).</summary>
+    public float Duration => Mode switch
+    {
+        Walk or Run or Sneak or Idle or SwimIdle => 2f,
+        Swim => PlayerPhysics.SwimStrokeSeconds * 2f,
+        Jump or SprintJump => 2f * JumpSpeed / Gravity + 0.9f,
+        Land => 0.25f + 0.9f,
+        Punch => PlayerModel.MineDuration + 0.1f,
+        HeavyPunch => PlayerModel.MineDuration / 0.7f + 0.1f,
+        Slice or SliceBack => PlayerModel.SliceDuration + 0.1f,
+        Throw => ThrowChargeSeconds + ThrowHoldSeconds + PlayerModel.ThrowDuration + 0.1f,
+        Hurt => 1f,
+        Equip => 1.2f,
+        Death => DeathFallSeconds + DeathHoldSeconds,
+        _ => 2f,
+    };
+
+    /// <summary>Goes back to the exact start of the active mode: a fresh <see cref="PlayerModel"/> on the same rig.</summary>
+    public void Restart()
+    {
+        _model = new PlayerModel { Rig = _model.Rig, BodyYawLags = _model.BodyYawLags, AutoSwimStroke = _model.AutoSwimStroke };
+        Reset();
+    }
+
+    // How long a play waits before firing again: a short rest, or never when replay is off.
+    private float RestFor(float seconds) => Replay ? seconds : float.MaxValue / 4f;
 
     /// <summary>The active mode, always one of <see cref="AllModes"/>.</summary>
     public string Mode { get; private set; }
@@ -195,7 +233,7 @@ public sealed class PlayerPreviewState
         {
             // Touched down: one frame supported lets the model see the landing.
             _jumping = false;
-            _rest = RestBetweenPlays;
+            _rest = RestFor(RestBetweenPlays);
             _model.Update(dt, speed, sprinting, grounded: true, verticalVelocity: 0f);
             return;
         }
@@ -224,7 +262,7 @@ public sealed class PlayerPreviewState
             return;
         }
         _jumping = false;
-        _rest = RestBetweenPlays + 0.6f;
+        _rest = RestFor(RestBetweenPlays + 0.6f);
         _model.Update(dt, 0f, grounded: true);
     }
 
@@ -243,7 +281,7 @@ public sealed class PlayerPreviewState
         if (_playing && !Busy())
         {
             _playing = false;
-            _rest = RestBetweenPlays;
+            _rest = RestFor(RestBetweenPlays);
         }
 
         if (!_playing)
@@ -303,7 +341,7 @@ public sealed class PlayerPreviewState
         {
             _model.ReleaseThrow(1f);
             _throwCharging = false;
-            _rest = RestBetweenPlays;
+            _rest = RestFor(RestBetweenPlays);
         }
     }
 
@@ -313,7 +351,8 @@ public sealed class PlayerPreviewState
         _model.Update(dt, 0f);
         _deathTimer += dt;
         var total = DeathFallSeconds + DeathHoldSeconds;
-        if (_deathTimer >= total + RestBetweenPlays) _deathTimer = 0f;
-        _model.DeathFall = _deathTimer >= total ? 0f : MathUtils.Clamp01(_deathTimer / DeathFallSeconds);
+        // Replaying: stand back up after the hold and start over; otherwise stay down.
+        if (Replay && _deathTimer >= total + RestBetweenPlays) _deathTimer = 0f;
+        _model.DeathFall = Replay && _deathTimer >= total ? 0f : MathUtils.Clamp01(_deathTimer / DeathFallSeconds);
     }
 }

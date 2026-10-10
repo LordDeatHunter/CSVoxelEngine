@@ -89,14 +89,15 @@ public sealed class Goblin : Mob
     private Vector3 _aimTarget;
     private bool _hitWall;
 
-    public Goblin(EntityType type, Vector3 position, int ammo) : base(type, position)
+    public Goblin(EntityType type, Vector3 position, int ammo, bool spawnIn = true) : base(type, position)
     {
         Ammo = Math.Max(0, ammo);
         Animation = new EntityAnimator(type.Model.Animations, WorldGenerationConfig.GoblinWalkSpeed);
         // A fresh goblin notices the player before its first throw rather than throwing on its
         // first grounded frame; unjittered so scripted shots repeat.
         _throwCooldown = WorldGenerationConfig.GoblinFirstThrowDelaySeconds;
-        Animation.Play(SpawnClip);
+        if (spawnIn) Animation.Play(SpawnClip);
+        else FinishSpawn();
     }
 
     /// <inheritdoc />

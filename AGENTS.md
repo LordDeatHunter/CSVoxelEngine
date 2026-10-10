@@ -96,6 +96,15 @@ triggers the game does, so what shows is exactly what the game poses (a jump loo
 swim that strokes as long as forward is held, a throw that charges, holds and releases, a death that
 falls over and gets back up). **Use this tab first for any player animation change**: it is faster
 than a scenario and shows the body from any orbit angle (the VIEW button switches to first person).
+Both animated tabs (ITEMS and ENTITIES) share a **timeline** along the bottom of the viewport
+(`AnimationClock`, GL-free and tested): a **Progress** slider (seconds into the current play; dragging it
+scrubs, and the clock stops while it is held), a **Speed** slider (x0 to x4 in steps of 0.1, 0 pauses) and a
+**LOOP** toggle (on: a one-shot starts over and a continuous pose wraps; off: the play runs once and holds its
+last frame). The clock steps the state in fixed 1/60 s slices, and a scrub restarts the state
+(`IPreviewDriver.Restart`: a fresh `PlayerModel` / mob, already settled unless the mode shows the spawn) and
+steps it up to the time, so scrubbing lands on exactly the frame playing would (a test asserts it for every
+mode). Both preview states are drivers: each mode has a `Duration`, the clock turns their own replay off
+(`Replay`) and owns it. `ITEM_DEBUGGER_SPEED` / `ITEM_DEBUGGER_LOOP` set the playback options at startup.
 **ENTITIES** lists every `EntityRegistry` entry and draws the selected one part by part
 through its `EntityAnimator` (`DebugSceneRenderer.RenderEntity`). The mode buttons are data-driven: one
 per clip in the selected model's `.bbmodel`, in file order, plus HURT (hurts the mob: the hit flash,
@@ -141,6 +150,7 @@ Environment variables for scripted captures:
 - `ITEM_DEBUGGER_PLAYER_ANIM=<mode>` picks the player animation (`idle`, `walk`, `run`, `sneak`, `jump`,
   `sprint jump`, `land`, `swim`, `swim idle`, `punch`, `heavy punch`, `slice`, `slice back`, `throw`,
   `hurt`, `equip`, `death`) and selects the ITEMS tab. An unknown mode logs a warning listing them.
+- `ITEM_DEBUGGER_SPEED=<0..4>` and `ITEM_DEBUGGER_LOOP=<0|1>` set the timeline's speed and loop at startup.
 - `ITEM_DEBUGGER_SHOT=<png path>` saves one screenshot and closes. Without `ITEM_DEBUGGER_SHOT_AT` it
   fires on an early frame, so a one-shot is caught near its start.
 - `ITEM_DEBUGGER_SHOT_AT=<seconds>` (with `ITEM_DEBUGGER_SHOT`) steps the simulation a fixed 1/60 s per

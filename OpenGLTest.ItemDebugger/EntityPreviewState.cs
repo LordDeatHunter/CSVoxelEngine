@@ -20,7 +20,7 @@ namespace silkgltriangle;
 /// construction, so build it only after content is loaded.
 /// </para>
 /// </summary>
-public sealed class EntityPreviewState
+public sealed class EntityPreviewState : IPreviewDriver
 {
     /// <summary>The mode that hurts the entity: the hit flash, recoil and (when authored) the hurt clip.</summary>
     public const string HurtMode = "hurt";
@@ -99,6 +99,54 @@ public sealed class EntityPreviewState
 
     /// <summary>True when the previewed rig has the hand the goblin holds its flint in.</summary>
     public bool ShowsHeldStone => Selected != null && Selected.Model.Parts.ContainsKey(Goblin.HandPart);
+
+    /// <summary>Whether the modes replay by themselves (a one-shot after a rest, the hurt pulse, a death or spawn starting
+    /// over). Off, each plays once and holds; the <see cref="AnimationClock"/> turns it off and owns the replay.</summary>
+    public bool Replay { get; set; } = true;
+
+    private float RestFor(float seconds) => Replay ? seconds : float.MaxValue / 4f;
+
+    /// <summary>True for idle and walk: no start or end of their own, so a clock wraps them.</summary>
+    public bool IsContinuous =>
+        string.Equals(Mode, EntityAnimator.IdleClip, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(Mode, EntityAnimator.WalkClip, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Seconds one play of the active mode lasts: its clip's length, or the life-cycle mode's own length.</summary>
+    public float Duration
+    {
+        get
+        {
+            if (string.Equals(Mode, HurtMode, StringComparison.OrdinalIgnoreCase)) return HurtPeriod;
+            if (string.Equals(Mode, SpawnMode, StringComparison.OrdinalIgnoreCase)) return 0.6f;
+            if (string.Equals(Mode, DeathMode, StringComparison.OrdinalIgnoreCase))
+                return (PreviewMob?.DeathSeconds ?? Mob.DefaultDeathSeconds) + 0.2f;
+            if (string.Equals(Mode, SlimeHop, StringComparison.OrdinalIgnoreCase)) return 2.6f;
+            if (Animator.Find(Mode) is { } clip && clip.Length > 0f) return clip.Length;
+            return 2f;
+        }
+    }
+
+    /// <summary>Back to the exact start of the active mode: a fresh mob (already settled unless the mode shows the spawn)
+    /// or a fresh animator, so stepping it forward again reproduces the same frames.</summary>
+    public void Restart()
+    {
+        var showSpawn = string.Equals(Mode, SpawnMode, StringComparison.OrdinalIgnoreCase);
+        if (_goblin != null)
+        {
+            _goblin = NewGoblin(showSpawn);
+            Animator = _goblin.Animation;
+        }
+        else if (_slime != null)
+        {
+            _slime = NewSlime();
+            if (!showSpawn) _slime.FinishSpawn();
+        }
+        else if (Selected != null)
+        {
+            Animator = new EntityAnimator(Selected.Model.Animations, WorldGenerationConfig.GoblinWalkSpeed);
+        }
+        ResetTimers();
+    }
 
     /// <summary>The mob being previewed (a goblin or a slime), or null for any other entity.</summary>
     public Mob? PreviewMob => (Mob?)_goblin ?? _slime;
@@ -231,7 +279,7 @@ public sealed class EntityPreviewState
         {
             if (!goblin.IsDying) goblin.BeginDying();
             _cycle += dt;
-            if (goblin.IsRemovable && _cycle >= goblin.DeathSeconds + RestBetweenPlays)
+            if (Replay && goblin.IsRemovable && _cycle >= goblin.DeathSeconds + RestBetweenPlays)
             {
                 _goblin = NewGoblin();
                 Animator = _goblin.Animation;
@@ -241,7 +289,7 @@ public sealed class EntityPreviewState
         else if (string.Equals(Mode, SpawnMode, StringComparison.OrdinalIgnoreCase))
         {
             _cycle += dt;
-            if (_cycle >= SpawnPeriod)
+            if (Replay && _cycle >= SpawnPeriod)
             {
                 _goblin = NewGoblin();
                 Animator = _goblin.Animation;
@@ -262,7 +310,7 @@ public sealed class EntityPreviewState
                 if (_rest <= 0f)
                 {
                     goblin.Animation.Play(Mode);
-                    _rest = RestBetweenPlays;
+                    _rest = RestFor(RestBetweenPlays);
                 }
             }
         }
@@ -284,8 +332,8 @@ public sealed class EntityPreviewState
             // passed), so the hop can be watched again and the slime stays near the frame.
             target = SlimeStart + new Vector3(0f, 0f, SlimeHopDistance);
             _cycle += dt;
-            if (_cycle >= SlimeHopCycleSeconds ||
-                (slime.IsGrounded && MathF.Abs(slime.Position.Z - target.Value.Z) < 0.5f && _cycle > 0.5f))
+            if (Replay && (_cycle >= SlimeHopCycleSeconds ||
+                (slime.IsGrounded && MathF.Abs(slime.Position.Z - target.Value.Z) < 0.5f && _cycle > 0.5f)))
             {
                 _slime = slime = NewSlime();
                 _cycle = 0f;
@@ -294,7 +342,7 @@ public sealed class EntityPreviewState
         else if (string.Equals(Mode, SpawnMode, StringComparison.OrdinalIgnoreCase))
         {
             _cycle += dt;
-            if (_cycle >= SpawnPeriod)
+            if (Replay && _cycle >= SpawnPeriod)
             {
                 _slime = slime = NewSlime();
                 _cycle = 0f;
@@ -308,7 +356,7 @@ public sealed class EntityPreviewState
                 slime.BeginDying();
             }
             _cycle += dt;
-            if (slime.IsRemovable && _cycle >= slime.DeathSeconds + RestBetweenPlays)
+            if (Replay && slime.IsRemovable && _cycle >= slime.DeathSeconds + RestBetweenPlays)
             {
                 _slime = slime = NewSlime();
                 _cycle = 0f;
@@ -330,7 +378,7 @@ public sealed class EntityPreviewState
     {
         _hurtTimer -= dt;
         if (_hurtTimer > 0f) return;
-        _hurtTimer += HurtPeriod;
+        _hurtTimer += RestFor(HurtPeriod);
         if (mob.Health <= 2) mob.NetworkSetState(mob.Position, mob.Facing, mob.Type.MaxHealth, mob.Velocity);
         mob.TakeDamage(1);
     }
@@ -352,7 +400,7 @@ public sealed class EntityPreviewState
             if (_hurtTimer <= 0f)
             {
                 _flash = 1f;
-                _hurtTimer += HurtPeriod;
+                _hurtTimer += RestFor(HurtPeriod);
             }
             else
             {
@@ -368,7 +416,7 @@ public sealed class EntityPreviewState
                 if (_rest <= 0f)
                 {
                     Animator.Play(Mode);
-                    _rest = RestBetweenPlays;
+                    _rest = RestFor(RestBetweenPlays);
                 }
             }
             Animator.Update(dt, 0f);
@@ -389,7 +437,7 @@ public sealed class EntityPreviewState
         }
     }
 
-    private Goblin NewGoblin() => new(Selected!, Vector3.Zero, ammo: 3);
+    private Goblin NewGoblin(bool spawnIn = true) => new(Selected!, Vector3.Zero, ammo: 3, spawnIn);
 
     private Slime NewSlime() => new(Selected!, SlimeStart);
 

@@ -22,6 +22,8 @@ public enum DebugButton
     EntityMode,
     // The button's Arg is the index into PlayerPreviewState.AllModes.
     PlayerMode,
+    // Toggles AnimationClock.Loop of the timeline.
+    Loop,
 }
 
 /// <summary>One editable number: a labelled track the debugger draws and hit-tests.</summary>
@@ -66,6 +68,11 @@ public sealed class ItemDebuggerUi
 
     /// <summary>The trees tab's growth step slider, which the program drags by label.</summary>
     public const string TreeStepSlider = "Step";
+
+    /// <summary>The timeline's sliders, which the program drags by label: how far through the animation it is
+    /// (scrubbing it stops the clock) and the playback speed.</summary>
+    public const string ProgressSlider = "Progress (s)";
+    public const string SpeedSlider = "Speed (x)";
 
     private const float Pad = 12f;
     private const float PanelWidth = 330f;
@@ -184,11 +191,13 @@ public sealed class ItemDebuggerUi
         slider.Min + Fraction(slider, x) * (slider.Max - slider.Min);
 
     public void Draw(UIRenderer ui, ItemDisplayEditor editor, EntityPreviewState entities, TreePreviewState trees,
-        DebuggerTab tab, PlayerPreviewState player, Vector2 screen, string status, bool firstPerson)
+        DebuggerTab tab, PlayerPreviewState player, Vector2 screen, string status, bool firstPerson,
+        AnimationClock? timeline = null)
     {
         _tab = tab;
         _sliders.Clear();
         _buttons.Clear();
+        _timelineBar = null;
         BuildTabs(tab);
         var count = tab switch
         {
@@ -210,10 +219,16 @@ public sealed class ItemDebuggerUi
                 break;
         }
 
+        // The timeline runs along the bottom of the viewport between the two panels (ITEMS and ENTITIES only).
+        if (timeline != null && tab != DebuggerTab.Trees)
+            BuildTimeline(timeline, screen);
+
         DrawPanel(ui, new Vector2(Pad + PanelWidth * 0.5f, screen.Y * 0.5f),
             new Vector2(PanelWidth, screen.Y - Pad * 2f));
         DrawPanel(ui, new Vector2(screen.X - Pad - PanelWidth * 0.5f, screen.Y * 0.5f),
             new Vector2(PanelWidth, screen.Y - Pad * 2f));
+        if (_timelineBar is { } bar)
+            DrawPanel(ui, bar.Centre, bar.Size);
 
         switch (tab)
         {
@@ -435,6 +450,39 @@ public sealed class ItemDebuggerUi
     private void AddSlider(string label, float min, float max, int decimals, Func<float> get, Action<float> set) =>
         _sliders.Add(new DebugSlider(label, min, max, decimals, get, set));
 
+    // Where the timeline strip sits this frame (null when the tab has none).
+    private (Vector2 Centre, Vector2 Size)? _timelineBar;
+
+    // The animation's progress and speed sliders and the loop toggle, in one row along the bottom of the viewport.
+    // The sliders are positioned here rather than in the right panel's column, and their labels follow their own
+    // tracks (DrawControls).
+    private void BuildTimeline(AnimationClock clock, Vector2 screen)
+    {
+        const float gap = 22f;
+        const float loopWidth = 130f;
+        const float speedWidth = 220f;
+        var left = Pad + PanelWidth + Pad * 2f;
+        var right = screen.X - Pad - PanelWidth - Pad * 2f;
+        var width = right - left;
+        if (width < 360f) return;
+
+        var trackY = screen.Y - Pad - 20f;
+        var progressWidth = Math.Max(120f, width - loopWidth - speedWidth - gap * 2f);
+        _timelineBar = (new Vector2((left + right) * 0.5f, screen.Y - Pad - 34f),
+            new Vector2(width + 16f, 68f));
+
+        AddSlider(ProgressSlider, 0f, clock.Duration, 2, () => clock.Time, v => clock.Seek(v));
+        _sliders[^1].TrackCentre = new Vector2(left + progressWidth * 0.5f, trackY);
+        _sliders[^1].TrackSize = new Vector2(progressWidth, TrackH);
+
+        AddSlider(SpeedSlider, 0f, AnimationClock.MaxSpeed, 1, () => clock.Speed, v => clock.Speed = v);
+        _sliders[^1].TrackCentre = new Vector2(left + progressWidth + gap + speedWidth * 0.5f, trackY);
+        _sliders[^1].TrackSize = new Vector2(speedWidth, TrackH);
+
+        AddButton(new Vector2(right - loopWidth * 0.5f, trackY), new Vector2(loopWidth, ButtonH),
+            DebugButton.Loop, clock.Loop ? "LOOP: ON" : "LOOP: OFF", true, clock.Loop);
+    }
+
     private void AddButton(Vector2 centre, Vector2 size, DebugButton button, string label, bool enabled, bool active,
         int arg = 0) =>
         _buttons.Add((centre, size, button, arg, label, enabled, active));
@@ -597,10 +645,13 @@ public sealed class ItemDebuggerUi
 
         foreach (var slider in _sliders)
         {
+            // The label and value sit over their own track, so a slider need not be in the right panel's column.
             var labelY = slider.TrackCentre.Y - 22f;
-            ui.DrawText(slider.Label, new Vector2(left, labelY), scale, Rgba.White);
+            var trackStart = slider.TrackCentre.X - slider.TrackSize.X * 0.5f;
+            var trackEnd = slider.TrackCentre.X + slider.TrackSize.X * 0.5f;
+            ui.DrawText(slider.Label, new Vector2(trackStart, labelY), scale, Rgba.White);
             var valueWidth = ui.MeasureTextWidth(slider.Formatted, scale);
-            ui.DrawText(slider.Formatted, new Vector2(right - valueWidth, labelY), scale, TextDim);
+            ui.DrawText(slider.Formatted, new Vector2(trackEnd - valueWidth, labelY), scale, TextDim);
 
             ui.DrawRect(slider.TrackCentre, slider.TrackSize, Track);
             var fraction = Math.Clamp((slider.Value - slider.Min) / (slider.Max - slider.Min), 0f, 1f);

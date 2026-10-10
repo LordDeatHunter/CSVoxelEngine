@@ -35,7 +35,12 @@ public static class ItemDebuggerProgram
     // No initializer for the same reason: it snapshots TreeSpeciesRegistry.
     private static TreePreviewState _trees = null!;
     private static DebuggerTab _tab;
-    private static readonly PlayerModel Player = new();
+    // The player model the ITEMS tab poses; the preview state replaces it on a restart, so it is read through here.
+    private static PlayerModel Player => _playerAnim.Model;
+    // The timeline of each animated tab: progress, speed and loop over the state's one play.
+    private static readonly AnimationClock PlayerClock = new();
+    private static readonly AnimationClock EntityClock = new();
+    private static AnimationClock ActiveClock => _tab == DebuggerTab.Entities ? EntityClock : PlayerClock;
     // The player's animation modes (idle, walk, jump, swim, punch, slice, throw, ...), driving Player.
     private static PlayerPreviewState _playerAnim = null!;
     private static readonly ItemDisplayEditor Editor = new();
@@ -118,10 +123,9 @@ public static class ItemDebuggerProgram
         _entities = new EntityPreviewState();
         _trees = new TreePreviewState();
         _ui = new ItemDebuggerUi();
-        Player.Rig = _scene.Rig;
-        Player.HoldingItem = true;
-        Player.Update(0.016f, 0f);
-        _playerAnim = new PlayerPreviewState(Player);
+        _playerAnim = new PlayerPreviewState(new PlayerModel { Rig = _scene.Rig, HoldingItem = true });
+        PlayerClock.Attach(_playerAnim);
+        EntityClock.Attach(_entities);
 
         if (_ui.Entries.Count > 0)
             Editor.Select(_ui.Entries[0].Id);
@@ -195,6 +199,22 @@ public static class ItemDebuggerProgram
             _lookYaw = lookYaw;
             _lookPitch = lookPitch;
         }
+
+        // Playback options: ITEM_DEBUGGER_SPEED=<0..4> and ITEM_DEBUGGER_LOOP=<0|1> apply to both timelines.
+        var speed = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_SPEED")?.Trim();
+        if (!string.IsNullOrEmpty(speed))
+        {
+            if (float.TryParse(speed, NumberStyles.Float, CultureInfo.InvariantCulture, out var speedValue))
+                PlayerClock.Speed = EntityClock.Speed = speedValue;
+            else
+                Log.Warn($"ITEM_DEBUGGER_SPEED: '{speed}' is not a number.");
+        }
+        var loop = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_LOOP")?.Trim();
+        if (loop is "0" or "1")
+            PlayerClock.Loop = EntityClock.Loop = loop == "1";
+        // The mode may have been picked above: start both timelines from its beginning.
+        PlayerClock.Reset();
+        EntityClock.Reset();
 
         _input = new InputManager(_window);
         if (_input.Mouse is { } mouse)
@@ -273,10 +293,13 @@ public static class ItemDebuggerProgram
             }
         }
 
+        // Dragging the progress slider scrubs: the clocks stop and the slider owns the time.
+        PlayerClock.Scrubbing = EntityClock.Scrubbing = _dragSlider == ItemDebuggerUi.ProgressSlider;
+
         switch (_tab)
         {
             case DebuggerTab.Entities:
-                _entities.Update((float)dt);
+                EntityClock.Update((float)dt);
                 break;
             case DebuggerTab.Trees:
                 // A tree only changes on a step, seed or species change; nothing animates per frame.
@@ -313,7 +336,7 @@ public static class ItemDebuggerProgram
 
         _scene.Ui.Begin(size);
         _ui.Draw(_scene.Ui, Editor, _entities, _trees, _tab, _playerAnim, new Vector2(size.X, size.Y), _status,
-            _firstPerson && _tab == DebuggerTab.Items);
+            _firstPerson && _tab == DebuggerTab.Items, _tab == DebuggerTab.Trees ? null : ActiveClock);
         _scene.Ui.End();
         _gl.BindVertexArray(0);
 
@@ -454,7 +477,7 @@ public static class ItemDebuggerProgram
     {
         if (dt <= 0f) return;
 
-        _playerAnim.Update(dt);
+        PlayerClock.Update(dt);
     }
 
     private static void OnMouseDown(IMouse mouse, MouseButton button)
@@ -481,6 +504,7 @@ public static class ItemDebuggerProgram
                 {
                     case DebuggerTab.Entities:
                         _entities.Select(slot);
+                        EntityClock.Reset();
                         break;
                     case DebuggerTab.Trees:
                         _trees.Select(slot);
@@ -573,11 +597,20 @@ public static class ItemDebuggerProgram
                 break;
             case DebugButton.EntityMode:
                 if (arg >= 0 && arg < _entities.Modes.Count)
+                {
                     _entities.SetMode(_entities.Modes[arg]);
+                    EntityClock.Reset();
+                }
                 break;
             case DebugButton.PlayerMode:
                 if (arg >= 0 && arg < PlayerPreviewState.AllModes.Count)
+                {
                     _playerAnim.SetMode(PlayerPreviewState.AllModes[arg]);
+                    PlayerClock.Reset();
+                }
+                break;
+            case DebugButton.Loop:
+                ActiveClock.Loop = !ActiveClock.Loop;
                 break;
             case DebugButton.FirstPerson:
                 _firstPerson = !_firstPerson;

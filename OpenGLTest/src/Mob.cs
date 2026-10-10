@@ -67,6 +67,10 @@ public abstract class Mob
     /// <summary>0 at spawn, 1 once the pop-in is over.</summary>
     public float SpawnProgress => MathUtils.Clamp01(_spawnTime / SpawnInSeconds);
 
+    /// <summary>Skips the spawn pop: the mob counts as already settled (a debugger restart of a mob that is not
+    /// being shown spawning).</summary>
+    public void FinishSpawn() => _spawnTime = SpawnInSeconds;
+
     /// <summary>Starts the death animation (idempotent). The owner rolls the loot at this moment.</summary>
     public void BeginDying()
     {
