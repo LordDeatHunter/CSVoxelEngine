@@ -437,6 +437,8 @@ public sealed class Goblin : Mob
 
         if (hitY)
         {
+            // IsGrounded still holds last frame's answer here, so this is the landing frame
+            if (movement.Y < 0f && !IsGrounded) NoteLanding(-_velocity.Y, Gravity);
             IsGrounded = movement.Y < 0f;
             _velocity.Y = 0f;
         }

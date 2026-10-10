@@ -112,6 +112,30 @@ public sealed class FallTrackerTests
         Assert.Equal(PlayerHealth.FallDamage(lowLedge + apex), damage);
     }
 
+    [Fact]
+    public void LandedDropReportsTheLandingsDropOnlyOnTheLandingObservation()
+    {
+        const float drop = 7f;
+        foreach (var (inWater, creative) in new[] { (false, false), (true, false), (false, true) })
+        {
+            // Water and creative cushion the damage, never the landing itself
+            var tracker = new FallTracker();
+            Stand(tracker, Ledge);
+            Airborne(tracker, Ledge, Ledge - drop);
+            Assert.Equal(0f, tracker.LandedDrop);
+            Stand(tracker, Ledge - drop, inWater, creative);
+            Assert.Equal(drop, tracker.LandedDrop, 3);
+            Stand(tracker, Ledge - drop);
+            Assert.Equal(0f, tracker.LandedDrop);
+        }
+
+        // A teleport-sized step down onto the ground lands nothing
+        var teleported = new FallTracker();
+        Stand(teleported, Ledge);
+        Stand(teleported, Ledge - (Max + 1f));
+        Assert.Equal(0f, teleported.LandedDrop);
+    }
+
     /// <summary>Stands on <see cref="Ledge"/>, falls <paramref name="drop"/> blocks and lands, returning the landing's damage.</summary>
     private static int Drop(float drop, bool inWater = false, bool creative = false)
     {

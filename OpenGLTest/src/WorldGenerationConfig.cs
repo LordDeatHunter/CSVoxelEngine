@@ -1147,6 +1147,20 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Seconds a cube takes to fade out at the end of its life (or after landing)
     public const float BlockDebrisFadeSeconds = 0.4f;
 
+    // --- Landing dust (LandingDust rules, GroundDust spawner, drawn as BlockDebris chips) ---
+    // A body landing from a real fall kicks up chips of the block it landed on: none below the
+    // minimum fall, then more and faster ones the longer the drop (MathUtils.ImpactStrength),
+    // reaching the caps at the full fall. Cosmetic: never on a headless server.
+    public const float LandingDustMinFallBlocks = 3f;
+    public const float LandingDustFullFallBlocks = 14f;
+    public const int LandingDustMinCount = 4;
+    public const int LandingDustMaxCount = 18;
+    // Blocks per second the chips fly out at, mostly sideways so the burst spreads along the ground
+    public const float LandingDustMinSpeed = 1.6f;
+    public const float LandingDustMaxSpeed = 4.5f;
+    // Edge length of a dust chip, smaller than a mining chip so it reads as grit
+    public const float LandingDustSize = 0.08f;
+
     // --- Wind (Wind.cs, SH-27) ---
     // One slowly turning wind shared by leaf sway, fire smoke and the cloud drift.
     /// <summary>Wind heading at lighting time 0, degrees from +X toward +Z.</summary>

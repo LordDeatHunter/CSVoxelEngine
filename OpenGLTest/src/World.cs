@@ -48,6 +48,7 @@ public class World : IItemUseWorld
     private readonly TreeGrowthWriter _treeGrowth = new();
     private readonly LeafParticleSystem _leaves = new();
     private readonly BlockDebrisSystem _debris = new();
+    private readonly GroundDust _dust = new();
     private readonly CampfireManager _campfires = new();
     private readonly QuernManager _querns = new();
     private readonly KilnManager _kilns = new();
@@ -1292,6 +1293,9 @@ public class World : IItemUseWorld
             headingForward, headingSide);
         // A hit-stop holds the punch pinch with the arm (read by the camera's next update)
         Camera.HoldPunchFov = Player.IsHitStopped;
+        // The dust a landing kicks up: cosmetic, so a headless server spawns none
+        if (!_serverMode)
+            _dust.UpdatePlayer(Camera, _chunkManager, _debris);
     }
 
     private int _lastSwimStrokes;
@@ -1555,6 +1559,9 @@ public class World : IItemUseWorld
         // After every mob manager and before the thrown items, so a mob killed or despawned
         // this frame is never hit by a projectile or drawn a healthbar.
         RefreshMobs();
+        // A mob that landed this frame kicks up its dust; a server spawns no particles
+        if (!_serverMode)
+            _dust.TakeMobLandings(_mobs, _chunkManager, _debris);
 
         UpdateToppling((float)deltaTime);
         UpdateThrown((float)deltaTime);

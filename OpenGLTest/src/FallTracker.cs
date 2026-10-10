@@ -25,6 +25,13 @@ public sealed class FallTracker
     private bool _hasFallState;
 
     /// <summary>
+    /// The drop in blocks the latest <see cref="Observe"/> landed (grounded after airborne), whether
+    /// or not it billed damage (water, creative), or 0 when that observation landed nothing. The
+    /// landing dust reads it; a teleport, flight or a reset never lands.
+    /// </summary>
+    public float LandedDrop { get; private set; }
+
+    /// <summary>
     /// Feeds one observation and returns the fall damage it lands, 0 when nothing lands.
     /// The first observation only seeds the state. A landing (grounded after airborne) bills
     /// the drop from the peak feet height unless <paramref name="creative"/> or
@@ -34,6 +41,7 @@ public sealed class FallTracker
     public int Observe(float feet, bool grounded, bool flying, bool inWater, bool creative, float maxStepBlocks)
     {
         var damage = 0;
+        LandedDrop = 0f;
         if (!_hasFallState)
         {
             _fallPeakFeet = feet;
@@ -62,6 +70,7 @@ public sealed class FallTracker
         else if (!_wasGrounded)
         {
             var drop = _fallPeakFeet - feet;
+            LandedDrop = MathF.Max(0f, drop);
             if (!creative && !inWater)
                 damage = PlayerHealth.FallDamage(drop);
             _fallPeakFeet = feet;
@@ -85,5 +94,6 @@ public sealed class FallTracker
         _prevFeet = feet;
         _wasGrounded = grounded;
         _hasFallState = true;
+        LandedDrop = 0f;
     }
 }

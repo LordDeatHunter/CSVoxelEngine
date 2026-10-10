@@ -3500,7 +3500,7 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// Draws the live mining debris as small cubes textured as the block they broke off
-    /// from. Each cube spins and tumbles about its centre and fades through the world
+    /// from (dust chips as its surface, <see cref="DebrisLook"/>). Each cube spins and tumbles about its centre and fades through the world
     /// shader's alpha, like the item drops but smaller and never collected.
     /// </summary>
     public void RenderBlockDebris(Camera camera, IReadOnlyList<BlockDebris> debris)
@@ -3514,7 +3514,9 @@ public class RenderManager : IDisposable
 
         foreach (var cube in debris)
         {
-            var mesh = blockCubes.GetTinted(cube.BlockId);
+            var mesh = cube.Look == DebrisLook.Surface
+                ? blockCubes.GetSurface(cube.BlockId)
+                : blockCubes.GetTinted(cube.BlockId);
             if (mesh == null) continue;
 
             var model = Matrix4x4.CreateScale(cube.Size)

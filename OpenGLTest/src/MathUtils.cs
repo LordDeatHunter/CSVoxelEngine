@@ -168,6 +168,14 @@ public static class MathUtils
     }
 
     /// <summary>
+    /// How hard an impact registers, 0..1: 0 at or below <paramref name="start"/>, rising to 1 at
+    /// <paramref name="full"/> and held there, along a square root, since the speed a fall ends at
+    /// grows with the square root of its height. Never decreases as <paramref name="value"/> grows.
+    /// </summary>
+    public static float ImpactStrength(float value, float start, float full) =>
+        MathF.Sqrt(InverseLerp(start, full, value));
+
+    /// <summary>
     /// Continuous -1..1 oscillation, completing one cycle every <paramref name="period"/>
     /// seconds. Starts at 0 and rises first, so an animation using it begins from rest.
     /// </summary>

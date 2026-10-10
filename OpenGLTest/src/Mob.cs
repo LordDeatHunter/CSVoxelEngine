@@ -107,6 +107,34 @@ public abstract class Mob
     /// <summary>Gives the body a hit recoil; <paramref name="strength"/> is roughly blocks of squash per second.</summary>
     protected void KickBody(float strength) => _kick.Impulse(strength);
 
+    private float _landingSpeed;
+    private float _landingGravity;
+
+    /// <summary>
+    /// Records that the body just landed at <paramref name="impactSpeed"/> blocks per second under
+    /// <paramref name="gravity"/>, for the owner's landing dust to take (<see cref="TryTakeLanding"/>).
+    /// Two landings before a take keep the harder one; nothing but the cosmetic dust reads it.
+    /// </summary>
+    protected void NoteLanding(float impactSpeed, float gravity)
+    {
+        if (impactSpeed <= _landingSpeed) return;
+        _landingSpeed = impactSpeed;
+        _landingGravity = gravity;
+    }
+
+    /// <summary>
+    /// True once per landing noted since the last take: the speed the body hit the ground at and
+    /// the height it fell to reach it. A world that spawns no dust (a headless server) never takes,
+    /// which leaves one float standing.
+    /// </summary>
+    public bool TryTakeLanding(out float impactSpeed, out float fallBlocks)
+    {
+        impactSpeed = _landingSpeed;
+        fallBlocks = LandingDust.FallFromImpactSpeed(_landingSpeed, _landingGravity);
+        _landingSpeed = 0f;
+        return impactSpeed > 0f;
+    }
+
     /// <summary>Horizontal half extent of the collision body, used by touch and hit tests.</summary>
     public abstract float BodyHalfExtent { get; }
 

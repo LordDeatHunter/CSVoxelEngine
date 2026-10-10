@@ -1,0 +1,55 @@
+{
+  // Ground dust (GroundDust / LandingDust, drawn as BlockDebris chips): run with
+  // VOXEL_SCRIPT=visual-examples/ground-dust.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/ground-dust/.
+  // Particles are RNG- and frame-rate-driven, so this is a presence check judged by eye, never a
+  // pixel instrument: each landing is caught in a short burst of shots, since the chips only live
+  // a few tenths of a second once they hit the ground.
+  // The player is filmed from the shoulder camera and switched to creative first (the C press), so
+  // the 10-block drops cost no health; creative on foot falls and lands like survival.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "walk", "keys": ["C"], "seconds": 0.05 },
+    { "op": "view", "mode": "shoulder" },
+
+    // LEG 1 — grass: the spawn clearing (ground top y 10 at x 8, z 8). Stand, then drop 10 blocks.
+    // The chips wear the grass's biome tint, so they must come out green, not grey.
+    { "op": "teleport", "pos": [8.5, 12.7, 8.5], "yaw": 0, "pitch": -25 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "teleport", "pos": [8.5, 22.7, 8.5], "yaw": 0, "pitch": -25 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "grass-landing-a", "hideHud": true },
+    { "op": "wait", "seconds": 0.08 },
+    { "op": "screenshot", "name": "grass-landing-b", "hideHud": true },
+    { "op": "wait", "seconds": 0.12 },
+    { "op": "screenshot", "name": "grass-landing-c", "hideHud": true },
+
+    // LEG 2 — sand: a flat desert chunk (ground top y 10 at x 168, z 136).
+    { "op": "teleport", "pos": [168.5, 12.7, 136.5], "yaw": 0, "pitch": -25 },
+    { "op": "wait", "seconds": 2.5 },
+    { "op": "teleport", "pos": [168.5, 22.7, 136.5], "yaw": 0, "pitch": -25 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "sand-landing-a", "hideHud": true },
+    { "op": "wait", "seconds": 0.08 },
+    { "op": "screenshot", "name": "sand-landing-b", "hideHud": true },
+    { "op": "wait", "seconds": 0.12 },
+    { "op": "screenshot", "name": "sand-landing-c", "hideHud": true },
+
+    // LEG 3 — a short hop down (under the minimum fall) raises nothing.
+    { "op": "teleport", "pos": [168.5, 14.7, 136.5], "yaw": 0, "pitch": -25 },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "sand-short-drop", "hideHud": true },
+
+    // LEG 4 — a goblin dropped 8 blocks onto the sand lands in a puff. The camera hovers (flying is
+    // immune to its stones) beside the drop.
+    { "op": "fly" },
+    { "op": "teleport", "pos": [164.5, 13.5, 136.5], "yaw": 0, "pitch": -10 },
+    { "op": "view", "mode": "first" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "spawn", "entity": "goblin", "pos": [169.5, 19.0, 136.5] },
+    { "op": "wait", "seconds": 0.72 },
+    { "op": "screenshot", "name": "goblin-landing-a", "hideHud": true },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "goblin-landing-b", "hideHud": true }
+  ]
+}

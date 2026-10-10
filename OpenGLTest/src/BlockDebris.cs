@@ -14,6 +14,10 @@ public class BlockDebris
     /// <summary>Block the cube renders as (see <see cref="BlockCubeCache"/>).</summary>
     public byte BlockId { get; }
 
+    /// <summary>Which of the block's cached cubes draws the chip: the whole block (a mining chip)
+    /// or its surface (dust).</summary>
+    public DebrisLook Look { get; }
+
     /// <summary>
     /// The plain path's <c>uBiomeTint</c> for this cube: a biome-tinted block's tint sampled at
     /// the cell it chipped off (<see cref="BiomeTint.CellTint"/>), so the chips match the
@@ -75,11 +79,15 @@ public class BlockDebris
 
     private float HalfExtent => Size * 0.5f;
 
+    /// <param name="pop">True (a mining chip) adds the random upward pop every chip leaves the
+    /// block with on top of <paramref name="toss"/>; false launches at exactly
+    /// <paramref name="toss"/>, so a caller that scales the launch (landing dust) owns the whole of it.</param>
     public BlockDebris(byte blockId, Vector3 position, Vector3? toss = null, float? size = null, Random? random = null,
-        Vector3? tint = null)
+        Vector3? tint = null, bool pop = true, DebrisLook look = DebrisLook.Block)
     {
         var rng = random ?? Random.Shared;
         BlockId = blockId;
+        Look = look;
         Tint = tint ?? Vector3.One;
         Position = position;
         Size = size ?? WorldGenerationConfig.BlockDebrisSize * (0.7f + 0.6f * rng.NextSingle());
@@ -89,6 +97,12 @@ public class BlockDebris
         Tumble = rng.NextSingle() * MathF.Tau;
         _spinSpeed = (rng.NextSingle() * 2f - 1f) * 6f;
         _tumbleSpeed = (rng.NextSingle() * 2f - 1f) * 6f;
+
+        if (!pop)
+        {
+            _velocity = toss ?? Vector3.Zero;
+            return;
+        }
 
         var angle = rng.NextSingle() * MathF.Tau;
         var horizontalSpeed = 0.8f + rng.NextSingle() * 1.8f;

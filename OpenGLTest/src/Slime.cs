@@ -245,7 +245,10 @@ public sealed class Slime : Mob
         // A landing hits the spring downward in proportion to the fall; leaving the ground is
         // kicked up by HopToward. Standing still never re-squashes.
         if (!wasGrounded && IsGrounded)
+        {
             _squash.Impulse(-MathF.Min(fallSpeed, 20f) * LandKickPerSpeed);
+            NoteLanding(fallSpeed, Gravity);
+        }
 
         float target;
         if (_windup > 0f) target = WindupSquash * MathUtils.EaseOutCubic(1f - _windup / WindupSeconds);

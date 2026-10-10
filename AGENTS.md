@@ -2554,6 +2554,16 @@ overshoot or jiggle.
   debugger never requests one. `visual-examples/hit-stop.json` films it.
 - **Death in singleplayer** plays for `World.DeathPlaySeconds` (the view tips over, the body falls)
   before the respawn; a client has no death screen and still snaps back.
+- **Ground dust** (`GroundDust`, owned by `World`; cosmetic, so never on a server): a landing kicks
+  up chips of the block under the feet (`GroundDust.TryFindSurface`: the feet's own cell if it holds
+  a stack cover like a snow drift, else the cell below), sized by `LandingDust` (nothing under
+  `LandingDustMinFallBlocks`, then count and launch speed grow with the drop along
+  `MathUtils.ImpactStrength`, both capped). They go through `BlockDebrisSystem.Puff` as
+  `DebrisLook.Surface` chips, which wear the block's top on every face (`BlockCubeCache.GetSurface`), so
+  grass dust is tinted green. The local player's landings come from `GroundDust`'s own
+  `FallTracker.LandedDrop` (singleplayer and a client); a mob reports its landing with
+  `Mob.NoteLanding` (the goblin's and slime's physics do) and `World` takes them after `RefreshMobs`
+  (singleplayer only: a client's mobs are mirrors and never land).
 - **Remote players** (protocol 7): the `PlayerState` flags carry cosmetic `Sneaking`, `Swimming`,
   `Sprinting` and `Airborne` bits (rebroadcast untrusted, never acted on) and every `PlayerList`
   entry ends with the player's last `NetPlayerAction` and a counter that moves per swing, so

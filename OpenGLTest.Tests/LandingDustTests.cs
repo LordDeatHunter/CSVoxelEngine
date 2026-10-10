@@ -1,0 +1,226 @@
+using System;
+using System.Numerics;
+using Xunit;
+
+namespace silkgltriangle.Tests;
+
+/// <summary>
+/// The landing dust: the rule that sizes a puff from the fall (<see cref="LandingDust"/>), the
+/// surface it is taken from (<see cref="GroundDust.TryFindSurface"/>) and the chips it spawns, plus
+/// the landings a falling mob notes for it.
+/// </summary>
+public sealed class LandingDustTests
+{
+    public LandingDustTests() => TestContent.EnsureLoaded();
+
+    private const float Dt = 1f / 60f;
+
+    private static byte Id(string block) => ContentRegistry.RequireBlock(block).Id;
+
+    // Feet of a body standing on MobTestWorld.Floor's y = 0 layer.
+    private static readonly Vector3 FloorFeet = new(8.5f, 1f, 8.5f);
+
+    [Fact]
+    public void AFallUnderTheMinimumKicksUpNothing()
+    {
+        for (var fall = 0f; fall < WorldGenerationConfig.LandingDustMinFallBlocks; fall += 0.05f)
+        {
+            Assert.Equal(0, LandingDust.Count(fall));
+            Assert.Equal(0f, LandingDust.Speed(fall));
+        }
+
+        var chunks = MobTestWorld.Floor(Id("sand"));
+        var debris = new BlockDebrisSystem();
+        var shortFall = WorldGenerationConfig.LandingDustMinFallBlocks * 0.9f;
+        Assert.Equal(0, GroundDust.Land(FloorFeet, shortFall, 0.3f, chunks, debris, new Random(1)));
+        Assert.Empty(debris.Debris);
+    }
+
+    [Fact]
+    public void CountAndSpeedNeverDecreaseAsTheFallGrows()
+    {
+        var lastCount = 0;
+        var lastSpeed = 0f;
+        for (var fall = 0f; fall <= 80f; fall += 0.05f)
+        {
+            var count = LandingDust.Count(fall);
+            var speed = LandingDust.Speed(fall);
+            Assert.True(count >= lastCount, $"count fell to {count} at a fall of {fall}");
+            Assert.True(speed >= lastSpeed, $"speed fell to {speed} at a fall of {fall}");
+            lastCount = count;
+            lastSpeed = speed;
+        }
+
+        // Anti-vacuity: a landing at the minimum already puffs, and a long drop throws more, faster dust
+        var atMinimum = WorldGenerationConfig.LandingDustMinFallBlocks;
+        Assert.True(LandingDust.Count(atMinimum) > 0);
+        Assert.True(LandingDust.Count(atMinimum * 4f) > LandingDust.Count(atMinimum));
+        Assert.True(LandingDust.Speed(atMinimum * 4f) > LandingDust.Speed(atMinimum));
+    }
+
+    [Fact]
+    public void CountAndSpeedStayUnderTheirCaps()
+    {
+        foreach (var fall in new[] { 5f, 20f, 100f, 1000f, float.MaxValue })
+        {
+            Assert.InRange(LandingDust.Count(fall), 0, WorldGenerationConfig.LandingDustMaxCount);
+            Assert.InRange(LandingDust.Speed(fall), 0f, WorldGenerationConfig.LandingDustMaxSpeed);
+        }
+
+        // A non-number fall (a broken tracker) is no fall at all
+        Assert.Equal(0, LandingDust.Count(float.NaN));
+    }
+
+    [Fact]
+    public void ALandingPuffsChipsOfTheBlockLandedOn()
+    {
+        var chunks = MobTestWorld.Floor(Id("sand"));
+        var debris = new BlockDebrisSystem();
+        var fall = WorldGenerationConfig.LandingDustMinFallBlocks * 3f;
+
+        var spawned = GroundDust.Land(FloorFeet, fall, 0.3f, chunks, debris, new Random(2));
+
+        Assert.Equal(LandingDust.Count(fall), spawned);
+        Assert.Equal(spawned, debris.Debris.Count);
+        Assert.All(debris.Debris, chip => Assert.Equal(Id("sand"), chip.BlockId));
+        // They start at the feet, above the ground they came off
+        Assert.All(debris.Debris, chip => Assert.True(chip.Position.Y > FloorFeet.Y));
+    }
+
+    [Fact]
+    public void GrassDustWearsTheBiomeTintOfTheCellLandedOn()
+    {
+        var chunks = MobTestWorld.Floor(Id("grass"));
+        var debris = new BlockDebrisSystem();
+
+        GroundDust.Land(FloorFeet, 10f, 0.3f, chunks, debris, new Random(3));
+
+        var expected = BiomeTint.CellTint(BiomeTintPalette.Grass, (int)FloorFeet.X, (int)FloorFeet.Z);
+        Assert.NotEmpty(debris.Debris);
+        Assert.All(debris.Debris, chip => Assert.Equal(expected, chip.Tint));
+        Assert.NotEqual(Vector3.One, expected);
+    }
+
+    [Fact]
+    public void DustChipsWearTheSurfaceOfTheBlockAndAGrassChipIsTintedAllRound()
+    {
+        var chunks = MobTestWorld.Floor(Id("grass"));
+        var debris = new BlockDebrisSystem();
+        GroundDust.Land(FloorFeet, 10f, 0.3f, chunks, debris, new Random(6));
+        Assert.All(debris.Debris, chip => Assert.Equal(DebrisLook.Surface, chip.Look));
+
+        // Every face of a surface chip is the block's top: grass's tinted top, never the dirt sides
+        var grass = ContentRegistry.RequireBlock("grass");
+        var (verts, _) = BlockCubeCache.BuildSurfaceCube(grass);
+        Assert.NotEmpty(verts);
+        Assert.All(verts, v => Assert.True(v.IsBiomeTinted));
+        Assert.All(verts, v => Assert.Equal(grass.BiomeTint!.Tinted[4], v.Layer));
+        for (var face = 0; face < 6; face++)
+            Assert.Contains(verts, v => (v.Normal & 7) == face);
+
+        // An untinted block's chip is its plain top all round
+        var sandstone = ContentRegistry.RequireBlock("sandstone");
+        var (stoneVerts, _) = BlockCubeCache.BuildSurfaceCube(sandstone);
+        Assert.All(stoneVerts, v => Assert.False(v.IsBiomeTinted));
+        Assert.All(stoneVerts, v => Assert.Equal(sandstone.Top, v.Layer));
+    }
+
+    [Fact]
+    public void TheChipsFlyOutwardAndFasterFromALongerFall()
+    {
+        float MeanSpread(float fall)
+        {
+            var chunks = MobTestWorld.Floor(Id("stone"));
+            var debris = new BlockDebrisSystem();
+            GroundDust.Land(FloorFeet, fall, 0.3f, chunks, debris, new Random(4));
+            for (var i = 0; i < 12; i++)
+                debris.Update(Dt, chunks);
+            var sum = 0f;
+            foreach (var chip in debris.Debris)
+                sum += new Vector2(chip.Position.X - FloorFeet.X, chip.Position.Z - FloorFeet.Z).Length();
+            return sum / debris.Debris.Count;
+        }
+
+        var shortSpread = MeanSpread(WorldGenerationConfig.LandingDustMinFallBlocks);
+        Assert.True(shortSpread > 0.05f, $"chips stayed at the feet: {shortSpread}");
+        Assert.True(MeanSpread(WorldGenerationConfig.LandingDustFullFallBlocks) > shortSpread);
+    }
+
+    [Fact]
+    public void ASnowDriftTheFeetStandInIsTheSurfaceAndAPlantIsLookedThrough()
+    {
+        var chunks = MobTestWorld.Floor(Id("stone"));
+        var chunk = chunks.Chunks[Vector3.Zero];
+
+        chunk.SetBlockRaw(8, 1, 8, Id("snow"), 3);
+        Assert.True(GroundDust.TryFindSurface(chunks, FloorFeet, 0.3f, out var cell, out var id));
+        Assert.Equal(Id("snow"), id);
+        Assert.Equal(new Vector3(8, 1, 8), cell);
+
+        chunk.SetBlockRaw(8, 1, 8, Id("tall_grass"), 0);
+        Assert.True(GroundDust.TryFindSurface(chunks, FloorFeet, 0.3f, out cell, out id));
+        Assert.Equal(Id("stone"), id);
+        Assert.Equal(new Vector3(8, 0, 8), cell);
+    }
+
+    [Fact]
+    public void ABodyOverALedgeStillFindsTheLedgeAndNothingUnderfootFindsNothing()
+    {
+        var chunks = MobTestWorld.Floor(Id("stone"));
+        var chunk = chunks.Chunks[Vector3.Zero];
+        chunk.SetBlockRaw(8, 0, 8, BlockType.Air, 0);
+
+        // The centre hangs over the hole, a corner of the body is still over the floor
+        Assert.True(GroundDust.TryFindSurface(chunks, new Vector3(8.15f, 1f, 8.5f), 0.3f, out var cell, out _));
+        Assert.Equal(7f, cell.X);
+
+        // High in the air nothing is underfoot
+        Assert.False(GroundDust.TryFindSurface(chunks, new Vector3(8.5f, 9f, 8.5f), 0.3f, out _, out _));
+    }
+
+    [Fact]
+    public void AGoblinNotesTheLandingOfItsFallOnceAndStandingStillRaisesNoDust()
+    {
+        var chunks = MobTestWorld.Floor(Id("stone"));
+        const float drop = 9f;
+        var goblin = new Goblin(EntityRegistry.Require("goblin"), new Vector3(8.5f, 1f + drop + Goblin.Height * 0.5f, 8.5f), ammo: 0);
+
+        for (var i = 0; i < 600 && !goblin.IsGrounded; i++)
+            goblin.Update(Dt, chunks, null);
+        Assert.True(goblin.IsGrounded);
+
+        Assert.True(goblin.TryTakeLanding(out var impactSpeed, out var fallBlocks));
+        Assert.True(impactSpeed > 0f);
+        Assert.InRange(fallBlocks, drop - 1f, drop + 1.5f);
+        Assert.True(LandingDust.Count(fallBlocks) > 0);
+        Assert.False(goblin.TryTakeLanding(out _, out _));
+
+        // Standing, the body only ever settles the hair it rests above the floor: whatever it notes
+        // is far too small a fall to raise dust
+        for (var i = 0; i < 120; i++)
+        {
+            goblin.Update(Dt, chunks, null);
+            if (goblin.TryTakeLanding(out _, out var settle))
+                Assert.Equal(0, LandingDust.Count(settle));
+        }
+    }
+
+    [Fact]
+    public void AMobLandingFromHighRaisesItsDustThroughGroundDust()
+    {
+        var chunks = MobTestWorld.Floor(Id("gravel"));
+        var debris = new BlockDebrisSystem();
+        var dust = new GroundDust();
+        var goblin = new Goblin(EntityRegistry.Require("goblin"), new Vector3(8.5f, 11f + Goblin.Height * 0.5f, 8.5f), ammo: 0);
+        Mob[] mobs = [goblin];
+
+        for (var i = 0; i < 600 && debris.Debris.Count == 0; i++)
+        {
+            goblin.Update(Dt, chunks, null);
+            dust.TakeMobLandings(mobs, chunks, debris, new Random(5));
+        }
+
+        Assert.NotEmpty(debris.Debris);
+        Assert.All(debris.Debris, chip => Assert.Equal(Id("gravel"), chip.BlockId));
+    }
+}

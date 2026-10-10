@@ -19,6 +19,7 @@ public class BlockCubeCache : IDisposable
     private readonly GL _gl;
     private readonly Dictionary<byte, Mesh> _meshes = new();
     private readonly Dictionary<byte, Mesh> _tintedMeshes = new();
+    private readonly Dictionary<byte, Mesh> _surfaceMeshes = new();
 
     public BlockCubeCache(GL gl) => _gl = gl;
 
@@ -76,6 +77,54 @@ public class BlockCubeCache : IDisposable
         return (vertices.ToArray(), indices.ToArray());
     }
 
+    /// <summary>
+    /// The cube a chip scuffed off the block's surface draws (<see cref="DebrisLook.Surface"/>, the
+    /// landing and footstep dust): <see cref="BuildSurfaceCube"/>, one cached mesh per block whose
+    /// biome-tinted quads, like <see cref="GetTinted"/>'s, take the per-draw <c>uBiomeTint</c>.
+    /// Null for air, unknown ids and a block whose tiles were never baked.
+    /// </summary>
+    public Mesh? GetSurface(byte blockId)
+    {
+        if (_surfaceMeshes.TryGetValue(blockId, out var mesh))
+            return mesh;
+
+        var type = BlockType.ById[blockId];
+        if (type == null || type.FaceTiles.Length < 6) return null;
+
+        var (vertices, indices) = BuildSurfaceCube(type);
+        mesh = new Mesh(_gl, vertices, indices);
+        _surfaceMeshes[blockId] = mesh;
+        return mesh;
+    }
+
+    /// <summary>
+    /// The block's top face on all six sides of a unit cube centred on the origin, with its tinted
+    /// top quad too when the block is biome-tinted, so a chip of grass is green all round instead of
+    /// showing the dirt sides a broken-off cube wears. GL-free.
+    /// </summary>
+    public static (Vertex[] Vertices, ushort[] Indices) BuildSurfaceCube(BlockType type)
+    {
+        const int top = 4; // +Y in Chunk.CubeFaces order
+        var tiles = new ushort[6];
+        Array.Fill(tiles, type.FaceTiles[top]);
+        BiomeTintFaces? tint = null;
+        if (type.BiomeTint is { } bt)
+        {
+            var baseTiles = new ushort[6];
+            var tintedTiles = new ushort[6];
+            Array.Fill(baseTiles, bt.Base[top]);
+            Array.Fill(tintedTiles, bt.Tinted[top]);
+            tint = new BiomeTintFaces(bt.Palette, baseTiles, tintedTiles);
+        }
+
+        var vertices = new List<Vertex>(PopBoxEmitter.MaxQuadsPerBox * 4);
+        var indices = new List<ushort>(PopBoxEmitter.MaxQuadsPerBox * 6);
+        ushort offset = 0;
+        PopBoxEmitter.EmitBox(vertices, indices, ref offset, BlockHitbox.FullCube, BlockHitbox.FullCube,
+            new Vector3(-0.5f), tiles, tint);
+        return (vertices.ToArray(), indices.ToArray());
+    }
+
     /// <summary>Face tiles on a plain unit cube, shaded as fully unoccluded.</summary>
     private Mesh CreateFallbackCube(BlockType type)
     {
@@ -98,6 +147,9 @@ public class BlockCubeCache : IDisposable
         foreach (var mesh in _tintedMeshes.Values)
             mesh.Dispose();
         _tintedMeshes.Clear();
+        foreach (var mesh in _surfaceMeshes.Values)
+            mesh.Dispose();
+        _surfaceMeshes.Clear();
 
         GC.SuppressFinalize(this);
     }
