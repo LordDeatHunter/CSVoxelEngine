@@ -37,7 +37,7 @@ public sealed class RemotePlayer
         Id = id;
         Name = name;
         // The body trails the look, so a turning player's head leads and the body follows.
-        Model = new PlayerModel { Rig = rig, BodyYawLags = true };
+        Model = new PlayerModel { Rig = rig, BodyYawLags = true, AutoSwimStroke = true };
     }
 
     public int Id { get; }
@@ -109,6 +109,13 @@ public sealed class RemotePlayer
             ? new Vector3(Eye.X - _prev.X, 0f, Eye.Z - _prev.Z).Length() / dt
             : 0f;
         var vy = _hasPrev ? (Eye.Y - _prevY) / dt : 0f;
+        // The heading along and across the look, which tips a swimmer toward where it is going.
+        var step = _hasPrev ? Eye - _prev : Vector3.Zero;
+        var yawRad = MathUtils.ToRadians(Yaw);
+        var fx = MathF.Cos(yawRad);
+        var fz = MathF.Sin(yawRad);
+        var headingForward = (step.X * fx + step.Z * fz) / dt;
+        var headingSide = (-step.X * fz + step.Z * fx) / dt;
         _prev = Eye;
         _prevY = Eye.Y;
         _hasPrev = true;
@@ -120,6 +127,7 @@ public sealed class RemotePlayer
             grounded: !airborne,
             verticalVelocity: airborne ? vy : 0f,
             sneaking: _flags.HasFlag(NetPlayerFlags.Sneaking),
-            swimming: _flags.HasFlag(NetPlayerFlags.Swimming));
+            swimming: _flags.HasFlag(NetPlayerFlags.Swimming),
+            swimForward: headingForward, swimSide: headingSide);
     }
 }

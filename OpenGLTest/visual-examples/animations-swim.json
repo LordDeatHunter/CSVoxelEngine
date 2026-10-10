@@ -1,0 +1,27 @@
+{
+  // The swim stroke from the shoulder camera: run with VOXEL_SCRIPT=visual-examples/animations-swim.json
+  // VOXEL_TIME=147 from OpenGLTest/. Shots land in visual/animations-swim/.
+  // The sea at x~432, z~0 is 10+ blocks deep (found by scanning worldgen; the older water.json coordinates are dry now). Holding W in the sea starts a stroke at once (the arms thrust out from the front and the swimmer
+  // is kicked forward); the shots catch the reach, the thrust, the hold and the slow recovery, a
+  // strafing tilt, and a stroke straight up.
+  "steps": [
+    { "op": "teleport", "pos": [432.5, 5.5, 0.5], "yaw": 0, "pitch": -5 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "float-ready" },
+    { "op": "walk", "keys": ["W"], "seconds": 0.08 },
+    { "op": "screenshot", "name": "thrust" },
+    { "op": "walk", "keys": ["W"], "seconds": 0.2 },
+    { "op": "screenshot", "name": "hold" },
+    { "op": "wait", "seconds": 0.35 },
+    { "op": "screenshot", "name": "recover" },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "reach-again" },
+    { "op": "walk", "keys": ["D"], "seconds": 0.35 },
+    { "op": "screenshot", "name": "strafe" },
+    { "op": "wait", "seconds": 1.2 },
+    { "op": "walk", "keys": ["Space"], "seconds": 0.3 },
+    { "op": "screenshot", "name": "up" }
+  ]
+}

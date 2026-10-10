@@ -1221,10 +1221,18 @@ public class World : IItemUseWorld
     {
         var camPos = Camera.Position;
         var horizontalSpeed = 0f;
+        var headingForward = 0f;
+        var headingSide = 0f;
         if (_hasPrevCamPos && deltaTime > 0.0)
         {
             var step = camPos - _prevCamPos;
             horizontalSpeed = new Vector3(step.X, 0f, step.Z).Length() / (float)deltaTime;
+            // The velocity along and across the body's facing, which tips a swimmer toward its heading.
+            var yaw = MathUtils.ToRadians(Camera.PlayerYaw);
+            var fx = MathF.Cos(yaw);
+            var fz = MathF.Sin(yaw);
+            headingForward = (step.X * fx + step.Z * fz) / (float)deltaTime;
+            headingSide = (-step.X * fz + step.Z * fx) / (float)deltaTime;
         }
         _prevCamPos = camPos;
         _hasPrevCamPos = true;
@@ -1241,9 +1249,16 @@ public class World : IItemUseWorld
         Player.SetLook(Camera.PlayerYaw, Camera.Pitch);
         var animSpeed = Camera.IsFlying ? 0f : horizontalSpeed;
         var supported = Camera.IsGrounded || Camera.IsFlying || Camera.IsInWater;
+        // A swim stroke the physics just started thrusts the arms out on the same frame.
+        var strokes = Camera.SwimStrokeCount;
+        if (strokes != _lastSwimStrokes) Player.TriggerSwimStroke();
+        _lastSwimStrokes = strokes;
         Player.Update((float)deltaTime, animSpeed, Camera.IsSprinting, supported,
-            Camera.VerticalVelocity, Camera.IsSneaking, Camera.IsInWater && !Camera.IsFlying);
+            Camera.VerticalVelocity, Camera.IsSneaking, Camera.IsInWater && !Camera.IsFlying,
+            headingForward, headingSide);
     }
+
+    private int _lastSwimStrokes;
 
     private bool _equipTracked;
 

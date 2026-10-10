@@ -54,6 +54,14 @@ public class PlayerModel
     private const float SprintJumpKneeFront = -1.0f;
     private const float SprintJumpKneeBack = -1.8f;
 
+    // Swim stroke arm poses (ApplyArmFrames): reaching forward with the hands together, and thrust
+    // out to the sides, slightly behind the shoulders.
+    private const float SwimReachRoll = 0.12f;
+    private const float SwimReachFlex = 1.75f;
+    private const float SwimSideRoll = 1.5f;
+    private const float SwimSideFlex = 0f;
+    private const float SwimSideBehind = 0.3f;
+
     // Airborne arms are thrown out to the sides (abduction about the body's front axis) with a
     // slight forward flex and a soft elbow, instead of hanging forward. A sprint jump trails them
     // further back and lower.
@@ -192,7 +200,12 @@ public class PlayerModel
     private Spring _equip = new(3.2f, 0.55f);
     private float _crouchBlend;
     private float _swimBlend;
-    private float _swimPhase;
+    // Seconds since the last swim stroke began; the stroke is over (the arms rest in front) once it
+    // reaches PlayerPhysics.SwimStrokeSeconds, and the first stroke after entering the water is ready.
+    private float _swimT = PlayerPhysics.SwimStrokeSeconds;
+    private float _swimFwd;
+    private float _swimSide;
+    private float _swimBobTime;
     private float _lookYaw;
     private float _lookPitch;
     private float _bodyYaw;
@@ -244,6 +257,21 @@ public class PlayerModel
 
     /// <summary>Smoothed 0..1 swimming amount (<c>swimming</c> in <see cref="Update"/>).</summary>
     public float SwimBlend => _swimBlend;
+
+    /// <summary>
+    /// How far through the current swim stroke the arms are, 0 at the thrust out to the sides and 1
+    /// once they have crept back to the front (also while no stroke is under way).
+    /// </summary>
+    public float SwimStrokeProgress => MathUtils.Clamp01(_swimT / PlayerPhysics.SwimStrokeSeconds);
+
+    /// <summary>
+    /// When true the model starts its own strokes while it swims and moves (a remote player, whose
+    /// strokes are not reported); the local player is told by <see cref="TriggerSwimStroke"/> instead.
+    /// </summary>
+    public bool AutoSwimStroke { get; set; }
+
+    /// <summary>A swim stroke just started (the physics kicked the swimmer): the arms thrust out from the front.</summary>
+    public void TriggerSwimStroke() => _swimT = 0f;
 
     /// <summary>The landing spring's displacement: positive while the body is squatting from an impact.</summary>
     public float LandingDip => _landDip.Value;
@@ -317,7 +345,8 @@ public class PlayerModel
     /// knees, falling extends toward landing.
     /// </summary>
     public void Update(float deltaTime, float horizontalSpeed, bool sprinting = false, bool grounded = true,
-        float verticalVelocity = 0f, bool sneaking = false, bool swimming = false)
+        float verticalVelocity = 0f, bool sneaking = false, bool swimming = false,
+        float swimForward = 0f, float swimSide = 0f)
     {
         if (deltaTime <= 0f) return;
         _time += deltaTime;
@@ -334,7 +363,13 @@ public class PlayerModel
         _equip.Step(0f, deltaTime);
         _crouchBlend = MathUtils.Damp(_crouchBlend, sneaking ? 1f : 0f, 12f, deltaTime);
         _swimBlend = MathUtils.Damp(_swimBlend, swimming ? 1f : 0f, 6f, deltaTime);
-        _swimPhase += deltaTime * (2.6f + 5f * MathUtils.Clamp01(horizontalSpeed / WalkSpeedRef));
+        _swimBobTime += deltaTime;
+        _swimT += deltaTime;
+        if (swimming && AutoSwimStroke && _swimT >= PlayerPhysics.SwimStrokeSeconds && horizontalSpeed > 0.8f)
+            _swimT = 0f;
+        // The body tips toward where the swimmer is heading, so these follow the velocity.
+        _swimFwd = MathUtils.Damp(_swimFwd, swimming ? swimForward : 0f, 8f, deltaTime);
+        _swimSide = MathUtils.Damp(_swimSide, swimming ? swimSide : 0f, 8f, deltaTime);
 
         if (BodyYawLags && _lookKnown)
         {
@@ -573,29 +608,43 @@ public class PlayerModel
         return WithThrow(WithPunch(ApplyMods(ApplySwim(blended), ComputeMods()), pitchDeg));
     }
 
-    // Swimming replaces the ground cycle: arms rock through an overhead crawl stroke opposite each
-    // other (a gentle sculling when still), the legs flutter, the knees stay soft. Blended in by
-    // the smoothed swim amount, so entering and leaving the water never snaps.
+    // The stroke clock as three phases: the thrust out to the sides (fast), a short hold with the
+    // arms out, and the slow recovery back to the front, after which the cycle rests until the next
+    // stroke. StrokeOut is 0 with the arms in front and 1 with them out to the sides.
+    private const float StrokeThrustEnd = 0.2f;
+    private const float StrokeHoldEnd = 0.3f;
+
+    private float StrokeOut()
+    {
+        var t = SwimStrokeProgress;
+        if (t >= 1f) return 0f;
+        if (t < StrokeThrustEnd) return MathUtils.EaseOutCubic(t / StrokeThrustEnd);
+        if (t < StrokeHoldEnd) return 1f;
+        return 1f - MathUtils.SmoothStep((t - StrokeHoldEnd) / (1f - StrokeHoldEnd));
+    }
+
+    // Swimming replaces the ground cycle for the legs and body: they kick at the burst (snapping
+    // from tucked to straight with the thrust), then draw back up slowly while the arms recover.
+    // The arms themselves are the arm frames below. Blended in by the smoothed swim amount, so
+    // entering and leaving the water never snaps.
     private Pose ApplySwim(in Pose pose)
     {
         var s = _swimBlend;
         if (s <= 0.001f) return pose;
-        var crawl = MathUtils.Clamp01(_moveBlend * 3f);
-        var stroke = MathF.Sin(_swimPhase);
-        var arm = 1.2f + 0.1f * MathF.Sin(_swimPhase * 0.5f);
-        var leftShoulder = arm + 1.5f * crawl * stroke;
-        var rightShoulder = arm - 1.5f * crawl * stroke + _holdBlend * HoldShoulder * 0.5f;
-        var leftElbow = 0.4f + 0.55f * crawl * MathF.Max(0f, MathF.Cos(_swimPhase));
-        var rightElbow = 0.4f + 0.55f * crawl * MathF.Max(0f, -MathF.Cos(_swimPhase));
-        var kick = MathF.Sin(_swimPhase * 2.4f) * (0.2f + 0.2f * crawl);
-        var bob = MathF.Sin(_swimPhase * 0.7f) * 0.025f;
+        var t = SwimStrokeProgress;
+        // 0 = legs straight (just kicked), 1 = drawn up under the body.
+        float tuck;
+        if (t >= 1f) tuck = 0.55f;
+        else if (t < StrokeThrustEnd) tuck = MathUtils.Lerp(0.55f, 0f, MathUtils.EaseOutCubic(t / StrokeThrustEnd));
+        else tuck = 0.55f * MathUtils.SmoothStep((t - StrokeThrustEnd) / (1f - StrokeThrustEnd));
+        var hip = 0.1f + 0.5f * tuck;
+        var knee = -(0.15f + 1.1f * tuck);
+        var bob = MathF.Sin(_swimBobTime * 1.7f) * 0.025f;
         return new Pose(
-            MathUtils.Lerp(pose.LeftHip, kick, s), MathUtils.Lerp(pose.RightHip, -kick, s),
-            MathUtils.Lerp(pose.LeftKnee, -0.35f - MathF.Max(0f, kick), s),
-            MathUtils.Lerp(pose.RightKnee, -0.35f - MathF.Max(0f, -kick), s),
-            MathUtils.Lerp(pose.LeftShoulder, leftShoulder, s), MathUtils.Lerp(pose.RightShoulder, rightShoulder, s),
-            MathUtils.Lerp(pose.LeftElbow, leftElbow, s), MathUtils.Lerp(pose.RightElbow, rightElbow, s),
-            MathUtils.Lerp(pose.TorsoPitch, -0.15f * crawl, s), MathUtils.Lerp(pose.Bob, bob, s));
+            MathUtils.Lerp(pose.LeftHip, hip + 0.08f, s), MathUtils.Lerp(pose.RightHip, hip - 0.08f, s),
+            MathUtils.Lerp(pose.LeftKnee, knee, s), MathUtils.Lerp(pose.RightKnee, knee, s),
+            pose.LeftShoulder, pose.RightShoulder, pose.LeftElbow, pose.RightElbow,
+            MathUtils.Lerp(pose.TorsoPitch, 0f, s), MathUtils.Lerp(pose.Bob, bob, s));
     }
 
     // ---- Arm frames ----------------------------------------------------------------------
@@ -636,6 +685,20 @@ public class PlayerModel
             var roll = MathUtils.Lerp(AirArmRoll, SprintAirArmRoll, _airRun) + (rise - fall * 0.3f) * 0.25f;
             Blend(ref upper, UpperFrame(side, roll, MathUtils.Lerp(AirArmFlex, SprintAirArmFlex, _airRun), 0f), air);
             Blend(ref fore, ForeFrame(side, MathUtils.Lerp(AirElbowFlex, SprintAirElbowFlex, _airRun), 0f), air);
+        }
+
+        // Swimming: the arms reach out in front, thrust out to the sides at the burst (a little behind
+        // the shoulders), hold there for a beat and creep back to the front for the next stroke.
+        if (_swimBlend > 0.001f)
+        {
+            var out_ = StrokeOut();
+            var sculling = MathF.Sin(_swimBobTime * 2.3f) * 0.07f * (1f - out_);
+            var reachRoll = SwimReachRoll;
+            var roll = MathUtils.Lerp(reachRoll, SwimSideRoll, out_);
+            var flex = MathUtils.Lerp(SwimReachFlex, SwimSideFlex, out_) + sculling;
+            var yaw = MathUtils.Lerp(0f, -SwimSideBehind, out_);
+            Blend(ref upper, UpperFrame(side, roll, flex, yaw), _swimBlend);
+            Blend(ref fore, ForeFrame(side, MathUtils.Lerp(0.1f, 0.3f, out_), 0f), _swimBlend);
         }
 
         if (!right) return;
@@ -686,6 +749,7 @@ public class PlayerModel
         public float HeadPitch { get; init; }
         public float HeadYaw { get; init; }
         public float SwimPitch { get; init; }
+        public float SwimRoll { get; init; }
         public float DeathPitch { get; init; }
     }
 
@@ -733,7 +797,12 @@ public class PlayerModel
             TorsoRoll = MathF.Cos(_walkPhase) * 0.035f * move + sliceRoll + _flinch.Value * 0.08f,
             HeadPitch = _flinch.Value * 0.45f - crouch * 0.1f,
             HeadYaw = BodyYawLags && _lookKnown ? -MathUtils.ToRadians(WrapDegrees(_lookYaw - _bodyYaw)) : 0f,
-            SwimPitch = -_swimBlend * MathUtils.Clamp01(_moveBlend * 3f) * 1.1f,
+            // The whole body (legs included) tips toward the heading: forward when swimming ahead, back
+            // when backing off, rolled toward a strafe, plus a lunge at the burst.
+            SwimPitch = _swimBlend * (-0.25f - 0.85f * MathUtils.Clamp01(_swimFwd / 5f)
+                                      + 0.45f * MathUtils.Clamp01(-_swimFwd / 5f)
+                                      - 0.18f * MathUtils.Pulse(SwimStrokeProgress, 0.08f)),
+            SwimRoll = -_swimBlend * Math.Clamp(_swimSide / 5f, -1f, 1f) * 0.6f,
             DeathPitch = MathUtils.EaseInCubic(MathUtils.Clamp01(fall)) * 1.5f,
         };
     }
@@ -912,9 +981,9 @@ public class PlayerModel
         // Swimming tips the body forward about the hips, a death lays it over about the feet.
         var pelvisY = rig.Parts.TryGetValue("ThighL", out var thigh) ? thigh.Pivot.Y : PelvisFallback;
         var local = Matrix4x4.Identity;
-        if (mods.SwimPitch != 0f)
+        if (mods.SwimPitch != 0f || mods.SwimRoll != 0f)
             local = Matrix4x4.CreateTranslation(0f, -pelvisY, 0f) * Matrix4x4.CreateRotationX(mods.SwimPitch)
-                    * Matrix4x4.CreateTranslation(0f, pelvisY, 0f);
+                    * Matrix4x4.CreateRotationZ(mods.SwimRoll) * Matrix4x4.CreateTranslation(0f, pelvisY, 0f);
         if (mods.DeathPitch != 0f)
             local *= Matrix4x4.CreateRotationX(mods.DeathPitch);
         var root = local * Matrix4x4.CreateRotationY(yawRad) * Matrix4x4.CreateTranslation(feet + new Vector3(0f, pose.Bob, 0f));

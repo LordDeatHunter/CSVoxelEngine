@@ -86,24 +86,126 @@ public sealed class PlayerModelJuiceTests
         Assert.Equal(rest.LeftKnee, model.GetPose().LeftKnee, 2);
     }
 
-    [Fact]
-    public void SwimmingStrokesTheArmsOppositeEachOtherAndEasesBackOutOfTheWater()
+    private static System.Numerics.Vector3 Origin(PlayerModel model, string part) =>
+        System.Numerics.Vector3.Transform(System.Numerics.Vector3.Zero,
+            model.GetPartMatrix(part, new System.Numerics.Vector3(0f, 1.62f, 0f), -90f, 0f));
+
+    private static System.Numerics.Vector3 Hand(PlayerModel model, string forearm) =>
+        System.Numerics.Vector3.Transform(new System.Numerics.Vector3(0f, model.HandDepth(), 0f),
+            model.GetPartMatrix(forearm, new System.Numerics.Vector3(0f, 1.62f, 0f), -90f, 0f));
+
+    private static PlayerModel Swimmer()
     {
-        var model = Settled();
-        var spread = 0f;
-        for (var i = 0; i < 180; i++)
+        var model = new PlayerModel();
+        for (var i = 0; i < 120; i++) model.Update(Dt, 0f, swimming: true);
+        return model;
+    }
+
+    private static void Advance(PlayerModel model, float seconds, float forward = 0f)
+    {
+        for (var t = 0f; t < seconds; t += Dt) model.Update(Dt, 0f, swimming: true, swimForward: forward);
+    }
+
+    [Fact]
+    public void ASwimStrokeReachesForwardThenThrustsTheArmsOutAndCreepsBackToTheFront()
+    {
+        var model = Swimmer();
+        float Spread() => MathF.Abs(Hand(model, "ForearmL").X - Hand(model, "ForearmR").X);
+        float Ahead() => Origin(model, "UpperArmR").Z - Hand(model, "ForearmR").Z;
+
+        // Ready: both hands out in front of the shoulders, close together.
+        var readySpread = Spread();
+        Assert.True(Ahead() > 0.35f);
+
+        model.TriggerSwimStroke();
+        Advance(model, PlayerPhysics.SwimStrokeSeconds * 0.25f);
+        // Thrust and hold: the arms are out at the sides, no longer in front.
+        Assert.True(Spread() > readySpread + 0.6f);
+        Assert.True(Ahead() < 0.2f);
+        var heldSpread = Spread();
+
+        // Recovery is slow: partway through the arms are still well out ...
+        Advance(model, PlayerPhysics.SwimStrokeSeconds * 0.25f);
+        Assert.True(Spread() > readySpread + 0.2f);
+        Assert.True(Spread() < heldSpread);
+
+        // ... and by the end of the stroke they are back in front, ready for the next.
+        Advance(model, PlayerPhysics.SwimStrokeSeconds * 0.6f);
+        Assert.Equal(1f, model.SwimStrokeProgress);
+        Assert.InRange(Spread(), readySpread - 0.1f, readySpread + 0.1f);
+        Assert.True(Ahead() > 0.35f);
+    }
+
+    [Fact]
+    public void TheArmsThrustOutQuicklyAndRecoverSlowly()
+    {
+        var model = Swimmer();
+        float Spread() => MathF.Abs(Hand(model, "ForearmL").X - Hand(model, "ForearmR").X);
+        var ready = Spread();
+
+        model.TriggerSwimStroke();
+        Advance(model, PlayerPhysics.SwimStrokeSeconds * 0.22f);
+        var thrust = Spread() - ready;
+        Assert.True(thrust > 0.6f);
+
+        // Moving back the same distance takes far longer than moving out did.
+        var framesBack = 0;
+        while (Spread() - ready > thrust * 0.5f && framesBack < 600)
+        {
+            model.Update(Dt, 0f, swimming: true);
+            framesBack++;
+        }
+        Assert.True(framesBack * Dt > PlayerPhysics.SwimStrokeSeconds * 0.2f);
+    }
+
+    [Fact]
+    public void TheLegsKickWithTheThrustAndDrawBackUpDuringTheRecovery()
+    {
+        var model = Swimmer();
+        model.TriggerSwimStroke();
+        Advance(model, PlayerPhysics.SwimStrokeSeconds * 0.22f);
+        var kicked = model.GetPose().LeftKnee;
+
+        Advance(model, PlayerPhysics.SwimStrokeSeconds * 0.7f);
+        var drawnUp = model.GetPose().LeftKnee;
+
+        Assert.True(drawnUp < kicked - 0.3f);
+    }
+
+    [Fact]
+    public void TheWholeBodyTipsTowardTheSwimDirectionAndLevelsOutWhenStill()
+    {
+        var still = Swimmer();
+        var heading = Swimmer();
+        Advance(heading, 1f, forward: 5f);
+
+        // Tipping forward carries the head out in front of where it floats when still, and the feet back.
+        Assert.True(Origin(heading, "Head").Z < Origin(still, "Head").Z - 0.3f);
+        Assert.True(Origin(heading, "ShinL").Z > Origin(still, "ShinL").Z + 0.1f);
+
+        Advance(heading, 2f, forward: 0f);
+        Assert.Equal(Origin(still, "Head").Z, Origin(heading, "Head").Z, 1);
+    }
+
+    [Fact]
+    public void ARemoteSwimmerStartsItsOwnStrokesWhileItMoves()
+    {
+        var model = new PlayerModel { AutoSwimStroke = true };
+        var restarts = 0;
+        var last = 1f;
+        for (var i = 0; i < 360; i++)
         {
             model.Update(Dt, 3f, swimming: true);
-            var pose = model.GetPose();
-            spread = MathF.Max(spread, MathF.Abs(pose.LeftShoulder - pose.RightShoulder));
+            if (model.SwimStrokeProgress < last - 0.5f) restarts++;
+            last = model.SwimStrokeProgress;
         }
 
-        Assert.True(model.SwimBlend > 0.9f);
-        Assert.True(spread > 1.5f);
+        Assert.True(restarts >= 2);
 
-        for (var i = 0; i < 240; i++) model.Update(Dt, 0f);
-        Assert.True(model.SwimBlend < 0.01f);
-        Assert.InRange(MathF.Abs(Settled().GetPose().LeftShoulder - model.GetPose().LeftShoulder), 0f, 0.06f);
+        // Standing still in the water it makes none.
+        var idle = new PlayerModel { AutoSwimStroke = true };
+        for (var i = 0; i < 240; i++) idle.Update(Dt, 0f, swimming: true);
+        Assert.Equal(1f, idle.SwimStrokeProgress);
     }
 
     [Fact]
