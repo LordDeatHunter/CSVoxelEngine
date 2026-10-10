@@ -144,7 +144,7 @@ public sealed class SlimeTests
     }
 
     [Fact]
-    public void LivingCapStopsFurtherSpawns()
+    public void NaturalCapStopsFurtherRingSpawns()
     {
         var chunks = MobTestWorld.Surface();
         var drops = new DropManager();
@@ -152,12 +152,12 @@ public sealed class SlimeTests
         var camera = new Camera(null, null);
         camera.TestTeleport(new Vector3(0.5f, 100f, 0.5f), yaw: 0f, pitch: 0f);
 
-        for (var i = 0; i < WorldGenerationConfig.SlimeMaxAlive; i++)
+        for (var i = 0; i < WorldGenerationConfig.MobNaturalCap; i++)
             manager.Spawn(new Vector3(0.5f, 1f + Slime.HalfExtent, 0.5f));
 
         manager.Update(WorldGenerationConfig.SlimeSpawnIntervalSeconds + 0.01f, chunks, drops, camera);
 
-        Assert.Equal(WorldGenerationConfig.SlimeMaxAlive, manager.Slimes.Count);
+        Assert.Equal(WorldGenerationConfig.MobNaturalCap, manager.Slimes.Count);
     }
 
     [Fact]

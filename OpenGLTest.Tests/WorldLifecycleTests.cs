@@ -387,25 +387,25 @@ public sealed class WorldLifecycleTests : IDisposable
     }
 
     [Fact]
-    public void SavedMobsNeverExceedTheirKindsAliveCapAndTheSurplusStaysSaved()
+    public void SavedMobsRestorePastTheNaturalCapButNeverPastTheHardCapAndTheSurplusStaysSaved()
     {
         WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
-        // More slimes than their kind may have alive, all inside the ready sphere, plus one goblin
+        // More mobs than may ever be alive together, all inside the ready sphere, of both kinds
         var mobs = new List<EntitySaveData.MobData>();
-        for (var i = 0; i < WorldGenerationConfig.SlimeMaxAlive + 3; i++)
-            mobs.Add(new EntitySaveData.MobData { Type = "slime", Position = [i, High, 0f] });
-        mobs.Add(new EntitySaveData.MobData { Type = "goblin", Position = [0f, High, 2f] });
+        for (var i = 0; i < WorldGenerationConfig.MobHardCap + 3; i++)
+            mobs.Add(new EntitySaveData.MobData { Type = "slime", Position = [i % 16 * 0.5f, High, i / 16 * 0.5f] });
+        mobs.Add(new EntitySaveData.MobData { Type = "goblin", Position = [0f, High, -2f] });
         WriteEntitiesFile(new EntitySaveData { Mobs = mobs });
 
         var world = NewWorld(new ChunkSaveStore(_dir));
         Assert.True(RunUntil(world, () => world.IsLoaded, LoadWallSeconds), "the world did not finish loading");
         Assert.False(world.LoadTimedOut);
 
-        // Read right after the flipping Update, before any manager could move or despawn a mob
-        Assert.True(world.Slimes.Count <= WorldGenerationConfig.SlimeMaxAlive,
-            $"{world.Slimes.Count} slimes restored past the cap");
-        Assert.Single(world.Goblins);
+        // Read right after the flipping Update, before any manager could move or despawn a mob. A
+        // restore is a forced spawn: the whole hard cap fills, well past the natural cap, and no more.
         Assert.Equal(world.Slimes.Count + world.Goblins.Count, world.Mobs.Count);
+        Assert.Equal(WorldGenerationConfig.MobHardCap, world.Mobs.Count);
+        Assert.True(world.Mobs.Count > WorldGenerationConfig.MobNaturalCap);
         Assert.True(world.Mobs.Count <= WorldGenerationConfig.MobsMaxAlive);
 
         // The live mobs plus the surplus still pending are all written back

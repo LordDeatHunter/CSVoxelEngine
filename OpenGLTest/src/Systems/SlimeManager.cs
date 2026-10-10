@@ -9,11 +9,13 @@ namespace silkgltriangle;
 /// bills contact damage while they are airborne, rolls death loot, and spawns new ones on dry
 /// forest surface in a ring around a player. Every rule runs against a list of
 /// <see cref="IMobTarget"/>s (the local camera, or a server's connected players), each slime
-/// chasing its nearest one. Main thread only.
+/// chasing its nearest one. Every spawn is judged by the global <see cref="MobCaps"/> it shares
+/// with the other mob kinds. Main thread only.
 /// </summary>
-public sealed class SlimeManager
+public sealed class SlimeManager : IMobPopulation
 {
     private readonly EntityType _type;
+    private readonly MobCaps _caps;
     private readonly List<Slime> _slimes = [];
     private readonly List<byte> _loot = [];
     // The camera overload's one-element target list, reused so it allocates nothing per frame.
@@ -21,13 +23,20 @@ public sealed class SlimeManager
     private float _spawnTimer;
     private int _spawnCursor;
 
-    public SlimeManager(EntityType type) => _type = type;
+    /// <summary>Joins <paramref name="caps"/> (the world's, shared with every other mob kind), or
+    /// caps itself alone when none is given (tests, previews).</summary>
+    public SlimeManager(EntityType type, MobCaps? caps = null)
+    {
+        _type = type;
+        _caps = caps ?? new MobCaps();
+        _caps.Register(this);
+    }
 
     /// <summary>Every slime still drawn: the living ones plus any playing their death
     /// (<see cref="Mob.IsDying"/>), which are no longer targets and do not count toward the cap.</summary>
     public IReadOnlyList<Slime> Slimes => _slimes;
 
-    /// <summary>Slimes that are alive (not yet dying), for the spawn cap.</summary>
+    /// <summary>Slimes that are alive (not yet dying), what the global caps count.</summary>
     public int LivingCount
     {
         get
@@ -64,9 +73,15 @@ public sealed class SlimeManager
     /// The singleplayer caller applies it to its <see cref="PlayerHealth"/> and shakes.</summary>
     public int DamageDealtThisFrame { get; private set; }
 
-    /// <summary>Adds a slime at an exact body-centre position (used by spawns and tests).</summary>
-    public Slime Spawn(Vector3 position)
+    /// <summary>
+    /// Adds a slime at an exact body-centre position: a forced spawn (scenarios, save restores, a
+    /// client's mirror, tests), which may go past the natural cap but never the hard cap. Null, and
+    /// nothing added, once the hard cap is full. The ring spawner adds through here too, after its
+    /// own natural-cap check.
+    /// </summary>
+    public Slime? Spawn(Vector3 position)
     {
+        if (_caps.ForcedRoom <= 0) return null;
         var slime = new Slime(_type, position);
         _slimes.Add(slime);
         return slime;
@@ -164,10 +179,11 @@ public sealed class SlimeManager
             drops.SpawnAt(id, slime.Position);
     }
 
-    // One shared timer and cap; each expiry tries the ring round the next target in turn.
+    // One shared timer, under the natural cap every mob kind shares; each expiry tries the ring
+    // round the next target in turn.
     private void UpdateSpawning(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
     {
-        if (LivingCount >= WorldGenerationConfig.SlimeMaxAlive) return;
+        if (!_caps.AllowsNaturalSpawn) return;
 
         _spawnTimer += deltaTime;
         if (_spawnTimer < WorldGenerationConfig.SlimeSpawnIntervalSeconds) return;

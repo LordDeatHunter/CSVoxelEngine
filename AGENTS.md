@@ -563,6 +563,8 @@ OpenGLTest/
                                #   facing, hit flash, body box, TakeDamage/Shove
     IMobTarget.cs              # what a mob chases and hurts: eye, immunity, TakeHit (Camera, ServerPlayer)
     MobTargets.cs              # GL-free target rules: body contact, nearest non-immune target, min distance
+    MobCaps.cs, IMobPopulation.cs  # the natural and hard mob caps every kind shares, over the
+                               #   living count each registered manager reports
     Goblin.cs                  # the goblin: body physics, throw-then-melee AI, clip/event contract
                                #   (ValidateContent), animation-driven release/impact events
     GoblinAim.cs               # GL-free low-arc ballistic solver for the thrown stones
@@ -1551,10 +1553,10 @@ pure function of the seed: only **deltas** and the seed are written.
   profiler row, which is entered nowhere else.
 - **Player and entities.** `player.json` never stores a position before the spawn settled, so a
   world closed mid-load searches the surface again next time. Saved mobs and drops are spawned
-  once loading finishes, each only when its chunk is loaded and a mob only while its kind is
-  below its alive cap (`SlimeMaxAlive` / `GoblinMaxAlive`, whose sum sizes the healthbar
-  buffers); an entry that waits stays pending and is saved again, and is discarded only after
-  `EntityRestoreTimeoutSeconds` of play.
+  once loading finishes, each only when its chunk is loaded; a restore is a forced spawn, so it
+  may pass the natural mob cap but a mob waits while the hard cap (`MobHardCap`, which sizes the
+  healthbar buffers) is full; an entry that waits stays pending and is saved again, and is
+  discarded only after `EntityRestoreTimeoutSeconds` of play.
 - **Not persisted** (tracked as `M-12` in TODO.md): the station block entities (campfire, quern,
   kiln, casting — a reloaded kiln is plain blocks plus its multiblock state bytes until a
   right-click re-registers it through `KilnManager.Ensure`, with no fuel or crucible), primed
@@ -2269,11 +2271,17 @@ centre), `Health`/`IsDead`, `Facing` (yaw, the model faces -Z at 0), `HitFlash`,
 manager has run and before `UpdateThrown`, so a mob killed or despawned this frame is never hit or given
 a healthbar. The punch, the slice, the player's thrown items (`ThrownProjectile.Update`, an AABB overlap
 against each mob's body box, so a tall goblin is hit through its head and shins) and the healthbars
-(`EntityHealthbarRenderer`, buffers sized by `WorldGenerationConfig.MobsMaxAlive`, the sum of every
-kind's cap) all read that one list. A new mob kind must be added to `MobsMaxAlive`, or its hearts vanish
-past the cap. The render passes keep one list per kind, because the meshes differ; `ReflectionEntities`
+(`EntityHealthbarRenderer`, buffers sized by `WorldGenerationConfig.MobsMaxAlive`, the hard cap
+below) all read that one list. The render passes keep one list per kind, because the meshes differ; `ReflectionEntities`
 carries both. Ring spawning on dry, loaded forest surface goes through `Systems/MobSpawner.cs`
 (`TryFindSurfaceSpawn`), and each manager wraps it with its own radii and body-centre offset.
+**Two global caps** bound every kind together (`MobCaps`, owned by `World` and handed to each manager,
+which registers itself as an `IMobPopulation`; a manager built alone caps itself): the ring spawners
+stop at the **natural cap** (`MobNaturalCap`), and a **forced** spawn — a manager's public `Spawn`
+(a slime splitting, a scenario, a save restore, a client mirroring its server) — may pass it but
+returns null at the **hard cap** (`MobHardCap`, `MobHardCapFactor` times the natural one, which is
+`MobsMaxAlive`). Both count living mobs only (`LivingCount`, dying excluded), so a new kind needs no
+cap of its own: it registers with the world's `MobCaps`.
 The managers never read the camera: they take a list of `IMobTarget`s (the camera in
 singleplayer, every connected player on a server), chase the nearest non-immune one, spawn rings
 round-robin over them under the global caps and despawn by the distance to the nearest (see "Mobs
@@ -2298,7 +2306,7 @@ the click, with the arm and blade carried across the front by `PlayerModel`.
 
 The second entity is the **goblin** (`Goblin` + `Systems/GoblinManager.cs`, owned by `World`), a short
 forest raider that throws the flint it carries and then closes for a club swing. It spawns like the
-slime: dry forest surface, a 20-40 block ring, a cap of `GoblinMaxAlive` and despawn beyond
+slime: dry forest surface, a 20-40 block ring, under the shared natural mob cap and despawn beyond
 `GoblinDespawnRadiusBlocks`. It has no light or time keying. Its **ammo** is a count of the ordinary
 `flint` item, rolled at spawn (`GoblinStoneMin..Max`). The stones still carried drop as flint on death,
 on top of the goblin's own loot table. A stone that misses **shatters**: it leaves no drop, so thrown

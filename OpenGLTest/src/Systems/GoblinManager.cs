@@ -11,11 +11,13 @@ namespace silkgltriangle;
 /// stones a goblin still carried, and spawns new ones on dry forest surface in a ring around a
 /// player. Every rule runs against a list of <see cref="IMobTarget"/>s (the local camera, or a
 /// server's connected players), each goblin chasing its nearest one. A stone that misses
-/// shatters: it never becomes a pickup. Main thread only.
+/// shatters: it never becomes a pickup. Every spawn is judged by the global <see cref="MobCaps"/>
+/// it shares with the other mob kinds. Main thread only.
 /// </summary>
-public sealed class GoblinManager
+public sealed class GoblinManager : IMobPopulation
 {
     private readonly EntityType _type;
+    private readonly MobCaps _caps;
     private readonly List<Goblin> _goblins = [];
     private readonly List<ThrownProjectile> _stones = [];
     private readonly List<byte> _loot = [];
@@ -26,19 +28,22 @@ public sealed class GoblinManager
     private int _spawnCursor;
 
     /// <summary>Validates the goblin content first, so a model missing a part, clip or event
-    /// fails at startup naming its file.</summary>
-    public GoblinManager(EntityType type)
+    /// fails at startup naming its file. Joins <paramref name="caps"/> (the world's, shared with
+    /// every other mob kind), or caps itself alone when none is given (tests, previews).</summary>
+    public GoblinManager(EntityType type, MobCaps? caps = null)
     {
         Goblin.ValidateContent(type);
         _type = type;
         _flintId = ContentRegistry.RequireItem("flint").Id;
+        _caps = caps ?? new MobCaps();
+        _caps.Register(this);
     }
 
     /// <summary>Every goblin still drawn: the living ones plus any playing their death
     /// (<see cref="Mob.IsDying"/>), which are no longer targets and do not count toward the cap.</summary>
     public IReadOnlyList<Goblin> Goblins => _goblins;
 
-    /// <summary>Goblins that are alive (not yet dying), for the spawn cap.</summary>
+    /// <summary>Goblins that are alive (not yet dying), what the global caps count.</summary>
     public int LivingCount
     {
         get
@@ -78,10 +83,15 @@ public sealed class GoblinManager
     /// The singleplayer caller applies it to its <see cref="PlayerHealth"/> and shakes.</summary>
     public int DamageDealtThisFrame { get; private set; }
 
-    /// <summary>Adds a goblin at an exact body-centre position (used by spawns, scenarios and
-    /// tests). A null <paramref name="ammo"/> rolls the stone count it carries.</summary>
-    public Goblin Spawn(Vector3 position, int? ammo = null)
+    /// <summary>
+    /// Adds a goblin at an exact body-centre position: a forced spawn (scenarios, save restores, a
+    /// client's mirror, tests), which may go past the natural cap but never the hard cap. Null, and
+    /// nothing added, once the hard cap is full. The ring spawner adds through here too, after its
+    /// own natural-cap check. A null <paramref name="ammo"/> rolls the stone count it carries.
+    /// </summary>
+    public Goblin? Spawn(Vector3 position, int? ammo = null)
     {
+        if (_caps.ForcedRoom <= 0) return null;
         var stones = ammo ?? Random.Shared.Next(WorldGenerationConfig.GoblinStoneMin,
             WorldGenerationConfig.GoblinStoneMax + 1);
         var goblin = new Goblin(_type, position, stones);
@@ -245,10 +255,11 @@ public sealed class GoblinManager
             drops.SpawnAt(_flintId, goblin.Position);
     }
 
-    // One shared timer and cap; each expiry tries the ring round the next target in turn.
+    // One shared timer, under the natural cap every mob kind shares; each expiry tries the ring
+    // round the next target in turn.
     private void UpdateSpawning(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
     {
-        if (LivingCount >= WorldGenerationConfig.GoblinMaxAlive) return;
+        if (!_caps.AllowsNaturalSpawn) return;
 
         _spawnTimer += deltaTime;
         if (_spawnTimer < WorldGenerationConfig.GoblinSpawnIntervalSeconds) return;

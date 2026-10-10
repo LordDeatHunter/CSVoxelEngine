@@ -1245,12 +1245,21 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // silently skip the far side of its crown.
     public const int MaxLeafDecayBacklogCells = 1 << 17;
 
+    // --- Mob caps (MobCaps) ---
+    // Two caps shared by every mob kind, judged against the living mobs of every manager together
+    // (dying ones excluded), so a new kind needs no cap of its own. The ring spawners stop at the
+    // natural cap; a forced spawn (a slime splitting, a scenario, a save restore, a client's
+    // mirror) may pass it, but nothing ever spawns past the hard cap, which also sizes the
+    // healthbar buffers (MobsMaxAlive).
+    public const int MobNaturalCap = 12;
+    public const int MobHardCapFactor = 15;
+    public const int MobHardCap = MobNaturalCap * MobHardCapFactor;
+
     // --- Slimes (SlimeManager) ---
     // Forest mobs that hop at the player. Natural spawns appear on dry forest surface in a ring
     // around the player and are culled when they stray too far. Damage only lands while a slime
     // is airborne; a grounded touch shoves it instead. Combat values live here so a future
     // player-attack pass reads one place.
-    public const int SlimeMaxAlive = 8;
     public const float SlimeSpawnIntervalSeconds = 8f;
     public const float SlimeSpawnMinRadiusBlocks = 20f;
     public const float SlimeSpawnMaxRadiusBlocks = 40f;
@@ -1273,7 +1282,6 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // throw band must stay inside the stone's level-ground range, v^2/g at GoblinStoneSpeed
     // under ThrownProjectile.Gravity, with margin for a chest-height target and the
     // semi-implicit Euler drop, or the far edge of the band has no solvable arc.
-    public const int GoblinMaxAlive = 4;
     public const float GoblinSpawnIntervalSeconds = 14f;
     public const float GoblinSpawnMinRadiusBlocks = 20f;
     public const float GoblinSpawnMaxRadiusBlocks = 40f;
@@ -1315,8 +1323,8 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Five hearts float above every live mob, billboarded to face the camera, using the same
     // heart sprites as the player HUD. The pool is drawn proportionally across the row (each
     // heart is MaxHealth / Hearts HP), so any entity kind reads correctly whatever its pool is.
-    // The buffers are sized for every mob kind alive together.
-    public const int MobsMaxAlive = SlimeMaxAlive + GoblinMaxAlive;
+    // The buffers are sized for the most mobs that can ever be alive together: the hard cap.
+    public const int MobsMaxAlive = MobHardCap;
     public const int EntityHealthbarHearts = 5;
     // Width (and height) of one heart in blocks; neighbours sit edge to edge like the HUD row.
     public const float EntityHeartSizeBlocks = 0.2f;

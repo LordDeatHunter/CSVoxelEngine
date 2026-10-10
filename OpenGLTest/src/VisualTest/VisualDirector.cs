@@ -103,7 +103,8 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                     feet.Y = ground + 1;
                 }
                 if (!world.SpawnEntity(step.Entity!, feet))
-                    throw new InvalidOperationException($"Step {_step + 1} spawns unknown entity '{step.Entity}'.");
+                    throw new InvalidOperationException(
+                        $"Step {_step + 1} cannot spawn '{step.Entity}': an unknown entity, or the mob hard cap is full.");
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} spawn {step.Entity} at {feet}");
                 Advance();
                 break;

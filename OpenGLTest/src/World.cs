@@ -39,6 +39,8 @@ public class World : IItemUseWorld
     private readonly FallingBlockManager _falling = new();
     private readonly SlimeManager? _slimes;
     private readonly GoblinManager? _goblins;
+    // The natural and hard mob caps every manager above spawns under, counted over all of them.
+    private readonly MobCaps _mobCaps = new();
     // The players the mob managers chase this frame, rebuilt right before they run.
     private readonly List<IMobTarget> _mobTargets = [];
     private readonly FluidManager _fluidManager = new();
@@ -474,9 +476,9 @@ public class World : IItemUseWorld
             _lodManager.WorldSource = _chunkManager.WorldSource;
             _canAcceptDrop = Inventory.CanAccept;
             if (EntityRegistry.TryGet("slime") is { } slimeType)
-                _slimes = new SlimeManager(slimeType);
+                _slimes = new SlimeManager(slimeType, _mobCaps);
             if (EntityRegistry.TryGet("goblin") is { } goblinType)
-                _goblins = new GoblinManager(goblinType);
+                _goblins = new GoblinManager(goblinType, _mobCaps);
 
             // A store means a real world opened from (or created into) a save: it streams first and
             // plays once the chunks around the player are there. Larger, still bounded budgets
@@ -591,21 +593,21 @@ public class World : IItemUseWorld
 
     /// <summary>
     /// Spawns one mob of the named entity kind standing with its feet at <paramref name="feet"/>
-    /// (the scripted visual tests' <c>spawn</c> op). False for an unknown name, or a kind whose
-    /// manager does not exist because its content is not registered.
+    /// (the scripted visual tests' <c>spawn</c> op), a forced spawn under the hard mob cap. False
+    /// for an unknown name, a kind whose manager does not exist because its content is not
+    /// registered, or a full hard cap.
     /// </summary>
     public bool SpawnEntity(string name, Vector3 feet)
     {
         if (string.Equals(name, "slime", StringComparison.OrdinalIgnoreCase))
         {
-            if (_slimes == null) return false;
-            _slimes.Spawn(feet + new Vector3(0f, Slime.HalfExtent, 0f));
+            if (_slimes?.Spawn(feet + new Vector3(0f, Slime.HalfExtent, 0f)) == null) return false;
+            RefreshMobs();
             return true;
         }
         if (string.Equals(name, "goblin", StringComparison.OrdinalIgnoreCase))
         {
-            if (_goblins == null) return false;
-            _goblins.Spawn(feet + new Vector3(0f, Goblin.Height * 0.5f, 0f));
+            if (_goblins?.Spawn(feet + new Vector3(0f, Goblin.Height * 0.5f, 0f)) == null) return false;
             RefreshMobs();
             return true;
         }
@@ -1629,11 +1631,10 @@ public class World : IItemUseWorld
     /// Spawns every pending saved mob and drop whose chunk is loaded, through the managers' own
     /// spawn paths, and restores its health, facing and motion. Each waits for its chunk because
     /// an entity restored over an unloaded chunk would fall through air (slimes, goblins and drops
-    /// all read unloaded cells as air). A mob whose kind is at its alive cap
-    /// (<see cref="WorldGenerationConfig.SlimeMaxAlive"/>, <see cref="WorldGenerationConfig.GoblinMaxAlive"/>;
-    /// the healthbar buffers are sized by <see cref="WorldGenerationConfig.MobsMaxAlive"/>) waits the
-    /// same way, so an over-full save never overfills the world and loses nothing, since pending
-    /// entries are re-saved. An unknown entity kind or item name, or a record with no
+    /// all read unloaded cells as air). A restore is a forced spawn: it may pass the natural mob cap
+    /// but a mob waits the same way while the hard cap (<see cref="WorldGenerationConfig.MobHardCap"/>,
+    /// which sizes the healthbar buffers) is full, so an over-full save never overfills the world
+    /// and loses nothing, since pending entries are re-saved. An unknown entity kind or item name, or a record with no
     /// position, is dropped with one warning per pass. After
     /// <see cref="WorldGenerationConfig.EntityRestoreTimeoutSeconds"/> of play whatever is still
     /// pending is discarded. Main thread, Playing only; nothing pending costs one check.
@@ -1663,19 +1664,20 @@ public class World : IItemUseWorld
             if (!IsCellLoaded(centre))
                 continue;
 
-            // A kind at its alive cap waits like an unloaded chunk: the entry stays pending (and is
-            // re-saved by CaptureEntities) instead of overfilling the cap-sized healthbar buffers
+            // A forced spawn, bounded by the hard cap rather than the natural one: a save only holds
+            // mobs that lived together (splits may have taken them past the natural cap) plus entries
+            // still pending, so restoring up to the hard cap reproduces the saved world, and the ring
+            // spawners stay refused until the population falls under the natural cap again. At a full
+            // hard cap the entry waits like an unloaded chunk: it stays pending (and is re-saved by
+            // CaptureEntities) instead of overfilling the cap-sized healthbar buffers.
             var isSlime = string.Equals(type!.Name, "slime", StringComparison.OrdinalIgnoreCase);
-            var atCap = isSlime
-                ? _slimes!.LivingCount >= WorldGenerationConfig.SlimeMaxAlive
-                : _goblins!.LivingCount >= WorldGenerationConfig.GoblinMaxAlive;
-            if (atCap)
+            Mob? spawned = isSlime
+                ? _slimes!.Spawn(centre)
+                : _goblins!.Spawn(centre, mob.Ammo ?? 0);
+            if (spawned == null)
                 continue;
 
             var velocity = ToVector(mob.Velocity);
-            Mob spawned = isSlime
-                ? _slimes!.Spawn(centre)
-                : _goblins!.Spawn(centre, mob.Ammo ?? 0);
             spawned.RestoreState(mob.Health ?? type.MaxHealth, mob.Facing ?? 0f, velocity);
             _pendingMobs.RemoveAt(i);
         }
@@ -1705,7 +1707,7 @@ public class World : IItemUseWorld
         if (_entityRestoreTimer >= WorldGenerationConfig.EntityRestoreTimeoutSeconds
             && (_pendingMobs.Count > 0 || _pendingDrops.Count > 0))
         {
-            Log.Warn($"Entity save: discarded {_pendingMobs.Count} mob(s) and {_pendingDrops.Count} drop(s) whose chunk never loaded or whose kind stayed at its alive cap");
+            Log.Warn($"Entity save: discarded {_pendingMobs.Count} mob(s) and {_pendingDrops.Count} drop(s) whose chunk never loaded or that the full mob hard cap kept out");
             _pendingMobs.Clear();
             _pendingDrops.Clear();
         }

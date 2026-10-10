@@ -39,7 +39,7 @@ AGENTS.md ("Content: blocks, items, models and loot are data") holds the full sc
 - Two blocks sharing a texture share its material (warned at startup).
 - Fluids force `solid/castsAO/hasItem/needsSupport` off; `hardensTo` pairs live under `flow`.
 - Tree species: `wood` must be a `tree_wood` block; two species may share a wood only if they agree on `thickness.rim`. Species with no `worldgen` block never generate.
-- Entities: a new `Mob` kind must be added to `WorldGenerationConfig.MobsMaxAlive`.
+- Entities: a new `Mob` kind's manager implements `IMobPopulation` and joins the world's `MobCaps` (the shared natural and hard caps); it gets no cap of its own.
 - Recipes: cook and crush are one per input; craft files are named by result, reverse by `<result>_from_<ingredient>`; a cast must melt back into exactly what it took (`MetalworksRecipeTests`).
 
 ## Tests to extend

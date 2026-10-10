@@ -186,12 +186,12 @@ public sealed class GoblinManagerTests
         Assert.True(BlockType.IsSolid(surface.GetBlockGlobal(
             (int)MathF.Floor(spawned.X), feetCell, (int)MathF.Floor(spawned.Z))));
 
-        // At the cap nothing more spawns.
+        // At the natural cap the ring spawns nothing more.
         var capped = Manager();
-        for (var i = 0; i < WorldGenerationConfig.GoblinMaxAlive; i++)
+        for (var i = 0; i < WorldGenerationConfig.MobNaturalCap; i++)
             capped.Spawn(new Vector3(0.5f, 1f + Goblin.Height * 0.5f, 0.5f), ammo: 0);
         capped.Update(interval, surface, drops, high);
-        Assert.Equal(WorldGenerationConfig.GoblinMaxAlive, capped.Goblins.Count);
+        Assert.Equal(WorldGenerationConfig.MobNaturalCap, capped.Goblins.Count);
 
         // Beyond the despawn radius a goblin is culled, inside it stays.
         var floor = StoneFloor();
