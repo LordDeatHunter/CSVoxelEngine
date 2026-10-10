@@ -45,14 +45,24 @@ public class PlayerModel
     // Airborne leg targets. A standing jump tucks both knees under; a sprint jump splits
     // into a reaching front leg and a tucked trailing leg. Rise tucks harder, fall extends
     // toward landing (all knees stay bent backward, hence negative with a floor).
-    private const float JumpHipFront = 0.45f;
-    private const float JumpHipBack = -0.30f;
-    private const float SprintJumpHipFront = 0.75f;
-    private const float SprintJumpHipBack = -0.65f;
-    private const float JumpKneeFront = -1.1f;
-    private const float JumpKneeBack = -0.6f;
-    private const float SprintJumpKneeFront = -0.45f;
-    private const float SprintJumpKneeBack = -1.4f;
+    private const float JumpHipFront = 0.75f;
+    private const float JumpHipBack = 0.30f;
+    private const float SprintJumpHipFront = 0.95f;
+    private const float SprintJumpHipBack = -0.30f;
+    private const float JumpKneeFront = -1.6f;
+    private const float JumpKneeBack = -1.3f;
+    private const float SprintJumpKneeFront = -1.0f;
+    private const float SprintJumpKneeBack = -1.8f;
+
+    // Airborne arms are thrown out to the sides (abduction about the body's front axis) with a
+    // slight forward flex and a soft elbow, instead of hanging forward. A sprint jump trails them
+    // further back and lower.
+    private const float AirArmRoll = 0.95f;
+    private const float SprintAirArmRoll = 0.6f;
+    private const float AirArmFlex = 0.12f;
+    private const float SprintAirArmFlex = -0.3f;
+    private const float AirElbowFlex = 0.35f;
+    private const float SprintAirElbowFlex = 0.25f;
     private const float MinKneeBend = -0.08f;
     private const float JumpShoulder = 0.5f;
     private const float JumpElbow = 0.7f;
@@ -573,6 +583,47 @@ public class PlayerModel
             MathUtils.Lerp(pose.TorsoPitch, -0.15f * crawl, s), MathUtils.Lerp(pose.Bob, bob, s));
     }
 
+    // ---- Arm frames ----------------------------------------------------------------------
+    // The base arm is a forward flex about X plus a yaw about the vertical: both of its bones stay in
+    // one plane, so it cannot reach out to the side. Poses that need that (the airborne arms, the
+    // punch's flared elbow, the throw's cock, the swim stroke) are instead given as an abduction
+    // (roll about the body's front axis), a flexion about X and a yaw, and the forearm as a flexion
+    // plus a bend about the roll's own axis, then slerped over the base by a weight. Roll first, then
+    // flexion, then yaw (System.Numerics is row-vector, so the leftmost factor runs first): with the
+    // arm held out to the side the elbow hinge (X) is the vertical axis, so a plain forearm flexion
+    // swings it forward in the horizontal plane, and a bend about Z lifts it up.
+    private static Quaternion FrameOf(Matrix4x4 m) => Quaternion.Normalize(Quaternion.CreateFromRotationMatrix(m));
+
+    // side is +1 for the right arm and -1 for the left, which mirrors the roll and the yaw.
+    private static Quaternion UpperFrame(float side, float roll, float flex, float yaw) =>
+        FrameOf(Matrix4x4.CreateRotationZ(side * roll) * Matrix4x4.CreateRotationX(flex)
+                * Matrix4x4.CreateRotationY(side * yaw));
+
+    private static Quaternion ForeFrame(float side, float flex, float bend) =>
+        FrameOf(Matrix4x4.CreateRotationX(flex) * Matrix4x4.CreateRotationZ(side * bend));
+
+    private static void Blend(ref Quaternion frame, Quaternion target, float weight)
+    {
+        if (weight > 0.001f) frame = Quaternion.Slerp(frame, target, MathUtils.Clamp01(weight));
+    }
+
+    /// <summary>Lays the pose-specific arm frames over the base ones; <paramref name="side"/> is +1 right, -1 left.</summary>
+    private void ApplyArmFrames(float side, ref Quaternion upper, ref Quaternion fore)
+    {
+        var right = side > 0f;
+
+        // Jumping: arms out to the sides. A carried item keeps the right arm nearer the front.
+        var air = _airBlend * (1f - _swimBlend) * (right ? 1f - 0.6f * _holdBlend : 1f);
+        if (air > 0.001f)
+        {
+            var rise = MathUtils.Clamp01(_airVelocity / 11f);
+            var fall = MathUtils.Clamp01(-_airVelocity / 12f);
+            var roll = MathUtils.Lerp(AirArmRoll, SprintAirArmRoll, _airRun) + (rise - fall * 0.3f) * 0.25f;
+            Blend(ref upper, UpperFrame(side, roll, MathUtils.Lerp(AirArmFlex, SprintAirArmFlex, _airRun), 0f), air);
+            Blend(ref fore, ForeFrame(side, MathUtils.Lerp(AirElbowFlex, SprintAirElbowFlex, _airRun), 0f), air);
+        }
+    }
+
     /// <summary>The body-wide offsets the second pass adds on top of the pose (see <see cref="ComputeMods"/>).</summary>
     private readonly struct Mods
     {
@@ -823,18 +874,24 @@ public class PlayerModel
             * Matrix4x4.CreateRotationY(mods.HeadYaw)
             * Matrix4x4.CreateTranslation(Pivot("Head")) * root;
 
-        Matrix4x4 UpperArm(Vector3 pivot, float shoulder, float sweep)
+        // The arm's two frames: the base flexion and yaw, then the pose-specific overlays.
+        void ArmFrames(Vector3 pivot, float shoulder, float sweep, float elbow,
+            out Quaternion upper, out Quaternion fore)
         {
             // Drift the hands toward the view centre so they read at the bottom of the
             // frame instead of out at the edges. Right arm (+X) yaws one way, left the other.
             // The slice sweep rides that same yaw but is applied after the forward pitch
             // (System.Numerics is row-vector, so the leftmost factor runs first), carrying the
             // raised arm through a horizontal arc instead of twisting a hanging one.
-            var inward = (pivot.X > 0f ? 1f : -1f) * ArmInwardYaw;
-            return Matrix4x4.CreateFromAxisAngle(swingAxis, shoulder)
-                * Matrix4x4.CreateFromAxisAngle(Vector3.UnitY, inward + sweep + _swayYaw.Value)
-                * Matrix4x4.CreateTranslation(pivot) * root;
+            var side = pivot.X > 0f ? 1f : -1f;
+            upper = FrameOf(Matrix4x4.CreateFromAxisAngle(swingAxis, shoulder)
+                            * Matrix4x4.CreateFromAxisAngle(Vector3.UnitY, side * ArmInwardYaw + sweep + _swayYaw.Value));
+            fore = FrameOf(Matrix4x4.CreateFromAxisAngle(swingAxis, elbow));
+            ApplyArmFrames(side, ref upper, ref fore);
         }
+
+        Matrix4x4 UpperArm(Vector3 pivot, Quaternion upper) =>
+            Matrix4x4.CreateFromQuaternion(upper) * Matrix4x4.CreateTranslation(pivot) * root;
 
         Matrix4x4 Thigh(Vector3 pivot, float hip) =>
             Matrix4x4.CreateFromAxisAngle(swingAxis, hip)
@@ -860,18 +917,24 @@ public class PlayerModel
 
         // Child joints ride their parent: the elbow offset is the file's forearm pivot minus
         // its upper-arm pivot, so reshaped limbs keep working.
+        Quaternion upperL = default, foreL = default, upperR = default, foreR = default;
+        if (part is "UpperArmL" or "ForearmL")
+            ArmFrames(Pivot("UpperArmL"), pose.LeftShoulder, 0f, pose.LeftElbow, out upperL, out foreL);
+        else if (part is "UpperArmR" or "ForearmR")
+            ArmFrames(Pivot("UpperArmR"), rightShoulder, rightArmYaw, rightElbow, out upperR, out foreR);
+
         return part switch
         {
             "Torso" => Torso(),
             "Head" => Head(),
-            "UpperArmL" => UpperArm(Pivot("UpperArmL"), pose.LeftShoulder, 0f),
-            "UpperArmR" => UpperArm(Pivot("UpperArmR"), rightShoulder, rightArmYaw),
-            "ForearmL" => Matrix4x4.CreateFromAxisAngle(swingAxis, pose.LeftElbow)
+            "UpperArmL" => UpperArm(Pivot("UpperArmL"), upperL),
+            "UpperArmR" => UpperArm(Pivot("UpperArmR"), upperR),
+            "ForearmL" => Matrix4x4.CreateFromQuaternion(foreL)
                 * Matrix4x4.CreateTranslation(Pivot("ForearmL") - Pivot("UpperArmL"))
-                * UpperArm(Pivot("UpperArmL"), pose.LeftShoulder, 0f),
-            "ForearmR" => Matrix4x4.CreateFromAxisAngle(swingAxis, rightElbow)
+                * UpperArm(Pivot("UpperArmL"), upperL),
+            "ForearmR" => Matrix4x4.CreateFromQuaternion(foreR)
                 * Matrix4x4.CreateTranslation(Pivot("ForearmR") - Pivot("UpperArmR"))
-                * UpperArm(Pivot("UpperArmR"), rightShoulder, rightArmYaw),
+                * UpperArm(Pivot("UpperArmR"), upperR),
             "ThighL" => Thigh(Pivot("ThighL"), pose.LeftHip),
             "ThighR" => Thigh(Pivot("ThighR"), pose.RightHip),
             "ShinL" => Matrix4x4.CreateFromAxisAngle(swingAxis, pose.LeftKnee)

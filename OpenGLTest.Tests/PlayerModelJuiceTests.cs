@@ -219,4 +219,31 @@ public sealed class PlayerModelJuiceTests
 
         Assert.True(heavyLean < lightLean);
     }
+
+    // The right hand's world position for a body standing at the origin facing -Z.
+    private static System.Numerics.Vector3 RightHand(PlayerModel model)
+    {
+        var eye = new System.Numerics.Vector3(0f, 1.62f, 0f);
+        return System.Numerics.Vector3.Transform(new System.Numerics.Vector3(0f, model.HandDepth(), 0f),
+            model.GetPartMatrix("ForearmR", eye, -90f, 0f));
+    }
+
+    [Fact]
+    public void JumpingThrowsTheArmsOutToTheSidesAndTucksTheLegsMoreThanBefore()
+    {
+        var model = Settled();
+        var rest = RightHand(model);
+        var restKnee = model.GetPose().LeftKnee;
+
+        for (var i = 0; i < 60; i++) model.Update(Dt, 0f, grounded: false, verticalVelocity: 6f);
+
+        var air = RightHand(model);
+        // Out to the side of the body (+X is the right hand's side) and not out in front of it.
+        Assert.True(air.X > rest.X + 0.25f);
+        Assert.True(air.Z > rest.Z - 0.05f);
+        // Both knees are folded well under the thighs.
+        var pose = model.GetPose();
+        Assert.True(pose.LeftKnee < restKnee - 1f);
+        Assert.True(pose.RightKnee < restKnee - 0.9f);
+    }
 }
