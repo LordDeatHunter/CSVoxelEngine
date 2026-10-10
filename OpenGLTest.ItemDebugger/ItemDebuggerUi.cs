@@ -5,24 +5,11 @@ using System.Numerics;
 
 namespace silkgltriangle;
 
-public enum PreviewMode
-{
-    Idle,
-    Walk,
-    Run,
-    Jump,
-}
-
 public enum DebugButton
 {
     Save,
     ReloadDisplay,
     ResetRenderer,
-    Idle,
-    Walk,
-    Run,
-    Jump,
-    Mine,
     FirstPerson,
     TabItems,
     TabEntities,
@@ -33,6 +20,8 @@ public enum DebugButton
     TreeRegrow,
     // The button's Arg is the index into EntityPreviewState.Modes.
     EntityMode,
+    // The button's Arg is the index into PlayerPreviewState.AllModes.
+    PlayerMode,
 }
 
 /// <summary>One editable number: a labelled track the debugger draws and hit-tests.</summary>
@@ -93,6 +82,7 @@ public sealed class ItemDebuggerUi
     // Entities and tree species have no icon, so their slots are wide enough to hold the name.
     private const int EntityColumns = 2;
     private const int ModesPerRow = 3;
+    private const int PlayerModesPerRow = 4;
 
     private static readonly Rgba Panel = Rgba.Grey(0.03f, 0.74f);
     private static readonly Rgba PanelLine = Rgba.Grey(0.45f, 0.6f);
@@ -194,7 +184,7 @@ public sealed class ItemDebuggerUi
         slider.Min + Fraction(slider, x) * (slider.Max - slider.Min);
 
     public void Draw(UIRenderer ui, ItemDisplayEditor editor, EntityPreviewState entities, TreePreviewState trees,
-        DebuggerTab tab, PreviewMode mode, Vector2 screen, string status, bool firstPerson)
+        DebuggerTab tab, PlayerPreviewState player, Vector2 screen, string status, bool firstPerson)
     {
         _tab = tab;
         _sliders.Clear();
@@ -216,7 +206,7 @@ public sealed class ItemDebuggerUi
                 BuildTreeControls(trees, screen);
                 break;
             default:
-                BuildControls(editor, mode, screen, firstPerson);
+                BuildControls(editor, player, screen, firstPerson);
                 break;
         }
 
@@ -351,27 +341,29 @@ public sealed class ItemDebuggerUi
         slider.TrackSize = new Vector2(width, TrackH);
     }
 
-    private void BuildControls(ItemDisplayEditor editor, PreviewMode mode, Vector2 screen, bool firstPerson)
+    private void BuildControls(ItemDisplayEditor editor, PlayerPreviewState player, Vector2 screen, bool firstPerson)
     {
         var left = screen.X - Pad - PanelWidth + Pad;
         var right = screen.X - Pad - Pad;
         var width = right - left;
         var y = Pad + 56f;
 
-        var buttonWidth = (width - ButtonGap * 3f) / 4f;
-        AddButton(new Vector2(left + buttonWidth * 0.5f, y + ButtonH * 0.5f),
-            new Vector2(buttonWidth, ButtonH), DebugButton.Idle, "IDLE", true, mode == PreviewMode.Idle);
-        AddButton(new Vector2(left + buttonWidth * 1.5f + ButtonGap, y + ButtonH * 0.5f),
-            new Vector2(buttonWidth, ButtonH), DebugButton.Walk, "WALK", true, mode == PreviewMode.Walk);
-        AddButton(new Vector2(left + buttonWidth * 2.5f + ButtonGap * 2f, y + ButtonH * 0.5f),
-            new Vector2(buttonWidth, ButtonH), DebugButton.Run, "RUN", true, mode == PreviewMode.Run);
-        AddButton(new Vector2(left + buttonWidth * 3.5f + ButtonGap * 3f, y + ButtonH * 0.5f),
-            new Vector2(buttonWidth, ButtonH), DebugButton.Jump, "JUMP", true, mode == PreviewMode.Jump);
-        y += ButtonH + ButtonGap;
-
-        AddButton(new Vector2((left + right) * 0.5f, y + ButtonH * 0.5f),
-            new Vector2(width, ButtonH), DebugButton.Mine, "MINE SWING", true, false);
-        y += ButtonH + ButtonGap;
+        // One button per player animation (PlayerPreviewState.AllModes), in rows: poses first, then the
+        // swings and reactions, which replay on their own.
+        var modes = PlayerPreviewState.AllModes;
+        for (var rowStart = 0; rowStart < modes.Count; rowStart += PlayerModesPerRow)
+        {
+            var inRow = Math.Min(PlayerModesPerRow, modes.Count - rowStart);
+            var buttonWidth = (width - ButtonGap * (inRow - 1)) / inRow;
+            for (var col = 0; col < inRow; col++)
+            {
+                var index = rowStart + col;
+                AddButton(new Vector2(left + buttonWidth * (col + 0.5f) + ButtonGap * col, y + ButtonH * 0.5f),
+                    new Vector2(buttonWidth, ButtonH), DebugButton.PlayerMode, PlayerPreviewState.LabelOf(modes[index]), true,
+                    string.Equals(modes[index], player.Mode, StringComparison.OrdinalIgnoreCase), index);
+            }
+            y += ButtonH + ButtonGap;
+        }
 
         AddButton(new Vector2((left + right) * 0.5f, y + ButtonH * 0.5f),
             new Vector2(width, ButtonH), DebugButton.FirstPerson,
@@ -536,7 +528,7 @@ public sealed class ItemDebuggerUi
         var title = entities.Selected?.DisplayName ?? "No entities";
         ui.DrawText(title, new Vector2(left, Pad + 8f), ui.CapHeightScale(18f), Rgba.White);
         if (entities.Selected != null && !entities.HasClips)
-            ui.DrawText("no clips: rest pose", new Vector2(left, Pad + 30f), ui.CapHeightScale(TextCap), TextDim);
+            ui.DrawText(entities.PreviewMob != null ? "no clips: code-driven" : "no clips: rest pose", new Vector2(left, Pad + 30f), ui.CapHeightScale(TextCap), TextDim);
     }
 
     private void DrawTreeTitle(UIRenderer ui, TreePreviewState trees, Vector2 screen)

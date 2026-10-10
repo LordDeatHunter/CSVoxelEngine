@@ -1,36 +1,63 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 
 namespace silkgltriangle;
 
 /// <summary>
 /// GL-free state behind the item debugger's ENTITIES tab: which entity is previewed and which
-/// mode it is shown in. The modes are data-driven — one per clip the selected model authored,
-/// in file order, followed by <see cref="HurtMode"/> (the hit-flash tint, which is not a clip) —
-/// so a model with no clips, such as the slime, offers only HURT and previews its rest pose.
-/// Idle and walk drive the locomotion layer at rest and at the walk reference speed; any other
-/// clip is a one-shot that replays after <see cref="RestBetweenPlays"/>, and the preview consumes
-/// the events it fires so none pile up. Snapshots <see cref="EntityRegistry"/> on construction,
-/// so build it only after content is loaded.
+/// mode it is shown in. The modes are data-driven. A model with clips offers one per clip in file
+/// order (idle and walk drive the locomotion layer at rest and at the walk reference speed; any other
+/// clip is a one-shot that replays after <see cref="RestBetweenPlays"/>, and the preview consumes the
+/// events it fires so none pile up) and <see cref="HurtMode"/> when it authored no <c>hurt</c> clip of
+/// its own. A clip-less model (the slime) offers the life-cycle modes <see cref="SlimeModes"/>.
+/// <para>
+/// A goblin or slime is previewed as the real <see cref="Goblin"/> / <see cref="Slime"/> object, driven
+/// the way a client drives a mob it does not simulate (<see cref="Mob.AnimateMirror"/>), so everything the
+/// game layers on top of the clips shows up here too: the spawn pop, the hit recoil and flash (and the
+/// goblin's overlay flinch), the death, the goblin's body pose (<see cref="BodyEffect"/>) and the slime's
+/// spring squash. The slime hops on a hidden floor. Snapshots <see cref="EntityRegistry"/> on
+/// construction, so build it only after content is loaded.
+/// </para>
 /// </summary>
 public sealed class EntityPreviewState
 {
-    /// <summary>The mode that pulses the hit flash instead of playing a clip.</summary>
+    /// <summary>The mode that hurts the entity: the hit flash, recoil and (when authored) the hurt clip.</summary>
     public const string HurtMode = "hurt";
+
+    /// <summary>Slime modes: standing, hopping toward the camera, taking hits, popping in, dying.</summary>
+    public const string SlimeIdle = "idle";
+    public const string SlimeHop = "hop";
+    public const string SpawnMode = "spawn";
+    public const string DeathMode = "death";
 
     /// <summary>Seconds a one-shot clip rests between the end of one play and the next.</summary>
     public const float RestBetweenPlays = 0.4f;
 
-    /// <summary>Seconds between two hit flashes in <see cref="HurtMode"/>.</summary>
+    /// <summary>Seconds between two hits in <see cref="HurtMode"/>.</summary>
     public const float HurtPeriod = 1f;
 
     /// <summary>Seconds one hit flash takes to fade from 1 to 0 (the in-game fade).</summary>
     public const float HitFlashSeconds = 0.25f;
 
+    /// <summary>Seconds between two spawns in <see cref="SpawnMode"/>.</summary>
+    public const float SpawnPeriod = 1.6f;
+
     private static readonly string[] HurtOnly = [HurtMode];
+    private static readonly string[] SlimeModes = [SlimeIdle, SlimeHop, HurtMode, SpawnMode, DeathMode];
+
+    // Where the previewed slime starts on the hidden floor, and how far ahead (toward the camera,
+    // +Z) its hop target is.
+    private static readonly Vector3 SlimeStart = new(8.5f, 1f + Slime.HalfExtent, 4.5f);
+    private const float SlimeHopDistance = 3f;
+    private const float SlimeHopCycleSeconds = 4f;
 
     private float _rest;
     private float _hurtTimer;
+    private float _cycle;
+    private Goblin? _goblin;
+    private Slime? _slime;
+    private ChunkManager? _floor;
 
     public EntityPreviewState()
     {
@@ -57,10 +84,11 @@ public sealed class EntityPreviewState
     /// <summary>The previewed entity, or null when no entity is registered.</summary>
     public EntityType? Selected => SelectedIndex >= 0 ? Entries[SelectedIndex] : null;
 
-    /// <summary>Plays the selected model's clips; rebuilt on every selection.</summary>
+    /// <summary>Plays the selected model's clips (a goblin's own animator); rebuilt on every selection.</summary>
     public EntityAnimator Animator { get; private set; }
 
-    /// <summary>The selected model's clip names in file order, then <see cref="HurtMode"/>.</summary>
+    /// <summary>The selected model's modes: its clip names in file order (then <see cref="HurtMode"/> unless
+    /// it has a <c>hurt</c> clip), or the slime's life-cycle modes.</summary>
     public IReadOnlyList<string> Modes { get; private set; }
 
     /// <summary>The active mode, always one of <see cref="Modes"/> as spelled there.</summary>
@@ -72,12 +100,39 @@ public sealed class EntityPreviewState
     /// <summary>True when the previewed rig has the hand the goblin holds its flint in.</summary>
     public bool ShowsHeldStone => Selected != null && Selected.Model.Parts.ContainsKey(Goblin.HandPart);
 
-    /// <summary>The hit-flash tint to draw with, 0..1; only non-zero in <see cref="HurtMode"/>.</summary>
-    public float HitFlash { get; private set; }
+    /// <summary>The mob being previewed (a goblin or a slime), or null for any other entity.</summary>
+    public Mob? PreviewMob => (Mob?)_goblin ?? _slime;
+
+    /// <summary>The hit-flash tint to draw with, 0..1.</summary>
+    public float HitFlash => PreviewMob?.HitFlash ?? _flash;
+
+    private float _flash;
 
     /// <summary>Yaw that turns the model (which faces -Z at 0) toward the default orbit camera
     /// on the +Z side.</summary>
     public float FacingYaw => MathF.PI;
+
+    /// <summary>Where the model's feet are relative to the orbit centre: the origin, except for a hopping slime,
+    /// which travels (and rises) with its hop.</summary>
+    public Vector3 DrawOffset => _slime is { } s
+        ? new Vector3(s.Position.X - SlimeStart.X, s.Position.Y - (1f + Slime.HalfExtent), s.Position.Z - SlimeStart.Z)
+        : Vector3.Zero;
+
+    /// <summary>
+    /// The pose the clips cannot give, to multiply after each part's matrix (row-vector order): the
+    /// goblin's lean, flinch, death fall and spawn pop (<see cref="Goblin.BodyEffect"/>), or the slime's
+    /// squash and stretch about its feet. Identity for any other entity.
+    /// </summary>
+    public Matrix4x4 BodyEffect()
+    {
+        var feet = DrawOffset;
+        if (_goblin is { } goblin) return goblin.BodyEffect(feet);
+        if (_slime is { } slime)
+            return Matrix4x4.CreateTranslation(-feet)
+                   * Matrix4x4.CreateScale(slime.HorizontalScale, slime.VerticalScale, slime.HorizontalScale)
+                   * Matrix4x4.CreateTranslation(feet);
+        return Matrix4x4.Identity;
+    }
 
     /// <summary>Seconds fed to <see cref="Update"/> since the last <see cref="Select"/> or
     /// <see cref="SetMode"/>.</summary>
@@ -89,17 +144,31 @@ public sealed class EntityPreviewState
     {
         if (Entries.Count == 0) return;
         SelectedIndex = Math.Clamp(index, 0, Entries.Count - 1);
-        var clips = Entries[SelectedIndex].Model.Animations;
-        Animator = new EntityAnimator(clips, WorldGenerationConfig.GoblinWalkSpeed);
-        if (clips.Count == 0)
+        var type = Entries[SelectedIndex];
+        var clips = type.Model.Animations;
+        _goblin = null;
+        _slime = null;
+        if (string.Equals(type.Name, "goblin", StringComparison.OrdinalIgnoreCase))
+            _goblin = NewGoblin();
+        else if (string.Equals(type.Name, "slime", StringComparison.OrdinalIgnoreCase))
+            _slime = NewSlime();
+        Animator = _goblin?.Animation ?? new EntityAnimator(clips, WorldGenerationConfig.GoblinWalkSpeed);
+
+        if (_slime != null)
+        {
+            Modes = SlimeModes;
+        }
+        else if (clips.Count == 0)
         {
             Modes = HurtOnly;
         }
         else
         {
-            var modes = new string[clips.Count + 1];
+            // A model with its own hurt clip lists it once: the mode hurts the mob and plays the clip.
+            var hasHurtClip = Animator.HasClip(HurtMode);
+            var modes = new string[clips.Count + (hasHurtClip ? 0 : 1)];
             for (var i = 0; i < clips.Count; i++) modes[i] = clips[i].Name;
-            modes[^1] = HurtMode;
+            if (!hasHurtClip) modes[^1] = HurtMode;
             Modes = modes;
         }
         Mode = Modes[0];
@@ -120,14 +189,17 @@ public sealed class EntityPreviewState
     }
 
     /// <summary>Switches to one of <see cref="Modes"/> (ignoring case), restarting the replay
-    /// rest, the hurt pulse and <see cref="Elapsed"/>; false for any other name. The animator is
-    /// kept, so switching from walk to idle crossfades rather than snapping.</summary>
+    /// rest, the hurt pulse and <see cref="Elapsed"/>; false for any other name. A goblin keeps its
+    /// animator, so switching from walk to idle crossfades rather than snapping; only a mob that has
+    /// died is replaced.</summary>
     public bool SetMode(string mode)
     {
         for (var i = 0; i < Modes.Count; i++)
         {
             if (!string.Equals(Modes[i], mode, StringComparison.OrdinalIgnoreCase)) continue;
             Mode = Modes[i];
+            if (PreviewMob is { IsDying: true }) Respawn();
+            if (_slime != null) _slime = NewSlime();
             ResetTimers();
             return true;
         }
@@ -140,51 +212,206 @@ public sealed class EntityPreviewState
         if (deltaTime <= 0f) return;
         Elapsed += deltaTime;
 
-        if (string.Equals(Mode, EntityAnimator.IdleClip, StringComparison.OrdinalIgnoreCase))
+        if (_slime != null) UpdateSlime(deltaTime);
+        else if (_goblin != null) UpdateGoblin(deltaTime);
+        else UpdateGeneric(deltaTime);
+    }
+
+    // ---- goblin --------------------------------------------------------------------------
+
+    private void UpdateGoblin(float dt)
+    {
+        var goblin = _goblin!;
+        var walking = string.Equals(Mode, EntityAnimator.WalkClip, StringComparison.OrdinalIgnoreCase);
+        // The mirrored velocity is what walks the clip (a client's goblin is driven the same way).
+        goblin.NetworkSetState(Vector3.Zero, 0f, goblin.Health,
+            walking ? new Vector3(0f, 0f, Animator.WalkReferenceSpeed) : Vector3.Zero);
+
+        if (string.Equals(Mode, DeathMode, StringComparison.OrdinalIgnoreCase))
         {
-            Animator.Update(deltaTime, 0f);
+            if (!goblin.IsDying) goblin.BeginDying();
+            _cycle += dt;
+            if (goblin.IsRemovable && _cycle >= goblin.DeathSeconds + RestBetweenPlays)
+            {
+                _goblin = NewGoblin();
+                Animator = _goblin.Animation;
+                _cycle = 0f;
+            }
         }
-        else if (string.Equals(Mode, EntityAnimator.WalkClip, StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(Mode, SpawnMode, StringComparison.OrdinalIgnoreCase))
         {
-            Animator.Update(deltaTime, Animator.WalkReferenceSpeed);
+            _cycle += dt;
+            if (_cycle >= SpawnPeriod)
+            {
+                _goblin = NewGoblin();
+                Animator = _goblin.Animation;
+                _cycle = 0f;
+            }
         }
         else if (Mode == HurtMode)
         {
-            _hurtTimer -= deltaTime;
+            HurtPulse(goblin, dt);
+        }
+        else if (!walking && !string.Equals(Mode, EntityAnimator.IdleClip, StringComparison.OrdinalIgnoreCase))
+        {
+            // A one-shot (throw, melee): the rest only counts down between plays, so each play ends,
+            // rests RestBetweenPlays, then starts again (the first starts at once).
+            if (!goblin.Animation.IsPlaying(Mode))
+            {
+                _rest -= dt;
+                if (_rest <= 0f)
+                {
+                    goblin.Animation.Play(Mode);
+                    _rest = RestBetweenPlays;
+                }
+            }
+        }
+
+        _goblin!.AnimateMirror(dt);
+        _goblin.Animation.DrainEvents();
+    }
+
+    // ---- slime ---------------------------------------------------------------------------
+
+    private void UpdateSlime(float dt)
+    {
+        var slime = _slime!;
+        Vector3? target = null;
+
+        if (string.Equals(Mode, SlimeHop, StringComparison.OrdinalIgnoreCase))
+        {
+            // Hop at a point ahead, toward the camera; start over once it has arrived (or a while has
+            // passed), so the hop can be watched again and the slime stays near the frame.
+            target = SlimeStart + new Vector3(0f, 0f, SlimeHopDistance);
+            _cycle += dt;
+            if (_cycle >= SlimeHopCycleSeconds ||
+                (slime.IsGrounded && MathF.Abs(slime.Position.Z - target.Value.Z) < 0.5f && _cycle > 0.5f))
+            {
+                _slime = slime = NewSlime();
+                _cycle = 0f;
+            }
+        }
+        else if (string.Equals(Mode, SpawnMode, StringComparison.OrdinalIgnoreCase))
+        {
+            _cycle += dt;
+            if (_cycle >= SpawnPeriod)
+            {
+                _slime = slime = NewSlime();
+                _cycle = 0f;
+            }
+        }
+        else if (string.Equals(Mode, DeathMode, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!slime.IsDying)
+            {
+                slime.TakeDamage(slime.Health);
+                slime.BeginDying();
+            }
+            _cycle += dt;
+            if (slime.IsRemovable && _cycle >= slime.DeathSeconds + RestBetweenPlays)
+            {
+                _slime = slime = NewSlime();
+                _cycle = 0f;
+            }
+        }
+        else if (Mode == HurtMode)
+        {
+            HurtPulse(slime, dt);
+        }
+
+        _floor ??= BuildFloor();
+        slime.Update(dt, _floor, target);
+    }
+
+    // ---- shared --------------------------------------------------------------------------
+
+    // One hit per HurtPeriod; a mob that is nearly dead is topped back up so the loop never kills it.
+    private void HurtPulse(Mob mob, float dt)
+    {
+        _hurtTimer -= dt;
+        if (_hurtTimer > 0f) return;
+        _hurtTimer += HurtPeriod;
+        if (mob.Health <= 2) mob.NetworkSetState(mob.Position, mob.Facing, mob.Type.MaxHealth, mob.Velocity);
+        mob.TakeDamage(1);
+    }
+
+    // A model that is neither a goblin nor a slime: clips only, with the plain hit-flash pulse.
+    private void UpdateGeneric(float dt)
+    {
+        if (string.Equals(Mode, EntityAnimator.IdleClip, StringComparison.OrdinalIgnoreCase))
+        {
+            Animator.Update(dt, 0f);
+        }
+        else if (string.Equals(Mode, EntityAnimator.WalkClip, StringComparison.OrdinalIgnoreCase))
+        {
+            Animator.Update(dt, Animator.WalkReferenceSpeed);
+        }
+        else if (Mode == HurtMode)
+        {
+            _hurtTimer -= dt;
             if (_hurtTimer <= 0f)
             {
-                HitFlash = 1f;
+                _flash = 1f;
                 _hurtTimer += HurtPeriod;
             }
             else
             {
-                HitFlash = MathF.Max(0f, HitFlash - deltaTime / HitFlashSeconds);
+                _flash = MathF.Max(0f, _flash - dt / HitFlashSeconds);
             }
-            Animator.Update(deltaTime, 0f);
+            Animator.Update(dt, 0f);
         }
         else
         {
-            // A one-shot: the rest only counts down between plays, so each play ends, rests
-            // RestBetweenPlays, then starts again (the first starts at once).
             if (!Animator.IsPlaying(Mode))
             {
-                _rest -= deltaTime;
+                _rest -= dt;
                 if (_rest <= 0f)
                 {
                     Animator.Play(Mode);
                     _rest = RestBetweenPlays;
                 }
             }
-            Animator.Update(deltaTime, 0f);
+            Animator.Update(dt, 0f);
             Animator.DrainEvents();
         }
+    }
+
+    private void Respawn()
+    {
+        if (_goblin != null)
+        {
+            _goblin = NewGoblin();
+            Animator = _goblin.Animation;
+        }
+        else if (_slime != null)
+        {
+            _slime = NewSlime();
+        }
+    }
+
+    private Goblin NewGoblin() => new(Selected!, Vector3.Zero, ammo: 3);
+
+    private Slime NewSlime() => new(Selected!, SlimeStart);
+
+    // The hidden floor a slime hops on: one chunk of stone with its top at y = 1.
+    private static ChunkManager BuildFloor()
+    {
+        var chunks = new ChunkManager(null!);
+        var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false) { IsBlockDataReady = true };
+        chunks.Chunks[Vector3.Zero] = chunk;
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        for (var x = 0; x < Chunk.Size; x++)
+        for (var z = 0; z < Chunk.Size; z++)
+            chunk.SetBlockRaw(x, 0, z, stone, 0);
+        return chunks;
     }
 
     private void ResetTimers()
     {
         _rest = 0f;
         _hurtTimer = 0f;
-        HitFlash = 0f;
+        _cycle = 0f;
+        _flash = 0f;
         Elapsed = 0f;
     }
 

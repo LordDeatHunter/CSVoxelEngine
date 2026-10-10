@@ -88,12 +88,26 @@ Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated
 
 The **item debugger** (`dotnet run --project OpenGLTest.ItemDebugger -c Release`, same working-directory
 rule) previews held items, entities and trees. Its left panel has three tabs. **ITEMS** is the item grid with the
-display sliders. **ENTITIES** lists every `EntityRegistry` entry and draws the selected one part by part
+display sliders, and the player body: its mode buttons are **every player animation**
+(`OpenGLTest.ItemDebugger/PlayerPreviewState.cs`, GL-free and tested): the poses IDLE WALK RUN SNEAK JUMP
+S-JUMP LAND SWIM FLOAT, and the swings and reactions PUNCH HEAVY SLICE BACK THROW HURT EQUIP DEATH,
+which replay on their own after a short rest. Each only feeds the real `PlayerModel` the inputs and
+triggers the game does, so what shows is exactly what the game poses (a jump loop with the landing, a
+swim that strokes as long as forward is held, a throw that charges, holds and releases, a death that
+falls over and gets back up). **Use this tab first for any player animation change**: it is faster
+than a scenario and shows the body from any orbit angle (the VIEW button switches to first person).
+**ENTITIES** lists every `EntityRegistry` entry and draws the selected one part by part
 through its `EntityAnimator` (`DebugSceneRenderer.RenderEntity`). The mode buttons are data-driven: one
-per clip in the selected model's `.bbmodel`, in file order, plus HURT (the hit-flash tint). For the
-goblin they read IDLE WALK THROW MELEE HURT. A clipless model such as the slime shows its rest pose and
-only HURT. One-shot clips replay after a short rest, and the preview consumes their events itself. The
-GL-free, tested state behind the tab is `OpenGLTest.ItemDebugger/EntityPreviewState.cs`.
+per clip in the selected model's `.bbmodel`, in file order, plus HURT (hurts the mob: the hit flash,
+its recoil and the `hurt` clip as an overlay, listed once when the model has that clip). For the goblin
+they read IDLE WALK THROW MELEE HURT DEATH SPAWN. A goblin or slime is previewed as the real `Goblin` /
+`Slime` object driven like a client drives a mob it does not simulate (`Mob.AnimateMirror`, and
+`NetworkSetState` for the walk velocity), so what the game layers on the clips shows too: the spawn pop,
+the hit recoil, the death, the goblin's body pose (`Goblin.BodyEffect`, applied to every part and the
+held flint) and the slime's spring squash. The clipless slime offers IDLE HOP HURT SPAWN DEATH (it hops on
+a hidden floor toward the camera and restarts). One-shot clips replay after a short rest, and the
+preview consumes their events itself. The GL-free, tested state behind the tab is
+`OpenGLTest.ItemDebugger/EntityPreviewState.cs`.
 
 **TREES** lists every `TreeSpeciesRegistry` species and grows the selected one pulse by pulse over a
 flat grass plane, at a fixed seed (`WorldSeed.Default` at first; the debugger never calls
@@ -122,10 +136,18 @@ Environment variables for scripted captures:
   reaches the species past the `cactus` block. An unknown name logs a warning.
 - `ITEM_DEBUGGER_TREE_STEP=<n|mature>` pins the TREES step (an integer, clamped to the slider range,
   or `mature`). Without it a selected species shows its mature tree.
-- `ITEM_DEBUGGER_ANIM=<clip|hurt>` picks the entity mode. An unknown mode logs a warning listing the
-  valid ones.
-- `ITEM_DEBUGGER_SHOT=<png path>` saves one screenshot and closes. It fires on an early frame, so a
-  one-shot clip is caught near its start.
+- `ITEM_DEBUGGER_ANIM=<clip|hurt|hop|spawn|death|...>` picks the entity mode. An unknown mode logs a
+  warning listing the valid ones.
+- `ITEM_DEBUGGER_PLAYER_ANIM=<mode>` picks the player animation (`idle`, `walk`, `run`, `sneak`, `jump`,
+  `sprint jump`, `land`, `swim`, `swim idle`, `punch`, `heavy punch`, `slice`, `slice back`, `throw`,
+  `hurt`, `equip`, `death`) and selects the ITEMS tab. An unknown mode logs a warning listing them.
+- `ITEM_DEBUGGER_SHOT=<png path>` saves one screenshot and closes. Without `ITEM_DEBUGGER_SHOT_AT` it
+  fires on an early frame, so a one-shot is caught near its start.
+- `ITEM_DEBUGGER_SHOT_AT=<seconds>` (with `ITEM_DEBUGGER_SHOT`) steps the simulation a fixed 1/60 s per
+  frame and captures once that much animation has run, so a given instant of a swing is the same every
+  run (a slice's strike is at about 0.4 s into a mode, its first play starting at once). Run it from
+  `OpenGLTest/` like the game: `ITEM_DEBUGGER_PLAYER_ANIM=slice ITEM_DEBUGGER_SHOT_AT=0.3
+  ITEM_DEBUGGER_SHOT=visual/debugger/slice.png dotnet run --project ../OpenGLTest.ItemDebugger -c Release`.
 - `ITEM_DEBUGGER_VIEW=first` starts the ITEMS view in first person.
 - `ITEM_DEBUGGER_LOOK=yaw,pitch` pins the first-person look angles.
 
@@ -2418,9 +2440,12 @@ overshoot or jiggle.
   `RemotePlayer` poses the model and replays punches, slices and throws.
 - **Verification**: `visual-examples/animations.json` (run with `VOXEL_TIME=147`) films the player's
   poses from the shoulder camera and the mobs' spawn, hit and death; its `damage`, `view` and
-  `player` ops (`hurt`, `punch`, `slice`, `equip`, `die`, `revive`) exist for it. The ItemDebugger's
-  ENTITIES tab lists the goblin's new clips automatically; the slime's squash is code, not a clip, so
-  it has no preview there.
+  `player` ops (`hurt`, `punch`, `slice`, `equip`, `charge`, `release`, `die`, `revive`) exist for it. For
+  iterating on a single animation prefer the **item debugger** (see "Build and run"): its ITEMS tab has a
+  button for every player animation and its ENTITIES tab previews the goblin and slime life-cycles,
+  including the slime's code-driven squash, with `ITEM_DEBUGGER_PLAYER_ANIM` / `ITEM_DEBUGGER_ANIM` and
+  `ITEM_DEBUGGER_SHOT_AT` for scripted captures. A new player animation gets a mode in
+  `PlayerPreviewState`, a new mob animation a mode in `EntityPreviewState`.
 
 ## Conventions
 

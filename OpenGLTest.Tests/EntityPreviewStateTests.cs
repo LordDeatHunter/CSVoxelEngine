@@ -79,8 +79,10 @@ public sealed class EntityPreviewStateTests
         {
             state.Update(Dt);
             var flash = state.HitFlash;
-            if (flash >= 1f && previous < 1f) rises++;
-            if (flash <= 0f && previous > 0f) falls++;
+            // A hit snaps the flash to full (a frame of fade is already off it by the time it is read) and
+            // it then fades away again.
+            if (flash > 0.7f && previous <= 0.7f) rises++;
+            if (flash <= 0.01f && previous > 0.01f) falls++;
             previous = flash;
         }
         Assert.True(rises > 1, $"The hit flash rose {rises} time(s).");
@@ -140,14 +142,91 @@ public sealed class EntityPreviewStateTests
     }
 
     [Fact]
-    public void ClipLessModelOffersOnlyHurt()
+    public void ClipLessModelOffersTheSlimesLifeCycleModesAndHurt()
     {
         var state = new EntityPreviewState();
         Assert.True(state.SelectByName("slime"));
         Assert.Empty(state.Selected!.Model.Animations);
         Assert.False(state.HasClips);
-        Assert.Equal(new[] { EntityPreviewState.HurtMode }, state.Modes);
-        Assert.Equal(EntityPreviewState.HurtMode, state.Mode);
+        Assert.Contains(EntityPreviewState.HurtMode, state.Modes);
+        foreach (var mode in new[] { EntityPreviewState.SlimeIdle, EntityPreviewState.SlimeHop,
+                     EntityPreviewState.SpawnMode, EntityPreviewState.DeathMode })
+            Assert.Contains(mode, state.Modes);
+        Assert.NotNull(state.PreviewMob);
+    }
+
+    [Fact]
+    public void AGoblinListsItsHurtClipOnceAndTheHurtModeFlinchesIt()
+    {
+        var state = Goblin();
+        Assert.Single(state.Modes, m => m == EntityPreviewState.HurtMode);
+        Assert.True(state.SetMode(EntityPreviewState.HurtMode));
+
+        var sawOverlay = false;
+        var sawFlash = false;
+        for (var i = 0; i < (int)(2.5f / Dt); i++)
+        {
+            state.Update(Dt);
+            sawOverlay |= state.Animator.IsOverlayPlaying;
+            sawFlash |= state.HitFlash > 0.5f;
+        }
+
+        Assert.True(sawOverlay, "The hurt mode never played the hurt clip.");
+        Assert.True(sawFlash, "The hurt mode never flashed the goblin.");
+        // The loop never kills the mob it is hurting.
+        Assert.False(state.PreviewMob!.IsDead);
+    }
+
+    [Fact]
+    public void ADeathModePlaysTheDeathThenStartsOverWithASpawn()
+    {
+        foreach (var name in new[] { "goblin", "slime" })
+        {
+            var state = new EntityPreviewState();
+            Assert.True(state.SelectByName(name));
+            Assert.True(state.SetMode(EntityPreviewState.DeathMode), name);
+
+            var died = false;
+            var started = false;
+            var peak = 0f;
+            for (var i = 0; i < (int)(6f / Dt); i++)
+            {
+                state.Update(Dt);
+                var mob = state.PreviewMob!;
+                died |= mob.IsDying;
+                peak = MathF.Max(peak, mob.DeathProgress);
+                // After a death the preview begins a fresh mob (alive, popping in).
+                if (died && !mob.IsDying) started = true;
+            }
+
+            Assert.True(died, $"{name}: the death mode never killed the mob.");
+            Assert.True(peak > 0.9f, $"{name}: the death only reached {peak}.");
+            Assert.True(started, $"{name}: the death mode never started over.");
+        }
+    }
+
+    [Fact]
+    public void TheSlimeHopsAndSquashesAndTheGoblinGetsABodyPose()
+    {
+        var slime = new EntityPreviewState();
+        Assert.True(slime.SelectByName("slime"));
+        Assert.True(slime.SetMode(EntityPreviewState.SlimeHop));
+        var highest = 0f;
+        var scaleRange = (Min: 10f, Max: 0f);
+        for (var i = 0; i < (int)(3f / Dt); i++)
+        {
+            slime.Update(Dt);
+            highest = MathF.Max(highest, slime.DrawOffset.Y);
+            var m = slime.BodyEffect();
+            scaleRange = (MathF.Min(scaleRange.Min, m.M22), MathF.Max(scaleRange.Max, m.M22));
+        }
+        Assert.True(highest > 0.3f, "The slime never left the ground.");
+        Assert.True(scaleRange.Max - scaleRange.Min > 0.2f, "The slime's squash and stretch never showed.");
+
+        var goblin = Goblin();
+        Assert.True(goblin.SetMode(EntityPreviewState.DeathMode));
+        for (var i = 0; i < (int)(0.6f / Dt); i++) goblin.Update(Dt);
+        Assert.NotEqual(Matrix4x4.Identity, goblin.BodyEffect());
     }
 
     [Fact]

@@ -167,18 +167,22 @@ public sealed class DebugSceneRenderer : IDisposable
 
         var preview = Preview(type);
         var animator = state.Animator;
+        // The previewed mob's own pose on top of the clips (a goblin's lean, flinch, death fall and spawn pop,
+        // a slime's squash) and where its feet are (a hopping slime travels).
+        var feet = state.DrawOffset;
+        var effect = state.BodyEffect();
         _world.SetUniform("uHitFlash", state.HitFlash);
         BindWorldTextures();
         BindArray(0, preview.Texture);
         for (var i = 0; i < preview.Parts.Length; i++)
             Draw(preview.Parts[i],
-                animator.GetPartMatrix(preview.PartNames[i], preview.Rig, Vector3.Zero, state.FacingYaw), viewProj);
+                animator.GetPartMatrix(preview.PartNames[i], preview.Rig, feet, state.FacingYaw) * effect, viewProj);
 
         if (state.ShowsHeldStone && _itemMeshes.TryGet(_flintId, out var stone, out var stoneTex))
         {
             BindArray(0, stoneTex);
             var model = Matrix4x4.CreateScale(Goblin.HeldStoneScale)
-                        * animator.HandAnchor(Goblin.HandPart, preview.Rig, Vector3.Zero, state.FacingYaw);
+                        * animator.HandAnchor(Goblin.HandPart, preview.Rig, feet, state.FacingYaw) * effect;
             Draw(stone, model, viewProj);
         }
         _world.SetUniform("uHitFlash", 0f);

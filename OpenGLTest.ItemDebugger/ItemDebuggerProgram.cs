@@ -36,6 +36,8 @@ public static class ItemDebuggerProgram
     private static TreePreviewState _trees = null!;
     private static DebuggerTab _tab;
     private static readonly PlayerModel Player = new();
+    // The player's animation modes (idle, walk, jump, swim, punch, slice, throw, ...), driving Player.
+    private static PlayerPreviewState _playerAnim = null!;
     private static readonly ItemDisplayEditor Editor = new();
 
     private static float _orbitYaw = 30f;
@@ -65,14 +67,17 @@ public static class ItemDebuggerProgram
     private static string? _dragSlider;
     private static string _status = "";
 
-    private static PreviewMode _mode = PreviewMode.Idle;
-    private static float _animTime;
     private static double _time;
 
     // Set to a PNG path to render a few frames, save one screenshot and quit. Used for
     // scripted verification of the tool without a human at the window.
     private const string ScreenshotVariable = "ITEM_DEBUGGER_SHOT";
     private static string? _screenshotPath;
+    // Seconds of simulated animation to run before the screenshot (ITEM_DEBUGGER_SHOT_AT); null = the
+    // usual early frame.
+    private const string ShotAtVariable = "ITEM_DEBUGGER_SHOT_AT";
+    private static double? _shotAt;
+    private static double _simulated;
     private static int _frameCount;
     private static bool _closing;
 
@@ -80,6 +85,9 @@ public static class ItemDebuggerProgram
     {
         AssetRoot.UseAssetsDirectory();
         _screenshotPath = Environment.GetEnvironmentVariable(ScreenshotVariable)?.Trim();
+        if (double.TryParse(Environment.GetEnvironmentVariable(ShotAtVariable)?.Trim(), NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var shotAt) && shotAt >= 0.0)
+            _shotAt = shotAt;
         Log.WriteLine($"Item debugger assets: {Directory.GetCurrentDirectory()}");
 
         var options = WindowOptions.Default with
@@ -113,6 +121,7 @@ public static class ItemDebuggerProgram
         Player.Rig = _scene.Rig;
         Player.HoldingItem = true;
         Player.Update(0.016f, 0f);
+        _playerAnim = new PlayerPreviewState(Player);
 
         if (_ui.Entries.Count > 0)
             Editor.Select(_ui.Entries[0].Id);
@@ -142,6 +151,15 @@ public static class ItemDebuggerProgram
                 _trees.SetStep(step);
             else
                 Log.Warn($"ITEM_DEBUGGER_TREE_STEP: '{treeStep}' is neither an integer step nor 'mature'.");
+        }
+
+        // A player animation (ITEM_DEBUGGER_PLAYER_ANIM=slice, throw, swim, ...) selects the ITEMS tab.
+        var playerAnim = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_PLAYER_ANIM")?.Trim();
+        if (!string.IsNullOrEmpty(playerAnim))
+        {
+            if (_playerAnim.SetMode(playerAnim)) _tab = DebuggerTab.Items;
+            else Log.Warn($"ITEM_DEBUGGER_PLAYER_ANIM: '{playerAnim}' is not a player animation " +
+                          $"({string.Join(", ", PlayerPreviewState.AllModes)}).");
         }
 
         // A clip name of the selected entity, or "hurt".
@@ -204,8 +222,11 @@ public static class ItemDebuggerProgram
             return;
         }
 
-        var dt = Math.Clamp(deltaTime, 0.0, 0.05);
-        _time += deltaTime;
+        // With ITEM_DEBUGGER_SHOT_AT the simulation steps a fixed 1/60 s a frame, so a scripted capture
+        // lands on the same instant of an animation every run.
+        var dt = _shotAt != null ? 1.0 / 60.0 : Math.Clamp(deltaTime, 0.0, 0.05);
+        _time += _shotAt != null ? dt : deltaTime;
+        _simulated += dt;
 
         var motion = _mouseDelta;
         _mouseDelta = Vector2.Zero;
@@ -274,7 +295,7 @@ public static class ItemDebuggerProgram
         }
 
         _scene.Ui.Begin(size);
-        _ui.Draw(_scene.Ui, Editor, _entities, _trees, _tab, _mode, new Vector2(size.X, size.Y), _status,
+        _ui.Draw(_scene.Ui, Editor, _entities, _trees, _tab, _playerAnim, new Vector2(size.X, size.Y), _status,
             _firstPerson && _tab == DebuggerTab.Items);
         _scene.Ui.End();
         _gl.BindVertexArray(0);
@@ -330,6 +351,8 @@ public static class ItemDebuggerProgram
     private static void CaptureScreenshot(Vector2D<int> size)
     {
         if (_screenshotPath is not { } path || ++_frameCount < 5) return;
+        // A scripted instant: wait until that much animation has been simulated.
+        if (_shotAt is { } at && _simulated < at) return;
 
         Console.WriteLine($"[item-debugger] capturing {size.X}x{size.Y} to {path}");
         Console.Out.Flush();
@@ -414,16 +437,7 @@ public static class ItemDebuggerProgram
     {
         if (dt <= 0f) return;
 
-        _animTime += dt;
-        Player.HoldingItem = true;
-        var (speed, sprinting, grounded, vertical) = _mode switch
-        {
-            PreviewMode.Walk => (8f, false, true, 0f),
-            PreviewMode.Run => (12f, true, true, 0f),
-            PreviewMode.Jump => (5f, false, false, MathF.Sin(_animTime * 2.5f) * 7f),
-            _ => (0f, false, true, 0f),
-        };
-        Player.Update(dt, speed, sprinting, grounded, vertical);
+        _playerAnim.Update(dt);
     }
 
     private static void OnMouseDown(IMouse mouse, MouseButton button)
@@ -544,20 +558,9 @@ public static class ItemDebuggerProgram
                 if (arg >= 0 && arg < _entities.Modes.Count)
                     _entities.SetMode(_entities.Modes[arg]);
                 break;
-            case DebugButton.Idle:
-                _mode = PreviewMode.Idle;
-                break;
-            case DebugButton.Walk:
-                _mode = PreviewMode.Walk;
-                break;
-            case DebugButton.Run:
-                _mode = PreviewMode.Run;
-                break;
-            case DebugButton.Jump:
-                _mode = PreviewMode.Jump;
-                break;
-            case DebugButton.Mine:
-                Player.Punch();
+            case DebugButton.PlayerMode:
+                if (arg >= 0 && arg < PlayerPreviewState.AllModes.Count)
+                    _playerAnim.SetMode(PlayerPreviewState.AllModes[arg]);
                 break;
             case DebugButton.FirstPerson:
                 _firstPerson = !_firstPerson;

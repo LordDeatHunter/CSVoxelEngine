@@ -5,6 +5,14 @@ description: Drive and screenshot the CSVoxelEngine game with VOXEL_SCRIPT scena
 
 # Visual verification
 
+**Animations: start in the item debugger, not a scenario.** `OpenGLTest.ItemDebugger` previews every player
+animation (ITEMS tab, one button each) and the goblin and slime life-cycles (ENTITIES tab) on the real
+models without a world, with a fixed-step capture: run from `OpenGLTest/`,
+`ITEM_DEBUGGER_PLAYER_ANIM=<mode> ITEM_DEBUGGER_SHOT_AT=<seconds> ITEM_DEBUGGER_SHOT=<png> dotnet run --project ../OpenGLTest.ItemDebugger -c Release`
+(`ITEM_DEBUGGER_SELECT=goblin ITEM_DEBUGGER_ANIM=death` for a mob; `ITEM_DEBUGGER_VIEW=first` for first
+person). Use a `VOXEL_SCRIPT` scenario (below) only to see an animation in the real world, with the camera,
+terrain and lighting around it. When you add or change an animation, give it a debugger mode.
+
 Build/test cannot prove a rendering or feel change. Use a scripted scenario, not ad-hoc input injection.
 
 ## Run recipe (PowerShell, Release)
