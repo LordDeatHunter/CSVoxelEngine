@@ -109,6 +109,112 @@ public sealed class SlimeSizeTests
         Assert.True(HitBy(SlimeSize.Max) > HitBy(SlimeSize.Min));
     }
 
+    // The same evenly spread rolls for every condition, so the shares compare like for like.
+    private static float[] EvenRolls(int count)
+    {
+        var rolls = new float[count];
+        for (var i = 0; i < count; i++)
+            rolls[i] = (i + 0.5f) / count;
+        return rolls;
+    }
+
+    private static float LargeShare(float night, bool underground)
+    {
+        var rolls = EvenRolls(1000);
+        var large = 0;
+        foreach (var roll in rolls)
+            if (SlimeSize.Roll(night, underground, roll) > SlimeSize.Min)
+                large++;
+        return large / (float)rolls.Length;
+    }
+
+    [Fact]
+    public void ByDayOnTheSurfaceMostSlimesAreSmallAndLargeOnesAreCommonerAtNightOrUnderground()
+    {
+        var day = LargeShare(night: 0f, underground: false);
+        var night = LargeShare(night: 1f, underground: false);
+        var cave = LargeShare(night: 0f, underground: true);
+
+        Assert.True(day < 0.5f, $"by day {day:P0} of the slimes are large");
+        Assert.True(day > 0f, "by day a larger slime must still be possible");
+        Assert.True(night > day, $"night {night:P0} vs day {day:P0}");
+        Assert.True(cave > day, $"underground {cave:P0} vs day {day:P0}");
+    }
+
+    [Fact]
+    public void ForOneRollADarkerOrDeeperSpawnIsNeverSmaller()
+    {
+        foreach (var roll in EvenRolls(400))
+        {
+            var day = SlimeSize.Roll(0f, false, roll);
+            var dusk = SlimeSize.Roll(0.5f, false, roll);
+            var night = SlimeSize.Roll(1f, false, roll);
+            var cave = SlimeSize.Roll(0f, true, roll);
+            Assert.InRange(day, SlimeSize.Min, SlimeSize.Max);
+            Assert.InRange(night, SlimeSize.Min, SlimeSize.Max);
+            Assert.True(day <= dusk && dusk <= night, $"roll {roll}: day {day}, dusk {dusk}, night {night}");
+            Assert.True(day <= cave, $"roll {roll}: day {day}, underground {cave}");
+        }
+    }
+
+    [Fact]
+    public void OnlyASpawnWellUnderItsColumnSurfaceCountsAsUnderground()
+    {
+        const int surface = 64;
+        Assert.False(SlimeSize.IsUnderground(surface, surface));
+        Assert.True(SlimeSize.IsUnderground(surface - 40, surface));
+
+        // Deeper never turns it back into a surface spawn
+        var wasUnderground = false;
+        for (var depth = 0; depth <= 40; depth++)
+        {
+            var underground = SlimeSize.IsUnderground(surface - depth, surface);
+            Assert.True(underground || !wasUnderground, $"depth {depth} reads as the surface again");
+            wasUnderground = underground;
+        }
+    }
+
+    [Fact]
+    public void TheNightFactorIsFullWithTheSunWellBelowTheHorizonAndNoneWithItWellUp()
+    {
+        var steps = 2400;
+        for (var i = 0; i < steps; i++)
+        {
+            var time = i * (double)WorldGenerationConfig.DayLengthSeconds / steps;
+            var elevation = DayCycle.SunDirection(time).Y;
+            var night = DayCycle.NightFactor(time);
+            Assert.InRange(night, 0f, 1f);
+            if (elevation > 0.3f) Assert.Equal(0f, night);
+            if (elevation < -0.1f) Assert.Equal(1f, night);
+        }
+
+        // A higher sun is never more night
+        for (var e = -0.5f; e < 0.5f; e += 0.01f)
+            Assert.True(DayCycle.Dayness(e + 0.01f) >= DayCycle.Dayness(e));
+    }
+
+    [Fact]
+    public void ARingSpawnedSlimeOfAnyRolledSizeFitsWhereItStands()
+    {
+        var chunks = MobTestWorld.Surface();
+        var player = new Vector3(0.5f, 100f, 0.5f);
+        var found = 0;
+        for (var attempt = 0; attempt < 60; attempt++)
+        {
+            // Full night and the lowest roll ask for the largest size the spot allows
+            if (!SlimeManager.TryFindSpawn(chunks, player, 1f, 0f, out var position, out var size))
+                continue;
+            found++;
+            Assert.InRange(size, SlimeSize.Min, SlimeSize.Max);
+            var half = Slime.HalfExtentFor(size);
+            Assert.False(Slime.IsColliding(position, half, chunks), $"a size {size} slime spawned inside a block");
+            var feet = position.Y - half;
+            Assert.Equal(MathF.Round(feet), feet, 3);
+        }
+
+        Assert.True(found > 0);
+    }
+
     [Fact]
     public void ALargerSlimeDropsMoreLoot()
     {

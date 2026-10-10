@@ -1476,7 +1476,8 @@ public class World : IItemUseWorld
         // server's players already took theirs through TakeHit).
         if (_slimes != null)
         {
-            _slimes.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets);
+            // The lighting clock's night, so the ring rolls larger slimes after dark
+            _slimes.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, DayCycle.NightFactor(LightingTime));
             if (!_serverMode && _slimes.DamageDealtThisFrame > 0)
             {
                 _health.TakeDamage(_slimes.DamageDealtThisFrame);

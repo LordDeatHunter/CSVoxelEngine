@@ -38,4 +38,39 @@ public static class SlimeSize
     /// <summary>How many times the slime's loot table is rolled on its death.</summary>
     public static int LootRolls(int size) =>
         Math.Max(1, (int)MathF.Round(Multiplier(size, WorldGenerationConfig.SlimeSizeLootStep)));
+
+    /// <summary>
+    /// The chance a ring spawn grows past each size: the day chance in full day, the night chance in
+    /// full night (<paramref name="night"/> is <see cref="DayCycle.NightFactor"/>, 0..1), and the
+    /// night chance whenever the spawn is <paramref name="underground"/>.
+    /// </summary>
+    public static float LargeChance(float night, bool underground) =>
+        MathUtils.Lerp(WorldGenerationConfig.SlimeLargeChanceDay, WorldGenerationConfig.SlimeLargeChanceNight,
+            underground ? 1f : MathUtils.Clamp01(night));
+
+    /// <summary>
+    /// The size a ring spawn gets from one uniform <paramref name="roll"/> in [0, 1): it grows one
+    /// size past <see cref="Min"/> while the roll stays under <c>chance^k</c> (k = 1, 2, ...), so
+    /// size <c>s + 1</c> or larger has probability <c>chance^s</c>, mostly small by day and larger
+    /// more often at night or underground. A pure function: for one roll, a higher chance never
+    /// gives a smaller slime.
+    /// </summary>
+    public static int Roll(float night, bool underground, float roll)
+    {
+        var chance = LargeChance(night, underground);
+        var size = Min;
+        var threshold = chance;
+        while (size < Max && roll < threshold)
+        {
+            size++;
+            threshold *= chance;
+        }
+        return size;
+    }
+
+    /// <summary>Whether a spawn standing on <paramref name="groundY"/> is below ground: at least
+    /// <see cref="WorldGenerationConfig.SlimeUndergroundDepthBlocks"/> under its column's terrain
+    /// height <paramref name="surfaceHeight"/> (a cave floor, not the open surface).</summary>
+    public static bool IsUnderground(int groundY, int surfaceHeight) =>
+        surfaceHeight - groundY >= WorldGenerationConfig.SlimeUndergroundDepthBlocks;
 }

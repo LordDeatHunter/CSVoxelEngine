@@ -1283,6 +1283,13 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float SlimeSizeHealthStep = 1f;
     public const float SlimeSizeDamageStep = 0.5f;
     public const float SlimeSizeLootStep = 1f;
+    // The size a ring spawn rolls (SlimeSize.Roll): each size past 1 is reached with the large-size
+    // chance again (so size s+1 has chance^s), and that chance eases from the day value to the night
+    // value with DayCycle.NightFactor. A spawn whose ground lies at least SlimeUndergroundDepthBlocks
+    // below its column's surface counts as full night, whatever the hour.
+    public const float SlimeLargeChanceDay = 0.1f;
+    public const float SlimeLargeChanceNight = 0.4f;
+    public const int SlimeUndergroundDepthBlocks = 4;
 
     // --- Goblins (GoblinManager) ---
     // Short forest raiders that throw the flint they carry at the player from a standoff band,

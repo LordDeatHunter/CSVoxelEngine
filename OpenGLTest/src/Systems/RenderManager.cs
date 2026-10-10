@@ -984,9 +984,9 @@ public class RenderManager : IDisposable
                 _invViewProj = Matrix4x4.Identity;
         }
 
-        // The sun orbits once per DayLengthSeconds; the phase starts it mid-morning
-        var angle = (float)(time / WorldGenerationConfig.DayLengthSeconds) * MathF.Tau + 0.8f;
-        _sunDir = Vector3.Normalize(new Vector3(MathF.Cos(angle), MathF.Sin(angle), 0.35f));
+        // The sun orbits once per DayLengthSeconds; the phase starts it mid-morning (DayCycle,
+        // which gameplay keyed to the hour reads too)
+        _sunDir = DayCycle.SunDirection(time);
         var elevation = _sunDir.Y;
 
         // The shadow camera fades itself out as the sun sets: at a grazing elevation the
@@ -1000,7 +1000,7 @@ public class RenderManager : IDisposable
         // out of sight shortly after the horizon instead of hanging in the night sky
         _sunVisibility = Smooth01((elevation + 0.08f) / 0.14f);
 
-        var dayness = Smooth01((elevation + 0.08f) / 0.33f);
+        var dayness = DayCycle.Dayness(elevation);
         _dayness = dayness;
         var duskAmount = MathUtils.Clamp01(1f - MathF.Abs(elevation) * 5f);
 

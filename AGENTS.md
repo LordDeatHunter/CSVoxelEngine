@@ -566,7 +566,9 @@ OpenGLTest/
     MobCaps.cs, IMobPopulation.cs  # the natural and hard mob caps every kind shares, over the
                                #   living count each registered manager reports
     SlimeSize.cs               # GL-free per-size slime stats: body scale, health, contact damage,
-                               #   loot rolls, each 1 + (size - 1) * its config step
+                               #   loot rolls, each 1 + (size - 1) * its config step; the spawn size roll
+    DayCycle.cs                # GL-free sun direction, dayness and night factor of the lighting clock
+                               #   (RenderManager.SetLighting and the slime size roll both read it)
     Goblin.cs                  # the goblin: body physics, throw-then-melee AI, clip/event contract
                                #   (ValidateContent), animation-driven release/impact events
     GoblinAim.cs               # GL-free low-arc ballistic solver for the thrown stones
@@ -2305,7 +2307,13 @@ in `RenderManager.SlimeTransform`, multiplied over the squash spring, the collis
 `BodyHalfExtent`/`BodyHalfHeight`, the healthbar height), the health pool (`Mob.MaxHealth`, virtual,
 over the JSON `hp`; the save and net clamps read it), the contact damage and the loot rolls (the table
 rolled `LootRolls` times). The size is saved (`EntitySaveData.MobData.Size`, absent = 1) and sent (a
-slime entry's `NetEntity.Ammo`). The player fights back with
+slime entry's `NetEntity.Ammo`). A ring spawn rolls its size (`SlimeSize.Roll`, a pure function of the
+night, an underground flag and one uniform roll): each size past 1 is reached with the large-size
+chance again, which eases from `SlimeLargeChanceDay` to `SlimeLargeChanceNight` with
+`DayCycle.NightFactor(World.LightingTime)` — the same sun `RenderManager.SetLighting` lights the world
+by — and is the night value for ground at least `SlimeUndergroundDepthBlocks` under its column's
+surface (`SlimeSize.IsUnderground`; the surface-only ring never finds such a spot today). A rolled body
+that would overlap a block beside the cleared column steps down a size until it fits. The player fights back with
 the left-click punch (`World.UpdatePunch` + `Combat`): a mob inside the forward 3-block, 30°-half-angle
 cone with line of sight takes the held item's `entityDamage` and a knockback shove, and while one is in
 the cone mining stands down (attack-first). `Mining.EntityDamage` is the bare-hand baseline (1) an item

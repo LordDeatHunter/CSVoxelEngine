@@ -88,8 +88,8 @@ public sealed class SlimeManager : IMobPopulation
     }
 
     /// <summary>Ticks the slimes against the one local player (singleplayer and the tests); see
-    /// <see cref="Update(float, ChunkManager, DropManager, IReadOnlyList{IMobTarget})"/>.</summary>
-    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, Camera camera)
+    /// <see cref="Update(float, ChunkManager, DropManager, IReadOnlyList{IMobTarget}, float)"/>.</summary>
+    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, Camera camera, float night = 0f)
     {
         if (camera == null)
         {
@@ -99,7 +99,7 @@ public sealed class SlimeManager : IMobPopulation
 
         _singleTarget.Clear();
         _singleTarget.Add(camera);
-        Update(deltaTime, chunks, drops, _singleTarget);
+        Update(deltaTime, chunks, drops, _singleTarget, night);
     }
 
     /// <summary>
@@ -108,9 +108,11 @@ public sealed class SlimeManager : IMobPopulation
     /// touches (<see cref="IMobTarget.TakeHit"/>, also summed into <see cref="DamageDealtThisFrame"/>),
     /// a grounded touch is shoved off by that target, a slime past the despawn radius of every
     /// target is culled, and the spawn ring cycles over the targets under the one shared cap and
-    /// timer. With no targets nothing chases, despawns or spawns.
+    /// timer. With no targets nothing chases, despawns or spawns. <paramref name="night"/> is the
+    /// lighting clock's <see cref="DayCycle.NightFactor"/>, which the ring spawn's size roll reads.
     /// </summary>
-    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, IReadOnlyList<IMobTarget> targets)
+    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, IReadOnlyList<IMobTarget> targets,
+        float night = 0f)
     {
         DamageDealtThisFrame = 0;
         if (chunks == null || targets == null) return;
@@ -164,7 +166,7 @@ public sealed class SlimeManager : IMobPopulation
                 _slimes.RemoveAt(i);
         }
 
-        UpdateSpawning(deltaTime, chunks, targets);
+        UpdateSpawning(deltaTime, chunks, targets, night);
     }
 
     // A larger slime rolls its kind's loot table once per LootRolls, so its yield grows with it.
@@ -184,7 +186,7 @@ public sealed class SlimeManager : IMobPopulation
 
     // One shared timer, under the natural cap every mob kind shares; each expiry tries the ring
     // round the next target in turn.
-    private void UpdateSpawning(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
+    private void UpdateSpawning(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets, float night)
     {
         if (!_caps.AllowsNaturalSpawn) return;
 
@@ -196,23 +198,47 @@ public sealed class SlimeManager : IMobPopulation
         var index = _spawnCursor % targets.Count;
         _spawnCursor = index + 1;
 
-        if (TryFindSpawn(chunks, targets[index].Eye, out var position))
-            Spawn(position);
+        if (TryFindSpawn(chunks, targets[index].Eye, night, Random.Shared.NextSingle(), out var position, out var size))
+            Spawn(position, size);
     }
 
-    /// <summary>The slime's spawn ring through <see cref="MobSpawner.TryFindSurfaceSpawn"/>,
-    /// returning the body centre resting on the found ground cell.</summary>
-    internal static bool TryFindSpawn(ChunkManager chunks, Vector3 playerPosition, out Vector3 position)
+    /// <summary>The smallest slime's spawn ring (a size roll that never grows); see
+    /// <see cref="TryFindSpawn(ChunkManager, Vector3, float, float, out Vector3, out int)"/>.</summary>
+    internal static bool TryFindSpawn(ChunkManager chunks, Vector3 playerPosition, out Vector3 position) =>
+        TryFindSpawn(chunks, playerPosition, 0f, 1f, out position, out _);
+
+    /// <summary>
+    /// The slime's spawn ring through <see cref="MobSpawner.TryFindSurfaceSpawn"/>: the size comes
+    /// from <see cref="SlimeSize.Roll"/> with <paramref name="night"/>, whether the ground cell is
+    /// below its column's surface (<see cref="SlimeSize.IsUnderground"/>) and
+    /// <paramref name="sizeRoll"/> (uniform in [0, 1)), and <paramref name="position"/> is that
+    /// size's body centre resting on the found ground cell. The ring only cleared the two cells above
+    /// one ground cell, so a larger body that would overlap a solid cell beside them steps down a
+    /// size at a time until it fits; the smallest body sits inside that column and always does.
+    /// </summary>
+    internal static bool TryFindSpawn(ChunkManager chunks, Vector3 playerPosition, float night, float sizeRoll,
+        out Vector3 position, out int size)
     {
         if (!MobSpawner.TryFindSurfaceSpawn(chunks, playerPosition,
                 WorldGenerationConfig.SlimeSpawnMinRadiusBlocks, WorldGenerationConfig.SlimeSpawnMaxRadiusBlocks,
                 WorldGenerationConfig.SlimeSpawnTries, out var x, out var groundY, out var z))
         {
             position = default;
+            size = SlimeSize.Min;
             return false;
         }
 
-        position = new Vector3(x + 0.5f, groundY + 1 + Slime.HalfExtent, z + 0.5f);
-        return true;
+        var column = chunks.WorldSource.GetColumn(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
+        var surface = column.Heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
+        size = SlimeSize.Roll(night, SlimeSize.IsUnderground(groundY, surface), sizeRoll);
+
+        while (true)
+        {
+            var half = Slime.HalfExtentFor(size);
+            position = new Vector3(x + 0.5f, groundY + 1 + half, z + 0.5f);
+            if (size <= SlimeSize.Min || !Slime.IsColliding(position, half, chunks))
+                return true;
+            size--;
+        }
     }
 }
