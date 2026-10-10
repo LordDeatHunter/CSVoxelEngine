@@ -137,7 +137,9 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
 
 ## Blocks and items
 
-- [ ] **Natural cotton.** A cotton plant block that generates in clumps and drops cotton.
+- [x] **Natural cotton.** *Done:* `cotton_plant` + `cotton` item, `CottonGenerator` over the
+  reusable `PlantClumps` rule (64-block cells, warm/dry forest fringe), `visual-examples/cotton.json`.
+  A cotton plant block that generates in clumps and drops cotton.
   One cross-model block (like `flower` / `tall_grass`, `needsSupport`, hardness 0), one `cotton`
   item and its loot table, all JSON (see the `add-content` skill).
   **Plants generate clumped, not scattered**: a cluster of a few blocks every X blocks, never
