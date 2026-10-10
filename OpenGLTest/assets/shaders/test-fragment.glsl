@@ -8,7 +8,8 @@
 // of the frame taken just before the water pass (uSceneColor/uSceneDepth), offset sideways
 // along the wave normal for refraction; the distance from the surface to what that copy saw
 // is how thick the water is, and Beer-Lambert absorption over that thickness plus an
-// in-scattered water colour is what makes shallows read clear and depth read teal. The planar
+// in-scattered water colour is what makes shallows read clear and depth read teal; where that
+// thickness runs out against a block or a bank a thin foam band rises. The planar
 // reflection is mixed in by a Schlick fresnel, so the surface is transparent underfoot and a
 // mirror at a graze. Opaque faces that look into water (bit 3 of the packed normal) get the
 // caustic net on top, projected back up the sun direction to the sea plane.
@@ -148,6 +149,11 @@ uniform float uWaterFlowScroll;   // blocks/s the ripples travel at full strengt
 uniform float uWaterFlowPeriod;   // seconds per flow-map phase; 0 turns the flow map off
 uniform float uWaterFallScroll;   // blocks/s the streaks run down a falling face
 uniform float uWaterFallStreak;   // tangent tilt of the falling streaks; 0 turns them off
+// Shore foam: the view-ray water depth at which the band ends (0, the default and the
+// ItemDebugger's, turns it off), its opacity at the contact line and its linear albedo.
+uniform float uWaterFoamWidth;
+uniform float uWaterFoamStrength;
+uniform vec3 uWaterFoamColor;
 // Average opaque colour of the leaves tile, for LOD foliage below: far crowns are
 // drawn opaque (no cutout holes) and transparent texels fall back to this.
 uniform vec3 uLodLeafColor;
@@ -358,6 +364,34 @@ float Hash12(vec2 p) {
     vec3 q = fract(vec3(p.xyx) * 0.1031);
     q += dot(q, q.yzx + 33.33);
     return fract((q.x + q.y) * q.z);
+}
+
+// Smooth value noise on the Hash12 lattice, 0..1.
+float ValueNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(Hash12(i), Hash12(i + vec2(1.0, 0.0)), f.x),
+               mix(Hash12(i + vec2(0.0, 1.0)), Hash12(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+
+// The shore foam's breakup pattern: two octaves drifting slowly against each other, so the
+// ragged edge of the band crawls instead of sitting still. 0..1.
+float FoamField(vec2 p, float t) {
+    return 0.6 * ValueNoise(p * 1.8 + vec2(t * 0.21, t * 0.09))
+         + 0.4 * ValueNoise(p * 4.3 + vec2(-t * 0.13, t * 0.27));
+}
+
+// FoamField carried along a flow by the same bounded two-phase flow map FlowWaveNormal uses, so
+// foam on a stream travels downstream with the ripples and cells of different flow never seam.
+float FlowFoam(vec2 p, float t, vec2 flow) {
+    float fs = length(flow);
+    if (fs < 1e-3 || uWaterFlowPeriod <= 0.0) return FoamField(p, t);
+    float ph0 = fract(t / uWaterFlowPeriod);
+    float ph1 = fract(ph0 + 0.5);
+    vec2 span = flow * uWaterFlowScroll * uWaterFlowPeriod;
+    return FoamField(p - span * ph0, t) * (1.0 - abs(2.0 * ph0 - 1.0))
+         + FoamField(p - span * ph1, t) * (1.0 - abs(2.0 * ph1 - 1.0));
 }
 
 // Block-light flicker, desynchronised by position. Each corner of a coarse xz lattice
@@ -730,6 +764,25 @@ void main() {
         // (uFogNear/uFogFar) already charges for.
         float thickness = fromBehind ? 0.0 : distance(scenePos, fWorldPos) * (1.0 - uUnderwater);
 
+        // Shore foam: a thin pale band that rises as that depth goes to zero, i.e. where the
+        // surface meets a block, a bank or a thin trickle. Bounded by uWaterFoamWidth, so open
+        // water never foams; never from below (the Snell window) nor on a side face, and never
+        // with the eye submerged. The ripple phases (wob) jiggle it and the flow map carries it
+        // downstream, so the ragged edge moves; the contact line itself stays mostly solid, with
+        // a gap wherever the pattern peaks (the threshold reaches past 1 there). It fades
+        // out over the same 64..160 blocks as the vertex waves: a band a third of a block wide
+        // turns subpixel out there and would only shimmer.
+        float foam = 0.0;
+        float foamFade = 1.0 - smoothstep(64.0, 160.0, dist);
+        if (!fromBehind && geomN.y > 0.5 && uWaterFoamWidth > 0.0 && foamFade > 0.0) {
+            float edge = 1.0 - distance(scenePos, fWorldPos) / uWaterFoamWidth;
+            if (edge > 0.0) {
+                vec2 fp = fWorldPos.xz + vec2(wob1, wob2) * 0.08;
+                float n = mix(0.15, 1.05, FlowFoam(fp, uTime, fWaterFlow.xy));
+                foam = smoothstep(n - 0.1, n + 0.1, edge) * uWaterFoamStrength * (1.0 - uUnderwater) * foamFade;
+            }
+        }
+
         vec3 waterLight = uAmbient * (0.12 + 0.88 * fSun) + uSunColor * (uSunIntensity * fSun * shadow * 0.6)
                           + (torch + pl) * 0.6;
         vec3 refr = behind * exp(-uWaterAbsorb * thickness)
@@ -777,6 +830,12 @@ void main() {
         col = mix(cheap, fancyCol, fancy);
         waterSpec *= fancy;
         col += uSunColor * (waterSpec * uSunIntensity);
+        // The foam is a pale diffuse film over the surface: lit exactly like an opaque face (the
+        // shared light term, so it darkens in shadow, cloud shadow and at night), mixed over the
+        // composed water in linear light like the fresnel mix above, and fogged by the common
+        // fog below. It covers the glitter it sits on. (foamFade ends well inside the fancy
+        // band, so the cheap far path never needs it.)
+        col = mix(col, uWaterFoamColor * light, foam);
         }
     }
 

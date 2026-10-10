@@ -855,6 +855,9 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterFlowPeriod", WorldGenerationConfig.WaterFlowPeriod);
         program.SetUniform("uWaterFallScroll", WorldGenerationConfig.WaterFallScrollSpeed);
         program.SetUniform("uWaterFallStreak", WorldGenerationConfig.WaterFallStreakStrength);
+        program.SetUniform("uWaterFoamWidth", WorldGenerationConfig.WaterFoamWidthBlocks);
+        program.SetUniform("uWaterFoamStrength", WorldGenerationConfig.WaterFoamStrength);
+        program.SetUniform("uWaterFoamColor", ColorSpace.SrgbToLinear(WorldGenerationConfig.WaterFoamColor));
         program.SetUniform("uLavaLayer", (float)ContentRegistry.RequireBlock("lava").Top);
         program.SetUniform("uLavaNormalScale", WorldGenerationConfig.LavaNormalScale);
         program.SetUniform("uLavaCatchLight", WorldGenerationConfig.LavaCatchLightStrength);

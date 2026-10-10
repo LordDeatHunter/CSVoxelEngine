@@ -1,0 +1,65 @@
+{
+  // Shore foam check: run from OpenGLTest/ with
+  //   VOXEL_TIME=360 VOXEL_SCRIPT=visual-examples/water-foam.json   (low sun, water.json's light)
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/water-foam.json   (noon)
+  // Shots land in visual/water-foam/. A thin pale band should line every place the liquid surface
+  // meets a block or a bank, broken up and crawling between the _later shots, while open water a
+  // little way out stays clear and the surface seen from below (sea_under) carries none.
+  // water.json's bay, pond and river anchors have frozen over or dried up under the current
+  // worldgen, so this file uses liquid shores a headless probe (ColdWeight under the snow line,
+  // a wet column beside one whose top stands at the water level) found for WorldSeed.Default:
+  //   a forest river with a one-block bank around x -44, z 108..145 (water level 0, bed -1);
+  //   the ocean coast at (346, 126) (level 0, bed -1) and the deep sea column (360, 136)
+  //   (floor -8) water.json uses for its underwater shots.
+  // The pillar shot stacks nine stones straight down from a hovering eye onto that deep floor
+  // (each place lands on the previous stone's top face, within World.InteractionReach and with
+  // the body clear of the cell it fills, hence the second, higher eye) until the last pokes out
+  // of the sea: the band rings the pillar on the side facing the camera.
+  // Flight holds every pose (and keeps the camera out of the mobs' reach).
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-38.5, 30.5, 117.5], "yaw": 180, "pitch": -35 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-38.5, 4.0, 117.5], "yaw": 180, "pitch": -35 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "river_bank", "hideHud": true },
+    { "op": "wait", "seconds": 0.7 },
+    { "op": "screenshot", "name": "river_bank_later", "hideHud": true },
+    { "op": "teleport", "pos": [-40.5, 2.4, 117.5], "yaw": 180, "pitch": -20 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "river_bank_close", "hideHud": true },
+    { "op": "teleport", "pos": [-38.5, 14.0, 117.5], "yaw": 180, "pitch": -65 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "river_high", "hideHud": true },
+
+    { "op": "teleport", "pos": [352.5, 30.5, 126.5], "yaw": 180, "pitch": -30 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [352.5, 4.0, 126.5], "yaw": 180, "pitch": -30 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "ocean_shore", "hideHud": true },
+
+    { "op": "teleport", "pos": [360.5, 0.0, 136.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "give", "block": "stone", "count": 9 },
+    { "op": "place" }, { "op": "wait", "seconds": 0.15 },
+    { "op": "place" }, { "op": "wait", "seconds": 0.15 },
+    { "op": "place" }, { "op": "wait", "seconds": 0.15 },
+    { "op": "place" }, { "op": "wait", "seconds": 0.15 },
+    { "op": "place" }, { "op": "wait", "seconds": 0.15 },
+    { "op": "teleport", "pos": [360.5, 4.5, 136.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "place" }, { "op": "wait", "seconds": 0.15 },
+    { "op": "place" }, { "op": "wait", "seconds": 0.15 },
+    { "op": "place" }, { "op": "wait", "seconds": 0.15 },
+    { "op": "place" }, { "op": "wait", "seconds": 1.5 },
+    { "op": "teleport", "pos": [360.5, 3.0, 141.0], "yaw": -90, "pitch": -35 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "pillar", "hideHud": true },
+    { "op": "wait", "seconds": 0.7 },
+    { "op": "screenshot", "name": "pillar_later", "hideHud": true },
+
+    { "op": "teleport", "pos": [362.5, -3.5, 138.5], "yaw": -135, "pitch": 55 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "sea_under", "hideHud": true }
+  ]
+}

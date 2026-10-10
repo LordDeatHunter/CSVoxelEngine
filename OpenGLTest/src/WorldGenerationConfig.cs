@@ -548,6 +548,20 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>How strongly the falling streaks tilt the side-face normal.</summary>
     public const float WaterFallStreakStrength = 0.5f;
 
+    // Shore foam (test-fragment.glsl): a thin pale band where the water surface meets a block,
+    // a bank or a thin trickle, i.e. where the water the eye looks through (the refraction
+    // path's depth from the surface to the scene behind it) thins to nothing.
+    /// <summary>
+    /// Water depth along the view ray, in blocks, at which the foam band ends. Must stay under a
+    /// full cell's surface height (<see cref="FluidState.SourceHeight"/>) less the wave swell, so
+    /// open water over a block floor never foams; only a wall, a bank or a thin flow does.
+    /// </summary>
+    public const float WaterFoamWidthBlocks = 0.5f;
+    /// <summary>Opacity of the foam at the contact line, 0..1 (the band breaks up away from it).</summary>
+    public const float WaterFoamStrength = 0.7f;
+    /// <summary>Albedo of the foam film, authored in sRGB (pale, slightly blue-white).</summary>
+    public static readonly Vector3 WaterFoamColor = new(0.86f, 0.92f, 0.94f);
+
     /// <summary>
     /// Steps of the screen-space reflection march that stands in for the planar mirror on water
     /// off the sea plane (a pond above sea level). The shader's loop bound is 8, so more is clamped.
