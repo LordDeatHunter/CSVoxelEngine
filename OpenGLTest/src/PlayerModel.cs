@@ -94,6 +94,11 @@ public class PlayerModel
     // The off hand swings back as the fist drives out, and the shoulders twist into the blow.
     private const float PunchLeftCounter = 0.45f;
     private const float PunchTwist = 0.16f;
+    // The chambered punch: the upper arm flares out to the side and forward and the forearm is folded
+    // across so the wrist points to the front; the thrust then brings the elbow in and forward.
+    private const float PunchChamberRoll = 1.2f;
+    private const float PunchChamberYaw = 0.35f;
+    private const float PunchChamberForearm = 1.15f;
 
     // Slice attack (items with AttackPattern.Slice). One swing lasts SliceDuration and is a
     // wind-up, a strike and a recovery, all eased so the pose equals the idle hold at both ends
@@ -130,8 +135,18 @@ public class PlayerModel
     // exact release pose through a follow-through, then settles slowly back to rest —
     // one direction change, which reads as follow-through rather than a bounce.
     public const float ThrowDuration = 0.55f;
-    private const float ThrowCockedShoulder = 2.6f;
-    private const float ThrowCockedElbow = 0.35f;
+    private const float ThrowCockedShoulder = 1.3f;
+    private const float ThrowCockedElbow = 0.6f;
+    // The cocked pose proper (ApplyArmFrames): the upper arm out to the right and a little behind
+    // the body, the forearm bent up at about a right angle to it, wrist above the elbow, and the
+    // shoulders wound back toward the throwing side. These replace the old straight-up arm.
+    private const float ThrowArmRoll = 1.4f;
+    private const float ThrowArmFlex = 0.1f;
+    private const float ThrowArmBehind = 0.4f;
+    private const float ThrowForearmTilt = 0.3f;
+    private const float ThrowForearmUp = 1.45f;
+    private const float ThrowWindTwist = 0.55f;
+    private const float ThrowFollowTwist = 0.3f;
     private const float ThrowFollowShoulder = 1.6f;
     private const float ThrowFollowElbow = 0.5f;
     private const float ThrowStrikeEnd = 0.3f;
@@ -622,6 +637,39 @@ public class PlayerModel
             Blend(ref upper, UpperFrame(side, roll, MathUtils.Lerp(AirArmFlex, SprintAirArmFlex, _airRun), 0f), air);
             Blend(ref fore, ForeFrame(side, MathUtils.Lerp(AirElbowFlex, SprintAirElbowFlex, _airRun), 0f), air);
         }
+
+        if (!right) return;
+
+        // Punch: the flare is full at the chamber and gone again at full extension, where the IK
+        // frame (the fist on the aim line) takes over, so the elbow swings from out to the side to
+        // forward as the arm thrusts.
+        if (_mineT < 1f)
+        {
+            var w = PunchWeights(_mineT);
+            var flare = w.Retract * (1f - w.Extend) * (1f - w.Recover);
+            Blend(ref upper, UpperFrame(side, PunchChamberRoll, 0f, PunchChamberYaw), flare);
+            Blend(ref fore, ForeFrame(side, PunchChamberForearm, 0.1f), flare);
+        }
+
+        // Throw: the cocked arm out to the right and behind, forearm up.
+        var cock = ThrowArmWeight();
+        if (cock > 0.001f)
+        {
+            Blend(ref upper, UpperFrame(side, ThrowArmRoll, ThrowArmFlex, -ThrowArmBehind), cock);
+            Blend(ref fore, ForeFrame(side, ThrowForearmTilt, ThrowForearmUp), cock);
+        }
+    }
+
+    // How much of the cocked arm the frame shows: eased in with the charge, full while held, and
+    // handed to the strike (the base pose racing to the follow-through) over the release.
+    private float ThrowArmWeight()
+    {
+        if (_throwCharge01.HasValue)
+            return MathUtils.SmoothStep(_throwCharge01.Value);
+        if (_throwT >= ThrowStrikeEnd)
+            return 0f;
+        var u = _throwT / ThrowStrikeEnd;
+        return MathUtils.SmoothStep(_throwReleaseCharge) * (1f - u * u);
     }
 
     /// <summary>The body-wide offsets the second pass adds on top of the pose (see <see cref="ComputeMods"/>).</summary>
@@ -652,15 +700,23 @@ public class PlayerModel
         var sliceTwist = IsSlicing ? SliceSweep() * 0.2f : 0f;
         var sliceRoll = IsSlicing ? _sliceDir * 0.07f * SliceStroke() : 0f;
 
-        // Throw: lean back while the arm is cocked, then fall forward through the release.
+        // Throw: the shoulders wind back toward the throwing (right) side and lean back while the
+        // arm is cocked, then whip forward through the release and settle.
         float throwLean = 0f;
+        float throwTwist = 0f;
         if (_throwCharge01.HasValue)
-            throwLean = 0.18f * MathUtils.SmoothStep(_throwCharge01.Value);
+        {
+            var cocked = MathUtils.SmoothStep(_throwCharge01.Value);
+            throwLean = 0.18f * cocked;
+            throwTwist = -ThrowWindTwist * cocked;
+        }
         else if (_throwT < 1f)
         {
-            var cocked = 0.18f * MathUtils.SmoothStep(_throwReleaseCharge);
+            var cocked = MathUtils.SmoothStep(_throwReleaseCharge);
             var strike = MathUtils.EaseOutCubic(MathF.Min(1f, _throwT / ThrowStrikeEnd));
-            throwLean = MathUtils.Lerp(cocked, -0.3f, strike) * (1f - MathUtils.SmoothStep((_throwT - ThrowStrikeEnd) / (1f - ThrowStrikeEnd)));
+            var settle = 1f - MathUtils.SmoothStep((_throwT - ThrowStrikeEnd) / (1f - ThrowStrikeEnd));
+            throwLean = MathUtils.Lerp(0.18f * cocked, -0.3f, strike) * settle;
+            throwTwist = MathUtils.Lerp(-ThrowWindTwist * cocked, ThrowFollowTwist, strike) * settle;
         }
 
         var fall = DeathFall;
@@ -672,7 +728,7 @@ public class PlayerModel
             RightShoulderExtra = -_equip.Value * 0.9f,
             TorsoPitch = -dip * 0.2f - crouch * 0.25f + _flinch.Value * 0.3f + throwLean,
             Drop = dip * 0.12f + crouch * 0.17f,
-            TorsoYaw = MathF.Sin(_walkPhase) * 0.1f * move + sliceTwist
+            TorsoYaw = MathF.Sin(_walkPhase) * 0.1f * move + sliceTwist + throwTwist
                        - PunchTwist * PunchWeights(_mineT).Extend,
             TorsoRoll = MathF.Cos(_walkPhase) * 0.035f * move + sliceRoll + _flinch.Value * 0.08f,
             HeadPitch = _flinch.Value * 0.45f - crouch * 0.1f,

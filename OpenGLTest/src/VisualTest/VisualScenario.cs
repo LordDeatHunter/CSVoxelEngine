@@ -46,7 +46,7 @@ public sealed class VisualStep
     public string? Mode { get; init; }
 
     /// <summary>What a <c>player</c> step makes the player's model do (<c>hurt</c>, <c>punch</c>,
-    /// <c>slice</c>, <c>equip</c>, <c>die</c> or <c>revive</c>).</summary>
+    /// <c>slice</c>, <c>equip</c>, <c>charge</c>, <c>release</c>, <c>die</c> or <c>revive</c>).</summary>
     public string? Action { get; init; }
 }
 
@@ -178,7 +178,7 @@ public sealed class VisualScenario
             "player" => new VisualStep
             {
                 Op = "player",
-                Action = ReadChoice(element, index, "player", "action", ["hurt", "punch", "slice", "equip", "die", "revive"]),
+                Action = ReadChoice(element, index, "player", "action", ["hurt", "punch", "slice", "equip", "charge", "release", "die", "revive"]),
             },
             "screenshot" => new VisualStep
             {

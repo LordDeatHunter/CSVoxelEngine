@@ -447,65 +447,92 @@ public sealed class PlayerModelTests
         Assert.Equal(rest, strike, 4);
     }
 
+    // World positions with the body at the origin facing -Z (the default look), +X its right.
+    private static Vector3 PartOrigin(PlayerModel player, string part) =>
+        Vector3.Transform(Vector3.Zero, player.GetPartMatrix(part, new Vector3(0.5f, 70f, 0.5f), -90f, 0f));
+
     [Fact]
-    public void ThrowChargeRaisesTheRightArmOverheadProgressively()
+    public void ThrowChargeCocksTheArmOutToTheRightWithTheWristAboveTheElbow()
     {
         var player = new PlayerModel { HoldingItem = true };
         for (var i = 0; i < 120; i++)
             player.Update(1f / 60f, 0f);
-        var rest = player.GetPose().RightShoulder;
-        var restElbow = player.GetPose().RightElbow;
         var eye = new Vector3(0.5f, 70f, 0.5f);
-        float HandY() => Vector3.Transform(Vector3.Zero, player.GetHandAnchorMatrix(eye, -90f)).Y;
-        var restHand = HandY();
+        Vector3 Hand() => Vector3.Transform(Vector3.Zero, player.GetHandAnchorMatrix(eye, -90f));
+        var restHand = Hand();
 
         player.StartThrowCharge();
         player.UpdateThrowCharge(0f);
-        var tapped = player.GetPose().RightShoulder;
-        var midHand = 0f;
+        var tapped = Hand();
         player.UpdateThrowCharge(0.5f);
-        var half = player.GetPose().RightShoulder;
-        midHand = HandY();
+        var half = Hand();
         player.UpdateThrowCharge(1f);
-        var full = player.GetPose().RightShoulder;
+        var full = Hand();
 
-        Assert.True(tapped >= rest);
-        Assert.True(half > tapped);
-        Assert.True(full > half);
-        Assert.True(full > rest + 0.5f);
-        Assert.True(player.GetPose().RightElbow < restElbow);
-        Assert.True(midHand > restHand);
-        Assert.True(HandY() > restHand + 0.15f);
+        // The hand travels out to the right as the charge builds, then the wrist lifts above the elbow.
+        Assert.True(half.X > tapped.X + 0.2f);
+        Assert.True(full.X > tapped.X + 0.2f);
+        Assert.True(full.Y > half.Y + 0.2f);
+
+        var shoulder = PartOrigin(player, "UpperArmR");
+        var elbow = PartOrigin(player, "ForearmR");
+        // The upper arm points almost straight out to the right, a little behind the body ...
+        Assert.True(elbow.X - shoulder.X > 0.25f);
+        Assert.True(MathF.Abs(elbow.Y - shoulder.Y) < 0.2f);
+        Assert.True(elbow.Z >= shoulder.Z - 0.02f);
+        // ... and the wrist sits above the elbow, nowhere near straight up from the shoulder.
+        Assert.True(full.Y > elbow.Y + 0.15f);
+        Assert.True(full.Y < shoulder.Y + 0.45f);
+        Assert.True(full.Y > restHand.Y + 0.15f);
     }
 
     [Fact]
-    public void ThrowReleaseFallsToRestWithoutBouncing()
+    public void ThrowChargeWindsTheShouldersBackTowardTheThrowingSide()
     {
-        var player = new PlayerModel();
-        player.Update(1f / 60f, 0f);
-        var rest = player.GetPose().RightShoulder;
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++)
+            player.Update(1f / 60f, 0f);
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+        // The torso's own right axis in the world: +X at rest, swinging its right side toward the back (+Z).
+        float RightSideZ() => Vector3.TransformNormal(Vector3.UnitX, player.GetPartMatrix("Torso", eye, -90f, 0f)).Z;
+        var rest = RightSideZ();
 
         player.StartThrowCharge();
         player.UpdateThrowCharge(1f);
-        var cocked = player.GetPose().RightShoulder;
+
+        Assert.True(RightSideZ() > rest + 0.2f);
+    }
+
+    [Fact]
+    public void ThrowReleaseWhipsForwardAndSettlesBackToRest()
+    {
+        var player = new PlayerModel();
+        player.Update(1f / 60f, 0f);
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+        Vector3 Hand() => Vector3.Transform(Vector3.Zero, player.GetHandAnchorMatrix(eye, -90f));
+        var rest = Hand();
+
+        player.StartThrowCharge();
+        player.UpdateThrowCharge(1f);
+        var cocked = Hand();
         player.ReleaseThrow(1f);
         Assert.True(player.IsThrowing);
         Assert.Equal(0f, player.ThrowProgress, 3);
-        Assert.Equal(cocked, player.GetPose().RightShoulder, 4);
+        // The release starts exactly from the cocked pose.
+        Assert.True(Vector3.Distance(cocked, Hand()) < 0.01f);
 
-        var last = cocked;
-        for (var i = 1; i <= 4; i++)
+        var mostForward = float.MaxValue;
+        for (var i = 0; i < 40; i++)
         {
-            player.Update(PlayerModel.ThrowDuration / 4f, 0f);
-            var sampled = player.GetPose().RightShoulder;
-            Assert.True(sampled < last - 0.05f);
-            last = sampled;
+            player.Update(PlayerModel.ThrowDuration / 40f, 0f);
+            mostForward = MathF.Min(mostForward, Hand().Z);
         }
 
+        Assert.True(mostForward < rest.Z - 0.15f);
         for (var i = 0; i < 60; i++)
             player.Update(1f / 60f, 0f);
         Assert.False(player.IsThrowing);
-        Assert.True(MathF.Abs(player.GetPose().RightShoulder - rest) < 0.05f);
+        Assert.True(Vector3.Distance(rest, Hand()) < 0.05f);
     }
 
     [Fact]

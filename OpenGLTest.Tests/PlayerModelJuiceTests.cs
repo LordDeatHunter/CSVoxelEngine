@@ -246,4 +246,32 @@ public sealed class PlayerModelJuiceTests
         Assert.True(pose.LeftKnee < restKnee - 1f);
         Assert.True(pose.RightKnee < restKnee - 0.9f);
     }
+
+    [Fact]
+    public void ThePunchChambersWithTheElbowOutToTheSideAndTheWristPointingForward()
+    {
+        var model = Settled();
+        var eye = new System.Numerics.Vector3(0f, 1.62f, 0f);
+        System.Numerics.Vector3 Origin(string part) =>
+            System.Numerics.Vector3.Transform(System.Numerics.Vector3.Zero, model.GetPartMatrix(part, eye, -90f, 0f));
+        var restElbow = Origin("ForearmR");
+
+        model.Punch();
+        model.Update(PlayerModel.MineDuration * 0.22f, 0f);
+        var shoulder = Origin("UpperArmR");
+        var elbow = Origin("ForearmR");
+        var hand = System.Numerics.Vector3.Transform(new System.Numerics.Vector3(0f, model.HandDepth(), 0f),
+            model.GetPartMatrix("ForearmR", eye, -90f, 0f));
+
+        // Shoulder-to-elbow reaches out to the side ...
+        Assert.True(elbow.X > restElbow.X + 0.12f);
+        Assert.True(MathF.Abs(elbow.X - shoulder.X) > MathF.Abs(elbow.Z - shoulder.Z) * 0.8f);
+        // ... while elbow-to-wrist points mostly to the front.
+        Assert.True(-(hand.Z - elbow.Z) > MathF.Abs(hand.X - elbow.X));
+
+        // By the end of the thrust the elbow has come back in and the fist is out in front.
+        model.Update(PlayerModel.MineDuration * 0.33f, 0f);
+        var thrustElbow = Origin("ForearmR");
+        Assert.True(thrustElbow.X < elbow.X - 0.05f);
+    }
 }

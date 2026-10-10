@@ -1264,6 +1264,8 @@ public class World : IItemUseWorld
             case "punch": PunchSwing(); break;
             case "slice": Player.StartSlice(1); break;
             case "equip": Player.NotifyEquip(); break;
+            case "charge": Player.StartThrowCharge(); Player.UpdateThrowCharge(1f); break;
+            case "release": Player.ReleaseThrow(1f); break;
             case "die": Player.DeathFall = 1f; Camera.DeathProgress = 1f; break;
             case "revive": Player.DeathFall = 0f; Camera.DeathProgress = 0f; break;
         }
