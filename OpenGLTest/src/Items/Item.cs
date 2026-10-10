@@ -165,10 +165,12 @@ public abstract class Item
 
     /// <summary>Held-item transform in hand space: scaled, rotated (yaw, then pitch, then roll),
     /// then translated. The renderer composes it under the hand matrix, so the item rides
-    /// the arm swing and the mine pump.</summary>
-    public Matrix4x4 DisplayMatrix()
+    /// the arm swing and the mine pump. <paramref name="rotationOffsetDegrees"/> is what the pose adds to
+    /// the display rotation for this frame (<c>PlayerModel.HeldItemRotationOffset</c>, the same
+    /// <c>[pitch, yaw, roll]</c> degrees), zero by default.</summary>
+    public Matrix4x4 DisplayMatrix(Vector3 rotationOffsetDegrees = default)
     {
-        var radians = DisplayRotation * (MathF.PI / 180f);
+        var radians = (DisplayRotation + rotationOffsetDegrees) * (MathF.PI / 180f);
         return Matrix4x4.CreateScale(DisplayScale)
             * Matrix4x4.CreateFromYawPitchRoll(radians.Y, radians.X, radians.Z)
             * Matrix4x4.CreateTranslation(DisplayTranslation);

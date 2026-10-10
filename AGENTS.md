@@ -2423,15 +2423,25 @@ overshoot or jiggle.
   degrees, forearm up, which made the hand look held up by the elbow) is eased into it as the stroke ramps in. The
   **blade is carried by the wrist**: its tip points along the forearm (so it follows the arm's sweep and is
   always across the direction the hand travels, never turned up mid-cut), rolled about its length by
-  `SliceBladeRoll` (cocked on edge, not laid flat) and cocked up from the forearm by `SliceBladeCant`, and through the main part of the cut (`SliceBladeYawWeight`: eased in at the end of the wind-up, full through the strike, out over the
-  start of the recovery) turned about the vertical by `SliceBladeYawOffset` (+45 degrees in the engine's yaw convention, counter-clockwise
-  seen from above, so the tip leads ahead of the hand's travel; mirrored for the return); in
+  `SliceBladeRoll` (cocked on edge, not laid flat) and cocked up from the forearm by `SliceBladeCant`, and through the main part of the cut (`SliceMainWeight`: eased in at the end of the wind-up,
+  full through the strike, out over the start of the recovery) turned about the vertical by `SliceBladeYawOffset`
+  (+45 degrees in the engine's yaw convention, so the tip leads ahead of the hand's travel; mirrored for the
+  return); in
   `GetHandAnchorMatrix` the wrist orientation takes over from the body-space one by the stroke. The tip therefore
   sweeps out to the wind-up side, forward as the hand crosses the middle and out to the far side (mirrored for the
   return).
-  `PlayerModelTests.TheSlicingArmIsExtendedForwardAndTheBladeFollowsTheWristThroughTheCut` measures it on the item
-  as drawn, with its display rotation: the blade sprite's tip is its (1, 1, 0) diagonal and its flat face the
-  sprite's +Z, both taken through the item's `DisplayMatrix` and the hand anchor.
+  On top of that the pose adds a **display-space offset** to the held blade through the main part of the cut
+  (`PlayerModel.HeldItemRotationOffset`, from `SliceBladeDisplayYawDegrees` / `SliceBladeDisplayRollDegrees`):
+  degrees in the item JSON's `display.rotation` order `[pitch, yaw, roll]`, which `Item.DisplayMatrix(offset)` and
+  the debugger's `ItemDisplayEditor.DisplayMatrix(offset)` add to the item's own rotation, so the blade is drawn
+  at yaw -145 / roll 70 mid-cut and at its JSON yaw -90 / roll 45 at rest. **That is how a mid-animation held-item
+  pose is tuned**: in the item debugger scrub the timeline to the frame, slide Rot yaw / Rot roll until it reads
+  right, and put the difference from the JSON values into those constants; the sliders keep showing the JSON
+  values (what SAVE TO JSON writes), since the offset is the pose's, not the item's. The yaw part mirrors for the
+  return swing and the roll does not: for a display yaw of -90 that makes the return's blade the exact mirror image
+  of the first swing's (`PlayerModelTests.TheDrawnBladeLeadsAheadOfTheForearmThroughTheCutAndTheReturnSwingIsItsMirrorImage`,
+  which measures the item as drawn: the blade sprite's tip is its (1, 1, 0) diagonal and its edge the (1, -1, 0) one,
+  both through `DisplayMatrix(offset)` and the hand anchor).
   The **shoulder socket** (`ShoulderSocketInward`, 0.09) slides the joint in toward the torso as an arm lifts off
   hanging (`SocketWeight`), so a raised arm stays seated on the body instead of hinging on a point 0.1 outside it
   with a gap; the punch IK includes it. `SliceImpactProgress` (where the damage lands) is the middle of the strike. Filmed by

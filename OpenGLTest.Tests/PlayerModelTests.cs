@@ -382,9 +382,9 @@ public sealed class PlayerModelTests
     public void TheSlicingArmIsExtendedForwardAndTheBladeFollowsTheWristThroughTheCut()
     {
         TestContent.EnsureLoaded();
-        // The blade as drawn: the sprite's tip is its (1, 1, 0) diagonal and its flat face the sprite's +Z, both
-        // taken through the item's display transform and the hand anchor.
-        var display = ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_blade").Id)!.DisplayMatrix();
+        // The blade as drawn: the sprite's tip is its (1, 1, 0) diagonal, taken through the item's display transform
+        // (plus what the pose adds to it for the frame) and the hand anchor.
+        var item = ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_blade").Id)!;
 
         foreach (var direction in new[] { 1, -1 })
         {
@@ -394,7 +394,7 @@ public sealed class PlayerModelTests
             var eye = new Vector3(0.5f, 70f, 0.5f);
 
             player.StartSlice(direction);
-            var samples = new System.Collections.Generic.List<(Vector3 Forearm, Vector3 Tip, float FlatFace, float Reach)>();
+            var samples = new System.Collections.Generic.List<(Vector3 Forearm, Vector3 Tip, float Reach)>();
             for (var i = 0; i < 42; i++)
             {
                 player.Update(PlayerModel.SliceDuration / 42f, 0f);
@@ -405,23 +405,20 @@ public sealed class PlayerModelTests
                 var hand = Vector3.Transform(new Vector3(0f, player.HandDepth(), 0f), forearmMatrix);
                 var shoulder = player.GetPartMatrix("UpperArmR", eye, -90f, 0f).Translation;
                 var forearm = Vector3.Normalize(hand - forearmMatrix.Translation);
-                var blade = display * player.GetHandAnchorMatrix(eye, -90f);
+                var blade = item.DisplayMatrix(player.HeldItemRotationOffset) * player.GetHandAnchorMatrix(eye, -90f);
                 var tip = Vector3.Normalize(Vector3.TransformNormal(new Vector3(1, 1, 0), blade));
-                var face = Vector3.Normalize(Vector3.TransformNormal(new Vector3(0, 0, 1), blade));
-                samples.Add((forearm, tip, MathF.Abs(face.Y), Vector3.Distance(shoulder, hand)));
+                samples.Add((forearm, tip, Vector3.Distance(shoulder, hand)));
             }
 
-            foreach (var (forearm, tip, flatFace, reach) in samples)
+            foreach (var (forearm, tip, reach) in samples)
             {
                 // The arm is held out in front, close to straight (the arm is 0.75 long), and its forearm points forward
                 // along it, not up.
                 Assert.True(reach > 0.66f, $"direction {direction}: the arm is bent in the cut (reach {reach}).");
                 Assert.True(forearm.Y < 0.4f, $"direction {direction}: the forearm points up ({forearm}).");
-                // The blade follows the wrist: its tip points the way the forearm does, turned about the vertical by the
-                // 45 degrees it is given through the main part of the cut (see the next test).
+                // The blade follows the wrist: its tip points roughly the way the forearm does (the mid-cut turn, below,
+                // leads it ahead of the forearm, never away from it).
                 Assert.True(Vector3.Dot(tip, forearm) > 0.55f, $"direction {direction}: the blade does not follow the wrist ({tip} vs {forearm}).");
-                // And it is cocked on edge a little, not laid completely flat.
-                Assert.InRange(flatFace, 0.35f, 0.9f);
             }
 
             // The sweep: out to the wind-up side, across the front, to the far side.
@@ -431,44 +428,116 @@ public sealed class PlayerModelTests
         }
     }
 
+    // The blade as drawn: the sprite's tip is its (1, 1, 0) diagonal and its in-plane edge the (1, -1, 0) one, both
+    // taken through the item's display transform (plus what the pose adds for the frame) and the hand anchor.
+    private static (Vector3 Tip, Vector3 Edge) DrawnBlade(PlayerModel player, Item item, Vector3 eye)
+    {
+        var blade = item.DisplayMatrix(player.HeldItemRotationOffset) * player.GetHandAnchorMatrix(eye, -90f);
+        return (Vector3.Normalize(Vector3.TransformNormal(new Vector3(1, 1, 0), blade)),
+            Vector3.Normalize(Vector3.TransformNormal(new Vector3(1, -1, 0), blade)));
+    }
+
     [Fact]
-    public void TheBladeIsTurnedAboutFortyFiveDegreesFromTheForearmThroughTheMainPartOfTheCutAndMirrorsForTheReturn()
+    public void TheMidCutTurnOfTheBladeIsAddedInTheItemsOwnDisplaySpaceOnlyThroughTheMainPartOfTheCut()
+    {
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++)
+            player.Update(1f / 60f, 0f);
+        // At rest the pose adds nothing to the item's display rotation.
+        Assert.Equal(Vector3.Zero, player.HeldItemRotationOffset);
+
+        player.StartSlice(1);
+        Vector3 At(float progress)
+        {
+            player.Update(PlayerModel.SliceDuration * (progress - player.SliceProgress), 0f);
+            return player.HeldItemRotationOffset;
+        }
+
+        // The rest frames at either end of the swing are untouched ...
+        Assert.Equal(Vector3.Zero, At(0.05f));
+        var mid = At(0.3f);
+        // ... through the main part of the cut the turn is on in full, the same at every frame of it, and it is a yaw
+        // and a roll (the sliders a blade is tuned with), never a pitch ...
+        Assert.NotEqual(0f, mid.Y);
+        Assert.NotEqual(0f, mid.Z);
+        Assert.Equal(0f, mid.X);
+        Assert.Equal(mid, At(0.4f));
+        Assert.Equal(mid, At(0.47f));
+        // ... and it has faded out again by the end of the recovery.
+        Assert.Equal(Vector3.Zero, At(0.8f));
+        for (var i = 0; i < 60; i++) player.Update(1f / 60f, 0f);
+        Assert.Equal(Vector3.Zero, player.HeldItemRotationOffset);
+
+        // The turn is the difference between the display rotation the blade reads right with mid-cut and its own: so
+        // drawing the item with its rotation plus the offset is the same as an item authored at that rotation.
+        TestContent.EnsureLoaded();
+        var item = ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_blade").Id)!;
+        var tuned = new ItemDisplayEditor();
+        tuned.Select(item.Id);
+        tuned.Rotation += mid;
+        var withOffset = item.DisplayMatrix(mid);
+        var authored = tuned.DisplayMatrix();
+        Assert.True(MaxDifference(withOffset, authored) < 1e-4f);
+    }
+
+    [Fact]
+    public void TheDrawnBladeLeadsAheadOfTheForearmThroughTheCutAndTheReturnSwingIsItsMirrorImage()
     {
         TestContent.EnsureLoaded();
-        var display = ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_blade").Id)!.DisplayMatrix();
+        var item = ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_blade").Id)!;
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+        var progresses = new[] { 0.3f, 0.35f, 0.4f, 0.45f, 0.48f };
 
-        foreach (var direction in new[] { 1, -1 })
+        (Vector3 Tip, Vector3 Edge, Vector3 Forearm)[] Swing(int direction)
         {
             var player = new PlayerModel { HoldingItem = true };
             for (var i = 0; i < 120; i++)
                 player.Update(1f / 60f, 0f);
-            var eye = new Vector3(0.5f, 70f, 0.5f);
-
-            Vector3 Horizontal(Vector3 v) => Vector3.Normalize(new Vector3(v.X, 0f, v.Z));
             player.StartSlice(direction);
-            var checkedFrames = 0;
-            for (var i = 0; i < 42; i++)
+            var frames = new (Vector3, Vector3, Vector3)[progresses.Length];
+            for (var k = 0; k < progresses.Length; k++)
             {
-                player.Update(PlayerModel.SliceDuration / 42f, 0f);
-                var progress = player.SliceProgress;
-                if (progress < 0.28f || progress > 0.47f) continue;
-
+                player.Update(PlayerModel.SliceDuration * (progresses[k] - player.SliceProgress), 0f);
                 var forearmMatrix = player.GetPartMatrix("ForearmR", eye, -90f, 0f);
                 var hand = Vector3.Transform(new Vector3(0f, player.HandDepth(), 0f), forearmMatrix);
-                var forearm = Horizontal(hand - forearmMatrix.Translation);
-                var blade = display * player.GetHandAnchorMatrix(eye, -90f);
-                var tip = Horizontal(Vector3.TransformNormal(new Vector3(1, 1, 0), blade));
+                var (tip, edge) = DrawnBlade(player, item, eye);
+                frames[k] = (tip, edge, Vector3.Normalize(hand - forearmMatrix.Translation));
+            }
+            return frames;
+        }
 
-                // The forearm's horizontal direction turned by +45 degrees about Y (the engine's yaw), mirrored for the
-                // return, is where the blade's tip points.
-                var expected = Vector3.TransformNormal(forearm, Matrix4x4.CreateRotationY(0.785f * direction));
-                Assert.True(Vector3.Dot(tip, expected) > 0.93f,
-                    $"direction {direction} at {progress:F2}: the tip {tip} is not the forearm {forearm} turned 45 degrees.");
-                checkedFrames++;
+        var first = Swing(1);
+        var back = Swing(-1);
+        for (var k = 0; k < progresses.Length; k++)
+        {
+            // Seen from above, the tip is turned ahead of the forearm, in the direction the hand travels (the first
+            // swing goes from the right round to the left, the return the other way).
+            foreach (var (frames, direction) in new[] { (first, 1), (back, -1) })
+            {
+                var forearm = frames[k].Forearm with { Y = 0f };
+                var tip = frames[k].Tip with { Y = 0f };
+                var lead = Vector3.Cross(forearm, tip).Y * direction;
+                Assert.True(lead > 0.05f,
+                    $"direction {direction} at {progresses[k]:F2}: the blade is not turned ahead of the forearm (lead {lead}).");
             }
 
-            Assert.True(checkedFrames > 4);
+            // The return swing draws the blade as the mirror image (across the player's facing) of the first: the same
+            // tip and the same leading edge, flipped left to right.
+            var mirrorTip = first[k].Tip with { X = -first[k].Tip.X };
+            var mirrorEdge = first[k].Edge with { X = -first[k].Edge.X };
+            Assert.True(Vector3.Dot(back[k].Tip, mirrorTip) > 0.98f, $"at {progresses[k]:F2} the return's tip is not the mirror of the first swing's.");
+            Assert.True(Vector3.Dot(back[k].Edge, mirrorEdge) > 0.98f, $"at {progresses[k]:F2} the return's edge is not the mirror of the first swing's.");
         }
+    }
+
+    private static float MaxDifference(Matrix4x4 a, Matrix4x4 b)
+    {
+        var m = 0f;
+        m = MathF.Max(m, MathF.Abs(a.M11 - b.M11)); m = MathF.Max(m, MathF.Abs(a.M12 - b.M12)); m = MathF.Max(m, MathF.Abs(a.M13 - b.M13));
+        m = MathF.Max(m, MathF.Abs(a.M21 - b.M21)); m = MathF.Max(m, MathF.Abs(a.M22 - b.M22)); m = MathF.Max(m, MathF.Abs(a.M23 - b.M23));
+        m = MathF.Max(m, MathF.Abs(a.M31 - b.M31)); m = MathF.Max(m, MathF.Abs(a.M32 - b.M32)); m = MathF.Max(m, MathF.Abs(a.M33 - b.M33));
+        m = MathF.Max(m, MathF.Abs(a.M41 - b.M41)); m = MathF.Max(m, MathF.Abs(a.M42 - b.M42)); m = MathF.Max(m, MathF.Abs(a.M43 - b.M43));
+        return m;
     }
 
     [Fact]

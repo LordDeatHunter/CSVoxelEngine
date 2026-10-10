@@ -154,10 +154,17 @@ public class PlayerModel
     // the way a blade is held out ahead of the hand. Both mirror with the swing's direction.
     private const float SliceBladeRoll = 0.8f;
     private const float SliceBladeCant = 0.12f;
-    // During the main part of the cut (SliceBladeYawWeight) the blade is also turned about the vertical by this much
+    // During the main part of the cut (SliceMainWeight) the blade is also turned about the vertical by this much
     // from the forearm's direction, in the engine's yaw convention (positive: counter-clockwise seen from above, toward the
     // player's left for the first swing, so the tip leads ahead of the hand's travel). Mirrored for the return.
     private const float SliceBladeYawOffset = 0.785f;
+    // On top of that, through the main part of the cut the held blade is drawn with this much added to its own display
+    // rotation (HeldItemRotationOffset): the same [pitch, yaw, roll] degrees the item JSON's display.rotation and the item
+    // debugger's Rot sliders use, so a value found by sliding them at a mid-cut frame transfers here as is. The blade's
+    // rest display is yaw -90 / roll 45; mid-cut it reads right at yaw -145 / roll 70. The yaw part mirrors for the
+    // return swing (for a display yaw of -90 the mirror image of yaw -90 + d is yaw -90 - d), the roll does not.
+    private const float SliceBladeDisplayYawDegrees = -55f;
+    private const float SliceBladeDisplayRollDegrees = 25f;
     private const float SliceBodyWindup = 1.0f;
     private const float SliceBodyFar = 0.85f;
 
@@ -281,6 +288,17 @@ public class PlayerModel
 
     /// <summary>Progress of the active slice swing: 0 at the wind-up, 1 when it has finished.</summary>
     public float SliceProgress => _sliceT;
+
+    /// <summary>
+    /// Degrees the pose adds to the held item's own display rotation, in the item JSON's <c>[pitch, yaw, roll]</c>
+    /// order (what <c>Item.DisplayMatrix</c> and the item debugger's Rot sliders take), so a value found by sliding
+    /// them at a frame of an animation transfers here unchanged. Zero at rest; through the main part of a slice it is
+    /// the blade's mid-cut turn (<see cref="SliceBladeDisplayYawDegrees"/>, <see cref="SliceBladeDisplayRollDegrees"/>),
+    /// the yaw mirrored for the return swing.
+    /// </summary>
+    public Vector3 HeldItemRotationOffset => IsSlicing
+        ? new Vector3(0f, SliceBladeDisplayYawDegrees * _sliceDir, SliceBladeDisplayRollDegrees) * SliceMainWeight()
+        : Vector3.Zero;
 
     /// <summary>Smoothed 0..1 movement amount driving the swing amplitude.</summary>
     public float MoveBlend => _moveBlend;
@@ -550,9 +568,10 @@ public class PlayerModel
     // finishes below it), through the same stroke so it is back at the idle pose by the end (no snap).
     private float SliceDrop() => SliceDiagonal();
 
-    // How much of SliceBladeYawOffset is applied: 0 until the wind-up is nearly over, full through the strike and
-    // faded out again over the start of the recovery, so the blade turns into the cut and back out of it.
-    private float SliceBladeYawWeight()
+    // The main part of the cut, as a weight: 0 until the wind-up is nearly over, full through the strike and faded out
+    // again over the start of the recovery, so what rides it (the blade's turn, its display offset) comes into the cut
+    // and goes back out of it, and the rest frames are untouched.
+    private float SliceMainWeight()
     {
         var p = MathUtils.Clamp01(_sliceT);
         if (p <= 0f || p >= 1f) return 0f;
@@ -1299,7 +1318,7 @@ public class PlayerModel
             forearmRotation.Translation = Vector3.Zero;
             var wrist = Matrix4x4.CreateRotationX(MathF.PI) * Matrix4x4.CreateRotationY(SliceBladeRoll * _sliceDir)
                         * Matrix4x4.CreateRotationX(SliceBladeCant) * forearmRotation
-                        * Matrix4x4.CreateRotationY(SliceBladeYawOffset * _sliceDir * SliceBladeYawWeight());
+                        * Matrix4x4.CreateRotationY(SliceBladeYawOffset * _sliceDir * SliceMainWeight());
             rotation = Matrix4x4.CreateFromQuaternion(Quaternion.Slerp(FrameOf(rotation), FrameOf(wrist), carried));
         }
 

@@ -308,7 +308,7 @@ public sealed class DebugSceneRenderer : IDisposable
             if (!_itemMeshes.TryGetFrame(editor.SelectedId, frame, out var mesh, out var texture)) return;
 
             BindArray(0, texture);
-            var model = RenderManager.PoseHeldItem(hand, editor.DisplayMatrix(),
+            var model = RenderManager.PoseHeldItem(hand, editor.DisplayMatrix(player.HeldItemRotationOffset),
                 editor.ItemHeldScale, editor.ItemGrip);
             Draw(mesh, model, viewProj);
             return;

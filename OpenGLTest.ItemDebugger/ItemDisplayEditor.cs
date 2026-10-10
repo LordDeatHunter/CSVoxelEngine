@@ -65,10 +65,12 @@ public sealed class ItemDisplayEditor
         BlockGrip = RenderManager.HeldBlockGrip;
     }
 
-    /// <summary>The edited display transform, composed exactly like <see cref="Item.DisplayMatrix"/>.</summary>
-    public Matrix4x4 DisplayMatrix()
+    /// <summary>The edited display transform, composed exactly like <see cref="Item.DisplayMatrix"/>, plus what the
+    /// pose adds for the frame (<see cref="PlayerModel.HeldItemRotationOffset"/>); the sliders keep showing the
+    /// item's own values, which is what SAVE TO JSON writes.</summary>
+    public Matrix4x4 DisplayMatrix(Vector3 rotationOffsetDegrees = default)
     {
-        var radians = Rotation * (MathF.PI / 180f);
+        var radians = (Rotation + rotationOffsetDegrees) * (MathF.PI / 180f);
         return Matrix4x4.CreateScale(Scale)
             * Matrix4x4.CreateFromYawPitchRoll(radians.Y, radians.X, radians.Z)
             * Matrix4x4.CreateTranslation(Translation);

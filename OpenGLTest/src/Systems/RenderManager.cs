@@ -3626,7 +3626,7 @@ public class RenderManager : IDisposable
                 Math.Max(0, type.FrameCount - 1));
             if (!itemMeshes.TryGetFrame(selectedId, frame, out var mesh, out var texture)) return;
 
-            var model = PoseHeldItem(hand, type.DisplayMatrix(), HeldItemScale, HeldItemGrip);
+            var model = PoseHeldItem(hand, type.DisplayMatrix(player.HeldItemRotationOffset), HeldItemScale, HeldItemGrip);
             SetDrawUniforms(model, model * viewProj, 1f, light);
 
             BindUnit(0, TextureTarget.Texture2DArray, texture);
