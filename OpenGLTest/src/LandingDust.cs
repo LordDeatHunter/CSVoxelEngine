@@ -38,8 +38,8 @@ public static class LandingDust
     /// Goo chips a slime's landing at <paramref name="impactSpeed"/> blocks per second throws: none
     /// under <see cref="WorldGenerationConfig.SlimeSplatMinImpact"/>, then growing linearly with the
     /// impact, as its squash kick does, to the cap at <see cref="WorldGenerationConfig.SlimeSplatFullImpact"/>.
-    /// <paramref name="scale"/> is the slime's size (1 for the one size there is), and a bigger slime
-    /// throws proportionally more.
+    /// <paramref name="scale"/> is the slime's body scale (<see cref="SlimeSize.Scale"/>, 1 for the
+    /// smallest), and a bigger slime throws proportionally more.
     /// </summary>
     public static int SplatCount(float impactSpeed, float scale = 1f)
     {

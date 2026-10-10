@@ -2594,8 +2594,8 @@ overshoot or jiggle.
   `FallTracker.LandedDrop` (singleplayer and a client); a mob reports its landing with
   `Mob.NoteLanding` (the goblin's and slime's physics do) and `World` takes them after `RefreshMobs`
   (singleplayer only: a client's mobs are mirrors and never land). A slime splats its own goo instead,
-  on every hop (`LandingDust.SplatCount`/`SplatSpeed`, linear in the impact like its squash kick, with
-  a `scale` for a bigger slime): `DebrisLook.Colour` chips with an air id, one grey cube
+  on every hop (`LandingDust.SplatCount`/`SplatSpeed`, linear in the impact like its squash kick, scaled
+  by the slime's body scale `SlimeSize.Scale(size)`): `DebrisLook.Colour` chips with an air id, one grey cube
   (`BlockCubeCache.GetColourChip`, `WorldGenerationConfig.ColourChipTile`) painted through `uBiomeTint`
   with `BiomeTint.VertexTint` of the mean opaque skin colour (`LandingDust.SkinColour`). Sprinting
   on foot over a `footstepDust` block (grounded, not sneaking, not in water, really moving) puffs once

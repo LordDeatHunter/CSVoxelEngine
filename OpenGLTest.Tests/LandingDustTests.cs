@@ -237,6 +237,43 @@ public sealed class LandingDustTests
     }
 
     [Fact]
+    public void ALargerSlimeLandingFromTheSameDropSplatsMoreAndBiggerGoo()
+    {
+        var chunks = MobTestWorld.Floor(Id("sand"));
+        var type = EntityRegistry.Require("slime");
+        var player = new Vector3(40.5f, 1.62f, 2.5f);
+
+        var small = DropAndSplat(SlimeSize.Min);
+        var large = DropAndSplat(SlimeSize.Max);
+
+        Assert.NotEmpty(small.Debris);
+        Assert.True(large.Debris.Count > small.Debris.Count);
+        Assert.True(MeanSize(large) > MeanSize(small));
+
+        // Feet four blocks over the floor whatever the body, so both land at the same impact speed
+        BlockDebrisSystem DropAndSplat(int size)
+        {
+            var debris = new BlockDebrisSystem();
+            var dust = new GroundDust();
+            var slime = new Slime(type, new Vector3(2.5f, 5f + Slime.HalfExtentFor(size), 2.5f), size);
+            Mob[] mobs = [slime];
+            for (var i = 0; i < 600 && debris.Debris.Count == 0; i++)
+            {
+                slime.Update(Dt, chunks, player);
+                dust.TakeMobLandings(mobs, chunks, debris, new Random(3));
+            }
+            return debris;
+        }
+
+        static float MeanSize(BlockDebrisSystem system)
+        {
+            var sum = 0f;
+            foreach (var chip in system.Debris) sum += chip.Size;
+            return sum / system.Debris.Count;
+        }
+    }
+
+    [Fact]
     public void TheSplatGrowsWithTheImpactNeverUnderTheMinimumAndABiggerSlimeSplatsMore()
     {
         for (var speed = 0f; speed < WorldGenerationConfig.SlimeSplatMinImpact; speed += 0.05f)

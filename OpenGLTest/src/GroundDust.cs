@@ -95,8 +95,13 @@ public sealed class GroundDust
             var mob = mobs[i];
             if (!mob.TryTakeLanding(out var impactSpeed, out var fallBlocks)) continue;
             var feet = mob.Position - new Vector3(0f, mob.BodyHalfHeight, 0f);
-            if (mob is Slime)
-                Splat(feet, impactSpeed, SplatColourOf(mob.Type), mob.BodyHalfExtent, debris, random: random);
+            if (mob is Slime slime)
+            {
+                // A bigger slime splats bigger by its body scale. Splat widens the spread by that
+                // scale itself, so it gets the size-1 width rather than the already scaled body.
+                var scale = SlimeSize.Scale(slime.Size);
+                Splat(feet, impactSpeed, SplatColourOf(mob.Type), mob.BodyHalfExtent / scale, debris, scale, random);
+            }
             else
                 Land(feet, fallBlocks, mob.BodyHalfExtent, chunks, debris, random);
         }
@@ -119,8 +124,8 @@ public sealed class GroundDust
     /// A slime whose feet are at <paramref name="feet"/> landed at <paramref name="impactSpeed"/>
     /// blocks per second: throws the goo <see cref="LandingDust.SplatCount"/> sizes, in
     /// <paramref name="colourSrgb"/>, from under a body <paramref name="halfWidth"/> across.
-    /// <paramref name="scale"/> is the slime's size (1 today), growing the count, the fling and the
-    /// chips. Returns how many chips it spawned.
+    /// <paramref name="scale"/> is the slime's body scale (<see cref="SlimeSize.Scale"/>), growing the
+    /// count, the fling, the spread and the chips. Returns how many chips it spawned.
     /// </summary>
     public static int Splat(Vector3 feet, float impactSpeed, Vector3 colourSrgb, float halfWidth,
         BlockDebrisSystem debris, float scale = 1f, Random? random = null)
