@@ -6,7 +6,8 @@ namespace silkgltriangle;
 /// creation; a rename only changes <see cref="Name"/>.
 /// </summary>
 public sealed class WorldInfo(
-    string slug, string name, int seed, long createdUnixMs, long lastPlayedUnixMs, int version, string directory)
+    string slug, string name, int seed, long createdUnixMs, long lastPlayedUnixMs, int version, string directory,
+    string? sourceName = null)
 {
     /// <summary>The folder name under the saves root, derived from the name at creation.</summary>
     public string Slug { get; } = slug;
@@ -26,4 +27,15 @@ public sealed class WorldInfo(
 
     /// <summary>The absolute path of the world's folder.</summary>
     public string Directory { get; } = directory;
+
+    /// <summary>The <c>source</c> value written in <c>world.json</c>, trimmed, or null when the file
+    /// has none (or a blank one). Kept raw, unvalidated, so a rewrite of the file (a rename, a
+    /// touch) preserves exactly what was there and never adds the field to a world that lacked
+    /// it; <see cref="WorldSources.Create"/> is what judges it.</summary>
+    public string? SourceName { get; } = string.IsNullOrWhiteSpace(sourceName) ? null : sourceName.Trim();
+
+    /// <summary>Which <see cref="IWorldSource"/> the dedicated server builds this world from
+    /// (<see cref="WorldSources"/>): <see cref="SourceName"/>, or <see cref="WorldSources.Generated"/>
+    /// when the file names none. The game's main menu ignores it and always generates.</summary>
+    public string Source => SourceName ?? WorldSources.Generated;
 }

@@ -447,8 +447,9 @@ public sealed class GameServer : IDisposable
                 var cx = reader.ReadInt();
                 var cz = reader.ReadInt();
                 // Exactly what this server's own mesher reads for the column (heights, water
-                // levels, corner climate), so a client derives nothing from worldgen.
-                WorldgenColumnSource.Instance.TryGet(cx, cz, out var terrain);
+                // levels, corner climate) from the world's source - worldgen, or an imported map
+                // where it supplies the column - so a client derives nothing from worldgen.
+                _world.GetChunkManager().ColumnSource.TryGet(cx, cz, out var terrain);
                 using var writer = new PacketWriter(NetMessage.ColumnTerrain);
                 writer.Write(cx);
                 writer.Write(cz);
@@ -711,7 +712,9 @@ public sealed class GameServer : IDisposable
             if (client.Removed || !_clients.ContainsKey(client.Id))
                 continue;
 
-            var data = LodRegion.BuildMeshData(request.Level, request.Rx, request.Rz);
+            // From the world's own source, so an imported map's far terrain is what clients see.
+            var data = LodRegion.BuildMeshData(request.Level, request.Rx, request.Rz,
+                source: _world.GetChunkManager().WorldSource);
             using var writer = new PacketWriter(NetMessage.LodRegionData);
             writer.Write(request.Level);
             writer.Write(request.Rx);
@@ -834,14 +837,21 @@ public sealed class GameServer : IDisposable
         Broadcast(writer.ToArray());
     }
 
+    /// <summary>
+    /// Broadcasts every live mob, drop, primed TNT and falling block (<see cref="NetMessage.EntityList"/>),
+    /// each under a stable id by object identity. The TNT and falling cubes are drawn by clients as
+    /// display-only mirrors; only this world ticks, detonates and lands them.
+    /// </summary>
     private void BroadcastEntities()
     {
         var mobs = _world.Mobs;
         var drops = _world.Drops;
+        var primed = _world.PrimedTnt;
+        var falling = _world.Falling;
         _entitySeen.Clear();
 
         using var writer = new PacketWriter(NetMessage.EntityList);
-        writer.Write(mobs.Count + drops.Count);
+        writer.Write(mobs.Count + drops.Count + primed.Count + falling.Count);
         for (var i = 0; i < mobs.Count; i++)
         {
             var mob = mobs[i];
@@ -868,6 +878,34 @@ public sealed class GameServer : IDisposable
             writer.Write(0);
             writer.Write(drop.BlockId);
             writer.Write(drop.Velocity);
+        }
+
+        // The fuse travels in milliseconds in the two int fields, so the client's flash and swell
+        // follow the server's fuse
+        for (var i = 0; i < primed.Count; i++)
+        {
+            var tnt = primed[i];
+            writer.Write((byte)NetEntityKind.PrimedTnt);
+            writer.Write(IdFor(tnt));
+            writer.Write(tnt.Position);
+            writer.Write(0f);
+            writer.Write((int)MathF.Round(tnt.FuseRemaining * 1000f));
+            writer.Write((int)MathF.Round(tnt.FuseDuration * 1000f));
+            writer.Write(tnt.BlockId);
+            writer.Write(Vector3.Zero);
+        }
+
+        for (var i = 0; i < falling.Count; i++)
+        {
+            var block = falling[i];
+            writer.Write((byte)NetEntityKind.FallingBlock);
+            writer.Write(IdFor(block));
+            writer.Write(block.Position);
+            writer.Write(0f);
+            writer.Write(0);
+            writer.Write(0);
+            writer.Write(block.BlockId);
+            writer.Write(Vector3.Zero);
         }
 
         Broadcast(writer.ToArray());

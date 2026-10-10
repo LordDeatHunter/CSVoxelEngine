@@ -37,6 +37,14 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
     /// </summary>
     public int UploadBudget { get; set; } = WorldGenerationConfig.MaxLodUploadsPerFrame;
 
+    /// <summary>
+    /// Where the far LOD reads its terrain: worldgen by default (<see cref="GeneratedWorldSource"/>),
+    /// the world's own <see cref="ChunkManager.WorldSource"/> otherwise (World copies it). Set
+    /// before <see cref="Start"/> (the LodGen <c>Thread.Start</c> publishes it) and never changed
+    /// afterwards; read on the LodGen workers.
+    /// </summary>
+    public IWorldSource WorldSource { get; set; } = GeneratedWorldSource.Instance;
+
     public readonly ConcurrentDictionary<(int Level, int X, int Z), LodRegion> Regions = new();
 
     /// <summary>
@@ -532,7 +540,7 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
 
         try
         {
-            EnqueueCompletedMesh(LodRegion.BuildMeshData(key.Level, key.X, key.Z, MeshBuffers));
+            EnqueueCompletedMesh(LodRegion.BuildMeshData(key.Level, key.X, key.Z, MeshBuffers, source: WorldSource));
         }
         finally
         {

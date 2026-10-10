@@ -69,6 +69,9 @@ public sealed class GameServerTests : IDisposable
         public bool Dead;
         public readonly List<(int Seq, Vector3 Eye)> PlayerCorrections = [];
 
+        /// <summary>The newest <see cref="NetMessage.EntityList"/> received, decoded.</summary>
+        public List<NetEntity>? Entities;
+
         public void Drain(NetworkClient client)
         {
             while (client.Inbound.TryDequeue(out var payload))
@@ -109,6 +112,26 @@ public sealed class GameServerTests : IDisposable
                     {
                         var seq = reader.ReadInt();
                         PlayerCorrections.Add((seq, reader.ReadVector3()));
+                        break;
+                    }
+                    case NetMessage.EntityList:
+                    {
+                        // The record shape the client's own reader decodes (Program's EntityList case)
+                        var count = reader.ReadInt();
+                        var entities = new List<NetEntity>(count);
+                        for (var i = 0; i < count; i++)
+                        {
+                            var kind = (NetEntityKind)reader.ReadByte();
+                            var id = reader.ReadInt();
+                            var position = reader.ReadVector3();
+                            var yaw = reader.ReadFloat();
+                            var health = reader.ReadInt();
+                            var ammo = reader.ReadInt();
+                            var itemId = reader.ReadByte();
+                            var velocity = reader.ReadVector3();
+                            entities.Add(new NetEntity(kind, id, position, yaw, health, ammo, itemId, velocity));
+                        }
+                        Entities = entities;
                         break;
                     }
                 }
@@ -912,6 +935,57 @@ public sealed class GameServerTests : IDisposable
         Assert.Contains(InboxOf(watcher).Broadcast, c => c.X == (int)floor.X && c.Y == (int)floor.Y
             && c.Z == (int)floor.Z && c.Id == 0);
         Assert.Equal(0, CellAt(floor).Id);
+    }
+
+    [Fact]
+    public void APrimedTntReachesTheClientsEntityList()
+    {
+        using var igniter = Connect("Igniter");
+        using var watcher = Connect("Watcher");
+        var arena = PrepareArena(igniter.Server!.Value.Spawn);
+        var tnt = ContentRegistry.RequireBlock("tnt").Id;
+        SetCell(arena.Front, tnt);
+        GrantAsSurvival(igniter, ContentRegistry.RequireItem("firestarter").Id, 1);
+        _world.UseRoll = static () => 0f;
+
+        var seq = SendWorld(igniter, WorldIntent.Use(arena.Eye, arena.AimAtFront, arena.Front));
+        Assert.True(AwaitResult(igniter, seq));
+        var primed = Assert.Single(_world.PrimedTnt);
+
+        // The next entity broadcast carries the cube to the client that did not light it, with the
+        // block that primed and the fuse the server runs, in milliseconds
+        var inbox = InboxOf(watcher);
+        NetEntity? carried = null;
+        var sw = Stopwatch.StartNew();
+        while (carried == null && sw.Elapsed.TotalSeconds < 5)
+        {
+            _server.Pump(0.01);
+            Thread.Sleep(5);
+            DrainAll();
+            if (inbox.Entities?.Find(e => e.Kind == NetEntityKind.PrimedTnt) is { Kind: NetEntityKind.PrimedTnt } found)
+                carried = found;
+        }
+
+        Assert.NotNull(carried);
+        var entry = carried!.Value;
+        Assert.Equal(primed.BlockId, entry.ItemId);
+        Assert.Equal(tnt, entry.ItemId);
+        Assert.Equal((int)MathF.Round(primed.FuseDuration * 1000f), entry.Ammo);
+        Assert.InRange(entry.Health, 1, entry.Ammo);
+        Assert.True(Vector3.Distance(primed.Position, entry.Position) < 1f,
+            $"the broadcast cube sits at {entry.Position}, the server's at {primed.Position}");
+
+        // Once the fuse has burnt out on the server, the broadcasts stop listing it
+        sw.Restart();
+        while (_world.PrimedTnt.Count > 0 && sw.Elapsed.TotalSeconds < 30)
+            Tick(0.1);
+        Assert.Empty(_world.PrimedTnt);
+        // Pump past any snapshot still in flight from before the blast
+        sw.Restart();
+        while (sw.Elapsed.TotalSeconds < 0.5)
+            Tick(0.05);
+        Assert.NotNull(inbox.Entities);
+        Assert.DoesNotContain(inbox.Entities!, e => e.Kind == NetEntityKind.PrimedTnt);
     }
 
     [Fact]

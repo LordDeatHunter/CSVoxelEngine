@@ -82,6 +82,41 @@ public class PrimedTnt
             MathF.Sin(angle) * horizontalSpeed);
     }
 
+    // A mirror: no ejection pop, and the age a cube that has burnt this long would have, so the
+    // strobe picks up where the server's is
+    private PrimedTnt(Vector3 position, byte blockId, float fuseDuration, float fuseRemaining)
+    {
+        Position = position;
+        BlockId = blockId;
+        FuseDuration = fuseDuration;
+        FuseRemaining = fuseRemaining;
+        _age = fuseDuration - fuseRemaining;
+    }
+
+    /// <summary>
+    /// A multiplayer client's display-only copy of a server cube (<see cref="NetEntityKind.PrimedTnt"/>):
+    /// it never moves by itself and never detonates, since the server alone runs the fuse and the
+    /// blast. <see cref="MirrorSetState"/> applies each snapshot and <see cref="AdvanceFuse"/> keeps
+    /// the strobe running between them.
+    /// </summary>
+    internal static PrimedTnt Mirror(Vector3 position, byte blockId, float fuseDuration, float fuseRemaining) =>
+        new(position, blockId, fuseDuration, fuseRemaining);
+
+    /// <summary>Takes a server snapshot's position and fuse; the strobe clock keeps running.</summary>
+    internal void MirrorSetState(Vector3 position, float fuseRemaining)
+    {
+        Position = position;
+        FuseRemaining = fuseRemaining;
+    }
+
+    /// <summary>Burns a mirror's fuse down by <paramref name="deltaTime"/> with no physics, never
+    /// below zero, so the flash keeps ticking between snapshots.</summary>
+    internal void AdvanceFuse(float deltaTime)
+    {
+        _age += deltaTime;
+        FuseRemaining = MathF.Max(0f, FuseRemaining - deltaTime);
+    }
+
     /// <summary>Advances the fuse and the physics. Main thread only.</summary>
     public void Update(float deltaTime, ChunkManager chunks)
     {

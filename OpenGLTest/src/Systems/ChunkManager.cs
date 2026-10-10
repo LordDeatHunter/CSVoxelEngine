@@ -125,6 +125,17 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     public IColumnSource ColumnSource { get; set; } = WorldgenColumnSource.Instance;
 
     /// <summary>
+    /// Where this world's terrain comes from: the blocks of every chunk the save store does not
+    /// hold (<see cref="CreateChunk"/>) and the <see cref="ColumnData"/> of every chunk column.
+    /// Worldgen by default (<see cref="GeneratedWorldSource"/>); a server hosting a custom or
+    /// imported map installs its own. Set before the generation workers start (their
+    /// <c>Thread.Start</c> publishes it) and never changed afterwards; read on the generation
+    /// workers (<see cref="CreateChunk"/>), the main thread (fluid wake, LOD edit hooks, spawn) and
+    /// the LOD threads, so an implementation must be thread-safe.
+    /// </summary>
+    public IWorldSource WorldSource { get; set; } = GeneratedWorldSource.Instance;
+
+    /// <summary>
     /// Mesh builds <see cref="ProcessDirtyChunks"/> starts per frame. Defaults to
     /// <see cref="WorldGenerationConfig.MaxDirtyChunksPerFrame"/>; raised by World while loading and
     /// restored at the flip to playing, like <see cref="MeshUploadBudget"/>. Main thread only.
@@ -930,24 +941,31 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     }
 
     /// <summary>
-    /// Builds the chunk at <paramref name="pos"/> with its block data ready: restored from the
-    /// save store when it holds one for <paramref name="key"/> (a pending snapshot the writer
-    /// has not landed yet counts, which is what makes an immediate fly-back safe), generated
-    /// from worldgen otherwise (<see cref="Chunk.IsRestored"/> tells them apart). Runs on a
-    /// generation worker; registering the chunk is the caller's, and so is queueing a restored
-    /// one for the main thread to adopt its player-placed cells, which must happen after the
-    /// chunk is published (see <see cref="QueueChunk"/>).
+    /// Builds the chunk at <paramref name="pos"/> with its block data ready; the single seam for
+    /// where a chunk's blocks come from. The save store wins: a chunk it holds for
+    /// <paramref name="key"/> (a pending snapshot the writer has not landed yet counts, which is
+    /// what makes an immediate fly-back safe) is restored against the world source's column.
+    /// Otherwise <see cref="WorldSource"/> fills it, which for the default source is worldgen
+    /// (<see cref="Chunk.IsRestored"/> tells a generated chunk from a restored or supplied one).
+    /// Runs on a generation worker; registering the chunk is the caller's, and so is queueing a
+    /// restored one for the main thread to adopt its player-placed cells, which must happen after
+    /// the chunk is published (see <see cref="QueueChunk"/>).
     /// </summary>
     internal Chunk CreateChunk(Vector3 pos, long key)
     {
+        var cx = MathUtils.FloorToInt(pos.X);
+        var cz = MathUtils.FloorToInt(pos.Z);
         if (saveStore != null && saveStore.TryLoad(key, out var snapshot))
         {
             var restored = new Chunk(gl, pos, generateBlockData: false);
-            restored.RestoreFrom(snapshot);
+            restored.RestoreFrom(snapshot, WorldSource.GetColumn(cx, cz));
             return restored;
         }
 
-        return new Chunk(gl, pos, generateBlockData: true);
+        // The default source's Fill is the GenerateBlockData call the constructor used to make
+        var chunk = new Chunk(gl, pos, generateBlockData: false);
+        WorldSource.Fill(chunk);
+        return chunk;
     }
 
     /// <summary>

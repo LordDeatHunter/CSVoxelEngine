@@ -16,14 +16,27 @@ namespace silkgltriangle;
 /// every player turn creative on (<see cref="GameServer.AllowCreative"/>). Without it only the
 /// operators may (<see cref="GameServer.Operators"/>): the players named by each <c>--op &lt;name&gt;</c>
 /// argument (repeatable) and by the hosted world folder's <see cref="OperatorList.FileName"/>, a
-/// JSON array of names; everyone else stays in survival.
+/// JSON array of names; everyone else stays in survival. The world's terrain comes from the
+/// <see cref="IWorldSource"/> named by <c>--source &lt;name&gt;</c>, else by the world's
+/// <c>world.json</c> <c>source</c> field (<see cref="WorldInfo.Source"/>), else worldgen
+/// (<see cref="WorldSources"/>): <c>imported</c> reads the world folder's
+/// <see cref="ImportedMapSource.DirectoryName"/> map and generates everything outside it. A source
+/// that cannot be built is refused before the world folder is locked.
 /// </summary>
 public static class ServerProgram
 {
+    private const string SourceFlag = "--source";
+
     public static void Main(string[] args)
     {
         var allowCreative = WorldGenerationConfig.ServerAllowCreative
             || Array.Exists(args, a => a.Equals("--allow-creative", StringComparison.OrdinalIgnoreCase));
+        var sourceArg = ArgValue(args, SourceFlag);
+        if (sourceArg == null && Array.Exists(args, a => a.Equals(SourceFlag, StringComparison.OrdinalIgnoreCase)))
+        {
+            Console.WriteLine($"{SourceFlag} needs a name ({string.Join(", ", WorldSources.Names)}).");
+            return;
+        }
 
         Console.WriteLine("CSVoxelEngine server");
         Console.WriteLine();
@@ -52,6 +65,21 @@ public static class ServerProgram
             return;
         }
 
+        // Resolved before the save store takes the folder's lock, so a refused source leaves the
+        // folder untouched
+        var sourceName = sourceArg ?? world.Source;
+        IWorldSource source;
+        try
+        {
+            source = WorldSources.Create(sourceName, world.Directory);
+        }
+        catch (Exception e) when (e is ArgumentException or IOException or InvalidDataException
+                                      or UnauthorizedAccessException)
+        {
+            Console.WriteLine($"Cannot use world source '{sourceName}': {e.Message}");
+            return;
+        }
+
         ChunkSaveStore save;
         try
         {
@@ -72,7 +100,8 @@ public static class ServerProgram
         operators.AddAll(OperatorList.Parse(save.ReadFile(OperatorList.FileName)));
 
         WorldSeed.Apply(world.Seed);
-        var gameWorld = new World(null!, null!, null!, null!, null!, null!, null, save, serverMode: true);
+        var gameWorld = new World(null!, null!, null!, null!, null!, null!, null, save, serverMode: true,
+            worldSource: source);
         using var server = new GameServer(gameWorld, world.Name, world.Seed, port)
         {
             AllowCreative = allowCreative,
@@ -94,6 +123,7 @@ public static class ServerProgram
 
         Console.WriteLine();
         Console.WriteLine($"Serving '{world.Name}' (seed {world.Seed}) on port {server.BoundPort} (IPv4 and IPv6).");
+        Console.WriteLine(SourceLine(source));
         Console.WriteLine(CreativeLine(allowCreative, operators));
         Console.WriteLine("Type 'stop' or press Ctrl+C to shut down.");
 
@@ -222,6 +252,21 @@ public static class ServerProgram
             Console.WriteLine();
         }
     }
+
+    // The value after a flag (matched case-insensitively, first occurrence), or null when the flag
+    // is absent, is the last argument or is followed by another flag
+    private static string? ArgValue(string[] args, string flag)
+    {
+        var i = Array.FindIndex(args, a => a.Equals(flag, StringComparison.OrdinalIgnoreCase));
+        if (i < 0 || i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
+            return null;
+        return args[i + 1];
+    }
+
+    // The startup line saying where the world's terrain comes from
+    private static string SourceLine(IWorldSource source) => source is ImportedMapSource imported
+        ? $"World source: {WorldSources.Imported} ({imported.MapDirectory}; generated outside the imported columns)"
+        : $"World source: {WorldSources.Generated}";
 
     // The startup line saying who may be creative: everyone, the listed operators, or nobody
     private static string CreativeLine(bool allowCreative, OperatorList operators)

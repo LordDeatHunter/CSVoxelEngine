@@ -99,11 +99,15 @@ public static class LodSurface
         return true;
     }
 
-    /// <summary>The column's overridden top, or its generated terrain height when it has no override.</summary>
-    internal static int TopOrHeight(int x, int z) =>
+    /// <summary>
+    /// The column's overridden top, or, when it has no override, its terrain height from
+    /// <paramref name="source"/> (the world's <see cref="ChunkManager.WorldSource"/>: worldgen's
+    /// generated height by default, an imported map's own height where it supplies the column).
+    /// </summary>
+    internal static int TopOrHeight(IWorldSource source, int x, int z) =>
         TryGet(x, z, out var top, out _)
             ? top
-            : ColumnCache.GetHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)[LocalIndex(x, z)];
+            : source.GetColumn(x >> Chunk.SizeShift, z >> Chunk.SizeShift).Heights[LocalIndex(x, z)];
 
     /// <summary>
     /// Whether a block counts as the LOD surface: a full, solid, occluding cube, the same notion
@@ -208,7 +212,7 @@ public static class LodSurface
         if (!chunks.TryGetCell(x, y, z, out var id, out _))
             return false;
 
-        var top = TopOrHeight(x, z);
+        var top = TopOrHeight(chunks.WorldSource, x, z);
 
         if (y > top)
         {
@@ -237,6 +241,6 @@ public static class LodSurface
             return Set(x, z, y - depth - 1, 0);
         }
 
-        return !IsSurfaceSolid(id) && LodRegion.LowerColumnBelow(x, y, z);
+        return !IsSurfaceSolid(id) && LodRegion.LowerColumnBelow(chunks.WorldSource, x, y, z);
     }
 }

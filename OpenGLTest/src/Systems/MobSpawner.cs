@@ -29,13 +29,23 @@ public static class MobSpawner
             var chunkZ = VoxelCoords.WorldToChunk(z);
             var localX = VoxelCoords.WorldToLocal(x);
             var localZ = VoxelCoords.WorldToLocal(z);
-            var height = ColumnCache.GetHeights(chunkX, chunkZ)[VoxelCoords.ColumnIndex(localX, localZ)];
+            // The world source's column (worldgen by default): its stored water level is exactly
+            // what TerrainGenerator.IsWaterColumn evaluates for a generated column
+            var source = chunks.WorldSource;
+            var column = source.GetColumn(chunkX, chunkZ);
+            var i = VoxelCoords.ColumnIndex(localX, localZ);
+            var height = column.Heights[i];
 
             // Surface spawns only: dry forest ground with two clear cells above, all of them in
             // loaded chunks (TryGetCell reports unloaded as absent, not as air). A lake bed counts
             // as wet even where it sits above sea level, so a mob never spawns inside a pond.
-            if (TerrainGenerator.IsWaterColumn(x, z, height)) continue;
-            if (!TerrainGenerator.IsForest(x, z)) continue;
+            if (height < column.WaterLevel[i]) continue;
+            // A generated column keeps worldgen's undithered forest test (ColumnData.Biomes holds
+            // the dithered biome); a column the source supplies only has its own biome to go by
+            var forest = source.Supplies(chunkX, chunkZ)
+                ? column.Biomes[i] == Biome.Forest
+                : TerrainGenerator.IsForest(x, z);
+            if (!forest) continue;
             if (!chunks.TryGetCell(x, height, z, out var ground, out _) || !BlockType.IsSolid(ground)) continue;
             if (!chunks.TryGetCell(x, height + 1, z, out var above1, out _) || BlockType.IsSolid(above1)) continue;
             if (!chunks.TryGetCell(x, height + 2, z, out var above2, out _) || BlockType.IsSolid(above2)) continue;

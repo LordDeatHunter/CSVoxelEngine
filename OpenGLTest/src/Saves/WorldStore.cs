@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace silkgltriangle;
 
@@ -17,7 +18,9 @@ namespace silkgltriangle;
 /// fixed at creation and never follows a rename. A folder whose metadata is missing or broken is
 /// skipped with a warning rather than failing the whole listing. Metadata writes go to a
 /// temporary file first and are moved over the old one, so a crash mid-write never leaves a
-/// truncated <c>world.json</c>.
+/// truncated <c>world.json</c>. The optional <c>source</c> field (the dedicated server's world
+/// source, <see cref="WorldInfo.SourceName"/>) is carried through every rewrite and never written
+/// for a world whose file has none.
 /// </para>
 /// </summary>
 public sealed class WorldStore(string root)
@@ -171,7 +174,8 @@ public sealed class WorldStore(string root)
             created,
             dto.LastPlayed ?? created,
             dto.Version ?? 0,
-            Path.GetFullPath(folder));
+            Path.GetFullPath(folder),
+            dto.Source);
     }
 
     private static void Write(WorldInfo world)
@@ -183,6 +187,8 @@ public sealed class WorldStore(string root)
             Created = world.CreatedUnixMs,
             LastPlayed = world.LastPlayedUnixMs,
             Version = world.Version,
+            // Null stays null and is not written, so only a world whose file named a source keeps one
+            Source = world.SourceName,
         };
         var path = Path.Combine(world.Directory, MetadataFileName);
         var tmp = path + ".tmp";
@@ -198,5 +204,10 @@ public sealed class WorldStore(string root)
         public long? Created { get; set; }
         public long? LastPlayed { get; set; }
         public int? Version { get; set; }
+
+        // The world source the dedicated server builds the world from (WorldSources); absent in
+        // every file the game writes, which reads as generated
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Source { get; set; }
     }
 }

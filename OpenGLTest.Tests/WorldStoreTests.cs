@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -158,5 +159,58 @@ public sealed class WorldStoreTests : IDisposable
 
         var listed = Assert.Single(store.List());
         Assert.Equal(WorldSeed.Default, listed.Seed);
+    }
+
+    [Fact]
+    public void AWorldsSourceSurvivesARenameAndATouchAndAnUnsetOneIsNeverWritten()
+    {
+        long now = 1_000;
+        var store = new WorldStore(_root) { Clock = () => now };
+        var imported = store.Create("Imported", 7);
+        var plain = store.Create("Plain", 8);
+        File.WriteAllText(Path.Combine(imported.Directory, WorldStore.MetadataFileName),
+            "{ \"Name\": \"Imported\", \"Seed\": 7, \"Created\": 1, \"LastPlayed\": 1, \"Version\": "
+            + WorldStore.CurrentVersion + ", \"source\": \"imported\" }");
+
+        var listed = store.List().Single(w => w.Slug == imported.Slug);
+        Assert.Equal("imported", listed.SourceName);
+        Assert.Equal(WorldSources.Imported, listed.Source);
+
+        // Both rewrites of world.json keep the source the file named
+        now += 10;
+        store.Rename(listed, "Renamed");
+        now += 10;
+        store.TouchLastPlayed(listed);
+        var reread = store.List().Single(w => w.Slug == imported.Slug);
+        Assert.Equal("Renamed", reread.Name);
+        Assert.Equal(listed.SourceName, reread.SourceName);
+        Assert.Equal(WorldSources.Imported, reread.Source);
+        Assert.Equal(listed.SourceName, SourceProperty(reread.Directory)?.GetString());
+
+        // A world the game created names no source, reads as generated, and gains no source
+        // property however often its file is rewritten
+        var unset = store.List().Single(w => w.Slug == plain.Slug);
+        Assert.Null(unset.SourceName);
+        Assert.Equal(WorldSources.Generated, unset.Source);
+        Assert.Null(SourceProperty(unset.Directory));
+        now += 10;
+        store.Rename(unset, "Still Plain");
+        now += 10;
+        store.TouchLastPlayed(unset);
+        Assert.Null(SourceProperty(unset.Directory));
+        Assert.Null(store.List().Single(w => w.Slug == plain.Slug).SourceName);
+    }
+
+    // The world.json "source" property, matched case-insensitively like the reader does, or null
+    // when the file has no such property at all (a property written as JSON null still counts)
+    private static JsonElement? SourceProperty(string worldDirectory)
+    {
+        using var json = JsonDocument.Parse(File.ReadAllText(Path.Combine(worldDirectory, WorldStore.MetadataFileName)));
+        foreach (var property in json.RootElement.EnumerateObject())
+        {
+            if (property.Name.Equals("source", StringComparison.OrdinalIgnoreCase))
+                return property.Value.Clone();
+        }
+        return null;
     }
 }

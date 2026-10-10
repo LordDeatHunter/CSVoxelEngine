@@ -39,6 +39,25 @@ public class TntManager
     }
 
     /// <summary>
+    /// A multiplayer client replaces its cubes with the server's (see <see cref="PrimedTnt.Mirror"/>).
+    /// Only a client calls this, and it never calls <see cref="Update"/>, so a mirror never falls
+    /// or detonates here.
+    /// </summary>
+    internal void ReplaceMirrors(IEnumerable<PrimedTnt> mirrors)
+    {
+        _primed.Clear();
+        _primed.AddRange(mirrors);
+    }
+
+    /// <summary>Burns every mirror's fuse down between server snapshots, so the flash keeps its
+    /// pace; no physics and no detonation.</summary>
+    internal void AnimateMirrors(float deltaTime)
+    {
+        foreach (var tnt in _primed)
+            tnt.AdvanceFuse(deltaTime);
+    }
+
+    /// <summary>
     /// Whether the cell touches fluid on any face, in which case its fuse is wet and it
     /// clears instead of priming. Unloaded neighbours read as absent, never as contact.
     /// </summary>

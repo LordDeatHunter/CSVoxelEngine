@@ -101,8 +101,10 @@ public static class NetFraming
     /// <see cref="NetMessage.PlayerState"/> acks; and a respawn is a
     /// <see cref="NetIntentKind.Respawn"/> world intent. 5: a column answer is the whole
     /// <see cref="silkgltriangle.ColumnTerrain"/> (heights, water levels, corner climate), so a
-    /// client derives nothing from worldgen.</summary>
-    public const int ProtocolVersion = 5;
+    /// client derives nothing from worldgen. 6: <see cref="NetMessage.EntityList"/> also carries
+    /// primed TNT and falling blocks (<see cref="NetEntityKind.PrimedTnt"/>,
+    /// <see cref="NetEntityKind.FallingBlock"/>), which a client draws as display-only mirrors.</summary>
+    public const int ProtocolVersion = 6;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

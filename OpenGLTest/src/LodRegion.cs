@@ -162,17 +162,27 @@ public class LodRegion : IDisposable
     }
 
     /// <summary>
-    /// Caps a column's LOD height below a removed block. Returns false when the LOD
-    /// terrain already sat below the removed block and no region rebuild is needed.
+    /// Caps a column's LOD height below a removed block, judged against worldgen's terrain
+    /// (<see cref="GeneratedWorldSource"/>). Returns false when the LOD terrain already sat below
+    /// the removed block and no region rebuild is needed.
     /// </summary>
-    public static bool LowerColumnBelow(int x, int y, int z)
+    public static bool LowerColumnBelow(int x, int y, int z) =>
+        LowerColumnBelow(GeneratedWorldSource.Instance, x, y, z);
+
+    /// <summary>
+    /// Caps a column's LOD height below a removed block, judged against the column's terrain
+    /// height from <paramref name="source"/> (the world's <see cref="ChunkManager.WorldSource"/>)
+    /// when it has no surface override. Returns false when the LOD terrain already sat below the
+    /// removed block and no region rebuild is needed.
+    /// </summary>
+    public static bool LowerColumnBelow(IWorldSource source, int x, int y, int z)
     {
         var cx = x >> Chunk.SizeShift;
         var cz = z >> Chunk.SizeShift;
         var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
         // The column's current top: a surface override (a raised or re-scanned column) if it has
-        // one, else the generated terrain height. The cap then applies on top, as before.
-        var current = LodSurface.TopOrHeight(x, z);
+        // one, else the source's terrain height. The cap then applies on top, as before.
+        var current = LodSurface.TopOrHeight(source, x, z);
 
         ColumnCaps.TryGetValue((cx, cz), out var bucket);
         if (bucket != null)
@@ -357,10 +367,26 @@ public class LodRegion : IDisposable
     /// fused nested-window scan instead of the separable rectangular min, and
     /// <c>LodHeightSamplingTests</c> asserts the two produce bit-identical output. Production
     /// always leaves it true.
+    ///
+    /// <paramref name="source"/> is the world's <see cref="IWorldSource"/> (null means worldgen,
+    /// <see cref="GeneratedWorldSource.Instance"/>). Every chunk column's heights come from its
+    /// <see cref="IWorldSource.GetColumn"/>. For a column the source does not supply, every other
+    /// per-cell decision stays the worldgen read it always was (the undithered
+    /// <see cref="TerrainGenerator.BiomeAt"/>, <see cref="TerrainGenerator.WaterLevelAt"/>, the
+    /// shore weight and gravel patches, <see cref="TerrainGenerator.ColdWeight"/>, the canopy and
+    /// the climate tint lattice), so a generated region is byte-identical to the build without a
+    /// source. For a column the source supplies (<see cref="IWorldSource.Supplies"/>), those come
+    /// from its <see cref="ColumnData"/> instead: the biome and water level at the cell centre,
+    /// snow from a Taiga or Frozen biome and sea ice from a Frozen one, beaches from
+    /// <see cref="TerrainGenerator.IsBeachHeight"/> in the Ocean biome, bare rock from a zero
+    /// <see cref="ColumnData.DirtDepth"/> in the Forest biome, and the tint lattice from the
+    /// stored corner climate. A supplied column's far LOD therefore shows no canopy bumps (its
+    /// trees are in its blocks) and no gravel caps.
     /// </summary>
     public static LodMeshData BuildMeshData(int level, int rx, int rz, MeshBufferPool? buffers = null,
-        bool separableMin = true)
+        bool separableMin = true, IWorldSource? source = null)
     {
+        source ??= GeneratedWorldSource.Instance;
         var spec = Levels[level];
         var cellSize = spec.CellSize;
         var cellShift = System.Numerics.BitOperations.TrailingZeroCount(cellSize);
@@ -378,6 +404,12 @@ public class LodRegion : IDisposable
         var hasCaps = !ColumnCaps.IsEmpty;
         var hasOverrides = !LodSurface.IsEmpty;
         var heightmaps = new int[chunkSpan * chunkSpan][];
+        // The source's column and whether it supplies it, per prefetched chunk column (same shape
+        // as heightmaps). A supplied column's cell decisions read its ColumnData; anySupplied keeps
+        // a region the source supplies nothing of on the exact worldgen path.
+        var columns = new ColumnData[chunkSpan * chunkSpan];
+        var supplied = new bool[chunkSpan * chunkSpan];
+        var anySupplied = false;
         // One cap-bucket resolution per prefetched heightmap (item C9). Null for every chunk column
         // the player has never edited — which is all of them until the first mined block — and the
         // whole array is skipped while the table is empty. Same shape and lifetime as heightmaps.
@@ -391,7 +423,11 @@ public class LodRegion : IDisposable
         for (var cx = 0; cx < chunkSpan; cx++)
         for (var cz = 0; cz < chunkSpan; cz++)
         {
-            heightmaps[cx * chunkSpan + cz] = ColumnCache.GetHeights(baseChunkX + cx, baseChunkZ + cz);
+            var column = source.GetColumn(baseChunkX + cx, baseChunkZ + cz);
+            columns[cx * chunkSpan + cz] = column;
+            heightmaps[cx * chunkSpan + cz] = column.Heights;
+            supplied[cx * chunkSpan + cz] = source.Supplies(baseChunkX + cx, baseChunkZ + cz);
+            anySupplied |= supplied[cx * chunkSpan + cz];
             if (capmaps != null && ColumnCaps.TryGetValue((baseChunkX + cx, baseChunkZ + cz), out var bucket))
             {
                 capmaps[cx * chunkSpan + cz] = bucket;
@@ -675,30 +711,23 @@ public class LodRegion : IDisposable
                 // wears one material even where its footprint straddles a border.
                 var centreX = baseFineX + i * cellSize + cellSize / 2;
                 var centreZ = baseFineZ + j * cellSize + cellSize / 2;
-                var cellBiome = TerrainGenerator.BiomeAt(centreX, centreZ);
-                biomeGrid[(i + 1) * heightGrid + (j + 1)] = cellBiome;
 
-                // A cell holds water only where the chunk mesher would actually flood it: an ocean,
-                // or a lake/river bed. maxOwn is the uneroded cell max, matching the beach sampling.
-                var cellLevel = TerrainGenerator.WaterLevelAt(centreX, centreZ);
-                if (maxOwn >= cellLevel) cellLevel = TerrainGenerator.NoWater;
-                waterLevels[(i + 1) * heightGrid + (j + 1)] = cellLevel;
-                seaFloor[(i + 1) * heightGrid + (j + 1)] = FloorMaterial(maxOwn, cellLevel, cellBiome);
-
-                // Sand rings ocean shores and lake/river rims, not every column in the height band.
-                // Taiga shores wear sand like forest ones; frozen rock keeps its own material.
-                beachTop[(i + 1) * heightGrid + (j + 1)] = TerrainGenerator.IsBeachHeight(maxOwn)
-                    && (cellBiome == Biome.Ocean
-                        || ((cellBiome == Biome.Forest || cellBiome == Biome.Taiga)
-                            && TerrainGenerator.SurfaceWaterWeight(centreX, centreZ) > 0f));
-                gravelTop[(i + 1) * heightGrid + (j + 1)] =
-                    beachTop[(i + 1) * heightGrid + (j + 1)] && TerrainGenerator.IsGravelPatch(centreX, centreZ);
-                rockTop[(i + 1) * heightGrid + (j + 1)] =
-                    cellBiome == Biome.Forest && maxOwn >= WorldGenerationConfig.MountainRockHeight;
-
-                var cold = TerrainGenerator.ColdWeight(centreX, centreZ);
-                snowTop[(i + 1) * heightGrid + (j + 1)] = cold > WorldGenerationConfig.SnowColdThreshold;
-                iceTop[(i + 1) * heightGrid + (j + 1)] = cold > WorldGenerationConfig.FreezeColdThreshold;
+                // The column the cell centre stands in, when the source supplies it. Cells are
+                // aligned to chunk columns (cellSize divides Chunk.Size), so the whole footprint
+                // stands in it, and the 1-cell border stays inside the prefetched span exactly as
+                // FineHeight's reads do.
+                ColumnData? suppliedColumn = null;
+                var centreLocal = 0;
+                if (anySupplied)
+                {
+                    var k = ((centreX >> Chunk.SizeShift) - baseChunkX) * chunkSpan
+                        + ((centreZ >> Chunk.SizeShift) - baseChunkZ);
+                    if (supplied[k])
+                    {
+                        suppliedColumn = columns[k];
+                        centreLocal = ((centreX & Chunk.SizeMask) << Chunk.SizeShift) | (centreZ & Chunk.SizeMask);
+                    }
+                }
 
                 // Cell cy is solid iff cellSize * (cy + 1) <= eroded height
                 var ground = ((minHeight - spec.HeightBias) >> cellShift) - 1;
@@ -711,17 +740,70 @@ public class LodRegion : IDisposable
                 var top = ground;
                 var canopyMax = 0;
                 byte canopyId = 0;
-                for (var dx = 0; dx < cellSize; dx++)
-                for (var dz = 0; dz < cellSize; dz++)
+
+                if (suppliedColumn == null)
                 {
-                    if (!TreeGenerator.TryGetCanopy(baseFineX + i * cellSize + dx, baseFineZ + j * cellSize + dz,
-                            spec.ProxyCanopy, out var t, out var leaf))
-                        continue;
-                    if (t > canopyMax)
+                    var cellBiome = TerrainGenerator.BiomeAt(centreX, centreZ);
+                    biomeGrid[(i + 1) * heightGrid + (j + 1)] = cellBiome;
+
+                    // A cell holds water only where the chunk mesher would actually flood it: an
+                    // ocean, or a lake/river bed. maxOwn is the uneroded cell max, matching the
+                    // beach sampling.
+                    var cellLevel = TerrainGenerator.WaterLevelAt(centreX, centreZ);
+                    if (maxOwn >= cellLevel) cellLevel = TerrainGenerator.NoWater;
+                    waterLevels[(i + 1) * heightGrid + (j + 1)] = cellLevel;
+                    seaFloor[(i + 1) * heightGrid + (j + 1)] = FloorMaterial(maxOwn, cellLevel, cellBiome);
+
+                    // Sand rings ocean shores and lake/river rims, not every column in the height
+                    // band. Taiga shores wear sand like forest ones; frozen rock keeps its own
+                    // material.
+                    beachTop[(i + 1) * heightGrid + (j + 1)] = TerrainGenerator.IsBeachHeight(maxOwn)
+                        && (cellBiome == Biome.Ocean
+                            || ((cellBiome == Biome.Forest || cellBiome == Biome.Taiga)
+                                && TerrainGenerator.SurfaceWaterWeight(centreX, centreZ) > 0f));
+                    gravelTop[(i + 1) * heightGrid + (j + 1)] =
+                        beachTop[(i + 1) * heightGrid + (j + 1)] && TerrainGenerator.IsGravelPatch(centreX, centreZ);
+                    rockTop[(i + 1) * heightGrid + (j + 1)] =
+                        cellBiome == Biome.Forest && maxOwn >= WorldGenerationConfig.MountainRockHeight;
+
+                    var cold = TerrainGenerator.ColdWeight(centreX, centreZ);
+                    snowTop[(i + 1) * heightGrid + (j + 1)] = cold > WorldGenerationConfig.SnowColdThreshold;
+                    iceTop[(i + 1) * heightGrid + (j + 1)] = cold > WorldGenerationConfig.FreezeColdThreshold;
+
+                    for (var dx = 0; dx < cellSize; dx++)
+                    for (var dz = 0; dz < cellSize; dz++)
                     {
-                        canopyMax = t;
-                        canopyId = leaf;
+                        if (!TreeGenerator.TryGetCanopy(baseFineX + i * cellSize + dx, baseFineZ + j * cellSize + dz,
+                                spec.ProxyCanopy, out var t, out var leaf))
+                            continue;
+                        if (t > canopyMax)
+                        {
+                            canopyMax = t;
+                            canopyId = leaf;
+                        }
                     }
+                }
+                else
+                {
+                    // A supplied column: every decision comes from the source's ColumnData, never
+                    // from worldgen, and its trees are already in its blocks (no canopy bumps).
+                    var cellBiome = suppliedColumn.Biomes[centreLocal];
+                    biomeGrid[(i + 1) * heightGrid + (j + 1)] = cellBiome;
+
+                    var cellLevel = suppliedColumn.WaterLevel[centreLocal];
+                    if (maxOwn >= cellLevel) cellLevel = TerrainGenerator.NoWater;
+                    waterLevels[(i + 1) * heightGrid + (j + 1)] = cellLevel;
+                    seaFloor[(i + 1) * heightGrid + (j + 1)] = FloorMaterial(maxOwn, cellLevel, cellBiome);
+
+                    beachTop[(i + 1) * heightGrid + (j + 1)] =
+                        TerrainGenerator.IsBeachHeight(maxOwn) && cellBiome == Biome.Ocean;
+                    gravelTop[(i + 1) * heightGrid + (j + 1)] = false;
+                    // The column-level bare-rock truth the chunk mesher's column fill follows, so a
+                    // supplied grass plateau above the mountain rock line keeps its grass.
+                    rockTop[(i + 1) * heightGrid + (j + 1)] =
+                        cellBiome == Biome.Forest && suppliedColumn.DirtDepth[centreLocal] == 0;
+                    snowTop[(i + 1) * heightGrid + (j + 1)] = cellBiome is Biome.Taiga or Biome.Frozen;
+                    iceTop[(i + 1) * heightGrid + (j + 1)] = cellBiome == Biome.Frozen;
                 }
 
                 if (canopyMax > 0)
@@ -809,11 +891,22 @@ public class LodRegion : IDisposable
             _ => stone,
         };
 
-        // Fill the tint lattice: one climate evaluation per point gives both palettes.
+        // Fill the tint lattice: one climate evaluation per point gives both palettes. Lattice
+        // point (li, lj) is the minimum corner of chunk column (regionChunkX + li, regionChunkZ + lj),
+        // prefetched at (li + 1, lj + 1); a column the source supplies stores the climate at exactly
+        // that corner (ColumnData.CornerWarmth), so its tint reads the stored value, as the chunk
+        // mesher's field does.
         for (var li = 0; li < latticeSpan; li++)
         for (var lj = 0; lj < latticeSpan; lj++)
-            BiomeTint.LatticeTints(regionChunkX + li, regionChunkZ + lj,
-                out grassTint[li * latticeSpan + lj], out foliageTint[li * latticeSpan + lj]);
+        {
+            var k = (li + 1) * chunkSpan + (lj + 1);
+            if (supplied[k])
+                BiomeTint.TintsFromClimate(columns[k].CornerWarmth, columns[k].CornerWetness,
+                    out grassTint[li * latticeSpan + lj], out foliageTint[li * latticeSpan + lj]);
+            else
+                BiomeTint.LatticeTints(regionChunkX + li, regionChunkZ + lj,
+                    out grassTint[li * latticeSpan + lj], out foliageTint[li * latticeSpan + lj]);
+        }
 
         // The tint at a region-local position, interpolated over the lattice cell of the chunk
         // column it stands in exactly as the chunk mesher's BiomeTintField.Sample does. The far edge

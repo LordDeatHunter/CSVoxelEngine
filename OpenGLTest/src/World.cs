@@ -122,6 +122,14 @@ public class World : IItemUseWorld
     private readonly List<int> _netMobRemovals = [];
     private readonly HashSet<Vector3> _netTouchedChunks = [];
 
+    // Multiplayer client: the server's primed TNT by network id (display-only mirrors, so a cube
+    // keeps its strobe clock across snapshots), its reconcile scratch, and the falling cubes of the
+    // newest snapshot, rebuilt wholesale.
+    private readonly Dictionary<int, PrimedTnt> _netTnt = [];
+    private readonly HashSet<int> _netTntSeen = [];
+    private readonly List<int> _netTntRemovals = [];
+    private readonly List<(Vector3 Centre, byte BlockId)> _netFalling = [];
+
     // Null on the headless path (tests), where Now runs off the summed Update deltas instead
     private readonly IWindow? _window;
     private double _headlessTime;
@@ -379,11 +387,18 @@ public class World : IItemUseWorld
     /// origin), except in client mode, where it means <see cref="Camera.PlaceholderSpawn"/>, since a
     /// client never reads worldgen.
     /// </para>
+    /// <para>
+    /// <paramref name="worldSource"/> is where the terrain comes from: the blocks of every chunk the
+    /// save store does not hold and the column data the fluid wake, the LOD edit hooks, the spawn
+    /// settle, the mob spawn ring and the far LOD read (<see cref="ChunkManager.WorldSource"/>, and
+    /// the mesher's <see cref="ChunkManager.ColumnSource"/>). A server passes the world's source
+    /// (an imported map, say); null means worldgen, which leaves both manager defaults untouched.
+    /// </para>
     /// </remarks>
     public World(GL gl, ChunkGeometryPool opaqueGeometry, ChunkGeometryPool translucentGeometry,
         ChunkGeometryPool lodGeometry, IWindow window, IInputContext input, SfxManager? sfx = null,
         ChunkSaveStore? saveStore = null, bool serverMode = false, bool clientMode = false,
-        Vector3? spawn = null)
+        Vector3? spawn = null, IWorldSource? worldSource = null)
     {
         WorldSeed.BeginWorld();
         ChunkGenerationWorker? generationWorker = null;
@@ -416,6 +431,14 @@ public class World : IItemUseWorld
             if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("VOXEL_SPAWN")))
                 _spawnSettled = true;
             _chunkManager = new ChunkManager(gl, opaqueGeometry, translucentGeometry, saveStore);
+            if (worldSource != null)
+            {
+                // Before any worker starts (Thread.Start publishes both): the source fills the
+                // chunks and is also what the mesher, the fluid surface query and a server's
+                // column answers read per chunk column
+                _chunkManager.WorldSource = worldSource;
+                _chunkManager.ColumnSource = worldSource;
+            }
             // A server never draws: finished meshes are marked and their light published, but the
             // geometry is discarded instead of uploaded to pools it does not have.
             _chunkManager.Headless = serverMode;
@@ -448,6 +471,7 @@ public class World : IItemUseWorld
             UpdateFocus();
             generationWorker = _generationWorker = new ChunkGenerationWorker(_chunkManager, Focus);
             lodManager = _lodManager = new LodManager(lodGeometry);
+            _lodManager.WorldSource = _chunkManager.WorldSource;
             _canAcceptDrop = Inventory.CanAccept;
             if (EntityRegistry.TryGet("slime") is { } slimeType)
                 _slimes = new SlimeManager(slimeType);
@@ -589,14 +613,15 @@ public class World : IItemUseWorld
     }
 
     /// <summary>
-    /// The generated terrain height of the column at (<paramref name="x"/>, <paramref name="z"/>):
-    /// the top solid cell before player edits, the same lookup the mob spawn ring uses. The
-    /// heightmap is a pure function of the column, so it is always available.
+    /// The terrain height of the column at (<paramref name="x"/>, <paramref name="z"/>) from the
+    /// world's source (<see cref="ChunkManager.WorldSource"/>: worldgen by default): the top solid
+    /// cell before player edits, the same lookup the mob spawn ring uses. A source answers every
+    /// column, so it is always available.
     /// </summary>
     public bool TryGroundHeight(int x, int z, out int height)
     {
-        var heights = ColumnCache.GetHeights(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
-        height = heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
+        var column = _chunkManager.WorldSource.GetColumn(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
+        height = column.Heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
         return true;
     }
 
@@ -649,12 +674,17 @@ public class World : IItemUseWorld
         var cz = VoxelCoords.WorldToChunk(sz);
         var lx = VoxelCoords.WorldToLocal(sx);
         var lz = VoxelCoords.WorldToLocal(sz);
-        var heightmap = ColumnCache.GetHeights(cx, cz)[VoxelCoords.ColumnIndex(lx, lz)];
+        // The world source's column (worldgen by default). Its stored water level is exactly what
+        // TerrainGenerator.IsWaterColumn evaluates for a generated column, and an imported one
+        // answers with its own.
+        var column = _chunkManager.WorldSource.GetColumn(cx, cz);
+        var columnIndex = VoxelCoords.ColumnIndex(lx, lz);
+        var heightmap = column.Heights[columnIndex];
         var estimate = Math.Max(heightmap, WorldGenerationConfig.SeaLevel);
         const float spawnLift = 0.02f;
         var holdEye = estimate + 1 + Camera.EyeHeight + spawnLift;
 
-        if (TerrainGenerator.IsWaterColumn(sx, sz, heightmap))
+        if (heightmap < column.WaterLevel[columnIndex])
         {
             if (!_chunkManager.TryGetCell(sx, WorldGenerationConfig.SeaLevel, sz, out _, out _))
             {
@@ -921,7 +951,10 @@ public class World : IItemUseWorld
     /// <summary>
     /// Reconciles the client's mobs and drops with a server snapshot: mobs are spawned, updated or
     /// removed by network id, drops are rebuilt wholesale. Only a client calls this; it never ticks
-    /// the mob AI, so the entities it holds are server state drawn in place.
+    /// the mob AI, so the entities it holds are server state drawn in place. In a client world the
+    /// snapshot's primed TNT and falling blocks become display-only mirrors too (TNT by network id,
+    /// falling cubes wholesale); any other world ignores them, since its own Update would tick and
+    /// detonate them.
     /// </summary>
     public void ApplyNetworkEntities(IReadOnlyList<NetEntity> entities)
     {
@@ -929,7 +962,7 @@ public class World : IItemUseWorld
         for (var i = 0; i < entities.Count; i++)
         {
             var entry = entities[i];
-            if (entry.Kind == NetEntityKind.Drop)
+            if (!NetEntity.IsMob(entry.Kind))
                 continue;
             _netMobsSeen.Add(entry.Id);
             if (_netMobs.TryGetValue(entry.Id, out var existing) && KindMatches(existing, entry.Kind))
@@ -959,7 +992,54 @@ public class World : IItemUseWorld
                 _dropManager.SpawnRestored(entry.ItemId, entry.Position, entry.Velocity, 0f);
         }
 
+        if (_clientMode)
+            ApplyNetworkMirrors(entities);
+
         RefreshMobs();
+    }
+
+    /// <summary>
+    /// A client's primed TNT and falling cubes from a server snapshot. A cube already mirrored under
+    /// the same id takes the new position and fuse (its strobe clock carries on), a new one is
+    /// mirrored at its reported fuse, an unlisted one goes; the falling cubes are rebuilt wholesale.
+    /// The client never ticks either manager (see <see cref="UpdateClient"/>), so neither moves,
+    /// lands nor detonates here.
+    /// </summary>
+    private void ApplyNetworkMirrors(IReadOnlyList<NetEntity> entities)
+    {
+        _netTntSeen.Clear();
+        _netFalling.Clear();
+        for (var i = 0; i < entities.Count; i++)
+        {
+            var entry = entities[i];
+            if (entry.Kind == NetEntityKind.FallingBlock)
+            {
+                _netFalling.Add((entry.Position, entry.ItemId));
+                continue;
+            }
+            if (entry.Kind != NetEntityKind.PrimedTnt)
+                continue;
+
+            // Milliseconds on the wire; a fuse is never shorter than what is left of it, so a bad
+            // pair cannot divide the flash by zero
+            var duration = Math.Max(entry.Ammo, 1) / 1000f;
+            var remaining = Math.Clamp(entry.Health, 0, Math.Max(entry.Ammo, 1)) / 1000f;
+            _netTntSeen.Add(entry.Id);
+            if (_netTnt.TryGetValue(entry.Id, out var existing))
+                existing.MirrorSetState(entry.Position, remaining);
+            else
+                _netTnt[entry.Id] = silkgltriangle.PrimedTnt.Mirror(entry.Position, entry.ItemId, duration, remaining);
+        }
+
+        _netTntRemovals.Clear();
+        foreach (var id in _netTnt.Keys)
+            if (!_netTntSeen.Contains(id))
+                _netTntRemovals.Add(id);
+        foreach (var id in _netTntRemovals)
+            _netTnt.Remove(id);
+
+        _tntManager.ReplaceMirrors(_netTnt.Values);
+        _falling.ReplaceMirrors(_netFalling);
     }
 
     /// <summary>Whether any station block entity (campfire, quern, kiln, cast mold) is tracked,
@@ -1095,14 +1175,18 @@ public class World : IItemUseWorld
         // The purely cosmetic systems a client's own edits still feed (mining debris, leaf
         // bursts and the ambient leaf fall) run locally, or what Render draws would hang in
         // mid-air. Falling blocks, TNT and toppling trees are never created on a client (see
-        // RemoveBlock), so their ticks stay the server's. The station mirrors only animate (a quern
-        // top turning between snapshots) and feed the fire particles; the server runs the stations
-        // and its StationState snapshots replace them. A throw this client released flies as a
-        // cosmetic copy of the server's, which alone deals damage and lands as a drop.
+        // RemoveBlock), so their ticks stay the server's: the falling cubes and primed TNT drawn here
+        // are the server's, mirrored from its EntityList (ApplyNetworkMirrors), and only the TNT
+        // fuse burns down locally so the flash keeps its pace between snapshots. The station mirrors
+        // only animate (a quern top turning between snapshots) and feed the fire particles; the
+        // server runs the stations and its StationState snapshots replace them. A throw this client
+        // released flies as a cosmetic copy of the server's, which alone deals damage and lands as a
+        // drop.
         FrameProfiler.Begin(ProfileSection.Entities);
         _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager);
         _debris.Update((float)deltaTime, _chunkManager);
         _querns.Animate((float)deltaTime);
+        _tntManager.AnimateMirrors((float)deltaTime);
         _fireCells.Clear();
         _fireCells.AddRange(_campfires.LitCells);
         _fireCells.AddRange(_kilns.LitCells);

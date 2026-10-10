@@ -181,9 +181,12 @@ public class Chunk : IDisposable
     public bool ModifiedSinceSave { get; private set; }
 
     /// <summary>
-    /// Whether this chunk's blocks came from a save (<see cref="RestoreFrom"/>) instead of
-    /// worldgen. A restored chunk can hold poured water anywhere, which is what makes the fluid
-    /// wake scan its borders whatever height it sits at.
+    /// Whether this chunk's blocks came from a snapshot (<see cref="RestoreFrom"/>) — a save, or
+    /// a world source that supplies chunks itself (<see cref="IWorldSource.Supplies"/>) — instead
+    /// of worldgen. A restored chunk can hold fluid anywhere (poured water, or an imported map's),
+    /// which is what makes the fluid wake scan its borders whatever height it sits at, and its
+    /// <see cref="RestoredPlayerPlaced"/> may be null. Restoring never sets
+    /// <see cref="ModifiedSinceSave"/>; only the raw writers do.
     /// </summary>
     public bool IsRestored { get; private set; }
 
@@ -842,29 +845,54 @@ public class Chunk : IDisposable
     /// <see cref="RestoreFrom(ChunkSnapshot)"/> with the block source chosen: a streamed
     /// multiplayer chunk (<paramref name="streamedColumns"/> true) carries no worldgen column, so
     /// its surface floor is derived from its own cells and no fluid frontier is scanned (the server
-    /// owns fluids). A save restore uses the column cache as before, for the fluid frontier.
+    /// owns fluids). A save restore without a world source at hand uses the column cache as
+    /// before, for the fluid frontier (<see cref="RestoreFrom(ChunkSnapshot, ColumnData)"/>).
     /// </summary>
     internal void RestoreFrom(ChunkSnapshot snapshot, bool streamedColumns)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
+        if (!streamedColumns)
+        {
+            RestoreFrom(snapshot, ColumnCache.Get((int)Position.X, (int)Position.Z));
+            return;
+        }
+
+        CopySnapshot(snapshot);
+        SurfaceMinY = LowestSolidY();
+        FinishRestore(snapshot);
+    }
+
+    /// <summary>
+    /// <see cref="RestoreFrom(ChunkSnapshot)"/> against a known column: the surface floor comes
+    /// from <paramref name="column"/> and the fluid frontier is scanned against its heights and
+    /// water levels. This is the save store's restore (with the world source's column) and the
+    /// way a world source that supplies chunks fills one (<see cref="IWorldSource.Fill"/>).
+    /// </summary>
+    internal void RestoreFrom(ChunkSnapshot snapshot, ColumnData column)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(column);
+
+        CopySnapshot(snapshot);
+        SurfaceMinY = column.MinHeight;
+        // A restored chunk can hold fluid anywhere, so it always scans (a chunk with no fluid
+        // cell simply reports nothing)
+        ScanFluidFrontier(column, LowerBoundY);
+        FinishRestore(snapshot);
+    }
+
+    // The blocks, state bytes and non-air count of a restore.
+    private void CopySnapshot(ChunkSnapshot snapshot)
+    {
         Array.Copy(snapshot.Blocks, _blocks, BlockCount);
         _state = snapshot.State is { } state ? (byte[])state.Clone() : null;
         _solidCount = BlockCount - _blocks.AsSpan().Count(BlockType.Air);
+    }
 
-        if (streamedColumns)
-        {
-            SurfaceMinY = LowestSolidY();
-        }
-        else
-        {
-            var column = ColumnCache.Get((int)Position.X, (int)Position.Z);
-            SurfaceMinY = column.MinHeight;
-            // A restored chunk can hold fluid anywhere, so it always scans (a chunk with no fluid
-            // cell simply reports nothing)
-            ScanFluidFrontier(column, LowerBoundY);
-        }
-
+    // The tail every restore shares; IsBlockDataReady goes true last, which publishes the rest.
+    private void FinishRestore(ChunkSnapshot snapshot)
+    {
         IsRestored = true;
         RestoredPlayerPlaced = snapshot.PlayerPlaced is { } placed ? (ushort[])placed.Clone() : null;
 
