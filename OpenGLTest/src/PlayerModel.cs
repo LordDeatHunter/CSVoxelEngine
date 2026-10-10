@@ -147,6 +147,8 @@ public class PlayerModel
     private float _airRun;
     private float _airVelocity;
     private float _mineT = 1f;
+    private float _mineSpeed = 1f;
+    private float _mineWeight;
     private float _sliceT = 1f;
     private int _sliceDir;
     private float _throwT = 1f;
@@ -335,7 +337,7 @@ public class PlayerModel
         _walkPhase += deltaTime * GaitSpeedScale * (4f + horizontalSpeed * 0.9f + _runBlend * RunStrideBoost);
 
         if (_mineT < 1f)
-            _mineT = Math.Min(1f, _mineT + deltaTime / MineDuration);
+            _mineT = Math.Min(1f, _mineT + deltaTime * _mineSpeed / MineDuration);
 
         if (_sliceT < 1f)
             _sliceT = Math.Min(1f, _sliceT + deltaTime / SliceDuration);
@@ -344,8 +346,17 @@ public class PlayerModel
             _throwT = Math.Min(1f, _throwT + deltaTime / ThrowDuration);
     }
 
-    /// <summary>Starts one hand swing (a mining hit just landed).</summary>
-    public void Punch() => _mineT = 0f;
+    /// <summary>
+    /// Starts one hand swing (a mining hit just landed). <paramref name="weight"/> is 0 for a light
+    /// swing (bare hand, a quick tool) up to 1 for a heavy one (a slow tool): a heavy swing takes
+    /// longer and leans the body harder into the blow.
+    /// </summary>
+    public void Punch(float weight = 0f)
+    {
+        _mineWeight = MathUtils.Clamp01(weight);
+        _mineSpeed = MathUtils.Lerp(1f, 0.7f, _mineWeight);
+        _mineT = 0f;
+    }
 
     /// <summary>
     /// Starts a slice swing: <paramref name="direction"/> is +1 for right-to-left and -1 for the
@@ -762,7 +773,7 @@ public class PlayerModel
         var (shoulder, elbow) = PunchJoints(pose, _mineT, pitchRad);
         return new Pose(pose.LeftHip, pose.RightHip, pose.LeftKnee, pose.RightKnee,
             pose.LeftShoulder - PunchLeftCounter * PunchWeights(_mineT).Extend, shoulder, pose.LeftElbow, elbow,
-            pose.TorsoPitch - PunchLean * PunchWeights(_mineT).Extend, pose.Bob);
+            pose.TorsoPitch - PunchLean * (1f + _mineWeight * 1.5f) * PunchWeights(_mineT).Extend, pose.Bob);
     }
 
     /// <summary>

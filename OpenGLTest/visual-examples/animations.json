@@ -1,0 +1,61 @@
+{
+  // Player and mob animations: run with VOXEL_SCRIPT=visual-examples/animations.json VOXEL_TIME=147
+  // from OpenGLTest/. Shots land in visual/animations/.
+  // The body is filmed from the shoulder camera (`view`) over the open forest clearing the goblins
+  // scenario uses (ground y 9..10, x -56..-32, z 32..68), facing -Z. The player is NOT flying, so the
+  // landing dip, the crouch and the run cycle show, and the goblins really can hurt: the "hurt"
+  // shots are best-effort.
+  // Stills only: each pose is caught a frame or two after the step that starts it.
+  "steps": [
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "idle" },
+    { "op": "walk", "keys": ["W"], "seconds": 0.7 },
+    { "op": "screenshot", "name": "walk" },
+    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 0.8 },
+    { "op": "screenshot", "name": "run" },
+    { "op": "walk", "keys": ["W", "ControlLeft"], "seconds": 0.8 },
+    { "op": "screenshot", "name": "sneak" },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "player", "action": "punch" },
+    { "op": "wait", "seconds": 0.07 },
+    { "op": "screenshot", "name": "punch" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "player", "action": "slice" },
+    { "op": "wait", "seconds": 0.25 },
+    { "op": "screenshot", "name": "slice" },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "player", "action": "hurt" },
+    { "op": "wait", "seconds": 0.06 },
+    { "op": "screenshot", "name": "flinch" },
+    { "op": "wait", "seconds": 0.8 },
+    // The walks carried the player forward; stand back at the clearing's edge before the mobs show up.
+    { "op": "teleport", "pos": [-43.5, 12.5, 62.5], "yaw": -90, "pitch": -5 },
+    { "op": "wait", "seconds": 1.2 },
+    { "op": "spawn", "entity": "slime", "pos": [-44.5, 56.5] },
+    { "op": "spawn", "entity": "goblin", "pos": [-41.5, 56.5] },
+    { "op": "wait", "seconds": 0.12 },
+    { "op": "screenshot", "name": "spawn-pop" },
+    { "op": "wait", "seconds": 1.4 },
+    { "op": "screenshot", "name": "mobs-idle" },
+    { "op": "damage", "amount": 1 },
+    { "op": "wait", "seconds": 0.07 },
+    { "op": "screenshot", "name": "mob-hit" },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "damage", "amount": 100 },
+    { "op": "wait", "seconds": 0.25 },
+    { "op": "screenshot", "name": "mob-death-early" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "mob-death-late" },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "player", "action": "die" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "player-death" },
+    { "op": "player", "action": "revive" },
+    { "op": "view", "mode": "first" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "first-person" }
+  ]
+}

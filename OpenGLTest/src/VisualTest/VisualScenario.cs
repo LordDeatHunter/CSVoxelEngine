@@ -38,6 +38,16 @@ public sealed class VisualStep
 
     /// <summary>The growth pulses a <c>grow</c> step runs.</summary>
     public int GrowSteps { get; init; }
+
+    /// <summary>Health a <c>damage</c> step takes off every live mob.</summary>
+    public int Amount { get; init; }
+
+    /// <summary>The camera mode a <c>view</c> step selects (<c>first</c>, <c>shoulder</c> or <c>orbit</c>).</summary>
+    public string? Mode { get; init; }
+
+    /// <summary>What a <c>player</c> step makes the player's model do (<c>hurt</c>, <c>punch</c>,
+    /// <c>slice</c>, <c>equip</c>, <c>die</c> or <c>revive</c>).</summary>
+    public string? Action { get; init; }
 }
 
 /// <summary>
@@ -157,6 +167,19 @@ public sealed class VisualScenario
             },
             "spawn" => ReadSpawn(element, index),
             "grow" => ReadGrow(element, index),
+            "damage" => new VisualStep
+            {
+                Op = "damage",
+                Amount = element.TryGetProperty("amount", out var amount) && amount.TryGetInt32(out var hp) && hp > 0
+                    ? hp
+                    : throw new InvalidOperationException($"Step {index} (damage) needs 'amount' above 0."),
+            },
+            "view" => new VisualStep { Op = "view", Mode = ReadChoice(element, index, "view", "mode", ["first", "shoulder", "orbit"]) },
+            "player" => new VisualStep
+            {
+                Op = "player",
+                Action = ReadChoice(element, index, "player", "action", ["hurt", "punch", "slice", "equip", "die", "revive"]),
+            },
             "screenshot" => new VisualStep
             {
                 Op = "screenshot",
@@ -164,8 +187,17 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, fly, give, spawn, grow or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, fly, give, spawn, grow, damage, view, player or screenshot."),
         };
+    }
+
+    private static string ReadChoice(JsonElement element, int index, string op, string field, string[] choices)
+    {
+        var value = element.TryGetProperty(field, out var property) ? property.GetString()?.Trim().ToLowerInvariant() : null;
+        if (value == null || Array.IndexOf(choices, value) < 0)
+            throw new InvalidOperationException(
+                $"Step {index} ({op}) needs '{field}' to be one of: {string.Join(", ", choices)}.");
+        return value;
     }
 
     private static Vector3 ReadPos(JsonElement element, int index, string op)

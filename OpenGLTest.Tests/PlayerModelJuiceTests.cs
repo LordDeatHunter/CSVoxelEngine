@@ -187,4 +187,36 @@ public sealed class PlayerModelJuiceTests
         // The head ends up near the ground and out behind where it stood.
         Assert.True(fallen.M42 < upright.M42 - 1f);
     }
+
+    [Fact]
+    public void AHeavySwingTakesLongerAndLeansHarderThanALightOne()
+    {
+        var light = new PlayerModel();
+        var heavy = new PlayerModel();
+        light.Punch(0f);
+        heavy.Punch(1f);
+
+        var frames = (int)(PlayerModel.MineDuration * 0.9f / Dt);
+        for (var i = 0; i < frames; i++)
+        {
+            light.Update(Dt, 0f);
+            heavy.Update(Dt, 0f);
+        }
+
+        Assert.True(heavy.MineT < light.MineT);
+
+        var lightLean = float.MaxValue;
+        var heavyLean = float.MaxValue;
+        light.Punch(0f);
+        heavy.Punch(1f);
+        for (var i = 0; i < 40; i++)
+        {
+            light.Update(Dt, 0f);
+            heavy.Update(Dt, 0f);
+            lightLean = MathF.Min(lightLean, light.GetPose().TorsoPitch);
+            heavyLean = MathF.Min(heavyLean, heavy.GetPose().TorsoPitch);
+        }
+
+        Assert.True(heavyLean < lightLean);
+    }
 }

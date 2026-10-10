@@ -1247,11 +1247,37 @@ public class World : IItemUseWorld
 
     private bool _equipTracked;
 
+    /// <summary>Scenario seam: damages every live mob, so a script can film the hit reaction and the death.</summary>
+    internal void DamageAllMobs(int amount)
+    {
+        RefreshMobs();
+        for (var i = 0; i < _mobs.Count; i++)
+            _mobs[i].TakeDamage(amount);
+    }
+
+    /// <summary>Scenario seam: makes the player's model play one reaction or swing, so a script can film it.</summary>
+    internal void TestPlayerAction(string action)
+    {
+        switch (action)
+        {
+            case "hurt": NotifyPlayerHurt(fromMob: false); break;
+            case "punch": PunchSwing(); break;
+            case "slice": Player.StartSlice(1); break;
+            case "equip": Player.NotifyEquip(); break;
+            case "die": Player.DeathFall = 1f; Camera.DeathProgress = 1f; break;
+            case "revive": Player.DeathFall = 0f; Camera.DeathProgress = 0f; break;
+        }
+    }
+
     // A swing of the fist: the arm throws the jab and the view pinches in for a beat.
     private void PunchSwing()
     {
-        Player.Punch();
-        Camera.PunchFov(-0.8f);
+        // A slower tool swings heavier: from the bare hand's pace (no weight) up to a tool with
+        // a long hit gap.
+        var gap = Mining.HitGapSeconds(ItemRegistry.TryGet(Inventory.SelectedBlockId));
+        var weight = MathUtils.InverseLerp(Mining.HitGapSeconds(null), Mining.HitGapSeconds(null) + 0.5f, gap);
+        Player.Punch(weight);
+        Camera.PunchFov(-0.8f - 0.8f * weight);
     }
 
     /// <summary>

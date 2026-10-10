@@ -132,6 +132,29 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 break;
             }
 
+            case "damage":
+                world.DamageAllMobs(step.Amount);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} damage mobs by {step.Amount}");
+                Advance();
+                break;
+
+            case "view":
+                world.Camera.TestSetMode(step.Mode switch
+                {
+                    "shoulder" => CameraMode.Shoulder,
+                    "orbit" => CameraMode.Orbit,
+                    _ => CameraMode.FirstPerson,
+                });
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} view {step.Mode}");
+                Advance();
+                break;
+
+            case "player":
+                world.TestPlayerAction(step.Action!);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} player {step.Action}");
+                Advance();
+                break;
+
             case "screenshot":
                 ScreenshotPath = Path.Combine(scenario.OutputDir, $"{_step + 1:D2}-{step.ShotName}.png");
                 ScreenshotHideHud = step.HideHud;

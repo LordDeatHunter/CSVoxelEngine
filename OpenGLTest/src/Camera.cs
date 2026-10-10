@@ -793,6 +793,18 @@ public class Camera : IMobTarget
     internal void SetGrounded(bool grounded) => IsGrounded = grounded;
     internal void SetSprinting(bool sprinting) => IsSprinting = sprinting;
     internal void SetSneaking(bool sneaking) => IsSneaking = sneaking;
+
+    /// <summary>Scenario seam: selects the camera mode directly (the F5 cycle without the key).</summary>
+    internal void TestSetMode(CameraMode mode)
+    {
+        Mode = mode;
+        _shoulderBlendT = IsShoulderSurf ? 1f : 0f;
+        if (mode == CameraMode.Orbit)
+        {
+            _orbitPlayerYaw = Yaw;
+            _hasActionTarget = false;
+        }
+    }
     internal void SetMovementFactor(float factor) => MovementFactor = factor;
     internal void SetGroundFriction(float friction) => GroundFriction = friction;
     internal void SetInWater(bool inWater) => IsInWater = inWater;
