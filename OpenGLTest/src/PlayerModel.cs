@@ -123,7 +123,7 @@ public class PlayerModel
     // as a wide arc; SliceSweepRadians is the follow-through past the aim.
     private const float SliceWindupRadians = 1.0f;
     private const float SliceSweepRadians = 0.8f;
-    private const float SliceLiftRadians = 0.7f;
+    private const float SliceLiftRadians = 0.95f;
     private const float SliceRollRadians = 1.6f;
     // The forward lift would carry the hand up to eye height; the hand is solved this many blocks
     // lower at the strike (via SolveArm, which keeps the shoulder anchored) so the slice reads at
@@ -141,12 +141,17 @@ public class PlayerModel
     // The slice is a whole-body motion: the arm sweep is only part of it. The entire body turns about
     // the feet (SliceBodyYaw, the legs counter-turning so the feet stay planted), the shoulders turn
     // further (SliceTorsoYaw), the weight drops into the strike, and the hand travels a small
-    // diagonal from above the chest line down to below it (SliceDiagonalBlocks) on every slice,
+    // diagonal from well above the chest line (SliceStartRaiseBlocks) down to just below it (SliceEndDropBlocks) on every slice,
     // whichever way it swings.
     private const float SliceBodyYaw = 0.42f;
     private const float SliceTorsoYaw = 0.5f;
     private const float SliceLegCounter = 0.6f;
-    private const float SliceDiagonalBlocks = 0.12f;
+    private const float SliceStartRaiseBlocks = 0.28f;
+    private const float SliceEndDropBlocks = 0.10f;
+    // The blade turns with the wrist roll, not with the whole arm sweep: it takes only this share of the
+    // body and arm yaw, or a wound-up arm would point the blade backward instead of out to the side.
+    private const float SliceBladeYawShare = 0.25f;
+    private const float SliceCrossBodyBladeFar = 0.45f;
     private const float SliceBodyWindup = 1.0f;
     private const float SliceBodyFar = 0.85f;
 
@@ -509,11 +514,11 @@ public class PlayerModel
         var p = MathUtils.Clamp01(_sliceT);
         if (p <= 0f || p >= 1f) return 0f;
         if (p < SliceWindupEnd)
-            return SliceDiagonalBlocks * MathUtils.SmoothStep(p / SliceWindupEnd);
+            return SliceStartRaiseBlocks * MathUtils.SmoothStep(p / SliceWindupEnd);
         if (p < SliceStrikeEnd)
-            return MathUtils.Lerp(SliceDiagonalBlocks, -SliceDiagonalBlocks,
+            return MathUtils.Lerp(SliceStartRaiseBlocks, -SliceEndDropBlocks,
                 MathUtils.EaseInOutCubic((p - SliceWindupEnd) / (SliceStrikeEnd - SliceWindupEnd)));
-        return -SliceDiagonalBlocks * (1f - MathUtils.SmoothStep((p - SliceStrikeEnd) / (1f - SliceStrikeEnd)));
+        return -SliceEndDropBlocks * (1f - MathUtils.SmoothStep((p - SliceStrikeEnd) / (1f - SliceStrikeEnd)));
     }
 
     private float SliceLift() => SliceLiftRadians * SliceStroke();
@@ -547,13 +552,17 @@ public class PlayerModel
         return (MathF.Atan2((b * y - a * z) / det, -(a * y + b * z) / det), elbow);
     }
 
-    // Wrist twist: rolls the blade from standing upright at rest to laying flat (a touch past
-    // horizontal) at the strike. The direction flips with the swing, so the return rolls the
-    // blade 180 degrees the other way and the same edge leads both ways. The negative sign is
-    // because the body's -Z rotation tips +Y toward -X; combined with the direction it lays the
-    // blade outward on the swing's own side. Applied in model space, before the body yaw, so the
-    // roll stays fixed to the body whichever way the player faces.
-    private float SliceRoll() => -SliceRollRadians * _sliceDir * SliceStroke();
+    // Wrist twist: the blade lies flat and turns with the hand. It starts the cut laid out toward the
+    // side the swing winds up on, stands upright as the hand crosses the middle and ends laid out
+    // toward the far side, so its tip follows the direction of the slice instead of staying pointed
+    // the same way throughout. It rides the same phases as the sweep (SlicePhase), which is 0 at both
+    // ends, so the blade is upright at rest and never jumps. The sign is because the body's -Z roll
+    // tips +Y toward -X: the sweep is negative on the wind-up side, which lays the blade out there.
+    // Applied in model space, before the body yaw, so the roll stays fixed to the body.
+    // The cut across the body (right to left, the first swing) lets the blade turn only part of the way
+    // at its end: laid flat to the left while the hand crosses the chest it reads as a slap with the
+    // flat of the blade, where the same turn on the outward cut (left to right) reads as a slice.
+    private float SliceRoll() => SliceRollRadians * SlicePhase(1f, _sliceDir > 0 ? SliceCrossBodyBladeFar : 1f);
 
     /// <summary>Joint angles in radians plus the vertical bob, for this frame.</summary>
     public readonly struct Pose
@@ -1161,7 +1170,7 @@ public class PlayerModel
         var punch = PunchActivity();
         return Matrix4x4.CreateRotationZ(SliceRoll())
             * Matrix4x4.CreateRotationX(pitchRad * punch)
-            * Matrix4x4.CreateRotationY(yawRad + ComputeMods().RootYaw + SliceSweep() + PunchArmYaw(pitchRad) + _swayYaw.Value)
+            * Matrix4x4.CreateRotationY(yawRad + SliceBladeYawShare * (ComputeMods().RootYaw + SliceSweep()) + PunchArmYaw(pitchRad) + _swayYaw.Value)
             * Matrix4x4.CreateTranslation(fist);
     }
 

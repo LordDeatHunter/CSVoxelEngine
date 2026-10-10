@@ -2381,9 +2381,13 @@ overshoot or jiggle.
   reads as a snap. The arm sweep is only part of it: the whole body turns about the feet
   (`SliceBodyYaw`, the legs counter-turning by `SliceLegCounter` so the feet stay planted), the shoulders
   turn further (`SliceTorsoYaw`), the knees and hips sink into the strike and the torso dips. The hand
-  also travels a small diagonal on every slice, from `SliceDiagonalBlocks` above the chest line to as far
-  below it (`SliceDiagonal`, through the same re-solved arm as the chest-height drop), whichever way the
-  swing goes. `SliceImpactProgress` (where the damage lands) is the middle of the strike. Filmed by
+  also travels a diagonal on every slice, from `SliceStartRaiseBlocks` above the chest line (so the cut
+  starts high, not horizontal) down to just `SliceEndDropBlocks` below it (`SliceDiagonal`, through the
+  same re-solved arm as the chest-height drop), whichever way the swing goes. The **blade turns with the
+  hand**: its wrist roll rides the sweep phases (`SliceRoll` = `SlicePhase(1, 1)`), laid out toward the
+  wind-up side at the start, upright as the hand crosses the middle and laid out toward the far side at
+  the end of the strike (mirrored for the return; the first, cross-body swing turns it only `SliceCrossBodyBladeFar` of the way, since laid flat across the chest it reads as a slap), and it takes only `SliceBladeYawShare` of the arm and
+  body yaw, so a wound-up arm does not point it backward. `SliceImpactProgress` (where the damage lands) is the middle of the strike. Filmed by
   `visual-examples/animations-slice.json`.
 - **Swim stroke animation**: `PlayerModel` runs the physics' stroke clock (`SwimStrokeProgress`, started
   by `TriggerSwimStroke`; a remote model with `AutoSwimStroke` starts its own while it moves): the arms

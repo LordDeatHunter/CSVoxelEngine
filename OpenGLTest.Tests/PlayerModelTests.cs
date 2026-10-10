@@ -379,7 +379,7 @@ public sealed class PlayerModelTests
     }
 
     [Fact]
-    public void SliceRollsTheBladeFlatAndFlipsItForTheReturn()
+    public void TheBladeTurnsWithTheSliceFromOneSideToTheOtherAndMirrorsForTheReturn()
     {
         var player = new PlayerModel { HoldingItem = true };
         for (var i = 0; i < 120; i++)
@@ -387,28 +387,42 @@ public sealed class PlayerModelTests
 
         var eye = new Vector3(0.5f, 70f, 0.5f);
 
-        // The blade's up axis measured on the body's right axis: 0 upright at rest, rolling out
-        // to the side as the wrist lays it flat.
+        // The blade's up axis measured on the body's right axis: 0 upright at rest, out to the right
+        // (positive) or the left (negative) as the wrist lays it flat.
         float BladeOutward() =>
             Vector3.TransformNormal(Vector3.UnitY, player.GetHandAnchorMatrix(eye, -90f)).X;
 
         player.StartSlice(1);
         var rest = BladeOutward();
-        player.Update(PlayerModel.SliceDuration * PlayerModel.SliceImpactProgress, 0f);
-        var rightToLeft = BladeOutward();
+        player.Update(PlayerModel.SliceDuration * 0.26f, 0f);
+        var windup = BladeOutward();
+        player.Update(PlayerModel.SliceDuration * PlayerModel.SliceImpactProgress - PlayerModel.SliceDuration * 0.26f, 0f);
+        var middle = BladeOutward();
+        player.Update(PlayerModel.SliceDuration * 0.49f - PlayerModel.SliceDuration * PlayerModel.SliceImpactProgress, 0f);
+        var strikeEnd = BladeOutward();
 
-        // The return rolls the other way, so the blade lays out on the opposite side.
-        player.StartSlice(-1);
-        player.Update(PlayerModel.SliceDuration * PlayerModel.SliceImpactProgress, 0f);
-        var leftToRight = BladeOutward();
-
+        // Right-to-left: it starts the cut facing right, passes upright, and ends facing left, but only
+        // part of the way: laid flat across the chest it would read as a slap, not a slice.
         Assert.True(rest < 0.3f);
-        Assert.True(rightToLeft > 0.7f);
-        Assert.True(leftToRight < -0.7f);
+        Assert.True(windup > 0.7f);
+        Assert.True(MathF.Abs(middle) < windup * 0.6f);
+        Assert.InRange(strikeEnd, -0.8f, -0.35f);
+
+        for (var i = 0; i < 60; i++)
+            player.Update(1f / 60f, 0f);
+
+        // The return mirrors it: starts facing left and ends facing right.
+        player.StartSlice(-1);
+        player.Update(PlayerModel.SliceDuration * 0.26f, 0f);
+        var returnWindup = BladeOutward();
+        player.Update(PlayerModel.SliceDuration * 0.23f, 0f);
+        var returnEnd = BladeOutward();
+        Assert.True(returnWindup < -0.7f);
+        Assert.True(returnEnd > 0.7f);
     }
 
     [Fact]
-    public void SliceLowersTheHandToChestAtTheStrike()
+    public void SliceStartsHighAndBringsTheHandDownToChestHeightByTheEndOfTheStrike()
     {
         var player = new PlayerModel { HoldingItem = true };
         for (var i = 0; i < 120; i++)
@@ -419,12 +433,16 @@ public sealed class PlayerModelTests
 
         player.StartSlice(1);
         var rest = HandY();
-        player.Update(PlayerModel.SliceDuration * PlayerModel.SliceImpactProgress, 0f);
-        var strike = HandY();
+        player.Update(PlayerModel.SliceDuration * 0.26f, 0f);
+        var start = HandY();
+        player.Update(PlayerModel.SliceDuration * 0.23f, 0f);
+        var end = HandY();
 
-        // The drop brings the strike down off the eye line, back near the idle holding height.
-        Assert.True(strike < eye.Y - 0.25f);
-        Assert.True(MathF.Abs(strike - rest) < 0.12f);
+        // The cut starts well above the idle holding height (not a flat, horizontal swing) ...
+        Assert.True(start > rest + 0.25f);
+        // ... and comes down off the eye line to about where the hand rests.
+        Assert.True(end < eye.Y - 0.25f);
+        Assert.True(MathF.Abs(end - rest) < 0.12f);
     }
 
     [Fact]
