@@ -1,0 +1,7 @@
+{
+  "result": "block/glass_pane",
+  "count": 16,
+  "ingredients": [
+    { "item": "block/glass", "count": 6 }
+  ]
+}

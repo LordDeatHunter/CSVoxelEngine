@@ -1,0 +1,61 @@
+{
+  // Glass pane check: run with VOXEL_TIME=147 (noon) and VOXEL_SCRIPT=visual-examples/panes.json.
+  // Shots land in visual/panes/.
+  //
+  // The flat desert patch of torches.json: the player stands at (253, -5) (sand at y 9, feet at
+  // 10, eye (253.5, 11.62, -4.5)) and every placement aims at an exact cell centre, cells written
+  // relative to the player's cell as (dx, y, dz). A three-wide dirt wall stands four cells ahead
+  // with a fourth dirt block on its middle; then panes, farthest first so none blocks a later ray:
+  //   (0, 11, -3) against the raised block's near face, (0, 10, -3) and (0, 10, -2) in a line
+  //   from the wall toward the camera, (-1, 10, -2) and (-2, 10, -2) branching off to the left,
+  //   and a lone pane at (2, 10, -1).
+  // Every pane is the same block, so the shots show how each one is drawn beside its neighbours:
+  //   panes-front    from where the player stands, with the HUD and the selection outline
+  //   panes-high     from above
+  //   panes-oblique  from the front left
+  //   panes-back     from behind the wall's right end
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [253.5, 30, -4.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 14 },
+    { "op": "teleport", "pos": [253.5, 11.63, -4.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 1 },
+
+    { "op": "give", "block": "dirt", "count": 4 },
+    { "op": "look", "yaw": -104.04, "pitch": -21.45 },
+    { "op": "place" },
+    { "op": "look", "yaw": -90, "pitch": -22.05 },
+    { "op": "place" },
+    { "op": "look", "yaw": -75.96, "pitch": -21.45 },
+    { "op": "place" },
+    { "op": "look", "yaw": -90, "pitch": -8.81 },
+    { "op": "place" },
+
+    { "op": "give", "block": "glass_pane", "count": 8 },
+    { "op": "look", "yaw": -90, "pitch": -1.96 },
+    { "op": "place" },
+    { "op": "look", "yaw": -90, "pitch": -28.37 },
+    { "op": "place" },
+    { "op": "look", "yaw": -90, "pitch": -39.0 },
+    { "op": "place" },
+    { "op": "look", "yaw": -116.57, "pitch": -35.92 },
+    { "op": "place" },
+    { "op": "look", "yaw": -135, "pitch": -29.81 },
+    { "op": "place" },
+    { "op": "look", "yaw": -26.57, "pitch": -35.92 },
+    { "op": "place" },
+
+    { "op": "look", "yaw": -90, "pitch": -25 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "panes-front" },
+    { "op": "teleport", "pos": [253.5, 16.5, -2.5], "yaw": -90, "pitch": -60 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "panes-high", "hideHud": true },
+    { "op": "teleport", "pos": [249.5, 12.5, -3.5], "yaw": -45, "pitch": -19.5 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "panes-oblique", "hideHud": true },
+    { "op": "teleport", "pos": [256.5, 12, -11.5], "yaw": 126.87, "pitch": -16.7 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "panes-back", "hideHud": true }
+  ]
+}

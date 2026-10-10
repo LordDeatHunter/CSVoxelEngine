@@ -1,0 +1,15 @@
+{
+  "name": "Glass Pane",
+  "model": "block/glass_pane",
+  "hardness": 1,
+  // Glass's flags: drawn blended in the translucent pass, fused with its own kind, never
+  // hiding a neighbour, darkening nothing and letting light through
+  "translucent": true,
+  "cullSelf": true,
+  "occludes": false,
+  "castsAO": false,
+  "light": { "passes": true },
+  // The body bumps into the thin slab, not the whole cell
+  "hitbox": { "min": [0, 0, 0.4375], "max": [1, 1, 0.5625] },
+  "collidesByHitbox": true
+}
