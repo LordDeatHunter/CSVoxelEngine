@@ -1,0 +1,14 @@
+{
+  "name": "Torch",
+  "model": "block/torch",
+  "hardness": 0,
+  "solid": false,
+  "castsAO": false,
+  // The tile is a stick on transparent texels: alpha-tested, and it gets the coverage-keeping mips
+  "cutout": true,
+  // The default warm block-light colour, so the torch costs no palette slot
+  "light": { "emission": 14 },
+  // Pops (dropping itself) when the block it stands on goes, and a flow washes it away
+  "needsSupport": true,
+  "hitbox": { "min": [0.375, 0, 0.375], "max": [0.625, 0.625, 0.625] }
+}

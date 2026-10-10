@@ -918,6 +918,7 @@ tools/generate-goblin-skin.ps1        # deterministic generator of goblin.png; i
 tools/generate-leaf-textureless.ps1   # deterministic grey leaf tiles for the biome tint (scaled to BiomeTintTextureGrey)
 tools/generate-tree-textures.ps1      # placeholder baobab / stone pine log and leaf tiles tinted from the oak art
 tools/generate-cotton-textures.py     # deterministic cotton_plant tile and cotton item sprite (stdlib PNG writer)
+tools/generate-torch-texture.py       # deterministic torch tile; its header pins the stick the torch models crop
 ```
 
 ## Content: blocks, items, models and loot are data

@@ -1,0 +1,48 @@
+{
+  // Torch check: run with VOXEL_TIME=700 (night) and VOXEL_SCRIPT=visual-examples/torches.json.
+  // Shots land in visual/torches/.
+  //
+  // Stands on the flat dune patch at (-61, 123) (ground cells at y 9, so the feet are at 10) and
+  // aims every placement at an exact cell: from the eye (-60.5, 11.62, 123.5) a cell centre
+  // (dx, 0, dz) away on the ground top is yaw atan2(dz, dx), pitch -atan(1.62 / |(dx, dz)|).
+  //   floor-close  three floor torches two cells ahead: thin posts with bright tops, warm pools
+  //   drop         a dirt block five cells ahead with a torch on top, mined from its side: the
+  //                torch pops and lies on the ground beside the dirt drop (out of pickup range)
+  //   floor-pools  the three pools from above, overlapping without block-sized seams
+  // The spawn is waited out on foot (no flight, so the player stays in survival and the mined
+  // blocks drop), then the teleport lands the eye a hair above the ground.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-60.5, 11.65, 123.5], "yaw": -90, "pitch": -39 },
+    { "op": "wait", "seconds": 2 },
+
+    { "op": "give", "block": "torch", "count": 8 },
+    { "op": "look", "yaw": -90, "pitch": -39.0 },
+    { "op": "place" },
+    { "op": "look", "yaw": -135, "pitch": -29.8 },
+    { "op": "place" },
+    { "op": "look", "yaw": -45, "pitch": -29.8 },
+    { "op": "place" },
+    { "op": "look", "yaw": -90, "pitch": -30 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "floor-close" },
+
+    { "op": "give", "block": "dirt", "count": 1 },
+    { "op": "look", "yaw": -90, "pitch": -17.95 },
+    { "op": "place" },
+    { "op": "give", "block": "torch", "count": 1 },
+    { "op": "look", "yaw": -90, "pitch": -6.8 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "on-dirt", "hideHud": true },
+    { "op": "look", "yaw": -90, "pitch": -13.97 },
+    { "op": "mine", "seconds": 3.0 },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "drop", "hideHud": true },
+
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-60.5, 19.5, 128.5], "yaw": -90, "pitch": -45 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "floor-pools", "hideHud": true }
+  ]
+}

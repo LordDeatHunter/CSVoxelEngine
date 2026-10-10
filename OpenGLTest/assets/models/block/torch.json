@@ -1,0 +1,24 @@
+{
+    // A floor torch: one thin post standing on the cell floor, its faces cropped out of the
+    // torch tile's stick (see tools/generate-torch-texture.py for where the stick lies).
+    // Unshaded like Minecraft's, so the flame never darkens with the face it is on.
+    "textures": {
+        "particle": "#torch",
+        "torch": "torch"
+    },
+    "elements": [
+        {
+            "from": [7, 0, 7],
+            "to": [9, 10, 9],
+            "shade": false,
+            "faces": {
+                "north": { "uv": [7, 6, 9, 16], "texture": "#torch" },
+                "south": { "uv": [7, 6, 9, 16], "texture": "#torch" },
+                "west": { "uv": [7, 6, 9, 16], "texture": "#torch" },
+                "east": { "uv": [7, 6, 9, 16], "texture": "#torch" },
+                "up": { "uv": [7, 6, 9, 8], "texture": "#torch" },
+                "down": { "uv": [7, 14, 9, 16], "texture": "#torch", "cullface": "down" }
+            }
+        }
+    ]
+}
