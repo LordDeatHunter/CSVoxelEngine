@@ -1,0 +1,31 @@
+{
+  // Rooted plant sway check: run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/plant-sway.json
+  // Shots land in visual/plant-sway/. A tall-grass patch in the forest east of the origin, framed
+  // close from a hovering camera so the same pose is held across the shots. The wind moves the
+  // grass tips between the shots while the roots, where each cross meets the ground, stay put
+  // (compare grass_a/b/c, or diff them). Canopy leaves still sway uniformly: tree_canopy frames a
+  // broadleaf crown from below for the same comparison.
+  //
+  // Vantage points from a headless probe (seed WorldSeed.Default): ground top at y 10 around
+  // (-56..-52, 8..12) in chunk (-4, 0, 0), dense with tall grass on y 11; the forest trunk at
+  // (-79, 14, -2) whose crown tops out at y 24 (see grass-tint.json).
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-54.5, 40.5, 14.5], "yaw": -90, "pitch": -30 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "teleport", "pos": [-54.5, 12.9, 14.0], "yaw": -90, "pitch": -32 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "grass_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "grass_b", "hideHud": true },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "grass_c", "hideHud": true },
+
+    { "op": "teleport", "pos": [-78.5, 18.5, 7.5], "yaw": -95, "pitch": 22 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "tree_canopy_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "tree_canopy_b", "hideHud": true }
+  ]
+}

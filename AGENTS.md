@@ -293,7 +293,10 @@ two floats in tile units** (0..1 across one tile, 0..W across a quad merged over
 sampler's REPEAT tiles it, so UVs are never atlas-absolute), sun/block bytes at 24-25, bytes
 26-27 read by GL as **one integer ushort** at attribute location 5 (`Normal` + `LightTint`: bits
 0-2 face, 3 submerged, 4 biome tint (`IsBiomeTinted`), 5 sway, 6-15 the 10-bit block-light tint code, `Vertex.BlockTint`,
-`IsSwaying`; attribute 6 is gone), the `ushort Layer` at 28 (attribute location 7, an integer attribute) and the `ushort
+`IsSwaying`; attribute 6 is gone; on a sway vertex the **alpha byte is its sway weight**,
+`Vertex.SwayWeight`/`EncodeSwayWeight`: 255 on canopy leaves, eased from 0 at a rooted plant's base
+to 255 at its tip, never 253/254, and the vertex shader hands the fragment an alpha of 1, so
+the exact-byte water/LOD-foliage flags only ever see non-swaying vertices), the `ushort Layer` at 28 (attribute location 7, an integer attribute) and the `ushort
 WaterSurface` at 30 (attribute location 8, also integer): the baked water surface over a
 submerged face in quarter blocks (`Vertex.EncodeWaterSurface`, 0 on every dry face). The mesher
 gets it from `ChunkMesher.SubmergedSurfaceCode`, which walks the fluid column in the padded snapshot and
@@ -506,7 +509,8 @@ world at the entity's cell by `EntityLight.Sample` (each chunk keeps its mesh-ti
 for that) and passed through `SetDrawUniforms`'s required `EntityLightSample` argument. Per-draw fade alpha reaches the fragment stage as the `flat` varying
 `fAlpha`, because a uniform cannot vary between the sub-draws of one multi-draw. The wave and
 sway blocks of `test-vertex.glsl` and `shadow-vertex.glsl` must stay byte-identical — a
-`TO_WORLD(p)` macro is what lets them be, and `ChunkDrawShaderTests` guards it.
+`TO_WORLD(p)` macro is what lets them be, and `ChunkDrawShaderTests` guards the sway block and
+its weight decode (both read `vColor.a` at location 1).
 
 ## Layout
 
@@ -929,7 +933,7 @@ trailing commas.
 | `castsAO` | `solid` | darkens neighbouring faces (`CastsAmbientOcclusion`) |
 | `cutout` | false | alpha-tested texture; forces `occludes` off whatever the file says |
 | `translucent` | false | drawn blended in the sorted translucent pass with the fluids (glass); forces occludes off; never casts a shadow |
-| `sway` | false | leaf-wind sway in the vertex shader |
+| `sway` | false | leaf-wind sway in the vertex shader. A full cube (leaves) sways uniformly; a non-full-cube `model` (a plant) is rooted: its sway eases from 0 at the model's lowest vertex to full at its highest (`BlockType.SwaysFromRoot`/`SwayWeightAt`, carried in the vertex alpha) |
 | `biomeTint` | none | colour the block by climate (see "Biome-tinted grass and leaves"): `{"palette": p, "faces": {face: entry}}`, where `palette` is `grass` (default) or `foliage`, a face key is `north`..`down`, `side` or `all`, and an entry is `{"tile": t}` or `{"overlay": t, "base": b}`. `tile` replaces the face with a tinted tile, `overlay` draws a tinted cutout tile over it (`base` optionally swapping the tile beneath). Only on a block that bakes to a plain full cube and is not translucent; `overlay` not on a cutout block. `FaceTiles` stay the default tiles for icons, drops and the held block |
 | `modelTint` | none | the sub-cell sibling of `biomeTint`: a palette name (`grass` default, or `foliage`) that tints **every** quad of the block's own baked model (`shade * the field`, bit 4 set) instead of per cube face. Only on a non-full-cube `model`-renderer block that is not translucent (a cross-shaped plant), and the model must wear a grey `_textureless` tile, since the tint multiplies the texel. The `tall_grass` / `dead_shrub` plants use it |
 | `material` | none | reflective surface tuning for the ores: `metallic` (0..1, default 0 - an ordinary diffuse block), `roughness` (0..1, default 1, lower being a tighter highlight) and `normalStrength` (0..4, default 1, scaling the tile's normal map). Omitting the object costs nothing at render time. Keyed by *texture*, not by block - see the material atlas below |

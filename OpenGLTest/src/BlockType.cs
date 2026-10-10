@@ -164,6 +164,30 @@ public sealed record BlockType
     public bool Sway { get; init; }
 
     /// <summary>
+    /// A swaying block whose model is not a full cube is a plant rooted in the ground (tall
+    /// grass, a shrub, a flower): its roots stay put and only the upper part moves, so the mesher
+    /// eases each vertex's sway weight from 0 at <see cref="SwayBaseY"/> to 1 at
+    /// <see cref="SwayTopY"/> (<see cref="SwayWeightAt"/>). False for canopy leaves, full cubes that
+    /// sway uniformly. Set in <c>ContentRegistry.BakeModels</c>.
+    /// </summary>
+    public bool SwaysFromRoot { get; internal set; }
+
+    /// <summary>Lowest vertex Y of the baked model in cell space, where a rooted plant's sway is 0.</summary>
+    public float SwayBaseY { get; internal set; }
+
+    /// <summary>Highest vertex Y of the baked model in cell space, where a rooted plant's sway is full.</summary>
+    public float SwayTopY { get; internal set; }
+
+    /// <summary>
+    /// The sway weight of a vertex at cell-space height <paramref name="cellY"/>: 1 on every
+    /// swaying block that is not rooted (leaves), and on a rooted plant the eased (quadratic)
+    /// fraction of the way from the model's own base to its own top, so a vertex on the cell's top
+    /// edge reads 1 rather than the 0 a bare <c>fract(y)</c> would give it.
+    /// </summary>
+    public float SwayWeightAt(float cellY) =>
+        SwaysFromRoot ? MathUtils.EaseInQuad(MathUtils.InverseLerp(SwayBaseY, SwayTopY, cellY)) : 1f;
+
+    /// <summary>
     /// Which faces wear a climate-tinted tile and from which palette (grass, leaves), or null when
     /// every face is drawn as the model says. Set in <c>ContentRegistry.BakeModels</c>, and only
     /// ever non-null on a block that bakes greedy (<see cref="IsGreedy"/>), so both mesh paths may

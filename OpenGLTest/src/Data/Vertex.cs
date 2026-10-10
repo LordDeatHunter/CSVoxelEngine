@@ -37,8 +37,9 @@ public struct Vertex
     /// rgb carries shade * <see cref="BiomeTint"/> (chunks, LOD, the felled tree) or shade alone
     /// with the tint in <c>uBiomeTint</c> (mining pop, debris), and the fragment shader multiplies
     /// the texel by <see cref="BiomeTint.Gain"/>. Bit 5: leaf-wind sway (<see cref="IsSwaying"/>; chunk
-    /// meshes set it on canopy leaves, standalone cubes such as drops, icons and mining pops stay
-    /// planted). Bits 6-7: the low two bits of the 10-bit block-light tint code
+    /// meshes set it on canopy leaves and rooted plants, standalone cubes such as drops, icons and
+    /// mining pops stay planted), with the alpha byte then holding the sway weight
+    /// (<see cref="SwayWeight"/>). Bits 6-7: the low two bits of the 10-bit block-light tint code
     /// (<see cref="BlockTint"/>).</summary>
     public byte Normal;
 
@@ -188,6 +189,27 @@ public struct Vertex
 
     /// <summary><see cref="Normal"/> bit 5: the leaf-wave shader sways this vertex.</summary>
     public readonly bool IsSwaying => (Normal & SwayBit) != 0;
+
+    /// <summary>
+    /// How far the wind moves this vertex, 0..1: on a swaying vertex (<see cref="IsSwaying"/>) the
+    /// alpha byte is its sway weight (<see cref="EncodeSwayWeight"/>), 0 everywhere else. Canopy
+    /// leaves carry 255 and sway uniformly; a rooted plant's vertices ease from 0 at the root to
+    /// 1 at the tip. The world and shadow vertex shaders read it the same way and then hand the
+    /// fragment stage an alpha of 1, so the weight never meets the water/LOD-foliage flags there.
+    /// </summary>
+    public readonly float SwayWeight => IsSwaying ? (PackedColor >> 24) / 255f : 0f;
+
+    /// <summary>
+    /// The alpha byte that carries a sway weight of <paramref name="weight"/> (clamped to 0..1).
+    /// A weight that would round to 253 or 254 snaps to a full 255 (a hair at the very tip), so a
+    /// swaying vertex never carries the fluid (254) or far-LOD foliage (253) alpha that CPU-side
+    /// readers check without looking at the sway bit.
+    /// </summary>
+    public static byte EncodeSwayWeight(float weight)
+    {
+        var a = (int)MathF.Round(MathUtils.Clamp01(weight) * 255f);
+        return a >= 253 ? (byte)255 : (byte)a;
+    }
 
     /// <summary>The 10-bit block-light tint code (<see cref="silkgltriangle.LightTint"/>), split
     /// across <see cref="Normal"/> bits 6-7 and <see cref="LightTint"/>.</summary>

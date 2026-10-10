@@ -1,5 +1,7 @@
 #version 460 core
 layout (location = 0) in vec3 vPosition;
+// Only the alpha is read: a swaying vertex's sway weight (Vertex.SwayWeight, see test-vertex.glsl).
+layout (location = 1) in vec4 vColor;
 layout (location = 2) in vec2 vTexCoord;
 layout (location = 5) in uint vNormalBits; // Vertex.Normal + LightTint; sway is bit 5
 layout (location = 7) in uint vLayer; // array-texture slice (Vertex.Layer)
@@ -26,7 +28,10 @@ out vec2 fTexCoord;
 flat out uint fLayer;
 
 void main() {
-    float vSway = (vNormalBits & 32u) != 0u ? 1.0 : 0.0;
+    // Bit 5 flags a swaying vertex, whose alpha is then its sway weight: uniform on canopy
+    // leaves, eased from nothing at a rooted plant's base to full at its tip (Vertex.SwayWeight).
+    bool swaying = (vNormalBits & 32u) != 0u;
+    float vSway = swaying ? vColor.a : 0.0;
 #ifdef CHUNK_DRAW
     vec3 chunkOrigin = draws[uDrawBase + gl_DrawID].originAndAlpha.xyz;
 #endif

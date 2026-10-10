@@ -1,5 +1,8 @@
 #version 460 core
 layout (location = 0) in vec3 vPosition;
+// rgb: shade (times the biome tint on a bit-4 face). Alpha: on a swaying vertex (bit 5) its sway
+// weight (Vertex.SwayWeight: 255 on canopy leaves, 0 at a plant's root up to 255 at its tip);
+// otherwise 254 flags water, 253 far-LOD foliage and 255 everything else.
 layout (location = 1) in vec4 vColor;
 layout (location = 2) in vec2 vTexCoord;
 layout (location = 3) in float vSun;
@@ -90,7 +93,10 @@ float LavaWaveHeight(vec2 p, float t) {
 }
 
 void main() {
-    float vSway = (vNormalBits & 32u) != 0u ? 1.0 : 0.0;
+    // Bit 5 flags a swaying vertex, whose alpha is then its sway weight: uniform on canopy
+    // leaves, eased from nothing at a rooted plant's base to full at its tip (Vertex.SwayWeight).
+    bool swaying = (vNormalBits & 32u) != 0u;
+    float vSway = swaying ? vColor.a : 0.0;
 #ifdef CHUNK_DRAW
     vec4 chunkDraw = draws[uDrawBase + gl_DrawID].originAndAlpha;
     vec3 chunkOrigin = chunkDraw.xyz;
@@ -104,7 +110,8 @@ void main() {
     // while the canopy visibly sways; amplitude peaks under a tenth of a block.
     vec3 displaced = vPosition;
     // ponytail: water flag rides in vColor.a (254 = water, 255 = everything else); fColor.a is unused otherwise.
-    bool isWater = vColor.a < 0.998;
+    // A swaying vertex's alpha is its sway weight instead, and water never sways.
+    bool isWater = !swaying && vColor.a < 0.998;
     bool isLava = isWater && abs(float(vLayer) - uLavaLayer) < 0.5;
     // Only true surface vertices move: skirt bottoms, the tops of stacked columns and the
     // integer-height tops of falling water all sit at whole numbers, and displacing those
@@ -138,7 +145,9 @@ void main() {
 #else
     gl_Position = uMVP * vec4(displaced, 1.0);
 #endif
-    fColor = vColor;
+    // The sway weight is spent here: the fragment stage decodes the exact alpha byte as the
+    // water / LOD-foliage flag, so a swaying vertex hands it a plain 255.
+    fColor = vec4(vColor.rgb, swaying ? 1.0 : vColor.a);
     // Vertex.Normal bit 4: biome-tinted face. Mirrors BiomeTint.Gain (4): the grey textureless
     // tiles need a multiplier above 1 to reach grass green, so the vertex rgb carries tint/4 and
     // the fragment scales it back.

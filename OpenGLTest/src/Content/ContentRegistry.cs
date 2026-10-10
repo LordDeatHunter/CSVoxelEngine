@@ -214,6 +214,24 @@ public static class ContentRegistry
                 ];
             }
 
+            // A swaying sub-cell model is a plant standing on the ground, not a canopy cube hung
+            // between its neighbours: its sway grows from its own base to its own top.
+            if (type.Sway && type.Renderer == BlockRenderer.Model && !baked.IsFullCube && baked.Quads.Length > 0)
+            {
+                var minY = float.MaxValue;
+                var maxY = float.MinValue;
+                foreach (var quad in baked.Quads)
+                foreach (var position in quad.Positions)
+                {
+                    minY = MathF.Min(minY, position.Y);
+                    maxY = MathF.Max(maxY, position.Y);
+                }
+
+                type.SwaysFromRoot = true;
+                type.SwayBaseY = minY;
+                type.SwayTopY = maxY;
+            }
+
             BlockType.OccludesById[id] = type.OccludesNeighbours;
             BlockType.PassesLightById[id] = type.PassesLight;
             BlockType.GreedyById[id] = type.Renderer == BlockRenderer.Model && !type.Fluid && BakesGreedy(baked);

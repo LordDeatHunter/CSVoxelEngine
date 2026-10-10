@@ -1415,7 +1415,8 @@ public class Chunk : IDisposable
                 : type.BakedModel;
             if (model == null) continue;
 
-            // Canopy leaves ride the wind in the vertex shader; everything else stays planted
+            // Canopy leaves and plants ride the wind in the vertex shader; everything else stays
+            // planted. A rooted plant's per-vertex weight rides the alpha byte (ModelVertexAlpha).
             var sway = type.Sway ? 1f : 0f;
             var lightBase = LightIdx(x, y, z);
             var quads = model.Quads;
@@ -1505,7 +1506,8 @@ public class Chunk : IDisposable
                     // brightness and no ambient occlusion
                     for (var j = 0; j < 4; j++)
                     {
-                        var vertex = new Vertex(basePos + positions[j], 255, 255, 255, 255, uvs[j], quad.Tile,
+                        var vertex = new Vertex(basePos + positions[j], 255, 255, 255,
+                            ChunkMesher.ModelVertexAlpha(type, positions[j].Y), uvs[j], quad.Tile,
                             sun, block, normal, sway, submerged, waterSurface, flatTint);
                         dstVertices.Add(modelTint is { } palette ? ChunkMesher.ApplyModelTint(vertex, fields.Field(palette)) : vertex);
                     }
@@ -1563,7 +1565,8 @@ public class Chunk : IDisposable
                             vTint = (ushort)(code >> 12);
                         }
 
-                        var vertex = new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j], quad.Tile,
+                        var vertex = new Vertex(basePos + positions[j], shade, shade, shade,
+                            ChunkMesher.ModelVertexAlpha(type, positions[j].Y), uvs[j], quad.Tile,
                             vSun, vBlock, normal, sway, submerged, waterSurface, vTint);
                         dstVertices.Add(modelTint is { } palette ? ChunkMesher.ApplyModelTint(vertex, fields.Field(palette)) : vertex);
                     }
@@ -1575,7 +1578,8 @@ public class Chunk : IDisposable
                     var shade = ShadeLut[(face << 2) | 3];
                     for (var j = 0; j < 4; j++)
                     {
-                        var vertex = new Vertex(basePos + positions[j], shade, shade, shade, 255, uvs[j], quad.Tile,
+                        var vertex = new Vertex(basePos + positions[j], shade, shade, shade,
+                            ChunkMesher.ModelVertexAlpha(type, positions[j].Y), uvs[j], quad.Tile,
                             sun, block, normal, sway, submerged, waterSurface, flatTint);
                         dstVertices.Add(modelTint is { } palette ? ChunkMesher.ApplyModelTint(vertex, fields.Field(palette)) : vertex);
                     }

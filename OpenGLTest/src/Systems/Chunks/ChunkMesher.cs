@@ -500,6 +500,15 @@ internal static class ChunkMesher
     }
 
     /// <summary>
+    /// The alpha byte of a model-path vertex at cell-space height <paramref name="cellY"/>: a
+    /// rooted plant's sway weight (<see cref="BlockType.SwayWeightAt"/>, so its roots stay put
+    /// and its tip moves fully), 255 for every other block - full weight on canopy leaves, and
+    /// the plain opaque alpha on a block that does not sway at all.
+    /// </summary>
+    internal static byte ModelVertexAlpha(BlockType type, float cellY) =>
+        type.SwaysFromRoot ? Vertex.EncodeSwayWeight(type.SwayWeightAt(cellY)) : (byte)255;
+
+    /// <summary>
     /// Emits one fluid cell's surface into the translucent lists. The top face is a quad whose
     /// four corners sit at <see cref="CornerHeight"/>, so a flow slopes away from its source
     /// and - the average being symmetric between neighbours - adjacent tops meet exactly with
