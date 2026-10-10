@@ -56,6 +56,29 @@ public sealed class WindTests
     }
 
     [Fact]
+    public void AGustNeverReversesTheWindNorBlowsPastFullStrengthAndVariesAcrossTheWorld()
+    {
+        var weakest = 1f;
+        var strongest = 0f;
+        foreach (var t in Times)
+        {
+            var offset = Wind.Offset(t, WorldGenerationConfig.WindGustSpeed);
+            for (var x = -200f; x <= 200f; x += 7.3f)
+            {
+                var anchor = new Vector2(x, x * 0.37f - 11f);
+                var gust = Wind.Gust(anchor, t, offset);
+                Assert.InRange(gust, 0.01f, 1f);
+                // The precomputed-offset overload is the very phase the shader twin computes
+                Assert.Equal(Wind.GustPhase(anchor, t), Wind.GustPhase(anchor, t, offset), 3);
+                weakest = MathF.Min(weakest, gust);
+                strongest = MathF.Max(strongest, gust);
+            }
+        }
+
+        Assert.True(strongest - weakest > 0.3f, "the gusts never vary");
+    }
+
+    [Fact]
     public void GustPhaseRateIsIndependentOfDistanceFromOrigin()
     {
         const double h = 0.1;

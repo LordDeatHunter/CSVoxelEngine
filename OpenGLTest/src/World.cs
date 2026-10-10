@@ -1216,7 +1216,7 @@ public class World : IItemUseWorld
         // released flies as a cosmetic copy of the server's, which alone deals damage and lands as a
         // drop.
         FrameProfiler.Begin(ProfileSection.Entities);
-        _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager);
+        _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager, windTime: LightingTime);
         _debris.Update((float)deltaTime, _chunkManager);
         _querns.Animate((float)deltaTime);
         _slimes?.AnimateMirrors((float)deltaTime);
@@ -1487,7 +1487,7 @@ public class World : IItemUseWorld
 
         _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager, _falling, _leaves, _leafDecay);
         _falling.Update((float)deltaTime, _chunkManager, _dropManager, _fluidManager, _lodManager);
-        _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager);
+        _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager, windTime: LightingTime);
         _debris.Update((float)deltaTime, _chunkManager);
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
         _querns.Update((float)deltaTime, _chunkManager, _dropManager);

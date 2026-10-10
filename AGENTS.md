@@ -280,7 +280,10 @@ heading turns slowly (`WorldGenerationConfig.Wind*`), with `Wind.Offset` its bou
 integral. Leaf sway reads it in both vertex shaders (`uWind`, the direction scaled by `WindLean`,
 leans the canopy downwind; `uWindOffset` advects the gust pattern, so the gust phase rate is the
 same anywhere in the world — keep the two sway blocks byte-identical), fire smoke and embers drift
-along it (`FireParticle.Update`'s `wind`), and the cloud layer and its shadows are carried by it
+along it (`FireParticle.Update`'s `wind`), falling leaves (ambient and burst) ease their sideways
+motion into it, pushed by the canopy's own gusts (`LeafParticleSystem.Update`'s `windTime`,
+`Wind.Gust`, the C# twin of the sway's `0.6 + 0.4 sin(phase)`; a landed leaf stays put;
+`visual-examples/leaf-wind.json` at `VOXEL_TIME` 147 and 1347), and the cloud layer and its shadows are carried by it
 (`CloudCopies.Drift`, wrapped modulo the field on both axes; `uCloudDrift` is a `vec2`). `World`
 gets the same lighting clock through `World.TimeOffset`, which `Program` sets from `VOXEL_TIME`, so
 leaves, smoke and clouds agree; `RenderManager.WindDirection` exposes the unit direction for future

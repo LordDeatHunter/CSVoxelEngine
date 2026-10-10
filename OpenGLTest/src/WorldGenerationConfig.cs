@@ -1282,6 +1282,11 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float WindSmokeDrift = 0.35f;
     /// <summary>Blocks per second an ember drifts downwind.</summary>
     public const float WindEmberDrift = 0.15f;
+    /// <summary>Blocks per second a falling leaf drifts downwind at full gust (scaled by Wind.Gust).</summary>
+    public const float WindLeafDrift = 1.5f;
+    /// <summary>How fast (1/s) a falling leaf's sideways motion settles into the wind's, so a burst's
+    /// toss is carried off downwind within a second or so.</summary>
+    public const float WindLeafDrag = 1.2f;
 
     // --- Campfire particles (FireParticleSystem + FireParticleRenderer) ---
     // Embers and smoke rising off lit firepits, spawned per lit cell near the camera.

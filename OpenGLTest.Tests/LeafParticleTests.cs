@@ -52,6 +52,82 @@ public sealed class LeafParticleTests
     }
 
     [Fact]
+    public void AFallingLeafDriftsDownTheWindWhicheverWayItBlows()
+    {
+        var (chunks, _) = Setup();
+        foreach (var wind in new[] { Vector2.UnitX, -Vector2.UnitY, Vector2.Normalize(new Vector2(-0.6f, 0.8f)) })
+        {
+            // Same seed, so the two leaves differ only by the wind
+            var still = new LeafParticle(new Vector3(8.5f, 6.5f, 8.5f), random: new Random(9));
+            var blown = new LeafParticle(new Vector3(8.5f, 6.5f, 8.5f), random: new Random(9));
+            for (var i = 0; i < 180; i++)
+            {
+                Assert.True(still.Update(1f / 60f, chunks));
+                Assert.True(blown.Update(1f / 60f, chunks, wind, gust: 1f));
+            }
+
+            Assert.False(blown.IsLanded, "the leaf landed before the comparison");
+            var drift = blown.Position - still.Position;
+            var along = drift.X * wind.X + drift.Z * wind.Y;
+            Assert.True(along > 0.5f, $"wind {wind}: drifted {along} along it");
+            // It still falls as a leaf, not faster or slower for the wind
+            Assert.Equal(still.Position.Y, blown.Position.Y, 3);
+        }
+    }
+
+    [Fact]
+    public void AHarderGustCarriesALeafFurther()
+    {
+        var (chunks, _) = Setup();
+        var soft = new LeafParticle(new Vector3(8.5f, 6.5f, 8.5f), random: new Random(10));
+        var hard = new LeafParticle(new Vector3(8.5f, 6.5f, 8.5f), random: new Random(10));
+        for (var i = 0; i < 120; i++)
+        {
+            soft.Update(1f / 60f, chunks, Vector2.UnitX, gust: 0.3f);
+            hard.Update(1f / 60f, chunks, Vector2.UnitX, gust: 1f);
+        }
+        Assert.True(hard.Position.X > soft.Position.X);
+    }
+
+    [Fact]
+    public void ALandedLeafStaysPutInTheWind()
+    {
+        var (chunks, _) = Setup();
+        var leaf = new LeafParticle(new Vector3(8.5f, 2.5f, 8.5f), random: new Random(11));
+        for (var i = 0; i < 600 && !leaf.IsLanded; i++)
+            leaf.Update(1f / 60f, chunks, Vector2.UnitX, gust: 1f);
+        Assert.True(leaf.IsLanded);
+
+        var rest = leaf.Position;
+        for (var i = 0; i < 30 && leaf.IsAlive; i++)
+            leaf.Update(1f / 60f, chunks, Vector2.UnitX, gust: 1f);
+        Assert.Equal(rest, leaf.Position);
+    }
+
+    [Fact]
+    public void TheSystemBlowsItsLeavesAlongTheWindOfItsClock()
+    {
+        var (chunks, _) = Setup();
+        // A day cycle apart the sun stands the same and the wind has turned right round
+        foreach (var t in new[] { 147.0, 147.0 + 180.0 / WorldGenerationConfig.WindTurnDegreesPerSecond })
+        {
+            var system = new LeafParticleSystem();
+            var rng = new Random(12);
+            for (var i = 0; i < 20; i++)
+                system.AddForTest(new LeafParticle(new Vector3(8.5f, 7.5f, 8.5f), random: rng));
+
+            for (var i = 0; i < 150; i++)
+                system.Update(1f / 60f, new Vector3(8f, 5f, 8f), chunks, rng, windTime: t);
+
+            var wind = Wind.Direction(t);
+            var along = 0f;
+            foreach (var leaf in system.Particles)
+                along += (leaf.Position.X - 8.5f) * wind.X + (leaf.Position.Z - 8.5f) * wind.Y;
+            Assert.True(along / system.Particles.Count > 0.3f, $"at t={t} the leaves drifted {along} along the wind");
+        }
+    }
+
+    [Fact]
     public void LandedLeafFadesOutAndIsRemoved()
     {
         var (chunks, _) = Setup();

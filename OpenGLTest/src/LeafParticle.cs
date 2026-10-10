@@ -78,9 +78,12 @@ public class LeafParticle
     /// Advances the leaf. Returns false once it should be removed.
     /// A leaf sinks toward its flutter speed instead of accelerating, drifts sideways on
     /// its sway, and dies on a solid cell below it (fading in place) or when its time runs out.
-    /// Submerged leaves drown fast instead of piling up on the sea floor.
+    /// Submerged leaves drown fast instead of piling up on the sea floor. <paramref name="wind"/> is
+    /// the unit downwind direction (<see cref="Wind.Direction"/>) and <paramref name="gust"/> how hard
+    /// it blows here (<see cref="Wind.Gust"/>): a falling leaf's sideways motion settles into the
+    /// wind's, while a landed one stays put. Left at default, the leaf falls in still air.
     /// </summary>
-    public bool Update(float deltaTime, ChunkManager chunks)
+    public bool Update(float deltaTime, ChunkManager chunks, Vector2 wind = default, float gust = 1f)
     {
         if (!IsAlive) return false;
         if (deltaTime <= 0f || chunks == null) return true;
@@ -113,6 +116,14 @@ public class LeafParticle
         _velocity.Y = MathUtils.Damp(_velocity.Y,
             -WorldGenerationConfig.LeafParticleFallSpeed,
             WorldGenerationConfig.LeafParticleFallDrag, deltaTime);
+
+        if (wind != default)
+        {
+            // A leaf is all drag: its sideways motion (a burst's toss included) eases into the wind's
+            var drift = wind * (WorldGenerationConfig.WindLeafDrift * gust);
+            _velocity.X = MathUtils.Damp(_velocity.X, drift.X, WorldGenerationConfig.WindLeafDrag, deltaTime);
+            _velocity.Z = MathUtils.Damp(_velocity.Z, drift.Y, WorldGenerationConfig.WindLeafDrag, deltaTime);
+        }
 
         Position += _velocity * deltaTime;
         Position += new Vector3(

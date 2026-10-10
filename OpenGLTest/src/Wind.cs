@@ -49,9 +49,20 @@ public static class Wind
     /// sampled at the anchor minus the gust offset, so the pattern rolls downwind while its phase
     /// rate stays the same everywhere in the (unbounded) world.
     /// </summary>
-    public static float GustPhase(Vector2 anchorXZ, double t)
-    {
-        var off = Offset(t, WorldGenerationConfig.WindGustSpeed);
-        return (float)(t * 0.5) + (anchorXZ.X - off.X) * 0.08f + (anchorXZ.Y - off.Y) * 0.06f;
-    }
+    public static float GustPhase(Vector2 anchorXZ, double t) =>
+        GustPhase(anchorXZ, t, Offset(t, WorldGenerationConfig.WindGustSpeed));
+
+    /// <summary><see cref="GustPhase(Vector2, double)"/> with the gust offset
+    /// (<c>Offset(t, WindGustSpeed)</c>) already in hand, so a caller sampling many anchors in one
+    /// frame computes it once.</summary>
+    public static float GustPhase(Vector2 anchorXZ, double t, Vector2 gustOffset) =>
+        (float)(t * 0.5) + (anchorXZ.X - gustOffset.X) * 0.08f + (anchorXZ.Y - gustOffset.Y) * 0.06f;
+
+    /// <summary>
+    /// How hard the wind gusts at <paramref name="anchorXZ"/>, 0.2..1: the C# twin of the leaf-sway
+    /// shaders' <c>gust = 0.6 + 0.4 * sin(phase)</c>, so the falling leaves are pushed by the very
+    /// gusts the canopy sways in. <paramref name="gustOffset"/> is <c>Offset(t, WindGustSpeed)</c>.
+    /// </summary>
+    public static float Gust(Vector2 anchorXZ, double t, Vector2 gustOffset) =>
+        0.6f + 0.4f * MathF.Sin(GustPhase(anchorXZ, t, gustOffset));
 }

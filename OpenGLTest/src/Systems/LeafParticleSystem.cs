@@ -64,18 +64,35 @@ public class LeafParticleSystem
 
     /// <summary>
     /// Samples ambient fall off nearby canopy and advances every leaf, removing the dead.
-    /// Back to front so a removal never skips the next leaf.
+    /// Back to front so a removal never skips the next leaf. <paramref name="windTime"/> is the
+    /// lighting clock the shared <see cref="Wind"/> reads: the falling leaves drift down its heading,
+    /// pushed by the same gusts (<see cref="Wind.Gust"/>) the canopy sways in. Null is still air.
     /// </summary>
-    public void Update(float deltaTime, Vector3 cameraPos, ChunkManager chunks, Random? random = null)
+    public void Update(float deltaTime, Vector3 cameraPos, ChunkManager chunks, Random? random = null,
+        double? windTime = null)
     {
         if (deltaTime <= 0f || chunks == null) return;
         var rng = random ?? Random.Shared;
 
         SpawnAmbient(deltaTime, cameraPos, chunks, rng);
 
+        // One heading and gust offset a frame; only the gust phase is per leaf
+        var wind = Vector2.Zero;
+        var gustOffset = Vector2.Zero;
+        var t = windTime ?? 0.0;
+        if (windTime.HasValue)
+        {
+            wind = Wind.Direction(t);
+            gustOffset = Wind.Offset(t, WorldGenerationConfig.WindGustSpeed);
+        }
+
         for (var i = _particles.Count - 1; i >= 0; i--)
         {
-            if (!_particles[i].Update(deltaTime, chunks))
+            var leaf = _particles[i];
+            var gust = windTime.HasValue
+                ? Wind.Gust(new Vector2(leaf.Position.X, leaf.Position.Z), t, gustOffset)
+                : 1f;
+            if (!leaf.Update(deltaTime, chunks, wind, gust))
                 _particles.RemoveAt(i);
         }
     }

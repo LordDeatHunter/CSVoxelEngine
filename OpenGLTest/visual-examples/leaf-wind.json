@@ -1,0 +1,37 @@
+{
+  // Falling leaves carried by the wind (LeafParticle / LeafParticleSystem over Wind.cs): run twice
+  // from OpenGLTest/, with VOXEL_TIME=147 and VOXEL_TIME=1347. Shots land in visual/leaf-wind/.
+  // 1200 s apart the sun stands the same (one day cycle), while the wind, turning 0.15 degrees a
+  // second, has swung right round (180 degrees), so the two runs must show the leaf cloud streaming
+  // off to opposite sides.
+  // An oak is grown on an open grass patch at the desert's edge (ground top y 10 at x 154, z 136;
+  // no other oak within 14 blocks) and felled from its base in creative, which shakes a cloud of
+  // leaves loose over the whole canopy (and the leftover crown decays, dropping more). The camera
+  // then hovers across the wind: at VOXEL_TIME=147 the wind blows at about 56 degrees from +X toward
+  // +Z and yaw -34 puts that heading on the screen's right, so the cloud drifts right; at 1347 left.
+  // Particles are RNG-driven: judge the drift by eye (follow single leaves through the burst of
+  // shots), never by pixels.
+  "steps": [
+    { "op": "wait", "seconds": 10 },
+    { "op": "walk", "keys": ["C"], "seconds": 0.05 },
+    { "op": "teleport", "pos": [152.0, 12.62, 136.5], "yaw": 0, "pitch": -24 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "grow", "species": "oak", "pos": [154, 136], "steps": 40 },
+    { "op": "grow", "species": "oak", "pos": [154, 136], "steps": 40 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "look", "yaw": 0, "pitch": -24 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "fly" },
+    { "op": "teleport", "pos": [144.0, 15.0, 142.7], "yaw": -34, "pitch": 4 },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "screenshot", "name": "leaves-a", "hideHud": true },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "leaves-b", "hideHud": true },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "leaves-c", "hideHud": true },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "leaves-d", "hideHud": true },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "leaves-e", "hideHud": true }
+  ]
+}
