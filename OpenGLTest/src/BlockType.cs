@@ -72,6 +72,10 @@ public sealed record BlockType
     // read per cell by the mesher, the raycast and body collision.
     internal static readonly bool[] PixelRimById = new bool[256];
 
+    // Whether the block is a pane (the pane renderer), which reaches arms toward neighbouring
+    // panes: read per neighbour by the pane emitter and the pane shape
+    internal static readonly bool[] PaneById = new bool[256];
+
     // Whether the binary greedy mesher may merge this block's faces: a plain full cube whose
     // six faces are the untransformed cube faces (see ContentRegistry.BakesGreedy). Anything
     // else goes through the per-quad scalar path.
@@ -472,6 +476,11 @@ public sealed record BlockType
     /// shells bevel their exposed corners (<see cref="TreeWoodShape.RimCornerMask"/>).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool HasPixelRim(byte blockId) => PixelRimById[blockId];
+
+    /// <summary>Whether a block id is a pane (<see cref="BlockRenderer.Pane"/>), whose shape
+    /// follows its neighbours (<see cref="PaneShape"/>).</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsPane(byte blockId) => PaneById[blockId];
 
     /// <summary>Whether the greedy mesher handles this block (a plain full cube in the
     /// <see cref="BlockRenderer.Model"/> renderer); false sends it down the per-quad path.</summary>

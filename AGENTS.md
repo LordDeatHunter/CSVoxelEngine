@@ -657,7 +657,9 @@ OpenGLTest/
       BiomeTintFaces.cs                     # a block's resolved biomeTint: palette + per-face base/tinted tiles
       SnowShape.cs                          # state-aware hitbox shape of layered snow
       BlockShape.cs                         # the one live-world box resolver (raycast, outline, pop,
-                                            #   shape collision): tree wood, snow, facing, plain boxes
+                                            #   shape collision): tree wood, snow, pane, facing, plain
+      PaneShape.cs                          # the pane renderer's shape: which neighbours get an arm,
+                                            #   post/arm boxes, the cached hitboxes per arm mask
       HorizontalFacing.cs                   # quarter turns about a footprint's centre: points, boxes,
                                             #   baked models (multiblocks at size 2, facing blocks at 1)
       TreeWoodShape.cs                      # the one tree_wood shape rule: which cells connect (parent
@@ -829,6 +831,8 @@ OpenGLTest/
         BlockRaycaster.cs      # the DDA block raycast + line-of-sight segment test, split out of Camera.cs
       Chunks/                  # GL-free chunk mesh/light/column generation, split out of Chunk.cs
         ChunkMesher.cs         # the greedy pass + per-voxel procedural emitters + water-surface codes
+        PaneEmitter.cs         # a pane cell from the padded snapshot: post + arms, no face between
+                               #   connected panes, caps culled against a same-shaped pane above/below
         ChunkLighting.cs       # the wide light-volume flood (sun + coloured lamp) + corner light queries
         ColumnCache.cs         # the process-global column-data cache, its accessors and the column fill
         IColumnSource.cs       # the seam a mesh build, the fluid-surface query and the pop/debris tint read
@@ -988,7 +992,7 @@ trailing commas.
 | `light.emission` | 0 | 0..15 (`LightEmission`) |
 | `light.color` | warm torch colour | sRGB `[r, g, b]`, 0..255 each, of the block's light; only legal with `emission` > 0. Colours within 0.5/255 share a `BlockLightPalette` slot, and at most 8 distinct colours exist (the default included) - a ninth throws naming the file. `blue_lamp` is the example |
 | `light.passes` | `!fullCube` | whether voxel light travels through the cell (`PassesLight`) |
-| `renderer` | `"model"` | `model` (baked quads), `tree_wood` (a grown tree's wood: its shape, thickness and tree-graph links come from the state byte, see `### Trees`; requires a `wood` object, forces `occludes` and `castsAO` off and `light.passes` on, never meshes greedy, and refuses `cutout`, `translucent`, `fluid`, `falls`, `needsSupport`, `stackMax` and `hitbox`), `pebbles`, `branch_pile`, `snow_layers`, `fluid` or `quern` (procedural emitters), `multiblock` (the anchor cell of a structure, carrying the whole volume's pre-rotated model) or `multiblock_part` (one of its other cells, solid and occluding but never meshed); a fluid's or layer block's model only supplies its tile |
+| `renderer` | `"model"` | `model` (baked quads), `tree_wood` (a grown tree's wood: its shape, thickness and tree-graph links come from the state byte, see `### Trees`; requires a `wood` object, forces `occludes` and `castsAO` off and `light.passes` on, never meshes greedy, and refuses `cutout`, `translucent`, `fluid`, `falls`, `needsSupport`, `stackMax` and `hitbox`), `pebbles`, `branch_pile`, `snow_layers`, `fluid` or `quern` (procedural emitters), `multiblock` (the anchor cell of a structure, carrying the whole volume's pre-rotated model), `multiblock_part` (one of its other cells, solid and occluding but never meshed) or `pane` (a 2 px post plus an arm toward every horizontal neighbour that is a pane or a solid full cube, derived at mesh time by `PaneEmitter` from `PaneShape`, never stored; a lone pane is just the post, as in Minecraft; the raycast, outline and body collide with the same arms through `BlockShape`; refuses `hitbox`, `fluid`, `falls`, `stackMax` and `needsSupport`, and a solid pane always collides by its arms); a fluid's, layer block's or pane's model only supplies its tile (and the pane's icon) |
 | `multiblock` | none | required on, and only legal with, `renderer: "multiblock"`: `{"part": "block/<name>", "source": "block/<name>"}` — the block filling the other seven cells (which must use `multiblock_part`) and the plain block the volume is built from and reverts to. The anchor and its part must both set `hasItem: false` (a structure is built, never held), and `cutout`/`translucent`/`fluid` are rejected, since both halves are ordinary opaque solids to everything but the mesher. Both default `occludes` and `light.passes` to **true**: the structure's surface really does cover its neighbours, and its quads carry no cullface and are lit from the anchor's own cell, so light has to reach that cell or the whole thing renders black. The model is authored in 0..32 model units (the 2x2x2 volume) with the opening on **north**, no `cullface` on any face and no face covering a whole cell plane — see `### Multiblocks` below |
 | `kiln` | false | marks a multiblock anchor as a kiln, which is what gives it `KilnManager`'s fuel, ignition, crucible slot and integrity sweep. Only legal on the `multiblock` renderer |
 | `wood` | none | required on, and only legal with, `renderer: "tree_wood"`: how hardness and loot follow the thickness stored in each cell's `WoodState` (code 0 = 1 px across .. 15 = full cube) |

@@ -1404,6 +1404,19 @@ public class Chunk : IDisposable
                 continue;
             }
 
+            // A pane is a post plus an arm toward each neighbouring pane or solid full cube, read
+            // from the snapshot (see PaneEmitter); a glass pane draws blended like glass
+            if (type.Renderer == BlockRenderer.Pane)
+            {
+                if (type.Translucent)
+                    PaneEmitter.EmitPane(tVertices, tIndices, ref tIndexOffset, padded, paddedState, pIdx,
+                        sunLight, blockLight, x, y, z, type, basePos);
+                else
+                    PaneEmitter.EmitPane(vertices, indices, ref indexOffset, padded, paddedState, pIdx,
+                        sunLight, blockLight, x, y, z, type, basePos);
+                continue;
+            }
+
             // A multiblock part is a solid, occluding cell that draws nothing: the anchor's
             // model already covers the whole 2x2x2 volume it belongs to.
             if (type.Renderer == BlockRenderer.MultiblockPart) continue;

@@ -1,8 +1,8 @@
 {
-    // A plain glass pane: one 2 px slab through the middle of the cell, full width along X and
-    // full height. Its big faces sit inside the cell and always draw; its thin ends, top and
-    // bottom cull against a neighbour (the block's cullSelf fuses a row or a stack of panes).
-    // UVs are left to the defaults, which crop the glass tile to each face.
+    // A glass pane as the icon, the held pane and the drop show it: one 2 px slab through the
+    // middle of the cell, full width along X and full height. In the world the pane renderer
+    // draws the post and arms instead (PaneShape) and only takes the tile from here. UVs are left
+    // to the defaults, which crop the glass tile to each face.
     "textures": {
         "particle": "#pane",
         "pane": "glass"

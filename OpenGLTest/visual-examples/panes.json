@@ -8,9 +8,14 @@
   // with a fourth dirt block on its middle; then panes, farthest first so none blocks a later ray:
   //   (0, 11, -3) against the raised block's near face, (0, 10, -3) and (0, 10, -2) in a line
   //   from the wall toward the camera, (-1, 10, -2) and (-2, 10, -2) branching off to the left,
-  //   and a lone pane at (2, 10, -1).
-  // Every pane is the same block, so the shots show how each one is drawn beside its neighbours:
+  //   (1, 10, -2) to the right and (0, 10, -1) toward the camera, and a lone pane at (2, 10, -1).
+  // Each pane reaches an arm toward every neighbouring pane or dirt block (PaneShape), so the
+  // line meets the wall, (0, 10, -2) is a full cross, the upper pane is a post with one arm into
+  // the raised block, the row ends stop at their posts and the lone pane is just a post:
   //   panes-front    from where the player stands, with the HUD and the selection outline
+  //   lone-before    the lone pane at world x 255, the last column of its chunk: a bare post
+  //   lone-border    a dirt block placed east of it, at x 256 across the chunk border: the pane
+  //                  remeshes and grows an arm into it
   //   panes-high     from above
   //   panes-oblique  from the front left
   //   panes-back     from behind the wall's right end
@@ -42,12 +47,25 @@
     { "op": "place" },
     { "op": "look", "yaw": -135, "pitch": -29.81 },
     { "op": "place" },
+    { "op": "look", "yaw": -63.43, "pitch": -35.92 },
+    { "op": "place" },
     { "op": "look", "yaw": -26.57, "pitch": -35.92 },
+    { "op": "place" },
+    { "op": "look", "yaw": -90, "pitch": -58.3 },
     { "op": "place" },
 
     { "op": "look", "yaw": -90, "pitch": -25 },
     { "op": "wait", "seconds": 1 },
     { "op": "screenshot", "name": "panes-front" },
+    { "op": "look", "yaw": -26.57, "pitch": -26.6 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "lone-before", "hideHud": true },
+    { "op": "give", "block": "dirt", "count": 1 },
+    { "op": "look", "yaw": -18.43, "pitch": -27.13 },
+    { "op": "place" },
+    { "op": "look", "yaw": -26.57, "pitch": -26.6 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "lone-border", "hideHud": true },
     { "op": "teleport", "pos": [253.5, 16.5, -2.5], "yaw": -90, "pitch": -60 },
     { "op": "wait", "seconds": 0.5 },
     { "op": "screenshot", "name": "panes-high", "hideHud": true },

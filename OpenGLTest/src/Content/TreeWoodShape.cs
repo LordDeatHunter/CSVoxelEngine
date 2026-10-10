@@ -314,8 +314,9 @@ public static class TreeWoodShape
     }
 
     /// <summary>
-    /// Whether a world-space body box touches the cell's drawn shape. Non-tree blocks and full
-    /// cubes test their registered hitboxes (the mould slab path), thin wood its node and tube
+    /// Whether a world-space body box touches the cell's drawn shape. Non-tree blocks test their
+    /// live boxes (<see cref="BlockShape.BoxesAt"/>: the mould slab's registered ones, a pane's
+    /// arms), full tree-wood cubes their registered hitboxes, thin wood its node and tube
     /// boxes and a bevelled pixel-rim shell its rim boxes, all without allocating. Only thin
     /// wood and bevel-capable shells read their neighbours. Touching a face exactly counts,
     /// matching the cell-granular collision test this refines.
@@ -328,7 +329,11 @@ public static class TreeWoodShape
         var bevels = type != null && BlockType.IsTreeWood(id) && CanBevel(id, state);
         if (type == null || !BlockType.IsTreeWood(id) || (!IsThin(state) && !bevels))
         {
-            foreach (var box in type?.Hitboxes ?? FullCubeBoxes)
+            // Any other shape-colliding block's live boxes (a pane's arms follow its neighbours)
+            var boxes = type == null ? FullCubeBoxes
+                : BlockType.IsTreeWood(id) ? type.Hitboxes
+                : BlockShape.BoxesAt(id, chunks, x, y, z);
+            foreach (var box in boxes)
                 if (Touches(cell + box.Min, cell + box.Max, min, max))
                     return true;
             return false;

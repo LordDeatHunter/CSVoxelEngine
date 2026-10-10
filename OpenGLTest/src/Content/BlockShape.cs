@@ -4,9 +4,9 @@ namespace silkgltriangle;
 /// The one resolver of a cell's boxes from the live world, shared by the raycast, the hover
 /// outline, the break overlay, the mining pop and shape collision, so all of them agree with what
 /// the mesher draws: tree wood follows its thickness and connections (<see cref="TreeWoodShape"/>),
-/// layered snow its stack depth (<see cref="SnowShape"/>), a facing block its facing
-/// (<see cref="BlockType.RotatedHitboxes"/>), and everything else its registered
-/// <see cref="BlockType.Hitboxes"/>. Only thin and bevelled tree wood allocate.
+/// layered snow its stack depth (<see cref="SnowShape"/>), a pane its arms (<see cref="PaneShape"/>),
+/// a facing block its facing (<see cref="BlockType.RotatedHitboxes"/>), and everything else its
+/// registered <see cref="BlockType.Hitboxes"/>. Only thin and bevelled tree wood allocate.
 /// </summary>
 public static class BlockShape
 {
@@ -21,6 +21,7 @@ public static class BlockShape
         if (BlockType.IsTreeWood(id)) return TreeWoodShape.GetBoxesAt(id, chunks, x, y, z);
         if (type.Renderer == BlockRenderer.SnowLayers)
             return SnowShape.GetBoxes(x, z, chunks.GetStateGlobal(x, y, z), type.StackMax);
+        if (type.Renderer == BlockRenderer.Pane) return PaneShape.GetBoxesAt(chunks, x, y, z);
         if (type.RotatedHitboxes is { } rotated)
             return rotated[chunks.GetStateGlobal(x, y, z) & 3];
         return type.Hitboxes;

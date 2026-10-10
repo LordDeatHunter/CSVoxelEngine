@@ -607,6 +607,7 @@ public static class ContentRegistry
         Array.Clear(BlockType.PassesLightById);
         Array.Clear(BlockType.TreeWoodById);
         Array.Clear(BlockType.PixelRimById);
+        Array.Clear(BlockType.PaneById);
         Array.Clear(BlockType.SolidById);
         Array.Clear(BlockType.CollidesByHitboxById);
         Array.Clear(BlockType.MovementSpeedById);
@@ -920,6 +921,22 @@ public static class ContentRegistry
             throw new InvalidOperationException(
                 $"Block '{path}' sets support: \"attached\" without facing: \"horizontal\"; the attached face is the one behind its front.");
         return (facing, attached);
+    }
+
+    /// <summary>
+    /// Validates a <c>pane</c> block: its shape comes from its neighbours (<see cref="PaneShape"/>),
+    /// so it declares no hitbox, and its state byte stays free, so it is no fluid, falling block,
+    /// stack or support-fragile block either (a pane stands on its own like glass).
+    /// </summary>
+    internal static void ValidatePane(BlockDefinition definition, string path)
+    {
+        if (definition.Hitbox.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null))
+            throw new InvalidOperationException(
+                $"Block '{path}' declares a hitbox on renderer \"pane\"; its boxes follow its arms.");
+        if ((definition.Fluid ?? false) || (definition.Falls ?? false) || definition.StackMax.HasValue
+            || (definition.NeedsSupport ?? false))
+            throw new InvalidOperationException(
+                $"Block '{path}' uses renderer \"pane\" with fluid, falls, stackMax or needsSupport; a pane is a plain standing block.");
     }
 
     /// <summary>
@@ -1393,9 +1410,13 @@ public static class ContentRegistry
                 "quern" => BlockRenderer.Quern,
                 "multiblock" => BlockRenderer.Multiblock,
                 "multiblock_part" => BlockRenderer.MultiblockPart,
+                "pane" => BlockRenderer.Pane,
                 _ => throw new InvalidOperationException(
-                    $"Block '{path}' has unknown renderer '{definition.Renderer}'; expected model, tree_wood, pebbles, branch_pile, snow_layers, fluid, quern, multiblock or multiblock_part."),
+                    $"Block '{path}' has unknown renderer '{definition.Renderer}'; expected model, tree_wood, pebbles, branch_pile, snow_layers, fluid, quern, multiblock, multiblock_part or pane."),
             };
+            var pane = renderer == BlockRenderer.Pane;
+            if (pane)
+                ValidatePane(definition, path);
 
             // A multiblock is a structure built out of eight cells: the anchor names the part
             // that fills the other seven and the plain block it is built from and reverts to,
@@ -1552,6 +1573,13 @@ public static class ContentRegistry
 
             var hitboxes = ParseHitboxes(definition.Hitbox, path);
             var collidesByHitbox = ResolveCollidesByHitbox(definition, hitboxes, solid, fluid, stackMax, path);
+            // A pane's boxes follow its arms (PaneShape); the registered set is the lone post, and
+            // a solid pane always collides by that live shape rather than the whole cell
+            if (pane)
+            {
+                hitboxes = PaneShape.Boxes(0);
+                collidesByHitbox = solid;
+            }
 
             var type = new BlockType
             {
@@ -1635,6 +1663,7 @@ public static class ContentRegistry
             BlockType.FootstepDustById[id] = type.FootstepDust;
             BlockType.CastsAoById[id] = type.CastsAmbientOcclusion;
             BlockType.TreeWoodById[id] = treeWood;
+            BlockType.PaneById[id] = pane;
             BlockType.FluidById[id] = type.Fluid;
             BlockType.FluidTickDivisorById[id] = type.FluidTickDivisor;
             BlockType.FluidRangeById[id] = type.FluidRange;
