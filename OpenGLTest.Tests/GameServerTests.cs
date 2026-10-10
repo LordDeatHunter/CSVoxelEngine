@@ -989,6 +989,45 @@ public sealed class GameServerTests : IDisposable
     }
 
     [Fact]
+    public void ASlimesSizeReachesTheClientsEntityListAndItsMirror()
+    {
+        using var client = Connect("Watcher");
+        var spawn = client.Server!.Value.Spawn;
+        Assert.True(_world.SpawnEntity("slime", spawn + new Vector3(3f, -Camera.EyeHeight, 0f), SlimeSize.Max));
+        var served = Assert.Single(_world.Slimes);
+
+        var inbox = InboxOf(client);
+        NetEntity? carried = null;
+        var sw = Stopwatch.StartNew();
+        while (carried == null && sw.Elapsed.TotalSeconds < 5)
+        {
+            _server.Pump(0.01);
+            Thread.Sleep(5);
+            DrainAll();
+            if (inbox.Entities?.Find(e => e.Kind == NetEntityKind.Slime) is { Kind: NetEntityKind.Slime } found)
+                carried = found;
+        }
+
+        Assert.NotNull(carried);
+        Assert.Equal(served.Size, carried!.Value.Ammo);
+
+        // A client world mirrors the slime at the size the server runs it
+        var mirror = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        try
+        {
+            mirror.GetChunkManager().Headless = true;
+            mirror.ApplyNetworkEntities(inbox.Entities!);
+            var mirrored = Assert.Single(mirror.Slimes);
+            Assert.Equal(served.Size, mirrored.Size);
+            Assert.Equal(served.Health, mirrored.Health);
+        }
+        finally
+        {
+            mirror.SaveAndDispose();
+        }
+    }
+
+    [Fact]
     public void AnIntentAimedFromWhereThePlayerIsNotIsRefused()
     {
         using var client = Connect("Teleporter");

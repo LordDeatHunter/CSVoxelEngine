@@ -7,7 +7,8 @@ namespace silkgltriangle;
 /// A slime: a gel cube that hops toward the player and only hurts on contact while it is off the
 /// ground. Grounded contact is harmless — the player shoves it instead. It falls and collides
 /// axis by axis like the falling cubes and primed TNT, sinks slowly through water, faces the
-/// player, and squashes on landing / stretches in the air. Main thread only.
+/// player, and squashes on landing / stretches in the air. Its <see cref="Size"/> scales the body,
+/// health, contact damage and loot (<see cref="SlimeSize"/>). Main thread only.
 /// </summary>
 public sealed class Slime : Mob
 {
@@ -51,8 +52,9 @@ public sealed class Slime : Mob
     private const float HopIntervalSeconds = 1.2f;
     private const float HopIntervalJitter = 0.3f;
 
-    /// <summary>Half the collision body's edge; a hair inside the 0.75-block drawn body so a
-    /// slime resting on a freed cell does not clip its neighbours.</summary>
+    /// <summary>Half the collision body's edge at size 1; a hair inside the 0.75-block drawn body
+    /// so a slime resting on a freed cell does not clip its neighbours. A larger slime's is this
+    /// times its <see cref="SizeScale"/> (<see cref="HalfExtentFor"/>).</summary>
     public const float HalfExtent = 0.36f;
 
     private const float ContactDamageCooldownSeconds = 0.6f;
@@ -71,19 +73,44 @@ public sealed class Slime : Mob
     private float _nextHop;
     private bool _inWater;
 
-    public Slime(EntityType type, Vector3 position) : base(type, position)
+    /// <summary>A slime of <paramref name="size"/> (clamped into <see cref="SlimeSize.Min"/>..
+    /// <see cref="SlimeSize.Max"/>) at full health; <paramref name="position"/> is the body centre,
+    /// <see cref="HalfExtentFor"/> that size above the feet.</summary>
+    public Slime(EntityType type, Vector3 position, int size = SlimeSize.Min) : base(type, position)
     {
+        Size = SlimeSize.Clamp(size);
+        SizeScale = SlimeSize.Scale(Size);
+        Health = MaxHealth;
         _nextHop = HopIntervalSeconds;
     }
 
-    /// <inheritdoc />
-    public override float BodyHalfExtent => HalfExtent;
+    /// <summary>The slime's size, fixed for its life; a split spawns smaller slimes instead.</summary>
+    public int Size { get; }
+
+    /// <summary>How much larger than a size-1 slime the body is drawn and collides.</summary>
+    public float SizeScale { get; }
+
+    /// <summary>The collision body's half edge of a slime of <paramref name="size"/>, which is also
+    /// how far its body centre sits above its feet.</summary>
+    public static float HalfExtentFor(int size) => HalfExtent * SlimeSize.Scale(size);
 
     /// <inheritdoc />
-    public override float BodyHalfHeight => HalfExtent;
+    public override int MaxHealth => SlimeSize.Health(Type.MaxHealth, Size);
+
+    /// <summary>Damage one airborne touch deals, scaled by the size.</summary>
+    public int ContactDamage => SlimeSize.ContactDamage(Size);
+
+    /// <summary>How many times the death rolls the kind's loot table, scaled by the size.</summary>
+    public int LootRolls => SlimeSize.LootRolls(Size);
 
     /// <inheritdoc />
-    public override float HeadAboveCentre => HalfExtent * VerticalScale;
+    public override float BodyHalfExtent => HalfExtent * SizeScale;
+
+    /// <inheritdoc />
+    public override float BodyHalfHeight => HalfExtent * SizeScale;
+
+    /// <inheritdoc />
+    public override float HeadAboveCentre => BodyHalfHeight * VerticalScale;
 
     /// <summary>Whether the slime currently rests on the ground.</summary>
     public bool IsGrounded { get; private set; }
@@ -101,7 +128,8 @@ public sealed class Slime : Mob
     /// <summary>Whether the slime is crouching for a hop it is about to launch.</summary>
     public bool IsWindingUp => _windup > 0f;
 
-    /// <summary>Vertical draw scale: the spring's squash/stretch, the death pop and the spawn pop.</summary>
+    /// <summary>Vertical draw scale: the spring's squash/stretch, the death pop and the spawn pop
+    /// (about 1 at rest; the size's <see cref="SizeScale"/> multiplies on top).</summary>
     public float VerticalScale => (1f + _squash.Value - HitKick * 0.04f) * LifeScale * DeathStretch;
 
     /// <summary>Horizontal draw scale, the volume-preserving counterpart of the squash.</summary>
@@ -230,7 +258,7 @@ public sealed class Slime : Mob
 
     private void ApplyPhysics(float deltaTime, ChunkManager chunks)
     {
-        var feetY = Position.Y - HalfExtent;
+        var feetY = Position.Y - BodyHalfHeight;
         var feetCell = new Vector3(Position.X, feetY, Position.Z).BlockCell();
         var surfaceY = chunks.GetFluidSurfaceGlobal(feetCell.X, feetCell.Y, feetCell.Z);
         var floating = feetY < surfaceY;
@@ -264,10 +292,11 @@ public sealed class Slime : Mob
         }
 
         var movement = _velocity * deltaTime;
+        var half = BodyHalfExtent;
 
-        Position = MoveOnAxis(Position, movement.X, 0, chunks, out var hitX);
-        Position = MoveOnAxis(Position, movement.Z, 2, chunks, out var hitZ);
-        Position = MoveOnAxis(Position, movement.Y, 1, chunks, out var hitY);
+        Position = MoveOnAxis(Position, movement.X, 0, half, chunks, out var hitX);
+        Position = MoveOnAxis(Position, movement.Z, 2, half, chunks, out var hitZ);
+        Position = MoveOnAxis(Position, movement.Y, 1, half, chunks, out var hitY);
 
         if (hitX) _velocity.X = 0f;
         if (hitZ) _velocity.Z = 0f;
@@ -286,7 +315,8 @@ public sealed class Slime : Mob
         }
     }
 
-    private static Vector3 MoveOnAxis(Vector3 start, float delta, int axis, ChunkManager chunks, out bool collided)
+    private static Vector3 MoveOnAxis(Vector3 start, float delta, int axis, float halfExtent, ChunkManager chunks,
+        out bool collided)
     {
         collided = false;
         if (MathF.Abs(delta) < float.Epsilon)
@@ -300,7 +330,7 @@ public sealed class Slime : Mob
             var step = MathUtils.ClampStep(remaining, CollisionStepSize);
             var candidate = OffsetAxis(position, axis, step);
 
-            if (IsColliding(candidate, chunks))
+            if (IsColliding(candidate, halfExtent, chunks))
             {
                 collided = true;
                 break;
@@ -324,9 +354,11 @@ public sealed class Slime : Mob
         };
     }
 
-    private static bool IsColliding(Vector3 center, ChunkManager chunks)
+    /// <summary>Whether a slime body of <paramref name="halfExtent"/> centred at
+    /// <paramref name="center"/> overlaps a solid cell (unloaded cells read as air).</summary>
+    internal static bool IsColliding(Vector3 center, float halfExtent, ChunkManager chunks)
     {
-        VoxelCoords.CellRange(center, HalfExtent, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
+        VoxelCoords.CellRange(center, halfExtent, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
 
         for (var x = minX; x <= maxX; x++)
         for (var y = minY; y <= maxY; y++)

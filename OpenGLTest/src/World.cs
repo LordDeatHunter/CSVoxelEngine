@@ -595,13 +595,15 @@ public class World : IItemUseWorld
     /// Spawns one mob of the named entity kind standing with its feet at <paramref name="feet"/>
     /// (the scripted visual tests' <c>spawn</c> op), a forced spawn under the hard mob cap. False
     /// for an unknown name, a kind whose manager does not exist because its content is not
-    /// registered, or a full hard cap.
+    /// registered, or a full hard cap. <paramref name="size"/> is a slime's size (other kinds
+    /// have none and ignore it).
     /// </summary>
-    public bool SpawnEntity(string name, Vector3 feet)
+    public bool SpawnEntity(string name, Vector3 feet, int size = SlimeSize.Min)
     {
         if (string.Equals(name, "slime", StringComparison.OrdinalIgnoreCase))
         {
-            if (_slimes?.Spawn(feet + new Vector3(0f, Slime.HalfExtent, 0f)) == null) return false;
+            var centre = feet + new Vector3(0f, Slime.HalfExtentFor(size), 0f);
+            if (_slimes?.Spawn(centre, size) == null) return false;
             RefreshMobs();
             return true;
         }
@@ -967,7 +969,7 @@ public class World : IItemUseWorld
             if (!NetEntity.IsMob(entry.Kind))
                 continue;
             _netMobsSeen.Add(entry.Id);
-            if (_netMobs.TryGetValue(entry.Id, out var existing) && KindMatches(existing, entry.Kind))
+            if (_netMobs.TryGetValue(entry.Id, out var existing) && KindMatches(existing, entry))
             {
                 existing.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
                 continue;
@@ -1084,14 +1086,18 @@ public class World : IItemUseWorld
         }
     }
 
-    private static bool KindMatches(Mob mob, NetEntityKind kind) =>
-        kind == NetEntityKind.Slime ? mob is Slime : kind == NetEntityKind.Goblin && mob is Goblin;
+    // A slime mirror also has to be the reported size (the ammo field), since a size is fixed for life
+    private static bool KindMatches(Mob mob, NetEntity entry) =>
+        entry.Kind == NetEntityKind.Slime
+            ? mob is Slime slime && slime.Size == SlimeSize.Clamp(entry.Ammo)
+            : entry.Kind == NetEntityKind.Goblin && mob is Goblin;
 
     private Mob? SpawnNetMob(NetEntity entry)
     {
         Mob? mob = entry.Kind switch
         {
-            NetEntityKind.Slime => _slimes?.Spawn(entry.Position),
+            // A slime's size rides the goblin-only ammo field (NetEntity)
+            NetEntityKind.Slime => _slimes?.Spawn(entry.Position, entry.Ammo),
             NetEntityKind.Goblin => _goblins?.Spawn(entry.Position, entry.Ammo),
             _ => null,
         };
@@ -1671,8 +1677,9 @@ public class World : IItemUseWorld
             // hard cap the entry waits like an unloaded chunk: it stays pending (and is re-saved by
             // CaptureEntities) instead of overfilling the cap-sized healthbar buffers.
             var isSlime = string.Equals(type!.Name, "slime", StringComparison.OrdinalIgnoreCase);
+            // A file saved before slimes had sizes carries none: those were all the smallest size
             Mob? spawned = isSlime
-                ? _slimes!.Spawn(centre)
+                ? _slimes!.Spawn(centre, mob.Size ?? SlimeSize.Min)
                 : _goblins!.Spawn(centre, mob.Ammo ?? 0);
             if (spawned == null)
                 continue;
@@ -1811,7 +1818,7 @@ public class World : IItemUseWorld
     /// <summary>
     /// The live mobs and drops as <see cref="EntitySaveCodec"/> writes them: every living slime and
     /// goblin (kind by <see cref="EntityType.Name"/>, body centre, health, facing, velocity, a
-    /// goblin's ammo) and the item drops nearest the player first, capped at
+    /// goblin's ammo, a slime's size) and the item drops nearest the player first, capped at
     /// <see cref="WorldGenerationConfig.MaxSavedDrops"/>, by <see cref="SaveNames"/> name (an id
     /// with no name is skipped with one warning). Entries still pending a restore are appended, so a
     /// flush during loading, or before a far entity's chunk arrived, never loses them.
@@ -1822,7 +1829,7 @@ public class World : IItemUseWorld
         var slimes = Slimes;
         for (var i = 0; i < slimes.Count; i++)
             if (!slimes[i].IsDead)
-                mobs.Add(MobSaveCodec.Capture(slimes[i], null));
+                mobs.Add(MobSaveCodec.Capture(slimes[i], null, slimes[i].Size));
         var goblins = Goblins;
         for (var i = 0; i < goblins.Count; i++)
             if (!goblins[i].IsDead)

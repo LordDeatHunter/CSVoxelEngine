@@ -263,12 +263,14 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.True(RunUntil(first, () => first.IsLoaded, LoadWallSeconds), "the first world did not finish loading");
         Assert.False(first.LoadTimedOut);
 
-        Assert.True(first.SpawnEntity("slime", new Vector3(2f, High - 1f, 2f)));
+        // A large slime, so the restore cannot pass on the default size either
+        Assert.True(first.SpawnEntity("slime", new Vector3(2f, High - 1f, 2f), SlimeSize.Max));
         Assert.True(first.SpawnEntity("goblin", new Vector3(-2f, High - 1f, 3f)));
         var slime = Assert.Single(first.Slimes);
         var goblin = Assert.Single(first.Goblins);
+        Assert.True(slime.Size > SlimeSize.Min);
         // A wounded, turned and moving slime, so the restore cannot pass on spawn defaults
-        var slimeHealth = slime.Type.MaxHealth - 1;
+        var slimeHealth = slime.MaxHealth - 1;
         var slimeVelocity = new Vector3(0.5f, 0f, -0.25f);
         slime.RestoreState(slimeHealth, 1.25f, slimeVelocity);
         // The body centre as the mob reports it, not the feet handed to SpawnEntity
@@ -293,6 +295,7 @@ public sealed class WorldLifecycleTests : IDisposable
         // Read right after the flipping Update: FinishLoading spawns before any manager has run,
         // and one more Update would let gravity pull everything down through the all-air chunks.
         var restoredSlime = Assert.Single(second.Slimes);
+        Assert.Equal(slime.Size, restoredSlime.Size);
         Assert.Equal(slimeCentre, restoredSlime.Position);
         Assert.Equal(slimeHealth, restoredSlime.Health);
         Assert.Equal(slimeFacing, restoredSlime.Facing);
@@ -407,6 +410,8 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Equal(WorldGenerationConfig.MobHardCap, world.Mobs.Count);
         Assert.True(world.Mobs.Count > WorldGenerationConfig.MobNaturalCap);
         Assert.True(world.Mobs.Count <= WorldGenerationConfig.MobsMaxAlive);
+        // The entries name no size, as a file saved before slimes had sizes: all the smallest
+        Assert.All(world.Slimes, s => Assert.Equal(SlimeSize.Min, s.Size));
 
         // The live mobs plus the surplus still pending are all written back
         Assert.True(world.SaveAndDispose());

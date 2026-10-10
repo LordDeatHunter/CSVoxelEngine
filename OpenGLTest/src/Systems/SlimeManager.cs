@@ -77,12 +77,12 @@ public sealed class SlimeManager : IMobPopulation
     /// Adds a slime at an exact body-centre position: a forced spawn (scenarios, save restores, a
     /// client's mirror, tests), which may go past the natural cap but never the hard cap. Null, and
     /// nothing added, once the hard cap is full. The ring spawner adds through here too, after its
-    /// own natural-cap check.
+    /// own natural-cap check. <paramref name="size"/> is clamped into the slime sizes.
     /// </summary>
-    public Slime? Spawn(Vector3 position)
+    public Slime? Spawn(Vector3 position, int size = SlimeSize.Min)
     {
         if (_caps.ForcedRoom <= 0) return null;
-        var slime = new Slime(_type, position);
+        var slime = new Slime(_type, position, size);
         _slimes.Add(slime);
         return slime;
     }
@@ -141,12 +141,12 @@ public sealed class SlimeManager : IMobPopulation
             {
                 var target = targets[t];
                 var eye = target.Eye;
-                if (!MobTargets.BodyTouches(eye, slime.Position, Slime.HalfExtent)) continue;
+                if (!MobTargets.BodyTouches(eye, slime.Position, slime.BodyHalfExtent)) continue;
 
                 if (!target.IsImmune && slime.CanDealContactDamage)
                 {
                     slime.NotifyContactDamage();
-                    var damage = WorldGenerationConfig.SlimeContactDamage;
+                    var damage = slime.ContactDamage;
                     DamageDealtThisFrame += damage;
                     var away = new Vector3(eye.X - slime.Position.X, 0f, eye.Z - slime.Position.Z);
                     target.TakeHit(damage, away, WorldGenerationConfig.SlimeKnockbackSpeed,
@@ -167,13 +167,16 @@ public sealed class SlimeManager : IMobPopulation
         UpdateSpawning(deltaTime, chunks, targets);
     }
 
+    // A larger slime rolls its kind's loot table once per LootRolls, so its yield grows with it.
     private void DropLoot(Slime slime, DropManager drops)
     {
         if (_type.LootTable == null) return;
 
         _loot.Clear();
         var (lootX, lootY, lootZ) = slime.Position.BlockCell();
-        _type.LootTable.Roll(new LootContext(lootX, lootY, lootZ, 0), _loot);
+        var context = new LootContext(lootX, lootY, lootZ, 0);
+        for (var roll = 0; roll < slime.LootRolls; roll++)
+            _type.LootTable.Roll(context, _loot);
 
         foreach (var id in _loot)
             drops.SpawnAt(id, slime.Position);

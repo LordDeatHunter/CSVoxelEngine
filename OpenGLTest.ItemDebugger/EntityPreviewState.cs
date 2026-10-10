@@ -379,7 +379,7 @@ public sealed class EntityPreviewState : IPreviewDriver
         _hurtTimer -= dt;
         if (_hurtTimer > 0f) return;
         _hurtTimer += RestFor(HurtPeriod);
-        if (mob.Health <= 2) mob.NetworkSetState(mob.Position, mob.Facing, mob.Type.MaxHealth, mob.Velocity);
+        if (mob.Health <= 2) mob.NetworkSetState(mob.Position, mob.Facing, mob.MaxHealth, mob.Velocity);
         mob.TakeDamage(1);
     }
 

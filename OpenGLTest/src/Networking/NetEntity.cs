@@ -15,7 +15,9 @@ public enum NetEntityKind : byte
 /// <summary>
 /// One server-authoritative entity in a broadcast snapshot: its kind and stable id, and the state
 /// the client renders from. A mob uses <see cref="Health"/>, <see cref="Yaw"/> and
-/// <see cref="Velocity"/> (and <see cref="Ammo"/> for a goblin); a drop uses <see cref="ItemId"/>.
+/// <see cref="Velocity"/>, and <see cref="Ammo"/> carries a goblin's ammo or a slime's size
+/// (<see cref="Slime.Size"/>; a 0 from an older server reads as the smallest size); a drop uses
+/// <see cref="ItemId"/>.
 /// A primed TNT uses <see cref="ItemId"/> (the block that primed), <see cref="Health"/> (the fuse
 /// remaining, in milliseconds) and <see cref="Ammo"/> (the whole fuse, in milliseconds); a falling
 /// block uses <see cref="ItemId"/> (the block that toppled). GL-free and content-free.

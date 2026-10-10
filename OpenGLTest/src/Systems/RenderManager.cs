@@ -3329,11 +3329,13 @@ public class RenderManager : IDisposable
 
     // The model's base sits on y = 0 while Position is the body centre, so the feet offset lifts
     // it onto the ground; scaling about the origin then squashes it from its base, not its middle.
+    // The size scale rides the same scale, so a large slime grows from its feet like its body box.
     private static Matrix4x4 SlimeTransform(Slime slime) =>
-        Matrix4x4.CreateScale(slime.HorizontalScale, slime.VerticalScale, slime.HorizontalScale)
+        Matrix4x4.CreateScale(slime.HorizontalScale * slime.SizeScale, slime.VerticalScale * slime.SizeScale,
+            slime.HorizontalScale * slime.SizeScale)
         * Matrix4x4.CreateRotationY(slime.Facing)
         * Matrix4x4.CreateTranslation(
-            slime.Position.X, slime.Position.Y - Slime.HalfExtent, slime.Position.Z);
+            slime.Position.X, slime.Position.Y - slime.BodyHalfHeight, slime.Position.Z);
 
     /// <summary>
     /// Draws the live goblins part by part, each part posed by the goblin's own

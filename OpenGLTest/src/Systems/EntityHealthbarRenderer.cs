@@ -184,7 +184,7 @@ public sealed class EntityHealthbarRenderer : IDisposable
         for (var slot = 0; slot < count; slot++)
         {
             var mob = mobs[_order[count - 1 - slot]];
-            HeartFills(mob.Health, mob.Type.MaxHealth, _fills);
+            HeartFills(mob.Health, mob.MaxHealth, _fills);
             var centre = new Vector3(mob.Position.X,
                 BarCentreY(mob.Position.Y, mob.HeadAboveCentre),
                 mob.Position.Z);

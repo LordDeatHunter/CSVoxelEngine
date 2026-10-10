@@ -66,6 +66,33 @@ public sealed class NetworkEntitySyncTests : IDisposable
     }
 
     [Fact]
+    public void ASlimesSizeRidesTheSnapshotIntoTheMirror()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        _world.GetChunkManager().Headless = true;
+
+        // The ammo field carries a slime's size; a full large slime's health is above the small pool
+        var pos = new Vector3(4f, 60f, 4f);
+        var large = new Slime(EntityRegistry.Require("slime"), pos, SlimeSize.Max);
+        _world.ApplyNetworkEntities([new NetEntity(NetEntityKind.Slime, 7, pos, 1f, large.MaxHealth, large.Size, 0, Vector3.Zero)]);
+        var mirrored = Assert.Single(_world.Slimes);
+        Assert.Equal(large.Size, mirrored.Size);
+        Assert.Equal(large.MaxHealth, mirrored.Health);
+        Assert.Equal(large.BodyHalfExtent, mirrored.BodyHalfExtent);
+
+        // The same id at the same size updates in place
+        _world.ApplyNetworkEntities([new NetEntity(NetEntityKind.Slime, 7, pos, 1f, 2, large.Size, 0, Vector3.Zero)]);
+        Assert.Same(mirrored, Assert.Single(_world.Slimes));
+
+        // An older server's 0 reads as the smallest size, which replaces the mirror (a size is for life)
+        _world.ApplyNetworkEntities([new NetEntity(NetEntityKind.Slime, 7, pos, 1f, 2, 0, 0, Vector3.Zero)]);
+        var replaced = Assert.Single(_world.Mobs);
+        Assert.NotSame(mirrored, replaced);
+        Assert.Equal(SlimeSize.Min, Assert.IsType<Slime>(replaced).Size);
+    }
+
+    [Fact]
     public void PrimedTntAndFallingBlocksMirrorFromASnapshot()
     {
         WorldSeed.Apply(WorldSeed.Default);

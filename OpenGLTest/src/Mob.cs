@@ -38,6 +38,11 @@ public abstract class Mob
 
     public int Health { get; protected set; }
 
+    /// <summary>This mob's full health: its kind's pool (<see cref="EntityType.MaxHealth"/>), or a
+    /// subclass's own (a slime scales it by its size). A subclass that overrides it sets
+    /// <see cref="Health"/> to it in its constructor, since the base constructor cannot.</summary>
+    public virtual int MaxHealth => Type.MaxHealth;
+
     public bool IsDead => Health <= 0;
 
     /// <summary>Yaw in radians the body faces; the model faces -Z at 0.</summary>
@@ -133,13 +138,13 @@ public abstract class Mob
 
     /// <summary>
     /// Puts back the health, facing and velocity a save recorded, on a mob freshly spawned at
-    /// its saved position. The health is clamped into 1..<see cref="EntityType.MaxHealth"/>, so
-    /// a restored mob is never dead on arrival and never above its kind's pool (a retuned
+    /// its saved position. The health is clamped into 1..<see cref="MaxHealth"/>, so
+    /// a restored mob is never dead on arrival and never above its pool (a retuned
     /// <c>hp</c> wins). AI timers and the animation stay the constructor's: they restart.
     /// </summary>
     internal void RestoreState(int health, float facing, Vector3 velocity)
     {
-        Health = Math.Clamp(health, 1, Math.Max(1, Type.MaxHealth));
+        Health = Math.Clamp(health, 1, Math.Max(1, MaxHealth));
         Facing = facing;
         SetVelocity(velocity);
     }
@@ -153,7 +158,7 @@ public abstract class Mob
     {
         Position = position;
         Facing = facing;
-        Health = Math.Clamp(health, 0, Math.Max(1, Type.MaxHealth));
+        Health = Math.Clamp(health, 0, Math.Max(1, MaxHealth));
         SetVelocity(velocity);
     }
 }

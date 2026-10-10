@@ -1,0 +1,27 @@
+{
+  // Slime sizes: run with VOXEL_SCRIPT=visual-examples/slime-sizes.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/slime-sizes/.
+  // `spawn` takes an optional `size` (an integer from 1, default 1; clamped to the slime sizes).
+  // Same open, flat, dry forest clearing as goblins.json (ground at y 9..10 over x -56..-32,
+  // z 32..68, no trunks): the camera hovers (fly makes it immune) facing -Z and the three sizes
+  // stand side by side about 8 blocks in front of it, small to large from left to right.
+  "steps": [
+    { "op": "teleport", "pos": [-43.5, 13.0, 61.5], "yaw": -90, "pitch": -14 },
+    { "op": "fly" },
+    // Chunks must be loaded before anything can stand on them: a slime reads an unloaded chunk
+    // as air and would fall through.
+    { "op": "wait", "seconds": 5 },
+    { "op": "spawn", "entity": "slime", "pos": [-47.5, 53.5], "size": 1 },
+    { "op": "spawn", "entity": "slime", "pos": [-43.5, 53.5], "size": 2 },
+    { "op": "spawn", "entity": "slime", "pos": [-38.5, 53.5], "size": 3 },
+    // Past the spawn pop, before the first hop's crouch
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "sizes" },
+    // Mid-hop: each size stretches and leaps at the camera
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "screenshot", "name": "hop" },
+    { "op": "wait", "seconds": 3 },
+    { "op": "look", "yaw": -90, "pitch": -40 },
+    { "op": "screenshot", "name": "close" }
+  ]
+}

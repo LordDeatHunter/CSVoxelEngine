@@ -1274,6 +1274,15 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // upward pop so the hit reads even on flat ground.
     public const float SlimeKnockbackSpeed = 6f;
     public const float SlimeKnockbackLift = 4.5f;
+    // Slime sizes (SlimeSize), 1..SlimeMaxSize: size 1 is the plain slime, and every size above it
+    // adds one step to each stat's multiplier, so a size s slime has (1 + (s - 1) * step) times the
+    // size-1 value: the body scale (drawn model, collision box, healthbar height), the health pool
+    // (over the entity JSON's hp), the contact damage and the loot table rolls.
+    public const int SlimeMaxSize = 3;
+    public const float SlimeSizeScaleStep = 0.5f;
+    public const float SlimeSizeHealthStep = 1f;
+    public const float SlimeSizeDamageStep = 0.5f;
+    public const float SlimeSizeLootStep = 1f;
 
     // --- Goblins (GoblinManager) ---
     // Short forest raiders that throw the flint they carry at the player from a standoff band,

@@ -877,7 +877,13 @@ public sealed class GameServer : IDisposable
         {
             var mob = mobs[i];
             var kind = mob is Slime ? NetEntityKind.Slime : NetEntityKind.Goblin;
-            var ammo = mob is Goblin goblin ? goblin.Ammo : 0;
+            // The int field is a goblin's ammo and a slime's size (NetEntity)
+            var ammo = mob switch
+            {
+                Goblin goblin => goblin.Ammo,
+                Slime slime => slime.Size,
+                _ => 0,
+            };
             writer.Write((byte)kind);
             writer.Write(IdFor(mob));
             writer.Write(mob.Position);

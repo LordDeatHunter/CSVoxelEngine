@@ -36,6 +36,15 @@ public sealed class EntityRestoreTests
         Assert.True(slime.Health >= 1);
         Assert.False(slime.IsDead);
 
+        // A larger slime's pool is its own: a saved health above the kind's base pool survives, and
+        // the clamp is the size's pool
+        var large = slimes.Spawn(new Vector3(4.5f, 1f + Slime.HalfExtentFor(SlimeSize.Max), 4.5f), SlimeSize.Max)!;
+        Assert.True(large.MaxHealth > max);
+        large.RestoreState(max + 1, facing, velocity);
+        Assert.Equal(max + 1, large.Health);
+        large.RestoreState(large.MaxHealth * 4, facing, velocity);
+        Assert.Equal(large.MaxHealth, large.Health);
+
         var goblins = new GoblinManager(EntityRegistry.Require("goblin"));
         var goblin = goblins.Spawn(new Vector3(6.5f, 1f + Goblin.Height * 0.5f, 6.5f), ammo: 5);
         var goblinHealth = goblin.Type.MaxHealth - 1;

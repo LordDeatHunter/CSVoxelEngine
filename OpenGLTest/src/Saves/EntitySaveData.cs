@@ -36,6 +36,10 @@ public sealed class EntitySaveData
 
         /// <summary>Flint still carried; only meaningful for a goblin.</summary>
         public int? Ammo { get; set; }
+
+        /// <summary>The body size (<see cref="Slime.Size"/>); only meaningful for a slime. Absent,
+        /// as in a file saved before slimes had sizes, restores the smallest size.</summary>
+        public int? Size { get; set; }
     }
 
     /// <summary>One item drop lying (or falling) in the world.</summary>

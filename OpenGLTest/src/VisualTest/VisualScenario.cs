@@ -28,6 +28,10 @@ public sealed class VisualStep
     /// <summary>The entity name a <c>spawn</c> step creates (resolved at run time).</summary>
     public string? Entity { get; init; }
 
+    /// <summary>The size a <c>spawn</c> step gives a slime (1 when the step names none; other
+    /// kinds ignore it).</summary>
+    public int Size { get; init; } = 1;
+
     /// <summary>True when a <c>spawn</c> step gave only <c>[x, z]</c>, and always for a <c>grow</c>
     /// step: the feet (or the tree's root search) go on top of the terrain column there, and
     /// <see cref="Pos"/>'s Y is ignored.</summary>
@@ -222,8 +226,9 @@ public sealed class VisualScenario
     }
 
     /// <summary>A <c>spawn</c> step: <c>entity</c> names what to create (validated against the
-    /// registry only when the step runs, so parsing stays content-free), and <c>pos</c> is either
-    /// <c>[x, z]</c> (feet snapped onto the terrain) or <c>[x, y, z]</c> (an exact feet position).</summary>
+    /// registry only when the step runs, so parsing stays content-free), <c>pos</c> is either
+    /// <c>[x, z]</c> (feet snapped onto the terrain) or <c>[x, y, z]</c> (an exact feet position),
+    /// and the optional <c>size</c> (an integer from 1, default 1) is a slime's size.</summary>
     private static VisualStep ReadSpawn(JsonElement element, int index)
     {
         if (!element.TryGetProperty("entity", out var entity)
@@ -231,17 +236,22 @@ public sealed class VisualScenario
             || string.IsNullOrWhiteSpace(entity.GetString()))
             throw new InvalidOperationException($"Step {index} (spawn) needs 'entity'.");
 
+        var size = 1;
+        if (element.TryGetProperty("size", out var sizeElement)
+            && (sizeElement.ValueKind != JsonValueKind.Number || !sizeElement.TryGetInt32(out size) || size < 1))
+            throw new InvalidOperationException($"Step {index} (spawn) needs 'size' to be an integer from 1.");
+
         var values = ReadPosValues(element, index, "spawn", "[x, z] or [x, y, z]");
         return values.Count switch
         {
             2 => new VisualStep
             {
-                Op = "spawn", Entity = entity.GetString()!.Trim(),
+                Op = "spawn", Entity = entity.GetString()!.Trim(), Size = size,
                 Pos = new Vector3(values[0], 0f, values[1]), SnapToGround = true,
             },
             3 => new VisualStep
             {
-                Op = "spawn", Entity = entity.GetString()!.Trim(),
+                Op = "spawn", Entity = entity.GetString()!.Trim(), Size = size,
                 Pos = new Vector3(values[0], values[1], values[2]),
             },
             _ => throw new InvalidOperationException(

@@ -114,6 +114,27 @@ public sealed class VisualScenarioTests
     }
 
     [Fact]
+    public void SpawnCarriesAnOptionalSizeThatDefaultsToTheSmallest()
+    {
+        var scenario = VisualScenario.Parse(
+            """{ "steps": [{ "op": "spawn", "entity": "slime", "pos": [1, 2], "size": 3 }, { "op": "spawn", "entity": "slime", "pos": [1, 2] }] }""",
+            "sizes");
+        Assert.Equal(3, scenario.Steps[0].Size);
+        Assert.Equal(1, scenario.Steps[1].Size);
+    }
+
+    [Theory]
+    [InlineData("""{ "steps": [{ "op": "spawn", "entity": "slime", "pos": [1, 2], "size": 0 }] }""")]
+    [InlineData("""{ "steps": [{ "op": "spawn", "entity": "slime", "pos": [1, 2], "size": 1.5 }] }""")]
+    [InlineData("""{ "steps": [{ "op": "spawn", "entity": "slime", "pos": [1, 2], "size": "big" }] }""")]
+    public void SpawnRefusesASizeThatIsNotAPositiveInteger(string json)
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() => VisualScenario.Parse(json, "bad"));
+        Assert.Contains("'size'", ex.Message);
+        Assert.Contains("(spawn)", ex.Message);
+    }
+
+    [Fact]
     public void UnknownOpNamesEveryOp()
     {
         var ex = Assert.Throws<InvalidOperationException>(
