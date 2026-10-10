@@ -1181,6 +1181,26 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float ShrubPatchThreshold = 0.2f;
     public const float ShrubDensity = 0.04f;
 
+    // --- Cotton (CottonGenerator over PlantClumps) ---
+    // Clumped, not scattered: at most one clump per 2^CottonCellShift-block cell, accepted with
+    // CottonClumpChance and only on the warm, dry forest fringe before the desert line: a forest
+    // centre whose desert weight (0.5 on the desert line itself) lies in
+    // [CottonMinDesertWeight, CottonMaxDesertWeight), the top end being where the grass/sand border
+    // dither starts, so a clump never lands on dithered sand. The centre sits up to CottonJitter
+    // blocks off the cell's middle, so centres are at least 2^shift - 2 * jitter apart, and the clump
+    // fills a CottonRadius disc: the CottonMinMembers cells nearest the centre always, the rest with
+    // a density falling from 1 at the centre to CottonEdgeDensity at the rim. Clumps never overlap
+    // while that spacing exceeds 2 * radius.
+    public const bool CottonEnabled = true;
+    public const int CottonCellShift = 6;
+    public const int CottonJitter = 16;
+    public const int CottonRadius = 3;
+    public const int CottonMinMembers = 5;
+    public const float CottonClumpChance = 0.6f;
+    public const float CottonEdgeDensity = 0.1f;
+    public const float CottonMinDesertWeight = 0.2f;
+    public const float CottonMaxDesertWeight = 0.5f - BiomeBorderDither;
+
     // --- Tree felling (TopplingTree) ---
     // Seconds for a felled tree to swing from upright to flat (cubic ease-in: slow tip,
     // accelerating slam), then rest before its wood pops out as item drops

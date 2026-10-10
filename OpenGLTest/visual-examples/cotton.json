@@ -1,0 +1,45 @@
+{
+  // Wild cotton (CottonGenerator over PlantClumps): one clump on the warm, dry forest fringe, from
+  // a few blocks away, from above and from the side, and one plant mined for its drop.
+  // Run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/cotton.json
+  // Coordinates (default seed, headless probe over PlantClumps.TryGetClump + IsCottonClimate and
+  // the generated chunks): the nearest clump to spawn is centred at (81, 173) in an open meadow
+  // at ground 7-8, twelve plants over x 80..83, z 171..174, flowers and grass tufts around it.
+  // Look for a tight cluster (never a lone stem every few blocks), every plant standing on grass,
+  // the white bolls readable, no plant floating or sunk, and the flowers filling in around the
+  // clump rather than inside it.
+  //
+  // The mining part runs first and on foot, since flight implies creative and creative breaking
+  // drops nothing: the plant (81, 174) is mined from 4 blocks south, outside the 3-block pickup
+  // range, so mined_drop and drop_rest show the cotton drop lying where the plant stood. The
+  // camera then flies (hovering, immune) for the overview shots, and the last shot holds cotton
+  // so the hotbar icon and the held sprite show.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [81.5, 9.8, 180.5], "yaw": -90, "pitch": -12 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "clump_near", "hideHud": true },
+
+    // Aim at the plant at (81, 174) over the flower at (81, 178) and the tuft at (81, 177)
+    { "op": "teleport", "pos": [81.5, 9.7, 178.5], "yaw": -90, "pitch": -16.3 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "mine_target" },
+    { "op": "mine", "seconds": 0.1 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "mined_drop", "hideHud": true },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "drop_rest", "hideHud": true },
+
+    { "op": "fly" },
+    { "op": "teleport", "pos": [81.5, 17.5, 178.5], "yaw": -90, "pitch": -58 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "clump_above", "hideHud": true },
+    { "op": "teleport", "pos": [88.5, 10.5, 173.0], "yaw": 180, "pitch": -12 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "clump_side", "hideHud": true },
+    { "op": "give", "block": "item/cotton", "count": 3 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "held_cotton" }
+  ]
+}

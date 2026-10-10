@@ -1,0 +1,6 @@
+{
+  // Cotton plant: 1-2 cotton bolls
+  "pools": [
+    { "rolls": 1, "entries": [ { "item": "item/cotton", "count": { "min": 1, "max": 2 } } ] }
+  ]
+}

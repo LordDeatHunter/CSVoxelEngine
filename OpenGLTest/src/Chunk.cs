@@ -509,6 +509,11 @@ public class Chunk : IDisposable
         if (WorldGenerationConfig.PebblesEnabled)
             PebbleGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
+        // Before the flowers and foliage, so their per-column scatter fills in around a clump
+        // instead of eating into it
+        if (WorldGenerationConfig.CottonEnabled)
+            CottonGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
+
         if (WorldGenerationConfig.FlowersEnabled)
             FlowerGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 

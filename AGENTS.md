@@ -834,6 +834,8 @@ OpenGLTest/
         LodCrownProxy.cs, LodCrownProfile.cs  # the far-LOD crown silhouette of a species
       SnowGenerator.cs         # cold weather: freezes surface water to ice, lays one layered-snow cell per cold column
       IceSpikeGenerator.cs     # rare single-column ice spikes on the barren frozen plains
+      PlantClumps.cs           # GL-free clumped-plant rule over a PlantClumpSpec (cell, jitter, radius, core, falloff)
+      CottonGenerator.cs       # wild cotton clumps on the dry forest fringe (PlantClumps + a climate gate)
       NoiseCaves.cs            # 3D-noise caves (cheese rooms, wide/narrow spaghetti, deep caverns) on a strided lattice
       WormCarver.cs            # worm-carved tunnels: per-XZ-cell deterministic paths, cached, carved sphere by sphere
       LavaGenerator.cs         # deep lava pockets: cave floors at/below LavaMaxY pond over inside patch mask + pool roll
@@ -866,6 +868,7 @@ OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple 
 tools/generate-goblin-skin.ps1        # deterministic generator of goblin.png; its header pins the UV layout
 tools/generate-leaf-textureless.ps1   # deterministic grey leaf tiles for the biome tint (scaled to BiomeTintTextureGrey)
 tools/generate-tree-textures.ps1      # placeholder baobab / stone pine log and leaf tiles tinted from the oak art
+tools/generate-cotton-textures.py     # deterministic cotton_plant tile and cotton item sprite (stdlib PNG writer)
 ```
 
 ## Content: blocks, items, models and loot are data
@@ -2233,6 +2236,15 @@ only in its `worldgen.biomes`: `oak` in the forest, `spruce` in the taiga and th
 (a thick stem whose few arms bend upward, wearing the generated `cactus_side`/`cactus_top` tiles;
 see `tools/generate-biome-textures.ps1`) in the desert, while `baobab` and `stone_pine` never
 generate; the forest also grows flowers (`FlowerGenerator`), and the frozen plains grow nothing.
+Wild cotton grows in **clumps** on the warm, dry forest fringe before the desert
+(`CottonGenerator`: a forest centre whose desert weight lies in
+`[CottonMinDesertWeight, CottonMaxDesertWeight)`, the top end being where the sand dither starts),
+stamped after the pebbles and before the flowers and foliage. Placement is the reusable
+`PlantClumps` rule over a `PlantClumpSpec`: one candidate clump per coarse cell, its centre jittered
+inside the cell (so centres are at least `MinCentreSpacing` apart), a disc whose `MinMembers` nearest
+cells always belong and whose rest thin toward the rim, and a column asks every cell that can reach
+it, so a clump is never cut at a cell or chunk border. A pure hash of (cell, seed), no noise, so no
+reseed; a later clumped plant needs only its own spec and gate. Like flowers, the far LOD draws none.
 How a tree is grown, stamped, felled and decays is in `### Trees`. Mob spawning (`MobSpawner`,
 shared by slimes and goblins) asks `TerrainGenerator.IsForest(x, z)`, which is now a real test.
 
