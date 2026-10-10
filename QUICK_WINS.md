@@ -38,7 +38,7 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
   footfall (`PlayerModel`'s walk cycle phase). A slice of `V-3` in TODO.md; build it right after
   the landing puffs so the surface-tint lookup is shared. Test: no puff while standing or
   sneaking, none on a non-loose surface.
-- [ ] **Sprint FOV widening.** The view eases out a few degrees while sprinting and back when
+- [x] **Sprint FOV widening.** *Done:* `SprintFov` term added to the base FOV and the punch pinch, capped at the on-foot sprint speed (`camera-feel.json`). The view eases out a few degrees while sprinting and back when
   the sprint ends.
   *Hook:* `Camera._currentFov` is already part of the view-cache key (see "Camera" in AGENTS.md),
   so add a target FOV driven through `MathUtils.Damp`; the knob (extra degrees, ease speed) goes
@@ -46,7 +46,7 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
   (`PunchFov`): add them, do not overwrite. Flight sprint (10x) should not blow the FOV out, so
   clamp it.
 
-- [ ] **Hit-stop on a landed punch.** When a punch or slice connects with a mob, the player's
+- [x] **Hit-stop on a landed punch.** *Done:* `PlayerModel.HitStop` + `SwingHitStop`; the rest of the swing replays faster so it still ends on time (bare-hand punch holds ~80 ms, slice 150 ms); a client predicts the connect (`hit-stop.json`). When a punch or slice connects with a mob, the player's
   swing freezes for about 100-200 ms so hits feel heavier (start near 150 ms and tune by feel).
   *Hook:* the swing clock in `PlayerModel` (`Punch`/`SlicePhase`) and the hit landing in
   `World.UpdatePunch`/`UpdateSlice`. Freeze only the swing animation and camera pinch, never the
@@ -54,12 +54,12 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
   tool may hold longer (`Punch(weight)`). Cosmetic and client-side: on a server the stall is
   local to the animation, so nothing may be paced by it (attack pacing stays `AttackPacing`).
   Test: the freeze is bounded and never extends past the max, a miss never freezes.
-- [ ] **Swim stroke bubbles.** Each swim stroke lets out a few bubbles from the head.
+- [x] **Swim stroke bubbles.** *Done:* `BubbleParticleSystem.TrackSwimStrokes`, one burst from the head per stroke while the eye is in water (`swim-bubbles.json`). Each swim stroke lets out a few bubbles from the head.
   *Hook:* `Camera.SwimStrokeCount` moves on every stroke, which is already how the body starts
   its stroke animation; spawn the bubbles on that change. The bubble texture and renderer exist
   (the HUD/world bubbles). Only while the head is actually in water (`IsEyeInWater`).
 
-- [ ] **Strafe camera tilt.** The view rolls 1-2 degrees toward the strafe direction and eases
+- [x] **Strafe camera tilt.** *Done:* `StrafeTilt`, an eased roll of at most 1.5° into the strafe, added to the other roll terms, off while flying or dead. The view rolls 1-2 degrees toward the strafe direction and eases
   back when the strafe stops.
   *Hook:* `Camera._roll` already folds into the view cache key (see "Camera" in AGENTS.md), so
   this is one damped target through `MathUtils.Damp` from the sideways input or velocity; the
@@ -180,13 +180,13 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
 
 ## Enemies
 
-- [ ] **Slime size variants.** Slimes come in sizes. Each size scales the body, health, damage
+- [x] **Slime size variants.** *Done:* sizes 1-3 via `SlimeSize` multipliers (body, health, damage, loot rolls), saved in `MobData.Size`, sent in `NetEntity.Ammo` (`slime-sizes.json`). Slimes come in sizes. Each size scales the body, health, damage
   and loot, on top of the existing hop AI and squash spring.
   *Hook:* `Slime` / `SlimeManager` (spawn roll, `WorldGenerationConfig.Slime*`), the model scale
   through the squash path, and the size must be saved and sent (`MobSaveCodec`, `NetEntity`), so
   look at both before starting. Per-size stats are data-like constants, not a branch per size.
   Test: stats grow monotonically with size; a size survives save and reload.
-  - *Sub-step (one mob cap, do this first):* replace the per-kind caps (`SlimeMaxAlive`,
+  - [x] *Sub-step (one mob cap, do this first):* *Done:* `MobCaps` (natural `MobNaturalCap`, hard `MobHardCap` = 15x) shared by both managers; `MobsMaxAlive` is the hard cap. replace the per-kind caps (`SlimeMaxAlive`,
     `GoblinMaxAlive`) with **two global mob caps** shared by every kind. The **natural spawn cap**
     limits how many mobs the ring spawner may have alive; the **hard cap** (about 15x the natural
     one, one constant in `WorldGenerationConfig`) limits how many may exist at all. A natural
@@ -198,13 +198,13 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
     `SlimeManager`, `GoblinManager` and the `MobSpawner` callers, and a mob kind added later needs
     no cap of its own. Test: natural spawns stop at the natural cap, a forced spawn exceeds it, no
     spawn of either kind exceeds the hard cap, and dying mobs do not count.
-  - *Sub-step (spawn rules):* by day the slimes are mostly small, with a small chance of a
+  - [x] *Sub-step (spawn rules):* *Done:* `SlimeSize.Roll` from `DayCycle.NightFactor` and the underground flag. by day the slimes are mostly small, with a small chance of a
     larger one. At night, or underground, the chance of a larger one is higher. Reads the
     lighting clock and the spawn height or sky exposure at the chosen cell; this is the
     light/time-keyed spawning `F-3` in TODO.md lists as open, but done only for slime size, not
     a general system. Test: the large-size share is higher at night and below ground than by day
     on the surface, with the same rolls.
-  - *Sub-step (splitting):* a slime that is large enough splits into smaller slimes when a hit
+  - [x] *Sub-step (splitting):* *Done:* `SlimeSize.SplitsOnHit` on the half-line transition, children forced under the hard cap (`slime-split.json`). a slime that is large enough splits into smaller slimes when a hit
     brings it to half health or below while it survives. A hit that kills it from above half
     does **not** split it (no children), and neither does a slime too small to split. So the rule
     is on the transition, not on being low: the health before the hit is above half, the health
