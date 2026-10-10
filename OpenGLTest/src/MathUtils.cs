@@ -125,6 +125,41 @@ public static class MathUtils
         return 1f - inverse * inverse * inverse;
     }
 
+    /// <summary>Smooth start and finish (cubic), the symmetric counterpart of the one-sided cubics.</summary>
+    public static float EaseInOutCubic(float t)
+    {
+        t = Clamp01(t);
+        return t < 0.5f ? 4f * t * t * t : 1f - MathF.Pow(-2f * t + 2f, 3f) / 2f;
+    }
+
+    /// <summary>Overshoots 1 then settles back (anticipation-free "pop"); 0 at 0 and exactly 1 at 1.</summary>
+    public static float EaseOutBack(float t, float overshoot = 1.70158f)
+    {
+        t = Clamp01(t) - 1f;
+        return 1f + t * t * ((overshoot + 1f) * t + overshoot);
+    }
+
+    /// <summary>Springy ring-out around 1; 0 at 0 and exactly 1 at 1.</summary>
+    public static float EaseOutElastic(float t)
+    {
+        t = Clamp01(t);
+        if (t <= 0f || t >= 1f) return t;
+        const float c4 = MathF.Tau / 3f;
+        return MathF.Pow(2f, -10f * t) * MathF.Sin((t * 10f - 0.75f) * c4) + 1f;
+    }
+
+    /// <summary>Ball-drop bounces settling at 1; 0 at 0 and exactly 1 at 1.</summary>
+    public static float EaseOutBounce(float t)
+    {
+        t = Clamp01(t);
+        const float n1 = 7.5625f, d1 = 2.75f;
+        if (t < 1f / d1) return n1 * t * t;
+        if (t < 2f / d1) { t -= 1.5f / d1; return n1 * t * t + 0.75f; }
+        if (t < 2.5f / d1) { t -= 2.25f / d1; return n1 * t * t + 0.9375f; }
+        t -= 2.625f / d1;
+        return n1 * t * t + 0.984375f;
+    }
+
     /// <summary>
     /// Continuous -1..1 oscillation, completing one cycle every <paramref name="period"/>
     /// seconds. Starts at 0 and rises first, so an animation using it begins from rest.
