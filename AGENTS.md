@@ -343,7 +343,17 @@ tracks the sun. The ore body darkens by `metallic * 0.6` and the sun highlight, 
 is scaled by `WorldGenerationConfig.OreSpecLinearScale` (`uOreSpecScale`), because the sRGB encode
 lifts an add on the near-black body far more than it did in display space and smeared coal's
 specks into grey. Every other (non-ore, non-water) tile is plain diffuse: the SH-23 grazing sky
-rim was removed because it tinted grazing foliage teal.
+rim was removed because it tinted grazing foliage teal. The one exception is the **snow sparkle**,
+not part of the material system: the snow block's tile (`uSnowLayer`, its `Top`, set in
+`InitWorldProgram`; `uSnowSparkle` 0 switches it off, as in the ItemDebugger) gets a separate term
+(`SnowGlint`): a `SnowSparkleDensity` share of texels, hashed (`Pcg3d`) from the texel's place on
+the face's own plane in texture-pixel space (`SnowTexels` must equal the tile size,
+`SnowSparkleTests`), carries a random cosine-weighted facet, and its whole texel flashes with
+`SnowSparkleStrength` of the sun while the eye/sun half vector lines up with it, so glints move with
+the camera. Gated by skylight, a thresholded shadow and cloud shadow (no dimmed glints in a shadow
+the low sun has faded), the sun on the face's side, distance (gone by 36 blocks) and a grazing view.
+Sunlit snow sits ~2x past the tonemap clip for most of a day, so the glints only read when it is
+under the clip, i.e. a low sun: `visual-examples/snow-sparkle.json` at `VOXEL_TIME=405`.
 
 **Chunk meshing.** The column terrain a build reads (heights for the sun seeding, water levels,
 the tint climate) comes from the 3x3 chunk columns around it, resolved once:

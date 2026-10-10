@@ -838,6 +838,11 @@ public class RenderManager : IDisposable
         // and a world with no reflective tiles safe.
         program.SetUniform("uMaterialCount", materialSsbo != 0 ? TileMaterials.ByLayer.Length : 0);
         program.SetUniform("uOreSpecScale", WorldGenerationConfig.OreSpecLinearScale);
+        // The snow glints key off the snow block's own tile; strength 0 (a program that never sets
+        // it, like the ItemDebugger's) leaves the term off whatever slice that is.
+        program.SetUniform("uSnowLayer", (float)ContentRegistry.RequireBlock("snow").Top);
+        program.SetUniform("uSnowSparkle", WorldGenerationConfig.SnowSparkleStrength);
+        program.SetUniform("uSnowSparkleDensity", WorldGenerationConfig.SnowSparkleDensity);
         program.SetUniform("uReflValid", 0f);
         // The water model's tuning constants never change at runtime, so they go up once here
         // instead of riding ApplyFrameUniforms every frame.

@@ -16,6 +16,7 @@ Several pieces of logic exist in more than one place on purpose. Change one and 
 | **Vertex layout** | `Vertex` (32 B), vertex attribute setup in `Chunk`/the pools, attribute locations in the vertex shaders (5 = normal+tint ushort, 7 = layer, 8 = water surface) and the bit meanings of `Vertex.Normal` (0-2 face, 3 submerged, 4 biome tint, 5 sway, 6-15 tint code); vertex alpha is the sway weight on a sway vertex, else 254 water / 253 LOD foliage / 255 | mesh tests, `PlantSwayTests` |
 | **Tonemap / sRGB** | `post-fragment.glsl` exposure + clamp + sRGB encode == `Tonemap.cs`; `ColorSpace.SrgbToLinear` on CPU colours | `ColorSpaceTests` |
 | **Contact AO** | `contact-ao-fragment.glsl` == `ContactAo` | `ContactAoTests` |
+| **Snow glint grid** | `const float SnowTexels` in `test-fragment.glsl` == the atlas tile size (`TextureAtlas.TileWidth`/`TileHeight`), so a glint lights exactly one texel of the snow art | `SnowSparkleTests` |
 | **Water fresnel / wet weight** | `test-fragment.glsl` == `SurfaceFresnel` | its tests |
 | **Texture sampling convention** | meshes sample `sampler2DArray` with `vec3(uv, float(layer))`; textures sampled before the tonemap are `SRGB8_ALPHA8`, data atlases plain; `ui-fragment.glsl` `uSrgbTex` re-encodes the two shared textures | check by eye |
 | **Material atlas** | `fTangent`/`fBitangent` in `test-vertex.glsl` must agree with `Chunk.TiledUv` per-face UV orientation | ore scenario |

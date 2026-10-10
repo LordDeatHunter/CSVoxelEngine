@@ -43,6 +43,11 @@ uniform sampler2DArray uMaterialAtlas;
 // it stays 0 wherever that buffer is not bound (the item debugger), so the buffer is never read.
 uniform int uMaterialCount;
 uniform float uOreSpecScale;  // WorldGenerationConfig.OreSpecLinearScale
+// Snow glints: the snow tile's atlas slice, the glint strength (0, the default and the
+// ItemDebugger's, switches the term off) and the share of texels carrying a glinting facet.
+uniform float uSnowLayer;
+uniform float uSnowSparkle;
+uniform float uSnowSparkleDensity;
 // How reflective each atlas slice is: (metallic, roughness, normalStrength, unused). Keyed by
 // tile rather than by block, which is what keeps this feature off the vertex entirely - fLayer
 // already rides every vertex. See TileMaterials.
@@ -455,6 +460,46 @@ float Caustics(vec2 p, float t) {
     return sharp + 0.2 * soft;
 }
 
+// pcg3d (Jarzynski & Olano 2020): three well-mixed 32-bit hashes of an integer cell. Integer
+// maths, so a texel far from the origin hashes as well as one beside it.
+uvec3 Pcg3d(uvec3 v) {
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
+    v ^= v >> 16u;
+    v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
+    return v;
+}
+
+// Texels per block of the snow tile (32 px art), which is the grid the glints sit on.
+const float SnowTexels = 32.0;
+
+// Snow sparkle: a few texels of the snow tile carry an ice-crystal facet tilted at random off
+// the face, and a facet glints - its texel flashes with mirrored sun - while the half vector
+// between the eye and the sun lines up with it. The texel and its facet are a hash of the texel's place in
+// texture-pixel space on the face's own plane, so they stay put on the surface, while the half
+// vector moves with the camera and the sun: glints come and go as you move. 0..1, before the
+// caller's sun gate.
+float SnowGlint(vec3 wp, vec3 N, vec3 T, vec3 B, vec3 V) {
+    vec2 st = vec2(dot(wp, T), dot(wp, B)) * SnowTexels;
+    // Which plane of faces: a face sits on a texel boundary, so the rounded depth is stable on
+    // it and differs between a face and the one behind it (the sign follows the normal).
+    float plane = floor(dot(wp, N) * SnowTexels + 0.5);
+    vec2 texel = floor(st);
+    vec3 h = vec3(Pcg3d(uvec3(ivec3(int(texel.x), int(texel.y), int(plane))))) / 4294967295.0;
+    if (h.x >= uSnowSparkleDensity) return 0.0;
+    // The facet: loose crystals lie every which way, so its normal is a cosine-weighted random
+    // direction over the face's hemisphere, picked by the other two hashes. Some facet then
+    // catches the sun from any viewpoint the face is lit from, most of them toward the sun.
+    float phi = 6.2831853 * h.y;
+    float sinT = sqrt(1.0 - h.z);
+    vec3 facet = (T * cos(phi) + B * sin(phi)) * sinT + N * sqrt(h.z);
+    vec3 H = normalize(V + uSunDir);
+    // A narrow mirror lobe (full within ~5 degrees, gone past ~9): only a small share of the
+    // facets catch the sun from any one place, and a step of the camera hands the glint to
+    // others. The whole texel lights, a square on the art's own pixel grid.
+    return smoothstep(0.988, 0.996, dot(facet, H));
+}
+
 // Schlick fresnel with the water/wet-surface F0 of 0.06, shared by the ore path and the wet
 // sheen. GL-free twin: SurfaceFresnel.Schlick. The water surface keeps its own inline copies,
 // which carry the inside-view total-internal-reflection variants.
@@ -614,6 +659,24 @@ void main() {
             // (WorldGenerationConfig.OreSpecLinearScale) brings the lift back to the old look.
             col += uSunColor * (spec * uSunIntensity * uOreSpecScale) * tint * nearFade;
         }
+    }
+
+    // Snow sparkle, on the snow tile only (see SnowGlint). Gated by the direct sun the face
+    // really gets - skylight, the shadow map and the cloud shadow (both already in shadow), the
+    // sun on the face's own side and up - so the glints vanish in shadow and at night. A glint
+    // mirrors the sun disc itself, so it wants nearly the full sun: the shadow term is
+    // thresholded rather than scaled, or a shadow the low sun has faded (its strength drops as
+    // the sun sets) or a thin cloud would still let dimmed glints through. Faded out
+    // with distance before a texel turns subpixel and the glints would only shimmer, and at a
+    // graze where the texels squash. Added in linear light like the ore highlight, so on snow
+    // already past the tonemap clip (most of a sunny day's flat tops) it is swallowed by the clip.
+    if (uSnowSparkle > 0.0 && !isWater && abs(float(fLayer) - uSnowLayer) < 0.5) {
+        vec3 Vs = normalize(uCameraPos - fWorldPos);
+        float gate = fSun * smoothstep(0.6, 0.95, shadow) * smoothstep(0.0, 0.15, ndl) * smoothstep(0.0, 0.2, uSunIntensity)
+                   * (1.0 - smoothstep(14.0, 36.0, dist)) * smoothstep(0.08, 0.3, dot(N, Vs));
+        if (gate > 0.0)
+            col += uSunColor * (uSunIntensity * uSnowSparkle * gate
+                                * SnowGlint(fWorldPos, N, fTangent, fBitangent, Vs));
     }
 
     if (fSubmerged > 0.5 && !isWater && dist < 96.0 && fWorldPos.y <= fWaterSurfaceY) {

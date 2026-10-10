@@ -1,0 +1,50 @@
+{
+  // Snow sparkle check: run from OpenGLTest/ with
+  //   VOXEL_TIME=405 VOXEL_SCRIPT=visual-examples/snow-sparkle.json   (low sun: the glints show)
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/snow-sparkle.json   (noon)
+  // Shots land in visual/snow-sparkle/. The 20 s streaming wait runs the clock on, so the shots
+  // land at about VOXEL_TIME + 22.
+  // Pinpoint glints of mirrored sun should dot the sunlit snow near the camera and move between
+  // sun_a, sun_b and sun_c (the camera steps a little between them, the sun holds still), most
+  // of them toward the sun, with none in the pillar's shadow strip (shadow) nor past a few dozen
+  // blocks. Sunlit snow sits past the tonemap clip for most of a sunny day (the sun's linear gain
+  // is ~2.7 at noon), so at VOXEL_TIME=147 the flat tops read plain white with or without the
+  // glints; at 405 (~427 by the shots) the sun stands ~6 degrees up, the top faces' n.l is small
+  // enough to bring the snow well under the clip, the shadows are still on, and the glints read.
+  // A few seconds later the sun sinks behind the forest on the horizon and the plain goes to shade.
+  // A barren frozen plain from a headless probe (WorldSeed.Default): (-1112, 584), ground 18 and
+  // flat for six blocks around, with no terrain rising toward the low sun within 400 blocks either
+  // way (the plain at (-856, 8) is ringed by hills that shade it at that hour). The setting sun
+  // stands toward yaw ~160, which the camera faces, and the four-stone pillar about five blocks
+  // that way throws its long shadow back across the view.
+  // Flight holds every pose; the pillar is stacked straight down from an eye high enough that the
+  // body never overlaps the next cell.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-1111.5, 50.5, 584.5], "yaw": 160, "pitch": -30 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "teleport", "pos": [-1111.5, 50.5, 584.5], "yaw": 160, "pitch": -30 },
+    { "op": "screenshot", "name": "plain_aerial", "hideHud": true },
+
+    { "op": "teleport", "pos": [-1111.5, 21.4, 584.5], "yaw": 160, "pitch": -28 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "sun_a", "hideHud": true },
+    { "op": "teleport", "pos": [-1111.5, 21.4, 585.2], "yaw": 160, "pitch": -28 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "sun_b", "hideHud": true },
+    { "op": "teleport", "pos": [-1110.8, 21.7, 584.5], "yaw": 160, "pitch": -28 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "sun_c", "hideHud": true },
+
+    { "op": "teleport", "pos": [-1116.5, 25.5, 586.5], "yaw": 160, "pitch": -89 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "give", "block": "stone", "count": 4 },
+    { "op": "place" }, { "op": "wait", "seconds": 0.15 },
+    { "op": "place" }, { "op": "wait", "seconds": 0.15 },
+    { "op": "place" }, { "op": "wait", "seconds": 0.15 },
+    { "op": "place" }, { "op": "wait", "seconds": 1.0 },
+    { "op": "teleport", "pos": [-1110.5, 21.6, 582.5], "yaw": 155, "pitch": -24 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "shadow", "hideHud": true }
+  ]
+}

@@ -603,6 +603,19 @@ public const float DayLengthSeconds = 1200f;
     /// </summary>
     public const float OreSpecLinearScale = 0.1f;
 
+    // --- Snow sparkle (test-fragment.glsl) ---
+    /// <summary>
+    /// Brightness of a snow glint (uSnowSparkle), as a multiple of the direct sun: the sun
+    /// mirrored by one ice-crystal facet, added in linear light. A glint is a single texel, so
+    /// unlike the ore highlight's broad lobe it cannot wash a face grey, and it is meant to reach
+    /// white. Sunlit snow already sits past the tonemap clip for most of the day (the sun's linear
+    /// gain is ~2.7 at noon), so the glints read only where it does not: a low sun, whose n.l on
+    /// the flat tops is small. 0 switches the term off.
+    /// </summary>
+    public const float SnowSparkleStrength = 1.5f;
+    /// <summary>Share of the snow tile's texels that carry a glinting facet at all (uSnowSparkleDensity).</summary>
+    public const float SnowSparkleDensity = 0.15f;
+
     // --- Wet albedo (test-fragment.glsl, SH-22) ---
     // Albedo multiplier on a submerged face below its own baked water surface. Dry faces beside or
     // above the water are never darkened: the old wet band tinted dry beach tops and banks.
