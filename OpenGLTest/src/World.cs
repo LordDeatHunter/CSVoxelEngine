@@ -564,13 +564,13 @@ public class World : IItemUseWorld
         {
             var slimes = _slimes.Slimes;
             for (var i = 0; i < slimes.Count; i++)
-                _mobs.Add(slimes[i]);
+                if (!slimes[i].IsDying) _mobs.Add(slimes[i]);
         }
         if (_goblins != null)
         {
             var goblins = _goblins.Goblins;
             for (var i = 0; i < goblins.Count; i++)
-                _mobs.Add(goblins[i]);
+                if (!goblins[i].IsDying) _mobs.Add(goblins[i]);
         }
     }
 
@@ -1186,6 +1186,8 @@ public class World : IItemUseWorld
         _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager);
         _debris.Update((float)deltaTime, _chunkManager);
         _querns.Animate((float)deltaTime);
+        _slimes?.AnimateMirrors((float)deltaTime);
+        _goblins?.AnimateMirrors((float)deltaTime);
         _tntManager.AnimateMirrors((float)deltaTime);
         _fireCells.Clear();
         _fireCells.AddRange(_campfires.LitCells);
@@ -1552,8 +1554,8 @@ public class World : IItemUseWorld
             // re-saved by CaptureEntities) instead of overfilling the cap-sized healthbar buffers
             var isSlime = string.Equals(type!.Name, "slime", StringComparison.OrdinalIgnoreCase);
             var atCap = isSlime
-                ? _slimes!.Slimes.Count >= WorldGenerationConfig.SlimeMaxAlive
-                : _goblins!.Goblins.Count >= WorldGenerationConfig.GoblinMaxAlive;
+                ? _slimes!.LivingCount >= WorldGenerationConfig.SlimeMaxAlive
+                : _goblins!.LivingCount >= WorldGenerationConfig.GoblinMaxAlive;
             if (atCap)
                 continue;
 

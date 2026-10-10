@@ -63,8 +63,19 @@ public sealed class Goblin : Mob
     // Hit flash: snapped to full on TakeDamage, then fades linearly back over this long.
     private const float HitFlashSeconds = 0.25f;
 
+    // Body language drawn on top of the clips (see BodyEffect): a forward lean that follows the
+    // walk, a flinch on a hit, a fall backward on death and the spawn pop.
+    private const float TurnRate = 14f;
+    private const float LeanPerSpeed = 0.045f;
+    private const float MaxLean = 0.2f;
+    private const float HitLeanPerKick = 1.1f;
+    private const float DeathFallRadians = 1.45f;
+    private const float WaterLean = 0.12f;
+
     private Vector3 _velocity;
     private bool _inWater;
+    private float _lean;
+    private bool _facingKnown;
     private float _throwCooldown;
     private float _meleeCooldown;
     private float _losRetry;
@@ -89,6 +100,28 @@ public sealed class Goblin : Mob
 
     /// <summary>The goblin's own animation state, driven by its speed and actions.</summary>
     public EntityAnimator Animation { get; }
+
+    /// <inheritdoc />
+    public override float DeathSeconds => 0.8f;
+
+    /// <summary>
+    /// The pose the clips cannot give: about the feet, a forward lean into the walk (backward when
+    /// backpedalling), a flinch recoil while the hit spring rings, the fall backward and shrink of
+    /// the death, and the spawn pop. Multiply it after the part matrix (row-vector order).
+    /// </summary>
+    public Matrix4x4 BodyEffect(Vector3 feet)
+    {
+        var scale = MathUtils.EaseOutBack(SpawnProgress)
+                    * (1f - MathUtils.EaseInCubic(MathUtils.InverseLerp(0.7f, 1f, DeathProgress)));
+        var tilt = _lean + HitKick * HitLeanPerKick
+                   + DeathFallRadians * MathUtils.EaseInCubic(MathUtils.InverseLerp(0f, 0.55f, DeathProgress));
+        var right = new Vector3(MathF.Cos(Facing), 0f, -MathF.Sin(Facing));
+        // Positive about the right axis tips the head backward; the lean is stored as forward-positive.
+        return Matrix4x4.CreateTranslation(-feet)
+               * Matrix4x4.CreateScale(MathF.Max(scale, 0.001f))
+               * Matrix4x4.CreateFromAxisAngle(right, -tilt)
+               * Matrix4x4.CreateTranslation(feet);
+    }
 
     /// <inheritdoc />
     public override Vector3 Velocity => _velocity;
@@ -199,20 +232,29 @@ public sealed class Goblin : Mob
     {
         if (deltaTime <= 0f || chunks == null) return;
 
+        TickLife(deltaTime);
         _hitFlash = MathF.Max(0f, _hitFlash - deltaTime / HitFlashSeconds);
         _throwCooldown = MathF.Max(0f, _throwCooldown - deltaTime);
         _meleeCooldown = MathF.Max(0f, _meleeCooldown - deltaTime);
         _losRetry = MathF.Max(0f, _losRetry - deltaTime);
 
         var move = Vector3.Zero;
+        if (IsDying) player = null;
         if (player != null)
         {
             var target = player.Eye;
             var to = new Vector3(target.X - Position.X, 0f, target.Z - Position.Z);
             var dist = to.Length();
             var toward = dist > 1e-3f ? to / dist : Vector3.Zero;
-            // The model faces -Z at yaw 0, so this rotation points -Z at the player.
-            if (dist > 1e-3f) Facing = MathF.Atan2(-to.X, -to.Z);
+            // The model faces -Z at yaw 0, so this rotation points -Z at the player. It turns over a
+            // few frames rather than snapping, except on the very first look.
+            if (dist > 1e-3f)
+            {
+                var yaw = MathF.Atan2(-to.X, -to.Z);
+                if (_facingKnown) TurnToward(yaw, TurnRate, deltaTime);
+                else Facing = yaw;
+                _facingKnown = true;
+            }
 
             move = Decide(dist, toward, chunks, player);
         }
@@ -246,7 +288,13 @@ public sealed class Goblin : Mob
 
         ApplyPhysics(deltaTime, chunks);
 
-        Animation.Update(deltaTime, MathF.Sqrt(_velocity.X * _velocity.X + _velocity.Z * _velocity.Z));
+        var planarSpeed = MathF.Sqrt(_velocity.X * _velocity.X + _velocity.Z * _velocity.Z);
+        Animation.Update(deltaTime, planarSpeed);
+
+        // Lean into the movement along the facing; afloat it leans back a little as it paddles.
+        var along = _velocity.X * Forward.X + _velocity.Z * Forward.Z;
+        var leanTarget = Math.Clamp(along * LeanPerSpeed, -MaxLean, MaxLean) - (_inWater ? WaterLean : 0f);
+        _lean = MathUtils.Damp(_lean, IsDying ? 0f : leanTarget, 8f, deltaTime);
     }
 
     // Chooses this frame's horizontal move (a unit vector or zero) and starts a throw or swing

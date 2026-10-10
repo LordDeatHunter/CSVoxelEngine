@@ -14,6 +14,16 @@ public abstract class Mob
     /// <summary>Hit flash amount, snapped to 1 by <see cref="TakeDamage"/>; each subclass fades it.</summary>
     protected float _hitFlash;
 
+    /// <summary>How long a killed mob stays on screen playing its death before it is removed.</summary>
+    public const float DefaultDeathSeconds = 0.5f;
+
+    /// <summary>How long a fresh mob takes to pop in.</summary>
+    public const float SpawnInSeconds = 0.35f;
+
+    private float _deathTime;
+    private float _spawnTime;
+    private Spring _kick = new(3.5f, 0.3f);
+
     protected Mob(EntityType type, Vector3 position)
     {
         Type = type;
@@ -33,9 +43,60 @@ public abstract class Mob
     /// <summary>Yaw in radians the body faces; the model faces -Z at 0.</summary>
     public float Facing { get; protected set; }
 
-    /// <summary>Hit flash amount, 1 right after <see cref="TakeDamage"/> fading back to 0. The
-    /// entity pass tints the skin red by this (non-emissive).</summary>
-    public float HitFlash => _hitFlash;
+    /// <summary>Hit flash amount, 1 right after <see cref="TakeDamage"/> fading back to 0 along an
+    /// ease-out (quick drop, soft tail). The entity pass tints the skin red by this (non-emissive).</summary>
+    public float HitFlash => _hitFlash * _hitFlash;
+
+    /// <summary>A springy 0-centred recoil the last hit started (positive = pushed in); the renderer
+    /// squashes or leans the body by it.</summary>
+    public float HitKick => _kick.Value;
+
+    /// <summary>Whether the mob has been killed and is playing its death; it is no longer a target,
+    /// a threat or part of the live count, but is still drawn until <see cref="IsRemovable"/>.</summary>
+    public bool IsDying { get; private set; }
+
+    /// <summary>Seconds the death plays before the owner removes the mob.</summary>
+    public virtual float DeathSeconds => DefaultDeathSeconds;
+
+    /// <summary>0 when the death starts, 1 when it is over (0 for a mob that is not dying).</summary>
+    public float DeathProgress => IsDying ? MathUtils.Clamp01(_deathTime / DeathSeconds) : 0f;
+
+    /// <summary>True once the death has played out and the owner may drop the mob.</summary>
+    public bool IsRemovable => IsDying && _deathTime >= DeathSeconds;
+
+    /// <summary>0 at spawn, 1 once the pop-in is over.</summary>
+    public float SpawnProgress => MathUtils.Clamp01(_spawnTime / SpawnInSeconds);
+
+    /// <summary>Starts the death animation (idempotent). The owner rolls the loot at this moment.</summary>
+    public void BeginDying()
+    {
+        if (IsDying) return;
+        IsDying = true;
+        _deathTime = 0f;
+    }
+
+    /// <summary>Advances the life-cycle clocks and the hit spring; every subclass calls it once a frame.</summary>
+    protected void TickLife(float deltaTime)
+    {
+        _spawnTime += deltaTime;
+        if (IsDying) _deathTime += deltaTime;
+        _kick.Step(0f, deltaTime);
+    }
+
+    /// <summary>Advances a mob whose AI a client never runs (death, spawn, hit recoil and flash).</summary>
+    public void AnimateMirror(float deltaTime)
+    {
+        TickLife(deltaTime);
+        _hitFlash = MathF.Max(0f, _hitFlash - deltaTime / 0.25f);
+    }
+
+    /// <summary>Eases <see cref="Facing"/> toward a yaw (radians) instead of snapping to it.</summary>
+    protected void TurnToward(float targetYaw, float rate, float deltaTime) =>
+        Facing = MathUtils.DampAngle(Facing * (180f / MathF.PI), targetYaw * (180f / MathF.PI), rate, deltaTime)
+                 * (MathF.PI / 180f);
+
+    /// <summary>Gives the body a hit recoil; <paramref name="strength"/> is roughly blocks of squash per second.</summary>
+    protected void KickBody(float strength) => _kick.Impulse(strength);
 
     /// <summary>Horizontal half extent of the collision body, used by touch and hit tests.</summary>
     public abstract float BodyHalfExtent { get; }
@@ -50,9 +111,10 @@ public abstract class Mob
     /// <summary>Applies a hit; the owner drops the loot and removes the mob once dead.</summary>
     public virtual void TakeDamage(int amount)
     {
-        if (amount <= 0) return;
+        if (amount <= 0 || IsDying) return;
         Health = Math.Max(0, Health - amount);
         _hitFlash = 1f;
+        KickBody(4f);
     }
 
     /// <summary>Sets the horizontal shove a contact or hit imparts, leaving vertical motion

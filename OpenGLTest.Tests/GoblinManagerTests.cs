@@ -120,6 +120,10 @@ public sealed class GoblinManagerTests
         goblin.TakeDamage(goblin.Type.MaxHealth);
         manager.Update(Dt, chunks, drops, camera);
 
+        // Loot drops at once; the corpse stays drawn until the death has played out.
+        Assert.True(goblin.IsDying);
+        Assert.Equal(0, manager.LivingCount);
+        manager.Update(goblin.DeathSeconds + 0.1f, chunks, drops, camera);
         Assert.Empty(manager.Goblins);
         Assert.True(CountFlint(drops) >= ammo);
     }

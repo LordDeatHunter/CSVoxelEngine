@@ -61,7 +61,7 @@ public sealed class NetworkEntitySyncTests : IDisposable
 
         // An empty snapshot removes everything.
         _world.ApplyNetworkEntities([]);
-        Assert.Empty(_world.Slimes);
+        Assert.Empty(_world.Mobs);
         Assert.Empty(_world.Drops);
     }
 
@@ -112,7 +112,7 @@ public sealed class NetworkEntitySyncTests : IDisposable
         Assert.Equal(later.Position, mirrored.Position);
         Assert.Equal(later.Health / 1000f, mirrored.FuseRemaining);
         Assert.Equal(tnt.Ammo / 1000f, mirrored.FuseDuration);
-        Assert.Empty(_world.Slimes);
+        Assert.Empty(_world.Mobs);
 
         // A cube the next snapshot no longer lists goes, while the one still listed stays itself
         _world.ApplyNetworkEntities([later, cube]);

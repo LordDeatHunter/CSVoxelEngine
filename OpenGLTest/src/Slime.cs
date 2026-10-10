@@ -15,7 +15,20 @@ public sealed class Slime : Mob
     private const float TerminalVelocity = -30f;
     private const float CollisionStepSize = 0.05f;
     private const float GroundFriction = 8f;
-    private const float LandSquashSeconds = 0.25f;
+
+    // Squash and stretch ride one under-damped spring (value = vertical scale offset), so a landing
+    // rings out as a jiggle instead of easing back. The rest target breathes a little; a hop first
+    // crouches (the windup) and launches with a stretch impulse.
+    private const float SquashFrequency = 3.4f;
+    private const float SquashDamping = 0.28f;
+    private const float WindupSeconds = 0.2f;
+    private const float WindupSquash = -0.26f;
+    private const float AirStretch = 0.14f;
+    private const float LaunchKick = 3.2f;
+    private const float LandKickPerSpeed = 0.55f;
+    private const float BreathAmplitude = 0.022f;
+    private const float BreathRate = 2.3f;
+    private const float TurnRate = 16f;
 
     // Buoyancy, tuned like the item drops: instead of gravity a floating slime eases toward a
     // rise proportional to how far under the surface it is, so it climbs, barely overshoots and
@@ -50,8 +63,10 @@ public sealed class Slime : Mob
 
     private Vector3 _velocity;
     private float _hopTimer;
-    private float _landPulse;
-    private float _airBlend;
+    private Spring _squash = new(SquashFrequency, SquashDamping);
+    private float _windup;
+    private Vector3 _windupTarget;
+    private float _clock;
     private float _damageCooldown;
     private float _nextHop;
     private bool _inWater;
@@ -78,14 +93,27 @@ public sealed class Slime : Mob
 
     /// <summary>Whether a touch may deal damage right now: airborne (not merely floating in
     /// water), and past the per-hop cooldown.</summary>
-    public bool CanDealContactDamage => IsAirborne && !_inWater && _damageCooldown <= 0f;
+    public bool CanDealContactDamage => !IsDying && IsAirborne && !_inWater && _damageCooldown <= 0f;
 
-    /// <summary>Vertical draw scale: stretched in the air, squashed for a moment on landing.</summary>
-    public float VerticalScale => 1f + 0.12f * _airBlend - 0.18f * _landPulse;
+    /// <inheritdoc />
+    public override float DeathSeconds => 0.45f;
 
-    /// <summary>Horizontal draw scale, the volume-preserving counterpart of
-    /// <see cref="VerticalScale"/>.</summary>
-    public float HorizontalScale => 1f - (VerticalScale - 1f) * 0.5f;
+    /// <summary>Whether the slime is crouching for a hop it is about to launch.</summary>
+    public bool IsWindingUp => _windup > 0f;
+
+    /// <summary>Vertical draw scale: the spring's squash/stretch, the death pop and the spawn pop.</summary>
+    public float VerticalScale => (1f + _squash.Value - HitKick * 0.04f) * LifeScale * DeathStretch;
+
+    /// <summary>Horizontal draw scale, the volume-preserving counterpart of the squash.</summary>
+    public float HorizontalScale => (1f - _squash.Value * 0.5f + HitKick * 0.02f) * LifeScale * DeathSpread;
+
+    // A fresh slime pops in with an overshoot; a dying one balloons wide and flat, then shrinks away.
+    private float LifeScale =>
+        MathUtils.EaseOutBack(SpawnProgress) * (1f - MathUtils.EaseInCubic(MathUtils.InverseLerp(0.55f, 1f, DeathProgress)));
+
+    private float DeathStretch => 1f + 0.35f * MathUtils.Pulse(DeathProgress * 2.2f, 0.4f) - 0.55f * MathUtils.SmoothStep(0.25f, 0.8f, DeathProgress);
+
+    private float DeathSpread => 1f + 0.45f * MathUtils.SmoothStep(0.15f, 0.7f, DeathProgress);
 
     /// <summary>Records that contact damage just landed, starting the per-hop cooldown.</summary>
     public void NotifyContactDamage() => _damageCooldown = ContactDamageCooldownSeconds;
@@ -114,16 +142,35 @@ public sealed class Slime : Mob
     {
         if (deltaTime <= 0f || chunks == null) return;
 
-        _airBlend = MathUtils.Damp(_airBlend, IsGrounded ? 0f : 1f, 10f, deltaTime);
-        _landPulse = MathF.Max(0f, _landPulse - deltaTime / LandSquashSeconds);
+        _clock += deltaTime;
+        TickLife(deltaTime);
         _hitFlash = MathF.Max(0f, _hitFlash - deltaTime / HitFlashSeconds);
         _damageCooldown = MathF.Max(0f, _damageCooldown - deltaTime);
 
+        var wasGrounded = IsGrounded;
+        var fallSpeed = -_velocity.Y;
         ApplyPhysics(deltaTime, chunks);
+        UpdateSquash(deltaTime, wasGrounded, fallSpeed);
 
         // Hop while grounded, or while floating in water where the buoyancy and drag applied
         // above damp the hop into a weak paddle at the player instead of a full leap.
-        if (!IsGrounded && !_inWater) return;
+        if (!IsGrounded && !_inWater) { _windup = 0f; return; }
+
+        if (_windup > 0f)
+        {
+            // Crouching: turn toward the target, then launch when the crouch is done.
+            var toTarget = _windupTarget - Position;
+            TurnToward(MathF.Atan2(-toTarget.X, -toTarget.Z), TurnRate, deltaTime);
+            _windup -= deltaTime;
+            if (_windup <= 0f)
+            {
+                _windup = 0f;
+                HopToward(_windupTarget);
+            }
+            return;
+        }
+
+        if (IsDying) return;
         if (playerPosition is not { } target) return;
 
         _hopTimer += deltaTime;
@@ -131,7 +178,23 @@ public sealed class Slime : Mob
 
         _hopTimer = 0f;
         _nextHop = HopIntervalSeconds + (Random.Shared.NextSingle() - 0.5f) * 2f * HopIntervalJitter;
-        HopToward(target);
+        _windup = WindupSeconds;
+        _windupTarget = target;
+    }
+
+    private void UpdateSquash(float deltaTime, bool wasGrounded, float fallSpeed)
+    {
+        // A landing hits the spring downward in proportion to the fall; leaving the ground is
+        // kicked up by HopToward. Standing still never re-squashes.
+        if (!wasGrounded && IsGrounded)
+            _squash.Impulse(-MathF.Min(fallSpeed, 20f) * LandKickPerSpeed);
+
+        float target;
+        if (_windup > 0f) target = WindupSquash * MathUtils.EaseOutCubic(1f - _windup / WindupSeconds);
+        else if (!IsGrounded && !_inWater) target = AirStretch;
+        else target = BreathAmplitude * MathF.Sin(_clock * BreathRate);
+
+        _squash.Step(target, deltaTime);
     }
 
     private void HopToward(Vector3 playerPosition)
@@ -142,6 +205,7 @@ public sealed class Slime : Mob
         toPlayer = Vector3.Normalize(toPlayer);
         _velocity = HopVelocity(toPlayer, _inWater);
         IsGrounded = false;
+        _squash.Impulse(LaunchKick);
 
         // The model faces -Z at yaw 0, so this rotation points -Z at the player.
         Facing = MathF.Atan2(-toPlayer.X, -toPlayer.Z);
@@ -212,8 +276,6 @@ public sealed class Slime : Mob
         {
             if (movement.Y < 0f)
             {
-                // Landing only counts from a real fall, so standing still does not re-squash
-                if (!IsGrounded) _landPulse = 1f;
                 IsGrounded = true;
             }
             _velocity.Y = 0f;

@@ -23,10 +23,41 @@ public sealed class SlimeManager
 
     public SlimeManager(EntityType type) => _type = type;
 
+    /// <summary>Every slime still drawn: the living ones plus any playing their death
+    /// (<see cref="Mob.IsDying"/>), which are no longer targets and do not count toward the cap.</summary>
     public IReadOnlyList<Slime> Slimes => _slimes;
 
-    /// <summary>Removes a slime the server no longer reports (a client's network reconcile).</summary>
-    public bool Remove(Slime slime) => _slimes.Remove(slime);
+    /// <summary>Slimes that are alive (not yet dying), for the spawn cap.</summary>
+    public int LivingCount
+    {
+        get
+        {
+            var count = 0;
+            for (var i = 0; i < _slimes.Count; i++)
+                if (!_slimes[i].IsDying) count++;
+            return count;
+        }
+    }
+
+    /// <summary>A client's network reconcile: the server no longer reports this slime, so it plays
+    /// its death where it stands and is then dropped.</summary>
+    public bool Remove(Slime slime)
+    {
+        if (!_slimes.Contains(slime)) return false;
+        slime.BeginDying();
+        return true;
+    }
+
+    /// <summary>Advances the death and spawn clocks of the slimes without simulating them (a
+    /// client never ticks the AI), dropping the ones whose death is over.</summary>
+    public void AnimateMirrors(float deltaTime)
+    {
+        for (var i = _slimes.Count - 1; i >= 0; i--)
+        {
+            _slimes[i].AnimateMirror(deltaTime);
+            if (_slimes[i].IsRemovable) _slimes.RemoveAt(i);
+        }
+    }
 
     /// <summary>Health the slimes took off every target together during the most recent
     /// <c>Update</c>; each hit also reached its target through <see cref="IMobTarget.TakeHit"/>.
@@ -76,12 +107,18 @@ public sealed class SlimeManager
         {
             var slime = _slimes[i];
             var chased = MobTargets.Nearest(targets, slime.Position);
-            slime.Update(deltaTime, chunks, chased >= 0 ? targets[chased].Eye : null);
+            slime.Update(deltaTime, chunks, chased >= 0 && !slime.IsDying ? targets[chased].Eye : null);
+
+            if (slime.IsDying)
+            {
+                if (slime.IsRemovable) _slimes.RemoveAt(i);
+                continue;
+            }
 
             if (slime.IsDead)
             {
                 DropLoot(slime, drops);
-                _slimes.RemoveAt(i);
+                slime.BeginDying();
                 continue;
             }
 
@@ -130,7 +167,7 @@ public sealed class SlimeManager
     // One shared timer and cap; each expiry tries the ring round the next target in turn.
     private void UpdateSpawning(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
     {
-        if (_slimes.Count >= WorldGenerationConfig.SlimeMaxAlive) return;
+        if (LivingCount >= WorldGenerationConfig.SlimeMaxAlive) return;
 
         _spawnTimer += deltaTime;
         if (_spawnTimer < WorldGenerationConfig.SlimeSpawnIntervalSeconds) return;

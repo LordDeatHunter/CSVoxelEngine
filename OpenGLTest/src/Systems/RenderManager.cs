@@ -3360,10 +3360,11 @@ public class RenderManager : IDisposable
         {
             var feet = GoblinFeet(goblin);
             var light = LightAt(goblin.Position);
+            var effect = goblin.BodyEffect(feet);
             worldShader.SetUniform(_locHitFlash, goblin.HitFlash);
             for (var i = 0; i < _goblinMeshes.Length; i++)
             {
-                var model = goblin.Animation.GetPartMatrix(_goblinPartNames[i], _goblinRig, feet, goblin.Facing);
+                var model = goblin.Animation.GetPartMatrix(_goblinPartNames[i], _goblinRig, feet, goblin.Facing) * effect;
                 SetDrawUniforms(model, model * viewProj, 1f, light);
                 _goblinMeshes[i].Render();
             }
@@ -3372,7 +3373,7 @@ public class RenderManager : IDisposable
             {
                 BindUnit(0, TextureTarget.Texture2DArray, stoneTexture);
                 var held = Matrix4x4.CreateScale(Goblin.HeldStoneScale)
-                           * goblin.Animation.HandAnchor(Goblin.HandPart, _goblinRig, feet, goblin.Facing);
+                           * goblin.Animation.HandAnchor(Goblin.HandPart, _goblinRig, feet, goblin.Facing) * effect;
                 SetDrawUniforms(held, held * viewProj, 1f, light);
                 stone.Render();
                 BindUnit(0, TextureTarget.Texture2DArray, _goblinTexture);

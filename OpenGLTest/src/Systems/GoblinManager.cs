@@ -34,10 +34,41 @@ public sealed class GoblinManager
         _flintId = ContentRegistry.RequireItem("flint").Id;
     }
 
+    /// <summary>Every goblin still drawn: the living ones plus any playing their death
+    /// (<see cref="Mob.IsDying"/>), which are no longer targets and do not count toward the cap.</summary>
     public IReadOnlyList<Goblin> Goblins => _goblins;
 
-    /// <summary>Removes a goblin the server no longer reports (a client's network reconcile).</summary>
-    public bool Remove(Goblin goblin) => _goblins.Remove(goblin);
+    /// <summary>Goblins that are alive (not yet dying), for the spawn cap.</summary>
+    public int LivingCount
+    {
+        get
+        {
+            var count = 0;
+            for (var i = 0; i < _goblins.Count; i++)
+                if (!_goblins[i].IsDying) count++;
+            return count;
+        }
+    }
+
+    /// <summary>A client's network reconcile: the server no longer reports this goblin, so it plays
+    /// its death where it stands and is then dropped.</summary>
+    public bool Remove(Goblin goblin)
+    {
+        if (!_goblins.Contains(goblin)) return false;
+        goblin.BeginDying();
+        return true;
+    }
+
+    /// <summary>Advances the death and spawn clocks of the goblins without simulating them (a
+    /// client never ticks the AI), dropping the ones whose death is over.</summary>
+    public void AnimateMirrors(float deltaTime)
+    {
+        for (var i = _goblins.Count - 1; i >= 0; i--)
+        {
+            _goblins[i].AnimateMirror(deltaTime);
+            if (_goblins[i].IsRemovable) _goblins.RemoveAt(i);
+        }
+    }
 
     /// <summary>Stones in flight; drawn and mirrored like the player's own throws.</summary>
     public IReadOnlyList<ThrownProjectile> Stones => _stones;
@@ -95,12 +126,18 @@ public sealed class GoblinManager
         {
             var goblin = _goblins[i];
             var chased = MobTargets.Nearest(targets, goblin.Position);
-            goblin.Update(deltaTime, chunks, chased >= 0 ? targets[chased] : null);
+            goblin.Update(deltaTime, chunks, chased >= 0 && !goblin.IsDying ? targets[chased] : null);
+
+            if (goblin.IsDying)
+            {
+                if (goblin.IsRemovable) _goblins.RemoveAt(i);
+                continue;
+            }
 
             if (goblin.IsDead)
             {
                 DropLoot(goblin, drops);
-                _goblins.RemoveAt(i);
+                goblin.BeginDying();
                 continue;
             }
 
@@ -211,7 +248,7 @@ public sealed class GoblinManager
     // One shared timer and cap; each expiry tries the ring round the next target in turn.
     private void UpdateSpawning(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
     {
-        if (_goblins.Count >= WorldGenerationConfig.GoblinMaxAlive) return;
+        if (LivingCount >= WorldGenerationConfig.GoblinMaxAlive) return;
 
         _spawnTimer += deltaTime;
         if (_spawnTimer < WorldGenerationConfig.GoblinSpawnIntervalSeconds) return;

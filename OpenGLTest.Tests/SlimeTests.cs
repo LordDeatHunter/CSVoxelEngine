@@ -95,6 +95,10 @@ public sealed class SlimeTests
         slime.TakeDamage(1000);
         manager.Update(Dt, chunks, drops, camera);
 
+        // The loot drops at once; the corpse plays its pop and is then removed.
+        Assert.True(slime.IsDying);
+        Assert.Equal(0, manager.LivingCount);
+        manager.Update(slime.DeathSeconds + 0.1f, chunks, drops, camera);
         Assert.Empty(manager.Slimes);
         var slimeball = ContentRegistry.Require("item/slimeball");
         Assert.Contains(drops.Drops, drop => drop.BlockId == slimeball);
