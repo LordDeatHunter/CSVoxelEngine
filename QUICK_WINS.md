@@ -155,12 +155,12 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
   helper rather than inline). Test: every clump has at least the minimum members, members are
   within the radius, clump centres are at least a cell apart, and the same seed gives the same
   cells.
-- [ ] **Torch.** A placeable light source: one block with `light.emission` and a warm
+- [x] **Torch.** *Done:* `torch` (light 14, default warm colour, no palette slot), cutout post model, `needsSupport`; recipe branch + coal -> 4 (`torches.json`). A placeable light source: one block with `light.emission` and a warm
   `light.color`, a small hitbox, floor placement only at first (`needsSupport`, so it pops when
   the ground goes).
   *Hook:* `add-content`; `V-4` (torch particles) is the follow-up for the flame, not part of this.
   Test: it emits light, and breaking the block under it pops it.
-  - *Sub-step (wall-mounted):* a torch placed against the side of a block leans out from the
+  - [x] *Sub-step (wall-mounted):* *Done:* a separate `wall_torch` id with `facing: horizontal` + `support: attached` (facing in state bits 0-1), `BlockSupport` as the one support rule (mining, TNT, felling, leaf decay), `BlockShape` as the one live hitbox resolver. a torch placed against the side of a block leans out from the
     wall. Store the facing in the state byte (`facing` in the low bits, like `Multiblock`), bake
     the four wall models (and rotate or pick by facing in the mesher), and make support follow
     the **attached** face instead of always the block below (`needsSupport` is below-only today,
@@ -168,11 +168,11 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
     Do this only after the floor torch ships.
 
 
-- [ ] **Glass pane.** A thin pane block (a thin slab-shaped model with a matching `hitbox`) on
+- [x] **Glass pane.** *Done:* `glass_pane`, glass flags on a 2 px slab; recipe 6 glass -> 16 (`panes.json`). A thin pane block (a thin slab-shaped model with a matching `hitbox`) on
   the existing translucent path. Single block, no connecting at first.
   *Hook:* `add-content`; glass already ships as `translucent` + `cullSelf`, so copy its flags
   and make the model a thin slab. Check that it passes light and does not occlude.
-  - *Side-step (neighbour connectivity):* the pane grows arms toward adjacent panes and solid
+  - [x] *Side-step (neighbour connectivity):* *Done:* new `pane` renderer: `PaneShape` + `PaneEmitter`, post plus arms toward panes and solid full blocks, matching boxes for the raycast, outline and player collision. the pane grows arms toward adjacent panes and solid
     blocks, like Minecraft's. The connection is derived from neighbours at mesh time (not stored),
     so it needs a procedural emitter in `ChunkMesher` (a new `renderer`) rather than a baked
     model, plus the matching selection boxes and a remesh of the neighbours when one changes.
