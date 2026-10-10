@@ -9,7 +9,7 @@ public enum DebugButton
 {
     Save,
     ReloadDisplay,
-    ResetRenderer,
+    ResetPreview,
     FirstPerson,
     TabItems,
     TabEntities,
@@ -404,7 +404,7 @@ public sealed class ItemDebuggerUi
             DebugButton.ReloadDisplay, "RELOAD FROM JSON", true, false);
         buttonY -= ButtonH + ButtonGap;
         AddButton(new Vector2((left + right) * 0.5f, buttonY), new Vector2(width, ButtonH),
-            DebugButton.ResetRenderer, "RESET PREVIEW", true, false);
+            DebugButton.ResetPreview, "RESET PREVIEW", true, false);
     }
 
     private void AddDisplaySliders(ItemDisplayEditor editor)

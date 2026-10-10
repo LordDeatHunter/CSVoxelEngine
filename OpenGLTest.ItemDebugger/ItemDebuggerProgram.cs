@@ -621,8 +621,8 @@ public static class ItemDebuggerProgram
                 Editor.ReloadDisplay();
                 _status = "Reloaded from JSON";
                 break;
-            case DebugButton.ResetRenderer:
-                Editor.ResetRenderer();
+            case DebugButton.ResetPreview:
+                Editor.ResetPreview();
                 _status = "Preview reset";
                 break;
             case DebugButton.Save:

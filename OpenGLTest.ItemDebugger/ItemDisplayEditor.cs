@@ -56,9 +56,12 @@ public sealed class ItemDisplayEditor
         }
     }
 
-    /// <summary>Resets the preview-only held scale and grip overrides to the renderer defaults.</summary>
-    public void ResetRenderer()
+    /// <summary>Resets every slider: the display ones back to the values the item JSON loaded with
+    /// (<see cref="ReloadDisplay"/>) and the preview-only held scale and grip overrides to the renderer
+    /// defaults. RESET PREVIEW; RELOAD FROM JSON is the display half alone.</summary>
+    public void ResetPreview()
     {
+        ReloadDisplay();
         ItemHeldScale = RenderManager.HeldItemScale;
         ItemGrip = RenderManager.HeldItemGrip;
         BlockHeldScale = RenderManager.HeldBlockScale;
