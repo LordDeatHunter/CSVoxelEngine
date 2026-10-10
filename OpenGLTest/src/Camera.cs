@@ -250,6 +250,8 @@ public class Camera : IMobTarget
     private Spring _fovPunch = new(5f, 0.4f);
     // Extra degrees of the sprint widening, eased by SprintFov.Step; added to the FOV, never set over it
     private float _sprintFov;
+    // Roll toward the strafe side in radians, eased by StrafeTilt.Step; added to _roll, never set over it
+    private float _strafeTilt;
     private float _sneakBlend;
     private float _prevVerticalVelocity;
     private bool _wasGrounded;
@@ -265,6 +267,9 @@ public class Camera : IMobTarget
 
     /// <summary>The hit-kick roll in radians.</summary>
     public float KickRoll => _kickRoll.Value;
+
+    /// <summary>The eased strafe tilt in radians: positive leans the view right (see <see cref="StrafeTilt"/>).</summary>
+    public float StrafeTiltRoll => _strafeTilt;
 
     /// <summary>0..1 how far the death view has fallen over; set by the world while a death plays.</summary>
     public float DeathProgress
@@ -593,9 +598,11 @@ public class Camera : IMobTarget
     /// The per-frame view juice: FOV (sprint widening plus punch pinch), head bob, landing dip,
     /// crouch drop and roll. <paramref name="sprintHeld"/> is the sprint key, on foot or flying;
     /// <see cref="SprintFov"/> decides whether that actually widens the view.
+    /// <paramref name="strafe"/> is the sideways movement input along the camera's right (-1..1),
+    /// which <see cref="StrafeTilt"/> turns into a lean.
     /// </summary>
     internal void UpdateHeadMotion(float deltaTime, float intendedSpeed, bool moving, bool swimming,
-        bool sprintHeld = false)
+        bool sprintHeld = false, float strafe = 0f)
     {
         _sprintFov = SprintFov.Step(_sprintFov,
             SprintFov.TargetDegrees(sprintHeld, moving, IsSneaking, swimming, intendedSpeed), deltaTime);
@@ -618,14 +625,16 @@ public class Camera : IMobTarget
             _bobPhase += deltaTime * (4f + intendedSpeed * 0.9f + _runBlend * 2.5f);
 
         var height = MathUtils.Lerp(WalkBobHeight, RunBobHeight, _runBlend);
-        var strafe = MathUtils.Lerp(WalkBobStrafe, RunBobStrafe, _runBlend);
+        var bobStrafe = MathUtils.Lerp(WalkBobStrafe, RunBobStrafe, _runBlend);
         var death = MathUtils.EaseInCubic(_deathProgress);
         _bobHeight = MathF.Sin(_bobPhase * 2f) * height * _bobBlend
                      - MathUtils.Clamp(_landDip.Value, -4f, 12f) * LandDipScale
                      - SneakEyeDrop * _sneakBlend - DeathDropBlocks * death;
-        _bobStrafe = MathF.Cos(_bobPhase) * strafe * _bobBlend;
+        _bobStrafe = MathF.Cos(_bobPhase) * bobStrafe * _bobBlend;
+        _strafeTilt = StrafeTilt.Step(_strafeTilt,
+            StrafeTilt.TargetRadians(strafe, IsFlying, dead: _deathProgress > 0f), deltaTime);
         _roll = MathF.Sin(_bobPhase) * RunRoll * _runBlend * _bobBlend
-                + MathUtils.Clamp(_kickRoll.Value, -0.12f, 0.12f) + DeathRollRadians * death;
+                + MathUtils.Clamp(_kickRoll.Value, -0.12f, 0.12f) + DeathRollRadians * death + _strafeTilt;
     }
 
     /// <summary>

@@ -241,13 +241,18 @@ public const float DayLengthSeconds = 1200f;
     public const int BreakOverlayFrames = 8;
     public const float BreakOverlayOpacity = 0.6f;
 
-    // --- Camera and swing feel (Camera, SprintFov) ---
+    // --- Camera and swing feel (Camera, SprintFov, StrafeTilt) ---
     // Degrees the view widens by at a full on-foot sprint, added to the base FOV and the punch
     // pinch. The 10x flight sprint widens exactly as far, never further (SprintFov clamps the
     // speed ramp at the on-foot sprint speed).
     public const float SprintFovExtraDegrees = 5f;
     // How fast the widening eases in and back out (MathUtils.Damp rate, per second)
     public const float SprintFovEaseRate = 6f;
+    // Degrees the view rolls toward a full sideways strafe (a lean into the move), added to the run
+    // sway, the hit kick and the death roll. Off while flying and while dead.
+    public const float StrafeTiltDegrees = 1.5f;
+    // How fast the tilt eases in and back to level (MathUtils.Damp rate, per second)
+    public const float StrafeTiltEaseRate = 8f;
 
     // --- Sky ---
     // Angular radius of the visible sun disc in degrees. The real sun is 0.27 degrees across

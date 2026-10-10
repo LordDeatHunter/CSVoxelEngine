@@ -8,6 +8,9 @@
   //   sprint-widened: the FOV eased out by the on-foot sprint (wider framing than base)
   //   sprint-ended:   the same spot after the sprint, back to the base FOV
   //   flight-sprint:  the 10x flight sprint, widened exactly as far as the on-foot sprint, no further
+  //   strafe-right:   the view leaned into a strafe to the right (the horizon rises toward the right)
+  //   strafe-left:    the mirror image
+  //   strafe-ended:   level again, matching base
   "steps": [
     { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
     { "op": "wait", "seconds": 6 },
@@ -26,6 +29,19 @@
     { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
     { "op": "screenshot", "name": "flight-sprint", "hideHud": true },
     { "op": "fly", "on": false },
-    { "op": "wait", "seconds": 1.5 }
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "walk", "keys": ["D"], "seconds": 0.6 },
+    { "op": "screenshot", "name": "strafe-right-moving", "hideHud": true },
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "screenshot", "name": "strafe-right", "hideHud": true },
+    { "op": "wait", "seconds": 1.2 },
+    { "op": "walk", "keys": ["A"], "seconds": 0.6 },
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "screenshot", "name": "strafe-left", "hideHud": true },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "screenshot", "name": "strafe-ended", "hideHud": true }
   ]
 }

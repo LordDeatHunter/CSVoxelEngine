@@ -282,7 +282,8 @@ internal sealed class PlayerPhysics
         _horizontalVelocity.Y = MathUtils.Damp(_horizontalVelocity.Y, wish.Y, accelRate, deltaTime);
 
         var intendedSpeed = _horizontalVelocity.Length();
-        camera.UpdateHeadMotion(deltaTime, intendedSpeed, moving, swimming, sprintHeld: sprinting);
+        camera.UpdateHeadMotion(deltaTime, intendedSpeed, moving, swimming, sprintHeld: sprinting,
+            strafe: Vector3.Dot(moveInput, right));
         UpdateShake(deltaTime);
 
         var frameMovement = new Vector3(_horizontalVelocity.X * deltaTime, 0f, _horizontalVelocity.Y * deltaTime);

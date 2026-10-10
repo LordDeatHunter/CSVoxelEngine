@@ -2524,7 +2524,10 @@ overshoot or jiggle.
   (`DeathProgress`). The **sprint FOV** widening (`SprintFov`, knobs `SprintFov*` in
   `WorldGenerationConfig`) is its own eased term *added* to the base FOV and the pinch: the sprint key
   with movement on foot or flying, never sneaking or swimming, scaled by the speed and clamped at the
-  on-foot sprint, so the 10x flight sprint widens no further. **Sneak** is Left Ctrl on foot (`Camera.IsSneaking`): slower, never sprinting, a
+  on-foot sprint, so the 10x flight sprint widens no further. The **strafe tilt** (`StrafeTilt`,
+  `StrafeTilt*` knobs) is likewise an eased term *added* to `_roll`: positive roll tips the view's up
+  axis toward the camera's right, so a strafe right leans the head right, into the move; off while
+  flying or dead. **Sneak** is Left Ctrl on foot (`Camera.IsSneaking`): slower, never sprinting, a
   lowered *view and model only* — the body and its collision keep their size, so the server's
   movement rules (which derive the feet from the eye) are unaffected.
 - **Death in singleplayer** plays for `World.DeathPlaySeconds` (the view tips over, the body falls)
