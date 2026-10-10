@@ -2521,7 +2521,10 @@ overshoot or jiggle.
 - **Camera** (`Camera.cs`): the view effects fold into `_bobHeight`, `_roll` and `_currentFov`, which
   the view cache is already keyed on, so none needs a key of its own: a landing dip, a directional
   hit kick (`AddHitKick`), an FOV pinch on a swing (`PunchFov`), a crouch eye drop and the death view
-  (`DeathProgress`). **Sneak** is Left Ctrl on foot (`Camera.IsSneaking`): slower, never sprinting, a
+  (`DeathProgress`). The **sprint FOV** widening (`SprintFov`, knobs `SprintFov*` in
+  `WorldGenerationConfig`) is its own eased term *added* to the base FOV and the pinch: the sprint key
+  with movement on foot or flying, never sneaking or swimming, scaled by the speed and clamped at the
+  on-foot sprint, so the 10x flight sprint widens no further. **Sneak** is Left Ctrl on foot (`Camera.IsSneaking`): slower, never sprinting, a
   lowered *view and model only* — the body and its collision keep their size, so the server's
   movement rules (which derive the feet from the eye) are unaffected.
 - **Death in singleplayer** plays for `World.DeathPlaySeconds` (the view tips over, the body falls)

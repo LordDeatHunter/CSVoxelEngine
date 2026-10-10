@@ -1,0 +1,31 @@
+{
+  // Camera feel: run with VOXEL_SCRIPT=visual-examples/camera-feel.json VOXEL_TIME=147 from
+  // OpenGLTest/. Shots land in visual/camera-feel/.
+  // First person over the open forest clearing the goblins scenario uses (ground y 9..10, x -56..-32,
+  // z 32..68), facing -Z. Teleport and screenshot steps do not tick the world, so "move, teleport back
+  // to P, screenshot" films the view effect the move left behind from exactly the reference eye P:
+  // compare each such shot with "base".
+  //   sprint-widened: the FOV eased out by the on-foot sprint (wider framing than base)
+  //   sprint-ended:   the same spot after the sprint, back to the base FOV
+  //   flight-sprint:  the 10x flight sprint, widened exactly as far as the on-foot sprint, no further
+  "steps": [
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "screenshot", "name": "base", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 1.2 },
+    { "op": "screenshot", "name": "sprint-moving", "hideHud": true },
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "screenshot", "name": "sprint-widened", "hideHud": true },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "screenshot", "name": "sprint-ended", "hideHud": true },
+    { "op": "fly" },
+    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 1.2 },
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "screenshot", "name": "flight-sprint", "hideHud": true },
+    { "op": "fly", "on": false },
+    { "op": "wait", "seconds": 1.5 }
+  ]
+}

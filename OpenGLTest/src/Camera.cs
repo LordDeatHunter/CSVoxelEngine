@@ -26,15 +26,18 @@ public class Camera : IMobTarget
     public float Pitch { get; private set; } = SpawnLook.Y;
     public bool IsGrounded { get; private set; }
     public bool IsFlying { get; private set; }
-    /// <summary>True while sprinting on foot with movement input; drives the run cycle, roll and FOV.</summary>
+    /// <summary>True while sprinting on foot with movement input; drives the run cycle and roll (the FOV
+    /// widening reads the sprint key itself, so a flight sprint widens too: see <see cref="SprintFov"/>).</summary>
     public bool IsSprinting { get; private set; }
     /// <summary>True while crouched on foot (Left Ctrl): slower, a lowered view and the model's crouch pose.
     /// The body and its collision keep their size, so the server's movement rules are unaffected.</summary>
     public bool IsSneaking { get; private set; }
     /// <summary>Strokes the swimmer has started so far; moves on each one (see <c>PlayerPhysics.SwimStrokeSeconds</c>).</summary>
     public int SwimStrokeCount => _physics.SwimStrokeCount;
-    /// <summary>Current vertical FOV in degrees; eases toward sprint boost with speed.</summary>
+    /// <summary>Current vertical FOV in degrees: the base FOV plus the eased sprint widening plus the punch pinch.</summary>
     public float CurrentFov => _currentFov;
+    /// <summary>The eased sprint widening in degrees, 0 at rest (see <see cref="SprintFov"/>).</summary>
+    public float SprintFovDegrees => _sprintFov;
     /// <summary>
     /// Creative mode (toggled with [C]): walking behaves like survival, but block placing
     /// costs nothing, breaking drops nothing, and double-tapping Space toggles flight.
@@ -127,8 +130,6 @@ public class Camera : IMobTarget
     /// <see cref="IsEyeInLava"/>, so a new emissive fluid burns unnamed.</summary>
     public bool IsInLava { get; private set; }
 
-    private const float SprintFovBoost = 5f;
-    private const float FovDampRate = 6f;
     private const float BobDampRate = 8f;
     private const float RunBlendRate = 6f;
     private const float WalkBobHeight = 0.035f;
@@ -247,7 +248,8 @@ public class Camera : IMobTarget
     private Spring _landDip = new(3f, 0.45f);
     private Spring _kickRoll = new(4f, 0.35f);
     private Spring _fovPunch = new(5f, 0.4f);
-    private float _fovBase = DefaultFov;
+    // Extra degrees of the sprint widening, eased by SprintFov.Step; added to the FOV, never set over it
+    private float _sprintFov;
     private float _sneakBlend;
     private float _prevVerticalVelocity;
     private bool _wasGrounded;
@@ -587,14 +589,18 @@ public class Camera : IMobTarget
         Pitch = MathUtils.ClampPitch(Pitch);
     }
 
+    /// <summary>
+    /// The per-frame view juice: FOV (sprint widening plus punch pinch), head bob, landing dip,
+    /// crouch drop and roll. <paramref name="sprintHeld"/> is the sprint key, on foot or flying;
+    /// <see cref="SprintFov"/> decides whether that actually widens the view.
     /// </summary>
-    internal void UpdateHeadMotion(float deltaTime, float intendedSpeed, bool moving, bool swimming)
+    internal void UpdateHeadMotion(float deltaTime, float intendedSpeed, bool moving, bool swimming,
+        bool sprintHeld = false)
     {
-        var fovTarget = DefaultFov + SprintFovBoost *
-            MathUtils.Clamp01((intendedSpeed - BaseSpeed) / (BaseSpeed * (SprintMultiplier - 1f)));
-        _fovBase = MathUtils.Damp(_fovBase, fovTarget, FovDampRate, deltaTime);
+        _sprintFov = SprintFov.Step(_sprintFov,
+            SprintFov.TargetDegrees(sprintHeld, moving, IsSneaking, swimming, intendedSpeed), deltaTime);
         _fovPunch.Step(0f, deltaTime);
-        _currentFov = _fovBase + MathUtils.Clamp(_fovPunch.Value, -6f, 6f);
+        _currentFov = DefaultFov + _sprintFov + MathUtils.Clamp(_fovPunch.Value, -6f, 6f);
 
         // A landing dips the view in proportion to the fall that ended just now.
         if (!_wasGrounded && IsGrounded && !IsFlying && _prevVerticalVelocity < -4f)
