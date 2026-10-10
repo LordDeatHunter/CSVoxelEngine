@@ -1,0 +1,28 @@
+{
+  // Floating damage numbers: run with VOXEL_SCRIPT=visual-examples/damage-numbers.json VOXEL_TIME=147
+  // from OpenGLTest/. Shots land in visual/damage-numbers/.
+  // The camera hovers (flying, so immune) at standing height over the goblins scenario's open forest
+  // clearing (ground y 9..10), looking down at a slime spawned 2.5 blocks in front and a goblin
+  // behind it. A real bare-hand punch (`mine` swings the fist at a mob in the cone before mining)
+  // floats a small number over the slime; a `damage` step on every mob floats one over each; then
+  // the numbers rise, fade and are gone.
+  "steps": [
+    { "op": "teleport", "pos": [-43.5, 11.7, 60.5], "yaw": -90, "pitch": -28 },
+    { "op": "fly" },
+    // Chunks must be loaded before a mob can stand on them
+    { "op": "wait", "seconds": 5 },
+    { "op": "spawn", "entity": "slime", "pos": [-43.5, 58.0] },
+    { "op": "spawn", "entity": "goblin", "pos": [-41.5, 55.5] },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "mine", "seconds": 0.1 },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "punch" },
+    { "op": "damage", "amount": 3 },
+    { "op": "wait", "seconds": 0.12 },
+    { "op": "screenshot", "name": "damage-all" },
+    { "op": "wait", "seconds": 0.45 },
+    { "op": "screenshot", "name": "rising" },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "screenshot", "name": "gone" }
+  ]
+}

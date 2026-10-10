@@ -660,6 +660,10 @@ public class UIRenderer : IDisposable
         DrawTextBatch(n * 2);
     }
 
+    /// <summary>The HUD's baked font, shared with the world-space text (floating damage numbers);
+    /// null when the font file failed to load.</summary>
+    public BitmapFont? Font => _font;
+
     /// <summary>Draw scale mapping a digit's cap-height to <paramref name="pixels"/>, for
     /// callers that do not hold the font (the item debugger) and size their own text with it.</summary>
     public float CapHeightScale(float pixels) => _font?.ScaleForCapHeight(pixels) ?? 1f;

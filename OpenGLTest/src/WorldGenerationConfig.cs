@@ -1385,6 +1385,26 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // How far above the mob's head (Position + Mob.HeadAboveCentre) the row's centre floats.
     public const float EntityHealthbarLiftBlocks = 0.22f;
 
+    // --- Floating damage numbers (DamageNumberPool, DamageNumberRenderer) ---
+    // A hit shows its damage as a small number above the mob's healthbar that rises, drifts a
+    // little sideways and fades out: fully opaque for the hold, faded over the rest of its life. It
+    // pops in at PopScale and springs back. The pool is a fixed array; a full one replaces its
+    // oldest number.
+    public const int DamageNumberCapacity = 32;
+    public const float DamageNumberLifetimeSeconds = 0.9f;
+    public const float DamageNumberHoldSeconds = 0.45f;
+    public const float DamageNumberRiseBlocks = 0.8f;
+    public const float DamageNumberDriftBlocks = 0.25f;
+    public const float DamageNumberPopSeconds = 0.18f;
+    public const float DamageNumberPopScale = 1.5f;
+    // Start height above the healthbar row's centre, and the digit cap height, in blocks.
+    public const float DamageNumberLiftBlocks = 0.18f;
+    public const float DamageNumberCapHeightBlocks = 0.2f;
+    // A client sees a killing blow only as the mob leaving the server's snapshot. Within this range
+    // of the camera (well inside every despawn radius, so it is never a despawn) that is a death,
+    // shown as the health the mob had left.
+    public const float DamageNumberDeathRangeBlocks = 32f;
+
     // --- Charged throws (ThrownProjectile) ---
     // Right-click in the air charges a throwable, release throws it. Damage scales from half
     // at a tap to full at a full charge, and the launch speed scales the same way.

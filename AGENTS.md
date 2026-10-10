@@ -2550,6 +2550,15 @@ overshoot or jiggle.
   fall or an item change), and `LowHealthVignette.Intensity` is a slow red edge heartbeat below
   `LowHealthThreshold`, off while dead or creative, drawn as a second term (`uLowHealth`) of the damage
   vignette's one full-screen pass. `visual-examples/hotbar.json` and `low-health.json` film them.
+- **Floating damage numbers**: a landed hit floats its damage over the mob (`World.DamageNumbers`, a
+  fixed `DamageNumberPool` of `DamageNumberCapacity` that replaces its oldest number when full),
+  drawn by `DamageNumberRenderer` right after the healthbars with their billboard shader and the HUD's
+  font atlas. Singleplayer sees every accepted `Mob.TakeDamage` through `Mob.HitsTaken` /
+  `LastHitDamage` (compared around `StrikeMob`, which punch, slice and throws all use); a client,
+  which never damages a mob, floats the health drop between two `EntityList` snapshots, plus the health
+  left on a mob that leaves the snapshot within `DamageNumberDeathRangeBlocks` of the camera (the
+  server stops listing a mob the moment it dies, so that is the killing blow). A headless server keeps
+  none. `visual-examples/damage-numbers.json` films them.
 - **Verification**: `visual-examples/animations.json` (run with `VOXEL_TIME=147`) films the player's
   poses from the shoulder camera and the mobs' spawn, hit and death; its `damage`, `view` and
   `player` ops (`hurt`, `punch`, `slice`, `equip`, `charge`, `release`, `die`, `revive`) exist for it. For

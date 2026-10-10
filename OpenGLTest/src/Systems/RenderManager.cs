@@ -187,6 +187,7 @@ public class RenderManager : IDisposable
     // Entity healthbars: one five-heart billboard row above every live slime.
     // Null until LoadResources builds it.
     private EntityHealthbarRenderer? _healthbars;
+    private DamageNumberRenderer? _damageNumbers;
 
     // Directional sun shadows: RenderShadows fills _nearShadow's depth texture (a depth-only FBO
     // attachment, sampled as a comparison sampler on unit 1) through its ViewProj, and every
@@ -776,6 +777,9 @@ public class RenderManager : IDisposable
         }
         _flintId = ContentRegistry.RequireItem("flint").Id;
         ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes, atlasIsSrgb: true);
+        // The damage numbers are laid out from the HUD's font; without one there is nothing to draw
+        if (ui.Font is { } font)
+            _damageNumbers = new DamageNumberRenderer(gl, font);
         CreateSelectionGeometry();
         CreatePopGeometry();
         // Everything above binds raw - the atlas build, the loader, the sun's filter tweak and
@@ -3438,6 +3442,20 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
+    /// Draws the floating damage numbers over struck mobs (see <see cref="DamageNumberRenderer"/>),
+    /// right after the healthbars they rise from and with the same depth and fog rules.
+    /// </summary>
+    public void RenderDamageNumbers(Camera camera, DamageNumberPool numbers)
+    {
+        if (camera == null || numbers.Count == 0 || _damageNumbers == null) return;
+
+        _damageNumbers.Render(numbers, camera.GetViewProjection(), camera.RenderEye, camera.ViewDirection,
+            _fogColor, _fogNear, _fogFar);
+        // The number renderer binds the font atlas to unit 0.
+        InvalidateTextureUnits();
+    }
+
+    /// <summary>
     /// Draws every live falling leaf in one batched billboard draw. Leaves are too small to
     /// cast shadows, so they skip the shadow pass; their own shader carries the frame light
     /// and fog, which is final by the time the entity pass runs.
@@ -4119,6 +4137,7 @@ public class RenderManager : IDisposable
         _fire?.Dispose();
         _bubbles?.Dispose();
         _healthbars?.Dispose();
+        _damageNumbers?.Dispose();
         _sunQuad.Dispose();
         gl.DeleteTexture(_sunTexture);
         gl.DeleteTexture(_breakProgressTexture);

@@ -240,6 +240,9 @@ public class World : IItemUseWorld
     // The hotbar's pickup pops, fed from Inventory's slots every frame (a rising count pops)
     private readonly HotbarPickupPop _hotbarPops = new();
 
+    // Floating damage numbers: from landed hits in singleplayer, from snapshot health drops on a client
+    private readonly DamageNumberPool _damageNumbers = new(WorldGenerationConfig.DamageNumberCapacity);
+
     /// <summary>
     /// Server mode: the connected players, owned by the server and read once a frame by the drop
     /// pickup, which credits each player's own inventory (flagging
@@ -977,7 +980,12 @@ public class World : IItemUseWorld
             _netMobsSeen.Add(entry.Id);
             if (_netMobs.TryGetValue(entry.Id, out var existing) && KindMatches(existing, entry))
             {
+                // A client never damages a mob itself: a hit shows up as the health drop between
+                // two snapshots, and that drop is what its damage number floats
+                var before = existing.Health;
                 existing.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
+                if (!_serverMode && existing.Health < before)
+                    ShowDamageNumber(existing, before - existing.Health);
                 continue;
             }
 
@@ -992,7 +1000,16 @@ public class World : IItemUseWorld
             if (!_netMobsSeen.Contains(id))
                 _netMobRemovals.Add(id);
         foreach (var id in _netMobRemovals)
+        {
+            // The server stops listing a mob the moment it dies, so the killing blow never shows as a
+            // drop; one leaving near the camera (far inside every despawn radius) died, and floats
+            // the health it had left
+            if (!_serverMode && _netMobs.TryGetValue(id, out var gone) && gone.Health > 0
+                && Vector3.DistanceSquared(gone.Position, Camera.Position)
+                <= WorldGenerationConfig.DamageNumberDeathRangeBlocks * WorldGenerationConfig.DamageNumberDeathRangeBlocks)
+                ShowDamageNumber(gone, gone.Health);
             RemoveNetMob(id);
+        }
 
         _dropManager.Clear();
         for (var i = 0; i < entities.Count; i++)
@@ -1215,6 +1232,7 @@ public class World : IItemUseWorld
 
         _hotbarPops.Update(Inventory, (float)deltaTime);
         _hotbarName.Update(Inventory, (float)deltaTime);
+        _damageNumbers.Update((float)deltaTime);
         // The pool itself is the server's (ApplyNetworkHealth mirrors it); only the damage flash
         // fades here
         _health.Update((float)deltaTime);
@@ -1299,7 +1317,11 @@ public class World : IItemUseWorld
     {
         RefreshMobs();
         for (var i = 0; i < _mobs.Count; i++)
+        {
+            var hits = _mobs[i].HitsTaken;
             _mobs[i].TakeDamage(amount);
+            ShowLandedHit(_mobs[i], hits);
+        }
     }
 
     /// <summary>Scenario seam: takes health off the local player's pool (the hearts, the damage flash
@@ -1576,6 +1598,7 @@ public class World : IItemUseWorld
 
         _hotbarPops.Update(Inventory, (float)deltaTime);
         _hotbarName.Update(Inventory, (float)deltaTime);
+        _damageNumbers.Update((float)deltaTime);
 
         // Water is aimed through unless the held item is out to scoop it, so a pond never
         // stops the player targeting the block under it
@@ -2208,6 +2231,7 @@ public class World : IItemUseWorld
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.BeginGpuPass(ProfileSection.EntityPass);
         renderManager.RenderEntityHealthbars(Camera, Mobs);
+        renderManager.RenderDamageNumbers(Camera, _damageNumbers);
         renderManager.RenderBlockDebris(Camera, _debris.Debris);
         foreach (var tree in _toppling)
             renderManager.RenderTopplingTree(Camera, tree);
@@ -2717,12 +2741,30 @@ public class World : IItemUseWorld
 
     /// <summary>Deals <paramref name="damage"/> to <paramref name="mob"/> and shoves it away from
     /// <paramref name="from"/> (the striker's eye, or where a thrown item left it).</summary>
-    private static void StrikeMob(Mob mob, int damage, Vector3 from)
+    private void StrikeMob(Mob mob, int damage, Vector3 from)
     {
+        var hits = mob.HitsTaken;
         mob.TakeDamage(damage);
+        ShowLandedHit(mob, hits);
         var away = new Vector3(mob.Position.X - from.X, 0f, mob.Position.Z - from.Z);
         mob.Shove(away, WorldGenerationConfig.SlimePunchShoveSpeed);
     }
+
+    /// <summary>The floating damage numbers over struck mobs (see <see cref="DamageNumberPool"/>).</summary>
+    internal DamageNumberPool DamageNumbers => _damageNumbers;
+
+    // Floats the damage of a hit over the mob when TakeDamage accepted it (its hit count moved). A
+    // headless server draws nothing, so it shows none.
+    private void ShowLandedHit(Mob mob, int hitsBefore)
+    {
+        if (_serverMode || mob.HitsTaken == hitsBefore) return;
+        ShowDamageNumber(mob, mob.LastHitDamage);
+    }
+
+    private void ShowDamageNumber(Mob mob, int amount) =>
+        _damageNumbers.Spawn(new Vector3(mob.Position.X,
+            EntityHealthbarRenderer.BarCentreY(mob.Position.Y, mob.HeadAboveCentre)
+            + WorldGenerationConfig.DamageNumberLiftBlocks, mob.Position.Z), amount);
 
     /// <summary>
     /// Block id at a world position; 0 (air) for unloaded chunks.

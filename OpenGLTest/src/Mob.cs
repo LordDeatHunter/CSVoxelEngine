@@ -117,6 +117,14 @@ public abstract class Mob
     /// healthbar is placed.</summary>
     public abstract float HeadAboveCentre { get; }
 
+    /// <summary>Counts the hits <see cref="TakeDamage"/> accepted, so a caller can tell whether its
+    /// hit landed by comparing it before and after (the world shows each landed hit as a floating
+    /// damage number of <see cref="LastHitDamage"/>).</summary>
+    public int HitsTaken { get; private set; }
+
+    /// <summary>The amount of the last hit <see cref="TakeDamage"/> accepted.</summary>
+    public int LastHitDamage { get; private set; }
+
     /// <summary>Applies a hit; the owner drops the loot and removes the mob once dead.</summary>
     public virtual void TakeDamage(int amount)
     {
@@ -124,6 +132,8 @@ public abstract class Mob
         Health = Math.Max(0, Health - amount);
         _hitFlash = 1f;
         KickBody(4f);
+        HitsTaken++;
+        LastHitDamage = amount;
     }
 
     /// <summary>Sets the horizontal shove a contact or hit imparts, leaving vertical motion
