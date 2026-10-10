@@ -28,6 +28,9 @@ public class Camera : IMobTarget
     public bool IsFlying { get; private set; }
     /// <summary>True while sprinting on foot with movement input; drives the run cycle, roll and FOV.</summary>
     public bool IsSprinting { get; private set; }
+    /// <summary>True while crouched on foot (Left Ctrl): slower, a lowered view and the model's crouch pose.
+    /// The body and its collision keep their size, so the server's movement rules are unaffected.</summary>
+    public bool IsSneaking { get; private set; }
     /// <summary>Current vertical FOV in degrees; eases toward sprint boost with speed.</summary>
     public float CurrentFov => _currentFov;
     /// <summary>
@@ -234,6 +237,56 @@ public class Camera : IMobTarget
     private float _bobHeight;
     private float _bobStrafe;
     private float _roll;
+
+    // Camera juice. Every effect folds into the fields the view cache is already keyed on
+    // (_bobHeight, _roll, _currentFov), so none of it needs a cache key of its own: a landing
+    // dips the view, a hit kicks its roll toward the blow, a landed punch pinches the FOV, a
+    // crouch lowers the eye and a death tips the view over.
+    private Spring _landDip = new(3f, 0.45f);
+    private Spring _kickRoll = new(4f, 0.35f);
+    private Spring _fovPunch = new(5f, 0.4f);
+    private float _fovBase = DefaultFov;
+    private float _sneakBlend;
+    private float _prevVerticalVelocity;
+    private bool _wasGrounded;
+    private float _deathProgress;
+    private const float SneakEyeDrop = 0.22f;
+    private const float LandDipPerSpeed = 0.55f;
+    private const float LandDipScale = 0.8f;
+    private const float DeathRollRadians = 1.2f;
+    private const float DeathDropBlocks = 1.1f;
+
+    /// <summary>The landing spring's displacement (positive = the view is dipped).</summary>
+    public float LandingDip => _landDip.Value;
+
+    /// <summary>The hit-kick roll in radians.</summary>
+    public float KickRoll => _kickRoll.Value;
+
+    /// <summary>0..1 how far the death view has fallen over; set by the world while a death plays.</summary>
+    public float DeathProgress
+    {
+        get => _deathProgress;
+        set => _deathProgress = MathUtils.Clamp01(value);
+    }
+
+    /// <summary>
+    /// A hit from the world direction <paramref name="awayHorizontal"/> (the way the blow pushes the
+    /// player): the view rolls away from the side it came from and dips, springing back.
+    /// </summary>
+    public void AddHitKick(Vector3 awayHorizontal, float strength = 1f)
+    {
+        var forward = GetForwardVector();
+        var right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
+        var side = awayHorizontal.LengthSquared() > 1e-6f
+            ? Vector3.Dot(Vector3.Normalize(new Vector3(awayHorizontal.X, 0f, awayHorizontal.Z)), right)
+            : 0f;
+        // Pushed to the right (blow from the left) rolls the view clockwise.
+        _kickRoll.Impulse((0.9f * side + 0.25f) * strength);
+        _landDip.Impulse(5f * strength);
+    }
+
+    /// <summary>Pinches the FOV for a beat: a negative <paramref name="degrees"/> is a zoom-in (an impact).</summary>
+    public void PunchFov(float degrees) => _fovPunch.Impulse(degrees * 14f);
 
     // PERF_TODO R7: GetViewProjection ran at 22 call sites a frame, rebuilding view and
     // projection every time. The cache is validated against its own inputs rather than
@@ -537,7 +590,18 @@ public class Camera : IMobTarget
     {
         var fovTarget = DefaultFov + SprintFovBoost *
             MathUtils.Clamp01((intendedSpeed - BaseSpeed) / (BaseSpeed * (SprintMultiplier - 1f)));
-        _currentFov = MathUtils.Damp(_currentFov, fovTarget, FovDampRate, deltaTime);
+        _fovBase = MathUtils.Damp(_fovBase, fovTarget, FovDampRate, deltaTime);
+        _fovPunch.Step(0f, deltaTime);
+        _currentFov = _fovBase + MathUtils.Clamp(_fovPunch.Value, -6f, 6f);
+
+        // A landing dips the view in proportion to the fall that ended just now.
+        if (!_wasGrounded && IsGrounded && !IsFlying && _prevVerticalVelocity < -4f)
+            _landDip.Impulse(MathF.Min(-_prevVerticalVelocity, 25f) * LandDipPerSpeed);
+        _wasGrounded = IsGrounded;
+        _prevVerticalVelocity = _physics.VerticalVelocity;
+        _landDip.Step(0f, deltaTime);
+        _kickRoll.Step(0f, deltaTime);
+        _sneakBlend = MathUtils.Damp(_sneakBlend, IsSneaking ? 1f : 0f, 12f, deltaTime);
 
         _runBlend = MathUtils.Damp(_runBlend, IsSprinting ? 1f : 0f, RunBlendRate, deltaTime);
         var bobTarget = moving && !IsFlying && (IsGrounded || swimming) ? 1f : 0f;
@@ -547,9 +611,13 @@ public class Camera : IMobTarget
 
         var height = MathUtils.Lerp(WalkBobHeight, RunBobHeight, _runBlend);
         var strafe = MathUtils.Lerp(WalkBobStrafe, RunBobStrafe, _runBlend);
-        _bobHeight = MathF.Sin(_bobPhase * 2f) * height * _bobBlend;
+        var death = MathUtils.EaseInCubic(_deathProgress);
+        _bobHeight = MathF.Sin(_bobPhase * 2f) * height * _bobBlend
+                     - MathUtils.Clamp(_landDip.Value, -4f, 12f) * LandDipScale
+                     - SneakEyeDrop * _sneakBlend - DeathDropBlocks * death;
         _bobStrafe = MathF.Cos(_bobPhase) * strafe * _bobBlend;
-        _roll = MathF.Sin(_bobPhase) * RunRoll * _runBlend * _bobBlend;
+        _roll = MathF.Sin(_bobPhase) * RunRoll * _runBlend * _bobBlend
+                + MathUtils.Clamp(_kickRoll.Value, -0.12f, 0.12f) + DeathRollRadians * death;
     }
 
     /// <summary>
@@ -724,6 +792,7 @@ public class Camera : IMobTarget
     internal void MoveBy(Vector3 delta) => Position += delta;
     internal void SetGrounded(bool grounded) => IsGrounded = grounded;
     internal void SetSprinting(bool sprinting) => IsSprinting = sprinting;
+    internal void SetSneaking(bool sneaking) => IsSneaking = sneaking;
     internal void SetMovementFactor(float factor) => MovementFactor = factor;
     internal void SetGroundFriction(float friction) => GroundFriction = friction;
     internal void SetInWater(bool inWater) => IsInWater = inWater;

@@ -43,6 +43,8 @@ internal sealed class PlayerPhysics
     // Swimming. Water has no gravity term: vertical speed eases toward a target instead, so it
     // stays capped by SwimUpSpeed/SinkSpeed however long the player stays under.
     private const float SwimSpeedFactor = 0.5f;
+    // Crouched walking speed as a share of the base walk.
+    private const float SneakSpeedFactor = 0.4f;
     internal const float SwimUpSpeed = 4f;
     private const float SinkSpeed = -2f;
     private const float WaterDrag = 6f;
@@ -213,8 +215,12 @@ internal sealed class PlayerPhysics
         // Flight ignores the water entirely, so a submerged player can still fly out.
         // Creative mode on foot swims like survival.
         var swimming = camera.IsInWater && !camera.IsFlying;
-        camera.SetSprinting(sprinting && moving && !camera.IsFlying && !swimming && camera.IsGrounded);
+        // Ctrl on foot crouches: slower, never sprinting. While flying Ctrl is "down" instead.
+        var sneaking = keyboard.IsKeyPressed(Key.ControlLeft) && !camera.IsFlying && !swimming;
+        camera.SetSneaking(sneaking);
+        camera.SetSprinting(sprinting && moving && !camera.IsFlying && !swimming && camera.IsGrounded && !sneaking);
         if (swimming) moveSpeed *= SwimSpeedFactor;
+        if (sneaking) moveSpeed = BaseSpeed * SneakSpeedFactor;
         // Pass-through blocks scale the walk instead of blocking it; flight is noclip.
         camera.SetMovementFactor(BlockMoveFactor(camera, chunkManager));
         if (!camera.IsFlying) moveSpeed *= camera.MovementFactor;

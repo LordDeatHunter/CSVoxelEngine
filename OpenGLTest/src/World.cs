@@ -1074,6 +1074,7 @@ public class World : IItemUseWorld
             var damage = current - health;
             _health.TakeDamage(damage);
             Camera.AddShake(Math.Clamp(damage / 40f, 0.2f, 1f));
+            NotifyPlayerHurt(fromMob: true);
         }
         else if (health > current)
         {
@@ -1227,14 +1228,81 @@ public class World : IItemUseWorld
         }
         _prevCamPos = camPos;
         _hasPrevCamPos = true;
+        var previousHeld = _heldId;
         _heldId = Inventory.SelectedBlockId;
+        // Swapping what is in hand dips the arm and springs it back up (not on the first frame).
+        if (_equipTracked && _heldId != previousHeld) Player.NotifyEquip();
+        _equipTracked = true;
         _hasHeld = _heldId != 0 && (Inventory.SelectedCount > 0 || Inventory.SelectedToolInstance > 0);
         Player.HoldingItem = _hasHeld;
+        // The shoulder camera shows the body from outside, where it trails the look; first person
+        // and orbit (which turns the body itself) keep it on the look.
+        Player.BodyYawLags = Camera.IsShoulderSurf && !Camera.IsOrbit;
+        Player.SetLook(Camera.PlayerYaw, Camera.Pitch);
         var animSpeed = Camera.IsFlying ? 0f : horizontalSpeed;
         var supported = Camera.IsGrounded || Camera.IsFlying || Camera.IsInWater;
         Player.Update((float)deltaTime, animSpeed, Camera.IsSprinting, supported,
-            Camera.VerticalVelocity);
+            Camera.VerticalVelocity, Camera.IsSneaking, Camera.IsInWater && !Camera.IsFlying);
     }
+
+    private bool _equipTracked;
+
+    // A swing of the fist: the arm throws the jab and the view pinches in for a beat.
+    private void PunchSwing()
+    {
+        Player.Punch();
+        Camera.PunchFov(-0.8f);
+    }
+
+    /// <summary>
+    /// Plays the player's hurt feedback: the torso flinches away from the blow and the view rolls
+    /// and dips. <paramref name="fromMob"/> finds the nearest living mob and reads the blow's
+    /// direction off it; a fall or lava burn has none and just rocks the body back.
+    /// </summary>
+    private void NotifyPlayerHurt(bool fromMob)
+    {
+        if (!fromMob)
+        {
+            Player.Hurt(0f);
+            Camera.AddHitKick(Vector3.Zero, 0.5f);
+            return;
+        }
+
+        Mob? nearest = null;
+        var best = 8f * 8f;
+        for (var i = 0; i < _mobs.Count; i++)
+        {
+            var d = Vector3.DistanceSquared(_mobs[i].Position, Camera.Position);
+            if (d >= best) continue;
+            best = d;
+            nearest = _mobs[i];
+        }
+
+        if (nearest == null)
+        {
+            Player.Hurt(0f);
+            Camera.AddHitKick(Vector3.Zero, 0.5f);
+            return;
+        }
+
+        var toMob = new Vector3(nearest.Position.X - Camera.Position.X, 0f, nearest.Position.Z - Camera.Position.Z);
+        if (toMob.LengthSquared() < 1e-6f)
+        {
+            Player.Hurt(0f);
+            return;
+        }
+
+        toMob = Vector3.Normalize(toMob);
+        var forward = Camera.GetForwardVector();
+        forward.Y = 0f;
+        var fromFront = forward.LengthSquared() > 1e-6f ? Vector3.Dot(toMob, Vector3.Normalize(forward)) : 0f;
+        Player.Hurt(fromFront);
+        Camera.AddHitKick(-toMob);
+    }
+
+    // Seconds the player's death plays (the view tips over, the body falls) before the respawn.
+    private const float DeathPlaySeconds = 0.9f;
+    private float _deathTimer;
 
     /// <summary>
     /// One gameplay frame. Each block of work runs under its own profiler section; the autosave
@@ -1362,6 +1430,7 @@ public class World : IItemUseWorld
             {
                 _health.TakeDamage(_slimes.DamageDealtThisFrame);
                 Camera.AddShake(Math.Clamp(_slimes.DamageDealtThisFrame / 20f, 0.2f, 1f));
+                NotifyPlayerHurt(fromMob: true);
             }
         }
 
@@ -1375,6 +1444,7 @@ public class World : IItemUseWorld
             {
                 _health.TakeDamage(goblinDamage);
                 Camera.AddShake(Math.Clamp(goblinDamage / 20f, 0.2f, 1f));
+                NotifyPlayerHurt(fromMob: true);
             }
         }
 
@@ -1945,11 +2015,28 @@ public class World : IItemUseWorld
         _health.Update(deltaTime);
 
         if (_health.Health < beforeHp)
+        {
             Camera.AddShake(Math.Clamp((beforeHp - _health.Health) / 40f, 0.2f, 1f));
+            NotifyPlayerHurt(fromMob: false);
+        }
 
         if (!_health.IsDead)
+        {
+            _deathTimer = 0f;
+            return;
+        }
+
+        // The death plays first: the view tips over and the body falls, then the respawn.
+        _deathTimer += deltaTime;
+        var progress = MathUtils.Clamp01(_deathTimer / DeathPlaySeconds);
+        Camera.DeathProgress = progress;
+        Player.DeathFall = progress;
+        if (progress < 1f)
             return;
 
+        _deathTimer = 0f;
+        Camera.DeathProgress = 0f;
+        Player.DeathFall = 0f;
         _health.Respawn();
         var home = _hasRespawnEye ? _respawnEye : Camera.Position;
         Camera.TestTeleport(home, Camera.Yaw, Camera.Pitch);
@@ -2227,7 +2314,7 @@ public class World : IItemUseWorld
                     return;
                 _creativeBreakTimer = 0f;
             }
-            Player.Punch();
+            PunchSwing();
             PlayHitSfx(BlockIdAt(_selectedBlockPosition));
             BreakMined(_selectedBlockPosition, player);
             return;
@@ -2268,7 +2355,7 @@ public class World : IItemUseWorld
         {
             if (BlockType.ById[_breakingBlockId] != null)
             {
-                Player.Punch();
+                PunchSwing();
                 PlayHitSfx(_breakingBlockId);
                 if (_breakAllowed)
                     BreakMined(_selectedBlockPosition, player);
@@ -2284,7 +2371,7 @@ public class World : IItemUseWorld
         while (_hitTimer >= _breakHitSeconds)
         {
             _hitTimer -= _breakHitSeconds;
-            Player.Punch();
+            PunchSwing();
             PlayHitSfx(_breakingBlockId);
 
             // Start the pop from where the hit actually landed inside this frame, not from
@@ -2363,7 +2450,7 @@ public class World : IItemUseWorld
                 return true;
 
             _punchTimer = 0f;
-            Player.Punch();
+            PunchSwing();
             if (_clientMode)
                 RaiseIntent(WorldIntent.AttackWith(player.Eye, player.ViewDirection, NetAttackKind.Punch));
             else
@@ -2374,7 +2461,7 @@ public class World : IItemUseWorld
         if (!_hasSelectedBlock && _punchTimer >= _punchGap)
         {
             _punchTimer = 0f;
-            Player.Punch();
+            PunchSwing();
         }
 
         return false;
@@ -2989,7 +3076,7 @@ public class World : IItemUseWorld
         if (TryCookOrCollect(maxDistance, player) || TryQuernInteract(maxDistance, player)
             || TryKilnInteract(maxDistance, player) || TryCastInteract(maxDistance, player))
         {
-            Player.Punch();
+            PunchSwing();
             outcome = RightClickOutcome.Station;
             return true;
         }
@@ -3135,7 +3222,7 @@ public class World : IItemUseWorld
             if (result.Applied && result.MorphToId.HasValue && instance > 0)
                 inventory.MorphTool(instance, result.MorphToId.Value);
             if (result.Punch)
-                Player.Punch();
+                PunchSwing();
             return result.Applied;
         }
         finally
@@ -3601,7 +3688,7 @@ public class World : IItemUseWorld
     {
         if (!PlaceBlockAtFace(hitPos, hitNormal, blockId, state: 0, out var placePos)) return false;
 
-        Player.Punch();
+        PunchSwing();
         // Sand placed into thin air falls at once instead of hovering (stackable piles never
         // fall - the registry forbids the combination - so only the block path topples). A
         // client never ticks falling blocks, so it leaves the fall to the server, which topples

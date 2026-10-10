@@ -81,6 +81,9 @@ public class PlayerModel
     private const float PunchStrikeEnd = 0.55f;
     // How far the torso leans into the thrust.
     private const float PunchLean = 0.07f;
+    // The off hand swings back as the fist drives out, and the shoulders twist into the blow.
+    private const float PunchLeftCounter = 0.45f;
+    private const float PunchTwist = 0.16f;
 
     // Slice attack (items with AttackPattern.Slice). One swing lasts SliceDuration and is a
     // wind-up, a strike and a recovery, all eased so the pose equals the idle hold at both ends
@@ -152,6 +155,27 @@ public class PlayerModel
     private float _time;
     private float _holdBlend;
 
+    // Secondary motion. Springs carry their own velocity so a landing, a hit or an item swap rings
+    // out instead of easing: the landing dip (positive = body lowered), the hit flinch (positive =
+    // thrown backward), the first-person arm lag behind the look and the equip lowering.
+    private Spring _landDip = new(3.2f, 0.4f);
+    private Spring _flinch = new(5f, 0.3f);
+    private Spring _swayYaw = new(3.5f, 0.5f);
+    private Spring _swayPitch = new(3.5f, 0.5f);
+    private Spring _equip = new(3.2f, 0.55f);
+    private float _crouchBlend;
+    private float _swimBlend;
+    private float _swimPhase;
+    private float _lookYaw;
+    private float _lookPitch;
+    private float _bodyYaw;
+    private bool _lookKnown;
+    private bool _wasAirborne;
+
+    // How far the body may trail the look before it is dragged along, in degrees.
+    private const float BodyYawDeadZone = 40f;
+    private const float PelvisFallback = 0.75f;
+
     /// <summary>Whether the right hand currently holds something; eases the carrying pose in and out.</summary>
     public bool HoldingItem { get; set; }
 
@@ -188,6 +212,74 @@ public class PlayerModel
     /// <summary>Smoothed 0..1 airborne amount blending the ground cycle into the jump pose.</summary>
     public float AirBlend => _airBlend;
 
+    /// <summary>Smoothed 0..1 crouch amount (<c>sneaking</c> in <see cref="Update"/>).</summary>
+    public float CrouchBlend => _crouchBlend;
+
+    /// <summary>Smoothed 0..1 swimming amount (<c>swimming</c> in <see cref="Update"/>).</summary>
+    public float SwimBlend => _swimBlend;
+
+    /// <summary>The landing spring's displacement: positive while the body is squatting from an impact.</summary>
+    public float LandingDip => _landDip.Value;
+
+    /// <summary>The hit flinch spring: positive while the torso is thrown back, negative while it is thrown forward.</summary>
+    public float Flinch => _flinch.Value;
+
+    /// <summary>The equip spring: 1 right after <see cref="NotifyEquip"/> (arm lowered) settling to 0.</summary>
+    public float EquipLowering => _equip.Value;
+
+    /// <summary>0..1 how far the body has fallen over in a death (set by the world while it plays).</summary>
+    public float DeathFall { get; set; }
+
+    /// <summary>
+    /// When true the body trails the look: it only turns once the look is more than a dead zone away
+    /// and then catches up, and the head turns on its own meanwhile. Off (the body always faces the
+    /// look) for the first-person body, whose fist and held item are aimed along the view.
+    /// </summary>
+    public bool BodyYawLags { get; set; }
+
+    /// <summary>The yaw (degrees, the camera's convention) the body is drawn facing.</summary>
+    public float BodyYaw => BodyYawLags && _lookKnown ? _bodyYaw : _lookYaw;
+
+    /// <summary>
+    /// Reports the current look. The change since the last call lags the arms behind the turn (the
+    /// viewmodel sway) and, with <see cref="BodyYawLags"/>, drives the body-yaw follow. Call once a
+    /// frame before <see cref="Update"/>.
+    /// </summary>
+    public void SetLook(float yawDeg, float pitchDeg)
+    {
+        if (_lookKnown)
+        {
+            var dYaw = WrapDegrees(yawDeg - _lookYaw);
+            var dPitch = pitchDeg - _lookPitch;
+            // The arms trail the view: turn right and the arm swings left; look up and it sinks.
+            _swayYaw.Value = Math.Clamp(_swayYaw.Value + MathUtils.ToRadians(dYaw) * 0.55f, -0.4f, 0.4f);
+            _swayPitch.Value = Math.Clamp(_swayPitch.Value - MathUtils.ToRadians(dPitch) * 0.55f, -0.4f, 0.4f);
+        }
+        else
+        {
+            _bodyYaw = yawDeg;
+        }
+        _lookYaw = yawDeg;
+        _lookPitch = pitchDeg;
+        _lookKnown = true;
+    }
+
+    /// <summary>A different item was just selected: the hand dips and springs back up with it.</summary>
+    public void NotifyEquip() => _equip.Value = 1f;
+
+    /// <summary>
+    /// The body took a hit. <paramref name="fromFront"/> is +1 for a blow from the front (the torso is
+    /// thrown back), -1 from behind (thrown forward), 0 for a hit with no direction (a fall, lava),
+    /// which just rocks it back a little.
+    /// </summary>
+    public void Hurt(float fromFront = 0f)
+    {
+        var direction = fromFront == 0f ? 0.5f : Math.Clamp(fromFront, -1f, 1f);
+        _flinch.Impulse(5.5f * direction);
+    }
+
+    private static float WrapDegrees(float degrees) => degrees - MathF.Round(degrees / 360f) * 360f;
+
     /// <summary>
     /// Advances the walk cycle and the mine swing. <paramref name="horizontalSpeed"/> is in
     /// blocks/s (the camera's XZ displacement per second); standing still eases the limbs
@@ -198,10 +290,35 @@ public class PlayerModel
     /// knees, falling extends toward landing.
     /// </summary>
     public void Update(float deltaTime, float horizontalSpeed, bool sprinting = false, bool grounded = true,
-        float verticalVelocity = 0f)
+        float verticalVelocity = 0f, bool sneaking = false, bool swimming = false)
     {
         if (deltaTime <= 0f) return;
         _time += deltaTime;
+
+        // A landing hits the dip spring in proportion to the fall speed the frame before.
+        var airborne = !grounded;
+        if (_wasAirborne && !airborne && _airVelocity < -2.5f)
+            _landDip.Impulse(MathF.Min(-_airVelocity, 20f));
+        _wasAirborne = airborne;
+        _landDip.Step(0f, deltaTime);
+        _flinch.Step(0f, deltaTime);
+        _swayYaw.Step(0f, deltaTime);
+        _swayPitch.Step(0f, deltaTime);
+        _equip.Step(0f, deltaTime);
+        _crouchBlend = MathUtils.Damp(_crouchBlend, sneaking ? 1f : 0f, 12f, deltaTime);
+        _swimBlend = MathUtils.Damp(_swimBlend, swimming ? 1f : 0f, 6f, deltaTime);
+        _swimPhase += deltaTime * (2.6f + 5f * MathUtils.Clamp01(horizontalSpeed / WalkSpeedRef));
+
+        if (BodyYawLags && _lookKnown)
+        {
+            var offset = WrapDegrees(_lookYaw - _bodyYaw);
+            // Outside the dead zone the body is dragged along; inside it only drifts after a moving
+            // player, quicker the faster they go.
+            if (MathF.Abs(offset) > BodyYawDeadZone)
+                _bodyYaw = _lookYaw - MathF.Sign(offset) * BodyYawDeadZone;
+            var follow = MathUtils.Lerp(1.2f, 9f, MathUtils.Clamp01(horizontalSpeed / 2f));
+            _bodyYaw += WrapDegrees(_lookYaw - _bodyYaw) * (1f - MathF.Exp(-follow * deltaTime));
+        }
 
         var target = MathUtils.Clamp01(horizontalSpeed / WalkSpeedRef);
         _moveBlend = MathUtils.Damp(_moveBlend, target, MoveBlendRate, deltaTime);
@@ -381,9 +498,10 @@ public class PlayerModel
             leftShoulder, rightShoulder, leftElbow, rightElbow, torsoPitch, bob);
 
         // The punch rides on whichever pose the frame is in (ground cycle or jump), applied
-        // after the two are blended so a swing still plays while running or falling.
+        // after the two are blended so a swing still plays while running or falling. The swim
+        // stroke and the body mods (landing, crouch, flinch, sway) sit between the two.
         if (_airBlend <= 0.001f)
-            return WithThrow(WithPunch(ground, pitchDeg));
+            return WithThrow(WithPunch(ApplyMods(ApplySwim(ground), ComputeMods()), pitchDeg));
 
         var rise = MathUtils.Clamp01(_airVelocity / 11f);
         var fall = MathUtils.Clamp01(-_airVelocity / 12f);
@@ -416,8 +534,98 @@ public class PlayerModel
             MathUtils.Lerp(ground.RightElbow, air.RightElbow, t),
             MathUtils.Lerp(ground.TorsoPitch, air.TorsoPitch, t),
             MathUtils.Lerp(ground.Bob, 0f, t));
-        return WithThrow(WithPunch(blended, pitchDeg));
+        return WithThrow(WithPunch(ApplyMods(ApplySwim(blended), ComputeMods()), pitchDeg));
     }
+
+    // Swimming replaces the ground cycle: arms rock through an overhead crawl stroke opposite each
+    // other (a gentle sculling when still), the legs flutter, the knees stay soft. Blended in by
+    // the smoothed swim amount, so entering and leaving the water never snaps.
+    private Pose ApplySwim(in Pose pose)
+    {
+        var s = _swimBlend;
+        if (s <= 0.001f) return pose;
+        var crawl = MathUtils.Clamp01(_moveBlend * 3f);
+        var stroke = MathF.Sin(_swimPhase);
+        var arm = 1.2f + 0.1f * MathF.Sin(_swimPhase * 0.5f);
+        var leftShoulder = arm + 1.5f * crawl * stroke;
+        var rightShoulder = arm - 1.5f * crawl * stroke + _holdBlend * HoldShoulder * 0.5f;
+        var leftElbow = 0.4f + 0.55f * crawl * MathF.Max(0f, MathF.Cos(_swimPhase));
+        var rightElbow = 0.4f + 0.55f * crawl * MathF.Max(0f, -MathF.Cos(_swimPhase));
+        var kick = MathF.Sin(_swimPhase * 2.4f) * (0.2f + 0.2f * crawl);
+        var bob = MathF.Sin(_swimPhase * 0.7f) * 0.025f;
+        return new Pose(
+            MathUtils.Lerp(pose.LeftHip, kick, s), MathUtils.Lerp(pose.RightHip, -kick, s),
+            MathUtils.Lerp(pose.LeftKnee, -0.35f - MathF.Max(0f, kick), s),
+            MathUtils.Lerp(pose.RightKnee, -0.35f - MathF.Max(0f, -kick), s),
+            MathUtils.Lerp(pose.LeftShoulder, leftShoulder, s), MathUtils.Lerp(pose.RightShoulder, rightShoulder, s),
+            MathUtils.Lerp(pose.LeftElbow, leftElbow, s), MathUtils.Lerp(pose.RightElbow, rightElbow, s),
+            MathUtils.Lerp(pose.TorsoPitch, -0.15f * crawl, s), MathUtils.Lerp(pose.Bob, bob, s));
+    }
+
+    /// <summary>The body-wide offsets the second pass adds on top of the pose (see <see cref="ComputeMods"/>).</summary>
+    private readonly struct Mods
+    {
+        public float HipBend { get; init; }
+        public float KneeBend { get; init; }
+        public float Shoulders { get; init; }
+        public float RightShoulderExtra { get; init; }
+        public float TorsoPitch { get; init; }
+        public float Drop { get; init; }
+        public float TorsoYaw { get; init; }
+        public float TorsoRoll { get; init; }
+        public float HeadPitch { get; init; }
+        public float HeadYaw { get; init; }
+        public float SwimPitch { get; init; }
+        public float DeathPitch { get; init; }
+    }
+
+    private Mods ComputeMods()
+    {
+        var dip = Math.Clamp(_landDip.Value, -0.15f, 0.6f);
+        var crouch = _crouchBlend;
+        var ground = 1f - _airBlend;
+        var move = _moveBlend * ground * (1f - _swimBlend);
+
+        // Slice: the shoulders twist with the sweep and the body shifts its weight onto the lead leg.
+        var sliceTwist = IsSlicing ? SliceSweep() * 0.2f : 0f;
+        var sliceRoll = IsSlicing ? _sliceDir * 0.07f * SliceStroke() : 0f;
+
+        // Throw: lean back while the arm is cocked, then fall forward through the release.
+        float throwLean = 0f;
+        if (_throwCharge01.HasValue)
+            throwLean = 0.18f * MathUtils.SmoothStep(_throwCharge01.Value);
+        else if (_throwT < 1f)
+        {
+            var cocked = 0.18f * MathUtils.SmoothStep(_throwReleaseCharge);
+            var strike = MathUtils.EaseOutCubic(MathF.Min(1f, _throwT / ThrowStrikeEnd));
+            throwLean = MathUtils.Lerp(cocked, -0.3f, strike) * (1f - MathUtils.SmoothStep((_throwT - ThrowStrikeEnd) / (1f - ThrowStrikeEnd)));
+        }
+
+        var fall = DeathFall;
+        return new Mods
+        {
+            HipBend = dip * 0.55f + crouch * 0.7f,
+            KneeBend = dip * 1.1f + crouch * 1.4f,
+            Shoulders = _swayPitch.Value + dip * 0.3f,
+            RightShoulderExtra = -_equip.Value * 0.9f,
+            TorsoPitch = -dip * 0.2f - crouch * 0.25f + _flinch.Value * 0.3f + throwLean,
+            Drop = dip * 0.12f + crouch * 0.17f,
+            TorsoYaw = MathF.Sin(_walkPhase) * 0.1f * move + sliceTwist
+                       - PunchTwist * PunchWeights(_mineT).Extend,
+            TorsoRoll = MathF.Cos(_walkPhase) * 0.035f * move + sliceRoll + _flinch.Value * 0.08f,
+            HeadPitch = _flinch.Value * 0.45f - crouch * 0.1f,
+            HeadYaw = BodyYawLags && _lookKnown ? -MathUtils.ToRadians(WrapDegrees(_lookYaw - _bodyYaw)) : 0f,
+            SwimPitch = -_swimBlend * MathUtils.Clamp01(_moveBlend * 3f) * 1.1f,
+            DeathPitch = MathUtils.EaseInCubic(MathUtils.Clamp01(fall)) * 1.5f,
+        };
+    }
+
+    private static Pose ApplyMods(in Pose pose, in Mods m) => new(
+        pose.LeftHip + m.HipBend, pose.RightHip + m.HipBend,
+        pose.LeftKnee - m.KneeBend, pose.RightKnee - m.KneeBend,
+        pose.LeftShoulder + m.Shoulders, pose.RightShoulder + m.Shoulders + m.RightShoulderExtra,
+        pose.LeftElbow, pose.RightElbow,
+        pose.TorsoPitch + m.TorsoPitch, pose.Bob - m.Drop);
 
     private Pose WithThrow(in Pose pose)
     {
@@ -553,7 +761,7 @@ public class PlayerModel
         var pitchRad = MathUtils.ToRadians(pitchDeg);
         var (shoulder, elbow) = PunchJoints(pose, _mineT, pitchRad);
         return new Pose(pose.LeftHip, pose.RightHip, pose.LeftKnee, pose.RightKnee,
-            pose.LeftShoulder, shoulder, pose.LeftElbow, elbow,
+            pose.LeftShoulder - PunchLeftCounter * PunchWeights(_mineT).Extend, shoulder, pose.LeftElbow, elbow,
             pose.TorsoPitch - PunchLean * PunchWeights(_mineT).Extend, pose.Bob);
     }
 
@@ -579,16 +787,29 @@ public class PlayerModel
         }
         // Model faces -Z at rest; this yaw maps it onto the camera's horizontal facing
         // (at the default -90 it is the identity, verified against Camera.GetForwardVector).
-        var yawRad = -(yawDeg + 90f) * MathF.PI / 180f;
-        var root = Matrix4x4.CreateRotationY(yawRad) * Matrix4x4.CreateTranslation(feet + new Vector3(0f, pose.Bob, 0f));
+        // A lagging body faces its own yaw and the head makes up the difference.
+        var mods = ComputeMods();
+        var bodyYawDeg = BodyYawLags && _lookKnown ? _bodyYaw : yawDeg;
+        var yawRad = -(bodyYawDeg + 90f) * MathF.PI / 180f;
+        // Swimming tips the body forward about the hips, a death lays it over about the feet.
+        var pelvisY = rig.Parts.TryGetValue("ThighL", out var thigh) ? thigh.Pivot.Y : PelvisFallback;
+        var local = Matrix4x4.Identity;
+        if (mods.SwimPitch != 0f)
+            local = Matrix4x4.CreateTranslation(0f, -pelvisY, 0f) * Matrix4x4.CreateRotationX(mods.SwimPitch)
+                    * Matrix4x4.CreateTranslation(0f, pelvisY, 0f);
+        if (mods.DeathPitch != 0f)
+            local *= Matrix4x4.CreateRotationX(mods.DeathPitch);
+        var root = local * Matrix4x4.CreateRotationY(yawRad) * Matrix4x4.CreateTranslation(feet + new Vector3(0f, pose.Bob, 0f));
         var swingAxis = Vector3.UnitX;
 
         Matrix4x4 Torso() =>
             Matrix4x4.CreateFromAxisAngle(swingAxis, pose.TorsoPitch)
+            * Matrix4x4.CreateRotationY(mods.TorsoYaw) * Matrix4x4.CreateRotationZ(mods.TorsoRoll)
             * Matrix4x4.CreateTranslation(Pivot("Torso")) * root;
 
         Matrix4x4 Head() =>
-            Matrix4x4.CreateFromAxisAngle(swingAxis, pitchDeg * MathF.PI / 180f * 0.8f)
+            Matrix4x4.CreateFromAxisAngle(swingAxis, pitchDeg * MathF.PI / 180f * 0.8f + mods.HeadPitch)
+            * Matrix4x4.CreateRotationY(mods.HeadYaw)
             * Matrix4x4.CreateTranslation(Pivot("Head")) * root;
 
         Matrix4x4 UpperArm(Vector3 pivot, float shoulder, float sweep)
@@ -600,7 +821,7 @@ public class PlayerModel
             // raised arm through a horizontal arc instead of twisting a hanging one.
             var inward = (pivot.X > 0f ? 1f : -1f) * ArmInwardYaw;
             return Matrix4x4.CreateFromAxisAngle(swingAxis, shoulder)
-                * Matrix4x4.CreateFromAxisAngle(Vector3.UnitY, inward + sweep)
+                * Matrix4x4.CreateFromAxisAngle(Vector3.UnitY, inward + sweep + _swayYaw.Value)
                 * Matrix4x4.CreateTranslation(pivot) * root;
         }
 
@@ -677,7 +898,7 @@ public class PlayerModel
     {
         var fist = Vector3.Transform(new Vector3(0f, HandDepth(), 0f),
             GetPartMatrix("ForearmR", eyePos, yawDeg, pitchDeg, backOffset));
-        var yawRad = -(yawDeg + 90f) * MathF.PI / 180f;
+        var yawRad = -((BodyYawLags && _lookKnown ? _bodyYaw : yawDeg) + 90f) * MathF.PI / 180f;
         var pitchRad = MathUtils.ToRadians(pitchDeg);
         // The slice sweep and blade roll ride the anchor as well as the fist position, so the held
         // blade turns through the arc and rolls from upright to horizontal instead of only sliding
@@ -689,7 +910,7 @@ public class PlayerModel
         var punch = PunchActivity();
         return Matrix4x4.CreateRotationZ(SliceRoll())
             * Matrix4x4.CreateRotationX(pitchRad * punch)
-            * Matrix4x4.CreateRotationY(yawRad + SliceSweep() + PunchArmYaw(pitchRad))
+            * Matrix4x4.CreateRotationY(yawRad + SliceSweep() + PunchArmYaw(pitchRad) + _swayYaw.Value)
             * Matrix4x4.CreateTranslation(fist);
     }
 
