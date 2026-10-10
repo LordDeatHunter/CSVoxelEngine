@@ -49,6 +49,8 @@ public sealed class EntityAnimator
     private AnimationClip? _action;
     private float _actionTime;
     private float _lastActionTime;
+    private AnimationClip? _overlay;
+    private float _overlayTime;
 
     /// <param name="clips">Every clip the model authored; idle and walk are found by name.</param>
     /// <param name="walkReferenceSpeed">Horizontal speed (blocks/s) at which the walk clip plays
@@ -89,6 +91,27 @@ public sealed class EntityAnimator
         }
     }
 
+    /// <summary>True while an additive overlay (<see cref="PlayOverlay"/>) is running.</summary>
+    public bool IsOverlayPlaying => _overlay != null;
+
+    /// <summary>Whether the model authored a clip with that name.</summary>
+    public bool HasClip(string name) => Find(name) != null;
+
+    /// <summary>
+    /// Starts a one-shot <b>overlay</b> (a flinch): played on top of whatever locomotion and action
+    /// are showing, adding its translation and rotating the pose by its rotation on the bones it
+    /// keys, so a hit never cancels a throw or swing already under way. Authored to start and end
+    /// at the identity, so it needs no blend. Replaying restarts it. False when there is no such clip.
+    /// </summary>
+    public bool PlayOverlay(string clipName)
+    {
+        var clip = Find(clipName);
+        if (clip == null) return false;
+        _overlay = clip;
+        _overlayTime = 0f;
+        return true;
+    }
+
     /// <summary>The clip with that name (ordinal, ignoring case), or null.</summary>
     public AnimationClip? Find(string name)
     {
@@ -111,6 +134,11 @@ public sealed class EntityAnimator
         var moving = horizontalSpeed > MovingSpeedThreshold;
         _walkBlend = MathUtils.Damp(_walkBlend, moving ? 1f : 0f, WalkBlendRate, deltaTime);
         _idleTime += deltaTime;
+        if (_overlay != null)
+        {
+            _overlayTime += deltaTime;
+            if (_overlayTime >= _overlay.Length) _overlay = null;
+        }
         if (_walkBlend > WalkClockMinBlend)
             _walkTime += deltaTime * MathF.Max(horizontalSpeed / WalkReferenceSpeed, MinWalkRate);
 
@@ -183,6 +211,12 @@ public sealed class EntityAnimator
         var pose = Blend(idle, walk, _walkBlend);
         if (_action != null && _action.Keys(bone))
             pose = Blend(pose, _action.Sample(bone, _actionTime), ActionWeight);
+        if (_overlay != null && _overlay.Keys(bone))
+        {
+            var add = _overlay.Sample(bone, _overlayTime);
+            pose = new AnimationClip.BoneTransform(pose.Translation + add.Translation,
+                Quaternion.Normalize(add.Rotation * pose.Rotation), pose.Scale);
+        }
         return pose;
     }
 

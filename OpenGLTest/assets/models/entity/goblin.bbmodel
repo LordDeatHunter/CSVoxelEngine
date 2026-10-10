@@ -295,7 +295,7 @@
             "name": "idle",
             "loop": "loop",
             "override": false,
-            "length": 2.0,
+            "length": 2.4,
             "snapping": 24,
             "selected": false,
             "anim_time_update": "",
@@ -308,26 +308,114 @@
                     "type": "bone",
                     "keyframes": [
                         {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001001",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-1.5",
+                                    "y": "0",
+                                    "z": "2.5"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001002",
+                            "time": 0.6,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001003",
+                            "time": 1.2,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-1.5",
+                                    "y": "0",
+                                    "z": "-2.5"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001004",
+                            "time": 1.8,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001005",
+                            "time": 2.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
                             "channel": "position",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000201",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001006",
                             "time": 0,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "position",
-                            "data_points": [{"x": "0", "y": "0.5", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000202",
-                            "time": 1,
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0.5",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001007",
+                            "time": 1.2,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "position",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000203",
-                            "time": 2,
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001008",
+                            "time": 2.4,
                             "color": -1,
                             "interpolation": "catmullrom"
                         }
@@ -339,55 +427,71 @@
                     "keyframes": [
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000204",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001009",
                             "time": 0,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "3", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000205",
-                            "time": 1,
+                            "data_points": [
+                                {
+                                    "x": "3",
+                                    "y": "14",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000100a",
+                            "time": 0.7,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000206",
-                            "time": 2,
-                            "color": -1,
-                            "interpolation": "catmullrom"
-                        }
-                    ]
-                },
-                "00000000-0000-4000-8000-000000000004": {
-                    "name": "ArmL",
-                    "type": "bone",
-                    "keyframes": [
-                        {
-                            "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000207",
-                            "time": 0,
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000100b",
+                            "time": 1.2,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "-3"}],
-                            "uuid": "00000000-0000-4000-8000-000000000208",
-                            "time": 1,
+                            "data_points": [
+                                {
+                                    "x": "4",
+                                    "y": "-10",
+                                    "z": "2"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000100c",
+                            "time": 1.7,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000209",
-                            "time": 2,
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000100d",
+                            "time": 2.4,
                             "color": -1,
                             "interpolation": "catmullrom"
                         }
@@ -399,25 +503,91 @@
                     "keyframes": [
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-00000000020a",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "3"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000100e",
                             "time": 0,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "3"}],
-                            "uuid": "00000000-0000-4000-8000-00000000020b",
-                            "time": 1,
+                            "data_points": [
+                                {
+                                    "x": "5",
+                                    "y": "0",
+                                    "z": "5"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000100f",
+                            "time": 1.2,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-00000000020c",
-                            "time": 2,
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "3"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001010",
+                            "time": 2.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000004": {
+                    "name": "ArmL",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "-3"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001011",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-4",
+                                    "y": "0",
+                                    "z": "-5"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001012",
+                            "time": 1.2,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "-3"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001013",
+                            "time": 2.4,
                             "color": -1,
                             "interpolation": "catmullrom"
                         }
@@ -443,41 +613,217 @@
                     "type": "bone",
                     "keyframes": [
                         {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "5",
+                                    "y": "6",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001014",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "4",
+                                    "y": "0",
+                                    "z": "2.5"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001015",
+                            "time": 0.2,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "5",
+                                    "y": "-6",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001016",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "4",
+                                    "y": "0",
+                                    "z": "-2.5"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001017",
+                            "time": 0.6,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "5",
+                                    "y": "6",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001018",
+                            "time": 0.8,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
                             "channel": "position",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-00000000020d",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0.2",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001019",
                             "time": 0,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "position",
-                            "data_points": [{"x": "0", "y": "0.5", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-00000000020e",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "1",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000101a",
                             "time": 0.2,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "position",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-00000000020f",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0.2",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000101b",
                             "time": 0.4,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "position",
-                            "data_points": [{"x": "0", "y": "0.5", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000210",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "1",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000101c",
                             "time": 0.6,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "position",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000211",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0.2",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000101d",
+                            "time": 0.8,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000002": {
+                    "name": "Head",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-4",
+                                    "y": "-5",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000101e",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-3",
+                                    "y": "0",
+                                    "z": "-1.5"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000101f",
+                            "time": 0.2,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-4",
+                                    "y": "5",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001020",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-3",
+                                    "y": "0",
+                                    "z": "1.5"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001021",
+                            "time": 0.6,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-4",
+                                    "y": "-5",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001022",
                             "time": 0.8,
                             "color": -1,
                             "interpolation": "catmullrom"
@@ -490,40 +836,70 @@
                     "keyframes": [
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "-35", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000212",
+                            "data_points": [
+                                {
+                                    "x": "-44",
+                                    "y": "0",
+                                    "z": "3"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001023",
                             "time": 0,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000213",
+                            "data_points": [
+                                {
+                                    "x": "-4",
+                                    "y": "0",
+                                    "z": "3"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001024",
                             "time": 0.2,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "35", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000214",
+                            "data_points": [
+                                {
+                                    "x": "44",
+                                    "y": "0",
+                                    "z": "3"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001025",
                             "time": 0.4,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000215",
+                            "data_points": [
+                                {
+                                    "x": "4",
+                                    "y": "0",
+                                    "z": "3"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001026",
                             "time": 0.6,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "-35", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000216",
+                            "data_points": [
+                                {
+                                    "x": "-44",
+                                    "y": "0",
+                                    "z": "3"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001027",
                             "time": 0.8,
                             "color": -1,
                             "interpolation": "catmullrom"
@@ -536,40 +912,70 @@
                     "keyframes": [
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "35", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000217",
+                            "data_points": [
+                                {
+                                    "x": "44",
+                                    "y": "0",
+                                    "z": "-3"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001028",
                             "time": 0,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000218",
+                            "data_points": [
+                                {
+                                    "x": "4",
+                                    "y": "0",
+                                    "z": "-3"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001029",
                             "time": 0.2,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "-35", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000219",
+                            "data_points": [
+                                {
+                                    "x": "-44",
+                                    "y": "0",
+                                    "z": "-3"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000102a",
                             "time": 0.4,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-00000000021a",
+                            "data_points": [
+                                {
+                                    "x": "-4",
+                                    "y": "0",
+                                    "z": "-3"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000102b",
                             "time": 0.6,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "35", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-00000000021b",
+                            "data_points": [
+                                {
+                                    "x": "44",
+                                    "y": "0",
+                                    "z": "-3"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000102c",
                             "time": 0.8,
                             "color": -1,
                             "interpolation": "catmullrom"
@@ -582,40 +988,126 @@
                     "keyframes": [
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "30", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-00000000021c",
+                            "data_points": [
+                                {
+                                    "x": "34",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000102d",
                             "time": 0,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-00000000021d",
+                            "data_points": [
+                                {
+                                    "x": "4",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000102e",
                             "time": 0.2,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "-30", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-00000000021e",
+                            "data_points": [
+                                {
+                                    "x": "-34",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000102f",
                             "time": 0.4,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-00000000021f",
+                            "data_points": [
+                                {
+                                    "x": "-4",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001030",
                             "time": 0.6,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "30", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000220",
+                            "data_points": [
+                                {
+                                    "x": "34",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001031",
+                            "time": 0.8,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001032",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001033",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "1.1",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001034",
+                            "time": 0.6,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001035",
                             "time": 0.8,
                             "color": -1,
                             "interpolation": "catmullrom"
@@ -628,40 +1120,126 @@
                     "keyframes": [
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "-30", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000221",
+                            "data_points": [
+                                {
+                                    "x": "-34",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001036",
                             "time": 0,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000222",
+                            "data_points": [
+                                {
+                                    "x": "-4",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001037",
                             "time": 0.2,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "30", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000223",
+                            "data_points": [
+                                {
+                                    "x": "34",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001038",
                             "time": 0.4,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000224",
+                            "data_points": [
+                                {
+                                    "x": "4",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001039",
                             "time": 0.6,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "-30", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000225",
+                            "data_points": [
+                                {
+                                    "x": "-34",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000103a",
+                            "time": 0.8,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000103b",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "1.1",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000103c",
+                            "time": 0.2,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000103d",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000103e",
                             "time": 0.8,
                             "color": -1,
                             "interpolation": "catmullrom"
@@ -689,32 +1267,244 @@
                     "keyframes": [
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000226",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000103f",
                             "time": 0,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "-8", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000227",
+                            "data_points": [
+                                {
+                                    "x": "5",
+                                    "y": "8",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001040",
+                            "time": 0.12,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-13",
+                                    "y": "-15",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001041",
                             "time": 0.28,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "10", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000228",
+                            "data_points": [
+                                {
+                                    "x": "15",
+                                    "y": "12",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001042",
                             "time": 0.42,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000229",
+                            "data_points": [
+                                {
+                                    "x": "8",
+                                    "y": "4",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001043",
+                            "time": 0.52,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001044",
+                            "time": 0.7,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001045",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "-0.9",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001046",
+                            "time": 0.12,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0.2",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001047",
+                            "time": 0.28,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0.6",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001048",
+                            "time": 0.42,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001049",
+                            "time": 0.52,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000104a",
+                            "time": 0.7,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000002": {
+                    "name": "Head",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000104b",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "2",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000104c",
+                            "time": 0.12,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-7",
+                                    "y": "4",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000104d",
+                            "time": 0.28,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "5",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000104e",
+                            "time": 0.42,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000104f",
                             "time": 0.7,
                             "color": -1,
                             "interpolation": "catmullrom"
@@ -727,32 +1517,340 @@
                     "keyframes": [
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-00000000022a",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001050",
                             "time": 0,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "-160", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-00000000022b",
+                            "data_points": [
+                                {
+                                    "x": "30",
+                                    "y": "0",
+                                    "z": "8"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001051",
+                            "time": 0.12,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-175",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001052",
                             "time": 0.28,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "-35", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-00000000022c",
+                            "data_points": [
+                                {
+                                    "x": "-42",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001053",
                             "time": 0.42,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-00000000022d",
+                            "data_points": [
+                                {
+                                    "x": "-18",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001054",
+                            "time": 0.52,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001055",
+                            "time": 0.7,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000004": {
+                    "name": "ArmL",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001056",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-12",
+                                    "y": "0",
+                                    "z": "-8"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001057",
+                            "time": 0.12,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-32",
+                                    "y": "0",
+                                    "z": "-10"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001058",
+                            "time": 0.28,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-10",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001059",
+                            "time": 0.42,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000105a",
+                            "time": 0.7,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000005": {
+                    "name": "LegR",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000105b",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-6",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000105c",
+                            "time": 0.12,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "14",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000105d",
+                            "time": 0.28,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "12",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000105e",
+                            "time": 0.42,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "5",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000105f",
+                            "time": 0.52,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001060",
+                            "time": 0.7,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000006": {
+                    "name": "LegL",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001061",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "6",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001062",
+                            "time": 0.12,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-14",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001063",
+                            "time": 0.28,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-22",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001064",
+                            "time": 0.42,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-10",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001065",
+                            "time": 0.52,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001066",
                             "time": 0.7,
                             "color": -1,
                             "interpolation": "catmullrom"
@@ -765,8 +1863,12 @@
                     "keyframes": [
                         {
                             "channel": "timeline",
-                            "data_points": [{"script": "release"}],
-                            "uuid": "00000000-0000-4000-8000-00000000022e",
+                            "data_points": [
+                                {
+                                    "script": "release"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001067",
                             "time": 0.42,
                             "color": -1,
                             "interpolation": "linear"
@@ -794,32 +1896,216 @@
                     "keyframes": [
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-00000000022f",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001068",
                             "time": 0,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "15", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000230",
-                            "time": 0.16,
+                            "data_points": [
+                                {
+                                    "x": "-15",
+                                    "y": "18",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001069",
+                            "time": 0.12,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "-20", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000231",
+                            "data_points": [
+                                {
+                                    "x": "22",
+                                    "y": "-22",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000106a",
                             "time": 0.3,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000232",
+                            "data_points": [
+                                {
+                                    "x": "10",
+                                    "y": "-8",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000106b",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000106c",
+                            "time": 0.5,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000106d",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "-0.5",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000106e",
+                            "time": 0.12,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "-1.1",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000106f",
+                            "time": 0.3,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "-0.4",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001070",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001071",
+                            "time": 0.5,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000002": {
+                    "name": "Head",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001072",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-9",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001073",
+                            "time": 0.12,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "12",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001074",
+                            "time": 0.3,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "6",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001075",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001076",
                             "time": 0.5,
                             "color": -1,
                             "interpolation": "catmullrom"
@@ -832,32 +2118,298 @@
                     "keyframes": [
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000233",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001077",
                             "time": 0,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "-110", "y": "0", "z": "-30"}],
-                            "uuid": "00000000-0000-4000-8000-000000000234",
-                            "time": 0.16,
+                            "data_points": [
+                                {
+                                    "x": "-135",
+                                    "y": "0",
+                                    "z": "-28"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001078",
+                            "time": 0.12,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "20", "y": "0", "z": "20"}],
-                            "uuid": "00000000-0000-4000-8000-000000000235",
+                            "data_points": [
+                                {
+                                    "x": "18",
+                                    "y": "0",
+                                    "z": "18"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001079",
                             "time": 0.3,
                             "color": -1,
                             "interpolation": "catmullrom"
                         },
                         {
                             "channel": "rotation",
-                            "data_points": [{"x": "0", "y": "0", "z": "0"}],
-                            "uuid": "00000000-0000-4000-8000-000000000236",
+                            "data_points": [
+                                {
+                                    "x": "32",
+                                    "y": "0",
+                                    "z": "8"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000107a",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000107b",
+                            "time": 0.5,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000004": {
+                    "name": "ArmL",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000107c",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-65",
+                                    "y": "0",
+                                    "z": "-12"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000107d",
+                            "time": 0.12,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-8",
+                                    "y": "0",
+                                    "z": "-6"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000107e",
+                            "time": 0.3,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "10",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000107f",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001080",
+                            "time": 0.5,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000005": {
+                    "name": "LegR",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001081",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-8",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001082",
+                            "time": 0.12,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "20",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001083",
+                            "time": 0.3,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "8",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001084",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001085",
+                            "time": 0.5,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000006": {
+                    "name": "LegL",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001086",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "8",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001087",
+                            "time": 0.12,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-26",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001088",
+                            "time": 0.3,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-10",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001089",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000108a",
                             "time": 0.5,
                             "color": -1,
                             "interpolation": "catmullrom"
@@ -870,11 +2422,796 @@
                     "keyframes": [
                         {
                             "channel": "timeline",
-                            "data_points": [{"script": "impact"}],
-                            "uuid": "00000000-0000-4000-8000-000000000237",
+                            "data_points": [
+                                {
+                                    "script": "impact"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000108b",
                             "time": 0.3,
                             "color": -1,
                             "interpolation": "linear"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "uuid": "00000000-0000-4000-8000-000000000305",
+            "name": "hurt",
+            "loop": "once",
+            "override": false,
+            "length": 0.4,
+            "snapping": 24,
+            "selected": false,
+            "anim_time_update": "",
+            "blend_weight": "",
+            "start_delay": "",
+            "loop_delay": "",
+            "animators": {
+                "00000000-0000-4000-8000-000000000001": {
+                    "name": "Torso",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000108c",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-16",
+                                    "y": "0",
+                                    "z": "5"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000108d",
+                            "time": 0.06,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-5",
+                                    "y": "0",
+                                    "z": "2"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000108e",
+                            "time": 0.16,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "2",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000108f",
+                            "time": 0.28,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001090",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000002": {
+                    "name": "Head",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001091",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-20",
+                                    "y": "10",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001092",
+                            "time": 0.06,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-6",
+                                    "y": "3",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001093",
+                            "time": 0.18,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001094",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000003": {
+                    "name": "ArmR",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001095",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-20",
+                                    "y": "0",
+                                    "z": "28"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001096",
+                            "time": 0.06,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-6",
+                                    "y": "0",
+                                    "z": "8"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001097",
+                            "time": 0.2,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001098",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000004": {
+                    "name": "ArmL",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-000000001099",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-20",
+                                    "y": "0",
+                                    "z": "-28"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000109a",
+                            "time": 0.06,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-6",
+                                    "y": "0",
+                                    "z": "-8"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000109b",
+                            "time": 0.2,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000109c",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "uuid": "00000000-0000-4000-8000-000000000306",
+            "name": "death",
+            "loop": "once",
+            "override": false,
+            "length": 0.8,
+            "snapping": 24,
+            "selected": false,
+            "anim_time_update": "",
+            "blend_weight": "",
+            "start_delay": "",
+            "loop_delay": "",
+            "animators": {
+                "00000000-0000-4000-8000-000000000002": {
+                    "name": "Head",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000109d",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-28",
+                                    "y": "14",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000109e",
+                            "time": 0.2,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-34",
+                                    "y": "14",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-00000000109f",
+                            "time": 0.8,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000003": {
+                    "name": "ArmR",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010a0",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-95",
+                                    "y": "0",
+                                    "z": "24"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010a1",
+                            "time": 0.18,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-130",
+                                    "y": "0",
+                                    "z": "38"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010a2",
+                            "time": 0.5,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-120",
+                                    "y": "0",
+                                    "z": "34"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010a3",
+                            "time": 0.8,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000004": {
+                    "name": "ArmL",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010a4",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-80",
+                                    "y": "0",
+                                    "z": "-24"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010a5",
+                            "time": 0.18,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-120",
+                                    "y": "0",
+                                    "z": "-38"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010a6",
+                            "time": 0.5,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-110",
+                                    "y": "0",
+                                    "z": "-34"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010a7",
+                            "time": 0.8,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000005": {
+                    "name": "LegR",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010a8",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "25",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010a9",
+                            "time": 0.25,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "32",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010aa",
+                            "time": 0.8,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000006": {
+                    "name": "LegL",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010ab",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-20",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010ac",
+                            "time": 0.25,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-26",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010ad",
+                            "time": 0.8,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "uuid": "00000000-0000-4000-8000-000000000307",
+            "name": "spawn",
+            "loop": "once",
+            "override": false,
+            "length": 0.45,
+            "snapping": 24,
+            "selected": false,
+            "anim_time_update": "",
+            "blend_weight": "",
+            "start_delay": "",
+            "loop_delay": "",
+            "animators": {
+                "00000000-0000-4000-8000-000000000001": {
+                    "name": "Torso",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "-2.2",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010ae",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "1.2",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010af",
+                            "time": 0.18,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "-0.4",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010b0",
+                            "time": 0.32,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010b1",
+                            "time": 0.45,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000002": {
+                    "name": "Head",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-12",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010b2",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-10",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010b3",
+                            "time": 0.18,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010b4",
+                            "time": 0.45,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000003": {
+                    "name": "ArmR",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-100",
+                                    "y": "0",
+                                    "z": "20"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010b5",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-110",
+                                    "y": "0",
+                                    "z": "30"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010b6",
+                            "time": 0.18,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010b7",
+                            "time": 0.45,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "00000000-0000-4000-8000-000000000004": {
+                    "name": "ArmL",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-100",
+                                    "y": "0",
+                                    "z": "-20"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010b8",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "-110",
+                                    "y": "0",
+                                    "z": "-30"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010b9",
+                            "time": 0.18,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "rotation",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "0"
+                                }
+                            ],
+                            "uuid": "00000000-0000-4000-8000-0000000010ba",
+                            "time": 0.45,
+                            "color": -1,
+                            "interpolation": "catmullrom"
                         }
                     ]
                 }

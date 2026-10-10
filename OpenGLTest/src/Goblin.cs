@@ -24,6 +24,11 @@ public sealed class Goblin : Mob
     public const string ThrowClip = "throw";
     public const string MeleeClip = "melee";
 
+    // Optional clips: absent ones simply play nothing, the procedural BodyEffect still shows.
+    public const string HurtClip = "hurt";
+    public const string DeathClip = "death";
+    public const string SpawnClip = "spawn";
+
     /// <summary>Timeline event on the throw clip at which the stone leaves the hand.</summary>
     public const string ReleaseEvent = "release";
 
@@ -76,6 +81,7 @@ public sealed class Goblin : Mob
     private bool _inWater;
     private float _lean;
     private bool _facingKnown;
+    private bool _deathPlayed;
     private float _throwCooldown;
     private float _meleeCooldown;
     private float _losRetry;
@@ -90,6 +96,29 @@ public sealed class Goblin : Mob
         // A fresh goblin notices the player before its first throw rather than throwing on its
         // first grounded frame; unjittered so scripted shots repeat.
         _throwCooldown = WorldGenerationConfig.GoblinFirstThrowDelaySeconds;
+        Animation.Play(SpawnClip);
+    }
+
+    /// <inheritdoc />
+    public override void TakeDamage(int amount)
+    {
+        var wasDying = IsDying;
+        base.TakeDamage(amount);
+        // A flinch on top of whatever is playing, so a hit never cancels a throw or swing.
+        if (amount > 0 && !wasDying) Animation.PlayOverlay(HurtClip);
+    }
+
+    /// <summary>A client's goblin is driven by server snapshots, not by <see cref="Update"/>: this
+    /// advances the clips from the mirrored velocity so it still walks and idles.</summary>
+    public override void AnimateMirror(float deltaTime)
+    {
+        base.AnimateMirror(deltaTime);
+        Animation.Update(deltaTime, MathF.Sqrt(_velocity.X * _velocity.X + _velocity.Z * _velocity.Z));
+        if (IsDying && !_deathPlayed)
+        {
+            _deathPlayed = true;
+            Animation.Play(DeathClip);
+        }
     }
 
     /// <summary>Stones left to throw; the manager drops what remains on death.</summary>
@@ -239,7 +268,15 @@ public sealed class Goblin : Mob
         _losRetry = MathF.Max(0f, _losRetry - deltaTime);
 
         var move = Vector3.Zero;
-        if (IsDying) player = null;
+        if (IsDying)
+        {
+            player = null;
+            if (!_deathPlayed)
+            {
+                _deathPlayed = true;
+                Animation.Play(DeathClip);
+            }
+        }
         if (player != null)
         {
             var target = player.Eye;

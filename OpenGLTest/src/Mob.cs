@@ -84,7 +84,7 @@ public abstract class Mob
     }
 
     /// <summary>Advances a mob whose AI a client never runs (death, spawn, hit recoil and flash).</summary>
-    public void AnimateMirror(float deltaTime)
+    public virtual void AnimateMirror(float deltaTime)
     {
         TickLife(deltaTime);
         _hitFlash = MathF.Max(0f, _hitFlash - deltaTime / 0.25f);

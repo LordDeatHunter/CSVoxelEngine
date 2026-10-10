@@ -126,6 +126,40 @@ public sealed class MobLifeTests
         Assert.InRange(MathF.Abs(MathF.Cos(goblin.Facing) - -1f), 0f, 0.05f);
     }
 
+    [Fact]
+    public void AHitFlinchesOverTheRunningActionWithoutCancellingIt()
+    {
+        var goblin = new Goblin(EntityRegistry.Require("goblin"), new Vector3(2.5f, 1f + Goblin.Height * 0.5f, 2.5f), 3);
+        var animator = goblin.Animation;
+        // Let the spawn clip end, then start a throw.
+        for (var i = 0; i < 60; i++) animator.Update(Dt, 0f);
+        Assert.True(animator.Play(Goblin.ThrowClip));
+
+        goblin.TakeDamage(1);
+
+        Assert.True(animator.IsPlaying(Goblin.ThrowClip));
+        Assert.True(animator.IsOverlayPlaying);
+
+        // The overlay is authored to return to rest, so it ends on its own.
+        for (var i = 0; i < 60; i++) animator.Update(Dt, 0f);
+        Assert.False(animator.IsOverlayPlaying);
+    }
+
+    [Fact]
+    public void AnOverlayRotatesTheBonesItKeysAndLeavesTheRest()
+    {
+        var goblin = new Goblin(EntityRegistry.Require("goblin"), new Vector3(2.5f, 1f + Goblin.Height * 0.5f, 2.5f), 0);
+        var animator = goblin.Animation;
+        for (var i = 0; i < 60; i++) animator.Update(Dt, 0f);
+        var before = animator.LocalTransform("LegL").Rotation;
+
+        animator.PlayOverlay(Goblin.HurtClip);
+        for (var i = 0; i < 4; i++) animator.Update(Dt, 0f);
+
+        Assert.Equal(before, animator.LocalTransform("LegL").Rotation);
+        Assert.NotEqual(Quaternion.Identity, animator.LocalTransform("Torso").Rotation);
+    }
+
     private sealed class PlayerTarget(Vector3 eye) : IMobTarget
     {
         public Vector3 Eye { get; } = eye;
