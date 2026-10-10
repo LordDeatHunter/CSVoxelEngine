@@ -4,5 +4,6 @@
   "sfx": "hit_rock",
   "pebbleWeight": 1,
   "hardness": 3,
-  "falls": true
+  "falls": true,
+  "footstepDust": true
 }

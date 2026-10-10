@@ -1179,6 +1179,19 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // wears on every face, so BiomeTint.VertexTint lands the chip on its target colour
     public const string ColourChipTile = "grass_top_textureless";
 
+    // --- Sprint footstep dust (FootstepDust rules, GroundDust): while sprinting on foot over loose
+    // ground (a block with "footstepDust"), every footfall of the gait kicks up a tiny puff ---
+    public const int FootstepDustCount = 5;
+    // Blocks per second the grit flies out at, well under a landing's
+    public const float FootstepDustSpeed = 1.3f;
+    // On top of that a footfall kicks its grit up and back, against the run (blocks per second)
+    public const float FootstepDustLift = 2.2f;
+    public const float FootstepDustKickBack = 1.5f;
+    public const float FootstepDustSize = 0.085f;
+    // Horizontal blocks per second the body must really be covering: a sprint held against a wall
+    // never puffs
+    public const float FootstepDustMinSpeed = 4f;
+
     // --- Wind (Wind.cs, SH-27) ---
     // One slowly turning wind shared by leaf sway, fire smoke and the cloud drift.
     /// <summary>Wind heading at lighting time 0, degrees from +X toward +Z.</summary>

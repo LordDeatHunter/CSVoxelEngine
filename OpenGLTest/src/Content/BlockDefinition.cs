@@ -60,6 +60,13 @@ public sealed class BlockDefinition
     /// </summary>
     public float? PebbleWeight { get; set; }
 
+    /// <summary>
+    /// Whether the block is loose ground (sand, snow, dirt, gravel) that a sprinting player kicks a
+    /// small puff of dust off at every footfall (see <see cref="GroundDust"/>). Default false; never
+    /// on a fluid.
+    /// </summary>
+    public bool? FootstepDust { get; set; }
+
     public bool? Occludes { get; set; }
     public bool? CullSelf { get; set; }
     public bool? CastsAO { get; set; }

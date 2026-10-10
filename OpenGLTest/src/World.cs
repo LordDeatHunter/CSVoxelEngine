@@ -1293,9 +1293,9 @@ public class World : IItemUseWorld
             headingForward, headingSide);
         // A hit-stop holds the punch pinch with the arm (read by the camera's next update)
         Camera.HoldPunchFov = Player.IsHitStopped;
-        // The dust a landing kicks up: cosmetic, so a headless server spawns none
+        // The dust a landing or a sprinting footfall kicks up: cosmetic, so a headless server spawns none
         if (!_serverMode)
-            _dust.UpdatePlayer(Camera, _chunkManager, _debris);
+            _dust.UpdatePlayer(Camera, Player.WalkPhase, horizontalSpeed, _chunkManager, _debris);
     }
 
     private int _lastSwimStrokes;

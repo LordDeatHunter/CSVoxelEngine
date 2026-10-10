@@ -56,14 +56,15 @@ public class BlockDebrisSystem
     /// lift, so the puff spreads low along the ground. The launch is exactly that, with none of
     /// <see cref="Burst"/>'s pop, so the caller's speed curve owns it. The chips wear the block's
     /// surface (<see cref="DebrisLook.Surface"/>) and are tinted like <see cref="Burst"/>'s; air and
-    /// unknown ids spawn nothing.
+    /// unknown ids spawn nothing. <paramref name="drift"/> is added to every chip's launch (a
+    /// footfall kicks its grit up and back).
     /// </summary>
     public void Puff(Vector3 origin, Vector3 cell, byte blockId, int count, float speed, float size,
-        Random? random = null, IColumnSource? columns = null)
+        Random? random = null, IColumnSource? columns = null, Vector3 drift = default)
     {
         if (blockId == BlockType.Air || BlockType.ById[blockId] == null) return;
         Spray(origin, blockId, DebrisLook.Surface, TintAt(cell, blockId, columns), count, speed, size,
-            radius: 0.15f, lift: 0.35f, random ?? Random.Shared);
+            radius: 0.15f, lift: 0.35f, random ?? Random.Shared, drift);
     }
 
     /// <summary>
@@ -80,9 +81,10 @@ public class BlockDebrisSystem
 
     // The ring launch Puff and Splat share: headings spread round the ring with a jitter (so even a
     // three-chip puff fans out), each starting up to radius out along its heading, flying at 60-100 %
-    // of speed sideways and lift..2 lift of it upward, launched exactly (no mining pop).
+    // of speed sideways and lift..2 lift of it upward, plus a shared drift, launched exactly (no
+    // mining pop).
     private void Spray(Vector3 origin, byte blockId, DebrisLook look, Vector3 tint, int count, float speed,
-        float size, float radius, float lift, Random rng)
+        float size, float radius, float lift, Random rng, Vector3 drift = default)
     {
         if (count <= 0 || speed <= 0f) return;
         for (var i = 0; i < count; i++)
@@ -90,7 +92,7 @@ public class BlockDebrisSystem
             var angle = (i + rng.NextSingle()) * MathF.Tau / count;
             var heading = new Vector3(MathF.Cos(angle), 0f, MathF.Sin(angle));
             var launch = heading * (speed * (0.6f + 0.4f * rng.NextSingle()))
-                         + new Vector3(0f, speed * lift * (1f + rng.NextSingle()), 0f);
+                         + new Vector3(0f, speed * lift * (1f + rng.NextSingle()), 0f) + drift;
             var start = origin + heading * (radius * rng.NextSingle());
             if (_debris.Count >= WorldGenerationConfig.BlockDebrisMax)
                 _debris.RemoveAt(0);

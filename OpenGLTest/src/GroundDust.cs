@@ -8,7 +8,8 @@ namespace silkgltriangle;
 /// The cosmetic ground dust: a landing from a real fall kicks up a puff of chips of the block
 /// landed on, decided by <see cref="LandingDust"/> and drawn as <see cref="BlockDebris"/> through
 /// <see cref="BlockDebrisSystem.Puff"/>, and a landing slime splats chips of its own green instead
-/// (<see cref="BlockDebrisSystem.Splat"/>). Owned by <see cref="World"/>, which feeds it the local
+/// (<see cref="BlockDebrisSystem.Splat"/>); sprinting over loose ground puffs at every footfall
+/// (<see cref="FootstepDust"/>). Owned by <see cref="World"/>, which feeds it the local
 /// player each frame (singleplayer and a client, whose own physics runs locally) and the mobs'
 /// landings in singleplayer; a headless server never calls it. Main thread only.
 /// </summary>
@@ -18,17 +19,67 @@ public sealed class GroundDust
     // the same way on a client, which bills no fall damage itself
     private readonly FallTracker _landing = new();
 
+    // The gait clock as the last frame left it, so a frame's footfalls are the strikes crossed since
+    private float _lastWalkPhase;
+    private bool _hasWalkPhase;
+
+    // Last frame's feet, which give the direction the body runs in
+    private Vector3 _lastFeet;
+    private Vector2 _runDirection;
+
     /// <summary>
-    /// One frame of the local player: a landing that ended a fall kicks up its puff. Landing in
-    /// water raises none.
+    /// One frame of the local player: a landing that ended a fall kicks up its puff (none landing in
+    /// water), and while sprinting over loose ground every footfall of the gait
+    /// (<paramref name="walkPhase"/>, <see cref="PlayerModel.WalkPhase"/>) kicks up a small one.
+    /// <paramref name="horizontalSpeed"/> is the body's real sideways speed this frame.
     /// </summary>
-    public void UpdatePlayer(Camera camera, ChunkManager chunks, BlockDebrisSystem debris, Random? random = null)
+    public void UpdatePlayer(Camera camera, float walkPhase, float horizontalSpeed, ChunkManager chunks,
+        BlockDebrisSystem debris, Random? random = null)
     {
         var feet = camera.Position - new Vector3(0f, Camera.EyeHeight, 0f);
         _landing.Observe(feet.Y, camera.IsGrounded, camera.IsFlying, camera.IsInWater, camera.IsCreative,
             FallTracker.DefaultMaxStepBlocks);
         if (_landing.LandedDrop > 0f && !camera.IsInWater)
             Land(feet, _landing.LandedDrop, PlayerPhysics.PlayerRadius, chunks, debris, random);
+
+        // The heading only moves while the body does, so a stop keeps the last one
+        var moved = new Vector2(feet.X - _lastFeet.X, feet.Z - _lastFeet.Z);
+        if (moved.LengthSquared() > 1e-8f) _runDirection = Vector2.Normalize(moved);
+        _lastFeet = feet;
+
+        Step(walkPhase, camera.IsSprinting, camera.IsGrounded, camera.IsFlying, camera.IsSneaking, camera.IsInWater,
+            horizontalSpeed, _runDirection, feet, chunks, debris, random);
+    }
+
+    /// <summary>
+    /// Advances the gait to <paramref name="walkPhase"/> and kicks up one footstep puff of the block
+    /// underfoot per foot strike crossed since the last call (<see cref="FootstepDust.FootfallsBetween"/>,
+    /// at most two, so a hitch never bursts), when <see cref="FootstepDust.Kicks"/> allows it; the
+    /// grit is kicked up and back against <paramref name="runDirection"/> (a unit XZ vector, or zero).
+    /// The first call only seeds the clock. Returns how many chips it spawned.
+    /// </summary>
+    public int Step(float walkPhase, bool sprinting, bool grounded, bool flying, bool sneaking, bool inWater,
+        float horizontalSpeed, Vector2 runDirection, Vector3 feet, ChunkManager chunks, BlockDebrisSystem debris,
+        Random? random = null)
+    {
+        var footfalls = _hasWalkPhase ? FootstepDust.FootfallsBetween(_lastWalkPhase, walkPhase) : 0;
+        _lastWalkPhase = walkPhase;
+        _hasWalkPhase = true;
+        if (footfalls <= 0) return 0;
+        if (!FootstepDust.BodyKicks(sprinting, grounded, flying, sneaking, inWater, horizontalSpeed))
+            return 0;
+        if (!TryFindSurface(chunks, feet, PlayerPhysics.PlayerRadius, out var cell, out var blockId)
+            || !FootstepDust.Kicks(sprinting, grounded, flying, sneaking, inWater, horizontalSpeed, blockId))
+            return 0;
+
+        var kick = new Vector3(-runDirection.X * WorldGenerationConfig.FootstepDustKickBack,
+            WorldGenerationConfig.FootstepDustLift, -runDirection.Y * WorldGenerationConfig.FootstepDustKickBack);
+        var puffs = Math.Min(footfalls, 2);
+        for (var i = 0; i < puffs; i++)
+            debris.Puff(feet + new Vector3(0f, WorldGenerationConfig.FootstepDustSize, 0f), cell, blockId,
+                WorldGenerationConfig.FootstepDustCount, WorldGenerationConfig.FootstepDustSpeed,
+                WorldGenerationConfig.FootstepDustSize, random, chunks.ColumnSource, kick);
+        return puffs * WorldGenerationConfig.FootstepDustCount;
     }
 
     /// <summary>

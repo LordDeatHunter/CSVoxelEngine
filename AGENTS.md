@@ -938,6 +938,7 @@ trailing commas.
 | `movementSpeed` | 0 | how fast the player moves through the block, 0..1: `0` (default) is a solid collider, a positive value makes it non-blocking for the player and scales their speed while the body overlaps it (`1` = full speed), so leaves at `0.75` are waded through at 75% speed; never set on fluids |
 | `friction` | 0.99 | grip of the block's top face, 0..1: `1` is instant response, lower slides more (ground response time grows with `1 - friction`); ice sets `0.95`. Only read from the solid block under the feet |
 | `pebbleWeight` | 0 | density multiplier (0..1) for the natural pebble scatter (`PebbleGenerator`) when this block is the exposed surface under the pebble cell: `1` keeps the patch's full density (stone, gravel), a lower value thins the scatter (grass `0.3`), and `0` (the default, e.g. sand and sandstone) means the surface grows no rock piles |
+| `footstepDust` | false | loose ground: a player sprinting on foot over it kicks up a tiny puff of its chips at every footfall (`FootstepDust`, `GroundDust`; sand, snow, dirt and gravel set it, grass does not). Illegal on a fluid |
 | `occludes` | full cube && !cutout | hides a neighbouring full cube's face (`OccludesNeighbours`) |
 | `cullSelf` | false | also cull faces against a neighbour of the same block (glass) |
 | `castsAO` | `solid` | darkens neighbouring faces (`CastsAmbientOcclusion`) |
@@ -2567,7 +2568,9 @@ overshoot or jiggle.
   on every hop (`LandingDust.SplatCount`/`SplatSpeed`, linear in the impact like its squash kick, with
   a `scale` for a bigger slime): `DebrisLook.Colour` chips with an air id, one grey cube
   (`BlockCubeCache.GetColourChip`, `WorldGenerationConfig.ColourChipTile`) painted through `uBiomeTint`
-  with `BiomeTint.VertexTint` of the mean opaque skin colour (`LandingDust.SkinColour`).
+  with `BiomeTint.VertexTint` of the mean opaque skin colour (`LandingDust.SkinColour`). Sprinting
+  on foot over a `footstepDust` block (grounded, not sneaking, not in water, really moving) puffs once
+  per foot strike of the gait: `PlayerModel.WalkPhase` crossing π/2 + kπ (`FootstepDust.FootfallsBetween`).
 - **Remote players** (protocol 7): the `PlayerState` flags carry cosmetic `Sneaking`, `Swimming`,
   `Sprinting` and `Airborne` bits (rebroadcast untrusted, never acted on) and every `PlayerList`
   entry ends with the player's last `NetPlayerAction` and a counter that moves per swing, so

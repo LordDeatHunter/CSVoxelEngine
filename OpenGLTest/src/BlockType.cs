@@ -59,6 +59,9 @@ public sealed record BlockType
     // this surface never grows pebbles. See PebbleGenerator.
     internal static readonly float[] PebbleWeightById = new float[256];
 
+    // Whether a sprinting footfall on the block kicks up dust (loose ground). See GroundDust.
+    internal static readonly bool[] FootstepDustById = new bool[256];
+
     // Whether the block is the reworked trees' wood (the tree_wood renderer), whose thickness
     // and parent direction live in the state byte. Read per voxel by the mesher's connection
     // test and per DDA step by the raycast, so flat like the other flags.
@@ -140,6 +143,10 @@ public sealed record BlockType
     /// <see cref="PebbleGenerator"/>.
     /// </summary>
     public float PebbleWeight { get; init; }
+
+    /// <summary>Whether the block is loose ground (sand, snow, dirt, gravel) a sprinting player kicks
+    /// a puff of dust off at every footfall; see <see cref="GroundDust"/>.</summary>
+    public bool FootstepDust { get; init; }
 
     /// <summary>Whether the block hides a neighbouring full cube's face. Defaults to "the baked
     /// model is a full cube and it is not cutout", so it is only known after baking.</summary>
@@ -401,6 +408,10 @@ public sealed record BlockType
     /// <c>0</c> means the surface never grows pebbles. See <see cref="PebbleGenerator"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float PebbleWeightOf(byte blockId) => PebbleWeightById[blockId];
+
+    /// <summary>Whether a sprinting footfall on the block kicks up dust; see <see cref="FootstepDust"/>.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool KicksFootstepDust(byte blockId) => FootstepDustById[blockId];
 
     /// <summary>Whether a block fully hides a neighbouring full cube's face.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

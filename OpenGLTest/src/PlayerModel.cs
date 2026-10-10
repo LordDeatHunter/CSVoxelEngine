@@ -353,6 +353,11 @@ public class PlayerModel
     /// <summary>The landing spring's displacement: positive while the body is squatting from an impact.</summary>
     public float LandingDip => _landDip.Value;
 
+    /// <summary>The gait clock in radians, only ever growing: the hips swing by its sine, so a foot
+    /// strikes the ground each time that sine peaks, at π/2 + kπ (twice a stride). The footstep dust
+    /// fires on those crossings (<see cref="FootstepDust.FootfallsBetween"/>).</summary>
+    public float WalkPhase => _walkPhase;
+
     /// <summary>The hit flinch spring: positive while the torso is thrown back, negative while it is thrown forward.</summary>
     public float Flinch => _flinch.Value;
 

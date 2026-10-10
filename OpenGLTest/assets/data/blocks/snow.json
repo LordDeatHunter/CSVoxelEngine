@@ -12,5 +12,6 @@
   "replaceableByPlacement": true,
   "stackMax": 16,
   "stackSolidAt": 16,
-  "loot": "snow"
+  "loot": "snow",
+  "footstepDust": true
 }

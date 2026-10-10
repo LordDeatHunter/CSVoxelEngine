@@ -40,6 +40,26 @@
     { "op": "wait", "seconds": 0.6 },
     { "op": "screenshot", "name": "sand-short-drop", "hideHud": true },
 
+    // LEG 3b — sprinting over the sand (+Z through the same flat chunk) kicks a small puff up and
+    // back off every footfall, about two a second, which then passes under the trailing camera; a
+    // walk raises none. Sand grit on sand is low-contrast by nature: look just behind the feet.
+    { "op": "teleport", "pos": [168.5, 12.7, 128.5], "yaw": 90, "pitch": -30 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "walk", "keys": ["W"], "seconds": 0.6 },
+    { "op": "screenshot", "name": "sand-walk", "hideHud": true },
+    { "op": "teleport", "pos": [168.5, 12.7, 128.5], "yaw": 90, "pitch": -30 },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 0.4 },
+    { "op": "screenshot", "name": "sand-sprint-a", "hideHud": true },
+    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 0.1 },
+    { "op": "screenshot", "name": "sand-sprint-b", "hideHud": true },
+    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 0.1 },
+    { "op": "screenshot", "name": "sand-sprint-c", "hideHud": true },
+    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 0.1 },
+    { "op": "screenshot", "name": "sand-sprint-d", "hideHud": true },
+    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 0.1 },
+    { "op": "screenshot", "name": "sand-sprint-e", "hideHud": true },
+
     // LEG 4 — a goblin dropped 8 blocks onto the sand lands in a puff. The camera hovers (flying is
     // immune to its stones) beside the drop.
     { "op": "fly" },

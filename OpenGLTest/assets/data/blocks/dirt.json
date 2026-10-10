@@ -1,4 +1,5 @@
 {
   "name": "Dirt",
-  "model": { "parent": "block/cube_all", "textures": { "all": "dirt" } }
+  "model": { "parent": "block/cube_all", "textures": { "all": "dirt" } },
+  "footstepDust": true
 }

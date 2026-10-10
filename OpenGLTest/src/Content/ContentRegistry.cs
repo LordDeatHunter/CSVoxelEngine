@@ -586,6 +586,7 @@ public static class ContentRegistry
         Array.Clear(BlockType.FrictionById);
         Array.Fill(BlockType.FrictionById, BlockType.DefaultFriction);
         Array.Clear(BlockType.PebbleWeightById);
+        Array.Clear(BlockType.FootstepDustById);
         TileMaterials.Reset();
         Array.Clear(BlockType.OccludesById);
         Array.Clear(BlockType.CastsAoById);
@@ -1420,6 +1421,12 @@ public static class ContentRegistry
             // A fluid is never the ground beneath a pebble cell, like its other forced-off traits
             if (fluid) pebbleWeight = 0f;
 
+            // Nor is it ground a footfall scuffs: a swimmer kicks up no dust
+            if (fluid && definition.FootstepDust == true)
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets footstepDust on a fluid: nobody runs on a fluid, so it can never puff.");
+            var footstepDust = definition.FootstepDust ?? false;
+
             var material = ParseMaterial(definition.Material, path);
 
             var hardness = definition.Hardness ?? BlockType.DefaultHardness;
@@ -1462,6 +1469,7 @@ public static class ContentRegistry
                 MovementSpeed = movementSpeed,
                 Friction = friction,
                 PebbleWeight = pebbleWeight,
+                FootstepDust = footstepDust,
                 CullSelf = definition.CullSelf ?? false,
                 // Tree wood is drawn at any thickness down to a 1 px twig, so it never darkens
                 // its neighbours, whatever the file says (forced here, where CastsAoById is mirrored)
@@ -1520,6 +1528,7 @@ public static class ContentRegistry
             BlockType.MovementSpeedById[id] = type.MovementSpeed;
             BlockType.FrictionById[id] = type.Friction;
             BlockType.PebbleWeightById[id] = type.PebbleWeight;
+            BlockType.FootstepDustById[id] = type.FootstepDust;
             BlockType.CastsAoById[id] = type.CastsAmbientOcclusion;
             BlockType.TreeWoodById[id] = treeWood;
             BlockType.FluidById[id] = type.Fluid;
