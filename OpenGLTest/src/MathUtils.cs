@@ -184,6 +184,22 @@ public static class MathUtils
     }
 
     /// <summary>
+    /// One-shot 0 -> 1 -> 0 bump with a springy settle, for a scale pop: an eased-out rise to 1
+    /// at <paramref name="peakAt"/>, then an <see cref="EaseOutBack"/> fall that dips a little
+    /// below 0 before landing on exactly 0 at t = 1, so whatever it scales rests where it began.
+    /// <paramref name="peakAt"/> is clamped away from the ends like <see cref="Pulse"/>'s.
+    /// </summary>
+    public static float BackPulse(float t, float peakAt = 0.25f)
+    {
+        t = Clamp01(t);
+        peakAt = MathF.Min(MathF.Max(peakAt, 0.05f), 0.95f);
+
+        return t < peakAt
+            ? EaseOutCubic(t / peakAt)
+            : 1f - EaseOutBack((t - peakAt) / (1f - peakAt));
+    }
+
+    /// <summary>
     /// A timed label's opacity: fully on for <paramref name="holdSeconds"/> after it appeared,
     /// then a smooth fade to 0 over <paramref name="fadeSeconds"/>, and 0 from then on. Never
     /// increases with <paramref name="elapsed"/>, so a label only ever fades out.

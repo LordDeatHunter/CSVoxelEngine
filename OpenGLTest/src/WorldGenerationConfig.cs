@@ -1393,11 +1393,15 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float ThrowSpeed = 40f;
     public const float ThrowLifetimeSeconds = 5f;
 
-    // --- HUD feedback (HotbarNameFade) ---
+    // --- HUD feedback (HotbarNameFade, HotbarPickupPop) ---
     // Selecting a hotbar slot (or the selected slot changing item) shows the item's name above
     // the hotbar: fully opaque for the hold, then faded out, about 1.5 s in all.
     public const float HotbarNameHoldSeconds = 1.0f;
     public const float HotbarNameFadeSeconds = 0.5f;
+    // A slot whose count rises (a pickup, a craft result, a server snapshot) bumps its icon to
+    // this scale and springs back over the duration. The hotbar's icon fill leaves room for it.
+    public const float HotbarPopSeconds = 0.3f;
+    public const float HotbarPopScale = 1.3f;
 
     // --- Multiplayer networking (NetProtocol, GameServer, NetworkClient) ---
     // The server broadcasts the player list on this cadence; clients send their own state at the

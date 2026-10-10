@@ -53,11 +53,6 @@ public class Inventory
     /// <summary>Test stock of every placeable block the player spawns with.</summary>
     public const int StartingStock = 50;
 
-    // A pickup makes the slot's icon jump and settle back, echoing the count change
-    // drawn in the slot's corner
-    public const float PopSeconds = 0.25f;
-    public const float PopScale = 1.3f;
-
     private readonly Dictionary<byte, int> _blocks = new();
     private readonly Dictionary<byte, int> _misc = new();
 
@@ -67,9 +62,6 @@ public class Inventory
     private int _nextToolInstance = 1;
 
     private readonly HotbarSlot[] _hotbar = new HotbarSlot[SlotCount];
-
-    // Seconds since each hotbar slot's last change, parked at PopSeconds once the pop finished
-    private readonly float[] _popElapsed = FinishedPops();
 
     /// <summary>Which hotbar slot is in hand; always a valid index.</summary>
     public int SelectedIndex { get; private set; }
@@ -128,9 +120,10 @@ public class Inventory
     }
 
     /// <summary>
-    /// Credits picked-up blocks or items to their pool and pops every hotbar slot showing
-    /// them. Tools arrive as new instances. Returns false for an id with no pool, or when
-    /// its pool is full — the caller must leave the drop on the ground.
+    /// Credits picked-up blocks or items to their pool (the HUD pops every hotbar slot whose
+    /// count rose, see <see cref="HotbarPickupPop"/>). Tools arrive as new instances.
+    /// Returns false for an id with no pool, or when its pool is full — the caller must
+    /// leave the drop on the ground.
     /// A pickup of an id the pools hold none of yet auto-equips into the first empty
     /// hotbar slot, when there is one, so a new find is immediately in hand.
     /// </summary>
@@ -160,7 +153,6 @@ public class Inventory
                 var fresh = store.GetValueOrDefault(id) <= 0;
                 var n = Math.Min(capacity - used, amount);
                 store[id] = CountFor(id) + n;
-                PopSlotsShowing(id);
                 if (fresh)
                     EquipNewStackable(id);
                 return true;
@@ -170,7 +162,7 @@ public class Inventory
 
     /// <summary>
     /// Morphs a tool instance into another item (a bucket scooped full, a water bucket
-    /// poured out) and pops every hotbar slot holding it, so shared slots flip together.
+    /// poured out). Hotbar slots name the instance, so every slot holding it flips together.
     /// </summary>
     public bool MorphTool(int instanceId, byte toId)
     {
@@ -179,9 +171,6 @@ public class Inventory
         var item = ItemRegistry.TryGet(toId);
         if (item == null) return false;
         stack.SetItem(item);
-        for (var i = 0; i < _hotbar.Length; i++)
-            if (_hotbar[i] is { IsTool: true } slot && slot.ToolInstance == instanceId)
-                _popElapsed[i] = 0f;
         return true;
     }
 
@@ -267,7 +256,6 @@ public class Inventory
         _hotbar[i] = _hotbar[i] is { IsTool: false } slot && slot.Id == id && id != 0
             ? HotbarSlot.Empty
             : new HotbarSlot(false, id, 0);
-        _popElapsed[i] = 0f;
     }
 
     /// <summary>
@@ -280,12 +268,10 @@ public class Inventory
         if (_hotbar[i] is { IsTool: true } slot && slot.ToolInstance == instanceId)
         {
             _hotbar[i] = HotbarSlot.Empty;
-            _popElapsed[i] = 0f;
             return true;
         }
         var alive = _tools.Any(t => t.InstanceId == instanceId);
         _hotbar[i] = alive ? new HotbarSlot(true, 0, instanceId) : HotbarSlot.Empty;
-        _popElapsed[i] = 0f;
         return alive;
     }
 
@@ -296,7 +282,7 @@ public class Inventory
     {
         var slot = _hotbar[Wrap(index)];
         if (slot.IsTool)
-            return _tools.FirstOrDefault(t => t.InstanceId == slot.ToolInstance)?.DefinitionId ?? 0;
+            return LiveTool(slot.ToolInstance)?.DefinitionId ?? 0;
         return slot.Id;
     }
 
@@ -308,7 +294,7 @@ public class Inventory
     {
         var slot = _hotbar[Wrap(index)];
         if (slot.IsTool)
-            return _tools.Any(t => t.InstanceId == slot.ToolInstance) ? 1 : 0;
+            return LiveTool(slot.ToolInstance) != null ? 1 : 0;
         return CountFor(slot.Id);
     }
 
@@ -316,7 +302,17 @@ public class Inventory
     {
         var slot = _hotbar[Wrap(index)];
         if (!slot.IsTool) return 0;
-        return _tools.Any(t => t.InstanceId == slot.ToolInstance) ? slot.ToolInstance : 0;
+        return LiveTool(slot.ToolInstance) != null ? slot.ToolInstance : 0;
+    }
+
+    // The slot readers above run for every hotbar slot every frame (the hotbar draw, the HUD's
+    // pickup pop), so they look the instance up with a plain loop rather than a capturing lambda.
+    private ItemStack? LiveTool(int instanceId)
+    {
+        for (var i = 0; i < _tools.Count; i++)
+            if (_tools[i].InstanceId == instanceId)
+                return _tools[i];
+        return null;
     }
 
     /// <summary>
@@ -612,7 +608,7 @@ public class Inventory
     /// repeated id is restored once) and later pickups get ids above every restored one; a
     /// durability or crucible value is clamped to this run's maximum. Names this run does not
     /// know, or that belong to the wrong pool, are dropped with one warning, and a hotbar slot
-    /// pointing at dropped content comes back empty. Nothing pops.
+    /// pointing at dropped content comes back empty.
     /// </summary>
     public void Import(PlayerSaveData.InventoryData data)
     {
@@ -718,17 +714,6 @@ public class Inventory
             Log.Warn($"Player save: dropped inventory content this run cannot restore: {string.Join(", ", dropped)}");
     }
 
-    /// <summary>Advances the slot pop animations.</summary>
-    public void Update(float deltaTime)
-    {
-        for (var i = 0; i < _popElapsed.Length; i++)
-            _popElapsed[i] = MathF.Min(PopSeconds, _popElapsed[i] + deltaTime);
-    }
-
-    /// <summary>Icon scale for a hotbar slot: 1 at rest, briefly larger just after a change.</summary>
-    public float PopScaleAt(int index) =>
-        MathUtils.Lerp(1f, PopScale, MathUtils.Pulse(_popElapsed[Wrap(index)] / PopSeconds));
-
     private Dictionary<byte, int>? StoreOf(byte id) => CategoryOf(id) switch
     {
         InventoryCategory.Blocks => _blocks,
@@ -778,13 +763,6 @@ public class Inventory
         else store[id] = left;
     }
 
-    private void PopSlotsShowing(byte id)
-    {
-        for (var i = 0; i < _hotbar.Length; i++)
-            if (IdAt(i) == id)
-                _popElapsed[i] = 0f;
-    }
-
     private void ClearSlotsShowing(byte id)
     {
         for (var i = 0; i < _hotbar.Length; i++)
@@ -794,7 +772,7 @@ public class Inventory
 
     /// <summary>
     /// First hotbar slot showing nothing (empty or holding a long-gone tool), or -1 when
-    /// the hotbar is full. New pickups equip there; the equip itself pops the slot.
+    /// the hotbar is full. New pickups equip there.
     /// </summary>
     private int FirstEmptySlot()
     {
@@ -819,13 +797,6 @@ public class Inventory
     }
 
     private static int Wrap(int index) => ((index % SlotCount) + SlotCount) % SlotCount;
-
-    private static float[] FinishedPops()
-    {
-        var pops = new float[SlotCount];
-        Array.Fill(pops, PopSeconds);
-        return pops;
-    }
 
     /// <summary>
     /// The debug/test inventory: 50 of every placeable block plus the handful of starting tools

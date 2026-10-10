@@ -98,4 +98,23 @@ public sealed class MathUtilsExtensionsTests
         }
         Assert.Equal(0f, MathUtils.HoldThenFade(hold + fade, hold, fade));
     }
+
+    [Fact]
+    public void BackPulseRisesToOneAndLandsExactlyOnZero()
+    {
+        const float peak = 0.3f;
+        Assert.Equal(0f, MathUtils.BackPulse(0f, peak));
+        Assert.Equal(1f, MathUtils.BackPulse(peak, peak), precision: 5);
+        Assert.Equal(0f, MathUtils.BackPulse(1f, peak));
+        Assert.Equal(0f, MathUtils.BackPulse(2f, peak));
+
+        // The rise never falls back before the peak
+        var previous = 0f;
+        for (var t = 0f; t < peak; t += 0.01f)
+        {
+            var value = MathUtils.BackPulse(t, peak);
+            Assert.True(value >= previous, $"rise fell at t={t}");
+            previous = value;
+        }
+    }
 }

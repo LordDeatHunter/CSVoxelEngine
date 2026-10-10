@@ -755,7 +755,8 @@ public class UIRenderer : IDisposable
     /// <summary>Draws the hotbar centred along the bottom edge, highlighting the selected slot.</summary>
     /// <param name="headingDegrees">Compass heading (0 = north), picking heading-driven sheet frames.</param>
     /// <param name="timeSeconds">Scene clock, picking loop-driven sheet frames.</param>
-    public void DrawHotbar(Inventory inventory, float headingDegrees, float timeSeconds)
+    /// <param name="pops">Per-slot pickup pops scaling each icon and its count; null draws every slot at rest.</param>
+    public void DrawHotbar(Inventory inventory, float headingDegrees, float timeSeconds, HotbarPickupPop? pops = null)
     {
         var stride = SlotSize + SlotGap;
         var firstCentreX = HotbarLayout.FirstCentreX(_screenSize);
@@ -780,7 +781,7 @@ public class UIRenderer : IDisposable
             if (id == 0) continue;
             var centre = new Vector2(firstCentreX + i * stride, centreY);
             // The pop marks a pickup; IconFill leaves enough margin for it to stay in the slot
-            var iconSize = SlotSize * IconFill * inventory.PopScaleAt(i);
+            var iconSize = SlotSize * IconFill * (pops?.ScaleAt(i) ?? 1f);
             // Items show their flat sprites here like the list rows; blocks keep 3D cubes
             if (ItemRegistry.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
                 DrawItemSprite(centre, new Vector2(iconSize), id, icon, headingDegrees, timeSeconds);
@@ -808,12 +809,14 @@ public class UIRenderer : IDisposable
             {
                 if (inventory.IdAt(i) == 0) continue;
                 var text = _textCache.SlotCount(i, inventory.CountAt(i));
-                var size = _font.MeasureSize(text.AsSpan(), _countScale);
+                // The count pops with its icon, growing out of the slot's corner
+                var countScale = _countScale * (pops?.ScaleAt(i) ?? 1f);
+                var size = _font.MeasureSize(text.AsSpan(), countScale);
                 var slotRight = firstCentreX + i * stride + SlotSize * 0.5f;
                 var slotBottom = centreY + SlotSize * 0.5f;
                 DrawText(text,
                     new Vector2(slotRight - CountPadRight - size.X, slotBottom - CountPadBottom - size.Y),
-                    _countScale, Rgba.White);
+                    countScale, Rgba.White);
             }
         }
     }
