@@ -1264,6 +1264,8 @@ public class World : IItemUseWorld
         Player.Update((float)deltaTime, animSpeed, Camera.IsSprinting, supported,
             Camera.VerticalVelocity, Camera.IsSneaking, Camera.IsInWater && !Camera.IsFlying,
             headingForward, headingSide);
+        // A hit-stop holds the punch pinch with the arm (read by the camera's next update)
+        Camera.HoldPunchFov = Player.IsHitStopped;
     }
 
     private int _lastSwimStrokes;
@@ -1294,8 +1296,9 @@ public class World : IItemUseWorld
         }
     }
 
-    // A swing of the fist: the arm throws the jab and the view pinches in for a beat.
-    private void PunchSwing()
+    // A swing of the fist: the arm throws the jab and the view pinches in for a beat. Returns the
+    // swing's weight, which a connecting punch's hit-stop reads.
+    private float PunchSwing()
     {
         // A slower tool swings heavier: from the bare hand's pace (no weight) up to a tool with
         // a long hit gap.
@@ -1303,6 +1306,7 @@ public class World : IItemUseWorld
         var weight = MathUtils.InverseLerp(Mining.HitGapSeconds(null), Mining.HitGapSeconds(null) + 0.5f, gap);
         Player.Punch(weight);
         Camera.PunchFov(-0.8f - 0.8f * weight);
+        return weight;
     }
 
     /// <summary>
@@ -2503,11 +2507,16 @@ public class World : IItemUseWorld
                 return true;
 
             _punchTimer = 0f;
-            PunchSwing();
+            var weight = PunchSwing();
             if (_clientMode)
                 RaiseIntent(WorldIntent.AttackWith(player.Eye, player.ViewDirection, NetAttackKind.Punch));
             else
                 StrikeMob(target, Combat.PunchDamage(held), player.Eye);
+            // The punch connected, so the swing holds at full extension for a beat (cosmetic: the
+            // punch timer above keeps the pace). A client only predicts the connect - a mob was in
+            // the cone with a clear line when the swing landed - since the server's verdict comes
+            // back far too late for a freeze that has to start with the swing.
+            Player.HitStop(SwingHitStop.SecondsFor(weight));
             return true;
         }
 
@@ -2580,11 +2589,22 @@ public class World : IItemUseWorld
         {
             _sliceImpactDone = true;
             var returnSwing = _sliceCombo.ReturnSwing;
+            bool connected;
             if (_clientMode)
+            {
                 RaiseIntent(WorldIntent.AttackWith(player.Eye, player.ViewDirection,
                     returnSwing ? NetAttackKind.SliceReturn : NetAttackKind.Slice));
+                // Predicted, like the punch's: the server lands the swing on its own mobs
+                connected = HasSliceTarget(player.Eye, player.ViewDirection);
+            }
             else
-                ApplySliceDamage(player.Eye, player.ViewDirection, HeldItem(), returnSwing);
+            {
+                connected = ApplySliceDamage(player.Eye, player.ViewDirection, HeldItem(), returnSwing) > 0;
+            }
+            // A connecting swing holds at the impact; it still ends on time, so the combo's next
+            // swing is never delayed
+            if (connected)
+                Player.HitStop(SwingHitStop.SecondsFor(0f));
         }
 
         if (Player.IsSlicing)
@@ -2651,6 +2671,21 @@ public class World : IItemUseWorld
             struck++;
         }
         return struck;
+    }
+
+    /// <summary>Whether a slice from <paramref name="origin"/> along <paramref name="direction"/> would
+    /// strike anything: some mob in the forward hemisphere with a clear line of sight, the targets
+    /// <see cref="ApplySliceDamage"/> picks from.</summary>
+    private bool HasSliceTarget(Vector3 origin, Vector3 direction)
+    {
+        for (var i = 0; i < _mobs.Count; i++)
+        {
+            var mob = _mobs[i];
+            if (Combat.InFrontHemisphere(origin, direction, mob.Position, out _)
+                && !BlockRaycaster.SegmentHitsBlock(origin, mob.Position, _chunkManager))
+                return true;
+        }
+        return false;
     }
 
     /// <summary>Deals <paramref name="damage"/> to <paramref name="mob"/> and shoves it away from

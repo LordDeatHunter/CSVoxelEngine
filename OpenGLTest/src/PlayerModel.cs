@@ -218,6 +218,9 @@ public class PlayerModel
     private float _mineWeight;
     private float _sliceT = 1f;
     private int _sliceDir;
+    // Hit-stop of the punch and slice clocks: a swing that connected holds at its impact pose
+    private readonly SwingHitStop _mineStop = new();
+    private readonly SwingHitStop _sliceStop = new();
     private float _throwT = 1f;
     private float? _throwCharge01;
     private float _throwReleaseCharge;
@@ -288,6 +291,23 @@ public class PlayerModel
 
     /// <summary>Progress of the active slice swing: 0 at the wind-up, 1 when it has finished.</summary>
     public float SliceProgress => _sliceT;
+
+    /// <summary>True while a swing that connected is held at its impact pose (see <see cref="HitStop"/>).</summary>
+    public bool IsHitStopped => _mineStop.IsHolding || _sliceStop.IsHolding;
+
+    /// <summary>
+    /// The swing in progress (the slice if one plays, else the punch) connected with a mob: it holds at
+    /// its impact pose for <paramref name="seconds"/> once it gets there, then replays the rest faster so
+    /// it still ends on time (<see cref="SwingHitStop"/>). Ignored with no swing in progress, so a call
+    /// can never freeze a later swing; a new swing drops any hold the last one had.
+    /// </summary>
+    public void HitStop(float seconds)
+    {
+        if (IsSlicing)
+            _sliceStop.Request(seconds);
+        else if (_mineT < 1f)
+            _mineStop.Request(seconds);
+    }
 
     /// <summary>
     /// Degrees the pose adds to the held item's own display rotation, in the item JSON's <c>[pitch, yaw, roll]</c>
@@ -460,11 +480,12 @@ public class PlayerModel
         // extra kick while running so the cadence lifts beyond a sped-up walk.
         _walkPhase += deltaTime * GaitSpeedScale * (4f + horizontalSpeed * 0.9f + _runBlend * RunStrideBoost);
 
+        // The punch's impact pose is full extension, the slice's where the sweep crosses the aim
         if (_mineT < 1f)
-            _mineT = Math.Min(1f, _mineT + deltaTime * _mineSpeed / MineDuration);
+            _mineT = _mineStop.Advance(_mineT, deltaTime, _mineSpeed / MineDuration, PunchStrikeEnd);
 
         if (_sliceT < 1f)
-            _sliceT = Math.Min(1f, _sliceT + deltaTime / SliceDuration);
+            _sliceT = _sliceStop.Advance(_sliceT, deltaTime, 1f / SliceDuration, SliceImpactProgress);
 
         if (_throwT < 1f)
             _throwT = Math.Min(1f, _throwT + deltaTime / ThrowDuration);
@@ -480,6 +501,7 @@ public class PlayerModel
         _mineWeight = MathUtils.Clamp01(weight);
         _mineSpeed = MathUtils.Lerp(1f, 0.7f, _mineWeight);
         _mineT = 0f;
+        _mineStop.Reset();
     }
 
     /// <summary>
@@ -491,6 +513,7 @@ public class PlayerModel
     {
         _sliceDir = direction;
         _sliceT = 0f;
+        _sliceStop.Reset();
     }
 
     public void StartThrowCharge() => _throwCharge01 = 0f;

@@ -2530,6 +2530,14 @@ overshoot or jiggle.
   flying or dead. **Sneak** is Left Ctrl on foot (`Camera.IsSneaking`): slower, never sprinting, a
   lowered *view and model only* — the body and its collision keep their size, so the server's
   movement rules (which derive the feet from the eye) are unaffected.
+- **Hit-stop** (`SwingHitStop`, `HitStop*` knobs): a punch or slice that connects
+  (`World.UpdatePunch`/`UpdateSlice`; on a client the *predicted* connect, a mob in the cone or
+  hemisphere with line of sight, since the server's verdict comes too late) calls
+  `PlayerModel.HitStop`, which holds that swing at its impact pose (full extension, or
+  `SliceImpactProgress`) and then replays the rest faster, so the swing still ends when it would have:
+  the slice combo, the jab pace and `AttackPacing` never see it, and the world, mobs and movement
+  never stop. `Camera.HoldPunchFov` holds the pinch while `PlayerModel.IsHitStopped`. The item
+  debugger never requests one. `visual-examples/hit-stop.json` films it.
 - **Death in singleplayer** plays for `World.DeathPlaySeconds` (the view tips over, the body falls)
   before the respawn; a client has no death screen and still snaps back.
 - **Remote players** (protocol 7): the `PlayerState` flags carry cosmetic `Sneaking`, `Swimming`,

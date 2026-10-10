@@ -1,0 +1,42 @@
+{
+  // Hit-stop on a landed punch: run with VOXEL_SCRIPT=visual-examples/hit-stop.json VOXEL_TIME=147
+  // from OpenGLTest/. Shots land in visual/hit-stop/.
+  // The player stands (survival, NOT flying: creative would instamine the ground every frame the
+  // goblin leaves the cone) on the flat stretch of the forest clearing the goblins scenario uses
+  // (ground y 9..10), facing -Z, and punches a goblin spawned two blocks ahead with a bare hand.
+  // Bare-hand mining needs seconds per block, longer than any attack below is held.
+  //   punch-connect:  0.19 s into a punch that landed - the fist is held out at full extension
+  //   punch-air:      0.19 s into a punch at nothing - no hold, the fist is already drawing back
+  //   shoulder-*:     the same pair from the shoulder camera, where the whole arm shows
+  //   *-held-attack:  the attack held on, to check the swing keeps animating
+  "steps": [
+    { "op": "teleport", "pos": [-43.5, 13.5, 54.5], "yaw": -90, "pitch": -15 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "spawn", "entity": "goblin", "pos": [-43.5, 52.5] },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "mine", "seconds": 0.19 },
+    { "op": "screenshot", "name": "punch-connect" },
+    { "op": "mine", "seconds": 0.5 },
+    { "op": "screenshot", "name": "punch-held-attack" },
+    // The scripted punch never strikes anything, so it films an unheld swing from the same pose.
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "player", "action": "punch" },
+    { "op": "wait", "seconds": 0.19 },
+    { "op": "screenshot", "name": "punch-air" },
+    { "op": "damage", "amount": 1000 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "teleport", "pos": [-43.5, 12.0, 54.5], "yaw": -90, "pitch": -15 },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "spawn", "entity": "goblin", "pos": [-43.5, 52.5] },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "mine", "seconds": 0.19 },
+    { "op": "screenshot", "name": "shoulder-punch-connect" },
+    { "op": "mine", "seconds": 0.5 },
+    { "op": "screenshot", "name": "shoulder-held-attack" },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "player", "action": "punch" },
+    { "op": "wait", "seconds": 0.19 },
+    { "op": "screenshot", "name": "shoulder-punch-air" }
+  ]
+}

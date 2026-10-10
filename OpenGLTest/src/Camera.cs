@@ -297,6 +297,13 @@ public class Camera : IMobTarget
     /// <summary>Pinches the FOV for a beat: a negative <paramref name="degrees"/> is a zoom-in (an impact).</summary>
     public void PunchFov(float degrees) => _fovPunch.Impulse(degrees * 14f);
 
+    /// <summary>
+    /// While true the punch pinch holds where it is instead of springing back. The world sets it
+    /// while the player's swing is held by a hit-stop (<see cref="PlayerModel.IsHitStopped"/>), so the
+    /// view freezes with the arm; it lasts no longer than that bounded hold.
+    /// </summary>
+    public bool HoldPunchFov { get; set; }
+
     // PERF_TODO R7: GetViewProjection ran at 22 call sites a frame, rebuilding view and
     // projection every time. The cache is validated against its own inputs rather than
     // dirty-flagged: the key holds exactly the mutable state GetViewMatrix and
@@ -606,7 +613,8 @@ public class Camera : IMobTarget
     {
         _sprintFov = SprintFov.Step(_sprintFov,
             SprintFov.TargetDegrees(sprintHeld, moving, IsSneaking, swimming, intendedSpeed), deltaTime);
-        _fovPunch.Step(0f, deltaTime);
+        if (!HoldPunchFov)
+            _fovPunch.Step(0f, deltaTime);
         _currentFov = DefaultFov + _sprintFov + MathUtils.Clamp(_fovPunch.Value, -6f, 6f);
 
         // A landing dips the view in proportion to the fall that ended just now.

@@ -241,7 +241,7 @@ public const float DayLengthSeconds = 1200f;
     public const int BreakOverlayFrames = 8;
     public const float BreakOverlayOpacity = 0.6f;
 
-    // --- Camera and swing feel (Camera, SprintFov, StrafeTilt) ---
+    // --- Camera and swing feel (Camera, SprintFov, StrafeTilt, SwingHitStop) ---
     // Degrees the view widens by at a full on-foot sprint, added to the base FOV and the punch
     // pinch. The 10x flight sprint widens exactly as far, never further (SprintFov clamps the
     // speed ramp at the on-foot sprint speed).
@@ -253,6 +253,18 @@ public const float DayLengthSeconds = 1200f;
     public const float StrafeTiltDegrees = 1.5f;
     // How fast the tilt eases in and back to level (MathUtils.Damp rate, per second)
     public const float StrafeTiltEaseRate = 8f;
+    // Hit-stop: a punch or slice that connects holds the swing (and the punch pinch) at its impact
+    // pose for a beat, a light swing for HitStopSeconds and the heaviest punch for
+    // HitStopHeavySeconds, never past HitStopMaxSeconds. Cosmetic only: the world, the mobs, their
+    // recoil, the player's movement and attack pacing never stop.
+    public const float HitStopSeconds = 0.15f;
+    public const float HitStopHeavySeconds = 0.2f;
+    public const float HitStopMaxSeconds = 0.25f;
+    // The most of a swing's remaining post-impact time a hold may take. The rest of the swing replays
+    // faster after the hold, so a frozen swing still ends exactly when it would have and nothing that
+    // waits on it (the slice combo's next swing, the next jab) is ever delayed. A punch, whose
+    // follow-through is short, therefore holds for less than HitStopSeconds.
+    public const float HitStopMaxRecoveryShare = 0.7f;
 
     // --- Sky ---
     // Angular radius of the visible sun disc in degrees. The real sun is 0.27 degrees across
