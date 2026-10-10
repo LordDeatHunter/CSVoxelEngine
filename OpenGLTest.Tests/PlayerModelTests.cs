@@ -379,43 +379,54 @@ public sealed class PlayerModelTests
     }
 
     [Fact]
-    public void TheBladeStaysFlatThroughTheWholeCutAndItsHeadingSweepsWithTheHand()
+    public void TheSlicingArmIsExtendedForwardAndTheBladeFollowsTheWristThroughTheCut()
     {
+        TestContent.EnsureLoaded();
+        // The blade as drawn: the sprite's tip is its (1, 1, 0) diagonal and its flat face the sprite's +Z, both
+        // taken through the item's display transform and the hand anchor.
+        var display = ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_blade").Id)!.DisplayMatrix();
+
         foreach (var direction in new[] { 1, -1 })
         {
             var player = new PlayerModel { HoldingItem = true };
             for (var i = 0; i < 120; i++)
                 player.Update(1f / 60f, 0f);
             var eye = new Vector3(0.5f, 70f, 0.5f);
-            // The blade's tip axis in the world (the body faces -Z, +X is its right).
-            Vector3 Tip() => Vector3.TransformNormal(Vector3.UnitY, player.GetHandAnchorMatrix(eye, -90f));
 
             player.StartSlice(direction);
-            var flatWorst = 0f;
-            var samples = new System.Collections.Generic.List<Vector3>();
+            var samples = new System.Collections.Generic.List<(Vector3 Forearm, Vector3 Tip, float FlatFace, float Reach)>();
             for (var i = 0; i < 42; i++)
             {
                 player.Update(PlayerModel.SliceDuration / 42f, 0f);
                 var progress = player.SliceProgress;
-                var tip = Tip();
-                // From the end of the wind-up to the end of the strike the blade lies flat: it is never turned up
-                // in the middle of the cut (which read as slapping).
-                if (progress >= 0.26f && progress <= 0.49f)
-                {
-                    flatWorst = MathF.Max(flatWorst, MathF.Abs(tip.Y));
-                    samples.Add(tip);
-                }
+                if (progress < 0.26f || progress > 0.49f) continue;
+
+                var forearmMatrix = player.GetPartMatrix("ForearmR", eye, -90f, 0f);
+                var hand = Vector3.Transform(new Vector3(0f, player.HandDepth(), 0f), forearmMatrix);
+                var shoulder = player.GetPartMatrix("UpperArmR", eye, -90f, 0f).Translation;
+                var forearm = Vector3.Normalize(hand - forearmMatrix.Translation);
+                var blade = display * player.GetHandAnchorMatrix(eye, -90f);
+                var tip = Vector3.Normalize(Vector3.TransformNormal(new Vector3(1, 1, 0), blade));
+                var face = Vector3.Normalize(Vector3.TransformNormal(new Vector3(0, 0, 1), blade));
+                samples.Add((forearm, tip, MathF.Abs(face.Y), Vector3.Distance(shoulder, hand)));
             }
 
-            Assert.True(flatWorst < 0.35f, $"direction {direction}: the blade tipped {flatWorst} out of flat mid-cut.");
+            foreach (var (forearm, tip, flatFace, reach) in samples)
+            {
+                // The arm is held out in front, close to straight (the arm is 0.75 long), and its forearm points forward
+                // along it, not up.
+                Assert.True(reach > 0.66f, $"direction {direction}: the arm is bent in the cut (reach {reach}).");
+                Assert.True(forearm.Y < 0.4f, $"direction {direction}: the forearm points up ({forearm}).");
+                // The blade follows the wrist: its tip points along the forearm.
+                Assert.True(Vector3.Dot(tip, forearm) > 0.8f, $"direction {direction}: the blade does not follow the wrist ({tip} vs {forearm}).");
+                // And it is cocked on edge a little, not laid completely flat.
+                Assert.InRange(flatFace, 0.35f, 0.9f);
+            }
 
-            // Its heading sweeps round with the hand: out to the wind-up side, across the front, to the far side.
-            var first = samples[0];
-            var middle = samples[samples.Count / 2];
-            var last = samples[^1];
-            Assert.True(first.X * direction > 0.5f, $"direction {direction}: the cut does not start with the tip out to the wind-up side ({first}).");
-            Assert.True(middle.Z < -0.5f, $"direction {direction}: the tip is not forward mid-cut ({middle}).");
-            Assert.True(last.X * direction < -0.4f, $"direction {direction}: the cut does not end with the tip out to the far side ({last}).");
+            // The sweep: out to the wind-up side, across the front, to the far side.
+            Assert.True(samples[0].Forearm.X * direction > 0.5f);
+            Assert.True(samples[samples.Count / 2].Forearm.Z < -0.6f);
+            Assert.True(samples[^1].Forearm.X * direction < -0.4f);
         }
     }
 
@@ -430,17 +441,15 @@ public sealed class PlayerModelTests
         float HandY() => Vector3.Transform(Vector3.Zero, player.GetHandAnchorMatrix(eye, -90f)).Y;
 
         player.StartSlice(1);
-        var rest = HandY();
         player.Update(PlayerModel.SliceDuration * 0.26f, 0f);
         var start = HandY();
         player.Update(PlayerModel.SliceDuration * 0.23f, 0f);
         var end = HandY();
 
-        // The cut starts well above the idle holding height (not a flat, horizontal swing) ...
-        Assert.True(start > rest + 0.25f);
-        // ... and comes down off the eye line to about where the hand rests.
-        Assert.True(end < eye.Y - 0.25f);
-        Assert.True(MathF.Abs(end - rest) < 0.12f);
+        // The cut comes down a clear diagonal from the wind-up to the end of the strike ...
+        Assert.True(start > end + 0.3f);
+        // ... and finishes at about chest height, well below the eye line.
+        Assert.True(end < eye.Y - 0.3f);
     }
 
     [Fact]

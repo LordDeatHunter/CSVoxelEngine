@@ -2418,15 +2418,18 @@ overshoot or jiggle.
   turn further (`SliceTorsoYaw`), the knees and hips sink into the strike and the torso dips. The hand
   also travels a diagonal on every slice, from `SliceStartRaiseBlocks` above the chest line (so the cut
   starts high, not horizontal) down to just `SliceEndDropBlocks` below it (`SliceDiagonal`, through the
-  same re-solved arm as the chest-height drop), whichever way the swing goes. The **blade stays flat through
-  the whole cut**: the wrist roll (`SliceRoll`) is held at about 92 degrees from the wind-up on (only the eased
-  stroke ramps it in and out), so the blade never turns up in the middle of the cut, which read as slapping.
-  Its heading (`SliceBladeYaw`) sweeps like a scythe's: the body's twist plus a sweep of its own plus a
-  constant lead-in, so the tip points out to the wind-up side at the start, forward as the hand crosses the
-  middle and out to the far side at the end of the strike, and the blade is always across the direction it
-  travels (mirrored for the return). `PlayerModelTests.TheBladeStaysFlatThroughTheWholeCutAndItsHeadingSweepsWithTheHand`
-  measures this on the item as drawn, with its display rotation: the blade sprite's tip is its (1, 1, 0) diagonal
-  and its flat face the sprite's +Z, both taken through the item's `DisplayMatrix` and the hand anchor.
+  same re-solved arm as the chest-height drop), whichever way the swing goes. The slicing **arm is held out in front,
+  nearly straight, at chest height** (`SliceArmShoulder`, `SliceArmElbow`): the carrying pose (elbow bent 75
+  degrees, forearm up, which made the hand look held up by the elbow) is eased into it as the stroke ramps in. The
+  **blade is carried by the wrist**: its tip points along the forearm (so it follows the arm's sweep and is
+  always across the direction the hand travels, never turned up mid-cut), rolled about its length by
+  `SliceBladeRoll` (cocked on edge, not laid flat) and cocked up from the forearm by `SliceBladeCant`; in
+  `GetHandAnchorMatrix` the wrist orientation takes over from the body-space one by the stroke. The tip therefore
+  sweeps out to the wind-up side, forward as the hand crosses the middle and out to the far side (mirrored for the
+  return).
+  `PlayerModelTests.TheSlicingArmIsExtendedForwardAndTheBladeFollowsTheWristThroughTheCut` measures it on the item
+  as drawn, with its display rotation: the blade sprite's tip is its (1, 1, 0) diagonal and its flat face the
+  sprite's +Z, both taken through the item's `DisplayMatrix` and the hand anchor.
   The **shoulder socket** (`ShoulderSocketInward`, 0.09) slides the joint in toward the torso as an arm lifts off
   hanging (`SocketWeight`), so a raised arm stays seated on the body instead of hinging on a point 0.1 outside it
   with a gap; the punch IK includes it. `SliceImpactProgress` (where the damage lands) is the middle of the strike. Filmed by
