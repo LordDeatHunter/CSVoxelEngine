@@ -1175,6 +1175,12 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float BubbleGrow = 0.02f;
     // Seconds a bubble takes to fade in at spawn and out at the end of its life
     public const float BubbleFadeSeconds = 0.4f;
+    // Each swim stroke with the eye underwater lets out one burst of this many bubbles
+    // (BubbleParticleSystem.TrackSwimStrokes), centred this far in front of the head and scattered
+    // up to this far around that point.
+    public const int SwimStrokeBubbleCount = 4;
+    public const float SwimStrokeBubbleForward = 0.4f;
+    public const float SwimStrokeBubbleSpread = 0.15f;
 
     // --- Pebbles (PebbleGenerator) ---
     // Ankle-high stones in rare low-frequency patches; a density roll thins inside them

@@ -1202,6 +1202,7 @@ public class World : IItemUseWorld
         _fireCells.AddRange(_campfires.LitCells);
         _fireCells.AddRange(_kilns.LitCells);
         _fire.Update((float)deltaTime, _fireCells, Camera.RenderEye, wind: Wind.Direction(LightingTime));
+        UpdateBubbles((float)deltaTime);
         UpdateThrown((float)deltaTime);
         RefreshProjectiles();
         FrameProfiler.End(ProfileSection.Entities);
@@ -1269,6 +1270,20 @@ public class World : IItemUseWorld
     }
 
     private int _lastSwimStrokes;
+
+    /// <summary>
+    /// The local player's bubbles: the steady exhale while the eye is under, plus a burst from the
+    /// head on each swim stroke (not in lava). Cosmetic, so singleplayer and a client run it and a
+    /// server, whose hovering camera is nobody, does not.
+    /// </summary>
+    private void UpdateBubbles(float deltaTime)
+    {
+        if (_serverMode)
+            return;
+        _bubbles.TrackSwimStrokes(Camera.SwimStrokeCount, Camera.Position,
+            Vector3Utils.FromYawPitch(Camera.PlayerYaw, 0f), Camera.IsEyeInWater && !Camera.IsEyeInLava);
+        _bubbles.Update(deltaTime, Camera.RenderEye, Camera.ViewDirection, Camera.IsEyeInWater, _chunkManager);
+    }
 
     private bool _equipTracked;
 
@@ -1452,7 +1467,7 @@ public class World : IItemUseWorld
         _fire.Update((float)deltaTime, _fireCells, Camera.RenderEye, wind: wind);
         GatherLavaVents(Camera.RenderEye);
         _lavaFire.Update((float)deltaTime, _lavaVents, Camera.RenderEye, wind: wind);
-        _bubbles.Update((float)deltaTime, Camera.RenderEye, Camera.ViewDirection, Camera.IsEyeInWater, _chunkManager);
+        UpdateBubbles((float)deltaTime);
 
         // Falling cubes shove the player aside instead of landing inside them; strictly
         // one-way, the player never deflects a cube

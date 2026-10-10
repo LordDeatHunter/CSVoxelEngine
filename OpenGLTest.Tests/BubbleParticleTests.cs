@@ -92,6 +92,51 @@ public sealed class BubbleParticleTests
     }
 
     [Fact]
+    public void EachSwimStrokeLetsOutOneBurstWhileTheEyeIsUnderwater()
+    {
+        var system = new BubbleParticleSystem();
+        var head = new Vector3(8.5f, 5f, 8.5f);
+        var facing = -Vector3.UnitZ;
+        var rng = new Random(21);
+
+        // The first call only learns the counter: a world joined mid-swim does not burst at once.
+        Assert.Equal(0, system.TrackSwimStrokes(7, head, facing, eyeInWater: true, rng));
+
+        // A stroke bursts once; the same counter on later frames lets out nothing more.
+        var burst = system.TrackSwimStrokes(8, head, facing, eyeInWater: true, rng);
+        Assert.True(burst > 0);
+        Assert.Equal(burst, system.Particles.Count);
+        Assert.Equal(0, system.TrackSwimStrokes(8, head, facing, eyeInWater: true, rng));
+
+        // A stroke with the eye dry spawns nothing, and is not saved up for when it goes under.
+        Assert.Equal(0, system.TrackSwimStrokes(9, head, facing, eyeInWater: false, rng));
+        Assert.Equal(0, system.TrackSwimStrokes(9, head, facing, eyeInWater: true, rng));
+
+        // The next stroke under water bursts again, by the same amount.
+        Assert.Equal(burst, system.TrackSwimStrokes(10, head, facing, eyeInWater: true, rng));
+        Assert.Equal(2 * burst, system.Particles.Count);
+    }
+
+    [Fact]
+    public void AStrokeBurstLeavesFromJustInFrontOfTheHead()
+    {
+        var system = new BubbleParticleSystem();
+        var head = new Vector3(8.5f, 5f, 8.5f);
+        var facing = new Vector3(1f, 0f, 0f);
+        var rng = new Random(22);
+        system.TrackSwimStrokes(0, head, facing, eyeInWater: true, rng);
+        system.TrackSwimStrokes(1, head, facing, eyeInWater: true, rng);
+
+        Assert.NotEmpty(system.Particles);
+        foreach (var bubble in system.Particles)
+        {
+            var offset = bubble.Position - head;
+            Assert.True(Vector3.Dot(offset, facing) > 0f);
+            Assert.True(offset.Length() < 1f);
+        }
+    }
+
+    [Fact]
     public void SystemRespectsMaxParticles()
     {
         var (chunks, _) = WaterColumn(top: 15);

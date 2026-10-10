@@ -1,0 +1,36 @@
+{
+  // Swim stroke bubbles: run with VOXEL_SCRIPT=visual-examples/swim-bubbles.json VOXEL_TIME=147
+  // from OpenGLTest/. Shots land in visual/swim-bubbles/.
+  // Fully submerged in the deep sea at x~432, z~0 (10+ blocks deep, sea level 0; see
+  // animations-swim.json). Each stroke lets out a burst of bubbles just in front of the head, which
+  // then stay in the water where they were let out while the swimmer glides on.
+  //   before:             under water before a stroke (only the slow exhale)
+  //   fp-stroke:          a couple of frames into a forward stroke, the burst right in front of the face
+  //   shoulder-stroke:    the swimmer has lunged on and the burst trails behind its head
+  //   shoulder-back:      a backing stroke, the burst left in front of the head
+  //   shoulder-up:        a stroke straight up, the burst left below the head
+  "steps": [
+    { "op": "teleport", "pos": [432.5, -3.5, 0.5], "yaw": 0, "pitch": -5 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "teleport", "pos": [432.5, -3.5, 0.5], "yaw": 0, "pitch": -5 },
+    { "op": "wait", "seconds": 1.2 },
+    { "op": "screenshot", "name": "before", "hideHud": true },
+    { "op": "walk", "keys": ["W"], "seconds": 0.02 },
+    { "op": "screenshot", "name": "fp-stroke", "hideHud": true },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "teleport", "pos": [432.5, -3.5, 0.5], "yaw": 0, "pitch": -5 },
+    { "op": "wait", "seconds": 1.2 },
+    { "op": "walk", "keys": ["W"], "seconds": 0.05 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "shoulder-stroke", "hideHud": true },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "walk", "keys": ["S"], "seconds": 0.05 },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "shoulder-back", "hideHud": true },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "walk", "keys": ["Space"], "seconds": 0.05 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "shoulder-up", "hideHud": true }
+  ]
+}
