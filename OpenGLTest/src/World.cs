@@ -1302,6 +1302,10 @@ public class World : IItemUseWorld
             _mobs[i].TakeDamage(amount);
     }
 
+    /// <summary>Scenario seam: takes health off the local player's pool (the hearts, the damage flash
+    /// and the low-health vignette all follow it), so a script can film the low-health HUD.</summary>
+    internal void DamagePlayer(int amount) => _health.TakeDamage(amount);
+
     /// <summary>Scenario seam: makes the player's model play one reaction or swing, so a script can film it.</summary>
     internal void TestPlayerAction(string action)
     {

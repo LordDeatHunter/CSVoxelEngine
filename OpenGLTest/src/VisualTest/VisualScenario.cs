@@ -43,8 +43,12 @@ public sealed class VisualStep
     /// <summary>The growth pulses a <c>grow</c> step runs.</summary>
     public int GrowSteps { get; init; }
 
-    /// <summary>Health a <c>damage</c> step takes off every live mob.</summary>
+    /// <summary>Health a <c>damage</c> step takes off every live mob, or off the player.</summary>
     public int Amount { get; init; }
+
+    /// <summary>Who a <c>damage</c> step hurts: <c>mobs</c> (the default, every live mob) or
+    /// <c>player</c> (the local player's health pool).</summary>
+    public string Target { get; init; } = "mobs";
 
     /// <summary>The camera mode a <c>view</c> step selects (<c>first</c>, <c>shoulder</c> or <c>orbit</c>).</summary>
     public string? Mode { get; init; }
@@ -180,6 +184,9 @@ public sealed class VisualScenario
                 Amount = element.TryGetProperty("amount", out var amount) && amount.TryGetInt32(out var hp) && hp > 0
                     ? hp
                     : throw new InvalidOperationException($"Step {index} (damage) needs 'amount' above 0."),
+                Target = element.TryGetProperty("target", out _)
+                    ? ReadChoice(element, index, "damage", "target", ["mobs", "player"])
+                    : "mobs",
             },
             "view" => new VisualStep { Op = "view", Mode = ReadChoice(element, index, "view", "mode", ["first", "shoulder", "orbit"]) },
             "player" => new VisualStep

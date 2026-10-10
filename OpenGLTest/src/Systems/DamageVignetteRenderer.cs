@@ -45,17 +45,21 @@ public sealed class DamageVignetteRenderer : IDisposable
 
     /// <summary>
     /// Draws the vignette over the current framebuffer. <paramref name="strength"/> is the 0..1
-    /// damage flash; <paramref name="time"/> advances the grain and pulse. A zero strength
-    /// skips the draw entirely.
+    /// damage flash and <paramref name="lowHealth"/> the 0..1 low-health pulse
+    /// (<see cref="LowHealthVignette.Intensity"/>), a second, broader edge term of the same pass;
+    /// <paramref name="time"/> advances the grain and the flash's flicker. When both are zero the
+    /// draw is skipped entirely.
     /// </summary>
-    public void Render(Vector2D<int> size, float strength, float time)
+    public void Render(Vector2D<int> size, float strength, float lowHealth, float time)
     {
         var s = MathUtils.Clamp01(strength);
-        if (s <= 0.001f || size.X <= 0 || size.Y <= 0) return;
+        var low = MathUtils.Clamp01(lowHealth);
+        if ((s <= 0.001f && low <= 0.001f) || size.X <= 0 || size.Y <= 0) return;
 
         _shader.Use();
         _shader.SetUniform("uResolution", new Vector2(size.X, size.Y));
         _shader.SetUniform("uStrength", s);
+        _shader.SetUniform("uLowHealth", low);
         _shader.SetUniform("uTime", time);
         _gl.BindVertexArray(_vao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);

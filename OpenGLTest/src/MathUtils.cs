@@ -184,6 +184,19 @@ public static class MathUtils
     }
 
     /// <summary>
+    /// A repeating 0..1 beat, one every <paramref name="period"/> seconds: each cycle is a
+    /// <see cref="Pulse"/> (a quick eased rise to 1 at <paramref name="peakAt"/> of the cycle,
+    /// then a smooth fall back to 0), so it reads as a slow heartbeat rather than a sine wobble,
+    /// and it is continuous across cycles. A non-positive period beats never (0).
+    /// </summary>
+    public static float Heartbeat(float time, float period, float peakAt = 0.3f)
+    {
+        if (period <= 0f) return 0f;
+        var cycles = time / period;
+        return Pulse(cycles - MathF.Floor(cycles), peakAt);
+    }
+
+    /// <summary>
     /// One-shot 0 -> 1 -> 0 bump with a springy settle, for a scale pop: an eased-out rise to 1
     /// at <paramref name="peakAt"/>, then an <see cref="EaseOutBack"/> fall that dips a little
     /// below 0 before landing on exactly 0 at t = 1, so whatever it scales rests where it began.

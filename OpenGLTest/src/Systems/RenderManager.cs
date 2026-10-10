@@ -3943,8 +3943,11 @@ public class RenderManager : IDisposable
                 Rgba.FromFloat(tint.X, tint.Y, tint.Z, alpha));
         }
 
-        if (damageFlash > 0.001f)
-            _vignette?.Render(window.Size, damageFlash, time);
+        // The hit flash and the low-health pulse share the vignette's one full-screen pass
+        var lowHealth = LowHealthVignette.Intensity((float)health / PlayerHealth.MaxHealth, time,
+            dead: health <= 0, creative: camera?.IsCreative == true);
+        if (damageFlash > 0.001f || lowHealth > 0.001f)
+            _vignette?.Render(window.Size, damageFlash, lowHealth, time);
 
         if (!view.IsOpen && (menu == null || !menu.IsOpen))
             ui.DrawCrosshair();

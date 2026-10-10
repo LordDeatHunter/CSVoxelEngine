@@ -134,8 +134,11 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
             }
 
             case "damage":
-                world.DamageAllMobs(step.Amount);
-                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} damage mobs by {step.Amount}");
+                if (step.Target == "player")
+                    world.DamagePlayer(step.Amount);
+                else
+                    world.DamageAllMobs(step.Amount);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} damage {step.Target} by {step.Amount}");
                 Advance();
                 break;
 

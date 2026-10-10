@@ -1403,6 +1403,17 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float HotbarPopSeconds = 0.3f;
     public const float HotbarPopScale = 1.3f;
 
+    // --- Low-health vignette (LowHealthVignette, vignette-fragment.glsl) ---
+    // Below the threshold (a fraction of the pool) the screen edge pulses red like a slow
+    // heartbeat, its strength rising from the min to the max as health falls to nothing. Between
+    // beats it eases down to the floor share of that strength rather than vanishing. Off while
+    // dead and in creative.
+    public const float LowHealthThreshold = 0.3f;
+    public const float LowHealthPulseSeconds = 1.25f;
+    public const float LowHealthMinStrength = 0.35f;
+    public const float LowHealthMaxStrength = 0.85f;
+    public const float LowHealthPulseFloor = 0.35f;
+
     // --- Multiplayer networking (NetProtocol, GameServer, NetworkClient) ---
     // The server broadcasts the player list on this cadence; clients send their own state at the
     // state cadence. The day clock syncs once a second, which is far below a visible sun step.

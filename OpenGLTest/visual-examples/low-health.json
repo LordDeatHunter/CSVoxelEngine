@@ -1,0 +1,45 @@
+{
+  // Low-health vignette: run with VOXEL_SCRIPT=visual-examples/low-health.json VOXEL_TIME=147 from
+  // OpenGLTest/. Shots land in visual/low-health/.
+  // A survival player in the open forest clearing the goblins scenario uses (ground y 9..10) loses
+  // health straight off its pool (`damage` with "target": "player"). Each shot waits out the 1.5 s
+  // hit flash first, so only the slow red edge pulse is left; shots a fraction of a beat apart catch
+  // it at different strengths, and lower health pulses harder. Creative (flying) turns it off.
+  // Forest mobs keep spawning around a survival player and a goblin's stone kills one at 5 HP, so
+  // every live mob is killed (`damage` on the mobs) before each wait: a fresh spawn 20+ blocks out
+  // cannot reach the player in the couple of seconds until the next sweep.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-43.5, 12.5, 62.5], "yaw": -90, "pitch": -10 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "full-health" },
+    // 35 of 100 HP left: above the threshold, so no pulse
+    { "op": "damage", "target": "player", "amount": 65 },
+    { "op": "damage", "amount": 1000 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "above-threshold" },
+    // 25 HP: just under it
+    { "op": "damage", "target": "player", "amount": 10 },
+    { "op": "damage", "amount": 1000 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "low-a" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "low-b" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "low-c" },
+    // 5 HP: much stronger
+    { "op": "damage", "target": "player", "amount": 20 },
+    { "op": "damage", "amount": 1000 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "critical-a" },
+    { "op": "damage", "amount": 1000 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "critical-b" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "critical-c" },
+    // Flying is creative, which turns the warning off
+    { "op": "fly" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "creative-off" }
+  ]
+}

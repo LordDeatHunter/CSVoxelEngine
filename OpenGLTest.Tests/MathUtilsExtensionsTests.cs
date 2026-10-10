@@ -100,6 +100,22 @@ public sealed class MathUtilsExtensionsTests
     }
 
     [Fact]
+    public void HeartbeatRepeatsEveryPeriodWithinZeroToOne()
+    {
+        const float period = 1.3f;
+        var peak = 0f;
+        for (var t = 0f; t < 3f * period; t += 0.005f)
+        {
+            var beat = MathUtils.Heartbeat(t, period);
+            Assert.InRange(beat, 0f, 1f);
+            Assert.True(MathF.Abs(beat - MathUtils.Heartbeat(t + period, period)) < 0.01f,
+                $"the beat at t={t} differs one period later");
+            peak = MathF.Max(peak, beat);
+        }
+        Assert.True(peak > 0.99f, "a beat should reach its full height once a cycle");
+    }
+
+    [Fact]
     public void BackPulseRisesToOneAndLandsExactlyOnZero()
     {
         const float peak = 0.3f;

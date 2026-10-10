@@ -144,6 +144,24 @@ public sealed class VisualScenarioTests
     }
 
     [Fact]
+    public void DamageHurtsTheMobsUnlessItTargetsThePlayer()
+    {
+        var scenario = VisualScenario.Parse("""
+            { "steps": [
+              { "op": "damage", "amount": 3 },
+              { "op": "damage", "amount": 70, "target": "player" },
+            ] }
+            """, "tour");
+        Assert.Equal("mobs", scenario.Steps[0].Target);
+        Assert.Equal("player", scenario.Steps[1].Target);
+        Assert.Equal(70, scenario.Steps[1].Amount);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => VisualScenario.Parse(
+            """{ "steps": [{ "op": "damage", "amount": 3, "target": "camera" }] }""", "bad"));
+        Assert.Contains("'target'", ex.Message);
+    }
+
+    [Fact]
     public void SelectTakesAOneBasedHotbarSlot()
     {
         var scenario = VisualScenario.Parse(
