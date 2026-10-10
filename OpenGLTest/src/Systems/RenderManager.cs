@@ -281,6 +281,10 @@ public class RenderManager : IDisposable
     // lava (_skyTint by _skyTintAmount; it stays dry in water so the Snell window shows sky),
     // and how far the fog has closed in to the underwater tint.
     private SkyPalette _sky = SkyPalette.Compute(1f, 0f);
+    // The dome's night sky this frame (stars and the eye their cloud cover is measured from) and
+    // the sun's lens glare, plus the eased cloud cover over the sun the glare fades with
+    private SkyDomeFrame _skyFrame;
+    private float _glareCloud;
     // Display-space (sRGB) light at the pre-SH-10 values, set by SetLighting: the sun colour
     // (the cloud layer and the underwater shafts), and the cloud layer's sun intensity and
     // ambient (see CloudRenderer.Render and RenderUnderwaterRays).
@@ -725,7 +729,7 @@ public class RenderManager : IDisposable
         gl.ActiveTexture(TextureUnit.Texture0 + CloudShadowUnit);
         gl.BindTexture(TextureTarget.Texture2D, _cloudShadow.Handle);
         gl.ActiveTexture(TextureUnit.Texture0);
-        _skyDome = new SkyRenderer(gl);
+        _skyDome = new SkyRenderer(gl, CloudShadowUnit);
         _post = new PostProcessRenderer(gl);
         _contactAo = new ContactAoRenderer(gl);
         _rays = new UnderwaterRaysRenderer(gl);
@@ -1042,6 +1046,10 @@ public class RenderManager : IDisposable
             Horizon = ColorSpace.SrgbToLinear(_sky.Horizon),
             Glow = ColorSpace.SrgbToLinear(_sky.Glow),
         };
+        // The stars turn with the sun's orbit and twinkle on the lighting clock, wrapped hourly so
+        // the float keeps its precision; their cloud cover follows the drawn clouds' drift
+        _skyFrame = new SkyDomeFrame(StarField.Visibility(elevation), StarField.SpinOf(_sunDir), (float)(_timeD % 3600.0), _cameraPos,
+            CloudCopies.Drift(_timeD, WorldGenerationConfig.CloudFieldSize), Vector3.Zero);
         // The flat sky/fog colour is the dome's no-glow horizon sample
         _skyColor = _sky.HazedHorizon;
         // Fog melts the far terrain (and the LOD edge) into the sky, day and night
@@ -1105,6 +1113,20 @@ public class RenderManager : IDisposable
         // (the scene copy captures it). Only lava, an opaque glow, still hides it.
         _sunVisibility *= 1f - lavaWet;
         UpdateShadowCamera(camera);
+
+        // The lens glare (SunGlare) is a camera effect, so it fades out with the eye underwater or
+        // in lava: the dome stays dry there for the Snell window, and a lens flare seen through the
+        // surface from below would read as a bug. The cloud over the sun's disc is eased, so a
+        // drifting edge fades it smoothly. The mirror draws the dome without it (RenderReflection).
+        var glareCover = 0f;
+        if (_cloudShadow != null && elevation > 0f)
+            glareCover = CloudCover.AcrossDisc(_cloudShadow.Coverage, CloudField.Cells, _cameraPos, _sunDir,
+                MathUtils.ToRadians(GameSettings.SunSize), _skyFrame.CloudDrift, CloudCover.Blocking(GameSettings.CloudOpacity));
+        _glareCloud = MathUtils.Damp(_glareCloud, glareCover, WorldGenerationConfig.SunGlareCloudEaseRate, dt);
+        var glare = camera == null
+            ? 0f
+            : SunGlare.Intensity(Vector3.Dot(camera.ViewDirection, _sunDir), elevation, _glareCloud) * (1f - wet);
+        _skyFrame = _skyFrame with { GlareColor = _sunColor * glare };
 
         _fogNear = MathUtils.Lerp(WorldGenerationConfig.FogNearBlocks,
             WorldGenerationConfig.UnderwaterFogNearBlocks, wet);
@@ -1841,7 +1863,12 @@ public class RenderManager : IDisposable
         // mirror's own look-at has no roll, and neither does its world view, so they agree.
         var mirrorRot = view;
         mirrorRot.M41 = mirrorRot.M42 = mirrorRot.M43 = 0f;
-        RenderSky(mirrorRot, camera.GetProjectionMatrix(), mirroredFwd);
+        // The stars are a function of direction alone, so the mirrored dome reflects them where
+        // they belong; only the cloud cover in front of them is measured from the mirrored eye,
+        // as the mirror's clouds are drawn from it. The lens glare is the camera's, not the
+        // sky's, so the mirror never reflects it.
+        RenderSky(mirrorRot, camera.GetProjectionMatrix(), mirroredFwd,
+            _skyFrame with { Eye = mirroredPos, GlareColor = Vector3.Zero });
         // RenderSun leaves its own program and its disc on unit 0; the mirrored world draws
         // below want ours and the atlas back.
         worldShader.Use();
@@ -2051,7 +2078,7 @@ public class RenderManager : IDisposable
         {
             var rot = camera.GetViewMatrix();
             rot.M41 = rot.M42 = rot.M43 = 0f;
-            RenderSky(rot, camera.GetProjectionMatrix(), camera.ViewDirection);
+            RenderSky(rot, camera.GetProjectionMatrix(), camera.ViewDirection, _skyFrame);
         }
 
         // Exactly once a frame, before any pass appends to it: the ring rolls onto its next
@@ -2075,13 +2102,14 @@ public class RenderManager : IDisposable
     /// Draws the sky dome (<see cref="SkyRenderer"/>) and then the sun disc over it
     /// (<see cref="RenderSun"/>). Follows RenderSun's parameter shape so the reflection pass can
     /// pass its own mirrored view. <paramref name="viewRotation"/> must be translation-free and
-    /// keep the camera's roll, since the world is drawn with that roll too.
+    /// keep the camera's roll, since the world is drawn with that roll too. <paramref name="frame"/>
+    /// is the frame's night sky, seen from the pass's own eye.
     /// </summary>
-    private void RenderSky(Matrix4x4 viewRotation, Matrix4x4 projection, Vector3 forward)
+    private void RenderSky(Matrix4x4 viewRotation, Matrix4x4 projection, Vector3 forward, in SkyDomeFrame frame)
     {
         if (!Matrix4x4.Invert(viewRotation * projection, out var inv))
             inv = Matrix4x4.Identity;
-        _skyDome?.Render(inv, _sky, _sunDir, _skyTint, _skyTintAmount);
+        _skyDome?.Render(inv, _sky, _sunDir, _skyTint, _skyTintAmount, frame);
         RenderSun(forward, projection);
     }
 

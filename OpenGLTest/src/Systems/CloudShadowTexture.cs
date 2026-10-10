@@ -18,11 +18,18 @@ internal sealed class CloudShadowTexture : IDisposable
     /// <summary>The GL texture name.</summary>
     public uint Handle { get; private set; }
 
+    /// <summary>
+    /// The baked coverage bytes the texture was uploaded from, kept for the CPU readers of the
+    /// cloud cover (the sun glare's <see cref="CloudCover.AcrossDisc"/>). Never modified.
+    /// </summary>
+    public byte[] Coverage { get; }
+
     public CloudShadowTexture(GL gl)
     {
         _gl = gl;
         var cells = CloudField.Cells;
         var coverage = CloudField.BuildShadowCoverage(CloudField.BuildLevels(), WorldGenerationConfig.CloudMaxLevels);
+        Coverage = coverage;
 
         Handle = gl.GenTexture();
         gl.BindTexture(TextureTarget.Texture2D, Handle);

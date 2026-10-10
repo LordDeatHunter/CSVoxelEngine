@@ -251,6 +251,30 @@ pre-SH-10 look; underwater and in lava it stays the linear mix toward `uFogColor
 blended by `uFogWet` rather than branched so the transition never pops. Cloud fog is display
 space too (see the cloud layer above); particle and healthbar fogs are still linear.
 
+**Stars.** The night dome adds a star field in `sky-fragment.glsl`'s `main` only, after
+`SkySample`, so the fog and `SkySample`'s three twins never see it. Stars live on a grid over the
+sphere of directions (cube face, equi-angular warp, `StarCellsPerFace`² cells, each cell's chance
+scaled by its solid angle), one star per cell kept `StarField.CellMargin` clear of the edges, drawn
+as a pixel-sized gaussian (`fwidth` of the view ray), so they never swim as the view turns. Each
+star twinkles smoothly on its own rate and phase hashed from its cell (`StarField.Twinkle`, the
+`uStarTime` clock wrapped hourly). Star space
+turns with the sun (`StarField.SpinOf`, the sun direction's own angle about Z), visibility fades over dusk
+and dawn by the sun's elevation (`StarField.Visibility`), out into the horizon haze and around the
+sun. Clouds hide them: the dome samples the cloud-shadow map (unit 8) cell by cell along each view
+ray (`CloudCoverAlongRay`), since the drawn clouds alone cover at their opacity. The mirror pass
+redraws the dome, so the stars reflect, and the Snell window shows them. GL-free twins:
+`StarField` (cells, hash, star placement) and `CloudCover` (the cover along a ray); keep them in step
+with the shader (`StarFieldTests`, `CloudCoverTests`). `visual-examples/night-sky.json` (`VOXEL_TIME`
+700, 450, 147, and 350 for the glare) frames them.
+
+**Sun glare.** A wide, faint glow around the sun, added in the same dome `main` (`uGlareColor` times
+`cos(angle to the sun)^SunGlareExponent`, `SunGlare.Radial`). Its strength is computed once a frame
+on the CPU (`SunGlare.Intensity`, capped at `SunGlareStrength`): how directly the camera faces the
+sun, the sun's height (zero at and below the horizon) and the cloud over its disc
+(`CloudCover.AcrossDisc` over `CloudShadowTexture.Coverage`, eased). It is a camera effect: zero
+underwater and in lava, and the mirror pass draws its dome with `GlareColor` zero, so no reflection
+ever carries it.
+
 **Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
 heading turns slowly (`WorldGenerationConfig.Wind*`), with `Wind.Offset` its bounded closed-form
 integral. Leaf sway reads it in both vertex shaders (`uWind`, the direction scaled by `WindLean`,
@@ -601,6 +625,8 @@ OpenGLTest/
     WorldGenerationConfig.cs   # all tuning constants (view radius, per-frame budgets, thread counts) and every worldgen knob (seed, ravine, cave, carver)
     MathUtils.cs               # lerp/easing/pulse helpers for animation curves + shared constants
     SkyPalette.cs              # GL-free zenith/horizon/glow sky palette and the C# reference of SkySample
+    StarField.cs               # GL-free twin of the night dome's star field (cells, hash, visibility)
+    SunGlare.cs                # GL-free sun lens glare: per-frame intensity and its sky falloff
     BlockLightPalette.cs       # GL-free 8-slot block-light colour palette (slot 0 = the default warm torch colour)
     LightTint.cs               # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
     BiomeTint.cs               # GL-free biome tint: Climate -> palette -> vertex tint on a 16-block lattice, Gain, Shade, CellTint

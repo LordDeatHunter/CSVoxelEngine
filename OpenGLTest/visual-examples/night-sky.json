@@ -1,0 +1,84 @@
+// Night sky and sun glare check: the stars (StarField) and the lens glare (SunGlare), both in
+// sky-fragment.glsl. Run from OpenGLTest/ once per time of day, copying visual/night-sky/ aside
+// between runs since each run overwrites it:
+//   $env:VOXEL_SCRIPT='visual-examples/night-sky.json'; $env:VOXEL_TIME='<t>'
+//   bin/Release/net9.0/silkgltriangle.exe
+// Times (DayLengthSeconds 1200, RenderManager.SetLighting: the sun at normalize(cos a, sin a, 0.35) with
+// a = t / 1200 * tau + 0.8): 700 night (full stars), 450 dusk (the run moves the sun ~0.3 degrees
+// a second, so the dome shots ~15 s in catch it ~6 degrees down with the stars a third faded in),
+// 350 afternoon (the glare shots in (B) and (F) face the sun), 147 noon (no stars at all), 1040
+// dawn (fading out).
+// Camera.IsEyeInWater and the physics only update during wait/walk/mine (never on a teleport,
+// look or screenshot), so every shot after a teleport is preceded by a wait.
+{
+  "steps": [
+    // (A) underwater, grounded as sky.json frames it: the Snell window shows the dry dome, and
+    // at night the stars in it, wobbling with the waves.
+    { "op": "wait", "seconds": 5 },
+    { "op": "teleport", "pos": [360.5, -3.5, 136.5], "yaw": 90, "pitch": 80 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "snell_window", "hideHud": true },
+
+    // (B) the sun's lens glare, framed for VOXEL_TIME 350: these shots land ~7 s in, at t ~357,
+    // with the sun at yaw ~159, pitch ~25 (it sinks ~0.3 degrees a second). Above the cloud layer
+    // so no cloud dims it: straight at the sun, then 15, 40 and 180 degrees off it, the glare
+    // shrinking with the turn and gone facing away. At other times these frame plain sky.
+    { "op": "fly" },
+    { "op": "teleport", "pos": [0.5, 200.5, 0.5], "yaw": 159, "pitch": 24 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "glare_sun", "hideHud": true },
+    { "op": "teleport", "pos": [0.5, 200.5, 0.5], "yaw": 174, "pitch": 24 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "glare_off_15", "hideHud": true },
+    { "op": "teleport", "pos": [0.5, 200.5, 0.5], "yaw": 199, "pitch": 24 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "glare_off_40", "hideHud": true },
+    { "op": "teleport", "pos": [0.5, 200.5, 0.5], "yaw": -21, "pitch": 10 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "glare_away", "hideHud": true },
+
+    // (C) the night dome, still flying. Under the cloud layer (base 160) looking up: stars only in
+    // the gaps, none through a cloud.
+    { "op": "teleport", "pos": [0.5, 140.5, 0.5], "yaw": -90, "pitch": 60 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "under_clouds_up", "hideHud": true },
+    // Above the layer: the whole field, unobstructed.
+    { "op": "teleport", "pos": [0.5, 200.5, 0.5], "yaw": 0, "pitch": 35 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "above_clouds", "hideHud": true },
+    // Straight up from above the layer: the zenith, where the cube faces of the star grid meet.
+    { "op": "teleport", "pos": [0.5, 200.5, 0.5], "yaw": 45, "pitch": 89 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "zenith", "hideHud": true },
+    // The same pose a moment later (hovering, so nothing moves but the clock): each star has
+    // twinkled on its own phase, so their brightnesses differ from the shot before.
+    { "op": "wait", "seconds": 0.7 },
+    { "op": "screenshot", "name": "zenith_twinkled", "hideHud": true },
+    // Toward the setting sun's side (yaw ~160 at dusk): the stars thin out into the horizon haze
+    // and keep clear of the sun.
+    { "op": "teleport", "pos": [0.5, 200.5, 0.5], "yaw": 160, "pitch": 6 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "horizon_sun_side", "hideHud": true },
+
+    // (D) terrain silhouettes against the stars, low over the ground: no star may draw in front
+    // of a hill or a tree.
+    { "op": "teleport", "pos": [0.5, 40.5, 0.5], "yaw": -90, "pitch": 12 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "silhouettes", "hideHud": true },
+
+    // (E) the water mirror over open sea (sky.json's column): the reflected dome carries the
+    // stars, mirrored where they belong.
+    { "op": "teleport", "pos": [360.5, 3.5, 136.5], "yaw": 110, "pitch": -5 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "mirror", "hideHud": true },
+    { "op": "teleport", "pos": [360.5, 12.5, 136.5], "yaw": 110, "pitch": -25 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "mirror_steep", "hideHud": true },
+
+    // (F) over the same sea toward the afternoon sun (VOXEL_TIME 350): the glare lights the sky
+    // above the horizon, while the mirror reflects the sun disc but never a second glare.
+    { "op": "teleport", "pos": [360.5, 3.5, 136.5], "yaw": 160, "pitch": 4 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "glare_over_water", "hideHud": true }
+  ]
+}

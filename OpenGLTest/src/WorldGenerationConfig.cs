@@ -281,6 +281,25 @@ public const float DayLengthSeconds = 1200f;
     // Falloff exponent of the glow from the disc outwards; higher means a tighter halo
     public const float SunGlowExponent = 2.5f;
 
+    // Lens glare (SunGlare): a much wider, fainter glow around the sun that grows as the camera
+    // faces it. Linear HDR brightness it adds right at the sun, times the sun colour, at its peak.
+    // Kept below the point where the sky round the disc washes out to white, so the disc stays crisp.
+    public const float SunGlareStrength = 0.28f;
+
+    // Falloff of the glare across the sky: cos(angle to the sun) raised to this. Lower is wider.
+    public const float SunGlareExponent = 8f;
+
+    // Angle between the view and the sun beyond which there is no glare at all
+    public const float SunGlareFacingDegrees = 65f;
+
+    // Sine of the sun's elevation from which the glare is at full strength; it fades to nothing
+    // as the sun reaches the horizon
+    public const float SunGlareFullElevation = 0.15f;
+
+    // Rate (per second) at which the glare follows the cloud cover over the sun, so a drifting
+    // cloud edge fades it instead of stepping it
+    public const float SunGlareCloudEaseRate = 2.5f;
+
     // --- Sky dome (SkyPalette, SkySample in the sky/world/cloud shaders) ---
     /// <summary>Sine of the view elevation at which the zenith colour has fully taken over from the horizon.</summary>
     public const float SkyHorizonBand = 0.35f;
@@ -300,6 +319,63 @@ public const float DayLengthSeconds = 1200f;
 
     /// <summary>How far the flat sky colour moves toward the dusk orange at full dusk (the 28198cc mix).</summary>
     public const float SkyDuskMix = 0.5f;
+
+    // --- Stars (StarField, Stars in sky-fragment.glsl) ---
+    /// <summary>Star cells along each side of one face of the cube of directions (6 faces); a cell holds at most one star.</summary>
+    public const int StarCellsPerFace = 72;
+
+    /// <summary>
+    /// Chance a cell at a cube face's centre holds a star (StarField.Probability scales it per cell
+    /// by solid angle), so about this share of 6 * StarCellsPerFace^2 stars cover the whole sphere.
+    /// </summary>
+    public const float StarDensity = 0.16f;
+
+    /// <summary>
+    /// Linear HDR brightness of the brightest star, before its colour tint and twinkle (which dims
+    /// a star by StarTwinkleDepth / 2 on average). The night dome is near black and the post pass
+    /// only clamps and encodes, so 1 already reads as a display-white point.
+    /// </summary>
+    public const float StarBrightness = 1.35f;
+
+    /// <summary>Brightness fraction of the faintest star; the rest spread up to 1 along the power law below.</summary>
+    public const float StarFaintest = 0.04f;
+
+    /// <summary>Exponent of the star brightness power law: higher makes bright stars rarer.</summary>
+    public const float StarBrightnessCurve = 4f;
+
+    /// <summary>
+    /// Gaussian radius of a faint star in screen pixels (pixel-relative, so stars stay pin-sharp
+    /// at any resolution and FOV and never vanish between pixel centres while the view turns).
+    /// </summary>
+    public const float StarRadiusPixels = 0.85f;
+
+    /// <summary>How much wider than a faint star the brightest star's point is.</summary>
+    public const float StarBrightRadiusScale = 1.6f;
+
+    /// <summary>Sine of the sun's elevation above which no star shows; below it they fade in over dusk.</summary>
+    public const float StarsGoneAboveSunElevation = -0.02f;
+
+    /// <summary>Sine of the sun's elevation below which the stars are at full brightness.</summary>
+    public const float StarsFullBelowSunElevation = -0.22f;
+
+    /// <summary>Sine of the view elevation over which the stars fade in above the horizon haze.</summary>
+    public const float StarHorizonFade = 0.2f;
+
+    /// <summary>
+    /// Radius of the starless disc around the sun as a multiple of the sun's glow radius
+    /// (SunSize * SunGlowScale); the stars feather back in over the next half of that radius.
+    /// </summary>
+    public const float StarSunMaskScale = 1.2f;
+
+    /// <summary>How deep a star's twinkle dips: its brightness swings between 1 - this and 1.</summary>
+    public const float StarTwinkleDepth = 0.45f;
+
+    /// <summary>
+    /// Slowest and fastest twinkle, in cycles per second; each star draws its own rate between them
+    /// from its cell hash. Slow on purpose: a real scintillation rate would flicker at the frame rate.
+    /// </summary>
+    public const float StarTwinkleRateMin = 0.25f;
+    public const float StarTwinkleRateMax = 1.2f;
 
     // --- Clouds ---
     // One static field of CloudCellSize-block cells (CloudField) drawn 3x3 around the camera by
