@@ -2423,7 +2423,9 @@ overshoot or jiggle.
   degrees, forearm up, which made the hand look held up by the elbow) is eased into it as the stroke ramps in. The
   **blade is carried by the wrist**: its tip points along the forearm (so it follows the arm's sweep and is
   always across the direction the hand travels, never turned up mid-cut), rolled about its length by
-  `SliceBladeRoll` (cocked on edge, not laid flat) and cocked up from the forearm by `SliceBladeCant`; in
+  `SliceBladeRoll` (cocked on edge, not laid flat) and cocked up from the forearm by `SliceBladeCant`, and through the main part of the cut (`SliceBladeYawWeight`: eased in at the end of the wind-up, full through the strike, out over the
+  start of the recovery) turned about the vertical by `SliceBladeYawOffset` (+45 degrees in the engine's yaw convention, counter-clockwise
+  seen from above, so the tip leads ahead of the hand's travel; mirrored for the return); in
   `GetHandAnchorMatrix` the wrist orientation takes over from the body-space one by the stroke. The tip therefore
   sweeps out to the wind-up side, forward as the hand crosses the middle and out to the far side (mirrored for the
   return).

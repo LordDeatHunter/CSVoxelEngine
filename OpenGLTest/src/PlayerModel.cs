@@ -154,6 +154,10 @@ public class PlayerModel
     // the way a blade is held out ahead of the hand. Both mirror with the swing's direction.
     private const float SliceBladeRoll = 0.8f;
     private const float SliceBladeCant = 0.12f;
+    // During the main part of the cut (SliceBladeYawWeight) the blade is also turned about the vertical by this much
+    // from the forearm's direction, in the engine's yaw convention (positive: counter-clockwise seen from above, toward the
+    // player's left for the first swing, so the tip leads ahead of the hand's travel). Mirrored for the return.
+    private const float SliceBladeYawOffset = 0.785f;
     private const float SliceBodyWindup = 1.0f;
     private const float SliceBodyFar = 0.85f;
 
@@ -545,6 +549,17 @@ public class PlayerModel
     // The hand's offset from where the extended arm puts it: the diagonal alone (it starts above that height and
     // finishes below it), through the same stroke so it is back at the idle pose by the end (no snap).
     private float SliceDrop() => SliceDiagonal();
+
+    // How much of SliceBladeYawOffset is applied: 0 until the wind-up is nearly over, full through the strike and
+    // faded out again over the start of the recovery, so the blade turns into the cut and back out of it.
+    private float SliceBladeYawWeight()
+    {
+        var p = MathUtils.Clamp01(_sliceT);
+        if (p <= 0f || p >= 1f) return 0f;
+        if (p < SliceWindupEnd) return MathUtils.SmoothStep(0.15f, SliceWindupEnd, p);
+        if (p < SliceStrikeEnd) return 1f;
+        return 1f - MathUtils.SmoothStep(SliceStrikeEnd, 0.65f, p);
+    }
 
     // Hand offset from the shoulder in the arm's bend plane (y, z), before the sweep yaw, for a
     // given shoulder pitch and elbow. Matches GetPartMatrix's arm chain exactly, so the two-bone
@@ -1283,7 +1298,8 @@ public class PlayerModel
             var forearmRotation = forearm;
             forearmRotation.Translation = Vector3.Zero;
             var wrist = Matrix4x4.CreateRotationX(MathF.PI) * Matrix4x4.CreateRotationY(SliceBladeRoll * _sliceDir)
-                        * Matrix4x4.CreateRotationX(SliceBladeCant) * forearmRotation;
+                        * Matrix4x4.CreateRotationX(SliceBladeCant) * forearmRotation
+                        * Matrix4x4.CreateRotationY(SliceBladeYawOffset * _sliceDir * SliceBladeYawWeight());
             rotation = Matrix4x4.CreateFromQuaternion(Quaternion.Slerp(FrameOf(rotation), FrameOf(wrist), carried));
         }
 

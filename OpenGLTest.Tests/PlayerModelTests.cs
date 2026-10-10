@@ -417,8 +417,9 @@ public sealed class PlayerModelTests
                 // along it, not up.
                 Assert.True(reach > 0.66f, $"direction {direction}: the arm is bent in the cut (reach {reach}).");
                 Assert.True(forearm.Y < 0.4f, $"direction {direction}: the forearm points up ({forearm}).");
-                // The blade follows the wrist: its tip points along the forearm.
-                Assert.True(Vector3.Dot(tip, forearm) > 0.8f, $"direction {direction}: the blade does not follow the wrist ({tip} vs {forearm}).");
+                // The blade follows the wrist: its tip points the way the forearm does, turned about the vertical by the
+                // 45 degrees it is given through the main part of the cut (see the next test).
+                Assert.True(Vector3.Dot(tip, forearm) > 0.55f, $"direction {direction}: the blade does not follow the wrist ({tip} vs {forearm}).");
                 // And it is cocked on edge a little, not laid completely flat.
                 Assert.InRange(flatFace, 0.35f, 0.9f);
             }
@@ -427,6 +428,46 @@ public sealed class PlayerModelTests
             Assert.True(samples[0].Forearm.X * direction > 0.5f);
             Assert.True(samples[samples.Count / 2].Forearm.Z < -0.6f);
             Assert.True(samples[^1].Forearm.X * direction < -0.4f);
+        }
+    }
+
+    [Fact]
+    public void TheBladeIsTurnedAboutFortyFiveDegreesFromTheForearmThroughTheMainPartOfTheCutAndMirrorsForTheReturn()
+    {
+        TestContent.EnsureLoaded();
+        var display = ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_blade").Id)!.DisplayMatrix();
+
+        foreach (var direction in new[] { 1, -1 })
+        {
+            var player = new PlayerModel { HoldingItem = true };
+            for (var i = 0; i < 120; i++)
+                player.Update(1f / 60f, 0f);
+            var eye = new Vector3(0.5f, 70f, 0.5f);
+
+            Vector3 Horizontal(Vector3 v) => Vector3.Normalize(new Vector3(v.X, 0f, v.Z));
+            player.StartSlice(direction);
+            var checkedFrames = 0;
+            for (var i = 0; i < 42; i++)
+            {
+                player.Update(PlayerModel.SliceDuration / 42f, 0f);
+                var progress = player.SliceProgress;
+                if (progress < 0.28f || progress > 0.47f) continue;
+
+                var forearmMatrix = player.GetPartMatrix("ForearmR", eye, -90f, 0f);
+                var hand = Vector3.Transform(new Vector3(0f, player.HandDepth(), 0f), forearmMatrix);
+                var forearm = Horizontal(hand - forearmMatrix.Translation);
+                var blade = display * player.GetHandAnchorMatrix(eye, -90f);
+                var tip = Horizontal(Vector3.TransformNormal(new Vector3(1, 1, 0), blade));
+
+                // The forearm's horizontal direction turned by +45 degrees about Y (the engine's yaw), mirrored for the
+                // return, is where the blade's tip points.
+                var expected = Vector3.TransformNormal(forearm, Matrix4x4.CreateRotationY(0.785f * direction));
+                Assert.True(Vector3.Dot(tip, expected) > 0.93f,
+                    $"direction {direction} at {progress:F2}: the tip {tip} is not the forearm {forearm} turned 45 degrees.");
+                checkedFrames++;
+            }
+
+            Assert.True(checkedFrames > 4);
         }
     }
 
