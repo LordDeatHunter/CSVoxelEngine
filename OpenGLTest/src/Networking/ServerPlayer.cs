@@ -301,6 +301,20 @@ public sealed class ServerPlayer : IMobTarget
     /// <summary>The state flags the client last reported, rebroadcast in the player list.</summary>
     public byte Flags { get; set; }
 
+    /// <summary>The swing this player last made (a <see cref="NetPlayerAction"/>), rebroadcast so
+    /// other clients can play it on this player's model.</summary>
+    public NetPlayerAction LastAction { get; private set; }
+
+    /// <summary>Moves on every <see cref="NoteAction"/>, so a client sees a repeat of the same swing.</summary>
+    public byte ActionSeq { get; private set; }
+
+    /// <summary>Records a swing for the next player list broadcast.</summary>
+    public void NoteAction(NetPlayerAction action)
+    {
+        LastAction = action;
+        unchecked { ActionSeq++; }
+    }
+
     /// <summary>Server clock of the last accepted <see cref="NetMessage.PlayerState"/>.</summary>
     public double LastStateAt { get; set; }
 

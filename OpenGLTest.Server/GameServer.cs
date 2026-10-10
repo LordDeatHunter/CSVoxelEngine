@@ -550,6 +550,25 @@ public sealed class GameServer : IDisposable
 
         player.Aim(intent.Eye, intent.Direction);
         var context = player.Context;
+        // Other clients see the swing even when the hit itself is refused.
+        switch (intent.Kind)
+        {
+            case NetIntentKind.BreakStart:
+            case NetIntentKind.BreakComplete:
+                player.NoteAction(NetPlayerAction.Punch);
+                break;
+            case NetIntentKind.Throw:
+                player.NoteAction(NetPlayerAction.Throw);
+                break;
+            case NetIntentKind.Attack:
+                player.NoteAction(intent.Attack switch
+                {
+                    NetAttackKind.Slice => NetPlayerAction.Slice,
+                    NetAttackKind.SliceReturn => NetPlayerAction.SliceReturn,
+                    _ => NetPlayerAction.Punch,
+                });
+                break;
+        }
         switch (intent.Kind)
         {
             case NetIntentKind.BreakStart:
@@ -826,6 +845,8 @@ public sealed class GameServer : IDisposable
             writer.Write(player.Yaw);
             writer.Write(player.Pitch);
             writer.Write(player.Flags);
+            writer.Write((byte)player.LastAction);
+            writer.Write(player.ActionSeq);
         }
         Broadcast(writer.ToArray());
     }

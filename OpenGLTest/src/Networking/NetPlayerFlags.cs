@@ -13,4 +13,11 @@ public enum NetPlayerFlags : byte
     None = 0,
     Creative = 1,
     Flying = 2,
+
+    // Cosmetic movement state, reported so other clients can pose this player's model (a crouch,
+    // a swim stroke, a run cycle, a jump). The server rebroadcasts them untrusted and never acts on them.
+    Sneaking = 4,
+    Swimming = 8,
+    Sprinting = 16,
+    Airborne = 32,
 }

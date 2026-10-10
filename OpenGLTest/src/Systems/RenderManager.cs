@@ -3408,12 +3408,12 @@ public class RenderManager : IDisposable
             var light = LightAt(remote.Eye);
             foreach (var part in PlayerModel.BodyParts)
             {
-                var model = remote.Model.GetPartMatrix(part, remote.Eye, remote.Yaw, 0f);
+                var model = remote.Model.GetPartMatrix(part, remote.Eye, remote.Yaw, remote.Pitch);
                 SetDrawUniforms(model, model * viewProj, 1f, light);
                 _playerMeshes[part].Render();
             }
 
-            var head = remote.Model.GetPartMatrix("Head", remote.Eye, remote.Yaw, 0f);
+            var head = remote.Model.GetPartMatrix("Head", remote.Eye, remote.Yaw, remote.Pitch);
             SetDrawUniforms(head, head * viewProj, 1f, light);
             _playerMeshes["Head"].Render();
         }

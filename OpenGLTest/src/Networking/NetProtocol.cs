@@ -103,8 +103,10 @@ public static class NetFraming
     /// <see cref="silkgltriangle.ColumnTerrain"/> (heights, water levels, corner climate), so a
     /// client derives nothing from worldgen. 6: <see cref="NetMessage.EntityList"/> also carries
     /// primed TNT and falling blocks (<see cref="NetEntityKind.PrimedTnt"/>,
-    /// <see cref="NetEntityKind.FallingBlock"/>), which a client draws as display-only mirrors.</summary>
-    public const int ProtocolVersion = 6;
+    /// <see cref="NetEntityKind.FallingBlock"/>), which a client draws as display-only mirrors.
+    /// 7: each <see cref="NetMessage.PlayerList"/> entry ends with the player's last
+    /// <see cref="NetPlayerAction"/> and its counter, and the player flags carry cosmetic movement bits.</summary>
+    public const int ProtocolVersion = 7;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

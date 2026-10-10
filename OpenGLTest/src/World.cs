@@ -1125,14 +1125,14 @@ public class World : IItemUseWorld
             if (index < 0)
             {
                 var remote = new RemotePlayer(entry.Id, entry.Name, Player.Rig);
-                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch);
+                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq);
                 _remotePlayers.Add(remote);
             }
             else
             {
                 var remote = _remotePlayers[index];
                 remote.Name = entry.Name;
-                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch);
+                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq);
             }
         }
 

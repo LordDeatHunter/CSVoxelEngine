@@ -512,8 +512,13 @@ public static class Program
             writer.Write(camera.Pitch);
             // The modes ride along as a request: the server decides whether this player may be
             // creative (and with it, whether its catalog grants are accepted)
+            var supported = camera.IsGrounded || camera.IsFlying || camera.IsInWater;
             writer.Write((byte)((camera.IsCreative ? NetPlayerFlags.Creative : NetPlayerFlags.None)
-                | (camera.IsFlying ? NetPlayerFlags.Flying : NetPlayerFlags.None)));
+                | (camera.IsFlying ? NetPlayerFlags.Flying : NetPlayerFlags.None)
+                | (camera.IsSneaking ? NetPlayerFlags.Sneaking : NetPlayerFlags.None)
+                | (camera.IsInWater && !camera.IsFlying ? NetPlayerFlags.Swimming : NetPlayerFlags.None)
+                | (camera.IsSprinting ? NetPlayerFlags.Sprinting : NetPlayerFlags.None)
+                | (!supported ? NetPlayerFlags.Airborne : NetPlayerFlags.None)));
             writer.Write(netCorrectionAck);
             client.Send(writer.ToArray());
         }
@@ -583,8 +588,10 @@ public static class Program
                     var eye = reader.ReadVector3();
                     var yaw = reader.ReadFloat();
                     var pitch = reader.ReadFloat();
-                    reader.ReadByte();
-                    remoteScratch.Add(new RemotePlayerSnapshot(id, name, eye, yaw, pitch));
+                    var flags = (NetPlayerFlags)reader.ReadByte();
+                    var action = (NetPlayerAction)reader.ReadByte();
+                    var actionSeq = reader.ReadByte();
+                    remoteScratch.Add(new RemotePlayerSnapshot(id, name, eye, yaw, pitch, flags, action, actionSeq));
                 }
                 w.SyncRemotePlayers(remoteScratch, netPlayerId);
                 break;
