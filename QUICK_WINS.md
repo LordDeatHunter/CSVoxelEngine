@@ -83,7 +83,7 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
 
 ## Shaders
 
-- [ ] **Tall grass roots stay put.** Today the whole `tall_grass` cross sways like a leaf, which
+- [x] **Tall grass roots stay put.** *Done:* a swaying vertex carries its sway weight in vertex alpha (leaves 255, plants 0 at the base to 255 at the tip, squared); `plant-sway.json`. Today the whole `tall_grass` cross sways like a leaf, which
   looks odd: the roots at the bottom of the block should be static and only the upper part
   should move, growing from nothing at the base to full sway at the tip.
   *Hook:* the sway is the `vSway` block in `test-vertex.glsl` and `shadow-vertex.glsl` (the two
@@ -103,7 +103,7 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
   is already wired. Verify with `visual-examples/trees.json` at two `VOXEL_TIME`s, where the
   heading differs.
 
-- [ ] **Water edge foam.** A thin pale line where the water surface meets a block or the shore.
+- [x] **Water edge foam.** *Done:* one term in the water fragment, rising as the view-ray depth drops under 0.5 blocks, top faces only (`water-foam.json`). A thin pale line where the water surface meets a block or the shore.
   *Hook:* the water fragment in `test-fragment.glsl` already reads the scene depth copy and
   measures the water's thickness (the Beer-Lambert path); foam is a term that rises as that
   thickness goes to zero. Animate it with the existing wave/flow phase so it moves, and keep the
@@ -127,7 +127,7 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
   you want) and when the sun is below the horizon. Strength constants in
   `WorldGenerationConfig`. Test (GL-free twin, like `Tonemap`): intensity is monotone in the
   alignment and zero when facing away.
-- [ ] **Snow sparkle.** Tiny glints on snow in direct sun that shift as you move.
+- [x] **Snow sparkle.** *Done:* hashed per-texel glints on the snow tile, gated by shadow, cloud shadow and distance; only visible with a low sun (`snow-sparkle.json` at VOXEL_TIME=405) because noon snow clips to white. Tiny glints on snow in direct sun that shift as you move.
   *Hook:* the ore highlight already exists (`material.metallic`, `OreSpecLinearScale`), but the
   AGENTS.md notes that material is keyed per tile and ore-only. Prefer a small separate
   fragment term for the snow tiles over turning on a general material, so this stays one
