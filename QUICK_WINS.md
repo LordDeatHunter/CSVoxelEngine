@@ -66,14 +66,14 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
   angle and ease speed go in `WorldGenerationConfig`. Add to the existing roll (the hit kick and
   death view use it), never overwrite. Off while flying and while dead. Test: no tilt without
   strafe input, the roll is bounded by the constant, and it returns to zero.
-- [ ] **Pickup pop on the hotbar.** When a drop is collected, the hotbar slot it lands in does a
+- [x] **Pickup pop on the hotbar.** *Done:* `HotbarPickupPop` + `MathUtils.BackPulse`, a rising count of the same item pops (also on a client snapshot); the old Inventory pop that fired on equips is gone. When a drop is collected, the hotbar slot it lands in does a
   quick scale bump.
   *Hook:* `UIRenderer`'s hotbar draw plus a per-slot timer set where a pickup adds to the
   inventory (`DropManager`'s collector crediting `Inventory`). The bump curve belongs in
   `MathUtils` (`EaseOutBack`). A slice of `V-5`. On a server the inventory snapshot arrives
   instead, so detect it from the slot's count rising, not from the pickup call. Test: a rising
   count starts the timer, a falling count (a drop or craft) does not.
-- [ ] **Low-health vignette pulse.** Below about 30% health the screen edge pulses red slowly,
+- [x] **Low-health vignette pulse.** *Done:* `LowHealthVignette.Intensity` (a `MathUtils.Heartbeat` pulse) as a second term of the damage vignette pass; `damage` op takes `"target": "player"` (`low-health.json`). Below about 30% health the screen edge pulses red slowly,
   stronger the lower it goes.
   *Hook:* a full-screen term in the UI pass or the post pass (`post-fragment.glsl`; if the post
   pass, mind that it is display-space and shared with the ItemDebugger). Driven by the health
@@ -220,13 +220,13 @@ Mark done with `[x]` and a short note, or delete the line. Add a new idea as one
 
 ## UI
 
-- [ ] **Hotbar item name fade.** Switching the selected hotbar slot shows that item's name
+- [x] **Hotbar item name fade.** *Done:* `HotbarNameFade` + `MathUtils.HoldThenFade`, drawn over the hearts; new `select` scenario op (`hotbar.json`). Switching the selected hotbar slot shows that item's name
   above the hotbar for about 1.5 s, then fades out.
   *Hook:* a draw in `UIRenderer` next to the hotbar and a small timer reset on selection change
   (singleplayer and the server's `SelectSlot` intent both change it). The fade curve belongs in
   `MathUtils`. Empty slot shows nothing; re-selecting the same slot does not restart it.
   Test: the timer resets on a change and not on a repeat.
-- [ ] **Floating damage numbers.** A small number appears above a mob when it is hit, rises and
+- [x] **Floating damage numbers.** *Done:* `DamageNumberPool` (32, oldest replaced) + `DamageNumberRenderer` from the HUD font; a client derives the amount from `EntityList` health drops (`damage-numbers.json`). A small number appears above a mob when it is hit, rises and
   fades.
   *Hook:* the healthbar billboard approach (`EntityHealthbarRenderer`, buffers sized by the mob
   cap) and the damage amount from `Mob.TakeDamage`. Pool them in a fixed buffer (no per-hit
