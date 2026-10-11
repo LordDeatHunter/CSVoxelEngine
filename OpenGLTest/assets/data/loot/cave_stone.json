@@ -1,0 +1,6 @@
+{
+  // A cave formation breaks into cobblestone (stalactite and stalagmite share it)
+  "pools": [
+    { "rolls": 1, "entries": [ { "item": "block/cobblestone" } ] }
+  ]
+}

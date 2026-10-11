@@ -2156,6 +2156,19 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const bool LilyPadsEnabled = true;
     public const float LilyPadChance = 0.35f;
 
+    // --- Glow mushrooms (GlowMushroomGenerator): a dim cyan light on deep cave floors ---
+    public const bool GlowMushroomsEnabled = true;
+    public const float GlowMushroomChance = 0.04f;
+    // Blocks under the column's height a mushroom needs (deep caves, never the surface)
+    public const int GlowMushroomMinDepth = 12;
+
+    // --- Cave formations (CaveFormationGenerator): stalactites on ceilings, stalagmites on
+    // floors, and a stalagmite under every stalactite's drip point ---
+    public const bool CaveFormationsEnabled = true;
+    public const float StalactiteChance = 0.03f;
+    public const float StalagmiteChance = 0.03f;
+    public const int CaveFormationMinDepth = 8;
+
     // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
     // first notices a player (the same moment its first-throw delay starts) ---
     public const float GoblinNoticePipSeconds = 0.9f;

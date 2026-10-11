@@ -1,0 +1,17 @@
+{
+  // A stone point hanging from a cave ceiling (CaveFormationGenerator): needsSupport with
+  // support "above", so it hangs from the block over it and pops when that is mined.
+  "name": "Stalactite",
+  "model": { "parent": "block/stalactite", "textures": { "stone": "stone" } },
+  "hardness": 4,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "light": { "passes": true },
+  "hasItem": false,
+  "needsSupport": true,
+  "support": "above",
+  "blocksSight": false,
+  "loot": "cave_stone",
+  "hitbox": { "min": [0.3, 0, 0.3], "max": [0.7, 1, 0.7] }
+}

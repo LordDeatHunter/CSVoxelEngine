@@ -1,0 +1,16 @@
+{
+  // A stone point rising from a cave floor (CaveFormationGenerator), standing on its floor like
+  // any needsSupport block: mine the floor and it pops. Walked through, a thin aim box.
+  "name": "Stalagmite",
+  "model": { "parent": "block/stalagmite", "textures": { "stone": "stone" } },
+  "hardness": 4,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "light": { "passes": true },
+  "hasItem": false,
+  "needsSupport": true,
+  "blocksSight": false,
+  "loot": "cave_stone",
+  "hitbox": { "min": [0.3, 0, 0.3], "max": [0.7, 1, 0.7] }
+}

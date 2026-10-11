@@ -1,0 +1,34 @@
+{
+  // A stone point rising from the cell floor: three tapering boxes, each face the stone tile
+  // (default UVs stretch it over the small boxes).
+  "textures": { "stone": "stone" },
+  "elements": [
+    {
+      "from": [5, 0, 5],
+      "to": [11, 6, 11],
+      "faces": {
+        "up": { "texture": "#stone" }, "down": { "texture": "#stone" },
+        "north": { "texture": "#stone" }, "south": { "texture": "#stone" },
+        "west": { "texture": "#stone" }, "east": { "texture": "#stone" }
+      }
+    },
+    {
+      "from": [6, 6, 6],
+      "to": [10, 11, 10],
+      "faces": {
+        "up": { "texture": "#stone" }, "down": { "texture": "#stone" },
+        "north": { "texture": "#stone" }, "south": { "texture": "#stone" },
+        "west": { "texture": "#stone" }, "east": { "texture": "#stone" }
+      }
+    },
+    {
+      "from": [7, 11, 7],
+      "to": [9, 16, 9],
+      "faces": {
+        "up": { "texture": "#stone" }, "down": { "texture": "#stone" },
+        "north": { "texture": "#stone" }, "south": { "texture": "#stone" },
+        "west": { "texture": "#stone" }, "east": { "texture": "#stone" }
+      }
+    }
+  ]
+}
