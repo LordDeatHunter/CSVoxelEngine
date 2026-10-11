@@ -8,9 +8,11 @@ namespace silkgltriangle;
 /// glow toward the sun. Computed once a frame on the CPU from the sun's elevation terms and
 /// uploaded as uniforms; <see cref="Sample"/> is the C# reference of the GLSL <c>SkySample</c>
 /// helper shared by the sky dome, the world fog and the cloud fog, so a fully fogged fragment
-/// comes out exactly the colour of the dome behind it. The palette is currently the flat sky
-/// colour of 28198cc (the look before the SH-11 dome): zenith and horizon are the same colour
-/// and the glow is zero, so every direction samples that one colour and its dusk/night mix.
+/// comes out exactly the colour of the dome behind it. The palette is the flat sky colour of
+/// 28198cc (the look before the SH-11 dome): zenith and horizon are the same colour, so every
+/// direction samples that one colour and its dusk/night mix, except for the sunset glow
+/// (<see cref="GlowAmount"/>): a warm band low toward the sun that only lights up while the sun
+/// crosses the horizon, so the day sky stays flat.
 /// </summary>
 public readonly record struct SkyPalette(Vector3 Zenith, Vector3 Horizon, Vector3 Glow)
 {
@@ -19,19 +21,36 @@ public readonly record struct SkyPalette(Vector3 Zenith, Vector3 Horizon, Vector
     private static readonly Vector3 NightSky = new(0.012f, 0.018f, 0.045f);
     private static readonly Vector3 DaySky = new(0.3f, 0.6f, 0.9f);
     private static readonly Vector3 DuskSky = new(0.98f, 0.45f, 0.2f);
+    // sRGB hue of the sunset glow band, scaled by SkyDuskGlowStrength * GlowAmount
+    private static readonly Vector3 DuskGlow = new(1f, 0.42f, 0.12f);
 
     /// <summary>
     /// Builds the palette from <paramref name="dayness"/> (0 night, 1 full day) and
     /// <paramref name="duskAmount"/> (1 with the sun on the horizon, 0 well away from it):
     /// night mixed toward day by dayness, then toward the dusk orange by
-    /// <c>duskAmount * SkyDuskMix</c>, used for both zenith and horizon with no glow.
+    /// <c>duskAmount * SkyDuskMix</c>, used for both zenith and horizon.
+    /// <paramref name="glowAmount"/> (<see cref="GlowAmount"/>, 0..1) scales the warm glow toward
+    /// the sun; 0 leaves the sky the same colour in every direction.
     /// </summary>
-    public static SkyPalette Compute(float dayness, float duskAmount)
+    public static SkyPalette Compute(float dayness, float duskAmount, float glowAmount = 0f)
     {
         var flat = Vector3.Lerp(NightSky, DaySky, dayness);
         flat = Vector3.Lerp(flat, DuskSky, duskAmount * WorldGenerationConfig.SkyDuskMix);
-        return new SkyPalette(flat, flat, Vector3.Zero);
+        var glow = DuskGlow * (WorldGenerationConfig.SkyDuskGlowStrength * MathUtils.Clamp01(glowAmount));
+        return new SkyPalette(flat, flat, glow);
     }
+
+    /// <summary>
+    /// How strong the sunset glow is for a sun at sine-elevation <paramref name="sunElevation"/>,
+    /// 0..1: zero with the sun at or above <see cref="WorldGenerationConfig.SkyGlowAboveSunElevation"/>
+    /// (the flat day sky) and at or below <see cref="WorldGenerationConfig.SkyGlowBelowSunElevation"/>
+    /// (night, once the afterglow has faded), rising smoothly to 1 at
+    /// <see cref="WorldGenerationConfig.SkyGlowPeakSunElevation"/>. The same at dawn, the sun
+    /// climbing back through the same band.
+    /// </summary>
+    public static float GlowAmount(float sunElevation) =>
+        MathUtils.SmoothStep(WorldGenerationConfig.SkyGlowBelowSunElevation, WorldGenerationConfig.SkyGlowPeakSunElevation, sunElevation)
+        * (1f - MathUtils.SmoothStep(WorldGenerationConfig.SkyGlowPeakSunElevation, WorldGenerationConfig.SkyGlowAboveSunElevation, sunElevation));
 
     /// <summary>
     /// The dome's shape constants as the shaders' <c>uSkyShape</c>: (horizon band, haze width,

@@ -322,6 +322,16 @@ sun, the sun's height (zero at and below the horizon) and the cloud over its dis
 underwater and in lava, and the mirror pass draws its dome with `GlareColor` zero, so no reflection
 ever carries it.
 
+**Sunset glow.** The one direction-dependent part of the otherwise flat dome (this supersedes the
+"zero glow" above): `SkyPalette.Compute`'s `glowAmount` scales a warm sRGB band
+(`SkyDuskGlowStrength`) that every `SkySample` copy already adds low toward the sun's azimuth
+(`Glow * lobe`). `SkyPalette.GlowAmount(sunElevation)` gives it a value only while the sun crosses
+the horizon, at sunset and sunrise alike: zero at and above `SkyGlowAboveSunElevation` (the flat day
+sky) and at and below `SkyGlowBelowSunElevation` (the afterglow gone), peaking at
+`SkyGlowPeakSunElevation`. The world and cloud fog sample the same band, so fogged terrain toward
+the sun melts into it. `SkyPaletteTests` holds the rules; `visual-examples/sunset-glow.json`
+(`VOXEL_TIME` 430, 147, 1030) frames it.
+
 **Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
 heading turns slowly (`WorldGenerationConfig.Wind*`), with `Wind.Offset` its bounded closed-form
 integral. Leaf sway reads it in both vertex shaders (`uWind`, the direction scaled by `WindLean`,

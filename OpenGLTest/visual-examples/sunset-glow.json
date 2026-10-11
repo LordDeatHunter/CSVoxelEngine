@@ -1,0 +1,31 @@
+// Sunset glow check (SkyPalette.GlowAmount): a warm band low in the sky toward the sun that only
+// shows while the sun crosses the horizon. Run from OpenGLTest/, once per time, copying
+// visual/sunset-glow/ aside between runs since each run overwrites it:
+//   $env:VOXEL_SCRIPT='visual-examples/sunset-glow.json'; $env:VOXEL_TIME='<t>'
+//   bin/Release/net9.0/silkgltriangle.exe
+// Times: 430 sunset (the shots land ~15 s in, with the sun on the horizon at yaw ~160: the glow
+// at its peak), 147 noon (no glow: toward and away from the sun look the same), 1030 sunrise
+// (the same band low toward the rising sun at yaw ~20).
+// Camera.IsEyeInWater and the physics only update during wait/walk/mine, so every shot after a
+// teleport is preceded by a wait.
+{
+  "steps": [
+    { "op": "wait", "seconds": 5 },
+    { "op": "fly" },
+    // The dome from high over the origin: toward the setting sun, then directly away from it.
+    { "op": "teleport", "pos": [0.5, 140.5, 0.5], "yaw": 160, "pitch": 4 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "toward_sunset", "hideHud": true },
+    { "op": "teleport", "pos": [0.5, 140.5, 0.5], "yaw": -20, "pitch": 4 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "away_from_sunset", "hideHud": true },
+    // Toward the sunrise side (the glow follows the sun, so at 1030 it shows here instead).
+    { "op": "teleport", "pos": [0.5, 140.5, 0.5], "yaw": 20, "pitch": 4 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "toward_sunrise", "hideHud": true },
+    // Low over the terrain toward the sun: the far fog melts into the same warm band.
+    { "op": "teleport", "pos": [0.5, 70.5, 0.5], "yaw": 160, "pitch": 0 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "fog_toward_sun", "hideHud": true }
+  ]
+}

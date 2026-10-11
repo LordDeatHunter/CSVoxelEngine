@@ -361,6 +361,18 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>How far the flat sky colour moves toward the dusk orange at full dusk (the 28198cc mix).</summary>
     public const float SkyDuskMix = 0.5f;
 
+    /// <summary>Brightness of the sunset glow band toward the sun at its peak (a scale on its sRGB hue in SkyPalette).</summary>
+    public const float SkyDuskGlowStrength = 0.5f;
+
+    /// <summary>Sine of the sun's elevation at and above which there is no sunset glow (the flat day sky).</summary>
+    public const float SkyGlowAboveSunElevation = 0.2f;
+
+    /// <summary>Sine of the sun's elevation at which the sunset glow is strongest (the sun on the horizon).</summary>
+    public const float SkyGlowPeakSunElevation = 0f;
+
+    /// <summary>Sine of the sun's elevation at and below which the afterglow is gone.</summary>
+    public const float SkyGlowBelowSunElevation = -0.1f;
+
     // --- Stars (StarField, Stars in sky-fragment.glsl) ---
     /// <summary>Star cells along each side of one face of the cube of directions (6 faces); a cell holds at most one star.</summary>
     public const int StarCellsPerFace = 72;

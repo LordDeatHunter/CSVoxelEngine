@@ -1077,7 +1077,8 @@ public class RenderManager : IDisposable
         _ambient = ColorSpace.SrgbToLinear(
             Mix(new Vector3(0.1f, 0.11f, 0.155f), new Vector3(0.42f, 0.45f, 0.52f), dayness));
 
-        _sky = SkyPalette.Compute(dayness, duskAmount);
+        // The warm glow toward the sun only while it crosses the horizon (the day sky stays flat)
+        _sky = SkyPalette.Compute(dayness, duskAmount, SkyPalette.GlowAmount(elevation));
         // SkyPalette stays authored (and tested) in sRGB; the dome and fog want it linear
         _sky = _sky with
         {
