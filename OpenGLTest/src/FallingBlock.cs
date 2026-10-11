@@ -79,6 +79,10 @@ public class FallingBlock
     /// <summary>Whether the cube's centre was under a fluid surface on its last physics step.</summary>
     public bool IsSubmerged { get; private set; }
 
+    /// <summary>The cube's water-splash memory, stepped by the world from its bottom each frame
+    /// (<see cref="WaterSplash.Track"/>).</summary>
+    internal WaterSplashTracker Splash { get; } = new();
+
     public FallingBlock(Vector3 position, byte blockId)
     {
         Position = position;

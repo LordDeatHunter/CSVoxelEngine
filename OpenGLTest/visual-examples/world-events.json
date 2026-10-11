@@ -19,6 +19,8 @@
   //              that hardens to cobblestone
   //   thud       a forest oak felled at its base hits the ground: a leaf burst off the crown, dust
   //              under the trunk and a camera shake (TopplingTree.TryTakeLanding)
+  //   splash     a goblin and then the player dropped into the bay throw pale droplets up off the
+  //              water surface (WaterSplash)
   "steps": [
     { "op": "fly", "on": true },
     { "op": "teleport", "pos": [253.5, 30, -4.5], "yaw": -90, "pitch": -28.37 },
@@ -121,6 +123,31 @@
     { "op": "wait", "seconds": 0.12 },
     { "op": "screenshot", "name": "thud-b", "hideHud": true },
     { "op": "wait", "seconds": 0.25 },
-    { "op": "screenshot", "name": "thud-c", "hideHud": true }
+    { "op": "screenshot", "name": "thud-c", "hideHud": true },
+
+    // LEG 5 — water splashes in the open sea swim-bubbles.json dives in (the sea surface is y 0.875,
+    // over 5 deep at (432.5, 0.5)): a goblin dropped from 6 blocks up throws pale droplets as it hits
+    // the water, seen by the hovering camera six blocks away; then the player itself, out of flight and
+    // filmed from the shoulder camera, falls in from 7 blocks up. The long wait streams the sea in.
+    { "op": "teleport", "pos": [426.5, 4.5, 4.5], "yaw": 0, "pitch": -15 },
+    { "op": "wait", "seconds": 14 },
+    { "op": "look", "yaw": 0, "pitch": -15 },
+    { "op": "spawn", "entity": "goblin", "pos": [432.5, 7.0, 4.5] },
+    { "op": "wait", "seconds": 0.55 },
+    { "op": "screenshot", "name": "splash-goblin-a", "hideHud": true },
+    { "op": "wait", "seconds": 0.08 },
+    { "op": "screenshot", "name": "splash-goblin-b", "hideHud": true },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "splash-goblin-c", "hideHud": true },
+    { "op": "damage", "amount": 100 },
+    { "op": "fly", "on": false },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "teleport", "pos": [432.5, 8.5, 0.5], "yaw": 0, "pitch": -25 },
+    { "op": "wait", "seconds": 0.66 },
+    { "op": "screenshot", "name": "splash-player-a", "hideHud": true },
+    { "op": "wait", "seconds": 0.08 },
+    { "op": "screenshot", "name": "splash-player-b", "hideHud": true },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "splash-player-c", "hideHud": true }
   ]
 }

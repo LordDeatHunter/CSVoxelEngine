@@ -125,6 +125,10 @@ public class ItemDrop
     /// <summary>Seconds since the drop appeared; drives the spin, the pulse and the pickup delay.</summary>
     internal float Age => _age;
 
+    /// <summary>The drop's water-splash memory, stepped by the world from its bottom each frame
+    /// (<see cref="WaterSplash.Track"/>).</summary>
+    internal WaterSplashTracker Splash { get; } = new();
+
     /// <summary>Adds <paramref name="impulse"/> (blocks per second) to an idle drop's velocity: a blast's
     /// shove (<see cref="BlastImpulse"/>). A drop already flying at a player ignores it.</summary>
     internal void Push(Vector3 impulse)

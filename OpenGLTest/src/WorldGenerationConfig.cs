@@ -1461,6 +1461,27 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int TreeThudDustCount = 5;
     public const float TreeThudDustSpeed = 2.6f;
 
+    // --- Water splash (WaterSplash, WaterSplashTracker, BlockDebrisSystem.Splash): anything that
+    // crosses a water surface throws pale droplets up from the water top, none under the minimum
+    // speed, more and higher the faster it crossed (MathUtils.ImpactStrength), capped at the full
+    // speed; the count scales with the body (1 for the player). A step farther than the teleport
+    // distance splashes nothing, and a body still for the stale time counts as still. Cosmetic:
+    // singleplayer and a client, never a headless server. ---
+    public const float WaterSplashMinSpeed = 2.5f;
+    public const float WaterSplashFullSpeed = 16f;
+    public const int WaterSplashMinCount = 4;
+    public const int WaterSplashMaxCount = 18;
+    public const float WaterSplashMinLaunch = 1.8f;
+    public const float WaterSplashMaxLaunch = 4.5f;
+    public const float WaterSplashSize = 0.07f;
+    public const float WaterSplashTeleportBlocks = 4f;
+    public const float WaterSplashStaleSeconds = 0.3f;
+    // How big a splash each kind of body throws, against the player's 1 (a mob's comes from its width)
+    public const float WaterSplashSmallScale = 0.35f;
+    public const float WaterSplashCubeScale = 1.4f;
+    // sRGB colour of a droplet: a pale water-blue
+    public static readonly Vector3 WaterSplashColor = new(0.72f, 0.86f, 1f);
+
     // --- Wind (Wind.cs, SH-27) ---
     // One slowly turning wind shared by leaf sway, fire smoke and the cloud drift.
     /// <summary>Wind heading at lighting time 0, degrees from +X toward +Z.</summary>

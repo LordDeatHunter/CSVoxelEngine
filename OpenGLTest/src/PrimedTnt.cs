@@ -15,7 +15,11 @@ public class PrimedTnt
 
     // Slightly inside a full block so a cube spawned where a block just was rests in the freed
     // cell instead of clipping its solid neighbours
-    private const float HalfExtent = 0.49f;
+    internal const float HalfExtent = 0.49f;
+
+    /// <summary>The cube's water-splash memory, stepped by the world from its bottom each frame
+    /// (<see cref="WaterSplash.Track"/>); a client's mirror keeps its own across snapshots.</summary>
+    internal WaterSplashTracker Splash { get; } = new();
 
     private const float Gravity = 28f;
     private const float TerminalVelocity = -30f;

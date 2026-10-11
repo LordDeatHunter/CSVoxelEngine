@@ -711,6 +711,8 @@ OpenGLTest/
     ShakeFalloff.cs            # GL-free camera-shake trauma of a world event (blast, tree thud) by its distance
     BlastImpulse.cs            # GL-free TNT blast shove: away from the centre, falling to zero at the radius
     FallingBlockLanding.cs     # a falling cube written back as a block: cell, block, fall, submerged (its dust)
+    WaterSplash.cs             # GL-free splash rule (droplets by crossing speed) + Track: a body's droplets off the water top
+    WaterSplashTracker.cs      # GL-free per-body water crossing memory: in water last frame, speed from its own height
     FaceLight.cs               # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters
     CutoutMipmap.cs            # GL-free coverage-preserving mip chain for cutout tiles (alpha rescaled per level)
     LightFlicker.cs            # GL-free per-cell flicker phase + curve for the campfire point lights
@@ -2999,7 +3001,22 @@ overshoot or jiggle.
   `TreeThudDustPoints` points of the landed trunk (`GroundDust.TreeThud`) and shakes the camera by its
   distance to the trunk (`ShakeFalloff`, `TreeThudShakeStrength` scaled by the wood that fell over
   `TreeThudFullWoodCells`). Singleplayer only: a server skips it, and a client sees no toppling tree
-  at all (`TreeThudTests`). `visual-examples/world-events.json` (`VOXEL_TIME=147`) films
+  at all (`TreeThudTests`). Anything that enters or leaves water splashes: every body keeps a
+  `WaterSplashTracker` (the player's in `World`, a field on `Mob`, `ItemDrop`, `ThrownProjectile`,
+  `FallingBlock` and `PrimedTnt`), which `World.UpdateSplashes` steps each frame through
+  `WaterSplash.Track` from the body's lowest point (the player by `Camera.IsInWater`, the rest by that
+  point being under its cell's fluid surface). The tracker measures the vertical speed from the body's
+  own height between frames (so a client mirror's 10 Hz jumps read as the speed over the snapshot),
+  seeds on its first call, ignores a teleport-sized step and treats a body still for
+  `WaterSplashStaleSeconds` as still; on a crossing it reports the entry's downward or the exit's upward
+  speed, and `WaterSplash.Count` / `Speed` (none under `WaterSplashMinSpeed`, growing along
+  `MathUtils.ImpactStrength` to `WaterSplashFullSpeed`, the count scaled by the body: a mob by its width,
+  drops and projectiles `WaterSplashSmallScale`, cubes `WaterSplashCubeScale`) size a ring of pale
+  `WaterSplashColor` `DebrisLook.Colour` droplets (`BlockDebrisSystem.Splash`) thrown up from the water
+  top of the column crossed (`ChunkManager.GetFluidColumnTopGlobal`), never off lava. A client splashes
+  its own player, the mob mirrors and the primed-TNT mirrors (all persist across snapshots); its drops and
+  falling cubes are rebuilt every snapshot, so they never splash there (`WaterSplashTests`).
+  `visual-examples/world-events.json` (`VOXEL_TIME=147`) films
   these effects; its blasts use the scenario op `prime` (`{ "op": "prime", "pos": [x, y, z] }`,
   `World.TestPrimeTnt`), a firestarter strike on the TNT block in that cell that never misses, since
   `give` cannot equip a tool instance and the strike's chance roll would make the scenario flaky.

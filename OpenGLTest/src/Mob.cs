@@ -243,6 +243,10 @@ public abstract class Mob
         }
     }
 
+    /// <summary>The mob's water-splash memory, stepped by the world from its feet each frame
+    /// (<see cref="WaterSplash.Track"/>); cosmetic, so a server never steps it.</summary>
+    public WaterSplashTracker Splash { get; } = new();
+
     /// <summary>Horizontal half extent of the collision body, used by touch and hit tests.</summary>
     public abstract float BodyHalfExtent { get; }
 

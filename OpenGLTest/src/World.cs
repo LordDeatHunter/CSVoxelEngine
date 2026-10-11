@@ -1341,6 +1341,7 @@ public class World : IItemUseWorld
         UpdateBubbles((float)deltaTime);
         UpdateThrown((float)deltaTime);
         RefreshProjectiles();
+        UpdateSplashes((float)deltaTime);
         FrameProfiler.End(ProfileSection.Entities);
 
         _hotbarPops.Update(Inventory, (float)deltaTime);
@@ -1416,6 +1417,47 @@ public class World : IItemUseWorld
     }
 
     private int _lastSwimStrokes;
+
+    // The local player's water-splash memory (its swim state, Camera.IsInWater)
+    private readonly WaterSplashTracker _playerSplash = new();
+
+    /// <summary>
+    /// Every body that crossed a water surface this frame throws droplets off it
+    /// (<see cref="WaterSplash.Track"/>): the local player by its swim state, and the mobs, drops,
+    /// projectiles, falling cubes and primed TNT by their lowest point. A client's mobs and TNT are
+    /// mirrors that keep their trackers across snapshots and splash from the snapshot positions; its
+    /// drops and falling cubes are rebuilt each snapshot, so they never do. Cosmetic: never on a server.
+    /// </summary>
+    private void UpdateSplashes(float deltaTime)
+    {
+        if (_serverMode)
+            return;
+        WaterSplash.Track(_playerSplash, Camera.Position - new Vector3(0f, Camera.EyeHeight, 0f), deltaTime, 1f,
+            _chunkManager, _debris, inWater: Camera.IsInWater);
+        for (var i = 0; i < _mobs.Count; i++)
+        {
+            var mob = _mobs[i];
+            WaterSplash.Track(mob.Splash, mob.Position - new Vector3(0f, mob.BodyHalfHeight, 0f), deltaTime,
+                mob.BodyHalfExtent / PlayerPhysics.PlayerRadius, _chunkManager, _debris);
+        }
+        // Index loops over the read-only lists, so a frame allocates no enumerator
+        var drops = _dropManager.Drops;
+        for (var i = 0; i < drops.Count; i++)
+            if (!drops[i].IsAttracted)
+                WaterSplash.Track(drops[i].Splash, drops[i].Position - new Vector3(0f, ItemDrop.Size * 0.5f, 0f),
+                    deltaTime, WorldGenerationConfig.WaterSplashSmallScale, _chunkManager, _debris);
+        for (var i = 0; i < _projectiles.Count; i++)
+            WaterSplash.Track(_projectiles[i].Splash, _projectiles[i].Position, deltaTime,
+                WorldGenerationConfig.WaterSplashSmallScale, _chunkManager, _debris);
+        var falling = _falling.Falling;
+        for (var i = 0; i < falling.Count; i++)
+            WaterSplash.Track(falling[i].Splash, falling[i].Position - new Vector3(0f, FallingBlock.HalfExtent, 0f),
+                deltaTime, WorldGenerationConfig.WaterSplashCubeScale, _chunkManager, _debris);
+        var primed = _tntManager.Primed;
+        for (var i = 0; i < primed.Count; i++)
+            WaterSplash.Track(primed[i].Splash, primed[i].Position - new Vector3(0f, silkgltriangle.PrimedTnt.HalfExtent, 0f),
+                deltaTime, WorldGenerationConfig.WaterSplashCubeScale, _chunkManager, _debris);
+    }
 
     /// <summary>
     /// The local player's bubbles: the steady exhale while the eye is under, plus a burst from the
@@ -1716,6 +1758,7 @@ public class World : IItemUseWorld
         UpdateToppling((float)deltaTime);
         UpdateThrown((float)deltaTime);
         RefreshProjectiles();
+        UpdateSplashes((float)deltaTime);
         // Remote player poses ease toward the last broadcast and drive their own walk cycles.
         for (var i = 0; i < _remotePlayers.Count; i++)
             _remotePlayers[i].Update(deltaTime);

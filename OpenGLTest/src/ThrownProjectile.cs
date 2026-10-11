@@ -22,6 +22,10 @@ public sealed class ThrownProjectile
     private Vector3 _velocity;
     private float _age;
 
+    /// <summary>The projectile's water-splash memory, stepped by the world from its centre each frame
+    /// (<see cref="WaterSplash.Track"/>).</summary>
+    internal WaterSplashTracker Splash { get; } = new();
+
     public float Spin => _age * 9f;
     public float Scale => ItemDrop.Size * (ItemRegistry.IsItem(ItemId) ? 1.5f : 1f);
     public bool IsExpired => _age >= WorldGenerationConfig.ThrowLifetimeSeconds;

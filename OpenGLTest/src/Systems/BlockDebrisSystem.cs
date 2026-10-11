@@ -94,6 +94,17 @@ public class BlockDebrisSystem
         Spray(origin, BlockType.Air, DebrisLook.Colour, BiomeTint.VertexTint(colourSrgb), count, speed, size,
             radius, lift: 0.6f, random ?? Random.Shared);
 
+    /// <summary>
+    /// Throws <paramref name="count"/> droplets of one flat sRGB <paramref name="colourSrgb"/> (pale water,
+    /// <see cref="DebrisLook.Colour"/>) up off a water surface at <paramref name="origin"/>, from a ring
+    /// <paramref name="radius"/> across: steeper than a splat, so a body crossing the surface reads as a
+    /// splash (<see cref="WaterSplash"/>).
+    /// </summary>
+    public void Splash(Vector3 origin, Vector3 colourSrgb, float radius, int count, float speed, float size,
+        Random? random = null) =>
+        Spray(origin, BlockType.Air, DebrisLook.Colour, BiomeTint.VertexTint(colourSrgb), count, speed, size,
+            radius, lift: 1.3f, random ?? Random.Shared);
+
     // The ring launch Puff, Skirt and Splat share: headings spread round the ring with a jitter (so
     // even a three-chip puff fans out), each starting innerRadius plus up to radius out along its
     // heading, flying at 60-100 % of speed sideways and lift..2 lift of it upward, plus a shared
