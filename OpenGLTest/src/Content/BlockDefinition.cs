@@ -68,6 +68,13 @@ public sealed class BlockDefinition
     public bool? FootstepDust { get; set; }
 
     /// <summary>
+    /// Whether the block stops a line of sight (a punch, a slice, a goblin's throw check): a
+    /// plant never does, so a mob behind tall grass can be struck while the grass itself still
+    /// aims for mining. Default true; only the sight-only ray walk reads it.
+    /// </summary>
+    public bool? BlocksSight { get; set; }
+
+    /// <summary>
     /// Whether the block springs a landing body back up (a slime block): the landing bills no fall
     /// damage and the body is thrown up again at <see cref="WorldGenerationConfig.SlimeBlockBounceRestitution"/>
     /// of its impact once that reaches <see cref="WorldGenerationConfig.SlimeBlockBounceMinSpeed"/>.

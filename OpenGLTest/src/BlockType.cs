@@ -65,6 +65,9 @@ public sealed record BlockType
     // Whether a body landing on the block is sprung back up (a slime block, see PlayerPhysics).
     internal static readonly bool[] BounceById = new bool[256];
 
+    // Whether the block stops a line of sight (a punch, a throw check); a plant never does.
+    internal static readonly bool[] BlocksSightById = new bool[256];
+
     // Whether the block is the reworked trees' wood (the tree_wood renderer), whose thickness
     // and parent direction live in the state byte. Read per voxel by the mesher's connection
     // test and per DDA step by the raycast, so flat like the other flags.
@@ -163,6 +166,10 @@ public sealed record BlockType
     /// <see cref="WorldGenerationConfig.SlimeBlockBounceRestitution"/>. Read through
     /// <see cref="BouncesAt"/>.</summary>
     public bool Bounces { get; init; }
+
+    /// <summary>Whether the block stops a line of sight (a punch, a throw check); a plant never
+    /// does. Read through <see cref="BlocksSightAt"/> by the sight-only ray walk.</summary>
+    public bool BlocksSight { get; init; } = true;
 
     /// <summary>Whether the block hides a neighbouring full cube's face. Defaults to "the baked
     /// model is a full cube and it is not cutout", so it is only known after baking.</summary>
@@ -508,6 +515,9 @@ public sealed record BlockType
 
     /// <summary>Whether a body landing on the block is sprung back up (a slime block).</summary>
     public static bool BouncesAt(byte blockId) => BounceById[blockId];
+
+    /// <summary>Whether the block stops a line of sight (a plant never does).</summary>
+    public static bool BlocksSightAt(byte blockId) => BlocksSightById[blockId];
 
     /// <summary>Whether a block fully hides a neighbouring full cube's face.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

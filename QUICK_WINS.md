@@ -163,14 +163,10 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Placement takes the plant's cell.** Tall grass, dead shrubs, flowers and cotton plants set
   `replaceableByPlacement`, so aiming at one fills its own cell and discards it (four JSON files;
   `PlacementTests`).
-- [ ] **Attacks pass through plants.** A mob behind tall grass cannot be punched or sliced
-  today: the line of sight (`BlockRaycaster.SegmentHitsBlock`) stops on the plant's hitbox.
-  Plants should not be cover. *Hook:* a `blocksSight` block flag (default true, a `BlockType`
-  mirror array like `Occludes`) read by the LOS walk only: `Raycast` gets a sight-only switch
-  that `SegmentHitsBlock` sets, so a flagged cell is walked through, while the aim ray still
-  targets it for mining. Set `"blocksSight": false` on `tall_grass`, `dead_shrub`, `flower` and
-  `cotton_plant` (the goblin's throw check and `MobInterest` share the test, so a goblin throws
-  through grass too). Test: a mob behind a plant is struck, one behind stone is not.
+- [x] **Attacks pass through plants.** A `blocksSight` block flag (default true, a `BlockType`
+  mirror) read only by the sight-only ray walk `SegmentHitsBlock` sets, so a plant never stops a
+  punch, a slice or a goblin's throw check while it still aims for mining; the four plants set
+  `blocksSight: false` (`SightTests`).
 
 ## Enemies
 

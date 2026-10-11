@@ -23,10 +23,11 @@ public static class BlockRaycaster
         if (distance < 1e-4f) return false;
 
         // A diagonal segment crosses up to 3 cells per block travelled; cap the walk on cells
-        // and stop on travelled distance, exactly like the capped shoulder-camera walk.
+        // and stop on travelled distance, exactly like the capped shoulder-camera walk. The walk
+        // is sight-only: a plant never stops a punch (BlockType.BlocksSightAt).
         var steps = Math.Max(1, (int)MathF.Ceiling(distance * 3f) + 2);
         return Raycast(from, delta / distance, distance, steps, stopAtRange: true,
-            chunkManager, out _, out _, out _, out _, includeFluids: false);
+            chunkManager, out _, out _, out _, out _, includeFluids: false, sightOnly: true);
     }
 
     /// <summary>
@@ -40,7 +41,7 @@ public static class BlockRaycaster
     /// </summary>
     public static bool Raycast(Vector3 origin, Vector3 direction, float range, float cellCap, bool stopAtRange,
         ChunkManager chunkManager, out Vector3 hitPosition, out Vector3 hitNormal, out int hitBoxIndex,
-        out float hitT, bool includeFluids)
+        out float hitT, bool includeFluids, bool sightOnly = false)
     {        // A diagonal ray crosses up to 3 cells per block travelled, so a walk counted in
         // iterations starves rays that travel further (shoulder camera) or aim steeply.
         // Capped walks therefore count cells generously and stop on travelled distance
@@ -78,6 +79,10 @@ public static class BlockRaycaster
             // already inside is skipped so swimming never targets the water on the player's face.
             var targetsCell = cellId != 0 && (!BlockType.IsFluid(cellId)
                 || (includeFluids && i > 0 && FluidState.IsSource(chunkManager.GetStateGlobal(cellX, cellY, cellZ))));
+            // A sight-only walk (the combat line of sight) walks through a block that does not
+            // block sight (a plant): the plant still aims for mining, it just never stops a punch
+            if (targetsCell && sightOnly && !BlockType.BlocksSightAt(cellId))
+                targetsCell = false;
 
             if (targetsCell)
             {

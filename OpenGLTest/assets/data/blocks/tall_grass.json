@@ -14,6 +14,8 @@
   "light": { "passes": true },
   "hasItem": false,
   "needsSupport": true,
+  // A punch or a goblin throw reaches through the plant (BlockRaycaster sightOnly)
+  "blocksSight": false,
   // A placement aimed at the plant fills its own cell, discarding it (Placement)
   "replaceableByPlacement": true,
   "loot": "tall_grass",
