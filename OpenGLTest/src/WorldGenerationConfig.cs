@@ -2082,6 +2082,9 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float SlimeBlockBounceRestitution = 0.8f;
     public const float SlimeBlockBounceMinSpeed = 5f;
 
+    // --- Bandage (ItemUseAction.Heal): HP one restores, spent from the stack ---
+    public const int BandageHealAmount = 20;
+
     // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
     // first notices a player (the same moment its first-throw delay starts) ---
     public const float GoblinNoticePipSeconds = 0.9f;

@@ -689,8 +689,9 @@ public static class ContentRegistry
                 "place_stack" => ItemUseAction.PlaceStack,
                 "ignite_campfire" => ItemUseAction.IgniteCampfire,
                 "convert_multiblock" => ItemUseAction.ConvertMultiblock,
+                "heal" => ItemUseAction.Heal,
                 _ => throw new InvalidOperationException(
-                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire or convert_multiblock."),
+                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire, convert_multiblock or heal."),
             };
 
             var durability = definition.Durability ?? 0;
@@ -1192,6 +1193,17 @@ public static class ContentRegistry
                 if (item.MaxDurability < 1)
                     throw new InvalidOperationException(
                         $"Item '{path}' has use.action 'ignite_campfire' without durability: ignite items must declare uses before breaking.");
+                continue;
+            }
+
+            if (item.UseAction == ItemUseAction.Heal)
+            {
+                if (item.UseResultId != 0)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'heal' with a use.result: a heal spends from its stack, it never morphs.");
+                if (item.UseFluidId != 0 || item.UseBlockId != 0)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'heal' with a use.fluid or use.block: a heal targets nobody.");
                 continue;
             }
 

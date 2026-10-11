@@ -1,0 +1,9 @@
+{
+  // Wrapped cotton that restores health (use.action "heal"; ItemUseAction.Heal, HealItem):
+  // refused at full health so the stack is never spent for nothing, and spent one per use
+  // otherwise. Crafted from two cotton (recipes/bandage.json). The sprite is a placeholder
+  // from tools/generate-bandage-texture.py.
+  "name": "Bandage",
+  "texture": "assets/textures/items/bandage.png",
+  "use": { "action": "heal" }
+}

@@ -128,5 +128,18 @@ internal sealed class StubItemUseWorld : IItemUseWorld
         return false;
     }
 
+    /// <summary>Health the stub's player has left; <see cref="Heal"/> refuses at the full pool.</summary>
+    public int Health { get; set; } = PlayerHealth.MaxHealth;
+
+    public int HealCalls { get; private set; }
+
+    public bool Heal(int amount)
+    {
+        HealCalls++;
+        if (Health <= 0 || Health >= PlayerHealth.MaxHealth) return false;
+        Health = System.Math.Min(PlayerHealth.MaxHealth, Health + amount);
+        return true;
+    }
+
     public void ConsumeSelected() => Consumed++;
 }

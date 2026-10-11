@@ -4022,6 +4022,26 @@ public class World : IItemUseWorld
         return true;
     }
 
+    bool IItemUseWorld.Heal(int amount)
+    {
+        // The pool belongs to the player the use runs for: this world's own in singleplayer and
+        // on a client (predicted, then the server's status confirms), the sending ServerPlayer's
+        // on a server, found through the dispatching context
+        if (!_serverMode)
+            return _health.Heal(amount);
+        var context = _activeContext;
+        if (context == null) return false;
+        var players = ServerPlayers;
+        for (var i = 0; i < players.Count; i++)
+        {
+            if (!ReferenceEquals(players[i].Context, context)) continue;
+            if (!players[i].Status.Heal(amount)) return false;
+            players[i].StatusDirty = true;
+            return true;
+        }
+        return false;
+    }
+
     void IItemUseWorld.ConsumeSelected() => ActiveInventory.ConsumeSelected();
     #endregion
 

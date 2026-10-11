@@ -69,6 +69,18 @@ public sealed class PlayerHealth
         DamageFlash = 1f;
     }
 
+    /// <summary>
+    /// Restores up to <paramref name="amount"/> HP (a bandage), clamped to the pool. False when
+    /// there is nothing to restore (already full, or dead), so a use is never spent for nothing.
+    /// </summary>
+    public bool Heal(int amount)
+    {
+        if (amount <= 0 || Health <= 0 || Health >= MaxHealth)
+            return false;
+        Health = Math.Min(MaxHealth, Health + amount);
+        return true;
+    }
+
     /// <summary>Burns while <paramref name="inLava"/> and not <paramref name="immune"/>
     /// (creative/flight). Leaving the lava (or going immune) clears the partial tick, so
     /// re-entry never eats an instant hit.</summary>

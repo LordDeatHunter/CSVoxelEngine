@@ -117,6 +117,10 @@ public interface IItemUseWorld
 
     /// <summary>Spends one unit from the selected stackable slot.</summary>
     void ConsumeSelected();
+
+    /// <summary>Restores up to <paramref name="amount"/> HP to the player the use runs for (a
+    /// bandage); false when they are at full health, so the use is never spent for nothing.</summary>
+    bool Heal(int amount);
 }
 
 /// <summary>Inputs to <see cref="Item.OnUse"/> beyond the world itself: how far the aim reaches

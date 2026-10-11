@@ -1,0 +1,7 @@
+{
+  "result": "item/bandage",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/cotton", "count": 2 }
+  ]
+}
