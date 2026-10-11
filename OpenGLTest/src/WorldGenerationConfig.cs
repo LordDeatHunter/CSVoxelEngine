@@ -275,6 +275,12 @@ public const float DayLengthSeconds = 1200f;
     // waits on it (the slice combo's next swing, the next jab) is ever delayed. A punch, whose
     // follow-through is short, therefore holds for less than HitStopSeconds.
     public const float HitStopMaxRecoveryShare = 0.7f;
+    // Throw charge zoom (ThrowZoom): degrees the view narrows by at a full throw charge, added to the
+    // base FOV, the sprint widening and the punch pinch. A spring follows the charge and springs back
+    // on release; its rate in Hz and damping ratio (below 1 overshoots a touch wider on the release).
+    public const float ThrowZoomDegrees = 4f;
+    public const float ThrowZoomSpringHz = 2.2f;
+    public const float ThrowZoomSpringDamping = 0.55f;
 
     // --- Sky ---
     // Angular radius of the visible sun disc in degrees. The real sun is 0.27 degrees across

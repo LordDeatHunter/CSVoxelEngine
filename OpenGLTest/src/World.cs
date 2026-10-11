@@ -1293,6 +1293,8 @@ public class World : IItemUseWorld
             headingForward, headingSide);
         // A hit-stop holds the punch pinch with the arm (read by the camera's next update)
         Camera.HoldPunchFov = Player.IsHitStopped;
+        // The throw being wound up narrows the view with the arm (ThrowZoom, the camera's next update)
+        Camera.ThrowCharge = Player.ThrowCharge;
         // The dust a landing or a sprinting footfall kicks up: cosmetic, so a headless server spawns none
         if (!_serverMode)
             _dust.UpdatePlayer(Camera, Player.WalkPhase, horizontalSpeed, _chunkManager, _debris);

@@ -34,10 +34,20 @@ public class Camera : IMobTarget
     public bool IsSneaking { get; private set; }
     /// <summary>Strokes the swimmer has started so far; moves on each one (see <c>PlayerPhysics.SwimStrokeSeconds</c>).</summary>
     public int SwimStrokeCount => _physics.SwimStrokeCount;
-    /// <summary>Current vertical FOV in degrees: the base FOV plus the eased sprint widening plus the punch pinch.</summary>
+    /// <summary>Current vertical FOV in degrees: the base FOV plus the eased sprint widening plus the punch
+    /// pinch plus the throw charge zoom.</summary>
     public float CurrentFov => _currentFov;
     /// <summary>The eased sprint widening in degrees, 0 at rest (see <see cref="SprintFov"/>).</summary>
     public float SprintFovDegrees => _sprintFov;
+    /// <summary>The sprung throw charge zoom in degrees: negative while a throw winds up, 0 at rest
+    /// (see <see cref="ThrowZoom"/>).</summary>
+    public float ThrowZoomDegrees => _throwZoomDegrees;
+    /// <summary>
+    /// The 0..1 charge of the throw the player is winding up, or null when none. The world sets it
+    /// every frame from the player's arm (<see cref="PlayerModel.ThrowCharge"/>); the next head-motion
+    /// update narrows the view toward it and springs back once it goes null.
+    /// </summary>
+    public float? ThrowCharge { get; set; }
     /// <summary>
     /// Creative mode (toggled with [C]): walking behaves like survival, but block placing
     /// costs nothing, breaking drops nothing, and double-tapping Space toggles flight.
@@ -252,6 +262,9 @@ public class Camera : IMobTarget
     private float _sprintFov;
     // Roll toward the strafe side in radians, eased by StrafeTilt.Step; added to _roll, never set over it
     private float _strafeTilt;
+    // The throw charge zoom's spring and its clamped degrees (ThrowZoom); added to the FOV, never set over it
+    private Spring _throwZoom = ThrowZoom.CreateSpring();
+    private float _throwZoomDegrees;
     private float _sneakBlend;
     private float _prevVerticalVelocity;
     private bool _wasGrounded;
@@ -602,7 +615,7 @@ public class Camera : IMobTarget
     }
 
     /// <summary>
-    /// The per-frame view juice: FOV (sprint widening plus punch pinch), head bob, landing dip,
+    /// The per-frame view juice: FOV (sprint widening, punch pinch and throw zoom), head bob, landing dip,
     /// crouch drop and roll. <paramref name="sprintHeld"/> is the sprint key, on foot or flying;
     /// <see cref="SprintFov"/> decides whether that actually widens the view.
     /// <paramref name="strafe"/> is the sideways movement input along the camera's right (-1..1),
@@ -615,7 +628,8 @@ public class Camera : IMobTarget
             SprintFov.TargetDegrees(sprintHeld, moving, IsSneaking, swimming, intendedSpeed), deltaTime);
         if (!HoldPunchFov)
             _fovPunch.Step(0f, deltaTime);
-        _currentFov = DefaultFov + _sprintFov + MathUtils.Clamp(_fovPunch.Value, -6f, 6f);
+        _throwZoomDegrees = ThrowZoom.Step(ref _throwZoom, ThrowZoom.TargetDegrees(ThrowCharge), deltaTime);
+        _currentFov = DefaultFov + _sprintFov + MathUtils.Clamp(_fovPunch.Value, -6f, 6f) + _throwZoomDegrees;
 
         // A landing dips the view in proportion to the fall that ended just now.
         if (!_wasGrounded && IsGrounded && !IsFlying && _prevVerticalVelocity < -4f)

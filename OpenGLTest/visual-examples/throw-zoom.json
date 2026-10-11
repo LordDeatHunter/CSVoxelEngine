@@ -1,0 +1,25 @@
+{
+  // Throw charge zoom: run with VOXEL_SCRIPT=visual-examples/throw-zoom.json VOXEL_TIME=147 from
+  // OpenGLTest/. Shots land in visual/throw-zoom/.
+  // First person over the open forest clearing camera-feel.json uses, facing -Z, with a mudball in
+  // hand. Compare each shot with "base":
+  //   charged:   the arm cocked at a full charge, the view narrowed a few degrees (tighter framing)
+  //   released:  just after the release, the view springing back (about the base framing)
+  //   settled:   back at the base FOV
+  "steps": [
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "give", "block": "item/mudball", "count": 4 },
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "base", "hideHud": true },
+    { "op": "player", "action": "charge" },
+    { "op": "wait", "seconds": 1.2 },
+    { "op": "screenshot", "name": "charged", "hideHud": true },
+    { "op": "player", "action": "release" },
+    { "op": "wait", "seconds": 0.25 },
+    { "op": "screenshot", "name": "released", "hideHud": true },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "settled", "hideHud": true }
+  ]
+}

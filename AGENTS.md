@@ -603,6 +603,7 @@ OpenGLTest/
     SliceCombo.cs              # the blade's two-phase slice combo: press/queue/advance state
     FallTracker.cs             # GL-free fall-damage rule: peak/grounded chain fed one feet height at a time
                                #   (singleplayer's UpdateHealth and each ServerPlayer's accepted states)
+    ThrowZoom.cs               # GL-free throw charge zoom: the FOV target from the charge and its spring step
     Player/                    # the player's rig shape and movement simulation
       PlayerRig.cs             # the posed shape: pivots, cuboids, skin palette, mesh building (Blockbench or Steve)
       PlayerPhysics.cs         # walk/fly/swim input -> body position, voxel collision (static BodyCollides),
@@ -2598,6 +2599,13 @@ overshoot or jiggle.
   flying or dead. **Sneak** is Left Ctrl on foot (`Camera.IsSneaking`): slower, never sprinting, a
   lowered *view and model only* — the body and its collision keep their size, so the server's
   movement rules (which derive the feet from the eye) are unaffected.
+  The **throw charge zoom** (`ThrowZoom`, `ThrowZoom*` knobs) is a third FOV term *added* beside the
+  sprint widening and the pinch: `World.UpdatePlayerModel` copies the arm's `PlayerModel.ThrowCharge`
+  into `Camera.ThrowCharge` (like `HoldPunchFov`), and the next head-motion update springs the view
+  toward `ThrowZoom.TargetDegrees` (narrower with the eased charge, 0 with none) through an
+  under-damped `Spring`, so a release or cancel springs back with a small wide overshoot, clamped at
+  half the zoom. Singleplayer and a client alike (it reads only the local arm);
+  `visual-examples/throw-zoom.json` films it, `ThrowZoomTests` locks it down.
 - **Hit-stop** (`SwingHitStop`, `HitStop*` knobs): a punch or slice that connects
   (`World.UpdatePunch`/`UpdateSlice`; on a client the *predicted* connect, a mob in the cone or
   hemisphere with line of sight, since the server's verdict comes too late) calls
