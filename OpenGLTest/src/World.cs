@@ -31,6 +31,11 @@ public class World : IItemUseWorld
     // amount as full cubes instead of barely moving
     public const float BlockPopGrow = 0.12f;
 
+    // A placement pops the block in: it appears a little too big and settles into its cell
+    // with one small overshoot (PlacePop), so a placement reads differently from a mining hit
+    public const float PlacePopSeconds = 0.22f;
+    public const float PlacePopGrow = 0.1f;
+
     private readonly ChunkManager _chunkManager;
     private readonly ChunkGenerationWorker _generationWorker;
     private readonly LodManager _lodManager;
@@ -170,6 +175,9 @@ public class World : IItemUseWorld
     private bool _breakAllowed;
     private float _hitTimer;
     private float _popElapsed = BlockPopSeconds;
+    private float _placePopElapsed = PlacePopSeconds;
+    private Vector3 _placePopPosition;
+    private byte _placePopId;
 
     // Punch cadence: the left-click attack runs on the held item's mining pace. Seeded to
     // infinity while the button is up, so the first frame of a press punches at once, exactly
@@ -382,6 +390,11 @@ public class World : IItemUseWorld
     // over BlockPopSeconds after each hit lands
     private float BlockPopGrowNow =>
         BlockPopGrow * MathUtils.Pulse(_popElapsed / BlockPopSeconds);
+
+    // Growth of a just-placed block's pop: it starts a little too big and settles with one small
+    // overshoot (PlacePop), rendered only while grown (the chunk mesh holds the rest-size block)
+    private float PlacePopGrowNow =>
+        PlacePop.Grow(_placePopElapsed, PlacePopSeconds, PlacePopGrow);
 
     /// <summary>
     /// Builds the world and starts its chunk-generation and LOD workers. With a
@@ -1378,6 +1391,10 @@ public class World : IItemUseWorld
     /// </summary>
     private void UpdatePlayerModel(double deltaTime)
     {
+        // The placement pop's clock runs every frame on every path (a client predicts its own
+        // placements), independent of the mining pop's hit-timed one
+        _placePopElapsed += (float)deltaTime;
+
         var camPos = Camera.Position;
         var horizontalSpeed = 0f;
         var headingForward = 0f;
@@ -2508,27 +2525,37 @@ public class World : IItemUseWorld
         // eye is above it - the crack simply would not appear. Drawing it here lets the water blend
         // and refract over it exactly as it does over the block itself. Guarded rather than an early
         // return, which would skip the passes below.
-        if (_hasSelectedBlock)
+        var placePopGrow = PlacePopGrowNow;
+        if (_hasSelectedBlock || placePopGrow > 0f)
         {
             FrameProfiler.Begin(ProfileSection.SelectPass);
             renderManager.BeginGpuPass(ProfileSection.SelectPass);
 
-            // While mining, the outline and the break overlay ride along with the popping block
-            var popGrow = _isBreaking ? BlockPopGrowNow : 0f;
+            if (_hasSelectedBlock)
+            {
+                // While mining, the outline and the break overlay ride along with the popping block
+                var popGrow = _isBreaking ? BlockPopGrowNow : 0f;
 
-            // The chunk mesh still holds the block at rest size, so the popped cube is only
-            // needed (and only hides it) while it is grown
-            if (popGrow > 0f)
-                renderManager.RenderBlockPop(Camera, _breakingBlockPosition, _breakingBlockId, popGrow,
-                    HitboxesAt(_breakingBlockPosition, _breakingBlockId));
+                // The chunk mesh still holds the block at rest size, so the popped cube is only
+                // needed (and only hides it) while it is grown
+                if (popGrow > 0f)
+                    renderManager.RenderBlockPop(Camera, _breakingBlockPosition, _breakingBlockId, popGrow,
+                        HitboxesAt(_breakingBlockPosition, _breakingBlockId));
 
-            var selectedId = BlockIdAt(_selectedBlockPosition);
-            renderManager.RenderBlockSelection(Camera, _selectedBlockPosition, _selectedFaceNormal, popGrow,
-                selectedId, _selectedBoxIndex, HitboxesAt(_selectedBlockPosition, selectedId), mining: _isBreaking);
+                var selectedId = BlockIdAt(_selectedBlockPosition);
+                renderManager.RenderBlockSelection(Camera, _selectedBlockPosition, _selectedFaceNormal, popGrow,
+                    selectedId, _selectedBoxIndex, HitboxesAt(_selectedBlockPosition, selectedId), mining: _isBreaking);
 
-            if (_isBreaking)
-                renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress, popGrow, _breakingBlockId,
-                    HitboxesAt(_breakingBlockPosition, _breakingBlockId));
+                if (_isBreaking)
+                    renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress, popGrow, _breakingBlockId,
+                        HitboxesAt(_breakingBlockPosition, _breakingBlockId));
+            }
+
+            // A just-placed block pops in; skipped while that same cell is the one being mined,
+            // whose own out-and-back pop is already playing there
+            if (placePopGrow > 0f && !(_isBreaking && _breakingBlockPosition == _placePopPosition))
+                renderManager.RenderBlockPop(Camera, _placePopPosition, _placePopId, placePopGrow,
+                    HitboxesAt(_placePopPosition, _placePopId));
 
             renderManager.EndGpuPass(ProfileSection.SelectPass);
             FrameProfiler.End(ProfileSection.SelectPass);
@@ -4337,6 +4364,12 @@ public class World : IItemUseWorld
         BlockEdited?.Invoke((int)placePos.X, (int)placePos.Y, (int)placePos.Z, blockId, state);
         if (upperId != 0)
             PlaceUpperHalf(placePos + Vector3.UnitY, upperId, state);
+
+        // The placement pop: the block appears a little too big and settles into its cell
+        // (rendered in the select pass); the upper half of a door rides along with its lower
+        _placePopElapsed = 0f;
+        _placePopPosition = placePos;
+        _placePopId = blockId;
         return true;
     }
 

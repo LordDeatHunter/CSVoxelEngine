@@ -36,9 +36,10 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Mob death poof.** A mob bursts into skin-coloured chips when its death animation ends:
   `GroundDust.DeathPoof` (`LandingDust.SkinColour`, `MobDeathPoof*`) at each manager's
   `IsRemovable` removal, singleplayer and a client, never a server (`MobDeathPoofTests`).
-- [ ] **Placement pop.** A placed block scales in from a little under full size with a small
-  overshoot. *Hook:* `RenderManager.RenderBlockPop` already pops a block on every mining hit; fire
-  it on placement with a `MathUtils.EaseOutBack` scale-in instead of the hit's out-and-back.
+- [x] **Placement pop.** A placed block pops in a little too big and settles with one small
+  overshoot: `PlacePop.Grow` (EaseOutBack) fired at `PlaceBlockAtFace` and drawn through the
+  mining pop's `RenderBlockPop` in the select pass, independent of the mining hit's pulse
+  (`PlacePopTests`).
 - [x] **Water splash for every entity.** A `WaterSplashTracker` per body (player, mobs, drops, projectiles, falling cubes, primed TNT) stepped by `World.UpdateSplashes`; `WaterSplash.Count/Speed` grow along `ImpactStrength` from `WaterSplashMinSpeed`, pale chips off the fluid column top, never off lava (`WaterSplashTests`, `world-events.json`).
 - [x] **Damage direction arc.** `DamageDirection` keeps the blow's world direction (fed by `Camera.TakeHit`, on a client by the `PlayerStatus` knockback that came with lost health) and the vignette pass draws it as `uHitArc`; falls and lava show none (`damage-arc.json`).
 - [ ] **Mob hit sparks.** A punch, slice or throw that connects throws a few pale chips from the
