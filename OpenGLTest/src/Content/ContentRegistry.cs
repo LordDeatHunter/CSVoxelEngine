@@ -608,6 +608,7 @@ public static class ContentRegistry
         Array.Clear(BlockType.TreeWoodById);
         Array.Clear(BlockType.PixelRimById);
         Array.Clear(BlockType.PaneById);
+        Array.Clear(BlockType.PaneProfileById);
         Array.Clear(BlockType.SolidById);
         Array.Clear(BlockType.CollidesByHitboxById);
         Array.Clear(BlockType.MovementSpeedById);
@@ -948,6 +949,38 @@ public static class ContentRegistry
             || (definition.NeedsSupport ?? false))
             throw new InvalidOperationException(
                 $"Block '{path}' uses renderer \"pane\" with fluid, falls, stackMax or needsSupport; a pane is a plain standing block.");
+    }
+
+    /// <summary>
+    /// Reads a pane block's <c>pane</c> object into its <see cref="PaneProfile"/>: omitted fields
+    /// take the glass pane's dimensions (post 2 px, arm as wide as the post, one full-height
+    /// rail), and anything <see cref="PaneProfile.Create"/> refuses throws naming the file.
+    /// </summary>
+    internal static PaneProfile ParsePaneProfile(BlockDefinition.PaneDefinition? definition, string path)
+    {
+        if (definition == null) return PaneProfile.Default;
+        var post = definition.Post ?? PaneProfile.Default.PostPx;
+        var arm = definition.Arm ?? post;
+        var rails = new List<(int Bottom, int Top)>();
+        if (definition.Rails == null)
+            rails.Add((0, PaneProfile.PixelsPerBlock));
+        else
+            foreach (var rail in definition.Rails)
+            {
+                if (rail is not { Length: 2 })
+                    throw new InvalidOperationException(
+                        $"Block '{path}' has a pane.rails entry that is not a [bottom, top] pair.");
+                rails.Add((rail[0], rail[1]));
+            }
+
+        try
+        {
+            return PaneProfile.Create(post, arm, rails);
+        }
+        catch (ArgumentException e)
+        {
+            throw new InvalidOperationException($"Block '{path}' has a pane object with {e.Message}", e);
+        }
     }
 
     /// <summary>
@@ -1428,6 +1461,10 @@ public static class ContentRegistry
             var pane = renderer == BlockRenderer.Pane;
             if (pane)
                 ValidatePane(definition, path);
+            else if (definition.Pane != null)
+                throw new InvalidOperationException(
+                    $"Block '{path}' declares a pane object without renderer \"pane\"; pane.* only shapes a pane.");
+            var paneProfile = pane ? ParsePaneProfile(definition.Pane, path) : null;
 
             // A multiblock is a structure built out of eight cells: the anchor names the part
             // that fills the other seven and the plain block it is built from and reverts to,
@@ -1588,7 +1625,7 @@ public static class ContentRegistry
             // a solid pane always collides by that live shape rather than the whole cell
             if (pane)
             {
-                hitboxes = PaneShape.Boxes(0);
+                hitboxes = paneProfile!.Boxes(0);
                 collidesByHitbox = solid;
             }
 
@@ -1617,6 +1654,7 @@ public static class ContentRegistry
                 LightEmission = emission,
                 LightColorSlot = lightColorSlot,
                 Renderer = renderer,
+                Pane = paneProfile,
                 Kiln = definition.Kiln ?? false,
                 StackMax = (byte)stackMax,
                 TipHardness = tipHardness,
@@ -1676,6 +1714,7 @@ public static class ContentRegistry
             BlockType.CastsAoById[id] = type.CastsAmbientOcclusion;
             BlockType.TreeWoodById[id] = treeWood;
             BlockType.PaneById[id] = pane;
+            BlockType.PaneProfileById[id] = paneProfile;
             BlockType.FluidById[id] = type.Fluid;
             BlockType.FluidTickDivisorById[id] = type.FluidTickDivisor;
             BlockType.FluidRangeById[id] = type.FluidRange;

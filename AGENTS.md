@@ -695,6 +695,8 @@ OpenGLTest/
                                             #   shape collision): tree wood, snow, pane, facing, plain
       PaneShape.cs                          # the pane renderer's shape: which neighbours get an arm,
                                             #   post/arm boxes, the cached hitboxes per arm mask
+      PaneProfile.cs                        # one pane block's dimensions (its "pane" JSON): post and
+                                            #   arm widths, the rails an arm fills, interned; its boxes
       HorizontalFacing.cs                   # quarter turns about a footprint's centre: points, boxes,
                                             #   baked models (multiblocks at size 2, facing blocks at 1)
       TreeWoodShape.cs                      # the one tree_wood shape rule: which cells connect (parent
@@ -1032,6 +1034,7 @@ trailing commas.
 | `renderer` | `"model"` | `model` (baked quads), `tree_wood` (a grown tree's wood: its shape, thickness and tree-graph links come from the state byte, see `### Trees`; requires a `wood` object, forces `occludes` and `castsAO` off and `light.passes` on, never meshes greedy, and refuses `cutout`, `translucent`, `fluid`, `falls`, `needsSupport`, `stackMax` and `hitbox`), `pebbles`, `branch_pile`, `snow_layers`, `fluid` or `quern` (procedural emitters), `multiblock` (the anchor cell of a structure, carrying the whole volume's pre-rotated model), `multiblock_part` (one of its other cells, solid and occluding but never meshed) or `pane` (a 2 px post plus an arm toward every horizontal neighbour that is a pane or a solid full cube, derived at mesh time by `PaneEmitter` from `PaneShape`, never stored; a lone pane is just the post, as in Minecraft; the raycast, outline and body collide with the same arms through `BlockShape`; refuses `hitbox`, `fluid`, `falls`, `stackMax` and `needsSupport`, and a solid pane always collides by its arms); a fluid's, layer block's or pane's model only supplies its tile (and the pane's icon) |
 | `multiblock` | none | required on, and only legal with, `renderer: "multiblock"`: `{"part": "block/<name>", "source": "block/<name>"}` — the block filling the other seven cells (which must use `multiblock_part`) and the plain block the volume is built from and reverts to. The anchor and its part must both set `hasItem: false` (a structure is built, never held), and `cutout`/`translucent`/`fluid` are rejected, since both halves are ordinary opaque solids to everything but the mesher. Both default `occludes` and `light.passes` to **true**: the structure's surface really does cover its neighbours, and its quads carry no cullface and are lit from the anchor's own cell, so light has to reach that cell or the whole thing renders black. The model is authored in 0..32 model units (the 2x2x2 volume) with the opening on **north**, no `cullface` on any face and no face covering a whole cell plane — see `### Multiblocks` below |
 | `kiln` | false | marks a multiblock anchor as a kiln, which is what gives it `KilnManager`'s fuel, ignition, crucible slot and integrity sweep. Only legal on the `multiblock` renderer |
+| `pane` | glass pane | only legal with `renderer: "pane"`: the post and arm dimensions in pixels, `{"post": p, "arm": a, "rails": [[bottom, top], ...]}` (`PaneProfile`): a full-height post `p` (1..16) wide, arms `a` (1..`p`, default `p`) wide filling each `rails` height band (ascending, apart, inside 0..16, default `[[0, 16]]`). Omitted is the glass pane's 2 px post and arms over the full height, drawn byte-identically to before. Panes join only panes of the same dimensions (interned, so equal dimensions are one `PaneProfile`) and solid full cubes, so a fence never reaches into a glass pane. `oak_fence` is `{"post": 4, "arm": 2, "rails": [[6, 9], [12, 15]]}` |
 | `wood` | none | required on, and only legal with, `renderer: "tree_wood"`: how hardness and loot follow the thickness stored in each cell's `WoodState` (code 0 = 1 px across .. 15 = full cube) |
 | `wood.tipHardness` | 0.25 | the share of `hardness` the thinnest (1 px) wood keeps, 0..1, rising linearly to the full `hardness` at a full cube (`BlockType.TipHardness`, read by `Mining.HardnessOf`). Player-placed tree wood is a full detached cube and therefore as hard as a trunk |
 | `wood.loot` | always drop self | thickness bands `[{"minThickness": n, "loot": l}, ...]`, strictly ascending by `minThickness` (0..15) and starting at exactly 0, so every thickness has loot; `loot` is `self` (drop the block, the default), `none` or a loot table name. The band with the largest `minThickness` at or below the cell's thickness is rolled (`WoodLootBand.Select`, through `LootContext.State` on every destruction path): `oak_log` gives the `wood` table (a stick half the time) under 8 px and itself from there, `cactus` always itself |
@@ -1140,6 +1143,18 @@ the trap: `ModelBaker` mirrors an explicit Minecraft uv on the way in (a side fa
 `32 - 2u`, an up/down face row `32 - 2v`), so an off-centre uv must be written mirrored and the
 art kept symmetric. `HangingBlockTests` covers the rule; `visual-examples/lanterns.json`
 (`VOXEL_TIME=700`) hangs one and pops it.
+
+The **fence** (`oak_fence`, three from four planks and two sticks) is the `pane` renderer with
+its dimensions as block data: the `pane` object (schema table) becomes the block's `PaneProfile`
+(`BlockType.Pane`, flat `BlockType.PaneProfileById`), a 4 px post plus two 2 px rails per arm.
+`PaneShape` reads the cell's own profile (its profile-less members describe the default glass
+pane, so the pane is byte-identical), `PaneEmitter` draws each arm's rails with their caps (a
+rail short of the cell's top or bottom always keeps them) and keeps the post's side wherever an
+arm does not cover it whole, and `PaneProfile.Boxes` gives the post plus one box per arm and
+rail to the raycast, outline and body. Panes join only their own shape. No gate and no 1.5-high
+collision. Its icon model is `block/fence_inventory`. `PaneProfileTests` holds the rules;
+`visual-examples/fences.json` (`VOXEL_TIME=147`) shoots fences, a dirt block and glass panes
+side by side.
 
 ### Item schema (`assets/data/items/<name>.json`)
 

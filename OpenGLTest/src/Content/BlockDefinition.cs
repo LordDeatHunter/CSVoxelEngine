@@ -153,12 +153,17 @@ public sealed class BlockDefinition
     public FlowDefinition? Flow { get; set; }
 
     /// <summary>"model" | "tree_wood" | "pebbles" | "branch_pile" | "snow_layers" |
-    /// "fluid" | "quern" | "multiblock" | "multiblock_part".</summary>
+    /// "fluid" | "quern" | "multiblock" | "multiblock_part" | "pane".</summary>
     public string? Renderer { get; set; }
 
     /// <summary>The structure an anchor block stands for; required on (and only legal with) the
     /// <c>"multiblock"</c> renderer.</summary>
     public MultiblockDefinition? Multiblock { get; set; }
+
+    /// <summary>The post and arm dimensions of a <c>"pane"</c> renderer block (a fence, a wall);
+    /// only legal with that renderer. Omitted means the glass pane's 2 px post and arms filling
+    /// the full height (<see cref="PaneProfile.Default"/>).</summary>
+    public PaneDefinition? Pane { get; set; }
 
     /// <summary>Marks a multiblock anchor as a kiln, which is what gives it fuel, ignition and
     /// the integrity sweep of the kiln manager. Only legal on the <c>"multiblock"</c>
@@ -248,6 +253,24 @@ public sealed class BlockDefinition
         /// <summary>Plain block the 2x2x2 volume is built from, and what each cell turns back
         /// into when the structure is broken, e.g. <c>"block/mud_bricks"</c>.</summary>
         public string? Source { get; set; }
+    }
+
+    /// <summary>
+    /// The <c>"pane"</c> object, in pixels of a 16-pixel block: <c>{"post": 4, "arm": 2,
+    /// "rails": [[6, 9], [12, 15]]}</c> is a fence. Every field is optional and defaults to the
+    /// glass pane's (post 2, arm as wide as the post, one rail filling the full height).
+    /// </summary>
+    public sealed class PaneDefinition
+    {
+        /// <summary>The full-height centre post's width, 1..16 px. Default 2.</summary>
+        public int? Post { get; set; }
+
+        /// <summary>Every arm's width, 1..post px. Default: the post's width.</summary>
+        public int? Arm { get; set; }
+
+        /// <summary>The height bands every arm fills, <c>[bottom, top]</c> in 0..16 px, ascending
+        /// and apart. Default <c>[[0, 16]]</c>, the full height.</summary>
+        public int[][]? Rails { get; set; }
     }
 
     /// <summary>

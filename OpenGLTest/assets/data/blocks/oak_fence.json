@@ -1,0 +1,16 @@
+{
+  // A wooden fence: the pane renderer with a fence's dimensions. A 4 px post stands in the middle
+  // of the cell and two 2 px rails reach toward every neighbouring fence (any pane of the same
+  // shape) or solid full cube; the raycast, the outline and the body collide with exactly those
+  // boxes. No gate, and no 1.5-high collision. Three from four planks and two sticks
+  // (recipes/oak_fence.json).
+  "name": "Oak Fence",
+  "model": { "parent": "block/fence_inventory", "textures": { "texture": "oak_planks" } },
+  "renderer": "pane",
+  "pane": { "post": 4, "arm": 2, "rails": [[6, 9], [12, 15]] },
+  "hardness": 6,
+  "sfx": "hit_wood",
+  // Stacked fences fuse: no buried caps between a post and the post above it
+  "cullSelf": true,
+  "castsAO": false
+}

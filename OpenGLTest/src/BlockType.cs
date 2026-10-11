@@ -76,6 +76,10 @@ public sealed record BlockType
     // panes: read per neighbour by the pane emitter and the pane shape
     internal static readonly bool[] PaneById = new bool[256];
 
+    // Each pane's post, arm and rail dimensions (its "pane" JSON), null for every other block:
+    // read per neighbour by the pane emitter and the pane shape, beside PaneById
+    internal static readonly PaneProfile?[] PaneProfileById = new PaneProfile?[256];
+
     // Whether the binary greedy mesher may merge this block's faces: a plain full cube whose
     // six faces are the untransformed cube faces (see ContentRegistry.BakesGreedy). Anything
     // else goes through the per-quad scalar path.
@@ -234,6 +238,11 @@ public sealed record BlockType
 
     /// <summary>Which geometry emitter turns this block into chunk vertices.</summary>
     public BlockRenderer Renderer { get; init; } = BlockRenderer.Model;
+
+    /// <summary>A <see cref="BlockRenderer.Pane"/> block's post, arm and rail dimensions (its
+    /// <c>pane</c> JSON, <see cref="PaneProfile.Default"/> when it wrote none); null for every
+    /// other renderer.</summary>
+    public PaneProfile? Pane { get; init; }
 
     /// <summary>Block filling the seven non-anchor cells of this multiblock's 2x2x2 volume, or
     /// 0 when the block is not a <see cref="BlockRenderer.Multiblock"/> anchor. Resolved after
