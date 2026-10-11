@@ -1,0 +1,20 @@
+{
+  // An oak trapdoor: a 3 px hatch on the cell floor that right-click swings up against the side
+  // nearest whoever placed it, and back down. The state byte holds the facing (from the placing
+  // player's look) and the open bit (DoorState); both models and both hitboxes are authored facing
+  // north and turned to the other three. The body collides with the hatch either way, so a closed
+  // one is stood on and an open one is a thin wall. Two from six planks (recipes/oak_trapdoor.json).
+  "name": "Oak Trapdoor",
+  "model": { "parent": "block/trapdoor_bottom", "textures": { "texture": "oak_trapdoor" } },
+  "facing": "horizontal",
+  "facingFromLook": true,
+  "open": {
+    "model": { "parent": "block/trapdoor_open", "textures": { "texture": "oak_trapdoor" } },
+    "hitbox": { "min": [0, 0, 0.8125], "max": [1, 1, 1] }
+  },
+  "hardness": 4,
+  "sfx": "hit_wood",
+  "castsAO": false,
+  "collidesByHitbox": true,
+  "hitbox": { "min": [0, 0, 0], "max": [1, 0.1875, 1] }
+}

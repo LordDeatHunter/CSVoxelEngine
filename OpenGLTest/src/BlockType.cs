@@ -309,6 +309,12 @@ public sealed record BlockType
     /// <see cref="RotatedHitboxes"/> by it.</summary>
     public bool HasHorizontalFacing { get; init; }
 
+    /// <summary>Whether right-click opens and closes this block (a trapdoor, a door half): its
+    /// state byte carries <see cref="DoorState.OpenBit"/> beside the facing, and
+    /// <see cref="RotatedModels"/> / <see cref="RotatedHitboxes"/> hold eight shapes, indexed by
+    /// <see cref="DoorState.ShapeIndex"/>.</summary>
+    public bool Openable { get; init; }
+
     /// <summary>Whether a placement faces this <see cref="HasHorizontalFacing"/> block along the
     /// placing player's horizontal look (stairs); see <see cref="Placement.LookFacing"/>.</summary>
     public bool FacingFromLook { get; init; }
@@ -316,6 +322,14 @@ public sealed record BlockType
     /// <summary>The <see cref="Hitboxes"/> turned to each horizontal facing, indexed like
     /// <see cref="RotatedModels"/>; null unless <see cref="HasHorizontalFacing"/>.</summary>
     public BlockHitbox[][]? RotatedHitboxes { get; internal set; }
+
+    /// <summary>
+    /// The index into <see cref="RotatedModels"/> / <see cref="RotatedHitboxes"/> a cell with
+    /// state byte <paramref name="state"/> draws and is hit with, for a block of
+    /// <paramref name="shapeCount"/> shapes: the facing for four (the facing blocks, a multiblock
+    /// anchor), and the facing plus the open bit for an openable block's eight.
+    /// </summary>
+    public static int ShapeIndex(byte state, int shapeCount) => state & (shapeCount - 1);
 
     /// <summary>The block a placement against a block's side becomes instead of this one (a
     /// torch's wall torch), or 0 when the block only ever places as itself; see

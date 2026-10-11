@@ -123,6 +123,14 @@ public sealed class BlockDefinition
     public bool? FacingFromLook { get; set; }
 
     /// <summary>
+    /// Makes the block openable (a trapdoor, a door half): right-click flips the open bit in its
+    /// state byte (<see cref="DoorState"/>) and the block is then drawn and hit with this object's
+    /// <c>model</c> and <c>hitbox</c>, authored facing north like the closed ones. Only legal with
+    /// <c>facing: "horizontal"</c> on the <c>model</c> renderer.
+    /// </summary>
+    public OpenDefinition? Open { get; set; }
+
+    /// <summary>
     /// The block a placement against a block's side becomes instead of this one (a torch's
     /// <c>"block/wall_torch"</c>), facing away from the wall it was placed on; a placement on top
     /// keeps this block and one under a ceiling is refused. The wall block needs
@@ -261,6 +269,18 @@ public sealed class BlockDefinition
         /// <summary>Plain block the 2x2x2 volume is built from, and what each cell turns back
         /// into when the structure is broken, e.g. <c>"block/mud_bricks"</c>.</summary>
         public string? Source { get; set; }
+    }
+
+    /// <summary>The <c>"open"</c> object: what an openable block looks like and is hit as while
+    /// open. Both fields are required.</summary>
+    public sealed class OpenDefinition
+    {
+        /// <summary>The open model: a model file name or an inline model object, facing north.</summary>
+        public JsonElement Model { get; set; }
+
+        /// <summary>The open selection (and, with <c>collidesByHitbox</c>, collision) boxes, in the
+        /// same schema as the block's <c>hitbox</c>, facing north.</summary>
+        public JsonElement Hitbox { get; set; }
     }
 
     /// <summary>

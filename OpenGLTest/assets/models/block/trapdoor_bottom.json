@@ -1,0 +1,33 @@
+{
+    // A closed trapdoor: a 3 px hatch lying on the cell floor. It is a facing block (the open
+    // model swings it up against one side), so no face may cover a whole cell side: the hatch is
+    // two half-width boxes, the buried faces between them left out. UVs are left to the defaults,
+    // which crop each face out of the tile.
+    "textures": {
+        "particle": "#texture"
+    },
+    "elements": [
+        {
+            "from": [0, 0, 0],
+            "to": [16, 3, 8],
+            "faces": {
+                "north": { "texture": "#texture", "cullface": "north" },
+                "west": { "texture": "#texture", "cullface": "west" },
+                "east": { "texture": "#texture", "cullface": "east" },
+                "up": { "texture": "#texture" },
+                "down": { "texture": "#texture", "cullface": "down" }
+            }
+        },
+        {
+            "from": [0, 0, 8],
+            "to": [16, 3, 16],
+            "faces": {
+                "south": { "texture": "#texture", "cullface": "south" },
+                "west": { "texture": "#texture", "cullface": "west" },
+                "east": { "texture": "#texture", "cullface": "east" },
+                "up": { "texture": "#texture" },
+                "down": { "texture": "#texture", "cullface": "down" }
+            }
+        }
+    ]
+}

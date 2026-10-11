@@ -1,0 +1,7 @@
+{
+  "result": "block/oak_trapdoor",
+  "count": 2,
+  "ingredients": [
+    { "item": "block/oak_planks", "count": 6 }
+  ]
+}

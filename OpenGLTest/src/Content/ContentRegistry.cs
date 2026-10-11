@@ -47,6 +47,10 @@ public static class ContentRegistry
     private static readonly Dictionary<string, HashSet<byte>> Tags = new(StringComparer.Ordinal);
     private static readonly Dictionary<byte, BlockModel> BlockModels = new();
 
+    // The open model of every openable block (its "open" object), flattened at load and baked
+    // beside the closed model in BakeModels
+    private static readonly Dictionary<byte, BlockModel> OpenModels = new();
+
     // Items that declare a "model": flattened at load like a block's, baked in BakeModels so a
     // station can draw the item as real geometry (the crucible standing in a kiln's hearth).
     private static readonly Dictionary<byte, BlockModel> ItemModels = new();
@@ -244,6 +248,22 @@ public static class ContentRegistry
                     HorizontalFacing.RotateModel(baked, 2, 1f),
                     HorizontalFacing.RotateModel(baked, 3, 1f),
                 ];
+
+                // An openable block's open model follows its four closed ones, indexed by the
+                // state byte's open bit beside the facing (DoorState.ShapeIndex)
+                if (type.Openable)
+                {
+                    var open = BakeOpenModel(type, OpenModels[id]);
+                    ValidateFacingBake(type, open);
+                    type.RotatedModels =
+                    [
+                        .. type.RotatedModels,
+                        open,
+                        HorizontalFacing.RotateModel(open, 1, 1f),
+                        HorizontalFacing.RotateModel(open, 2, 1f),
+                        HorizontalFacing.RotateModel(open, 3, 1f),
+                    ];
+                }
             }
 
             BlockType.OccludesById[id] = type.OccludesNeighbours;
@@ -365,6 +385,19 @@ public static class ContentRegistry
                     $"Block '{path}' declares modelTint but its model is not a plain non-full-cube model; a full cube uses biomeTint's per-face tiles instead.");
 
             type.ModelBiomeTint = BiomeTintFaces.ParsePalette(paletteName, path);
+        }
+    }
+
+    private static BakedModel BakeOpenModel(BlockType type, BlockModel model)
+    {
+        try
+        {
+            return ModelBaker.Bake(model);
+        }
+        catch (Exception e) when (e is not InvalidOperationException)
+        {
+            throw new InvalidOperationException(
+                $"Failed to bake the open model of block '{type.Name}' ('{model.Source}'): {e.Message}", e);
         }
     }
 
@@ -591,6 +624,7 @@ public static class ContentRegistry
         MeltRecipes.Clear();
         CastRecipes.Clear();
         BlockModels.Clear();
+        OpenModels.Clear();
         ItemModels.Clear();
         BlockDefinitions.Clear();
         BiomeTintPending.Clear();
@@ -966,6 +1000,23 @@ public static class ContentRegistry
             throw new InvalidOperationException(
                 $"Block '{path}' sets facingFromLook with support: \"attached\"; an attached block faces away from its wall.");
         return true;
+    }
+
+    /// <summary>
+    /// Reads a block's <c>open</c> object: its open boxes, or null for a block that does not open.
+    /// The open bit shares the state byte with the facing, so an openable block needs one, and
+    /// both the open model and the open boxes must be written.
+    /// </summary>
+    internal static BlockHitbox[]? ParseOpen(BlockDefinition definition, bool horizontalFacing, string path)
+    {
+        if (definition.Open is not { } open) return null;
+        if (!horizontalFacing)
+            throw new InvalidOperationException(
+                $"Block '{path}' declares an open object without facing: \"horizontal\"; the open bit sits beside the facing.");
+        if (open.Model.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
+            throw new InvalidOperationException($"Block '{path}' declares an open object without a model.");
+        return ParseHitboxes(open.Hitbox, path)
+               ?? throw new InvalidOperationException($"Block '{path}' declares an open object without a hitbox.");
     }
 
     /// <summary>
@@ -1572,6 +1623,7 @@ public static class ContentRegistry
             var (horizontalFacing, supportAttached) =
                 ParseFacingAndSupport(definition, renderer, fluid, falls, stackMax, needsSupport, path, out var supportAbove);
             var facingFromLook = ParseFacingFromLook(definition, horizontalFacing, supportAttached, path);
+            var openHitboxes = ParseOpen(definition, horizontalFacing, path);
             var solid = !fluid && (definition.Solid ?? true);
             if (stackSolidAt > 0 && solid)
                 throw new InvalidOperationException(
@@ -1683,6 +1735,7 @@ public static class ContentRegistry
                 SupportAbove = supportAbove,
                 HasHorizontalFacing = horizontalFacing,
                 FacingFromLook = facingFromLook,
+                Openable = openHitboxes != null,
                 ReplaceableByPlacement = replaceableByPlacement,
                 Falls = falls,
                 Fluid = fluid,
@@ -1705,6 +1758,12 @@ public static class ContentRegistry
             // A facing block's selection boxes turn with it, exactly like its model will in BakeModels
             if (horizontalFacing)
                 type.RotatedHitboxes = HorizontalFacing.RotateBoxes(type.Hitboxes);
+            // ...and an openable block's open boxes follow the closed ones (DoorState.ShapeIndex)
+            if (openHitboxes != null)
+            {
+                type.RotatedHitboxes = [.. type.RotatedHitboxes!, .. HorizontalFacing.RotateBoxes(openHitboxes)];
+                OpenModels[id] = ResolveModel(definition.Open!.Model, path);
+            }
             if (definition.WallBlock != null)
                 wallPending.Add((id, definition.WallBlock, path));
             if (definition.BiomeTint != null)

@@ -69,7 +69,8 @@ public sealed class StairTests : IDisposable
     [Fact]
     public void AStairRisesTheWayItsPlacerLooks()
     {
-        foreach (var stair in LookFaced().Where(t => t.CollidesByHitbox))
+        // A stair: a look-faced block the body climbs, a box of it standing above the half line
+        foreach (var stair in LookFaced().Where(t => t.CollidesByHitbox && t.Hitboxes.Any(b => b.Min.Y >= 0.5f - 1e-4f)))
         for (var facing = 0; facing < 4; facing++)
         {
             var look = Chunk.CubeFaces[facing].normal;

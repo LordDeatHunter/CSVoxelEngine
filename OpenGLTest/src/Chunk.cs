@@ -1423,9 +1423,10 @@ public class Chunk : IDisposable
 
             // ...and the anchor draws that whole model, pre-rotated to the facing its state
             // byte's low two bits carry (see MultiblockShape), as does a facing block such as a
-            // wall torch, turned about its own cell (see HorizontalFacing).
+            // wall torch, turned about its own cell (see HorizontalFacing); an openable block also
+            // reads its open bit (DoorState), picking one of its eight models.
             var model = type.RotatedModels != null
-                ? type.RotatedModels[paddedState[pIdx] & 3]
+                ? type.RotatedModels[BlockType.ShapeIndex(paddedState[pIdx], type.RotatedModels.Length)]
                 : type.BakedModel;
             if (model == null) continue;
 

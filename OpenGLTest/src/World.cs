@@ -3258,7 +3258,8 @@ public class World : IItemUseWorld
         if (local)
             Camera.NotifyPlayerAction();
         if (TryCookOrCollect(maxDistance, player) || TryQuernInteract(maxDistance, player)
-            || TryKilnInteract(maxDistance, player) || TryCastInteract(maxDistance, player))
+            || TryKilnInteract(maxDistance, player) || TryCastInteract(maxDistance, player)
+            || TryToggleOpenable(maxDistance, player))
         {
             PunchSwing();
             outcome = RightClickOutcome.Station;
@@ -3798,6 +3799,33 @@ public class World : IItemUseWorld
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Right-click on an openable block (a trapdoor; <see cref="BlockType.Openable"/>): flips its
+    /// open bit (<see cref="DoorState"/>) whatever is in hand, so a held block never places
+    /// against it. The flip is a state write through <see cref="Chunk.SetStateAt"/> (saved,
+    /// journaled to clients and remeshed at once) with the edit-path hooks, and a client reports
+    /// it as part of its prediction. Returns whether the click belonged to an openable block.
+    /// </summary>
+    private bool TryToggleOpenable(float maxDistance, PlayerContext player)
+    {
+        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        if (!_chunkManager.TryGetCell((int)hit.X, (int)hit.Y, (int)hit.Z, out var id, out var state)) return false;
+        if (BlockType.ById[id] is not { Openable: true }) return false;
+        ToggleOpenCell(hit, DoorState.Toggle(state));
+        return true;
+    }
+
+    /// <summary>Writes an openable cell's new <paramref name="state"/> and runs the hooks every
+    /// edit path runs: the fluid and leaf-decay schedules and the client's prediction report.</summary>
+    private void ToggleOpenCell(Vector3 cell, byte state)
+    {
+        var chunk = _chunkManager.ChunkAt((int)cell.X, (int)cell.Y, (int)cell.Z);
+        if (chunk == null || !chunk.SetStateAt(cell, state, _chunkManager)) return;
+        _fluidManager.ScheduleAround(cell);
+        _leafDecay.ScheduleAround(cell);
+        RaiseBlockEdited(cell);
     }
 
     /// <summary>
