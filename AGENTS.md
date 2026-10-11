@@ -2526,7 +2526,11 @@ the click, with the arm and blade carried across the front by `PlayerModel`.
 
 A larger slime is pushed less: every shove (a punch, a slice, a grounded player walking into it) is
 divided by its body scale (`SlimeSize.ShoveSpeed`, applied in `Slime.Shove`), while a split child's
-launch (`Slime.Pop`) is not (`SlimeKnockbackTests`).
+launch (`Slime.Pop`) is not (`SlimeKnockbackTests`). A larger slime also hops higher and farther after
+a longer crouch: the hop's vertical and horizontal launch speeds and the crouch time are the size-1
+ones times the body scale to `SlimeHopLiftExponent`, `SlimeHopReachExponent` and
+`SlimeHopWindupExponent` (`SlimeSize.HopLift`/`HopReach`/`WindupScale`, read by `Slime.HopVelocity`
+and the squash spring's windup; `SlimeHopTests`).
 
 The second entity is the **goblin** (`Goblin` + `Systems/GoblinManager.cs`, owned by `World`), a short
 forest raider that throws the flint it carries and then closes for a club swing. It spawns like the

@@ -35,6 +35,19 @@ public static class SlimeSize
     /// </summary>
     public static float ShoveSpeed(float speed, int size) => speed / Scale(size);
 
+    /// <summary>How much faster than a size-1 slime's a hop of <paramref name="size"/> leaves the ground
+    /// (the vertical launch speed): the body <see cref="Scale"/> to
+    /// <see cref="WorldGenerationConfig.SlimeHopLiftExponent"/>.</summary>
+    public static float HopLift(int size) => MathF.Pow(Scale(size), WorldGenerationConfig.SlimeHopLiftExponent);
+
+    /// <summary>How much faster than a size-1 slime's a hop of <paramref name="size"/> travels sideways:
+    /// the body <see cref="Scale"/> to <see cref="WorldGenerationConfig.SlimeHopReachExponent"/>.</summary>
+    public static float HopReach(int size) => MathF.Pow(Scale(size), WorldGenerationConfig.SlimeHopReachExponent);
+
+    /// <summary>How much longer than a size-1 slime's the crouch before a hop of <paramref name="size"/>
+    /// lasts: the body <see cref="Scale"/> to <see cref="WorldGenerationConfig.SlimeHopWindupExponent"/>.</summary>
+    public static float WindupScale(int size) => MathF.Pow(Scale(size), WorldGenerationConfig.SlimeHopWindupExponent);
+
     /// <summary>The health pool of a slime whose kind's JSON pool is <paramref name="baseHealth"/>.</summary>
     public static int Health(int baseHealth, int size) =>
         Math.Max(1, (int)MathF.Round(baseHealth * Multiplier(size, WorldGenerationConfig.SlimeSizeHealthStep)));

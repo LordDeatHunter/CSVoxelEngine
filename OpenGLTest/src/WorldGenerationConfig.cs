@@ -1499,6 +1499,13 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float SlimeSizeHealthStep = 1f;
     public const float SlimeSizeDamageStep = 0.5f;
     public const float SlimeSizeLootStep = 1f;
+    // Size-scaled hops (SlimeSize.HopLift/HopReach/WindupScale): a larger slime's hop launch speeds
+    // (the vertical lift and the horizontal reach) and the crouch before it are the size-1 ones times
+    // the body scale to these powers, so a big slime hops higher and farther after a longer crouch.
+    // The apex height grows with the square of the lift factor (v^2 / 2g).
+    public const float SlimeHopLiftExponent = 0.4f;
+    public const float SlimeHopReachExponent = 0.4f;
+    public const float SlimeHopWindupExponent = 0.6f;
     // The size a ring spawn rolls (SlimeSize.Roll): each size past 1 is reached with the large-size
     // chance again (so size s+1 has chance^s), and that chance eases from the day value to the night
     // value with DayCycle.NightFactor. A spawn whose ground lies at least SlimeUndergroundDepthBlocks

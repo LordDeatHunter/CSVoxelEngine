@@ -66,6 +66,7 @@ public sealed class Slime : Mob
     private Vector3 _velocity;
     private float _hopTimer;
     private Spring _squash = new(SquashFrequency, SquashDamping);
+    private readonly float _windupSeconds;
     private float _windup;
     private Vector3 _windupTarget;
     private float _clock;
@@ -83,6 +84,8 @@ public sealed class Slime : Mob
         SizeScale = SlimeSize.Scale(Size);
         Health = MaxHealth;
         _nextHop = HopIntervalSeconds;
+        // A larger slime crouches longer before it hops (SlimeSize.WindupScale)
+        _windupSeconds = WindupSeconds * SlimeSize.WindupScale(Size);
     }
 
     /// <summary>The slime's size, fixed for its life; a split spawns smaller slimes instead.</summary>
@@ -241,7 +244,7 @@ public sealed class Slime : Mob
 
         _hopTimer = 0f;
         _nextHop = HopIntervalSeconds + (Random.Shared.NextSingle() - 0.5f) * 2f * HopIntervalJitter;
-        _windup = WindupSeconds;
+        _windup = _windupSeconds;
         _windupTarget = target;
     }
 
@@ -256,7 +259,7 @@ public sealed class Slime : Mob
         }
 
         float target;
-        if (_windup > 0f) target = WindupSquash * MathUtils.EaseOutCubic(1f - _windup / WindupSeconds);
+        if (_windup > 0f) target = WindupSquash * MathUtils.EaseOutCubic(1f - _windup / _windupSeconds);
         else if (!IsGrounded && !_inWater) target = AirStretch;
         else target = BreathAmplitude * MathF.Sin(_clock * BreathRate);
 
@@ -269,7 +272,7 @@ public sealed class Slime : Mob
         if (toPlayer.LengthSquared() < 1e-6f) return;
 
         toPlayer = Vector3.Normalize(toPlayer);
-        _velocity = HopVelocity(toPlayer, _inWater);
+        _velocity = HopVelocity(toPlayer, _inWater, Size);
         IsGrounded = false;
         _squash.Impulse(LaunchKick);
 
@@ -281,15 +284,18 @@ public sealed class Slime : Mob
     /// Launch velocity for a hop along the unit horizontal <paramref name="direction"/>. A land
     /// hop uses the full vertical lift; a water hop keeps the same total speed but halves the
     /// vertical component and moves the rest into the horizontal, so it reads as a low forward
-    /// skim — a jumping slide.
+    /// skim — a jumping slide. A larger <paramref name="size"/> launches faster on both axes
+    /// (<see cref="SlimeSize.HopLift"/>, <see cref="SlimeSize.HopReach"/>), so it hops higher and farther.
     /// </summary>
-    internal static Vector3 HopVelocity(Vector3 direction, bool inWater)
+    internal static Vector3 HopVelocity(Vector3 direction, bool inWater, int size = SlimeSize.Min)
     {
+        var hopSpeed = HopSpeed * SlimeSize.HopReach(size);
+        var jumpSpeed = HopJumpSpeed * SlimeSize.HopLift(size);
         if (!inWater)
-            return new Vector3(direction.X * HopSpeed, HopJumpSpeed, direction.Z * HopSpeed);
+            return new Vector3(direction.X * hopSpeed, jumpSpeed, direction.Z * hopSpeed);
 
-        var totalSpeed = MathF.Sqrt(HopSpeed * HopSpeed + HopJumpSpeed * HopJumpSpeed);
-        var vertical = HopJumpSpeed * WaterHopVerticalFactor;
+        var totalSpeed = MathF.Sqrt(hopSpeed * hopSpeed + jumpSpeed * jumpSpeed);
+        var vertical = jumpSpeed * WaterHopVerticalFactor;
         var horizontal = MathF.Sqrt(MathF.Max(0f, totalSpeed * totalSpeed - vertical * vertical));
         return new Vector3(direction.X * horizontal, vertical, direction.Z * horizontal);
     }
