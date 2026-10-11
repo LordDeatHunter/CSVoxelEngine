@@ -83,9 +83,16 @@ public static class LandingDust
     /// The sRGB colour (0..1) of an entity skin: the mean of its opaque texels, so a slime splats its
     /// own green. <paramref name="fallback"/> when the model has no skin or not one opaque texel.
     /// </summary>
-    public static Vector3 SkinColour(BbmodelData model, Vector3 fallback)
+    public static Vector3 SkinColour(BbmodelData model, Vector3 fallback) =>
+        MeanColour(model.TexturePixels, fallback);
+
+    /// <summary>
+    /// The mean sRGB colour (0..1) of an RGBA pixel array's opaque texels (an entity skin, an item
+    /// sprite, so a breaking tool shatters in its own colours). <paramref name="fallback"/> when
+    /// there is no array or not one opaque texel.
+    /// </summary>
+    public static Vector3 MeanColour(byte[]? pixels, Vector3 fallback)
     {
-        var pixels = model.TexturePixels;
         if (pixels == null) return fallback;
         long r = 0, g = 0, b = 0, n = 0;
         for (var i = 0; i + 3 < pixels.Length; i += 4)

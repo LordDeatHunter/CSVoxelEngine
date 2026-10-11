@@ -4001,11 +4001,33 @@ public class World : IItemUseWorld
             ActiveInventory.MarkToolUsed(_activeToolInstance, Now, delaySeconds);
     }
 
-    bool IItemUseWorld.DamageTool(int amount) =>
-        _activeToolInstance > 0 && ActiveInventory.DamageTool(_activeToolInstance, amount);
+    bool IItemUseWorld.DamageTool(int amount)
+    {
+        if (_activeToolInstance <= 0) return false;
+        var inventory = ActiveInventory;
+        var itemId = inventory.ToolItemId(_activeToolInstance);
+        var slot = inventory.SlotOfTool(_activeToolInstance);
+        if (!inventory.DamageTool(_activeToolInstance, amount)) return false;
+        ToolBroke(itemId, slot);
+        return true;
+    }
 
     void IItemUseWorld.ConsumeSelected() => ActiveInventory.ConsumeSelected();
     #endregion
+
+    // A tool that ran out of durability shatters: chips of its sprite's colour burst off the hand
+    // and its hotbar slot flashes (cosmetic: a server draws nothing)
+    private void ToolBroke(byte itemId, int slot)
+    {
+        if (_serverMode) return;
+        if (slot >= 0) _hotbarPops.Flash(slot);
+        if (itemId == 0 || ItemRegistry.TryGet(itemId) is not { } item) return;
+        var hand = Player.GetHandAnchorMatrix(Camera.Position, Camera.PlayerYaw,
+            PlayerModel.FirstPersonBodyBack * (1f - Camera.ShoulderBlend), Camera.Pitch).Translation;
+        _debris.Spark(hand, ToolShatter.ColourOf(item, WorldGenerationConfig.ToolShatterFallbackColor),
+            0.12f, WorldGenerationConfig.ToolShatterCount, WorldGenerationConfig.ToolShatterSpeed,
+            WorldGenerationConfig.ToolShatterSize);
+    }
 
     private bool TryCookOrCollect(float maxDistance, PlayerContext player)
     {

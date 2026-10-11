@@ -2065,6 +2065,18 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float HotbarPopSeconds = 0.3f;
     public const float HotbarPopScale = 1.3f;
 
+    // --- Tool break shatter (ToolShatter): a tool whose durability runs out bursts into chips of
+    // its sprite's mean colour at the hand, and its hotbar slot flashes. Cosmetic: never a server. ---
+    public const int ToolShatterCount = 10;
+    // Blocks per second the chips fly out at
+    public const float ToolShatterSpeed = 3f;
+    public const float ToolShatterSize = 0.08f;
+    // sRGB colour of the chips when the item's sprite cannot be read
+    public static readonly Vector3 ToolShatterFallbackColor = new(0.75f, 0.7f, 0.6f);
+    // How long a broken tool's hotbar slot flashes, and the strength of its white overlay at the start
+    public const float HotbarFlashSeconds = 0.35f;
+    public const float HotbarFlashAlpha = 0.6f;
+
     // --- Low-health vignette (LowHealthVignette, vignette-fragment.glsl) ---
     // Below the threshold (a fraction of the pool) the screen edge pulses red like a slow
     // heartbeat, its strength rising from the min to the max as health falls to nothing. Between

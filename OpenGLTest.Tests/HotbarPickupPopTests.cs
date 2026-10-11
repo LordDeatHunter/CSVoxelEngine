@@ -56,6 +56,27 @@ public sealed class HotbarPickupPopTests
     }
 
     [Fact]
+    public void ABrokenToolsSlotFlashesAndFadesOut()
+    {
+        var pops = new HotbarPickupPop();
+        Assert.Equal(0f, pops.FlashAt(3));
+        pops.Flash(3);
+        Assert.Equal(1f, pops.FlashAt(3));
+        Assert.Equal(0f, pops.FlashAt(4));
+
+        pops.Advance(WorldGenerationConfig.HotbarFlashSeconds * 0.5f);
+        var half = pops.FlashAt(3);
+        Assert.True(half > 0f && half < 1f, $"a half-flashed slot read {half}");
+
+        pops.Advance(WorldGenerationConfig.HotbarFlashSeconds);
+        Assert.Equal(0f, pops.FlashAt(3));
+        // An out-of-range slot never flashes and never throws
+        pops.Flash(-1);
+        pops.Flash(Inventory.SlotCount + 5);
+        Assert.Equal(0f, pops.FlashAt(Inventory.SlotCount + 5));
+    }
+
+    [Fact]
     public void APopReturnsToExactlyTheRestScale()
     {
         var pops = new HotbarPickupPop();

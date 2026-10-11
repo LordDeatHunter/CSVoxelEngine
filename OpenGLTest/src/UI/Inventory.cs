@@ -176,6 +176,15 @@ public class Inventory
         return true;
     }
 
+    /// <summary>Hotbar slot holding a tool instance, or -1 when no slot does (the tool broke).</summary>
+    public int SlotOfTool(int instanceId)
+    {
+        for (var i = 0; i < _hotbar.Length; i++)
+            if (_hotbar[i] is { IsTool: true } slot && slot.ToolInstance == instanceId)
+                return i;
+        return -1;
+    }
+
     /// <summary>
     /// Drops a tool instance from the pool and empties every hotbar slot holding it
     /// (thrown tools leave no ghost behind).

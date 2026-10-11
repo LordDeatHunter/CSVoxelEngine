@@ -53,10 +53,10 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **TNT fuse halved.** `TntManager.PlayerFuseSeconds` 1 s, the chain fuse unchanged; `PrimedTnt.WhiteFlash` speeds its strobe over the fuse it gets (`FirestarterTests`).
 - [x] **TNT blast pushes entities.** `BlastImpulse.At` (`BlastPushMaxSpeed` at the centre, zero at `BlastRadius`, tipped up by `BlastPushUpBias`) on other primed TNT, drops (`DropManager.ApplyBlastImpulse`), falling cubes, mobs (`Mob.Shove`) and players through `IMobTarget.TakeHit` (a server's queued knockback); creative, flying and dead players immune (`BlastEffectTests`).
 - [x] **Falling block landing dust.** `FallingBlockManager.Landings` -> `GroundDust.LandBlock` -> `BlockDebrisSystem.Skirt`, sized by `LandingDust.FallingBlockCount/Speed` from `FallingBlock.FallBlocks`; a client puffs at a `BlockChanges` write beside a mirrored cube (`FallingBlockDustTests`).
-- [ ] **Tool break shatter.** When a tool's durability hits 0 it shatters into chips at the hand and
-  the hotbar slot flashes. *Hook:* the use-up transition in `Inventory` (`DurabilityComponent`
-  `UsesLeft` reaching 0), a `HotbarPickupPop`-style slot flash, `DebrisLook.Colour` chips of the
-  item sprite's mean colour.
+- [x] **Tool break shatter.** A tool whose durability runs out shatters into chips of its
+  sprite's mean colour at the hand (`ToolShatter.ColourOf` at `World.DamageTool`) and its hotbar
+  slot flashes white and fades (`HotbarPickupPop.Flash`, `ToolShatterTests`,
+  `HotbarPickupPopTests`).
 - [ ] **Pickup sparkle.** A few bright motes pop where a drop is collected. *Hook:* the collector
   credit in `DropManager`, `FireParticle`-style billboards. A slice of `V-5`.
 - [x] **Surfacing droplets.** `SurfacingDroplets` (timing and a seed per surfacing, read in `Camera.RefreshEyeWaterState`); hashed discs with trails as the vignette pass's `uDroplets` term, none from lava (`surfacing-droplets.json`).

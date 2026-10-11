@@ -17,8 +17,13 @@ public sealed class HotbarPickupPop
     private readonly int[] _counts = new int[Inventory.SlotCount];
     private readonly bool[] _seen = new bool[Inventory.SlotCount];
     private readonly float[] _elapsed = new float[Inventory.SlotCount];
+    private readonly float[] _flashElapsed = new float[Inventory.SlotCount];
 
-    public HotbarPickupPop() => Array.Fill(_elapsed, WorldGenerationConfig.HotbarPopSeconds);
+    public HotbarPickupPop()
+    {
+        Array.Fill(_elapsed, WorldGenerationConfig.HotbarPopSeconds);
+        Array.Fill(_flashElapsed, WorldGenerationConfig.HotbarFlashSeconds);
+    }
 
     /// <summary>Advances the running pops, then observes every hotbar slot of <paramref name="inventory"/>.</summary>
     public void Update(Inventory inventory, float deltaTime)
@@ -49,8 +54,26 @@ public sealed class HotbarPickupPop
     {
         var step = MathF.Max(0f, deltaTime);
         for (var i = 0; i < _elapsed.Length; i++)
+        {
             _elapsed[i] = MathF.Min(WorldGenerationConfig.HotbarPopSeconds, _elapsed[i] + step);
+            _flashElapsed[i] = MathF.Min(WorldGenerationConfig.HotbarFlashSeconds, _flashElapsed[i] + step);
+        }
     }
+
+    /// <summary>Starts <paramref name="slot">'s flash: the tool it held just broke. Independent of
+    /// the count pop, so it shows on a slot that is now empty.</summary>
+    public void Flash(int slot)
+    {
+        if (slot >= 0 && slot < _flashElapsed.Length)
+            _flashElapsed[slot] = 0f;
+    }
+
+    /// <summary>Flash strength of a hotbar slot: 1 right after its tool broke, easing out to 0 over
+    /// <see cref="WorldGenerationConfig.HotbarFlashSeconds"/> (0 for a slot that never flashed).</summary>
+    public float FlashAt(int slot) =>
+        slot < 0 || slot >= _flashElapsed.Length
+            ? 0f
+            : MathUtils.EaseOutCubic(1f - _flashElapsed[slot] / WorldGenerationConfig.HotbarFlashSeconds);
 
     /// <summary>Icon scale for a hotbar slot: exactly 1 at rest, briefly larger just after its count rose.</summary>
     public float ScaleAt(int slot) =>
