@@ -282,6 +282,11 @@ public const float DayLengthSeconds = 1200f;
     public const float ThrowZoomSpringHz = 2.2f;
     public const float ThrowZoomSpringDamping = 0.55f;
 
+    // --- Water depth states (WaterImmersion, PlayerPhysics) ---
+    // The share of the body (PlayerHeight) under the fluid surface from which a body with its eye
+    // still above it floats rather than wades; the eye going under is always a swim.
+    public const float WaterFloatShare = 0.5f;
+
     // --- Sky ---
     // Angular radius of the visible sun disc in degrees. The real sun is 0.27 degrees across
     // its radius, but at that size it reads as a pinprick, so games exaggerate it.

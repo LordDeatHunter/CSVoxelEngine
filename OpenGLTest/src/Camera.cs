@@ -131,6 +131,19 @@ public class Camera : IMobTarget
     /// </summary>
     public bool IsInWater { get; private set; }
 
+    /// <summary>
+    /// The share of the body's height under the highest fluid surface over the cells it overlaps,
+    /// 0..1 (<see cref="WaterImmersion.Share"/>), refreshed with <see cref="IsInWater"/>.
+    /// </summary>
+    public float ImmersionShare { get; private set; }
+
+    /// <summary>
+    /// How deep the body stands in a fluid (<see cref="WaterImmersion.PhaseOf"/>): wading under half,
+    /// floating from half up with the head's eye above the surface, swimming once it is under. Read
+    /// from the head's eye even in the shoulder view, since it is the body's state, not the view's.
+    /// </summary>
+    public WaterPhase WaterPhase { get; private set; }
+
     /// <summary>Whether the eye itself sits below a fluid surface — the source of truth for the
     /// underwater tint, which must not fade in while only the legs are wet.</summary>
     public bool IsEyeInWater { get; private set; }
@@ -869,6 +882,11 @@ public class Camera : IMobTarget
     internal void SetMovementFactor(float factor) => MovementFactor = factor;
     internal void SetGroundFriction(float friction) => GroundFriction = friction;
     internal void SetInWater(bool inWater) => IsInWater = inWater;
+    internal void SetImmersion(float share, WaterPhase phase)
+    {
+        ImmersionShare = share;
+        WaterPhase = phase;
+    }
     internal void SetEyeInWater(bool inWater) => IsEyeInWater = inWater;
     internal void SetInLava(bool inLava) => IsInLava = inLava;
     internal void SetEyeInLava(bool inLava) => IsEyeInLava = inLava;

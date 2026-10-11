@@ -414,7 +414,8 @@ internal sealed class PlayerPhysics
     /// fluid cells the body overlaps, and averages those cells' flow directions into the push
     /// applied while swimming. A fluid surface sits below its cell top (8/9 of a block for a
     /// source, less for a flowing skirt), so both tests compare real surface heights instead of
-    /// merely asking whether the cell holds water.
+    /// merely asking whether the cell holds water. The highest surface over the whole body sets
+    /// <see cref="Camera.ImmersionShare"/> and <see cref="Camera.WaterPhase"/> (<see cref="WaterImmersion"/>).
     /// </summary>
     public void UpdateWaterState(Camera camera, ChunkManager chunkManager)
     {
@@ -424,17 +425,23 @@ internal sealed class PlayerPhysics
         var swimMin = new Vector3(position.X - PlayerRadius, feetY, position.Z - PlayerRadius);
         var swimMax = new Vector3(position.X + PlayerRadius, feetY + SwimDepth, position.Z + PlayerRadius);
         VoxelCoords.CellRange(swimMin, swimMax, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
+        // The whole body's cells, for how much of it is under (the swim band is their lower part)
+        var scanTopY = Math.Max(maxY, MathUtils.FloorToInt(feetY + PlayerHeight));
 
-        // One pass over the footprint answers both questions: whether any cell is deep enough
-        // to swim in, and which way the ones that are actually flow
+        // One pass over the footprint answers all three questions: whether any cell in the swim
+        // band is deep enough to swim in, which way the ones that are actually flow, and how high
+        // the highest fluid surface over the body reaches
         var inWater = false;
         var flowSum = Vector3.Zero;
         var flowCells = 0;
+        var surfaceTop = float.NegativeInfinity;
         for (var x = minX; x <= maxX; x++)
-        for (var y = minY; y <= maxY; y++)
+        for (var y = minY; y <= scanTopY; y++)
         for (var z = minZ; z <= maxZ; z++)
         {
-            if (chunkManager.GetFluidSurfaceGlobal(x, y, z) <= feetY) continue;
+            var surface = chunkManager.GetFluidSurfaceGlobal(x, y, z);
+            if (surface > surfaceTop) surfaceTop = surface;
+            if (y > maxY || surface <= feetY) continue;
 
             inWater = true;
 
@@ -457,6 +464,8 @@ internal sealed class PlayerPhysics
         }
 
         camera.UpdateEyeWaterSurface(chunkManager, eyeX, eyeY, eyeZ);
+        var share = WaterImmersion.Share(feetY, surfaceTop);
+        camera.SetImmersion(share, WaterImmersion.PhaseOf(share, camera.IsEyeInWater));
 
         // Lava burns on body contact, not just eye contact: a wade through a shallow pool
         // keeps the eye dry but still has to hurt. The one rule lives in PlayerBodyProbe, which
