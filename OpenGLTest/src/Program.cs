@@ -1782,7 +1782,7 @@ public static class Program
                     chatView.AddSystem($"Unknown item '{request.Item}'");
                     return;
                 }
-                w.Inventory.Add(id, request.Count);
+                w.CreditItem(id, request.Count);
                 chatView.AddSystem($"Gave {request.Count} x {request.Item}");
                 return;
 

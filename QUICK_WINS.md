@@ -214,11 +214,8 @@ files waits in TODO.md instead, since there are none to use yet.
   knows.
 - [x] **Chat fades when closed.** `ChatView` keeps an arrival clock per line and `AlphaAt` holds it opaque through `HoldSeconds`, eases it out over `FadeSeconds` and pins it at 1 while the log is open (the draw skips fully faded lines) (`ChatViewTests`).
 - [x] **`/time` chat command.** the `ChatCommands` table parses `/time day|night|<seconds>` (day = noon, night = midnight, a number is `VOXEL_TIME` units) and both Program and GameServer run it through `World.SetLightingTime`; a server needs operator rights and sends a `TimeSync` at once (`ChatCommandsTests`).
-- [ ] **Day toast.** "Day 4" fades in at dawn. *Hook:* `DayCycle` on the lighting clock, with a
-  `HotbarNameFade`-style hold-then-fade.
-- [ ] **New item toast.** The first pickup of an item shows "New: Cotton". *Hook:* the discovered
-  set of the look-at label: `Inventory.Add` of an id not in it adds it and raises the toast (never
-  at world load, so a restored inventory does not toast).
+- [x] **Day toast.** `HudToast` (a hold-then-fade line drawn above the item-name row) shown by the world's `DayToast.CrossedDawn` watch on the lighting clock, so "Day N" fades in the moment the sun rises through dawn, once a day (`HudToastTests`).
+- [x] **New item toast.** `DiscoveryLog` marks the ids a world has seen; the drop pickup and `World.CreditItem` (the /give path) toast "New: <name>" on a first credit, and a restored inventory is marked known at load so loading never toasts (`DiscoveryLogTests`).
 - [x] **Screenshot key.** F2 reads the finished frame back through `VisualCapture` and saves it to `ScreenshotPaths.Directory` as a millisecond-stamped PNG (`ScreenshotPathTests`).
 - [x] **Hide-HUD key.** F1 toggles `hudVisible`, the same gate the scenario screenshot's `hideHud` drives (`ScreenshotPathTests` covers the shared path naming).
 - [ ] **Tab player list.** Holding Tab in multiplayer lists who is online. *Hook:* the

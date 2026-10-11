@@ -621,6 +621,17 @@ public class Inventory
     /// know, or that belong to the wrong pool, are dropped with one warning, and a hotbar slot
     /// pointing at dropped content comes back empty.
     /// </summary>
+    /// <summary>
+    /// Every id the inventory holds — the blocks, the misc stacks and the tools — for the
+    /// discovery log's load marking (a restored inventory toasts nothing).
+    /// </summary>
+    public IEnumerable<byte> HeldIds()
+    {
+        foreach (var id in _blocks.Keys) yield return id;
+        foreach (var id in _misc.Keys) yield return id;
+        foreach (var tool in _tools) yield return tool.DefinitionId;
+    }
+
     public void Import(PlayerSaveData.InventoryData data)
     {
         _blocks.Clear();

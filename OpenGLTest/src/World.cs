@@ -311,6 +311,20 @@ public class World : IItemUseWorld
     /// its alpha is above zero.</summary>
     public HudToast Toast { get; } = new();
 
+    // The discovered set behind the "New: ..." toast (see DiscoveryLog)
+    private readonly DiscoveryLog _discovered = new();
+
+    /// <summary>
+    /// Credits <paramref name="count"/> of an item to this world's inventory (the creative grants
+    /// and the /give command), toasting a first find like a pickup does.
+    /// </summary>
+    public void CreditItem(byte id, int count)
+    {
+        if (!Inventory.Add(id, count)) return;
+        if (_discovered.Discover(id))
+            Toast.Show($"New: {Inventory.DisplayName(id)}");
+    }
+
     // The sun's elevation last frame, for the dawn watch behind the day toast
     private float _lastSunElevation;
     private bool _sunElevationKnown;
@@ -620,6 +634,9 @@ public class World : IItemUseWorld
             _health.Restore(hp);
         if (saved.Inventory is { } inventory)
             Inventory.Import(inventory);
+            // A restored inventory is known, so loading a world never toasts a find
+            _discovered.Reset();
+            foreach (var id in Inventory.HeldIds()) _discovered.MarkKnown(id);
     }
 
     /// <summary>
@@ -1769,6 +1786,8 @@ public class World : IItemUseWorld
             }
 
             pickedUp |= Inventory.Add(collected[i]);
+            if (_discovered.Discover(collected[i]))
+                Toast.Show($"New: {Inventory.DisplayName(collected[i])}");
         }
 
         if (pickedUp)
