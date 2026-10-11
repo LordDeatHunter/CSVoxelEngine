@@ -88,6 +88,8 @@ public sealed class Goblin : Mob
     private bool _losBlocked;
     private Vector3 _aimTarget;
     private bool _hitWall;
+    private float _noticePipElapsed = WorldGenerationConfig.GoblinNoticePipSeconds;
+    private bool _noticed;
 
     public Goblin(EntityType type, Vector3 position, int ammo, bool spawnIn = true) : base(type, position)
     {
@@ -127,6 +129,15 @@ public sealed class Goblin : Mob
 
     /// <summary>Whether the goblin currently stands on the ground.</summary>
     public bool IsGrounded { get; private set; }
+
+    /// <summary>
+    /// The notice pip's clock: 0 on the frame the goblin first had a player to chase (the same
+    /// moment its first-throw delay starts), rising to 1 over
+    /// <see cref="WorldGenerationConfig.GoblinNoticePipSeconds"/>; 1 for a goblin that never
+    /// noticed anyone, and never restarted when a target is lost and regained.
+    /// </summary>
+    public float NoticePipProgress =>
+        MathUtils.Clamp01(_noticePipElapsed / WorldGenerationConfig.GoblinNoticePipSeconds);
 
     /// <summary>The goblin's own animation state, driven by its speed and actions.</summary>
     public EntityAnimator Animation { get; }
@@ -268,6 +279,8 @@ public sealed class Goblin : Mob
         _throwCooldown = MathF.Max(0f, _throwCooldown - deltaTime);
         _meleeCooldown = MathF.Max(0f, _meleeCooldown - deltaTime);
         _losRetry = MathF.Max(0f, _losRetry - deltaTime);
+        _noticePipElapsed = MathF.Min(WorldGenerationConfig.GoblinNoticePipSeconds,
+            _noticePipElapsed + deltaTime);
 
         var move = Vector3.Zero;
         if (IsDying)
@@ -281,6 +294,13 @@ public sealed class Goblin : Mob
         }
         if (player != null)
         {
+            // The first sight of a player starts the pip; it never restarts on a re-notice
+            if (!_noticed)
+            {
+                _noticed = true;
+                _noticePipElapsed = 0f;
+            }
+
             var target = player.Eye;
             var to = new Vector3(target.X - Position.X, 0f, target.Z - Position.Z);
             var dist = to.Length();

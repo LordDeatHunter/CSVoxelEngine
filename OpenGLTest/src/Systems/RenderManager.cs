@@ -200,6 +200,7 @@ public class RenderManager : IDisposable
     // Null until LoadResources builds it.
     private EntityHealthbarRenderer? _healthbars;
     private DamageNumberRenderer? _damageNumbers;
+    private NoticePipRenderer? _noticePips;
 
     // Directional sun shadows: RenderShadows fills _nearShadow's depth texture (a depth-only FBO
     // attachment, sampled as a comparison sampler on unit 1) through its ViewProj, and every
@@ -822,7 +823,10 @@ public class RenderManager : IDisposable
         ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes, atlasIsSrgb: true);
         // The damage numbers are laid out from the HUD's font; without one there is nothing to draw
         if (ui.Font is { } font)
+        {
             _damageNumbers = new DamageNumberRenderer(gl, font);
+            _noticePips = new NoticePipRenderer(gl, font);
+        }
         CreateSelectionGeometry();
         CreatePopGeometry();
         // Everything above binds raw - the atlas build, the loader, the sun's filter tweak and
@@ -3721,6 +3725,20 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
+    /// Draws the "!" over every goblin that just noticed a player (see <see cref="NoticePipRenderer"/>),
+    /// with the damage numbers' depth and fog rules.
+    /// </summary>
+    public void RenderNoticePips(Camera camera, IReadOnlyList<Goblin> goblins)
+    {
+        if (camera == null || goblins.Count == 0 || _noticePips == null) return;
+
+        _noticePips.Render(goblins, camera.GetViewProjection(), camera.RenderEye, camera.ViewDirection,
+            _fogColor, _fogNear, _fogFar);
+        // The pip renderer binds the font atlas to unit 0.
+        InvalidateTextureUnits();
+    }
+
+    /// <summary>
     /// Draws every live falling leaf in one batched billboard draw. Leaves are too small to
     /// cast shadows, so they skip the shadow pass; their own shader carries the frame light
     /// and fog, which is final by the time the entity pass runs.
@@ -4429,6 +4447,7 @@ public class RenderManager : IDisposable
         _bubbles?.Dispose();
         _healthbars?.Dispose();
         _damageNumbers?.Dispose();
+        _noticePips?.Dispose();
         _sunQuad.Dispose();
         gl.DeleteTexture(_sunTexture);
         gl.DeleteTexture(_breakProgressTexture);

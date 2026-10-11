@@ -2516,6 +2516,8 @@ public class World : IItemUseWorld
         renderManager.BeginGpuPass(ProfileSection.EntityPass);
         renderManager.RenderEntityHealthbars(Camera, Mobs);
         renderManager.RenderDamageNumbers(Camera, _damageNumbers);
+        if (_goblins != null)
+            renderManager.RenderNoticePips(Camera, _goblins.Goblins);
         renderManager.RenderBlockDebris(Camera, _debris.Debris);
         foreach (var tree in _toppling)
             renderManager.RenderTopplingTree(Camera, tree);

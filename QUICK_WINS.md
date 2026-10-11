@@ -60,9 +60,9 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Pickup sparkle.** A few bright motes (`FireParticleKind.Spark`) pop at the chest where a
   drop is collected, singleplayer only (`PickupSparkle*`, `FireParticleTests`).
 - [x] **Surfacing droplets.** `SurfacingDroplets` (timing and a seed per surfacing, read in `Camera.RefreshEyeWaterState`); hashed discs with trails as the vignette pass's `uDroplets` term, none from lava (`surfacing-droplets.json`).
-- [ ] **Goblin notice pip.** A "!" billboard pops over a goblin's head when it first notices the
-  player. *Hook:* `Goblin`'s first-throw-delay start (its noticing moment) and the healthbar
-  billboard path; the glyph from the HUD font.
+- [x] **Goblin notice pip.** A "!" billboard pops over a goblin's head the moment it first
+  notices a player (`Goblin.NoticePipProgress` from its first sight; `NoticePipRenderer` over the
+  HUD font like the damage numbers) (`GoblinNoticePipTests`).
 - [x] **Water depth states.** `WaterImmersion` / `WaterPhase` (Dry, Wade, Float, Swim) beside `Camera.IsInWater`; `WadeSpeedFactor`, a buoyancy target that rests the body about 70 % under (`WaterFloatRestShare`), Ctrl dives; the `SURFACE` float pose (`ITEM_DEBUGGER_PLAYER_ANIM=surface`); the cosmetic `NetPlayerFlags.Floating` bit, no protocol bump (`water-depth.json`).
 - [x] **Throw charge zoom.** `ThrowZoom`, a spring-driven FOV term beside `SprintFov` following `Camera.ThrowCharge` (`throw-zoom.json`).
 

@@ -2077,6 +2077,15 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float HotbarFlashSeconds = 0.35f;
     public const float HotbarFlashAlpha = 0.6f;
 
+    // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
+    // first notices a player (the same moment its first-throw delay starts) ---
+    public const float GoblinNoticePipSeconds = 0.9f;
+    // Blocks the pip floats above the head, and its cap height
+    public const float GoblinNoticePipRiseBlocks = 0.55f;
+    public const float GoblinNoticePipCapHeightBlocks = 0.45f;
+    // Pips drawn per frame; past it the rest wait for the next frame
+    public const int GoblinNoticePipMax = 16;
+
     // --- Pickup sparkle (FireParticleKind.Spark): a few bright motes pop where a drop is collected,
     // at the collector's chest. Cosmetic: singleplayer only (a client's pickups are server-side). ---
     public const int PickupSparkleCount = 5;
