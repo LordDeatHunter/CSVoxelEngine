@@ -249,12 +249,12 @@ public sealed class GoblinManager : IMobPopulation
             _type.LootTable.Roll(new LootContext(lootX, lootY, lootZ, 0), _loot);
 
             foreach (var id in _loot)
-                drops.SpawnAt(id, goblin.Position);
+                drops.SpawnAt(id, goblin.Position, MobLoot.RandomToss());
         }
 
         // The stones it never threw.
         for (var i = 0; i < goblin.Ammo; i++)
-            drops.SpawnAt(_flintId, goblin.Position);
+            drops.SpawnAt(_flintId, goblin.Position, MobLoot.RandomToss());
     }
 
     // One shared timer, under the natural cap every mob kind shares; each expiry tries the ring

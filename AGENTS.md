@@ -643,6 +643,7 @@ OpenGLTest/
                                #   living count each registered manager reports
     MobFallDamage.cs           # GL-free mob fall damage: a share of the mob's pool per block past its safe height
     MobLava.cs                 # GL-free mob lava rule: body box in a burning fluid, damage per tick
+    MobLoot.cs                 # GL-free loot toss: the up-and-out launch a killed mob's drops get
     SlimeSize.cs               # GL-free per-size slime stats: body scale, health, contact damage,
                                #   loot rolls, each 1 + (size - 1) * its config step; the spawn size roll
     DayCycle.cs                # GL-free sun direction, dayness and night factor of the lighting clock
@@ -2505,7 +2506,10 @@ death it causes rolls the loot as usual (`MobLavaTests`). `visual-examples/mob-h
 despawn radius is not removed outright; the manager calls `Mob.BeginDying` without rolling any loot,
 so it plays its death pose and is dropped once that has run, and like any dying mob it leaves
 `LivingCount`, the saves and the server's broadcast at once (`SlimeTests`, `GoblinManagerTests`,
-`MobTargetTests`).
+`MobTargetTests`). **Loot toss**: every item a killed mob drops (its table's rolls, a goblin's carried
+flint) is spawned with `DropManager.SpawnAt`'s toss set to `MobLoot.RandomToss()`, a random outward
+heading at `MobLootTossMinSpeed..MaxSpeed` plus `MobLootTossLift` on top of the drop's own pop, so
+the loot arcs out of the body (`MobLootTests`).
 
 The first entity is the **slime** (`Slime` + `Systems/SlimeManager.cs`), owned by `World`. It hops
 toward the player, damages on contact only while airborne (a slime merely bobbing in water is

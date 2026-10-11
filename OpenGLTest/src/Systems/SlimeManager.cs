@@ -219,8 +219,9 @@ public sealed class SlimeManager : IMobPopulation
         for (var roll = 0; roll < slime.LootRolls; roll++)
             _type.LootTable.Roll(context, _loot);
 
+        // Each item arcs out of the body (MobLoot) rather than appearing at its feet
         foreach (var id in _loot)
-            drops.SpawnAt(id, slime.Position);
+            drops.SpawnAt(id, slime.Position, MobLoot.RandomToss());
     }
 
     // One shared timer, under the natural cap every mob kind shares; each expiry tries the ring

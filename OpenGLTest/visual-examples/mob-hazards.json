@@ -17,9 +17,13 @@
     { "op": "spawn", "entity": "goblin", "pos": [169.5, 19.0, 138.5] },
     { "op": "wait", "seconds": 0.85 },
     { "op": "screenshot", "name": "goblin-fall" },
-    // A size-2 slime dropped nine blocks (past its own hop's apex) loses hearts too
+    // LOOT TOSS (MobLoot): both goblins killed at once; their loot and carried flint arc up and
+    // out of the bodies instead of appearing at their feet
     { "op": "damage", "amount": 100 },
-    { "op": "wait", "seconds": 1.0 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "loot-toss" },
+    // A size-2 slime dropped nine blocks (past its own hop's apex) loses hearts too
+    { "op": "wait", "seconds": 0.8 },
     { "op": "spawn", "entity": "slime", "pos": [169.5, 20.0, 136.5], "size": 2 },
     { "op": "wait", "seconds": 0.9 },
     { "op": "screenshot", "name": "slime-fall" },

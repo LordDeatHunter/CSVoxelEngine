@@ -1486,6 +1486,14 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float MobLavaTickSeconds = 0.5f;
     public const float MobLavaDamageShare = 0.15f;
 
+    // --- Mob loot toss (MobLoot) ---
+    // A killed mob's every dropped item leaves its body with this toss on top of a drop's own small
+    // pop: a random horizontal heading at MinSpeed..MaxSpeed blocks per second plus Lift upward, so
+    // the loot arcs out instead of appearing at its feet.
+    public const float MobLootTossMinSpeed = 1.5f;
+    public const float MobLootTossMaxSpeed = 2.5f;
+    public const float MobLootTossLift = 2.5f;
+
     // --- Slimes (SlimeManager) ---
     // Forest mobs that hop at the player. Natural spawns appear on dry forest surface in a ring
     // around the player and are culled when they stray too far. Damage only lands while a slime
