@@ -51,10 +51,7 @@ files waits in TODO.md instead, since there are none to use yet.
   one for an exit. A slice of `V-2`. A server skips it; a client's mirrors splash from their
   snapshot positions. Test: a slow entry spawns nothing, and the count never falls as the speed
   grows.
-- [ ] **Damage direction arc.** A red arc on the screen edge points toward where a hit came from,
-  then fades. *Hook:* `Camera.AddHitKick` already gets the direction; keep it relative to the view
-  yaw and draw a third term in the damage vignette pass beside `uLowHealth`. Fall and lava damage
-  have no direction and show none.
+- [x] **Damage direction arc.** `DamageDirection` keeps the blow's world direction (fed by `Camera.TakeHit`, on a client by the `PlayerStatus` knockback that came with lost health) and the vignette pass draws it as `uHitArc`; falls and lava show none (`damage-arc.json`).
 - [ ] **Mob hit sparks.** A punch, slice or throw that connects throws a few pale chips from the
   contact point. *Hook:* `World.StrikeMob` (all three paths go through it), then
   `BlockDebrisSystem.Puff` with `DebrisLook.Colour`; on a client, the predicted connect the
@@ -95,42 +92,12 @@ files waits in TODO.md instead, since there are none to use yet.
   item sprite's mean colour.
 - [ ] **Pickup sparkle.** A few bright motes pop where a drop is collected. *Hook:* the collector
   credit in `DropManager`, `FireParticle`-style billboards. A slice of `V-5`.
-- [ ] **Surfacing droplets.** When the head leaves water, droplets streak down the screen and fade
-  over about 1.5 s. *Hook:* `Camera.IsEyeInWater` going true to false, and a droplet-mask term in
-  the UI pass (hashed discs, no texture).
+- [x] **Surfacing droplets.** `SurfacingDroplets` (timing and a seed per surfacing, read in `Camera.RefreshEyeWaterState`); hashed discs with trails as the vignette pass's `uDroplets` term, none from lava (`surfacing-droplets.json`).
 - [ ] **Goblin notice pip.** A "!" billboard pops over a goblin's head when it first notices the
   player. *Hook:* `Goblin`'s first-throw-delay start (its noticing moment) and the healthbar
   billboard path; the glyph from the HUD font.
-- [ ] **Water depth states.** The body reacts to how deep it stands in water in three bands by the
-  share of its height under the surface (`PlayerPhysics.PlayerHeight` is 1.8): **fully underwater**
-  keeps today's swim animation; about **70 % submerged**, floating at the surface of a deep pool,
-  gets a new surface-float animation; **under half**, a one-block-deep pool, only slows the walk
-  and plays no special animation. Deep water never puts the player in the last band, because they
-  settle at the surface (step 2). Each step ships on its own:
-  - [ ] *Step 1 (the rule):* a GL-free `WaterImmersion` (the submerged share of the body from
-    `PlayerPhysics.UpdateWaterState`'s fluid surface heights) and a phase from it and
-    `Camera.IsEyeInWater`: `Wade` (< 0.5), `Float` (0.5 up to an eye under the surface) and `Swim`
-    (the eye under). Exposed on `Camera` beside `IsInWater`. Test: the bands are monotone in the
-    water depth, and a one-block source pool (surface 8/9 of a block) reads `Wade`.
-  - [ ] *Step 2 (movement):* `Wade` keeps the walk with a lighter slowdown than `SwimSpeedFactor`
-    (a new `WadeSpeedFactor`) and the normal jump; `Float` and `Swim` keep the burst strokes. In deep
-    water a body with its eye above the surface settles where about 70 % of it is under (a
-    buoyancy target for the vertical speed, so `SinkSpeed` stops pulling it down at the surface);
-    Space still strokes up and Ctrl dives into `Swim`. The server's mirror
-    (`PlayerBodyProbe.InWater`) and the hover rule in `MovementRules` must keep accepting a body
-    that rests at the surface. Test: a body in deep water comes to rest at the float height and
-    never in `Wade`.
-  - [ ] *Step 3 (animation):* a `PlayerModel` surface-float pose: the whole body vertical and
-    straight (no swim tilt, no forward lean), the arms doing a slow sculling motion beside the hips
-    and the legs hanging with a faint flutter; it blends in and out from the swim pose through
-    `MathUtils.Damp`. Add a `SURFACE` mode to the item debugger's `PlayerPreviewState`
-    (`ITEM_DEBUGGER_PLAYER_ANIM=surface`), and a scenario that films a pool in all three bands.
-  - [ ] *Step 4 (remote players):* a cosmetic `Floating` bit in `NetPlayerFlags` beside
-    `Swimming`, so `RemotePlayer` poses the float for others. Check first whether the flags reader
-    rejects an unknown bit; if it does, the protocol version moves.
-- [ ] **Throw charge zoom.** The FOV narrows a few degrees as a throw charges and springs back on
-  release. *Hook:* an eased term added beside `SprintFov` and the punch pinch, driven by the 0..1
-  throw charge; the knob goes in `WorldGenerationConfig`.
+- [x] **Water depth states.** `WaterImmersion` / `WaterPhase` (Dry, Wade, Float, Swim) beside `Camera.IsInWater`; `WadeSpeedFactor`, a buoyancy target that rests the body about 70 % under (`WaterFloatRestShare`), Ctrl dives; the `SURFACE` float pose (`ITEM_DEBUGGER_PLAYER_ANIM=surface`); the cosmetic `NetPlayerFlags.Floating` bit, no protocol bump (`water-depth.json`).
+- [x] **Throw charge zoom.** `ThrowZoom`, a spring-driven FOV term beside `SprintFov` following `Camera.ThrowCharge` (`throw-zoom.json`).
 
 ## Shaders
 
