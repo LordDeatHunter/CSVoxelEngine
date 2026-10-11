@@ -45,9 +45,8 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Mob hit sparks.** A punch, slice or throw that connects throws pale chips from the
   contact point: `BlockDebrisSystem.Spark` at `World.StrikeMob` (singleplayer) and at the client's
   predicted connect, the same one the hit-stop reads; never a server (`MobHitSparkTests`).
-- [ ] **Drop landing bounce.** Item drops hop once or twice when they land instead of stopping
-  dead. *Hook:* the drop physics landing in `DropManager`, a restitution that dies off under a
-  minimum speed (or a `MathUtils.EaseOutBounce` offset on the drawn height only).
+- [x] **Drop landing bounce.** A drop that lands hops back up once or twice (`BounceDamping`
+  restitution, dying off under `BounceMinImpact`) instead of stopping dead (`DropBounceTests`).
 - [x] **Steam on lava hardening.** `FluidManager.HardenedCells` (both hardening rules) -> `World.PuffSteam`, a pale `FireParticleKind.Steam` through `FireParticleSystem.Puff`; a client puffs where a `BlockChanges` entry turns a fluid into its `hardensTo` (`SteamPuffTests`, `world-events.json`).
 - [x] **Tree fall thud.** `TopplingTree.TryTakeLanding` fires once at flat -> `World.ThudTree`: a leaf burst off the landed canopy, `GroundDust.TreeThud` under the trunk, a `ShakeFalloff` shake scaled by the wood that fell (`TreeThudTests`).
 - [x] **TNT blast shake.** `ShakeFalloff.Trauma` (full inside `BlastRadius`, zero at `BlastShakeRangeBlocks`) from `TntManager.Blasts` through `World.ShakeForBlast`; a client shakes where a primed mirror vanishes with its fuse spent (`BlastEffectTests`); the `prime` scenario op strikes a cube without the firestarter's miss chance.

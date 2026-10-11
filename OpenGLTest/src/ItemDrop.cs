@@ -37,12 +37,14 @@ public class ItemDrop
     private const float CollectDistance = 0.2f;
 
     // Idle physics (before the drop latches onto the player): gravity, ground friction and a
-    // small bounce so drops settle onto the terrain instead of hovering where the block was
+    // landing bounce so drops hop once or twice instead of stopping dead
     private const float Gravity = 28f;
     private const float TerminalVelocity = -30f;
     private const float GroundFriction = 8f;
-    private const float BounceDamping = 0.35f;
-    private const float BounceThreshold = 4f;
+    // A landing at or above BounceMinImpact hops back up at BounceDamping of the impact; each hop
+    // is smaller, so a drop dies off under the minimum after one or two and settles
+    private const float BounceDamping = 0.5f;
+    private const float BounceMinImpact = 1f;
     private const float CollisionStepSize = 0.05f;
 
     // Buoyancy: instead of gravity, a submerged drop eases toward a rise proportional to how
@@ -225,7 +227,7 @@ public class ItemDrop
         Position = MoveOnAxis(Position, movement.Z, 2, chunks, out var hitZ);
         Position = MoveOnAxis(Position, movement.Y, 1, chunks, out var hitY);
 
-        // Walls just stop that axis; the floor bounces light impacts and rests on hard ones
+        // Walls just stop that axis; the floor hops a real landing back up and rests a gentle one
         if (hitX) _velocity.X = 0f;
         if (hitZ) _velocity.Z = 0f;
 
@@ -236,7 +238,7 @@ public class ItemDrop
                 // Water absorbs the impact: a sinking drop settles on the bottom rather than
                 // bouncing back up through the surface
                 var impact = -_velocity.Y;
-                _velocity.Y = !floating && impact >= BounceThreshold ? impact * BounceDamping : 0f;
+                _velocity.Y = !floating && impact >= BounceMinImpact ? impact * BounceDamping : 0f;
                 IsGrounded = _velocity.Y == 0f;
             }
             else
