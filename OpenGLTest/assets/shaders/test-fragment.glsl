@@ -69,6 +69,11 @@ uniform float uIceLayer;
 uniform float uIceGlint;
 uniform float uIceShine;
 uniform float uIceSheen;
+// Glass sheen (GlassSheen is the twin): the glass tile's atlas slice (glass blocks and panes share
+// it) and the share of the mirrored sky a face takes at a full graze; 0, the default and the
+// ItemDebugger's, switches it off.
+uniform float uGlassLayer;
+uniform float uGlassSheen;
 // The leaf sway's wind (test-vertex.glsl): downwind direction * WindLean and the gusts' travelled
 // offset; the grass shimmer rolls its bands along it.
 uniform vec2 uWind;
@@ -767,6 +772,26 @@ void main() {
         col += uSunColor * (uSunIntensity * uIceGlint * spec);
     }
 
+    // Glass sheen, on the glass tile only (glass blocks and panes), which draws blended in the
+    // translucent pass: at a graze the pane mirrors the sky. Glass is mostly see-through, so tinting
+    // its colour alone would vanish under its low alpha; instead the sky is folded into the blend
+    // itself, raising the alpha to a + F - aF and the colour to (c a (1 - F) + sky F) / alpha, which
+    // over any background is exactly the plain glass composite mixed toward the sky by F (the Schlick
+    // fresnel times uGlassSheen). abs() reads a face seen from inside the cube the same way, and the
+    // mirrored sky is dimmed by skylight, so there is nothing to mirror underground. GL-free twin:
+    // GlassSheen.
+    float glassAlpha = -1.0;
+    if (uGlassSheen > 0.0 && !isWater && abs(float(fLayer) - uGlassLayer) < 0.5) {
+        vec3 Vg = normalize(uCameraPos - fWorldPos);
+        float side = dot(Vg, N);
+        vec3 Ng = side < 0.0 ? -N : N;
+        float F = Schlick(abs(side)) * uGlassSheen;
+        vec3 skyG = mix(SkySample(reflect(-Vg, Ng)), uFogColor, uFogWet) * fSun;
+        float a = texColor.a;
+        glassAlpha = a + F - a * F;
+        col = (col * (a * (1.0 - F)) + skyG * F) / max(glassAlpha, 1e-4);
+    }
+
     if (fSubmerged > 0.5 && !isWater && dist < 96.0 && fWorldPos.y <= fWaterSurfaceY) {
         // Where on the surface did this sunlight come through? Follow the sun back up to this
         // face's own water surface (baked by the mesher), not the sea plane, so a pond above sea
@@ -1025,6 +1050,8 @@ void main() {
     // Water composited the refracted scene itself, so nothing is left for the blender to
     // show through: its only alpha is the chunk's stream-in fade.
     float texAlpha = texColor.a;
+    // The glass sheen folded the mirrored sky into the blend (see above)
+    if (glassAlpha >= 0.0) texAlpha = glassAlpha;
 #ifdef CHUNK_DRAW
     // The atlas samples its mips, so a leaf texel that survived the cutoff can still carry a
     // filtered alpha below 1; blended as-is the sky would tint the canopy through it. In the

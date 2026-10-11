@@ -776,6 +776,13 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>Share of the mirrored sky an ice face shows at a full graze (scaled by the Schlick fresnel).</summary>
     public const float IceSheenStrength = 0.6f;
 
+    // --- Glass sheen (test-fragment.glsl, GlassSheen) ---
+    /// <summary>
+    /// Share of the mirrored sky a glass (or pane) face shows at a full graze, scaled by the Schlick
+    /// fresnel and folded into the blend (uGlassSheen). 0 switches the term off.
+    /// </summary>
+    public const float GlassSheenStrength = 0.6f;
+
     // --- Wet albedo (test-fragment.glsl, SH-22) ---
     // Albedo multiplier on a submerged face below its own baked water surface. Dry faces beside or
     // above the water are never darkened: the old wet band tinted dry beach tops and banks.

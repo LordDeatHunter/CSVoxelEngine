@@ -380,6 +380,18 @@ light, the dim phase reaches the clipped molten texels too. `LavaPulse` is the G
 strength, smooth, slow); `uLavaPulse` 0 (the ItemDebugger) switches it off. `lava.json` ends with
 two shots of the pool 2.5 s apart (`pulse_a`, `pulse_b`).
 
+**Glass sheen.** Glass blocks and panes share the glass tile (`uGlassLayer`) and draw blended in the
+translucent pass; at a graze they mirror the sky. The weight is `GlassSheenStrength` times the
+Schlick fresnel of `|V.N|` (a face seen from inside the cube reads the same), the sky is `SkySample`
+of the reflected ray blended to `uFogColor` by `uFogWet` and dimmed by skylight. Tinting the colour
+alone would vanish under glass's low tile alpha, so the sky is folded into the blend: the fragment
+writes alpha `a + F - aF` (`glassAlpha`, which replaces `texAlpha` at the end) and colour
+`(c a (1 - F) + sky F) / alpha`, which straight-alpha blended over any background is exactly the
+plain glass composite mixed toward the sky by F. `GlassSheen` is the GL-free twin (`GlassSheenTests`
+proves that identity); `uGlassSheen` 0 (the ItemDebugger) switches it off.
+`visual-examples/glass-sheen.json` (`VOXEL_TIME=147`) places glass and panes on the frozen plain and
+frames them head-on, grazing and from above.
+
 Shaders (`assets/shaders/**/*.glsl`), textures (`assets/textures/**/*.png`), fonts (`assets/fonts/**/*.ttf`) and all content JSON (`assets/**/*.json` — blocks, items, loot tables, models) are copied to the output directory via `CopyToOutputDirectory` rules in the csproj — **new asset types/extensions need a matching `<None Update>` entry** or they won't be found at runtime. The JSON rule is a wildcard over the whole `assets` tree, so adding a block, item, loot table or model needs no csproj edit.
 
 Assets are opened by **relative** path (`FileUtils.ReadFile("assets/shaders/...")`, `TextureAtlas.Build(gl, "assets/textures/blocks")` in `RenderManager.LoadResources`), so the app must be launched with a working directory that contains `assets/` — either the build output directory or `OpenGLTest/`. `dotnet run --project OpenGLTest/silkgltriangle.csproj` satisfies this (it runs from the project folder); launching the built executable from an arbitrary directory does not.
@@ -665,6 +677,7 @@ OpenGLTest/
     GrassShimmer.cs            # GL-free twin of the grass wind shimmer: gust-carried bands, distance fade, the face gate
     IceGlint.cs                # GL-free twin of the ice tile term: fresnel sky sheen weight, gated sun highlight
     LavaPulse.cs               # GL-free twin of the lava glow pulse: the slow noise field and the brightness factor
+    GlassSheen.cs              # GL-free twin of the glass sheen: fresnel weight and the sky folded into the blend
     ChunkGenerationWorker.cs   # background threads creating chunks around every streaming focus (one
                                #   ChunkScanFrontier per focus, served round-robin)
     Camera.cs                  # FPS camera pose, view/proj cache, shoulder/orbit modes; movement+physics and the DDA

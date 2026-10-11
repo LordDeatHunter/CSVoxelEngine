@@ -862,6 +862,9 @@ public class RenderManager : IDisposable
         program.SetUniform("uIceGlint", WorldGenerationConfig.IceGlintStrength);
         program.SetUniform("uIceShine", WorldGenerationConfig.IceGlintShine);
         program.SetUniform("uIceSheen", WorldGenerationConfig.IceSheenStrength);
+        // Glass blocks and panes share the glass tile; their grazing sky tint (GlassSheen)
+        program.SetUniform("uGlassLayer", (float)ContentRegistry.RequireBlock("glass").Top);
+        program.SetUniform("uGlassSheen", WorldGenerationConfig.GlassSheenStrength);
         program.SetUniform("uReflValid", 0f);
         // The water model's tuning constants never change at runtime, so they go up once here
         // instead of riding ApplyFrameUniforms every frame.

@@ -1,0 +1,47 @@
+{
+  // Glass sheen check: run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/glass-sheen.json
+  // Shots land in visual/glass-sheen/. On the barren frozen plain of snow-sparkle.json ((-1112, 584),
+  // ground 18 under a snow drift, flat for six blocks around) the player places a row of three glass
+  // blocks about seven blocks to the north and a row of three glass panes nearer, farthest first so
+  // no placement ray hits an earlier block. Then, with an empty hand:
+  //   head_on   looking straight at both rows: little sheen, the glass as before
+  //   grazing   from beside the rows, looking along them: the faces pick up a fresnel tint of the
+  //             sky (GlassSheen, test-fragment.glsl), and their opacity rises with it
+  //   above     looking down on the rows at a steep angle
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-1111.5, 50.5, 584.5], "yaw": -90, "pitch": -30 },
+    { "op": "wait", "seconds": 16 },
+    { "op": "teleport", "pos": [-1111.5, 21.4, 584.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 1 },
+
+    { "op": "give", "block": "glass", "count": 3 },
+    { "op": "look", "yaw": -90, "pitch": -20 },
+    { "op": "place" },
+    { "op": "look", "yaw": -81, "pitch": -20 },
+    { "op": "place" },
+    { "op": "look", "yaw": -99, "pitch": -20 },
+    { "op": "place" },
+    { "op": "give", "block": "glass_pane", "count": 3 },
+    { "op": "look", "yaw": -90, "pitch": -31 },
+    { "op": "place" },
+    { "op": "look", "yaw": -75, "pitch": -30 },
+    { "op": "place" },
+    { "op": "look", "yaw": -105, "pitch": -30 },
+    { "op": "place" },
+    // An empty hotbar slot keeps the first-person held block out of the shots
+    { "op": "select", "slot": 9 },
+    { "op": "wait", "seconds": 0.5 },
+
+    { "op": "teleport", "pos": [-1111.5, 20.9, 588.5], "yaw": -90, "pitch": -6 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "head_on", "hideHud": true },
+    { "op": "teleport", "pos": [-1105.5, 20.9, 582.5], "yaw": 200, "pitch": -5 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "grazing", "hideHud": true },
+    { "op": "teleport", "pos": [-1111.5, 27.0, 584.5], "yaw": -90, "pitch": -55 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "above", "hideHud": true }
+  ]
+}
