@@ -160,13 +160,9 @@ files waits in TODO.md instead, since there are none to use yet.
   + a tile from a `tools/` script (placeholder, listed in `USER_TODO.md`). Enables the ruined
   pillars.
 - [x] **Cobblestone wall.** `cobblestone_wall`: the pane renderer with `"pane": {"post": 8, "arm": 6}`, full-height arms and `cullSelf` so stacked walls meet seamlessly (`PaneProfileTests`, `fences.json`).
-- [ ] **Placement takes the plant's cell.** Right-clicking tall grass, a dead shrub, a flower or
-  a cotton plant while holding a block should replace the plant with the block instead of
-  filling the cell across the hit face. The flag already exists (`replaceableByPlacement`, read
-  by `Placement.TargetCell`/`CanOccupy`; layered snow is its one user), so this is JSON plus a
-  test. *Hook:* add `"replaceableByPlacement": true` to `tall_grass`, `dead_shrub`, `flower` and
-  `cotton_plant` (all already `solid: false`, which the registry check wants). `PlacementTests`:
-  aiming at a plant fills the plant's own cell and the plant is gone.
+- [x] **Placement takes the plant's cell.** Tall grass, dead shrubs, flowers and cotton plants set
+  `replaceableByPlacement`, so aiming at one fills its own cell and discards it (four JSON files;
+  `PlacementTests`).
 - [ ] **Attacks pass through plants.** A mob behind tall grass cannot be punched or sliced
   today: the line of sight (`BlockRaycaster.SegmentHitsBlock`) stops on the plant's hitbox.
   Plants should not be cover. *Hook:* a `blocksSight` block flag (default true, a `BlockType`

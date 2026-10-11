@@ -12,5 +12,7 @@
   "sway": true,
   "light": { "passes": true },
   "needsSupport": true,
+  // A placement aimed at the plant fills its own cell, discarding it (Placement)
+  "replaceableByPlacement": true,
   "hitbox": { "min": [0.25, 0, 0.25], "max": [0.75, 1, 0.75] }
 }

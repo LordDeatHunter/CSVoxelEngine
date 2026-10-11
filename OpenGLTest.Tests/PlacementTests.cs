@@ -78,4 +78,26 @@ public sealed class PlacementTests
         Assert.Equal(snow.Id, center.GetLocalBlock(8, 8, 8));
         Assert.Equal(snow.StackMax, center.GetLocalState(8, 8, 8));
     }
+
+    [Fact]
+    public void APlacementAimedAtAPlantFillsThePlantCell()
+    {
+        var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
+        MeshTestWorld.FillWalledArea(manager, Block("stone"));
+        var dirt = Block("dirt");
+        var world = center.Position * Chunk.Size + new Vector3(8, 8, 8);
+        var hit = new Vector3(4, 5, 6);
+
+        foreach (var name in new[] { "tall_grass", "dead_shrub", "flower", "cotton_plant" })
+        {
+            var plant = Block(name);
+            // The aim fills the plant's own cell instead of the one across the hit face...
+            Assert.True(BlockType.IsReplaceableByPlacement(plant, 0));
+            Assert.Equal(hit, Placement.TargetCell(hit, Vector3.UnitY, plant, 0));
+            // ...and the write takes it over, plant gone
+            center.SetBlockRaw(8, 8, 8, plant, 0);
+            Assert.True(center.PlaceBlockAt(world, dirt, manager));
+            Assert.Equal(dirt, center.GetLocalBlock(8, 8, 8));
+        }
+    }
 }

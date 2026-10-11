@@ -14,6 +14,8 @@
   "light": { "passes": true },
   "hasItem": false,
   "needsSupport": true,
+  // A placement aimed at the plant fills its own cell, discarding it (Placement)
+  "replaceableByPlacement": true,
   "loot": "dead_shrub",
   "hitbox": { "min": [0.2, 0, 0.2], "max": [0.8, 1, 0.8] }
 }
