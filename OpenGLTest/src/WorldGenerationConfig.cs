@@ -1413,6 +1413,13 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // much of its locally burnt-down fuse left (the server only drops a cube when it detonates)
     public const float BlastMirrorFuseSlackSeconds = 0.5f;
 
+    // --- TNT blast push (BlastImpulse): a blast shoves every loose thing within TntManager.BlastRadius
+    // away from its centre, this many blocks per second at the centre, falling linearly to nothing at
+    // the radius. The direction is tipped up by the bias so things are tossed, not skated. Gameplay:
+    // singleplayer and the server (a player's share goes through its queued knockback). ---
+    public const float BlastPushMaxSpeed = 14f;
+    public const float BlastPushUpBias = 0.5f;
+
     // --- Wind (Wind.cs, SH-27) ---
     // One slowly turning wind shared by leaf sway, fire smoke and the cloud drift.
     /// <summary>Wind heading at lighting time 0, degrees from +X toward +Z.</summary>

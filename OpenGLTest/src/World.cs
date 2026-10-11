@@ -1082,6 +1082,49 @@ public class World : IItemUseWorld
         Camera.AddShake(ShakeFalloff.Trauma(WorldGenerationConfig.BlastShakeStrength, TntManager.BlastRadius,
             WorldGenerationConfig.BlastShakeRangeBlocks, Vector3.Distance(Camera.Position, centre)));
 
+    /// <summary>
+    /// A TNT blast at <paramref name="centre"/> shoves the players and the living mobs in range away
+    /// from it (<see cref="BlastImpulse"/>): the local camera in singleplayer, every connected player
+    /// on a server (through <see cref="IMobTarget.TakeHit"/>, which queues the knockback the player's
+    /// status carries to its client), a creative, flying or dead player being immune; a mob is shoved
+    /// sideways (<see cref="Mob.Shove"/>). The drops, falling cubes and other TNT the blast reached
+    /// were already flung by <see cref="TntManager"/>. Gameplay: singleplayer and the server.
+    /// </summary>
+    private void PushFromBlast(Vector3 centre)
+    {
+        if (_serverMode)
+        {
+            var players = ServerPlayers;
+            for (var i = 0; i < players.Count; i++)
+                PushTargetFromBlast(players[i], centre);
+        }
+        else
+        {
+            PushTargetFromBlast(Camera, centre);
+        }
+
+        for (var i = 0; i < _mobs.Count; i++)
+        {
+            var mob = _mobs[i];
+            if (mob.IsDying) continue;
+            var impulse = BlastImpulse.At(centre, mob.Position, TntManager.BlastRadius);
+            var sideways = new Vector3(impulse.X, 0f, impulse.Z);
+            if (sideways.LengthSquared() > 1e-6f)
+                mob.Shove(sideways, sideways.Length());
+        }
+    }
+
+    // One player's share of a blast, aimed at its body's middle rather than its eye
+    private static void PushTargetFromBlast(IMobTarget target, Vector3 centre)
+    {
+        if (target.IsImmune) return;
+        var body = target.Eye - new Vector3(0f, Camera.EyeHeight * 0.5f, 0f);
+        var impulse = BlastImpulse.At(centre, body, TntManager.BlastRadius);
+        if (impulse == Vector3.Zero) return;
+        var sideways = new Vector3(impulse.X, 0f, impulse.Z);
+        target.TakeHit(0, sideways, sideways.Length(), MathF.Max(0f, impulse.Y));
+    }
+
     /// <summary>Whether any station block entity (campfire, quern, kiln, cast mold) is tracked,
     /// so a server with none sends no station snapshots.</summary>
     public bool HasStations => StationNetCodec.AnyStations(_campfires, _querns, _kilns, _casting);
@@ -1523,10 +1566,14 @@ public class World : IItemUseWorld
         }
 
         _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager, _falling, _leaves, _leafDecay);
-        // Every blast this frame shakes the local camera by its distance; a server's camera is nobody
-        if (!_serverMode)
-            foreach (var blast in _tntManager.Blasts)
+        // Every blast this frame shoves the players and mobs in range and shakes the local camera by its
+        // distance; a server's camera is nobody
+        foreach (var blast in _tntManager.Blasts)
+        {
+            PushFromBlast(blast);
+            if (!_serverMode)
                 ShakeForBlast(blast);
+        }
         _falling.Update((float)deltaTime, _chunkManager, _dropManager, _fluidManager, _lodManager);
         _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager, windTime: LightingTime);
         _debris.Update((float)deltaTime, _chunkManager);

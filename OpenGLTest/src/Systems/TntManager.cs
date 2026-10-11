@@ -7,7 +7,8 @@ namespace silkgltriangle;
 /// <summary>
 /// Owns the live primed TNT: spawns cubes where firestarter strikes and blasts light TNT,
 /// ticks their fuses, and detonates them. A blast clears a sphere of blocks (dropping nothing) and primes any dry TNT
-/// caught in it, so blasts chain; submerged TNT just clears. The player itself is never harmed.
+/// caught in it, so blasts chain; submerged TNT just clears. The player itself is never harmed, only
+/// shoved: everything loose in range is flung away from the centre (<see cref="BlastImpulse"/>).
 /// Main thread only.
 /// </summary>
 public class TntManager
@@ -24,8 +25,9 @@ public class TntManager
     public const float ChainFuseSeconds = 0.5f;
 
     private readonly List<PrimedTnt> _primed = [];
-    // Spawned while iterating _primed (chained TNT); drained after the tick
-    private readonly List<(Vector3 Position, byte BlockId)> _pendingSpawns = [];
+    // Spawned while iterating _primed (chained TNT), each with the shove of the blast that lit it;
+    // drained after the tick
+    private readonly List<(Vector3 Position, byte BlockId, Vector3 Impulse)> _pendingSpawns = [];
     // Centres of the blasts of the last Update, for the world's camera shake
     private readonly List<Vector3> _blasts = [];
 
@@ -96,8 +98,12 @@ public class TntManager
             Detonate(at, chunks, lod, drops, fluids, falling, leaves, leafDecay);
         }
 
-        foreach (var (position, blockId) in _pendingSpawns)
-            _primed.Add(new PrimedTnt(position, blockId, ChainFuseSeconds));
+        foreach (var (position, blockId, impulse) in _pendingSpawns)
+        {
+            var chained = new PrimedTnt(position, blockId, ChainFuseSeconds);
+            chained.Push(impulse);
+            _primed.Add(chained);
+        }
         _pendingSpawns.Clear();
     }
 
@@ -164,8 +170,9 @@ public class TntManager
             if (BlockType.ById[removed]?.OnBreak == BlockBreakAction.PrimeTnt
                 && !IsSubmerged(chunks, x, y, z))
             {
-                // Deferred: the live list is being iterated further up the call stack
-                _pendingSpawns.Add((new Vector3(x + 0.5f, y + 0.5f, z + 0.5f), removed));
+                // Deferred: the live list is being iterated further up the call stack. The cube is
+                // flung like everything else the blast reaches
+                _pendingSpawns.Add((cellCenter, removed, BlastImpulse.At(center, cellCenter, radius)));
             }
             else
             {
@@ -218,6 +225,16 @@ public class TntManager
                     standingState);
             }
         }
+
+        // Everything loose in range is flung away from the centre: the other primed TNT, the drops
+        // (this blast's own loot included, so it flies out of the crater) and the falling cubes
+        // already in the air. Before the sweep below, so sand this blast undermines falls straight
+        // and rebuilds instead of scattering. The world shoves the players and mobs (Blasts).
+        foreach (var other in _primed)
+            other.Push(BlastImpulse.At(center, other.Position, radius));
+        drops.ApplyBlastImpulse(center, radius);
+        foreach (var block in falling.Falling)
+            block.Push(BlastImpulse.At(center, block.Position, radius));
 
         foreach (var chunkPos in touchedChunks)
         {

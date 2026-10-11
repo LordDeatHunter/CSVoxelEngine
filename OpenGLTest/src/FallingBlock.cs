@@ -76,6 +76,23 @@ public class FallingBlock
         _lastPosition = position;
     }
 
+    /// <summary>Current velocity in blocks per second.</summary>
+    public Vector3 Velocity => _velocity;
+
+    /// <summary>
+    /// Adds <paramref name="impulse"/> (blocks per second) to the velocity: a blast's shove
+    /// (<see cref="BlastImpulse"/>). The cube counts as airborne again, so it neither settles mid-flight
+    /// nor keeps a slide it was committed to.
+    /// </summary>
+    public void Push(Vector3 impulse)
+    {
+        _velocity += impulse;
+        _restTime = 0f;
+        _sliding = false;
+        _slideDir = null;
+        _wasAirborne = true;
+    }
+
     /// <summary>Advances the physics. Main thread only.</summary>
     public void Update(float deltaTime, ChunkManager chunks)
     {

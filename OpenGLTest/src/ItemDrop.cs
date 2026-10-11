@@ -125,6 +125,14 @@ public class ItemDrop
     /// <summary>Seconds since the drop appeared; drives the spin, the pulse and the pickup delay.</summary>
     internal float Age => _age;
 
+    /// <summary>Adds <paramref name="impulse"/> (blocks per second) to an idle drop's velocity: a blast's
+    /// shove (<see cref="BlastImpulse"/>). A drop already flying at a player ignores it.</summary>
+    internal void Push(Vector3 impulse)
+    {
+        if (_attracted) return;
+        _velocity += impulse;
+    }
+
     /// <summary>
     /// Lets go of the player the drop was flying at, so it falls back to the ground under its idle
     /// physics: a multiplayer server calls it when no player can take the drop any more (the one

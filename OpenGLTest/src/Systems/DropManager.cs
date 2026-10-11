@@ -30,6 +30,16 @@ public class DropManager
     public void Clear() => _drops.Clear();
 
     /// <summary>
+    /// A TNT blast of <paramref name="radius"/> at <paramref name="centre"/> shoves every idle drop in
+    /// range away from it (<see cref="BlastImpulse"/>), so loot flies out of a crater.
+    /// </summary>
+    public void ApplyBlastImpulse(Vector3 centre, float radius)
+    {
+        for (var i = 0; i < _drops.Count; i++)
+            _drops[i].Push(BlastImpulse.At(centre, _drops[i].Position, radius));
+    }
+
+    /// <summary>
     /// Block ids collected during the most recent <see cref="Update"/>. Valid until the next one.
     /// </summary>
     public ReadOnlySpan<byte> Collected => CollectionsMarshal.AsSpan(_collected);

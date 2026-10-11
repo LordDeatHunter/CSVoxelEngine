@@ -117,6 +117,13 @@ public class PrimedTnt
         FuseRemaining = MathF.Max(0f, FuseRemaining - deltaTime);
     }
 
+    /// <summary>Current velocity in blocks per second.</summary>
+    public Vector3 Velocity => _velocity;
+
+    /// <summary>Adds <paramref name="impulse"/> (blocks per second) to the velocity: another blast's
+    /// shove (<see cref="BlastImpulse"/>), which gravity and the collisions then play out.</summary>
+    public void Push(Vector3 impulse) => _velocity += impulse;
+
     /// <summary>Advances the fuse and the physics. Main thread only.</summary>
     public void Update(float deltaTime, ChunkManager chunks)
     {
