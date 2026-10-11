@@ -4,26 +4,32 @@
   // (bare limbs under their leaf pads read as fronds); a dedicated palm logic is still open. Its
   // own wood and leaf blocks (palm_log, palm_leaves) so the decay and crumble rules resolve the
   // palm, never an oak sharing the same ids.
+  // Shape tuned against the 8 flat-ground test samples: an 11-cell trunk, 4 fronds of 7-10 bare
+  // cells each (one per side, off the top two trunk nodes), then a radius-3 fan at every tip. The
+  // 2.6 base girth with pipeExponent 1.5 grows the root to the 12 px cap on every mature tree
+  // (6-7 px at 15 %, 6-8 at 25 %), so the full crown waits for a mature trunk, and the 90-115
+  // pulse budget is what keeps every frond long enough to leave its own first cell bare.
   "wood": "block/palm_log",
   "leaves": "block/palm_leaves",
   "growth": {
     "logic": "umbrella",
-    "signalEnergy": 20,
+    // 22 keeps the tree's schedule box (a whole felled crown) under the leaf-decay backlog cap
+    "signalEnergy": 22,
     "upProbability": 4,
     "lowestBranchHeight": 8,
-    "maturitySteps": [30, 45]
+    "maturitySteps": [90, 115]
   },
   "thickness": {
-    "tipPx": 2,
+    "tipPx": 1,
     "pipeExponent": 1.5,
     "maxPx": 12,
-    "girthProfile": [[0, 1.6], [0.5, 1.2], [1, 1.0]],
+    "girthProfile": [[0, 2.6], [0.5, 1.6], [1, 1.0]],
     "trunkShape": "circle",
     "rim": "block"
   },
   "leafCluster": { "shape": "fan", "radius": 3, "hydration": 5, "tipMaxPx": 3, "minRadius": 1, "fullRadiusPx": 12 },
   "features": [ { "type": "roots", "depth": 3 } ],
-  "lod": { "crownHeight": [10, 13], "crownRadius": 3, "profile": "column" },
+  "lod": { "crownHeight": [12, 15], "crownRadius": 10, "profile": "dome" },
   "worldgen": {
     "biomes": ["desert"],
     "oasis": true,

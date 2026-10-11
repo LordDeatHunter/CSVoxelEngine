@@ -46,13 +46,20 @@ public sealed class GrowTreeItemTests
     }
 
     [Fact]
-    public void EverySpeciesBlockNamesItsSpecies()
+    public void EverySpeciesBlockResolvesToItsSpeciesOrItsWoodsLeafyOwner()
     {
         foreach (var species in TreeSpeciesRegistry.All)
         {
-            Assert.Equal(species.Name, TreeSpeciesRegistry.ForBlock(species.WoodId)?.Name);
+            // Leaves are never shared, so they always name their species
             if (species.LeavesId != 0)
                 Assert.Equal(species.Name, TreeSpeciesRegistry.ForBlock(species.LeavesId)?.Name);
+
+            // A wood resolves to its species, or to the leafy species whose wood it borrows (the
+            // dead tree and the oak): growing the column's tree never turns an oak into a snag
+            var owner = TreeSpeciesRegistry.ForBlock(species.WoodId);
+            Assert.NotNull(owner);
+            Assert.True(owner == species || (owner.HasLeaves && owner.WoodId == species.WoodId),
+                $"'{species.Name}' wood resolves to '{owner.Name}'");
         }
 
         Assert.Null(TreeSpeciesRegistry.ForBlock(ContentRegistry.RequireBlock("stone").Id));

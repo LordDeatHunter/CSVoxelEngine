@@ -1728,6 +1728,10 @@ public static class ContentRegistry
             if (falls && needsSupport)
                 throw new InvalidOperationException(
                     $"Block '{path}' sets both falls and needsSupport: a falling block topples instead of popping.");
+            var flowResistant = definition.FlowResistant ?? false;
+            if (flowResistant && !needsSupport)
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets flowResistant without needsSupport: only a fragile block has a wash-away rule to opt out of.");
             var (horizontalFacing, supportAttached) =
                 ParseFacingAndSupport(definition, renderer, fluid, falls, stackMax, needsSupport, path, out var supportAbove);
             var facingFromLook = ParseFacingFromLook(definition, horizontalFacing, supportAttached, path);
@@ -1849,6 +1853,7 @@ public static class ContentRegistry
                 WoodLootBands = woodLootBands ?? [new WoodLootBand(0, null, true)],
                 HasItem = !fluid && (definition.HasItem ?? true),
                 NeedsSupport = needsSupport,
+                FlowResistant = flowResistant,
                 SupportAttached = supportAttached,
                 SupportAbove = supportAbove,
                 HasHorizontalFacing = horizontalFacing,
@@ -1923,8 +1928,9 @@ public static class ContentRegistry
             BlockType.HardensToById[id] = type.HardensToId;
             BlockType.HardensTouchingById[id] = type.HardensTouchingId;
             BlockType.FallsById[id] = type.Falls;
-            // Fragile blocks are washed away by a flow instead of stopping it
-            BlockType.ReplaceableById[id] = type.NeedsSupport;
+            // Fragile blocks are washed away by a flow instead of stopping it; a flow-resistant
+            // one (a cave formation) is rock and stays standing
+            BlockType.ReplaceableById[id] = type.NeedsSupport && !type.FlowResistant;
             // A flagged block is taken over in place by a placement aimed at it
             BlockType.ReplaceableByPlacementById[id] = type.ReplaceableByPlacement;
         }

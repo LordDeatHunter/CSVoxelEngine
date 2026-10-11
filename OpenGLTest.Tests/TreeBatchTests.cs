@@ -296,19 +296,17 @@ public sealed class TreeBatchTests
     /// least <see cref="TreeGenerator.ReachHorizontal"/> from every cell border, so only their own
     /// cell's trees reach them, searched in rings outward from the origin.
     /// </summary>
-    private static IEnumerable<(int Cx, int Cz)> ForestColumnsInsideACell()
+    // Wooded forest chunk columns, searched in rings from the origin. No margin from a tree
+    // cell's border is needed: a chunk's canopy aggregates every batch that can overhang it
+    // (TreeGenerator.GetCanopyColumns), so the comparison holds at any reach.
+    private static IEnumerable<(int Cx, int Cz)> WoodedForestColumns()
     {
         const int maxRadius = 96;
-        var mask = WorldGenerationConfig.TreeCellBlocks - 1;
-        var r = TreeGenerator.ReachHorizontal;
-        bool Inside(int chunk) =>
-            ((chunk * Chunk.Size) & mask) >= r && (((chunk + 1) * Chunk.Size - 1) & mask) <= mask - r;
-
         for (var ring = 1; ring <= maxRadius; ring++)
         for (var cx = -ring; cx <= ring; cx++)
         for (var cz = -ring; cz <= ring; cz++)
         {
-            if (Math.Max(Math.Abs(cx), Math.Abs(cz)) != ring || !Inside(cx) || !Inside(cz)) continue;
+            if (Math.Max(Math.Abs(cx), Math.Abs(cz)) != ring) continue;
 
             var allForest = true;
             for (var dx = -1; dx <= 1 && allForest; dx++)
@@ -331,12 +329,13 @@ public sealed class TreeBatchTests
         var leafIds = TreeWorldgenFixture.LeafIds();
         var canopied = 0;
         var tried = 0;
-        foreach (var (cx, cz) in ForestColumnsInsideACell())
+        foreach (var (cx, cz) in WoodedForestColumns())
         {
             // Widen the search until some column actually carries a canopy, a few columns at most
             if (canopied > 0 || ++tried > 4) break;
 
-            var world = TreeWorldgenFixture.Generate(cx, cz, reverse: false);
+            var world = TreeWorldgenFixture.Generate(cx, cz, reverse: false,
+                radius: TreeGenerator.ReachChunkRadius);
             var highest = new Dictionary<(int X, int Z), (int Y, byte Leaf)>();
             foreach (var ((x, y, z), (block, _)) in world)
             {

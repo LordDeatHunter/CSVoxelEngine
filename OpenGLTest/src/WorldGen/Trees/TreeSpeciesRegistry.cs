@@ -23,17 +23,21 @@ public static class TreeSpeciesRegistry
 
     /// <summary>
     /// The species whose wood or leaves <paramref name="blockId"/> is, or null for any other block.
-    /// Two species sharing one wood (allowed when they agree on the rim) resolve to the first in
-    /// file order, which is all a use that grows the column's tree needs.
+    /// A block two species share (the dead tree borrows the oak's wood) resolves to the leafy owner,
+    /// so the growth item never turns an oak into a snag; a leafless species with a wood of its own
+    /// still resolves to itself.
     /// </summary>
     public static TreeSpecies? ForBlock(byte blockId)
     {
+        TreeSpecies? leafless = null;
         foreach (var species in _byName.Values)
         {
-            if (species.WoodId == blockId || (species.LeavesId != 0 && species.LeavesId == blockId))
-                return species;
+            if (species.WoodId != blockId && (species.LeavesId == 0 || species.LeavesId != blockId))
+                continue;
+            if (species.HasLeaves) return species;
+            leafless ??= species;
         }
-        return null;
+        return leafless;
     }
 
     /// <summary>The species registered under that file name; throws naming the missing content.</summary>

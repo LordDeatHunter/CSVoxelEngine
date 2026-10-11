@@ -12,6 +12,7 @@ namespace silkgltriangle.Tests;
 public sealed class TileMaterialTests
 {
     private const string Coal = "coal_ore";
+    private const string Crystal = "crystal_block";
     private const string Malachite = "malachite_ore";
     private const string Obsidian = "obsidian";
 
@@ -21,15 +22,17 @@ public sealed class TileMaterialTests
         TileMaterials.Of(TextureAtlas.TileOf(name));
 
     [Fact]
-    public void OnlyTheOresAreReflective()
+    public void OnlyTheOresAndTheGeodesCrystalAreReflective()
     {
+        // The geode's crystal block is shiny on purpose (its own `material`); everything else
+        // that reflects is an ore
         var reflective = BlockType.Types.Values
             .Where(t => t.Material is { } m && m.IsReflective)
             .Select(t => t.Name)
             .OrderBy(n => n, System.StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal([Coal, Malachite, Obsidian], reflective);
+        Assert.Equal([Coal, Crystal, Malachite, Obsidian], reflective);
     }
 
     [Fact]

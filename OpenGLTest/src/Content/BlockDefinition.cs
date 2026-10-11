@@ -119,6 +119,13 @@ public sealed class BlockDefinition
     public bool? NeedsSupport { get; set; }
 
     /// <summary>
+    /// Whether a <see cref="NeedsSupport"/> block a flow may not wash away: a cave formation is
+    /// rock, not vegetation, so water flowing past leaves it standing (it still pops when the
+    /// block holding it up is mined). Only legal with <see cref="NeedsSupport"/>.
+    /// </summary>
+    public bool? FlowResistant { get; set; }
+
+    /// <summary>
     /// Which neighbour holds a <see cref="NeedsSupport"/> block up: <c>"below"</c> (the default: a
     /// flower, a floor torch), <c>"above"</c> (a hanging lantern: the cell over it, so it is placed
     /// against a block's underside) or <c>"attached"</c> (a wall torch): the cell behind the

@@ -327,6 +327,12 @@ public sealed record BlockType
     /// (see <see cref="BlockSupport"/>).</summary>
     public bool NeedsSupport { get; init; }
 
+    /// <summary>Whether a <see cref="NeedsSupport"/> block a flow may not wash away (a cave
+    /// formation): water flowing past it leaves it standing, where an ordinary fragile block
+    /// (a pebble, a plant) is displaced and drops its loot. It still pops when the block holding
+    /// it up is mined, which is <see cref="BlockSupport"/>'s rule, not this one.</summary>
+    public bool FlowResistant { get; init; }
+
     /// <summary>Whether a <see cref="NeedsSupport"/> block hangs off the cell behind its front
     /// (a wall torch) instead of standing on the cell below; only ever set together with
     /// <see cref="HasHorizontalFacing"/>, whose facing names that front.</summary>

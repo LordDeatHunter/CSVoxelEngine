@@ -10,6 +10,8 @@
   "light": { "passes": true },
   "hasItem": false,
   "needsSupport": true,
+  // Rock, not vegetation: a flow washes an ordinary fragile block away, never this one
+  "flowResistant": true,
   "support": "above",
   "blocksSight": false,
   "loot": "cave_stone",

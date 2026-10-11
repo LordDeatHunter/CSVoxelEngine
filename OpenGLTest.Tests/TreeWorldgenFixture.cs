@@ -44,15 +44,19 @@ internal static class TreeWorldgenFixture
     }
 
     /// <summary>
-    /// Generates the 3x3 chunk columns around (cx, cz) over the band from below the lowest surface
-    /// to above the tallest tree, and returns every cell's (block, state) by world position.
+    /// Generates the (2 * <paramref name="radius"/> + 1)² chunk columns around (cx, cz) over the
+    /// band from below the lowest surface to above the tallest tree, and returns every cell's
+    /// (block, state) by world position. A canopy read reaches <see cref="TreeGenerator.ReachHorizontal"/>
+    /// blocks out, so a test comparing against it wants <see cref="TreeGenerator.ReachChunkRadius"/>
+    /// rather than the default one-chunk ring.
     /// </summary>
-    public static Dictionary<(int X, int Y, int Z), (byte Block, byte State)> Generate(int cx, int cz, bool reverse)
+    public static Dictionary<(int X, int Y, int Z), (byte Block, byte State)> Generate(
+        int cx, int cz, bool reverse, int radius = 1)
     {
         var minHeight = int.MaxValue;
         var maxHeight = int.MinValue;
-        for (var dx = -1; dx <= 1; dx++)
-        for (var dz = -1; dz <= 1; dz++)
+        for (var dx = -radius; dx <= radius; dx++)
+        for (var dz = -radius; dz <= radius; dz++)
         {
             var column = ColumnCache.Get(cx + dx, cz + dz);
             minHeight = Math.Min(minHeight, column.MinHeight);
@@ -62,8 +66,8 @@ internal static class TreeWorldgenFixture
         var cyLo = (minHeight >> Chunk.SizeShift) - 1;
         var cyHi = ((maxHeight + TreeGenerator.ReachUp) >> Chunk.SizeShift) + 1;
         var positions = new List<Vector3>();
-        for (var dx = -1; dx <= 1; dx++)
-        for (var dz = -1; dz <= 1; dz++)
+        for (var dx = -radius; dx <= radius; dx++)
+        for (var dz = -radius; dz <= radius; dz++)
         for (var cy = cyLo; cy <= cyHi; cy++)
             positions.Add(new Vector3(cx + dx, cy, cz + dz));
         if (reverse) positions.Reverse();

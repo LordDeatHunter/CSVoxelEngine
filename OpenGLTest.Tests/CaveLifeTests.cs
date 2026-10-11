@@ -109,4 +109,20 @@ public sealed class CaveLifeTests
         Assert.True(stalactites > 0, "no stalactite in the cave room");
         Assert.True(stalagmites > 0, "no stalagmite in the cave room");
     }
+
+    [Fact]
+    public void ACaveFormationIsRockAndAFlowLeavesItStanding()
+    {
+        // A formation pops when the rock holding it up is mined, but a flow may not wash it away
+        // the way it washes a pebble or a plant away: the fluid tick reads IsReplaceable
+        var stalagmite = ContentRegistry.RequireBlock("stalagmite").Id;
+        var stalactite = ContentRegistry.RequireBlock("stalactite").Id;
+        var pebble = ContentRegistry.RequireBlock("pebble").Id;
+
+        Assert.True(BlockType.ById[stalagmite]!.NeedsSupport);
+        Assert.True(BlockType.ById[stalagmite]!.FlowResistant);
+        Assert.False(BlockType.IsReplaceable(stalagmite));
+        Assert.False(BlockType.IsReplaceable(stalactite));
+        Assert.True(BlockType.IsReplaceable(pebble));
+    }
 }

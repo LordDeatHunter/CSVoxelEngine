@@ -33,6 +33,61 @@ public sealed class CellBatchMesherTests
     private static IEnumerable<Vertex> AllVertices(IEnumerable<ChunkMeshData> meshes) =>
         meshes.SelectMany(m => m.Vertices.Concat(m.TranslucentVertices));
 
+    /// <summary>Every quad a mesh draws, as its four corners.</summary>
+    private static IEnumerable<Vector3[]> Quads(IEnumerable<ChunkMeshData> meshes)
+    {
+        foreach (var mesh in meshes)
+        foreach (var (vertices, indices) in new[] { (mesh.Vertices, mesh.Indices), (mesh.TranslucentVertices, mesh.TranslucentIndices) })
+            for (var q = 0; q + 5 < indices.Count; q += 6)
+                yield return
+                [
+                    vertices[indices[q]].Position, vertices[indices[q + 1]].Position,
+                    vertices[indices[q + 2]].Position, vertices[indices[q + 3]].Position,
+                ];
+    }
+
+    private static float Axis(Vector3 v, int axis) => axis switch { 0 => v.X, 1 => v.Y, _ => v.Z };
+
+    private static bool IsInteger(float f) => MathF.Abs(f - MathF.Round(f)) < Eps;
+
+    /// <summary>
+    /// Whether some quad draws this cell: an axis-aligned quad on one of its face planes covering
+    /// the face's centre (a greedy merge draws one quad across many cells, so the cells it covers
+    /// in the middle hold no vertex of their own), or — for the procedural boxes, tubes and rims —
+    /// a vertex landing inside the cell.
+    /// </summary>
+    private static bool IsDrawn((int X, int Y, int Z) cell, IReadOnlyList<Vector3> vertices, IEnumerable<Vector3[]> quads)
+    {
+        foreach (var v in vertices)
+        {
+            if (MathF.Floor(v.X + Eps) == cell.X && MathF.Floor(v.Y + Eps) == cell.Y
+                && MathF.Floor(v.Z + Eps) == cell.Z)
+                return true;
+        }
+
+        var centre = new Vector3(cell.X + 0.5f, cell.Y + 0.5f, cell.Z + 0.5f);
+        foreach (var quad in quads)
+        for (var axis = 0; axis < 3; axis++)
+        {
+            var plane = Axis(quad[0], axis);
+            if (!IsInteger(plane) || MathF.Abs(plane - (Axis(centre, axis) + 0.5f)) > 0.5f + Eps) continue;
+            var covers = true;
+            for (var other = 0; other < 3 && covers; other++)
+            {
+                if (other == axis) continue;
+                float lo = float.MaxValue, hi = float.MinValue;
+                foreach (var corner in quad)
+                {
+                    lo = MathF.Min(lo, Axis(corner, other));
+                    hi = MathF.Max(hi, Axis(corner, other));
+                }
+                covers = Axis(centre, other) >= lo - Eps && Axis(centre, other) <= hi + Eps;
+            }
+            if (covers) return true;
+        }
+        return false;
+    }
+
     private static (int X, int Y, int Z) ChunkOf(int x, int y, int z) =>
         (x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift);
 
@@ -82,23 +137,15 @@ public sealed class CellBatchMesherTests
             var cells = GrowAtCorner(species);
             var occupied = cells.Select(c => (c.X, c.Y, c.Z)).ToHashSet();
 
-            // Every cell some vertex lies on or inside, the vertex grown by a small epsilon.
-            var touched = new HashSet<(int, int, int)>();
-            foreach (var v in AllVertices(CellBatchMesher.Build(cells)))
-            {
-                var lo = v.Position - new Vector3(Eps);
-                var hi = v.Position + new Vector3(Eps);
-                for (var x = (int)MathF.Floor(lo.X); x <= (int)MathF.Floor(hi.X); x++)
-                for (var y = (int)MathF.Floor(lo.Y); y <= (int)MathF.Floor(hi.Y); y++)
-                for (var z = (int)MathF.Floor(lo.Z); z <= (int)MathF.Floor(hi.Z); z++)
-                    touched.Add((x, y, z));
-            }
+            var meshes = CellBatchMesher.Build(cells);
+            var vertices = AllVertices(meshes).Select(v => v.Position).ToList();
+            var quads = Quads(meshes).ToList();
 
             foreach (var c in cells)
             {
                 var exposed = FaceOffsets.Any(o => !occupied.Contains((c.X + o.X, c.Y + o.Y, c.Z + o.Z)));
                 if (exposed)
-                    Assert.True(touched.Contains((c.X, c.Y, c.Z)),
+                    Assert.True(IsDrawn((c.X, c.Y, c.Z), vertices, quads),
                         $"{species.Name}: exposed cell ({c.X}, {c.Y}, {c.Z}) produced no geometry");
             }
         }
