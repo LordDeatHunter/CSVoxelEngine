@@ -59,7 +59,6 @@ public static class WorldSeed
         NoiseCaves.Reseed();
         CoalGenerator.Reseed();
         MalachiteGenerator.Reseed();
-        FlowerGenerator.Reseed();
         LavaGenerator.Reseed();
         PebbleGenerator.Reseed();
         SnowGenerator.Reseed();

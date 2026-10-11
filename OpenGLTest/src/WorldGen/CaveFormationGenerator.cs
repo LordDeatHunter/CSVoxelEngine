@@ -54,7 +54,8 @@ public static class CaveFormationGenerator
         for (var z = 0; z < Chunk.Size; z++)
         {
             var height = column.Heights[(x << Chunk.SizeShift) | z];
-            var top = Math.Min(height - WorldGenerationConfig.CaveFormationMinDepth, worldY0 + Chunk.Size - 1);
+            var top = Math.Min(height - WorldGenerationConfig.CaveFormationMinDepth,
+                worldY0 + Chunk.Size - 2);
             for (var y = top; y >= worldY0; y--)
             {
                 var ly = y - worldY0;

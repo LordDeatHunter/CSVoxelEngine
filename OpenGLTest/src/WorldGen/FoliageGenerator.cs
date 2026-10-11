@@ -53,8 +53,17 @@ public static class FoliageGenerator
     {
         if (!TerrainGenerator.IsForest(x, z)) return false;
         if (GrassPatchNoise.GetNoise(x, z) <= WorldGenerationConfig.GrassPatchThreshold) return false;
-        return UnitHash(x, z, GrassDensitySalt) < WorldGenerationConfig.GrassDensity;
+        // Denser where the climate is wetter (Climate's own wetness, the tint's input)
+        TerrainGenerator.Climate(x, z, out _, out var wetness);
+        var density = GrassDensityAt(wetness);
+        return UnitHash(x, z, GrassDensitySalt) < density;
     }
+
+    /// <summary>The tuft density a column of this climate wetness takes: the dry end's share at
+    /// 0, the wet end's at 1, linear between.</summary>
+    public static float GrassDensityAt(float wetness) =>
+        MathUtils.Lerp(WorldGenerationConfig.GrassDensityDry, WorldGenerationConfig.GrassDensityWet,
+            MathUtils.Clamp01(wetness));
 
     /// <summary>Whether the desert surface column (x, z) grows a dead shrub.</summary>
     public static bool TryGetDeadShrub(int x, int z)

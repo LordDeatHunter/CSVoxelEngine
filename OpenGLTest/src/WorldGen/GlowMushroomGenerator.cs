@@ -35,8 +35,10 @@ public static class GlowMushroomGenerator
             var height = column.Heights[(x << Chunk.SizeShift) | z];
             if (!TryGetMushroom(worldX0 + x, worldZ0 + z)) continue;
 
-            // Down from the deepest cell this chunk could hold to the depth line
-            var top = Math.Min(height - WorldGenerationConfig.GlowMushroomMinDepth, worldY0 + Chunk.Size - 1);
+            // Down from the deepest cell this chunk could hold to the depth line (one short of the
+            // chunk top, so the headroom read stays inside the chunk)
+            var top = Math.Min(height - WorldGenerationConfig.GlowMushroomMinDepth,
+                worldY0 + Chunk.Size - 2);
             for (var y = top; y >= worldY0; y--)
             {
                 var ly = y - worldY0;

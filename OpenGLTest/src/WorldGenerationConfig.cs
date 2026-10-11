@@ -1751,12 +1751,17 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Fraction of natural pebble stones that are obsidian instead of flint (~1% per rock)
     public const float PebbleObsidianChance = 0.01f;
 
-    // --- Flowers (FlowerGenerator) ---
-    // Meadow cross-blocks in low-frequency patches on dry grass; a density roll thins inside them
+    // --- Flowers (FlowerGenerator over PlantClumps) ---
+    // Meadow cross-blocks in clumps on dry grass, only where the forest is open enough
     public const bool FlowersEnabled = true;
-    public const float FlowerPatchFrequency = 1f / 64f;
-    public const float FlowerPatchThreshold = 0.2f;
-    public const float FlowerDensity = 0.06f;
+    public const int MeadowCellShift = 5;
+    public const int MeadowRadius = 4;
+    public const int MeadowJitter = 3;
+    public const int MeadowMinMembers = 4;
+    public const float MeadowClumpChance = 0.45f;
+    public const float MeadowEdgeDensity = 0.25f;
+    // ForestOpenness a clump's centre needs: the open stretches between the woodland
+    public const float MeadowMinOpenness = 0.55f;
 
     // --- Foliage (FoliageGenerator) ---
     // Ground cover on the biome's own surface: forest grass tufts are common, desert dead shrubs
@@ -1764,7 +1769,9 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const bool FoliageEnabled = true;
     public const float GrassPatchFrequency = 1f / 48f;
     public const float GrassPatchThreshold = 0.05f;
-    public const float GrassDensity = 0.35f;
+    // The tuft density runs from the dry end to the wet end of the climate's wetness
+    public const float GrassDensityDry = 0.15f;
+    public const float GrassDensityWet = 0.5f;
     public const float ShrubPatchFrequency = 1f / 64f;
     public const float ShrubPatchThreshold = 0.2f;
     public const float ShrubDensity = 0.04f;

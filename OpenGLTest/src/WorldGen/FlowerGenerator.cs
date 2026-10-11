@@ -3,17 +3,28 @@ using System;
 namespace silkgltriangle;
 
 /// <summary>
-/// Meadow flowers in low-frequency patches: one X-shaped cross block sitting on the
-/// surface, a pure function of (x, z) like <see cref="PebbleGenerator"/> so chunks agree
-/// without shared state. Only dry grass columns qualify (no beaches, no sea floors),
-/// and the cell above the ground must be air over grass.
+/// Meadow flowers in clumps: one X-shaped cross block sitting on the surface, placed through
+/// <see cref="PlantClumps"/> over <see cref="Clumps"/> and gated at the clump's centre by
+/// <see cref="IsOpenMeadow"/> (open forest), so a meadow grows whole or not at all. A pure
+/// function of (x, z) and the seed, so chunks agree without shared state. Only dry grass columns
+/// qualify (no beaches, no sea floors), and the cell above the ground must be air over grass.
 /// </summary>
 public static class FlowerGenerator
 {
-    private const int PatchSalt = 0x7A3B1C;
-    private const int DensitySalt = 0x7A3B1D;
+    private const int ClumpSalt = 0x7A3B1E;
 
-    private static FastNoiseLite PatchNoise;
+    /// <summary>The clump shape every meadow flower is placed by.</summary>
+    public static readonly PlantClumpSpec Clumps = new(
+        WorldGenerationConfig.MeadowCellShift,
+        WorldGenerationConfig.MeadowRadius,
+        WorldGenerationConfig.MeadowJitter,
+        WorldGenerationConfig.MeadowMinMembers,
+        WorldGenerationConfig.MeadowClumpChance,
+        WorldGenerationConfig.MeadowEdgeDensity,
+        ClumpSalt);
+
+    // Cached so a membership test never allocates a delegate
+    private static readonly Func<int, int, bool> OpennessGate = IsOpenMeadow;
 
     /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
     public static readonly byte FlowerBlock;
@@ -22,25 +33,23 @@ public static class FlowerGenerator
 
     static FlowerGenerator()
     {
-        Reseed();
         FlowerBlock = ContentRegistry.RequireBlock("flower").Id;
         GrassBlock = ContentRegistry.RequireBlock("grass").Id;
     }
 
     /// <summary>
-    /// Builds the noise from the current <see cref="WorldGenerationConfig.Seed"/>: once from the
-    /// static constructor, and again by <see cref="WorldSeed.Apply"/> while no worker thread runs.
+    /// Whether a clump centred at (x, z) may grow: forest open enough
+    /// (<see cref="TerrainGenerator.ForestOpenness"/> at least
+    /// <see cref="WorldGenerationConfig.MeadowMinOpenness"/>), so meadows fill the open stretches
+    /// between the woodland instead of the woods themselves.
     /// </summary>
-    internal static void Reseed() => PatchNoise = TerrainGenerator.MakeNoise(62, WorldGenerationConfig.FlowerPatchFrequency);
+    public static bool IsOpenMeadow(int x, int z) =>
+        TerrainGenerator.IsForest(x, z)
+        && TerrainGenerator.ForestOpenness(x, z) >= WorldGenerationConfig.MeadowMinOpenness;
 
-    /// <summary>Whether the surface column (x, z) grows a flower.</summary>
-    public static bool TryGetFlower(int x, int z)
-    {
-        // A meadow plant: desert and ocean columns stay bare
-        if (!TerrainGenerator.IsForest(x, z)) return false;
-        if (PatchNoise.GetNoise(x, z) <= WorldGenerationConfig.FlowerPatchThreshold) return false;
-        return UnitHash(x, z, DensitySalt) < WorldGenerationConfig.FlowerDensity;
-    }
+    /// <summary>Whether the surface column (x, z) grows a flower, before the terrain checks.</summary>
+    public static bool TryGetFlower(int x, int z) =>
+        PlantClumps.TryGetMember(Clumps, WorldGenerationConfig.Seed, x, z, OpennessGate, out _, out _);
 
     /// <summary>
     /// Stamps flowers onto the surface: one block above the heightmap, into air only, and
@@ -67,11 +76,5 @@ public static class FlowerGenerator
             if (ly == 0 || blocks[Chunk.Idx(x, ly - 1, z)] != GrassBlock) continue;
             blocks[i] = FlowerBlock;
         }
-    }
-
-    private static float UnitHash(int x, int z, int salt)
-    {
-        var h = SplitMix64.Hash(x, z, WorldGenerationConfig.Seed ^ salt);
-        return (SplitMix64.Mix(h + 0x9E3779B97F4A7C15UL) >> 40) * (1f / (1 << 24));
     }
 }
