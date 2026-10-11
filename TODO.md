@@ -398,13 +398,10 @@ single-arc player.
 - [ ] **`V-5` · Item pickup sparkle & interaction feedback** — P2, S.
 - [ ] **`V-6` · Sky: stars, moon phases, shooting stars, aurora** — P1, M.
   Clouds, the sun disc, the sun glare and twinkling stars exist; finish the sky.
-  - [ ] **Moon.** A moon disc opposite the sun, showing a phase that follows the day count.
-    *Hook:* `RenderSun`'s additive disc along `DayCycle`'s sun direction negated, faded in and out
-    like the stars (`StarField.Visibility`), the phase (day number = lighting clock /
-    `DayLengthSeconds`) shaded over the disc in the shader, so one image covers every phase. It
-    should also reach the mirror and the Snell window, like the sun.
-    The sprite is in: `assets/textures/environment/moon.png`, a full lit disc (64x64 RGBA like
-    `sun.png`), drawn additively like the sun with the shader darkening the unlit part.
+  - [x] **Moon.** `RenderManager.RenderMoon` draws the sun's quad with `moon-fragment.glsl` and
+    `moon.png` opposite the sun; `MoonPhase` steps at noon (day 0 full, an 8-day cycle), the disc
+    fades like the stars, reaches the mirror and the Snell window and hides the stars behind it
+    (`moon.json` at 700, 3100 and 4300; `MoonPhaseTests`).
   - [ ] **Shooting stars.** A rare streak across the night dome. *Hook:* `sky-fragment.glsl`'s
     main after the stars, on hashed time slots (a slot index from `uStarTime`, a hashed start
     direction, heading and length per slot, most slots empty), faded by `StarField.Visibility`

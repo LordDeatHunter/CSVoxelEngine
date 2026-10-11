@@ -79,53 +79,24 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Snow sparkle.** Hashed per-texel glints on the snow tile; only shows with a low sun, since noon snow clips to white (`snow-sparkle.json`, `VOXEL_TIME=405`).
 
 - [x] **Leaf backlight.** `LeafBacklight` + `uLeafBacklight*`: sway faces (a flat `fSwayFlag`) glow by a `pow(dot(view, sun))` lobe times a shadow-map read `LeafBacklightReachBlocks` toward the sun, since the faces seen against the sun point away from it (`leaf-backlight.json`, `VOXEL_TIME=1100`).
-- [ ] **Eye adaptation.** Exposure eases up in a dark cave and back down outside.
-  *Hook:* `EntityLight.Sample` at the eye cell (sun and block light, no GPU readback), eased
-  through `MathUtils.Damp` (slower adapting to dark than to light), scaling `TonemapExposure` in
-  `RenderPostProcess`. Clamp it so a lamp-lit room is not blown out.
+- [x] **Eye adaptation.** `EyeAdaptation` sets the exposure target from `EntityLight.Sample` at the eye: 1 under sky or in a lit room, up to `EyeAdaptMaxExposure` in the dark, slower into the dark than out; `uExposure` set every frame (`eye-adaptation.json`).
 - [x] **Grass wind shimmer.** `GrassShimmer` + `uGrassShimmer*`: bands across `uWind` on biome-tinted up faces, read at the position minus `uWindOffset`, weighted by the sway's gust, gone by 112 blocks (`grass-shimmer.json`).
 - [x] **Ice glint.** `IceGlint` + `uIceLayer`/`uIceGlint`/`uIceShine`/`uIceSheen`: a fresnel sky mirror plus a sun highlight gated by the face's direct sun (`ice-glint.json`, `VOXEL_TIME=405`).
-- [ ] **Underwater wobble.** A gentle screen distortion while the eye is under water.
-  *Hook:* a UV offset in `post-fragment.glsl` behind a new `uUnderwater` (0 in the ItemDebugger);
-  the FXAA taps must read around the same offset coordinate.
-- [ ] **Cloud silver lining.** Thin cloud edges near the sun light up.
-  *Hook:* `cloud-fragment.glsl`, a dot(view, sun) term weighted by how thin the cloud is there;
-  zero with the sun below the horizon.
-- [ ] **Sunset horizon glow.** A warm band toward the sun at dusk only.
-  *Hook:* `SkyPalette.Compute` already returns a glow that is zero today, and all four `SkySample`
-  copies read it. The flat day sky is deliberate, so give the glow a value only near the horizon
-  crossing; `SkyPalette.Sample` is the tested twin.
+- [x] **Underwater wobble.** `uUnderwater` sways the read point in `post-fragment.glsl` (`UnderwaterWobble.Offset`, a wrapped clock); FXAA reads around the same swayed point, filtered bilinearly (`underwater-wobble.json`).
+- [x] **Cloud silver lining.** A forward-scatter lobe in `cloud-fragment.glsl` times the cloud's thinness along the view ray (`CloudThinness` from the cloud-shadow map), strength `CloudSilverLining.Strength`, zero at and below the horizon (`cloud-silver-lining.json`).
+- [x] **Sunset horizon glow.** `SkyPalette.GlowAmount` gives the `SkySample` glow lobe a warm value only while the sun crosses the horizon (`SkyDuskGlowStrength`, `SkyGlow*SunElevation`); fog toward the sun blends into the band (`sunset-glow.json`, `SkyPaletteTests`).
 - [x] **Sun glitter on water.** `WaterGlitter` + `uWaterGlitter*`: five hashed facets per block tilted off the wave normal, lit by the snow glint's half-vector test as one round point per cell, re-rolled 3x a second; off from below, underwater, in shade and past 128 blocks (`water-glitter.json`, `VOXEL_TIME=360`).
 
 - [x] **Lava glow pulse.** `LavaPulse` + `uLavaPulse`: the lava glow (`isLava`/`uLavaLayer`) scaled by a slow two-octave value-noise field after the display-space clip (`lava.json` pulse shots).
-- [ ] **Damage chromatic fringe.** On a hit the screen edges split red and blue for about 0.3 s.
-  *Hook:* a `uDamageFringe` term in `post-fragment.glsl` (display-space, 0 in the ItemDebugger),
-  driven by the same flash value as the damage vignette.
-- [ ] **Biome colour grade.** A faint warm tint in the desert and a cool one over snow. *Hook:* a
-  post-pass tint uniform from `TerrainGenerator.Climate` at the eye, eased with
-  `MathUtils.Damp`; a few percent at most. `V-7` is the nearby sunset grading.
-- [ ] **Aurora.** Slow green and violet curtains in the night dome, only seen from cold biomes.
-  *Hook:* `sky-fragment.glsl` main after the stars: bands from a noise of the view azimuth with a
-  vertical falloff, faded by `ColdWeight` at the eye (a `uColdness` uniform, eased) and by
-  `StarField.Visibility`. The mirror pass redraws the dome, so it reflects. A GL-free twin carries
-  the fade.
+- [x] **Damage chromatic fringe.** `uDamageFringe` in `post-fragment.glsl` splits red and blue from the screen centre by `DamageFringe.Strength` of `PlayerHealth.DamageFlash` (its first 0.3 s) (`damage-fringe.json`).
+- [x] **Biome colour grade.** `BiomeGrade.Tint` of the eye's climate from the column source (never worldgen), at most `BiomeGradeStrength` per channel, eased, neutral on an unknown column, applied as `uGrade` in the post pass (`biome-grade.json`).
+- [x] **Aurora.** `AuroraCurtains` in `sky-fragment.glsl` after the stars, hidden by clouds, faded by `Aurora.Visibility` = eased coldness at the eye (`EyeClimate.TryAt` over the column source) times `StarField.Visibility` (`aurora.json`, `VOXEL_TIME=700` on the frozen plain).
 - [x] **Deep-water darkness.** `DeepWaterFog.Dim(depth)` -> `uDeepWaterDim` from `Camera.EyeWaterSurfaceY - RenderEye.Y`: the underwater fog and the from-below reflection lose red first and never drop under 15 % (`deep-water.json`).
 - [x] **Glass sheen.** `GlassSheen` + `uGlassLayer`/`uGlassSheen`: glass and panes fold `SkySample` times `SurfaceFresnel.Schlick` into the translucent blend with alpha `a + F - aF` (`glass-sheen.json`).
 - [x] **Ore twinkle.** `OreTwinkle` + `uOreTwinkle*` in the ore material path: a hashed 4 % of texels flash once per 0.2-0.5 Hz cycle, gated like the snow glint, gone by 28 blocks (`ore-twinkle.json`).
 - [x] **Selection outline pulse.** `SelectionPulse` + `uPulseDepth`/`uPulsePeriod`: 70-100 % over `SelectionPulsePeriodSeconds`, held steady while mining; the outline beams now cull back faces so the breath reads (`selection-pulse.json`).
-- [ ] **Moonlight.** At night a faint cool directional light from the moon keeps shadows and a blue
-  cast. *Hook:* `RenderManager.SetLighting` and `DayCycle` (moon direction = sun negated): the
-  ambient floor goes slightly blue and the shadow pass takes the moon direction while the sun is
-  down. Builds on the moon sprite task in `V-6`.
-- [ ] **Godrays.** Visible light shafts through trees, clouds and gaps when the sun is in view.
-  (This is the "low-sun air shafts" idea, defined as godrays.) *Hook:* `UnderwaterRaysRenderer` is
-  the existing full-screen ray march with a shadow-map lookup; run the same march over air. Its
-  strength is `SunGlare`-style: alignment of the view with the sun, times a factor that peaks at a
-  low sun and fades to a fraction at noon, times a cloud-cover factor, zero with the sun below the
-  horizon and zero under water (the underwater rays take over). The march is limited to the near
-  shadow cascade. Composite in display space like the underwater shafts. It is a new pass, but it
-  is the feature. A GL-free twin carries the strength; verify with a scenario at `VOXEL_TIME` 147,
-  405 and 440 in a forest.
+- [x] **Moonlight.** `Moonlight` key-light rule: below `MoonlightSwitchSunElevation` the world's `uSunDir`/colour/intensity become the moon's (cool, scaled by `MoonPhase`, casting shadows), handed over with both lights at zero where the sunset glow ends; the night ambient is bluer and the sky keeps the true sun (`_skySunDir`) (`moonlight.json`). The moon disc itself is TODO.md's `V-6` (`RenderMoon`, `moon-fragment.glsl`, `moon.json`).
+- [x] **Godrays.** `GodraysRenderer`: the underwater shafts' half-res march over air through the near cascade and the cloud shadows plus an open-sky term (`Godrays.Scatter`), composited radially toward the sun's screen position; strength `Godrays.Intensity`, its own `godPass` row (~0.35 ms GPU at 1080p), `GodraysEnabled` (`godrays.json` at 395/425/147).
 
 ## Blocks and items
 
