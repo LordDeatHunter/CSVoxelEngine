@@ -93,5 +93,23 @@ public static class SnowGenerator
             if (blocks[si] != BlockType.Air) continue;
             blocks[si] = snowBlock;
         }
+
+        // Taiga spruce crowns wear snow on their top leaves: a cold column's highest non-air cell
+        // with air over it, when it is a leaf, takes a snow cell the way the ground does. The scan
+        // stops at the first non-air cell, so a snowed ground (or any other cover) is left alone.
+        for (var x = 0; x < Chunk.Size; x++)
+        for (var z = 0; z < Chunk.Size; z++)
+        {
+            if (TerrainGenerator.ColdWeight(worldX0 + x, worldZ0 + z) <= WorldGenerationConfig.SnowColdThreshold)
+                continue;
+            for (var ly = Chunk.Size - 2; ly > 0; ly--)
+            {
+                var i = Chunk.Idx(x, ly, z);
+                if (blocks[i] == BlockType.Air) continue;
+                if (TreeGenerator.IsLeaf(blocks[i]) && blocks[i + Chunk.Size] == BlockType.Air)
+                    blocks[i + Chunk.Size] = snowBlock;
+                break;
+            }
+        }
     }
 }
