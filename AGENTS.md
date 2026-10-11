@@ -1782,6 +1782,15 @@ id, one `LeafDecayManager.ScheduleBox` over the written box (pruning is left to 
 `ChunkManager.MarkDirty` per touched chunk and `TreeGenerator.PoisonCanopy(x, z, 0)` plus
 `LodManager.MarkEditedColumn` per changed column.
 
+**The sapling clock** (`Systems/SaplingManager.cs`, owned by `World`, main thread only, skipped on
+a client): a `plant_tree` use (an acorn on dirt or grass, `World.PlantTree`, which maps the hit
+cell and face to the ground cell) plants through the writer's Planted branch and schedules the root
+cell; every `SaplingPulseSeconds` (jittered by `SaplingPulseJitter`) the manager grows it one pulse
+through the same `TryGrowTree` path, up to the species' `MaturityStepsAt` for its own root cell and
+seed, then forgets it — so a sapling becomes a tree over a few minutes. A cell in an unloaded chunk
+waits, and a cell whose wood is gone (mined, or grown over) is forgotten. In memory only: a reload
+leaves a half-grown sapling standing until it is grown again by hand (see the known gaps).
+
 **The item debugger's TREES tab** (`OpenGLTest.ItemDebugger/TreePreviewState.cs`, see "Build and
 run") grows any species pulse by pulse over flat grass at a fixed seed through `GrowSteps`, and
 meshes it with `CellBatchMesher` (`src/CellBatchMesher.cs`): the real chunk mesher over as many
@@ -2028,7 +2037,8 @@ pure function of the seed: only **deltas** and the seed are written.
 - **Not persisted** (tracked as `M-12` in TODO.md): the station block entities (campfire, quern,
   kiln, casting — a reloaded kiln is plain blocks plus its multiblock state bytes until a
   right-click re-registers it through `KilnManager.Ensure`, with no fuel or crucible), primed
-  TNT, falling blocks, projectiles in flight and toppling trees.
+  TNT, falling blocks, projectiles in flight, toppling trees and the sapling clock (a half-grown
+  sapling stands where it is until it is grown again).
 
 ## Multiple players and chat
 

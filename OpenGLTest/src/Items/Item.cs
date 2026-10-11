@@ -123,6 +123,9 @@ public abstract class Item
     /// </summary>
     public float UseSeconds { get; internal init; }
 
+    /// <summary>The tree species an <c>plant_tree</c> use plants (an acorn plants an oak), or null.</summary>
+    public string? UseTreeName { get; internal init; }
+
     /// <summary>Cells across the spritesheet texture; 1 for a plain sprite.</summary>
     public int SpriteCols { get; internal init; } = 1;
 
@@ -226,6 +229,7 @@ public abstract class Item
         CrucibleCapacityMl = spec.CrucibleCapacityMl;
         UseDelaySeconds = spec.UseDelay;
         UseSeconds = spec.UseSeconds;
+        UseTreeName = spec.TreeName;
         SpriteCols = spec.SpriteCols;
         SpriteRows = spec.SpriteRows;
         FrameCount = spec.FrameCount;

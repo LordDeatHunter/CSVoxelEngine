@@ -152,5 +152,18 @@ internal sealed class StubItemUseWorld : IItemUseWorld
         return TreeCells.Contains(((int)cell.X, (int)cell.Y, (int)cell.Z));
     }
 
+    /// <summary>Species names <see cref="PlantTree"/> accepts, with the cells they may plant on.</summary>
+    public Dictionary<string, HashSet<(int, int, int)>> Plantable { get; } = new();
+
+    public List<(string Species, int X, int Y, int Z)> PlantTreeCalls { get; } = new();
+
+    public bool PlantTree(string species, Vector3 hit, Vector3 normal)
+    {
+        var ground = normal.Y > 0.5f ? hit : hit + normal;
+        var cell = ((int)ground.X, (int)ground.Y, (int)ground.Z);
+        PlantTreeCalls.Add((species, cell.Item1, cell.Item2, cell.Item3));
+        return Plantable.TryGetValue(species, out var cells) && cells.Contains(cell);
+    }
+
     public void ConsumeSelected() => Consumed++;
 }

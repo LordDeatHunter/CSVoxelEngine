@@ -9,5 +9,6 @@
   "occludes": false,
   "castsAO": false,
   "light": { "passes": true },
-  "loot": "leaves"
+  // Oak leaves carry the acorn (assets/data/loot/oak_leaves.json); other species share leaves.json
+  "loot": "oak_leaves"
 }

@@ -44,7 +44,8 @@ public static class ItemFactory
         // Appended with a default so the positional construction in the tests keeps compiling
         float FuelSeconds = 0f,
         int CrucibleCapacityMl = 0,
-        float UseSeconds = 0f);
+        float UseSeconds = 0f,
+        string? TreeName = null);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,
@@ -78,6 +79,7 @@ public static class ItemFactory
             ItemUseAction.ConvertMultiblock => new ConvertMultiblockItem(spec),
             ItemUseAction.Heal => new HealItem(spec),
             ItemUseAction.GrowTree => new GrowTreeItem(spec),
+            ItemUseAction.PlantTree => new PlantTreeItem(spec),
             _ => new PlainItem(spec),
         };
     }

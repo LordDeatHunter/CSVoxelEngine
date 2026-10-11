@@ -50,4 +50,11 @@ public enum ItemUseAction
     /// spending one unit. Refused on anything that is not a tree.
     /// </summary>
     GrowTree,
+
+    /// <summary>
+    /// Plants a sapling of the item's <see cref="Item.UseTreeName"/> species on the aimed ground
+    /// (an acorn on dirt or grass), spending one unit. The sapling then grows on its own
+    /// (<see cref="SaplingManager"/>). Refused where the species cannot root.
+    /// </summary>
+    PlantTree,
 }

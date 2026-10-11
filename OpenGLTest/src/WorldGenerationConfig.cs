@@ -2089,6 +2089,11 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // aimed tree, spent from the stack ---
     public const int AshGrowthPulses = 3;
 
+    // --- Saplings (SaplingManager): a planted sapling grows one pulse at a time until its
+    // species' maturity step, one pulse per SaplingPulseSeconds jittered by SaplingPulseJitter ---
+    public const float SaplingPulseSeconds = 3f;
+    public const float SaplingPulseJitter = 0.5f;
+
     // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
     // first notices a player (the same moment its first-throw delay starts) ---
     public const float GoblinNoticePipSeconds = 0.9f;

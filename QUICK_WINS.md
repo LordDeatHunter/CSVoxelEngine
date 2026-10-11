@@ -139,17 +139,10 @@ files waits in TODO.md instead, since there are none to use yet.
   on trust (a known gap).
 
 - [x] **Door.** `oak_door` + `oak_door_upper` through the `upperHalf` field (`TallBlock`): placement needs both cells, breaking either half removes both (`RemoveTallBlock`) and drops one door, both halves share one `DoorState` (`DoorTests`, `doors.json`).
-- [ ] **Acorn.** An oak-leaf drop that plants a sapling when used on dirt or grass, which then grows
-  stage by stage on its own. *Hook:* a `use.action: "plant_tree"` calling
-  `World.TryGrowTree(species, x, y, z, 1)`, which already plants a sapling on solid ground, and the
-  growth stages already exist (`TreeGrower.GrowFurther`, one pulse per step), but nothing ticks
-  them: add a small main-thread sapling scheduler (a `FluidManager`-style scheduled-cell set) that
-  runs one pulse every `SaplingPulseSeconds` (jittered) until the species' maturity step, through
-  the same `TryGrowTree`. Like the station block entities it is in memory only, so a reload stalls
-  the sapling at its stage until it is re-planted or fertilised: list that gap in AGENTS.md. Oak
-  leaves drop it at a low chance (the leaves loot table, JSON); a stone pine cone and a spruce cone
-  follow the same pattern. Test: a pulse count never exceeds maturity, and a sapling on
-  unloaded ground waits.
+- [x] **Acorn.** An oak-leaf drop (its own `oak_leaves` loot table) that plants an oak sapling on
+  dirt or grass with a `plant_tree` use, and a `SaplingManager` clock that pulses it one growth
+  step per jittered `SaplingPulseSeconds` up to the species' maturity (in memory only, a known
+  gap) (`SaplingManagerTests`, `AcornTests`).
 - [x] **Flint from gravel.** Mining gravel drops flint about one time in six instead of the block
   (`assets/data/loot/gravel.json`, the block's `loot` field; `ContentTests`).
 - [x] **Cactus prick.** A `contactDamage` block field (the cactus sets 1) ticked by

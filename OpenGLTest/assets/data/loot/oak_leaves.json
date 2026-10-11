@@ -1,0 +1,10 @@
+{
+  // An oak leaf's own table (the shared leaves table plus the rare acorn): oak leaves drop vines
+  // and branches like every leaf, and about one time in twenty the acorn inside them. Other
+  // species keep assets/data/loot/leaves.json.
+  "pools": [
+    { "rolls": 1, "chance": 0.15, "entries": [ { "item": "item/vine" } ] },
+    { "rolls": 1, "chance": 0.15, "entries": [ { "item": "item/branch" } ] },
+    { "rolls": 1, "chance": 0.05, "entries": [ { "item": "item/acorn" } ] }
+  ]
+}

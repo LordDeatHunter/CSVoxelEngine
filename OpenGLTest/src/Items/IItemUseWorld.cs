@@ -129,6 +129,15 @@ public interface IItemUseWorld
     /// nothing.
     /// </summary>
     bool GrowTree(Vector3 cell);
+
+    /// <summary>
+    /// Plants a sapling of <paramref name="species"/> on the ground cell the aim hit
+    /// (<paramref name="hit"/> is the aimed cell and <paramref name="normal"/> the face; a hit
+    /// from above plants on that very cell), through the growth writer's Planted branch, and
+    /// schedules it with the world's sapling clock. False where the species cannot root, so the
+    /// use is never spent for nothing.
+    /// </summary>
+    bool PlantTree(string species, Vector3 hit, Vector3 normal);
 }
 
 /// <summary>Inputs to <see cref="Item.OnUse"/> beyond the world itself: how far the aim reaches

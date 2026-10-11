@@ -691,8 +691,9 @@ public static class ContentRegistry
                 "convert_multiblock" => ItemUseAction.ConvertMultiblock,
                 "heal" => ItemUseAction.Heal,
                 "grow_tree" => ItemUseAction.GrowTree,
+                "plant_tree" => ItemUseAction.PlantTree,
                 _ => throw new InvalidOperationException(
-                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire, convert_multiblock, heal or grow_tree."),
+                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire, convert_multiblock, heal, grow_tree or plant_tree."),
             };
 
             var durability = definition.Durability ?? 0;
@@ -798,7 +799,8 @@ public static class ContentRegistry
                 tool != null, power, hitDelay, attack, blockDamage, entityDamage, throwDamage, name,
                 FuelSeconds: fuelSeconds,
                 CrucibleCapacityMl: crucibleCapacity,
-                UseSeconds: useSeconds));
+                UseSeconds: useSeconds,
+                TreeName: use?.Tree));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ItemIds, StringComparer.Ordinal));
@@ -1221,6 +1223,20 @@ public static class ContentRegistry
                 if (item.UseFluidId != 0 || item.UseBlockId != 0)
                     throw new InvalidOperationException(
                         $"Item '{path}' has use.action 'grow_tree' with a use.fluid or use.block: the tree is read from the aimed cell.");
+                continue;
+            }
+
+            if (item.UseAction == ItemUseAction.PlantTree)
+            {
+                if (string.IsNullOrWhiteSpace(item.UseTreeName))
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'plant_tree' without use.tree: name the species file under assets/data/trees/.");
+                if (item.UseResultId != 0)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'plant_tree' with a use.result: planting spends from its stack, it never morphs.");
+                if (item.UseFluidId != 0 || item.UseBlockId != 0)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'plant_tree' with a use.fluid or use.block: the ground is read from the aimed cell.");
                 continue;
             }
 

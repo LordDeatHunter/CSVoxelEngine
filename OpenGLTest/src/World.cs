@@ -44,6 +44,7 @@ public class World : IItemUseWorld
     private readonly FallingBlockManager _falling = new();
     private readonly SlimeManager? _slimes;
     private readonly GoblinManager? _goblins;
+    private readonly SaplingManager _saplings = new();
     // The natural and hard mob caps every manager above spawns under, counted over all of them.
     private readonly MobCaps _mobCaps = new();
     // The players the mob managers chase this frame, rebuilt right before they run.
@@ -696,6 +697,11 @@ public class World : IItemUseWorld
             var rootCell = new Vector3(result.RootX, result.RootY, result.RootZ);
             _chunkManager.ImmediateRemeshWithBorders(VoxelCoords.ChunkPosOf(rootCell), rootCell);
         }
+
+        // A freshly planted sapling joins the sapling clock and grows on its own over the next
+        // few minutes (SaplingManager); an existing tree the call grew needs no clock
+        if (result.Status == TreeGrowthStatus.Planted)
+            _saplings.Schedule(species.Name, result.RootX, result.RootY, result.RootZ);
         return result;
     }
 
@@ -1842,6 +1848,11 @@ public class World : IItemUseWorld
         FrameProfiler.Begin(ProfileSection.LeafDecay);
         _leafDecay.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager, _leaves);
         FrameProfiler.End(ProfileSection.LeafDecay);
+
+        // A client never grows anything itself: the server owns the world and broadcasts its cells
+        if (!_clientMode)
+            _saplings.Update((float)deltaTime, _chunkManager,
+                (species, x, y, z, steps) => TryGrowTree(species, x, y, z, steps));
 
         // After the fluid tick, so every edit path of the frame precedes the autosave. The one
         // Save span in the codebase, entered here only and never nested inside another section.
@@ -4128,6 +4139,16 @@ public class World : IItemUseWorld
         if (TreeSpeciesRegistry.ForBlock(BlockIdAt(cell)) is not { } species) return false;
         return TryGrowTree(species.Name, (int)cell.X, (int)cell.Y, (int)cell.Z,
             WorldGenerationConfig.AshGrowthPulses).Succeeded;
+    }
+
+    bool IItemUseWorld.PlantTree(string species, Vector3 hit, Vector3 normal)
+    {
+        if (TreeSpeciesRegistry.TryGet(species) is null) return false;
+        // The ground cell: the aimed cell itself when it was hit from above, else the cell
+        // across the face (the writer plants on its ground when the column holds no tree)
+        var ground = normal.Y > 0.5f ? hit : hit + normal;
+        var result = TryGrowTree(species, (int)ground.X, (int)ground.Y, (int)ground.Z, steps: 0);
+        return result.Status == TreeGrowthStatus.Planted;
     }
 
     void IItemUseWorld.ConsumeSelected() => ActiveInventory.ConsumeSelected();

@@ -1,0 +1,6 @@
+{
+  // An oak leaf's drop (assets/data/loot/oak_leaves.json): vines, branches and the rare acorn.
+  "name": "Acorn",
+  "texture": "assets/textures/items/acorn.png",
+  "use": { "action": "plant_tree", "tree": "oak" }
+}
