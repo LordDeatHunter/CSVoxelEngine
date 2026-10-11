@@ -69,11 +69,22 @@ public class FallingBlock
     private Vector3 _lastPosition;
     private float _stillTime;
 
+    // The highest the centre has been, so a settle knows how far the cube fell
+    private float _peakY;
+
+    /// <summary>How far the cube has dropped from the highest point it reached, in blocks; what its
+    /// settling dust is sized by (<see cref="LandingDust.FallingBlockCount"/>).</summary>
+    public float FallBlocks => MathF.Max(0f, _peakY - Position.Y);
+
+    /// <summary>Whether the cube's centre was under a fluid surface on its last physics step.</summary>
+    public bool IsSubmerged { get; private set; }
+
     public FallingBlock(Vector3 position, byte blockId)
     {
         Position = position;
         BlockId = blockId;
         _lastPosition = position;
+        _peakY = position.Y;
     }
 
     /// <summary>Current velocity in blocks per second.</summary>
@@ -97,6 +108,7 @@ public class FallingBlock
     public void Update(float deltaTime, ChunkManager chunks)
     {
         ApplyPhysics(deltaTime, chunks);
+        _peakY = MathF.Max(_peakY, Position.Y);
 
         if (Vector3.DistanceSquared(Position, _lastPosition) < 1e-6f)
             _stillTime += deltaTime;
@@ -125,6 +137,7 @@ public class FallingBlock
 
         var (fluidX, fluidY, fluidZ) = Position.BlockCell();
         var submerged = Position.Y < chunks.GetFluidSurfaceGlobal(fluidX, fluidY, fluidZ);
+        IsSubmerged = submerged;
 
         if (submerged)
             _velocity.Y = MathUtils.Damp(_velocity.Y, WaterSinkSpeed, WaterDrag, deltaTime);

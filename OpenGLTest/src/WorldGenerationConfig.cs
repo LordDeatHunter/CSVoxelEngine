@@ -1420,6 +1420,19 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float BlastPushMaxSpeed = 14f;
     public const float BlastPushUpBias = 0.5f;
 
+    // --- Falling block landing dust (LandingDust.FallingBlock*, GroundDust.LandBlock): a sand or gravel
+    // cube that settles throws chips of itself out from under its rim, more and faster the longer it
+    // fell, none under the minimum (a lip slide) and none under water. A client, which never sees the
+    // fall, puffs as if the cube fell the client fall. Cosmetic: never on a headless server. ---
+    public const float FallingBlockDustMinFallBlocks = 0.75f;
+    public const float FallingBlockDustFullFallBlocks = 10f;
+    public const int FallingBlockDustMinCount = 6;
+    public const int FallingBlockDustMaxCount = 20;
+    public const float FallingBlockDustMinSpeed = 1.6f;
+    public const float FallingBlockDustMaxSpeed = 4.4f;
+    public const float FallingBlockDustSize = 0.1f;
+    public const float FallingBlockDustClientFallBlocks = 3f;
+
     // --- Wind (Wind.cs, SH-27) ---
     // One slowly turning wind shared by leaf sway, fire smoke and the cloud drift.
     /// <summary>Wind heading at lighting time 0, degrees from +X toward +Z.</summary>

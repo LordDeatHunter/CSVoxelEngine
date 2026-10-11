@@ -132,6 +132,7 @@ public class World : IItemUseWorld
     private readonly HashSet<int> _netTntSeen = [];
     private readonly List<int> _netTntRemovals = [];
     private readonly List<(Vector3 Centre, byte BlockId)> _netFalling = [];
+    private readonly List<(Vector3 Centre, byte BlockId)> _netFallingPrevious = [];
 
     // Null on the headless path (tests), where Now runs off the summed Update deltas instead
     private readonly IWindow? _window;
@@ -951,6 +952,13 @@ public class World : IItemUseWorld
             chunk.SetBlockRaw(change.X & Chunk.SizeMask, change.Y & Chunk.SizeMask, change.Z & Chunk.SizeMask,
                 change.Id, change.State);
             _netTouchedChunks.Add(chunk.Position);
+            // The server's falling cube writing itself back: dust as if it fell the client fall, since
+            // the mirror never told how far (a client in a server world only; never on a server)
+            if (_clientMode && id != change.Id && BlockType.IsFalling(change.Id)
+                && NearMirroredFallingCube(change.X, change.Y, change.Z, change.Id))
+                GroundDust.LandBlock(new Vector3(change.X, change.Y, change.Z), change.Id,
+                    WorldGenerationConfig.FallingBlockDustClientFallBlocks, submerged: BlockType.IsFluid(id), _debris,
+                    _chunkManager.ColumnSource);
             if (BlockType.ById[change.Id]?.Renderer == BlockRenderer.Quern)
                 _querns.Ensure(change.X, change.Y, change.Z);
         }
@@ -1036,6 +1044,10 @@ public class World : IItemUseWorld
     private void ApplyNetworkMirrors(IReadOnlyList<NetEntity> entities)
     {
         _netTntSeen.Clear();
+        // The last snapshot's cubes stay known for one more, so a cube's cell write is recognised
+        // whichever of its EntityList and BlockChanges arrives first
+        _netFallingPrevious.Clear();
+        _netFallingPrevious.AddRange(_netFalling);
         _netFalling.Clear();
         for (var i = 0; i < entities.Count; i++)
         {
@@ -1074,6 +1086,22 @@ public class World : IItemUseWorld
 
         _tntManager.ReplaceMirrors(_netTnt.Values);
         _falling.ReplaceMirrors(_netFalling);
+    }
+
+    /// <summary>Whether a falling-cube mirror of <paramref name="blockId"/> from the newest or the
+    /// previous snapshot sat within a block and a half of cell (x, y, z): the cube that just wrote
+    /// itself back there.</summary>
+    private bool NearMirroredFallingCube(int x, int y, int z, byte blockId)
+    {
+        var centre = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
+        const float reach = 1.5f * 1.5f;
+        foreach (var (cube, id) in _netFalling)
+            if (id == blockId && Vector3.DistanceSquared(cube, centre) <= reach)
+                return true;
+        foreach (var (cube, id) in _netFallingPrevious)
+            if (id == blockId && Vector3.DistanceSquared(cube, centre) <= reach)
+                return true;
+        return false;
     }
 
     /// <summary>Shakes the local camera for a TNT blast at <paramref name="centre"/>, by its distance
@@ -1575,6 +1603,11 @@ public class World : IItemUseWorld
                 ShakeForBlast(blast);
         }
         _falling.Update((float)deltaTime, _chunkManager, _dropManager, _fluidManager, _lodManager);
+        // A cube that settled throws a skirt of its own chips; cosmetic, so never on a server
+        if (!_serverMode)
+            foreach (var landing in _falling.Landings)
+                GroundDust.LandBlock(landing.Cell, landing.BlockId, landing.FallBlocks, landing.Submerged, _debris,
+                    _chunkManager.ColumnSource);
         _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager, windTime: LightingTime);
         _debris.Update((float)deltaTime, _chunkManager);
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);

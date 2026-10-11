@@ -68,6 +68,21 @@ public class BlockDebrisSystem
     }
 
     /// <summary>
+    /// A whole block settling into <paramref name="cell"/> (a falling sand cube) throws
+    /// <paramref name="count"/> chips of itself out from under its rim: they start on a ring just
+    /// outside the cell's sides at its floor, never inside the solid block, and fly off outward like a
+    /// <see cref="Puff"/>, so the landing reads as a skirt of dust. Air and unknown ids spawn nothing.
+    /// </summary>
+    public void Skirt(Vector3 cell, byte blockId, int count, float speed, float size, Random? random = null,
+        IColumnSource? columns = null)
+    {
+        if (blockId == BlockType.Air || BlockType.ById[blockId] == null) return;
+        var origin = cell + new Vector3(0.5f, size, 0.5f);
+        Spray(origin, blockId, DebrisLook.Surface, TintAt(cell, blockId, columns), count, speed, size,
+            radius: 0.15f, lift: 0.35f, random ?? Random.Shared, innerRadius: 0.5f + size);
+    }
+
+    /// <summary>
     /// Throws <paramref name="count"/> chips of one flat sRGB <paramref name="colourSrgb"/> (a
     /// slime's goo, <see cref="DebrisLook.Colour"/>) out of a body whose feet are at
     /// <paramref name="origin"/> and which is <paramref name="radius"/> across: they burst from under
@@ -79,12 +94,13 @@ public class BlockDebrisSystem
         Spray(origin, BlockType.Air, DebrisLook.Colour, BiomeTint.VertexTint(colourSrgb), count, speed, size,
             radius, lift: 0.6f, random ?? Random.Shared);
 
-    // The ring launch Puff and Splat share: headings spread round the ring with a jitter (so even a
-    // three-chip puff fans out), each starting up to radius out along its heading, flying at 60-100 %
-    // of speed sideways and lift..2 lift of it upward, plus a shared drift, launched exactly (no
-    // mining pop).
+    // The ring launch Puff, Skirt and Splat share: headings spread round the ring with a jitter (so
+    // even a three-chip puff fans out), each starting innerRadius plus up to radius out along its
+    // heading, flying at 60-100 % of speed sideways and lift..2 lift of it upward, plus a shared
+    // drift, launched exactly (no mining pop). A square block's rim is further out toward its corners,
+    // so a Skirt pushes each start out to the cell's square edge along its heading.
     private void Spray(Vector3 origin, byte blockId, DebrisLook look, Vector3 tint, int count, float speed,
-        float size, float radius, float lift, Random rng, Vector3 drift = default)
+        float size, float radius, float lift, Random rng, Vector3 drift = default, float innerRadius = 0f)
     {
         if (count <= 0 || speed <= 0f) return;
         for (var i = 0; i < count; i++)
@@ -93,7 +109,10 @@ public class BlockDebrisSystem
             var heading = new Vector3(MathF.Cos(angle), 0f, MathF.Sin(angle));
             var launch = heading * (speed * (0.6f + 0.4f * rng.NextSingle()))
                          + new Vector3(0f, speed * lift * (1f + rng.NextSingle()), 0f) + drift;
-            var start = origin + heading * (radius * rng.NextSingle());
+            var inner = innerRadius > 0f
+                ? innerRadius / MathF.Max(MathF.Abs(heading.X), MathF.Abs(heading.Z))
+                : 0f;
+            var start = origin + heading * (inner + radius * rng.NextSingle());
             if (_debris.Count >= WorldGenerationConfig.BlockDebrisMax)
                 _debris.RemoveAt(0);
             _debris.Add(new BlockDebris(blockId, start, launch, size * (0.75f + 0.5f * rng.NextSingle()), rng,

@@ -12,8 +12,16 @@ namespace silkgltriangle;
 public class FallingBlockManager
 {
     private readonly List<FallingBlock> _falling = [];
+    private readonly List<FallingBlockLanding> _landings = [];
 
     public IReadOnlyList<FallingBlock> Falling => _falling;
+
+    /// <summary>
+    /// Every cube the last <see cref="Update"/> wrote back as a block, with how far it fell and whether
+    /// it settled under water; valid until the next one. The world raises the settling dust from it
+    /// (<see cref="GroundDust.LandBlock"/>), except on a headless server.
+    /// </summary>
+    public IReadOnlyList<FallingBlockLanding> Landings => _landings;
 
     /// <summary>Whether any live cube's body touches the world cell (x, y, z).</summary>
     public bool OverlapsAny(int x, int y, int z)
@@ -57,6 +65,7 @@ public class FallingBlockManager
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, FluidManager fluids,
         LodManager? lod = null)
     {
+        _landings.Clear();
         // Ascending, because a toppled column is stored bottom-up: the lowest cube is written
         // back as a block before the one above it moves for this frame, so each cube lands on
         // a real support. Iterating top-first let every cube fall a frame into the cell below,
@@ -187,6 +196,7 @@ public class FallingBlockManager
 
         if (chunk.PlaceBlockAt(cell, block.BlockId, chunks))
         {
+            _landings.Add(new FallingBlockLanding(cell, block.BlockId, block.FallBlocks, block.IsSubmerged));
             fluids.ScheduleAround(cell);
 
             // A landing cube can raise or re-tile the far LOD's surface like a placement; only a

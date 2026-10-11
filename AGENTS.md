@@ -710,6 +710,7 @@ OpenGLTest/
     LeafParticle.cs            # one falling leaf billboard (sway, tumble, rest, fade); LeafParticleSystem owns them
     ShakeFalloff.cs            # GL-free camera-shake trauma of a world event (blast, tree thud) by its distance
     BlastImpulse.cs            # GL-free TNT blast shove: away from the centre, falling to zero at the radius
+    FallingBlockLanding.cs     # a falling cube written back as a block: cell, block, fall, submerged (its dust)
     FaceLight.cs               # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters
     CutoutMipmap.cs            # GL-free coverage-preserving mip chain for cutout tiles (alpha rescaled per level)
     LightFlicker.cs            # GL-free per-cell flicker phase + curve for the campfire point lights
@@ -2976,7 +2977,15 @@ overshoot or jiggle.
   never growing with distance. Singleplayer reads the centres `TntManager.Blasts` reports for the frame;
   a client, which never ticks TNT, takes a primed-TNT mirror leaving the server's snapshot with its
   locally burnt fuse within `BlastMirrorFuseSlackSeconds` as the blast (the server drops a cube only when
-  it detonates). Tests: `BlastEffectTests`. `visual-examples/world-events.json` (`VOXEL_TIME=147`) films
+  it detonates). Tests: `BlastEffectTests`. A sand or gravel cube that settles throws a skirt of its
+  own chips (`GroundDust.LandBlock` -> `BlockDebrisSystem.Skirt`, which starts each chip just outside
+  the cell's sides so none spawns inside the solid block), sized by `LandingDust.FallingBlockCount` /
+  `FallingBlockSpeed` from the fall (`FallingBlock.FallBlocks`, from the highest point the cube
+  reached; none under `FallingBlockDustMinFallBlocks`, none under water): singleplayer reads
+  `FallingBlockManager.Landings` (each cube written back as a block that frame), and a client puffs
+  where a `BlockChanges` entry turns a cell into a `falls` block beside a falling-cube mirror of that
+  block in the newest or previous snapshot, as if it fell `FallingBlockDustClientFallBlocks`
+  (`FallingBlockDustTests`). `visual-examples/world-events.json` (`VOXEL_TIME=147`) films
   these effects; its blasts use the scenario op `prime` (`{ "op": "prime", "pos": [x, y, z] }`,
   `World.TestPrimeTnt`), a firestarter strike on the TNT block in that cell that never misses, since
   `give` cannot equip a tool instance and the strike's chance roll would make the scenario flaky.

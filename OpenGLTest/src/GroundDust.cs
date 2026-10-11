@@ -9,7 +9,8 @@ namespace silkgltriangle;
 /// landed on, decided by <see cref="LandingDust"/> and drawn as <see cref="BlockDebris"/> through
 /// <see cref="BlockDebrisSystem.Puff"/>, and a landing slime splats chips of its own green instead
 /// (<see cref="BlockDebrisSystem.Splat"/>); sprinting over loose ground puffs at every footfall
-/// (<see cref="FootstepDust"/>). Owned by <see cref="World"/>, which feeds it the local
+/// (<see cref="FootstepDust"/>), and a settling sand cube throws a skirt of its own chips
+/// (<see cref="LandBlock"/>). Owned by <see cref="World"/>, which feeds it the local
 /// player each frame (singleplayer and a client, whose own physics runs locally) and the mobs'
 /// landings in singleplayer; a headless server never calls it. Main thread only.
 /// </summary>
@@ -151,6 +152,23 @@ public sealed class GroundDust
         if (!TryFindSurface(chunks, feet, halfWidth, out var cell, out var blockId)) return 0;
         debris.Puff(feet + new Vector3(0f, WorldGenerationConfig.LandingDustSize, 0f), cell, blockId, count,
             LandingDust.Speed(fallBlocks), WorldGenerationConfig.LandingDustSize, random, chunks.ColumnSource);
+        return count;
+    }
+
+    /// <summary>
+    /// A falling block (sand, gravel) settled into <paramref name="cell"/> after a fall of
+    /// <paramref name="fallBlocks"/>: throws the skirt of its own chips <see cref="LandingDust.FallingBlockCount"/>
+    /// sizes (<see cref="BlockDebrisSystem.Skirt"/>), none when it settled <paramref name="submerged"/>.
+    /// Returns how many chips it spawned.
+    /// </summary>
+    public static int LandBlock(Vector3 cell, byte blockId, float fallBlocks, bool submerged, BlockDebrisSystem debris,
+        IColumnSource? columns = null, Random? random = null)
+    {
+        if (submerged) return 0;
+        var count = LandingDust.FallingBlockCount(fallBlocks);
+        if (count <= 0) return 0;
+        debris.Skirt(cell, blockId, count, LandingDust.FallingBlockSpeed(fallBlocks),
+            WorldGenerationConfig.FallingBlockDustSize, random, columns);
         return count;
     }
 

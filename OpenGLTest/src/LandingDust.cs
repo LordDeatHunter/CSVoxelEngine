@@ -29,6 +29,28 @@ public static class LandingDust
             WorldGenerationConfig.LandingDustMaxSpeed, Strength(fallBlocks));
     }
 
+    /// <summary>
+    /// Chips a falling block (sand, gravel) throws when it settles after a fall of
+    /// <paramref name="fallBlocks"/>: none under <see cref="WorldGenerationConfig.FallingBlockDustMinFallBlocks"/>
+    /// (a cube that only slid off a ledge's lip), then growing with the drop along
+    /// <see cref="MathUtils.ImpactStrength"/> to the cap at <see cref="WorldGenerationConfig.FallingBlockDustFullFallBlocks"/>.
+    /// A block is far heavier than a body, so a one-block drop already puffs.
+    /// </summary>
+    public static int FallingBlockCount(float fallBlocks)
+    {
+        if (!(fallBlocks >= WorldGenerationConfig.FallingBlockDustMinFallBlocks)) return 0;
+        return (int)MathF.Round(MathUtils.Lerp(WorldGenerationConfig.FallingBlockDustMinCount,
+            WorldGenerationConfig.FallingBlockDustMaxCount, FallingBlockStrength(fallBlocks)));
+    }
+
+    /// <summary>Launch speed in blocks per second of those chips; 0 under the minimum fall.</summary>
+    public static float FallingBlockSpeed(float fallBlocks)
+    {
+        if (!(fallBlocks >= WorldGenerationConfig.FallingBlockDustMinFallBlocks)) return 0f;
+        return MathUtils.Lerp(WorldGenerationConfig.FallingBlockDustMinSpeed,
+            WorldGenerationConfig.FallingBlockDustMaxSpeed, FallingBlockStrength(fallBlocks));
+    }
+
     /// <summary>The height a body under <paramref name="gravity"/> fell from rest to reach
     /// <paramref name="impactSpeed"/> (v² / 2g), which is how a mob's landing speed becomes a fall.</summary>
     public static float FallFromImpactSpeed(float impactSpeed, float gravity) =>
@@ -81,6 +103,10 @@ public static class LandingDust
     private static float Strength(float fallBlocks) =>
         MathUtils.ImpactStrength(fallBlocks, WorldGenerationConfig.LandingDustMinFallBlocks,
             WorldGenerationConfig.LandingDustFullFallBlocks);
+
+    private static float FallingBlockStrength(float fallBlocks) =>
+        MathUtils.ImpactStrength(fallBlocks, WorldGenerationConfig.FallingBlockDustMinFallBlocks,
+            WorldGenerationConfig.FallingBlockDustFullFallBlocks);
 
     private static float SplatStrength(float impactSpeed) =>
         MathUtils.InverseLerp(WorldGenerationConfig.SlimeSplatMinImpact, WorldGenerationConfig.SlimeSplatFullImpact,

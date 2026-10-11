@@ -13,6 +13,8 @@
   //   tnt-blast  the frames right after the blast: the crater, its loot flung out of it, the goblin and
   //              the slime shoved away from the centre, and the camera shaken off its line (compare
   //              the horizon with tnt-fuse)
+  //   sand-settle a sand cube placed against the top of a four-high dirt pillar falls three blocks
+  //              and settles in a skirt of its own chips (FallingBlockManager.Landings)
   "steps": [
     { "op": "fly", "on": true },
     { "op": "teleport", "pos": [253.5, 30, -4.5], "yaw": -90, "pitch": -28.37 },
@@ -39,6 +41,40 @@
     { "op": "wait", "seconds": 0.15 },
     { "op": "screenshot", "name": "tnt-blast-c", "hideHud": true },
     { "op": "wait", "seconds": 1.2 },
-    { "op": "screenshot", "name": "tnt-after", "hideHud": true }
+    { "op": "screenshot", "name": "tnt-after", "hideHud": true },
+    { "op": "damage", "amount": 100 },
+
+    // LEG 2 — a sand cube placed against the top of a four-high dirt pillar topples three blocks to
+    // the ground beside it and settles in a skirt of its own chips. The camera hovers (flight, so
+    // creative) at (254.5, 15.5, 1.5), above the pillar's top, so every placement ray reaches the top
+    // face it aims at (x 256, z 1, tops at y 10..13) before any side face, within the first-person
+    // ray's ten cells; the sand's aim then meets the finished pillar's west face and puts the sand
+    // in the air at (255, 13, 1).
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [254.5, 15.5, 1.5], "yaw": 0, "pitch": -70.02 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "give", "block": "dirt", "count": 4 },
+    { "op": "look", "yaw": 0, "pitch": -70.02 },
+    { "op": "place" },
+    { "op": "look", "yaw": 0, "pitch": -66.04 },
+    { "op": "place" },
+    { "op": "look", "yaw": 0, "pitch": -60.26 },
+    { "op": "place" },
+    { "op": "look", "yaw": 0, "pitch": -51.34 },
+    { "op": "place" },
+    { "op": "give", "block": "sand", "count": 1 },
+    { "op": "look", "yaw": 0, "pitch": -53.13 },
+    { "op": "place" },
+    // Empty hands, and a side view of the landing cell (255, 10, 1) from six blocks south of it
+    { "op": "select", "slot": 9 },
+    { "op": "teleport", "pos": [255.5, 12.5, -4.5], "yaw": 90, "pitch": -20 },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "sand-settle-a", "hideHud": true },
+    { "op": "wait", "seconds": 0.08 },
+    { "op": "screenshot", "name": "sand-settle-b", "hideHud": true },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "sand-settle-c", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "sand-settle-d", "hideHud": true }
   ]
 }
