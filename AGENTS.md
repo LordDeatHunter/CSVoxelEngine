@@ -358,6 +358,22 @@ never changes in view, the shaded share matches `IlluminatedFraction`, waxing li
 `visual-examples/moon.json` (`VOXEL_TIME` 700 full, 3100 last quarter, 4300 crescent, 5500 new,
 7900 first quarter) frames it.
 
+**Moonlight.** At night the moon is the world's **key light**: `RenderManager._sunDir` (what
+`uSunDir`, the shadow cascades, the clouds, the leaves and the rays read) is `Moonlight.Direction`,
+the sun by day and the moon (the sun negated) once the sun is at or below
+`MoonlightSwitchSunElevation`, while the sky (the dome, the sun and moon discs, the stars' turn, the
+glare) keeps the true sun in `_skySunDir`, and the sun disc its own `_sunDiscColor`. So the world
+shader's `uSunColor`/`uSunIntensity` are the moonlight's at night: `Moonlight.ColorSrgb` (cool) at
+`Moonlight.Intensity` (`MoonlightIntensity`, eased in by `Moonlight.Rise` as the moon climbs and
+scaled by the phase, `MoonlightNewMoonShare` at a new moon), and the shadow strength follows the key
+light's own elevation, so a night keeps soft shadows (the shadow passes now run at night too). The
+handover never pops: the sun's light eases out below the horizon (`Moonlight.SunFade`, which also
+removes the old night floor that lit the world from under the ground) and the moon's eases in from
+the switch, both zero there. The switch sits at or below `SkyGlowBelowSunElevation`, because the
+world and cloud `SkySample` copies read `uSunDir`: with no glow left, the key light's direction
+changes nothing in the fog. The night ambient is a touch bluer. `MoonlightTests`;
+`visual-examples/moonlight.json` (`VOXEL_TIME` 455 the handover, 950 a low moon, 700, 5450 a new moon).
+
 **Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
 heading turns slowly (`WorldGenerationConfig.Wind*`), with `Wind.Offset` its bounded closed-form
 integral. Leaf sway reads it in both vertex shaders (`uWind`, the direction scaled by `WindLean`,
@@ -841,6 +857,7 @@ OpenGLTest/
     SunGlare.cs                # GL-free sun lens glare: per-frame intensity and its sky falloff
     CloudSilverLining.cs       # GL-free twin of the clouds' silver lining: sun gate, forward lobe, thinness along the view
     MoonPhase.cs               # GL-free moon: the day's phase (steps at noon), its light direction, lit share, visibility
+    Moonlight.cs               # GL-free key-light rule: sun by day, moon at night, handed over with both dark
     BlockLightPalette.cs       # GL-free 8-slot block-light colour palette (slot 0 = the default warm torch colour)
     LightTint.cs               # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
     BiomeTint.cs               # GL-free biome tint: Climate -> palette -> vertex tint on a 16-block lattice, Gain, Shade, CellTint

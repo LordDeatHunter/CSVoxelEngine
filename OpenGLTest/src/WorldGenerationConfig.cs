@@ -370,7 +370,10 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>Sine of the sun's elevation at which the sunset glow is strongest (the sun on the horizon).</summary>
     public const float SkyGlowPeakSunElevation = 0f;
 
-    /// <summary>Sine of the sun's elevation at and below which the afterglow is gone.</summary>
+    /// <summary>
+    /// Sine of the sun's elevation at and below which the afterglow is gone. Must stay at or above
+    /// MoonlightSwitchSunElevation, where the moon takes over the world's light (MoonlightTests).
+    /// </summary>
     public const float SkyGlowBelowSunElevation = -0.1f;
 
     // --- Stars (StarField, Stars in sky-fragment.glsl) ---
@@ -454,6 +457,23 @@ public const float DayLengthSeconds = 1200f;
 
     /// <summary>Half-width of the soft terminator between the lit and dark parts, in units of the sphere normal's dot with the light.</summary>
     public const float MoonTerminatorSoftness = 0.06f;
+
+    // --- Moonlight (Moonlight, RenderManager.SetLighting) ---
+    /// <summary>
+    /// Sine of the sun's elevation at and below which the moon lights the world instead of the sun.
+    /// Must stay at or below SkyGlowBelowSunElevation, so the sunset glow is gone by then
+    /// (MoonlightTests asserts it).
+    /// </summary>
+    public const float MoonlightSwitchSunElevation = -0.1f;
+
+    /// <summary>How much further the sun sinks (the moon climbs), in sine of elevation, while the moonlight eases in.</summary>
+    public const float MoonlightRiseBand = 0.25f;
+
+    /// <summary>The full moon's light in the world shader's sun-intensity units (the noon sun is about 2.6).</summary>
+    public const float MoonlightIntensity = 0.07f;
+
+    /// <summary>Share of the full moon's light a new moon still gives, so a moonless night keeps faint shadows.</summary>
+    public const float MoonlightNewMoonShare = 0.35f;
 
     // --- Clouds ---
     // One static field of CloudCellSize-block cells (CloudField) drawn 3x3 around the camera by

@@ -46,7 +46,9 @@ public readonly record struct SkyPalette(Vector3 Zenith, Vector3 Horizon, Vector
     /// (the flat day sky) and at or below <see cref="WorldGenerationConfig.SkyGlowBelowSunElevation"/>
     /// (night, once the afterglow has faded), rising smoothly to 1 at
     /// <see cref="WorldGenerationConfig.SkyGlowPeakSunElevation"/>. The same at dawn, the sun
-    /// climbing back through the same band.
+    /// climbing back through the same band. Below the lower edge the glow is exactly zero, which is
+    /// what lets the moon light the world there (<see cref="Moonlight"/>): the world and cloud fog's
+    /// SkySample then reads the moon's direction, and with no glow the direction changes nothing.
     /// </summary>
     public static float GlowAmount(float sunElevation) =>
         MathUtils.SmoothStep(WorldGenerationConfig.SkyGlowBelowSunElevation, WorldGenerationConfig.SkyGlowPeakSunElevation, sunElevation)

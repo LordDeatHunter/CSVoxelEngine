@@ -1,0 +1,31 @@
+// Moonlight check (Moonlight, RenderManager.SetLighting): at night the moon is the key light, a
+// faint cool light from above that keeps the trees' shadows, and the sun hands over to it with
+// both dark, so the light never pops. Run from OpenGLTest/, once per time, copying
+// visual/moonlight/ aside between runs:
+//   $env:VOXEL_SCRIPT='visual-examples/moonlight.json'; $env:VOXEL_TIME='<t>'
+//   bin/Release/net9.0/silkgltriangle.exe
+// Times: 455 (the handover: the shots step through it ~3 s apart at the same pose, the sun
+// reaching the switch elevation at t ~467), 950 (a low moon: long shadows), 700 (the moon high),
+// 5450 (the same hour on day 4, a new moon: the dimmest moonlight).
+// Flying, so the pose holds between shots.
+{
+  "steps": [
+    { "op": "wait", "seconds": 5 },
+    { "op": "fly" },
+    { "op": "teleport", "pos": [0.5, 74.5, 0.5], "yaw": 160, "pitch": -32 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "screenshot", "name": "forest_1", "hideHud": true },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "forest_2", "hideHud": true },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "forest_3", "hideHud": true },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "forest_4", "hideHud": true },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "forest_5", "hideHud": true },
+    // Looking the other way, down at the trees with the moon behind the eye.
+    { "op": "teleport", "pos": [0.5, 74.5, 0.5], "yaw": -20, "pitch": -40 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "forest_other_way", "hideHud": true }
+  ]
+}

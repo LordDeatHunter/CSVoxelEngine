@@ -135,7 +135,7 @@ public class RenderManager : IDisposable
     private readonly List<Vertex> _popVerts = new(MaxPopBoxes * PopBoxEmitter.MaxQuadsPerBox * 4);
     private readonly List<ushort> _popIndices = new(MaxPopBoxes * PopBoxEmitter.MaxQuadsPerBox * 6);
 
-    // The sun disc: one shared unit quad plus its sprite, oriented around _sunDir every frame
+    // The sun disc: one shared unit quad plus its sprite, oriented around _skySunDir every frame
     // by RenderSun. _sunVisibility fades it out below the horizon and underwater.
     private uint _sunTexture;
     private Mesh _sunQuad;
@@ -265,7 +265,13 @@ public class RenderManager : IDisposable
 
     // Per-frame lighting state, pushed once per frame via SetLighting and uploaded to the
     // world shader once per frame by ApplyFrameUniforms
+    // _sunDir is the world's key light (Moonlight): the sun by day, the moon (the sun negated) once
+    // the sun is well down. Everything that lights or shadows the world reads it; the sky (the dome,
+    // the sun and moon discs, the stars' turn, the glare) reads the true sun, _skySunDir.
     private Vector3 _sunDir = Vector3.UnitY;
+    private Vector3 _skySunDir = Vector3.UnitY;
+    // The sun disc's own colour (linear); _sunColor is the key light's, the moonlight's at night
+    private Vector3 _sunDiscColor = Vector3.One;
     private Vector3 _sunColor = Vector3.One;
     private float _sunIntensity = 1f;
     private Vector3 _ambient = new(0.42f, 0.45f, 0.52f);
@@ -1057,14 +1063,18 @@ public class RenderManager : IDisposable
 
         // The sun orbits once per DayLengthSeconds; the phase starts it mid-morning (DayCycle,
         // which gameplay keyed to the hour reads too)
-        _sunDir = DayCycle.SunDirection(time);
-        var elevation = _sunDir.Y;
+        _skySunDir = DayCycle.SunDirection(time);
+        var elevation = _skySunDir.Y;
+        // The world's key light: the sun, or the moon once the sun is well down (Moonlight). The
+        // handover happens with both at zero strength, so neither the light nor its shadows pop.
+        var moonLit = Moonlight.IsMoonLit(elevation);
+        _sunDir = Moonlight.Direction(_skySunDir);
 
-        // The shadow camera fades itself out as the sun sets: at a grazing elevation the
-        // shadows stretch to the horizon and the ortho box cannot hold them, and at night
-        // there is no direct sun left to remove anyway.
+        // The shadow camera fades itself out as the key light sets: at a grazing elevation the
+        // shadows stretch to the horizon and the ortho box cannot hold them. The moon, the key
+        // light at night, climbs from the handover on, so its shadows fade in as it does.
         _shadowStrength = GameSettings.Shadows
-            ? Smooth01((elevation - 0.02f) / 0.12f)
+            ? Smooth01((_sunDir.Y - 0.02f) / 0.12f)
             : 0f;
 
         // The disc itself fades over a much narrower band than the light does, so it sinks
@@ -1089,17 +1099,35 @@ public class RenderManager : IDisposable
         // (cloud-fragment.glsl, rays-upsample-fragment.glsl), with the exact pre-SH-10 sun,
         // intensity and ambient: the world's retuned linear constants below would light them
         // differently than they were.
-        _sunSrgb = _sunColor;
-        _cloudSunIntensity = 0.05f + 1.2f * dayness;
+        _sunDiscColor = ColorSpace.SrgbToLinear(_sunColor);
         _cloudAmbientSrgb = Mix(new Vector3(0.06f, 0.07f, 0.11f), new Vector3(0.42f, 0.45f, 0.52f), dayness);
-        _sunColor = ColorSpace.SrgbToLinear(_sunColor);
-        _sunIntensity = SunLinearGain * MathF.Pow(0.05f + 1.2f * dayness, SunLinearExponent);
+        if (moonLit)
+        {
+            // Moonlight: a faint cool key light from the moon, eased in as it climbs from the
+            // handover and fuller with a fuller moon (Moonlight.Intensity). The clouds take the
+            // same share of their own night floor.
+            _sunSrgb = Moonlight.ColorSrgb;
+            _sunColor = Moonlight.ColorLinear;
+            _sunIntensity = Moonlight.Intensity(elevation, _moonPhase);
+            _cloudSunIntensity = (0.05f + 1.2f * dayness) * Moonlight.Rise(elevation) * Moonlight.PhaseShare(_moonPhase);
+        }
+        else
+        {
+            // The sun's light, easing out below the horizon to nothing at the handover
+            // (Moonlight.SunFade), instead of lighting the night from under the ground
+            var fade = Moonlight.SunFade(elevation);
+            _sunSrgb = _sunColor;
+            _sunColor = _sunDiscColor;
+            _sunIntensity = SunLinearGain * MathF.Pow(0.05f + 1.2f * dayness, SunLinearExponent) * fade;
+            _cloudSunIntensity = (0.05f + 1.2f * dayness) * fade;
+        }
         // Thin cloud edges near the sun light up, never with the sun at or below the horizon
         if (_clouds != null)
             _clouds.SilverLining = CloudSilverLining.Strength(elevation);
 
+        // The night end is a touch bluer than it was: the moonlit sky the shaded faces see
         _ambient = ColorSpace.SrgbToLinear(
-            Mix(new Vector3(0.1f, 0.11f, 0.155f), new Vector3(0.42f, 0.45f, 0.52f), dayness));
+            Mix(new Vector3(0.09f, 0.105f, 0.165f), new Vector3(0.42f, 0.45f, 0.52f), dayness));
 
         // The warm glow toward the sun only while it crosses the horizon (the day sky stays flat)
         _sky = SkyPalette.Compute(dayness, duskAmount, SkyPalette.GlowAmount(elevation));
@@ -1112,7 +1140,7 @@ public class RenderManager : IDisposable
         };
         // The stars turn with the sun's orbit and twinkle on the lighting clock, wrapped hourly so
         // the float keeps its precision; their cloud cover follows the drawn clouds' drift
-        _skyFrame = new SkyDomeFrame(StarField.Visibility(elevation), StarField.SpinOf(_sunDir), (float)(_timeD % 3600.0), _cameraPos,
+        _skyFrame = new SkyDomeFrame(StarField.Visibility(elevation), StarField.SpinOf(_skySunDir), (float)(_timeD % 3600.0), _cameraPos,
             CloudCopies.Drift(_timeD, WorldGenerationConfig.CloudFieldSize), Vector3.Zero);
         // The flat sky/fog colour is the dome's no-glow horizon sample
         _skyColor = _sky.HazedHorizon;
@@ -1185,13 +1213,13 @@ public class RenderManager : IDisposable
         // drifting edge fades it smoothly. The mirror draws the dome without it (RenderReflection).
         var glareCover = 0f;
         if (_cloudShadow != null && elevation > 0f)
-            glareCover = CloudCover.AcrossDisc(_cloudShadow.Coverage, CloudField.Cells, _cameraPos, _sunDir,
+            glareCover = CloudCover.AcrossDisc(_cloudShadow.Coverage, CloudField.Cells, _cameraPos, _skySunDir,
                 MathUtils.ToRadians(GameSettings.SunSize), _skyFrame.CloudDrift, CloudCover.Blocking(GameSettings.CloudOpacity));
         _glareCloud = MathUtils.Damp(_glareCloud, glareCover, WorldGenerationConfig.SunGlareCloudEaseRate, dt);
         var glare = camera == null
             ? 0f
-            : SunGlare.Intensity(Vector3.Dot(camera.ViewDirection, _sunDir), elevation, _glareCloud) * (1f - wet);
-        _skyFrame = _skyFrame with { GlareColor = _sunColor * glare, MoonVisibility = _moonVisibility };
+            : SunGlare.Intensity(Vector3.Dot(camera.ViewDirection, _skySunDir), elevation, _glareCloud) * (1f - wet);
+        _skyFrame = _skyFrame with { GlareColor = _sunDiscColor * glare, MoonVisibility = _moonVisibility };
 
         _fogNear = MathUtils.Lerp(WorldGenerationConfig.FogNearBlocks,
             WorldGenerationConfig.UnderwaterFogNearBlocks, wet);
@@ -2177,7 +2205,8 @@ public class RenderManager : IDisposable
     {
         if (!Matrix4x4.Invert(viewRotation * projection, out var inv))
             inv = Matrix4x4.Identity;
-        _skyDome?.Render(inv, _sky, _sunDir, _skyTint, _skyTintAmount, frame);
+        // The dome reads the true sun, never the key light: its glow, stars and moon mask follow it
+        _skyDome?.Render(inv, _sky, _skySunDir, _skyTint, _skyTintAmount, frame);
         RenderSun(forward, projection);
         RenderMoon(forward, projection);
     }
@@ -2203,7 +2232,7 @@ public class RenderManager : IDisposable
 
         var viewRot = Matrix4x4.CreateLookAt(Vector3.Zero, forward, Vector3.UnitY);
         moonShader.SetUniform("uViewProj", viewRot * projection);
-        moonShader.SetUniform("uSunDir", -_sunDir);
+        moonShader.SetUniform("uSunDir", -_skySunDir);
         moonShader.SetUniform("uHalfSize", 2f * 100f * MathF.Tan(MathUtils.ToRadians(
             WorldGenerationConfig.MoonAngularRadiusDeg * WorldGenerationConfig.MoonGlowScale)));
         moonShader.SetUniform("uDiscFraction", 1f / WorldGenerationConfig.MoonGlowScale);
@@ -2231,7 +2260,7 @@ public class RenderManager : IDisposable
     /// Three things make it cheap. It is drawn first, with the depth test and depth writes
     /// off, so everything drawn afterwards occludes it for free; the dome under it is
     /// <see cref="SkyRenderer"/>'s.
-    /// The quad is placed 100 blocks along <see cref="_sunDir"/> under a view matrix with the
+    /// The quad is placed 100 blocks along <see cref="_skySunDir"/> under a view matrix with the
     /// translation removed, so it effectively sits at infinity and never parallaxes as the
     /// player walks. And it blends additively (One, One), so the shader's black background
     /// contributes nothing and the glow brightens the sky rather than greying it.
@@ -2253,7 +2282,7 @@ public class RenderManager : IDisposable
         // Rotation only: dropping the camera position is what pins the quad at infinity
         var viewRot = Matrix4x4.CreateLookAt(Vector3.Zero, forward, Vector3.UnitY);
         sunShader.SetUniform("uViewProj", viewRot * projection);
-        sunShader.SetUniform("uSunDir", _sunDir);
+        sunShader.SetUniform("uSunDir", _skySunDir);
         // The quad has to hold the whole glow, so it is sized to the glow's angular radius and
         // the shader keeps the textured disc inside the inner uDiscFraction of it. The unit
         // square's corners sit at +-0.5, hence the factor 2 to make uHalfSize the true radius.
@@ -2265,7 +2294,7 @@ public class RenderManager : IDisposable
         // An HDR intensity: the disc plus the sky behind it has to clear the tonemap knee by a
         // wide margin to read as display white, and the additive glow needs the same lift to show
         // over a bright linear sky as it did added in display space.
-        sunShader.SetUniform("uSunColor", _sunColor * SunDiscIntensity);
+        sunShader.SetUniform("uSunColor", _sunDiscColor * SunDiscIntensity);
         sunShader.SetUniform("uVisibility", _sunVisibility);
 
         _sunQuad.Render();
