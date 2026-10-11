@@ -87,6 +87,26 @@ public sealed class GoblinManager : IMobPopulation
         }
     }
 
+    /// <summary>
+    /// Alerts every other living goblin within <see cref="WorldGenerationConfig.GoblinPackAlertRadiusBlocks"/>
+    /// of one that just noticed a player: each skips its first-throw delay, so the pack joins in
+    /// together. One pass over the pack, run on the noticing frame only.
+    /// </summary>
+    internal void AlertPackAround(Goblin noticed)
+    {
+        var radius = WorldGenerationConfig.GoblinPackAlertRadiusBlocks;
+        var radiusSquared = radius * radius;
+        for (var i = 0; i < _goblins.Count; i++)
+        {
+            var other = _goblins[i];
+            if (other == noticed || other.IsDying) continue;
+            var dx = other.Position.X - noticed.Position.X;
+            var dz = other.Position.Z - noticed.Position.Z;
+            if (dx * dx + dz * dz <= radiusSquared)
+                other.AlertPack();
+        }
+    }
+
     /// <summary>Stones in flight; drawn and mirrored like the player's own throws.</summary>
     public IReadOnlyList<ThrownProjectile> Stones => _stones;
 
@@ -214,6 +234,10 @@ public sealed class GoblinManager : IMobPopulation
             goblin.Update(deltaTime, chunks, chased >= 0 && !goblin.IsDying ? targets[chased] : null,
                 chased < 0 ? goblin.WanderGoal(targets.Count, deltaTime) : null, dodge);
             goblin.UpdateHazards(deltaTime, chunks);
+
+            // A goblin that just noticed a player pulls its whole pack forward
+            if (goblin.TakeJustNoticed())
+                AlertPackAround(goblin);
 
             if (goblin.IsDying)
             {

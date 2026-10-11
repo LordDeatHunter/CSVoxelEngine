@@ -2105,6 +2105,10 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float GoblinDodgeConeDegrees = 12f;
     public const float GoblinDodgeRangeBlocks = 20f;
 
+    // --- Goblin pack alert (GoblinManager.AlertPackAround): a goblin that notices a player pulls
+    // every other goblin within this radius forward, skipping their first-throw delay ---
+    public const float GoblinPackAlertRadiusBlocks = 12f;
+
     // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
     // first notices a player (the same moment its first-throw delay starts) ---
     public const float GoblinNoticePipSeconds = 0.9f;

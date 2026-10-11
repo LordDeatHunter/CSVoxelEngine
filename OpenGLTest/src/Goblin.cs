@@ -91,6 +91,11 @@ public sealed class Goblin : Mob
     // Which way the goblin sidesteps a charged throw aimed at it: fixed per goblin at spawn from
     // its cell, so the same goblin always breaks the same way instead of jittering
     private readonly float _dodgeSide;
+    // Whether this goblin has ever started a throw; the pack alert only pulls a first throw forward
+    private bool _thrownOnce;
+    // Set on the frame the goblin first noticed a target, read (and cleared) by the manager, which
+    // alerts the pack with it
+    private bool _justNoticed;
     private float _noticePipElapsed = WorldGenerationConfig.GoblinNoticePipSeconds;
     private bool _noticed;
 
@@ -148,6 +153,29 @@ public sealed class Goblin : Mob
     /// like any goblin.
     /// </summary>
     public bool IsFleeing => Health > 0 && Health <= MaxHealth * WorldGenerationConfig.GoblinFleeHealthShare;
+
+    /// <summary>
+    /// Takes whether this goblin first noticed a target since the last call (true once): the
+    /// manager uses it to alert the pack (goblins within
+    /// <see cref="WorldGenerationConfig.GoblinPackAlertRadiusBlocks"/> skip their first-throw delay).
+    /// </summary>
+    public bool TakeJustNoticed()
+    {
+        var noticed = _justNoticed;
+        _justNoticed = false;
+        return noticed;
+    }
+
+    /// <summary>
+    /// Another goblin of the pack just noticed a player: skip this goblin's first-throw delay so
+    /// the pack joins in together. Only a goblin that has not thrown yet (and has stones) is
+    /// pulled forward; a later alert never resets a running cooldown.
+    /// </summary>
+    public void AlertPack()
+    {
+        if (_thrownOnce || IsDying || Ammo <= 0) return;
+        _throwCooldown = 0f;
+    }
 
     /// <summary>
     /// The notice pip's clock: 0 on the frame the goblin first had a player to chase (the same
@@ -319,6 +347,7 @@ public sealed class Goblin : Mob
             {
                 _noticed = true;
                 _noticePipElapsed = 0f;
+                _justNoticed = true;
             }
 
             var target = player.Eye;
@@ -425,6 +454,7 @@ public sealed class Goblin : Mob
                 {
                     _losBlocked = false;
                     _aimTarget = chest;
+                    _thrownOnce = true;
                     Animation.Play(ThrowClip);
                     _throwCooldown = WorldGenerationConfig.GoblinThrowCooldownSeconds
                                      + (Random.Shared.NextSingle() - 0.5f) * 2f * WorldGenerationConfig.GoblinThrowCooldownJitter;

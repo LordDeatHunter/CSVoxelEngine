@@ -188,9 +188,10 @@ files waits in TODO.md instead, since there are none to use yet.
   the line while the aim holds, its side fixed at spawn; singleplayer passes the local arm's aim
   (`GoblinManager.IsAimedAt`, `Goblin.Decide`; `GoblinDodgeTests`).
 
-- [ ] **Pack alert.** When a goblin notices the player, goblins within 12 blocks skip their
-  first-throw delay. *Hook:* the noticing moment in `GoblinManager`, then one pass over nearby
-  goblins; reuses `GoblinFirstThrowDelaySeconds`.
+- [x] **Pack alert.** A goblin that notices a player alerts every other goblin within
+  `GoblinPackAlertRadiusBlocks` (12), which skip their first-throw delay so the pack throws
+  together (`Goblin.TakeJustNoticed`/`AlertPack`, `GoblinManager.AlertPackAround`;
+  `GoblinPackAlertTests`).
 - [ ] **Pack spawning.** A goblin ring spawn rolls a group of 1-3 within 3 blocks of the chosen
   cell. *Hook:* `GoblinManager`'s call into `MobSpawner.TryFindSurfaceSpawn`, with a repeated
   search for the neighbours; every member respects `MobCaps`' natural cap.
