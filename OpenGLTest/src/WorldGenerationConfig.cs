@@ -766,6 +766,43 @@ public const float DayLengthSeconds = 1200f;
     // is exponential, so ~2 blocks of mismatch keeps about a third of a tap's weight and a
     // silhouette several blocks deep rejects its neighbours outright.
     public const float WaterRayUpsampleToleranceBlocks = 2f;
+
+    // Godrays (Godrays, GodraysRenderer, godrays-fragment.glsl): light shafts through trees, clouds
+    // and gaps in dry air when the sun is in view, the underwater shafts' march run over air.
+    /// <summary>Master switch for the godrays pass; off, it costs nothing and the frame is exactly what it was.</summary>
+    public const bool GodraysEnabled = true;
+    /// <summary>Peak strength (Godrays.Intensity's cap), a multiplier on what the shafts add.</summary>
+    public const float GodraysStrength = 1f;
+    /// <summary>Scattering per block of sunlit air marched (Godrays.Scatter): how fast the shafts saturate along a ray.</summary>
+    public const float GodraysDensityPerBlock = 0.006f;
+    /// <summary>The most the shafts add to a display value, at full strength and phase with a long sunlit path.</summary>
+    public const float GodraysMaxAdd = 0.4f;
+    /// <summary>Blocks of sunlit air counted past the march for a ray that reaches open sky (no terrain, tree or cloud in the way).</summary>
+    public const float GodraysSkyBlocks = 250f;
+    /// <summary>How far the march reaches, in blocks: inside the near shadow cascade (ShadowRadiusBlocks).</summary>
+    public const float GodraysMaxDistance = 72f;
+    /// <summary>Samples per marched pixel (the march runs at half resolution).</summary>
+    public const int GodraysSteps = 24;
+    /// <summary>Angle between the view and the sun beyond which there are no godrays.</summary>
+    public const float GodraysFacingDegrees = 80f;
+    /// <summary>Sine of the sun's elevation at which the shafts are strongest (a low sun).</summary>
+    public const float GodraysPeakElevation = 0.2f;
+    /// <summary>Share of their peak strength the shafts keep with the sun straight overhead.</summary>
+    public const float GodraysNoonShare = 0.3f;
+    /// <summary>How much a full cloud over the sun's disc dims the shafts (they never vanish: cloud gaps still cast them).</summary>
+    public const float GodraysCloudDim = 0.7f;
+    /// <summary>How much a full-thickness cloud's shadow removes from the sunlit air under it, in the march.</summary>
+    public const float GodraysCloudShadow = 0.8f;
+    /// <summary>Forward-scatter falloff of the shafts: cos(view, sun) raised to this.</summary>
+    public const float GodraysPhaseExponent = 8f;
+    /// <summary>Share of the forward peak the shafts keep looking well away from the sun.</summary>
+    public const float GodraysPhaseFloor = 0.02f;
+    /// <summary>How much of the way from a pixel to the sun's place on screen the composite's radial blur reaches.</summary>
+    public const float GodraysBlurLength = 0.85f;
+    /// <summary>Each radial blur sample's weight relative to the one before it (nearer samples count more).</summary>
+    public const float GodraysBlurDecay = 0.95f;
+    /// <summary>Radial blur samples per full-resolution pixel.</summary>
+    public const int GodraysBlurSamples = 24;
     // Flow-aware water (SH-14): the mesher bakes each fluid corner's FluidFlow.Corner vector into
     // the vertex and the world shaders stretch and scroll the wave normal along it.
     /// <summary>Corner flow magnitude (<see cref="FluidFlow.Corner{T}"/>) that reads as full

@@ -160,6 +160,11 @@ public class RenderManager : IDisposable
     // Underwater sun shafts, one additive full-screen pass. Null until LoadResources builds it.
     private UnderwaterRaysRenderer? _rays;
 
+    // Godrays: the same march over dry air (RenderGodrays). Null until LoadResources builds it.
+    private GodraysRenderer? _godrays;
+    // This frame's godray strength (Godrays.Intensity), set by SetLighting; 0 skips the pass
+    private float _godrayStrength;
+
     // The sky dome, one full-screen pass drawn before the sun disc (RenderSky). Null until
     // LoadResources builds it; the clear colour stands in for it until then.
     private SkyRenderer? _skyDome;
@@ -766,6 +771,7 @@ public class RenderManager : IDisposable
         _post = new PostProcessRenderer(gl);
         _contactAo = new ContactAoRenderer(gl);
         _rays = new UnderwaterRaysRenderer(gl);
+        _godrays = new GodraysRenderer(gl, CloudShadowUnit);
         _vignette = new DamageVignetteRenderer(gl);
         _leaves = new LeafParticleRenderer(gl);
         _fire = new FireParticleRenderer(gl);
@@ -1226,6 +1232,11 @@ public class RenderManager : IDisposable
         var glare = camera == null
             ? 0f
             : SunGlare.Intensity(Vector3.Dot(camera.ViewDirection, _skySunDir), elevation, _glareCloud) * (1f - wet);
+        // Godrays: strongest facing a low sun, a fraction at noon, dimmed by the cloud over it and
+        // gone under water, where the underwater shafts take over (Godrays.Intensity)
+        _godrayStrength = camera == null || !WorldGenerationConfig.GodraysEnabled
+            ? 0f
+            : Godrays.Intensity(Vector3.Dot(camera.ViewDirection, _skySunDir), elevation, _glareCloud, wet);
         // The aurora shows only from cold lands: the climate at the eye's column, read from the stored
         // corner climate (never worldgen noise, so a client reads what its server streamed), eased so
         // walking across a border fades it; an unknown column eases it out
@@ -2665,6 +2676,41 @@ public class RenderManager : IDisposable
         // UnderwaterRaysRenderer selects unit 5 for the upsample and puts unit 0 back. Unit 5 is
         // untracked so the records happen to survive, but the renderer does not promise that.
         InvalidateTextureUnits();
+    }
+
+    /// <summary>
+    /// Godrays: light shafts through trees, clouds and gaps in dry air when the sun is in view
+    /// (<see cref="GodraysRenderer"/>), drawn after everything else in the world, like the underwater
+    /// shafts, whose half-resolution target it borrows (the two never need it at once: the godrays
+    /// fade out as the eye goes under). It reads the HDR scene's own depth texture, marching it
+    /// through the near shadow cascade, so it needs no scene copy, and composites through the
+    /// colour-only HDR framebuffer so that read is no feedback loop. Skipped when the frame's strength
+    /// (<see cref="Godrays.Intensity"/>, set by <see cref="SetLighting"/>) is negligible, when the
+    /// shadow passes did not run (shadows off, or the sun too low for them), and when
+    /// <see cref="WorldGenerationConfig.GodraysEnabled"/> is off.
+    /// </summary>
+    public void RenderGodrays(Camera? camera)
+    {
+        if (camera == null || _godrays == null || !WorldGenerationConfig.GodraysEnabled) return;
+        if (_godrayStrength <= 0.0005f || _shadowStrengthDry <= 0f) return;
+        if (_raysFbo == 0 || _hdrColorOnlyFbo == 0) return;
+        // The sun's place on screen, which the composite blurs toward; none behind the eye
+        var sunClip = Vector4.Transform(new Vector4(_cameraPos + _skySunDir * 1000f, 1f), _sceneViewProj);
+        if (sunClip.W <= 1e-4f) return;
+        var sunUv = new Vector2(sunClip.X / sunClip.W, sunClip.Y / sunClip.W) * 0.5f + new Vector2(0.5f);
+        BindUnit(1, TextureTarget.Texture2D, _nearShadow.DepthTex);
+        BindUnit(4, TextureTarget.Texture2D, _hdrDepthTex);
+        ActiveUnit(0);
+        var cloudShadow = GameSettings.CloudOpacity > 0f ? WorldGenerationConfig.GodraysCloudShadow : 0f;
+        _godrays.Render(_raysFbo, _raysTex, _raysSize, _hdrColorOnlyFbo, _hdrColorTex, _viewportSize, _invViewProj,
+            _cameraPos, _sunDir, _sunSrgb, _godrayStrength,
+            _nearShadow.ViewProj, CloudCopies.Drift(_timeD, WorldGenerationConfig.CloudFieldSize), cloudShadow, sunUv);
+        // The renderer bound units 5 and 9 behind the cache's back, and unit 4 must not keep the
+        // scene depth (the next frame renders into it)
+        InvalidateTextureUnits();
+        BindUnit(4, TextureTarget.Texture2D, 0);
+        ActiveUnit(0);
+        BindSceneTarget();
     }
 
     // Wall-clock timestamp of the previous RenderWorld, so the chunk fade-in can advance by
@@ -4376,6 +4422,7 @@ public class RenderManager : IDisposable
         _post?.Dispose();
         _contactAo?.Dispose();
         _rays?.Dispose();
+        _godrays?.Dispose();
         _vignette?.Dispose();
         _leaves?.Dispose();
         _fire?.Dispose();

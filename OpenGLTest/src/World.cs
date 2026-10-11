@@ -2577,6 +2577,14 @@ public class World : IItemUseWorld
         renderManager.EndGpuPass(ProfileSection.RaysPass);
         FrameProfiler.End(ProfileSection.RaysPass);
 
+        // Godrays: the same march over dry air when the sun is in view; also after everything that
+        // writes depth, since it reads the scene depth
+        FrameProfiler.Begin(ProfileSection.GodraysPass);
+        renderManager.BeginGpuPass(ProfileSection.GodraysPass);
+        renderManager.RenderGodrays(Camera);
+        renderManager.EndGpuPass(ProfileSection.GodraysPass);
+        FrameProfiler.End(ProfileSection.GodraysPass);
+
         // Last world pass: tonemap the linear HDR scene target into the default framebuffer.
         // The UI draws after this, straight onto that gamma framebuffer.
         FrameProfiler.Begin(ProfileSection.PostPass);

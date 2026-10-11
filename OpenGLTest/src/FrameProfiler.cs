@@ -39,6 +39,7 @@ public enum ProfileSection
     WaterPass,
     CloudPass,
     RaysPass,
+    GodraysPass,
     SelectPass,
     PostPass,
     UiPass,
@@ -81,7 +82,7 @@ public static class FrameProfiler
         "fluidWake", "fluidTick", "leafDecay", "raycast", "breaking",
         "progUpdate", "usePlace", "debugLog", "player", "save",
         "lighting", "shadows", "reflect", "lodPass", "worldPass", "entityPass", "aoPass", "waterPass",
-        "cloudPass", "raysPass", "selectPass", "postPass", "uiPass",
+        "cloudPass", "raysPass", "godPass", "selectPass", "postPass", "uiPass",
         "rendShell", "screenshot", "publish",
     ];
 

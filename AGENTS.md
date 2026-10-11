@@ -426,6 +426,27 @@ nearest texel, so the sway never steps a whole pixel. The clock is wrapped on th
 common period (`UnderwaterWobble.WrapTime`), so it never jumps. `UnderwaterWobbleTests`;
 `visual-examples/underwater-wobble.json` (`VOXEL_TIME` 147).
 
+**Godrays.** Light shafts through trees, clouds and gaps in dry air when the sun is in view:
+`RenderManager.RenderGodrays` (`GodraysRenderer`), its own `godPass` profiler row right after
+`raysPass`, switched off by `GodraysEnabled`. Two draws. The march (`godrays-fragment.glsl`) is the
+underwater shafts' march run over air into their half-resolution target (borrowed: the two never
+need it at once): each pixel's ray up to `GodraysMaxDistance` (inside the near cascade) in
+`GodraysSteps` jittered samples, summing the sunlit blocks that pass the near shadow map and the
+cloud shadow up the sun ray (`GodraysCloudShadow`, unit 8), plus `GodraysSkyBlocks` for a ray that
+reaches open sky (depth at the far plane: nothing drawn there, no terrain, tree or cloud), turned
+into light by the saturating `Godrays.Scatter` and the forward `Godrays.Phase`. It reads the HDR
+scene's own depth texture (no scene copy). The composite (`godrays-composite-fragment.glsl`)
+averages that along the line from each pixel toward the sun's place on screen (`GodraysBlur*`), so
+the contrast between long sunlit rays and short or shadowed ones streaks outward from the sun as
+beams, and adds it in display space through the colour-only HDR framebuffer like the underwater
+shafts. The frame's strength is `Godrays.Intensity` (set by `SetLighting`): facing the sun within
+`GodraysFacingDegrees`, strongest for a sun near `GodraysPeakElevation` and `GodraysNoonShare` of
+that overhead, zero at and below the horizon, dimmed by the eased cloud over the sun's disc and
+zero under water (where the underwater shafts take over); the pass is also skipped while the
+shadow passes do not run. Cost on the dev GPU at 1080p: about 0.35 ms GPU (under 0.8 ms worst)
+and 0.02-0.05 ms CPU while active, nothing otherwise. `GodraysTests`;
+`visual-examples/godrays.json` (`VOXEL_TIME` 395, 425, 147, with `VOXEL_DEBUG=1` for the cost).
+
 **Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
 heading turns slowly (`WorldGenerationConfig.Wind*`), with `Wind.Offset` its bounded closed-form
 integral. Leaf sway reads it in both vertex shaders (`uWind`, the direction scaled by `WindLean`,
@@ -916,6 +937,7 @@ OpenGLTest/
     BiomeGrade.cs              # GL-free post colour grade from the eye's climate: warm over desert, cool over snow, eased
     DamageFringe.cs            # GL-free twin of the post pass's damage chromatic fringe: strength from the flash, edge weight
     UnderwaterWobble.cs        # GL-free twin of the post pass's underwater screen sway: the offset and its wrapped clock
+    Godrays.cs                 # GL-free twin of the godrays' strength (facing, sun height, cloud, wet), scatter and phase
     BlockLightPalette.cs       # GL-free 8-slot block-light colour palette (slot 0 = the default warm torch colour)
     LightTint.cs               # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
     BiomeTint.cs               # GL-free biome tint: Climate -> palette -> vertex tint on a 16-block lattice, Gain, Shade, CellTint
@@ -1101,6 +1123,7 @@ OpenGLTest/
       UITextCache.cs           # memoised per-frame HUD strings (FPS, compass, coordinates, counts)
       ShadowCascade.cs         # one sun shadow cascade: radius, map size, depth FBO/texture, texel-stepped centre (StepCentre) and light view-proj
       PostEffects.cs           # the post pass's per-frame camera effects (exposure, grade, ...) handed to PostProcessRenderer
+      GodraysRenderer.cs       # the godrays: a half-res shadow-map march over dry air, then a radial composite toward the sun
       UnderwaterRaysRenderer.cs # additive full-screen sun shafts while the eye is submerged
       SkyRenderer.cs           # the full-screen sky dome pass (sky-fragment.glsl)
       ChunkGeometryPool.cs     # the two shared chunk vertex/index buffers (opaque, translucent):
