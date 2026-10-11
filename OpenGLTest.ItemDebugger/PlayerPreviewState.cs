@@ -30,6 +30,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public const string Slice = "slice";
     public const string SliceBack = "slice back";
     public const string Throw = "throw";
+    public const string Use = "use";
     public const string Hurt = "hurt";
     public const string Equip = "equip";
     public const string Death = "death";
@@ -38,7 +39,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public static readonly IReadOnlyList<string> AllModes =
     [
         Idle, Walk, Run, Sneak, Jump, SprintJump, Land, Swim, SwimIdle, Surface,
-        Punch, HeavyPunch, Slice, SliceBack, Throw, Hurt, Equip, Death,
+        Punch, HeavyPunch, Slice, SliceBack, Throw, Use, Hurt, Equip, Death,
     ];
 
     /// <summary>Seconds a one-shot rests between the end of one play and the next.</summary>
@@ -66,6 +67,9 @@ public sealed class PlayerPreviewState : IPreviewDriver
     // How long the throw charge takes to build, how long it is held cocked, how long death holds the body down.
     private const float ThrowChargeSeconds = 0.8f;
     private const float ThrowHoldSeconds = 0.35f;
+    // How long the timed-use pose takes to rise and how long it is held before letting go
+    private const float UseChargeSeconds = 1.0f;
+    private const float UseHoldSeconds = 0.3f;
     private const float DeathHoldSeconds = 0.7f;
     private const float DeathFallSeconds = 0.9f;
 
@@ -76,6 +80,8 @@ public sealed class PlayerPreviewState : IPreviewDriver
     private bool _jumping;
     private float _throwTimer;
     private bool _throwCharging;
+    private float _useTimer;
+    private bool _useCharging;
     private float _deathTimer;
     private bool _playing;
 
@@ -109,6 +115,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
         HeavyPunch => PlayerModel.MineDuration / 0.7f + 0.1f,
         Slice or SliceBack => PlayerModel.SliceDuration + 0.1f,
         Throw => ThrowChargeSeconds + ThrowHoldSeconds + PlayerModel.ThrowDuration + 0.1f,
+        Use => UseChargeSeconds + UseHoldSeconds + 0.4f,
         Hurt => 1f,
         Equip => 1.2f,
         Death => DeathFallSeconds + DeathHoldSeconds,
@@ -155,10 +162,13 @@ public sealed class PlayerPreviewState : IPreviewDriver
         _jumping = false;
         _throwTimer = 0f;
         _throwCharging = false;
+        _useTimer = 0f;
+        _useCharging = false;
         _deathTimer = 0f;
         _playing = false;
         // A leftover charge, fall or death from the previous mode must not carry over.
         _model.CancelThrowCharge();
+        _model.CancelUseCharge();
         _model.DeathFall = 0f;
     }
 
@@ -209,6 +219,9 @@ public sealed class PlayerPreviewState : IPreviewDriver
                 break;
             case Throw:
                 Throwing(deltaTime);
+                break;
+            case Use:
+                Using(deltaTime);
                 break;
             case Death:
                 Dying(deltaTime);
@@ -350,6 +363,36 @@ public sealed class PlayerPreviewState : IPreviewDriver
             _throwCharging = false;
             _rest = RestFor(RestBetweenPlays);
         }
+    }
+
+    // A timed use: raise the held item over the use time, hold the pose a beat, let it down.
+    private void Using(float dt)
+    {
+        _model.Update(dt, 0f);
+        if (!_useCharging)
+        {
+            _rest -= dt;
+            if (_rest > 0f) return;
+            _model.StartUseCharge();
+            _useCharging = true;
+            _useTimer = 0f;
+            return;
+        }
+
+        _useTimer += dt;
+        if (_useTimer <= UseChargeSeconds)
+        {
+            _model.UpdateUseCharge(MathUtils.Clamp01(_useTimer / UseChargeSeconds));
+            return;
+        }
+        if (_useTimer <= UseChargeSeconds + UseHoldSeconds)
+        {
+            _model.UpdateUseCharge(1f);
+            return;
+        }
+        _model.CancelUseCharge();
+        _useCharging = false;
+        _rest = RestFor(RestBetweenPlays);
     }
 
     // A death: the body falls over, stays down, then stands back up and starts again.

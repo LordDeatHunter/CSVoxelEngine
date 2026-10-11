@@ -131,14 +131,12 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Clock.** While it sits in the hotbar the HUD shows the time of day and the day number in
   the compass's place (`Clock.DayNumber`/`Readout` over the lighting clock, `UIRenderer.DrawClock`,
   crafted from copper ingots and a mud brick; `ClockTests`).
-- [ ] **Use time with a usage animation.** Usable items (the firestarter, the bandage and the
-  fertilizer) take time: holding right-click plays a use animation, the use happens only when it
-  completes, and letting go early cancels it and spends nothing. Do it after the bandage and the
-  fertilizer. *Hook:* a `use.seconds` on the item JSON (the firestarter's `useDelay` stays the
-  cooldown after a use), a hold timer beside the throw charge, a `PlayerModel` use pose (one
-  generic pose first: a strike for the firestarter, a wrap for the bandage and a sprinkle for ash
-  can follow) and a mode in the item debugger's `PlayerPreviewState`. On a server the `Use`
-  intent arrives at completion; check the hold time like `BreakProgress` checks mining.
+- [x] **Use time with a usage animation.** Usable items declare `use.seconds`: holding
+  right-click charges a use pose (`PlayerModel.StartUseCharge`/`WithUse`, one generic raise) and
+  the use runs only at completion, letting go early cancels it and spends nothing
+  (`World.TryBeginUseCharge`/`UpdateUseCharge`; the firestarter, bandage and ash declare times;
+  the item debugger has a USE mode; `UseTimeTests`). A server still takes the completed Use intent
+  on trust (a known gap).
 
 - [x] **Door.** `oak_door` + `oak_door_upper` through the `upperHalf` field (`TallBlock`): placement needs both cells, breaking either half removes both (`RemoveTallBlock`) and drops one door, both halves share one `DoorState` (`DoorTests`, `doors.json`).
 - [ ] **Acorn.** An oak-leaf drop that plants a sapling when used on dirt or grass, which then grows

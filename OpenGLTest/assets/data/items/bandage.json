@@ -5,5 +5,5 @@
   // from tools/generate-bandage-texture.py.
   "name": "Bandage",
   "texture": "assets/textures/items/bandage.png",
-  "use": { "action": "heal" }
+  "use": { "action": "heal", "seconds": 1.2 }
 }

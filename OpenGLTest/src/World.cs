@@ -199,6 +199,9 @@ public class World : IItemUseWorld
     private float _throwChargeSeconds;
     private byte _throwItemId;
     private float _throwBaseDamage;
+    private bool _useCharging;
+    private float _useChargeSeconds;
+    private byte _useItemId;
     public Camera Camera { get; }
 
     /// <summary>The blocky player body: walk-swung limbs, jabbing right arm.</summary>
@@ -3685,6 +3688,65 @@ public class World : IItemUseWorld
         _throwBaseDamage = item.ThrowDamage ?? 0f;
         Player.StartThrowCharge();
         return true;
+    }
+
+    /// <summary>Whether a timed use is charging (see <see cref="TryBeginUseCharge"/>).</summary>
+    public bool IsUseCharging => _useCharging;
+
+    /// <summary>
+    /// Starts the timed use of the selected item when it declares <see cref="Item.UseSeconds"/>:
+    /// holding the button plays a use pose and the use runs only at completion, so letting go
+    /// early (<see cref="CancelUseCharge"/>) spends nothing. False for anything else, which uses
+    /// on the click or charges a throw. False unless the world is playing.
+    /// </summary>
+    public bool TryBeginUseCharge()
+    {
+        if (!IsPlaying) return false;
+        if (_useCharging) return true;
+        var id = Inventory.SelectedBlockId;
+        if (id == 0 || Inventory.SelectedCount <= 0) return false;
+        if (ItemRegistry.TryGet(id) is not { } item || item.UseSeconds <= 0f) return false;
+        _useCharging = true;
+        _useChargeSeconds = 0f;
+        _useItemId = id;
+        Player.StartUseCharge();
+        return true;
+    }
+
+    /// <summary>
+    /// Advances a held timed use; at the selected item's <see cref="Item.UseSeconds"/> the use
+    /// runs exactly as a click would have run it. A changed selection cancels the charge.
+    /// </summary>
+    public void UpdateUseCharge(float deltaTime)
+    {
+        if (!IsPlaying) return;
+        if (!_useCharging) return;
+        var seconds = ItemRegistry.TryGet(_useItemId)?.UseSeconds ?? 0f;
+        if (Inventory.SelectedBlockId != _useItemId || Inventory.SelectedCount <= 0 || seconds <= 0f)
+        {
+            CancelUseCharge();
+            return;
+        }
+
+        _useChargeSeconds += Math.Max(0f, deltaTime);
+        if (_useChargeSeconds < seconds)
+        {
+            Player.UpdateUseCharge(MathUtils.Clamp01(_useChargeSeconds / seconds));
+            return;
+        }
+
+        // Completed: the use runs now, on the same path a click would have taken
+        _useCharging = false;
+        Player.CancelUseCharge();
+        TryUseSelected(InteractionReach);
+    }
+
+    /// <summary>Cancels a held timed use; the item spends nothing.</summary>
+    public void CancelUseCharge()
+    {
+        if (!IsPlaying) return;
+        _useCharging = false;
+        Player.CancelUseCharge();
     }
 
     /// <summary>Advances a held throw charge. Does nothing unless the world is playing: nothing

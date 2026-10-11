@@ -43,7 +43,8 @@ public static class ItemFactory
         string SourceName,
         // Appended with a default so the positional construction in the tests keeps compiling
         float FuelSeconds = 0f,
-        int CrucibleCapacityMl = 0);
+        int CrucibleCapacityMl = 0,
+        float UseSeconds = 0f);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,

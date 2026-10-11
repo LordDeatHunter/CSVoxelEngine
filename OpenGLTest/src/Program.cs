@@ -1310,7 +1310,11 @@ public static class Program
         var rightDown = inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true;
         var rightHeld = rightDown && !inventoryView.IsOpen && !pauseMenuView.IsOpen && !chatView.IsOpen;
         var rightPressed = rightHeld && !rightWasDown;
-        if (rightHeld && w.IsThrowCharging)
+        if (rightHeld && w.IsUseCharging)
+        {
+            w.UpdateUseCharge((float)deltaTime);
+        }
+        else if (rightHeld && w.IsThrowCharging)
         {
             w.UpdateThrowCharge((float)deltaTime);
         }
@@ -1318,21 +1322,29 @@ public static class Program
         {
             placeTimer = 0;
             FrameProfiler.Begin(ProfileSection.UsePlace);
-            var claimed = w.TryUseSelected(World.InteractionReach);
+            // A timed use (use.seconds) charges instead of firing on the click, and runs only
+            // when the hold completes; anything else uses or places on the click
+            var claimed = w.TryBeginUseCharge() || w.TryUseSelected(World.InteractionReach);
             FrameProfiler.End(ProfileSection.UsePlace);
             if (!claimed)
                 w.TryBeginThrowCharge();
         }
-        else if (!rightHeld && w.IsThrowCharging)
+        else if (!rightHeld && (w.IsThrowCharging || w.IsUseCharging))
         {
             FrameProfiler.Begin(ProfileSection.UsePlace);
-            w.ReleaseThrow();
+            if (w.IsUseCharging)
+                w.CancelUseCharge();
+            else
+                w.ReleaseThrow();
             placeTimer = 0;
             FrameProfiler.End(ProfileSection.UsePlace);
         }
         rightWasDown = rightDown;
-        if (!rightHeld && (inventoryView.IsOpen || pauseMenuView.IsOpen || chatView.IsOpen) && w.IsThrowCharging)
-            w.CancelThrowCharge();
+        if (!rightHeld && (inventoryView.IsOpen || pauseMenuView.IsOpen || chatView.IsOpen))
+        {
+            if (w.IsThrowCharging) w.CancelThrowCharge();
+            if (w.IsUseCharging) w.CancelUseCharge();
+        }
 
         // The menu freezes the simulation: the world keeps rendering behind the overlay
         // but physics, chunks, fluids and mining all hold still until resume.

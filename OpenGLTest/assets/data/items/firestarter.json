@@ -1,3 +1,4 @@
 { "name": "Firestarter", "texture": "assets/textures/items/firestarter.png",
   "durability": 10, "useDelay": 1.5,
-  "use": { "action": "ignite_campfire", "block": "block/branch_pile", "chance": 0.15 } }
+  // use.seconds is the strike's wind-up (hold right-click); useDelay stays the cooldown after it
+  "use": { "action": "ignite_campfire", "block": "block/branch_pile", "chance": 0.15, "seconds": 0.9 } }

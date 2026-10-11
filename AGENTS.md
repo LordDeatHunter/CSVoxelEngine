@@ -1494,7 +1494,8 @@ right-click behaviour (`World.TryUseSelected` -> `TryUseItem`):
 
 | field | meaning |
 |---|---|
-| `use.action` | `pickup_fluid` (scoop the targeted fluid source into the item), `place_fluid` (pour one into the targeted cell), `place_stack` (build a stack block up), `ignite_campfire` (strike a branch pile, or a kiln that has fuel) or `convert_multiblock` (turn a 2x2x2 volume into a structure) |
+| `use.action` | `pickup_fluid` (scoop the targeted fluid source into the item), `place_fluid` (pour one into the targeted cell), `place_stack` (build a stack block up), `ignite_campfire` (strike a branch pile, or a kiln that has fuel), `convert_multiblock` (turn a 2x2x2 volume into a structure), `heal` (restore health to the user, refused at full health) or `grow_tree` (grow the tree the aimed cell belongs to, `AshGrowthPulses` pulses) |
+| `use.seconds` | seconds holding right-click takes before the use runs: the world charges a use pose (`PlayerModel.StartUseCharge`/`WithUse`) and only runs the use at completion, so letting go early cancels it and spends nothing (`World.TryBeginUseCharge`/`UpdateUseCharge`/`CancelUseCharge`, beside the throw charge). 0 (omitted) keeps the old instant use. The firestarter's `useDelay` stays the cooldown after a use |
 | `use.block` | for `convert_multiblock`, the **source** block the volume must be built from (`block/mud_bricks`); for `place_stack`, the stack block it builds |
 | `use.result` (`convert_multiblock`) | the multiblock **anchor** block the volume becomes (`block/mud_brick_kiln`). The registry checks at startup that the anchor really is a `multiblock` renderer built from that very source, so a mismatched pair names its file instead of failing in play. The converter itself is spent by nothing and never morphs |
 | `use.fluid` | the fluid block the action works on; must be a block with `fluid: true` || `use.result` | the item this one becomes on success; must be an item, and the two normally point at each other |
@@ -2587,7 +2588,9 @@ only copy, so a line never appears twice.
 **Known gaps** (open): players are keyed by name with no authentication, so whoever joins first
 under a name gets that name's inventory, status and operator rights (`ops.json` is read once at
 start, and there is no in-game op command); a slice's return-swing flag and a throw's charge are
-taken from the client (both are paced, neither verified); a third-person placement may land on a
+taken from the client (both are paced, neither verified); a timed use (`use.seconds`) is held
+locally and the completed `Use` intent is taken on trust, so a modified client can fire one
+instantly; a third-person placement may land on a
 face other than the one the client predicted (any face of the hit cell turned toward the eye is
 accepted) and is then corrected; a correction covers the 3x3x3 cells around the named cell, so a
 prediction outside it waits for the journal; projectiles and toppling trees are not in

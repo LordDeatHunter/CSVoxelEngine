@@ -116,6 +116,13 @@ public abstract class Item
     /// <summary>Seconds between uses of this item; 0 means the global click rate applies.</summary>
     public float UseDelaySeconds { get; internal init; }
 
+    /// <summary>
+    /// Seconds holding right-click takes before this item's use runs (a bandage wrap, a
+    /// firestarter strike): the world plays a use pose while the button is held and only runs the
+    /// use at completion, so letting go early cancels it and spends nothing. 0 is an instant use.
+    /// </summary>
+    public float UseSeconds { get; internal init; }
+
     /// <summary>Cells across the spritesheet texture; 1 for a plain sprite.</summary>
     public int SpriteCols { get; internal init; } = 1;
 
@@ -218,6 +225,7 @@ public abstract class Item
         FuelSeconds = spec.FuelSeconds;
         CrucibleCapacityMl = spec.CrucibleCapacityMl;
         UseDelaySeconds = spec.UseDelay;
+        UseSeconds = spec.UseSeconds;
         SpriteCols = spec.SpriteCols;
         SpriteRows = spec.SpriteRows;
         FrameCount = spec.FrameCount;

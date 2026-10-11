@@ -703,6 +703,10 @@ public static class ContentRegistry
             if (!float.IsFinite(useDelay) || useDelay < 0f || useDelay > 60f)
                 throw new InvalidOperationException(
                     $"Item '{path}' has useDelay {definition.UseDelay}; expected 0..60 seconds.");
+            var useSeconds = use?.Seconds ?? 0f;
+            if (!float.IsFinite(useSeconds) || useSeconds < 0f || useSeconds > 10f)
+                throw new InvalidOperationException(
+                    $"Item '{path}' has use.seconds {use?.Seconds}; expected 0..10 seconds.");
             var chance = use?.Chance ?? 1f;
             if (!float.IsFinite(chance) || chance <= 0f || chance > 1f)
                 throw new InvalidOperationException(
@@ -793,7 +797,8 @@ public static class ContentRegistry
                 display.Rotation, display.Translation, display.Scale,
                 tool != null, power, hitDelay, attack, blockDamage, entityDamage, throwDamage, name,
                 FuelSeconds: fuelSeconds,
-                CrucibleCapacityMl: crucibleCapacity));
+                CrucibleCapacityMl: crucibleCapacity,
+                UseSeconds: useSeconds));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ItemIds, StringComparer.Ordinal));

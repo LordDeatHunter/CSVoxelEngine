@@ -198,6 +198,10 @@ public class PlayerModel
     public const float ThrowDuration = 0.55f;
     private const float ThrowCockedShoulder = 1.3f;
     private const float ThrowCockedElbow = 0.6f;
+    // The timed-use pose's raised arm: up in front of the chest with the elbow bent, presenting
+    // the held item (between the equip hold and the throw's cock)
+    private const float UseShoulder = 1.0f;
+    private const float UseElbow = 1.15f;
     // The cocked pose proper (ApplyArmFrames): the upper arm out to the right and a little behind
     // the body, the forearm bent up at about a right angle to it, wrist above the elbow, and the
     // shoulders wound back toward the throwing side. These replace the old straight-up arm.
@@ -242,6 +246,7 @@ public class PlayerModel
     private readonly SwingHitStop _sliceStop = new();
     private float _throwT = 1f;
     private float? _throwCharge01;
+    private float? _useCharge01;
     private float _throwReleaseCharge;
     private float _time;
     private float _holdBlend;
@@ -309,6 +314,10 @@ public class PlayerModel
 
     /// <summary>Charge the arm is cocked to, or null when no throw is being aimed.</summary>
     public float? ThrowCharge => _throwCharge01;
+
+    /// <summary>The timed-use pose's charge 0..1, or null when no use is charging (see
+    /// <see cref="WithUse"/>).</summary>
+    public float? UseCharge => _useCharge01;
 
     /// <summary>Progress of the active slice swing: 0 at the wind-up, 1 when it has finished.</summary>
     public float SliceProgress => _sliceT;
@@ -557,6 +566,19 @@ public class PlayerModel
 
     public void StartThrowCharge() => _throwCharge01 = 0f;
 
+    /// <summary>Starts the timed-use pose (see <see cref="World.TryBeginUseCharge"/>).</summary>
+    public void StartUseCharge() => _useCharge01 = 0f;
+
+    /// <summary>Advances the timed-use pose; <paramref name="charge01"/> is the hold's share.</summary>
+    public void UpdateUseCharge(float charge01)
+    {
+        if (_useCharge01.HasValue)
+            _useCharge01 = MathUtils.Clamp01(charge01);
+    }
+
+    /// <summary>Lets the timed-use pose go; the arm eases back to whatever it was doing.</summary>
+    public void CancelUseCharge() => _useCharge01 = null;
+
     public void UpdateThrowCharge(float charge01)
     {
         if (_throwCharge01.HasValue)
@@ -729,7 +751,7 @@ public class PlayerModel
         // after the two are blended so a swing still plays while running or falling. The swim
         // stroke and the body mods (landing, crouch, flinch, sway) sit between the two.
         if (_airBlend <= 0.001f)
-            return WithThrow(WithPunch(ApplyMods(ApplySwim(ground), ComputeMods()), pitchDeg));
+            return WithUse(WithThrow(WithPunch(ApplyMods(ApplySwim(ground), ComputeMods()), pitchDeg)));
 
         var rise = MathUtils.Clamp01(_airVelocity / 11f);
         var fall = MathUtils.Clamp01(-_airVelocity / 12f);
@@ -762,7 +784,7 @@ public class PlayerModel
             MathUtils.Lerp(ground.RightElbow, air.RightElbow, t),
             MathUtils.Lerp(ground.TorsoPitch, air.TorsoPitch, t),
             MathUtils.Lerp(ground.Bob, 0f, t));
-        return WithThrow(WithPunch(ApplyMods(ApplySwim(blended), ComputeMods()), pitchDeg));
+        return WithUse(WithThrow(WithPunch(ApplyMods(ApplySwim(blended), ComputeMods()), pitchDeg)));
     }
 
     // The stroke clock as three phases: the thrust out to the sides (fast), a short hold with the
@@ -1063,6 +1085,19 @@ public class PlayerModel
         pose.LeftShoulder + m.Shoulders, pose.RightShoulder + m.Shoulders + m.RightShoulderExtra,
         pose.LeftElbow, pose.RightElbow,
         pose.TorsoPitch + m.TorsoPitch, pose.Bob - m.Drop);
+
+    // The timed-use pose: the hand comes up in front of the chest, presenting what it holds,
+    // rises through the hold (UseShoulder/UseElbow) and eases back when the charge ends. One
+    // generic pose for every use time; a strike, a wrap and a sprinkle can follow.
+    private Pose WithUse(in Pose pose)
+    {
+        if (!_useCharge01.HasValue) return pose;
+        var raised = MathUtils.SmoothStep(_useCharge01.Value);
+        var fromShoulder = MathUtils.Lerp(pose.RightShoulder, UseShoulder, raised);
+        var fromElbow = MathUtils.Lerp(pose.RightElbow, UseElbow, raised);
+        return new Pose(pose.LeftHip, pose.RightHip, pose.LeftKnee, pose.RightKnee,
+            pose.LeftShoulder, fromShoulder, pose.LeftElbow, fromElbow, pose.TorsoPitch, pose.Bob);
+    }
 
     private Pose WithThrow(in Pose pose)
     {

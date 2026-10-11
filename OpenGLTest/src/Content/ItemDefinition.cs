@@ -183,5 +183,12 @@ public sealed class ItemDefinition
         /// Per-use success chance 0..1 for <c>ignite_campfire</c>; omitted means always.
         /// </summary>
         public float? Chance { get; set; }
+
+        /// <summary>
+        /// Seconds the use takes: holding right-click plays a use pose and the use runs only when
+        /// the hold completes, so letting go early cancels it and spends nothing. 0 (omitted) is
+        /// the old instant use. See <see cref="Item.UseSeconds"/>.
+        /// </summary>
+        public float? Seconds { get; set; }
     }
 }
