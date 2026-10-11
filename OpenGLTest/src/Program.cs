@@ -69,6 +69,10 @@ public static class Program
     private static bool netDead;
     private static float netRespawnTimer;
     private static bool debugEnabled;
+    private static bool hudVisible = true;
+    private static bool screenshotRequested;
+    private static bool f1WasPressed;
+    private static bool f2WasPressed;
     private static bool xWasPressed;
     private static bool qWasPressed;
     private static bool rightWasDown;
@@ -1239,6 +1243,17 @@ public static class Program
         }
         xWasPressed = xPressed;
 
+        // F1 toggles the HUD (the screenshot path's hideHud); F2 saves a PNG beside the saves
+        var f1Pressed = inputManager.Keyboard?.IsKeyPressed(Key.F1) == true;
+        if (f1Pressed && !f1WasPressed)
+            hudVisible = !hudVisible;
+        f1WasPressed = f1Pressed;
+
+        var f2Pressed = inputManager.Keyboard?.IsKeyPressed(Key.F2) == true;
+        if (f2Pressed && !f2WasPressed)
+            screenshotRequested = true;
+        f2WasPressed = f2Pressed;
+
         // ESC toggles the pause menu instead of closing the game: first press opens it,
         // ESC on the settings page steps back to the main page, ESC there resumes the game.
         // An open [E] panel or chat is closed first so they never overlap the menu.
@@ -1966,7 +1981,8 @@ public static class Program
 
         FrameProfiler.Begin(ProfileSection.UiPass);
         renderManager.BeginGpuPass(ProfileSection.UiPass);
-        var hideHud = visualDirector?.TakeScreenshot == true && visualDirector.ScreenshotHideHud;
+        var hideHud = !hudVisible
+            || (visualDirector?.TakeScreenshot == true && visualDirector.ScreenshotHideHud);
         if (!hideHud)
             world.RenderUI(renderManager, inventoryView,
                 (float)world.LightingTime, shownFps, debugEnabled,
@@ -1983,11 +1999,14 @@ public static class Program
         // Timed even when no screenshot is due, so the pairing stays obvious; an empty span
         // costs one Stopwatch read.
         FrameProfiler.Begin(ProfileSection.Screenshot);
-        if (visualDirector?.TakeScreenshot == true)
+        if (visualDirector?.TakeScreenshot == true || screenshotRequested)
         {
-            visualDirector.TakeScreenshot = false;
+            var scripted = visualDirector?.TakeScreenshot == true;
+            var path = scripted ? visualDirector!.ScreenshotPath : Path.Combine(ScreenshotPaths.Directory,
+                ScreenshotPaths.NameFor(DateTime.Now));
+            if (scripted) visualDirector!.TakeScreenshot = false;
+            else screenshotRequested = false;
             var size = windowManager.Window.FramebufferSize;
-            var path = visualDirector.ScreenshotPath;
             var pixels = VisualCapture.ReadPixels(renderManager.gl, size.X, size.Y);
             VisualCapture.QueueSave(pixels, size.X, size.Y, path);
         }
