@@ -50,8 +50,10 @@ public class Inventory
     public const int ToolCapacity = 8;
     public const int MiscCapacity = 2048;
 
-    /// <summary>Test stock of every placeable block the player spawns with.</summary>
-    public const int StartingStock = 50;
+    /// <summary>Test stock of every placeable block the player spawns with. Every placeable block
+    /// gets this much out of the one shared <see cref="BlockCapacity"/>, so it is kept small
+    /// enough that the whole seed still leaves the pool room to add to as blocks are added.</summary>
+    public const int StartingStock = 24;
 
     private readonly Dictionary<byte, int> _blocks = new();
     private readonly Dictionary<byte, int> _misc = new();

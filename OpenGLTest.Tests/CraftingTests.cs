@@ -78,9 +78,9 @@ public sealed class CraftingTests
         Assert.True(recipe.Ingredients[0].Accepts(cobble));
         Assert.False(recipe.Ingredients[0].Accepts(dirt));
 
-        // The greedy spend takes stone first: 25 crafts drain the 50 stone, and the 26th
-        // spills over into cobblestone, proving the pool spans both members.
-        for (var i = 0; i < 25; i++)
+        // The greedy spend takes stone first: half the stock in crafts drains the stone, and the
+        // next one spills over into cobblestone, proving the pool spans both members.
+        for (var i = 0; i < Inventory.StartingStock / 2; i++)
             Assert.True(inventory.TryCraft(recipe));
         Assert.Equal(0, inventory.CountFor(stone));
         Assert.Equal(Inventory.StartingStock, inventory.CountFor(cobble));
