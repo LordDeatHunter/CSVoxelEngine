@@ -4257,7 +4257,8 @@ public class RenderManager : IDisposable
         int fps, bool showProfiler, Camera? camera = null, bool showCoordinates = true,
         PauseMenuView? menu = null, SettingsMenuView? settings = null,
         int health = PlayerHealth.MaxHealth, float damageFlash = 0f, HotbarNameFade? hotbarName = null,
-        HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0, HudToast? toast = null)
+        HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0, HudToast? toast = null,
+        CrosshairState crosshair = default)
     {
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         ui.Begin(window.Size, window.FramebufferSize, UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
@@ -4286,7 +4287,7 @@ public class RenderManager : IDisposable
                 droplets, camera?.Droplets.Seconds ?? 0f, camera?.Droplets.Seed ?? 0);
 
         if (!view.IsOpen && (menu == null || !menu.IsOpen))
-            ui.DrawCrosshair();
+            ui.DrawCrosshair(crosshair.ThrowCharge, crosshair.BreakProgress, crosshair.HitMarker);
         if (camera != null && HasCompassEquipped(inventory))
             ui.DrawCompass(camera.Yaw, camera.Position, showCoordinates);
         else if (camera != null && HasClockEquipped(inventory))

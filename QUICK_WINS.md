@@ -187,18 +187,9 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Hotbar item name fade.** `HotbarNameFade` over the hearts; `select` scenario op (`hotbar.json`).
 - [x] **Floating damage numbers.** `DamageNumberPool` + `DamageNumberRenderer`; a client reads the health drop between snapshots (`damage-numbers.json`).
 
-- [ ] **Crosshair hit marker.** A brief X flash on the crosshair when a hit lands. *Hook:* the
-  connect signal the hit-stop uses, drawn beside `UIRenderer.DrawCrosshair` and faded through
-  `MathUtils`.
-- [ ] **Crosshair spreads while charging.** While a throw charges, the centre dot stays put and
-  the four outer pips slide outward with the charge, snapping back on release. No new art:
-  `assets/textures/crosshair.png` is 16x16 with five separate pieces (a 4x4 centre dot and four
-  pills, an empty row and column between each). *Hook:* five meshes cropped with `UvRect`
-  (`Primitives.CreateRectangle(..., uv:)`, as the hearts are), the four arms offset by the eased
-  charge in `UIRenderer.DrawCrosshair`.
-- [ ] **Mining progress ring.** A circle around the crosshair fills as the targeted block breaks.
-  *Hook:* the break loop's damage over `Mining.HardnessOf`, drawn as segments in `UIRenderer`;
-  hidden at zero and in creative.
+- [x] **Crosshair hit marker.** `HitMarker` flashes at the two connecting-hit sites the hit-stop uses (a landed punch or slice) and `UIRenderer.DrawCrosshair` draws the X, fading over `HitMarker.Seconds` (`HitMarkerTests`).
+- [x] **Crosshair spreads while charging.** the crosshair is drawn as five pieces cropped out of its 16x16 texture (a centre dot and four pills); the arms slide outward with `Camera.ThrowCharge` (eased) while the dot stays put, and snap back on release.
+- [x] **Mining progress ring.** a ring of `CrosshairRingSegments` dots around the crosshair, the lit share following `World.Crosshair.BreakProgress` (0 in creative or with no target, so it never shows there).
 - [ ] **Look-at label.** Looking at a block always shows what it is: its name and a small 3D
   render of it under the crosshair, the name in red when the held tool cannot mine it. A block the
   player has **not obtained yet** shows the name "Unknown" and the render as a flat dark silhouette;

@@ -175,6 +175,10 @@ public class UIRenderer : IDisposable
     private readonly Mesh _heartFullMesh;
     private readonly Mesh _heartHalfMesh;
 
+    // The crosshair's five cropped pieces (see DrawCrosshair)
+    private readonly Mesh _crosshairCentreMesh;
+    private readonly Mesh[] _crosshairArmMeshes;
+
     // Count font, baked once from the TTF. Null when the file is missing or broken, in
     // which case the hotbar simply draws no counts.
     private readonly BitmapFont? _font;
@@ -265,6 +269,17 @@ public class UIRenderer : IDisposable
         _heartEmptyMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartUv);
         _heartFullMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartUv);
         _heartHalfMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartHalfUv);
+
+        // The crosshair's five pieces, cropped out of the 16x16 texture: a 4x4 centre dot and four
+        // 5x4 pills with an empty row and column between them (see DrawCrosshair)
+        _crosshairCentreMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(6f, 6f, 10f, 10f));
+        _crosshairArmMeshes =
+        [
+            Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(6f, 0f, 10f, 5f)),
+            Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(6f, 11f, 10f, 16f)),
+            Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(0f, 6f, 5f, 10f)),
+            Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(11f, 6f, 16f, 10f)),
+        ];
         foreach (var (id, type) in ItemRegistry.ById)
         {
             if (type is BlockItem) continue;
@@ -477,8 +492,88 @@ public class UIRenderer : IDisposable
         _gl.Disable(EnableCap.DepthTest);
     }
 
-    public void DrawCrosshair() =>
-        DrawTexture(ScreenCentre, new Vector2(CrosshairSize), _crosshairTexture);
+    // One crosshair piece's pixel rect (y measured from the texture's top) as a UV rect
+    private static UvRect CrosshairUv(float x0, float y0, float x1, float y1) =>
+        new(new Vector2(x0 / CrosshairTextureSize, 1f - y1 / CrosshairTextureSize),
+            new Vector2(x1 / CrosshairTextureSize, 1f - y0 / CrosshairTextureSize));
+
+    /// <summary>
+    /// The crosshair, cropped out of the 16x16 texture into its five pieces: the centre dot stays
+    /// put while the four arms slide outward with a throw's charge (snapping back on release), a
+    /// ring of segments around them fills with <paramref name="breakProgress"/> while a block is
+    /// mined (nothing at zero, so creative never shows it) and an X flashes at
+    /// <paramref name="hitMarker"/> when a hit lands.
+    /// </summary>
+    public void DrawCrosshair(float throwCharge = 0f, float breakProgress = 0f, float hitMarker = 0f)
+    {
+        var centre = ScreenCentre;
+        var unit = CrosshairSize / CrosshairTextureSize;
+        var spread = MathUtils.SmoothStep(MathUtils.Clamp01(throwCharge)) * CrosshairSpreadPx;
+
+        // The pieces' pixel rects in the texture: the dot at the middle, one pill per direction,
+        // an empty row and column between each
+        DrawMesh(_crosshairCentreMesh, RectTransform(centre, new Vector2(4f * unit)), Rgba.White, _crosshairTexture);
+        for (var i = 0; i < _crosshairArmMeshes.Length; i++)
+        {
+            var (size, offset) = i switch
+            {
+                0 => (new Vector2(4f, 5f), new Vector2(0f, -5.5f)),
+                1 => (new Vector2(4f, 5f), new Vector2(0f, 5.5f)),
+                2 => (new Vector2(5f, 4f), new Vector2(-5.5f, 0f)),
+                _ => (new Vector2(5f, 4f), new Vector2(5.5f, 0f)),
+            };
+            var position = centre + new Vector2(offset.X * unit, offset.Y * unit)
+                + (i switch
+                {
+                    0 => new Vector2(0f, -spread),
+                    1 => new Vector2(0f, spread),
+                    2 => new Vector2(-spread, 0f),
+                    _ => new Vector2(spread, 0f),
+                });
+            DrawMesh(_crosshairArmMeshes[i], RectTransform(position, size * unit), Rgba.White, _crosshairTexture);
+        }
+
+        // The mining ring: segments around the crosshair, the lit share of them following the
+        // block's break progress
+        var progress = MathUtils.Clamp01(breakProgress);
+        if (progress > 0.001f)
+        {
+            var lit = (int)MathF.Ceiling(progress * CrosshairRingSegments);
+            for (var i = 0; i < CrosshairRingSegments; i++)
+            {
+                var angle = i / (float)CrosshairRingSegments * MathF.Tau - MathF.PI * 0.5f;
+                var position = centre + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * CrosshairRingRadius;
+                DrawRect(position, new Vector2(CrosshairRingDot), i < lit ? Rgba.White : Rgba.Grey(1f, 0.22f));
+            }
+        }
+
+        // The hit marker: two bars crossed at 45 degrees, fading out with the mark
+        var mark = MathUtils.Clamp01(hitMarker);
+        if (mark > 0.001f)
+        {
+            var colour = new Rgba(255, 96, 96, (byte)(mark * 255f + 0.5f));
+            for (var i = 0; i < 2; i++)
+            {
+                var rotation = Matrix4x4.CreateRotationZ((i == 0 ? 1f : -1f) * MathF.PI * 0.25f);
+                var model = Matrix4x4.CreateScale(CrosshairMarkerLength, CrosshairMarkerWidth, 1f)
+                            * rotation
+                            * Matrix4x4.CreateTranslation(centre.X, centre.Y, 0f);
+                DrawMesh(_unitSquare, model, colour);
+            }
+        }
+    }
+
+    // The crosshair texture's edge in pixels (its pieces' rects are authored against it)
+    private const float CrosshairTextureSize = 16f;
+    // How far a fully charged throw pushes the arms outward, in canvas units
+    private const float CrosshairSpreadPx = 7f;
+    // The mining ring: segments around the crosshair and the ring's radius and dot size
+    private const int CrosshairRingSegments = 12;
+    private const float CrosshairRingRadius = 18f;
+    private const float CrosshairRingDot = 3.5f;
+    // The hit marker's bars: their length and thickness
+    private const float CrosshairMarkerLength = 26f;
+    private const float CrosshairMarkerWidth = 3f;
 
     /// <summary>
     /// The survival hearts: 10 in a row centred above the hotbar, 1 heart per 10 HP.

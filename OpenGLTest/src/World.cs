@@ -311,6 +311,18 @@ public class World : IItemUseWorld
     /// its alpha is above zero.</summary>
     public HudToast Toast { get; } = new();
 
+    // The crosshair's hit marker, shown where the hit-stop is requested (UpdatePunch/UpdateSlice)
+    private readonly HitMarker _hitMarker = new();
+
+    /// <summary>
+    /// What the HUD crosshair draws with this frame: the throw charge (the arms spread), the mined
+    /// block's break progress (0 in creative or with no target) and the hit marker's alpha.
+    /// </summary>
+    public CrosshairState Crosshair =>
+        new(Camera.ThrowCharge ?? 0f,
+            _isBreaking && !Camera.IsCreative ? BreakProgress : 0f,
+            _hitMarker.Alpha);
+
     // The discovered set behind the "New: ..." toast (see DiscoveryLog)
     private readonly DiscoveryLog _discovered = new();
 
@@ -1959,6 +1971,8 @@ public class World : IItemUseWorld
         _hotbarPops.Update(Inventory, (float)deltaTime);
         _hotbarName.Update(Inventory, (float)deltaTime);
         _damageNumbers.Update((float)deltaTime);
+        Toast.Update((float)deltaTime);
+        _hitMarker.Update((float)deltaTime);
 
         // Water is aimed through unless the held item is out to scoop it, so a pond never
         // stops the player targeting the block under it
@@ -2812,7 +2826,7 @@ public class World : IItemUseWorld
         SettingsMenuView? settings = null)
     {
         renderManager.RenderUI(_window!, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings,
-            _health.Health, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime, Toast);
+            _health.Health, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime, Toast, Crosshair);
     }
     
     /// <summary>
@@ -3050,6 +3064,7 @@ public class World : IItemUseWorld
             // the cone with a clear line when the swing landed - since the server's verdict comes
             // back far too late for a freeze that has to start with the swing.
             Player.HitStop(SwingHitStop.SecondsFor(weight));
+            _hitMarker.Show();
             return true;
         }
 
@@ -3139,6 +3154,7 @@ public class World : IItemUseWorld
             // swing is never delayed
             if (connected)
                 Player.HitStop(SwingHitStop.SecondsFor(0f));
+                _hitMarker.Show();
         }
 
         if (Player.IsSlicing)
