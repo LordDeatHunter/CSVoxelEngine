@@ -1501,6 +1501,23 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float MobNoticeRadiusBlocks = 32f;
     public const float MobSneakNoticeFactor = 0.5f;
 
+    // --- Mob interest (MobInterest, Mob.PickTarget / WanderGoal) ---
+    // A mob whose line of sight to its target (checked every MobSightCheckSeconds) stays blocked for
+    // MobLoseInterestSeconds stops chasing until a check finds the line clear again. A mob chasing
+    // nothing wanders: it walks or hops toward a goal MobWanderMin..MaxRadiusBlocks away, picked anew
+    // every MobWanderRepickSeconds or on arrival, at MobWanderSpeedFactor of its walk speed (the
+    // goblin; a slime keeps its hop). One idle for MobIdleDespawnSeconds and farther than
+    // MobIdleDespawnMinDistanceBlocks from every target despawns (fading out, no loot).
+    public const float MobLoseInterestSeconds = 8f;
+    public const float MobSightCheckSeconds = 0.5f;
+    public const float MobWanderMinRadiusBlocks = 3f;
+    public const float MobWanderMaxRadiusBlocks = 8f;
+    public const float MobWanderRepickSeconds = 6f;
+    public const float MobWanderArriveBlocks = 1f;
+    public const float MobWanderSpeedFactor = 0.5f;
+    public const float MobIdleDespawnSeconds = 30f;
+    public const float MobIdleDespawnMinDistanceBlocks = 24f;
+
     // --- Slimes (SlimeManager) ---
     // Forest mobs that hop at the player. Natural spawns appear on dry forest surface in a ring
     // around the player and are culled when they stray too far. Damage only lands while a slime

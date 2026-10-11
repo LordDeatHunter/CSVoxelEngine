@@ -135,8 +135,10 @@ public sealed class GoblinManager : IMobPopulation
         for (var i = _goblins.Count - 1; i >= 0; i--)
         {
             var goblin = _goblins[i];
-            var chased = MobTargets.Nearest(targets, goblin.Position);
-            goblin.Update(deltaTime, chunks, chased >= 0 && !goblin.IsDying ? targets[chased] : null);
+            // Its noticed target while it keeps interest (Mob.PickTarget), else a wander goal
+            var chased = goblin.PickTarget(targets, deltaTime, chunks);
+            goblin.Update(deltaTime, chunks, chased >= 0 && !goblin.IsDying ? targets[chased] : null,
+                chased < 0 ? goblin.WanderGoal(targets.Count, deltaTime) : null);
             goblin.UpdateHazards(deltaTime, chunks);
 
             if (goblin.IsDying)
@@ -186,8 +188,10 @@ public sealed class GoblinManager : IMobPopulation
                 }
             }
 
-            // Past every target's despawn radius: fades out through the death pose, dropping nothing
-            if (targets.Count > 0 && MobTargets.MinHorizontalDistanceSquared(targets, goblin.Position) > despawnSquared)
+            // Past every target's despawn radius, or idle long and far off: fades out through the
+            // death pose, dropping nothing
+            if (targets.Count > 0 && (MobTargets.MinHorizontalDistanceSquared(targets, goblin.Position) > despawnSquared
+                                      || goblin.ShouldIdleDespawn(targets)))
                 goblin.BeginDying();
         }
 

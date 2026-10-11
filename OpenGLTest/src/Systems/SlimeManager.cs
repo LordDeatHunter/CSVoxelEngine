@@ -127,8 +127,10 @@ public sealed class SlimeManager : IMobPopulation
         for (var i = _slimes.Count - 1; i >= 0; i--)
         {
             var slime = _slimes[i];
-            var chased = MobTargets.Nearest(targets, slime.Position);
-            slime.Update(deltaTime, chunks, chased >= 0 && !slime.IsDying ? targets[chased].Eye : null);
+            // Its noticed target while it keeps interest (Mob.PickTarget), else a wander goal
+            var chased = slime.PickTarget(targets, deltaTime, chunks);
+            slime.Update(deltaTime, chunks,
+                chased >= 0 && !slime.IsDying ? targets[chased].Eye : slime.WanderGoal(targets.Count, deltaTime));
             slime.UpdateHazards(deltaTime, chunks);
 
             if (slime.IsDying)
@@ -173,8 +175,10 @@ public sealed class SlimeManager : IMobPopulation
                 }
             }
 
-            // Past every target's despawn radius: fades out through the death pose, dropping nothing
-            if (targets.Count > 0 && MobTargets.MinHorizontalDistanceSquared(targets, slime.Position) > despawnSquared)
+            // Past every target's despawn radius, or idle long and far off: fades out through the
+            // death pose, dropping nothing
+            if (targets.Count > 0 && (MobTargets.MinHorizontalDistanceSquared(targets, slime.Position) > despawnSquared
+                                      || slime.ShouldIdleDespawn(targets)))
                 slime.BeginDying();
         }
 

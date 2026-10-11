@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 
 namespace silkgltriangle;
@@ -149,6 +150,60 @@ public abstract class Mob
         _landingSpeed = 0f;
         return impactSpeed > 0f;
     }
+
+    private readonly MobInterest _interest = new();
+    private Vector3 _wanderGoal;
+    private float _wanderTimer;
+    private bool _hasWanderGoal;
+
+    /// <summary>Where the mob looks from for its line of sight: a little above the body centre.</summary>
+    public Vector3 SightOrigin => Position + new Vector3(0f, BodyHalfHeight * 0.6f, 0f);
+
+    /// <summary>This mob's interest in what it noticed (lost after a while out of sight, idle time).</summary>
+    public MobInterest Interest => _interest;
+
+    /// <summary>
+    /// The shared chase rule each manager asks once a frame before the mob's update: the target the
+    /// notice rule picks (<see cref="MobTargets.Nearest"/>), unless this mob has lost interest in it
+    /// after <see cref="WorldGenerationConfig.MobLoseInterestSeconds"/> without a clear line of sight
+    /// (<see cref="MobInterest"/>). The index into <paramref name="targets"/>, or -1 when it chases nobody.
+    /// </summary>
+    public int PickTarget(IReadOnlyList<IMobTarget> targets, float deltaTime, ChunkManager chunks)
+    {
+        var index = MobTargets.Nearest(targets, Position);
+        var chases = _interest.Update(index >= 0 ? targets[index] : null, SightOrigin, deltaTime, chunks);
+        if (!chases) return -1;
+        _hasWanderGoal = false;
+        return index;
+    }
+
+    /// <summary>
+    /// Where a mob that chases nobody strolls to: a goal <see cref="MobInterest.WanderPoint"/> picks
+    /// around it, picked anew every <see cref="WorldGenerationConfig.MobWanderRepickSeconds"/> or once
+    /// reached. Null when there is nobody in play at all (<paramref name="targetCount"/> 0), so an empty
+    /// server's mobs stand still.
+    /// </summary>
+    public Vector3? WanderGoal(int targetCount, float deltaTime)
+    {
+        if (targetCount <= 0 || IsDying) return null;
+        _wanderTimer -= deltaTime;
+        var dx = _wanderGoal.X - Position.X;
+        var dz = _wanderGoal.Z - Position.Z;
+        var arrive = WorldGenerationConfig.MobWanderArriveBlocks;
+        if (!_hasWanderGoal || _wanderTimer <= 0f || dx * dx + dz * dz < arrive * arrive)
+        {
+            _wanderGoal = MobInterest.WanderPoint(Position, Random.Shared.NextSingle(), Random.Shared.NextSingle());
+            _wanderTimer = WorldGenerationConfig.MobWanderRepickSeconds * (0.75f + 0.5f * Random.Shared.NextSingle());
+            _hasWanderGoal = true;
+        }
+        return _wanderGoal;
+    }
+
+    /// <summary>Whether this mob, idle long enough and far from every one of <paramref name="targets"/>,
+    /// despawns (<see cref="MobInterest.ShouldIdleDespawn"/>); never with nobody in play.</summary>
+    public bool ShouldIdleDespawn(IReadOnlyList<IMobTarget> targets) =>
+        targets.Count > 0
+        && MobInterest.ShouldIdleDespawn(_interest.IdleSeconds, MobTargets.MinHorizontalDistanceSquared(targets, Position));
 
     private float _lavaTimer;
 

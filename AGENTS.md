@@ -644,6 +644,8 @@ OpenGLTest/
     MobFallDamage.cs           # GL-free mob fall damage: a share of the mob's pool per block past its safe height
     MobLava.cs                 # GL-free mob lava rule: body box in a burning fluid, damage per tick
     MobLoot.cs                 # GL-free loot toss: the up-and-out launch a killed mob's drops get
+    MobInterest.cs             # GL-free per-mob interest: sight checks, losing a hidden target, idle
+                               #   time, the idle despawn gate and wander goals
     SlimeSize.cs               # GL-free per-size slime stats: body scale, health, contact damage,
                                #   loot rolls, each 1 + (size - 1) * its config step; the spawn size roll
     DayCycle.cs                # GL-free sun direction, dayness and night factor of the lighting clock
@@ -2514,7 +2516,17 @@ target within its `MobTargets.NoticeRadius`, `MobNoticeRadiusBlocks` horizontall
 `MobSneakNoticeFactor` while the target sneaks (`IMobTarget.IsSneaking`: the camera's own crouch, a
 `ServerPlayer`'s cosmetic `NetPlayerFlags.Sneaking`, untrusted but only ever helping the one who
 claims it); a target past it is neither chased nor faced, though despawning still measures every
-target (`MobNoticeTests`).
+target (`MobNoticeTests`). **Lose interest**: each manager picks the chased target through
+`Mob.PickTarget`, the notice rule plus the mob's `MobInterest`, which checks the line of sight from
+`Mob.SightOrigin` to the target's eye every `MobSightCheckSeconds` (`BlockRaycaster.SegmentHitsBlock`)
+and gives the target up once the line has stayed blocked for `MobLoseInterestSeconds`; a clear check
+wins it back and a different target starts the count over. A mob chasing nobody (none noticed, or
+interest lost) **wanders**: `Mob.WanderGoal` picks a point `MobWanderMin..MaxRadiusBlocks` away, anew
+every `MobWanderRepickSeconds` or on arrival, which a slime hops toward at its usual cadence and a
+goblin strolls to at `MobWanderSpeedFactor` of its walk (`Goblin.Update`'s `wander`); with nobody in
+play at all it stands still as before. Idle for `MobIdleDespawnSeconds` and farther than
+`MobIdleDespawnMinDistanceBlocks` from every target, it despawns through the same fade
+(`Mob.ShouldIdleDespawn`; `MobInterestTests`).
 
 The first entity is the **slime** (`Slime` + `Systems/SlimeManager.cs`), owned by `World`. It hops
 toward the player, damages on contact only while airborne (a slime merely bobbing in water is

@@ -256,9 +256,10 @@ public sealed class Goblin : Mob
     /// stands on the ground with a clear line to the player's chest; out of stones it closes to
     /// the standoff distance and starts a swing when in reach. It stands still while a throw or
     /// swing plays. A null <paramref name="player"/> (nobody to chase) leaves the goblin standing
-    /// where it is, still falling, floating and animating.
+    /// where it is, still falling, floating and animating, or strolling toward
+    /// <paramref name="wander"/> when one is given (<see cref="Mob.WanderGoal"/>).
     /// </summary>
-    public void Update(float deltaTime, ChunkManager chunks, IMobTarget? player)
+    public void Update(float deltaTime, ChunkManager chunks, IMobTarget? player, Vector3? wander = null)
     {
         if (deltaTime <= 0f || chunks == null) return;
 
@@ -295,6 +296,18 @@ public sealed class Goblin : Mob
             }
 
             move = Decide(dist, toward, chunks, player);
+        }
+        else if (wander is { } goal && !IsDying && !Animation.IsActionPlaying)
+        {
+            // Nobody chased (none noticed, or interest lost): stroll toward the wander goal
+            var to = new Vector3(goal.X - Position.X, 0f, goal.Z - Position.Z);
+            var dist = to.Length();
+            if (dist > WorldGenerationConfig.MobWanderArriveBlocks)
+            {
+                TurnToward(MathF.Atan2(-to.X, -to.Z), TurnRate, deltaTime);
+                _facingKnown = true;
+                move = to / dist * WorldGenerationConfig.MobWanderSpeedFactor;
+            }
         }
 
         // Walking: ease the horizontal velocity toward the chosen move (or friction toward a
