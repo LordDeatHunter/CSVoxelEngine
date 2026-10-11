@@ -1,0 +1,43 @@
+{
+  // Water depth states: run with VOXEL_SCRIPT=visual-examples/water-depth.json VOXEL_TIME=147 from
+  // OpenGLTest/. Shots land in visual/water-depth/. Filmed from the shoulder camera so the body shows.
+  //   wade:       a one-block puddle poured from a bucket in the open forest clearing (ground at y
+  //               9..10 over x -56..-32, z 32..68): under half the body is in, so it just stands
+  //               (and walks, slowed) with no special pose
+  //   wade-walk:  walking through the puddle: the ordinary walk cycle
+  //   float:      the deep sea at x~432, z~0 (sea level 0, surface at y 0.89; see swim-bubbles.json):
+  //               dropped in from above, the body has settled with about 70 % of it under and the eye
+  //               out, upright in the surface-float pose (arms sculling by the hips, legs hanging)
+  //   float-hop:  a stroke up from the float, the body bobbing out over the surface
+  //   floated:    settled back at the float
+  //   swim:       after a down stroke (Ctrl) the eye is under: the ordinary swim pose
+  "steps": [
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "give", "block": "item/water_bucket", "count": 1 },
+    { "op": "teleport", "pos": [-43.5, 12.0, 60.5], "yaw": -90, "pitch": -55 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "walk", "keys": ["W"], "seconds": 0.25 },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "look", "yaw": -90, "pitch": -15 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "wade", "hideHud": true },
+    { "op": "walk", "keys": ["W"], "seconds": 0.35 },
+    { "op": "screenshot", "name": "wade-walk", "hideHud": true },
+    { "op": "teleport", "pos": [432.5, 4.5, 0.5], "yaw": 0, "pitch": -10 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "teleport", "pos": [432.5, 4.5, 0.5], "yaw": 0, "pitch": -10 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "screenshot", "name": "float", "hideHud": true },
+    { "op": "walk", "keys": ["Space"], "seconds": 0.1 },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "float-hop", "hideHud": true },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "floated", "hideHud": true },
+    { "op": "walk", "keys": ["ControlLeft"], "seconds": 0.1 },
+    { "op": "wait", "seconds": 1.6 },
+    { "op": "screenshot", "name": "swim", "hideHud": true }
+  ]
+}

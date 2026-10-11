@@ -24,6 +24,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public const string Land = "land";
     public const string Swim = "swim";
     public const string SwimIdle = "swim idle";
+    public const string Surface = "surface";
     public const string Punch = "punch";
     public const string HeavyPunch = "heavy punch";
     public const string Slice = "slice";
@@ -36,7 +37,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     /// <summary>Every mode, in the order the debugger lists them.</summary>
     public static readonly IReadOnlyList<string> AllModes =
     [
-        Idle, Walk, Run, Sneak, Jump, SprintJump, Land, Swim, SwimIdle,
+        Idle, Walk, Run, Sneak, Jump, SprintJump, Land, Swim, SwimIdle, Surface,
         Punch, HeavyPunch, Slice, SliceBack, Throw, Hurt, Equip, Death,
     ];
 
@@ -93,12 +94,14 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public bool Replay { get; set; } = true;
 
     /// <summary>True for the poses with no start or end (idle, walk, run, sneak, swim): a clock wraps them.</summary>
-    public bool IsContinuous => Mode is Idle or Walk or Run or Sneak or Swim or SwimIdle;
+    public bool IsContinuous => Mode is Idle or Walk or Run or Sneak or Swim or SwimIdle or Surface;
 
     /// <summary>Seconds one play of the active mode lasts (a cycle for a continuous pose).</summary>
     public float Duration => Mode switch
     {
         Walk or Run or Sneak or Idle or SwimIdle => 2f,
+        // About two slow sculls of the surface float
+        Surface => 3f,
         Swim => PlayerPhysics.SwimStrokeSeconds * 2f,
         Jump or SprintJump => 2f * JumpSpeed / Gravity + 0.9f,
         Land => 0.25f + 0.9f,
@@ -188,6 +191,10 @@ public sealed class PlayerPreviewState : IPreviewDriver
                 break;
             case SwimIdle:
                 Swimming(deltaTime, 0f);
+                break;
+            case Surface:
+                // At rest at the top of deep water (WaterPhase.Float), exactly as the world feeds it
+                _model.Update(deltaTime, 0f, grounded: true, swimming: true, floating: true);
                 break;
             case Land:
                 Landing(deltaTime);

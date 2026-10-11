@@ -1283,14 +1283,17 @@ public class World : IItemUseWorld
         Player.BodyYawLags = Camera.IsShoulderSurf && !Camera.IsOrbit;
         Player.SetLook(Camera.PlayerYaw, Camera.Pitch);
         var animSpeed = Camera.IsFlying ? 0f : horizontalSpeed;
-        var supported = Camera.IsGrounded || Camera.IsFlying || Camera.IsInWater;
+        // How deep the body stands (WaterImmersion): wading walks with no water pose, floating at the
+        // surface takes the upright float pose and only an eye under water swims
+        var waterPhase = Camera.IsFlying ? WaterPhase.Dry : Camera.WaterPhase;
+        var supported = Camera.IsGrounded || Camera.IsFlying || waterPhase >= WaterPhase.Float;
         // A swim stroke the physics just started thrusts the arms out on the same frame.
         var strokes = Camera.SwimStrokeCount;
         if (strokes != _lastSwimStrokes) Player.TriggerSwimStroke();
         _lastSwimStrokes = strokes;
         Player.Update((float)deltaTime, animSpeed, Camera.IsSprinting, supported,
-            Camera.VerticalVelocity, Camera.IsSneaking, Camera.IsInWater && !Camera.IsFlying,
-            headingForward, headingSide);
+            Camera.VerticalVelocity, Camera.IsSneaking, waterPhase >= WaterPhase.Float,
+            headingForward, headingSide, floating: waterPhase == WaterPhase.Float);
         // A hit-stop holds the punch pinch with the arm (read by the camera's next update)
         Camera.HoldPunchFov = Player.IsHitStopped;
         // The throw being wound up narrows the view with the arm (ThrowZoom, the camera's next update)

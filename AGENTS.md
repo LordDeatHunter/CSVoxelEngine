@@ -2604,6 +2604,16 @@ overshoot or jiggle.
   stroke. The legs snap straight with the thrust and draw up during the recovery, and the whole body
   tips about the hips toward the heading (`Update(..., swimForward:, swimSide:)`: forward when
   swimming ahead, back when backing off, rolled into a strafe, plus a lunge at the burst).
+- **Surface float** (`PlayerModel.Update(..., floating:)`, `FloatBlend`, `Float*` constants): a body at
+  rest in `WaterPhase.Float` is upright and straight (`ComputeMods` drops the swim tilt and roll by the
+  float's share), its arms scull slowly beside the hips (upper arms a little out and forward, forearms
+  bent forward, the hands sweeping out and in together) and its legs hang with a faint flutter. It eases
+  in over the swim pose through `MathUtils.Damp` and back out during a stroke (a floater swimming off
+  strokes in the swim pose) or once the body stops floating. `World.UpdatePlayerModel` feeds the swim
+  pose only from `Float` up (a wader walks with no water pose) and `floating` in `Float`. The item
+  debugger's `SURFACE` mode (`ITEM_DEBUGGER_PLAYER_ANIM=surface`) previews it, `SurfaceFloatPoseTests`
+  locks it down and `visual-examples/water-depth.json` (`VOXEL_TIME=147`) films a poured puddle (wade),
+  the deep sea's float, a stroke hop and a dive (swim) from the shoulder camera.
 - **Player model** (`PlayerModel.cs`): the existing `Pose` is post-processed by `ApplySwim` and
   `ApplyMods` (`ComputeMods`): a landing dip spring (knees, hips, torso, root drop), crouch
   (`Update(..., sneaking:)`), a swim stroke (`swimming:`), the hit flinch (`Hurt(fromFront)`), torso
