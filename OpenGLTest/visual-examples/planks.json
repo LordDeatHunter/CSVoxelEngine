@@ -1,0 +1,37 @@
+{
+  // Building-wood check: run with VOXEL_TIME=147 (noon) and VOXEL_SCRIPT=visual-examples/planks.json.
+  // Shots land in visual/planks/.
+  //
+  // The flat desert patch of torches.json: the player hovers at (253, -5) (sand at y 9, feet at
+  // 10, eye (253.5, 11.62, -4.5)) and every placement aims at an exact cell, written relative to
+  // the player's cell as (dx, y, dz): a ground cell centre (dx, 9, dz) is yaw atan2(dz, dx),
+  // pitch -atan(1.62 / |(dx, dz)|).
+  //   planks-front    a row of three oak planks three cells ahead, (-1..1, 10, -3), with a fourth
+  //                   on the middle one: the boards run horizontally and tile across the merged
+  //                   faces without a visible edge
+  //   planks-oblique  the same from the front left
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [253.5, 30, -4.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 14 },
+    { "op": "teleport", "pos": [253.5, 11.63, -4.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 1 },
+
+    { "op": "give", "block": "oak_planks", "count": 4 },
+    { "op": "look", "yaw": -108.43, "pitch": -27.13 },
+    { "op": "place" },
+    { "op": "look", "yaw": -90, "pitch": -28.37 },
+    { "op": "place" },
+    { "op": "look", "yaw": -71.57, "pitch": -27.13 },
+    { "op": "place" },
+    { "op": "look", "yaw": -90, "pitch": -11.68 },
+    { "op": "place" },
+
+    { "op": "look", "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "planks-front" },
+    { "op": "teleport", "pos": [249.5, 12.5, -3.5], "yaw": -45, "pitch": -20 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "planks-oblique", "hideHud": true }
+  ]
+}

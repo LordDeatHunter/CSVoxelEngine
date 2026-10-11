@@ -962,6 +962,7 @@ OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple 
   AssetRoot.cs                        # locate assets/ walking up from the server's working directory
 tools/generate-goblin-skin.ps1        # deterministic generator of goblin.png; its header pins the UV layout
 tools/generate-leaf-textureless.ps1   # deterministic grey leaf tiles for the biome tint (scaled to BiomeTintTextureGrey)
+tools/generate-plank-texture.py       # deterministic oak_planks tile (stdlib PNG writer)
 tools/generate-tree-textures.ps1      # placeholder baobab / stone pine log and leaf tiles tinted from the oak art
 tools/generate-cotton-textures.py     # deterministic cotton_plant tile and cotton item sprite (stdlib PNG writer)
 tools/generate-torch-texture.py       # deterministic torch tile; its header pins the stick the torch models crop
@@ -1111,6 +1112,14 @@ chunk (`anyUnloaded`, so a half-loaded structure is never mangled) and otherwise
 including when the *anchor* cell itself is gone — which is what `KilnState.AnchorId` remembers.
 **Only kilns get that sweep**: a future multiblock that is not a kiln needs its own registry, or a
 generic one.
+
+### Building blocks
+
+Plain construction pieces built from the schema above. `oak_planks` is the first building wood:
+four from one `oak_log` (`recipes/oak_planks.json`), a plain `cube_all` block with `sfx: hit_wood`
+that is mined by hand. Its tile comes from `tools/generate-plank-texture.py` (stdlib PNG writer,
+byte-identical re-runs) and is what the wooden pieces below crop their faces from.
+`visual-examples/planks.json` (`VOXEL_TIME=147`) builds and shoots them.
 
 ### Item schema (`assets/data/items/<name>.json`)
 
