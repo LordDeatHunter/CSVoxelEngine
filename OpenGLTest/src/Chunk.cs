@@ -523,6 +523,10 @@ public class Chunk : IDisposable
         if (WorldGenerationConfig.CaveFormationsEnabled)
             CaveFormationGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
+        // Loose rock buried inside stone, after the carvers so a pocket never fills a cave
+        if (WorldGenerationConfig.GravelPocketsEnabled)
+            GravelPocketGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
+
         // Frozen-only ice spikes go down before the snow, so a spike keeps its base cell
         if (WorldGenerationConfig.SnowAndIceEnabled)
             IceSpikeGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);

@@ -2178,6 +2178,16 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float StalagmiteChance = 0.03f;
     public const int CaveFormationMinDepth = 8;
 
+    // --- Gravel and sand pockets (GravelPocketGenerator): loose blobs buried inside stone that
+    // cave in when mined ---
+    public const bool GravelPocketsEnabled = true;
+    public const float GravelPocketFrequency = 1f / 24f;
+    public const float GravelPocketThreshold = 0.3f;
+    // Blocks under the column's surface a pocket needs (soil and rock caps stay solid)
+    public const int GravelPocketMinBurial = 3;
+    // Share of a pocket's cells that are sand rather than gravel
+    public const float GravelPocketSandShare = 0.35f;
+
     // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
     // first notices a player (the same moment its first-throw delay starts) ---
     public const float GoblinNoticePipSeconds = 0.9f;
