@@ -644,13 +644,33 @@ public class UIRenderer : IDisposable
         if (_blockCubes.Get(label.BlockId) is { } cube)
         {
             // The shape is centred on its own origin, so it spins in place; an unknown block is
-            // the same mesh with uUseTexture off, a flat dark silhouette
+            // the same mesh with uUseTexture off, a flat dark silhouette. FlipToScreen mirrors
+            // the Y-up model into the Y-down canvas with the tilt then tipping its top face
+            // towards the viewer, like the icons; the model's faces overlap on screen, so the
+            // draw needs the depth test the flat shapes skip, or its back faces blend over the
+            // front ones.
+            _gl.Enable(EnableCap.DepthTest);
+            EnsureDepthCleared();
+
             var model = Matrix4x4.CreateScale(LookLabelCubeSize)
                         * Matrix4x4.CreateRotationY(time * 0.6f)
-                        * Matrix4x4.CreateRotationX(-0.45f)
-                        * Matrix4x4.CreateTranslation(cubeCentre.X, cubeCentre.Y, 0f);
+                        * Matrix4x4.CreateRotationX(LookLabelCubeTilt)
+                        * FlipToScreen(cubeCentre);
+
+            // Same cutout discard as DrawBlockIcon: a leaf's transparent texels would
+            // otherwise write depth and swallow the faces behind them.
+            var cutout = label.Known && BlockType.ById[label.BlockId]?.Cutout == true;
+            if (cutout)
+            {
+                _shader.Use();
+                _shader.SetUniform(_locAlphaCutoff, 0.5f);
+            }
             DrawMesh(cube, model, label.Known ? Rgba.White : new Rgba(26, 26, 30),
                 label.Known ? _atlasTexture : 0, srgb: label.Known && _atlasIsSrgb);
+            if (cutout)
+                _shader.SetUniform(_locAlphaCutoff, 0f);
+
+            _gl.Disable(EnableCap.DepthTest);
         }
 
         var name = FittedText(label.Text, _countScale, LookLabelMaxWidth);
@@ -673,6 +693,8 @@ public class UIRenderer : IDisposable
     // The look-at label's cube: its size, how far below the crosshair it sits and the gap to the name
     private const float LookLabelCubeSize = 34f;
     private const float LookLabelCubeOffsetY = 46f;
+    // Positive tips the mesh's top face at the viewer once FlipToScreen has mirrored it
+    private const float LookLabelCubeTilt = 0.45f;
     private const float LookLabelNameGap = 14f;
     private const float LookLabelMaxWidth = 200f;
 
