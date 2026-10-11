@@ -111,6 +111,14 @@ public class FluidManager
     /// </summary>
     public bool Enabled { get; set; } = true;
 
+    // The cells that hardened (lava to cobblestone) during the last Update, for the steam puffs
+    private readonly List<Vector3> _hardened = [];
+
+    /// <summary>Every cell contact hardening turned solid during the last <see cref="Update"/> (lava
+    /// touching water, and a flow settling against a fluid that hardens on its touch); valid until
+    /// the next one. The world puffs steam off each (cosmetic, never on a server).</summary>
+    public IReadOnlyList<Vector3> HardenedCells => _hardened;
+
     /// <summary>Schedules a cell and its six face neighbours for the next tick. Every path that
     /// changes a block must call this, or water beside the edit will not notice it.</summary>
     public void ScheduleAround(Vector3 cell) => ScheduleAround((int)cell.X, (int)cell.Y, (int)cell.Z);
@@ -347,6 +355,7 @@ public class FluidManager
     /// </summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, LodManager? lod = null)
     {
+        _hardened.Clear();
         _accumulator += deltaTime;
 
         // The tick's helpers read through this and its chunk cache, so they need no manager
@@ -473,6 +482,7 @@ public class FluidManager
         if (hardensTo != 0 && TouchesFluid(x, y, z, BlockType.HardensTouchingById[id]))
         {
             Write(x, y, z, hardensTo, 0);
+            _hardened.Add(new Vector3(x, y, z));
             ScheduleAround(x, y, z);
             return;
         }
@@ -727,6 +737,8 @@ public class FluidManager
         }
 
         Write(x, y, z, writeId, writeState);
+        if (writeId != fluid)
+            _hardened.Add(new Vector3(x, y, z));
         ScheduleAround(x, y, z);
     }
 

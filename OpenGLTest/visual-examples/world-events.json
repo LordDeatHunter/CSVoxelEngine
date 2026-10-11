@@ -15,6 +15,8 @@
   //              the horizon with tnt-fuse)
   //   sand-settle a sand cube placed against the top of a four-high dirt pillar falls three blocks
   //              and settles in a skirt of its own chips (FallingBlockManager.Landings)
+  //   steam      lava poured into the crater and water run down onto it: grey smoke off every cell
+  //              that hardens to cobblestone
   "steps": [
     { "op": "fly", "on": true },
     { "op": "teleport", "pos": [253.5, 30, -4.5], "yaw": -90, "pitch": -28.37 },
@@ -75,6 +77,29 @@
     { "op": "wait", "seconds": 0.1 },
     { "op": "screenshot", "name": "sand-settle-c", "hideHud": true },
     { "op": "wait", "seconds": 0.15 },
-    { "op": "screenshot", "name": "sand-settle-d", "hideHud": true }
+    { "op": "screenshot", "name": "sand-settle-d", "hideHud": true },
+
+    // LEG 3 — steam: lava poured into the bottom of the leg 1 crater, then water poured on its slope
+    // two blocks east, which runs down onto the lava: every cell that hardens to cobblestone puffs
+    // grey smoke (FluidManager.HardenedCells). Each pour looks straight down from a hovering eye.
+    { "op": "teleport", "pos": [253.5, 14.5, -7.5], "yaw": 0, "pitch": -89 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "give", "block": "item/lava_bucket" },
+    { "op": "place" },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "teleport", "pos": [255.5, 14.5, -7.5], "yaw": 0, "pitch": -89 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "give", "block": "item/water_bucket" },
+    { "op": "place" },
+    { "op": "select", "slot": 8 },
+    { "op": "teleport", "pos": [253.5, 10.5, -3.5], "yaw": -90, "pitch": -25 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "steam-a", "hideHud": true },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "steam-b", "hideHud": true },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "steam-c", "hideHud": true },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "screenshot", "name": "steam-d", "hideHud": true }
   ]
 }

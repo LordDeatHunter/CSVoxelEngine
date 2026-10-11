@@ -1433,6 +1433,20 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float FallingBlockDustSize = 0.1f;
     public const float FallingBlockDustClientFallBlocks = 3f;
 
+    // --- Steam on lava hardening (FluidManager.HardenedCells -> FireParticleSystem.Puff of
+    // FireParticleKind.Steam on the campfire instance): a cell contact hardening turns solid puffs
+    // this many pale steam particles off its top, scattered across the spread; at most the cap of
+    // cells (within FireParticleRadius of the camera) puff in one frame, so a lake meeting the sea
+    // never floods the particle ring. ---
+    public const int SteamPuffSmoke = 8;
+    public const float SteamPuffSpread = 0.9f;
+    public const int SteamPuffMaxCellsPerFrame = 12;
+    public const float SteamLifetime = 2.2f;
+    public const float SteamRise = 1.1f;
+    public const float SteamSize = 0.3f;
+    public const float SteamGrow = 0.35f;
+    public const float SteamAlpha = 0.6f;
+
     // --- Wind (Wind.cs, SH-27) ---
     // One slowly turning wind shared by leaf sway, fire smoke and the cloud drift.
     /// <summary>Wind heading at lighting time 0, degrees from +X toward +Z.</summary>

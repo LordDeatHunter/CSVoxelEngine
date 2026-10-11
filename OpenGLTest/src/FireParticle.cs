@@ -7,12 +7,17 @@ public enum FireParticleKind : byte
 {
     Ember,
     Smoke,
+
+    /// <summary>A pale puff off lava that just hardened: drawn like smoke (blended, unlit) but
+    /// lighter, quicker to rise and swell, and shorter lived.</summary>
+    Steam,
 }
 
 /// <summary>
-/// One campfire particle: an ember (small, orange, fast rise, short life) or a smoke puff
-/// (larger, grey, slow rise, grows as it climbs). Pure CPU state; drawn batched by
-/// <see cref="FireParticleRenderer"/>. Main thread only.
+/// One campfire particle: an ember (small, orange, fast rise, short life), a smoke puff
+/// (larger, grey, slow rise, grows as it climbs) or a steam puff (pale, quick, brief). Pure CPU
+/// state; drawn batched by <see cref="FireParticleRenderer"/>, which blends everything but an
+/// ember like smoke. Main thread only.
 /// </summary>
 public sealed class FireParticle
 {
@@ -21,13 +26,19 @@ public sealed class FireParticle
     public float Size { get; private set; }
     public bool IsAlive { get; private set; } = true;
 
-    public float Alpha => Kind == FireParticleKind.Ember
-        ? 1f - MathUtils.Clamp01(_age / _lifetime)
-        : 0.45f * (1f - MathUtils.Clamp01(_age / _lifetime));
+    public float Alpha => Kind switch
+    {
+        FireParticleKind.Ember => 1f - MathUtils.Clamp01(_age / _lifetime),
+        FireParticleKind.Steam => WorldGenerationConfig.SteamAlpha * (1f - MathUtils.Clamp01(_age / _lifetime)),
+        _ => 0.45f * (1f - MathUtils.Clamp01(_age / _lifetime)),
+    };
 
-    public (byte R, byte G, byte B) Color => Kind == FireParticleKind.Ember
-        ? EmberColor(_age / _lifetime)
-        : ((byte)110, (byte)110, (byte)115);
+    public (byte R, byte G, byte B) Color => Kind switch
+    {
+        FireParticleKind.Ember => EmberColor(_age / _lifetime),
+        FireParticleKind.Steam => ((byte)236, (byte)238, (byte)242),
+        _ => ((byte)110, (byte)110, (byte)115),
+    };
 
     private Vector3 _velocity;
     private float _age;
@@ -50,6 +61,16 @@ public sealed class FireParticle
                 (rng.NextSingle() * 2f - 1f) * 0.35f);
             Size = WorldGenerationConfig.FireEmberSize * (0.7f + 0.6f * rng.NextSingle());
             _grow = 0f;
+        }
+        else if (kind == FireParticleKind.Steam)
+        {
+            _lifetime = WorldGenerationConfig.SteamLifetime * (0.7f + 0.6f * rng.NextSingle());
+            _velocity = new Vector3(
+                (rng.NextSingle() * 2f - 1f) * 0.3f,
+                WorldGenerationConfig.SteamRise * (0.8f + 0.4f * rng.NextSingle()),
+                (rng.NextSingle() * 2f - 1f) * 0.3f);
+            Size = WorldGenerationConfig.SteamSize * (0.8f + 0.4f * rng.NextSingle());
+            _grow = WorldGenerationConfig.SteamGrow;
         }
         else
         {
@@ -87,9 +108,9 @@ public sealed class FireParticle
         }
         else
         {
-            // Sway across the wind and drift down it. Smoke picks the drift up as it rises clear
-            // of the fire (full after half its life); embers are carried from the start.
-            var drift = Kind == FireParticleKind.Smoke
+            // Sway across the wind and drift down it. Smoke and steam pick the drift up as they rise
+            // clear of their source (full after half their life); embers are carried from the start.
+            var drift = Kind != FireParticleKind.Ember
                 ? WorldGenerationConfig.WindSmokeDrift * MathUtils.Clamp01(_age / (0.5f * _lifetime))
                 : WorldGenerationConfig.WindEmberDrift;
             Position += new Vector3(-wind.Y * sway + wind.X * drift * deltaTime, 0f,

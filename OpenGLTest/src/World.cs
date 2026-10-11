@@ -124,6 +124,8 @@ public class World : IItemUseWorld
     private readonly HashSet<int> _netMobsSeen = [];
     private readonly List<int> _netMobRemovals = [];
     private readonly HashSet<Vector3> _netTouchedChunks = [];
+    // Multiplayer client: the cells of a block-change batch that are lava hardening, for the steam
+    private readonly List<Vector3> _netHardened = [];
 
     // Multiplayer client: the server's primed TNT by network id (display-only mirrors, so a cube
     // keeps its strobe clock across snapshots), its reconcile scratch, and the falling cubes of the
@@ -940,6 +942,7 @@ public class World : IItemUseWorld
     public void ApplyNetworkBlockChanges(IReadOnlyList<NetCellChange> changes)
     {
         _netTouchedChunks.Clear();
+        _netHardened.Clear();
         for (var i = 0; i < changes.Count; i++)
         {
             var change = changes[i];
@@ -959,6 +962,9 @@ public class World : IItemUseWorld
                 GroundDust.LandBlock(new Vector3(change.X, change.Y, change.Z), change.Id,
                     WorldGenerationConfig.FallingBlockDustClientFallBlocks, submerged: BlockType.IsFluid(id), _debris,
                     _chunkManager.ColumnSource);
+            // The server's lava hardening into its rock: steam, like a local hardening
+            if (_clientMode && change.Id != 0 && BlockType.IsFluid(id) && BlockType.HardensToById[id] == change.Id)
+                _netHardened.Add(new Vector3(change.X, change.Y, change.Z));
             if (BlockType.ById[change.Id]?.Renderer == BlockRenderer.Quern)
                 _querns.Ensure(change.X, change.Y, change.Z);
         }
@@ -968,6 +974,9 @@ public class World : IItemUseWorld
             if (_chunkManager.Chunks.TryGetValue(pos, out var touched))
                 touched.RemeshAfterBatchEdit(_chunkManager);
         }
+
+        if (_netHardened.Count > 0)
+            PuffSteam(_netHardened);
     }
 
     /// <summary>
@@ -1086,6 +1095,26 @@ public class World : IItemUseWorld
 
         _tntManager.ReplaceMirrors(_netTnt.Values);
         _falling.ReplaceMirrors(_netFalling);
+    }
+
+    /// <summary>
+    /// Puffs steam (smoke on the campfire particle instance, <see cref="FireParticleSystem.Puff"/>)
+    /// off the top of each cell in <paramref name="cells"/> that contact hardening just turned solid,
+    /// for at most <see cref="WorldGenerationConfig.SteamPuffMaxCellsPerFrame"/> cells within
+    /// <see cref="WorldGenerationConfig.FireParticleRadius"/> of the eye. Cosmetic: singleplayer and a client.
+    /// </summary>
+    private void PuffSteam(IReadOnlyList<Vector3> cells)
+    {
+        const float reach = WorldGenerationConfig.FireParticleRadius * WorldGenerationConfig.FireParticleRadius;
+        var puffed = 0;
+        for (var i = 0; i < cells.Count && puffed < WorldGenerationConfig.SteamPuffMaxCellsPerFrame; i++)
+        {
+            var top = cells[i] + new Vector3(0.5f, 1.05f, 0.5f);
+            if (Vector3.DistanceSquared(top, Camera.RenderEye) > reach) continue;
+            _fire.Puff(top, WorldGenerationConfig.SteamPuffSmoke, WorldGenerationConfig.SteamPuffSpread,
+                FireParticleKind.Steam);
+            puffed++;
+        }
     }
 
     /// <summary>Whether a falling-cube mirror of <paramref name="blockId"/> from the newest or the
@@ -1704,6 +1733,9 @@ public class World : IItemUseWorld
         // Runs after every path that can edit a block this frame, so the cells they scheduled
         // are all in the same tick
         _fluidManager.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
+        // Lava that hardened this frame gives off steam; cosmetic, so never on a server
+        if (!_serverMode)
+            PuffSteam(_fluidManager.HardenedCells);
 
         FrameProfiler.End(ProfileSection.FluidTick);
 

@@ -95,6 +95,26 @@ public sealed class FireParticleSystem
         }
     }
 
+    /// <summary>
+    /// A one-off burst of <paramref name="count"/> puffs of <paramref name="kind"/> rising from around
+    /// <paramref name="origin"/>, scattered up to half of <paramref name="spread"/> either way across
+    /// it (the steam off lava that just hardened). Evicts the oldest particles past the cap like any
+    /// spawn; the next <see cref="Update"/> moves them.
+    /// </summary>
+    public void Puff(Vector3 origin, int count, float spread, FireParticleKind kind = FireParticleKind.Smoke,
+        Random? random = null)
+    {
+        var rng = random ?? Random.Shared;
+        for (var i = 0; i < count; i++)
+        {
+            if (_particles.Count >= _maxParticles)
+                _particles.RemoveAt(0);
+            var jitter = new Vector3((rng.NextSingle() - 0.5f) * spread, rng.NextSingle() * 0.2f,
+                (rng.NextSingle() - 0.5f) * spread);
+            _particles.Add(new FireParticle(origin + jitter, kind, rng));
+        }
+    }
+
     private void Spawn(Vector3 origin, FireParticleKind kind, Random rng)
     {
         if (_particles.Count >= _maxParticles)

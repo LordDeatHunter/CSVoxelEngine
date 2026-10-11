@@ -2985,7 +2985,14 @@ overshoot or jiggle.
   `FallingBlockManager.Landings` (each cube written back as a block that frame), and a client puffs
   where a `BlockChanges` entry turns a cell into a `falls` block beside a falling-cube mirror of that
   block in the newest or previous snapshot, as if it fell `FallingBlockDustClientFallBlocks`
-  (`FallingBlockDustTests`). `visual-examples/world-events.json` (`VOXEL_TIME=147`) films
+  (`FallingBlockDustTests`). Lava hardening gives off steam: `FluidManager.HardenedCells` lists every
+  cell contact hardening turned solid in the frame (the touching rule and a flow arriving hardened),
+  and `World.PuffSteam` puffs `SteamPuffSmoke` pale `FireParticleKind.Steam` particles (drawn blended
+  like smoke, lighter, quicker and briefer) off the top of each through `FireParticleSystem.Puff` on
+  the campfire instance, at most `SteamPuffMaxCellsPerFrame` cells within `FireParticleRadius` a frame,
+  since a waking cave pocket hardens dozens a frame far below; a client puffs where a `BlockChanges`
+  entry turns a fluid into its own `hardensTo` block (a flow crusting against lava is missed there)
+  (`SteamPuffTests`). `visual-examples/world-events.json` (`VOXEL_TIME=147`) films
   these effects; its blasts use the scenario op `prime` (`{ "op": "prime", "pos": [x, y, z] }`,
   `World.TestPrimeTnt`), a firestarter strike on the TNT block in that cell that never misses, since
   `give` cannot equip a tool instance and the strike's chance roll would make the scenario flaky.
