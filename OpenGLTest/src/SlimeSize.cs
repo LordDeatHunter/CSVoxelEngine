@@ -27,6 +27,14 @@ public static class SlimeSize
     /// <summary>The body scale: the drawn model and the collision box are the size-1 ones times this.</summary>
     public static float Scale(int size) => Multiplier(size, WorldGenerationConfig.SlimeSizeScaleStep);
 
+    /// <summary>
+    /// The horizontal speed a shove of <paramref name="speed"/> (a punch, a slice, a grounded player
+    /// walking into it) leaves a slime of <paramref name="size"/> with: the shove divided by the body
+    /// <see cref="Scale"/>, so a larger, heavier slime is pushed less and the smallest takes the shove
+    /// as given.
+    /// </summary>
+    public static float ShoveSpeed(float speed, int size) => speed / Scale(size);
+
     /// <summary>The health pool of a slime whose kind's JSON pool is <paramref name="baseHealth"/>.</summary>
     public static int Health(int baseHealth, int size) =>
         Math.Max(1, (int)MathF.Round(baseHealth * Multiplier(size, WorldGenerationConfig.SlimeSizeHealthStep)));

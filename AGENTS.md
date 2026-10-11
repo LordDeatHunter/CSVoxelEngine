@@ -2524,6 +2524,10 @@ swing hits the nearest two mobs in a forward hemisphere of the same reach with l
 buffered return swing is at half power, and the damage lands at the swing's impact frame rather than on
 the click, with the arm and blade carried across the front by `PlayerModel`.
 
+A larger slime is pushed less: every shove (a punch, a slice, a grounded player walking into it) is
+divided by its body scale (`SlimeSize.ShoveSpeed`, applied in `Slime.Shove`), while a split child's
+launch (`Slime.Pop`) is not (`SlimeKnockbackTests`).
+
 The second entity is the **goblin** (`Goblin` + `Systems/GoblinManager.cs`, owned by `World`), a short
 forest raider that throws the flint it carries and then closes for a club swing. It spawns like the
 slime: dry forest surface, a 20-40 block ring, under the shared natural mob cap and despawn beyond

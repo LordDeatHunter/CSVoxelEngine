@@ -171,14 +171,19 @@ public sealed class Slime : Mob
     /// <paramref name="horizontalDirection"/> plus a small upward <paramref name="lift"/>.</summary>
     internal void Pop(Vector3 horizontalDirection, float speed, float lift)
     {
-        Shove(horizontalDirection, speed);
+        // The split's own launch, not a shove: the child's size does not damp it
+        SetHorizontalVelocity(horizontalDirection, speed);
         _velocity.Y = lift;
         IsGrounded = false;
     }
 
-    /// <summary>Sets the horizontal shove a grounded player contact imparts, leaving vertical
-    /// motion alone. Setting (not adding) keeps a sustained touch from accelerating the slime.</summary>
-    public override void Shove(Vector3 horizontalDirection, float speed)
+    /// <summary>Sets the horizontal shove a grounded player contact or a hit imparts, leaving vertical
+    /// motion alone. Setting (not adding) keeps a sustained touch from accelerating the slime. A larger
+    /// slime is pushed less (<see cref="SlimeSize.ShoveSpeed"/>).</summary>
+    public override void Shove(Vector3 horizontalDirection, float speed) =>
+        SetHorizontalVelocity(horizontalDirection, SlimeSize.ShoveSpeed(speed, Size));
+
+    private void SetHorizontalVelocity(Vector3 horizontalDirection, float speed)
     {
         if (horizontalDirection.LengthSquared() < 1e-6f) return;
         horizontalDirection.Y = 0f;
