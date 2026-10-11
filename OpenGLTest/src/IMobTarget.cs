@@ -16,6 +16,11 @@ public interface IMobTarget
     /// chase an immune player when no other is in play, so a hovering camera can film them.</summary>
     bool IsImmune { get; }
 
+    /// <summary>Whether the player sneaks, which halves the range a mob notices it from
+    /// (<see cref="MobTargets.NoticeRadius"/>): the camera's own crouch, or a connected player's
+    /// cosmetic flag, which is untrusted but can only ever help the one who claims it.</summary>
+    bool IsSneaking => false;
+
     /// <summary>A mob hit landed: take <paramref name="damage"/> and a knockback shove along the
     /// horizontal <paramref name="awayHorizontal"/> at <paramref name="knockbackSpeed"/> plus an
     /// upward <paramref name="lift"/>.</summary>

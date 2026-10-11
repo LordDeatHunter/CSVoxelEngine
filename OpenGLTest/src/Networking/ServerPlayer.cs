@@ -200,6 +200,9 @@ public sealed class ServerPlayer : IMobTarget
     /// <summary>No mob hurts a creative, flying or dead player.</summary>
     public bool IsImmune => Creative || Flying || IsDead;
 
+    /// <summary>The client's cosmetic sneaking flag: mobs notice a sneaking player from half as far.</summary>
+    public bool IsSneaking => ((NetPlayerFlags)Flags & NetPlayerFlags.Sneaking) != 0;
+
     /// <summary>
     /// A mob hit landed on this player: the damage comes off <see cref="Status"/> at once, and the
     /// shove is queued (<see cref="TakePendingKnockback"/>) for the client to apply, since only the

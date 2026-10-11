@@ -34,9 +34,18 @@ public static class MobTargets
     }
 
     /// <summary>
+    /// How far, horizontally, a mob notices <paramref name="target"/> from:
+    /// <see cref="WorldGenerationConfig.MobNoticeRadiusBlocks"/>, times
+    /// <see cref="WorldGenerationConfig.MobSneakNoticeFactor"/> while the target sneaks.
+    /// </summary>
+    public static float NoticeRadius(IMobTarget target) =>
+        WorldGenerationConfig.MobNoticeRadiusBlocks * (target.IsSneaking ? WorldGenerationConfig.MobSneakNoticeFactor : 1f);
+
+    /// <summary>
     /// Index of the target a mob at <paramref name="position"/> chases: the horizontally nearest
     /// one that is not immune, else (every target immune) the nearest immune one, so mobs still
-    /// face a lone hovering camera. -1 when there are no targets.
+    /// face a lone hovering camera. A target farther than its <see cref="NoticeRadius"/> (shorter
+    /// while it sneaks) goes unnoticed. -1 when no target is noticed.
     /// </summary>
     public static int Nearest(IReadOnlyList<IMobTarget> targets, Vector3 position)
     {
@@ -49,6 +58,8 @@ public static class MobTargets
         {
             var target = targets[i];
             var squared = HorizontalDistanceSquared(target.Eye, position);
+            var notice = NoticeRadius(target);
+            if (squared > notice * notice) continue;
             if (target.IsImmune)
             {
                 if (squared < bestImmuneSquared)

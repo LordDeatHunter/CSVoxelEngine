@@ -1494,6 +1494,13 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float MobLootTossMaxSpeed = 2.5f;
     public const float MobLootTossLift = 2.5f;
 
+    // --- Mob notice range (MobTargets.NoticeRadius) ---
+    // A mob only chases a target within this horizontal distance, scaled by MobSneakNoticeFactor
+    // while the target sneaks, so a crouching player can creep past. Inside the spawn ring's outer
+    // edge on purpose: a mob spawned at the far edge waits until the player comes closer.
+    public const float MobNoticeRadiusBlocks = 32f;
+    public const float MobSneakNoticeFactor = 0.5f;
+
     // --- Slimes (SlimeManager) ---
     // Forest mobs that hop at the player. Natural spawns appear on dry forest surface in a ring
     // around the player and are culled when they stray too far. Damage only lands while a slime

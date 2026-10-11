@@ -1,0 +1,22 @@
+{
+  // Mob notice range (MobTargets.NoticeRadius): run with VOXEL_SCRIPT=visual-examples/mob-notice.json
+  // VOXEL_TIME=147 from OpenGLTest/. Shots land in visual/mob-notice/.
+  // The player stands at the south end of the open, flat forest clearing of slime-sizes.json
+  // (ground at y 9..10 over x -56..-32, z 32..68, no trunks) facing -Z, switched to creative first
+  // (the C press) so the goblin's stones cost nothing; creative on foot still sneaks with Left Ctrl,
+  // and mobs still chase an immune player when nobody else is about. A goblin spawns 22 blocks
+  // ahead: past the sneaking range, inside the standing one. While the player sneaks it ignores
+  // them ("sneaking"); once they stand up it notices them and walks in to its throwing band
+  // ("standing").
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "walk", "keys": ["C"], "seconds": 0.05 },
+    { "op": "teleport", "pos": [-44.5, 12.7, 66.5], "yaw": -90, "pitch": -4 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "spawn", "entity": "goblin", "pos": [-44.5, 44.5] },
+    { "op": "walk", "keys": ["ControlLeft"], "seconds": 3 },
+    { "op": "screenshot", "name": "sneaking" },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "standing" }
+  ]
+}

@@ -2509,7 +2509,12 @@ so it plays its death pose and is dropped once that has run, and like any dying 
 `MobTargetTests`). **Loot toss**: every item a killed mob drops (its table's rolls, a goblin's carried
 flint) is spawned with `DropManager.SpawnAt`'s toss set to `MobLoot.RandomToss()`, a random outward
 heading at `MobLootTossMinSpeed..MaxSpeed` plus `MobLootTossLift` on top of the drop's own pop, so
-the loot arcs out of the body (`MobLootTests`).
+the loot arcs out of the body (`MobLootTests`). **Notice range**: `MobTargets.Nearest` only picks a
+target within its `MobTargets.NoticeRadius`, `MobNoticeRadiusBlocks` horizontally, times
+`MobSneakNoticeFactor` while the target sneaks (`IMobTarget.IsSneaking`: the camera's own crouch, a
+`ServerPlayer`'s cosmetic `NetPlayerFlags.Sneaking`, untrusted but only ever helping the one who
+claims it); a target past it is neither chased nor faced, though despawning still measures every
+target (`MobNoticeTests`).
 
 The first entity is the **slime** (`Slime` + `Systems/SlimeManager.cs`), owned by `World`. It hops
 toward the player, damages on contact only while airborne (a slime merely bobbing in water is
