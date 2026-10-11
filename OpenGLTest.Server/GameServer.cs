@@ -330,11 +330,17 @@ public sealed class GameServer : IDisposable
                 var text = reader.ReadString();
                 if (text.Length > ChatView.MaxInputLength)
                     text = text[..ChatView.MaxInputLength];
-                if (!string.IsNullOrWhiteSpace(text))
+                if (string.IsNullOrWhiteSpace(text))
+                    break;
+                // A command line runs here for the sending player (never echoed as chat);
+                // anything else is chat
+                if (text[0] == '/')
                 {
-                    BroadcastChat(ChatKind.Player, client.Name, text);
-                    Log.WriteLine($"chat: <{client.Name}> {text}");
+                    RunCommand(client, text);
+                    break;
                 }
+                BroadcastChat(ChatKind.Player, client.Name, text);
+                Log.WriteLine($"chat: <{client.Name}> {text}");
                 break;
             }
 
@@ -867,6 +873,92 @@ public sealed class GameServer : IDisposable
         using var writer = new PacketWriter(NetMessage.TimeSync);
         writer.Write(_world.LightingTime);
         Broadcast(writer.ToArray());
+    }
+
+    /// <summary>
+    /// Runs one chat command for the player who sent it, on the same table singleplayer uses
+    /// (<see cref="ChatCommands"/>): <c>/tp</c> and <c>/give</c> need operator rights, and so does
+    /// <c>/time</c>; the answers are system lines to that player (a time change also goes out as a
+    /// <see cref="NetMessage.TimeSync"/> at once).
+    /// </summary>
+    private void RunCommand(ClientConnection client, string line)
+    {
+        if (!_players.TryGetValue(client.Id, out var player)) return;
+        var parsed = ChatCommands.Parse(line);
+        if (ChatCommands.RequiresOperator(parsed.Kind) || parsed.Kind == ChatCommands.CommandKind.Time)
+        {
+            if (!MayBeCreative(player.Name))
+            {
+                SendSystem(client, "That command is for operators only");
+                return;
+            }
+        }
+
+        switch (parsed.Kind)
+        {
+            case ChatCommands.CommandKind.Time:
+                if (parsed.Args.Length == 0 || ChatCommands.TimeSeconds(parsed.Args[0]) is not { } seconds)
+                {
+                    SendSystem(client, "Usage: /time day|night|<seconds>");
+                    return;
+                }
+                _world.SetLightingTime(seconds);
+                BroadcastTime();
+                BroadcastSystem($"Time set to {seconds:0.#} s by {player.Name}");
+                return;
+
+            case ChatCommands.CommandKind.Teleport:
+                if (ChatCommands.TeleportTarget(parsed.Args) is not { } target)
+                {
+                    SendSystem(client, "Usage: /tp x y z");
+                    return;
+                }
+                player.Teleport(target);
+                SendPlayerCorrection(client, player.IssueCorrection(), player.Position);
+                SendSystem(client, $"Teleported to {target.X:0.#} {target.Y:0.#} {target.Z:0.#}");
+                return;
+
+            case ChatCommands.CommandKind.Give:
+                if (ChatCommands.GiveRequest(parsed.Args) is not { } request)
+                {
+                    SendSystem(client, "Usage: /give <item> [count]");
+                    return;
+                }
+                if (!TryResolveContent(request.Item, out var id))
+                {
+                    SendSystem(client, $"Unknown item '{request.Item}'");
+                    return;
+                }
+                player.Inventory.Add(id, request.Count);
+                player.InventoryChanged = true;
+                SendSystem(client, $"Gave {request.Count} x {request.Item}");
+                return;
+
+            default:
+                SendSystem(client, ChatCommands.HelpText);
+                return;
+        }
+    }
+
+    // An item or block by plain name (blocks first, like a loot entry) or by its block//item/
+    // pinned name
+    private static bool TryResolveContent(string name, out byte id)
+    {
+        var trimmed = name.Trim();
+        if (trimmed.StartsWith("block/", StringComparison.OrdinalIgnoreCase))
+            return ContentRegistry.TryResolveBlock(trimmed[6..], out id);
+        if (trimmed.StartsWith("item/", StringComparison.OrdinalIgnoreCase))
+            return ContentRegistry.TryResolveItem(trimmed[5..], out id);
+        return ContentRegistry.TryResolveBlock(trimmed, out id) || ContentRegistry.TryResolveItem(trimmed, out id);
+    }
+
+    private void SendSystem(ClientConnection client, string text)
+    {
+        using var writer = new PacketWriter(NetMessage.ChatMessage);
+        writer.Write((byte)ChatKind.System);
+        writer.Write("");
+        writer.Write(text);
+        client.Send(writer.ToArray());
     }
 
     /// <summary>

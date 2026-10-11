@@ -229,12 +229,7 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Hide-HUD key.** F1 toggles `hudVisible`, the same gate the scenario screenshot's `hideHud` drives (`ScreenshotPathTests` covers the shared path naming).
 - [ ] **Tab player list.** Holding Tab in multiplayer lists who is online. *Hook:* the
   `PlayerList` data `World.SyncRemotePlayers` already keeps.
-- [ ] **Chat commands: help, tp, give.** `/help` lists the commands, `/tp x y z` teleports and
-  `/give <item> [count]` grants items. `/tp` and `/give` are creative-or-operator only. *Hook:* the
-  same command table as `/time`. `/tp` sets the camera position in singleplayer and sends a
-  `PlayerCorrection` on a server (`ServerPlayer.IssueCorrection`); `/give` takes the creative-grant
-  path with the item resolved by name. A bad argument or unknown item answers with a system line.
-  Tab-completion for these lives in `TODO.md` (`U-22`).
+- [x] **Chat commands: help, tp, give.** `/help` answers with `ChatCommands.HelpText`, `/tp x y z` teleports (creative locally, `ServerPlayer.Teleport` + a correction on a server) and `/give <item> [count]` grants through `Inventory.Add` with the name resolved by block then item; both need rights (`ChatCommandsTests`).
 - [ ] **Item tooltips.** Hovering any slot or row shows a panel with the display name, kind, tool
   power, damage, durability left and fuel time when present. *Hook:* the fields already on `Item` /
   `ItemStack`, drawn by `UIRenderer` after the panel. A slice of `U-1`.
