@@ -16,6 +16,13 @@
     // (a shallower look, so the smoke reads against the cave behind the pool)
     { "op": "look", "yaw": 0, "pitch": -12 },
     { "op": "wait", "seconds": 3 },
-    { "op": "screenshot", "name": "embers", "hideHud": true }
+    { "op": "screenshot", "name": "embers", "hideHud": true },
+    // The glow pulse (LavaPulse): down on the pool, the same pose twice 2.5 s apart; the slow noise
+    // field that breathes the surface's brightness has drifted between them
+    { "op": "look", "yaw": -90, "pitch": -50 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "pulse_a", "hideHud": true },
+    { "op": "wait", "seconds": 2.5 },
+    { "op": "screenshot", "name": "pulse_b", "hideHud": true }
   ]
 }

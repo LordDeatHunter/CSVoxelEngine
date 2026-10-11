@@ -619,6 +619,9 @@ public const float DayLengthSeconds = 1200f;
     public const float LavaCatchLightStrength = 0.6f;
     // Blinn exponent of that catch-light: high, so a nearby fire reads as a small glint
     public const float LavaCatchLightPower = 48f;
+    // Lava glow pulse (test-fragment.glsl, LavaPulse): how far the lava's brightness breathes above
+    // and below itself on a slow noise field, as a fraction (0.2 = 80..120 %); 0 switches it off
+    public const float LavaPulseStrength = 0.2f;
     // Screen-space refraction offset at the camera, in uv units; shrinks with distance in the shader
     public const float WaterRefractStrength = 0.06f;
     // Seen from below, the surface is a Snell window: the whole sky above is squeezed into a

@@ -886,6 +886,7 @@ public class RenderManager : IDisposable
         program.SetUniform("uLavaNormalScale", WorldGenerationConfig.LavaNormalScale);
         program.SetUniform("uLavaCatchLight", WorldGenerationConfig.LavaCatchLightStrength);
         program.SetUniform("uLavaCatchPower", WorldGenerationConfig.LavaCatchLightPower);
+        program.SetUniform("uLavaPulse", WorldGenerationConfig.LavaPulseStrength);
         program.SetUniform("uLodLeafColor", _lodLeafColor);
         // The plain path's per-draw biome tint (mining pop, debris) must read as white for every
         // other draw, GLSL's zero default would draw a flagged vertex black; the chunk program

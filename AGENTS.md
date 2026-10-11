@@ -370,6 +370,16 @@ are `GrassShimmerWavelengthBlocks` apart and fade out between `GrassShimmerFadeN
 `uGrassShimmer` 0 switches it off. `visual-examples/grass-shimmer.json` (`VOXEL_TIME=147`, three
 shots of one meadow 0.7 s apart).
 
+**Lava glow pulse.** Lava is the fluid path's `isLava` (a water-flagged quad on the lava tile,
+`uLavaLayer`), whose glow is worked out in display space and clipped there. After that clip the
+glow is multiplied by `1 + LavaPulseStrength * (2 * field - 1)`, where the field (`LavaPulseField`)
+is two octaves of the shader's `ValueNoise` drifting slowly against each other, so broad patches of
+the surface brighten and dim over seconds on top of the existing fast sine pulse; applied in linear
+light, the dim phase reaches the clipped molten texels too. `LavaPulse` is the GL-free twin (its
+`Hash12`/`ValueNoise` are float ports of the shader's; `LavaPulseTests`: bounded, identity at zero
+strength, smooth, slow); `uLavaPulse` 0 (the ItemDebugger) switches it off. `lava.json` ends with
+two shots of the pool 2.5 s apart (`pulse_a`, `pulse_b`).
+
 Shaders (`assets/shaders/**/*.glsl`), textures (`assets/textures/**/*.png`), fonts (`assets/fonts/**/*.ttf`) and all content JSON (`assets/**/*.json` — blocks, items, loot tables, models) are copied to the output directory via `CopyToOutputDirectory` rules in the csproj — **new asset types/extensions need a matching `<None Update>` entry** or they won't be found at runtime. The JSON rule is a wildcard over the whole `assets` tree, so adding a block, item, loot table or model needs no csproj edit.
 
 Assets are opened by **relative** path (`FileUtils.ReadFile("assets/shaders/...")`, `TextureAtlas.Build(gl, "assets/textures/blocks")` in `RenderManager.LoadResources`), so the app must be launched with a working directory that contains `assets/` — either the build output directory or `OpenGLTest/`. `dotnet run --project OpenGLTest/silkgltriangle.csproj` satisfies this (it runs from the project folder); launching the built executable from an arbitrary directory does not.
@@ -654,6 +664,7 @@ OpenGLTest/
     LeafBacklight.cs           # GL-free twin of the leaf backlight: lobe around the sun, sun and light-through gates
     GrassShimmer.cs            # GL-free twin of the grass wind shimmer: gust-carried bands, distance fade, the face gate
     IceGlint.cs                # GL-free twin of the ice tile term: fresnel sky sheen weight, gated sun highlight
+    LavaPulse.cs               # GL-free twin of the lava glow pulse: the slow noise field and the brightness factor
     ChunkGenerationWorker.cs   # background threads creating chunks around every streaming focus (one
                                #   ChunkScanFrontier per focus, served round-robin)
     Camera.cs                  # FPS camera pose, view/proj cache, shoulder/orbit modes; movement+physics and the DDA

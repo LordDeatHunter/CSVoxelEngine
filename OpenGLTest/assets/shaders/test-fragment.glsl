@@ -192,6 +192,9 @@ uniform float uLavaLayer;
 uniform float uLavaNormalScale;  // slope-to-normal gain of the lava swell (WorldGenerationConfig.LavaNormalScale)
 uniform float uLavaCatchLight;   // strength of the point-light catch-light on lava
 uniform float uLavaCatchPower;   // Blinn exponent of that catch-light
+// How far the lava glow breathes above and below its own brightness on the slow noise field
+// (LavaPulse is the twin); 0, the default and the ItemDebugger's, switches it off.
+uniform float uLavaPulse;
 
 out vec4 FragColor;
 
@@ -410,6 +413,13 @@ float ValueNoise(vec2 p) {
 float FoamField(vec2 p, float t) {
     return 0.6 * ValueNoise(p * 1.8 + vec2(t * 0.21, t * 0.09))
          + 0.4 * ValueNoise(p * 4.3 + vec2(-t * 0.13, t * 0.27));
+}
+
+// The lava glow pulse's field: two octaves of value noise drifting slowly against each other, so
+// broad patches of the surface brighten and dim over seconds. 0..1. GL-free twin: LavaPulse.Field.
+float LavaPulseField(vec2 p, float t) {
+    return 0.6 * ValueNoise(p * 0.22 + vec2(t * 0.11, -t * 0.07))
+         + 0.4 * ValueNoise(p * 0.47 + vec2(-t * 0.09, t * 0.13));
 }
 
 // FoamField carried along a flow by the same bounded two-phase flow map FlowWaveNormal uses, so
@@ -793,6 +803,11 @@ void main() {
         float molten = clamp((albedoS.r - max(albedoS.g, albedoS.b)) * 4.0, 0.0, 1.0);
         float pulse = 0.9 + 0.1 * sin(uTime * 2.0 + fWorldPos.x * 1.3 + fWorldPos.z * 1.7);
         col = SrgbToLinear(min(mix(albedoS, albedoS * 2.0 + vec3(0.55, 0.13, 0.01), molten) * pulse, vec3(1.0)));
+        // Glow pulse: the whole surface breathes in brightness on a slow noise field, in linear
+        // light after the display-space clip above, so the dimming phase reaches the clipped molten
+        // texels too while the brightening one pushes them toward white through the tonemap.
+        if (uLavaPulse > 0.0)
+            col *= 1.0 + uLavaPulse * (2.0 * LavaPulseField(fWorldPos.xz, uTime) - 1.0);
         // A glossy crust catches the nearby fires, kilns and TNT as small highlights riding the
         // swell, plus a faint fresnel sheen of the sky. The torch/block channel is excluded:
         // lava's own emission saturates fBlock on every lava fragment, so it carries no direction.
