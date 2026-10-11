@@ -1493,8 +1493,9 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Slime sizes (SlimeSize), 1..SlimeMaxSize: size 1 is the plain slime, and every size above it
     // adds one step to each stat's multiplier, so a size s slime has (1 + (s - 1) * step) times the
     // size-1 value: the body scale (drawn model, collision box, healthbar height), the health pool
-    // (over the entity JSON's hp), the contact damage and the loot table rolls.
-    public const int SlimeMaxSize = 3;
+    // (over the entity JSON's hp), the contact damage and the loot table rolls. The largest size is
+    // the rare giant, which splits into the size below it like any other.
+    public const int SlimeMaxSize = 4;
     public const float SlimeSizeScaleStep = 0.5f;
     public const float SlimeSizeHealthStep = 1f;
     public const float SlimeSizeDamageStep = 0.5f;
@@ -1512,6 +1513,9 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // below its column's surface counts as full night, whatever the hour.
     public const float SlimeLargeChanceDay = 0.1f;
     public const float SlimeLargeChanceNight = 0.4f;
+    // The last step, into the largest size (the giant), is taken with this share of the usual chance,
+    // so a giant is rarer than the geometric falloff alone would make it.
+    public const float SlimeMaxSizeChanceFactor = 0.25f;
     public const int SlimeUndergroundDepthBlocks = 4;
     // A slime above the smallest size splits when a hit takes it from above half its health to at
     // or below half while it survives (SlimeSize.SplitsOnHit): this many children of the next

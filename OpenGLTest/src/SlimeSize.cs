@@ -73,16 +73,19 @@ public static class SlimeSize
     /// The size a ring spawn gets from one uniform <paramref name="roll"/> in [0, 1): it grows one
     /// size past <see cref="Min"/> while the roll stays under <c>chance^k</c> (k = 1, 2, ...), so
     /// size <c>s + 1</c> or larger has probability <c>chance^s</c>, mostly small by day and larger
-    /// more often at night or underground. A pure function: for one roll, a higher chance never
-    /// gives a smaller slime.
+    /// more often at night or underground. The last step, into <see cref="Max"/> (the giant), takes
+    /// <see cref="WorldGenerationConfig.SlimeMaxSizeChanceFactor"/> of that threshold on top, so the
+    /// giant is rarer still. A pure function: for one roll, a higher chance never gives a smaller slime.
     /// </summary>
     public static int Roll(float night, bool underground, float roll)
     {
         var chance = LargeChance(night, underground);
         var size = Min;
         var threshold = chance;
-        while (size < Max && roll < threshold)
+        while (size < Max)
         {
+            var step = size + 1 == Max ? threshold * WorldGenerationConfig.SlimeMaxSizeChanceFactor : threshold;
+            if (roll >= step) break;
             size++;
             threshold *= chance;
         }

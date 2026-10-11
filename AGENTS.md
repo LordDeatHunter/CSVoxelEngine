@@ -2530,7 +2530,11 @@ launch (`Slime.Pop`) is not (`SlimeKnockbackTests`). A larger slime also hops hi
 a longer crouch: the hop's vertical and horizontal launch speeds and the crouch time are the size-1
 ones times the body scale to `SlimeHopLiftExponent`, `SlimeHopReachExponent` and
 `SlimeHopWindupExponent` (`SlimeSize.HopLift`/`HopReach`/`WindupScale`, read by `Slime.HopVelocity`
-and the squash spring's windup; `SlimeHopTests`).
+and the squash spring's windup; `SlimeHopTests`). The largest size (`SlimeMaxSize`, 4) is the rare
+**giant**: `SlimeSize.Roll` takes the last step into it with only `SlimeMaxSizeChanceFactor` of the
+usual threshold, so it is rarer than the size below it in every light (`GiantSlimeTests`), and it
+splits into that size like any other; `visual-examples/slime-sizes.json` stands it beside the other
+three.
 
 The second entity is the **goblin** (`Goblin` + `Systems/GoblinManager.cs`, owned by `World`), a short
 forest raider that throws the flint it carries and then closes for a club swing. It spawns like the
