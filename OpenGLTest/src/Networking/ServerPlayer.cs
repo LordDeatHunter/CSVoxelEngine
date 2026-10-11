@@ -266,10 +266,26 @@ public sealed class ServerPlayer : IMobTarget
         var before = Status.Health;
         var inLava = PlayerBodyProbe.IsKnown(Position, chunks) && PlayerBodyProbe.InLava(Position, chunks);
         Status.UpdateLava(dt, inLava, Creative || Flying);
+        UpdateCactusContact(dt, chunks);
         Status.Update(dt);
         if (Status.Health != before || Status.IsDead)
             StatusDirty = true;
     }
+
+    // Standing against a cactus pricks: one tick per ContactDamage.TickSeconds while the reported
+    // body box touches one; creative and flying are immune. The same rule singleplayer's
+    // World.UpdateCactusContact runs on its own pool.
+    private void UpdateCactusContact(float dt, ChunkManager chunks)
+    {
+        var touching = PlayerBodyProbe.IsKnown(Position, chunks);
+        ContactDamage.Touches(touching ? chunks : null, Position - new Vector3(0f, Camera.EyeHeight, 0f),
+            PlayerPhysics.PlayerRadius, PlayerPhysics.PlayerHeight, out var damage);
+        var tick = ContactDamage.Tick(ref _contactTimer, dt, (int)damage, !(Creative || Flying));
+        if (tick > 0)
+            Status.TakeDamage(tick);
+    }
+
+    private float _contactTimer;
 
     /// <summary>
     /// The server moves the player: the accepted eye jumps to <paramref name="eye"/> and the fall

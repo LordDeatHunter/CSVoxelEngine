@@ -1756,6 +1756,10 @@ public static class ContentRegistry
             var footstepDust = definition.FootstepDust ?? false;
             var bounce = definition.Bounce ?? false;
             var blocksSight = definition.BlocksSight ?? true;
+            var contactDamage = definition.ContactDamage ?? 0f;
+            if (!float.IsFinite(contactDamage) || contactDamage < 0f || contactDamage > 100f)
+                throw new InvalidOperationException(
+                    $"Block '{path}' has contactDamage {definition.ContactDamage}; expected 0..100.");
 
             var material = ParseMaterial(definition.Material, path);
 
@@ -1809,6 +1813,7 @@ public static class ContentRegistry
                 FootstepDust = footstepDust,
                 Bounces = bounce,
                 BlocksSight = blocksSight,
+                ContactDamage = contactDamage,
                 CullSelf = definition.CullSelf ?? false,
                 // Tree wood is drawn at any thickness down to a 1 px twig, so it never darkens
                 // its neighbours, whatever the file says (forced here, where CastsAoById is mirrored)
@@ -1890,6 +1895,7 @@ public static class ContentRegistry
             BlockType.FootstepDustById[id] = type.FootstepDust;
             BlockType.BounceById[id] = type.Bounces;
             BlockType.BlocksSightById[id] = type.BlocksSight;
+            BlockType.ContactDamageById[id] = type.ContactDamage;
             BlockType.CastsAoById[id] = type.CastsAmbientOcclusion;
             BlockType.TreeWoodById[id] = treeWood;
             BlockType.PaneById[id] = pane;

@@ -7,6 +7,8 @@
   "hardness": 2,
   "renderer": "tree_wood",
   "sfx": "hit_wood",
+  // Standing against a cactus pricks for 1 every ContactDamage.TickSeconds
+  "contactDamage": 1,
   // Every thickness of cactus drops a cactus
   "wood": { "tipHardness": 0.5, "loot": [ { "minThickness": 0, "loot": "self" } ] }
 }

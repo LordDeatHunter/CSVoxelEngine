@@ -202,6 +202,7 @@ public class World : IItemUseWorld
     private bool _useCharging;
     private float _useChargeSeconds;
     private byte _useItemId;
+    private float _contactTimer;
     public Camera Camera { get; }
 
     /// <summary>The blocky player body: walk-swung limbs, jabbing right arm.</summary>
@@ -696,6 +697,21 @@ public class World : IItemUseWorld
             _chunkManager.ImmediateRemeshWithBorders(VoxelCoords.ChunkPosOf(rootCell), rootCell);
         }
         return result;
+    }
+
+    // Standing against a cactus pricks: one tick per ContactDamage.TickSeconds while the body box
+    // touches one; leaving it (or going creative/flying) clears the partial tick. Singleplayer
+    // only: a client mirrors the server's pool, and a server's players tick their own
+    // (ServerPlayer.TickStatus).
+    private void UpdateCactusContact(float deltaTime)
+    {
+        if (_serverMode || _clientMode) return;
+        ContactDamage.Touches(_chunkManager, Camera.Position - new Vector3(0f, Camera.EyeHeight, 0f),
+            PlayerPhysics.PlayerRadius, PlayerPhysics.PlayerHeight, out var damage);
+        var tick = ContactDamage.Tick(ref _contactTimer, deltaTime, (int)damage,
+            !(Camera.IsCreative || Camera.IsFlying));
+        if (tick > 0)
+            _health.TakeDamage(tick);
     }
 
     private void EnsureSpawnSettled()
@@ -2408,6 +2424,7 @@ public class World : IItemUseWorld
             _health.TakeDamage(damage);
 
         _health.UpdateLava(deltaTime, Camera.IsInLava, Camera.IsCreative || Camera.IsFlying);
+        UpdateCactusContact(deltaTime);
         _health.Update(deltaTime);
 
         if (_health.Health < beforeHp)

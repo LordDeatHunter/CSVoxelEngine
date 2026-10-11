@@ -75,6 +75,13 @@ public sealed class BlockDefinition
     public bool? BlocksSight { get; set; }
 
     /// <summary>
+    /// Damage a body overlapping the block takes every <see cref="ContactDamage.TickSeconds"/>
+    /// while it touches it (a cactus pricks for 1). 0 (the default) means harmless. Read only for
+    /// a body's own box, never for the block it stands on top of.
+    /// </summary>
+    public float? ContactDamage { get; set; }
+
+    /// <summary>
     /// Whether the block springs a landing body back up (a slime block): the landing bills no fall
     /// damage and the body is thrown up again at <see cref="WorldGenerationConfig.SlimeBlockBounceRestitution"/>
     /// of its impact once that reaches <see cref="WorldGenerationConfig.SlimeBlockBounceMinSpeed"/>.

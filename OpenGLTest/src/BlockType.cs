@@ -68,6 +68,9 @@ public sealed record BlockType
     // Whether the block stops a line of sight (a punch, a throw check); a plant never does.
     internal static readonly bool[] BlocksSightById = new bool[256];
 
+    // Damage a body touching the block takes per contact tick (a cactus); 0 is harmless.
+    internal static readonly float[] ContactDamageById = new float[256];
+
     // Whether the block is the reworked trees' wood (the tree_wood renderer), whose thickness
     // and parent direction live in the state byte. Read per voxel by the mesher's connection
     // test and per DDA step by the raycast, so flat like the other flags.
@@ -170,6 +173,10 @@ public sealed record BlockType
     /// <summary>Whether the block stops a line of sight (a punch, a throw check); a plant never
     /// does. Read through <see cref="BlocksSightAt"/> by the sight-only ray walk.</summary>
     public bool BlocksSight { get; init; } = true;
+
+    /// <summary>Damage a body touching this block takes every <see cref="ContactDamage.TickSeconds"/>
+    /// (a cactus pricks for 1); 0 is harmless. Read through <see cref="ContactDamageAt"/>.</summary>
+    public float ContactDamage { get; init; }
 
     /// <summary>Whether the block hides a neighbouring full cube's face. Defaults to "the baked
     /// model is a full cube and it is not cutout", so it is only known after baking.</summary>
@@ -518,6 +525,9 @@ public sealed record BlockType
 
     /// <summary>Whether the block stops a line of sight (a plant never does).</summary>
     public static bool BlocksSightAt(byte blockId) => BlocksSightById[blockId];
+
+    /// <summary>Damage a body touching the block takes per contact tick (0 when harmless).</summary>
+    public static float ContactDamageAt(byte blockId) => ContactDamageById[blockId];
 
     /// <summary>Whether a block fully hides a neighbouring full cube's face.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

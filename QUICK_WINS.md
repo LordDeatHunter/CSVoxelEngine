@@ -152,10 +152,10 @@ files waits in TODO.md instead, since there are none to use yet.
   unloaded ground waits.
 - [x] **Flint from gravel.** Mining gravel drops flint about one time in six instead of the block
   (`assets/data/loot/gravel.json`, the block's `loot` field; `ContentTests`).
-- [ ] **Cactus prick.** Standing against a cactus deals 1 damage every 0.5 s. *Hook:* a
-  `contactDamage` block field read where the body overlaps cells (beside the lava rule), applied to
-  the camera's pool in singleplayer and to `ServerPlayer` on a server through the existing status
-  path; creative and flying are immune.
+- [x] **Cactus prick.** A `contactDamage` block field (the cactus sets 1) ticked by
+  `ContactDamage.Touches`/`Tick` every `ContactDamage.TickSeconds` while a body box is flush
+  against the cell (never for the cell it stands on top of); the local pool in singleplayer and
+  each `ServerPlayer`'s status on a server, creative and flying immune (`ContactDamageTests`).
 - [ ] **Stone bricks.** 4 stone to 4 stone bricks, one decorative tile. *Hook:* JSON block + recipe
   + a tile from a `tools/` script (placeholder, listed in `USER_TODO.md`). Enables the ruined
   pillars.
