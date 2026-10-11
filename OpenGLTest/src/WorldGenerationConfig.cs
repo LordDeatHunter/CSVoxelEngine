@@ -2202,6 +2202,18 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int PoolBurial = 8;
     public const float PoolChance = 0.5f;
 
+    // --- Ruined pillars (RuinedPillarGenerator): broken stone-brick columns on the dry land ---
+    public const bool RuinedPillarsEnabled = true;
+    public const int PillarCellShift = 6;
+    public const float PillarChance = 0.08f;
+    public const int PillarMinHeight = 2;
+    public const int PillarMaxHeight = 4;
+
+    // --- Desert wells (DesertWellGenerator): a sandstone ring around a sunken pool ---
+    public const bool DesertWellsEnabled = true;
+    public const int WellCellShift = 7;
+    public const float WellChance = 0.06f;
+
     // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
     // first notices a player (the same moment its first-throw delay starts) ---
     public const float GoblinNoticePipSeconds = 0.9f;

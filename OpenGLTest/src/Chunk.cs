@@ -512,6 +512,13 @@ public class Chunk : IDisposable
         if (WorldGenerationConfig.CairnsEnabled)
             CairnGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
 
+        // Ruins on the dry land, clipped at chunk borders
+        if (WorldGenerationConfig.RuinedPillarsEnabled)
+            RuinedPillarGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
+
+        if (WorldGenerationConfig.DesertWellsEnabled)
+            DesertWellGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
+
         // Pond plants, after the water: reeds may replace the shallow cell they stand in, and a
         // lily pad floats on the cell above a lake's top water cell
         if (WorldGenerationConfig.ReedsEnabled)
