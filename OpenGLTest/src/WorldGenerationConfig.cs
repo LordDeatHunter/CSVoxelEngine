@@ -762,6 +762,17 @@ public const float DayLengthSeconds = 1200f;
     /// wide turns into shimmering pixels well inside the full-detail ring.</summary>
     public const float GrassShimmerFadeFarBlocks = 112f;
 
+    // --- Ice glint (test-fragment.glsl, IceGlint) ---
+    /// <summary>
+    /// Brightness of the sun highlight on ice, as a multiple of the direct sun (uIceGlint), added in
+    /// linear light. 0 switches the whole ice term off, the sky sheen included.
+    /// </summary>
+    public const float IceGlintStrength = 1f;
+    /// <summary>Blinn exponent of the ice sun highlight: high, since ice is a smooth, flat face.</summary>
+    public const float IceGlintShine = 96f;
+    /// <summary>Share of the mirrored sky an ice face shows at a full graze (scaled by the Schlick fresnel).</summary>
+    public const float IceSheenStrength = 0.6f;
+
     // --- Wet albedo (test-fragment.glsl, SH-22) ---
     // Albedo multiplier on a submerged face below its own baked water surface. Dry faces beside or
     // above the water are never darkened: the old wet band tinted dry beach tops and banks.

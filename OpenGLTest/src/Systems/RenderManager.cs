@@ -857,6 +857,11 @@ public class RenderManager : IDisposable
         program.SetUniform("uGrassShimmerWavelength", WorldGenerationConfig.GrassShimmerWavelengthBlocks);
         program.SetUniform("uGrassShimmerFadeNear", WorldGenerationConfig.GrassShimmerFadeNearBlocks);
         program.SetUniform("uGrassShimmerFadeFar", WorldGenerationConfig.GrassShimmerFadeFarBlocks);
+        // The ice tile's sky sheen and sun highlight (IceGlint); 0 strength leaves both off
+        program.SetUniform("uIceLayer", (float)ContentRegistry.RequireBlock("ice").Top);
+        program.SetUniform("uIceGlint", WorldGenerationConfig.IceGlintStrength);
+        program.SetUniform("uIceShine", WorldGenerationConfig.IceGlintShine);
+        program.SetUniform("uIceSheen", WorldGenerationConfig.IceSheenStrength);
         program.SetUniform("uReflValid", 0f);
         // The water model's tuning constants never change at runtime, so they go up once here
         // instead of riding ApplyFrameUniforms every frame.

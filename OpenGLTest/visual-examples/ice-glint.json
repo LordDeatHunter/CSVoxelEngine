@@ -1,0 +1,54 @@
+{
+  // Ice glint check: run from OpenGLTest/ with
+  //   VOXEL_TIME=405 VOXEL_SCRIPT=visual-examples/ice-glint.json
+  // Shots land in visual/ice-glint/. At VOXEL_TIME=405 (about 425 by the shots) the sun stands
+  // about 6 degrees up toward yaw ~160, low enough that the sunlit snow sits under the tonemap clip
+  // (see snow-sparkle.json), so the ice reads against it. On the barren frozen plain of
+  // snow-sparkle.json ((-1112, 584), ground 18 under a snow drift, flat for six blocks around) a
+  // patch of ice is placed along the line toward the sun, farthest first so no placement ray hits an
+  // earlier block (a placement aimed at the drift fills the drift's own cell, so the ice tops sit at
+  // y 20). Then, with an empty hand:
+  //   sun_glint    hovering just over the plain east of the patch, looking toward the sun at its
+  //                mirror angle: a sun highlight rides the ice tops (IceGlint, test-fragment.glsl)
+  //   sky_sheen    from the far side, grazing across the patch away from the sun: the tops pick
+  //                up a fresnel sheen of the sky
+  //   overhead     looking straight down on the patch, where both terms are weakest
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-1111.5, 50.5, 584.5], "yaw": 159, "pitch": -30 },
+    { "op": "wait", "seconds": 16 },
+    { "op": "teleport", "pos": [-1111.5, 21.4, 584.5], "yaw": 159, "pitch": -20 },
+    { "op": "wait", "seconds": 1 },
+
+    { "op": "give", "block": "ice", "count": 16 },
+    { "op": "look", "yaw": 159, "pitch": -16 },
+    { "op": "place" },
+    { "op": "look", "yaw": 159, "pitch": -19 },
+    { "op": "place" },
+    { "op": "look", "yaw": 159, "pitch": -23 },
+    { "op": "place" },
+    { "op": "look", "yaw": 159, "pitch": -29 },
+    { "op": "place" },
+    { "op": "look", "yaw": 151, "pitch": -20 },
+    { "op": "place" },
+    { "op": "look", "yaw": 167, "pitch": -20 },
+    { "op": "place" },
+    { "op": "look", "yaw": 150, "pitch": -26 },
+    { "op": "place" },
+    { "op": "look", "yaw": 168, "pitch": -26 },
+    { "op": "place" },
+    // An empty hotbar slot keeps the first-person held block out of the shots
+    { "op": "select", "slot": 9 },
+    { "op": "wait", "seconds": 0.5 },
+
+    { "op": "teleport", "pos": [-1108.2, 21.0, 583.4], "yaw": 160, "pitch": -7 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "sun_glint", "hideHud": true },
+    { "op": "teleport", "pos": [-1123.0, 22.0, 589.0], "yaw": -21, "pitch": -10 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "sky_sheen", "hideHud": true },
+    { "op": "teleport", "pos": [-1117.0, 28.0, 586.6], "yaw": 159, "pitch": -89 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "overhead", "hideHud": true }
+  ]
+}

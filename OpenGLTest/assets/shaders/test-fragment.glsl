@@ -62,6 +62,13 @@ uniform float uGrassShimmer;
 uniform float uGrassShimmerWavelength;
 uniform float uGrassShimmerFadeNear;
 uniform float uGrassShimmerFadeFar;
+// Ice glint (IceGlint is the twin): the ice tile's atlas slice, the sun highlight's strength (0, the
+// default and the ItemDebugger's, switches the whole term off), its Blinn exponent and the share of
+// the mirrored sky a face takes at a full graze.
+uniform float uIceLayer;
+uniform float uIceGlint;
+uniform float uIceShine;
+uniform float uIceSheen;
 // The leaf sway's wind (test-vertex.glsl): downwind direction * WindLean and the gusts' travelled
 // offset; the grass shimmer rolls its bands along it.
 uniform vec2 uWind;
@@ -733,6 +740,21 @@ void main() {
             float gust = 0.6 + 0.4 * sin(uTime * 0.5 + g.x * 0.08 + g.y * 0.06);
             col += albedo * light * (uGrassShimmer * fade * gust * smoothstep(0.35, 1.0, wave));
         }
+    }
+
+    // Ice glint, on the ice tile only (a separate tile term like the snow sparkle, not the ore
+    // material path): a Schlick-weighted mirror of the sky in the reflected direction, mixed in like
+    // the ore's sky so a grazing face turns sky-coloured rather than piling a sky on top, and a Blinn
+    // sun highlight added in linear light. The sky is dimmed by skylight (nothing to mirror
+    // underground) and the highlight is gated by the direct sun the face really gets: skylight, the
+    // shadow and cloud shadow, the sun on the face's own side. GL-free twin: IceGlint.
+    if (uIceGlint > 0.0 && !isWater && abs(float(fLayer) - uIceLayer) < 0.5) {
+        vec3 Vi = normalize(uCameraPos - fWorldPos);
+        vec3 skyR = mix(SkySample(reflect(-Vi, N)), uFogColor, uFogWet) * fSun;
+        col = mix(col, skyR, Schlick(max(dot(Vi, N), 0.0)) * uIceSheen);
+        float spec = pow(max(dot(N, normalize(Vi + uSunDir)), 0.0), uIceShine)
+                   * fSun * shadow * smoothstep(0.0, 0.15, ndl) * smoothstep(0.0, 0.2, uSunIntensity);
+        col += uSunColor * (uSunIntensity * uIceGlint * spec);
     }
 
     if (fSubmerged > 0.5 && !isWater && dist < 96.0 && fWorldPos.y <= fWaterSurfaceY) {

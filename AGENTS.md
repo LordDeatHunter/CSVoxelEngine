@@ -447,6 +447,17 @@ the low sun has faded), the sun on the face's side, distance (gone by 36 blocks)
 Sunlit snow sits ~2x past the tonemap clip for most of a day, so the glints only read when it is
 under the clip, i.e. a low sun: `visual-examples/snow-sparkle.json` at `VOXEL_TIME=405`.
 
+The **ice glint** is a second such tile term, on the ice block's tile (`uIceLayer`; `uIceGlint` 0
+switches it off, as in the ItemDebugger): a fresnel sheen of the sky the face mirrors
+(`SkySample` of the reflected view ray, blended to `uFogColor` by `uFogWet`, dimmed by skylight)
+mixed over the lit ice by `IceSheenStrength * Schlick`, the way the ore mixes its sky, plus a
+Blinn sun highlight (`IceGlintShine`) of `IceGlintStrength` times the direct sun, added in linear
+light and gated by skylight, the shadow and cloud shadow and the sun on the face's side. Ice is
+translucent but its tile is opaque, so it needs no alpha handling in the translucent pass. Twin
+`IceGlint` (`SheenWeight`, `Highlight`; `IceGlintTests`); `visual-examples/ice-glint.json` at
+`VOXEL_TIME=405` places a patch of ice on the frozen plain and frames the highlight, the grazing
+sheen and an overhead view.
+
 **Chunk meshing.** The column terrain a build reads (heights for the sun seeding, water levels,
 the tint climate) comes from the 3x3 chunk columns around it, resolved once:
 `Chunk.GenerateMeshData` (the one caller of `GenerateMeshDataFromSnapshot`), right after the neighbour resolve and the empty/enclosed early
@@ -642,6 +653,7 @@ OpenGLTest/
     SelectionPulse.cs          # GL-free twin of the outline's breathing opacity (steady while mining)
     LeafBacklight.cs           # GL-free twin of the leaf backlight: lobe around the sun, sun and light-through gates
     GrassShimmer.cs            # GL-free twin of the grass wind shimmer: gust-carried bands, distance fade, the face gate
+    IceGlint.cs                # GL-free twin of the ice tile term: fresnel sky sheen weight, gated sun highlight
     ChunkGenerationWorker.cs   # background threads creating chunks around every streaming focus (one
                                #   ChunkScanFrontier per focus, served round-robin)
     Camera.cs                  # FPS camera pose, view/proj cache, shoulder/orbit modes; movement+physics and the DDA
