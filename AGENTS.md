@@ -399,6 +399,15 @@ room), up to `EyeAdaptMaxExposure` in total darkness. An unknown cell reads as o
 `EyeAdaptationTests`; `visual-examples/eye-adaptation.json` (`VOXEL_TIME` 147) films a dark tunnel on
 arrival and adapted, then the over-bright step back outside settling within a couple of seconds.
 
+**Biome colour grade.** The post pass multiplies the finished, anti-aliased display image by
+`uGrade` (`PostEffects.Grade`, (1, 1, 1) by default): `BiomeGrade.Tint` of the eye's climate (the same
+`EyeClimate.TryAt` sample the aurora reads), warm where it is warm and dry (the desert's own
+weighting) and cool where it is cold enough for snow (`BiomeGradeColdStart..ColdFull`), each channel
+moving at most `BiomeGradeStrength`; exactly neutral across the temperate band. `RenderManager._grade`
+eases toward it (`BiomeGradeEaseRate`) and back to neutral over an unknown column, so a client
+without its column yet never guesses. `BiomeGradeTests`; `visual-examples/biome-grade.json`
+(`VOXEL_TIME` 147) compares the noon sky over the origin, a deep desert and a frozen plain.
+
 **Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
 heading turns slowly (`WorldGenerationConfig.Wind*`), with `Wind.Offset` its bounded closed-form
 integral. Leaf sway reads it in both vertex shaders (`uWind`, the direction scaled by `WindLean`,
@@ -886,6 +895,7 @@ OpenGLTest/
     Aurora.cs                  # GL-free twin of the aurora's fade (eye coldness x star visibility) and its wrapped noise drift
     EyeClimate.cs              # GL-free climate at a world column from an IColumnSource's stored corner climate (no worldgen)
     EyeAdaptation.cs           # GL-free exposure target from the voxel light at the eye, eased slower into the dark
+    BiomeGrade.cs              # GL-free post colour grade from the eye's climate: warm over desert, cool over snow, eased
     BlockLightPalette.cs       # GL-free 8-slot block-light colour palette (slot 0 = the default warm torch colour)
     LightTint.cs               # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
     BiomeTint.cs               # GL-free biome tint: Climate -> palette -> vertex tint on a 16-block lattice, Gain, Shade, CellTint
@@ -1070,6 +1080,7 @@ OpenGLTest/
                                #   DrawMainMenu (all main-menu pages) and DrawLoadingScreen
       UITextCache.cs           # memoised per-frame HUD strings (FPS, compass, coordinates, counts)
       ShadowCascade.cs         # one sun shadow cascade: radius, map size, depth FBO/texture, texel-stepped centre (StepCentre) and light view-proj
+      PostEffects.cs           # the post pass's per-frame camera effects (exposure, grade, ...) handed to PostProcessRenderer
       UnderwaterRaysRenderer.cs # additive full-screen sun shafts while the eye is submerged
       SkyRenderer.cs           # the full-screen sky dome pass (sky-fragment.glsl)
       ChunkGeometryPool.cs     # the two shared chunk vertex/index buffers (opaque, translucent):

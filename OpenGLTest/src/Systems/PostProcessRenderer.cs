@@ -31,6 +31,7 @@ public sealed class PostProcessRenderer : IDisposable
         _shader.Use();
         _shader.SetUniform("uScene", 0);
         _shader.SetUniform("uExposure", WorldGenerationConfig.TonemapExposure);
+        _shader.SetUniform("uGrade", System.Numerics.Vector3.One);
         _shader.SetUniform("uFxaaReduceMin", WorldGenerationConfig.FxaaReduceMin);
         _shader.SetUniform("uFxaaReduceMul", WorldGenerationConfig.FxaaReduceMul);
         _shader.SetUniform("uFxaaSpanMax", WorldGenerationConfig.FxaaSpanMax);
@@ -57,11 +58,10 @@ public sealed class PostProcessRenderer : IDisposable
     /// Resolves the scene texture bound on unit 0 into the currently bound framebuffer, covering
     /// every pixel with blending and the depth test off, then restores the state the UI pass
     /// expects (depth on and writable, SrcAlpha/OneMinusSrcAlpha blending). <paramref name="viewport"/>
-    /// is the scene texture's size in pixels, which FXAA clamps its taps to. <paramref name="exposure"/>
-    /// is the frame's tonemap exposure (<see cref="WorldGenerationConfig.TonemapExposure"/> times the
-    /// eye adaptation, <see cref="EyeAdaptation"/>).
+    /// is the scene texture's size in pixels, which FXAA clamps its taps to. <paramref name="effects"/>
+    /// are the frame's camera effects: the exposure (eye adaptation) and the colour grade.
     /// </summary>
-    public void Render(Vector2D<int> viewport, float exposure)
+    public void Render(Vector2D<int> viewport, in PostEffects effects)
     {
         _gl.Disable(EnableCap.DepthTest);
         _gl.DepthMask(false);
@@ -69,7 +69,8 @@ public sealed class PostProcessRenderer : IDisposable
 
         _shader.Use();
         _shader.SetUniform("uResolution", new System.Numerics.Vector2(viewport.X, viewport.Y));
-        _shader.SetUniform("uExposure", exposure);
+        _shader.SetUniform("uExposure", effects.Exposure);
+        _shader.SetUniform("uGrade", effects.Grade);
         _gl.BindVertexArray(_vao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         _gl.BindVertexArray(0);

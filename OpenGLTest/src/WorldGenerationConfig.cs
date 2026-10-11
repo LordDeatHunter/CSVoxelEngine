@@ -185,6 +185,16 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>How fast the exposure falls back in the light (per second): much quicker than adapting to the dark.</summary>
     public const float EyeAdaptToLightRate = 2.5f;
 
+    // --- Biome colour grade (BiomeGrade, post-fragment.glsl's uGrade) ---
+    /// <summary>Most any channel of the final image moves under the desert's warm or the snow's cool grade (0.04 = 4 %).</summary>
+    public const float BiomeGradeStrength = 0.04f;
+    /// <summary>Coldness at the eye (EyeClimate.Coldness) from which the cool grade starts: about where snow begins to settle.</summary>
+    public const float BiomeGradeColdStart = 0.45f;
+    /// <summary>Coldness at the eye at which the cool grade is full.</summary>
+    public const float BiomeGradeColdFull = 0.85f;
+    /// <summary>How fast the grade follows the eye's climate (MathUtils.Damp rate, per second): a slow drift across a border.</summary>
+    public const float BiomeGradeEaseRate = 0.5f;
+
     /// <summary>FXAA's floor on the edge-direction reduction (post-fragment.glsl's
     /// uFxaaReduceMin): keeps the direction from blowing up on near-flat luma, so faint
     /// gradients are not smeared across <see cref="FxaaSpanMax"/> pixels.</summary>

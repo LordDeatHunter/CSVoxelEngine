@@ -303,6 +303,8 @@ public class RenderManager : IDisposable
     // The eye adaptation's exposure multiplier (EyeAdaptation), eased toward the voxel light at the
     // eye each frame by SetLighting and applied by RenderPostProcess; 1 in any lit place
     private float _eyeExposure = 1f;
+    // The biome colour grade (BiomeGrade), eased toward the climate at the eye; (1, 1, 1) is neutral
+    private Vector3 _grade = Vector3.One;
     // Display-space (sRGB) light at the pre-SH-10 values, set by SetLighting: the sun colour
     // (the cloud layer and the underwater shafts), and the cloud layer's sun intensity and
     // ambient (see CloudRenderer.Render and RenderUnderwaterRays).
@@ -1229,10 +1231,13 @@ public class RenderManager : IDisposable
         // walking across a border fades it; an unknown column eases it out
         var eyeClimateKnown = false;
         var eyeWarmth = 0.5f;
+        var eyeWetness = 0.5f;
         var columns = LightSource?.ColumnSource;
         if (columns != null && camera != null)
-            eyeClimateKnown = EyeClimate.TryAt(columns, camera.Position.X, camera.Position.Z, out eyeWarmth, out _);
+            eyeClimateKnown = EyeClimate.TryAt(columns, camera.Position.X, camera.Position.Z, out eyeWarmth, out eyeWetness);
         _eyeColdness = Aurora.Ease(_eyeColdness, Aurora.TargetColdness(eyeClimateKnown, eyeWarmth), dt);
+        // The biome colour grade reads the same climate (neutral, eased back, when it is unknown)
+        _grade = BiomeGrade.Ease(_grade, BiomeGrade.Target(eyeClimateKnown, eyeWarmth, eyeWetness), dt);
         // Eye adaptation: the exposure eases up in the dark, read from the voxel light at the eye's
         // cell (no GPU readback); open sky and lit rooms keep it at 1
         var eyeLight = camera != null ? EntityLight.Sample(LightSource, camera.Position) : EntityLightSample.Default;
@@ -1840,8 +1845,9 @@ public class RenderManager : IDisposable
         gl.Viewport(_viewportSize);
         BindUnit(0, TextureTarget.Texture2D, _hdrColorTex);
         ActiveUnit(0);
-        // The eye adaptation (SetLighting) scales the exposure up in the dark
-        _post.Render(_viewportSize, WorldGenerationConfig.TonemapExposure * _eyeExposure);
+        // The eye adaptation (SetLighting) scales the exposure up in the dark; the biome grade tints
+        // the finished image faintly warm over the desert and cool over the snow
+        _post.Render(_viewportSize, new PostEffects(WorldGenerationConfig.TonemapExposure * _eyeExposure, _grade));
         BindUnit(0, TextureTarget.Texture2D, 0);
     }
 

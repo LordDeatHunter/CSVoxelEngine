@@ -20,6 +20,9 @@ uniform float uFxaaReduceMul;  // WorldGenerationConfig.FxaaReduceMul
 uniform float uFxaaSpanMax;    // WorldGenerationConfig.FxaaSpanMax, in pixels
 uniform float uFxaaEdgeThreshold;     // WorldGenerationConfig.FxaaEdgeThreshold
 uniform float uFxaaEdgeThresholdMin;  // WorldGenerationConfig.FxaaEdgeThresholdMin
+// The biome colour grade (BiomeGrade): a faint display-space multiplier over the finished image,
+// warm over the desert and cool over the snow; (1, 1, 1) leaves the image alone.
+uniform vec3 uGrade;
 
 out vec4 FragColor;
 
@@ -129,6 +132,8 @@ vec3 Fxaa(vec2 pos)
 void main()
 {
     vec3 c = Fxaa(gl_FragCoord.xy);
+    // The grade after the anti-aliasing, so FXAA keeps judging edges on the image itself
+    c = min(c * uGrade, vec3(1.0));
     // Half-LSB dither before the 8-bit write, so long fog, sky and lighting gradients break up
     // instead of banding. Static per pixel (no time term), so it never crawls. It runs after
     // FXAA so the blur never smooths the dither away.

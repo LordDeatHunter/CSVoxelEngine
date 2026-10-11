@@ -1,0 +1,24 @@
+// Biome colour grade check (BiomeGrade, post-fragment.glsl's uGrade): a faint warm tint over the
+// desert, a cool one over the snow and nothing in the temperate lands, eased across a border. Run
+// from OpenGLTest/ at noon:
+//   $env:VOXEL_SCRIPT='visual-examples/biome-grade.json'; $env:VOXEL_TIME='147'
+//   bin/Release/net9.0/silkgltriangle.exe
+// The grade is a few percent, so compare the plain sky in the top of each shot (the dome is the same
+// colour everywhere at noon): warmer over the dunes, bluer over the snow than at the origin.
+// Spots (WorldGenerationConfig.Seed default): a deep desert at (256, 0), ground 9 (a headless probe: warmth 1, wetness 0), the
+// barren frozen plain at (-1112, 584) (snow-sparkle.json), the temperate origin.
+{
+  "steps": [
+    { "op": "wait", "seconds": 5 },
+    { "op": "fly" },
+    { "op": "teleport", "pos": [0.5, 95.5, 0.5], "yaw": -90, "pitch": 10 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "screenshot", "name": "1_temperate", "hideHud": true },
+    { "op": "teleport", "pos": [256.5, 50.5, 0.5], "yaw": -90, "pitch": 10 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "screenshot", "name": "2_desert", "hideHud": true },
+    { "op": "teleport", "pos": [-1112.5, 45.5, 584.5], "yaw": -90, "pitch": 10 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "screenshot", "name": "3_snow", "hideHud": true }
+  ]
+}
