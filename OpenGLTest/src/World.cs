@@ -4042,6 +4042,15 @@ public class World : IItemUseWorld
         return false;
     }
 
+    bool IItemUseWorld.GrowTree(Vector3 cell)
+    {
+        // The aimed cell names the species (its wood or leaves); the growth writer then finds
+        // the tree's root in that column and grows it, or plants a sapling when there is none
+        if (TreeSpeciesRegistry.ForBlock(BlockIdAt(cell)) is not { } species) return false;
+        return TryGrowTree(species.Name, (int)cell.X, (int)cell.Y, (int)cell.Z,
+            WorldGenerationConfig.AshGrowthPulses).Succeeded;
+    }
+
     void IItemUseWorld.ConsumeSelected() => ActiveInventory.ConsumeSelected();
     #endregion
 

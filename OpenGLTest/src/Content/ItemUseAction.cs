@@ -44,4 +44,10 @@ public enum ItemUseAction
     /// the sending player's own pool.
     /// </summary>
     Heal,
+
+    /// <summary>
+    /// Grows the tree the targeted cell belongs to by a few pulses (ash on a trunk or a canopy),
+    /// spending one unit. Refused on anything that is not a tree.
+    /// </summary>
+    GrowTree,
 }

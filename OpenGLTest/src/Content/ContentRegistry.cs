@@ -690,8 +690,9 @@ public static class ContentRegistry
                 "ignite_campfire" => ItemUseAction.IgniteCampfire,
                 "convert_multiblock" => ItemUseAction.ConvertMultiblock,
                 "heal" => ItemUseAction.Heal,
+                "grow_tree" => ItemUseAction.GrowTree,
                 _ => throw new InvalidOperationException(
-                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire, convert_multiblock or heal."),
+                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire, convert_multiblock, heal or grow_tree."),
             };
 
             var durability = definition.Durability ?? 0;
@@ -1204,6 +1205,17 @@ public static class ContentRegistry
                 if (item.UseFluidId != 0 || item.UseBlockId != 0)
                     throw new InvalidOperationException(
                         $"Item '{path}' has use.action 'heal' with a use.fluid or use.block: a heal targets nobody.");
+                continue;
+            }
+
+            if (item.UseAction == ItemUseAction.GrowTree)
+            {
+                if (item.UseResultId != 0)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'grow_tree' with a use.result: a growth spends from its stack, it never morphs.");
+                if (item.UseFluidId != 0 || item.UseBlockId != 0)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has use.action 'grow_tree' with a use.fluid or use.block: the tree is read from the aimed cell.");
                 continue;
             }
 

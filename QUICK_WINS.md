@@ -125,9 +125,9 @@ files waits in TODO.md instead, since there are none to use yet.
 - [ ] **Bandage.** Cotton -> bandage; using one restores some health, the first heal in the game.
   *Hook:* a new `use.action: "heal"` (`ItemUseAction` + `ItemFactory`), spending one, refused at
   full health. On a server it is the `Use` intent against that player's own `PlayerHealth`.
-- [ ] **Ash fertilizer.** Using `ash` on a tree grows it a few pulses. *Hook:* a
-  `use.action: "grow_tree"` that finds the targeted column's species and calls
-  `World.TryGrowTree`, which does the rest; refused on anything that is not a tree.
+- [x] **Ash fertilizer.** Using `ash` on a tree grows it `AshGrowthPulses` pulses through the
+  reactive growth path (`use.action: "grow_tree"`, `GrowTreeItem`, `TreeSpeciesRegistry.ForBlock`),
+  spending one; refused on anything that is not a tree (`GrowTreeItemTests`).
 - [ ] **Clock.** While held, the HUD shows the time of day and the day number. *Hook:* the held
   item HUD path the compass uses (`Compass`), reading `World.LightingTime` and
   `WorldGenerationConfig.DayLengthSeconds`.

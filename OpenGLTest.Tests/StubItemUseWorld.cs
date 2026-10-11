@@ -141,5 +141,16 @@ internal sealed class StubItemUseWorld : IItemUseWorld
         return true;
     }
 
+    /// <summary>Cells whose use would grow a tree; <see cref="GrowTree"/> refuses every other cell.</summary>
+    public HashSet<(int, int, int)> TreeCells { get; } = new();
+
+    public List<(int, int, int)> GrowTreeCalls { get; } = new();
+
+    public bool GrowTree(Vector3 cell)
+    {
+        GrowTreeCalls.Add(((int)cell.X, (int)cell.Y, (int)cell.Z));
+        return TreeCells.Contains(((int)cell.X, (int)cell.Y, (int)cell.Z));
+    }
+
     public void ConsumeSelected() => Consumed++;
 }

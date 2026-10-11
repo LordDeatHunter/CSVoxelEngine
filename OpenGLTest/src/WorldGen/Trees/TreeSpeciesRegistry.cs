@@ -21,6 +21,21 @@ public static class TreeSpeciesRegistry
     /// <summary>The species registered under that file name, or null.</summary>
     public static TreeSpecies? TryGet(string name) => _byName.GetValueOrDefault(name);
 
+    /// <summary>
+    /// The species whose wood or leaves <paramref name="blockId"/> is, or null for any other block.
+    /// Two species sharing one wood (allowed when they agree on the rim) resolve to the first in
+    /// file order, which is all a use that grows the column's tree needs.
+    /// </summary>
+    public static TreeSpecies? ForBlock(byte blockId)
+    {
+        foreach (var species in _byName.Values)
+        {
+            if (species.WoodId == blockId || (species.LeavesId != 0 && species.LeavesId == blockId))
+                return species;
+        }
+        return null;
+    }
+
     /// <summary>The species registered under that file name; throws naming the missing content.</summary>
     public static TreeSpecies Require(string name)
     {

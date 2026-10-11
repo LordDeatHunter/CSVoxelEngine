@@ -76,6 +76,7 @@ public static class ItemFactory
             ItemUseAction.IgniteCampfire => new IgniteItem(spec),
             ItemUseAction.ConvertMultiblock => new ConvertMultiblockItem(spec),
             ItemUseAction.Heal => new HealItem(spec),
+            ItemUseAction.GrowTree => new GrowTreeItem(spec),
             _ => new PlainItem(spec),
         };
     }

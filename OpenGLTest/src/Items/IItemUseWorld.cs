@@ -121,6 +121,14 @@ public interface IItemUseWorld
     /// <summary>Restores up to <paramref name="amount"/> HP to the player the use runs for (a
     /// bandage); false when they are at full health, so the use is never spent for nothing.</summary>
     bool Heal(int amount);
+
+    /// <summary>
+    /// Grows the tree the targeted cell belongs to (ash on a trunk or a canopy) by a few pulses
+    /// (<see cref="WorldGenerationConfig.AshGrowthPulses"/>), through the same reactive growth
+    /// path a sapling uses. False when the cell holds no tree, so the use is never spent for
+    /// nothing.
+    /// </summary>
+    bool GrowTree(Vector3 cell);
 }
 
 /// <summary>Inputs to <see cref="Item.OnUse"/> beyond the world itself: how far the aim reaches
