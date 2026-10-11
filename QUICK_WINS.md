@@ -251,34 +251,21 @@ files waits in TODO.md instead, since there are none to use yet.
   - [x] *Spawn rules:* `SlimeSize.Roll`, larger at night and underground.
   - [x] *Splitting:* on the half-health transition, children forced under the hard cap (`slime-split.json`).
 
-- [ ] **Mob fall damage.** *Hook:* `Mob.NoteLanding` already reports each landing's drop (for the
-  dust); feed it through `FallTracker`'s damage rule into `Mob.TakeDamage`. Singleplayer and the
-  server, never a client mirror. Test: a short drop deals nothing, and the damage never falls as
-  the drop grows.
-- [ ] **Mobs burn in lava.** *Hook:* the lava rule behind `PlayerBodyProbe.InLava`, applied to the
-  mob's body box, dealing damage per second with the hit flash; the death rolls loot as usual.
+- [x] **Mob fall damage.** `Mob.NoteLanding` bills `MobFallDamage.Damage`: free up to `MobSafeFallBlocks` (plus a slime's own hop peak), then a share of the mob's pool per block; free in water, authoritative sims only (`MobFallDamageTests`, `mob-hazards.json`).
+- [x] **Mobs burn in lava.** `Mob.UpdateHazards` with `MobLava.BodyInLava` (the `PlayerBodyProbe.InLava` cell test over the body box) dealing a pool share every `MobLavaTickSeconds` with the hit flash (`MobLavaTests`, `mob-hazards.json`).
 - [ ] **Goblins flee at low health.** Below a share of its health a goblin turns and runs.
   *Hook:* the stance in `Goblin.Update` (the backpedal branch already moves it away); it still
   despawns by distance as usual.
 - [ ] **Goblins scavenge flint.** A goblin walking over a flint drop picks it up as ammo.
   *Hook:* `DropManager`'s multi-collector (`DropCollector`) with goblins as collectors that take
   only flint, capped at `GoblinStoneMax`.
-- [ ] **Sneaking shortens the notice range.** *Hook:* a notice radius in `MobTargets`' nearest
-  target rule, halved while `Camera.IsSneaking`. On a server the sneak flag is cosmetic and
-  untrusted, but a lie only helps the liar sneak.
-- [ ] **Slime merge.** Two touching slimes of the same size merge into one of the next size.
-  *Hook:* the inverse of the split (`SlimeSize`, a forced spawn under `MobCaps`), capped at
-  `SlimeSize.Max`, never while dying, and with a cooldown so split children do not merge straight
-  back.
-- [ ] **Cave slimes.** Slimes also spawn on dark cave floors. *Hook:* an underground search in
-  `MobSpawner` beside `TryFindSurfaceSpawn` (a cave floor with low sky light);
-  `SlimeSize.IsUnderground` and the size roll already handle depth. A slice of `F-3`.
+- [x] **Sneaking shortens the notice range.** `MobTargets.Nearest` only picks targets inside `MobTargets.NoticeRadius` (`MobNoticeRadiusBlocks`, times `MobSneakNoticeFactor` while `IMobTarget.IsSneaking`; the camera's crouch, a `ServerPlayer`'s cosmetic flag) (`MobNoticeTests`, `mob-notice.json`).
+- [x] **Slime merge.** `SlimeManager.MergeTouching` over `SlimeMerge`: two touching living slimes of one size below the largest, both older than `SlimeMergeCooldownSeconds`, become one forced spawn of the next size (`SlimeMergeTests`, `slime-merge.json`).
+- [x] **Cave slimes.** `MobSpawner.TryFindCaveSpawn` (a dry, dark, loaded cave floor at least `SlimeUndergroundDepthBlocks` under the surface); `SlimeManager.TryFindSpawn` tries caves first for a player underground (`CaveSlimeTests`).
 - [ ] **Goblin stones hit other mobs.** *Hook:* `GoblinManager.Stones` are plain
   `ThrownProjectile`s; test them against the mob list the way the player's throws are, skipping
   the thrower.
-- [ ] **Ledge caution.** A mob will not walk off a drop of more than about 3 blocks unless its
-  target is below. *Hook:* a `World.TryGroundHeight` probe one step ahead of the walk; pairs with
-  mob fall damage.
+- [x] **Ledge caution.** `Mob.IsLedgeAhead` over `LedgeProbe` (live cells, not the heightmap): no step or hop landing more than `MobLedgeMaxDropBlocks` down unless the target is lower (`LedgeCautionTests`, `mob-hazards.json`).
 - [ ] **Goblin dodge.** A goblin sidesteps when a charged throw is aimed at it. *Hook:* the
   throw-charge state and the player's facing, read in the goblin's stance. Singleplayer first.
 
@@ -288,18 +275,10 @@ files waits in TODO.md instead, since there are none to use yet.
 - [ ] **Pack spawning.** A goblin ring spawn rolls a group of 1-3 within 3 blocks of the chosen
   cell. *Hook:* `GoblinManager`'s call into `MobSpawner.TryFindSurfaceSpawn`, with a repeated
   search for the neighbours; every member respects `MobCaps`' natural cap.
-- [ ] **Torch-safe ground.** Ring spawns refuse cells whose block light is 8 or more. *Hook:*
-  `MobSpawner` plus `EntityLight.Sample` at the candidate cell, so torches keep a base clear. A
-  slice of `F-3`'s light-keyed spawning.
-- [ ] **Size-scaled knockback.** Larger slimes are shoved less. *Hook:* `Mob.Shove` divides the
-  impulse by `SlimeSize.Scale`. A pure rule, so testable (monotone in size).
-- [ ] **Despawn fade.** A mob that despawns by distance fades out instead of vanishing. *Hook:* the
-  despawn branch in the managers calls `BeginDying` without rolling loot, so it plays the existing
-  death pose and alpha; it is skipped in `LivingCount` like any dying mob.
-- [ ] **Giant slime.** A rare size-4 slime that splits into size-3 ones. *Hook:* `SlimeSize.Max`
-  and the per-size step constants in `WorldGenerationConfig`, with a lower roll chance than size 3.
-  Splitting and loot rolls already follow the size; the rolled body must fit (the existing step-down
-  check handles that).
+- [x] **Torch-safe ground.** `MobSpawner.TryFindSurfaceSpawn` refuses a cell with block light at or over `MobSpawnBlockLightLimit` (`MobSpawner.IsLitByBlocks` over `EntityLight.Sample`) (`TorchSafeSpawnTests`).
+- [x] **Size-scaled knockback.** `SlimeSize.ShoveSpeed` (the shove over the body scale) in `Slime.Shove`; a split child's launch is unscaled (`SlimeKnockbackTests`).
+- [x] **Despawn fade.** Both managers' despawn branch calls `Mob.BeginDying()` without loot, so the mob plays its death pose and leaves `LivingCount` (`mob-hazards.json`).
+- [x] **Giant slime.** `SlimeMaxSize` 4; `SlimeSize.Roll` takes the last step at `SlimeMaxSizeChanceFactor` of the usual threshold, so it is rarer than size 3 in every light (`GiantSlimeTests`, `slime-sizes.json`).
 - [ ] **Goblin torches.** Each goblin may carry torches, which it holds in its off hand at night
   while the main hand still holds and throws the flint. *Hook:* at spawn a goblin rolls a torch
   count (0 or 1-2) with a chance that is very small by day, a lot higher at night
@@ -315,15 +294,9 @@ files waits in TODO.md instead, since there are none to use yet.
   size) and sent (check first that `NetEntity.ItemId` is unused for mobs; it can carry the count,
   so the client draws the torch). Test: the carry chance is higher at night and below ground than
   by day with the same roll, and a goblin never equips with none.
-- [ ] **Loot toss.** A killed mob's loot arcs out with a small random velocity instead of appearing
-  at its feet. *Hook:* `DropManager.SpawnLoot` takes an optional launch velocity; the mob death
-  passes a small up-and-out vector.
-- [ ] **Size-scaled hops.** Bigger slimes hop higher and farther, with a longer crouch. *Hook:* the
-  hop velocity in `Slime` and the crouch time in the squash spring multiply by `SlimeSize.Scale`
-  to a power; the tuning goes in `WorldGenerationConfig`.
-- [ ] **Lose interest.** A mob that has had no line of sight to its target for 8 s stops chasing,
-  wanders and may despawn. *Hook:* the chase target pick in `MobTargets` plus a per-mob timer
-  reusing `BlockRaycaster.SegmentHitsBlock`.
+- [x] **Loot toss.** Every death drop goes through `DropManager.SpawnAt(id, pos, MobLoot.RandomToss())`, an up-and-out launch tuned by `MobLootToss*` (`MobLootTests`, `mob-hazards.json`).
+- [x] **Size-scaled hops.** `SlimeSize.HopLift` / `HopReach` / `WindupScale` raise the body scale to the `SlimeHop*Exponent` knobs, read by `Slime.HopVelocity` and the crouch time (`SlimeHopTests`).
+- [x] **Lose interest.** `Mob.PickTarget` = the notice rule plus a per-mob `MobInterest`: sight checked every `MobSightCheckSeconds`, dropped after `MobLoseInterestSeconds` without it, then the mob wanders toward `Mob.WanderGoal` and idles out through `Mob.ShouldIdleDespawn` (`MobInterestTests`, `mob-notice.json`).
 
 ## World
 
