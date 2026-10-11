@@ -1,0 +1,33 @@
+{
+  // A leafless snag for the desert and the frozen plains: the oak wood and growth logic, no
+  // leaves (a leafless species), and a sparse worldgen block. It shares oak_log with oak, which
+  // the rim must agree on (both "block").
+  "wood": "block/oak_log",
+  "growth": {
+    "logic": "oak",
+    "signalEnergy": 8,
+    "upProbability": 2,
+    "lowestBranchHeight": 3,
+    "maturitySteps": [20, 35]
+  },
+  "thickness": {
+    "tipPx": 1,
+    "pipeExponent": 1.5,
+    "maxPx": 10,
+    "girthProfile": [[0, 2.0], [0.5, 1.4], [1, 1.0]],
+    "trunkShape": "circle",
+    "rim": "block"
+  },
+  "features": [ { "type": "roots", "depth": 2 } ],
+  // leafless: the crown proxy only has to stay valid (the far LOD draws no canopy)
+  "lod": { "crownHeight": [4, 7], "crownRadius": 1, "profile": "column" },
+  "worldgen": {
+    "biomes": ["desert", "frozen"],
+    "density": 0.004,
+    "spacing": 4,
+    "maxSlope": 3,
+    "minSoil": 0,
+    "minGround": 1,
+    "maxGround": 90
+  }
+}
