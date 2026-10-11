@@ -211,10 +211,11 @@ files waits in TODO.md instead, since there are none to use yet.
 
 ## World
 
-- [ ] **Fallen logs.** 3-5 oak log cells lying along X or Z on the forest floor. *Hook:*
-  `WoodState.Detached` cubes (they never fell, weld or feed leaves), placed per cell hash in the
-  stamp step like `CottonGenerator`. Like trees they sit above `height`; the far LOD shows none.
-- [ ] **Boulders.** A rare 2-4 block blob of stone or cobblestone on the forest and taiga floor.
+- [x] **Fallen logs.** A rare detached oak log of 3-5 cells lying along X or Z on the forest
+  floor, decided per 32-block cell from a pure hash so chunks agree at borders and clipped there
+  (`FallenLogGenerator`, `WoodState.Detached`; `SceneryTests`).
+- [x] **Boulders.** A rare 2-4 cell blob of stone or cobblestone on the forest and taiga floor,
+  per 32-block cell from a pure hash, into air only (`BoulderGenerator`; `SceneryTests`).
   *Hook:* one candidate per coarse cell hash (the `PlantClumps` cell pattern), stamped per chunk
   and clipped at its border; no far-LOD bump.
 - [ ] **Reeds at shores.** A cross-model plant in clumps on the columns at the water's edge.

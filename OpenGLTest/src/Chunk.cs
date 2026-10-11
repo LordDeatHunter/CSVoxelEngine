@@ -497,6 +497,17 @@ public class Chunk : IDisposable
         }
         WorldgenStats.AddTreeTicks(System.Diagnostics.Stopwatch.GetTimestamp() - treeStart);
 
+        // Scenery on the floor, after the trees so it never displaces one and into air only
+        if (WorldGenerationConfig.FallenLogsEnabled)
+        {
+            var state = _state;
+            FallenLogGenerator.Stamp(_blocks, ref state, worldX0, lowerBoundY, worldZ0);
+            _state = state;
+        }
+
+        if (WorldGenerationConfig.BouldersEnabled)
+            BoulderGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
+
         // Frozen-only ice spikes go down before the snow, so a spike keeps its base cell
         if (WorldGenerationConfig.SnowAndIceEnabled)
             IceSpikeGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);

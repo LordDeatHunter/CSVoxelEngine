@@ -2124,6 +2124,23 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Night factor from which a carried torch is out
     public const float GoblinTorchNightFactor = 0.5f;
 
+    // --- Fallen logs (FallenLogGenerator): a rare detached oak log on the forest floor ---
+    public const bool FallenLogsEnabled = true;
+    // One candidate log per 2^FallenLogCellShift-block cell, accepted with FallenLogChance
+    public const int FallenLogCellShift = 5;
+    public const float FallenLogChance = 0.3f;
+    public const int FallenLogMinLength = 3;
+    public const int FallenLogMaxLength = 5;
+
+    // --- Boulders (BoulderGenerator): a rare blob of stone or cobblestone on the forest and
+    // taiga floor ---
+    public const bool BouldersEnabled = true;
+    // One candidate boulder per 2^BoulderCellShift-block cell, accepted with BoulderChance
+    public const int BoulderCellShift = 5;
+    public const float BoulderChance = 0.2f;
+    public const int BoulderMinBlocks = 2;
+    public const int BoulderMaxBlocks = 4;
+
     // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
     // first notices a player (the same moment its first-throw delay starts) ---
     public const float GoblinNoticePipSeconds = 0.9f;
