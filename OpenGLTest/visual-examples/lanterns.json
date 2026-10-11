@@ -1,0 +1,50 @@
+{
+  // Hanging lantern check: run with VOXEL_TIME=700 (night) and VOXEL_SCRIPT=visual-examples/lanterns.json.
+  // Shots land in visual/lanterns/.
+  //
+  // The flat desert patch of torches.json: the player hovers over (253, -5) (sand at y 9) and
+  // every placement aims at an exact face, cells written relative to the player's cell as
+  // (dx, y, dz). From an eye at y 14.63 it builds a three-high plank pillar at (0, 10..12, -3)
+  // and an arm off the pillar's top toward the camera, (0, 12, -2); then, from the eye at 11.63,
+  // it aims up at the arm's underside and hangs a lantern from it at (0, 11, -2):
+  //   lantern-front    the lantern under the arm, its chain reaching the block it hangs from,
+  //                    lighting the pillar and the sand in the default warm torch colour
+  //   lantern-oblique  the same from the front left
+  //   lantern-popped   the arm mined: the lantern loses what held it up and pops
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [253.5, 30, -4.5], "yaw": -90, "pitch": -40 },
+    { "op": "wait", "seconds": 14 },
+    { "op": "teleport", "pos": [253.5, 14.63, -4.5], "yaw": -90, "pitch": -40 },
+    { "op": "wait", "seconds": 1 },
+
+    { "op": "give", "block": "oak_planks", "count": 4 },
+    { "op": "look", "yaw": -90, "pitch": -57.06 },
+    { "op": "place" },
+    { "op": "look", "yaw": -90, "pitch": -50.43 },
+    { "op": "place" },
+    { "op": "look", "yaw": -90, "pitch": -41.24 },
+    { "op": "place" },
+    { "op": "look", "yaw": -90, "pitch": -40.43 },
+    { "op": "place" },
+
+    { "op": "teleport", "pos": [253.5, 11.63, -4.5], "yaw": -90, "pitch": 10.48 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "give", "block": "lantern", "count": 1 },
+    { "op": "place" },
+
+    { "op": "look", "yaw": -90, "pitch": 5 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "lantern-front" },
+    { "op": "teleport", "pos": [250.5, 12.5, -3.5], "yaw": -45, "pitch": -10 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "lantern-oblique", "hideHud": true },
+
+    { "op": "teleport", "pos": [253.5, 11.63, -4.5], "yaw": -90, "pitch": 30.1 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "mine", "seconds": 0.5 },
+    { "op": "look", "yaw": -90, "pitch": 5 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "lantern-popped", "hideHud": true }
+  ]
+}

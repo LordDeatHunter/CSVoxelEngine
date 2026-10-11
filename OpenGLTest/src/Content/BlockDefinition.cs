@@ -98,8 +98,9 @@ public sealed class BlockDefinition
 
     /// <summary>
     /// Which neighbour holds a <see cref="NeedsSupport"/> block up: <c>"below"</c> (the default: a
-    /// flower, a floor torch) or <c>"attached"</c> (a wall torch): the cell behind the block's
-    /// front, opposite the horizontal facing its state byte carries. Only legal with
+    /// flower, a floor torch), <c>"above"</c> (a hanging lantern: the cell over it, so it is placed
+    /// against a block's underside) or <c>"attached"</c> (a wall torch): the cell behind the
+    /// block's front, opposite the horizontal facing its state byte carries. Only legal with
     /// <c>needsSupport</c>, and <c>"attached"</c> also needs <c>facing</c>.
     /// </summary>
     public string? Support { get; set; }

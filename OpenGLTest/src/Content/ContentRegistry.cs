@@ -891,7 +891,17 @@ public static class ContentRegistry
     /// hangs off the cell behind the front, so it needs a facing to name that front.
     /// </summary>
     internal static (bool HorizontalFacing, bool SupportAttached) ParseFacingAndSupport(BlockDefinition definition,
-        BlockRenderer renderer, bool fluid, bool falls, int stackMax, bool needsSupport, string path)
+        BlockRenderer renderer, bool fluid, bool falls, int stackMax, bool needsSupport, string path) =>
+        ParseFacingAndSupport(definition, renderer, fluid, falls, stackMax, needsSupport, path, out _);
+
+    /// <summary>
+    /// <see cref="ParseFacingAndSupport(BlockDefinition, BlockRenderer, bool, bool, int, bool, string)"/>,
+    /// also reporting <c>support: "above"</c> (<paramref name="supportAbove"/>): a block hanging from
+    /// the cell over it (a lantern), which needs no facing.
+    /// </summary>
+    internal static (bool HorizontalFacing, bool SupportAttached) ParseFacingAndSupport(BlockDefinition definition,
+        BlockRenderer renderer, bool fluid, bool falls, int stackMax, bool needsSupport, string path,
+        out bool supportAbove)
     {
         var facing = definition.Facing switch
         {
@@ -909,11 +919,12 @@ public static class ContentRegistry
 
         var attached = definition.Support switch
         {
-            null or "below" => false,
+            null or "below" or "above" => false,
             "attached" => true,
             _ => throw new InvalidOperationException(
-                $"Block '{path}' has unknown support '{definition.Support}'; expected below or attached."),
+                $"Block '{path}' has unknown support '{definition.Support}'; expected below, above or attached."),
         };
+        supportAbove = definition.Support == "above";
         if (definition.Support != null && !needsSupport)
             throw new InvalidOperationException(
                 $"Block '{path}' sets support without needsSupport; only a support-fragile block is held up by anything.");
@@ -954,7 +965,7 @@ public static class ContentRegistry
         var wall = BlockType.ById[id]!;
         if (id == ownerId)
             throw new InvalidOperationException($"Block '{path}' names itself in wallBlock.");
-        if (!owner.NeedsSupport || owner.SupportAttached || owner.HasHorizontalFacing)
+        if (!owner.NeedsSupport || owner.SupportAttached || owner.SupportAbove || owner.HasHorizontalFacing)
             throw new InvalidOperationException(
                 $"Block '{path}' sets wallBlock but is not a floor block (needsSupport, support below, no facing); a placement on top keeps it.");
         if (!wall.HasHorizontalFacing || !wall.SupportAttached)
@@ -1505,7 +1516,7 @@ public static class ContentRegistry
                 throw new InvalidOperationException(
                     $"Block '{path}' sets both falls and needsSupport: a falling block topples instead of popping.");
             var (horizontalFacing, supportAttached) =
-                ParseFacingAndSupport(definition, renderer, fluid, falls, stackMax, needsSupport, path);
+                ParseFacingAndSupport(definition, renderer, fluid, falls, stackMax, needsSupport, path, out var supportAbove);
             var solid = !fluid && (definition.Solid ?? true);
             if (stackSolidAt > 0 && solid)
                 throw new InvalidOperationException(
@@ -1613,6 +1624,7 @@ public static class ContentRegistry
                 HasItem = !fluid && (definition.HasItem ?? true),
                 NeedsSupport = needsSupport,
                 SupportAttached = supportAttached,
+                SupportAbove = supportAbove,
                 HasHorizontalFacing = horizontalFacing,
                 ReplaceableByPlacement = replaceableByPlacement,
                 Falls = falls,

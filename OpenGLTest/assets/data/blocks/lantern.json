@@ -1,0 +1,15 @@
+{
+  // A copper lantern hung under a ceiling: placed against a block's underside, it hangs from the
+  // block above it and pops (dropping itself) when that block goes. A torch in a copper cage
+  // (recipes/lantern.json), it lights like the torch, in the same warm default colour.
+  "name": "Lantern",
+  "model": "block/lantern",
+  "hardness": 1,
+  "solid": false,
+  "castsAO": false,
+  "light": { "emission": 15 },
+  "needsSupport": true,
+  "support": "above",
+  // The cage and the chain above it, up to the block it hangs from
+  "hitbox": { "min": [0.3125, 0.125, 0.3125], "max": [0.6875, 1, 0.6875] }
+}

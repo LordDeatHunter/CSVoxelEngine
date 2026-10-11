@@ -963,6 +963,7 @@ OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple 
 tools/generate-goblin-skin.ps1        # deterministic generator of goblin.png; its header pins the UV layout
 tools/generate-leaf-textureless.ps1   # deterministic grey leaf tiles for the biome tint (scaled to BiomeTintTextureGrey)
 tools/generate-plank-texture.py       # deterministic oak_planks tile (stdlib PNG writer)
+tools/generate-lantern-texture.py     # deterministic lantern tile; its header pins the uv of every model part
 tools/generate-tree-textures.ps1      # placeholder baobab / stone pine log and leaf tiles tinted from the oak art
 tools/generate-cotton-textures.py     # deterministic cotton_plant tile and cotton item sprite (stdlib PNG writer)
 tools/generate-torch-texture.py       # deterministic torch tile; its header pins the stick the torch models crop
@@ -1038,7 +1039,7 @@ trailing commas.
 | `stackSolidAt` | 0 | stack count at which a stack block turns solid, for a block whose partial stacks are walked through (layered snow at 16). Only legal from 1..`stackMax` on a `solid: false` stack block |
 | `hasItem` | true | enters the blocks pool and can be hotbarred; false for pebbles, branch piles, layered snow and the kiln's anchor and part (fluids force it off). Every `tree_wood` log and every leaf block keeps its item: placing one writes a detached full cube (`WoodState.Detached`) or a persistent leaf (`LeafState`), which never fells with a tree or decays |
 | `needsSupport` | false | pops, rolling its loot, when the block holding it up is emptied (the block below, or behind it with `support: "attached"`; `BlockSupport`), and is only placed against a solid holder; also makes the block replaceable, so a flow washes it away. Mining, blasts, felling and leaf decay pop it; a toppling falls block does not yet |
-| `support` | `"below"` | which neighbour holds a `needsSupport` block up: `below` or `attached` (the cell behind its front, opposite the `facing` in its state byte: a wall torch). Only with `needsSupport`; `attached` also needs `facing` |
+| `support` | `"below"` | which neighbour holds a `needsSupport` block up: `below`, `above` (the cell over it: a hanging lantern, so it is placed against a block's underside, or wherever a solid block stands over the target cell; `BlockType.SupportAbove`) or `attached` (the cell behind its front, opposite the `facing` in its state byte: a wall torch). Only with `needsSupport`; `attached` also needs `facing` |
 | `facing` | none | `"horizontal"`: the state byte's low two bits are a facing (north -Z 0, south +Z 1, west -X 2, east +X 3); the model (no full-face quads) and `hitbox` are authored facing north and pre-turned to all four (`BlockType.RotatedModels`/`RotatedHitboxes`, `HorizontalFacing`). Only on the `model` renderer, never with `fluid`, `falls` or `stackMax` |
 | `wallBlock` | none | the block a placement against a block's side becomes, facing the hit normal (leaning away from the wall); on top the block places as itself, under a ceiling it is refused (`Placement.TryMount`). The wall block needs `facing` and `support: "attached"`, and is picked as this block (`BlockType.PickId`). `torch` -> `wall_torch` |
 | `replaceableByPlacement` | false | a block placement aimed at this block fills the block's own cell and discards it, instead of filling the cell across the hit face, so a block placed against a partial snow drift rests on the ground instead of hovering a layer above it. Only fires while the cell is not solid, so a full snow stack stays an ordinary block, and the displaced block drops nothing. Independent of `needsSupport`, which is what a flow or a bucket may overwrite. Illegal on an always-solid block, which could never honour it |
@@ -1127,6 +1128,18 @@ side crops the lower half of its tile) with a `0..0.5` `hitbox` and `collidesByH
 idiom, so the body steps onto and stands on them. There is no top-half or double-slab placement.
 `BuildingBlockTests` holds the rules every shape-colliding model block obeys: it is drawn exactly
 as far as its boxes reach on every facing, and a floor slab is stood on at its top.
+
+The **lantern** hangs under a ceiling: `support: "above"` (`BlockSupport.SupportOffset` returns
++Y for a `BlockType.SupportAbove` block), so `World.PlaceBlockAtFace`'s support check only lets it
+in where a solid block stands over the target cell (a placement against a block's underside), and
+every pop path that asks `BlockSupport` (mining's `PopUnsupportedAround`, the blast scan, leaf
+decay) takes it down with that block. It lights like the torch (emission 15, the default warm
+colour), is non-solid, and crafts from a torch and a copper ingot. Its model crops a cage, a lid
+and a chain out of one opaque tile from `tools/generate-lantern-texture.py`, whose header notes
+the trap: `ModelBaker` mirrors an explicit Minecraft uv on the way in (a side face samples column
+`32 - 2u`, an up/down face row `32 - 2v`), so an off-centre uv must be written mirrored and the
+art kept symmetric. `HangingBlockTests` covers the rule; `visual-examples/lanterns.json`
+(`VOXEL_TIME=700`) hangs one and pops it.
 
 ### Item schema (`assets/data/items/<name>.json`)
 

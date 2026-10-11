@@ -291,6 +291,10 @@ public sealed record BlockType
     /// <see cref="HasHorizontalFacing"/>, whose facing names that front.</summary>
     public bool SupportAttached { get; init; }
 
+    /// <summary>Whether a <see cref="NeedsSupport"/> block hangs from the cell above it (a lantern
+    /// under a ceiling) instead of standing on the cell below; see <see cref="BlockSupport"/>.</summary>
+    public bool SupportAbove { get; init; }
+
     /// <summary>Whether the state byte's low two bits are a horizontal facing (a wall torch):
     /// the mesher draws <see cref="RotatedModels"/> and the shape resolvers read
     /// <see cref="RotatedHitboxes"/> by it.</summary>
