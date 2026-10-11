@@ -1,0 +1,27 @@
+{
+  // Selection outline pulse check: run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/selection-pulse.json
+  // Shots land in visual/selection-pulse/. The camera hovers still over the flat desert patch of
+  // panes.json (sand at y 9 around (253, -5)) and looks down at one block, so only the outline's
+  // opacity changes between the shots: it breathes between 70 % and 100 % (SelectionPulse,
+  // selection-fragment.glsl) over one SelectionPulsePeriodSeconds, and pulse_a..pulse_e are
+  // spaced about a fifth of a period apart, so the outline reads darkest in one and faintest in
+  // another. While the block is being mined the outline holds steady (SelectionPulseTests; a
+  // still frame cannot show it).
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [253.5, 30, -4.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 14 },
+    { "op": "teleport", "pos": [253.5, 12.5, -4.5], "yaw": -90, "pitch": -50 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "pulse_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.32 },
+    { "op": "screenshot", "name": "pulse_b", "hideHud": true },
+    { "op": "wait", "seconds": 0.32 },
+    { "op": "screenshot", "name": "pulse_c", "hideHud": true },
+    { "op": "wait", "seconds": 0.32 },
+    { "op": "screenshot", "name": "pulse_d", "hideHud": true },
+    { "op": "wait", "seconds": 0.32 },
+    { "op": "screenshot", "name": "pulse_e", "hideHud": true }
+  ]
+}

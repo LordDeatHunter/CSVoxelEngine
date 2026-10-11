@@ -2275,7 +2275,7 @@ public class World : IItemUseWorld
 
             var selectedId = BlockIdAt(_selectedBlockPosition);
             renderManager.RenderBlockSelection(Camera, _selectedBlockPosition, _selectedFaceNormal, popGrow,
-                selectedId, _selectedBoxIndex, HitboxesAt(_selectedBlockPosition, selectedId));
+                selectedId, _selectedBoxIndex, HitboxesAt(_selectedBlockPosition, selectedId), mining: _isBreaking);
 
             if (_isBreaking)
                 renderManager.RenderBlockBreaking(Camera, _breakingBlockPosition, BreakProgress, popGrow, _breakingBlockId,

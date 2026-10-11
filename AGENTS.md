@@ -334,6 +334,17 @@ the crease is exactly the plain midpoint crease. The cost is that a corner seen 
 keeps a band about that reach wide in the world rather than a tap radius wide on screen.
 `ContactAoEnabled = false` skips the pass entirely.
 
+**Selection outline pulse.** The targeted block's outline breathes between
+`SelectionPulseMinOpacity` (70 %) and full opacity, one breath every `SelectionPulsePeriodSeconds`:
+`selection-fragment.glsl` scales the outline's `uOpacity` by `1 - uPulseDepth * (0.5 + 0.5 sin)` of
+`uTime`, and `SelectionPulse` is its GL-free twin (`Depth(mining)` is what `RenderBlockSelection`
+uploads, `Opacity` the curve). While the block is being mined (`World._isBreaking`, passed as
+`RenderBlockSelection`'s `mining`) the depth is 0, so the outline holds steady at full and the crack
+overlay stays readable; the face highlight (`uDisplayMix` 1) never pulses. The outline beams draw
+with back faces culled, so each pixel blends exactly one face of a beam: with both faces blended an
+alpha `a` read as `1-(1-a)^2` and the breath all but vanished. `SelectionPulseTests`,
+`visual-examples/selection-pulse.json` (`VOXEL_TIME=147`).
+
 Shaders (`assets/shaders/**/*.glsl`), textures (`assets/textures/**/*.png`), fonts (`assets/fonts/**/*.ttf`) and all content JSON (`assets/**/*.json` — blocks, items, loot tables, models) are copied to the output directory via `CopyToOutputDirectory` rules in the csproj — **new asset types/extensions need a matching `<None Update>` entry** or they won't be found at runtime. The JSON rule is a wildcard over the whole `assets` tree, so adding a block, item, loot table or model needs no csproj edit.
 
 Assets are opened by **relative** path (`FileUtils.ReadFile("assets/shaders/...")`, `TextureAtlas.Build(gl, "assets/textures/blocks")` in `RenderManager.LoadResources`), so the app must be launched with a working directory that contains `assets/` — either the build output directory or `OpenGLTest/`. `dotnet run --project OpenGLTest/silkgltriangle.csproj` satisfies this (it runs from the project folder); launching the built executable from an arbitrary directory does not.
@@ -603,6 +614,7 @@ OpenGLTest/
     CutoutMipmap.cs            # GL-free coverage-preserving mip chain for cutout tiles (alpha rescaled per level)
     LightFlicker.cs            # GL-free per-cell flicker phase + curve for the campfire point lights
     SelectionOutlineMesh.cs    # GL-free selection outline: the 12 box edges as thin beams (no glLineWidth)
+    SelectionPulse.cs          # GL-free twin of the outline's breathing opacity (steady while mining)
     ChunkGenerationWorker.cs   # background threads creating chunks around every streaming focus (one
                                #   ChunkScanFrontier per focus, served round-robin)
     Camera.cs                  # FPS camera pose, view/proj cache, shoulder/orbit modes; movement+physics and the DDA

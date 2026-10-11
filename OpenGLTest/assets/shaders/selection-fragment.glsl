@@ -11,6 +11,13 @@ uniform float uOpacity;
 uniform int uDisplayMix;
 uniform sampler2D uScene;
 
+// The outline breathes (SelectionPulse is the GL-free twin): its opacity dips by uPulseDepth on a
+// sine of uTime, one breath every uPulsePeriod seconds. uPulseDepth 0 (the default, and what the
+// renderer sends while the block is being mined) holds it steady.
+uniform float uTime;
+uniform float uPulseDepth;
+uniform float uPulsePeriod;
+
 out vec4 FragColor;
 
 // Exact piecewise sRGB encode, the twin of ColorSpace.LinearToSrgb (and post-fragment.glsl's).
@@ -32,7 +39,10 @@ vec3 SrgbToLinear(vec3 c)
 
 void main() {
     if (uDisplayMix == 0) {
-        FragColor = vec4(uColor, uOpacity);
+        float breathe = 1.0;
+        if (uPulseDepth > 0.0 && uPulsePeriod > 0.0)
+            breathe = 1.0 - uPulseDepth * (0.5 + 0.5 * sin(uTime / uPulsePeriod * 6.2831853));
+        FragColor = vec4(uColor, uOpacity * breathe);
         return;
     }
     vec3 dst = texelFetch(uScene, ivec2(gl_FragCoord.xy), 0).rgb;

@@ -3739,10 +3739,12 @@ public class RenderManager : IDisposable
     /// <summary>
     /// Draws the targeted block's outline and face highlight. Each of the block's hitboxes gets
     /// its own outline; the highlight lands on the hit box's face. <paramref name="grow"/> is the
-    /// block's current pop growth so the highlight tracks it while mining.
+    /// block's current pop growth so the highlight tracks it while mining. The outline breathes
+    /// (<see cref="SelectionPulse"/>) unless <paramref name="mining"/>, which holds it steady so the
+    /// crack overlay stays readable.
     /// </summary>
     public void RenderBlockSelection(Camera camera, Vector3 blockPosition, Vector3 hitNormal, float grow = 0f,
-        byte blockId = 0, int hitBoxIndex = 0, BlockHitbox[]? boxes = null)
+        byte blockId = 0, int hitBoxIndex = 0, BlockHitbox[]? boxes = null, bool mining = false)
     {
         selectionShader.Use();
 
@@ -3754,14 +3756,23 @@ public class RenderManager : IDisposable
         boxes ??= BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
         // sRGB-authored outline colours, decoded: the selection draws into the linear HDR target
         selectionShader.SetUniform("uColor", SelectionOutlineColor);
-        selectionShader.SetUniform("uOpacity", 0.95f);
+        // Full at the top of each breath: SelectionPulse dips it to SelectionPulseMinOpacity
+        selectionShader.SetUniform("uOpacity", 1f);
         selectionShader.SetUniform("uDisplayMix", 0);
+        selectionShader.SetUniform("uTime", _time);
+        selectionShader.SetUniform("uPulseDepth", SelectionPulse.Depth(mining));
+        selectionShader.SetUniform("uPulsePeriod", WorldGenerationConfig.SelectionPulsePeriodSeconds);
 
         // The outline is twelve edge beams (SelectionOutlineMesh) rather than GL lines, since
         // LineWidth is unreliable in a core profile. The vertices are already in world space.
         gl.BindVertexArray(outlineVao);
         gl.BindBuffer(BufferTargetARB.ArrayBuffer, outlineVbo);
         selectionShader.SetUniform("uMVP", viewProj);
+        // Back faces culled: a beam is a convex box, so each pixel then blends exactly one face of
+        // it. Without that the front and back faces both blend, and an alpha a reads as 1-(1-a)^2,
+        // which squashed the breath from 70..100 % into ~91..100 %.
+        gl.Enable(EnableCap.CullFace);
+        gl.CullFace(TriangleFace.Back);
         // The outline inflates a hair past the grown box so it never z-fights the block
         var outlinePad = new Vector3(0.01f + grow);
         foreach (var box in boxes)
@@ -3779,6 +3790,7 @@ public class RenderManager : IDisposable
                     DrawElementsType.UnsignedInt, null);
             }
         }
+        gl.Disable(EnableCap.CullFace);
 
         var hitBox = boxes[Math.Clamp(hitBoxIndex, 0, boxes.Length - 1)];
         var faceIndex = FaceIndexFromNormal(hitNormal);

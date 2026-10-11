@@ -156,6 +156,15 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>Floor on the selection outline beam thickness, in blocks, for a box right at the eye.</summary>
     public const float SelectionOutlineMinThickness = 0.002f;
 
+    /// <summary>
+    /// Lowest opacity the selection outline breathes down to (SelectionPulse, selection-fragment.glsl's
+    /// uPulseDepth = 1 - this); the top of each breath is full opacity. 1 switches the pulse off.
+    /// </summary>
+    public const float SelectionPulseMinOpacity = 0.7f;
+
+    /// <summary>Seconds per breath of the selection outline (uPulsePeriod).</summary>
+    public const float SelectionPulsePeriodSeconds = 1.6f;
+
     // Distance fog that blends far terrain into the sky (also hides the LOD edge at night)
     public const float FogNearBlocks = 200f;
     public const float FogFarBlocks = 1800f;
