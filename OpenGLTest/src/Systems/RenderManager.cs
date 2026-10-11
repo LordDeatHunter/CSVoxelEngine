@@ -16,6 +16,7 @@ public class RenderManager : IDisposable
     private Shader breakShader;
     private Shader shadowShader;
     private Shader sunShader;
+    private Shader moonShader;
 
     // The pooled chunk-draw variants of the two world programs: the same GLSL sources compiled
     // a second time with #define CHUNK_DRAW, so their vertex stage reads its per-draw origin and
@@ -139,6 +140,12 @@ public class RenderManager : IDisposable
     private uint _sunTexture;
     private Mesh _sunQuad;
     private float _sunVisibility;
+
+    // The moon disc (RenderMoon): the sun's quad again, opposite the sun, with its own sprite and the
+    // phase (MoonPhase) shaded over it; _moonVisibility fades it with the stars and out in lava.
+    private uint _moonTexture;
+    private float _moonVisibility;
+    private float _moonPhase = MoonPhase.FirstNightPhase;
 
     private uint _breakProgressTexture;
 
@@ -727,6 +734,15 @@ public class RenderManager : IDisposable
         gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
         gl.BindTexture(TextureTarget.Texture2DArray, 0);
         _sunQuad = Primitives.CreateSquare(gl, 1f);
+        // The moon rides the sun's quad and vertex shader, with its own sprite (Linear, like the sun's)
+        moonShader = new Shader(gl, sunVs, FileUtils.ReadFile("assets/shaders/moon-fragment.glsl"));
+        moonShader.Use();
+        moonShader.SetUniform("uMoonTexture", 0);
+        _moonTexture = TextureLoader.LoadFromFile(gl, "assets/textures/environment/moon.png", srgb: true);
+        gl.BindTexture(TextureTarget.Texture2DArray, _moonTexture);
+        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
+        gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        gl.BindTexture(TextureTarget.Texture2DArray, 0);
         _clouds = new CloudRenderer(gl, CloudShadowUnit);
         _cloudShadow = new CloudShadowTexture(gl);
         // Bound once for the whole run: nothing else ever touches unit 8 (see CloudShadowUnit).
@@ -1055,6 +1071,11 @@ public class RenderManager : IDisposable
         // out of sight shortly after the horizon instead of hanging in the night sky
         _sunVisibility = Smooth01((elevation + 0.08f) / 0.14f);
 
+        // The moon stands opposite the sun and fades in and out with the stars; its phase steps
+        // once a day, at noon, while it is below the horizon (MoonPhase)
+        _moonVisibility = MoonPhase.Visibility(elevation);
+        _moonPhase = MoonPhase.Fraction(time);
+
         var dayness = DayCycle.Dayness(elevation);
         _dayness = dayness;
         var duskAmount = MathUtils.Clamp01(1f - MathF.Abs(elevation) * 5f);
@@ -1155,6 +1176,7 @@ public class RenderManager : IDisposable
         // The disc stays in water: the surface's Snell window shows it refracted from below
         // (the scene copy captures it). Only lava, an opaque glow, still hides it.
         _sunVisibility *= 1f - lavaWet;
+        _moonVisibility *= 1f - lavaWet;
         UpdateShadowCamera(camera);
 
         // The lens glare (SunGlare) is a camera effect, so it fades out with the eye underwater or
@@ -1169,7 +1191,7 @@ public class RenderManager : IDisposable
         var glare = camera == null
             ? 0f
             : SunGlare.Intensity(Vector3.Dot(camera.ViewDirection, _sunDir), elevation, _glareCloud) * (1f - wet);
-        _skyFrame = _skyFrame with { GlareColor = _sunColor * glare };
+        _skyFrame = _skyFrame with { GlareColor = _sunColor * glare, MoonVisibility = _moonVisibility };
 
         _fogNear = MathUtils.Lerp(WorldGenerationConfig.FogNearBlocks,
             WorldGenerationConfig.UnderwaterFogNearBlocks, wet);
@@ -2157,7 +2179,52 @@ public class RenderManager : IDisposable
             inv = Matrix4x4.Identity;
         _skyDome?.Render(inv, _sky, _sunDir, _skyTint, _skyTintAmount, frame);
         RenderSun(forward, projection);
+        RenderMoon(forward, projection);
     }
+
+    /// <summary>
+    /// Draws the moon: <see cref="RenderSun"/>'s quad and vertex shader placed opposite the sun, with
+    /// the moon sprite and moon-fragment.glsl, which shades this day's phase (<see cref="MoonPhase"/>)
+    /// over the full disc and adds a faint halo that grows with how much of it is lit. Additive and
+    /// depth-free like the sun, so the terrain drawn after it occludes it; RenderSky draws it for the
+    /// mirror as well, and the Snell window shows it through the scene copy.
+    /// </summary>
+    private void RenderMoon(Vector3 forward, Matrix4x4 projection)
+    {
+        if (_moonVisibility <= 0f) return;
+
+        gl.Disable(EnableCap.DepthTest);
+        gl.DepthMask(false);
+        gl.Enable(EnableCap.Blend);
+        gl.BlendFunc(BlendingFactor.One, BlendingFactor.One);
+
+        moonShader.Use();
+        BindUnit(0, TextureTarget.Texture2DArray, _moonTexture);
+
+        var viewRot = Matrix4x4.CreateLookAt(Vector3.Zero, forward, Vector3.UnitY);
+        moonShader.SetUniform("uViewProj", viewRot * projection);
+        moonShader.SetUniform("uSunDir", -_sunDir);
+        moonShader.SetUniform("uHalfSize", 2f * 100f * MathF.Tan(MathUtils.ToRadians(
+            WorldGenerationConfig.MoonAngularRadiusDeg * WorldGenerationConfig.MoonGlowScale)));
+        moonShader.SetUniform("uDiscFraction", 1f / WorldGenerationConfig.MoonGlowScale);
+        moonShader.SetUniform("uPhaseLight", MoonPhase.LightDirection(_moonPhase));
+        moonShader.SetUniform("uLitFraction", MoonPhase.IlluminatedFraction(_moonPhase));
+        moonShader.SetUniform("uTerminator", WorldGenerationConfig.MoonTerminatorSoftness);
+        moonShader.SetUniform("uEarthshine", WorldGenerationConfig.MoonEarthshine);
+        moonShader.SetUniform("uGlowIntensity", WorldGenerationConfig.MoonGlowIntensity);
+        moonShader.SetUniform("uGlowExponent", WorldGenerationConfig.MoonGlowExponent);
+        moonShader.SetUniform("uMoonColor", MoonColorLinear * WorldGenerationConfig.MoonIntensity);
+        moonShader.SetUniform("uVisibility", _moonVisibility);
+
+        _sunQuad.Render();
+
+        gl.BindVertexArray(0);
+        gl.DepthMask(true);
+        gl.Enable(EnableCap.DepthTest);
+    }
+
+    // The moon's cool white tint, authored in sRGB like every palette colour and decoded once
+    private static readonly Vector3 MoonColorLinear = ColorSpace.SrgbToLinear(new Vector3(0.9f, 0.94f, 1f));
 
     /// <summary>
     /// Draws the sun: a textured disc surrounded by a radial glow, on one screen-facing quad.
@@ -4235,6 +4302,8 @@ public class RenderManager : IDisposable
         shadowShader.Dispose();
         chunkShadowShader.Dispose();
         sunShader.Dispose();
+        moonShader.Dispose();
+        gl.DeleteTexture(_moonTexture);
         _clouds?.Dispose();
         _cloudShadow?.Dispose();
         _skyDome?.Dispose();

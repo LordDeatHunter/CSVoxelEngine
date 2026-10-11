@@ -343,6 +343,21 @@ the lobe and thinness are computed only where the lobe is non-zero. GL-free twin
 (`CloudSilverLiningTests`); `visual-examples/cloud-silver-lining.json` (`VOXEL_TIME` 343, 400, 147)
 frames it.
 
+**Moon (V-6).** `RenderManager.RenderMoon`, called by `RenderSky` right after `RenderSun` (so the
+mirror draws it too and the Snell window shows it through the scene copy), draws the sun's quad and
+`sun-vertex.glsl` again opposite the sun (`-_sunDir`), additively and depth-free, with the full-disc
+sprite `assets/textures/environment/moon.png` and `moon-fragment.glsl`, which shades the phase over
+it: each disc point gets a sphere normal and is lit where it faces `MoonPhase.LightDirection`,
+softened over `MoonTerminatorSoftness`, the unlit part keeping `MoonEarthshine`; a faint halo grows
+with the lit share. `MoonPhase` (GL-free) picks the phase: `DayIndex` counts whole days from the
+first noon (`DayCycle.NoonTime`), so it steps at noon while the moon is below the horizon, day 0 (a
+new world's first night) is full and the cycle is `MoonCycleDays` long. It fades in and out with
+the stars (`MoonPhase.Visibility` = `StarField.Visibility`) and out in lava, and the dome hides the
+stars behind its disc (`uMoonMask`, `SkyDomeFrame.MoonVisibility`). `MoonPhaseTests` (the phase
+never changes in view, the shaded share matches `IlluminatedFraction`, waxing lit on the right);
+`visual-examples/moon.json` (`VOXEL_TIME` 700 full, 3100 last quarter, 4300 crescent, 5500 new,
+7900 first quarter) frames it.
+
 **Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
 heading turns slowly (`WorldGenerationConfig.Wind*`), with `Wind.Offset` its bounded closed-form
 integral. Leaf sway reads it in both vertex shaders (`uWind`, the direction scaled by `WindLean`,
@@ -825,6 +840,7 @@ OpenGLTest/
     StarField.cs               # GL-free twin of the night dome's star field (cells, hash, visibility)
     SunGlare.cs                # GL-free sun lens glare: per-frame intensity and its sky falloff
     CloudSilverLining.cs       # GL-free twin of the clouds' silver lining: sun gate, forward lobe, thinness along the view
+    MoonPhase.cs               # GL-free moon: the day's phase (steps at noon), its light direction, lit share, visibility
     BlockLightPalette.cs       # GL-free 8-slot block-light colour palette (slot 0 = the default warm torch colour)
     LightTint.cs               # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
     BiomeTint.cs               # GL-free biome tint: Climate -> palette -> vertex tint on a 16-block lattice, Gain, Shade, CellTint

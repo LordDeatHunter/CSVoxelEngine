@@ -60,6 +60,12 @@ uniform vec3 uEye;            // the eye the dome is seen from (the mirrored one
 uniform vec3 uGlareColor;
 uniform float uGlareExponent;
 
+// The moon (drawn after the dome by moon-fragment.glsl, opposite the sun) hides the stars behind its
+// disc, including its unlit part: how visible it is this frame, and the cos of the outer and inner
+// radius of the starless disc (feathered by a pixel or so).
+uniform float uMoonVisibility;
+uniform vec2 uMoonMask;
+
 out vec4 FragColor;
 
 const float QuarterPi = 0.78539816;
@@ -197,11 +203,11 @@ void main()
     // SunGlare.Radial; added in main only, like the stars, so the fog never sees it
     col += uGlareColor * pow(max(dot(dir, uSunDir), 0.0), uGlareExponent);
 
-    // V-6: the moon (visibility from -elevation) is still to come, here beside the stars
     if (uStarVisibility > 0.0 && dir.y > 0.0) {
         float fade = uStarVisibility
                    * smoothstep(0.0, uStarHorizonFade, dir.y)                   // horizon haze
-                   * (1.0 - smoothstep(uStarSunMask.x, uStarSunMask.y, dot(dir, uSunDir))); // sun disc
+                   * (1.0 - smoothstep(uStarSunMask.x, uStarSunMask.y, dot(dir, uSunDir))) // sun disc
+                   * (1.0 - uMoonVisibility * smoothstep(uMoonMask.x, uMoonMask.y, dot(dir, -uSunDir))); // moon disc
         if (fade > 0.0) {
             // Star space turns with the sun (StarField.ToStarSpace), so the stars set with it
             vec3 sd = vec3(uStarSpin.x * dir.x + uStarSpin.y * dir.y,

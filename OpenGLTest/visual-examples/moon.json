@@ -1,0 +1,36 @@
+// Moon check (MoonPhase, RenderManager.RenderMoon, moon-fragment.glsl): the disc opposite the sun,
+// the day's phase shaded over it, the stars hidden behind it, and the moon in the water mirror and
+// in the Snell window. Run from OpenGLTest/, once per time, copying visual/moon/ aside between runs:
+//   $env:VOXEL_SCRIPT='visual-examples/moon.json'; $env:VOXEL_TIME='<t>'
+//   bin/Release/net9.0/silkgltriangle.exe
+// Times: 700 (night of day 0: full), 1900 (day 1: waning gibbous), 3100 (day 2: last quarter, the
+// left half lit), 4300 (day 3: waning crescent), 5500 (day 4: new, only the earthshine), 7900
+// (day 6: first quarter, the right half lit). Each is the same hour, so the moon stands in the same
+// place: ~10 s in it is at yaw ~-61, pitch ~67.
+// Camera.IsEyeInWater and the physics only update during wait/walk/mine, so every shot after a
+// teleport is preceded by a wait.
+{
+  "steps": [
+    { "op": "wait", "seconds": 5 },
+    { "op": "fly" },
+    // Above the cloud layer, straight at the moon, then a wider frame of it among the stars.
+    { "op": "teleport", "pos": [0.5, 200.5, 0.5], "yaw": -61, "pitch": 67 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "moon", "hideHud": true },
+    { "op": "teleport", "pos": [0.5, 200.5, 0.5], "yaw": -61, "pitch": 45 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "moon_sky", "hideHud": true },
+    // From the ground, under the clouds: drifting clouds pass in front of it.
+    { "op": "teleport", "pos": [0.5, 130.5, 0.5], "yaw": -61, "pitch": 60 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "moon_under_clouds", "hideHud": true },
+    // The water mirror over open sea: the moon reflected below the horizon.
+    { "op": "teleport", "pos": [360.5, 12.5, 136.5], "yaw": -61, "pitch": -55 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "moon_mirror", "hideHud": true },
+    // Underwater, looking up through the surface: the Snell window shows it.
+    { "op": "teleport", "pos": [360.5, -3.5, 136.5], "yaw": -61, "pitch": 67 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "moon_snell", "hideHud": true }
+  ]
+}

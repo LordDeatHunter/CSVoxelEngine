@@ -430,6 +430,31 @@ public const float DayLengthSeconds = 1200f;
     public const float StarTwinkleRateMin = 0.25f;
     public const float StarTwinkleRateMax = 1.2f;
 
+    // --- Moon (MoonPhase, RenderManager.RenderMoon, moon-fragment.glsl) ---
+    /// <summary>Days from one full moon to the next; the phase steps once a day, at noon.</summary>
+    public const int MoonCycleDays = 8;
+
+    /// <summary>Angular radius of the moon disc in degrees (exaggerated like the sun's).</summary>
+    public const float MoonAngularRadiusDeg = 2.6f;
+
+    /// <summary>Radius of the moon quad as a multiple of the disc: the extra ring holds its faint halo.</summary>
+    public const float MoonGlowScale = 2.2f;
+
+    /// <summary>Peak brightness of the halo at the disc's edge, scaled by how much of the disc is lit.</summary>
+    public const float MoonGlowIntensity = 0.1f;
+
+    /// <summary>Falloff exponent of the halo from the disc outwards.</summary>
+    public const float MoonGlowExponent = 3f;
+
+    /// <summary>Linear HDR brightness of the lit disc (times its sprite and its cool tint).</summary>
+    public const float MoonIntensity = 1.6f;
+
+    /// <summary>Share of the lit brightness the unlit part keeps (earthshine), so a crescent still shows its whole disc faintly.</summary>
+    public const float MoonEarthshine = 0.025f;
+
+    /// <summary>Half-width of the soft terminator between the lit and dark parts, in units of the sphere normal's dot with the light.</summary>
+    public const float MoonTerminatorSoftness = 0.06f;
+
     // --- Clouds ---
     // One static field of CloudCellSize-block cells (CloudField) drawn 3x3 around the camera by
     // CloudRenderer. Cell levels come from periodic value noise, so the field tiles with no seam.

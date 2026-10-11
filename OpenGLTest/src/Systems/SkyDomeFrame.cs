@@ -14,5 +14,6 @@ namespace silkgltriangle;
 /// <param name="Eye">Where the dome is seen from, for the cloud cover along each view ray.</param>
 /// <param name="CloudDrift">The cloud layer's wrapped drift this frame (<see cref="CloudCopies.Drift"/>).</param>
 /// <param name="GlareColor">The linear sun colour times <see cref="SunGlare.Intensity"/>; zero turns the glare off.</param>
+/// <param name="MoonVisibility">How visible the moon is (<see cref="MoonPhase.Visibility"/>): the stars behind its disc are hidden by that much.</param>
 public readonly record struct SkyDomeFrame(float StarVisibility, float StarSpin, float StarTime, Vector3 Eye,
-    Vector2 CloudDrift, Vector3 GlareColor);
+    Vector2 CloudDrift, Vector3 GlareColor, float MoonVisibility = 0f);
