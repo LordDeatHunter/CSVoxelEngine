@@ -1,0 +1,20 @@
+{
+  // A shore reed: a cross tile of stalks standing in the shallows or on the very edge
+  // (ReedGenerator). Cutout, swaying, unsupported without its ground like the other plants, and
+  // dropping nothing; the tile is a placeholder from tools/generate-pond-plants.py.
+  "name": "Reed",
+  "model": { "parent": "block/cross", "textures": { "cross": "reed" } },
+  "hardness": 0,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "cutout": true,
+  "sway": true,
+  "light": { "passes": true },
+  "hasItem": false,
+  "needsSupport": true,
+  "blocksSight": false,
+  "replaceableByPlacement": true,
+  "loot": "none",
+  "hitbox": { "min": [0.2, 0, 0.2], "max": [0.8, 1, 0.8] }
+}

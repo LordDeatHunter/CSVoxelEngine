@@ -1,0 +1,17 @@
+{
+  // A lily pad: a flat pad floating on a still lake's surface, stamped by LilyPadGenerator on the
+  // cell above the lake's top water cell. No needsSupport (water cannot hold a block up); a thin
+  // hitbox, walked through. The tile is a placeholder from tools/generate-pond-plants.py.
+  "name": "Lily Pad",
+  "model": { "parent": "block/lily_pad", "textures": { "pad": "lily_pad" } },
+  "hardness": 0,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "cutout": true,
+  "light": { "passes": true },
+  "hasItem": false,
+  "blocksSight": false,
+  "loot": "none",
+  "hitbox": { "min": [0, 0, 0], "max": [1, 0.0625, 1] }
+}

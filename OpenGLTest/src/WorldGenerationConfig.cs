@@ -2141,6 +2141,21 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int BoulderMinBlocks = 2;
     public const int BoulderMaxBlocks = 4;
 
+    // --- Reeds (ReedGenerator): clumps of reeds on the columns at a water's edge ---
+    public const bool ReedsEnabled = true;
+    public const int ReedCellShift = 5;
+    public const float ReedClumpChance = 0.6f;
+    public const int ReedRadius = 2;
+    public const int ReedJitter = 2;
+    public const int ReedMinMembers = 2;
+    public const float ReedEdgeDensity = 0.35f;
+    // The edge band: ground this far under the water level (or level with it) takes reeds
+    public const int ReedShallowDepth = 1;
+
+    // --- Lily pads (LilyPadGenerator): a pad on a still lake's surface ---
+    public const bool LilyPadsEnabled = true;
+    public const float LilyPadChance = 0.35f;
+
     // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
     // first notices a player (the same moment its first-throw delay starts) ---
     public const float GoblinNoticePipSeconds = 0.9f;

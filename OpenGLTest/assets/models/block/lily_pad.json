@@ -1,0 +1,19 @@
+{
+  // One flat pad a texel high, the whole cell across (the lily pad's model): its own tile on every
+  // face, the sides cropped to the pad's one-texel edge.
+  "textures": { "pad": "lily_pad" },
+  "elements": [
+    {
+      "from": [0, 0, 0],
+      "to": [16, 1, 16],
+      "faces": {
+        "up": { "uv": [0, 0, 16, 16], "texture": "#pad" },
+        "down": { "uv": [0, 0, 16, 16], "texture": "#pad" },
+        "north": { "uv": [0, 0, 16, 1], "texture": "#pad" },
+        "south": { "uv": [0, 0, 16, 1], "texture": "#pad" },
+        "west": { "uv": [0, 0, 16, 1], "texture": "#pad" },
+        "east": { "uv": [0, 0, 16, 1], "texture": "#pad" }
+      }
+    }
+  ]
+}

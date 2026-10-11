@@ -508,6 +508,14 @@ public class Chunk : IDisposable
         if (WorldGenerationConfig.BouldersEnabled)
             BoulderGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
 
+        // Pond plants, after the water: reeds may replace the shallow cell they stand in, and a
+        // lily pad floats on the cell above a lake's top water cell
+        if (WorldGenerationConfig.ReedsEnabled)
+            ReedGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
+
+        if (WorldGenerationConfig.LilyPadsEnabled)
+            LilyPadGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
+
         // Frozen-only ice spikes go down before the snow, so a spike keeps its base cell
         if (WorldGenerationConfig.SnowAndIceEnabled)
             IceSpikeGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
