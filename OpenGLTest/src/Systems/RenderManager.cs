@@ -847,6 +847,11 @@ public class RenderManager : IDisposable
         program.SetUniform("uSnowLayer", (float)ContentRegistry.RequireBlock("snow").Top);
         program.SetUniform("uSnowSparkle", WorldGenerationConfig.SnowSparkleStrength);
         program.SetUniform("uSnowSparkleDensity", WorldGenerationConfig.SnowSparkleDensity);
+        // Leaves lit through from behind (LeafBacklight); strength 0 (the ItemDebugger) leaves it off
+        program.SetUniform("uLeafBacklight", WorldGenerationConfig.LeafBacklightStrength);
+        program.SetUniform("uLeafBacklightPower", WorldGenerationConfig.LeafBacklightPower);
+        program.SetUniform("uLeafBacklightReach", WorldGenerationConfig.LeafBacklightReachBlocks);
+        program.SetUniform("uLeafBacklightTint", ColorSpace.SrgbToLinear(WorldGenerationConfig.LeafBacklightTint));
         program.SetUniform("uReflValid", 0f);
         // The water model's tuning constants never change at runtime, so they go up once here
         // instead of riding ApplyFrameUniforms every frame.

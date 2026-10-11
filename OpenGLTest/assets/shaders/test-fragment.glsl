@@ -33,6 +33,7 @@ flat in float fWaterSurfaceY;
 in vec3 fWaterFlow; // flow xy * strength, z = falling (fluid quads only; see test-vertex.glsl)
 flat in float fAlpha; // per-draw fade from the vertex stage: a uniform cannot vary inside one multi-draw
 flat in float fTintGain; // BiomeTint.Gain on a biome-tinted face (Vertex.Normal bit 4), else 1
+flat in float fSwayFlag; // 1 on a leaf-sway face (Vertex.Normal bit 5: leaves, rooted plants), else 0
 
 // One slice per block tile; UVs are tile-local and REPEAT across merged quads.
 uniform sampler2DArray uTextureAtlas;
@@ -48,6 +49,13 @@ uniform float uOreSpecScale;  // WorldGenerationConfig.OreSpecLinearScale
 uniform float uSnowLayer;
 uniform float uSnowSparkle;
 uniform float uSnowSparkleDensity;
+// Leaf backlight (LeafBacklight is the twin): the strength (0, the default and the ItemDebugger's,
+// switches it off), the exponent of the lobe around the sun, how far toward the sun the
+// light-through test looks, in blocks, and the linear tint of the light a leaf lets through.
+uniform float uLeafBacklight;
+uniform float uLeafBacklightPower;
+uniform float uLeafBacklightReach;
+uniform vec3 uLeafBacklightTint;
 // How reflective each atlas slice is: (metallic, roughness, normalStrength, unused). Keyed by
 // tile rather than by block, which is what keeps this feature off the vertex entirely - fLayer
 // already rides every vertex. See TileMaterials.
@@ -677,6 +685,23 @@ void main() {
         if (gate > 0.0)
             col += uSunColor * (uSunIntensity * uSnowSparkle * gate
                                 * SnowGlint(fWorldPos, N, fTangent, fBitangent, Vs));
+    }
+
+    // Leaf backlight, on leaf-sway faces only (canopy leaves and rooted plants, bit 5): a leaf
+    // between the eye and the sun glows warm, lit through. The lobe is a power of how directly
+    // the view ray points at the sun. Whether sunlight reaches this leaf at all is the shadow map
+    // read a little toward the sun from it, with the sun as the normal: the faces the eye sees
+    // from the dark side face away from the sun and read as self-shadowed at their own position,
+    // so only a crown's thin, sunlit rim lets light through while leaves deep in its own shadow
+    // stay dark. The shadow pass is untouched. GL-free twin: LeafBacklight.Weight.
+    if (uLeafBacklight > 0.0 && fSwayFlag > 0.5) {
+        float forward = dot((fWorldPos - uCameraPos) / max(dist, 1e-4), uSunDir);
+        float gate = pow(max(forward, 0.0), uLeafBacklightPower) * fSun * cloudShadow
+                   * smoothstep(0.0, 0.1, uSunDir.y) * smoothstep(0.0, 0.2, uSunIntensity) * (1.0 - uUnderwater);
+        if (gate > 0.001) {
+            float through = SampleShadow(fWorldPos + uSunDir * uLeafBacklightReach, uSunDir, 1.0, uShadowStrength);
+            col += albedo * uLeafBacklightTint * uSunColor * (uSunIntensity * uLeafBacklight * gate * through);
+        }
     }
 
     if (fSubmerged > 0.5 && !isWater && dist < 96.0 && fWorldPos.y <= fWaterSurfaceY) {

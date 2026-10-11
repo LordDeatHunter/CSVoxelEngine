@@ -733,6 +733,21 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>Share of the snow tile's texels that carry a glinting facet at all (uSnowSparkleDensity).</summary>
     public const float SnowSparkleDensity = 0.15f;
 
+    // --- Leaf backlight (test-fragment.glsl, LeafBacklight) ---
+    /// <summary>
+    /// Brightness of the light a leaf lets through when it stands between the eye and the sun, as a
+    /// multiple of the direct sun on its tinted albedo (uLeafBacklight). 0 switches the term off.
+    /// </summary>
+    public const float LeafBacklightStrength = 0.9f;
+    /// <summary>Exponent of the backlight's lobe around the sun: higher keeps the glow closer to the
+    /// sun's direction (6 is about half strength 25 degrees off it).</summary>
+    public const float LeafBacklightPower = 6f;
+    /// <summary>How far toward the sun, in blocks, the shadow map is read to decide whether sunlight
+    /// reaches a leaf from behind: a crown thinner than this along the sun glows, a thicker one stays dark.</summary>
+    public const float LeafBacklightReachBlocks = 1.5f;
+    /// <summary>Tint of the transmitted light over the leaf's own albedo, authored in sRGB (warm).</summary>
+    public static readonly Vector3 LeafBacklightTint = new(1f, 0.9f, 0.6f);
+
     // --- Wet albedo (test-fragment.glsl, SH-22) ---
     // Albedo multiplier on a submerged face below its own baked water surface. Dry faces beside or
     // above the water are never darkened: the old wet band tinted dry beach tops and banks.

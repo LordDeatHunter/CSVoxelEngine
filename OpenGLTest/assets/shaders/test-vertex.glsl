@@ -65,6 +65,9 @@ out float fSubmerged;
 flat out float fAlpha;
 // BiomeTint.Gain on a biome-tinted face (Vertex.Normal bit 4), 1 everywhere else.
 flat out float fTintGain;
+// 1 on a leaf-sway face (Vertex.Normal bit 5: canopy leaves and rooted plants), 0 everywhere else.
+// The fragment stage lights these through from behind (the leaf backlight).
+flat out float fSwayFlag;
 // World Y of the water surface above a submerged face (0 elsewhere, decoding far below any
 // face).
 flat out float fWaterSurfaceY;
@@ -153,6 +156,7 @@ void main() {
     // the fragment scales it back.
     bool biomeTinted = (vNormalBits & 16u) != 0u;
     fTintGain = biomeTinted ? 4.0 : 1.0;
+    fSwayFlag = swaying ? 1.0 : 0.0;
 #ifndef CHUNK_DRAW
     if (biomeTinted) fColor.rgb *= uBiomeTint;
 #endif

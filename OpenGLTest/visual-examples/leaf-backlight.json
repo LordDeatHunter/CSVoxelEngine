@@ -1,0 +1,26 @@
+{
+  // Leaf backlight check: run from OpenGLTest/ with
+  //   VOXEL_TIME=1100 VOXEL_SCRIPT=visual-examples/leaf-backlight.json
+  // Shots land in visual/leaf-backlight/. VOXEL_TIME=1100 is the next morning: by the shots (about
+  // 1115) the sun stands roughly 20 degrees up toward yaw ~25 (+X, a little +Z). The camera hovers
+  // over the forest meadow west of the oak at (-79, 14, -2) (crown top y 24, see grass-tint.json):
+  //   toward_sun       the oak's crown right in front of the sun: its sunlit edges should glow warm,
+  //                    lit through, while leaves deep in the crown's own shadow stay dark
+  //                    (LeafBacklight, test-fragment.glsl)
+  //   toward_sun_wide  the row of crowns beside the sun, where the glow falls off with the angle
+  //   away_from_sun    the same meadow with the sun at the camera's back: the term is zero
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-92.5, 40.5, 2.5], "yaw": 15, "pitch": -10 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-91.5, 16.5, -7.5], "yaw": 26, "pitch": 16 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "toward_sun", "hideHud": true },
+    { "op": "teleport", "pos": [-92.5, 18.5, 2.5], "yaw": 0, "pitch": 6 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "toward_sun_wide", "hideHud": true },
+    { "op": "teleport", "pos": [-92.5, 18.5, 2.5], "yaw": 195, "pitch": 6 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "away_from_sun", "hideHud": true }
+  ]
+}

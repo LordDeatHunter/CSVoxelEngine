@@ -345,6 +345,19 @@ with back faces culled, so each pixel blends exactly one face of a beam: with bo
 alpha `a` read as `1-(1-a)^2` and the breath all but vanished. `SelectionPulseTests`,
 `visual-examples/selection-pulse.json` (`VOXEL_TIME=147`).
 
+**Leaf backlight.** A leaf-sway face (bit 5: canopy leaves and rooted plants; `test-vertex.glsl`
+hands the fragment the flag as the flat `fSwayFlag`, outside the guarded sway block) standing
+between the eye and the sun glows warm, as if lit through: the world fragment adds
+`albedo * LeafBacklightTint * sun` scaled by `LeafBacklightStrength` and a
+`pow(dot(viewRay, sunDir), LeafBacklightPower)` lobe, gated by skylight, the cloud shadow, a risen
+sun and dry eyes. Whether sunlight reaches the leaf from behind is the shadow map read
+`LeafBacklightReachBlocks` toward the sun from it with the sun as the normal (the faces the eye sees
+from the dark side read as self-shadowed at their own position), so a crown's thin, sunlit rim
+lights up while leaves deep in its own shadow stay dark; the shadow pass is untouched.
+`LeafBacklight.Weight` is the GL-free twin (`LeafBacklightTests`); `uLeafBacklight` 0 (the
+ItemDebugger) switches it off. `visual-examples/leaf-backlight.json` (`VOXEL_TIME=1100`, a morning
+sun behind an oak crown).
+
 Shaders (`assets/shaders/**/*.glsl`), textures (`assets/textures/**/*.png`), fonts (`assets/fonts/**/*.ttf`) and all content JSON (`assets/**/*.json` — blocks, items, loot tables, models) are copied to the output directory via `CopyToOutputDirectory` rules in the csproj — **new asset types/extensions need a matching `<None Update>` entry** or they won't be found at runtime. The JSON rule is a wildcard over the whole `assets` tree, so adding a block, item, loot table or model needs no csproj edit.
 
 Assets are opened by **relative** path (`FileUtils.ReadFile("assets/shaders/...")`, `TextureAtlas.Build(gl, "assets/textures/blocks")` in `RenderManager.LoadResources`), so the app must be launched with a working directory that contains `assets/` — either the build output directory or `OpenGLTest/`. `dotnet run --project OpenGLTest/silkgltriangle.csproj` satisfies this (it runs from the project folder); launching the built executable from an arbitrary directory does not.
@@ -615,6 +628,7 @@ OpenGLTest/
     LightFlicker.cs            # GL-free per-cell flicker phase + curve for the campfire point lights
     SelectionOutlineMesh.cs    # GL-free selection outline: the 12 box edges as thin beams (no glLineWidth)
     SelectionPulse.cs          # GL-free twin of the outline's breathing opacity (steady while mining)
+    LeafBacklight.cs           # GL-free twin of the leaf backlight: lobe around the sun, sun and light-through gates
     ChunkGenerationWorker.cs   # background threads creating chunks around every streaming focus (one
                                #   ChunkScanFrontier per focus, served round-robin)
     Camera.cs                  # FPS camera pose, view/proj cache, shoulder/orbit modes; movement+physics and the DDA
