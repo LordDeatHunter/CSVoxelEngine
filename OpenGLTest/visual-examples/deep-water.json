@@ -1,0 +1,35 @@
+{
+  // Deep-water darkness check: run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/deep-water.json
+  // Shots land in visual/deep-water/. Flight holds every pose under water (it ignores the water's
+  // physics, while the eye still counts as submerged), and each shot looks level into open water,
+  // so the frame is mostly the underwater fog: it should read darker and bluer (red lost first) the
+  // deeper the eye is below the surface (DeepWaterFog, test-fragment.glsl's uDeepWaterDim).
+  //   sea_1 / sea_5 / sea_9   the warm sea at x~432, z~0 (10+ blocks deep, sea level 0; see
+  //                           swim-bubbles.json) at 1.5, 5.5 and 9 blocks down
+  //   basin_3 / basin_26      biomes.json's deep basin at (59, 943) (floor ~-30, a frozen sea: the
+  //                           surface is ice) at 3 and 26 blocks down
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [432.5, 10.5, 0.5], "yaw": 0, "pitch": -20 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [432.5, -1.5, 0.5], "yaw": 0, "pitch": -4 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "sea_1", "hideHud": true },
+    { "op": "teleport", "pos": [432.5, -5.5, 0.5], "yaw": 0, "pitch": -4 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "sea_5", "hideHud": true },
+    { "op": "teleport", "pos": [432.5, -9.0, 0.5], "yaw": 0, "pitch": -4 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "sea_9", "hideHud": true },
+
+    { "op": "teleport", "pos": [58.5, 9.5, 943.5], "yaw": 20, "pitch": -25 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [58.5, -3.0, 943.5], "yaw": 20, "pitch": 0 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "basin_3", "hideHud": true },
+    { "op": "teleport", "pos": [58.5, -26.0, 943.5], "yaw": 20, "pitch": 0 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "basin_26", "hideHud": true }
+  ]
+}

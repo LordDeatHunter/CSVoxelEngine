@@ -1041,6 +1041,13 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float UnderwaterFadeSeconds = 0.15f;
     public const float UnderwaterFogNearBlocks = 1f;
     public const float UnderwaterFogFarBlocks = 48f;
+    // Deep-water darkness (DeepWaterFog, test-fragment.glsl's uDeepWaterDim): the underwater fog
+    // darkens and loses red the deeper the eye is below the surface. The dim approaches
+    // DeepWaterFogMaxDim (never pitch black) over a depth scale; each channel loses at its own rate,
+    // red first. MaxDim 0 switches it off.
+    public const float DeepWaterFogMaxDim = 0.85f;
+    public const float DeepWaterFogScaleBlocks = 16f;
+    public static readonly Vector3 DeepWaterFogLoss = new(1.6f, 1.0f, 0.8f);
 
     // --- Lava ---
     // Deep cave floors pond over with lava sources where a patch mask and a per-cell roll

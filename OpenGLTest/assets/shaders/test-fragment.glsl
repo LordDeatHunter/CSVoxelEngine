@@ -114,6 +114,9 @@ uniform vec3 uSkyGlow;
 uniform vec4 uSkyShape;       // x horizon band, y haze width, z haze strength, w glow exponent
 // 0 dry, 1 fully underwater/in lava: blends the dome-sampled fog back to the flat uFogColor.
 uniform float uFogWet;
+// Deep-water darkness (DeepWaterFog): how much the wet fog colour is dimmed per channel with the
+// eye's depth below the water surface; 0 (dry, in lava, and the ItemDebugger's default) leaves it.
+uniform vec3 uDeepWaterDim;
 uniform int uNumPointLights;
 uniform vec3 uPointPos[8];
 uniform vec3 uPointColor[8];
@@ -1008,7 +1011,8 @@ void main() {
         // the water body below, and the underwater fog colour (already blended to the tint by
         // SetLighting, dimmed by skylight just below) stands in for that scene. The sea-level
         // mirror is only valid for a face seen from above, whatever height the eye is at.
-        vec3 refl = uFogColor;
+        // (darkened with the eye's depth like the fog it stands in for: the deep-water darkness)
+        vec3 refl = uFogColor * (1.0 - uDeepWaterDim);
         if (uReflValid > 0.5 && !fromBehind) {
             vec4 rp = uReflViewProj * vec4(fWorldPos, 1.0);
             vec2 rbase = rp.xy / rp.w * 0.5 + 0.5;
@@ -1061,10 +1065,13 @@ void main() {
     // keeps the cost at zero inside FogNear; underwater (uFogWet ~1) the sample would be
     // thrown away, so it is skipped. In the mirror pass uCameraPos is the mirrored eye.
     if (f > 0.0) {
-        vec3 fogCol = uFogColor;
+        // Deep-water darkness: underwater the flat fog colour darkens and loses red with the eye's
+        // depth below the surface (uDeepWaterDim, from DeepWaterFog; zero dry and in lava).
+        vec3 wetFogColor = uFogColor * (1.0 - uDeepWaterDim);
+        vec3 fogCol = wetFogColor;
         if (uFogWet < 0.999) {
             vec3 fogDir = (fWorldPos - uCameraPos) / max(dist, 1e-4);
-            fogCol = mix(SkySample(fogDir), uFogColor, uFogWet);
+            fogCol = mix(SkySample(fogDir), wetFogColor, uFogWet);
         }
         // Squared ramp, mixed in display space in dry air: the same f*f mix done in linear
         // light reads visibly hazier (a half-fogged dark forest lands far brighter once

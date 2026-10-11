@@ -375,6 +375,10 @@ public class RenderManager : IDisposable
     // into the scene copies.
     private Matrix4x4 _sceneViewProj = Matrix4x4.Identity;
 
+    // The eye's depth below its own water surface (Camera.EyeWaterSurfaceY), read in BeginFrame for
+    // the deep-water darkness (DeepWaterFog); 0 while the eye is dry or in lava
+    private float _eyeWaterDepth;
+
     // Underwater tint: the eye state is a hard flag, so it is eased into _underwaterT
     // (0 = above water, 1 = fully submerged) over UnderwaterFadeSeconds
     private static readonly Vector3 UnderwaterFogColor = new(0.05f, 0.22f, 0.42f);
@@ -2117,6 +2121,9 @@ public class RenderManager : IDisposable
         chunkShader.SetUniform(_locChunkAlphaCutoff, WorldGenerationConfig.AlphaCutoff);
         worldShader.Use();
         worldShader.SetUniform(_locAlphaCutoff, WorldGenerationConfig.AlphaCutoff);
+        _eyeWaterDepth = camera is { IsEyeInWater: true, IsEyeInLava: false }
+            ? camera.EyeWaterSurfaceY - camera.RenderEye.Y
+            : 0f;
         ApplyFrameUniforms();
         gl.Enable(EnableCap.Blend);
         // The world passes rely on straight alpha blending for the fluid mesh and the chunk
@@ -2421,6 +2428,10 @@ public class RenderManager : IDisposable
         program.SetUniform("uSceneViewProj", _sceneViewProj);
         program.SetUniform("uShadowStrengthDry", _shadowStrengthDry);
         program.SetUniform("uUnderwater", _eyeInLava ? 0f : MathUtils.SmoothStep(_underwaterT));
+        // The wet fog darkens and loses red with the eye's depth (DeepWaterFog), eased in with the
+        // underwater tint; nothing in lava, whose fog is its own red glow
+        program.SetUniform("uDeepWaterDim",
+            _eyeInLava ? Vector3.Zero : DeepWaterFog.Dim(_eyeWaterDepth) * MathUtils.SmoothStep(_underwaterT));
     }
 
     /// <summary>
