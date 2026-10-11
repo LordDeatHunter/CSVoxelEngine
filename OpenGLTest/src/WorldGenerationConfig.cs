@@ -2214,6 +2214,25 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int WellCellShift = 7;
     public const float WellChance = 0.06f;
 
+    // --- Geodes (GeodeGenerator): a crystal-lined hollow sphere deep in rock ---
+    public const bool GeodesEnabled = true;
+    public const int GeodeCellShift = 7;
+    public const float GeodeChance = 0.25f;
+    // The depth band the centres sit in, and the radius range
+    public const int GeodeMinY = -48;
+    public const int GeodeMaxY = -16;
+    public const int GeodeMinRadius = 2;
+    public const int GeodeMaxRadius = 3;
+
+    // --- Meteor craters (MeteorGenerator): a rare obsidian-lined bowl in the land ---
+    public const bool MeteorsEnabled = true;
+    public const int MeteorCellShift = 8;
+    public const float MeteorChance = 0.06f;
+    public const int MeteorMinRadius = 4;
+    public const int MeteorMaxRadius = 7;
+    // Bowl depth per block inside the rim: the centre is radius * this deep
+    public const float MeteorBowlSlope = 0.6f;
+
     // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
     // first notices a player (the same moment its first-throw delay starts) ---
     public const float GoblinNoticePipSeconds = 0.9f;

@@ -1,0 +1,10 @@
+{
+  // A geode's lining: rock shot through with pale crystal (GeodeGenerator). Shiny like an ore
+  // through the material path, which is keyed by this tile. The tile is a placeholder from
+  // tools/generate-crystal-texture.py.
+  "name": "Crystal Block",
+  "model": { "parent": "block/cube_all", "textures": { "all": "crystal_block" } },
+  "sfx": "hit_rock",
+  "hardness": 4,
+  "material": { "metallic": 0.6, "roughness": 0.25, "normalStrength": 1 }
+}
