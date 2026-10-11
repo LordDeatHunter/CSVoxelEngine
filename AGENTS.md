@@ -167,6 +167,28 @@ Environment variables for scripted captures:
 The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, `C` to toggle creative mode (placing costs nothing, breaking drops nothing; double-tap Space toggles flight, but only while creative — flight is noclip and Space/Left Ctrl move up/down while flying), Left Shift to sprint (1.5x on foot, 10x while flying), hold left-click to punch first, then mine: a mob (a slime or a goblin) inside the forward punch cone (3 blocks, 30° half-angle, line of sight required; only the nearest is hit) takes the held item's `entityDamage` (1 bare-hand, 3 for the primitive tools, 5 for the copper tools, 6 for the obsidian blade) and a knockback shove instead of being mined through (an item declaring `attack: "slice"` — the obsidian blade — instead swings a two-phase blade sweep: each click hits the nearest two mobs in the forward hemisphere of the same reach, the buffered return swing lands at half power, and the arm and blade are carried across the front), while a clear cone mines the targeted block (hit-based: one hit per the held item's `tool.hitDelayMs`, deals the item's `blockDamage`, 0.5 bare-hand, against the block's float `hardness`, declared in its JSON - 5 for most blocks, 8 for malachite ore, 24 for a full-cube trunk of the `tree_wood` logs and 1 for leaves; a tree-wood cell scales its block's `hardness` by the thickness in its `WoodState` (`Mining.HardnessOf`: `hardness * (tipHardness + (1 - tipHardness) * thickness / WoodState.FullCube)`, so the thinnest wood keeps `wood.tipHardness` of it and placed, detached wood is as hard as a trunk), and `0` means it pops on first contact like a pebble; a block with `requiresTool` and a `tools` dict needs a listed tool tag at or above its required tier, and the wrong tool whiffs for 0 damage and no progress; damage resets if you release, switch target or switch tool; instant while creative, which ignores the gate; a click with no block under the crosshair still swings the fist); a stepped crack-sprite overlay drawn on the block's faces via `break-*.glsl` from `assets/textures/environment/break_progress.png` (8 stacked 32x32 frames, the top one blank); each hit pops the block out and back via `RenderManager.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), 1-10 to pick one of the 10 hotbar slots, `E` for the list inventory (a search field sits over the tabs: typing names the owned items and the recipes that make or consume a matching thing, ranked with prefix hits and owned items first, and clicking a result picks the item or opens its recipe; blocks/tools/misc tabs with shared caps of 2048/8/2048; click a row to preview, click a hotbar slot to equip, same item again to unequip; the world keeps running and `E`/Escape closes it, and a focused field takes the keyboard so typing never moves the player). A new survival world starts with **nothing** (`Inventory.Empty`); `C` creative mode turns the same Blocks/Tools/Misc tabs into the **whole item catalog** (`CreativeCatalog`) - clicking a row grants one, each row's `[+1]` / `[+10]` / `[+100]` button grants that many, and a red `[X]` clears the id's counts (`Inventory.RemoveAll`), all through the ordinary            `Inventory.Add` - while the Craft tab keeps listing every recipe. `T` opens the chat (type, Enter sends, Escape closes, the arrow keys walk sent messages; while it is open the keyboard is captured so the player never moves while typing) and works in singleplayer and on a server. `X` to toggle debug logging               
            (FPS/position/water state to console), Escape to open the pause menu (RESUME / SETTINGS / SAVE & QUIT;        Escape on its settings page steps back to it, and on the main page resumes). SAVE & QUIT presents a `Saving...` frame, calls `World.SaveAndDispose` on the next update and returns to the main menu's worlds page. None of these keys act while a world is still loading.
 
+**HUD and feedback.** The crosshair is drawn as five pieces cropped out of its 16x16 texture (a
+centre dot and four pills): the arms slide outward with the eased `Camera.ThrowCharge` while a throw
+is charged, a ring of dots around it fills with `World.Crosshair.BreakProgress` (0 in creative or
+with no target), and the hit marker flashes an X at the two connecting-hit sites the hit-stop uses (a
+landed punch or slice), fading over `HitMarker.Seconds` (`HitMarkerTests`). Under it the **look-at
+label** shows the targeted block: its name and a small spinning 3D render of it under the crosshair
+(`UIRenderer.DrawLookLabel` over `BlockCubeCache`), the name in red while the held item cannot mine
+it, and "Unknown" with a flat dark silhouette until its item has been obtained; creative mode and a
+block with no item at all always know, and `X` adds id, state, sun/block light and cell debug lines
+(`LookLabel`, `World.LookAt`, `LookLabelTests`, `look-label.json`). "Obtained" is the inventory's own
+set (`Inventory.Knows`, marked in `Add`, saved as names in `player.json` and riding the
+`InventoryNetCodec` snapshot, so a server's player and a client agree), which also drives the
+"New: <name>" toast on a first pickup or `/give`. `HudToast` draws one line above the item-name row
+for the day toast ("Day N" as the sun rises through dawn), the inventory-full warning and the
+first-find toast; `HotbarNameFade` shows the selected item's name after a slot or item switch and
+`HotbarPickupPop` bumps a slot whose count rises. `ItemTooltip.Lines` builds the hover panel over the
+[E] panel's rows and the hotbar, and holding Tab draws the player list (a server session only). F2
+saves the finished frame through `VisualCapture`; F1 toggles `hudVisible`, the gate the scenario
+screenshot's `hideHud` drives. The chat commands are `/help`, `/tp x y z`, `/give <item> [count]`
+(the last two needing rights) and `/time day|night|<seconds>`; the death line is
+`DeathMessages.For` over the blow `PlayerHealth` recorded, drained into the chat (`TakeDeathMessage`).
+
 `X` also raises the **frame profiler overlay** under the FPS counter, and prints the same
 snapshot to the console once a second so a headless run's log carries it. Console writes go
 through the async `Log` queue (`OpenGLTest/src/Log.cs`), so a slow terminal never stalls the
@@ -892,6 +914,10 @@ OpenGLTest/
     MobFallDamage.cs           # GL-free mob fall damage: a share of the mob's pool per block past its safe height
     MobLava.cs                 # GL-free mob lava rule: body box in a burning fluid, damage per tick
     MobLoot.cs                 # GL-free loot toss: the up-and-out launch a killed mob's drops get
+    ContactDamage.cs           # GL-free contact damage a body takes standing against a cactus
+    GoblinTorches.cs           # GL-free torch roll for a goblin spawn (night, depth, one uniform roll)
+    ChatCommands.cs            # the chat command table: /help, /tp, /give, /time and their rights
+    DeathMessages.cs           # the death line from the blow PlayerHealth recorded
     MobInterest.cs             # GL-free per-mob interest: sight checks, losing a hidden target, idle
                                #   time, the idle despawn gate and wander goals
     LedgeProbe.cs              # GL-free ledge caution: the drop to the first ground ahead, safe-step rule
@@ -1070,6 +1096,16 @@ OpenGLTest/
       GameSettings.cs          # player settings with JSON persistence (settings.json)
       Compass.cs               # HUD compass heading math
       Chat.cs                  # ChatKind/ChatMessage, ChatView (log/input/history) and ChatLayout
+      CrosshairState.cs        # throw charge, break progress and hit marker, handed to the UI pass
+      HitMarker.cs             # the crosshair's connecting-hit X: its flash clock and fade
+      HudToast.cs              # one hold-then-fade HUD line (the day toast, a first find, packs full)
+      DayToast.cs              # the dawn watch behind "Day N"
+      HotbarNameFade.cs        # the selected item's name over the hearts after a switch
+      HotbarPickupPop.cs       # the bump a hotbar slot gets when its count rises
+      LookLabel.cs             # the look-at label's rule: name, "Unknown", the mineable flag
+      LookLabelState.cs        # what one frame's label draws: text, flags, cell, state byte, light
+      ItemTooltip.cs           # the hover panel's lines, built from the item's own fields
+      ScreenshotPaths.cs       # where F2's capture lands and what it is called
       Primitives.cs            # Vertex-layout mesh factories for simple shapes
     Items/                     # the Item class hierarchy ItemFactory hands out per use action
       Item.cs, ItemFactory.cs  # the abstract item; the per-use.action factory building the singletons
@@ -1205,6 +1241,23 @@ OpenGLTest/
       IceSpikeGenerator.cs     # rare single-column ice spikes on the barren frozen plains
       PlantClumps.cs           # GL-free clumped-plant rule over a PlantClumpSpec (cell, jitter, radius, core, falloff)
       CottonGenerator.cs       # wild cotton clumps on the dry forest fringe (PlantClumps + a climate gate)
+      FallenLogGenerator.cs    # a rare 3-5 cell detached oak log lying on the forest floor
+      BoulderGenerator.cs      # a rare 2-4 cell stone or cobblestone blob on the forest/taiga floor
+      CairnGenerator.cs        # a 3-cell cobblestone stack with a pebble hat on a local summit
+      RuinedPillarGenerator.cs # broken stone columns standing on the surface
+      DesertWellGenerator.cs   # the desert's ring-and-roof well, dug into sand over sandstone
+      SeaStackGenerator.cs     # stone stacks rising out of the sea near a shore
+      OasisGenerator.cs        # a desert oasis: a water disc, a grass ring and palms (worldgen.oasis)
+      ReedGenerator.cs         # shore reeds on the shallow water edge (PlantClumps)
+      LilyPadGenerator.cs      # lily pads floating on ponds (PlantClumps)
+      GlowMushroomGenerator.cs # lit mushrooms on dry, dark cave floors
+      CaveFormationGenerator.cs# stalactites and stalagmites in cave rooms
+      GeodeGenerator.cs        # a hollow, crystal-lined sphere deep in solid stone
+      MeteorGenerator.cs       # a blast crater with scattered meteor rock
+      HotSpringGenerator.cs    # steaming cave water bodies
+      UndergroundPoolGenerator.cs # still cave pools on carved floors
+      GravelPocketGenerator.cs # gravel and sand pockets buried in stone (falls blocks, see "Gravel pockets")
+      FlowerGenerator.cs       # meadow flowers on warm, open grass
       NoiseCaves.cs            # 3D-noise caves (cheese rooms, wide/narrow spaghetti, deep caverns) on a strided lattice
       WormCarver.cs            # worm-carved tunnels: per-XZ-cell deterministic paths, cached, carved sphere by sphere
       LavaGenerator.cs         # deep lava pockets: cave floors at/below LavaMaxY pond over inside patch mask + pool roll
@@ -1316,6 +1369,7 @@ trailing commas.
 | `stackSolidAt` | 0 | stack count at which a stack block turns solid, for a block whose partial stacks are walked through (layered snow at 16). Only legal from 1..`stackMax` on a `solid: false` stack block |
 | `hasItem` | true | enters the blocks pool and can be hotbarred; false for pebbles, branch piles, layered snow and the kiln's anchor and part (fluids force it off). Every `tree_wood` log and every leaf block keeps its item: placing one writes a detached full cube (`WoodState.Detached`) or a persistent leaf (`LeafState`), which never fells with a tree or decays |
 | `needsSupport` | false | pops, rolling its loot, when the block holding it up is emptied (the block below, or behind it with `support: "attached"`; `BlockSupport`), and is only placed against a solid holder; also makes the block replaceable, so a flow washes it away. Mining, blasts, felling and leaf decay pop it; a toppling falls block does not yet |
+| `flowResistant` | false | a `needsSupport` block a flow may not wash away (a cave formation is rock, not vegetation): the fluid tick treats the cell as a wall and only mining the block under it pops it. Only legal with `needsSupport` |
 | `support` | `"below"` | which neighbour holds a `needsSupport` block up: `below`, `above` (the cell over it: a hanging lantern, so it is placed against a block's underside, or wherever a solid block stands over the target cell; `BlockType.SupportAbove`) or `attached` (the cell behind its front, opposite the `facing` in its state byte: a wall torch). Only with `needsSupport`; `attached` also needs `facing` |
 | `facing` | none | `"horizontal"`: the state byte's low two bits are a facing (north -Z 0, south +Z 1, west -X 2, east +X 3); the model (no full-face quads) and `hitbox` are authored facing north and pre-turned to all four (`BlockType.RotatedModels`/`RotatedHitboxes`, `HorizontalFacing`). Only on the `model` renderer, never with `fluid`, `falls` or `stackMax` |
 | `facingFromLook` | false | a placement faces the block along the placing player's horizontal look (`Placement.LookFacing`: the dominant horizontal axis of `PlayerContext.ViewDirection`, so a server replays a `Place` intent by that player's own aim), whatever face was hit: stairs placed looking north climb north. Only with `facing`, never with `support: "attached"` |
@@ -1478,6 +1532,33 @@ a sweep); breaking that orphan drops the door as usual. The door tiles are from
 `DoorTests` covers placement, the two-cell refusal, breaking either half and the shared toggle;
 `doors.json` shoots two doors, one clicked open.
 
+**Stone bricks** (`stone_bricks`, four from four stone) are a plain `cube_all` building block on
+`stone_bricks`' own tile.
+
+**Slime block** (nine slimeballs) carries the `bounce` flag: a body that lands on it is sprung back
+up at `SlimeBlockBounceRestitution` of its impact and bills no fall damage (`FallTracker`'s cushioned
+landing); the tile comes from `tools/generate-slime-block-texture.py` (`SlimeBlockTests`).
+
+**Bandage** is the first `use.action: "heal"` item (`HealItem` -> `PlayerHealth.Heal`, refused at
+full health, `BandageHealAmount`), its sprite from `tools/generate-bandage-texture.py`
+(`HealItemTests`).
+
+**Ash fertilizer** (`use.action: "grow_tree"`) grows the tree of the column it is used on, resolving
+the species from the targeted block (`TreeSpeciesRegistry.ForBlock`, which resolves a wood two
+species share to the leafy owner) and refusing, spending nothing, where the cell holds no tree
+(`GrowTreeItemTests`). The **acorn** plants an oak sapling the same way (`AcornTests`), and
+`World.TryGrowTree` is the reactive growth path behind both (`### Trees`).
+
+**Flint from gravel**: the gravel loot table yields the flint inside it sometimes, so a gravel patch
+is worth digging (`GravelPocketTests` covers the pocket side).
+
+Two small interaction rules round the list out: **a cactus prick** hurts any body standing against
+the cactus' side (a `contact` block flag, billed like a mob's contact damage; `CactusPrickTests`),
+and **attacks pass through plants**: the punch and slice cones ignore non-solid plants (tall grass,
+flowers), so a mob behind one is still reachable. **A placement takes the plant's own cell** when
+the targeted block is `replaceableByPlacement` (the layered snow idiom), so building against a plant
+fills where it stands instead of hovering beside it (`PlacementTests`).
+
 ### Item schema (`assets/data/items/<name>.json`)
 
 ```json
@@ -1577,10 +1658,13 @@ One file per species; the file name is the species name (`TreeSpeciesRegistry.By
 the blocks** (`LoadTreeSpecies`; a missing folder is an empty registry), compiles each file through
 the pure `TreeSpeciesCompiler.Compile` (DTO `TreeSpeciesDefinition.cs`) into an immutable
 `TreeSpecies`, and every error starts `Tree species '<path>'`. Block references take an optional
-`block/` prefix and never resolve to an item. Five species ship: `oak`, `spruce` and `cactus`
-generate in the world, while `baobab` and `stone_pine` have **no `worldgen` block** and are only
-ever grown (`TreeGrowthWriter`, the `grow` op, the item debugger). See `### Trees` for what the
-fields drive.
+`block/` prefix and never resolve to an item. Seven species ship: `oak` (the forest), `spruce` (the
+taiga), the leafless `cactus` (the desert) and the leafless `dead_tree` (the desert and the frozen
+plains, which borrows the oak's wood — `TreeSpeciesRegistry.ForBlock` resolves a shared wood to the
+leafy owner, so the growth item never turns an oak into a snag) generate in the world; the `palm`
+generates only through its `worldgen.oasis` disc; and `baobab` and `stone_pine` have **no `worldgen`
+block** and are only ever grown (`TreeGrowthWriter`, the `grow` op, the item debugger). See
+`### Trees` for what the fields drive.
 
 | field | default | meaning |
 |---|---|---|
@@ -2702,10 +2786,14 @@ A desert column is sand over `SandstoneDepth` sandstone blocks, then stone; a fr
 rock (the snow pass covers it); a ravined (bare-stone) column keeps those rules.
 
 **Cold weather** (`WorldGen/SnowGenerator.cs`) runs last of the surface features and reads
-`TerrainGenerator.ColdWeight` (a biome-generation input) so the snow and freeze lines fade in as a
-column cools rather than snapping at a biome border. It freezes a cold column's surface water into a
-walkable ice sheet (the sea-level cell becomes `ice`) and lays one **layered snow** cell above the
-solid ground (or the ice). A snow cell's depth is drawn from `SnowGenerator.DepthAt` when its state
+`SnowGenerator.ColdWeightAt` — the climate's `TerrainGenerator.ColdWeight` (a biome-generation input)
+so the snow and freeze lines fade in as a column cools rather than snapping at a biome border,
+**raised by altitude** above `MountainRockHeight` and full at `MountainSnowFullHeight`, so a warm
+biome's peak wears a snow cap and the near stamp, the drawn depth and the far LOD all read the one
+function. It freezes a cold column's surface water into a
+walkable ice sheet (the sea-level cell becomes `ice`), lays one **layered snow** cell above the
+solid ground (or the ice) and dusts the canopy tops of a cold column's trees, so a taiga or frozen
+forest reads white from above (`SnowCanopyTests`). A snow cell's depth is drawn from `SnowGenerator.DepthAt` when its state
 byte is 0 and from the state byte when a player stacks it (`SnowShape`); each layer is 1/16 of a
 block, so a full stack is solid and partial layers are walked through (`BlockType.IsSolidCell`).
 `WorldGen/IceSpikeGenerator.cs` grows occasional single-column ice spikes on the frozen plains.
@@ -2731,6 +2819,41 @@ it, so a clump is never cut at a cell or chunk border. A pure hash of (cell, see
 reseed; a later clumped plant needs only its own spec and gate. Like flowers, the far LOD draws none.
 How a tree is grown, stamped, felled and decays is in `### Trees`. Mob spawning (`MobSpawner`,
 shared by slimes and goblins) asks `TerrainGenerator.IsForest(x, z)`, which is now a real test.
+
+**Scenery and landmarks** are pure per-cell functions like the rest of worldgen — each decided
+from a hash of (cell, seed) or a `PlantClumps` clump, stamped per chunk and clipped at its border,
+into air or stone only, and never drawn by the far LOD (`SceneryTests`, `PillarWellTests`,
+`GeodeMeteorTests`, `OasisTests`, `PoolCairnTests`, `PondPlantTests`, `CaveLifeTests`,
+`SpringStackTests`, `GravelPocketTests`, `SnowCanopyTests`):
+- **Fallen logs** (`FallenLogGenerator`): a rare detached oak log of 3-5 cells lying along X or Z on
+  the forest floor, written as `WoodState.Detached` so it never welds to a standing tree or fells.
+- **Boulders** (`BoulderGenerator`): a rare 2-4 cell blob of stone or cobblestone on the forest and
+  taiga floor.
+- **Cairns** (`CairnGenerator`): a three-cell cobblestone stack with a one-stone pebble hat on a
+  local summit.
+- **Ruined pillars** (`RuinedPillarGenerator`) and the **desert well** (`DesertWellGenerator`):
+  broken stone columns on the surface, and the desert's ring-and-roof well dug into sand over
+  sandstone.
+- **Sea stacks** (`SeaStackGenerator`) and **hot springs** (`HotSpringGenerator`): stone stacks
+  rising out of the sea near a shore, and steaming water bodies in caves.
+- **Oases** (`OasisGenerator`): a desert water disc with a grass ring and palms — the one place the
+  `palm` species (a worldgen species with `worldgen.oasis`) is planted, since the ordinary desert
+  placement never picks it.
+- **Reeds** (`ReedGenerator`) and **lily pads** (`LilyPadGenerator`): shore reeds on the shallow
+  water edge and pads floating on ponds, both over `PlantClumps`.
+- **Glow mushrooms** (`GlowMushroomGenerator`) on dry, dark cave floors, and **cave formations**
+  (`CaveFormationGenerator`): stalactites hanging from ceilings and stalagmites standing on floors,
+  both `needsSupport` and `flowResistant` (rock: a flow leaves them standing).
+- **Geodes** (`GeodeGenerator`) and **meteor craters** (`MeteorGenerator`): a hollow, crystal-lined
+  sphere deep in solid stone (its `crystal_block` is the one non-ore block on the reflective
+  material path), and a blast crater with scattered meteor rock.
+- **Gravel and sand pockets** (`GravelPocketGenerator`): blobs of loose rock buried in stone, both
+  `falls` blocks, so mining into one can bring a small collapse down.
+- **Underground pools** (`UndergroundPoolGenerator`): still water on carved cave floors.
+
+The tuft density of the `tall_grass`/`dead_shrub` plants runs with the climate's wetness
+(`FoliageGenerator.GrassDensityAt`, `GrassDensityDry`..`GrassDensityWet`) and every flower stands in
+an open-forest clump (`FlowerGenerator`, the `PlantClumps` rule) (`MeadowTests`).
 
 ## Entities
 
@@ -2917,6 +3040,36 @@ throw band must stay inside it, with margin for a chest-height target and the se
 `GoblinAimTests` locks that relation down, so retuning the speed or the band cannot silently make edge
 throws fall short. An out-of-range target still gets a 45-degree maximum-range toss toward it. Every
 goblin number lives under `WorldGenerationConfig.Goblin*`.
+
+A goblin's life has more rules than its AI. **Flee**: below `GoblinFleeHealthShare` (a quarter) of
+its pool it turns and runs from the player at `GoblinFleeSpeedFactor` of its walk, never throwing or
+swinging (`Goblin.IsFleeing`, `GoblinFleeTests`). **Scavenge**: a live goblin with ammo room joins
+the world's drop pass as a `DropCollector` that takes only flint (`GoblinManager.AppendCollectors`,
+`AwardScavenged`, capped at `GoblinStoneMax`; a client's mirrors never scavenge)
+(`GoblinScavengeTests`). **Dodge**: a charged throw (at least `GoblinDodgeChargeThreshold`) aimed at
+a goblin inside `GoblinDodgeConeDegrees` and within `GoblinDodgeRangeBlocks` makes it sidestep out of
+the line while the aim holds, its side fixed at spawn (`GoblinManager.IsAimedAt`, `Goblin.Decide`;
+`GoblinDodgeTests`). **Pack alert**: a goblin that notices a player alerts every other goblin within
+`GoblinPackAlertRadiusBlocks`, which skip their first-throw delay so the pack throws together
+(`Goblin.TakeJustNoticed`/`AlertPack`, `GoblinPackAlertAround`; `GoblinPackAlertTests`). **Pack
+spawning**: a ring spawn rolls one to `GoblinPackMaxSize` goblins, the rest landing within
+`GoblinPackSpawnRadiusBlocks` of the found cell, each re-checked against the shared natural cap
+(`GoblinManager.TryFindPackMate`; `GoblinPackSpawnTests`). **Torches**: a spawn may carry up to
+`GoblinTorchMaxCount` torches (a roll whose chance is small by day, larger at night and highest
+underground), equips one while it is dark (drawn at the off hand's `ArmL` anchor through
+`BodyEffect`, its flame point joining `World.FireCells` for light and embers), and drops the carried
+torches on death with the flint; the count is saved (`MobData.Torches`) and sent (the mob
+`NetEntity.ItemId` byte) (`GoblinTorches`, `GoblinTorchTests`). **A notice pip**: a "!" billboard
+pops over a goblin's head the moment it first spots a player (`GoblinNoticePipTests`).
+
+Every mob shares three more hazards. **Fall damage**: `Mob.NoteLanding` bills `MobFallDamage.Damage`
+over the drop its impact speed implies — free up to `Mob.SafeFallBlocks` (plus a slime's own hop
+peak), then `MobFallDamagePerBlockShare` of the pool per whole block, nothing when the feet were in
+water (`MobFallDamageTests`). **Lava**: `Mob.UpdateHazards` with `MobLava.BodyInLava` deals a pool
+share every `MobLavaTickSeconds` with the hit flash, a death it causes rolling loot as usual
+(`MobLavaTests`). **Ledge caution**: `Mob.IsLedgeAhead` over `LedgeProbe` (live cells, not the
+heightmap) stops a step or a hop that would land more than `MobLedgeMaxDropBlocks` down unless the
+target stands lower (`LedgeCautionTests`).
 
 ### Entity animation
 
@@ -3108,6 +3261,19 @@ overshoot or jiggle.
   debugger never requests one. `visual-examples/hit-stop.json` films it.
 - **Death in singleplayer** plays for `World.DeathPlaySeconds` (the view tips over, the body falls)
   before the respawn; a client has no death screen and still snaps back.
+- **Mob death poof.** A mob bursts into skin-coloured chips when its death animation ends
+  (`BlockDebrisSystem` + `DebrisLook.Colour`, `LandingDust.SkinColour`), the same pool the slime
+  splat uses.
+- **Placement pop.** A placed block pops in a little too big and settles with one small overshoot
+  (`RenderManager.RenderBlockPop`, `PopBoxEmitter`).
+- **Mob hit sparks.** A punch, slice or throw that connects throws pale chips from the wound point
+  on top of the floating damage number.
+- **Drop landing bounce.** A drop that lands hops back up once or twice, damped by `BounceDamping`,
+  so a pickup reads as physical.
+- **Tool break shatter.** A tool whose durability runs out shatters into chips of its own sprite
+  colours instead of just vanishing.
+- **Pickup sparkle.** A few bright `FireParticleKind.Spark` motes pop at the chest where a drop is
+  collected.
 - **Ground dust** (`GroundDust`, owned by `World`; cosmetic, so never on a server): a landing kicks
   up chips of the block under the feet (`GroundDust.TryFindSurface`: the feet's own cell if it holds
   a stack cover like a snow drift, else the cell below), sized by `LandingDust` (nothing under
