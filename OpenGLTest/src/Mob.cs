@@ -73,6 +73,9 @@ public abstract class Mob
     /// <summary>0 at spawn, 1 once the pop-in is over.</summary>
     public float SpawnProgress => MathUtils.Clamp01(_spawnTime / SpawnInSeconds);
 
+    /// <summary>Seconds this mob has lived (its own simulated time since it spawned or was restored).</summary>
+    public float AgeSeconds => _spawnTime;
+
     /// <summary>Skips the spawn pop: the mob counts as already settled (a debugger restart of a mob that is not
     /// being shown spawning).</summary>
     public void FinishSpawn() => _spawnTime = SpawnInSeconds;

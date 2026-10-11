@@ -647,6 +647,8 @@ OpenGLTest/
     MobInterest.cs             # GL-free per-mob interest: sight checks, losing a hidden target, idle
                                #   time, the idle despawn gate and wander goals
     LedgeProbe.cs              # GL-free ledge caution: the drop to the first ground ahead, safe-step rule
+    SlimeMerge.cs              # GL-free slime merge: who merges (same size, touching, past the cooldown),
+                               #   the merged size, centre and health
     SlimeSize.cs               # GL-free per-size slime stats: body scale, health, contact damage,
                                #   loot rolls, each 1 + (size - 1) * its config step; the spawn size roll
     DayCycle.cs                # GL-free sun direction, dayness and night factor of the lighting clock
@@ -2595,7 +2597,15 @@ its column's surface, its standing cell has at most `SlimeCaveMaxSkyLight` sky l
 published light snapshot reads as full sun) and it is not torch-lit. `SlimeManager.TryFindSpawn`
 searches caves first for a player standing underground and the surface first otherwise, each falling
 back to the other, and the size roll treats a cave spawn as underground (night chance); this makes the
-"surface-only ring never finds such a spot" note above out of date (`CaveSlimeTests`).
+"surface-only ring never finds such a spot" note above out of date (`CaveSlimeTests`). **Slime
+merge**, the split's inverse: after its main loop `SlimeManager.Update` merges every pair of living,
+same-sized slimes below the largest whose bodies touch and which have both lived
+`SlimeMergeCooldownSeconds` (`SlimeMerge.CanMerge` over `Mob.AgeSeconds`, so a split's children never
+merge straight back): both vanish without loot and one slime of the next size pops in midway on the
+lower feet (only where its body fits), a forced spawn the hard cap always has room for since the pair
+leaves first, carrying the pair's share of their pools (`SlimeMerge.MergedHealth`). Each slime merges
+at most once an update; only the authoritative simulation merges, and a client sees the pair leave
+its snapshot (playing their death pop) and the merged slime arrive (`SlimeMergeTests`).
 
 The second entity is the **goblin** (`Goblin` + `Systems/GoblinManager.cs`, owned by `World`), a short
 forest raider that throws the flint it carries and then closes for a club swing. It spawns like the

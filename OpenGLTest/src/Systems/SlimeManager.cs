@@ -22,6 +22,9 @@ public sealed class SlimeManager : IMobPopulation
     private readonly MobCaps _caps;
     private readonly List<Slime> _slimes = [];
     private readonly List<byte> _loot = [];
+    // Reused by MergeTouching so a frame with merges allocates nothing once warm
+    private readonly HashSet<Slime> _mergeUsed = [];
+    private readonly List<(Slime A, Slime B, Vector3 Centre, int Size)> _merges = [];
     // The camera overload's one-element target list, reused so it allocates nothing per frame.
     private readonly List<IMobTarget> _singleTarget = new(1);
     private float _spawnTimer;
@@ -182,7 +185,44 @@ public sealed class SlimeManager : IMobPopulation
                 slime.BeginDying();
         }
 
+        MergeTouching(chunks);
         UpdateSpawning(deltaTime, chunks, targets, night);
+    }
+
+    // Two touching slimes of one size merge into one of the next (SlimeMerge, the split's inverse):
+    // both vanish without loot and the merged slime pops in midway, carrying the pair's share of
+    // health. Each slime merges at most once an update, and only where the larger body fits. The two
+    // leave before the forced spawn, so the hard cap always has room for the one that replaces them.
+    private void MergeTouching(ChunkManager chunks)
+    {
+        _mergeUsed.Clear();
+        _merges.Clear();
+        for (var i = 0; i < _slimes.Count; i++)
+        {
+            var a = _slimes[i];
+            if (_mergeUsed.Contains(a) || !SlimeMerge.IsReady(a)) continue;
+            for (var j = i + 1; j < _slimes.Count; j++)
+            {
+                var b = _slimes[j];
+                if (_mergeUsed.Contains(b) || !SlimeMerge.CanMerge(a, b)) continue;
+                var size = SlimeMerge.MergedSize(a.Size);
+                var centre = SlimeMerge.MergedCentre(a, b, size);
+                if (Slime.IsColliding(centre, Slime.HalfExtentFor(size), chunks)) continue;
+                _mergeUsed.Add(a);
+                _mergeUsed.Add(b);
+                _merges.Add((a, b, centre, size));
+                break;
+            }
+        }
+
+        foreach (var (a, b, centre, size) in _merges)
+        {
+            _slimes.Remove(a);
+            _slimes.Remove(b);
+            Spawn(centre, size)?.RestoreState(
+                SlimeMerge.MergedHealth(a.Health, a.MaxHealth, b.Health, b.MaxHealth, SlimeSize.Health(_type.MaxHealth, size)),
+                a.Facing, (a.Velocity + b.Velocity) * 0.5f);
+        }
     }
 
     // The children of a split: the next smaller size, each spawned inside the parent's body (which

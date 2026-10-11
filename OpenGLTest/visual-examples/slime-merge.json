@@ -1,0 +1,25 @@
+{
+  // Slime merge (SlimeMerge): run with VOXEL_SCRIPT=visual-examples/slime-merge.json VOXEL_TIME=147
+  // from OpenGLTest/. Shots land in visual/slime-merge/.
+  // Same flat forest clearing and hovering (immune) camera as slime-split.json. Four of the smallest
+  // slimes hop in under the camera ("before"); once each has lived SlimeMergeCooldownSeconds (10 s),
+  // touching pairs merge into slimes of the next size that pop in where the pair met ("merged"),
+  // and those merge again ten seconds later ("merged-again").
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    // Looking almost straight down, since the slimes gather right under the hovering camera
+    { "op": "teleport", "pos": [-43.5, 19.0, 57.5], "yaw": -90, "pitch": -82 },
+    { "op": "fly" },
+    { "op": "wait", "seconds": 2 },
+    { "op": "spawn", "entity": "slime", "pos": [-46.5, 57.5] },
+    { "op": "spawn", "entity": "slime", "pos": [-40.5, 57.5] },
+    { "op": "spawn", "entity": "slime", "pos": [-43.5, 54.5] },
+    { "op": "spawn", "entity": "slime", "pos": [-43.5, 60.5] },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "before" },
+    { "op": "wait", "seconds": 9 },
+    { "op": "screenshot", "name": "merged" },
+    { "op": "wait", "seconds": 11 },
+    { "op": "screenshot", "name": "merged-again" }
+  ]
+}

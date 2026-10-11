@@ -1593,6 +1593,11 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int SlimeCaveSearchHalfHeight = 12;
     public const int SlimeCaveScanDepth = 24;
     public const int SlimeCaveMaxSkyLight = 4;
+    // Slime merge (SlimeMerge): two living slimes of the same size below the largest whose bodies
+    // touch merge into one of the next size (the split's inverse), its health the pair's share of
+    // their pools scaled to the larger one, once both have lived SlimeMergeCooldownSeconds, so a
+    // split's children do not merge straight back.
+    public const float SlimeMergeCooldownSeconds = 10f;
 
     // --- Goblins (GoblinManager) ---
     // Short forest raiders that throw the flint they carry at the player from a standoff band,
