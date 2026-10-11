@@ -1,0 +1,8 @@
+{
+  // A decorative building block: four from four stone (recipes/stone_bricks.json). The tile is a
+  // placeholder from tools/generate-stone-brick-texture.py.
+  "name": "Stone Bricks",
+  "model": { "parent": "block/cube_all", "textures": { "all": "stone_bricks" } },
+  "sfx": "hit_rock",
+  "hardness": 6
+}

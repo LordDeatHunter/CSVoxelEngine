@@ -206,6 +206,17 @@ public sealed class ContentTests
     }
 
     [Fact]
+    public void StoneBricksCraftFromStone()
+    {
+        var bricks = ContentRegistry.RequireBlock("stone_bricks");
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var recipe = ContentRegistry.RecipeForResult(bricks.Id);
+        Assert.NotNull(recipe);
+        Assert.Equal(4, recipe!.ResultCount);
+        Assert.Contains(recipe.Ingredients, i => i.Accepts(stone) && i.Count == 4);
+    }
+
+    [Fact]
     public void GravelSometimesDropsFlint()
     {
         var gravel = ContentRegistry.RequireBlock("gravel");

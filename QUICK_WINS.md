@@ -156,9 +156,8 @@ files waits in TODO.md instead, since there are none to use yet.
   `ContactDamage.Touches`/`Tick` every `ContactDamage.TickSeconds` while a body box is flush
   against the cell (never for the cell it stands on top of); the local pool in singleplayer and
   each `ServerPlayer`'s status on a server, creative and flying immune (`ContactDamageTests`).
-- [ ] **Stone bricks.** 4 stone to 4 stone bricks, one decorative tile. *Hook:* JSON block + recipe
-  + a tile from a `tools/` script (placeholder, listed in `USER_TODO.md`). Enables the ruined
-  pillars.
+- [x] **Stone bricks.** `stone_bricks`, four from four stone, a grey running-bond tile from
+  `tools/generate-stone-brick-texture.py` (`ContentTests`).
 - [x] **Cobblestone wall.** `cobblestone_wall`: the pane renderer with `"pane": {"post": 8, "arm": 6}`, full-height arms and `cullSelf` so stacked walls meet seamlessly (`PaneProfileTests`, `fences.json`).
 - [x] **Placement takes the plant's cell.** Tall grass, dead shrubs, flowers and cotton plants set
   `replaceableByPlacement`, so aiming at one fills its own cell and discards it (four JSON files;
