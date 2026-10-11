@@ -40,17 +40,7 @@ files waits in TODO.md instead, since there are none to use yet.
 - [ ] **Placement pop.** A placed block scales in from a little under full size with a small
   overshoot. *Hook:* `RenderManager.RenderBlockPop` already pops a block on every mining hit; fire
   it on placement with a `MathUtils.EaseOutBack` scale-in instead of the hit's out-and-back.
-- [ ] **Water splash for every entity.** Anything that enters or leaves water throws droplets up
-  from the surface, more and higher the faster it moves: the player, slimes, goblins, item drops,
-  thrown items and stones, falling blocks and primed TNT. *Hook:* one pure `SplashStrength(speed)`
-  beside `LandingDust` (`MathUtils.ImpactStrength`, nothing under a minimum speed, count and height
-  capped), a "was in water last frame" flag per entity (the player's is `Camera.IsInWater`; mobs,
-  drops, projectiles, falling blocks and TNT each already test their own cell for water), and
-  droplets at the water top of the entry column (`ChunkManager.GetFluidColumnTopGlobal`) through
-  `BlockDebrisSystem.Puff`. The speed is the entry's, the downward speed for an entry and the upward
-  one for an exit. A slice of `V-2`. A server skips it; a client's mirrors splash from their
-  snapshot positions. Test: a slow entry spawns nothing, and the count never falls as the speed
-  grows.
+- [x] **Water splash for every entity.** A `WaterSplashTracker` per body (player, mobs, drops, projectiles, falling cubes, primed TNT) stepped by `World.UpdateSplashes`; `WaterSplash.Count/Speed` grow along `ImpactStrength` from `WaterSplashMinSpeed`, pale chips off the fluid column top, never off lava (`WaterSplashTests`, `world-events.json`).
 - [x] **Damage direction arc.** `DamageDirection` keeps the blow's world direction (fed by `Camera.TakeHit`, on a client by the `PlayerStatus` knockback that came with lost health) and the vignette pass draws it as `uHitArc`; falls and lava show none (`damage-arc.json`).
 - [ ] **Mob hit sparks.** A punch, slice or throw that connects throws a few pale chips from the
   contact point. *Hook:* `World.StrikeMob` (all three paths go through it), then
@@ -59,33 +49,12 @@ files waits in TODO.md instead, since there are none to use yet.
 - [ ] **Drop landing bounce.** Item drops hop once or twice when they land instead of stopping
   dead. *Hook:* the drop physics landing in `DropManager`, a restitution that dies off under a
   minimum speed (or a `MathUtils.EaseOutBounce` offset on the drawn height only).
-- [ ] **Steam on lava hardening.** Lava turning to cobblestone gives off a puff of grey smoke.
-  *Hook:* `FluidManager`'s contact hardening (both the touching rule and a flow settling against
-  lava), queuing the cell for `FireParticleSystem`'s smoke. A server skips it; a client can puff
-  where a `BlockChanges` entry turns lava into cobblestone.
-- [ ] **Tree fall thud.** A felled tree hitting the ground shakes the camera and throws a leaf
-  burst and dust. *Hook:* `TopplingTree` reaching flat, `LeafParticleSystem`'s
-  bursts, `GroundDust` along the trunk, and `Camera.AddShake` scaled by distance.
-- [ ] **TNT blast shake.** The camera shakes in proportion to the blast, falling off with distance.
-  *Hook:* `TntManager.Detonate` calls `Camera.AddShake(clamp(BlastRadius / distance))` for the local
-  player; a client gets it from the blast's `BlockChanges` batch. No new message.
-- [ ] **TNT fuse halved.** A hand-lit cube goes off after 1 s instead of 2 s. *Hook:*
-  `TntManager.PlayerFuseSeconds` (the chain fuse, `ChainFuseSeconds` 0.5 s, stays, so chains stay
-  prompt). `FirestarterTests` reads the constant, so it follows; check the strobe pace
-  (`PrimedTnt`'s flash) still reads at the shorter fuse.
-- [ ] **TNT blast pushes entities.** A blast shoves every entity in range away from the centre,
-  harder the closer it is, including other primed TNT. *Hook:* one pure
-  `BlastImpulse(centre, target, radius)` (falling off to zero at `BlastRadius`, capped) applied at
-  the end of `TntManager.Detonate` to: the player (`Camera.AddKnockback`; on a server
-  `ServerPlayer`'s queued knockback, which the status already sends), every mob (`Mob.Shove`),
-  item drops and falling blocks (their velocity) and the other primed TNT (`PrimedTnt` already has a
-  velocity and gravity, so it needs only an impulse method). Creative or flying players are
-  immune like for any damage. Test: the impulse never grows with distance and is zero outside the
-  radius.
-- [ ] **Falling block landing dust.** A sand or gravel block that settles throws a puff of its own
-  chips. *Hook:* the converting-to-block step in `FallingBlockManager`, `GroundDust` /
-  `BlockDebrisSystem.Puff`, scaled by the fall height; a client sees it when the cell appears in
-  `BlockChanges`.
+- [x] **Steam on lava hardening.** `FluidManager.HardenedCells` (both hardening rules) -> `World.PuffSteam`, a pale `FireParticleKind.Steam` through `FireParticleSystem.Puff`; a client puffs where a `BlockChanges` entry turns a fluid into its `hardensTo` (`SteamPuffTests`, `world-events.json`).
+- [x] **Tree fall thud.** `TopplingTree.TryTakeLanding` fires once at flat -> `World.ThudTree`: a leaf burst off the landed canopy, `GroundDust.TreeThud` under the trunk, a `ShakeFalloff` shake scaled by the wood that fell (`TreeThudTests`).
+- [x] **TNT blast shake.** `ShakeFalloff.Trauma` (full inside `BlastRadius`, zero at `BlastShakeRangeBlocks`) from `TntManager.Blasts` through `World.ShakeForBlast`; a client shakes where a primed mirror vanishes with its fuse spent (`BlastEffectTests`); the `prime` scenario op strikes a cube without the firestarter's miss chance.
+- [x] **TNT fuse halved.** `TntManager.PlayerFuseSeconds` 1 s, the chain fuse unchanged; `PrimedTnt.WhiteFlash` speeds its strobe over the fuse it gets (`FirestarterTests`).
+- [x] **TNT blast pushes entities.** `BlastImpulse.At` (`BlastPushMaxSpeed` at the centre, zero at `BlastRadius`, tipped up by `BlastPushUpBias`) on other primed TNT, drops (`DropManager.ApplyBlastImpulse`), falling cubes, mobs (`Mob.Shove`) and players through `IMobTarget.TakeHit` (a server's queued knockback); creative, flying and dead players immune (`BlastEffectTests`).
+- [x] **Falling block landing dust.** `FallingBlockManager.Landings` -> `GroundDust.LandBlock` -> `BlockDebrisSystem.Skirt`, sized by `LandingDust.FallingBlockCount/Speed` from `FallingBlock.FallBlocks`; a client puffs at a `BlockChanges` write beside a mirrored cube (`FallingBlockDustTests`).
 - [ ] **Tool break shatter.** When a tool's durability hits 0 it shatters into chips at the hand and
   the hotbar slot flashes. *Hook:* the use-up transition in `Inventory` (`DurabilityComponent`
   `UsesLeft` reaching 0), a `HotbarPickupPop`-style slot flash, `DebrisLook.Colour` chips of the
@@ -166,16 +135,7 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Glass pane.** `glass_pane`; 6 glass -> 16 (`panes.json`).
   - [x] *Neighbour connectivity:* `pane` renderer (`PaneShape` + `PaneEmitter`), arms toward panes and solid cubes, matching hitboxes.
 
-- [ ] **Torch flame particles.** A small flicker of flame and a thin wisp of smoke rise off every
-  torch head. A slice of `V-4`. *Hook:* the lava-ember pattern: the mesher collects the cells of a
-  block with a new `flame` field (the flame point in 0..16 model units, authored facing north and
-  turned through `HorizontalFacing` for `wall_torch`) into a `ChunkMeshData` list like
-  `HotFluidVents`, and `World` gathers them near the eye like `GatherLavaVents` (nearest chunks
-  first, capped) into a third `FireParticleSystem` with small rates and a zero spawn offset, since
-  each point is already exact. The flame can be small embers, or a short-lived `Flame` kind beside
-  `FireParticleKind`'s `Ember` and `Smoke`. Its spawn jitter (0.5 blocks wide) is far too wide
-  for a 2 px stick, so make it a constructor parameter. No point lights: the torch's own block
-  light already lights it. Cosmetic, so a headless server never runs it.
+- [x] **Torch flame particles.** The `flame` block field (turned with the facing, `BlockType.FlamePoints`) -> `ChunkMeshData.FlamePoints` (dropped headless) -> `World.UpdateTorchFlames`, a third `FireParticleSystem` with spawn-scatter and scale parameters: small embers plus smoke, no point light (`TorchFlameTests`, `torches.json` flame shots at 700).
 - [x] **Planks.** `oak_planks`, four from an `oak_log`; tile from `tools/generate-plank-texture.py` (`planks.json`).
 - [x] **Slab.** `cobblestone_slab` and `oak_planks_slab` on a `block/slab` parent, colliding by a 0..0.5 `hitbox` (`BuildingBlockTests`, `planks.json`).
 - [x] **Stairs.** `cobblestone_stairs` / `oak_planks_stairs`: `facing: "horizontal"` plus the new `facingFromLook` flag, which `Placement.LookFacing` reads from the placing `PlayerContext`'s view (`StairTests`).
