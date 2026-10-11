@@ -2526,7 +2526,11 @@ every `MobWanderRepickSeconds` or on arrival, which a slime hops toward at its u
 goblin strolls to at `MobWanderSpeedFactor` of its walk (`Goblin.Update`'s `wander`); with nobody in
 play at all it stands still as before. Idle for `MobIdleDespawnSeconds` and farther than
 `MobIdleDespawnMinDistanceBlocks` from every target, it despawns through the same fade
-(`Mob.ShouldIdleDespawn`; `MobInterestTests`).
+(`Mob.ShouldIdleDespawn`; `MobInterestTests`). **Torch-safe ground**: the ring spawn search refuses a
+column whose standing cell holds `MobSpawnBlockLightLimit` or more block light
+(`MobSpawner.IsLitByBlocks`, read through `EntityLight.Sample` from the light each chunk publishes
+with its mesh; a headless server publishes it too, and a cell without a snapshot reads as unlit), so
+torches and lamps keep a base clear of new mobs (`TorchSafeSpawnTests`).
 
 The first entity is the **slime** (`Slime` + `Systems/SlimeManager.cs`), owned by `World`. It hops
 toward the player, damages on contact only while airborne (a slime merely bobbing in water is

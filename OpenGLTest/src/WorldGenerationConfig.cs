@@ -1518,6 +1518,11 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float MobIdleDespawnSeconds = 30f;
     public const float MobIdleDespawnMinDistanceBlocks = 24f;
 
+    // --- Torch-safe ground (MobSpawner.IsLitByBlocks) ---
+    // A ring spawn is refused where the cell a mob would stand in holds this much block light
+    // (0..15) or more, so torches and lamps keep a base clear of new mobs.
+    public const int MobSpawnBlockLightLimit = 8;
+
     // --- Slimes (SlimeManager) ---
     // Forest mobs that hop at the player. Natural spawns appear on dry forest surface in a ring
     // around the player and are culled when they stray too far. Damage only lands while a slime

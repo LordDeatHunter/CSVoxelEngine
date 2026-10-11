@@ -5,8 +5,8 @@ namespace silkgltriangle;
 
 /// <summary>
 /// The surface spawn search shared by every mob manager: samples a ring around the player and
-/// returns the first dry, loaded forest column with two clear cells above its ground. Main thread
-/// only (it reads the live chunk map).
+/// returns the first dry, loaded forest column with two clear cells above its ground that no torch
+/// lights (<see cref="IsLitByBlocks"/>). Main thread only (it reads the live chunk map).
 /// </summary>
 public static class MobSpawner
 {
@@ -49,6 +49,8 @@ public static class MobSpawner
             if (!chunks.TryGetCell(x, height, z, out var ground, out _) || !BlockType.IsSolid(ground)) continue;
             if (!chunks.TryGetCell(x, height + 1, z, out var above1, out _) || BlockType.IsSolid(above1)) continue;
             if (!chunks.TryGetCell(x, height + 2, z, out var above2, out _) || BlockType.IsSolid(above2)) continue;
+            // Torch-safe ground: never where a lamp or torch lights the cell a mob would stand in
+            if (IsLitByBlocks(chunks, x, height + 1, z)) continue;
 
             groundY = height;
             return true;
@@ -56,5 +58,18 @@ public static class MobSpawner
 
         x = groundY = z = 0;
         return false;
+    }
+
+    /// <summary>
+    /// Whether the block light (torches, lamps, lava) in cell (<paramref name="x"/>, <paramref name="y"/>,
+    /// <paramref name="z"/>) reaches <see cref="WorldGenerationConfig.MobSpawnBlockLightLimit"/>, which
+    /// keeps every ring spawn off it, so a few torches keep a base clear. Read through
+    /// <see cref="EntityLight.Sample"/> from the light each chunk publishes with its mesh (a headless
+    /// server publishes it too); a cell without one reads as unlit.
+    /// </summary>
+    public static bool IsLitByBlocks(ChunkManager chunks, int x, int y, int z)
+    {
+        var light = EntityLight.Sample(chunks, new Vector3(x + 0.5f, y + 0.5f, z + 0.5f));
+        return (int)MathF.Round(light.Block * 15f) >= WorldGenerationConfig.MobSpawnBlockLightLimit;
     }
 }
