@@ -389,6 +389,16 @@ redraws the dome, so it reflects, and the Snell window shows it. `AuroraTests`;
 `visual-examples/aurora.json` (`VOXEL_TIME` 700) films it over a frozen plain and back at the
 temperate origin, where it has faded out.
 
+**Eye adaptation.** The post pass's exposure (`uExposure`, now set per frame by
+`PostProcessRenderer.Render(viewport, exposure)`) is `TonemapExposure` times `RenderManager._eyeExposure`,
+which `SetLighting` eases each frame (`EyeAdaptation.Step`: `EyeAdaptToDarkRate` while it rises, the
+faster `EyeAdaptToLightRate` while it falls) toward `EyeAdaptation.Target` of the voxel light at the
+eye's cell (`EntityLight.Sample(LightSource, camera.Position)`, sky and block light, no GPU readback):
+exactly 1 once the brighter of the two reaches `EyeAdaptFullLight` (open sky at any hour, a lamp-lit
+room), up to `EyeAdaptMaxExposure` in total darkness. An unknown cell reads as open sky.
+`EyeAdaptationTests`; `visual-examples/eye-adaptation.json` (`VOXEL_TIME` 147) films a dark tunnel on
+arrival and adapted, then the over-bright step back outside settling within a couple of seconds.
+
 **Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
 heading turns slowly (`WorldGenerationConfig.Wind*`), with `Wind.Offset` its bounded closed-form
 integral. Leaf sway reads it in both vertex shaders (`uWind`, the direction scaled by `WindLean`,
@@ -875,6 +885,7 @@ OpenGLTest/
     Moonlight.cs               # GL-free key-light rule: sun by day, moon at night, handed over with both dark
     Aurora.cs                  # GL-free twin of the aurora's fade (eye coldness x star visibility) and its wrapped noise drift
     EyeClimate.cs              # GL-free climate at a world column from an IColumnSource's stored corner climate (no worldgen)
+    EyeAdaptation.cs           # GL-free exposure target from the voxel light at the eye, eased slower into the dark
     BlockLightPalette.cs       # GL-free 8-slot block-light colour palette (slot 0 = the default warm torch colour)
     LightTint.cs               # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
     BiomeTint.cs               # GL-free biome tint: Climate -> palette -> vertex tint on a 16-block lattice, Gain, Shade, CellTint

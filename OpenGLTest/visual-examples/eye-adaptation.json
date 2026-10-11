@@ -1,0 +1,35 @@
+// Eye adaptation check (EyeAdaptation, RenderManager.RenderPostProcess): the exposure eases up in a
+// dark cave (slowly) and back down outside (quickly), and never changes under open sky. Run from
+// OpenGLTest/:
+//   $env:VOXEL_SCRIPT='visual-examples/eye-adaptation.json'; $env:VOXEL_TIME='147'
+//   bin/Release/net9.0/silkgltriangle.exe
+// The cave is an unlit tunnel ~25 blocks under the forest north-east of the origin (a headless probe on
+// WorldSeed.Default: air along x 53..57, z -53..-77 at y -12, no fluid within a chunk). Flying, so the pose holds.
+{
+  "steps": [
+    { "op": "wait", "seconds": 5 },
+    { "op": "fly" },
+    // A first visit, so the tunnel's chunks are loaded and meshed when the real arrival is filmed.
+    { "op": "teleport", "pos": [55.5, -11.5, -73.5], "yaw": -90, "pitch": -5 },
+    { "op": "wait", "seconds": 8 },
+    // Daylight: the reference exposure (back at 1 after the visit).
+    { "op": "teleport", "pos": [0.5, 90.5, 0.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "1_outside", "hideHud": true },
+    // Into the tunnel: the first frame is still at the outdoor exposure...
+    { "op": "teleport", "pos": [55.5, -11.5, -73.5], "yaw": -90, "pitch": -5 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "2_cave_arrive", "hideHud": true },
+    // ...and the eye adapts over a few seconds.
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "3_cave_2s", "hideHud": true },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "4_cave_adapted", "hideHud": true },
+    // Back out into daylight: briefly over-bright, then quickly normal again.
+    { "op": "teleport", "pos": [0.5, 90.5, 0.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "5_outside_arrive", "hideHud": true },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "6_outside_2s", "hideHud": true }
+  ]
+}

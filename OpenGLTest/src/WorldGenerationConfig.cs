@@ -175,6 +175,16 @@ public const float DayLengthSeconds = 1200f;
     /// the pre-SH-10 shots separately, and a global exposure would have moved them all at once.</summary>
     public const float TonemapExposure = 1.0f;
 
+    // --- Eye adaptation (EyeAdaptation, RenderManager.RenderPostProcess) ---
+    /// <summary>Most the exposure rises in total darkness (a multiplier on TonemapExposure).</summary>
+    public const float EyeAdaptMaxExposure = 1.8f;
+    /// <summary>Voxel light at the eye (0..1, the brighter of sky and block light) from which the exposure stays at 1, so a lamp-lit room is never brightened.</summary>
+    public const float EyeAdaptFullLight = 0.6f;
+    /// <summary>How fast the exposure rises in the dark (MathUtils.Damp rate, per second): the eye adapts slowly.</summary>
+    public const float EyeAdaptToDarkRate = 0.5f;
+    /// <summary>How fast the exposure falls back in the light (per second): much quicker than adapting to the dark.</summary>
+    public const float EyeAdaptToLightRate = 2.5f;
+
     /// <summary>FXAA's floor on the edge-direction reduction (post-fragment.glsl's
     /// uFxaaReduceMin): keeps the direction from blowing up on near-flat luma, so faint
     /// gradients are not smeared across <see cref="FxaaSpanMax"/> pixels.</summary>

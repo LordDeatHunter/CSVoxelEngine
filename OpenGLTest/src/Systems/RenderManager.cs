@@ -300,6 +300,9 @@ public class RenderManager : IDisposable
     private float _glareCloud;
     // How cold it is at the eye, eased (Aurora.Ease): what fades the aurora in and out
     private float _eyeColdness;
+    // The eye adaptation's exposure multiplier (EyeAdaptation), eased toward the voxel light at the
+    // eye each frame by SetLighting and applied by RenderPostProcess; 1 in any lit place
+    private float _eyeExposure = 1f;
     // Display-space (sRGB) light at the pre-SH-10 values, set by SetLighting: the sun colour
     // (the cloud layer and the underwater shafts), and the cloud layer's sun intensity and
     // ambient (see CloudRenderer.Render and RenderUnderwaterRays).
@@ -1230,6 +1233,10 @@ public class RenderManager : IDisposable
         if (columns != null && camera != null)
             eyeClimateKnown = EyeClimate.TryAt(columns, camera.Position.X, camera.Position.Z, out eyeWarmth, out _);
         _eyeColdness = Aurora.Ease(_eyeColdness, Aurora.TargetColdness(eyeClimateKnown, eyeWarmth), dt);
+        // Eye adaptation: the exposure eases up in the dark, read from the voxel light at the eye's
+        // cell (no GPU readback); open sky and lit rooms keep it at 1
+        var eyeLight = camera != null ? EntityLight.Sample(LightSource, camera.Position) : EntityLightSample.Default;
+        _eyeExposure = EyeAdaptation.Step(_eyeExposure, EyeAdaptation.Target(eyeLight.Sun, eyeLight.Block), dt);
         _skyFrame = _skyFrame with
         {
             GlareColor = _sunDiscColor * glare,
@@ -1833,7 +1840,8 @@ public class RenderManager : IDisposable
         gl.Viewport(_viewportSize);
         BindUnit(0, TextureTarget.Texture2D, _hdrColorTex);
         ActiveUnit(0);
-        _post.Render(_viewportSize);
+        // The eye adaptation (SetLighting) scales the exposure up in the dark
+        _post.Render(_viewportSize, WorldGenerationConfig.TonemapExposure * _eyeExposure);
         BindUnit(0, TextureTarget.Texture2D, 0);
     }
 
