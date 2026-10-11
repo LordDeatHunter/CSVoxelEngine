@@ -213,14 +213,51 @@ public sealed class FirestarterTests
     }
 
     [Fact]
-    public void PlayerPrimedFuseBurnsTwoSeconds()
+    public void PlayerPrimedFuseBurnsItsWholeFuse()
     {
         var tnt = ContentRegistry.RequireBlock("tnt").Id;
         var primed = new PrimedTnt(new Vector3(8, 8, 8), tnt, TntManager.PlayerFuseSeconds);
-        primed.Update(1.9f, null!);
+        primed.Update(TntManager.PlayerFuseSeconds - 0.05f, null!);
         Assert.False(primed.IsDue);
-        primed.Update(0.2f, null!);
+        primed.Update(0.1f, null!);
         Assert.True(primed.IsDue);
+    }
+
+    [Fact]
+    public void AChainFuseIsShorterThanAHandLitOne()
+    {
+        // A blast-lit cube must go off before the hand-lit one that set the chain off would have,
+        // or a chain reads as a string of separate fuses
+        Assert.True(TntManager.ChainFuseSeconds < TntManager.PlayerFuseSeconds);
+    }
+
+    [Fact]
+    public void TheStrobeQuickensAsTheFuseBurnsDownWhateverItsLength()
+    {
+        // The flash rate ramps over the fuse it was given, so a shorter fuse still blinks faster
+        // toward its end: count the white/dark toggles over the first and the last fifth
+        var tnt = ContentRegistry.RequireBlock("tnt").Id;
+        var primed = new PrimedTnt(new Vector3(8, 8, 8), tnt, TntManager.PlayerFuseSeconds);
+        const int steps = 200;
+        var dt = TntManager.PlayerFuseSeconds / steps;
+        var toggles = new int[steps];
+        var last = primed.WhiteFlash;
+        for (var i = 0; i < steps; i++)
+        {
+            primed.Update(dt, null!);
+            var now = primed.WhiteFlash;
+            toggles[i] = now != last ? 1 : 0;
+            last = now;
+        }
+
+        var early = 0;
+        var late = 0;
+        for (var i = 0; i < steps / 5; i++)
+        {
+            early += toggles[i];
+            late += toggles[steps - 1 - i];
+        }
+        Assert.True(late > early);
     }
 
     [Fact]

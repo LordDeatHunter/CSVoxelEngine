@@ -15,8 +15,10 @@ public class TntManager
     /// <summary>Blast radius in blocks, measured from the primed cube's centre.</summary>
     public const float BlastRadius = 4f;
 
-    /// <summary>Fuse for a cube lit by hand (firestarter).</summary>
-    public const float PlayerFuseSeconds = 2f;
+    /// <summary>Fuse for a cube lit by hand (firestarter): a second, long enough to step back from,
+    /// short enough that a lit cube does not loiter. <see cref="PrimedTnt.WhiteFlash"/> ramps its
+    /// strobe over whatever the fuse is, so it still reads at this length.</summary>
+    public const float PlayerFuseSeconds = 1f;
 
     /// <summary>Fuse for a cube lit by another blast, so chains go off promptly.</summary>
     public const float ChainFuseSeconds = 0.5f;
