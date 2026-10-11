@@ -178,9 +178,10 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Sneaking shortens the notice range.** `MobTargets.Nearest` only picks targets inside `MobTargets.NoticeRadius` (`MobNoticeRadiusBlocks`, times `MobSneakNoticeFactor` while `IMobTarget.IsSneaking`; the camera's crouch, a `ServerPlayer`'s cosmetic flag) (`MobNoticeTests`, `mob-notice.json`).
 - [x] **Slime merge.** `SlimeManager.MergeTouching` over `SlimeMerge`: two touching living slimes of one size below the largest, both older than `SlimeMergeCooldownSeconds`, become one forced spawn of the next size (`SlimeMergeTests`, `slime-merge.json`).
 - [x] **Cave slimes.** `MobSpawner.TryFindCaveSpawn` (a dry, dark, loaded cave floor at least `SlimeUndergroundDepthBlocks` under the surface); `SlimeManager.TryFindSpawn` tries caves first for a player underground (`CaveSlimeTests`).
-- [ ] **Goblin stones hit other mobs.** *Hook:* `GoblinManager.Stones` are plain
-  `ThrownProjectile`s; test them against the mob list the way the player's throws are, skipping
-  the thrower.
+- [x] **Goblin stones hit other mobs.** The stone pass feeds `ThrownProjectile.Update` the live
+  goblins (each stone skips its own thrower) and slimes: a struck mob takes `GoblinStoneDamage`
+  and a shove and the stone stops, while a miss shatters as before (`GoblinManager.UpdateStones`,
+  `GoblinStoneTests`).
 - [x] **Ledge caution.** `Mob.IsLedgeAhead` over `LedgeProbe` (live cells, not the heightmap): no step or hop landing more than `MobLedgeMaxDropBlocks` down unless the target is lower (`LedgeCautionTests`, `mob-hazards.json`).
 - [ ] **Goblin dodge.** A goblin sidesteps when a charged throw is aimed at it. *Hook:* the
   throw-charge state and the player's facing, read in the goblin's stance. Singleplayer first.

@@ -20,6 +20,10 @@ public sealed class GoblinManager : IMobPopulation
     private readonly MobCaps _caps;
     private readonly List<Goblin> _goblins = [];
     private readonly List<ThrownProjectile> _stones = [];
+    // Parallel to _stones: the goblin each stone was thrown by, so a stone never hits its thrower
+    private readonly List<Goblin> _stoneOwners = [];
+    // The mobs a frame's stones can hit, rebuilt per stone pass
+    private readonly List<Mob> _stoneMobs = [];
     private readonly List<byte> _loot = [];
     private readonly byte _flintId;
     // One delegate for every goblin's collector: it only ever takes flint
@@ -86,6 +90,16 @@ public sealed class GoblinManager : IMobPopulation
     /// <summary>Stones in flight; drawn and mirrored like the player's own throws.</summary>
     public IReadOnlyList<ThrownProjectile> Stones => _stones;
 
+    /// <summary>Test seam: launches a stone as if <paramref name="owner"/> had thrown it, so a
+    /// test can fly one at a mob without driving the whole throw clip.</summary>
+    internal ThrownProjectile TestThrowStone(Goblin owner, Vector3 origin, Vector3 velocity)
+    {
+        var stone = new ThrownProjectile(_flintId, origin, velocity, 0f, 1f);
+        _stones.Add(stone);
+        _stoneOwners.Add(owner);
+        return stone;
+    }
+
     /// <summary>
     /// Appends one <see cref="DropCollector"/> per living goblin with ammo room: it takes only
     /// flint, which the world's drop pass flies in like a player's pickup. The order is kept so
@@ -135,7 +149,7 @@ public sealed class GoblinManager : IMobPopulation
     /// <summary>Ticks the goblins against the one local player (singleplayer and the tests); see
     /// <see cref="Update(float, ChunkManager, DropManager, IReadOnlyList{IMobTarget})"/>.</summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, Camera camera,
-        BlockDebrisSystem? debris = null)
+        BlockDebrisSystem? debris = null, IReadOnlyList<Slime>? slimes = null)
     {
         if (camera == null)
         {
@@ -145,7 +159,7 @@ public sealed class GoblinManager : IMobPopulation
 
         _singleTarget.Clear();
         _singleTarget.Add(camera);
-        Update(deltaTime, chunks, drops, _singleTarget, debris);
+        Update(deltaTime, chunks, drops, _singleTarget, debris, slimes);
     }
 
     /// <summary>
@@ -159,7 +173,7 @@ public sealed class GoblinManager : IMobPopulation
     /// no targets nothing chases, despawns or spawns.
     /// </summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, IReadOnlyList<IMobTarget> targets,
-        BlockDebrisSystem? debris = null)
+        BlockDebrisSystem? debris = null, IReadOnlyList<Slime>? slimes = null)
     {
         DamageDealtThisFrame = 0;
         if (chunks == null || targets == null) return;
@@ -194,7 +208,10 @@ public sealed class GoblinManager : IMobPopulation
             }
 
             if (goblin.TryTakeThrowRelease(out var origin, out var velocity))
+            {
                 _stones.Add(new ThrownProjectile(_flintId, origin, velocity, 0f, 1f));
+                _stoneOwners.Add(goblin);
+            }
 
             // The swing is decided at its impact frame, so a player who backed off during the
             // wind-up dodges it.
@@ -234,17 +251,28 @@ public sealed class GoblinManager : IMobPopulation
                 goblin.BeginDying();
         }
 
-        UpdateStones(deltaTime, chunks, targets);
+        UpdateStones(deltaTime, chunks, targets, slimes);
         UpdateSpawning(deltaTime, chunks, targets);
     }
 
-    private void UpdateStones(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
+    private void UpdateStones(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets,
+        IReadOnlyList<Slime>? slimes)
     {
+        // The mobs a stone can hit: every living goblin (never its own thrower, which each stone
+        // skips) plus the slimes
+        _stoneMobs.Clear();
+        for (var i = 0; i < _goblins.Count; i++)
+            if (!_goblins[i].IsDying) _stoneMobs.Add(_goblins[i]);
+        if (slimes != null)
+            for (var i = 0; i < slimes.Count; i++)
+                if (!slimes[i].IsDying) _stoneMobs.Add(slimes[i]);
+
         for (var i = _stones.Count - 1; i >= 0; i--)
         {
             var stone = _stones[i];
-            // Stones pass through mobs: goblins never hit each other or a slime.
-            var alive = stone.Update(deltaTime, chunks, null, out _);
+            var owner = _stoneOwners[i];
+            // A stone hits mobs in its way (but never its own thrower) as well as targets
+            var alive = stone.Update(deltaTime, chunks, _stoneMobs, out var mobHit, owner);
 
             // Any touched target stops the stone; it hurts the first touched one that is not
             // immune, so a hovering player beside a survival one never shields them.
@@ -272,15 +300,35 @@ public sealed class GoblinManager : IMobPopulation
                     var away = new Vector3(eye.X - stone.Position.X, 0f, eye.Z - stone.Position.Z);
                     hurt.TakeHit(damage, away, WorldGenerationConfig.GoblinStoneKnockbackSpeed, 0f);
                 }
-                _stones.RemoveAt(i);
+                RemoveStone(i);
+                continue;
             }
-            else if (!alive)
+
+            if (mobHit != null)
+            {
+                // A mob in the way takes the stone and stops it: goblins hurt each other and the
+                // slimes, exactly like a stone that struck a player
+                mobHit.TakeDamage(WorldGenerationConfig.GoblinStoneDamage);
+                var away = new Vector3(mobHit.Position.X - stone.Position.X, 0f,
+                    mobHit.Position.Z - stone.Position.Z);
+                mobHit.Shove(away, WorldGenerationConfig.GoblinStoneKnockbackSpeed);
+                RemoveStone(i);
+                continue;
+            }
+
+            if (!alive)
             {
                 // A stone that hit the ground, a wall or its lifetime shatters: no drop, so
                 // missed throws never pile up as pickups (the carried stones drop on death).
-                _stones.RemoveAt(i);
+                RemoveStone(i);
             }
         }
+    }
+
+    private void RemoveStone(int index)
+    {
+        _stones.RemoveAt(index);
+        _stoneOwners.RemoveAt(index);
     }
 
     private void DropLoot(Goblin goblin, DropManager drops)

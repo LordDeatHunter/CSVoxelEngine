@@ -55,7 +55,8 @@ public sealed class ThrownProjectile
         return direction * (WorldGenerationConfig.ThrowSpeed * ChargeFactor(charge01));
     }
 
-    public bool Update(float deltaTime, ChunkManager chunks, IReadOnlyList<Mob>? mobs, out Mob? hit)
+    public bool Update(float deltaTime, ChunkManager chunks, IReadOnlyList<Mob>? mobs, out Mob? hit,
+        Mob? ignore = null)
     {
         hit = null;
         _age += Math.Max(0f, deltaTime);
@@ -76,7 +77,7 @@ public sealed class ThrownProjectile
             for (var i = 0; i < mobs.Count; i++)
             {
                 var mob = mobs[i];
-                if (mob.IsDead) continue;
+                if (mob.IsDead || mob == ignore) continue;
                 var d = Position - mob.Position;
                 var reachXz = HalfExtent + mob.BodyHalfExtent + 0.05f;
                 var reachY = HalfExtent + mob.BodyHalfHeight + 0.05f;
