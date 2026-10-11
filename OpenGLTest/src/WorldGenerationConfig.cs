@@ -459,6 +459,16 @@ public const float DayLengthSeconds = 1200f;
     /// </summary>
     public const float CloudShadowStrength = 0.4f;
 
+    // Silver lining (CloudSilverLining, cloud-fragment.glsl): thin cloud edges near the sun light up.
+    /// <summary>Peak brightness of the lining, as a share of the cloud's own display-space sun term.</summary>
+    public const float CloudSilverLiningStrength = 0.9f;
+    /// <summary>Forward-scatter falloff: cos(angle to the sun) raised to this. Higher keeps it closer to the sun.</summary>
+    public const float CloudSilverLiningExponent = 10f;
+    /// <summary>Sine of the sun's elevation from which the lining is at full strength (zero at the horizon).</summary>
+    public const float CloudSilverLiningFullElevation = 0.1f;
+    /// <summary>Blocks between the points the thinness test reads along the view ray behind a cloud surface.</summary>
+    public const float CloudSilverLiningStepBlocks = 2.5f;
+
     // --- Far-terrain LOD ---
     // Level definitions (cell sizes, per-level radii) live in LodRegion.Levels.
 

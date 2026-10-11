@@ -727,7 +727,7 @@ public class RenderManager : IDisposable
         gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
         gl.BindTexture(TextureTarget.Texture2DArray, 0);
         _sunQuad = Primitives.CreateSquare(gl, 1f);
-        _clouds = new CloudRenderer(gl);
+        _clouds = new CloudRenderer(gl, CloudShadowUnit);
         _cloudShadow = new CloudShadowTexture(gl);
         // Bound once for the whole run: nothing else ever touches unit 8 (see CloudShadowUnit).
         gl.ActiveTexture(TextureUnit.Texture0 + CloudShadowUnit);
@@ -1073,6 +1073,9 @@ public class RenderManager : IDisposable
         _cloudAmbientSrgb = Mix(new Vector3(0.06f, 0.07f, 0.11f), new Vector3(0.42f, 0.45f, 0.52f), dayness);
         _sunColor = ColorSpace.SrgbToLinear(_sunColor);
         _sunIntensity = SunLinearGain * MathF.Pow(0.05f + 1.2f * dayness, SunLinearExponent);
+        // Thin cloud edges near the sun light up, never with the sun at or below the horizon
+        if (_clouds != null)
+            _clouds.SilverLining = CloudSilverLining.Strength(elevation);
 
         _ambient = ColorSpace.SrgbToLinear(
             Mix(new Vector3(0.1f, 0.11f, 0.155f), new Vector3(0.42f, 0.45f, 0.52f), dayness));

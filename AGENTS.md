@@ -332,6 +332,17 @@ sky) and at and below `SkyGlowBelowSunElevation` (the afterglow gone), peaking a
 the sun melts into it. `SkyPaletteTests` holds the rules; `visual-examples/sunset-glow.json`
 (`VOXEL_TIME` 430, 147, 1030) frames it.
 
+**Cloud silver lining.** Thin cloud edges near the sun light up: `cloud-fragment.glsl` adds the
+display-space sun term times `uSilverStrength` times the forward lobe `cos(view, sun)^CloudSilverLiningExponent`
+times how thin the cloud is behind the lit surface along the view ray (`CloudThinness`: the share of
+`CloudSilverLining.Samples` points `CloudSilverLiningStepBlocks` apart that are out of the cloud
+volume, read cell by cell from the cloud-shadow coverage map on unit 8 like the stars' cloud cover,
+so `CloudRenderer` now takes that unit). The frame's strength is `CloudSilverLining.Strength` of the
+sun's elevation (zero at and below the horizon), set on `CloudRenderer.SilverLining` by `SetLighting`;
+the lobe and thinness are computed only where the lobe is non-zero. GL-free twin `CloudSilverLining`
+(`CloudSilverLiningTests`); `visual-examples/cloud-silver-lining.json` (`VOXEL_TIME` 343, 400, 147)
+frames it.
+
 **Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
 heading turns slowly (`WorldGenerationConfig.Wind*`), with `Wind.Offset` its bounded closed-form
 integral. Leaf sway reads it in both vertex shaders (`uWind`, the direction scaled by `WindLean`,
@@ -813,6 +824,7 @@ OpenGLTest/
     SkyPalette.cs              # GL-free zenith/horizon/glow sky palette and the C# reference of SkySample
     StarField.cs               # GL-free twin of the night dome's star field (cells, hash, visibility)
     SunGlare.cs                # GL-free sun lens glare: per-frame intensity and its sky falloff
+    CloudSilverLining.cs       # GL-free twin of the clouds' silver lining: sun gate, forward lobe, thinness along the view
     BlockLightPalette.cs       # GL-free 8-slot block-light colour palette (slot 0 = the default warm torch colour)
     LightTint.cs               # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
     BiomeTint.cs               # GL-free biome tint: Climate -> palette -> vertex tint on a 16-block lattice, Gain, Shade, CellTint

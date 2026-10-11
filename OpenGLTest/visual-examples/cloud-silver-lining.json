@@ -1,0 +1,29 @@
+// Cloud silver lining check (CloudSilverLining, cloud-fragment.glsl): thin cloud edges near the
+// sun light up, the heart of a thick cloud and clouds away from the sun do not. Run from
+// OpenGLTest/, once per time, copying visual/cloud-silver-lining/ aside between runs:
+//   $env:VOXEL_SCRIPT='visual-examples/cloud-silver-lining.json'; $env:VOXEL_TIME='<t>'
+//   bin/Release/net9.0/silkgltriangle.exe
+// Times: 343 afternoon (the shots land ~8 s in, with the sun at yaw ~159, pitch ~25), 400 low sun
+// (pitch ~13, the same yaw), 147 noon (the sun overhead: the up shot looks at it), 700 night (no
+// lining at all, the sun is down).
+// Flying, under the cloud base (160), so the clouds stand between the eye and the sun.
+{
+  "steps": [
+    { "op": "wait", "seconds": 5 },
+    { "op": "fly" },
+    { "op": "teleport", "pos": [0.5, 132.5, 0.5], "yaw": 159, "pitch": 25 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "toward_sun", "hideHud": true },
+    { "op": "teleport", "pos": [0.5, 132.5, 0.5], "yaw": 159, "pitch": 13 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "toward_low_sun", "hideHud": true },
+    // The same clouds 70 degrees off the sun: no lining.
+    { "op": "teleport", "pos": [0.5, 132.5, 0.5], "yaw": 229, "pitch": 25 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "off_sun", "hideHud": true },
+    // Straight up (the noon sun overhead).
+    { "op": "teleport", "pos": [0.5, 132.5, 0.5], "yaw": 159, "pitch": 80 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "up", "hideHud": true }
+  ]
+}

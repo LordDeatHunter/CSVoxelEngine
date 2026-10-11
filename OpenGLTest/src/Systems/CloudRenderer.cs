@@ -29,7 +29,16 @@ public sealed class CloudRenderer : IDisposable
     private readonly uint _indexCount;
     private bool _disposed;
 
-    public CloudRenderer(GL gl)
+    /// <summary>
+    /// This frame's silver-lining strength (<see cref="CloudSilverLining.Strength"/> of the sun's
+    /// elevation), set by <see cref="RenderManager.SetLighting"/>; 0, the default, draws none.
+    /// </summary>
+    public float SilverLining { get; set; }
+
+    /// <param name="gl">The context.</param>
+    /// <param name="cloudShadowUnit">The texture unit the cloud-shadow coverage map stays bound on;
+    /// the silver lining reads the cloud's thickness from it.</param>
+    public CloudRenderer(GL gl, int cloudShadowUnit)
     {
         _gl = gl;
         var (vertices, indices) = CloudField.BuildMesh(CloudField.BuildLevels());
@@ -38,6 +47,17 @@ public sealed class CloudRenderer : IDisposable
         _shader = new Shader(gl,
             FileUtils.ReadFile("assets/shaders/cloud-vertex.glsl"),
             FileUtils.ReadFile("assets/shaders/cloud-fragment.glsl"));
+
+        // The silver lining's tuning and the coverage map never change at run time
+        _shader.Use();
+        _shader.SetUniform("uSilverExponent", WorldGenerationConfig.CloudSilverLiningExponent);
+        _shader.SetUniform("uSilverStep", WorldGenerationConfig.CloudSilverLiningStepBlocks);
+        _shader.SetUniform("uCloudShadowMap", cloudShadowUnit);
+        _shader.SetUniform("uCloudCells", CloudField.Cells);
+        _shader.SetUniform("uCloudMaxLevels", WorldGenerationConfig.CloudMaxLevels);
+        _shader.SetUniform("uCloudHeight", WorldGenerationConfig.CloudHeight);
+        _shader.SetUniform("uCloudLayer", WorldGenerationConfig.CloudLayerThickness);
+        _shader.SetUniform("uCloudField", WorldGenerationConfig.CloudFieldSize);
 
         _vao = gl.GenVertexArray();
         gl.BindVertexArray(_vao);
@@ -135,6 +155,8 @@ public sealed class CloudRenderer : IDisposable
         _shader.SetUniform("uSkyShape", SkyPalette.Shape);
         _shader.SetUniform("uFogWet", fogWet);
         _shader.SetUniform("uScene", sceneUnit);
+        _shader.SetUniform("uSilverStrength", SilverLining);
+        _shader.SetUniform("uCloudDrift", drift);
 
         _gl.NamedBufferSubData(_instanceVbo, 0, offsets[..count]);
         _gl.BindVertexArray(_vao);
