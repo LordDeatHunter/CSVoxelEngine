@@ -56,6 +56,9 @@ public class Camera : IMobTarget
     /// while the player turns.
     /// </summary>
     public Vector2 DamageArcScreenDirection => _damageArc.ScreenDirection(Yaw);
+    /// <summary>The droplets streaking down the screen after the eye surfaced from water (see
+    /// <see cref="SurfacingDroplets"/>): their strength, age and pattern seed.</summary>
+    public SurfacingDroplets Droplets => _droplets;
     /// <summary>
     /// Creative mode (toggled with [C]): walking behaves like survival, but block placing
     /// costs nothing, breaking drops nothing, and double-tapping Space toggles flight.
@@ -275,6 +278,8 @@ public class Camera : IMobTarget
     private float _throwZoomDegrees;
     // Where the last billed blow came from, for the damage direction arc (aged in UpdateHeadMotion)
     private readonly DamageDirection _damageArc = new();
+    // The surfacing droplets: aged in UpdateHeadMotion, told the eye's fluid state in RefreshEyeWaterState
+    private readonly SurfacingDroplets _droplets = new();
     private float _sneakBlend;
     private float _prevVerticalVelocity;
     private bool _wasGrounded;
@@ -640,6 +645,7 @@ public class Camera : IMobTarget
             _fovPunch.Step(0f, deltaTime);
         _throwZoomDegrees = ThrowZoom.Step(ref _throwZoom, ThrowZoom.TargetDegrees(ThrowCharge), deltaTime);
         _damageArc.Update(deltaTime);
+        _droplets.Update(deltaTime);
         _currentFov = DefaultFov + _sprintFov + MathUtils.Clamp(_fovPunch.Value, -6f, 6f) + _throwZoomDegrees;
 
         // A landing dips the view in proportion to the fall that ended just now.
@@ -806,9 +812,14 @@ public class Camera : IMobTarget
 
     internal void RefreshEyeWaterState(ChunkManager chunkManager)
     {
-        if (!IsShoulderSurf)
-            return;
+        if (IsShoulderSurf)
+            RefreshShoulderEyeWaterState(chunkManager);
+        // The frame's final eye state, the one the underwater tint reads, decides the droplets
+        _droplets.Observe(IsEyeInWater, IsEyeInLava);
+    }
 
+    private void RefreshShoulderEyeWaterState(ChunkManager chunkManager)
+    {
         var eye = Position + _shoulderOffset;
         var (eyeX, eyeY, eyeZ) = eye.BlockCell();
         IsEyeInWater = eye.Y < chunkManager.GetFluidSurfaceGlobal(eyeX, eyeY, eyeZ);

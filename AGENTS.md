@@ -606,6 +606,7 @@ OpenGLTest/
     ThrowZoom.cs               # GL-free throw charge zoom: the FOV target from the charge and its spring step
     DamageDirection.cs         # GL-free damage direction arc: the last blow's world direction, its fade and
                                #   its screen direction from the view yaw (the vignette pass's third term)
+    SurfacingDroplets.cs       # GL-free timing of the droplets streaking down after the eye surfaces from water
     Player/                    # the player's rig shape and movement simulation
       PlayerRig.cs             # the posed shape: pivots, cuboids, skin palette, mesh building (Blockbench or Steve)
       PlayerPhysics.cs         # walk/fly/swim input -> body position, voxel collision (static BodyCollides),
@@ -2653,6 +2654,14 @@ overshoot or jiggle.
   `NotifyPlayerHurt` gives `AddHitKick` would not) and, on a client, by `Camera.AddDamageDirection` from
   a `PlayerStatus` knockback that came with lost health; a fall or lava tick has no direction and shows
   none. `visual-examples/damage-arc.json` films it, `DamageDirectionTests` locks it down.
+  **Surfacing droplets** are a fourth term of the same pass (`uDroplets`, `uDropletTime`,
+  `uDropletSeed`): when the eye comes up out of water (not lava), hashed drops with a dark rim and a
+  glint dot the screen, the bigger ones slide down leaving thin trails, and all fade out over
+  `SurfacingDropletSeconds`. The camera's GL-free `SurfacingDroplets` carries the timing: it is told
+  the frame's final eye state in `Camera.RefreshEyeWaterState` (the one the underwater tint reads, so
+  the shoulder camera's eye counts), aged in `UpdateHeadMotion`, cleared the moment the eye is back
+  under, and given a new seed per surfacing; the drop positions, sizes and slides are hashed in the
+  shader. `visual-examples/surfacing-droplets.json` films it, `SurfacingDropletsTests` locks it down.
 - **Floating damage numbers**: a landed hit floats its damage over the mob (`World.DamageNumbers`, a
   fixed `DamageNumberPool` of `DamageNumberCapacity` that replaces its oldest number when full),
   drawn by `DamageNumberRenderer` right after the healthbars with their billboard shader and the HUD's

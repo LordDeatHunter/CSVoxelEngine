@@ -1606,6 +1606,10 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // toward where the last mob blow came from, full for the hold and then faded out smoothly.
     public const float DamageArcHoldSeconds = 0.4f;
     public const float DamageArcFadeSeconds = 1.1f;
+    // Surfacing droplets (SurfacingDroplets, vignette-fragment.glsl): when the eye comes up out of
+    // water, drops streak down the screen, full for the hold and gone this long after surfacing.
+    public const float SurfacingDropletHoldSeconds = 0.25f;
+    public const float SurfacingDropletSeconds = 1.5f;
 
     // --- Multiplayer networking (NetProtocol, GameServer, NetworkClient) ---
     // The server broadcasts the player list on this cadence; clients send their own state at the

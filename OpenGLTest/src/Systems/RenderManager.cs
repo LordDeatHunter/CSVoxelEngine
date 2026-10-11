@@ -4005,11 +4005,14 @@ public class RenderManager : IDisposable
         // The hit flash and the low-health pulse share the vignette's one full-screen pass
         var lowHealth = LowHealthVignette.Intensity((float)health / PlayerHealth.MaxHealth, time,
             dead: health <= 0, creative: camera?.IsCreative == true);
-        // ...and so does the damage direction arc toward the last blow (DamageDirection)
+        // ...and so do the damage direction arc toward the last blow (DamageDirection) and the
+        // droplets streaking down after the eye surfaced (SurfacingDroplets)
         var hitArc = camera?.DamageArcStrength ?? 0f;
-        if (damageFlash > 0.001f || lowHealth > 0.001f || hitArc > 0.001f)
+        var droplets = camera?.Droplets.Intensity ?? 0f;
+        if (damageFlash > 0.001f || lowHealth > 0.001f || hitArc > 0.001f || droplets > 0.001f)
             _vignette?.Render(window.Size, damageFlash, lowHealth, time, hitArc,
-                camera?.DamageArcScreenDirection ?? Vector2.Zero);
+                camera?.DamageArcScreenDirection ?? Vector2.Zero,
+                droplets, camera?.Droplets.Seconds ?? 0f, camera?.Droplets.Seed ?? 0);
 
         if (!view.IsOpen && (menu == null || !menu.IsOpen))
             ui.DrawCrosshair();

@@ -50,17 +50,23 @@ public sealed class DamageVignetteRenderer : IDisposable
     /// <paramref name="time"/> advances the grain and the flash's flicker. <paramref name="hitArc"/>
     /// is the 0..1 damage direction arc (<see cref="DamageDirection.Intensity"/>), a third term drawn
     /// on the screen edge along <paramref name="hitArcDirection"/> (a unit screen direction, x right,
-    /// y up). When all three are zero the draw is skipped entirely.
+    /// y up). <paramref name="droplets"/> is the 0..1 strength of the surfacing droplets
+    /// (<see cref="SurfacingDroplets"/>), slid by <paramref name="dropletSeconds"/> since surfacing in
+    /// the pattern <paramref name="dropletSeed"/> picks. When every term is zero the draw is skipped
+    /// entirely.
     /// </summary>
     public void Render(Vector2D<int> size, float strength, float lowHealth, float time,
-        float hitArc = 0f, Vector2 hitArcDirection = default)
+        float hitArc = 0f, Vector2 hitArcDirection = default,
+        float droplets = 0f, float dropletSeconds = 0f, int dropletSeed = 0)
     {
         var s = MathUtils.Clamp01(strength);
         var low = MathUtils.Clamp01(lowHealth);
         // A degenerate direction draws no arc rather than a spot at an arbitrary edge
         var arcDirection = hitArcDirection.LengthSquared() > 1e-6f ? Vector2.Normalize(hitArcDirection) : Vector2.Zero;
         var arc = arcDirection == Vector2.Zero ? 0f : MathUtils.Clamp01(hitArc);
-        if ((s <= 0.001f && low <= 0.001f && arc <= 0.001f) || size.X <= 0 || size.Y <= 0) return;
+        var drops = MathUtils.Clamp01(droplets);
+        if ((s <= 0.001f && low <= 0.001f && arc <= 0.001f && drops <= 0.001f) || size.X <= 0 || size.Y <= 0)
+            return;
 
         _shader.Use();
         _shader.SetUniform("uResolution", new Vector2(size.X, size.Y));
@@ -68,6 +74,9 @@ public sealed class DamageVignetteRenderer : IDisposable
         _shader.SetUniform("uLowHealth", low);
         _shader.SetUniform("uHitArc", arc);
         _shader.SetUniform("uHitArcDir", arcDirection);
+        _shader.SetUniform("uDroplets", drops);
+        _shader.SetUniform("uDropletTime", MathF.Max(0f, dropletSeconds));
+        _shader.SetUniform("uDropletSeed", (float)dropletSeed);
         _shader.SetUniform("uTime", time);
         _gl.BindVertexArray(_vao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);

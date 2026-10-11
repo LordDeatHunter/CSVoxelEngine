@@ -1,0 +1,30 @@
+{
+  // Surfacing droplets: run with VOXEL_SCRIPT=visual-examples/surfacing-droplets.json VOXEL_TIME=147
+  // from OpenGLTest/. Shots land in visual/surfacing-droplets/.
+  // The deep sea at x~432, z~0 (sea level 0, surface at y 0.89; see swim-bubbles.json). The eye
+  // starts under water, then the camera turns flight on (flight ignores the water, so it hovers
+  // instead of sinking back) and pops the eye up into the air, which starts the droplets. The HUD
+  // stays on: the drops are drawn in the UI pass.
+  //   under:     under water, no droplets
+  //   surfaced:  just out: drops all over the screen at full strength
+  //   sliding:   half a second on, the bigger drops slid down with trails behind them
+  //   fading:    about a second on, fading out
+  //   gone:      past the 1.5 s, a clear view again
+  "steps": [
+    { "op": "teleport", "pos": [432.5, -2.5, 0.5], "yaw": 0, "pitch": -5 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "fly" },
+    { "op": "teleport", "pos": [432.5, -2.5, 0.5], "yaw": 0, "pitch": -5 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "under" },
+    { "op": "teleport", "pos": [432.5, 2.6, 0.5], "yaw": 0, "pitch": -5 },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "surfaced" },
+    { "op": "wait", "seconds": 0.45 },
+    { "op": "screenshot", "name": "sliding" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "fading" },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "gone" }
+  ]
+}

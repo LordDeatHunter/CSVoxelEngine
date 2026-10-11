@@ -10,6 +10,12 @@ uniform float uLowHealth;
 // 0 draws nothing.
 uniform float uHitArc;
 uniform vec2 uHitArcDir;
+// Surfacing droplets, 0..1 (SurfacingDroplets): drops streaking down the screen after the eye came
+// up out of water. uDropletTime is the seconds since surfacing (it slides them), uDropletSeed picks a
+// fresh pattern per surfacing. 0 draws nothing.
+uniform float uDroplets;
+uniform float uDropletTime;
+uniform float uDropletSeed;
 uniform float uTime;
 
 out vec4 FragColor;
@@ -20,6 +26,65 @@ float Hash(vec2 p)
     p = fract(p * vec2(123.34, 456.21));
     p += dot(p, p + 45.32);
     return fract(p.x * p.y);
+}
+
+// Grid cell of the droplet scatter in screen heights, the share of cells holding a drop, the
+// slide of the smallest and the biggest drop (screen heights after a second of sliding; the slide
+// grows with time^1.5), and how many cells above a pixel a drop that slid down onto it may have
+// started from: it must cover the biggest drop's slide over the droplets' 1.5 s.
+const float DropCell = 0.13;
+const float DropDensity = 0.45;
+const float DropSlideMin = 0.04;
+const float DropSlideMax = 0.40;
+const int DropReachCells = 6;
+
+// The surfacing drops over this pixel as (colour, alpha): one hashed drop per occupied grid cell,
+// a little taller than wide, with a dark refracting rim, a pale body and a bright glint, sliding
+// down (bigger ones faster, each after its own short delay) and leaving a thin fading trail.
+// p is in screen heights from the bottom-left corner, so drops stay round on any window.
+vec4 Droplets(vec2 p)
+{
+    vec2 salt = fract(vec2(uDropletSeed * 0.1031, uDropletSeed * 0.1173)) * 64.0;
+    vec2 cell = floor(p / DropCell);
+    vec3 color = vec3(0.0);
+    float alpha = 0.0;
+    for (int dy = 0; dy <= DropReachCells; dy++)
+    for (int dx = -1; dx <= 1; dx++)
+    {
+        vec2 id = cell + vec2(float(dx), float(dy));
+        vec2 key = id + salt;
+        if (Hash(key) > DropDensity)
+            continue;
+
+        float size = Hash(key * 3.1 + 1.3);
+        float r = DropCell * mix(0.10, 0.26, size);
+        vec2 origin = (id + 0.15 + 0.7 * vec2(Hash(key * 1.7 + 3.1), Hash(key * 2.3 + 7.7))) * DropCell;
+        float delay = 0.25 * Hash(key * 4.7 + 2.9);
+        float slide = max(uDropletTime - delay, 0.0);
+        float fall = mix(DropSlideMin, DropSlideMax, size * size) * slide * sqrt(slide);
+        vec2 centre = origin - vec2(0.0, fall);
+
+        vec2 q = (p - centre) / vec2(r, r * 1.2);
+        float len = length(q);
+        float body = 1.0 - smoothstep(0.85, 1.0, len);
+        float rim = smoothstep(0.55, 0.95, len) * body;
+        float glint = 1.0 - smoothstep(0.0, 0.32, length(q - vec2(-0.32, 0.38)));
+        float above = p.y - centre.y;
+        float trail = (1.0 - smoothstep(r * 0.22, r * 0.42, abs(p.x - centre.x)))
+            * step(0.0, above) * step(above, fall) * (1.0 - above / max(fall, 1e-4)) * (1.0 - body);
+
+        float bodyA = body * 0.10;
+        float rimA = rim * 0.24;
+        float glintA = glint * body * 0.55;
+        float trailA = trail * 0.30;
+        float a = bodyA + rimA + glintA + trailA;
+        if (a <= alpha)
+            continue;
+        // Drops rarely overlap, so the strongest one at a pixel stands for all of them
+        color = (vec3(0.70, 0.80, 0.90) * (bodyA + trailA) + vec3(0.10, 0.14, 0.18) * rimA + vec3(1.0) * glintA) / a;
+        alpha = a;
+    }
+    return vec4(color, min(alpha, 1.0));
 }
 
 void main()
@@ -63,10 +128,20 @@ void main()
         arc = uHitArc * spot * band * band * (0.92 + 0.08 * grain) * 0.85;
     }
 
-    float alpha = clamp(hit + low + arc, 0.0, 1.0);
+    vec4 drops = vec4(0.0);
+    if (uDroplets > 0.0)
+    {
+        drops = Droplets(gl_FragCoord.xy / uResolution.y);
+        drops.a *= uDroplets;
+    }
+
+    float red = hit + low + arc;
+    float alpha = clamp(red + drops.a, 0.0, 1.0);
     vec3 color = mix(vec3(0.85, 0.06, 0.04), vec3(0.50, 0.0, 0.0), max(vignette, edge));
     // The arc keeps a brighter red than the dark edge glow, by its share of the coverage
-    color = mix(color, vec3(0.95, 0.10, 0.06), arc / max(hit + low + arc, 1e-4));
+    color = mix(color, vec3(0.95, 0.10, 0.06), arc / max(red, 1e-4));
+    // ...and the drops their own pale colours, by theirs
+    color = mix(color, drops.rgb, drops.a / max(red + drops.a, 1e-4));
     FragColor = vec4(color, alpha);
 }
 
