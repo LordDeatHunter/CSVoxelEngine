@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Xunit;
 
@@ -68,17 +69,21 @@ public sealed class ContactAoTests
         return scene(v.Eye, dir) is { } t ? DepthOf(v, v.Eye + dir * t) : 1f;
     }
 
-    private static float OcclusionAt(View v, Scene scene, Vector3 target, in ContactAoSettings s)
+    private static float OcclusionAt(View v, Scene scene, Vector3 target, in ContactAoSettings s) =>
+        OcclusionAtUv(v, scene, Project(v, target), s);
+
+    /// <summary>The pass at one pixel: the centre, its taps a rounded tap radius away and its four
+    /// 1-pixel neighbours, read the way the shader reads them.</summary>
+    private static float OcclusionAtUv(View v, Scene scene, Vector2 uv, in ContactAoSettings s)
     {
-        var uv = Project(v, target);
         var dC = DepthAt(v, scene, uv);
         var dist = Vector3.Distance(ContactAo.Reconstruct(v.Inv, uv, dC), v.Eye);
-        var r = ContactAo.PixelRadius(dist, s.RadiusBlocks, ContactAo.PxPerBlockAtUnitDist(Height, FovY), s.MaxPx);
-        var dx = new Vector2(r / Width, 0f);
-        var dy = new Vector2(0f, r / Height);
-        return ContactAo.Occlusion(v.Inv, v.Eye, uv, dC,
-            DepthAt(v, scene, uv - dx), DepthAt(v, scene, uv + dx),
-            DepthAt(v, scene, uv - dy), DepthAt(v, scene, uv + dy), s);
+        var pxPerBlock = ContactAo.PxPerBlockAtUnitDist(Height, FovY);
+        var r = MathF.Round(ContactAo.PixelRadius(dist, s.RadiusBlocks, pxPerBlock, s.MaxPx));
+        float At(float x, float y) => DepthAt(v, scene, uv + new Vector2(x / Width, y / Height));
+        var taps = new ContactAoTaps(dC, At(-r, 0f), At(r, 0f), At(0f, -r), At(0f, r),
+            At(-1f, 0f), At(1f, 0f), At(0f, -1f), At(0f, 1f));
+        return ContactAo.Occlusion(v.Inv, v.Eye, uv, taps, new Vector2(r, r), new Vector2(Width, Height), pxPerBlock, s);
     }
 
     private static Scene Floor => (o, d) => Plane(o, d, Vector3.UnitY, 0f, _ => true);
@@ -87,6 +92,48 @@ public sealed class ContactAoTests
     private static Scene Corner(float wallZ) => (o, d) => Nearest(
         Plane(o, d, Vector3.UnitY, 0f, p => p.Z >= wallZ),
         Plane(o, d, Vector3.UnitZ, wallZ, p => p.Y >= 0f));
+
+    private const float PostHalf = 1f / 16f;
+    private const float PostHeight = 0.625f;
+
+    /// <summary>The floor with a thin square post standing on it at (0, postZ), a torch's width
+    /// and height.</summary>
+    private static Scene Post(float postZ) => (o, d) => Nearest(
+        Plane(o, d, Vector3.UnitY, 0f, _ => true),
+        Plane(o, d, Vector3.UnitZ, postZ + PostHalf, p => MathF.Abs(p.X) <= PostHalf && p.Y is >= 0f and <= PostHeight),
+        Plane(o, d, Vector3.UnitX, -PostHalf, p => MathF.Abs(p.Z - postZ) <= PostHalf && p.Y is >= 0f and <= PostHeight),
+        Plane(o, d, Vector3.UnitX, PostHalf, p => MathF.Abs(p.Z - postZ) <= PostHalf && p.Y is >= 0f and <= PostHeight),
+        Plane(o, d, Vector3.UnitY, PostHeight, p => MathF.Abs(p.X) <= PostHalf && MathF.Abs(p.Z - postZ) <= PostHalf));
+
+    /// <summary>Every floor pixel in a window around the post, with how far its floor point lies
+    /// from the post's footprint and its occlusion.</summary>
+    private static IEnumerable<(float FromPost, float Occlusion)> FloorAroundPost(View v, float postZ, ContactAoSettings s)
+    {
+        var scene = Post(postZ);
+        var baseUv = Project(v, new Vector3(0f, 0f, postZ + PostHalf));
+        var topUv = Project(v, new Vector3(0f, PostHeight, postZ - PostHalf));
+        var top = (topUv.Y - baseUv.Y) * Height;
+        for (var y = -30f; y <= top + 60f; y += 2f)
+        for (var x = -90f; x <= 90f; x += 2f)
+        {
+            var uv = baseUv + new Vector2(x / Width, y / Height);
+            var p = ContactAo.Reconstruct(v.Inv, uv, DepthAt(v, scene, uv));
+            if (p.Y > 1e-3f) continue; // on the post
+            var dx = MathF.Max(MathF.Abs(p.X) - PostHalf, 0f);
+            var dz = MathF.Max(MathF.Abs(p.Z - postZ) - PostHalf, 0f);
+            yield return (MathF.Sqrt(dx * dx + dz * dz), OcclusionAtUv(v, scene, uv, s));
+        }
+    }
+
+    private static readonly (Vector3 Eye, float PostZ)[] PostViews =
+    [
+        (new Vector3(0f, 3.5f, 0f), -4f),
+        (new Vector3(0f, 1.7f, 0f), -6f),
+        (new Vector3(0.8f, 5f, 0f), -10f),
+    ];
+
+    private static View PostView((Vector3 Eye, float PostZ) pv) =>
+        LookAt(pv.Eye, new Vector3(0f, PostHeight * 0.5f, pv.PostZ));
 
     [Fact]
     public void FlatPlaneAtGrazingAngleIsNotOccluded()
@@ -151,15 +198,51 @@ public sealed class ContactAoTests
     }
 
     [Fact]
+    public void AThinPostLeavesNoGhostOnTheFloorBesideIt()
+    {
+        // Floor pixels a tap radius beside the post have a tap on it; past the reach (with slack
+        // for the rounded pixel radius) none of them may darken, while the plain midpoint crease
+        // without the reach does darken them: it is the reach that removes the ghost.
+        var beyondReach = 1.25f * S.ReachFar * S.RadiusBlocks;
+        var noReach = S with { ReachNear = 1e5f, ReachFar = 2e5f };
+        foreach (var pv in PostViews)
+        {
+            var v = PostView(pv);
+            var ghost = 0f;
+            foreach (var (fromPost, occ) in FloorAroundPost(v, pv.PostZ, S))
+                if (fromPost > beyondReach) Assert.Equal(0f, occ, 4);
+            foreach (var (fromPost, occ) in FloorAroundPost(v, pv.PostZ, noReach))
+                if (fromPost > beyondReach) ghost = MathF.Max(ghost, occ);
+            Assert.True(ghost > 0.25f * S.Strength, $"no ghost to remove from {pv.Eye}");
+        }
+    }
+
+    [Fact]
+    public void AThinPostStillDarkensTheFloorAtItsFoot()
+    {
+        foreach (var pv in PostViews)
+        {
+            var v = PostView(pv);
+            var foot = 0f;
+            foreach (var (fromPost, occ) in FloorAroundPost(v, pv.PostZ, S))
+                if (fromPost < S.RadiusBlocks) foot = MathF.Max(foot, occ);
+            Assert.True(foot > 0f, $"no contact AO at the foot from {pv.Eye}");
+        }
+    }
+
+    [Fact]
     public void OcclusionNeverExceedsStrength()
     {
         var v = LookAt(new Vector3(0f, 1.7f, 0f), new Vector3(3f, 0f, -8f));
+        var pxPerBlock = ContactAo.PxPerBlockAtUnitDist(Height, FovY);
         var rng = new Random(1234);
         for (var i = 0; i < 20000; i++)
         {
             var uv = new Vector2(rng.NextSingle(), rng.NextSingle());
             float D() => 0.5f + 0.5f * rng.NextSingle();
-            var occ = ContactAo.Occlusion(v.Inv, v.Eye, uv, D(), D(), D(), D(), D(), S);
+            var taps = new ContactAoTaps(D(), D(), D(), D(), D(), D(), D(), D(), D());
+            var tapPx = new Vector2(rng.Next(1, 33), rng.Next(1, 33));
+            var occ = ContactAo.Occlusion(v.Inv, v.Eye, uv, taps, tapPx, new Vector2(Width, Height), pxPerBlock, S);
             Assert.InRange(occ, 0f, S.Strength);
         }
     }

@@ -228,6 +228,16 @@ public const float DayLengthSeconds = 1200f;
     /// and the AO vanishes exactly where it is most visible.</summary>
     public const float ContactAoMaxPx = 32f;
 
+    /// <summary>Distance from the shaded point, in tap radii, within which a tap that sees a
+    /// surface in front of the shaded one counts fully as an occluder. A wall or pebble rising
+    /// beside the point is about one tap radius away.</summary>
+    public const float ContactAoReachNear = 1.5f;
+
+    /// <summary>Distance from the shaded point, in tap radii, past which such a tap no longer
+    /// counts: the upper part of a torch, drop or mob stands that far in front of the ground beside
+    /// it, which would otherwise darken a displaced copy of its silhouette onto that ground.</summary>
+    public const float ContactAoReachFar = 2.5f;
+
     // Sunlight and lamp light spread through air losing one level per block from a max
     // of 15, so one edited block can change light up to this far away. Block edits must
     // remesh every chunk in this radius, not just face-adjacent ones.

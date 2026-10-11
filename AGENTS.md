@@ -298,11 +298,20 @@ and before the depth-less or blended draws (healthbars, the first-person head, d
 trees, player, held item), the selection outline, water (whose refraction copy then carries the AO),
 clouds and particles. It samples the HDR depth texture through the colour-only
 `_hdrColorOnlyFbo` (no feedback loop) with multiplicative blending (`Zero, SrcColor`). Four taps
-per pixel, `ContactAoRadiusBlocks` wide in the world (clamped to `ContactAoMaxPx`): for each opposite
+(plus the four 1-pixel neighbours) per pixel, `ContactAoRadiusBlocks` wide in the world (clamped to `ContactAoMaxPx`): for each opposite
 pair, the midpoint of their raw depths is reconstructed on the centre ray and compared with the
 centre. Raw depth is affine in screen space over a plane, so planes never darken at any angle;
 a concave corner creases positive, convex edges and far silhouettes are rejected by the
-`ContactAoMinBlocks..RangeBlocks` window, and it fades out by `ContactAoFadeFar`.
+`ContactAoMinBlocks..RangeBlocks` window, and it fades out by `ContactAoFadeFar`. A thin object
+standing in front of the ground (a torch, a drop, a mob) would crease the ground a tap radius beside
+it exactly like a corner and leave displaced copies of its silhouette there, so each pair's crease is
+split between its two taps along the centre surface's own slope (read from the four 1-pixel
+neighbours; of the two one-sided slopes the one that carries the surface out to its own tap wins, the
+stronger crease on a tie), and a tap in front of that surface only counts while what it sees lies
+within `ContactAoReachNear..ReachFar` tap radii of the centre point (`ContactAo.Reach`). A wall or
+pebble beside the point is that close, the upper part of a post is not; with every occluder in reach
+the crease is exactly the plain midpoint crease. The cost is that a corner seen at a grazing angle
+keeps a band about that reach wide in the world rather than a tap radius wide on screen.
 `ContactAoEnabled = false` skips the pass entirely.
 
 Shaders (`assets/shaders/**/*.glsl`), textures (`assets/textures/**/*.png`), fonts (`assets/fonts/**/*.ttf`) and all content JSON (`assets/**/*.json` — blocks, items, loot tables, models) are copied to the output directory via `CopyToOutputDirectory` rules in the csproj — **new asset types/extensions need a matching `<None Update>` entry** or they won't be found at runtime. The JSON rule is a wildcard over the whole `assets` tree, so adding a block, item, loot table or model needs no csproj edit.

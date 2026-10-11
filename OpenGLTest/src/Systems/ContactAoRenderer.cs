@@ -66,6 +66,8 @@ public sealed class ContactAoRenderer : IDisposable
         _shader.SetUniform("uFadeFar", s.FadeFar);
         _shader.SetUniform("uRadiusBlocks", s.RadiusBlocks);
         _shader.SetUniform("uMaxPx", s.MaxPx);
+        _shader.SetUniform("uReachNear", s.ReachNear);
+        _shader.SetUniform("uReachFar", s.ReachFar);
         _gl.BindVertexArray(_vao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         _gl.BindVertexArray(0);
