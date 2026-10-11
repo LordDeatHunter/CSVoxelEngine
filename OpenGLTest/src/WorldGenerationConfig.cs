@@ -2188,6 +2188,20 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Share of a pocket's cells that are sand rather than gravel
     public const float GravelPocketSandShare = 0.35f;
 
+    // --- Cairns (CairnGenerator): a cobblestone stack landmark on a mountain summit ---
+    public const bool CairnsEnabled = true;
+    public const int CairnCellShift = 6;
+    public const float CairnChance = 0.25f;
+
+    // --- Underground pools (UndergroundPoolGenerator): water on cave floors above the lava band
+    // and below the sea ---
+    public const bool UndergroundPoolsEnabled = true;
+    public const float PoolPatchFrequency = 1f / 96f;
+    public const float PoolPatchThreshold = 0.35f;
+    // Blocks under the column's surface a pool needs (entrances and ravine floors stay dry)
+    public const int PoolBurial = 8;
+    public const float PoolChance = 0.5f;
+
     // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
     // first notices a player (the same moment its first-throw delay starts) ---
     public const float GoblinNoticePipSeconds = 0.9f;
