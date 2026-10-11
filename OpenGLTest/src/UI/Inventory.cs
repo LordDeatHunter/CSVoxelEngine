@@ -463,9 +463,12 @@ public class Inventory
         if (category == InventoryCategory.Crafting || category == InventoryCategory.Tools)
             return [];
         var store = category == InventoryCategory.Blocks ? _blocks : _misc;
+        // The panel's order: by display name, then the fuller stack first. Rows are always built
+        // here, so the list is sorted by construction and a sort button would be a no-op.
         return store
             .Where(kv => kv.Value > 0)
             .OrderBy(kv => DisplayName(kv.Key), StringComparer.OrdinalIgnoreCase)
+            .ThenByDescending(kv => kv.Value)
             .Select(kv => new StackRow(kv.Key, DisplayName(kv.Key), kv.Value))
             .ToArray();
     }

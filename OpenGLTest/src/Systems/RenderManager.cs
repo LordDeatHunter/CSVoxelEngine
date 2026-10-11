@@ -4325,6 +4325,21 @@ public class RenderManager : IDisposable
         InvalidateTextureUnits();
     }
 
+    /// <summary>
+    /// Draws the Tab player list (see <see cref="UIRenderer.DrawPlayerList"/>) over the HUD while
+    /// the key is held: the local player first, then every other player on the server.
+    /// </summary>
+    public void RenderPlayerList(IWindow window, IReadOnlyList<string> names)
+    {
+        if (names.Count == 0) return;
+        var windowSize = new Vector2(window.Size.X, window.Size.Y);
+        ui.Begin(window.Size, window.FramebufferSize,
+            UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
+        ui.DrawPlayerList(names);
+        ui.End();
+        InvalidateTextureUnits();
+    }
+
     // Clear colour of a menu frame; the menu and loading backdrops cover it anyway.
     private static readonly Vector4 MenuClearColor = new(0.06f, 0.07f, 0.09f, 1f);
 

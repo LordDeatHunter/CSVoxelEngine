@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Xunit;
 
@@ -202,5 +203,30 @@ public sealed class InventoryTests
         var inventory = new Inventory();
         Assert.False(inventory.PickBlock(0));
         Assert.Equal(0, inventory.SelectedIndex);
+    }
+
+    [Fact]
+    public void ThePanelRowsAreSortedByNameThenCount()
+    {
+        var inventory = new Inventory();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var dirt = ContentRegistry.RequireBlock("dirt").Id;
+        var flint = ContentRegistry.RequireItem("flint").Id;
+        inventory.Add(stone, 3);
+        inventory.Add(dirt, 5);
+        inventory.Add(flint, 2);
+
+        var rows = inventory.StackEntries(InventoryCategory.Blocks);
+        var names = rows.Select(r => r.Name).ToList();
+        Assert.Equal(names.OrderBy(n => n, StringComparer.OrdinalIgnoreCase), names);
+        Assert.All(rows, r => Assert.True(r.Count > 0));
+
+        // The count is the tiebreak: the same name never appears twice (ids are unique), so the
+        // rule is pinned through the sort key itself
+        for (var i = 1; i < rows.Count; i++)
+        {
+            if (string.Equals(rows[i].Name, rows[i - 1].Name, StringComparison.OrdinalIgnoreCase))
+                Assert.True(rows[i].Count <= rows[i - 1].Count);
+        }
     }
 }

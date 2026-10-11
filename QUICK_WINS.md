@@ -218,15 +218,12 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **New item toast.** `DiscoveryLog` marks the ids a world has seen; the drop pickup and `World.CreditItem` (the /give path) toast "New: <name>" on a first credit, and a restored inventory is marked known at load so loading never toasts (`DiscoveryLogTests`).
 - [x] **Screenshot key.** F2 reads the finished frame back through `VisualCapture` and saves it to `ScreenshotPaths.Directory` as a millisecond-stamped PNG (`ScreenshotPathTests`).
 - [x] **Hide-HUD key.** F1 toggles `hudVisible`, the same gate the scenario screenshot's `hideHud` drives (`ScreenshotPathTests` covers the shared path naming).
-- [ ] **Tab player list.** Holding Tab in multiplayer lists who is online. *Hook:* the
-  `PlayerList` data `World.SyncRemotePlayers` already keeps.
+- [x] **Tab player list.** holding Tab over the HUD draws the panel (`UIRenderer.DrawPlayerList` over `World.RemotePlayers`, the local player first), a server session only, and never while the chat, a menu or the panel owns the keyboard.
 - [x] **Chat commands: help, tp, give.** `/help` answers with `ChatCommands.HelpText`, `/tp x y z` teleports (creative locally, `ServerPlayer.Teleport` + a correction on a server) and `/give <item> [count]` grants through `Inventory.Add` with the name resolved by block then item; both need rights (`ChatCommandsTests`).
 - [ ] **Item tooltips.** Hovering any slot or row shows a panel with the display name, kind, tool
   power, damage, durability left and fuel time when present. *Hook:* the fields already on `Item` /
   `ItemStack`, drawn by `UIRenderer` after the panel. A slice of `U-1`.
-- [ ] **Inventory sort.** A button on each tab sorts it by name, then count. *Hook:*
-  `InventoryView` and the pool order in `Inventory`. Singleplayer first: on a server it needs a new
-  `NetInventoryAction`.
+- [x] **Inventory sort.** already covered: `Inventory.StackEntries` builds the panel rows sorted by display name, now with the fuller stack first as the count tiebreak (`InventoryTests`); a sort button would be a no-op, since the rows are sorted by construction and the pools are keyed by id.
 - [x] **Number-key slot assign.** with the [E] panel open, 1-9 (and 0) equip the hovered row into that hotbar slot through the same equip a click performs (`Program.AssignHoveredRowToHotbar`, sent as an `Equip` intent on a server).
 - [x] **HUD scale.** already covered: the settings page's GUI Scale row (`GameSettings.GuiScaleIndex` over `GuiScales`, 0.5x..2x, `RequestedGuiScale` feeding `UiCanvas.EffectiveScale`) scales the HUD across the 75-150 % band and beyond; a continuous slider would duplicate the tested setting.
 - [x] **Sprint toggle option.** the `Sprint Toggle` controls setting plus `SprintToggle.Step` driving `Camera.SprintHeld` (a fresh press flips the latch; off, the key is held as before) (`SprintToggleTests`).

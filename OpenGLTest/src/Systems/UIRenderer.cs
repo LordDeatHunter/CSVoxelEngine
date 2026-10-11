@@ -48,6 +48,9 @@ public class UIRenderer : IDisposable
     // The toast row sits this far above the item-name row, so the two never overlap
     private const float ToastRowGap = 26f;
 
+    // Smallest width of the Tab player list panel; a long name widens it
+    private const float PlayerListWidth = 200f;
+
     private const float SlotBorder = 2f;
     private const float SelectedBorder = 3f;
 
@@ -504,6 +507,31 @@ public class UIRenderer : IDisposable
                 DrawMesh(_heartHalfMesh,
                     RectTransform(centre with { X = centre.X - HeartDrawWidth * 0.25f }, halfSize),
                     Rgba.White, _heartTexture);
+        }
+    }
+
+    /// <summary>
+    /// The Tab player list: a centred panel with a header and one line per online player (the local
+    /// one first), drawn over the HUD while Tab is held.
+    /// </summary>
+    public void DrawPlayerList(IReadOnlyList<string> names)
+    {
+        if (_font == null || names.Count == 0) return;
+
+        var lineHeight = CountCapHeight + 6f;
+        var width = PlayerListWidth;
+        foreach (var name in names)
+            width = MathF.Max(width, _font.MeasureSize(name, _countScale).X + 32f);
+        var height = lineHeight * (names.Count + 1) + 16f;
+        var centre = new Vector2(_screenSize.X * 0.5f, _screenSize.Y * 0.28f);
+        DrawRect(centre, new Vector2(width, height), PanelBackground);
+
+        var top = centre.Y - height * 0.5f + 8f;
+        DrawTextCentred($"Players ({names.Count})", centre.X, top, _countScale, AccentGold);
+        for (var i = 0; i < names.Count; i++)
+        {
+            DrawText(names[i], new Vector2(centre.X - width * 0.5f + 16f, top + lineHeight * (i + 1)),
+                _countScale, Rgba.White);
         }
     }
 

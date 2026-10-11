@@ -73,6 +73,7 @@ public static class Program
     private static bool screenshotRequested;
     private static bool f1WasPressed;
     private static bool f2WasPressed;
+    private static bool tabHeld;
     private static bool xWasPressed;
     private static bool qWasPressed;
     private static bool rightWasDown;
@@ -1304,6 +1305,10 @@ public static class Program
             screenshotRequested = true;
         f2WasPressed = f2Pressed;
 
+        // Tab lists who is online while it is held (a server session; the chat owns Tab otherwise)
+        tabHeld = inputManager.Keyboard?.IsKeyPressed(Key.Tab) == true
+                  && !chatView.IsOpen && !pauseMenuView.IsOpen && !inventoryView.IsOpen;
+
         // ESC toggles the pause menu instead of closing the game: first press opens it,
         // ESC on the settings page steps back to the main page, ESC there resumes the game.
         // An open [E] panel or chat is closed first so they never overlap the menu.
@@ -1730,6 +1735,19 @@ public static class Program
         SendChat(text);
     }
 
+    /// <summary>The Tab player list's lines: the local player first, then the server's others.</summary>
+    private static IReadOnlyList<string> PlayerListNames()
+    {
+        _playerNames.Clear();
+        _playerNames.Add($"{chatView.LocalName} (you)");
+        if (world != null)
+            foreach (var remote in world.RemotePlayers)
+                _playerNames.Add(remote.Name);
+        return _playerNames;
+    }
+
+    private static readonly List<string> _playerNames = [];
+
     /// <summary>
     /// Runs one chat command locally, on the same table a server uses (<see cref="ChatCommands"/>):
     /// <c>/tp</c> and <c>/give</c> need creative mode, <c>/time</c> and <c>/help</c> do not, and
@@ -2135,6 +2153,9 @@ public static class Program
         // The chat log and input draw over the HUD; hidden with the HUD and behind the pause menu.
         if (!hideHud && !pauseMenuView.IsOpen)
             renderManager.RenderChat(windowManager.Window, chatView, windowManager.Window.Time);
+        // The Tab player list rides over the HUD while the key is held (a server session only)
+        if (!hideHud && !pauseMenuView.IsOpen && tabHeld && netClient != null)
+            renderManager.RenderPlayerList(windowManager.Window, PlayerListNames());
         // The loading screen fades out over the world's first playing frames
         if (!loadingView.IsFinished)
             renderManager.RenderLoadingOverlay(windowManager.Window, loadingView, windowManager.Window.Time);
