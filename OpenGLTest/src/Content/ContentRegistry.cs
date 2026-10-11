@@ -919,6 +919,36 @@ public static class ContentRegistry
     }
 
     /// <summary>
+    /// Reads a block's <c>flame</c>: three numbers in 0..16 model units, legal only on the
+    /// <c>model</c> renderer (a procedural emitter has no authored head to burn on). A
+    /// <c>facing: "horizontal"</c> block's point is authored facing north and pre-turned to all four
+    /// facings exactly like its model (<see cref="HorizontalFacing.RotatePoint"/>); any other block
+    /// keeps the one point. Returned in cell-local 0..1, or null when the block declares none.
+    /// </summary>
+    internal static Vector3[]? ParseFlame(BlockDefinition definition, BlockRenderer renderer, string path)
+    {
+        if (definition.Flame == null) return null;
+        if (renderer != BlockRenderer.Model)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets flame on renderer '{definition.Renderer}'; only a model block has an authored head for the flame.");
+        var flame = definition.Flame;
+        if (flame.Length != 3 || !Array.TrueForAll(flame, v => float.IsFinite(v) && v >= 0f && v <= 16f))
+            throw new InvalidOperationException(
+                $"Block '{path}' has flame [{string.Join(", ", flame)}]; expected three numbers in 0..16 model units.");
+
+        var point = new Vector3(flame[0], flame[1], flame[2]) / 16f;
+        if (definition.Facing != "horizontal")
+            return [point];
+        return
+        [
+            point,
+            HorizontalFacing.RotatePoint(point, 1, 1f),
+            HorizontalFacing.RotatePoint(point, 2, 1f),
+            HorizontalFacing.RotatePoint(point, 3, 1f),
+        ];
+    }
+
+    /// <summary>
     /// Reads a block's <c>facing</c> and <c>support</c>. A facing lives in the state byte, so it is
     /// refused wherever something else owns that byte (a fluid's level, a stack's count, a falling
     /// cube that would lose it) and on any renderer but <c>model</c> (a multiblock carries its own
@@ -1611,6 +1641,7 @@ public static class ContentRegistry
             if (emission > 15)
                 throw new InvalidOperationException($"Block '{path}' has light.emission {emission}; expected 0..15.");
             var lightColorSlot = ResolveLightColor(definition.Light?.Color, emission, path);
+            var flamePoints = ParseFlame(definition, renderer, path);
 
             var flow = definition.Flow;
             if (flow != null && !(definition.Fluid ?? false))
@@ -1755,6 +1786,7 @@ public static class ContentRegistry
                 Material = material,
                 LightEmission = emission,
                 LightColorSlot = lightColorSlot,
+                FlamePoints = flamePoints,
                 Renderer = renderer,
                 Pane = paneProfile,
                 Kiln = definition.Kiln ?? false,

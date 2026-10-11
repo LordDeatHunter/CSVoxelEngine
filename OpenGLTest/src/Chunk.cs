@@ -1299,6 +1299,8 @@ public class Chunk : IDisposable
 
         // Exposed hot-fluid cells (lava open to the air), allocated only when one turns up
         List<ushort>? vents = null;
+        // Chunk-local flame points of the blocks that burn one (torches), likewise lazy
+        List<Vector3>? flames = null;
 
         // World origin of this chunk, for the procedural emitters' per-cell world position; a
         // submerged face whose column leaves the padded snapshot reads its water level from the
@@ -1429,6 +1431,11 @@ public class Chunk : IDisposable
                 ? type.RotatedModels[BlockType.ShapeIndex(paddedState[pIdx], type.RotatedModels.Length)]
                 : type.BakedModel;
             if (model == null) continue;
+
+            // A block with a flame (a torch) records the flame's exact chunk-local point, turned with
+            // its facing like the model, for the world's flame particles
+            if (type.FlamePointAt(paddedState[pIdx]) is { } flame)
+                (flames ??= []).Add(basePos + flame);
 
             // Canopy leaves and plants ride the wind in the vertex shader; everything else stays
             // planted. A rooted plant's per-vertex weight rides the alpha byte (ModelVertexAlpha).
@@ -1612,7 +1619,7 @@ public class Chunk : IDisposable
         }
 
         return new ChunkMeshData(vertices, indices, tVertices, tIndices, hasWater)
-            { HotFluidVents = vents?.ToArray() };
+            { HotFluidVents = vents?.ToArray(), FlamePoints = flames?.ToArray() };
     }
 
     /// <summary>Corners of one axis-aligned face of the [min, max] box (cell-local).</summary>
@@ -1677,6 +1684,13 @@ public class Chunk : IDisposable
     public ushort[]? HotFluidVents { get; private set; }
 
     /// <summary>
+    /// Chunk-local points of the flames of the last applied mesh (torch heads, see
+    /// <see cref="BlockType.FlamePoints"/>), or null when there are none. Main thread only. A headless
+    /// server drops them (<see cref="MarkMeshedHeadless"/>), since it never draws a flame.
+    /// </summary>
+    public Vector3[]? FlamePoints { get; private set; }
+
+    /// <summary>
     /// Uploads a finished mesh into the shared chunk geometry pools, releasing whatever this
     /// chunk held before. The upload is a synchronous <c>glBufferSubData</c>, so the caller may
     /// recycle <paramref name="meshData"/>'s lists the moment this returns. An empty list never
@@ -1708,6 +1722,7 @@ public class Chunk : IDisposable
 
         HasWaterMesh = meshData.HasWater && meshData.TranslucentVertices.Count > 0;
         HotFluidVents = meshData.HotFluidVents;
+        FlamePoints = meshData.FlamePoints;
     }
 
     /// <summary>
@@ -1831,4 +1846,10 @@ public record ChunkMeshData(List<Vertex> Vertices, List<ushort> Indices,
     /// (<see cref="Chunk.IsHotFluidVent"/>), or null when there are none.
     /// </summary>
     public ushort[]? HotFluidVents { get; init; }
+
+    /// <summary>
+    /// Chunk-local points of the flames of the blocks that burn one (<see cref="BlockType.FlamePoints"/>,
+    /// already turned to each cell's facing), or null when there are none.
+    /// </summary>
+    public Vector3[]? FlamePoints { get; init; }
 }

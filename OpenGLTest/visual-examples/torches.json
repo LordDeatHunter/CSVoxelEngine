@@ -17,6 +17,8 @@
   //                foot below stays (it hangs on the foot, not on the block above it)
   //   wall-oblique the pillars from the front left, where the lean of each torch shows
   //   floor-pools  the pools from above, overlapping without block-sized seams
+  //   flame-floor, flame-wall  close shots of a floor and a wall torch: a flicker of embers over
+  //                each head and a thin wisp of smoke (the "flame" block field)
   // The player hovers over the patch until it streams in, then drops out of creative with C so
   // the mined blocks drop (flight left creative on).
   "steps": [
@@ -85,6 +87,19 @@
     { "op": "screenshot", "name": "wall-oblique", "hideHud": true },
     { "op": "teleport", "pos": [253.5, 19.5, 0.5], "yaw": -90, "pitch": -45 },
     { "op": "wait", "seconds": 1 },
-    { "op": "screenshot", "name": "floor-pools", "hideHud": true }
+    { "op": "screenshot", "name": "floor-pools", "hideHud": true },
+
+    // Torch flames (World's torch fire instance, fed by each block's "flame" point through
+    // Chunk.FlamePoints), close up with empty hands: the middle floor torch two cells ahead (head
+    // flame at (253.5, 10.66, -6.5)) and the right pillar's foot torch, facing south (flame at
+    // (255.5, 10.83, -7.75)), from its front right, where its lean shows. Embers flicker just over
+    // each head and a thin wisp of smoke rises off it.
+    { "op": "select", "slot": 10 },
+    { "op": "teleport", "pos": [253.5, 11.0, -5.3], "yaw": -90, "pitch": -16 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "flame-floor", "hideHud": true },
+    { "op": "teleport", "pos": [256.4, 11.1, -6.8], "yaw": -133.5, "pitch": -12 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "flame-wall", "hideHud": true }
   ]
 }

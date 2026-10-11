@@ -42,14 +42,28 @@ public sealed class FireParticle
 
     private Vector3 _velocity;
     private float _age;
-    private readonly float _lifetime;
-    private readonly float _grow;
+    private float _lifetime;
+    private float _grow;
     private readonly float _swayPhase;
-    private readonly float _swayAmp;
+    private float _swayAmp;
 
-    public FireParticle(Vector3 position, FireParticleKind kind, Random? random = null)
+    /// <param name="scale">Shrinks (or grows) the whole particle: its size, growth, lifetime, speed and
+    /// sway all scale by it, so a torch's flame (a small scale) is a short, tight flicker over its head
+    /// and its smoke a thin wisp, where a campfire's (1) fill a firepit.</param>
+    public FireParticle(Vector3 position, FireParticleKind kind, Random? random = null, float scale = 1f)
+        : this(position, kind, random ?? Random.Shared)
     {
-        var rng = random ?? Random.Shared;
+        if (scale == 1f) return;
+        Size *= scale;
+        _grow *= scale;
+        _lifetime *= scale;
+        _velocity *= scale;
+        _swayAmp *= scale;
+    }
+
+    private FireParticle(Vector3 position, FireParticleKind kind, Random random)
+    {
+        var rng = random;
         Position = position;
         Kind = kind;
         if (kind == FireParticleKind.Ember)

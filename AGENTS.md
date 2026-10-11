@@ -1167,6 +1167,7 @@ trailing commas.
 | `light.emission` | 0 | 0..15 (`LightEmission`) |
 | `light.color` | warm torch colour | sRGB `[r, g, b]`, 0..255 each, of the block's light; only legal with `emission` > 0. Colours within 0.5/255 share a `BlockLightPalette` slot, and at most 8 distinct colours exist (the default included) - a ninth throws naming the file. `blue_lamp` is the example |
 | `light.passes` | `!fullCube` | whether voxel light travels through the cell (`PassesLight`) |
+| `flame` | none | `[x, y, z]` in 0..16 model units: where a small flame burns (a torch's head, half a pixel above its stick). Authored facing north and pre-turned with a `facing` block (`BlockType.FlamePoints`, `FlamePointAt(state)`); the mesher records each cell's point in `Chunk.FlamePoints` and the world burns a flicker of embers and a wisp of smoke there (see "Animation juice"). Only on the `model` renderer |
 | `renderer` | `"model"` | `model` (baked quads), `tree_wood` (a grown tree's wood: its shape, thickness and tree-graph links come from the state byte, see `### Trees`; requires a `wood` object, forces `occludes` and `castsAO` off and `light.passes` on, never meshes greedy, and refuses `cutout`, `translucent`, `fluid`, `falls`, `needsSupport`, `stackMax` and `hitbox`), `pebbles`, `branch_pile`, `snow_layers`, `fluid` or `quern` (procedural emitters), `multiblock` (the anchor cell of a structure, carrying the whole volume's pre-rotated model), `multiblock_part` (one of its other cells, solid and occluding but never meshed) or `pane` (a 2 px post plus an arm toward every horizontal neighbour that is a pane or a solid full cube, derived at mesh time by `PaneEmitter` from `PaneShape`, never stored; a lone pane is just the post, as in Minecraft; the raycast, outline and body collide with the same arms through `BlockShape`; refuses `hitbox`, `fluid`, `falls`, `stackMax` and `needsSupport`, and a solid pane always collides by its arms); a fluid's, layer block's or pane's model only supplies its tile (and the pane's icon) |
 | `multiblock` | none | required on, and only legal with, `renderer: "multiblock"`: `{"part": "block/<name>", "source": "block/<name>"}` — the block filling the other seven cells (which must use `multiblock_part`) and the plain block the volume is built from and reverts to. The anchor and its part must both set `hasItem: false` (a structure is built, never held), and `cutout`/`translucent`/`fluid` are rejected, since both halves are ordinary opaque solids to everything but the mesher. Both default `occludes` and `light.passes` to **true**: the structure's surface really does cover its neighbours, and its quads carry no cullface and are lit from the anchor's own cell, so light has to reach that cell or the whole thing renders black. The model is authored in 0..32 model units (the 2x2x2 volume) with the opening on **north**, no `cullface` on any face and no face covering a whole cell plane — see `### Multiblocks` below |
 | `kiln` | false | marks a multiblock anchor as a kiln, which is what gives it `KilnManager`'s fuel, ignition, crucible slot and integrity sweep. Only legal on the `multiblock` renderer |
@@ -3015,7 +3016,17 @@ overshoot or jiggle.
   `WaterSplashColor` `DebrisLook.Colour` droplets (`BlockDebrisSystem.Splash`) thrown up from the water
   top of the column crossed (`ChunkManager.GetFluidColumnTopGlobal`), never off lava. A client splashes
   its own player, the mob mirrors and the primed-TNT mirrors (all persist across snapshots); its drops and
-  falling cubes are rebuilt every snapshot, so they never splash there (`WaterSplashTests`).
+  falling cubes are rebuilt every snapshot, so they never splash there (`WaterSplashTests`). Torch
+  heads burn: the mesher records the chunk-local point of every block with a JSON `flame` (turned to the
+  cell's facing) in `ChunkMeshData.FlamePoints` beside `HotFluidVents`, kept on `Chunk.FlamePoints` by
+  `UpdateMesh` and dropped by `Chunk.MarkMeshedHeadless`, since a server never draws one; each frame
+  `World.UpdateTorchFlames` gathers the points within `TorchFlameRadius` of the eye from the
+  `Renderable` chunks (nearest first, at most `TorchFlameMaxEmitters`) into a third
+  `FireParticleSystem` (`TorchEmberPerSecond`, `TorchSmokePerSecond`, no spawn offset, the spawn scatter
+  `TorchFlameJitter` and the particle scale `TorchFlameScale`, both constructor parameters, the scale
+  shrinking a `FireParticle`'s size, life, speed and sway), drawn after the lava batch. No point lights:
+  the torch's own block light lights it (`TorchFlameTests`; `visual-examples/torches.json` at
+  `VOXEL_TIME=700` ends on close shots of a floor and a wall torch).
   `visual-examples/world-events.json` (`VOXEL_TIME=147`) films
   these effects; its blasts use the scenario op `prime` (`{ "op": "prime", "pos": [x, y, z] }`,
   `World.TestPrimeTnt`), a firestarter strike on the TNT block in that cell that never misses, since

@@ -26,6 +26,8 @@ public sealed class FireParticleSystem
     private readonly float _smokePerSecond;
     private readonly int _maxParticles;
     private readonly Vector3 _spawnOffset;
+    private readonly float _spawnJitter;
+    private readonly float _particleScale;
     private float _emberDebt;
     private float _smokeDebt;
 
@@ -42,14 +44,20 @@ public sealed class FireParticleSystem
     /// A separately tuned system: <paramref name="embersPerSecond"/> and <paramref name="smokePerSecond"/>
     /// are per lit cell in range, <paramref name="maxParticles"/> is this instance's own ring
     /// capacity (the oldest particle is evicted past it) and <paramref name="spawnOffset"/> is
-    /// where inside a cell the particles start.
+    /// where inside a cell the particles start. <paramref name="spawnJitter"/> is how wide the spawn
+    /// scatter is across the origin (a firepit's half block by default; a torch's flame point is
+    /// exact, so its scatter is a pixel or two) and <paramref name="particleScale"/> shrinks every
+    /// particle it spawns (<see cref="FireParticle"/>'s scale).
     /// </summary>
-    public FireParticleSystem(float embersPerSecond, float smokePerSecond, int maxParticles, Vector3 spawnOffset)
+    public FireParticleSystem(float embersPerSecond, float smokePerSecond, int maxParticles, Vector3 spawnOffset,
+        float spawnJitter = 0.5f, float particleScale = 1f)
     {
         _embersPerSecond = embersPerSecond;
         _smokePerSecond = smokePerSecond;
         _maxParticles = maxParticles;
         _spawnOffset = spawnOffset;
+        _spawnJitter = spawnJitter;
+        _particleScale = particleScale;
         _particles = new ParticleRing<FireParticle>(maxParticles);
     }
 
@@ -120,7 +128,8 @@ public sealed class FireParticleSystem
         if (_particles.Count >= _maxParticles)
             _particles.RemoveAt(0);
         var jitter = new Vector3(
-            (rng.NextSingle() - 0.5f) * 0.5f, rng.NextSingle() * 0.15f, (rng.NextSingle() - 0.5f) * 0.5f);
-        _particles.Add(new FireParticle(origin + jitter, kind, rng));
+            (rng.NextSingle() - 0.5f) * _spawnJitter, rng.NextSingle() * 0.3f * _spawnJitter,
+            (rng.NextSingle() - 0.5f) * _spawnJitter);
+        _particles.Add(new FireParticle(origin + jitter, kind, rng, _particleScale));
     }
 }

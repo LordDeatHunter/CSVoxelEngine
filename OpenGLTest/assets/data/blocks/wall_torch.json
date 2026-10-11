@@ -9,6 +9,10 @@
   "castsAO": false,
   "cutout": true,
   "light": { "emission": 14 },
+  // Half a pixel past the head of the leaning stick, facing north like the model: block/wall_torch's
+  // post tops out at (8, 12.74, 12.17) once its 22.5 degree lean is applied, and the flame continues
+  // along it. The facing turns it with the model.
+  "flame": [8, 13.2, 12],
   // Pops when the block behind it goes, not the one below; drops a torch (loot/wall_torch.json)
   "needsSupport": true,
   "support": "attached",

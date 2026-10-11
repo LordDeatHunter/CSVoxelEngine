@@ -8,6 +8,8 @@
   "cutout": true,
   // The default warm block-light colour, so the torch costs no palette slot
   "light": { "emission": 14 },
+  // The flame flickers half a pixel above the head of the stick (block/torch tops out at y 10)
+  "flame": [8, 10.5, 8],
   // Pops (dropping itself) when the block it stands on goes, and a flow washes it away
   "needsSupport": true,
   // Placed against a block's side it becomes the wall torch, leaning out from that wall

@@ -167,6 +167,15 @@ public sealed class BlockDefinition
     public bool? Fluid { get; set; }
 
     public LightDefinition? Light { get; set; }
+
+    /// <summary>
+    /// Where a small flame burns on the block (a torch's head), as <c>[x, y, z]</c> in 0..16 model
+    /// units, authored facing north like the model and turned with a <c>facing</c> block's state:
+    /// the mesher records it for the world's flame particles. Only on the <c>model</c> renderer.
+    /// Omitted means no flame.
+    /// </summary>
+    public float[]? Flame { get; set; }
+
     public WoodDefinition? Wood { get; set; }
 
     /// <summary>Reflective surface tuning; omitted means a plain non-metallic block, which is

@@ -1530,6 +1530,25 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     /// <summary>Cap on emitting vents per frame, filled nearest chunk first so the pool beside the player always wins.</summary>
     public const int LavaVentMaxEmitters = 96;
 
+    // --- Torch flames (a third FireParticleSystem instance in World) ---
+    // Every block with a JSON "flame" point (the torches; recorded per chunk by the mesher in
+    // Chunk.FlamePoints) gives off a small flicker of embers and a thin wisp of smoke from exactly
+    // that point. Cosmetic: never on a headless server.
+    /// <summary>Embers per second off each torch in range.</summary>
+    public const float TorchEmberPerSecond = 7f;
+    /// <summary>Smoke puffs per second off each torch in range.</summary>
+    public const float TorchSmokePerSecond = 1.2f;
+    /// <summary>Ring capacity of the torch particle instance.</summary>
+    public const int TorchParticleMax = 256;
+    /// <summary>Only flames within this distance (blocks) of the eye burn.</summary>
+    public const float TorchFlameRadius = 24f;
+    /// <summary>Cap on burning flames per frame, filled nearest chunk first.</summary>
+    public const int TorchFlameMaxEmitters = 48;
+    /// <summary>Spawn scatter across a flame point, in blocks: a pixel or so, since the point is exact.</summary>
+    public const float TorchFlameJitter = 0.06f;
+    /// <summary>Particle scale of a torch flame against a campfire's 1 (size, lifetime, speed, sway).</summary>
+    public const float TorchFlameScale = 0.45f;
+
     // --- Exhaled bubbles (BubbleParticleSystem + BubbleParticleRenderer) ---
     // Small billboards rising off the player's mouth while the eye is submerged, popping
     // at the water surface. One batched billboard draw covers all of them.

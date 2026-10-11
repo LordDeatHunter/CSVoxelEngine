@@ -233,6 +233,16 @@ public sealed record BlockType
     /// <summary><see cref="BlockLightPalette"/> slot of the emitted light's colour; 0 is the default.</summary>
     public byte LightColorSlot { get; init; }
 
+    /// <summary>Where the block's flame burns (its JSON <c>flame</c>), cell-local 0..1, one point per
+    /// horizontal facing for a <see cref="HasHorizontalFacing"/> block (indexed by the state byte's low
+    /// two bits) and a single point otherwise; null for a block with no flame. See <see cref="FlamePointAt"/>.</summary>
+    public System.Numerics.Vector3[]? FlamePoints { get; init; }
+
+    /// <summary>The cell-local flame point of this block standing with <paramref name="state"/>, or
+    /// null when it has no flame.</summary>
+    public System.Numerics.Vector3? FlamePointAt(byte state) =>
+        FlamePoints is { } points ? points[points.Length == 4 ? state & 3 : 0] : null;
+
     /// <summary>Whether voxel light travels through it; defaults to "not a full cube".</summary>
     public bool PassesLight { get; internal set; }
 

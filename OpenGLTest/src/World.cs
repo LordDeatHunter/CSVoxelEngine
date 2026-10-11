@@ -61,6 +61,13 @@ public class World : IItemUseWorld
         new Vector3(0.5f, FluidState.SourceHeight, 0.5f));
     private readonly List<Vector3> _lavaVents = [];
     private readonly List<(float dist2, Chunk chunk)> _lavaVentChunks = [];
+    // Torch flames: a third instance with tiny, tight particles spawned exactly at each flame point
+    // (Chunk.FlamePoints, already world-exact, so no spawn offset)
+    private readonly FireParticleSystem _torchFire = new(WorldGenerationConfig.TorchEmberPerSecond,
+        WorldGenerationConfig.TorchSmokePerSecond, WorldGenerationConfig.TorchParticleMax, Vector3.Zero,
+        WorldGenerationConfig.TorchFlameJitter, WorldGenerationConfig.TorchFlameScale);
+    private readonly List<Vector3> _torchFlames = [];
+    private readonly List<(float dist2, Chunk chunk)> _torchFlameChunks = [];
     private static readonly Comparison<(float dist2, Chunk chunk)> NearestVentChunkFirst =
         static (a, b) => a.dist2.CompareTo(b.dist2);
 
@@ -352,6 +359,9 @@ public class World : IItemUseWorld
 
     /// <summary>Live campfire embers and smoke, feeding the fire billboard pass.</summary>
     public IReadOnlyList<FireParticle> FireParticles => _fire.Particles;
+
+    /// <summary>Live torch flame embers and smoke (a third fire instance).</summary>
+    public IReadOnlyList<FireParticle> TorchFlameParticles => _torchFire.Particles;
 
     /// <summary>Live exhaled bubbles, feeding the bubble billboard pass.</summary>
     public IReadOnlyList<BubbleParticle> Bubbles => _bubbles.Particles;
@@ -1338,6 +1348,7 @@ public class World : IItemUseWorld
         _fireCells.AddRange(_campfires.LitCells);
         _fireCells.AddRange(_kilns.LitCells);
         _fire.Update((float)deltaTime, _fireCells, Camera.RenderEye, wind: Wind.Direction(LightingTime));
+        UpdateTorchFlames((float)deltaTime, Wind.Direction(LightingTime));
         UpdateBubbles((float)deltaTime);
         UpdateThrown((float)deltaTime);
         RefreshProjectiles();
@@ -1696,6 +1707,7 @@ public class World : IItemUseWorld
         _fire.Update((float)deltaTime, _fireCells, Camera.RenderEye, wind: wind);
         GatherLavaVents(Camera.RenderEye);
         _lavaFire.Update((float)deltaTime, _lavaVents, Camera.RenderEye, wind: wind);
+        UpdateTorchFlames((float)deltaTime, wind);
         UpdateBubbles((float)deltaTime);
 
         // Falling cubes shove the player aside instead of landing inside them; strictly
@@ -2289,6 +2301,51 @@ public class World : IItemUseWorld
         }
     }
 
+    /// <summary>
+    /// The torch flames: gathers every flame point (<see cref="Chunk.FlamePoints"/>) within
+    /// <see cref="WorldGenerationConfig.TorchFlameRadius"/> of the eye, nearest chunks first and at most
+    /// <see cref="WorldGenerationConfig.TorchFlameMaxEmitters"/> of them, and burns them in the torch
+    /// particle instance, drifting with <paramref name="wind"/>. No point lights: a torch's own block
+    /// light already lights it. Cosmetic: a headless server never runs it.
+    /// </summary>
+    private void UpdateTorchFlames(float deltaTime, Vector2 wind)
+    {
+        if (_serverMode)
+            return;
+        var eye = Camera.RenderEye;
+        _torchFlames.Clear();
+        _torchFlameChunks.Clear();
+        const float radius = WorldGenerationConfig.TorchFlameRadius;
+        const float chunkReach = radius + Chunk.Size;
+        const float half = Chunk.Size * 0.5f;
+        var chunks = _chunkManager.Renderable;
+        for (var i = 0; i < chunks.Count; i++)
+        {
+            var chunk = chunks[i];
+            if (chunk.FlamePoints is null) continue;
+            var d2 = Vector3.DistanceSquared(chunk.Position * Chunk.Size + new Vector3(half), eye);
+            if (d2 <= chunkReach * chunkReach)
+                _torchFlameChunks.Add((d2, chunk));
+        }
+
+        if (_torchFlameChunks.Count > 1)
+            _torchFlameChunks.Sort(NearestVentChunkFirst);
+        foreach (var (_, chunk) in _torchFlameChunks)
+        {
+            var origin = chunk.Position * Chunk.Size;
+            foreach (var local in chunk.FlamePoints!)
+            {
+                var point = origin + local;
+                if (Vector3.DistanceSquared(point, eye) > radius * radius) continue;
+                _torchFlames.Add(point);
+                if (_torchFlames.Count >= WorldGenerationConfig.TorchFlameMaxEmitters) break;
+            }
+            if (_torchFlames.Count >= WorldGenerationConfig.TorchFlameMaxEmitters) break;
+        }
+
+        _torchFire.Update(deltaTime, _torchFlames, eye, wind: wind);
+    }
+
     /// <summary>A stable 0..1 hash of a cell, so the thinned vent set does not flicker frame to frame.</summary>
     private static float VentHash01(Vector3 cell)
     {
@@ -2507,6 +2564,7 @@ public class World : IItemUseWorld
         // calls a frame are safe. The batches are not depth-sorted against each other, which
         // only matters where campfire and lava smoke overlap (cosmetic).
         renderManager.RenderFireParticles(Camera, _lavaFire.Particles);
+        renderManager.RenderFireParticles(Camera, _torchFire.Particles);
         renderManager.RenderBubbleParticles(Camera, _bubbles.Particles);
         renderManager.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);
