@@ -191,13 +191,14 @@ internal sealed class PlayerPhysics
         camera.UpdateCreativeToggle(keyboard);
         camera.UpdateFlightToggle(deltaTime, keyboard);
         camera.UpdateShoulderToggle(keyboard);
+        camera.UpdateSprintLatch(keyboard.IsKeyPressed(Key.ShiftLeft));
         camera.SetShoulderBlendT(Math.Clamp(camera.ShoulderBlendT
             + (camera.IsShoulderSurf ? deltaTime : -deltaTime) / Camera.ShoulderTransitionSeconds, 0f, 1f));
         UpdateWaterState(camera, chunkManager);
         _knockback.X = MathUtils.Damp(_knockback.X, 0f, KnockbackDamping, deltaTime);
         _knockback.Z = MathUtils.Damp(_knockback.Z, 0f, KnockbackDamping, deltaTime);
 
-        var sprinting = keyboard.IsKeyPressed(Key.ShiftLeft);
+        var sprinting = camera.SprintHeld;
         var moveSpeed = BaseSpeed * (sprinting ? (camera.IsFlying ? FlyBoostMultiplier : SprintMultiplier) : 1f);
         var direction = camera.IsOrbit ? camera.ViewDirection : camera.GetForwardVector();
         var right = Vector3.Normalize(Vector3.Cross(direction, Vector3.UnitY));

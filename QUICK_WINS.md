@@ -228,3 +228,34 @@ files waits in TODO.md instead, since there are none to use yet.
   set of the look-at label: `Inventory.Add` of an id not in it adds it and raises the toast (never
   at world load, so a restored inventory does not toast).
 - [x] **Screenshot key.** F2 reads the finished frame back through `VisualCapture` and saves it to `ScreenshotPaths.Directory` as a millisecond-stamped PNG (`ScreenshotPathTests`).
+- [x] **Hide-HUD key.** F1 toggles `hudVisible`, the same gate the scenario screenshot's `hideHud` drives (`ScreenshotPathTests` covers the shared path naming).
+- [ ] **Tab player list.** Holding Tab in multiplayer lists who is online. *Hook:* the
+  `PlayerList` data `World.SyncRemotePlayers` already keeps.
+- [ ] **Chat commands: help, tp, give.** `/help` lists the commands, `/tp x y z` teleports and
+  `/give <item> [count]` grants items. `/tp` and `/give` are creative-or-operator only. *Hook:* the
+  same command table as `/time`. `/tp` sets the camera position in singleplayer and sends a
+  `PlayerCorrection` on a server (`ServerPlayer.IssueCorrection`); `/give` takes the creative-grant
+  path with the item resolved by name. A bad argument or unknown item answers with a system line.
+  Tab-completion for these lives in `TODO.md` (`U-22`).
+- [ ] **Item tooltips.** Hovering any slot or row shows a panel with the display name, kind, tool
+  power, damage, durability left and fuel time when present. *Hook:* the fields already on `Item` /
+  `ItemStack`, drawn by `UIRenderer` after the panel. A slice of `U-1`.
+- [ ] **Inventory sort.** A button on each tab sorts it by name, then count. *Hook:*
+  `InventoryView` and the pool order in `Inventory`. Singleplayer first: on a server it needs a new
+  `NetInventoryAction`.
+- [x] **Number-key slot assign.** with the [E] panel open, 1-9 (and 0) equip the hovered row into that hotbar slot through the same equip a click performs (`Program.AssignHoveredRowToHotbar`, sent as an `Equip` intent on a server).
+- [x] **HUD scale.** already covered: the settings page's GUI Scale row (`GameSettings.GuiScaleIndex` over `GuiScales`, 0.5x..2x, `RequestedGuiScale` feeding `UiCanvas.EffectiveScale`) scales the HUD across the 75-150 % band and beyond; a continuous slider would duplicate the tested setting.
+- [x] **Sprint toggle option.** the `Sprint Toggle` controls setting plus `SprintToggle.Step` driving `Camera.SprintHeld` (a fresh press flips the latch; off, the key is held as before) (`SprintToggleTests`).
+- [ ] **Worlds list details.** Each row also shows the last played date and the seed. *Hook:*
+  `WorldInfo` already holds the timestamps and seed; a second line in
+  `UIRenderer.DrawMainMenu`'s row.
+- [ ] **Death message.** On death a system chat line reads "Player was slain by Goblin" (or "fell",
+  "burned"). *Hook:* the damage source at the lethal hit (mob type via `IMobTarget.TakeHit`, fall
+  via `FallTracker`, lava) feeding `ChatKind.System`; broadcast on a server.
+- [ ] **Inventory-full warning.** A drop in pickup range that the full pool cannot take shows
+  "Inventory full" over the hotbar **once**: it fires on the transition into the blocked state and
+  stays silent until the pool has had room again (a slot freed or an item count fell), however many
+  drops hover nearby or how long they stay. *Hook:* the "one nobody can take lets go" branch in
+  `DropManager`'s collector for singleplayer; a client detects it itself from its inventory mirror
+  and the drops near it in `EntityList`, so no new message. A `HotbarNameFade`-style hold-then-fade.
+  Test: the warning fires once per full episode and re-arms only after room appears.

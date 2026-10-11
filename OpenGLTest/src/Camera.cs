@@ -29,6 +29,23 @@ public class Camera : IMobTarget
     /// <summary>True while sprinting on foot with movement input; drives the run cycle and roll (the FOV
     /// widening reads the sprint key itself, so a flight sprint widens too: see <see cref="SprintFov"/>).</summary>
     public bool IsSprinting { get; private set; }
+
+    // The sprint latch (see SprintToggle): with the toggle setting on, the key flips it on each
+    // press instead of being held
+    private bool _sprintLatched;
+    private bool _sprintKeyWasHeld;
+
+    /// <summary>Whether the sprint key counts as held this frame: the toggle setting's latch, or
+    /// the key itself (<see cref="SprintToggle.Step"/>).</summary>
+    public bool SprintHeld { get; private set; }
+
+    /// <summary>Advances the sprint latch from this frame's key state.</summary>
+    public void UpdateSprintLatch(bool keyHeld)
+    {
+        SprintHeld = SprintToggle.Step(_sprintLatched, keyHeld, _sprintKeyWasHeld, GameSettings.SprintToggle);
+        _sprintLatched = SprintHeld;
+        _sprintKeyWasHeld = keyHeld;
+    }
     /// <summary>True while crouched on foot (Left Ctrl): slower, a lowered view and the model's crouch pose.
     /// The body and its collision keep their size, so the server's movement rules are unaffected.</summary>
     public bool IsSneaking { get; private set; }

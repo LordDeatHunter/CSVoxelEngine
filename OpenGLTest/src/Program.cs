@@ -804,6 +804,56 @@ public static class Program
     }
 
     /// <summary>
+    /// The number keys while the [E] panel is open: the row under the cursor goes into that hotbar
+    /// slot, the same equip a click on the slot performs with the row selected. Only the plain
+    /// tabs — a search result and a creative catalog row have their own click actions.
+    /// </summary>
+    private static void AssignHoveredRowToHotbar()
+    {
+        var inventory = world?.Inventory;
+        if (inventory == null || inputManager?.Mouse == null || inputManager.Keyboard == null) return;
+        if (!inventoryView.Search.IsEmpty) return;
+        if (inventoryView.Tab == InventoryCategory.Crafting) return;
+        if (world!.Camera.IsCreative) return;
+
+        var rowCount = RowCountFor(inventoryView.Tab);
+        var offset = InventoryPanelLayout.ClampedOffset(inventoryView.ScrollOffset, rowCount,
+            renderManager!.UiCanvasSize);
+        var row = renderManager.UiPanelRowAt(inputManager.Mouse.Position, offset, rowCount);
+        if (row == null) return;
+
+        byte id = 0;
+        var tool = 0;
+        if (inventoryView.Tab == InventoryCategory.Tools)
+        {
+            var entries = inventory.ToolEntries();
+            if (row.Value >= entries.Count) return;
+            tool = entries[row.Value].InstanceId;
+        }
+        else
+        {
+            var entries = inventory.StackEntries(inventoryView.Tab);
+            if (row.Value >= entries.Count) return;
+            id = entries[row.Value].Id;
+        }
+        if (id == 0 && tool == 0) return;
+
+        for (var i = 0; i < NumberKeys.Length; i++)
+        {
+            if (inputManager.Keyboard.IsKeyPressed(NumberKeys[i]) != true) continue;
+            var intent = tool != 0
+                ? InventoryIntent.EquipTool(i, tool)
+                : InventoryIntent.EquipStackable(i, id);
+            if (SendInventoryIntent(intent)) return;
+            if (tool != 0)
+                inventory.EquipTool(i, tool);
+            else
+                inventory.EquipStackable(i, id);
+            return;
+        }
+    }
+
+    /// <summary>
     /// After a local selection change (the wheel), tells the server about it while connected,
     /// since the server owns the selection and its next inventory sync would otherwise revert the
     /// slot. Nothing to do in singleplayer.
@@ -1296,6 +1346,11 @@ public static class Program
         eWasPressed = ePressed;
 
         var qPressed = inputManager.Keyboard?.IsKeyPressed(Key.Q) == true;
+        // With the panel open, the number keys put the hovered row into that hotbar slot instead
+        // (the equip a click on the slot performs with the row selected)
+        if (inventoryView.IsOpen && inventoryView.Focus == InventoryFocus.None && !pauseMenuView.IsOpen)
+            AssignHoveredRowToHotbar();
+
         if (!inventoryView.IsOpen && !pauseMenuView.IsOpen && !chatView.IsOpen)
         {
             // 1-10 grabs the hotbar slot directly; scroll still walks it one step at a time

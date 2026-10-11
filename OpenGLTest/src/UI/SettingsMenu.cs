@@ -103,6 +103,8 @@ public static class SettingsRows
 
         new SliderRow("Controls", "Mouse Sensitivity", SensitivityMin, SensitivityMax, 2, "",
             () => GameSettings.MouseSensitivity, v => GameSettings.MouseSensitivity = v),
+        new ToggleRow("Controls", "Sprint Toggle",
+            () => GameSettings.SprintToggle, v => GameSettings.SprintToggle = v),
         new SliderRow("Controls", "Field of View", FovMin, FovMax, 0, "deg",
             () => GameSettings.FieldOfView, v => GameSettings.FieldOfView = v),
     ];

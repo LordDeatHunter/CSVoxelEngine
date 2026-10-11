@@ -42,6 +42,9 @@ public static class GameSettings
     public static float MouseSensitivity { get; set; }
     public static float FieldOfView { get; set; }
 
+    /// <summary>Whether the sprint key toggles instead of being held (see <see cref="SprintToggle"/>).</summary>
+    public static bool SprintToggle { get; set; }
+
     /// <summary>Window sizes offered by the resolution option row.</summary>
     public static readonly (int W, int H)[] Resolutions =
         [(1280, 720), (1600, 900), (1920, 1080), (2560, 1440)];
@@ -82,6 +85,7 @@ public static class GameSettings
         SfxVolume = WorldGenerationConfig.SfxVolume;
         MouseSensitivity = 0.2f;
         FieldOfView = 70f;
+        SprintToggle = false;
     }
 
     /// <summary>Where the JSON lives (outside the repo, so it never dirties the checkout).</summary>
@@ -125,6 +129,7 @@ public static class GameSettings
         if (dto.SfxVolume is { } sfx) SfxVolume = Math.Clamp(sfx, 0f, 1f);
         if (dto.MouseSensitivity is { } sensitivity) MouseSensitivity = Math.Clamp(sensitivity, SettingsRows.SensitivityMin, SettingsRows.SensitivityMax);
         if (dto.FieldOfView is { } fov) FieldOfView = Math.Clamp(fov, SettingsRows.FovMin, SettingsRows.FovMax);
+        if (dto.SprintToggle is { } sprintToggle) SprintToggle = sprintToggle;
     }
 
     public static void Save(string? path = null)
@@ -151,6 +156,7 @@ public static class GameSettings
             SfxVolume = SfxVolume,
             MouseSensitivity = MouseSensitivity,
             FieldOfView = FieldOfView,
+            SprintToggle = SprintToggle,
         };
         try
         {
@@ -186,5 +192,6 @@ public static class GameSettings
         public float? SfxVolume { get; set; }
         public float? MouseSensitivity { get; set; }
         public float? FieldOfView { get; set; }
+        public bool? SprintToggle { get; set; }
     }
 }
