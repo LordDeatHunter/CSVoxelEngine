@@ -104,14 +104,10 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Natural cotton.** `cotton_plant` + `cotton`, clumped by the reusable `PlantClumps` rule on the dry forest fringe (`cotton.json`).
 - [x] **Torch.** `torch`, light 14, `needsSupport`; branch + coal -> 4 (`torches.json`).
   - [x] *Wall-mounted:* `wall_torch` with `facing` + `support: "attached"`; `BlockSupport` is the one support rule.
-- [ ] **Charred torch top.** The torch's top face shows the stick's wood: the model's `up` uv
-  `[7, 6, 9, 8]` lands on the char band plus two wood rows, because top and bottom faces mirror v
-  in `ModelBaker` (`FlipV`). Give the torch a top tile of its own. *Hook:* let
-  `tools/generate-torch-texture.py` also write `torch_top.png` (a charred square with a faint
-  ember centre, listed in `USER_TODO.md`), and point the `up` faces of `block/torch.json` and
-  `block/wall_torch.json` at a `"torch_top"` texture variable (any uv crop: the whole tile is the
-  top). A new PNG under `assets/textures/blocks` becomes an atlas slice by the file glob and the
-  block's cutout mips cover it, so no csproj edit. `torches.json`.
+- [x] **Charred torch top.** The torch's `up` faces wear a `torch_top` tile of their own (a
+  charred square with a faint ember centre, written by `tools/generate-torch-texture.py`) over
+  the whole tile, so the top no longer shows the side crop's char band and wood rows
+  (`TorchFlameTests`).
 - [x] **Glass pane.** `glass_pane`; 6 glass -> 16 (`panes.json`).
   - [x] *Neighbour connectivity:* `pane` renderer (`PaneShape` + `PaneEmitter`), arms toward panes and solid cubes, matching hitboxes.
 

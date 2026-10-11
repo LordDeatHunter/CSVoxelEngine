@@ -18,6 +18,22 @@ public sealed class TorchFlameTests
     private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     [Fact]
+    public void EveryTorchsTopFaceWearsTheCharredTopTile()
+    {
+        var top = TextureAtlas.TileOf("torch_top");
+        foreach (var name in new[] { "torch", "wall_torch" })
+        {
+            var type = ContentRegistry.RequireBlock(name);
+            var up = type.BakedModel!.Quads.Where(q => q.Face == 4).ToArray();
+            Assert.NotEmpty(up);
+            // The whole tile, so the top never shows the side crop's char band and wood rows
+            Assert.All(up, q => Assert.Equal(top, q.Tile));
+            Assert.All(up, q => Assert.Equal(0f, q.Uvs.Min(u => MathF.Min(u.X, u.Y))));
+            Assert.All(up, q => Assert.Equal(1f, q.Uvs.Max(u => MathF.Max(u.X, u.Y))));
+        }
+    }
+
+    [Fact]
     public void EveryFlameBurnsJustOverTheTopOfItsOwnModelOnEveryFacing()
     {
         var flaming = BlockType.Types.Values.Where(t => t.FlamePoints != null).ToList();

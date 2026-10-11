@@ -12,6 +12,10 @@ their faces out of exactly that stick:
 
 so moving the stick here means moving those uvs too.
 
+A second tile, torch_top.png (32x32, fully opaque), is the burnt end of the stick seen straight
+down: char with a faint ember still glowing at the centre. The models' `up` faces sample it with
+[0, 0, 16, 16] (the whole tile), so the top never shows the side crop's char band and wood rows.
+
 The output is a pure function of the constants below (no noise, no randomness), so re-running
 reproduces the PNG byte for byte. Run from the repo root:  python tools/generate-torch-texture.py
 """
@@ -21,6 +25,7 @@ from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PATH = os.path.join(ROOT, "OpenGLTest", "assets", "textures", "blocks", "torch.png")
+TOP_PATH = os.path.join(ROOT, "OpenGLTest", "assets", "textures", "blocks", "torch_top.png")
 
 SIZE = 32
 STICK_COLUMNS = range(14, 18)
@@ -37,6 +42,11 @@ FLAME = [
 ]
 
 CHAR = [(96, 61, 38), (82, 52, 32), (72, 45, 28), (60, 38, 24)]
+
+# The top tile: char, with a faint ember still glowing at the centre (radius in texels)
+TOP_CHAR = (58, 37, 23)
+TOP_EMBER = (208, 104, 40)
+TOP_EMBER_RADIUS = 11
 
 # Wood per column, lit side (14) to shaded side (17), so the stick reads round
 WOOD = [(152, 108, 60), (134, 94, 51), (119, 83, 45), (99, 69, 37)]
@@ -68,6 +78,24 @@ def main():
             pixels[column, row] = shade(WOOD[column_index], grain) + (255,)
 
     image.save(PATH, format="PNG", optimize=False)
+
+    top = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 255))
+    top_pixels = top.load()
+    for y in range(SIZE):
+        for x in range(SIZE):
+            dx = x - (SIZE - 1) / 2
+            dy = y - (SIZE - 1) / 2
+            distance = (dx * dx + dy * dy) ** 0.5
+            glow = max(0.0, 1.0 - distance / TOP_EMBER_RADIUS)
+            glow = glow * glow * 0.6
+            grain = -10 if (x + y) % 5 == 0 else 0
+            rgb = tuple(
+                max(0, min(255, round(c + (e - c) * glow) + grain))
+                for c, e in zip(TOP_CHAR, TOP_EMBER)
+            )
+            top_pixels[x, y] = rgb + (255,)
+
+    top.save(TOP_PATH, format="PNG", optimize=False)
 
 
 if __name__ == "__main__":
