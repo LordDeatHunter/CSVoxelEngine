@@ -369,6 +369,18 @@ single-arc player.
 - [ ] **`U-21` · Crafting grid (optional)** — P3, M.
   Decide whether a shaped grid is ever wanted; the current system is deliberately shapeless.
   Parked, not planned — revisit only if content demands it.
+- [ ] **`U-22` · Chat command autocomplete** — P2, S–M. Pairs `U-7`; for the quick-win `/time`,
+  `/tp`, `/give` and `/help`.
+  Tab completes in the chat input. *Hook:* the command table those commands share (each entry gains
+  an argument spec). Tab on `/` completes the command name (a unique prefix completes at once,
+  several cycle through the matches with Tab and Shift+Tab, shown as a suggestion row above the
+  input like the inventory search's dropdown); after the name, Tab completes the argument from its
+  spec: `/time` offers `day` and `night`, `/give` the item names (`ContentRegistry` blocks and
+  items by display name and file name, owned items first), `/tp` offers nothing (numbers) and later
+  commands can offer online player names. `ChatView` owns the suggestion state (GL-free, tested: the
+  completion of a prefix, the cycle order and wrap, no completion for an unknown command);
+  `UIRenderer.DrawChat` draws the row. Multiplayer: complete against the client's own content, and
+  against the player list for names; the server still judges every command.
 
 ---
 
@@ -385,7 +397,19 @@ single-arc player.
   already produce these.
 - [ ] **`V-5` · Item pickup sparkle & interaction feedback** — P2, S.
 - [ ] **`V-6` · Sky: stars, moon phases, shooting stars, aurora** — P1, M.
-  Clouds and the sun disc exist; finish the sky.
+  Clouds, the sun disc, the sun glare and twinkling stars exist; finish the sky.
+  - [ ] **Moon.** A moon disc opposite the sun, showing a phase that follows the day count.
+    *Hook:* `RenderSun`'s additive disc along `DayCycle`'s sun direction negated, faded in and out
+    like the stars (`StarField.Visibility`), the phase (day number = lighting clock /
+    `DayLengthSeconds`) shaded over the disc in the shader, so one image covers every phase. It
+    should also reach the mirror and the Snell window, like the sun.
+    The sprite is in: `assets/textures/environment/moon.png`, a full lit disc (64x64 RGBA like
+    `sun.png`), drawn additively like the sun with the shader darkening the unlit part.
+  - [ ] **Shooting stars.** A rare streak across the night dome. *Hook:* `sky-fragment.glsl`'s
+    main after the stars, on hashed time slots (a slot index from `uStarTime`, a hashed start
+    direction, heading and length per slot, most slots empty), faded by `StarField.Visibility`
+    and hidden by the cloud cover like the stars, with a GL-free twin of the slot hash beside
+    `StarField`. No art needed.
 - [ ] **`V-7` · Sunrise/sunset colour grading** — P2, M.
 - [ ] **`V-8` · Post-processing: bloom, underwater fog gradient, damage/heal flash** — P2, L.
   Bloom for lamps/campfire/sun.
@@ -408,6 +432,10 @@ single-arc player.
   dip, hurt kick; builds on the existing trauma shake.
 - [ ] **`V-18` · Block & environment detail pass** — P3, M.
   Connected textures, more material atlas entries, emissive/flicker variants.
+- [ ] **`V-19` · Item drop presentation & quality tiers** — P3, M.
+  Drops hover, bob and spin, with a faint glow or pulse for rarer items. The glow wants an item
+  **quality / tier** concept (a tier on `ItemDefinition`, shown on the drop, the tooltip and the
+  inventory row), so do the two together. Cosmetic half only is not worth a ticket on its own.
 
 ---
 
@@ -416,6 +444,24 @@ single-arc player.
 - [ ] **`M-2` · Gameplay SFX** — P1, M.
   `SfxManager`/`SfxMixer` play per-block hit groups and pickup, with an SFX volume slider. Still
   open: **place/step/splash/fire/UI** sounds. Note: audio is NAudio + NLayer, not Silk.NET.
+- [ ] **`M-25` · Mining sound pitch by hardness** — P3, S. *(reconsider before doing)*
+  Pitch the block-hit sound a little lower on harder blocks so stone sounds heavier than dirt;
+  one multiplier in `SfxManager`. Open question: whether per-hardness pitch beats authoring
+  distinct hit groups (`sfx` on the block JSON), and how it interacts with random variants.
+- [ ] **`M-26` · Footstep sounds by surface** — P2, S.
+  Every footfall plays a step sound from the surface under the feet, quieter or silent while
+  sneaking. *Hook:* `FootstepDust.FootfallsBetween` already finds the footfalls in
+  `PlayerModel.WalkPhase` (the puffs only fire while sprinting, the sounds should on every grounded
+  step), and `SfxManager.Play(group)` plays a group. Add a `stepSfx` block field naming the step
+  group, beside `sfx` (the hit group); a block without one is silent. Remote players can step from
+  their own `RemotePlayer` model later.
+  **Needed from you:** step clips in `assets/sfx/`, named `<group>_<n>.wav` (2-4 variants per
+  group, one picked at random per step), in exactly the format of the existing clips: 16-bit PCM,
+  stereo, 44100 Hz. `SfxManager` skips any other format. Each should be short (about 0.1-0.3 s)
+  and start right on its transient so it lands on the footfall. Groups: `step_grass`,
+  `step_dirt` (also mud), `step_sand`, `step_gravel`, `step_stone` (stone, cobblestone,
+  sandstone, ores, bricks), `step_wood` (logs, later planks), `step_snow`, `step_leaves` and
+  `step_glass` (glass, panes, ice).
 - [ ] **`M-3` · Keep content JSON-only** — ongoing.
   New blocks/items/recipes/structures stay data, not code, per AGENTS.md. Add schema fields as
   the systems above need them (tool, station, harvest tier, food, spell, machine...).
