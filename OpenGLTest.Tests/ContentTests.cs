@@ -206,6 +206,29 @@ public sealed class ContentTests
     }
 
     [Fact]
+    public void GravelSometimesDropsFlint()
+    {
+        var gravel = ContentRegistry.RequireBlock("gravel");
+        Assert.NotNull(gravel.LootTable);
+        var flint = ContentRegistry.RequireItem("flint").Id;
+        var into = new List<byte>();
+        var flintRolls = 0;
+        const int rolls = 4000;
+        for (var i = 0; i < rolls; i++)
+        {
+            into.Clear();
+            gravel.LootTable!.Roll(new LootContext(0, 0, 0), into);
+            Assert.Single(into);
+            if (into[0] == flint) flintRolls++;
+            else Assert.Equal(gravel.Id, into[0]);
+        }
+
+        // The flint share lands in the 10-20 % band (a 1-in-6 weight)
+        var share = flintRolls / (float)rolls;
+        Assert.InRange(share, 0.08f, 0.25f);
+    }
+
+    [Fact]
     public void TntDropsItselfWhenDestroyed()
     {
         var tnt = ContentRegistry.RequireBlock("tnt");

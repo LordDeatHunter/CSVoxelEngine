@@ -1,0 +1,13 @@
+{
+  // Mining gravel mostly drops the gravel back, and about one time in six the flint inside it
+  // (flint is otherwise only carried by goblins). See LootTable.
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "item/flint", "weight": 1, "count": 1 },
+        { "item": "block/gravel", "weight": 5, "count": 1 }
+      ]
+    }
+  ]
+}

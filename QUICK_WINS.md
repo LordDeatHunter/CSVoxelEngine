@@ -150,9 +150,8 @@ files waits in TODO.md instead, since there are none to use yet.
   leaves drop it at a low chance (the leaves loot table, JSON); a stone pine cone and a spruce cone
   follow the same pattern. Test: a pulse count never exceeds maturity, and a sapling on
   unloaded ground waits.
-- [ ] **Flint from gravel.** Mining gravel has a 10-20 % chance to drop flint. *Hook:* the gravel
-  loot table in JSON, `item/flint`. Check first what the table drops today; flint is otherwise only
-  carried by goblins.
+- [x] **Flint from gravel.** Mining gravel drops flint about one time in six instead of the block
+  (`assets/data/loot/gravel.json`, the block's `loot` field; `ContentTests`).
 - [ ] **Cactus prick.** Standing against a cactus deals 1 damage every 0.5 s. *Hook:* a
   `contactDamage` block field read where the body overlaps cells (beside the lava rule), applied to
   the camera's pool in singleplayer and to `ServerPlayer` on a server through the existing status

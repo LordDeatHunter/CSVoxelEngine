@@ -5,5 +5,7 @@
   "pebbleWeight": 1,
   "hardness": 3,
   "falls": true,
-  "footstepDust": true
+  "footstepDust": true,
+  // Mostly itself, sometimes the flint inside it (assets/data/loot/gravel.json)
+  "loot": "gravel"
 }
