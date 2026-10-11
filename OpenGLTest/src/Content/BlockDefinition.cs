@@ -115,6 +115,14 @@ public sealed class BlockDefinition
     public string? Facing { get; set; }
 
     /// <summary>
+    /// Whether a placement faces the block along the placing player's horizontal look direction
+    /// (stairs: looking north places them climbing north), instead of leaving the facing at 0.
+    /// Only legal with <c>facing: "horizontal"</c> and never on an attached block, whose facing
+    /// names the wall it hangs on. Omitted means false.
+    /// </summary>
+    public bool? FacingFromLook { get; set; }
+
+    /// <summary>
     /// The block a placement against a block's side becomes instead of this one (a torch's
     /// <c>"block/wall_torch"</c>), facing away from the wall it was placed on; a placement on top
     /// keeps this block and one under a ceiling is refused. The wall block needs

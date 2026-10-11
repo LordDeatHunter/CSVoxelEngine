@@ -309,6 +309,10 @@ public sealed record BlockType
     /// <see cref="RotatedHitboxes"/> by it.</summary>
     public bool HasHorizontalFacing { get; init; }
 
+    /// <summary>Whether a placement faces this <see cref="HasHorizontalFacing"/> block along the
+    /// placing player's horizontal look (stairs); see <see cref="Placement.LookFacing"/>.</summary>
+    public bool FacingFromLook { get; init; }
+
     /// <summary>The <see cref="Hitboxes"/> turned to each horizontal facing, indexed like
     /// <see cref="RotatedModels"/>; null unless <see cref="HasHorizontalFacing"/>.</summary>
     public BlockHitbox[][]? RotatedHitboxes { get; internal set; }

@@ -12,7 +12,11 @@
   //                   cobblestone slabs on the left, (-3, 10, -2) and (-2, 10, -2), and two oak
   //                   plank slabs on the right, (2..3, 10, -2), each placed farthest first; an oak
   //                   slab also sits on the row's left plank, (-1, 11, -3). Every slab side shows
-  //                   the lower half of its tile, cropped rather than squashed
+  //                   the lower half of its tile, cropped rather than squashed. Stairs face the
+  //                   way the player looks while placing them: oak plank stairs at (0, 10, -2),
+  //                   placed looking north, climb away from the camera toward the row; cobblestone
+  //                   stairs at (-2, 10, -1) and (2, 10, -1), placed looking mostly west and east,
+  //                   show their stepped profiles side on, rising away from the middle
   //   planks-oblique  the same from the front left
   "steps": [
     { "op": "fly", "on": true },
@@ -42,6 +46,15 @@
     { "op": "look", "yaw": -45, "pitch": -29.81 },
     { "op": "place" },
     { "op": "look", "yaw": -108.43, "pitch": -11.09 },
+    { "op": "place" },
+
+    { "op": "give", "block": "oak_planks_stairs", "count": 1 },
+    { "op": "look", "yaw": -90, "pitch": -39.0 },
+    { "op": "place" },
+    { "op": "give", "block": "cobblestone_stairs", "count": 2 },
+    { "op": "look", "yaw": -153.43, "pitch": -35.92 },
+    { "op": "place" },
+    { "op": "look", "yaw": -26.57, "pitch": -35.92 },
     { "op": "place" },
 
     { "op": "look", "yaw": -90, "pitch": -20 },

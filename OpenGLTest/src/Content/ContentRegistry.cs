@@ -952,6 +952,23 @@ public static class ContentRegistry
     }
 
     /// <summary>
+    /// Reads a block's <c>facingFromLook</c>: a placement that faces the block along the player's
+    /// look needs a facing to write, and an attached block's facing already names its wall.
+    /// </summary>
+    internal static bool ParseFacingFromLook(BlockDefinition definition, bool horizontalFacing, bool supportAttached,
+        string path)
+    {
+        if (!(definition.FacingFromLook ?? false)) return false;
+        if (!horizontalFacing)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets facingFromLook without facing: \"horizontal\"; the look has no facing to turn.");
+        if (supportAttached)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets facingFromLook with support: \"attached\"; an attached block faces away from its wall.");
+        return true;
+    }
+
+    /// <summary>
     /// Reads a pane block's <c>pane</c> object into its <see cref="PaneProfile"/>: omitted fields
     /// take the glass pane's dimensions (post 2 px, arm as wide as the post, one full-height
     /// rail), and anything <see cref="PaneProfile.Create"/> refuses throws naming the file.
@@ -1554,6 +1571,7 @@ public static class ContentRegistry
                     $"Block '{path}' sets both falls and needsSupport: a falling block topples instead of popping.");
             var (horizontalFacing, supportAttached) =
                 ParseFacingAndSupport(definition, renderer, fluid, falls, stackMax, needsSupport, path, out var supportAbove);
+            var facingFromLook = ParseFacingFromLook(definition, horizontalFacing, supportAttached, path);
             var solid = !fluid && (definition.Solid ?? true);
             if (stackSolidAt > 0 && solid)
                 throw new InvalidOperationException(
@@ -1664,6 +1682,7 @@ public static class ContentRegistry
                 SupportAttached = supportAttached,
                 SupportAbove = supportAbove,
                 HasHorizontalFacing = horizontalFacing,
+                FacingFromLook = facingFromLook,
                 ReplaceableByPlacement = replaceableByPlacement,
                 Falls = falls,
                 Fluid = fluid,

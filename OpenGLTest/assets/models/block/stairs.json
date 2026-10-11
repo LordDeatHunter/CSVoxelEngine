@@ -1,0 +1,45 @@
+{
+    // A stair facing north (the engine's authored facing): a bottom half block plus a top step
+    // over its north half, so a player looking north climbs it. The bottom half is split into a
+    // north and a south box, because a facing block's model may carry no face covering a whole
+    // cell side (it is turned to the other three facings and must shade flat on all of them);
+    // faces buried inside the model are left out. UVs are left to the defaults, which crop each
+    // face out of its tile instead of squashing the tile into it.
+    "textures": {
+        "particle": "#side"
+    },
+    "elements": [
+        {
+            "from": [0, 0, 0],
+            "to": [16, 8, 8],
+            "faces": {
+                "north": { "texture": "#side", "cullface": "north" },
+                "west": { "texture": "#side", "cullface": "west" },
+                "east": { "texture": "#side", "cullface": "east" },
+                "down": { "texture": "#bottom", "cullface": "down" }
+            }
+        },
+        {
+            "from": [0, 0, 8],
+            "to": [16, 8, 16],
+            "faces": {
+                "south": { "texture": "#side", "cullface": "south" },
+                "west": { "texture": "#side", "cullface": "west" },
+                "east": { "texture": "#side", "cullface": "east" },
+                "down": { "texture": "#bottom", "cullface": "down" },
+                "up": { "texture": "#top" }
+            }
+        },
+        {
+            "from": [0, 8, 0],
+            "to": [16, 16, 8],
+            "faces": {
+                "north": { "texture": "#side", "cullface": "north" },
+                "south": { "texture": "#side" },
+                "west": { "texture": "#side", "cullface": "west" },
+                "east": { "texture": "#side", "cullface": "east" },
+                "up": { "texture": "#top", "cullface": "up" }
+            }
+        }
+    ]
+}

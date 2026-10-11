@@ -1044,6 +1044,7 @@ trailing commas.
 | `needsSupport` | false | pops, rolling its loot, when the block holding it up is emptied (the block below, or behind it with `support: "attached"`; `BlockSupport`), and is only placed against a solid holder; also makes the block replaceable, so a flow washes it away. Mining, blasts, felling and leaf decay pop it; a toppling falls block does not yet |
 | `support` | `"below"` | which neighbour holds a `needsSupport` block up: `below`, `above` (the cell over it: a hanging lantern, so it is placed against a block's underside, or wherever a solid block stands over the target cell; `BlockType.SupportAbove`) or `attached` (the cell behind its front, opposite the `facing` in its state byte: a wall torch). Only with `needsSupport`; `attached` also needs `facing` |
 | `facing` | none | `"horizontal"`: the state byte's low two bits are a facing (north -Z 0, south +Z 1, west -X 2, east +X 3); the model (no full-face quads) and `hitbox` are authored facing north and pre-turned to all four (`BlockType.RotatedModels`/`RotatedHitboxes`, `HorizontalFacing`). Only on the `model` renderer, never with `fluid`, `falls` or `stackMax` |
+| `facingFromLook` | false | a placement faces the block along the placing player's horizontal look (`Placement.LookFacing`: the dominant horizontal axis of `PlayerContext.ViewDirection`, so a server replays a `Place` intent by that player's own aim), whatever face was hit: stairs placed looking north climb north. Only with `facing`, never with `support: "attached"` |
 | `wallBlock` | none | the block a placement against a block's side becomes, facing the hit normal (leaning away from the wall); on top the block places as itself, under a ceiling it is refused (`Placement.TryMount`). The wall block needs `facing` and `support: "attached"`, and is picked as this block (`BlockType.PickId`). `torch` -> `wall_torch` |
 | `replaceableByPlacement` | false | a block placement aimed at this block fills the block's own cell and discards it, instead of filling the cell across the hit face, so a block placed against a partial snow drift rests on the ground instead of hovering a layer above it. Only fires while the cell is not solid, so a full snow stack stays an ordinary block, and the displaced block drops nothing. Independent of `needsSupport`, which is what a flow or a bucket may overwrite. Illegal on an always-solid block, which could never honour it |
 | `falls` | false | gravity-affected (sand, gravel): topples into a `FallingBlock` entity when the cell below stops being solid, sinks through water, slides off lone supports; never combines with `fluid`/`needsSupport` |
@@ -1131,6 +1132,17 @@ side crops the lower half of its tile) with a `0..0.5` `hitbox` and `collidesByH
 idiom, so the body steps onto and stands on them. There is no top-half or double-slab placement.
 `BuildingBlockTests` holds the rules every shape-colliding model block obeys: it is drawn exactly
 as far as its boxes reach on every facing, and a floor slab is stood on at its top.
+
+**Stairs** (`cobblestone_stairs`, `oak_planks_stairs`, four from six of their block) are a
+`facing: "horizontal"` block with `facingFromLook`: `Placement.TryMount`'s look overload writes
+`Placement.LookFacing` of the placing `PlayerContext.ViewDirection` into the state byte's low two
+bits (`World.PlaceBlockAtFace` takes the view from the placing player, the item-use path from
+`ActiveContext`), so the step rises the way the player looked. The `block/stairs` parent is
+authored facing north (tall step over the north half) and split into three boxes so no face
+covers a whole cell side (`ValidateFacingBake`); the two `hitbox` boxes turn with it
+(`RotatedHitboxes`) and the body collides with them, so the walk step climbs them. On a client
+in third person the predicted facing reads the camera's view while the server reads the aim,
+so a placement near a 45-degree look may be corrected. `StairTests` covers the rules.
 
 The **lantern** hangs under a ceiling: `support: "above"` (`BlockSupport.SupportOffset` returns
 +Y for a `BlockType.SupportAbove` block), so `World.PlaceBlockAtFace`'s support check only lets it

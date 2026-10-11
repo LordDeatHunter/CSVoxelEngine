@@ -52,4 +52,30 @@ public static class Placement
         placedState = (byte)facing;
         return true;
     }
+
+    /// <summary>
+    /// <see cref="TryMount(byte, byte, Vector3, bool, out byte, out byte)"/> for a placement made
+    /// looking along <paramref name="viewDirection"/>: a placed block that takes its facing from the
+    /// look (<see cref="BlockType.FacingFromLook"/>, stairs) faces <see cref="LookFacing"/> of it,
+    /// whatever face was hit. Everything else mounts exactly as the overload without a look.
+    /// </summary>
+    public static bool TryMount(byte blockId, byte state, Vector3 normal, bool fillsHitCell, Vector3 viewDirection,
+        out byte placedId, out byte placedState)
+    {
+        if (!TryMount(blockId, state, normal, fillsHitCell, out placedId, out placedState)) return false;
+        if (BlockType.ById[placedId] is { FacingFromLook: true })
+            placedState = (byte)LookFacing(viewDirection);
+        return true;
+    }
+
+    /// <summary>
+    /// The horizontal facing a look along <paramref name="viewDirection"/> points at: the dominant
+    /// horizontal axis of the look with its vertical part ignored, so looking down at the floor
+    /// still faces the way the player is turned. A look straight up or down faces north.
+    /// </summary>
+    public static int LookFacing(Vector3 viewDirection)
+    {
+        var facing = HorizontalFacing.FacingOf(new Vector3(viewDirection.X, 0f, viewDirection.Z));
+        return facing < 0 ? 0 : facing;
+    }
 }

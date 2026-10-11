@@ -3479,7 +3479,7 @@ public class World : IItemUseWorld
 
     bool IItemUseWorld.PlaceBlockAtFace(Vector3 hit, Vector3 normal, byte blockId, byte state,
         out Vector3 placedCell) =>
-        PlaceBlockAtFace(hit, normal, blockId, state, out placedCell);
+        PlaceBlockAtFace(hit, normal, blockId, state, ActiveContext.ViewDirection, out placedCell);
 
     void IItemUseWorld.AfterPlaced(Vector3 pos)
     {
@@ -3871,7 +3871,7 @@ public class World : IItemUseWorld
     /// </summary>
     private bool PlaceAgainstFace(Vector3 hitPos, Vector3 hitNormal, byte blockId, PlayerContext player)
     {
-        if (!PlaceBlockAtFace(hitPos, hitNormal, blockId, state: 0, out var placePos)) return false;
+        if (!PlaceBlockAtFace(hitPos, hitNormal, blockId, state: 0, player.ViewDirection, out var placePos)) return false;
 
         PunchSwing();
         // Sand placed into thin air falls at once instead of hovering (stackable piles never
@@ -3907,10 +3907,12 @@ public class World : IItemUseWorld
     /// cell itself when it holds a stack a placement may take over (layered snow), which it
     /// overwrites in place. <paramref name="state"/> rides into the state byte (a fresh rock
     /// pile starts at 1) and <paramref name="placedCell"/> reports the cell that was filled.
+    /// <paramref name="viewDirection"/> is the placing player's look, which faces a block that
+    /// takes its facing from it (stairs, <see cref="Placement.LookFacing"/>).
     /// Returns whether one was placed, without spending anything.
     /// </summary>
     private bool PlaceBlockAtFace(Vector3 hitPos, Vector3 hitNormal, byte blockId, byte state,
-        out Vector3 placedCell)
+        Vector3 viewDirection, out Vector3 placedCell)
     {
         placedCell = Placement.TargetCell(hitPos, hitNormal, BlockIdAt(hitPos),
             _chunkManager.GetStateGlobal((int)hitPos.X, (int)hitPos.Y, (int)hitPos.Z));
@@ -3921,7 +3923,7 @@ public class World : IItemUseWorld
 
         // A torch against a block's side becomes its wall torch, leaning out from that wall (the
         // facing rides in the state byte); under a ceiling it has nothing to hang from
-        if (!Placement.TryMount(blockId, state, hitNormal, placePos == hitPos, out blockId, out state))
+        if (!Placement.TryMount(blockId, state, hitNormal, placePos == hitPos, viewDirection, out blockId, out state))
             return false;
 
         // A live cube owns its cell until it lands: placing into one would cement the cube
