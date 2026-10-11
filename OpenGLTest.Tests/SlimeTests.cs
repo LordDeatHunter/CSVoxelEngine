@@ -161,7 +161,7 @@ public sealed class SlimeTests
     }
 
     [Fact]
-    public void SlimesOutsideTheDespawnRadiusAreCulled()
+    public void SlimesOutsideTheDespawnRadiusFadeOutWithoutLoot()
     {
         var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
         var drops = new DropManager();
@@ -169,11 +169,16 @@ public sealed class SlimeTests
         var camera = new Camera(null, null);
         camera.TestTeleport(new Vector3(0.5f, 1.62f, 0.5f), yaw: 0f, pitch: 0f);
 
-        manager.Spawn(new Vector3(
-            WorldGenerationConfig.SlimeDespawnRadiusBlocks + 4f, 1f + Slime.HalfExtent, 0.5f));
+        var stray = manager.Spawn(new Vector3(
+            WorldGenerationConfig.SlimeDespawnRadiusBlocks + 4f, 1f + Slime.HalfExtent, 0.5f))!;
         manager.Update(Dt, chunks, drops, camera);
 
+        // It plays the death pose instead of vanishing, no longer counts, and drops nothing
+        Assert.True(stray.IsDying);
+        Assert.Equal(0, manager.LivingCount);
+        manager.Update(stray.DeathSeconds + 0.1f, chunks, drops, camera);
         Assert.Empty(manager.Slimes);
+        Assert.Empty(drops.Drops);
     }
 
     [Fact]

@@ -76,7 +76,8 @@ public abstract class Mob
     /// being shown spawning).</summary>
     public void FinishSpawn() => _spawnTime = SpawnInSeconds;
 
-    /// <summary>Starts the death animation (idempotent). The owner rolls the loot at this moment.</summary>
+    /// <summary>Starts the death animation (idempotent). The owner rolls the loot at this moment for a
+    /// kill; a despawn by distance starts it too, with no loot, so the mob fades out instead of vanishing.</summary>
     public void BeginDying()
     {
         if (IsDying) return;

@@ -200,7 +200,8 @@ public sealed class GoblinManagerTests
         var far = culling.Spawn(GroundBody(WorldGenerationConfig.GoblinDespawnRadiusBlocks + 4f, 0.5f), ammo: 0);
         var near = culling.Spawn(GroundBody(WorldGenerationConfig.GoblinDespawnRadiusBlocks - 4f, 0.5f), ammo: 0);
         culling.Update(Dt, floor, drops, camera);
-        Assert.DoesNotContain(far, culling.Goblins);
+        Assert.True(far!.IsDying);
+        Assert.False(near!.IsDying);
         Assert.Contains(near, culling.Goblins);
     }
 }

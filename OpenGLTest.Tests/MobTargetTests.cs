@@ -95,19 +95,21 @@ public sealed class MobTargetTests
         var survivor = kept.Spawn(body);
         kept.Update(Dt, chunks, drops, [farA, nearB]);
         Assert.Contains(survivor, kept.Slimes);
+        Assert.False(survivor!.IsDying);
 
-        // Past every target's radius: culled.
+        // Past every target's radius: culled (it fades out through its death).
         var farC = new RecordingTarget(new Vector3(body.X - (radius + 4f), StandingEyeY, body.Z));
         var culling = new SlimeManager(EntityRegistry.Require("slime"));
         var stray = culling.Spawn(body);
         culling.Update(Dt, chunks, drops, [farA, farC]);
-        Assert.DoesNotContain(stray, culling.Slimes);
+        Assert.True(stray!.IsDying);
 
         // With nobody to measure against nothing despawns.
         var empty = new SlimeManager(EntityRegistry.Require("slime"));
         var alone = empty.Spawn(body);
         empty.Update(Dt, chunks, drops, Array.Empty<IMobTarget>());
         Assert.Contains(alone, empty.Slimes);
+        Assert.False(alone!.IsDying);
     }
 
     [Fact]

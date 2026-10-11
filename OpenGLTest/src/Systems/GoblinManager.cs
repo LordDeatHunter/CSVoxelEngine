@@ -186,8 +186,9 @@ public sealed class GoblinManager : IMobPopulation
                 }
             }
 
+            // Past every target's despawn radius: fades out through the death pose, dropping nothing
             if (targets.Count > 0 && MobTargets.MinHorizontalDistanceSquared(targets, goblin.Position) > despawnSquared)
-                _goblins.RemoveAt(i);
+                goblin.BeginDying();
         }
 
         UpdateStones(deltaTime, chunks, targets);

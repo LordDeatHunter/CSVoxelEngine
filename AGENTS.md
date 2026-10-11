@@ -2501,7 +2501,11 @@ update; a body box touching a burning fluid (`MobLava.BodyInLava`, the cell test
 `PlayerBodyProbe.InLava`) takes `MobLava.DamagePerTick` (`MobLavaDamageShare` of its full health, at
 least 1) every `MobLavaTickSeconds` with the hit flash, leaving it clears the partial tick, and a
 death it causes rolls the loot as usual (`MobLavaTests`). `visual-examples/mob-hazards.json`
-(`VOXEL_TIME=147`) films the falls and the lava bath.
+(`VOXEL_TIME=147`) films the falls and the lava bath. **Despawn fade**: a mob past every target's
+despawn radius is not removed outright; the manager calls `Mob.BeginDying` without rolling any loot,
+so it plays its death pose and is dropped once that has run, and like any dying mob it leaves
+`LivingCount`, the saves and the server's broadcast at once (`SlimeTests`, `GoblinManagerTests`,
+`MobTargetTests`).
 
 The first entity is the **slime** (`Slime` + `Systems/SlimeManager.cs`), owned by `World`. It hops
 toward the player, damages on contact only while airborne (a slime merely bobbing in water is

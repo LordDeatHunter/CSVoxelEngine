@@ -173,8 +173,9 @@ public sealed class SlimeManager : IMobPopulation
                 }
             }
 
+            // Past every target's despawn radius: fades out through the death pose, dropping nothing
             if (targets.Count > 0 && MobTargets.MinHorizontalDistanceSquared(targets, slime.Position) > despawnSquared)
-                _slimes.RemoveAt(i);
+                slime.BeginDying();
         }
 
         UpdateSpawning(deltaTime, chunks, targets, night);
