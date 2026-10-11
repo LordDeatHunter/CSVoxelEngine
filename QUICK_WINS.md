@@ -193,22 +193,12 @@ files waits in TODO.md instead, since there are none to use yet.
   `FireParticleKind`'s `Ember` and `Smoke`. Its spawn jitter (0.5 blocks wide) is far too wide
   for a 2 px stick, so make it a constructor parameter. No point lights: the torch's own block
   light already lights it. Cosmetic, so a headless server never runs it.
-- [ ] **Planks.** `oak_log` -> 4 `oak_planks`, the first plain building wood (none exists yet).
-  *Hook:* a JSON block and recipe (`add-content` skill); the tile from a deterministic generator
-  in `tools/`, like the torch's. Per-species planks only if wanted.
-- [ ] **Slab.** A bottom half block, for cobblestone and planks. *Hook:* `collidesByHitbox` with
-  a 0..0.5 `hitbox` (the molds already stand on a slab this way); no top-half placement at first.
-- [ ] **Stairs.** *Hook:* `facing: "horizontal"` (pre-turned `RotatedModels` / `RotatedHitboxes`)
-  plus `collidesByHitbox` with two boxes. Placement needs a facing from the player's look, since
-  `Placement.TryMount` only faces a block from a side hit; make that a block flag.
-- [ ] **Fence.** A wooden post with arms toward fences and solid blocks. *Hook:* the `pane`
-  renderer; move `PaneShape`'s post and arm widths into block data and add a fence block. No gate
-  and no 1.5-high collision.
-- [ ] **Trapdoor.** A one-cell hinged door that right-click opens and closes. *Hook:* `facing` in
-  state bits 0-1 plus an open bit, a model and hitbox per state, and a step in
-  `World.TryUseSelected`'s right-click chain.
-- [ ] **Hanging lantern.** A lantern hung under a ceiling. *Hook:* a new `support: "above"` in
-  `BlockSupport` and placement against a block's underside; light like the torch.
+- [x] **Planks.** `oak_planks`, four from an `oak_log`; tile from `tools/generate-plank-texture.py` (`planks.json`).
+- [x] **Slab.** `cobblestone_slab` and `oak_planks_slab` on a `block/slab` parent, colliding by a 0..0.5 `hitbox` (`BuildingBlockTests`, `planks.json`).
+- [x] **Stairs.** `cobblestone_stairs` / `oak_planks_stairs`: `facing: "horizontal"` plus the new `facingFromLook` flag, which `Placement.LookFacing` reads from the placing `PlayerContext`'s view (`StairTests`).
+- [x] **Fence.** `oak_fence`: the `pane` block object (`post`, `arm`, `rails` in px) becomes a `PaneProfile` that `PaneShape`/`PaneEmitter` read; panes join only their own shape (`PaneProfileTests`, `fences.json`).
+- [x] **Trapdoor.** `oak_trapdoor`: the `open` block object (model + hitbox) makes a block openable, open bit = state bit 2 (`DoorState`), toggled by `World.TryToggleOpenable` in the right-click chain (`OpenableTests`, `doors.json`).
+- [x] **Hanging lantern.** `lantern` (torch + copper ingot, emission 15) on the general `support: "above"` rule (`BlockType.SupportAbove`); tile from `tools/generate-lantern-texture.py` (`HangingBlockTests`, `lanterns.json`).
 - [ ] **Slime block.** A block that bounces a landing body back up, crafted from slimeballs, which
   have no use today. *Hook:* a `bounce` block flag read where the player's landing is detected
   (`FallTracker.LandedDrop`, `PlayerPhysics`), cancelling the fall damage; mobs and drops later.
@@ -230,11 +220,7 @@ files waits in TODO.md instead, since there are none to use yet.
   can follow) and a mode in the item debugger's `PlayerPreviewState`. On a server the `Use`
   intent arrives at completion; check the hold time like `BreakProgress` checks mining.
 
-- [ ] **Door.** A two-cell-tall wooden door that right-click opens and closes. *Hook:* a lower and
-  an upper block, `facing` plus an open bit in the state byte and a hitbox per state
-  (`BlockShape`); placement writes both halves, and breaking either removes the other, like
-  `Multiblock.Revert` in miniature. A step in `World.TryUseSelected`'s right-click chain toggles
-  both. Needs planks first.
+- [x] **Door.** `oak_door` + `oak_door_upper` through the `upperHalf` field (`TallBlock`): placement needs both cells, breaking either half removes both (`RemoveTallBlock`) and drops one door, both halves share one `DoorState` (`DoorTests`, `doors.json`).
 - [ ] **Acorn.** An oak-leaf drop that plants a sapling when used on dirt or grass, which then grows
   stage by stage on its own. *Hook:* a `use.action: "plant_tree"` calling
   `World.TryGrowTree(species, x, y, z, 1)`, which already plants a sapling on solid ground, and the
@@ -256,9 +242,7 @@ files waits in TODO.md instead, since there are none to use yet.
 - [ ] **Stone bricks.** 4 stone to 4 stone bricks, one decorative tile. *Hook:* JSON block + recipe
   + a tile from a `tools/` script (placeholder, listed in `USER_TODO.md`). Enables the ruined
   pillars.
-- [ ] **Cobblestone wall.** A thinner pillar that connects like a fence. *Hook:* the fence entry's
-  generalised `PaneShape` with wider post and arm widths from block data; the same renderer with a
-  different JSON.
+- [x] **Cobblestone wall.** `cobblestone_wall`: the pane renderer with `"pane": {"post": 8, "arm": 6}`, full-height arms and `cullSelf` so stacked walls meet seamlessly (`PaneProfileTests`, `fences.json`).
 
 ## Enemies
 
