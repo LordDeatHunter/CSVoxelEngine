@@ -10,7 +10,8 @@ namespace silkgltriangle.Tests;
 /// The pane renderer's dimensions as block data (<see cref="PaneProfile"/>): every pane shape's
 /// boxes stay in the cell, never overlap and reach the cell edge exactly toward its arms; panes
 /// join only panes of their own shape (a fence never reaches into a glass pane); a pane that
-/// declares nothing keeps the glass pane's shape; and a railed shape is drawn exactly as its boxes.
+/// declares nothing keeps the glass pane's shape; and a shape whose arms leave the post showing
+/// (a fence's rails, a wall's narrower arms) is drawn exactly as its boxes.
 /// </summary>
 public sealed class PaneProfileTests
 {
@@ -108,6 +109,34 @@ public sealed class PaneProfileTests
                 ContentRegistry.ParsePaneProfile(definition, path)).Message);
     }
 
+    [Fact]
+    public void StackedPanesOfOneKindDrawNoFaceWhereTheyMeet()
+    {
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var fused = Panes().Where(t => t.CullSelf).ToArray();
+        Assert.NotEmpty(fused);
+
+        foreach (var type in fused)
+        {
+            var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
+            var y = FloorY + 1;
+            // Two of them stacked, both with an arm into a stone column to the west
+            center.SetBlockRaw(8, y, 8, type.Id, 0);
+            center.SetBlockRaw(8, y + 1, 8, type.Id, 0);
+            center.SetBlockRaw(7, y, 8, stone, 0);
+            center.SetBlockRaw(7, y + 1, 8, stone, 0);
+            var mesh = center.GenerateMeshData(manager);
+            Assert.NotNull(mesh);
+            var list = type.Translucent ? mesh!.TranslucentVertices : mesh!.Vertices;
+
+            Assert.DoesNotContain(Quads(list), q =>
+                q.All(v => v.Layer == type.Top || v.Layer == type.Bottom || v.Layer == type.Side)
+                && q.All(v => MathF.Abs(v.Position.Y - (y + 1)) < 1e-4f)
+                && q.Average(v => v.Position.X) is var cx && cx > 7.5f && cx < 9f
+                && q.Average(v => v.Position.Z) is var cz && cz > 8f && cz < 9f);
+        }
+    }
+
     private static IEnumerable<Vertex[]> Quads(List<Vertex> vertices)
     {
         for (var q = 0; q + 3 < vertices.Count; q += 4)
@@ -115,8 +144,9 @@ public sealed class PaneProfileTests
     }
 
     [Fact]
-    public void ARailedPaneIsDrawnExactlyAsItsBoxes()
+    public void APaneWhoseArmsLeaveItsPostShowingIsDrawnExactlyAsItsBoxes()
     {
+        // A fence's rails, a wall's narrower arms: the post's sides stay, the arms keep their caps
         var railed = Panes().Where(t => !t.Pane!.FullArms).ToArray();
         Assert.NotEmpty(railed);
         var stone = ContentRegistry.RequireBlock("stone").Id;

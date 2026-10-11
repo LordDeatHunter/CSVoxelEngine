@@ -1156,6 +1156,12 @@ collision. Its icon model is `block/fence_inventory`. `PaneProfileTests` holds t
 `visual-examples/fences.json` (`VOXEL_TIME=147`) shoots fences, a dirt block and glass panes
 side by side.
 
+The **cobblestone wall** (six from six cobblestone) is the same renderer with a wall's JSON:
+`"pane": {"post": 8, "arm": 6}`, an 8 px pillar with 6 px arms over the full height, so stacked
+walls meet seamlessly (`cullSelf` hides the caps between them); its icon is
+`block/wall_inventory`. `fences.json` builds a short wall run behind the fences, one wall stacked
+and one turning away from the fence in front of it.
+
 ### Item schema (`assets/data/items/<name>.json`)
 
 ```json

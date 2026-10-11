@@ -6,10 +6,14 @@
   // 10, eye (253.5, 11.62, -4.5)) and every placement aims at an exact ground cell centre
   // (dx, 9, dz) relative to the player's cell: yaw atan2(dz, dx), pitch -atan(1.62 / |(dx, dz)|),
   // farthest first so none blocks a later ray.
-  //   A dirt block at (-3, 10, -3); oak fences at (-2..0, 10, -3) and (0, 10, -2); glass panes
-  //   at (1, 10, -3) and (2, 10, -3). The fences join each other and the dirt with two rails each
-  //   (the corner one turns toward the camera), while the fence and the glass pane beside it,
-  //   two different pane shapes, reach no arm toward each other; the two panes join.
+  //   Cobblestone walls at (-1..1, 10, -5), one stacked on the middle at (0, 11, -5) and one at
+  //   (-1, 10, -4) right behind the fence row; a dirt block at (-3, 10, -3); oak fences at
+  //   (-2..0, 10, -3) and (0, 10, -2); glass panes at (1, 10, -3) and (2, 10, -3). The walls join
+  //   each other with full-height arms (the stacked one meets the wall below seamlessly) and the
+  //   fences join each other and the dirt with two rails each (the corner one turns toward the
+  //   camera), while the three different pane shapes reach no arm toward each other: the wall at
+  //   (-1, 10, -4) turns away from the fence in front of it, and the fence from the glass pane
+  //   beside it; the two panes join.
   //   fences-front    from where the player stands, with the HUD and the selection outline
   //   fences-high     from above: the posts and rails' tops
   //   fences-oblique  from the front left
@@ -19,6 +23,18 @@
     { "op": "wait", "seconds": 14 },
     { "op": "teleport", "pos": [253.5, 11.63, -4.5], "yaw": -90, "pitch": -20 },
     { "op": "wait", "seconds": 1 },
+
+    { "op": "give", "block": "cobblestone_wall", "count": 5 },
+    { "op": "look", "yaw": -101.31, "pitch": -17.6 },
+    { "op": "place" },
+    { "op": "look", "yaw": -78.69, "pitch": -17.6 },
+    { "op": "place" },
+    { "op": "look", "yaw": -90, "pitch": -17.95 },
+    { "op": "place" },
+    { "op": "look", "yaw": -90, "pitch": -7.07 },
+    { "op": "place" },
+    { "op": "look", "yaw": -104.04, "pitch": -21.45 },
+    { "op": "place" },
 
     { "op": "give", "block": "dirt", "count": 1 },
     { "op": "look", "yaw": -135, "pitch": -20.9 },

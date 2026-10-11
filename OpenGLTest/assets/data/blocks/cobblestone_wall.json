@@ -1,0 +1,16 @@
+{
+  // A cobblestone wall: the fence's pane renderer with a wall's dimensions, an 8 px pillar and
+  // 6 px arms reaching the full height toward every neighbouring wall (any pane of the same
+  // shape) or solid full cube, so stacked walls meet seamlessly. Six from six cobblestone
+  // (recipes/cobblestone_wall.json).
+  "name": "Cobblestone Wall",
+  "model": { "parent": "block/wall_inventory", "textures": { "texture": "cobblestone" } },
+  "renderer": "pane",
+  "pane": { "post": 8, "arm": 6 },
+  "sfx": "hit_rock",
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  // Stacked walls fuse: no buried caps between a pillar and the pillar above it
+  "cullSelf": true,
+  "castsAO": false
+}

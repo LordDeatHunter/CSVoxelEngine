@@ -1,0 +1,7 @@
+{
+  "result": "block/cobblestone_wall",
+  "count": 6,
+  "ingredients": [
+    { "item": "block/cobblestone", "count": 6 }
+  ]
+}
