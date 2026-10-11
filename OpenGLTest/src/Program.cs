@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Numerics;
 using System.Runtime;
 using System.Threading;
 using Silk.NET.Input;
@@ -805,6 +806,70 @@ public static class Program
     }
 
     /// <summary>
+    /// The tooltip for whatever the cursor hovers while the [E] panel is open: a panel row's item
+    /// (or the tool instance it names) or a hotbar slot's, with the cursor as the anchor. Null
+    /// when nothing hovers.
+    /// </summary>
+    private static (Vector2 Anchor, List<string> Lines)? HoveredTooltip()
+    {
+        if (!inventoryView.IsOpen || pauseMenuView.IsOpen || inputManager?.Mouse == null) return null;
+        var inventory = world?.Inventory;
+        if (inventory == null || renderManager == null) return null;
+        var position = new Vector2(inputManager.Mouse.Position.X, inputManager.Mouse.Position.Y);
+
+        // A panel row first (the rows sit over the list), then a hotbar slot
+        if (HoveredRow(out var rowId, out var rowTool))
+        {
+            var stack = rowTool != 0 ? inventory.GetToolStack(rowTool) : null;
+            return (position, ItemTooltip.Lines(rowTool != 0 ? stack!.DefinitionId : rowId, stack));
+        }
+
+        if (renderManager.UiHotbarSlotAt(position) is { } slot && slot >= 0 && inventory.IdAt(slot) != 0)
+        {
+            var tool = inventory.ToolInstanceAt(slot);
+            var stack = tool != 0 ? inventory.GetToolStack(tool) : null;
+            return (position, ItemTooltip.Lines(inventory.IdAt(slot), stack));
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// The panel row under the cursor, if any: its item id, or the tool instance it names (then
+    /// the id is 0). The one reading of "which row is hovered" the number keys and the tooltip
+    /// share, so they never disagree.
+    /// </summary>
+    private static bool HoveredRow(out byte id, out int toolInstance)
+    {
+        id = 0;
+        toolInstance = 0;
+        var inventory = world?.Inventory;
+        if (inventory == null || inputManager?.Mouse == null || renderManager == null) return false;
+        if (!inventoryView.Search.IsEmpty) return false;
+        if (inventoryView.Tab == InventoryCategory.Crafting) return false;
+        if (world!.Camera.IsCreative) return false;
+
+        var rowCount = RowCountFor(inventoryView.Tab);
+        var offset = InventoryPanelLayout.ClampedOffset(inventoryView.ScrollOffset, rowCount,
+            renderManager.UiCanvasSize);
+        var row = renderManager.UiPanelRowAt(
+            new Vector2(inputManager.Mouse.Position.X, inputManager.Mouse.Position.Y), offset, rowCount);
+        if (row == null) return false;
+
+        if (inventoryView.Tab == InventoryCategory.Tools)
+        {
+            var entries = inventory.ToolEntries();
+            if (row.Value >= entries.Count) return false;
+            toolInstance = entries[row.Value].InstanceId;
+            return true;
+        }
+
+        var stacks = inventory.StackEntries(inventoryView.Tab);
+        if (row.Value >= stacks.Count) return false;
+        id = stacks[row.Value].Id;
+        return true;
+    }
+
+    /// <summary>
     /// The number keys while the [E] panel is open: the row under the cursor goes into that hotbar
     /// slot, the same equip a click on the slot performs with the row selected. Only the plain
     /// tabs — a search result and a creative catalog row have their own click actions.
@@ -812,36 +877,13 @@ public static class Program
     private static void AssignHoveredRowToHotbar()
     {
         var inventory = world?.Inventory;
-        if (inventory == null || inputManager?.Mouse == null || inputManager.Keyboard == null) return;
-        if (!inventoryView.Search.IsEmpty) return;
-        if (inventoryView.Tab == InventoryCategory.Crafting) return;
-        if (world!.Camera.IsCreative) return;
-
-        var rowCount = RowCountFor(inventoryView.Tab);
-        var offset = InventoryPanelLayout.ClampedOffset(inventoryView.ScrollOffset, rowCount,
-            renderManager!.UiCanvasSize);
-        var row = renderManager.UiPanelRowAt(inputManager.Mouse.Position, offset, rowCount);
-        if (row == null) return;
-
-        byte id = 0;
-        var tool = 0;
-        if (inventoryView.Tab == InventoryCategory.Tools)
-        {
-            var entries = inventory.ToolEntries();
-            if (row.Value >= entries.Count) return;
-            tool = entries[row.Value].InstanceId;
-        }
-        else
-        {
-            var entries = inventory.StackEntries(inventoryView.Tab);
-            if (row.Value >= entries.Count) return;
-            id = entries[row.Value].Id;
-        }
+        if (inventory == null) return;
+        if (!HoveredRow(out var id, out var tool)) return;
         if (id == 0 && tool == 0) return;
 
         for (var i = 0; i < NumberKeys.Length; i++)
         {
-            if (inputManager.Keyboard.IsKeyPressed(NumberKeys[i]) != true) continue;
+            if (inputManager!.Keyboard?.IsKeyPressed(NumberKeys[i]) != true) continue;
             var intent = tool != 0
                 ? InventoryIntent.EquipTool(i, tool)
                 : InventoryIntent.EquipStackable(i, id);
@@ -2156,6 +2198,9 @@ public static class Program
         // The Tab player list rides over the HUD while the key is held (a server session only)
         if (!hideHud && !pauseMenuView.IsOpen && tabHeld && netClient != null)
             renderManager.RenderPlayerList(windowManager.Window, PlayerListNames());
+        // A hover tooltip over the [E] panel's rows and the hotbar slots
+        if (!hideHud && !pauseMenuView.IsOpen)
+            renderManager.RenderTooltip(windowManager.Window, HoveredTooltip());
         // The loading screen fades out over the world's first playing frames
         if (!loadingView.IsFinished)
             renderManager.RenderLoadingOverlay(windowManager.Window, loadingView, windowManager.Window.Time);

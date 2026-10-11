@@ -4326,6 +4326,19 @@ public class RenderManager : IDisposable
         InvalidateTextureUnits();
     }
 
+    /// <summary>Draws one hover tooltip (see <see cref="UIRenderer.DrawTooltip"/>), or nothing when
+    /// the cursor hovers nothing.</summary>
+    public void RenderTooltip(IWindow window, (Vector2 Anchor, IReadOnlyList<string> Lines)? tooltip)
+    {
+        if (tooltip is not { Lines.Count: > 0 } hover) return;
+        var windowSize = new Vector2(window.Size.X, window.Size.Y);
+        ui.Begin(window.Size, window.FramebufferSize,
+            UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
+        ui.DrawTooltip(hover.Anchor, hover.Lines);
+        ui.End();
+        InvalidateTextureUnits();
+    }
+
     /// <summary>
     /// Draws the Tab player list (see <see cref="UIRenderer.DrawPlayerList"/>) over the HUD while
     /// the key is held: the local player first, then every other player on the server.

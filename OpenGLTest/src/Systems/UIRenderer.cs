@@ -47,7 +47,6 @@ public class UIRenderer : IDisposable
     private const float BottomMargin = HotbarLayout.BottomMargin;
     // The toast row sits this far above the item-name row, so the two never overlap
     private const float ToastRowGap = 26f;
-
     // Smallest width of the Tab player list panel; a long name widens it
     private const float PlayerListWidth = 200f;
 
@@ -629,6 +628,36 @@ public class UIRenderer : IDisposable
                 _countScale, Rgba.White);
         }
     }
+
+    /// <summary>
+    /// One hover tooltip (see <see cref="ItemTooltip"/>): a panel just below-right of the cursor
+    /// with the hovered item's lines, clamped inside the canvas.
+    /// </summary>
+    public void DrawTooltip(Vector2 anchor, IReadOnlyList<string> lines)
+    {
+        if (_font == null || lines.Count == 0) return;
+
+        var lineHeight = CountCapHeight + 6f;
+        var width = TooltipWidth;
+        foreach (var line in lines)
+            width = MathF.Max(width, _font.MeasureSize(line, _countScale).X + 24f);
+        var height = lineHeight * lines.Count + 16f;
+        var centre = anchor + new Vector2(16f + width * 0.5f, 18f + height * 0.5f);
+        centre.X = Math.Clamp(centre.X, width * 0.5f + 4f, _screenSize.X - width * 0.5f - 4f);
+        centre.Y = Math.Clamp(centre.Y, height * 0.5f + 4f, _screenSize.Y - height * 0.5f - 4f);
+        DrawRect(centre, new Vector2(width, height), PanelBackground);
+        DrawBorder(centre, new Vector2(width, height), SlotBorder, SlotBorderColor);
+
+        var top = centre.Y - height * 0.5f + 8f;
+        for (var i = 0; i < lines.Count; i++)
+        {
+            DrawText(lines[i], new Vector2(centre.X - width * 0.5f + 12f, top + lineHeight * i),
+                _countScale, i == 0 ? Rgba.White : TextDim);
+        }
+    }
+
+    // Smallest width of a tooltip panel; a long line widens it
+    private const float TooltipWidth = 120f;
 
     /// <summary>
     /// One toast line (<see cref="HudToast"/>) centred a little above the item-name row, at
