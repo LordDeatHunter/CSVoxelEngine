@@ -286,6 +286,17 @@ public const float DayLengthSeconds = 1200f;
     // The share of the body (PlayerHeight) under the fluid surface from which a body with its eye
     // still above it floats rather than wades; the eye going under is always a swim.
     public const float WaterFloatShare = 0.5f;
+    // Wading (under WaterFloatShare) walks, at this share of the walk speed: a lighter slowdown than
+    // swimming's, with the normal jump.
+    public const float WadeSpeedFactor = 0.75f;
+    // Floating: a body in deep water with its eye above the surface (and one that has not dived,
+    // even with the eye under) settles where this share of it is under. Its vertical speed eases at
+    // FloatSettleRate (per second) toward FloatBuoyancy (per second) times its height error, capped
+    // by the swim sink and rise speeds; the pair is near critically damped, so it settles without
+    // bobbing through the surface.
+    public const float WaterFloatRestShare = 0.7f;
+    public const float FloatBuoyancy = 2.5f;
+    public const float FloatSettleRate = 6.4f;
 
     // --- Sky ---
     // Angular radius of the visible sun disc in degrees. The real sun is 0.27 degrees across

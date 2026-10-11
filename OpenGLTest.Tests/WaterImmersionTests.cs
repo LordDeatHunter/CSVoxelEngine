@@ -63,6 +63,25 @@ public sealed class WaterImmersionTests
     }
 
     [Fact]
+    public void TheBuoyancyAlwaysHeadsBackToTheRestShare()
+    {
+        const float rest = WorldGenerationConfig.WaterFloatRestShare;
+        Assert.Equal(0f, WaterImmersion.BuoyancySpeed(rest), 5);
+
+        var previous = float.NegativeInfinity;
+        for (var share = 0f; share <= 1.0001f; share += 0.01f)
+        {
+            var speed = WaterImmersion.BuoyancySpeed(share);
+            // Deeper never pushes up less, and the push always points back at the rest
+            Assert.True(speed >= previous);
+            if (share < rest - 1e-3f) Assert.True(speed < 0f);
+            if (share > rest + 1e-3f) Assert.True(speed > 0f);
+            Assert.InRange(speed, PlayerPhysics.SinkSpeed, PlayerPhysics.SwimUpSpeed);
+            previous = speed;
+        }
+    }
+
+    [Fact]
     public void AOneBlockSourcePoolIsWadedThrough()
     {
         var camera = BodyAt(Pool(depth: 1), feetY: 1f);

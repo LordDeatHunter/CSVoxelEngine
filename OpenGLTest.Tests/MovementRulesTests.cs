@@ -256,4 +256,51 @@ public sealed class MovementRulesTests
         Assert.Equal(-1, FirstRejection(course, Line(Eye(Chunk.Size + 4.5f, 5f, 4.5f), Vector3.Zero, grace * 3f)));
         Assert.Equal(-1, FirstRejection(course, Line(Eye(2.5f, Chunk.Size + 4f, 4.5f), Vector3.Zero, grace * 3f)));
     }
+
+    /// <summary>
+    /// The states the client's own physics reports at its cadence over <paramref name="seconds"/> for
+    /// a body starting at <paramref name="eye"/> with <paramref name="keys"/> held for the first
+    /// <paramref name="holdSeconds"/>.
+    /// </summary>
+    private static List<Vector3> Simulated(ChunkManager chunks, Vector3 eye, float seconds,
+        Silk.NET.Input.Key[] keys, float holdSeconds)
+    {
+        const float step = 1f / 120f;
+        var camera = new Camera(null, null);
+        camera.TestTeleport(eye, yaw: 0f, pitch: 0f);
+        var keyboard = new ScriptedKeyboard();
+        var path = new List<Vector3> { camera.Position };
+        var sinceState = 0f;
+        for (var t = 0f; t < seconds; t += step)
+        {
+            if (t < holdSeconds) keyboard.Press(keys);
+            else keyboard.ReleaseAll();
+            camera.Update(step, keyboard, chunks);
+            sinceState += step;
+            if (sinceState < Dt) continue;
+            sinceState -= Dt;
+            path.Add(camera.Position);
+        }
+        return path;
+    }
+
+    [Fact]
+    public void AFloatingBodyAtRestAndItsStrokeHopAreNeverJudgedAHover()
+    {
+        // The deep pool's surface sits 8/9 into its top cell; the eye starts just out of it
+        var pool = MobTestWorld.Pool(12);
+        var surface = 12f + FluidState.SourceHeight;
+        var start = new Vector3(8.5f, surface + 0.05f, 8.5f);
+
+        // Settling at the float and then floating still for longer than the hover grace: the body
+        // rests in water, not in the air
+        var grace = (float)WorldGenerationConfig.NetHoverGraceSeconds;
+        var floating = Simulated(pool, start, 3f + grace * 2f, [], 0f);
+        Assert.True(PlayerBodyProbe.InWater(floating[^1], pool));
+        AssertNeverRejected("float at rest", pool, floating);
+
+        // A stroke up from the float, out over the surface and back down to it
+        var hop = Simulated(pool, floating[^1], 4f, [Silk.NET.Input.Key.Space], 0.1f);
+        AssertNeverRejected("float stroke hop", pool, hop);
+    }
 }

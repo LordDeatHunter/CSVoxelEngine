@@ -42,7 +42,7 @@ internal sealed class PlayerPhysics
 
     // Swimming. Water has no gravity term: vertical speed eases toward a target instead, so it
     // stays capped by SwimUpSpeed/SinkSpeed however long the player stays under.
-    private const float SwimSpeedFactor = 0.5f;
+    internal const float SwimSpeedFactor = 0.5f;
     // Crouched walking speed as a share of the base walk.
     private const float SneakSpeedFactor = 0.4f;
     internal const float SwimUpSpeed = 4f;
@@ -63,10 +63,18 @@ internal sealed class PlayerPhysics
 
     private float _swimStrokeTimer = SwimStrokeSeconds;
     private float _pendingSwimVertical;
+    // Water depth states (WaterImmersion). A swimmer stays on the swim physics, off the ground, even
+    // while a stroke up bobs it out above the float band, so it is caught by the buoyancy on the way
+    // back down instead of falling through the surface; landing on ground ends the latch. A down
+    // stroke dives: the dive keeps today's slow sink under water until the eye surfaces again, while
+    // a body under water that never dived floats back up.
+    private bool _swimLatched;
+    private bool _diving;
+    private WaterPhase _lastPhase;
 
     /// <summary>Counts strokes started, so the body can start its stroke animation on the same frame.</summary>
     public int SwimStrokeCount { get; private set; }
-    private const float SinkSpeed = -2f;
+    internal const float SinkSpeed = -2f;
     private const float WaterDrag = 6f;
     // Pushing into a bank while holding Space lifts the player over it, so getting out of
     // water never needs a ramp
@@ -233,13 +241,26 @@ internal sealed class PlayerPhysics
         }
 
         // Flight ignores the water entirely, so a submerged player can still fly out.
-        // Creative mode on foot swims like survival.
-        var swimming = camera.IsInWater && !camera.IsFlying;
+        // Creative mode on foot swims like survival. Floating and swimming stroke; wading (under
+        // half the body in, a one-block pool) walks, slowed, and jumps as on land.
+        var phase = camera.WaterPhase;
+        var swimming = camera.IsInWater && !camera.IsFlying
+                       && (phase >= WaterPhase.Float || (_swimLatched && !camera.IsGrounded));
+        var wading = camera.IsInWater && !camera.IsFlying && !swimming;
+        if (camera.IsFlying || camera.IsGrounded && !swimming)
+            _swimLatched = false;
+        else if (swimming)
+            _swimLatched = true;
+        // The dive ends once the eye is back above the surface, or the body out of the swim
+        if (!swimming && !_swimLatched || _lastPhase == WaterPhase.Swim && phase != WaterPhase.Swim)
+            _diving = false;
+        _lastPhase = phase;
         // Ctrl on foot crouches: slower, never sprinting. While flying Ctrl is "down" instead.
         var sneaking = keyboard.IsKeyPressed(Key.ControlLeft) && !camera.IsFlying && !swimming;
         camera.SetSneaking(sneaking);
         camera.SetSprinting(sprinting && moving && !camera.IsFlying && !swimming && camera.IsGrounded && !sneaking);
         if (swimming) moveSpeed *= SwimSpeedFactor;
+        if (wading) moveSpeed *= WorldGenerationConfig.WadeSpeedFactor;
         if (sneaking) moveSpeed = BaseSpeed * SneakSpeedFactor;
         // Pass-through blocks scale the walk instead of blocking it; flight is noclip.
         camera.SetMovementFactor(BlockMoveFactor(camera, chunkManager));
@@ -266,6 +287,8 @@ internal sealed class PlayerPhysics
                     _horizontalVelocity = new Vector2(moveInput.X, moveInput.Z) * burst;
                 }
                 _pendingSwimVertical = strokeUp ? SwimBurstUp : strokeDown ? SwimBurstDown : 0f;
+                if (!strokeUp && strokeDown)
+                    _diving = true;
             }
         }
         else if (camera.IsGrounded)
@@ -300,9 +323,9 @@ internal sealed class PlayerPhysics
             frameMovement.Z += _knockback.Z * deltaTime;
         }
 
-        // Flowing water carries the player with it. Added before the horizontal moves below, so
-        // the push is still stopped by a wall rather than shoving the player through it.
-        if (swimming)
+        // Flowing water carries the player with it, swimming or wading. Added before the horizontal
+        // moves below, so the push is still stopped by a wall rather than shoving the player through it.
+        if (swimming || wading)
         {
             frameMovement.X += _waterFlow.X * FlowPushSpeed * deltaTime;
             frameMovement.Z += _waterFlow.Z * FlowPushSpeed * deltaTime;
@@ -325,7 +348,9 @@ internal sealed class PlayerPhysics
             }
             else
             {
-                // A vertical stroke sets the speed, which then glides toward the gentle sink.
+                // A vertical stroke sets the speed, which then glides: toward the gentle sink for a
+                // diver, and toward the float height for everyone else (floating at the top of deep
+                // water, or under it without having dived), so SinkSpeed stops pulling at the surface
                 if (_pendingSwimVertical != 0f)
                 {
                     _verticalVelocity = _pendingSwimVertical > 0f
@@ -333,7 +358,10 @@ internal sealed class PlayerPhysics
                         : MathF.Min(_verticalVelocity, _pendingSwimVertical);
                     _pendingSwimVertical = 0f;
                 }
-                _verticalVelocity = MathUtils.Damp(_verticalVelocity, SinkSpeed, SwimGlideDrag, deltaTime);
+                _verticalVelocity = _diving
+                    ? MathUtils.Damp(_verticalVelocity, SinkSpeed, SwimGlideDrag, deltaTime)
+                    : MathUtils.Damp(_verticalVelocity, WaterImmersion.BuoyancySpeed(camera.ImmersionShare),
+                        WorldGenerationConfig.FloatSettleRate, deltaTime);
             }
 
             frameMovement.Y = _verticalVelocity * deltaTime;
