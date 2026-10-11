@@ -169,9 +169,9 @@ files waits in TODO.md instead, since there are none to use yet.
 
 - [x] **Mob fall damage.** `Mob.NoteLanding` bills `MobFallDamage.Damage`: free up to `MobSafeFallBlocks` (plus a slime's own hop peak), then a share of the mob's pool per block; free in water, authoritative sims only (`MobFallDamageTests`, `mob-hazards.json`).
 - [x] **Mobs burn in lava.** `Mob.UpdateHazards` with `MobLava.BodyInLava` (the `PlayerBodyProbe.InLava` cell test over the body box) dealing a pool share every `MobLavaTickSeconds` with the hit flash (`MobLavaTests`, `mob-hazards.json`).
-- [ ] **Goblins flee at low health.** Below a share of its health a goblin turns and runs.
-  *Hook:* the stance in `Goblin.Update` (the backpedal branch already moves it away); it still
-  despawns by distance as usual.
+- [x] **Goblins flee at low health.** Below `GoblinFleeHealthShare` (a quarter) of its pool a
+  goblin turns and runs from the player at `GoblinFleeSpeedFactor` of its walk, never throwing or
+  swinging, and still despawns by distance as usual (`Goblin.IsFleeing`; `GoblinFleeTests`).
 - [ ] **Goblins scavenge flint.** A goblin walking over a flint drop picks it up as ammo.
   *Hook:* `DropManager`'s multi-collector (`DropCollector`) with goblins as collectors that take
   only flint, capped at `GoblinStoneMax`.

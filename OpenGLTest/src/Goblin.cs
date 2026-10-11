@@ -131,6 +131,14 @@ public sealed class Goblin : Mob
     public bool IsGrounded { get; private set; }
 
     /// <summary>
+    /// Whether the goblin has given up: at or below <see cref="WorldGenerationConfig.GoblinFleeHealthShare"/>
+    /// of its pool it turns and runs from the player instead of fighting, faster than its walk
+    /// (<see cref="WorldGenerationConfig.GoblinFleeSpeedFactor"/>); it still despawns by distance
+    /// like any goblin.
+    /// </summary>
+    public bool IsFleeing => Health > 0 && Health <= MaxHealth * WorldGenerationConfig.GoblinFleeHealthShare;
+
+    /// <summary>
     /// The notice pip's clock: 0 on the frame the goblin first had a player to chase (the same
     /// moment its first-throw delay starts), rising to 1 over
     /// <see cref="WorldGenerationConfig.GoblinNoticePipSeconds"/>; 1 for a goblin that never
@@ -310,6 +318,8 @@ public sealed class Goblin : Mob
             if (dist > 1e-3f)
             {
                 var yaw = MathF.Atan2(-to.X, -to.Z);
+                // A fleeing goblin faces down its escape, not at the player it runs from
+                if (IsFleeing) yaw += MathF.PI;
                 if (_facingKnown) TurnToward(yaw, TurnRate, deltaTime);
                 else Facing = yaw;
                 _facingKnown = true;
@@ -339,7 +349,9 @@ public sealed class Goblin : Mob
         // stop), on the ground at full speed and afloat at a paddle.
         if (IsGrounded || _inWater)
         {
-            var speed = IsGrounded ? WorldGenerationConfig.GoblinWalkSpeed
+            var speed = IsGrounded
+                ? WorldGenerationConfig.GoblinWalkSpeed
+                  * (IsFleeing ? WorldGenerationConfig.GoblinFleeSpeedFactor : 1f)
                 : WorldGenerationConfig.GoblinWalkSpeed * SwimSpeedFactor;
             var moving = move != Vector3.Zero;
             var rate = moving ? MoveAccel : IsGrounded ? GroundFriction : 0f;
@@ -378,6 +390,9 @@ public sealed class Goblin : Mob
     private Vector3 Decide(float dist, Vector3 toward, ChunkManager chunks, IMobTarget player)
     {
         if (Animation.IsActionPlaying) return Vector3.Zero;
+
+        // Given up: turn and run, never throw or swing
+        if (IsFleeing) return -toward;
 
         if (Ammo > 0)
         {

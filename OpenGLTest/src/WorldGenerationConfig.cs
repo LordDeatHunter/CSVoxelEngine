@@ -2094,6 +2094,11 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float SaplingPulseSeconds = 3f;
     public const float SaplingPulseJitter = 0.5f;
 
+    // --- Goblin flee (Goblin.IsFleeing): below this share of its pool a goblin gives up and runs
+    // from the player at this much of its walk speed ---
+    public const float GoblinFleeHealthShare = 0.25f;
+    public const float GoblinFleeSpeedFactor = 1.4f;
+
     // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
     // first notices a player (the same moment its first-throw delay starts) ---
     public const float GoblinNoticePipSeconds = 0.9f;
