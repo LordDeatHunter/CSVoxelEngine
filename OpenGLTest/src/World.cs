@@ -327,8 +327,26 @@ public class World : IItemUseWorld
             _isBreaking && !Camera.IsCreative ? BreakProgress : 0f,
             _hitMarker.Alpha);
 
-    // The discovered set behind the "New: ..." toast (see DiscoveryLog)
-    private readonly DiscoveryLog _discovered = new();
+    /// <summary>
+    /// The look-at label's state under the crosshair, or null with no target (see
+    /// <see cref="LookLabel"/>): the block's name ("Unknown" until its item is obtained), whether
+    /// the held item can mine it, and the cell, state byte and voxel light the profiler's debug
+    /// lines read.
+    /// </summary>
+    public LookLabelState? LookAt
+    {
+        get
+        {
+            if (!_hasSelectedBlock) return null;
+            var blockId = BlockIdAt(_selectedBlockPosition);
+            var state = LookLabel.For(blockId, Camera.IsCreative, Inventory.Knows, HeldItem());
+            if (state.Text.Length == 0) return null;
+            var (x, y, z) = _selectedBlockPosition.BlockCell();
+            return new LookLabelState(state.Text, state.Known, state.Mineable, _selectedBlockPosition,
+                blockId, _chunkManager.GetStateGlobal(x, y, z),
+                EntityLight.Sample(_chunkManager, _selectedBlockPosition));
+        }
+    }
 
     /// <summary>
     /// Credits <paramref name="count"/> of an item to this world's inventory (the creative grants
@@ -336,8 +354,8 @@ public class World : IItemUseWorld
     /// </summary>
     public void CreditItem(byte id, int count)
     {
-        if (!Inventory.Add(id, count)) return;
-        if (_discovered.Discover(id))
+        var known = Inventory.Knows(id);
+        if (Inventory.Add(id, count) && !known)
             Toast.Show($"New: {Inventory.DisplayName(id)}");
     }
 
@@ -650,9 +668,6 @@ public class World : IItemUseWorld
             _health.Restore(hp);
         if (saved.Inventory is { } inventory)
             Inventory.Import(inventory);
-            // A restored inventory is known, so loading a world never toasts a find
-            _discovered.Reset();
-            foreach (var id in Inventory.HeldIds()) _discovered.MarkKnown(id);
     }
 
     /// <summary>
@@ -1801,8 +1816,10 @@ public class World : IItemUseWorld
                 continue;
             }
 
+            var known = Inventory.Knows(collected[i]);
             pickedUp |= Inventory.Add(collected[i]);
-            if (_discovered.Discover(collected[i]))
+            // A first find toasts its name: Add marks the id obtained, so read it before
+            if (!known)
                 Toast.Show($"New: {Inventory.DisplayName(collected[i])}");
         }
 
@@ -2837,7 +2854,7 @@ public class World : IItemUseWorld
         SettingsMenuView? settings = null)
     {
         renderManager.RenderUI(_window!, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings,
-            _health.Health, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime, Toast, Crosshair);
+            _health.Health, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime, Toast, Crosshair, LookAt);
     }
     
     /// <summary>

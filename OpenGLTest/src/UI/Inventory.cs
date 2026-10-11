@@ -56,6 +56,9 @@ public class Inventory
     public const int StartingStock = 24;
 
     private readonly Dictionary<byte, int> _blocks = new();
+    // The ids this player has obtained (the look-at label's "Unknown" rule); filled by Add and
+    // saved as names like every other pool
+    private readonly HashSet<byte> _known = [];
     private readonly Dictionary<byte, int> _misc = new();
 
     // One entry per tool; InstanceId is handed out increasing and never reused, so a
@@ -133,6 +136,7 @@ public class Inventory
     {
         var category = CategoryOf(id);
         if (!category.HasValue || amount <= 0) return false;
+        _known.Add(id);
 
         switch (category.Value)
         {
@@ -610,10 +614,27 @@ public class Inventory
             Hotbar = hotbar,
             SelectedIndex = SelectedIndex,
             NextToolInstance = _nextToolInstance,
+            Known = ExportKnown(),
         };
         if (unnamed.Count > 0)
             Log.Warn($"Player save: left out content with no save name: {string.Join(", ", unnamed)}");
         return data;
+    }
+
+    /// <summary>
+    /// Whether this player has ever obtained the id — the look-at label's "Unknown" rule (see
+    /// <see cref="LookLabel"/>). Every credited id is marked in <see cref="Add(byte, int)"/>, and a
+    /// restored save's obtained names are marked on import.
+    /// </summary>
+    public bool Knows(byte id) => _known.Contains(id);
+
+    // The obtained set as save names, for Export
+    private List<string> ExportKnown()
+    {
+        var names = new List<string>(_known.Count);
+        foreach (var id in _known)
+            if (SaveNames.NameOf(id) is { } name) names.Add(name);
+        return names;
     }
 
     /// <summary>
@@ -624,24 +645,19 @@ public class Inventory
     /// know, or that belong to the wrong pool, are dropped with one warning, and a hotbar slot
     /// pointing at dropped content comes back empty.
     /// </summary>
-    /// <summary>
-    /// Every id the inventory holds — the blocks, the misc stacks and the tools — for the
-    /// discovery log's load marking (a restored inventory toasts nothing).
-    /// </summary>
-    public IEnumerable<byte> HeldIds()
-    {
-        foreach (var id in _blocks.Keys) yield return id;
-        foreach (var id in _misc.Keys) yield return id;
-        foreach (var tool in _tools) yield return tool.DefinitionId;
-    }
-
     public void Import(PlayerSaveData.InventoryData data)
     {
         _blocks.Clear();
         _misc.Clear();
         _tools.Clear();
+        _known.Clear();
         Array.Fill(_hotbar, HotbarSlot.Empty);
         var dropped = new List<string>();
+
+        // The obtained set: the saved names that still exist this run
+        if (data.Known != null)
+            foreach (var name in data.Known)
+                if (name != null && SaveNames.TryResolve(name, out var known)) _known.Add(known);
 
         void ImportStore(List<PlayerSaveData.StackData>? entries, InventoryCategory category,
             Dictionary<byte, int> store)

@@ -229,4 +229,30 @@ public sealed class InventoryTests
                 Assert.True(rows[i].Count <= rows[i - 1].Count);
         }
     }
+
+    [Fact]
+    public void AnIdBecomesObtainedWhenItIsAdded()
+    {
+        var inventory = Inventory.Empty();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+
+        Assert.False(inventory.Knows(stone));
+        Assert.True(inventory.Add(stone, 1));
+        Assert.True(inventory.Knows(stone));
+    }
+
+    [Fact]
+    public void TheObtainedSetSurvivesASaveRoundTripWithoutTheStack()
+    {
+        var inventory = Inventory.Empty();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        inventory.Add(stone, 1);
+        Assert.True(inventory.RemoveAll(stone));
+        Assert.Equal(0, inventory.CountFor(stone));
+
+        // Spent but obtained: the saved names bring the id back as known
+        var restored = Inventory.Empty();
+        restored.Import(inventory.Export());
+        Assert.True(restored.Knows(stone));
+    }
 }

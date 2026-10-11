@@ -1,0 +1,64 @@
+using Xunit;
+
+namespace silkgltriangle.Tests;
+
+/// <summary>
+/// The look-at label's rule (<see cref="LookLabel"/>): a block reads as "Unknown" until its item
+/// has been obtained, a block with no item is always known, creative mode always knows everything,
+/// and the name is flagged red only when the held item cannot mine the block.
+/// </summary>
+public sealed class LookLabelTests
+{
+    public LookLabelTests() => TestContent.EnsureLoaded();
+
+    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+
+    [Fact]
+    public void ABlockIsUnknownUntilItsItemIsObtained()
+    {
+        var stone = Block("stone");
+        var known = new System.Collections.Generic.HashSet<byte>();
+
+        var unknown = LookLabel.For(stone, creative: false, known.Contains, held: null);
+        Assert.Equal("Unknown", unknown.Text);
+        Assert.False(unknown.Known);
+
+        known.Add(stone);
+        var knownState = LookLabel.For(stone, creative: false, known.Contains, held: null);
+        Assert.Equal("Stone", knownState.Text);
+        Assert.True(knownState.Known);
+
+        // No target reads as an empty label
+        Assert.Equal("", LookLabel.For(BlockType.Air, creative: false, known.Contains, held: null).Text);
+    }
+
+    [Fact]
+    public void CreativeAndItemlessBlocksAreAlwaysKnown()
+    {
+        var stone = Block("stone");
+        var creative = LookLabel.For(stone, creative: true, _ => false, held: null);
+        Assert.True(creative.Known);
+        Assert.Equal("Stone", creative.Text);
+
+        // A block with no item at all (pebbles) is always known, even in survival
+        var pebble = Block("pebble");
+        Assert.False(BlockType.ById[pebble]!.HasItem);
+        var state = LookLabel.For(pebble, creative: false, _ => false, held: null);
+        Assert.True(state.Known);
+    }
+
+    [Fact]
+    public void TheNameTurnsRedWhenTheHeldItemCannotMineIt()
+    {
+        var stone = Block("stone");
+        var bare = LookLabel.For(stone, creative: false, _ => true, held: null);
+        Assert.False(bare.Mineable);
+
+        var pickaxe = ContentRegistry.RequireItem("primitive_pickaxe");
+        var armed = LookLabel.For(stone, creative: false, _ => true, held: pickaxe);
+        Assert.True(armed.Mineable);
+
+        // Creative can always mine, whatever is held
+        Assert.True(LookLabel.For(stone, creative: true, _ => true, held: null).Mineable);
+    }
+}

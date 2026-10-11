@@ -630,6 +630,53 @@ public class UIRenderer : IDisposable
     }
 
     /// <summary>
+    /// The look-at label under the crosshair: a small 3D render of the targeted block (its own
+    /// cube mesh and atlas tile, or a flat dark silhouette while the player has not obtained it)
+    /// with its name below it — red when the held item cannot mine it — and, with the profiler on,
+    /// the debug lines (id, state byte, sun and block light, chunk and cell).
+    /// </summary>
+    public void DrawLookLabel(LookLabelState label, float time, bool debug)
+    {
+        if (_font == null || string.IsNullOrEmpty(label.Text)) return;
+
+        var centre = ScreenCentre;
+        var cubeCentre = centre + new Vector2(0f, LookLabelCubeOffsetY);
+        if (_blockCubes.Get(label.BlockId) is { } cube)
+        {
+            // The shape is centred on its own origin, so it spins in place; an unknown block is
+            // the same mesh with uUseTexture off, a flat dark silhouette
+            var model = Matrix4x4.CreateScale(LookLabelCubeSize)
+                        * Matrix4x4.CreateRotationY(time * 0.6f)
+                        * Matrix4x4.CreateRotationX(-0.45f)
+                        * Matrix4x4.CreateTranslation(cubeCentre.X, cubeCentre.Y, 0f);
+            DrawMesh(cube, model, label.Known ? Rgba.White : new Rgba(26, 26, 30),
+                label.Known ? _atlasTexture : 0, srgb: label.Known && _atlasIsSrgb);
+        }
+
+        var name = FittedText(label.Text, _countScale, LookLabelMaxWidth);
+        DrawTextCentred(name, centre.X, cubeCentre.Y + LookLabelNameGap, _countScale,
+            label.Mineable ? Rgba.White : DangerRed);
+        if (!debug) return;
+
+        var chunkPos = VoxelCoords.ChunkPosOf(label.Cell);
+        var lines = new[]
+        {
+            $"id {label.BlockId}   state {label.BlockState}",
+            $"sun {label.Light.Sun:0}   block {label.Light.Block:0}",
+            $"chunk {(int)chunkPos.X} {(int)chunkPos.Y} {(int)chunkPos.Z}   cell {(int)label.Cell.X & Chunk.SizeMask} {(int)label.Cell.Y & Chunk.SizeMask} {(int)label.Cell.Z & Chunk.SizeMask}",
+        };
+        var top = cubeCentre.Y + LookLabelNameGap + CountCapHeight + 6f;
+        for (var i = 0; i < lines.Length; i++)
+            DrawTextCentred(lines[i], centre.X, top + i * (CountCapHeight + 4f), _countScale, TextDim);
+    }
+
+    // The look-at label's cube: its size, how far below the crosshair it sits and the gap to the name
+    private const float LookLabelCubeSize = 34f;
+    private const float LookLabelCubeOffsetY = 46f;
+    private const float LookLabelNameGap = 14f;
+    private const float LookLabelMaxWidth = 200f;
+
+    /// <summary>
     /// One hover tooltip (see <see cref="ItemTooltip"/>): a panel just below-right of the cursor
     /// with the hovered item's lines, clamped inside the canvas.
     /// </summary>

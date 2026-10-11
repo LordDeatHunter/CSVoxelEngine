@@ -190,23 +190,18 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Crosshair hit marker.** `HitMarker` flashes at the two connecting-hit sites the hit-stop uses (a landed punch or slice) and `UIRenderer.DrawCrosshair` draws the X, fading over `HitMarker.Seconds` (`HitMarkerTests`).
 - [x] **Crosshair spreads while charging.** the crosshair is drawn as five pieces cropped out of its 16x16 texture (a centre dot and four pills); the arms slide outward with `Camera.ThrowCharge` (eased) while the dot stays put, and snap back on release.
 - [x] **Mining progress ring.** a ring of `CrosshairRingSegments` dots around the crosshair, the lit share following `World.Crosshair.BreakProgress` (0 in creative or with no target, so it never shows there).
-- [ ] **Look-at label.** Looking at a block always shows what it is: its name and a small 3D
-  render of it under the crosshair, the name in red when the held tool cannot mine it. A block the
-  player has **not obtained yet** shows the name "Unknown" and the render as a flat dark silhouette;
-  creative mode always shows everything; with `X` on, the label adds debug lines (block id, state
-  byte, sun and block light, the chunk and local cell). Hidden with no target. *Hook:* the
-  selection raycast, `BlockType.DisplayName`, `Mining.CanMine` and `BlockCubeCache`'s cube mesh
-  drawn through the UI pass (the silhouette is the same mesh with a flat colour and no texture).
-  "Obtained" is a per-player set of discovered item ids, filled in `Inventory.Add`, saved in
-  `player.json` (an optional field, so no new file and an old save reads as empty) and carried in
-  the `InventoryNetCodec` snapshot (the save JSON shape), so a server's player and a client agree.
-  A block without an item (`hasItem` false: pebbles, piles, snow layers, kiln parts) is always
-  known. Test: a block is unknown until its item has been added, and a creative player always
-  knows.
+- [x] **Look-at label.** The block under the crosshair shows its name and a small spinning 3D
+  render of it below (`UIRenderer.DrawLookLabel` over `BlockCubeCache`), the name in red while the
+  held item cannot mine it, and "Unknown" with a flat dark silhouette until its item has been
+  obtained; creative mode and a block with no item at all (`hasItem` false) always know, and `X`
+  adds id, state byte, sun/block light and chunk/cell debug lines. `LookLabel` is the rule,
+  `World.LookAt` the raycast's state, and "obtained" is `Inventory`'s own set, marked in `Add`,
+  saved as names in `player.json` (an optional field) and riding the `InventoryNetCodec` snapshot
+  (`LookLabelTests`, `InventoryTests`, `look-label.json`).
 - [x] **Chat fades when closed.** `ChatView` keeps an arrival clock per line and `AlphaAt` holds it opaque through `HoldSeconds`, eases it out over `FadeSeconds` and pins it at 1 while the log is open (the draw skips fully faded lines) (`ChatViewTests`).
 - [x] **`/time` chat command.** the `ChatCommands` table parses `/time day|night|<seconds>` (day = noon, night = midnight, a number is `VOXEL_TIME` units) and both Program and GameServer run it through `World.SetLightingTime`; a server needs operator rights and sends a `TimeSync` at once (`ChatCommandsTests`).
 - [x] **Day toast.** `HudToast` (a hold-then-fade line drawn above the item-name row) shown by the world's `DayToast.CrossedDawn` watch on the lighting clock, so "Day N" fades in the moment the sun rises through dawn, once a day (`HudToastTests`).
-- [x] **New item toast.** `DiscoveryLog` marks the ids a world has seen; the drop pickup and `World.CreditItem` (the /give path) toast "New: <name>" on a first credit, and a restored inventory is marked known at load so loading never toasts (`DiscoveryLogTests`).
+- [x] **New item toast.** The drop pickup and `World.CreditItem` (the /give path) toast "New: <name>" on a first credit, read off the inventory's own obtained set (`Inventory.Knows`, the same one the look-at label reads) before the add marks it, and a restored inventory comes back with its obtained names so loading never toasts (`InventoryTests`).
 - [x] **Screenshot key.** F2 reads the finished frame back through `VisualCapture` and saves it to `ScreenshotPaths.Directory` as a millisecond-stamped PNG (`ScreenshotPathTests`).
 - [x] **Hide-HUD key.** F1 toggles `hudVisible`, the same gate the scenario screenshot's `hideHud` drives (`ScreenshotPathTests` covers the shared path naming).
 - [x] **Tab player list.** holding Tab over the HUD draws the panel (`UIRenderer.DrawPlayerList` over `World.RemotePlayers`, the local player first), a server session only, and never while the chat, a menu or the panel owns the keyboard.

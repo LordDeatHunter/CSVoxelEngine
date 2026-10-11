@@ -1,0 +1,29 @@
+{
+  // The look-at label under the crosshair: "Unknown" with a flat dark silhouette until the
+  // block's item has been obtained, then its name and a textured cube; the name turns red while
+  // the held item cannot mine the block. Digging down to the stone shows the red name, and the
+  // pickaxe turns it white. Run it with VOXEL_DEBUG=1 to catch the label's own debug lines.
+  "steps": [
+    { "op": "wait", "seconds": 5 },
+    { "op": "look", "yaw": -90, "pitch": -80 },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "unknown-grass" },
+    { "op": "give", "block": "grass", "count": 1 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "known-grass" },
+    { "op": "mine", "seconds": 3.2 },
+    { "op": "mine", "seconds": 3.2 },
+    { "op": "mine", "seconds": 3.2 },
+    { "op": "mine", "seconds": 3.2 },
+    { "op": "mine", "seconds": 3.2 },
+    { "op": "mine", "seconds": 3.2 },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "stone-unknown-red" },
+    { "op": "give", "block": "stone", "count": 1 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "stone-known-red" },
+    { "op": "give", "block": "primitive_pickaxe", "count": 1 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "stone-pickaxe-white" }
+  ]
+}

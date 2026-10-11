@@ -58,6 +58,10 @@ public sealed class PlayerSaveData
         /// <summary>The next tool instance id to hand out, so restored and new instances
         /// never collide.</summary>
         public int? NextToolInstance { get; set; }
+
+        /// <summary>Names of the ids this player has obtained (the look-at label's "Unknown"
+        /// rule). Absent, as in a save written before it existed, reads as empty.</summary>
+        public List<string>? Known { get; set; }
     }
 
     /// <summary>One stackable pool entry: a block or item name and its pool total.</summary>
