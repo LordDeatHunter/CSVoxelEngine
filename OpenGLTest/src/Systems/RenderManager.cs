@@ -298,6 +298,8 @@ public class RenderManager : IDisposable
     // the sun's lens glare, plus the eased cloud cover over the sun the glare fades with
     private SkyDomeFrame _skyFrame;
     private float _glareCloud;
+    // How cold it is at the eye, eased (Aurora.Ease): what fades the aurora in and out
+    private float _eyeColdness;
     // Display-space (sRGB) light at the pre-SH-10 values, set by SetLighting: the sun colour
     // (the cloud layer and the underwater shafts), and the cloud layer's sun intensity and
     // ambient (see CloudRenderer.Render and RenderUnderwaterRays).
@@ -1219,7 +1221,22 @@ public class RenderManager : IDisposable
         var glare = camera == null
             ? 0f
             : SunGlare.Intensity(Vector3.Dot(camera.ViewDirection, _skySunDir), elevation, _glareCloud) * (1f - wet);
-        _skyFrame = _skyFrame with { GlareColor = _sunDiscColor * glare, MoonVisibility = _moonVisibility };
+        // The aurora shows only from cold lands: the climate at the eye's column, read from the stored
+        // corner climate (never worldgen noise, so a client reads what its server streamed), eased so
+        // walking across a border fades it; an unknown column eases it out
+        var eyeClimateKnown = false;
+        var eyeWarmth = 0.5f;
+        var columns = LightSource?.ColumnSource;
+        if (columns != null && camera != null)
+            eyeClimateKnown = EyeClimate.TryAt(columns, camera.Position.X, camera.Position.Z, out eyeWarmth, out _);
+        _eyeColdness = Aurora.Ease(_eyeColdness, Aurora.TargetColdness(eyeClimateKnown, eyeWarmth), dt);
+        _skyFrame = _skyFrame with
+        {
+            GlareColor = _sunDiscColor * glare,
+            MoonVisibility = _moonVisibility,
+            Aurora = Aurora.Visibility(_eyeColdness, StarField.Visibility(elevation)),
+            AuroraDrift = Aurora.Drift(time),
+        };
 
         _fogNear = MathUtils.Lerp(WorldGenerationConfig.FogNearBlocks,
             WorldGenerationConfig.UnderwaterFogNearBlocks, wet);

@@ -1,0 +1,37 @@
+// Aurora check (Aurora, AuroraCurtains in sky-fragment.glsl): slow green and violet curtains in the
+// night dome, seen only from cold lands. Run from OpenGLTest/ at night, copying visual/aurora/ aside
+// between runs:
+//   $env:VOXEL_SCRIPT='visual-examples/aurora.json'; $env:VOXEL_TIME='700'
+//   bin/Release/net9.0/silkgltriangle.exe
+// Times: 700 night (the curtains), 147 noon (none, whatever the climate).
+// The cold spot is snow-sparkle.json's barren frozen plain (-1112, 584), ground 18 (WorldSeed.Default).
+// The coldness at the eye is eased, so each arrival waits for it to settle; the last shot flies back
+// to the temperate origin, where the curtains have faded out.
+{
+  "steps": [
+    { "op": "wait", "seconds": 5 },
+    { "op": "fly" },
+    { "op": "teleport", "pos": [-1112.5, 40.5, 584.5], "yaw": 0, "pitch": 14 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "screenshot", "name": "cold_east", "hideHud": true },
+    { "op": "teleport", "pos": [-1112.5, 40.5, 584.5], "yaw": 90, "pitch": 14 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "cold_south", "hideHud": true },
+    { "op": "teleport", "pos": [-1112.5, 40.5, 584.5], "yaw": 180, "pitch": 14 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "cold_west", "hideHud": true },
+    { "op": "teleport", "pos": [-1112.5, 40.5, 584.5], "yaw": 270, "pitch": 14 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "cold_north", "hideHud": true },
+    // A few seconds later, the same pose: the curtains have drifted and rippled.
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "cold_north_later", "hideHud": true },
+    { "op": "teleport", "pos": [-1112.5, 40.5, 584.5], "yaw": 270, "pitch": 40 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "cold_up", "hideHud": true },
+    // Back over the temperate origin: no aurora.
+    { "op": "teleport", "pos": [0.5, 140.5, 0.5], "yaw": 270, "pitch": 14 },
+    { "op": "wait", "seconds": 14 },
+    { "op": "screenshot", "name": "temperate_none", "hideHud": true }
+  ]
+}

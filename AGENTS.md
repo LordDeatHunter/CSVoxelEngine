@@ -374,6 +374,21 @@ world and cloud `SkySample` copies read `uSunDir`: with no glow left, the key li
 changes nothing in the fog. The night ambient is a touch bluer. `MoonlightTests`;
 `visual-examples/moonlight.json` (`VOXEL_TIME` 455 the handover, 950 a low moon, 700, 5450 a new moon).
 
+**Aurora.** Slow green and violet curtains in the night dome, seen only from cold lands:
+`AuroraCurtains` in `sky-fragment.glsl`'s `main`, after the stars (so the fog and the `SkySample`
+twins never see it), hidden behind the clouds by the same `CloudCoverAlongRay`. Broad sectors along
+the horizon come from a periodic value noise of the view azimuth, with fine vertical folds, a wavy
+bright lower edge and a glow fading up from green to violet; each noise's drift is wrapped into its
+period on the CPU (`Aurora.Drift`, `Aurora.Periods`), so it never jumps. The strength
+(`SkyDomeFrame.Aurora`, `Aurora.Visibility`) is the eye's coldness, eased (`AuroraColdEaseRate`) and
+ramped over `AuroraColdStart..AuroraColdFull`, times `StarField.Visibility`. The coldness comes from
+`EyeClimate.TryAt` over `RenderManager.LightSource.ColumnSource` (the stored corner climate of the
+eye's column, bilinear like the biome tint, read back through `EyeClimate.Coldness`), never from
+worldgen noise, so a client reads its server's climate; an unknown column eases it out. The mirror
+redraws the dome, so it reflects, and the Snell window shows it. `AuroraTests`;
+`visual-examples/aurora.json` (`VOXEL_TIME` 700) films it over a frozen plain and back at the
+temperate origin, where it has faded out.
+
 **Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
 heading turns slowly (`WorldGenerationConfig.Wind*`), with `Wind.Offset` its bounded closed-form
 integral. Leaf sway reads it in both vertex shaders (`uWind`, the direction scaled by `WindLean`,
@@ -858,6 +873,8 @@ OpenGLTest/
     CloudSilverLining.cs       # GL-free twin of the clouds' silver lining: sun gate, forward lobe, thinness along the view
     MoonPhase.cs               # GL-free moon: the day's phase (steps at noon), its light direction, lit share, visibility
     Moonlight.cs               # GL-free key-light rule: sun by day, moon at night, handed over with both dark
+    Aurora.cs                  # GL-free twin of the aurora's fade (eye coldness x star visibility) and its wrapped noise drift
+    EyeClimate.cs              # GL-free climate at a world column from an IColumnSource's stored corner climate (no worldgen)
     BlockLightPalette.cs       # GL-free 8-slot block-light colour palette (slot 0 = the default warm torch colour)
     LightTint.cs               # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
     BiomeTint.cs               # GL-free biome tint: Climate -> palette -> vertex tint on a 16-block lattice, Gain, Shade, CellTint

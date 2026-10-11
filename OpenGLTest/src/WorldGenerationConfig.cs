@@ -458,6 +458,22 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>Half-width of the soft terminator between the lit and dark parts, in units of the sphere normal's dot with the light.</summary>
     public const float MoonTerminatorSoftness = 0.06f;
 
+    // --- Aurora (Aurora, AuroraCurtains in sky-fragment.glsl) ---
+    /// <summary>Coldness at the eye (EyeClimate.Coldness, the cold ramp) at and below which there is no aurora: the snow line.</summary>
+    public const float AuroraColdStart = 0.55f;
+
+    /// <summary>Coldness at the eye from which the aurora is at full strength (past the taiga/frozen line).</summary>
+    public const float AuroraColdFull = 0.85f;
+
+    /// <summary>How fast the eased coldness follows the eye's climate (MathUtils.Damp rate, per second): a slow fade across a border.</summary>
+    public const float AuroraColdEaseRate = 0.35f;
+
+    /// <summary>Linear HDR brightness of the curtains' bright lower edge at full strength.</summary>
+    public const float AuroraBrightness = 0.5f;
+
+    /// <summary>How fast the curtains drift and ripple along the sky (noise cells per second).</summary>
+    public const float AuroraDriftSpeed = 0.035f;
+
     // --- Moonlight (Moonlight, RenderManager.SetLighting) ---
     /// <summary>
     /// Sine of the sun's elevation at and below which the moon lights the world instead of the sun.

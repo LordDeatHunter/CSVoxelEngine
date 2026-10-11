@@ -54,6 +54,8 @@ public sealed class SkyRenderer : IDisposable
         _shader.SetUniform("uCloudField", WorldGenerationConfig.CloudFieldSize);
         _shader.SetUniform("uCloudFog", new Vector2(WorldGenerationConfig.FogNearBlocks, WorldGenerationConfig.FogFarBlocks));
         _shader.SetUniform("uGlareExponent", WorldGenerationConfig.SunGlareExponent);
+        _shader.SetUniform("uAuroraBrightness", WorldGenerationConfig.AuroraBrightness);
+        _shader.SetUniform("uAuroraPeriods", Aurora.Periods);
         // The starless disc behind the moon: its own radius, feathered just past the edge
         _shader.SetUniform("uMoonMask", new Vector2(
             MathUtils.CosDeg(WorldGenerationConfig.MoonAngularRadiusDeg * 1.08f),
@@ -112,6 +114,8 @@ public sealed class SkyRenderer : IDisposable
         _shader.SetUniform("uCloudBlocking", CloudCover.Blocking(GameSettings.CloudOpacity));
         _shader.SetUniform("uGlareColor", frame.GlareColor);
         _shader.SetUniform("uMoonVisibility", frame.MoonVisibility);
+        _shader.SetUniform("uAurora", frame.Aurora);
+        _shader.SetUniform("uAuroraDrift", frame.AuroraDrift);
 
         _gl.BindVertexArray(_vao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);

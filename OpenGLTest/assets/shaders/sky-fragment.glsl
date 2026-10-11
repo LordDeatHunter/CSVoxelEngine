@@ -66,6 +66,16 @@ uniform float uGlareExponent;
 uniform float uMoonVisibility;
 uniform vec2 uMoonMask;
 
+// The aurora (Aurora is the C# twin of its fade and drift): slow green and violet curtains in the
+// night dome, seen only from cold biomes. uAurora is this frame's strength (0 by day, in warm lands
+// and wherever the eye's climate is unknown); uAuroraDrift is each noise's drift in cells, wrapped
+// into its period on the CPU (uAuroraPeriods: the curtain sectors, their detail, the lower edge's
+// wave, the fine folds), so the curtains drift on forever with no jump.
+uniform float uAurora;
+uniform float uAuroraBrightness;
+uniform vec4 uAuroraPeriods;
+uniform vec4 uAuroraDrift;
+
 out vec4 FragColor;
 
 const float QuarterPi = 0.78539816;
@@ -188,6 +198,38 @@ float CloudCoverAlongRay(vec3 d)
     return uCloudBlocking * (1.0 - f * f * f);
 }
 
+// A hash of one noise cell, 0..1.
+float AuroraHash(float n)
+{
+    return fract(sin(n * 127.1 + 311.7) * 43758.5453);
+}
+
+// Smooth 1D value noise that repeats every `period` cells, so it closes seamlessly round the horizon.
+float AuroraNoise(float x, float period)
+{
+    float i = floor(x);
+    float f = fract(x);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(AuroraHash(mod(i, period)), AuroraHash(mod(i + 1.0, period)), f);
+}
+
+// The curtains' light in direction d (above the horizon): broad sectors along the horizon where
+// curtains hang (a noise of the view azimuth), fine vertical folds inside them, a wavy lower edge
+// that is brightest, and a glow fading up from it, green low and violet high.
+vec3 AuroraCurtains(vec3 d)
+{
+    float a = atan(d.z, d.x) / 6.2831853 + 0.5;      // 0..1 once round the horizon
+    vec4 x = a * uAuroraPeriods + uAuroraDrift;
+    float sector = smoothstep(0.3, 0.65, 0.65 * AuroraNoise(x.x, uAuroraPeriods.x) + 0.35 * AuroraNoise(x.y, uAuroraPeriods.y));
+    if (sector <= 0.0) return vec3(0.0);
+    float base = 0.14 + 0.16 * AuroraNoise(x.z, uAuroraPeriods.z);
+    float folds = 0.45 + 0.55 * AuroraNoise(x.w, uAuroraPeriods.w);
+    float h = d.y - base;
+    float v = smoothstep(-0.06, 0.015, h) * exp(-max(h, 0.0) / 0.2);
+    vec3 tint = mix(vec3(0.08, 1.0, 0.42), vec3(0.55, 0.18, 1.0), smoothstep(0.03, 0.4, h));
+    return tint * (uAuroraBrightness * sector * folds * v);
+}
+
 void main()
 {
     vec2 ndc = fUv * 2.0 - 1.0;
@@ -218,6 +260,14 @@ void main()
             if (dot(star, star) > 1e-10)
                 col += star * (fade * (1.0 - CloudCoverAlongRay(dir)));
         }
+    }
+
+    // The aurora, after the stars and like them only here (the fog never sees it), hidden behind
+    // the clouds; the cloud test runs only where a curtain shines.
+    if (uAurora > 0.0 && dir.y > 0.0) {
+        vec3 aurora = AuroraCurtains(dir);
+        if (dot(aurora, aurora) > 1e-10)
+            col += aurora * (uAurora * (1.0 - CloudCoverAlongRay(dir)));
     }
 
     col = mix(col, uSkyTint, uSkyTintAmount);
