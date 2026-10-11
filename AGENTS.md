@@ -171,9 +171,10 @@ The app opens a window and grabs the mouse. Controls: WASD to move, mouse to loo
 centre dot and four pills): the arms slide outward with the eased `Camera.ThrowCharge` while a throw
 is charged, a ring of dots around it fills with `World.Crosshair.BreakProgress` (0 in creative or
 with no target), and the hit marker flashes an X at the two connecting-hit sites the hit-stop uses (a
-landed punch or slice), fading over `HitMarker.Seconds` (`HitMarkerTests`). Under it the **look-at
-label** shows the targeted block: its name and a small spinning 3D render of it under the crosshair
-(`UIRenderer.DrawLookLabel` over `BlockCubeCache`), the name in red while the held item cannot mine
+landed punch or slice), fading over `HitMarker.Seconds` (`HitMarkerTests`). At the top of the
+screen the **look-at label** shows the targeted block: its name and a small spinning 3D render of
+it, pushed below the compass or clock strip while one is equipped (`UIRenderer.DrawLookLabel` and
+its `LookLabelTop` over `BlockCubeCache`), the name in red while the held item cannot mine
 it, and "Unknown" with a flat dark silhouette until its item has been obtained; creative mode and a
 block with no item at all always know, and `X` adds id, state, sun/block light and cell debug lines
 (`LookLabel`, `World.LookAt`, `LookLabelTests`, `look-label.json`). "Obtained" is the inventory's own

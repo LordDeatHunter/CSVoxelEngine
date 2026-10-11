@@ -1,8 +1,9 @@
 {
-  // The look-at label under the crosshair: "Unknown" with a flat dark silhouette until the
+  // The look-at label at the top of the screen: "Unknown" with a flat dark silhouette until the
   // block's item has been obtained, then its name and a textured cube; the name turns red while
   // the held item cannot mine the block. Digging down to the stone shows the red name, and the
-  // pickaxe turns it white. Run it with VOXEL_DEBUG=1 to catch the label's own debug lines.
+  // pickaxe turns it white; the last shot equips the compass, which pushes the label below its
+  // strip. Run it with VOXEL_DEBUG=1 to catch the label's own debug lines.
   "steps": [
     { "op": "wait", "seconds": 5 },
     { "op": "look", "yaw": -90, "pitch": -80 },
@@ -24,6 +25,11 @@
     { "op": "screenshot", "name": "stone-known-red" },
     { "op": "give", "block": "primitive_pickaxe", "count": 1 },
     { "op": "wait", "seconds": 0.3 },
-    { "op": "screenshot", "name": "stone-pickaxe-white" }
+    { "op": "screenshot", "name": "stone-pickaxe-white" },
+    { "op": "look", "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "give", "block": "compass", "count": 1 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "compass-pushes-label" }
   ]
 }

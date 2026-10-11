@@ -4286,16 +4286,20 @@ public class RenderManager : IDisposable
                 camera?.DamageArcScreenDirection ?? Vector2.Zero,
                 droplets, camera?.Droplets.Seconds ?? 0f, camera?.Droplets.Seed ?? 0);
 
+        // The compass and the clock share the top-centre strip; the look-at label rides below it
+        var hasCompass = camera != null && HasCompassEquipped(inventory);
+        var hasClock = camera != null && HasClockEquipped(inventory);
         if (!view.IsOpen && (menu == null || !menu.IsOpen))
         {
             ui.DrawCrosshair(crosshair.ThrowCharge, crosshair.BreakProgress, crosshair.HitMarker);
             // The look-at label (its debug lines ride the profiler overlay, i.e. X)
             if (lookAt is { } label)
-                ui.DrawLookLabel(label, time, showProfiler);
+                ui.DrawLookLabel(label, time, showProfiler,
+                    UIRenderer.LookLabelTop(hasCompass, hasClock, showCoordinates));
         }
-        if (camera != null && HasCompassEquipped(inventory))
-            ui.DrawCompass(camera.Yaw, camera.Position, showCoordinates);
-        else if (camera != null && HasClockEquipped(inventory))
+        if (hasCompass)
+            ui.DrawCompass(camera!.Yaw, camera.Position, showCoordinates);
+        else if (hasClock)
             ui.DrawClock(Clock.DayNumber(lightingTime), Clock.Readout(lightingTime));
         ui.DrawFps(fps);
         if (showProfiler)

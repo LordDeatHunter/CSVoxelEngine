@@ -630,17 +630,20 @@ public class UIRenderer : IDisposable
     }
 
     /// <summary>
-    /// The look-at label under the crosshair: a small 3D render of the targeted block (its own
-    /// cube mesh and atlas tile, or a flat dark silhouette while the player has not obtained it)
-    /// with its name below it — red when the held item cannot mine it — and, with the profiler on,
-    /// the debug lines (id, state byte, sun and block light, chunk and cell).
+    /// The look-at label at the top of the screen: a small 3D render of the targeted block (its
+    /// own cube mesh and atlas tile, or a flat dark silhouette while the player has not obtained
+    /// it) with its name below it — red when the held item cannot mine it — and, with the
+    /// profiler on, the debug lines (id, state byte, sun and block light, chunk and cell).
+    /// <paramref name="top"/> is the y its layout starts at; <see cref="LookLabelTop"/> gives the
+    /// value for the frame's compass/clock state, so the strip pushes the label below it.
     /// </summary>
-    public void DrawLookLabel(LookLabelState label, float time, bool debug)
+    public void DrawLookLabel(LookLabelState label, float time, bool debug, float top)
     {
         if (_font == null || string.IsNullOrEmpty(label.Text)) return;
 
         var centre = ScreenCentre;
-        var cubeCentre = centre + new Vector2(0f, LookLabelCubeOffsetY);
+        // Anchored by the spinning cube's largest half-height, so no yaw ever rises above `top`
+        var cubeCentre = new Vector2(centre.X, top + LookLabelCubeHalfHeight);
         if (_blockCubes.Get(label.BlockId) is { } cube)
         {
             // The shape is centred on its own origin, so it spins in place; an unknown block is
@@ -685,16 +688,36 @@ public class UIRenderer : IDisposable
             $"sun {label.Light.Sun:0}   block {label.Light.Block:0}",
             $"chunk {(int)chunkPos.X} {(int)chunkPos.Y} {(int)chunkPos.Z}   cell {(int)label.Cell.X & Chunk.SizeMask} {(int)label.Cell.Y & Chunk.SizeMask} {(int)label.Cell.Z & Chunk.SizeMask}",
         };
-        var top = cubeCentre.Y + LookLabelNameGap + CountCapHeight + 6f;
+        var linesTop = cubeCentre.Y + LookLabelNameGap + CountCapHeight + 6f;
         for (var i = 0; i < lines.Length; i++)
-            DrawTextCentred(lines[i], centre.X, top + i * (CountCapHeight + 4f), _countScale, TextDim);
+            DrawTextCentred(lines[i], centre.X, linesTop + i * (CountCapHeight + 4f), _countScale, TextDim);
     }
 
-    // The look-at label's cube: its size, how far below the crosshair it sits and the gap to the name
+    /// <summary>
+    /// The y the look-at label's layout starts at: below the compass or the clock while either
+    /// occupies the top-centre strip, the compass as low as its coordinates line when one is
+    /// shown, and the strip's own top margin with neither — so equipping the compass pushes the
+    /// label down instead of overlapping it. The compass wins when both are equipped, like the
+    /// draw itself, and a clock has no coordinates line.
+    /// </summary>
+    public static float LookLabelTop(bool compass, bool clock, bool coordinates)
+    {
+        if (compass)
+            return CompassTop + CompassHeight
+                + (coordinates ? CompassCoordsGap + CountCapHeight : 0f) + LookLabelTopGap;
+        return clock ? CompassTop + CompassHeight + LookLabelTopGap : CompassTop;
+    }
+
+    // The look-at label: its cube's size and tilt, the spinning cube's largest screen half-height
+    // (its layout anchor), the gap below the top HUD strip and the gap from the cube to the name
     private const float LookLabelCubeSize = 34f;
-    private const float LookLabelCubeOffsetY = 46f;
     // Positive tips the mesh's top face at the viewer once FlipToScreen has mirrored it
     private const float LookLabelCubeTilt = 0.45f;
+    // The cube's vertical half extent: half the size times cos(tilt) + sin(tilt) * (|sin yaw| +
+    // |cos yaw|), whose worst yaw is the sqrt(2) diagonal
+    private static readonly float LookLabelCubeHalfHeight = LookLabelCubeSize * 0.5f
+        * (MathF.Cos(LookLabelCubeTilt) + MathF.Sin(LookLabelCubeTilt) * MathF.Sqrt(2f));
+    private const float LookLabelTopGap = 6f;
     private const float LookLabelNameGap = 14f;
     private const float LookLabelMaxWidth = 200f;
 

@@ -191,8 +191,9 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Crosshair spreads while charging.** the crosshair is drawn as five pieces cropped out of its 16x16 texture (a centre dot and four pills); the arms slide outward with `Camera.ThrowCharge` (eased) while the dot stays put, and snap back on release.
 - [x] **Mining progress ring.** a ring of `CrosshairRingSegments` dots around the crosshair, the lit share following `World.Crosshair.BreakProgress` (0 in creative or with no target, so it never shows there).
 - [x] **Look-at label.** The block under the crosshair shows its name and a small spinning 3D
-  render of it below (`UIRenderer.DrawLookLabel` over `BlockCubeCache`), the name in red while the
-  held item cannot mine it, and "Unknown" with a flat dark silhouette until its item has been
+  render of it at the top of the screen, below the compass or clock strip while one is equipped
+  (`UIRenderer.DrawLookLabel` and its `LookLabelTop` over `BlockCubeCache`), the name in red while
+  the held item cannot mine it, and "Unknown" with a flat dark silhouette until its item has been
   obtained; creative mode and a block with no item at all (`hasItem` false) always know, and `X`
   adds id, state byte, sun/block light and chunk/cell debug lines. `LookLabel` is the rule,
   `World.LookAt` the raycast's state, and "obtained" is `Inventory`'s own set, marked in `Add`,
