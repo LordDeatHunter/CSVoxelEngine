@@ -22,6 +22,10 @@ public sealed class GoblinManager : IMobPopulation
     private readonly List<ThrownProjectile> _stones = [];
     private readonly List<byte> _loot = [];
     private readonly byte _flintId;
+    // One delegate for every goblin's collector: it only ever takes flint
+    private readonly Func<byte, bool> _canScavenge;
+    // The goblins a frame's collectors were built for, in the same order (AwardScavenged's index)
+    private readonly List<Goblin> _collectorGoblins = [];
     // The camera overload's one-element target list, reused so it allocates nothing per frame.
     private readonly List<IMobTarget> _singleTarget = new(1);
     private float _spawnTimer;
@@ -35,6 +39,7 @@ public sealed class GoblinManager : IMobPopulation
         Goblin.ValidateContent(type);
         _type = type;
         _flintId = ContentRegistry.RequireItem("flint").Id;
+        _canScavenge = id => id == _flintId;
         _caps = caps ?? new MobCaps();
         _caps.Register(this);
     }
@@ -80,6 +85,31 @@ public sealed class GoblinManager : IMobPopulation
 
     /// <summary>Stones in flight; drawn and mirrored like the player's own throws.</summary>
     public IReadOnlyList<ThrownProjectile> Stones => _stones;
+
+    /// <summary>
+    /// Appends one <see cref="DropCollector"/> per living goblin with ammo room: it takes only
+    /// flint, which the world's drop pass flies in like a player's pickup. The order is kept so
+    /// <see cref="AwardScavenged"/> can credit the right goblin by its collector index.
+    /// </summary>
+    public void AppendCollectors(List<DropCollector> into)
+    {
+        _collectorGoblins.Clear();
+        for (var i = 0; i < _goblins.Count; i++)
+        {
+            var goblin = _goblins[i];
+            if (goblin.IsDying || goblin.Ammo >= WorldGenerationConfig.GoblinStoneMax) continue;
+            _collectorGoblins.Add(goblin);
+            into.Add(new DropCollector(goblin.Position, _canScavenge));
+        }
+    }
+
+    /// <summary>Credits a drop scavenged by the collector at <paramref name="index"/> of this
+    /// frame's <see cref="AppendCollectors"/> order: flint becomes ammo, clamped at the cap.</summary>
+    public void AwardScavenged(int index, byte id)
+    {
+        if (index < 0 || index >= _collectorGoblins.Count || id != _flintId) return;
+        _collectorGoblins[index].AddAmmo(1);
+    }
 
     /// <summary>Health the goblins took off every target together during the most recent
     /// <c>Update</c>; each hit also reached its target through <see cref="IMobTarget.TakeHit"/>.

@@ -127,6 +127,11 @@ public sealed class Goblin : Mob
     /// <summary>Stones left to throw; the manager drops what remains on death.</summary>
     public int Ammo { get; private set; }
 
+    /// <summary>Adds scavenged stones (flint picked up off the ground), clamped at
+    /// <see cref="WorldGenerationConfig.GoblinStoneMax"/>.</summary>
+    public void AddAmmo(int amount) =>
+        Ammo = Math.Clamp(Ammo + amount, 0, WorldGenerationConfig.GoblinStoneMax);
+
     /// <summary>Whether the goblin currently stands on the ground.</summary>
     public bool IsGrounded { get; private set; }
 

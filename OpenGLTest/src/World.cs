@@ -1701,26 +1701,57 @@ public class World : IItemUseWorld
         RestorePendingEntities(deltaTime);
 
         // Drops collected this tick land in the inventory pools. A full pool ignores the
-        // drop (it is never attracted), and an id with no pool is discarded. A server has no
-        // player of its own: each connected player collects into their own inventory instead.
+        // drop (it is never attracted), and an id with no pool is discarded. The collectors are
+        // the local player (singleplayer and a client), or every connected player on a server
+        // (which has no player of its own), plus every goblin with ammo room, which scavenges
+        // flint off the ground as its own ammo.
+        _dropCollectors.Clear();
         if (_serverMode)
         {
-            UpdateServerPickup((float)deltaTime);
+            var players = ServerPlayers;
+            for (var i = 0; i < players.Count; i++)
+                _dropCollectors.Add(new DropCollector(players[i].Position, players[i].CanAcceptDrop));
         }
         else
         {
-            _dropManager.Update((float)deltaTime, Camera.Position, _chunkManager, _canAcceptDrop);
-            var pickedUp = false;
-            foreach (var blockId in _dropManager.Collected)
-                pickedUp |= Inventory.Add(blockId);
-            if (pickedUp)
+            _dropCollectors.Add(new DropCollector(Camera.Position, _canAcceptDrop));
+        }
+
+        // A client's goblins are mirrors whose ammo is the server's (EntityList): never scavenge
+        var goblinCollectors = _dropCollectors.Count;
+        if (!_clientMode)
+            _goblins?.AppendCollectors(_dropCollectors);
+        _dropManager.Update((float)deltaTime, _dropCollectors, _chunkManager);
+
+        var pickedUp = false;
+        var collected = _dropManager.Collected;
+        var collectors = _dropManager.CollectedBy;
+        for (var i = 0; i < collected.Length; i++)
+        {
+            if (collectors[i] >= goblinCollectors)
             {
-                _sfx?.Play(SfxLibrary.PickupGroup);
-                // Bright motes pop where the drop was collected, at the chest
-                _fire.Puff(Camera.Position - new Vector3(0f, WorldGenerationConfig.PickupSparkleDrop, 0f),
-                    WorldGenerationConfig.PickupSparkleCount, WorldGenerationConfig.PickupSparkleSpread,
-                    FireParticleKind.Spark);
+                _goblins!.AwardScavenged(collectors[i] - goblinCollectors, collected[i]);
+                continue;
             }
+
+            if (_serverMode)
+            {
+                var player = ServerPlayers[collectors[i]];
+                if (player.Inventory.Add(collected[i]))
+                    player.InventoryChanged = true;
+                continue;
+            }
+
+            pickedUp |= Inventory.Add(collected[i]);
+        }
+
+        if (pickedUp)
+        {
+            _sfx?.Play(SfxLibrary.PickupGroup);
+            // Bright motes pop where the drop was collected, at the chest
+            _fire.Puff(Camera.Position - new Vector3(0f, WorldGenerationConfig.PickupSparkleDrop, 0f),
+                WorldGenerationConfig.PickupSparkleCount, WorldGenerationConfig.PickupSparkleSpread,
+                FireParticleKind.Spark);
         }
 
         _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager, _falling, _leaves, _leafDecay);
@@ -1885,24 +1916,6 @@ public class World : IItemUseWorld
     /// to that player's own inventory, flagging it for a fresh snapshot. The server camera (the
     /// chunk focus) never collects anything.
     /// </summary>
-    private void UpdateServerPickup(float deltaTime)
-    {
-        var players = ServerPlayers;
-        _dropCollectors.Clear();
-        for (var i = 0; i < players.Count; i++)
-            _dropCollectors.Add(new DropCollector(players[i].Position, players[i].CanAcceptDrop));
-
-        _dropManager.Update(deltaTime, _dropCollectors, _chunkManager);
-        var collected = _dropManager.Collected;
-        var collectors = _dropManager.CollectedBy;
-        for (var i = 0; i < collected.Length; i++)
-        {
-            var player = players[collectors[i]];
-            if (player.Inventory.Add(collected[i]))
-                player.InventoryChanged = true;
-        }
-    }
-
     /// <summary>
     /// The <see cref="WorldPhase.Loading"/> frame: streaming only. Chunks and far LOD stream and
     /// upload under the loading budgets, the spawn settles and freshly loaded water wakes, but

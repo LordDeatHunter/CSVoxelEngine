@@ -172,9 +172,9 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Goblins flee at low health.** Below `GoblinFleeHealthShare` (a quarter) of its pool a
   goblin turns and runs from the player at `GoblinFleeSpeedFactor` of its walk, never throwing or
   swinging, and still despawns by distance as usual (`Goblin.IsFleeing`; `GoblinFleeTests`).
-- [ ] **Goblins scavenge flint.** A goblin walking over a flint drop picks it up as ammo.
-  *Hook:* `DropManager`'s multi-collector (`DropCollector`) with goblins as collectors that take
-  only flint, capped at `GoblinStoneMax`.
+- [x] **Goblins scavenge flint.** A live goblin with ammo room joins the world's drop pass as a
+  `DropCollector` that takes only flint (`GoblinManager.AppendCollectors`/`AwardScavenged`,
+  capped at `GoblinStoneMax`; a client's mirrors never scavenge) (`GoblinScavengeTests`).
 - [x] **Sneaking shortens the notice range.** `MobTargets.Nearest` only picks targets inside `MobTargets.NoticeRadius` (`MobNoticeRadiusBlocks`, times `MobSneakNoticeFactor` while `IMobTarget.IsSneaking`; the camera's crouch, a `ServerPlayer`'s cosmetic flag) (`MobNoticeTests`, `mob-notice.json`).
 - [x] **Slime merge.** `SlimeManager.MergeTouching` over `SlimeMerge`: two touching living slimes of one size below the largest, both older than `SlimeMergeCooldownSeconds`, become one forced spawn of the next size (`SlimeMergeTests`, `slime-merge.json`).
 - [x] **Cave slimes.** `MobSpawner.TryFindCaveSpawn` (a dry, dark, loaded cave floor at least `SlimeUndergroundDepthBlocks` under the surface); `SlimeManager.TryFindSpawn` tries caves first for a player underground (`CaveSlimeTests`).
