@@ -3330,12 +3330,54 @@ public class World : IItemUseWorld
     }
 
     /// <summary>Swings falling trees, then pops their wood out as item drops once rested.</summary>
+    // Scratch for ThudTree: the landed blocks, split into canopy and trunk
+    private readonly List<TopplingTree.FellBlock> _thudLanded = [];
+    private readonly List<Vector3> _thudLeaves = [];
+    private readonly List<Vector3> _thudWood = [];
+
+    /// <summary>
+    /// A felled tree just swung flat: the camera shakes by its distance to the landed trunk (harder
+    /// the more wood fell, <see cref="ShakeFalloff"/>), the landed canopy bursts leaves
+    /// (<see cref="LeafParticleSystem.BurstCells"/>) and the trunk kicks the ground's dust up
+    /// (<see cref="GroundDust.TreeThud"/>). Cosmetic: singleplayer.
+    /// </summary>
+    private void ThudTree(TopplingTree tree)
+    {
+        _thudLanded.Clear();
+        _thudLeaves.Clear();
+        _thudWood.Clear();
+        tree.GatherLanded(_thudLanded);
+        var centre = Vector3.Zero;
+        foreach (var block in _thudLanded)
+        {
+            if (TreeGenerator.IsLeaf(block.Id))
+            {
+                _thudLeaves.Add(block.Cell);
+                continue;
+            }
+            _thudWood.Add(block.Cell);
+            centre += block.Cell;
+        }
+
+        _leaves.BurstCells(_thudLeaves, WorldGenerationConfig.LeafParticleBurstThud);
+        GroundDust.TreeThud(_thudWood, _chunkManager, _debris);
+        if (_thudWood.Count == 0) return;
+        centre = centre / _thudWood.Count + new Vector3(0.5f);
+        var strength = WorldGenerationConfig.TreeThudShakeStrength
+                       * MathUtils.Clamp01(_thudWood.Count / (float)WorldGenerationConfig.TreeThudFullWoodCells);
+        Camera.AddShake(ShakeFalloff.Trauma(strength, WorldGenerationConfig.TreeThudShakeNearBlocks,
+            WorldGenerationConfig.TreeThudShakeRangeBlocks, Vector3.Distance(Camera.Position, centre)));
+    }
+
     private void UpdateToppling(float deltaTime)
     {
         for (var i = _toppling.Count - 1; i >= 0; i--)
         {
             var tree = _toppling[i];
             tree.Update(deltaTime);
+            // The moment it hits the ground: cosmetic, so a server's trees land in silence
+            if (tree.TryTakeLanding() && !_serverMode)
+                ThudTree(tree);
             if (!tree.IsDone) continue;
 
             foreach (var (id, cell) in tree.TakeDrops())

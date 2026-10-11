@@ -173,6 +173,32 @@ public sealed class GroundDust
     }
 
     /// <summary>
+    /// A felled tree's trunk just hit the ground lying in <paramref name="woodCells"/> (its landed wood,
+    /// <see cref="TopplingTree.GatherLanded"/>): kicks up a puff of the ground's own chips under at most
+    /// <see cref="WorldGenerationConfig.TreeThudDustPoints"/> of them, spread evenly along the trunk. A
+    /// stretch with no ground under it (a trunk lying over a drop) raises nothing. Returns how many
+    /// chips it spawned.
+    /// </summary>
+    public static int TreeThud(IReadOnlyList<Vector3> woodCells, ChunkManager chunks, BlockDebrisSystem debris,
+        Random? random = null)
+    {
+        if (woodCells.Count == 0) return 0;
+        var points = Math.Min(woodCells.Count, WorldGenerationConfig.TreeThudDustPoints);
+        var step = (float)woodCells.Count / points;
+        var size = WorldGenerationConfig.LandingDustSize;
+        var spawned = 0;
+        for (var i = 0; i < points; i++)
+        {
+            var feet = woodCells[(int)(i * step)] + new Vector3(0.5f, 0f, 0.5f);
+            if (!TryFindSurface(chunks, feet, 0.45f, out var ground, out var groundId)) continue;
+            debris.Puff(feet + new Vector3(0f, size, 0f), ground, groundId, WorldGenerationConfig.TreeThudDustCount,
+                WorldGenerationConfig.TreeThudDustSpeed, size, random, chunks.ColumnSource);
+            spawned += WorldGenerationConfig.TreeThudDustCount;
+        }
+        return spawned;
+    }
+
+    /// <summary>
     /// The block a body standing with its feet at <paramref name="feet"/> stands on, and its cell:
     /// the feet's own cell under their centre first (a cover the feet sink into, such as a layered
     /// snow drift, or a slab the body stands on), then the cell below, under the centre and then under

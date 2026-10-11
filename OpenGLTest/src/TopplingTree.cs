@@ -28,6 +28,8 @@ public class TopplingTree : IDisposable
     private readonly bool _drops;
     private float _elapsed;
     private bool _dropsTaken;
+    // Set by the update the swing reaches flat, cleared by TryTakeLanding
+    private bool _landingPending;
 
     /// <summary>CPU-side mesh, pivot-relative, daylight-baked. Built in the constructor.</summary>
     public ChunkMeshData MeshData { get; }
@@ -253,10 +255,38 @@ public class TopplingTree : IDisposable
     {
         if (IsDone) return;
 
+        var falling = _elapsed < WorldGenerationConfig.TreeToppleSeconds;
         _elapsed += deltaTime;
+        if (falling && _elapsed >= WorldGenerationConfig.TreeToppleSeconds)
+            _landingPending = true;
         if (_elapsed >= WorldGenerationConfig.TreeToppleSeconds + WorldGenerationConfig.TreeFellRestSeconds)
             IsDone = true;
     }
+
+    /// <summary>True exactly once: on the first call after the update that swung the tree flat, the
+    /// moment it hits the ground (the world's thud: shake, leaf burst and dust).</summary>
+    public bool TryTakeLanding()
+    {
+        if (!_landingPending) return false;
+        _landingPending = false;
+        return true;
+    }
+
+    /// <summary>
+    /// Appends every collected block to <paramref name="into"/> at the cell it lies in once the tree
+    /// is flat (the same rest cells <see cref="TakeDrops"/> drops its loot at), keeping its id and
+    /// state, so the thud knows where the trunk and the canopy came down.
+    /// </summary>
+    public void GatherLanded(List<FellBlock> into)
+    {
+        var landed = Matrix4x4.CreateFromAxisAngle(_axis, MathF.PI * 0.5f);
+        foreach (var block in _blocks)
+            into.Add(block with { Cell = RestCell(block, landed) });
+    }
+
+    // The floored cell a block's centre comes to rest in after the swing
+    private Vector3 RestCell(FellBlock block, Matrix4x4 landed) =>
+        (_pivot + Vector3.Transform(block.Cell + new Vector3(0.5f) - _pivot, landed)).Floor();
 
     /// <summary>
     /// Item drops for the landed tree, each at the floored cell its block came to rest in.
@@ -278,8 +308,7 @@ public class TopplingTree : IDisposable
         var rolled = new List<byte>();
         foreach (var block in _blocks)
         {
-            var rest = _pivot + Vector3.Transform(block.Cell + new Vector3(0.5f) - _pivot, landed);
-            var cell = rest.Floor();
+            var cell = RestCell(block, landed);
 
             // The resting cell is the loot context too, so position-dependent rolls see where
             // the block landed rather than where it grew

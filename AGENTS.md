@@ -2992,7 +2992,14 @@ overshoot or jiggle.
   the campfire instance, at most `SteamPuffMaxCellsPerFrame` cells within `FireParticleRadius` a frame,
   since a waking cave pocket hardens dozens a frame far below; a client puffs where a `BlockChanges`
   entry turns a fluid into its own `hardensTo` block (a flow crusting against lava is missed there)
-  (`SteamPuffTests`). `visual-examples/world-events.json` (`VOXEL_TIME=147`) films
+  (`SteamPuffTests`). A felled tree hitting the ground thuds: `TopplingTree.TryTakeLanding` is true
+  exactly once, on the update its swing reaches flat, and `World.ThudTree` then takes the blocks'
+  rest cells (`TopplingTree.GatherLanded`, the cells `TakeDrops` drops at), bursts
+  `LeafParticleBurstThud` leaves off the landed canopy, kicks the ground's dust up under at most
+  `TreeThudDustPoints` points of the landed trunk (`GroundDust.TreeThud`) and shakes the camera by its
+  distance to the trunk (`ShakeFalloff`, `TreeThudShakeStrength` scaled by the wood that fell over
+  `TreeThudFullWoodCells`). Singleplayer only: a server skips it, and a client sees no toppling tree
+  at all (`TreeThudTests`). `visual-examples/world-events.json` (`VOXEL_TIME=147`) films
   these effects; its blasts use the scenario op `prime` (`{ "op": "prime", "pos": [x, y, z] }`,
   `World.TestPrimeTnt`), a firestarter strike on the TNT block in that cell that never misses, since
   `give` cannot equip a tool instance and the strike's chance roll would make the scenario flaky.

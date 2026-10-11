@@ -17,6 +17,8 @@
   //              and settles in a skirt of its own chips (FallingBlockManager.Landings)
   //   steam      lava poured into the crater and water run down onto it: grey smoke off every cell
   //              that hardens to cobblestone
+  //   thud       a forest oak felled at its base hits the ground: a leaf burst off the crown, dust
+  //              under the trunk and a camera shake (TopplingTree.TryTakeLanding)
   "steps": [
     { "op": "fly", "on": true },
     { "op": "teleport", "pos": [253.5, 30, -4.5], "yaw": -90, "pitch": -28.37 },
@@ -100,6 +102,25 @@
     { "op": "wait", "seconds": 0.6 },
     { "op": "screenshot", "name": "steam-c", "hideHud": true },
     { "op": "wait", "seconds": 1.0 },
-    { "op": "screenshot", "name": "steam-d", "hideHud": true }
+    { "op": "screenshot", "name": "steam-d", "hideHud": true },
+
+    // LEG 4 — the tree fall thud: the forest oak trees.json fells, cut at its base from trees.json's
+    // own base_aim pose (a single-frame creative mine), tips east, away from the cut; the side view
+    // from the south catches it as it hits the ground TreeToppleSeconds (1.2 s) later: a leaf burst
+    // off the landed crown, dust kicked up under the trunk, and the camera shaken.
+    { "op": "teleport", "pos": [-67.4, 21.0, 3.1], "yaw": -157.5, "pitch": -4.8 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "teleport", "pos": [-81.5, 15.7, -1.5], "yaw": 0, "pitch": -21.8 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "teleport", "pos": [-74.5, 17.5, 11.5], "yaw": -90, "pitch": -12 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "thud-falling", "hideHud": true },
+    { "op": "wait", "seconds": 0.42 },
+    { "op": "screenshot", "name": "thud-a", "hideHud": true },
+    { "op": "wait", "seconds": 0.12 },
+    { "op": "screenshot", "name": "thud-b", "hideHud": true },
+    { "op": "wait", "seconds": 0.25 },
+    { "op": "screenshot", "name": "thud-c", "hideHud": true }
   ]
 }
