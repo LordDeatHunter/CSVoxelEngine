@@ -2579,7 +2579,15 @@ and the squash spring's windup; `SlimeHopTests`). The largest size (`SlimeMaxSiz
 **giant**: `SlimeSize.Roll` takes the last step into it with only `SlimeMaxSizeChanceFactor` of the
 usual threshold, so it is rarer than the size below it in every light (`GiantSlimeTests`), and it
 splits into that size like any other; `visual-examples/slime-sizes.json` stands it beside the other
-three.
+three. **Cave slimes**: slimes also spawn on dark cave floors in the same ring
+(`MobSpawner.TryFindCaveSpawn`, any biome): each try scans a column down from a random height within
+`SlimeCaveSearchHalfHeight` of the player's feet for at most `SlimeCaveScanDepth` cells and takes the
+first solid floor under two clear, dry cells, if it lies at least `SlimeUndergroundDepthBlocks` under
+its column's surface, its standing cell has at most `SlimeCaveMaxSkyLight` sky light (a cell without a
+published light snapshot reads as full sun) and it is not torch-lit. `SlimeManager.TryFindSpawn`
+searches caves first for a player standing underground and the surface first otherwise, each falling
+back to the other, and the size roll treats a cave spawn as underground (night chance); this makes the
+"surface-only ring never finds such a spot" note above out of date (`CaveSlimeTests`).
 
 The second entity is the **goblin** (`Goblin` + `Systems/GoblinManager.cs`, owned by `World`), a short
 forest raider that throws the flint it carries and then closes for a club swing. It spawns like the

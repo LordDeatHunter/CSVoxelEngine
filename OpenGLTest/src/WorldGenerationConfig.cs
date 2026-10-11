@@ -1576,6 +1576,16 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int SlimeSplitChildren = 2;
     public const float SlimeSplitShoveSpeed = 4f;
     public const float SlimeSplitLift = 5f;
+    // Cave slimes (MobSpawner.TryFindCaveSpawn): slimes also spawn on dark cave floors in the same
+    // ring, searched SlimeCaveSpawnTries times from a random height within SlimeCaveSearchHalfHeight of
+    // the player's feet, down at most SlimeCaveScanDepth cells, on a floor at least
+    // SlimeUndergroundDepthBlocks under its column's surface whose standing cell has at most
+    // SlimeCaveMaxSkyLight sky light. A player underground is searched for cave spawns first, one on
+    // the surface for surface spawns first, each falling back to the other.
+    public const int SlimeCaveSpawnTries = 16;
+    public const int SlimeCaveSearchHalfHeight = 12;
+    public const int SlimeCaveScanDepth = 24;
+    public const int SlimeCaveMaxSkyLight = 4;
 
     // --- Goblins (GoblinManager) ---
     // Short forest raiders that throw the flint they carry at the player from a standoff band,

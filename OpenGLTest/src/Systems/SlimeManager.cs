@@ -252,7 +252,10 @@ public sealed class SlimeManager : IMobPopulation
         TryFindSpawn(chunks, playerPosition, 0f, 1f, out position, out _);
 
     /// <summary>
-    /// The slime's spawn ring through <see cref="MobSpawner.TryFindSurfaceSpawn"/>: the size comes
+    /// The slime's spawn ring through <see cref="MobSpawner.TryFindSurfaceSpawn"/> and, for cave
+    /// slimes, <see cref="MobSpawner.TryFindCaveSpawn"/>: a player standing underground
+    /// (<see cref="SlimeSize.IsUnderground"/> at its feet) is searched for a dark cave floor first, one
+    /// on the surface for surface ground first, each falling back to the other. The size comes
     /// from <see cref="SlimeSize.Roll"/> with <paramref name="night"/>, whether the ground cell is
     /// below its column's surface (<see cref="SlimeSize.IsUnderground"/>) and
     /// <paramref name="sizeRoll"/> (uniform in [0, 1)), and <paramref name="position"/> is that
@@ -263,9 +266,13 @@ public sealed class SlimeManager : IMobPopulation
     internal static bool TryFindSpawn(ChunkManager chunks, Vector3 playerPosition, float night, float sizeRoll,
         out Vector3 position, out int size)
     {
-        if (!MobSpawner.TryFindSurfaceSpawn(chunks, playerPosition,
-                WorldGenerationConfig.SlimeSpawnMinRadiusBlocks, WorldGenerationConfig.SlimeSpawnMaxRadiusBlocks,
-                WorldGenerationConfig.SlimeSpawnTries, out var x, out var groundY, out var z))
+        int x, groundY, z;
+        var found = PlayerUnderground(chunks, playerPosition)
+            ? TryFindCave(chunks, playerPosition, out x, out groundY, out z)
+              || TryFindSurface(chunks, playerPosition, out x, out groundY, out z)
+            : TryFindSurface(chunks, playerPosition, out x, out groundY, out z)
+              || TryFindCave(chunks, playerPosition, out x, out groundY, out z);
+        if (!found)
         {
             position = default;
             size = SlimeSize.Min;
@@ -284,5 +291,27 @@ public sealed class SlimeManager : IMobPopulation
                 return true;
             size--;
         }
+    }
+
+    private static bool TryFindSurface(ChunkManager chunks, Vector3 playerPosition, out int x, out int groundY, out int z) =>
+        MobSpawner.TryFindSurfaceSpawn(chunks, playerPosition,
+            WorldGenerationConfig.SlimeSpawnMinRadiusBlocks, WorldGenerationConfig.SlimeSpawnMaxRadiusBlocks,
+            WorldGenerationConfig.SlimeSpawnTries, out x, out groundY, out z);
+
+    private static bool TryFindCave(ChunkManager chunks, Vector3 playerPosition, out int x, out int groundY, out int z) =>
+        MobSpawner.TryFindCaveSpawn(chunks, playerPosition,
+            WorldGenerationConfig.SlimeSpawnMinRadiusBlocks, WorldGenerationConfig.SlimeSpawnMaxRadiusBlocks,
+            WorldGenerationConfig.SlimeCaveSpawnTries, WorldGenerationConfig.SlimeCaveSearchHalfHeight,
+            WorldGenerationConfig.SlimeCaveScanDepth, WorldGenerationConfig.SlimeCaveMaxSkyLight,
+            out x, out groundY, out z);
+
+    // Whether the player's feet stand underground: well under its own column's terrain height
+    private static bool PlayerUnderground(ChunkManager chunks, Vector3 playerPosition)
+    {
+        var x = MathUtils.FloorToInt(playerPosition.X);
+        var z = MathUtils.FloorToInt(playerPosition.Z);
+        var column = chunks.WorldSource.GetColumn(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
+        var surface = column.Heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
+        return SlimeSize.IsUnderground(MathUtils.FloorToInt(playerPosition.Y - Camera.EyeHeight) - 1, surface);
     }
 }

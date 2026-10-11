@@ -61,6 +61,67 @@ public static class MobSpawner
     }
 
     /// <summary>
+    /// The underground counterpart of <see cref="TryFindSurfaceSpawn"/>: up to <paramref name="tries"/>
+    /// random columns in the same ring, each scanned downward from a random height within
+    /// <paramref name="searchHalfHeight"/> of the player's feet for at most <paramref name="scanDepth"/>
+    /// cells, taking the first solid floor with two clear, dry cells above it. The floor must lie at
+    /// least <see cref="WorldGenerationConfig.SlimeUndergroundDepthBlocks"/> under its column's terrain
+    /// height (<see cref="SlimeSize.IsUnderground"/>), the cell above it must be dark (sky light at most
+    /// <paramref name="maxSkyLight"/>, read like <see cref="IsLitByBlocks"/>; a cell without a published
+    /// light snapshot reads as full sun, so it is refused) and not torch-lit, and every cell read must
+    /// be loaded. Any biome. On success <paramref name="groundY"/> is the floor cell's Y.
+    /// </summary>
+    public static bool TryFindCaveSpawn(ChunkManager chunks, Vector3 playerPosition, float minRadius,
+        float maxRadius, int tries, int searchHalfHeight, int scanDepth, int maxSkyLight,
+        out int x, out int groundY, out int z)
+    {
+        var feetY = MathUtils.FloorToInt(playerPosition.Y - Camera.EyeHeight);
+        for (var attempt = 0; attempt < tries; attempt++)
+        {
+            var angle = Random.Shared.NextSingle() * MathF.Tau;
+            var radius = MathUtils.Lerp(minRadius, maxRadius, Random.Shared.NextSingle());
+            x = MathUtils.FloorToInt(playerPosition.X + MathF.Cos(angle) * radius);
+            z = MathUtils.FloorToInt(playerPosition.Z + MathF.Sin(angle) * radius);
+            var column = chunks.WorldSource.GetColumn(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
+            var surface = column.Heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
+
+            var top = feetY + Random.Shared.Next(-searchHalfHeight, searchHalfHeight + 1);
+            var clearAbove = 0;
+            for (var y = top; y > top - scanDepth; y--)
+            {
+                if (!chunks.TryGetCell(x, y, z, out var id, out _)) break;
+                if (BlockType.IsFluid(id))
+                {
+                    clearAbove = 0;
+                    continue;
+                }
+                if (!BlockType.IsSolid(id))
+                {
+                    clearAbove++;
+                    continue;
+                }
+                if (clearAbove < 2)
+                {
+                    clearAbove = 0;
+                    continue;
+                }
+
+                // The first floor under two clear cells decides this try
+                if (SlimeSize.IsUnderground(y, surface) && !IsLitByBlocks(chunks, x, y + 1, z)
+                    && (int)MathF.Round(EntityLight.Sample(chunks, new Vector3(x + 0.5f, y + 1.5f, z + 0.5f)).Sun * 15f) <= maxSkyLight)
+                {
+                    groundY = y;
+                    return true;
+                }
+                break;
+            }
+        }
+
+        x = groundY = z = 0;
+        return false;
+    }
+
+    /// <summary>
     /// Whether the block light (torches, lamps, lava) in cell (<paramref name="x"/>, <paramref name="y"/>,
     /// <paramref name="z"/>) reaches <see cref="WorldGenerationConfig.MobSpawnBlockLightLimit"/>, which
     /// keeps every ring spawn off it, so a few torches keep a base clear. Read through
