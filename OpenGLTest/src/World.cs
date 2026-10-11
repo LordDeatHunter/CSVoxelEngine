@@ -314,6 +314,10 @@ public class World : IItemUseWorld
     // The crosshair's hit marker, shown where the hit-stop is requested (UpdatePunch/UpdateSlice)
     private readonly HitMarker _hitMarker = new();
 
+    // Whether a drop in reach was refused last frame, so the "Inventory full" warning fires on
+    // the transition into the blocked state only
+    private bool _pickupBlocked;
+
     /// <summary>
     /// What the HUD crosshair draws with this frame: the throw charge (the arms spread), the mined
     /// block's break progress (0 in creative or with no target) and the hit marker's alpha.
@@ -1810,6 +1814,13 @@ public class World : IItemUseWorld
                 WorldGenerationConfig.PickupSparkleCount, WorldGenerationConfig.PickupSparkleSpread,
                 FireParticleKind.Spark);
         }
+
+        // A drop in reach the pool refuses warns "Inventory full" once, and stays silent until
+        // there is room again (the transition, not the state)
+        var blocked = !_serverMode && _dropManager.PickupBlocked;
+        if (blocked && !_pickupBlocked)
+            Toast.Show("Inventory full");
+        _pickupBlocked = blocked;
 
         _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager, _falling, _leaves, _leafDecay);
         // Every blast this frame shoves the players and mobs in range and shakes the local camera by its

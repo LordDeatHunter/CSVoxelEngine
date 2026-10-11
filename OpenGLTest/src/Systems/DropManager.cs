@@ -160,6 +160,24 @@ public class DropManager
     }
 
     /// <summary>
+    /// Whether the last <see cref="Update(float, Vector3, ChunkManager, Func{byte, bool})"/> saw a
+    /// drop within pickup range that the pool refused (a full inventory). The HUD's "Inventory
+    /// full" warning fires on this turning true and stays silent while it stays true; a drop the
+    /// pool has room for again clears it.
+    /// </summary>
+    public bool PickupBlocked => _blockedCollectors.Contains(0);
+
+    // Collector indices with a drop in range they refused this update (see BlockedCollectors)
+    private readonly List<int> _blockedCollectors = [];
+
+    /// <summary>
+    /// The collector indices that had a drop within their own pickup range refused this update (a
+    /// full pool): the local player's index drives the HUD's "Inventory full" warning, so a goblin
+    /// refusing a stone at its feet never warns anyone. Empty when nothing was refused.
+    /// </summary>
+    public IReadOnlyList<int> BlockedCollectors => _blockedCollectors;
+
+    /// <summary>
     /// Advances the drops, collecting what reaches the player. A drop whose id
     /// <paramref name="canCollect"/> refuses is never attracted and stays on the ground,
     /// so a full inventory pool ignores pickups instead of sucking them up.
@@ -169,6 +187,7 @@ public class DropManager
     {
         _collected.Clear();
         _collectedBy.Clear();
+        _blockedCollectors.Clear();
         if (_drops.Count == 0) return;
 
         var target = playerPosition - Vector3.UnitY * CollectHeightOffset;
@@ -179,9 +198,12 @@ public class DropManager
         {
             var drop = _drops[i];
             var wanted = canCollect?.Invoke(drop.BlockId) ?? true;
-            var inRange = wanted && Vector3.DistanceSquared(drop.Position, target) <= rangeSquared;
+            var inRange = Vector3.DistanceSquared(drop.Position, target) <= rangeSquared;
+            // A drop within reach that the pool refuses is what the HUD's "Inventory full"
+            // warning reads; it is still not attracted, so the drop stays on the ground
+            if (!wanted && inRange && !_blockedCollectors.Contains(0)) _blockedCollectors.Add(0);
 
-            if (!drop.Update(deltaTime, target, inRange, chunks)) continue;
+            if (!drop.Update(deltaTime, target, wanted && inRange, chunks)) continue;
 
             // Belt and braces: a drop that latched before its pool filled still needs room
             if (!wanted && !(canCollect?.Invoke(drop.BlockId) ?? true)) continue;
@@ -204,6 +226,7 @@ public class DropManager
     {
         _collected.Clear();
         _collectedBy.Clear();
+        _blockedCollectors.Clear();
         if (_drops.Count == 0) return;
 
         var rangeSquared = PickupRange * PickupRange;
@@ -222,9 +245,16 @@ public class DropManager
             for (var c = 0; c < collectors.Count; c++)
             {
                 var collector = collectors[c];
-                if (!(collector.CanCollect?.Invoke(drop.BlockId) ?? true)) continue;
                 var aim = collector.Eye - lift;
                 var distanceSquared = Vector3.DistanceSquared(drop.Position, aim);
+                // A collector within reach that refuses the drop is a blocked pool (see
+                // BlockedCollectors), and is not a candidate to fly it in
+                if (!(collector.CanCollect?.Invoke(drop.BlockId) ?? true))
+                {
+                    if (distanceSquared <= rangeSquared && !_blockedCollectors.Contains(c))
+                        _blockedCollectors.Add(c);
+                    continue;
+                }
                 if (distanceSquared >= nearestSquared) continue;
                 nearest = c;
                 nearestSquared = distanceSquared;

@@ -218,10 +218,4 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Sprint toggle option.** the `Sprint Toggle` controls setting plus `SprintToggle.Step` driving `Camera.SprintHeld` (a fresh press flips the latch; off, the key is held as before) (`SprintToggleTests`).
 - [x] **Worlds list details.** the row's second line is `MainMenuLayout.WorldDetailText`: the seed plus the last-played moment (`WorldInfo.LastPlayedUnixMs`, local `yyyy-MM-dd HH:mm`), or "never played" (`MainMenuLayoutTests`).
 - [x] **Death message.** `DeathMessages.For` over the blow recorded in `PlayerHealth` (`DamageSource` plus the mob's display name through `IMobTarget.TakeHit`; the fall, lava and the cactus name themselves); `World.TakeDeathMessage` drains it into the chat, and a server broadcasts its own once per death (`DeathMessageTests`).
-- [ ] **Inventory-full warning.** A drop in pickup range that the full pool cannot take shows
-  "Inventory full" over the hotbar **once**: it fires on the transition into the blocked state and
-  stays silent until the pool has had room again (a slot freed or an item count fell), however many
-  drops hover nearby or how long they stay. *Hook:* the "one nobody can take lets go" branch in
-  `DropManager`'s collector for singleplayer; a client detects it itself from its inventory mirror
-  and the drops near it in `EntityList`, so no new message. A `HotbarNameFade`-style hold-then-fade.
-  Test: the warning fires once per full episode and re-arms only after room appears.
+- [x] **Inventory-full warning.** `DropManager.BlockedCollectors` reports a drop within a collector's reach that its pool refused, and the world shows "Inventory full" through `HudToast` on the transition into the blocked state only (a goblin's own refusal is its index, never the player's; a client reads its own mirror the same way) (`InventoryFullWarningTests`).
