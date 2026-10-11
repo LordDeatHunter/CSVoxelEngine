@@ -1287,6 +1287,8 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Above this altitude a forest column turns to bare rock, so a high crest reads as a rocky
     // mountain instead of another tree-covered hill (trees also stop at TreeMaxGroundHeight).
     public const float MountainRockHeight = 56f;
+    // Height at which a peak wears full snow whatever its climate (SnowGenerator.ColdWeightAt)
+    public const int MountainSnowFullHeight = 96;
     // No crests this close to the origin (faded in by the second radius), so the spawn view
     // stays a forest valley rather than a random summit.
     public const float MountainSpawnClearStart = 48f;

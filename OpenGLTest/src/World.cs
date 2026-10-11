@@ -4009,7 +4009,7 @@ public class World : IItemUseWorld
         return pile.Renderer switch
         {
             BlockRenderer.BranchPile => BranchPileGenerator.CountWithState(state, pile.StackMax),
-            BlockRenderer.SnowLayers => SnowShape.CountWithState(x, z, state, pile.StackMax),
+            BlockRenderer.SnowLayers => SnowShape.CountWithState(x, y, z, state, pile.StackMax),
             _ => PebbleGenerator.CountWithState(x, z, state, pile.StackMax),
         };
     }

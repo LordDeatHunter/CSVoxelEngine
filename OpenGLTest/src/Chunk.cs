@@ -1415,7 +1415,7 @@ public class Chunk : IDisposable
             // Layered snow renders as one box whose height is its stack depth; see EmitSnowLayers
             if (type.Renderer == BlockRenderer.SnowLayers)
             {
-                ChunkMesher.EmitSnowLayers(worldX0, worldZ0, vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
+                ChunkMesher.EmitSnowLayers(worldX0, chunkBaseY, worldZ0, vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
                     x, y, z, type, basePos);
                 continue;
             }

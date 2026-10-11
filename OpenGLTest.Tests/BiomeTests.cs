@@ -567,7 +567,7 @@ public sealed class BiomeTests
             hot[k] = TerrainGenerator.Classify(0f, TerrainGenerator.ColdWeight(x, z),
                 TerrainGenerator.WarmWeight(x, z), 1f) == Biome.Desert;
             if (hot[k] && InWindow(gx) && InWindow(gz)) hotInWindow++;
-            if (SnowGenerator.DepthAt(x, z) <= 0) continue;
+            if (SnowGenerator.DepthAt(x, z, 0) <= 0) continue;
             seed[k] = k;
             frontier.Add(k);
         }

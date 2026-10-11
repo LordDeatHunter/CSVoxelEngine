@@ -22,7 +22,7 @@ public sealed class SnowCanopyTests
         for (var x = -3000; x <= 3000 && !found; x += 23)
         for (var z = -3000; z <= 3000 && !found; z += 23)
         {
-            if (SnowGenerator.DepthAt(x, z) <= 0) continue;
+            if (SnowGenerator.DepthAt(x, z, 0) <= 0) continue;
             worldX = x;
             worldZ = z;
             found = true;
@@ -62,5 +62,26 @@ public sealed class SnowCanopyTests
         var otherX = (lx + 1) & Chunk.SizeMask;
         Assert.Equal(snow, blocks[Chunk.Idx(otherX, 11, lz)]);
         Assert.Equal(BlockType.Air, blocks[Chunk.Idx(otherX, 12, lz)]);
+    }
+
+    [Fact]
+    public void APeakAboveTheRockLineIsColdWhateverItsClimate()
+    {
+        // A warm column with no climate cold at all (the origin's forest is temperate)
+        var worldX = 0;
+        var worldZ = 0;
+        Assert.Equal(0f, TerrainGenerator.ColdWeight(worldX, worldZ));
+        var rockLine = (int)WorldGenerationConfig.MountainRockHeight;
+        Assert.Equal(0f, SnowGenerator.ColdWeightAt(worldX, worldZ, rockLine));
+
+        // Altitude takes over above the rock line: cold at once, full snow at the cap height
+        Assert.True(SnowGenerator.ColdWeightAt(worldX, worldZ, rockLine + 1) > 0f);
+        Assert.Equal(1f, SnowGenerator.ColdWeightAt(worldX, worldZ, WorldGenerationConfig.MountainSnowFullHeight), 3);
+        Assert.True(SnowGenerator.ColdWeightAt(worldX, worldZ, WorldGenerationConfig.MountainSnowFullHeight)
+                    > WorldGenerationConfig.SnowColdThreshold);
+
+        // And a bare snow cell on the cap draws its layers (the same function the LOD reads)
+        Assert.True(SnowGenerator.DepthAt(worldX, worldZ, WorldGenerationConfig.MountainSnowFullHeight) > 0,
+            "a snow-capped peak draws no snow");
     }
 }

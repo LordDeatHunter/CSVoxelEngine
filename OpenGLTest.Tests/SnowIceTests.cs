@@ -219,7 +219,7 @@ public sealed class SnowIceTests
             var wz = cz * Chunk.Size + z;
             if (TerrainGenerator.BiomeAt(wx, wz) != Biome.Frozen) continue;
             if (IceSpikeGenerator.TryGetSpike(wx, wz, out _, out _)) continue;
-            if (SnowGenerator.DepthAt(wx, wz) <= 0) continue;
+            if (SnowGenerator.DepthAt(wx, wz, 0) <= 0) continue;
 
             var column = ColumnCache.Get(cx, cz);
             var height = column.Heights[(x << Chunk.SizeShift) | z];
@@ -237,14 +237,14 @@ public sealed class SnowIceTests
     [Fact]
     public void SnowDepthIsZeroWhenWarmAndPositiveWhenCold()
     {
-        Assert.Equal(0, SnowGenerator.DepthAt(0, 0));
+        Assert.Equal(0, SnowGenerator.DepthAt(0, 0, 0));
         Assert.True(TryFindColumn(
             (x, z) => TerrainGenerator.ColdWeight(x, z) > 0.9f
                       && !TerrainGenerator.IsWaterColumn(x, z,
                           ColumnCache.GetHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
                               [((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)]),
             out var x2, out var z2));
-        Assert.True(SnowGenerator.DepthAt(x2, z2) > 0);
+        Assert.True(SnowGenerator.DepthAt(x2, z2, 0) > 0);
     }
 
     [Fact]
@@ -261,8 +261,8 @@ public sealed class SnowIceTests
         Assert.True(BlockType.IsSolidCell(stone, 0));
 
         // The hitbox rises with the stack.
-        var low = SnowShape.GetBoxes(8, 8, 1, snow.StackMax)[0].Max.Y;
-        var high = SnowShape.GetBoxes(8, 8, snow.StackMax, snow.StackMax)[0].Max.Y;
+        var low = SnowShape.GetBoxes(8, 40, 8, 1, snow.StackMax)[0].Max.Y;
+        var high = SnowShape.GetBoxes(8, 40, 8, snow.StackMax, snow.StackMax)[0].Max.Y;
         Assert.True(high > low);
         Assert.Equal(1f, high);
     }
@@ -271,9 +271,9 @@ public sealed class SnowIceTests
     public void SnowStackCountsPassThroughAndDeriveFromWorldgen()
     {
         var snow = BlockType.ById[Snow]!;
-        Assert.Equal(5, SnowShape.CountWithState(0, 0, 5, snow.StackMax));
-        Assert.Equal(SnowGenerator.DepthAt(0, 0) is 0 ? 1 : SnowGenerator.DepthAt(0, 0),
-            SnowShape.CountWithState(0, 0, 0, snow.StackMax));
+        Assert.Equal(5, SnowShape.CountWithState(0, 40, 0, 5, snow.StackMax));
+        Assert.Equal(SnowGenerator.DepthAt(0, 0, 0) is 0 ? 1 : SnowGenerator.DepthAt(0, 0, 0),
+            SnowShape.CountWithState(0, 40, 0, 0, snow.StackMax));
     }
 
     [Fact]

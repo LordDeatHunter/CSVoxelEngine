@@ -13,13 +13,13 @@ namespace silkgltriangle;
 /// </summary>
 public static class SnowShape
 {
-    /// <summary>Layers in the cell (x, z): an explicit state 1..<paramref name="max"/>, else the
-    /// column's natural depth, clamped into range.</summary>
-    public static int CountWithState(int x, int z, byte state, int max)
+    /// <summary>Layers in the cell (x, y, z): an explicit state 1..<paramref name="max"/>, else the
+    /// column's natural depth at that height, clamped into range.</summary>
+    public static int CountWithState(int x, int y, int z, byte state, int max)
     {
         var cap = max < 1 ? 1 : max;
         if (state >= 1 && state <= cap) return state;
-        return Math.Clamp(SnowGenerator.DepthAt(x, z), 1, cap);
+        return Math.Clamp(SnowGenerator.DepthAt(x, z, y), 1, cap);
     }
 
     /// <summary>Height of a stack in blocks: 1/<paramref name="max"/> for one layer up to 1.</summary>
@@ -28,10 +28,10 @@ public static class SnowShape
 
     /// <summary>Boxes covering the drawn layers: a full cube when the stack fills the cell, a
     /// floor-sitting slab of its height otherwise.</summary>
-    public static BlockHitbox[] GetBoxes(int x, int z, byte state, int max)
+    public static BlockHitbox[] GetBoxes(int x, int y, int z, byte state, int max)
     {
         if (max < 2) return [BlockHitbox.FullCube];
-        var height = Height(CountWithState(x, z, state, max), max);
+        var height = Height(CountWithState(x, y, z, state, max), max);
         return height >= 1f
             ? [BlockHitbox.FullCube]
             : [new BlockHitbox(Vector3.Zero, new Vector3(1f, height, 1f))];

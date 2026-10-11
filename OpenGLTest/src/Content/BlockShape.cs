@@ -21,7 +21,7 @@ public static class BlockShape
         if (type == null) return FullCube;
         if (BlockType.IsTreeWood(id)) return TreeWoodShape.GetBoxesAt(id, chunks, x, y, z);
         if (type.Renderer == BlockRenderer.SnowLayers)
-            return SnowShape.GetBoxes(x, z, chunks.GetStateGlobal(x, y, z), type.StackMax);
+            return SnowShape.GetBoxes(x, y, z, chunks.GetStateGlobal(x, y, z), type.StackMax);
         if (type.Renderer == BlockRenderer.Pane) return PaneShape.GetBoxesAt(chunks, x, y, z);
         if (type.RotatedHitboxes is { } rotated)
             return rotated[BlockType.ShapeIndex(chunks.GetStateGlobal(x, y, z), rotated.Length)];

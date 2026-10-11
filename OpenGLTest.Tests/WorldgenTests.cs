@@ -362,13 +362,13 @@ public sealed class WorldgenTests
         {
             var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
             var biome = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift).Biomes[local];
-            foundCold |= biome is Biome.Taiga or Biome.Frozen || SnowGenerator.DepthAt(x, z) > 0;
+            foundCold |= biome is Biome.Taiga or Biome.Frozen || SnowGenerator.DepthAt(x, z, 0) > 0;
             if (biome != Biome.Desert) continue;
             foundDesert = true;
 
             Assert.True(TerrainGenerator.ColdWeight(x, z) == 0f,
                 $"desert at ({x},{z}) is on the cold ramp (cold {TerrainGenerator.ColdWeight(x, z)})");
-            Assert.True(SnowGenerator.DepthAt(x, z) == 0, $"desert at ({x},{z}) lies under snow");
+            Assert.True(SnowGenerator.DepthAt(x, z, 0) == 0, $"desert at ({x},{z}) lies under snow");
         }
 
         Assert.True(foundDesert, "scan area holds no desert");

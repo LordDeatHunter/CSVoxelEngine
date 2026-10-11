@@ -894,14 +894,14 @@ internal static class ChunkMesher
     /// fraction of a block tall, so a full stack is a full cube. The bottom face is skipped unless
     /// the cell below cannot occlude, since a layer normally rests on ground that draws its own top.
     /// </summary>
-    internal static void EmitSnowLayers(int worldX0, int worldZ0, List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+    internal static void EmitSnowLayers(int worldX0, int worldY0, int worldZ0, List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
         int x, int y, int z, BlockType type, Vector3 basePos)
     {
         var worldX = worldX0 + x;
         var worldZ = worldZ0 + z;
         var maxCount = type.StackMax >= 2 ? type.StackMax : 16;
-        var count = SnowShape.CountWithState(worldX, worldZ, paddedState[pIdx], maxCount);
+        var count = SnowShape.CountWithState(worldX, worldY0 + y, worldZ, paddedState[pIdx], maxCount);
         var height = SnowShape.Height(count, maxCount);
 
         Span<FaceLight> lights = stackalloc FaceLight[6];

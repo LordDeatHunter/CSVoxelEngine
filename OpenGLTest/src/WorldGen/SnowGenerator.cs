@@ -27,13 +27,14 @@ public static class SnowGenerator
     /// <summary>
     /// Natural snow depth of the column (x, z) in layers: 0 when it is too warm for snow, otherwise
     /// 1..<see cref="WorldGenerationConfig.SnowMaxDepth"/>, deeper where the drift noise runs high.
-    /// This is the depth a bare (state 0) snow cell draws (see <see cref="SnowShape"/>).
+    /// This is the depth a bare (state 0) snow cell draws (see <see cref="SnowShape"/>), so a cell
+    /// on a mountain cap reads its own height.
     /// </summary>
-    public static int DepthAt(float x, float z)
+    public static int DepthAt(float x, float z, int height)
     {
         // SnowAndIceEnabled is a compile-time const, so an early return on it would read as
         // unreachable; a multiplier keeps the toggle a real expression (see BiomeWeights).
-        var cold = TerrainGenerator.ColdWeight(x, z)
+        var cold = ColdWeightAt(x, z, height)
                    * (WorldGenerationConfig.SnowAndIceEnabled ? 1f : 0f);
         if (cold <= WorldGenerationConfig.SnowColdThreshold) return 0;
 
@@ -43,6 +44,23 @@ public static class SnowGenerator
         var drift = 0.4f + 0.6f * (0.5f + 0.5f * DriftNoise.GetNoise(x, z));
         var depth = 1 + (int)(amount * drift * (WorldGenerationConfig.SnowMaxDepth - 1));
         return depth < 1 ? 1 : depth;
+    }
+
+    /// <summary>
+    /// The coldness the snow rules read at a column: the climate's own
+    /// <see cref="TerrainGenerator.ColdWeight"/>, raised by altitude so a peak above
+    /// <see cref="WorldGenerationConfig.MountainRockHeight"/> wears snow even in a warm biome —
+    /// full snow at <see cref="WorldGenerationConfig.MountainSnowFullHeight"/>. The near stamp,
+    /// the drawn depth and the far LOD all read this one function, so their lines agree.
+    /// </summary>
+    public static float ColdWeightAt(float x, float z, int height)
+    {
+        var cold = TerrainGenerator.ColdWeight(x, z);
+        if (height <= WorldGenerationConfig.MountainRockHeight) return cold;
+        var altitude = (height - WorldGenerationConfig.MountainRockHeight)
+                       / (float)(WorldGenerationConfig.MountainSnowFullHeight
+                                 - WorldGenerationConfig.MountainRockHeight);
+        return MathF.Max(cold, MathUtils.Clamp01(altitude));
     }
 
     /// <summary>
@@ -61,12 +79,11 @@ public static class SnowGenerator
         {
             var worldX = worldX0 + x;
             var worldZ = worldZ0 + z;
-            var cold = TerrainGenerator.ColdWeight(worldX, worldZ);
-            if (cold <= WorldGenerationConfig.SnowColdThreshold) continue;
-
             var local = VoxelCoords.ColumnIndex(x, z);
             var height = column.Heights[local];
             var level = column.WaterLevel[local];
+            var cold = ColdWeightAt(worldX, worldZ, height);
+            if (cold <= WorldGenerationConfig.SnowColdThreshold) continue;
             int surfaceLy;
             if (height < level)
             {
@@ -100,7 +117,8 @@ public static class SnowGenerator
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
         {
-            if (TerrainGenerator.ColdWeight(worldX0 + x, worldZ0 + z) <= WorldGenerationConfig.SnowColdThreshold)
+            var height = column.Heights[(x << Chunk.SizeShift) | z];
+            if (ColdWeightAt(worldX0 + x, worldZ0 + z, height) <= WorldGenerationConfig.SnowColdThreshold)
                 continue;
             for (var ly = Chunk.Size - 2; ly > 0; ly--)
             {

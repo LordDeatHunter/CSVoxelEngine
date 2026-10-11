@@ -766,7 +766,7 @@ public class LodRegion : IDisposable
                     rockTop[(i + 1) * heightGrid + (j + 1)] =
                         cellBiome == Biome.Forest && maxOwn >= WorldGenerationConfig.MountainRockHeight;
 
-                    var cold = TerrainGenerator.ColdWeight(centreX, centreZ);
+                    var cold = SnowGenerator.ColdWeightAt(centreX, centreZ, maxOwn);
                     snowTop[(i + 1) * heightGrid + (j + 1)] = cold > WorldGenerationConfig.SnowColdThreshold;
                     iceTop[(i + 1) * heightGrid + (j + 1)] = cold > WorldGenerationConfig.FreezeColdThreshold;
 
