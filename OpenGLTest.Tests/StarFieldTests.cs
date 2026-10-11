@@ -107,36 +107,6 @@ public sealed class StarFieldTests
     }
 
     [Fact]
-    public void StarSpaceTurnsWithTheSun()
-    {
-        // A sun orbiting about the Z axis, at any tilt, stays put in star space all the way round,
-        // so every star keeps its place relative to it and sets with it; a star does the same.
-        foreach (var tilt in new[] { 0f, 0.35f, -0.6f })
-        {
-            var pinned = StarSpaceOfSunAt(0f, tilt);
-            for (var a = -MathF.PI; a < 3f * MathF.PI; a += 0.137f)
-            {
-                var inStarSpace = StarSpaceOfSunAt(a, tilt);
-                Assert.True(Vector3.Distance(pinned, inStarSpace) < 1e-4f, $"the sun drifts in star space at angle {a}");
-            }
-        }
-
-        // and a star turned along with the sun keeps its star-space place too
-        var star = Vector3.Normalize(new Vector3(0.2f, 0.7f, -0.4f));
-        var sunAt = Vector3.Normalize(new Vector3(1f, 0f, 0.35f));
-        var turned = Vector3.Transform(star, Matrix4x4.CreateRotationZ(1.1f));
-        var sunTurned = Vector3.Transform(sunAt, Matrix4x4.CreateRotationZ(1.1f));
-        Assert.True(Vector3.Distance(StarField.ToStarSpace(star, StarField.SpinOf(sunAt)),
-            StarField.ToStarSpace(turned, StarField.SpinOf(sunTurned))) < 1e-4f);
-    }
-
-    private static Vector3 StarSpaceOfSunAt(float angle, float tilt)
-    {
-        var sun = Vector3.Normalize(new Vector3(MathF.Cos(angle), MathF.Sin(angle), tilt));
-        return StarField.ToStarSpace(sun, StarField.SpinOf(sun));
-    }
-
-    [Fact]
     public void ATwinkleOnlyEverDimsAStarByItsDepth()
     {
         var depth = WorldGenerationConfig.StarTwinkleDepth;

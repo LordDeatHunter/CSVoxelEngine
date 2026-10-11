@@ -302,10 +302,10 @@ space too (see the cloud layer above); particle and healthbar fogs are still lin
 `SkySample`, so the fog and `SkySample`'s three twins never see it. Stars live on a grid over the
 sphere of directions (cube face, equi-angular warp, `StarCellsPerFace`² cells, each cell's chance
 scaled by its solid angle), one star per cell kept `StarField.CellMargin` clear of the edges, drawn
-as a pixel-sized gaussian (`fwidth` of the view ray), so they never swim as the view turns. Each
+as a pixel-sized gaussian (`fwidth` of the view ray), so they never swim as the view turns and they
+stay put in the sky. Each
 star twinkles smoothly on its own rate and phase hashed from its cell (`StarField.Twinkle`, the
-`uStarTime` clock wrapped hourly). Star space
-turns with the sun (`StarField.SpinOf`, the sun direction's own angle about Z), visibility fades over dusk
+`uStarTime` clock wrapped hourly). Visibility fades over dusk
 and dawn by the sun's elevation (`StarField.Visibility`), out into the horizon haze and around the
 sun. Clouds hide them: the dome samples the cloud-shadow map (unit 8) cell by cell along each view
 ray (`CloudCoverAlongRay`), since the drawn clouds alone cover at their opacity. The mirror pass

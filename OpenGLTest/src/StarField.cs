@@ -13,9 +13,8 @@ namespace silkgltriangle;
 /// at the one cell a pixel falls in, never clips a star's soft point at a cell border. The warp
 /// leaves a cell at a face edge a little smaller in solid angle than one at the face centre, so
 /// <see cref="Probability"/> scales each cell's chance by its relative solid angle and the field
-/// is equally dense in every direction (no cube-shaped clumping at the face corners).
-/// Star space turns with the sun (see <see cref="SpinOf"/> and <see cref="ToStarSpace"/>), so the
-/// stars set with it.
+/// is equally dense in every direction (no cube-shaped clumping at the face corners). The stars
+/// stay put in the sky; only <see cref="Visibility"/> moves.
 /// </summary>
 public static class StarField
 {
@@ -37,26 +36,6 @@ public static class StarField
     public static float Visibility(float sunElevation) =>
         1f - MathUtils.SmoothStep(WorldGenerationConfig.StarsFullBelowSunElevation,
             WorldGenerationConfig.StarsGoneAboveSunElevation, sunElevation);
-
-    /// <summary>
-    /// The sky's turn, in radians, for a sun in direction <paramref name="sunDir"/>: the sun
-    /// travels along normalize(cos a, sin a, 0.35) about the Z axis (RenderManager.SetLighting), so
-    /// its angle about Z is the orbit angle a, read from the direction itself so the stars can never
-    /// drift from the sun whatever clock moves it.
-    /// </summary>
-    public static float SpinOf(Vector3 sunDir) => MathF.Atan2(sunDir.Y, sunDir.X);
-
-    /// <summary>
-    /// A world direction in star space, the frame turning with the sun: rotating by
-    /// -<paramref name="spinAngle"/> (<see cref="SpinOf"/>) about Z pins the sun, and with it every
-    /// star, in place. Twin of the <c>uStarSpin</c> rotation in sky-fragment.glsl.
-    /// </summary>
-    public static Vector3 ToStarSpace(Vector3 dir, float spinAngle)
-    {
-        var c = MathF.Cos(spinAngle);
-        var s = MathF.Sin(spinAngle);
-        return new Vector3(c * dir.X + s * dir.Y, -s * dir.X + c * dir.Y, dir.Z);
-    }
 
     /// <summary>
     /// The cube face (0..5: +X, -X, +Y, -Y, +Z, -Z) a direction falls on and its face coordinates,

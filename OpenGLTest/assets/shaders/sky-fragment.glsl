@@ -19,11 +19,10 @@ uniform vec3 uSunDir;
 uniform vec3 uSkyTint;        // what the dome fades toward in lava
 uniform float uSkyTintAmount;
 
-// Stars (StarField is the C# twin). Per frame: how visible they are (0 by day), the sky's turn
-// with the sun (cos, sin), and the cos of the outer and inner radius of the starless disc
-// around the sun. The rest is WorldGenerationConfig tuning, set once by SkyRenderer.
+// Stars (StarField is the C# twin). Per frame: how visible they are (0 by day) and the cos of
+// the outer and inner radius of the starless disc around the sun. The rest is
+// WorldGenerationConfig tuning, set once by SkyRenderer.
 uniform float uStarVisibility;
-uniform vec2 uStarSpin;
 uniform vec2 uStarSunMask;
 uniform float uStarCells;
 uniform float uStarDensity;
@@ -251,10 +250,7 @@ void main()
                    * (1.0 - smoothstep(uStarSunMask.x, uStarSunMask.y, dot(dir, uSunDir))) // sun disc
                    * (1.0 - uMoonVisibility * smoothstep(uMoonMask.x, uMoonMask.y, dot(dir, -uSunDir))); // moon disc
         if (fade > 0.0) {
-            // Star space turns with the sun (StarField.ToStarSpace), so the stars set with it
-            vec3 sd = vec3(uStarSpin.x * dir.x + uStarSpin.y * dir.y,
-                           -uStarSpin.y * dir.x + uStarSpin.x * dir.y, dir.z);
-            vec3 star = Stars(sd, px);
+            vec3 star = Stars(dir, px);
             // Most pixels hold no star, so the cloud test (up to three map reads) runs only
             // where one actually shines
             if (dot(star, star) > 1e-10)

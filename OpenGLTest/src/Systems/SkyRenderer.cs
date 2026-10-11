@@ -103,7 +103,6 @@ public sealed class SkyRenderer : IDisposable
         _shader.SetUniform("uSkyTintAmount", tintAmount);
 
         _shader.SetUniform("uStarVisibility", frame.StarVisibility);
-        _shader.SetUniform("uStarSpin", new Vector2(MathF.Cos(frame.StarSpin), MathF.Sin(frame.StarSpin)));
         _shader.SetUniform("uStarTime", frame.StarTime);
         // No star inside the sun's glow, feathered back in over half the radius again; the
         // glow follows the player's sun-size setting, so the mask does too.

@@ -73,13 +73,9 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Water edge foam.** One water-fragment term over thin view-ray depth, top faces only (`water-foam.json`).
 - [x] **Stars.** Dome-only star field, turned with the sun and hidden by clouds (`night-sky.json`).
   - [x] *Twinkle:* per-star rate and phase hashed from its cell.
-- [ ] **Stars hold still.** The stars sweep around the sky once a day today (`StarField.SpinOf` /
-  `ToStarSpace`, `uStarSpin`); they should stay put and only fade in over dusk and out over
-  dawn. *Hook:* delete the spin: `StarField` loses `SpinOf`/`ToStarSpace`, `sky-fragment.glsl`
-  feeds the view ray straight to `Stars`, and `SkyDomeFrame.StarSpin` and its `SkyRenderer`
-  uniform go with them, leaving `StarField.Visibility` as the only clock. Update `StarFieldTests`
-  (the pinned-star test goes), the shader-sync table's stars row and the AGENTS.md stars
-  paragraph. `night-sky.json` is the check.
+- [x] **Stars hold still.** The spin is gone (`StarField.SpinOf`/`ToStarSpace`, `uStarSpin`,
+  `SkyDomeFrame.StarSpin` deleted; the shader feeds the view ray straight to `Stars`), leaving
+  `StarField.Visibility` as the only clock (`StarFieldTests`).
 - [x] **Sun lens glare.** `SunGlare.Intensity` from alignment, sun height and cloud cover (`night-sky.json`).
 - [x] **Snow sparkle.** Hashed per-texel glints on the snow tile; only shows with a low sun, since noon snow clips to white (`snow-sparkle.json`, `VOXEL_TIME=405`).
 

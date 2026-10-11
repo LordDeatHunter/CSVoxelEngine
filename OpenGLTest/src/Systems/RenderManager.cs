@@ -1155,9 +1155,9 @@ public class RenderManager : IDisposable
             Horizon = ColorSpace.SrgbToLinear(_sky.Horizon),
             Glow = ColorSpace.SrgbToLinear(_sky.Glow),
         };
-        // The stars turn with the sun's orbit and twinkle on the lighting clock, wrapped hourly so
-        // the float keeps its precision; their cloud cover follows the drawn clouds' drift
-        _skyFrame = new SkyDomeFrame(StarField.Visibility(elevation), StarField.SpinOf(_skySunDir), (float)(_timeD % 3600.0), _cameraPos,
+        // The stars twinkle on the lighting clock, wrapped hourly so the float keeps its
+        // precision; their cloud cover follows the drawn clouds' drift
+        _skyFrame = new SkyDomeFrame(StarField.Visibility(elevation), (float)(_timeD % 3600.0), _cameraPos,
             CloudCopies.Drift(_timeD, WorldGenerationConfig.CloudFieldSize), Vector3.Zero);
         // The flat sky/fog colour is the dome's no-glow horizon sample
         _skyColor = _sky.HazedHorizon;
