@@ -54,6 +54,24 @@
     { "op": "wait", "seconds": 0.12 },
     { "op": "screenshot", "name": "despawn-fading" },
     { "op": "wait", "seconds": 0.6 },
-    { "op": "screenshot", "name": "despawn-gone" }
+    { "op": "screenshot", "name": "despawn-gone" },
+
+    // LEDGE CAUTION (LedgeProbe): the forest plateau east of the slime-sizes clearing (top y 8 out to
+    // x -30 at z 66) drops into a ravine eight blocks deep. A size-2 slime hops east at the camera
+    // hovering level with it across the ravine, and sits at the edge rather than hop into it
+    // ("ledge-stop"); once the camera drops into the ravine the target is below, so the slime hops
+    // down after it ("ledge-follow-a" catches it mid-hop over the drop; the ravine floor holds water).
+    { "op": "damage", "amount": 100 },
+    { "op": "teleport", "pos": [-21.5, 13.0, 66.5], "yaw": 180, "pitch": -12 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "spawn", "entity": "slime", "pos": [-38.5, 9.0, 66.5], "size": 2 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "ledge-stop" },
+    // Down to just over the ravine's east lip (eye 7, feet more than a ledge under the slime's)
+    { "op": "teleport", "pos": [-21.5, 7.0, 66.5], "yaw": 180, "pitch": -16 },
+    { "op": "wait", "seconds": 2.0 },
+    { "op": "screenshot", "name": "ledge-follow-a" },
+    { "op": "wait", "seconds": 2.0 },
+    { "op": "screenshot", "name": "ledge-follow-b" }
   ]
 }

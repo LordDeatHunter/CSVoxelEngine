@@ -1523,6 +1523,13 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // (0..15) or more, so torches and lamps keep a base clear of new mobs.
     public const int MobSpawnBlockLightLimit = 8;
 
+    // --- Ledge caution (LedgeProbe, Mob.IsLedgeAhead) ---
+    // A mob will not walk (a goblin's next step, MobLedgeProbeBlocks past its body) or hop (a slime's
+    // landing spot) onto ground more than MobLedgeMaxDropBlocks below its feet unless its target
+    // stands lower than that; with MobSafeFallBlocks it pairs so a cautious mob never takes fall damage.
+    public const float MobLedgeMaxDropBlocks = 3f;
+    public const float MobLedgeProbeBlocks = 0.5f;
+
     // --- Slimes (SlimeManager) ---
     // Forest mobs that hop at the player. Natural spawns appear on dry forest surface in a ring
     // around the player and are culled when they stray too far. Damage only lands while a slime

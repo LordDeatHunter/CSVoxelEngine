@@ -205,6 +205,15 @@ public abstract class Mob
         targets.Count > 0
         && MobInterest.ShouldIdleDespawn(_interest.IdleSeconds, MobTargets.MinHorizontalDistanceSquared(targets, Position));
 
+    /// <summary>
+    /// Ledge caution (<see cref="LedgeProbe"/>): whether moving along the horizontal
+    /// <paramref name="direction"/> to <paramref name="distance"/> blocks from the body centre would step
+    /// off a drop of more than <see cref="WorldGenerationConfig.MobLedgeMaxDropBlocks"/>, with
+    /// <paramref name="targetEye"/> (the chased target's eye, or null) not standing below it.
+    /// </summary>
+    public bool IsLedgeAhead(Vector3 direction, float distance, ChunkManager chunks, Vector3? targetEye) =>
+        LedgeProbe.IsLedgeAhead(chunks, Position, Position.Y - BodyHalfHeight, direction, distance, targetEye);
+
     private float _lavaTimer;
 
     /// <summary>

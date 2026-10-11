@@ -646,6 +646,7 @@ OpenGLTest/
     MobLoot.cs                 # GL-free loot toss: the up-and-out launch a killed mob's drops get
     MobInterest.cs             # GL-free per-mob interest: sight checks, losing a hidden target, idle
                                #   time, the idle despawn gate and wander goals
+    LedgeProbe.cs              # GL-free ledge caution: the drop to the first ground ahead, safe-step rule
     SlimeSize.cs               # GL-free per-size slime stats: body scale, health, contact damage,
                                #   loot rolls, each 1 + (size - 1) * its config step; the spawn size roll
     DayCycle.cs                # GL-free sun direction, dayness and night factor of the lighting clock
@@ -2530,7 +2531,14 @@ play at all it stands still as before. Idle for `MobIdleDespawnSeconds` and fart
 column whose standing cell holds `MobSpawnBlockLightLimit` or more block light
 (`MobSpawner.IsLitByBlocks`, read through `EntityLight.Sample` from the light each chunk publishes
 with its mesh; a headless server publishes it too, and a cell without a snapshot reads as unlit), so
-torches and lamps keep a base clear of new mobs (`TorchSafeSpawnTests`).
+torches and lamps keep a base clear of new mobs (`TorchSafeSpawnTests`). **Ledge caution**: a mob
+will not step (a goblin's next step, `MobLedgeProbeBlocks` past its body, zeroing its move in
+`Goblin.Update`) or hop (where a slime's flat-ground hop would land, sitting that hop out) onto ground
+more than `MobLedgeMaxDropBlocks` under its feet unless its target stands lower than that
+(`Mob.IsLedgeAhead` over `LedgeProbe`, which reads the live cells rather than the generated heightmap
+`World.TryGroundHeight` returns, so caves and dug pits count; an unloaded cell or lava below is a
+bottomless drop and water a soft landing), so a cautious mob never takes the fall damage above
+(`LedgeCautionTests`).
 
 The first entity is the **slime** (`Slime` + `Systems/SlimeManager.cs`), owned by `World`. It hops
 toward the player, damages on contact only while airborne (a slime merely bobbing in water is

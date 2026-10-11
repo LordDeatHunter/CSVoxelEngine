@@ -310,6 +310,11 @@ public sealed class Goblin : Mob
             }
         }
 
+        // Ledge caution: never step off a drop the fall would punish unless the target is down there
+        if (move != Vector3.Zero && IsGrounded
+            && IsLedgeAhead(move, HalfExtent + WorldGenerationConfig.MobLedgeProbeBlocks, chunks, player?.Eye))
+            move = Vector3.Zero;
+
         // Walking: ease the horizontal velocity toward the chosen move (or friction toward a
         // stop), on the ground at full speed and afloat at a paddle.
         if (IsGrounded || _inWater)

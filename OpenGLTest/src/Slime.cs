@@ -255,8 +255,21 @@ public sealed class Slime : Mob
 
         _hopTimer = 0f;
         _nextHop = HopIntervalSeconds + (Random.Shared.NextSingle() - 0.5f) * 2f * HopIntervalJitter;
+        // Ledge caution: sit this hop out when it would land off a drop the target is not below
+        if (HopLandsOffALedge(target, chunks)) return;
         _windup = _windupSeconds;
         _windupTarget = target;
+    }
+
+    // Whether a hop toward the target (an eye, or a wander goal) would come down past a ledge: the
+    // drop is judged where a hop on flat ground lands, its reach being 2 vx vy / g.
+    private bool HopLandsOffALedge(Vector3 target, ChunkManager chunks)
+    {
+        var direction = new Vector3(target.X - Position.X, 0f, target.Z - Position.Z);
+        if (direction.LengthSquared() < 1e-6f) return false;
+        var hop = HopVelocity(Vector3.Normalize(direction), _inWater, Size);
+        var reach = 2f * MathF.Sqrt(hop.X * hop.X + hop.Z * hop.Z) * hop.Y / Gravity;
+        return IsLedgeAhead(direction, reach, chunks, target);
     }
 
     private void UpdateSquash(float deltaTime, bool wasGrounded, float fallSpeed)
