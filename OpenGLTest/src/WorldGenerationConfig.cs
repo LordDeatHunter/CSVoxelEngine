@@ -2233,6 +2233,32 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Bowl depth per block inside the rim: the centre is radius * this deep
     public const float MeteorBowlSlope = 0.6f;
 
+    // --- Hot springs (HotSpringGenerator): a small pond in cold biomes that never freezes ---
+    public const bool HotSpringsEnabled = true;
+    public const int SpringCellShift = 7;
+    public const float SpringChance = 0.3f;
+    public const float SpringMinCold = 0.5f;
+    public const int SpringRadius = 3;
+    // Blocks under the spring's surface its flat floor is carved to
+    public const int SpringDepth = 2;
+    // Steam: puffs a second over every vent in range, the reach it gathers within and the cap
+    public const float SpringSteamPerSecond = 0.6f;
+    public const float SpringSteamRadius = 32f;
+    public const int SpringSteamMaxVents = 16;
+    public const int SpringSteamMaxPuffsPerFrame = 4;
+    public const int SpringSteamCount = 2;
+    public const float SpringSteamSpread = 0.35f;
+
+    // --- Sea stacks (SeaStackGenerator): rock pillars in the shallow ocean ---
+    public const bool SeaStacksEnabled = true;
+    public const int SeaStackCellShift = 6;
+    public const float SeaStackChance = 0.25f;
+    public const int SeaStackRadius = 2;
+    // How shallow the ocean must be for a stack, and how high its top rises above the sea
+    public const int SeaStackShallowDepth = 6;
+    public const int SeaStackMinHeight = 3;
+    public const int SeaStackMaxHeight = 6;
+
     // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
     // first notices a player (the same moment its first-throw delay starts) ---
     public const float GoblinNoticePipSeconds = 0.9f;

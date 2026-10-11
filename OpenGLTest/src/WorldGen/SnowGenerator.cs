@@ -87,6 +87,9 @@ public static class SnowGenerator
             int surfaceLy;
             if (height < level)
             {
+                // A hot spring never freezes: its site holds its own warm surface
+                if (WorldGenerationConfig.HotSpringsEnabled && HotSpringGenerator.IsSite(worldX, worldZ))
+                    continue;
                 // Open water only freezes below the freeze line; a merely cold lake keeps its surface.
                 if (cold <= WorldGenerationConfig.FreezeColdThreshold) continue;
                 var seaLy = level - worldY0;

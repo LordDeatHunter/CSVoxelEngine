@@ -204,6 +204,9 @@ public class World : IItemUseWorld
     private float _useChargeSeconds;
     private byte _useItemId;
     private float _contactTimer;
+    private readonly List<Vector3> _springVents = [];
+    private readonly List<(float DistanceSquared, Chunk Chunk)> _springVentChunks = [];
+    private float _springSteamDebt;
     public Camera Camera { get; }
 
     /// <summary>The blocky player body: walk-swung limbs, jabbing right arm.</summary>
@@ -1793,6 +1796,9 @@ public class World : IItemUseWorld
         _fire.Update((float)deltaTime, _fireCells, Camera.RenderEye, wind: wind);
         GatherLavaVents(Camera.RenderEye);
         _lavaFire.Update((float)deltaTime, _lavaVents, Camera.RenderEye, wind: wind);
+        // Hot springs steam while the eye is in range; cosmetic, so never on a server
+        if (!_serverMode)
+            UpdateSpringSteam((float)deltaTime, Camera.RenderEye);
         UpdateTorchFlames((float)deltaTime, wind);
         UpdateBubbles((float)deltaTime);
 
@@ -2377,6 +2383,62 @@ public class World : IItemUseWorld
                 _lavaVents.Add(cell);
                 if (_lavaVents.Count >= WorldGenerationConfig.LavaVentMaxEmitters) return;
             }
+        }
+    }
+
+    /// <summary>
+    /// The hot-spring steam: gathers every spring water top (<see cref="Chunk.SpringVents"/>) within
+    /// <see cref="WorldGenerationConfig.SpringSteamRadius"/> of the eye, nearest chunks first and at
+    /// most <see cref="WorldGenerationConfig.SpringSteamMaxVents"/> of them, and puffs a pale
+    /// <see cref="FireParticleKind.Steam"/> wisp over each at
+    /// <see cref="WorldGenerationConfig.SpringSteamPerSecond"/> per vent (the campfire instance's
+    /// <see cref="FireParticleSystem.Puff"/>, like the hardening-lava steam). Cosmetic: a headless
+    /// server never runs it.
+    /// </summary>
+    private void UpdateSpringSteam(float deltaTime, Vector3 eye)
+    {
+        _springVents.Clear();
+        _springVentChunks.Clear();
+        var radius = WorldGenerationConfig.SpringSteamRadius;
+        var chunkReach = radius + Chunk.Size;
+        var half = Chunk.Size * 0.5f;
+        foreach (var chunk in _chunkManager.Renderable)
+        {
+            if (chunk.SpringVents is null) continue;
+            var d2 = Vector3.DistanceSquared(chunk.Position * Chunk.Size + new Vector3(half), eye);
+            if (d2 > chunkReach * chunkReach) continue;
+            _springVentChunks.Add((d2, chunk));
+        }
+        if (_springVentChunks.Count == 0)
+        {
+            _springSteamDebt = 0f;
+            return;
+        }
+
+        _springVentChunks.Sort(NearestVentChunkFirst);
+        foreach (var (_, chunk) in _springVentChunks)
+        {
+            var origin = chunk.Position * Chunk.Size;
+            foreach (var idx in chunk.SpringVents!)
+            {
+                var cell = origin + Chunk.LocalOfIdx(idx);
+                if (Vector3.DistanceSquared(cell, eye) > radius * radius) continue;
+                _springVents.Add(cell);
+                if (_springVents.Count >= WorldGenerationConfig.SpringSteamMaxVents) break;
+            }
+            if (_springVents.Count >= WorldGenerationConfig.SpringSteamMaxVents) break;
+        }
+
+        _springSteamDebt += deltaTime * WorldGenerationConfig.SpringSteamPerSecond * _springVents.Count;
+        var puffs = (int)_springSteamDebt;
+        if (puffs <= 0) return;
+        _springSteamDebt -= puffs;
+        puffs = Math.Min(puffs, WorldGenerationConfig.SpringSteamMaxPuffsPerFrame);
+        for (var i = 0; i < puffs; i++)
+        {
+            var vent = _springVents[Random.Shared.Next(_springVents.Count)];
+            _fire.Puff(vent + new Vector3(0f, 1f, 0f), WorldGenerationConfig.SpringSteamCount,
+                WorldGenerationConfig.SpringSteamSpread, FireParticleKind.Steam);
         }
     }
 

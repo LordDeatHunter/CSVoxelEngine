@@ -617,7 +617,7 @@ public static class TerrainGenerator
     /// <see cref="Compute"/> carves into. <paramref name="forestHeight"/> is the pre-blend forest
     /// profile, which the river carve reads to dry out as the land climbs.
     /// </summary>
-    private static float LandHeight(float worldX, float worldZ, out Biome biome,
+    internal static float LandHeight(float worldX, float worldZ, out Biome biome,
         out float oceanWeight, out float desertWeight, out float forestHeight)
     {
         // Forest floor: a broad swell plus a hill mass (a positive-only field gated by the
@@ -740,7 +740,25 @@ public static class TerrainGenerator
 
                 waterLevel[i] = WaterLevelFor(biome, gate, riverWeight, lakeWeight, lakeSurface);
 
+                // A hot spring: a cold, hashed site carves its small pond and holds its own warm
+                // surface, which SnowGenerator never freezes and whose vents steam
+                if (WorldGenerationConfig.HotSpringsEnabled
+                    && HotSpringGenerator.TryGetSite((int)worldX, (int)worldZ, out var springLevel)
+                    && springLevel < heightF)
+                {
+                    heightF = MathF.Min(heightF, springLevel - WorldGenerationConfig.SpringDepth);
+                    waterLevel[i] = springLevel;
+                }
+
                 var height = (int)heightF;
+
+                // A sea stack: a hashed site in the shallow ocean raises the column into a tapered
+                // rock pillar, part of the heightmap so the far LOD reads it too
+                if (WorldGenerationConfig.SeaStacksEnabled)
+                {
+                    var stackTop = SeaStackGenerator.TopAt((int)worldX, (int)worldZ, height, biome);
+                    if (stackTop > height) height = stackTop;
+                }
 
                 // Sampled once and reused: the same value cuts the ravine into the heightmap and
                 // decides how much soil is left on the column.

@@ -1351,6 +1351,7 @@ public class Chunk : IDisposable
 
         // Exposed hot-fluid cells (lava open to the air), allocated only when one turns up
         List<ushort>? vents = null;
+        List<ushort>? springVents = null;
         // Chunk-local flame points of the blocks that burn one (torches), likewise lazy
         List<Vector3>? flames = null;
 
@@ -1455,6 +1456,13 @@ public class Chunk : IDisposable
                 hasWater = true;
                 if (IsHotFluidVent(padded[pIdx], padded[pIdx + FaceNeighborDelta[4]]))
                     (vents ??= []).Add((ushort)Idx(x, y, z));
+                // A water top inside a hot spring steams (its site is the same pure hash the
+                // carve read, so the vents match the pond)
+                else if (WorldGenerationConfig.HotSpringsEnabled
+                         && padded[pIdx] == TerrainGenerator.SeaBlock
+                         && padded[pIdx + FaceNeighborDelta[4]] == BlockType.Air
+                         && HotSpringGenerator.IsSite(worldX0 + x, worldZ0 + z))
+                    (springVents ??= []).Add((ushort)Idx(x, y, z));
                 continue;
             }
 
@@ -1671,7 +1679,7 @@ public class Chunk : IDisposable
         }
 
         return new ChunkMeshData(vertices, indices, tVertices, tIndices, hasWater)
-            { HotFluidVents = vents?.ToArray(), FlamePoints = flames?.ToArray() };
+            { HotFluidVents = vents?.ToArray(), SpringVents = springVents?.ToArray(), FlamePoints = flames?.ToArray() };
     }
 
     /// <summary>Corners of one axis-aligned face of the [min, max] box (cell-local).</summary>
@@ -1735,6 +1743,11 @@ public class Chunk : IDisposable
     /// </summary>
     public ushort[]? HotFluidVents { get; private set; }
 
+    /// <summary>Local <see cref="Idx"/> indices of the chunk's hot-spring water tops (their vents
+    /// steam), or null when there are none. A headless server never sets it, since it draws no
+    /// steam.</summary>
+    public ushort[]? SpringVents { get; private set; }
+
     /// <summary>
     /// Chunk-local points of the flames of the last applied mesh (torch heads, see
     /// <see cref="BlockType.FlamePoints"/>), or null when there are none. Main thread only. A headless
@@ -1774,6 +1787,7 @@ public class Chunk : IDisposable
 
         HasWaterMesh = meshData.HasWater && meshData.TranslucentVertices.Count > 0;
         HotFluidVents = meshData.HotFluidVents;
+        SpringVents = meshData.SpringVents;
         FlamePoints = meshData.FlamePoints;
     }
 
@@ -1898,6 +1912,10 @@ public record ChunkMeshData(List<Vertex> Vertices, List<ushort> Indices,
     /// (<see cref="Chunk.IsHotFluidVent"/>), or null when there are none.
     /// </summary>
     public ushort[]? HotFluidVents { get; init; }
+
+    /// <summary>Local <see cref="Chunk.Idx"/> indices of the chunk's hot-spring water tops (their
+    /// vents steam), or null when there are none.</summary>
+    public ushort[]? SpringVents { get; init; }
 
     /// <summary>
     /// Chunk-local points of the flames of the blocks that burn one (<see cref="BlockType.FlamePoints"/>,

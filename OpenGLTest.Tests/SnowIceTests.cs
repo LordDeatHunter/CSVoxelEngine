@@ -150,7 +150,7 @@ public sealed class SnowIceTests
     }
 
     [Fact]
-    public void FrozenPlainsGrowNoTrees()
+    public void FrozenPlainsGrowOnlyLeaflessSnags()
     {
         for (var cx = -48; cx <= 48; cx++)
         for (var cz = -48; cz <= 48; cz++)
@@ -163,7 +163,10 @@ public sealed class SnowIceTests
             {
                 if (TerrainGenerator.BiomeAt(cx * Chunk.Size + x, cz * Chunk.Size + z) != Biome.Frozen)
                     continue;
-                Assert.False(TreeGenerator.TryGetTree(cx * Chunk.Size + x, cz * Chunk.Size + z, out _, out _));
+                // Only the dead tree's bare trunk stands here: no species with leaves may root
+                if (!TreeGenerator.TryGetTree(cx * Chunk.Size + x, cz * Chunk.Size + z, out var species, out _))
+                    continue;
+                Assert.False(species.HasLeaves, $"{species.Name} roots in the frozen plains");
             }
         }
     }
