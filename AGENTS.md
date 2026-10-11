@@ -358,6 +358,18 @@ lights up while leaves deep in its own shadow stay dark; the shadow pass is unto
 ItemDebugger) switches it off. `visual-examples/leaf-backlight.json` (`VOXEL_TIME=1100`, a morning
 sun behind an oak crown).
 
+**Grass wind shimmer.** Soft bright bands lie across the wind on the grass tops and roll downwind
+with the leaf sway's gusts: on a biome-tinted up face (bit 4, face 4; never a swaying face nor the
+far LOD's crowns) the world fragment reads a crest pattern along `uWind` (normalised) at the
+position less `uWindOffset` — the very offset the sway samples its gust wave at, which the fragment
+stage now declares too — weights it by the sway's own gust (`0.6 + 0.4 sin(...)`) and brightens the
+grass by `GrassShimmerStrength` of its own light, so the bands darken with shade and night. Bands
+are `GrassShimmerWavelengthBlocks` apart and fade out between `GrassShimmerFadeNearBlocks` and
+`GrassShimmerFadeFarBlocks`. `GrassShimmer` is the GL-free twin (its gust is `Wind.Gust`;
+`GrassShimmerTests`: banded, carried exactly by the gust offset, faded, grass tops only);
+`uGrassShimmer` 0 switches it off. `visual-examples/grass-shimmer.json` (`VOXEL_TIME=147`, three
+shots of one meadow 0.7 s apart).
+
 Shaders (`assets/shaders/**/*.glsl`), textures (`assets/textures/**/*.png`), fonts (`assets/fonts/**/*.ttf`) and all content JSON (`assets/**/*.json` — blocks, items, loot tables, models) are copied to the output directory via `CopyToOutputDirectory` rules in the csproj — **new asset types/extensions need a matching `<None Update>` entry** or they won't be found at runtime. The JSON rule is a wildcard over the whole `assets` tree, so adding a block, item, loot table or model needs no csproj edit.
 
 Assets are opened by **relative** path (`FileUtils.ReadFile("assets/shaders/...")`, `TextureAtlas.Build(gl, "assets/textures/blocks")` in `RenderManager.LoadResources`), so the app must be launched with a working directory that contains `assets/` — either the build output directory or `OpenGLTest/`. `dotnet run --project OpenGLTest/silkgltriangle.csproj` satisfies this (it runs from the project folder); launching the built executable from an arbitrary directory does not.
@@ -629,6 +641,7 @@ OpenGLTest/
     SelectionOutlineMesh.cs    # GL-free selection outline: the 12 box edges as thin beams (no glLineWidth)
     SelectionPulse.cs          # GL-free twin of the outline's breathing opacity (steady while mining)
     LeafBacklight.cs           # GL-free twin of the leaf backlight: lobe around the sun, sun and light-through gates
+    GrassShimmer.cs            # GL-free twin of the grass wind shimmer: gust-carried bands, distance fade, the face gate
     ChunkGenerationWorker.cs   # background threads creating chunks around every streaming focus (one
                                #   ChunkScanFrontier per focus, served round-robin)
     Camera.cs                  # FPS camera pose, view/proj cache, shoulder/orbit modes; movement+physics and the DDA

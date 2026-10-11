@@ -748,6 +748,20 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>Tint of the transmitted light over the leaf's own albedo, authored in sRGB (warm).</summary>
     public static readonly Vector3 LeafBacklightTint = new(1f, 0.9f, 0.6f);
 
+    // --- Grass wind shimmer (test-fragment.glsl, GrassShimmer) ---
+    /// <summary>
+    /// How much a shimmer band brightens the grass tops, as a share of their own light at a band's
+    /// crest and a full gust (uGrassShimmer). 0 switches the term off.
+    /// </summary>
+    public const float GrassShimmerStrength = 0.5f;
+    /// <summary>Distance between two shimmer bands along the wind, in blocks.</summary>
+    public const float GrassShimmerWavelengthBlocks = 7f;
+    /// <summary>Distance from the eye, in blocks, at which the shimmer starts to fade out.</summary>
+    public const float GrassShimmerFadeNearBlocks = 48f;
+    /// <summary>Distance from the eye, in blocks, past which there is no shimmer: a band a few blocks
+    /// wide turns into shimmering pixels well inside the full-detail ring.</summary>
+    public const float GrassShimmerFadeFarBlocks = 112f;
+
     // --- Wet albedo (test-fragment.glsl, SH-22) ---
     // Albedo multiplier on a submerged face below its own baked water surface. Dry faces beside or
     // above the water are never darkened: the old wet band tinted dry beach tops and banks.

@@ -852,6 +852,11 @@ public class RenderManager : IDisposable
         program.SetUniform("uLeafBacklightPower", WorldGenerationConfig.LeafBacklightPower);
         program.SetUniform("uLeafBacklightReach", WorldGenerationConfig.LeafBacklightReachBlocks);
         program.SetUniform("uLeafBacklightTint", ColorSpace.SrgbToLinear(WorldGenerationConfig.LeafBacklightTint));
+        // Bands rolling over the grass tops with the wind (GrassShimmer); 0 strength leaves it off
+        program.SetUniform("uGrassShimmer", WorldGenerationConfig.GrassShimmerStrength);
+        program.SetUniform("uGrassShimmerWavelength", WorldGenerationConfig.GrassShimmerWavelengthBlocks);
+        program.SetUniform("uGrassShimmerFadeNear", WorldGenerationConfig.GrassShimmerFadeNearBlocks);
+        program.SetUniform("uGrassShimmerFadeFar", WorldGenerationConfig.GrassShimmerFadeFarBlocks);
         program.SetUniform("uReflValid", 0f);
         // The water model's tuning constants never change at runtime, so they go up once here
         // instead of riding ApplyFrameUniforms every frame.

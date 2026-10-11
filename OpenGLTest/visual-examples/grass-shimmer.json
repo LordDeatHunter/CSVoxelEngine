@@ -1,0 +1,22 @@
+{
+  // Grass wind shimmer check: run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/grass-shimmer.json
+  // Shots land in visual/grass-shimmer/. The camera hovers over the open forest meadow north-east
+  // of (-92.5, 2.5) (ground ~16, the leaf-backlight.json spot) and looks down across the grass:
+  // soft bright bands (GrassShimmer, test-fragment.glsl) lie across the grass tops at right angles
+  // to the wind and roll downwind with the leaf-sway gusts, so they sit in different places in
+  // meadow_a, meadow_b and meadow_c (0.7 s apart, the camera held still). Canopy tops, sides and
+  // the far LOD never shimmer.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-92.5, 40.5, 2.5], "yaw": 40, "pitch": -30 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-92.5, 26.5, 2.5], "yaw": 40, "pitch": -32 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "meadow_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.7 },
+    { "op": "screenshot", "name": "meadow_b", "hideHud": true },
+    { "op": "wait", "seconds": 0.7 },
+    { "op": "screenshot", "name": "meadow_c", "hideHud": true }
+  ]
+}

@@ -56,6 +56,16 @@ uniform float uLeafBacklight;
 uniform float uLeafBacklightPower;
 uniform float uLeafBacklightReach;
 uniform vec3 uLeafBacklightTint;
+// Grass wind shimmer (GrassShimmer is the twin): the strength (0, the default and the
+// ItemDebugger's, switches it off), the band wavelength in blocks and the distance fade window.
+uniform float uGrassShimmer;
+uniform float uGrassShimmerWavelength;
+uniform float uGrassShimmerFadeNear;
+uniform float uGrassShimmerFadeFar;
+// The leaf sway's wind (test-vertex.glsl): downwind direction * WindLean and the gusts' travelled
+// offset; the grass shimmer rolls its bands along it.
+uniform vec2 uWind;
+uniform vec2 uWindOffset;
 // How reflective each atlas slice is: (metallic, roughness, normalStrength, unused). Keyed by
 // tile rather than by block, which is what keeps this feature off the vertex entirely - fLayer
 // already rides every vertex. See TileMaterials.
@@ -701,6 +711,27 @@ void main() {
         if (gate > 0.001) {
             float through = SampleShadow(fWorldPos + uSunDir * uLeafBacklightReach, uSunDir, 1.0, uShadowStrength);
             col += albedo * uLeafBacklightTint * uSunColor * (uSunIntensity * uLeafBacklight * gate * through);
+        }
+    }
+
+    // Grass wind shimmer, on biome-tinted up faces only (the grass tops: bit 4, face 4; never the
+    // swaying canopy nor the far crowns): soft bright bands lie across the wind and roll downwind
+    // with the leaf sway's gusts. The pattern is read at the position carried back by the gusts'
+    // travelled offset (uWindOffset), exactly as the sway samples its gust wave, and weighted by
+    // that same gust, so the bands travel and swell with the canopy. It brightens the lit grass by
+    // a share of its own light, so it darkens with shade and night, and fades out with distance
+    // before a band turns into shimmering pixels. GL-free twin: GrassShimmer.
+    if (uGrassShimmer > 0.0 && fTintGain > 1.0 && fSwayFlag < 0.5 && !lodLeaves && N.y > 0.5) {
+        float fade = 1.0 - smoothstep(uGrassShimmerFadeNear, uGrassShimmerFadeFar, dist);
+        if (fade > 0.0) {
+            vec2 wd = uWind / max(length(uWind), 1e-6);
+            vec2 g = fWorldPos.xz - uWindOffset;
+            float along = dot(g, wd);
+            float across = dot(g, vec2(-wd.y, wd.x));
+            float k = 6.2831853 / uGrassShimmerWavelength;
+            float wave = sin(along * k + 1.5 * sin(across * k * 0.31 + along * k * 0.17));
+            float gust = 0.6 + 0.4 * sin(uTime * 0.5 + g.x * 0.08 + g.y * 0.06);
+            col += albedo * light * (uGrassShimmer * fade * gust * smoothstep(0.35, 1.0, wave));
         }
     }
 
