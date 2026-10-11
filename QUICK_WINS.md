@@ -213,13 +213,7 @@ files waits in TODO.md instead, since there are none to use yet.
   known. Test: a block is unknown until its item has been added, and a creative player always
   knows.
 - [x] **Chat fades when closed.** `ChatView` keeps an arrival clock per line and `AlphaAt` holds it opaque through `HoldSeconds`, eases it out over `FadeSeconds` and pins it at 1 while the log is open (the draw skips fully faded lines) (`ChatViewTests`).
-- [ ] **`/time` chat command.** `/time day`, `/time night` and `/time <seconds>` set the clock.
-  *Hook:* a small command table checked in `Program.SubmitChat` before `SendChat` (a line starting
-  with `/` is never echoed as chat), then `World.SetLightingTime`. `day` and `night` are fixed
-  points of the cycle (noon and midnight), `<seconds>` uses `VOXEL_TIME`'s units (a cycle is
-  `DayLengthSeconds`), and an unknown command answers with a system line. On a server the line
-  goes up as `ChatSend`, `GameServer` runs it for an operator only (`OperatorList`) and sends a
-  `TimeSync` at once. A slice of `U-7`; the next command is one more table entry.
+- [x] **`/time` chat command.** the `ChatCommands` table parses `/time day|night|<seconds>` (day = noon, night = midnight, a number is `VOXEL_TIME` units) and both Program and GameServer run it through `World.SetLightingTime`; a server needs operator rights and sends a `TimeSync` at once (`ChatCommandsTests`).
 - [ ] **Day toast.** "Day 4" fades in at dawn. *Hook:* `DayCycle` on the lighting clock, with a
   `HotbarNameFade`-style hold-then-fade.
 - [ ] **New item toast.** The first pickup of an item shows "New: Cotton". *Hook:* the discovered
