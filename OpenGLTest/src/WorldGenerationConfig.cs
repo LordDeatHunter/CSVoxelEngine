@@ -682,6 +682,25 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>Albedo of the foam film, authored in sRGB (pale, slightly blue-white).</summary>
     public static readonly Vector3 WaterFoamColor = new(0.86f, 0.92f, 0.94f);
 
+    // Sun glitter (test-fragment.glsl, WaterGlitter): hashed sparkles of mirrored sun on the waves
+    // along the sun's reflection path.
+    /// <summary>Brightness of a glitter sparkle as a multiple of the direct sun (uWaterGlitter): one
+    /// mirrored sun on a tiny facet, meant to reach white. 0 switches the term off.</summary>
+    public const float WaterGlitterStrength = 2f;
+    /// <summary>Glitter cells per block along each axis of the water plane; each holds at most one sparkle.</summary>
+    public const float WaterGlitterCellsPerBlock = 5f;
+    /// <summary>Share of the glitter cells that hold a sparkle facet at all.</summary>
+    public const float WaterGlitterDensity = 0.8f;
+    /// <summary>Largest tilt of a sparkle facet off the wave normal, in radians: how far around the
+    /// wave's own mirror direction the sparkles spread, i.e. how wide the glitter path is.</summary>
+    public const float WaterGlitterTiltRadians = 0.12f;
+    /// <summary>How many times a second each cell re-rolls its facet (fading out and in between).</summary>
+    public const float WaterGlitterRate = 3f;
+    /// <summary>Distances from the eye, in blocks, over which the glitter fades out before a cell
+    /// turns subpixel and a sparkle would only shimmer.</summary>
+    public const float WaterGlitterFadeNearBlocks = 48f;
+    public const float WaterGlitterFadeFarBlocks = 128f;
+
     /// <summary>
     /// Steps of the screen-space reflection march that stands in for the planar mirror on water
     /// off the sea plane (a pond above sea level). The shader's loop bound is 8, so more is clamped.

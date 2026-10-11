@@ -897,6 +897,14 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterFoamWidth", WorldGenerationConfig.WaterFoamWidthBlocks);
         program.SetUniform("uWaterFoamStrength", WorldGenerationConfig.WaterFoamStrength);
         program.SetUniform("uWaterFoamColor", ColorSpace.SrgbToLinear(WorldGenerationConfig.WaterFoamColor));
+        // Hashed sun sparkles on the waves (WaterGlitter); 0 strength leaves them off
+        program.SetUniform("uWaterGlitter", WorldGenerationConfig.WaterGlitterStrength);
+        program.SetUniform("uWaterGlitterCells", WorldGenerationConfig.WaterGlitterCellsPerBlock);
+        program.SetUniform("uWaterGlitterDensity", WorldGenerationConfig.WaterGlitterDensity);
+        program.SetUniform("uWaterGlitterTilt", WorldGenerationConfig.WaterGlitterTiltRadians);
+        program.SetUniform("uWaterGlitterRate", WorldGenerationConfig.WaterGlitterRate);
+        program.SetUniform("uWaterGlitterFade",
+            new Vector2(WorldGenerationConfig.WaterGlitterFadeNearBlocks, WorldGenerationConfig.WaterGlitterFadeFarBlocks));
         program.SetUniform("uLavaLayer", (float)ContentRegistry.RequireBlock("lava").Top);
         program.SetUniform("uLavaNormalScale", WorldGenerationConfig.LavaNormalScale);
         program.SetUniform("uLavaCatchLight", WorldGenerationConfig.LavaCatchLightStrength);

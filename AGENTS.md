@@ -233,6 +233,21 @@ first and never goes pitch black (`DeepWaterFogTests`). `visual-examples/deep-wa
 (`VOXEL_TIME=147`) frames the warm sea at 1.5, 5.5 and 9 blocks down and a frozen deep basin at 3 and
 26.
 
+**Sun glitter.** On top of the water's smooth sun highlight (`waterSpec`) the fancy water path adds
+hashed sparkles along the sun's reflection path (`WaterGlitterAt`): the water plane is cut into
+`WaterGlitterCellsPerBlock` cells per block, a `WaterGlitterDensity` share of which carry a tiny facet
+tilted up to `WaterGlitterTiltRadians` off the wave normal (`Pcg3d`, like the snow glint), and a facet
+mirrors the sun through a narrow lobe on the eye/sun half vector, so the sparkles gather where the
+waves already face it. The light is a small round point at a hashed spot in its cell, each cell
+re-rolls its facet `WaterGlitterRate` times a second on its own phase and fades in and out within each
+roll, so they dance without popping; added as `WaterGlitterStrength` times the direct sun, gated by
+the shadow and skylight, a risen sun and a fade between `WaterGlitterFadeNearBlocks` and
+`WaterGlitterFadeFarBlocks`, top faces only, never from below (`fromBehind`) nor with the eye
+underwater. `WaterGlitter` is the GL-free twin (`Sparkle`, `Life`, `Spot`, `Gate`;
+`WaterGlitterTests`); `uWaterGlitter` 0 switches it off. `visual-examples/water-glitter.json`
+(`VOXEL_TIME=360`) frames the reflection path over the warm sea twice 0.3 s apart, away from the sun
+and from below.
+
 **Linear lighting (SH-10).** The world is lit in linear light and rendered into
 `RenderManager`'s HDR scene target — an `RGBA16F` colour texture plus a sampleable `DepthComponent24`
 depth texture (`CreateHdrTarget`, which also builds `_hdrColorOnlyFbo` over the colour alone for the
@@ -705,6 +720,7 @@ OpenGLTest/
     GlassSheen.cs              # GL-free twin of the glass sheen: fresnel weight and the sky folded into the blend
     OreTwinkle.cs              # GL-free twin of the ore twinkle: per-texel cycle, the flash tent, sun/distance gate
     DeepWaterFog.cs            # the deep-water darkness curve: per-channel fog dim from the eye's depth, red first
+    WaterGlitter.cs            # GL-free twin of the sun glitter on water: mirror lobe, sparkle life and spot, gate
     ChunkGenerationWorker.cs   # background threads creating chunks around every streaming focus (one
                                #   ChunkScanFrontier per focus, served round-robin)
     Camera.cs                  # FPS camera pose, view/proj cache, shoulder/orbit modes; movement+physics and the DDA

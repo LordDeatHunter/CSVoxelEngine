@@ -1,0 +1,29 @@
+{
+  // Sun glitter check: run from OpenGLTest/ with
+  //   VOXEL_TIME=360 VOXEL_SCRIPT=visual-examples/water-glitter.json
+  // Shots land in visual/water-glitter/. At VOXEL_TIME=360 (about 375 by the shots) the sun stands
+  // about 20 degrees up toward yaw ~159. Flight holds every pose over the warm sea at x~432, z~0 (10+
+  // blocks deep, sea level 0; see swim-bubbles.json):
+  //   path_a / path_b  looking toward the sun down its reflection path on the waves: hashed sparkles
+  //                    of mirrored sun glitter along it (WaterGlitter, test-fragment.glsl) and move
+  //                    between the two shots, 0.3 s apart
+  //   away             the same height facing away from the sun: no glitter
+  //   below            under the surface looking up through it toward the sun: the sparkles are off
+  //                    from below and underwater
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [432.5, 20.5, 0.5], "yaw": 159, "pitch": -20 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [432.5, 5.5, 0.5], "yaw": 159, "pitch": -14 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "path_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "path_b", "hideHud": true },
+    { "op": "teleport", "pos": [432.5, 5.5, 0.5], "yaw": -21, "pitch": -14 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "away", "hideHud": true },
+    { "op": "teleport", "pos": [432.5, -3.0, 0.5], "yaw": 159, "pitch": 55 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "below", "hideHud": true }
+  ]
+}

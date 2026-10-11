@@ -200,6 +200,16 @@ uniform float uWaterFallStreak;   // tangent tilt of the falling streaks; 0 turn
 uniform float uWaterFoamWidth;
 uniform float uWaterFoamStrength;
 uniform vec3 uWaterFoamColor;
+// Sun glitter (WaterGlitter is the twin): the sparkle strength as a multiple of the direct sun (0,
+// the default and the ItemDebugger's, switches it off), glitter cells per block, the share of cells
+// holding a sparkle, the facets' tilt off the wave normal in radians, how many times a second each
+// cell re-rolls its facet, and the distance fade window.
+uniform float uWaterGlitter;
+uniform float uWaterGlitterCells;
+uniform float uWaterGlitterDensity;
+uniform float uWaterGlitterTilt;
+uniform float uWaterGlitterRate;
+uniform vec2 uWaterGlitterFade;
 // Average opaque colour of the leaves tile, for LOD foliage below: far crowns are
 // drawn opaque (no cutout holes) and transparent texels fall back to this.
 uniform vec3 uLodLeafColor;
@@ -565,6 +575,32 @@ float OreTwinkle(vec3 wp, vec3 N, vec3 T, vec3 B, float t) {
     float cyc = fract(t * mix(uOreTwinkleRate.x, uOreTwinkleRate.y, h.y) + h.z);
     float k = max(1.0 - abs(cyc - 0.5) / uOreTwinkleWidth, 0.0);
     return k * k;
+}
+
+// Sun glitter on the waves: the water plane is cut into uWaterGlitterCells cells per block, and a
+// uWaterGlitterDensity share of them carries a tiny facet tilted at random up to uWaterGlitterTilt
+// off the wave normal. A facet mirrors the sun while the eye/sun half vector lines up with it, the
+// snow glint's narrow lobe, so the sparkles gather where the waves already face the half vector:
+// along the sun's reflection path. Each cell re-rolls its facet uWaterGlitterRate times a second on
+// its own phase and fades in and out within each roll, so the sparkles dance without popping. The
+// light is a small round point at a hashed spot in its cell, never the whole cell, so a near
+// sparkle reads as a point of sun rather than a lit square. 0..1, before the caller's gates.
+// GL-free twin: WaterGlitter.Sparkle / Life / Spot.
+float WaterGlitterAt(vec2 xz, vec3 nW, vec3 H, float t) {
+    vec2 g = xz * uWaterGlitterCells;
+    vec2 cell = floor(g);
+    ivec2 ic = ivec2(int(cell.x), int(cell.y));
+    vec3 c0 = vec3(Pcg3d(uvec3(ivec3(ic, 0)) + uvec3(0u, 0u, 0x68E31DA4u))) / 4294967295.0;
+    float spot = 1.0 - smoothstep(0.12, 0.28, length(fract(g) - (0.3 + 0.4 * c0.yz)));
+    if (spot <= 0.0) return 0.0;
+    float tt = t * uWaterGlitterRate + c0.x;
+    vec3 h = vec3(Pcg3d(uvec3(ivec3(ic, int(floor(tt)))) + uvec3(0x1B56C4E9u, 0u, 0u))) / 4294967295.0;
+    if (h.x >= uWaterGlitterDensity) return 0.0;
+    vec3 t1 = normalize(cross(nW, vec3(0.0, 0.0, 1.0)));
+    vec3 t2 = cross(nW, t1);
+    float phi = 6.2831853 * h.y;
+    vec3 facet = normalize(nW + (t1 * cos(phi) + t2 * sin(phi)) * (uWaterGlitterTilt * sqrt(h.z)));
+    return smoothstep(0.9980, 0.9996, dot(facet, H)) * sin(3.14159265 * fract(tt)) * spot;
 }
 
 // Schlick fresnel with the water/wet-surface F0 of 0.06, shared by the ore path and the wet
@@ -1050,6 +1086,17 @@ void main() {
         col = mix(cheap, fancyCol, fancy);
         waterSpec *= fancy;
         col += uSunColor * (waterSpec * uSunIntensity);
+        // Sun glitter: hashed sparkles of mirrored sun on the wave tops along the reflection path
+        // (see WaterGlitterAt). Never from below (the sun is seen refracted through the window there,
+        // not mirrored) nor with the eye underwater, never on a side face, and gated like the
+        // glitter above by the shadow and skylight, plus a risen sun and a distance fade that ends
+        // well before a cell turns subpixel. GL-free twin: WaterGlitter.Gate.
+        if (uWaterGlitter > 0.0 && !fromBehind && geomN.y > 0.5) {
+            float gate = shadow * fSun * smoothstep(0.0, 0.05, uSunDir.y) * smoothstep(0.0, 0.2, uSunIntensity)
+                       * (1.0 - uUnderwater) * (1.0 - smoothstep(uWaterGlitterFade.x, uWaterGlitterFade.y, dist)) * fancy;
+            if (gate > 0.0)
+                col += uSunColor * (uSunIntensity * uWaterGlitter * gate * WaterGlitterAt(fWorldPos.xz, nW, H, uTime));
+        }
         // The foam is a pale diffuse film over the surface: lit exactly like an opaque face (the
         // shared light term, so it darkens in shadow, cloud shadow and at night), mixed over the
         // composed water in linear light like the fresnel mix above, and fogged by the common
