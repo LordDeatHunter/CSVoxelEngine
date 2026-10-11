@@ -1,0 +1,17 @@
+{
+  // A bottom half block of cobblestone: six from three cobblestone (recipes/cobblestone_slab.json).
+  // The body collides with the half-height hitbox, so it is stepped onto and stood on like a
+  // mold; there is no top-half placement yet.
+  "name": "Cobblestone Slab",
+  "model": {
+    "parent": "block/slab",
+    "textures": { "bottom": "cobblestone", "top": "cobblestone", "side": "cobblestone" }
+  },
+  "sfx": "hit_rock",
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  // A half block must not darken the floor around it the way a full cube would
+  "castsAO": false,
+  "collidesByHitbox": true,
+  "hitbox": { "min": [0, 0, 0], "max": [1, 0.5, 1] }
+}

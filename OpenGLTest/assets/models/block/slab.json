@@ -1,0 +1,23 @@
+{
+    // A bottom half block, like Minecraft's block/slab: one box filling the lower half of the
+    // cell. UVs are left to the defaults, which crop each side to the lower half of its tile
+    // instead of squashing the whole tile into it. The top carries no cullface: it sits half a
+    // block below the cell's top, so nothing above can hide it.
+    "textures": {
+        "particle": "#side"
+    },
+    "elements": [
+        {
+            "from": [0, 0, 0],
+            "to": [16, 8, 16],
+            "faces": {
+                "down": { "texture": "#bottom", "cullface": "down" },
+                "up": { "texture": "#top" },
+                "north": { "texture": "#side", "cullface": "north" },
+                "south": { "texture": "#side", "cullface": "south" },
+                "west": { "texture": "#side", "cullface": "west" },
+                "east": { "texture": "#side", "cullface": "east" }
+            }
+        }
+    ]
+}

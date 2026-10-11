@@ -1121,6 +1121,13 @@ that is mined by hand. Its tile comes from `tools/generate-plank-texture.py` (st
 byte-identical re-runs) and is what the wooden pieces below crop their faces from.
 `visual-examples/planks.json` (`VOXEL_TIME=147`) builds and shoots them.
 
+**Slabs** (`cobblestone_slab`, `oak_planks_slab`, six from three of their block) are bottom half
+blocks: the `block/slab` parent (one 16x8x16 box, `#bottom`/`#top`/`#side`, default UVs so each
+side crops the lower half of its tile) with a `0..0.5` `hitbox` and `collidesByHitbox`, the molds'
+idiom, so the body steps onto and stands on them. There is no top-half or double-slab placement.
+`BuildingBlockTests` holds the rules every shape-colliding model block obeys: it is drawn exactly
+as far as its boxes reach on every facing, and a floor slab is stood on at its top.
+
 ### Item schema (`assets/data/items/<name>.json`)
 
 ```json

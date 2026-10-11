@@ -1,0 +1,7 @@
+{
+  "result": "block/cobblestone_slab",
+  "count": 6,
+  "ingredients": [
+    { "item": "block/cobblestone", "count": 3 }
+  ]
+}
