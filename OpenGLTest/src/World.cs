@@ -306,6 +306,21 @@ public class World : IItemUseWorld
 
     /// <summary>Current HP, 0-100, drawn as 10 hearts in the HUD.</summary>
     public int Health => _health.Health;
+
+    /// <summary>The death line posted on the first dead frame, waiting for the UI to drain it into
+    /// the chat (<see cref="TakeDeathMessage"/>); null while alive.</summary>
+    private string? _pendingDeathMessage;
+
+    /// <summary>
+    /// Takes the pending death message (see <see cref="DeathMessages"/>) once: the UI shows it as a
+    /// system chat line. Null when nobody died since the last call.
+    /// </summary>
+    public string? TakeDeathMessage()
+    {
+        var message = _pendingDeathMessage;
+        _pendingDeathMessage = null;
+        return message;
+    }
     private readonly FallTracker _fall = new();
     private Vector3 _respawnEye;
     private bool _hasRespawnEye;
@@ -720,7 +735,7 @@ public class World : IItemUseWorld
         var tick = ContactDamage.Tick(ref _contactTimer, deltaTime, (int)damage,
             !(Camera.IsCreative || Camera.IsFlying));
         if (tick > 0)
-            _health.TakeDamage(tick);
+            _health.TakeDamage(tick, DamageSource.Cactus);
     }
 
     private void EnsureSpawnSettled()
@@ -1833,7 +1848,7 @@ public class World : IItemUseWorld
                 _serverMode ? null : _debris);
             if (!_serverMode && _slimes.DamageDealtThisFrame > 0)
             {
-                _health.TakeDamage(_slimes.DamageDealtThisFrame);
+                _health.TakeDamage(_slimes.DamageDealtThisFrame, DamageSource.Mob, Camera.LastMobAttacker);
                 Camera.AddShake(Math.Clamp(_slimes.DamageDealtThisFrame / 20f, 0.2f, 1f));
                 NotifyPlayerHurt(fromMob: true);
             }
@@ -1852,7 +1867,7 @@ public class World : IItemUseWorld
             var goblinDamage = _goblins.DamageDealtThisFrame;
             if (!_serverMode && goblinDamage > 0)
             {
-                _health.TakeDamage(goblinDamage);
+                _health.TakeDamage(goblinDamage, DamageSource.Mob, Camera.LastMobAttacker);
                 Camera.AddShake(Math.Clamp(goblinDamage / 20f, 0.2f, 1f));
                 NotifyPlayerHurt(fromMob: true);
             }
@@ -2519,7 +2534,7 @@ public class World : IItemUseWorld
         var damage = _fall.Observe(feet, Camera.IsGrounded, Camera.IsFlying, Camera.IsInWater, Camera.IsCreative,
             FallTracker.DefaultMaxStepBlocks, cushioned: PlayerPhysics.BounceBelow(Camera, _chunkManager));
         if (damage > 0)
-            _health.TakeDamage(damage);
+            _health.TakeDamage(damage, DamageSource.Fall);
 
         _health.UpdateLava(deltaTime, Camera.IsInLava, Camera.IsCreative || Camera.IsFlying);
         UpdateCactusContact(deltaTime);
@@ -2534,8 +2549,12 @@ public class World : IItemUseWorld
         if (!_health.IsDead)
         {
             _deathTimer = 0f;
+            _pendingDeathMessage = null;
             return;
         }
+
+        // The first dead frame posts the death line once; Program drains it into the chat
+        _pendingDeathMessage ??= DeathMessages.For("Player", _health.LastSource, _health.LastKiller);
 
         // The death plays first: the view tips over and the body falls, then the respawn.
         _deathTimer += deltaTime;

@@ -1010,12 +1010,21 @@ public class Camera : IMobTarget
     /// <see cref="World"/> applies the mob manager's <c>DamageDealtThisFrame</c> to its own health
     /// pool (and shakes the view) exactly as before mobs had targets.
     /// </summary>
-    public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift)
+    public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift,
+        string? attacker = null)
     {
         if (damage > 0)
+        {
             AddDamageDirection(awayHorizontal);
+            // Remembered so the world's billing of the hit names the killer in a death message
+            LastMobAttacker = attacker;
+        }
         AddKnockback(awayHorizontal, knockbackSpeed, lift);
     }
+
+    /// <summary>The display name of the last mob whose hit landed on this camera (see
+    /// <see cref="World"/>'s billing), or null.</summary>
+    public string? LastMobAttacker { get; private set; }
 
     /// <summary>
     /// A billed blow pushed the player along <paramref name="awayHorizontal"/>: the damage direction

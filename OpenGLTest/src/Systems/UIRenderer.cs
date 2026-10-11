@@ -227,7 +227,6 @@ public class UIRenderer : IDisposable
     private const int MaxFittedTexts = 256;
     private readonly Dictionary<(string Text, float Scale, float Width), string> _fittedTexts = new();
     private Vector2 _fitCacheScreen;
-    private readonly Dictionary<int, string> _seedTexts = new();
     private readonly string?[] _percentTexts = new string?[101];
 
     // The opaque backdrop behind every menu and loading frame: nothing is rendered behind those.
@@ -1258,7 +1257,8 @@ public class UIRenderer : IDisposable
                             SlotBorderColor);
                     DrawText(FittedText(world.Name, _countScale, nameWidth),
                         new Vector2(nameLeft, rowTop + 8f), _countScale, Rgba.White);
-                    DrawText(SeedText(world.Seed), new Vector2(nameLeft, rowTop + 36f), _countScale, TextDim);
+                    DrawText(MainMenuLayout.WorldDetailText(world.Seed, world.LastPlayedUnixMs),
+                        new Vector2(nameLeft, rowTop + 36f), _countScale, TextDim);
                     DrawSmallButton(MainMenuLayout.RowButtonCentre(screen, i, offset, 0),
                         MainMenuLayout.RowButtonSize, "PLAY");
                     DrawSmallButton(MainMenuLayout.RowButtonCentre(screen, i, offset, 1),
@@ -1481,9 +1481,13 @@ public class UIRenderer : IDisposable
                     TextWrap.Wrap(text, ChatLayout.MaxWidth, s => _font.MeasureSize(s, _countScale).X, _chatWrap);
                 else
                     _chatWrap.Add(text);
-                // Wrapped top to bottom, collected bottom-up: push the message's last line first
+                // Wrapped top to bottom, collected bottom-up: push the message's last line first.
+                // A fading line's alpha rides its colour, and a fully faded one is skipped so the
+                // log shrinks with it.
+                var alpha = view.AlphaAt(m);
+                if (alpha <= 0.004f) continue;
                 for (var l = _chatWrap.Count - 1; l >= 0 && _chatLines.Count < ChatLayout.VisibleMessages; l--)
-                    _chatLines.Add((_chatWrap[l], color));
+                    _chatLines.Add((_chatWrap[l], color.WithAlpha(alpha)));
             }
 
             var visible = _chatLines.Count;
@@ -1589,15 +1593,6 @@ public class UIRenderer : IDisposable
         fitted = FitText(text, scale, maxWidth);
         _fittedTexts[(text, scale, maxWidth)] = fitted;
         return fitted;
-    }
-
-    private string SeedText(int seed)
-    {
-        if (_seedTexts.TryGetValue(seed, out var text)) return text;
-        if (_seedTexts.Count >= MaxFittedTexts) _seedTexts.Clear();
-        text = $"seed {seed}";
-        _seedTexts[seed] = text;
-        return text;
     }
 
     private string PercentText(float progress)

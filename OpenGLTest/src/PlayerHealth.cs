@@ -69,6 +69,28 @@ public sealed class PlayerHealth
         DamageFlash = 1f;
     }
 
+    /// <summary>The source of the last recorded blow, for the death message (see
+    /// <see cref="DeathMessages"/>); <see cref="DamageSource.None"/> until something names itself.
+    /// A later source-less hit leaves it standing.</summary>
+    public DamageSource LastSource { get; private set; }
+
+    /// <summary>The killer's display name when the last recorded blow was a mob's, else null.</summary>
+    public string? LastKiller { get; private set; }
+
+    /// <summary>Like <see cref="TakeDamage(int)"/>, but names what dealt the blow so the death
+    /// message can say it.</summary>
+    public void TakeDamage(int amount, DamageSource source, string? killer = null)
+    {
+        if (amount <= 0)
+            return;
+        if (source != DamageSource.None)
+        {
+            LastSource = source;
+            LastKiller = killer;
+        }
+        TakeDamage(amount);
+    }
+
     /// <summary>
     /// Restores up to <paramref name="amount"/> HP (a bandage), clamped to the pool. False when
     /// there is nothing to restore (already full, or dead), so a use is never spent for nothing.
@@ -96,7 +118,7 @@ public sealed class PlayerHealth
         while (_lavaTimer >= LavaTickSeconds)
         {
             _lavaTimer -= LavaTickSeconds;
-            TakeDamage(LavaDamagePerTick);
+            TakeDamage(LavaDamagePerTick, DamageSource.Lava);
         }
     }
 

@@ -212,9 +212,7 @@ files waits in TODO.md instead, since there are none to use yet.
   A block without an item (`hasItem` false: pebbles, piles, snow layers, kiln parts) is always
   known. Test: a block is unknown until its item has been added, and a creative player always
   knows.
-- [ ] **Chat fades when closed.** Today the last lines stay on screen for good. *Hook:* an arrival
-  time per `ChatMessage`, and `UIRenderer.DrawChat` fading each line (and its backdrop) with
-  `MathUtils.HoldThenFade` while the chat is closed; opening it shows them all again.
+- [x] **Chat fades when closed.** `ChatView` keeps an arrival clock per line and `AlphaAt` holds it opaque through `HoldSeconds`, eases it out over `FadeSeconds` and pins it at 1 while the log is open (the draw skips fully faded lines) (`ChatViewTests`).
 - [ ] **`/time` chat command.** `/time day`, `/time night` and `/time <seconds>` set the clock.
   *Hook:* a small command table checked in `Program.SubmitChat` before `SendChat` (a line starting
   with `/` is never echoed as chat), then `World.SetLightingTime`. `day` and `night` are fixed
@@ -246,12 +244,8 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Number-key slot assign.** with the [E] panel open, 1-9 (and 0) equip the hovered row into that hotbar slot through the same equip a click performs (`Program.AssignHoveredRowToHotbar`, sent as an `Equip` intent on a server).
 - [x] **HUD scale.** already covered: the settings page's GUI Scale row (`GameSettings.GuiScaleIndex` over `GuiScales`, 0.5x..2x, `RequestedGuiScale` feeding `UiCanvas.EffectiveScale`) scales the HUD across the 75-150 % band and beyond; a continuous slider would duplicate the tested setting.
 - [x] **Sprint toggle option.** the `Sprint Toggle` controls setting plus `SprintToggle.Step` driving `Camera.SprintHeld` (a fresh press flips the latch; off, the key is held as before) (`SprintToggleTests`).
-- [ ] **Worlds list details.** Each row also shows the last played date and the seed. *Hook:*
-  `WorldInfo` already holds the timestamps and seed; a second line in
-  `UIRenderer.DrawMainMenu`'s row.
-- [ ] **Death message.** On death a system chat line reads "Player was slain by Goblin" (or "fell",
-  "burned"). *Hook:* the damage source at the lethal hit (mob type via `IMobTarget.TakeHit`, fall
-  via `FallTracker`, lava) feeding `ChatKind.System`; broadcast on a server.
+- [x] **Worlds list details.** the row's second line is `MainMenuLayout.WorldDetailText`: the seed plus the last-played moment (`WorldInfo.LastPlayedUnixMs`, local `yyyy-MM-dd HH:mm`), or "never played" (`MainMenuLayoutTests`).
+- [x] **Death message.** `DeathMessages.For` over the blow recorded in `PlayerHealth` (`DamageSource` plus the mob's display name through `IMobTarget.TakeHit`; the fall, lava and the cactus name themselves); `World.TakeDeathMessage` drains it into the chat, and a server broadcasts its own once per death (`DeathMessageTests`).
 - [ ] **Inventory-full warning.** A drop in pickup range that the full pool cannot take shows
   "Inventory full" over the hotbar **once**: it fires on the transition into the blocked state and
   stays silent until the pool has had room again (a slot freed or an item count fell), however many

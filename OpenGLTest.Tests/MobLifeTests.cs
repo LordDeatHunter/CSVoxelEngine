@@ -164,6 +164,6 @@ public sealed class MobLifeTests
     {
         public Vector3 Eye { get; } = eye;
         public bool IsImmune => true;
-        public void TakeHit(int damage, Vector3 away, float speed, float lift) { }
+        public void TakeHit(int damage, Vector3 away, float speed, float lift, string? attacker = null) { }
     }
 }

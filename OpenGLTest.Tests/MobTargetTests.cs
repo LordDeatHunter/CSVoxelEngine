@@ -28,7 +28,8 @@ public sealed class MobTargetTests
         public bool IsImmune { get; } = immune;
         public List<int> Hits { get; } = [];
 
-        public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift) =>
+        public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift,
+            string? attacker = null) =>
             Hits.Add(damage);
 
         public int DamageTaken

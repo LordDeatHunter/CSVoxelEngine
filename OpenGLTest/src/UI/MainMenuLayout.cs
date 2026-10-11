@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 
 namespace silkgltriangle;
@@ -11,6 +12,15 @@ namespace silkgltriangle;
 /// </summary>
 public static class MainMenuLayout
 {
+    /// <summary>
+    /// A world row's second line: the seed and when the world was last played, so two saves are
+    /// told apart at a glance. A world with no play time yet (a fresh save) says so.
+    /// </summary>
+    public static string WorldDetailText(int seed, long lastPlayedUnixMs) =>
+        lastPlayedUnixMs <= 0
+            ? $"seed {seed}   never played"
+            : $"seed {seed}   played {DateTimeOffset.FromUnixTimeMilliseconds(lastPlayedUnixMs).ToLocalTime():yyyy-MM-dd HH:mm}";
+
     // --- Worlds page ---
     public const float RowHeight = 64f;
     public const float PanelWidth = 960f;

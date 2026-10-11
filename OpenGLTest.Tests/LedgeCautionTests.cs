@@ -78,7 +78,7 @@ public sealed class LedgeCautionTests
     {
         public Vector3 Eye { get; } = eye;
         public bool IsImmune => true;
-        public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift) { }
+        public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift, string? attacker = null) { }
     }
 
     [Fact]

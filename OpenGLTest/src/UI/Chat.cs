@@ -36,8 +36,17 @@ public sealed class ChatView
     /// <summary>Most characters one chat line accepts.</summary>
     public const int MaxInputLength = 200;
 
+    /// <summary>Seconds a closed log's line stays fully opaque after arriving, before it fades.</summary>
+    public const float HoldSeconds = 8f;
+
+    /// <summary>Seconds the fade out takes once the hold is over.</summary>
+    public const float FadeSeconds = 2f;
+
     private readonly List<ChatMessage> _messages = new();
     private readonly List<string> _history = new();
+    // Arrival time of each message on _clock, so a closed log can fade its old lines
+    private readonly List<float> _arrived = new();
+    private float _clock;
 
     public bool IsOpen { get; private set; }
 
@@ -73,16 +82,39 @@ public sealed class ChatView
     {
         Close();
         _messages.Clear();
+        _arrived.Clear();
         _history.Clear();
         _historyCursor = 0;
+    }
+
+    /// <summary>Advances the arrival clock: a line fades once it has been on screen
+    /// <see cref="HoldSeconds"/> + <see cref="FadeSeconds"/> of it.</summary>
+    public void Update(float deltaTime) => _clock += MathF.Max(0f, deltaTime);
+
+    /// <summary>
+    /// The alpha the line at <paramref name="index"/> draws with: fully opaque while the log is
+    /// open (the player is reading), else 1 through <see cref="HoldSeconds"/> after it arrived and
+    /// easing to 0 over <see cref="FadeSeconds"/>.
+    /// </summary>
+    public float AlphaAt(int index)
+    {
+        if (IsOpen) return 1f;
+        if (index < 0 || index >= _arrived.Count) return 1f;
+        var age = _clock - _arrived[index];
+        if (age <= HoldSeconds) return 1f;
+        return 1f - MathUtils.SmoothStep(MathUtils.InverseLerp(0f, FadeSeconds, age - HoldSeconds));
     }
 
     /// <summary>Appends a line, dropping the oldest once the log is full.</summary>
     public void AddMessage(ChatKind kind, string sender, string text)
     {
         _messages.Add(new ChatMessage(kind, sender, text));
+        _arrived.Add(_clock);
         if (_messages.Count > MaxMessages)
+        {
             _messages.RemoveAt(0);
+            _arrived.RemoveAt(0);
+        }
     }
 
     public void AddSystem(string text) => AddMessage(ChatKind.System, "", text);

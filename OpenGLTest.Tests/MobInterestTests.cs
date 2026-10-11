@@ -19,7 +19,7 @@ public sealed class MobInterestTests
     {
         public Vector3 Eye { get; } = eye;
         public bool IsImmune => false;
-        public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift) { }
+        public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift, string? attacker = null) { }
     }
 
     private static byte Stone => ContentRegistry.RequireBlock("stone").Id;

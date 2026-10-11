@@ -282,7 +282,7 @@ public sealed class GoblinManager : IMobPopulation
                     DamageDealtThisFrame += damage;
                     var away = new Vector3(eye.X - goblin.Position.X, 0f, eye.Z - goblin.Position.Z);
                     target.TakeHit(damage, away, WorldGenerationConfig.GoblinKnockbackSpeed,
-                        WorldGenerationConfig.GoblinKnockbackLift);
+                        WorldGenerationConfig.GoblinKnockbackLift, _type.DisplayName);
                 }
             }
 
@@ -364,7 +364,7 @@ public sealed class GoblinManager : IMobPopulation
                     DamageDealtThisFrame += damage;
                     var eye = hurt.Eye;
                     var away = new Vector3(eye.X - stone.Position.X, 0f, eye.Z - stone.Position.Z);
-                    hurt.TakeHit(damage, away, WorldGenerationConfig.GoblinStoneKnockbackSpeed, 0f);
+                    hurt.TakeHit(damage, away, WorldGenerationConfig.GoblinStoneKnockbackSpeed, 0f, _type.DisplayName);
                 }
                 RemoveStone(i);
                 continue;

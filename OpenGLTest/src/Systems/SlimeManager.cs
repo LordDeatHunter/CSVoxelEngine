@@ -176,7 +176,7 @@ public sealed class SlimeManager : IMobPopulation
                     DamageDealtThisFrame += damage;
                     var away = new Vector3(eye.X - slime.Position.X, 0f, eye.Z - slime.Position.Z);
                     target.TakeHit(damage, away, WorldGenerationConfig.SlimeKnockbackSpeed,
-                        WorldGenerationConfig.SlimeKnockbackLift);
+                        WorldGenerationConfig.SlimeKnockbackLift, _type.DisplayName);
                 }
                 else if (slime.IsGrounded)
                 {

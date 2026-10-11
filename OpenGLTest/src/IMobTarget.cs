@@ -23,6 +23,7 @@ public interface IMobTarget
 
     /// <summary>A mob hit landed: take <paramref name="damage"/> and a knockback shove along the
     /// horizontal <paramref name="awayHorizontal"/> at <paramref name="knockbackSpeed"/> plus an
-    /// upward <paramref name="lift"/>.</summary>
-    void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift);
+    /// upward <paramref name="lift"/>. <paramref name="attacker"/> is the mob's display name, which
+    /// a death names in its message.</summary>
+    void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift, string? attacker = null);
 }

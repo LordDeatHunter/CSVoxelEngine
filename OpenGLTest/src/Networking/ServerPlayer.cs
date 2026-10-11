@@ -208,15 +208,20 @@ public sealed class ServerPlayer : IMobTarget
     /// shove is queued (<see cref="TakePendingKnockback"/>) for the client to apply, since only the
     /// client simulates its body. A zero direction leaves the queued impulse as it was.
     /// </summary>
-    public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift)
+    public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift,
+        string? attacker = null)
     {
-        Status.TakeDamage(damage);
+        Status.TakeDamage(damage, DamageSource.Mob, attacker);
         awayHorizontal.Y = 0f;
         if (awayHorizontal.LengthSquared() > 1e-6f)
             _pendingKnockback = Vector3.Normalize(awayHorizontal) * knockbackSpeed;
         _pendingLift = MathF.Max(_pendingLift, lift);
         StatusDirty = true;
     }
+
+    /// <summary>Whether this player's death has been announced in the chat (the server says it
+    /// once per death, and again after a respawn).</summary>
+    public bool DeathAnnounced { get; set; }
 
     /// <summary>
     /// Hands over the knockback queued since the last call (a horizontal impulse in blocks/s and an

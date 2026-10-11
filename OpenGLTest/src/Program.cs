@@ -1429,6 +1429,12 @@ public static class Program
                 : inputManager.Keyboard;
             w.Update((float)deltaTime, board);
 
+            // The chat log fades its old lines while closed; its clock runs every playing frame
+            chatView.Update((float)deltaTime);
+            // A death posts one system line (singleplayer; a server broadcasts its own)
+            if (w.TakeDeathMessage() is { } death)
+                chatView.AddSystem(death);
+
             FrameProfiler.Begin(ProfileSection.Breaking);
             w.UpdateBlockBreaking(deltaTime,
                 !inventoryView.IsOpen && !chatView.IsOpen

@@ -800,6 +800,17 @@ public sealed class GameServer : IDisposable
         foreach (var player in _playerList)
         {
             player.TickStatus((float)deltaTime, chunks);
+            // A death is announced in the chat once, and re-armed by the respawn
+            if (player.Status.IsDead && !player.DeathAnnounced)
+            {
+                player.DeathAnnounced = true;
+                BroadcastSystem(DeathMessages.For(player.Name, player.Status.LastSource,
+                    player.Status.LastKiller));
+            }
+            else if (!player.Status.IsDead)
+            {
+                player.DeathAnnounced = false;
+            }
             if (player.StatusDirty && _clients.TryGetValue(player.Id, out var client))
                 SendPlayerStatus(client, player);
         }

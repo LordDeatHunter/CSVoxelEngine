@@ -16,7 +16,7 @@ public sealed class MobNoticeTests
         public Vector3 Eye { get; } = eye;
         public bool IsImmune { get; } = immune;
         public bool IsSneaking { get; } = sneaking;
-        public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift) { }
+        public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift, string? attacker = null) { }
     }
 
     private static readonly Vector3 Mob = new(0f, 1f, 0f);

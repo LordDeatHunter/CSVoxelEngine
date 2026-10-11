@@ -114,4 +114,19 @@ public sealed class MainMenuLayoutTests
         var playLeft = MainMenuLayout.RowButtonCentre(Screen, 0, 0f, 0).X - MainMenuLayout.RowButtonSize.X * 0.5f;
         Assert.True(playLeft >= MainMenuLayout.NameLeft(Screen) + MainMenuLayout.NameMaxWidth(Screen));
     }
+
+    [Fact]
+    public void AWorldRowShowsItsSeedAndLastPlayedMoment()
+    {
+        var played = new DateTimeOffset(2026, 10, 11, 14, 30, 0, TimeSpan.Zero).ToUnixTimeMilliseconds();
+        var text = MainMenuLayout.WorldDetailText(seed: -42, played);
+        Assert.Contains("seed -42", text);
+        Assert.Contains("played", text);
+        Assert.Contains("2026-10-11", text);
+
+        // A world with no play time says so instead of showing 1970
+        var fresh = MainMenuLayout.WorldDetailText(seed: 7, lastPlayedUnixMs: 0);
+        Assert.Contains("seed 7", fresh);
+        Assert.Contains("never played", fresh);
+    }
 }
