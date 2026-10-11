@@ -23,6 +23,10 @@ uniform float uFxaaEdgeThresholdMin;  // WorldGenerationConfig.FxaaEdgeThreshold
 // The biome colour grade (BiomeGrade): a faint display-space multiplier over the finished image,
 // warm over the desert and cool over the snow; (1, 1, 1) leaves the image alone.
 uniform vec3 uGrade;
+// The damage chromatic fringe (DamageFringe): for a moment after a hit the screen edges split into
+// red and blue, read up to uFringeShare of the screen height apart at the corners. 0 draws none.
+uniform float uDamageFringe;
+uniform float uFringeShare;
 
 out vec4 FragColor;
 
@@ -132,6 +136,16 @@ vec3 Fxaa(vec2 pos)
 void main()
 {
     vec3 c = Fxaa(gl_FragCoord.xy);
+    // The damage fringe: red and blue read from either side of the pixel along the line from the
+    // screen centre, nothing in the middle and the most at the corners (DamageFringe.EdgeWeight)
+    if (uDamageFringe > 0.0) {
+        vec2 fromCentre = gl_FragCoord.xy / uResolution - 0.5;
+        float d = length(fromCentre);
+        vec2 shift = fromCentre / max(d, 1e-4)
+                   * (uDamageFringe * smoothstep(0.2, 0.7, d) * uFringeShare * uResolution.y);
+        c.r = DisplayBilinear(gl_FragCoord.xy + shift).r;
+        c.b = DisplayBilinear(gl_FragCoord.xy - shift).b;
+    }
     // The grade after the anti-aliasing, so FXAA keeps judging edges on the image itself
     c = min(c * uGrade, vec3(1.0));
     // Half-LSB dither before the 8-bit write, so long fog, sky and lighting gradients break up

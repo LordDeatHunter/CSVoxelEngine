@@ -32,6 +32,8 @@ public sealed class PostProcessRenderer : IDisposable
         _shader.SetUniform("uScene", 0);
         _shader.SetUniform("uExposure", WorldGenerationConfig.TonemapExposure);
         _shader.SetUniform("uGrade", System.Numerics.Vector3.One);
+        _shader.SetUniform("uDamageFringe", 0f);
+        _shader.SetUniform("uFringeShare", WorldGenerationConfig.DamageFringeScreenShare);
         _shader.SetUniform("uFxaaReduceMin", WorldGenerationConfig.FxaaReduceMin);
         _shader.SetUniform("uFxaaReduceMul", WorldGenerationConfig.FxaaReduceMul);
         _shader.SetUniform("uFxaaSpanMax", WorldGenerationConfig.FxaaSpanMax);
@@ -71,6 +73,7 @@ public sealed class PostProcessRenderer : IDisposable
         _shader.SetUniform("uResolution", new System.Numerics.Vector2(viewport.X, viewport.Y));
         _shader.SetUniform("uExposure", effects.Exposure);
         _shader.SetUniform("uGrade", effects.Grade);
+        _shader.SetUniform("uDamageFringe", effects.DamageFringe);
         _gl.BindVertexArray(_vao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         _gl.BindVertexArray(0);

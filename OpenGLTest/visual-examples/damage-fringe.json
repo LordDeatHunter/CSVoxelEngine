@@ -1,0 +1,22 @@
+{
+  // Damage chromatic fringe: run with VOXEL_SCRIPT=visual-examples/damage-fringe.json VOXEL_TIME=147
+  // from OpenGLTest/. Shots land in visual/damage-fringe/.
+  // A survival player in low-health.json's forest clearing takes a hit straight off its pool
+  // (`damage` with "target": "player"): the shot right after it shows the screen edges split red and
+  // blue (DamageFringe, driven by the vignette's damage flash, strongest at the corners and nothing
+  // in the middle), a tenth of a second later it is weaker, and by 0.4 s it is gone while the
+  // vignette's own red flash is still fading. Every live mob is killed first so nothing else hurts.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-43.5, 12.5, 62.5], "yaw": -90, "pitch": -10 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "damage", "amount": 1000 },
+    { "op": "screenshot", "name": "before" },
+    { "op": "damage", "target": "player", "amount": 10 },
+    { "op": "screenshot", "name": "hit" },
+    { "op": "wait", "seconds": 0.12 },
+    { "op": "screenshot", "name": "hit_0.12s" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "hit_0.4s" }
+  ]
+}

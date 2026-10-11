@@ -408,6 +408,15 @@ eases toward it (`BiomeGradeEaseRate`) and back to neutral over an unknown colum
 without its column yet never guesses. `BiomeGradeTests`; `visual-examples/biome-grade.json`
 (`VOXEL_TIME` 147) compares the noon sky over the origin, a deep desert and a frozen plain.
 
+**Damage chromatic fringe.** For a moment after a hit the screen edges split red and blue:
+post-fragment.glsl reads red and blue from either side of each pixel along the line from the screen
+centre (`DisplayBilinear`, after FXAA, before the grade), by `uDamageFringe` times
+`DamageFringe.EdgeWeight` (nothing in the middle, full at the corners) times `DamageFringeScreenShare`
+of the screen height. The strength is `DamageFringe.Strength` of the vignette's own damage flash
+(`PlayerHealth.DamageFlash`, which `World.Render` now hands to `RenderManager.RenderPostProcess`), so
+it lasts only the first `DamageFringeSeconds` of the flash; a client mirrors the flash with its health.
+`DamageFringeTests`; `visual-examples/damage-fringe.json` (`VOXEL_TIME` 147).
+
 **Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
 heading turns slowly (`WorldGenerationConfig.Wind*`), with `Wind.Offset` its bounded closed-form
 integral. Leaf sway reads it in both vertex shaders (`uWind`, the direction scaled by `WindLean`,
@@ -896,6 +905,7 @@ OpenGLTest/
     EyeClimate.cs              # GL-free climate at a world column from an IColumnSource's stored corner climate (no worldgen)
     EyeAdaptation.cs           # GL-free exposure target from the voxel light at the eye, eased slower into the dark
     BiomeGrade.cs              # GL-free post colour grade from the eye's climate: warm over desert, cool over snow, eased
+    DamageFringe.cs            # GL-free twin of the post pass's damage chromatic fringe: strength from the flash, edge weight
     BlockLightPalette.cs       # GL-free 8-slot block-light colour palette (slot 0 = the default warm torch colour)
     LightTint.cs               # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
     BiomeTint.cs               # GL-free biome tint: Climate -> palette -> vertex tint on a 16-block lattice, Gain, Shade, CellTint

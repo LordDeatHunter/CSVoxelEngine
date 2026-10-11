@@ -2581,7 +2581,7 @@ public class World : IItemUseWorld
         // The UI draws after this, straight onto that gamma framebuffer.
         FrameProfiler.Begin(ProfileSection.PostPass);
         renderManager.BeginGpuPass(ProfileSection.PostPass);
-        renderManager.RenderPostProcess();
+        renderManager.RenderPostProcess(_health.DamageFlash);
         renderManager.EndGpuPass(ProfileSection.PostPass);
         FrameProfiler.End(ProfileSection.PostPass);
     }

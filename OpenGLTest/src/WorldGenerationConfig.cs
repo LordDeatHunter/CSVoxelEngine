@@ -195,6 +195,12 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>How fast the grade follows the eye's climate (MathUtils.Damp rate, per second): a slow drift across a border.</summary>
     public const float BiomeGradeEaseRate = 0.5f;
 
+    // --- Damage chromatic fringe (DamageFringe, post-fragment.glsl's uDamageFringe) ---
+    /// <summary>How long after a hit the screen edges stay split red and blue, in seconds.</summary>
+    public const float DamageFringeSeconds = 0.3f;
+    /// <summary>Largest red/blue shift at the screen corners right at the hit, as a share of the screen height.</summary>
+    public const float DamageFringeScreenShare = 0.006f;
+
     /// <summary>FXAA's floor on the edge-direction reduction (post-fragment.glsl's
     /// uFxaaReduceMin): keeps the direction from blowing up on near-flat luma, so faint
     /// gradients are not smeared across <see cref="FxaaSpanMax"/> pixels.</summary>

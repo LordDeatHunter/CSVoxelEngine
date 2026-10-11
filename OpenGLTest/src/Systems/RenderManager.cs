@@ -1837,8 +1837,10 @@ public class RenderManager : IDisposable
     /// sRGB encode and dither in post-fragment.glsl). Runs at the end of World.Render; the UI then
     /// draws on top of the result in gamma space. The scene texture is unbound from unit 0 again
     /// afterwards so next frame's render target never sits on a sampler unit.
+    /// <paramref name="damageFlash"/> is the player's damage flash (<see cref="PlayerHealth.DamageFlash"/>),
+    /// which drives the damage chromatic fringe.
     /// </summary>
-    public void RenderPostProcess()
+    public void RenderPostProcess(float damageFlash = 0f)
     {
         if (_post == null || _hdrFbo == 0) return;
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
@@ -1846,8 +1848,10 @@ public class RenderManager : IDisposable
         BindUnit(0, TextureTarget.Texture2D, _hdrColorTex);
         ActiveUnit(0);
         // The eye adaptation (SetLighting) scales the exposure up in the dark; the biome grade tints
-        // the finished image faintly warm over the desert and cool over the snow
-        _post.Render(_viewportSize, new PostEffects(WorldGenerationConfig.TonemapExposure * _eyeExposure, _grade));
+        // the finished image faintly warm over the desert and cool over the snow; the damage flash
+        // (the vignette's, PlayerHealth.DamageFlash) splits the screen edges for a moment after a hit
+        _post.Render(_viewportSize, new PostEffects(WorldGenerationConfig.TonemapExposure * _eyeExposure, _grade,
+            DamageFringe.Strength(damageFlash)));
         BindUnit(0, TextureTarget.Texture2D, 0);
     }
 
