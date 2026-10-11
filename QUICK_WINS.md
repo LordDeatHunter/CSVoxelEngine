@@ -109,19 +109,13 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Sun lens glare.** `SunGlare.Intensity` from alignment, sun height and cloud cover (`night-sky.json`).
 - [x] **Snow sparkle.** Hashed per-texel glints on the snow tile; only shows with a low sun, since noon snow clips to white (`snow-sparkle.json`, `VOXEL_TIME=405`).
 
-- [ ] **Leaf backlight.** Leaves between the camera and the sun glow warm, as if lit through.
-  *Hook:* the world fragment on sway-flagged vertices (bit 5), a power of dot(view, sun) times
-  the shadow term, so leaves in shadow stay dark. Keep the shadow pass untouched.
+- [x] **Leaf backlight.** `LeafBacklight` + `uLeafBacklight*`: sway faces (a flat `fSwayFlag`) glow by a `pow(dot(view, sun))` lobe times a shadow-map read `LeafBacklightReachBlocks` toward the sun, since the faces seen against the sun point away from it (`leaf-backlight.json`, `VOXEL_TIME=1100`).
 - [ ] **Eye adaptation.** Exposure eases up in a dark cave and back down outside.
   *Hook:* `EntityLight.Sample` at the eye cell (sun and block light, no GPU readback), eased
   through `MathUtils.Damp` (slower adapting to dark than to light), scaling `TonemapExposure` in
   `RenderPostProcess`. Clamp it so a lamp-lit room is not blown out.
-- [ ] **Grass wind shimmer.** Soft bright bands roll across grass tops along the wind.
-  *Hook:* biome-tinted up faces (bit 4, face 4) in the world fragment, with the `uWind` /
-  `uWindOffset` the leaf sway already reads, so the bands travel with the gusts.
-- [ ] **Ice glint.** Ice gets a fresnel sky sheen and a sun highlight.
-  *Hook:* a separate tile term like the snow sparkle (`uSnowLayer` / `SnowGlint`), not the ore
-  material system.
+- [x] **Grass wind shimmer.** `GrassShimmer` + `uGrassShimmer*`: bands across `uWind` on biome-tinted up faces, read at the position minus `uWindOffset`, weighted by the sway's gust, gone by 112 blocks (`grass-shimmer.json`).
+- [x] **Ice glint.** `IceGlint` + `uIceLayer`/`uIceGlint`/`uIceShine`/`uIceSheen`: a fresnel sky mirror plus a sun highlight gated by the face's direct sun (`ice-glint.json`, `VOXEL_TIME=405`).
 - [ ] **Underwater wobble.** A gentle screen distortion while the eye is under water.
   *Hook:* a UV offset in `post-fragment.glsl` behind a new `uUnderwater` (0 in the ItemDebugger);
   the FXAA taps must read around the same offset coordinate.
@@ -132,13 +126,9 @@ files waits in TODO.md instead, since there are none to use yet.
   *Hook:* `SkyPalette.Compute` already returns a glow that is zero today, and all four `SkySample`
   copies read it. The flat day sky is deliberate, so give the glow a value only near the horizon
   crossing; `SkyPalette.Sample` is the tested twin.
-- [ ] **Sun glitter on water.** Hashed sparkles on the waves along the sun's reflection path.
-  *Hook:* the water fragment, using the snow sparkle's hash-and-half-vector approach over the
-  wave normal; off underwater and from below.
+- [x] **Sun glitter on water.** `WaterGlitter` + `uWaterGlitter*`: five hashed facets per block tilted off the wave normal, lit by the snow glint's half-vector test as one round point per cell, re-rolled 3x a second; off from below, underwater, in shade and past 128 blocks (`water-glitter.json`, `VOXEL_TIME=360`).
 
-- [ ] **Lava glow pulse.** The lava surface breathes in brightness on a slow noise field. *Hook:*
-  the fluid fragment path. Check first how lava is told apart from water in `test-fragment.glsl`;
-  if it is not, gate the term behind the lava tile's layer like `uSnowLayer`.
+- [x] **Lava glow pulse.** `LavaPulse` + `uLavaPulse`: the lava glow (`isLava`/`uLavaLayer`) scaled by a slow two-octave value-noise field after the display-space clip (`lava.json` pulse shots).
 - [ ] **Damage chromatic fringe.** On a hit the screen edges split red and blue for about 0.3 s.
   *Hook:* a `uDamageFringe` term in `post-fragment.glsl` (display-space, 0 in the ItemDebugger),
   driven by the same flash value as the damage vignette.
@@ -150,17 +140,10 @@ files waits in TODO.md instead, since there are none to use yet.
   vertical falloff, faded by `ColdWeight` at the eye (a `uColdness` uniform, eased) and by
   `StarField.Visibility`. The mirror pass redraws the dome, so it reflects. A GL-free twin carries
   the fade.
-- [ ] **Deep-water darkness.** Underwater fog darkens and loses red the deeper the eye is below the
-  surface. *Hook:* the underwater branch of the fog mix, with depth = `Camera.EyeWaterSurfaceY`
-  minus the eye height (already a uniform for the rays); the curve is a tested pure function.
-- [ ] **Glass sheen.** Glass and pane faces pick up a fresnel sky tint at grazing angles. *Hook:*
-  the translucent fragment path, reusing `SurfaceFresnel.Schlick` and `SkySample`.
-- [ ] **Ore twinkle.** Ore tiles occasionally flash a bright texel under the sun. *Hook:* the
-  per-tile material path (`material.metallic` above 0), with a hashed texel threshold like the snow
-  glint, gated by the sun term and distance.
-- [ ] **Selection outline pulse.** The block outline breathes between 70 % and 100 % alpha. *Hook:*
-  `selection-fragment.glsl` with the clock uniform; off while mining so the crack overlay stays
-  readable.
+- [x] **Deep-water darkness.** `DeepWaterFog.Dim(depth)` -> `uDeepWaterDim` from `Camera.EyeWaterSurfaceY - RenderEye.Y`: the underwater fog and the from-below reflection lose red first and never drop under 15 % (`deep-water.json`).
+- [x] **Glass sheen.** `GlassSheen` + `uGlassLayer`/`uGlassSheen`: glass and panes fold `SkySample` times `SurfaceFresnel.Schlick` into the translucent blend with alpha `a + F - aF` (`glass-sheen.json`).
+- [x] **Ore twinkle.** `OreTwinkle` + `uOreTwinkle*` in the ore material path: a hashed 4 % of texels flash once per 0.2-0.5 Hz cycle, gated like the snow glint, gone by 28 blocks (`ore-twinkle.json`).
+- [x] **Selection outline pulse.** `SelectionPulse` + `uPulseDepth`/`uPulsePeriod`: 70-100 % over `SelectionPulsePeriodSeconds`, held steady while mining; the outline beams now cull back faces so the breath reads (`selection-pulse.json`).
 - [ ] **Moonlight.** At night a faint cool directional light from the moon keeps shadows and a blue
   cast. *Hook:* `RenderManager.SetLighting` and `DayCycle` (moon direction = sun negated): the
   ambient floor goes slightly blue and the shadow pass takes the moon direction while the sun is
