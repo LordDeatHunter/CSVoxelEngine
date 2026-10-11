@@ -137,6 +137,7 @@ public sealed class GoblinManager : IMobPopulation
             var goblin = _goblins[i];
             var chased = MobTargets.Nearest(targets, goblin.Position);
             goblin.Update(deltaTime, chunks, chased >= 0 && !goblin.IsDying ? targets[chased] : null);
+            goblin.UpdateHazards(deltaTime, chunks);
 
             if (goblin.IsDying)
             {

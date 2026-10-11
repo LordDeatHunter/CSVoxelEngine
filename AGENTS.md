@@ -641,6 +641,8 @@ OpenGLTest/
     MobTargets.cs              # GL-free target rules: body contact, nearest non-immune target, min distance
     MobCaps.cs, IMobPopulation.cs  # the natural and hard mob caps every kind shares, over the
                                #   living count each registered manager reports
+    MobFallDamage.cs           # GL-free mob fall damage: a share of the mob's pool per block past its safe height
+    MobLava.cs                 # GL-free mob lava rule: body box in a burning fluid, damage per tick
     SlimeSize.cs               # GL-free per-size slime stats: body scale, health, contact damage,
                                #   loot rolls, each 1 + (size - 1) * its config step; the spawn size roll
     DayCycle.cs                # GL-free sun direction, dayness and night factor of the lighting clock
@@ -2494,7 +2496,12 @@ physics reports (`Mob.NoteLanding`, which also feeds the landing dust) bills `Mo
 over the drop its impact speed implies: free up to `Mob.SafeFallBlocks` (`MobSafeFallBlocks`; a slime
 adds its own hop's apex, so its hops never hurt it), then `MobFallDamagePerBlockShare` of the mob's
 full health (at least 1) per whole block past it, and nothing when the feet were in water
-(`MobFallDamageTests`).
+(`MobFallDamageTests`). **Lava**: each manager calls `Mob.UpdateHazards` right after the mob's own
+update; a body box touching a burning fluid (`MobLava.BodyInLava`, the cell test of
+`PlayerBodyProbe.InLava`) takes `MobLava.DamagePerTick` (`MobLavaDamageShare` of its full health, at
+least 1) every `MobLavaTickSeconds` with the hit flash, leaving it clears the partial tick, and a
+death it causes rolls the loot as usual (`MobLavaTests`). `visual-examples/mob-hazards.json`
+(`VOXEL_TIME=147`) films the falls and the lava bath.
 
 The first entity is the **slime** (`Slime` + `Systems/SlimeManager.cs`), owned by `World`. It hops
 toward the player, damages on contact only while airborne (a slime merely bobbing in water is

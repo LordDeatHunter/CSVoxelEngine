@@ -1479,6 +1479,13 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float MobSafeFallBlocks = 3f;
     public const float MobFallDamagePerBlockShare = 0.1f;
 
+    // --- Mob lava (MobLava, Mob.UpdateHazards) ---
+    // A mob whose body box touches lava burns: every tick spent in it costs this share of its own full
+    // health (at least 1), with the hit flash. Leaving the lava clears the partial tick, as for the
+    // player, so a brush never eats an instant hit.
+    public const float MobLavaTickSeconds = 0.5f;
+    public const float MobLavaDamageShare = 0.15f;
+
     // --- Slimes (SlimeManager) ---
     // Forest mobs that hop at the player. Natural spawns appear on dry forest surface in a ring
     // around the player and are culled when they stray too far. Damage only lands while a slime

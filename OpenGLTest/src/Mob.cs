@@ -149,6 +149,32 @@ public abstract class Mob
         return impactSpeed > 0f;
     }
 
+    private float _lavaTimer;
+
+    /// <summary>
+    /// The shared world hazards, called by the owning manager once a frame right after the mob's own
+    /// update, in the authoritative simulation only: a body box in lava (<see cref="MobLava"/>) burns
+    /// one damage tick per <see cref="WorldGenerationConfig.MobLavaTickSeconds"/> with the hit flash, and
+    /// leaving it (or dying) clears the partial tick. A death it causes rolls the loot as usual, since the
+    /// manager checks <see cref="IsDead"/> after this.
+    /// </summary>
+    public void UpdateHazards(float deltaTime, ChunkManager chunks)
+    {
+        if (deltaTime <= 0f || chunks == null) return;
+        if (IsDying || !MobLava.BodyInLava(Position, BodyHalfExtent, BodyHalfHeight, chunks))
+        {
+            _lavaTimer = 0f;
+            return;
+        }
+
+        _lavaTimer += deltaTime;
+        while (_lavaTimer >= WorldGenerationConfig.MobLavaTickSeconds && !IsDead)
+        {
+            _lavaTimer -= WorldGenerationConfig.MobLavaTickSeconds;
+            TakeDamage(MobLava.DamagePerTick(MaxHealth));
+        }
+    }
+
     /// <summary>Horizontal half extent of the collision body, used by touch and hit tests.</summary>
     public abstract float BodyHalfExtent { get; }
 

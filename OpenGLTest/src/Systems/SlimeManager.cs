@@ -129,6 +129,7 @@ public sealed class SlimeManager : IMobPopulation
             var slime = _slimes[i];
             var chased = MobTargets.Nearest(targets, slime.Position);
             slime.Update(deltaTime, chunks, chased >= 0 && !slime.IsDying ? targets[chased].Eye : null);
+            slime.UpdateHazards(deltaTime, chunks);
 
             if (slime.IsDying)
             {
