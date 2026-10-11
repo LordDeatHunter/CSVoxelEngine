@@ -199,21 +199,12 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Size-scaled knockback.** `SlimeSize.ShoveSpeed` (the shove over the body scale) in `Slime.Shove`; a split child's launch is unscaled (`SlimeKnockbackTests`).
 - [x] **Despawn fade.** Both managers' despawn branch calls `Mob.BeginDying()` without loot, so the mob plays its death pose and leaves `LivingCount` (`mob-hazards.json`).
 - [x] **Giant slime.** `SlimeMaxSize` 4; `SlimeSize.Roll` takes the last step at `SlimeMaxSizeChanceFactor` of the usual threshold, so it is rarer than size 3 in every light (`GiantSlimeTests`, `slime-sizes.json`).
-- [ ] **Goblin torches.** Each goblin may carry torches, which it holds in its off hand at night
-  while the main hand still holds and throws the flint. *Hook:* at spawn a goblin rolls a torch
-  count (0 or 1-2) with a chance that is very small by day, a lot higher at night
-  (`DayCycle.NightFactor`, eased like the slime size roll) and highest underground
-  (`SlimeSize.IsUnderground`'s depth rule, ready for when goblins spawn in caves); the three
-  chances and the count go in `WorldGenerationConfig.Goblin*`. A goblin with torches **equips**
-  one while it is dark (night or underground): the torch is drawn at the off hand's
-  `EntityAnimator.HandAnchor` (`ArmL`, where the flint is `ArmR`) through the `Goblin.BodyEffect`
-  matrix, put away by day, and its flame point joins `World.FireCells` (minus
-  `FireParticleSystem.SpawnOffset`, as the kiln does) so it lights the area and sheds embers, a few
-  blocks of radius like a campfire. **On death the carried torches drop** with the flint and the
-  goblin's loot table. The count is saved (an optional `MobData` field, absent = 0, like a slime's
-  size) and sent (check first that `NetEntity.ItemId` is unused for mobs; it can carry the count,
-  so the client draws the torch). Test: the carry chance is higher at night and below ground than
-  by day with the same roll, and a goblin never equips with none.
+- [x] **Goblin torches.** A spawn may carry up to `GoblinTorchMaxCount` torches (a roll whose
+  chance is small by day, larger at night and highest underground), equips one while it is dark
+  (drawn at the off hand's `ArmL` anchor through `BodyEffect`, its flame point joining
+  `World.FireCells` for light and embers), and drops the carried torches on death with the flint;
+  the count is saved (`MobData.Torches`) and sent (the mob `NetEntity.ItemId` byte)
+  (`GoblinTorches`, `Goblin.TorchFlamePoint`; `GoblinTorchTests`).
 - [x] **Loot toss.** Every death drop goes through `DropManager.SpawnAt(id, pos, MobLoot.RandomToss())`, an up-and-out launch tuned by `MobLootToss*` (`MobLootTests`, `mob-hazards.json`).
 - [x] **Size-scaled hops.** `SlimeSize.HopLift` / `HopReach` / `WindupScale` raise the body scale to the `SlimeHop*Exponent` knobs, read by `Slime.HopVelocity` and the crouch time (`SlimeHopTests`).
 - [x] **Lose interest.** `Mob.PickTarget` = the notice rule plus a per-mob `MobInterest`: sight checked every `MobSightCheckSeconds`, dropped after `MobLoseInterestSeconds` without it, then the mob wanders toward `Mob.WanderGoal` and idles out through `Mob.ShouldIdleDespawn` (`MobInterestTests`, `mob-notice.json`).

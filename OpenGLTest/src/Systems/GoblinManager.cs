@@ -26,6 +26,7 @@ public sealed class GoblinManager : IMobPopulation
     private readonly List<Mob> _stoneMobs = [];
     private readonly List<byte> _loot = [];
     private readonly byte _flintId;
+    private readonly byte _torchId;
     // One delegate for every goblin's collector: it only ever takes flint
     private readonly Func<byte, bool> _canScavenge;
     // The goblins a frame's collectors were built for, in the same order (AwardScavenged's index)
@@ -43,6 +44,7 @@ public sealed class GoblinManager : IMobPopulation
         Goblin.ValidateContent(type);
         _type = type;
         _flintId = ContentRegistry.RequireItem("flint").Id;
+        _torchId = ContentRegistry.RequireBlock("torch").Id;
         _canScavenge = id => id == _flintId;
         _caps = caps ?? new MobCaps();
         _caps.Register(this);
@@ -154,14 +156,15 @@ public sealed class GoblinManager : IMobPopulation
     /// Adds a goblin at an exact body-centre position: a forced spawn (scenarios, save restores, a
     /// client's mirror, tests), which may go past the natural cap but never the hard cap. Null, and
     /// nothing added, once the hard cap is full. The ring spawner adds through here too, after its
-    /// own natural-cap check. A null <paramref name="ammo"/> rolls the stone count it carries.
+    /// own natural-cap check. A null <paramref name="ammo"/> rolls the stone count it carries, and
+    /// a null <paramref name="torches"/> carries none.
     /// </summary>
-    public Goblin? Spawn(Vector3 position, int? ammo = null)
+    public Goblin? Spawn(Vector3 position, int? ammo = null, int? torches = null)
     {
         if (_caps.ForcedRoom <= 0) return null;
         var stones = ammo ?? Random.Shared.Next(WorldGenerationConfig.GoblinStoneMin,
             WorldGenerationConfig.GoblinStoneMax + 1);
-        var goblin = new Goblin(_type, position, stones);
+        var goblin = new Goblin(_type, position, stones, torches: torches ?? 0);
         _goblins.Add(goblin);
         return goblin;
     }
@@ -215,7 +218,7 @@ public sealed class GoblinManager : IMobPopulation
     /// </summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, IReadOnlyList<IMobTarget> targets,
         BlockDebrisSystem? debris = null, IReadOnlyList<Slime>? slimes = null, Vector3? aimOrigin = null,
-        Vector3? aimDirection = null, float aimCharge = 0f)
+        Vector3? aimDirection = null, float aimCharge = 0f, float night = 0f)
     {
         DamageDealtThisFrame = 0;
         if (chunks == null || targets == null) return;
@@ -231,6 +234,9 @@ public sealed class GoblinManager : IMobPopulation
             // Its noticed target while it keeps interest (Mob.PickTarget), else a wander goal
             var chased = goblin.PickTarget(targets, deltaTime, chunks);
             var dodge = dodgeAimed && IsAimedAt(goblin.Position, aimOrigin!.Value, aimDirection!.Value);
+            // A carried torch is out while it is dark (night or underground), lighting the goblin's
+            // own patch of the world through its flame point
+            goblin.SetDark(night, IsUnderground(chunks, goblin.Position));
             goblin.Update(deltaTime, chunks, chased >= 0 && !goblin.IsDying ? targets[chased] : null,
                 chased < 0 ? goblin.WanderGoal(targets.Count, deltaTime) : null, dodge);
             goblin.UpdateHazards(deltaTime, chunks);
@@ -301,7 +307,18 @@ public sealed class GoblinManager : IMobPopulation
         }
 
         UpdateStones(deltaTime, chunks, targets, slimes);
-        UpdateSpawning(deltaTime, chunks, targets);
+        UpdateSpawning(deltaTime, chunks, targets, night);
+    }
+
+    // Whether a position stands below its column's terrain: the cave rule the torch roll shares
+    // with the slime size roll, read from the world source's column heights
+    private static bool IsUnderground(ChunkManager chunks, Vector3 position)
+    {
+        var (x, y, z) = position.BlockCell();
+        var source = chunks.WorldSource;
+        var column = source.GetColumn(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
+        var surface = column.Heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
+        return SlimeSize.IsUnderground(y, surface);
     }
 
     private void UpdateStones(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets,
@@ -395,11 +412,15 @@ public sealed class GoblinManager : IMobPopulation
         // The stones it never threw.
         for (var i = 0; i < goblin.Ammo; i++)
             drops.SpawnAt(_flintId, goblin.Position, MobLoot.RandomToss());
+
+        // The torches it still carried.
+        for (var i = 0; i < goblin.Torches; i++)
+            drops.SpawnAt(_torchId, goblin.Position, MobLoot.RandomToss());
     }
 
     // One shared timer, under the natural cap every mob kind shares; each expiry tries the ring
     // round the next target in turn.
-    private void UpdateSpawning(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
+    private void UpdateSpawning(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets, float night)
     {
         if (!_caps.AllowsNaturalSpawn) return;
 
@@ -414,16 +435,21 @@ public sealed class GoblinManager : IMobPopulation
         if (TryFindSpawn(chunks, targets[index].Eye, out var position))
         {
             // A ring spawn rolls a pack: the found cell leads, and one to two more join it within
-            // GoblinPackSpawnRadiusBlocks while the shared natural cap still has room
+            // GoblinPackSpawnRadiusBlocks while the shared natural cap still has room. Each member
+            // rolls its own torches from the lighting clock's night and its own depth.
             var pack = 1 + Random.Shared.Next(WorldGenerationConfig.GoblinPackMaxSize);
-            Spawn(position);
+            Spawn(position, torches: RollTorches(chunks, position, night));
             for (var member = 1; member < pack && _caps.AllowsNaturalSpawn; member++)
             {
                 if (TryFindPackMate(chunks, position, out var mate))
-                    Spawn(mate);
+                    Spawn(mate, torches: RollTorches(chunks, mate, night));
             }
         }
     }
+
+    // The torches one ring spawn carries: the light and depth rule over one uniform roll
+    private static int RollTorches(ChunkManager chunks, Vector3 position, float night) =>
+        GoblinTorches.Roll(night, IsUnderground(chunks, position), Random.Shared.NextSingle());
 
     // A pack mate's spot: the same dry-surface search, ringed on the leader's cell rather than the
     // player

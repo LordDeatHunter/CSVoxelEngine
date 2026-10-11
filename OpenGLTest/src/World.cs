@@ -1282,7 +1282,7 @@ public class World : IItemUseWorld
         {
             // A slime's size rides the goblin-only ammo field (NetEntity)
             NetEntityKind.Slime => _slimes?.Spawn(entry.Position, entry.Ammo),
-            NetEntityKind.Goblin => _goblins?.Spawn(entry.Position, entry.Ammo),
+            NetEntityKind.Goblin => _goblins?.Spawn(entry.Position, entry.Ammo, entry.ItemId),
             _ => null,
         };
         mob?.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
@@ -1781,6 +1781,13 @@ public class World : IItemUseWorld
         _fireCells.Clear();
         _fireCells.AddRange(_campfires.LitCells);
         _fireCells.AddRange(_kilns.LitCells);
+        // A goblin's lit torch: its flame rides the off hand, a few blocks of radius like a campfire
+        if (_goblins != null)
+        {
+            foreach (var goblin in _goblins.Goblins)
+                if (goblin.TorchFlamePoint is { } flame)
+                    _fireCells.Add(flame - FireParticleSystem.SpawnOffset);
+        }
         // The lighting clock (window time plus VOXEL_TIME), so the smoke blows the way the leaves lean
         var wind = Wind.Direction(LightingTime);
         _fire.Update((float)deltaTime, _fireCells, Camera.RenderEye, wind: wind);
@@ -1834,7 +1841,8 @@ public class World : IItemUseWorld
                 _slimes?.Slimes,
                 aimOrigin: _serverMode || _clientMode ? null : Camera.Position,
                 aimDirection: _serverMode || _clientMode ? null : Camera.LastAimDirection,
-                aimCharge: _serverMode || _clientMode ? 0f : Camera.ThrowCharge ?? 0f);
+                aimCharge: _serverMode || _clientMode ? 0f : Camera.ThrowCharge ?? 0f,
+                night: DayCycle.NightFactor(LightingTime));
             var goblinDamage = _goblins.DamageDealtThisFrame;
             if (!_serverMode && goblinDamage > 0)
             {
@@ -2021,7 +2029,7 @@ public class World : IItemUseWorld
             // A file saved before slimes had sizes carries none: those were all the smallest size
             Mob? spawned = isSlime
                 ? _slimes!.Spawn(centre, mob.Size ?? SlimeSize.Min)
-                : _goblins!.Spawn(centre, mob.Ammo ?? 0);
+                : _goblins!.Spawn(centre, mob.Ammo ?? 0, mob.Torches ?? 0);
             if (spawned == null)
                 continue;
 
@@ -2174,7 +2182,7 @@ public class World : IItemUseWorld
         var goblins = Goblins;
         for (var i = 0; i < goblins.Count; i++)
             if (!goblins[i].IsDead)
-                mobs.Add(MobSaveCodec.Capture(goblins[i], goblins[i].Ammo));
+                mobs.Add(MobSaveCodec.Capture(goblins[i], goblins[i].Ammo, torches: goblins[i].Torches));
         mobs.AddRange(_pendingMobs);
 
         _dropSort.Clear();

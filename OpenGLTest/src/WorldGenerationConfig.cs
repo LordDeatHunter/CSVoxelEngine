@@ -2115,6 +2115,15 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float GoblinPackSpawnRadiusBlocks = 3f;
     public const int GoblinPackSpawnTries = 8;
 
+    // --- Goblin torches (GoblinTorches): a spawn may carry torches, held in the off hand while it
+    // is dark (night or underground), lit like a small campfire and dropped on death ---
+    public const float GoblinTorchChanceDay = 0.03f;
+    public const float GoblinTorchChanceNight = 0.4f;
+    public const float GoblinTorchChanceUnderground = 0.7f;
+    public const int GoblinTorchMaxCount = 2;
+    // Night factor from which a carried torch is out
+    public const float GoblinTorchNightFactor = 0.5f;
+
     // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
     // first notices a player (the same moment its first-throw delay starts) ---
     public const float GoblinNoticePipSeconds = 0.9f;

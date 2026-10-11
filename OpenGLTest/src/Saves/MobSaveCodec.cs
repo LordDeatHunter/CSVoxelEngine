@@ -7,7 +7,7 @@ namespace silkgltriangle;
 /// </summary>
 internal static class MobSaveCodec
 {
-    public static EntitySaveData.MobData Capture(Mob mob, int? ammo, int? size = null) => new()
+    public static EntitySaveData.MobData Capture(Mob mob, int? ammo, int? size = null, int? torches = null) => new()
     {
         Type = mob.Type.Name,
         Position = [mob.Position.X, mob.Position.Y, mob.Position.Z],
@@ -15,6 +15,7 @@ internal static class MobSaveCodec
         Facing = mob.Facing,
         Velocity = [mob.Velocity.X, mob.Velocity.Y, mob.Velocity.Z],
         Ammo = ammo,
-        Size = size
+        Size = size,
+        Torches = torches
     };
 }

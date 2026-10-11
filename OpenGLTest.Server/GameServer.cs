@@ -890,7 +890,8 @@ public sealed class GameServer : IDisposable
             writer.Write(mob.Facing);
             writer.Write(mob.Health);
             writer.Write(ammo);
-            writer.Write((byte)0);
+            // The byte field is a goblin's torch count (a slime carries none)
+            writer.Write(mob is Goblin torchGoblin ? (byte)torchGoblin.Torches : (byte)0);
             writer.Write(mob.Velocity);
         }
 

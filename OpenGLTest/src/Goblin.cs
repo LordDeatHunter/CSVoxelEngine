@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Numerics;
 
 namespace silkgltriangle;
@@ -37,6 +38,17 @@ public sealed class Goblin : Mob
 
     /// <summary>Draw scale of the flint held in the throwing hand while ammo remains.</summary>
     public const float HeldStoneScale = 0.28f;
+
+    /// <summary>Scale the off hand's carried torch is drawn at (the block's model, not an item
+    /// sprite).</summary>
+    public const float HeldTorchScale = 0.5f;
+
+    /// <summary>The bone holding a carried torch: the off hand, where the flint rides the right.</summary>
+    public const string OffHandPart = "ArmL";
+
+    // The rigs the animation poses, one per entity type and shared with nothing GL-bound, so the
+    // torch flame point can be read without the renderer
+    private static readonly ConcurrentDictionary<EntityType, PlayerRig> RigCache = new();
 
     /// <summary>Half the collision body's horizontal edge.</summary>
     public const float HalfExtent = 0.3f;
@@ -93,15 +105,18 @@ public sealed class Goblin : Mob
     private readonly float _dodgeSide;
     // Whether this goblin has ever started a throw; the pack alert only pulls a first throw forward
     private bool _thrownOnce;
+    // Whether the manager last read the light as dark (a carried torch is out then)
+    private bool _dark;
     // Set on the frame the goblin first noticed a target, read (and cleared) by the manager, which
     // alerts the pack with it
     private bool _justNoticed;
     private float _noticePipElapsed = WorldGenerationConfig.GoblinNoticePipSeconds;
     private bool _noticed;
 
-    public Goblin(EntityType type, Vector3 position, int ammo, bool spawnIn = true) : base(type, position)
+    public Goblin(EntityType type, Vector3 position, int ammo, bool spawnIn = true, int torches = 0) : base(type, position)
     {
         Ammo = Math.Max(0, ammo);
+        Torches = Math.Clamp(torches, 0, WorldGenerationConfig.GoblinTorchMaxCount);
         Animation = new EntityAnimator(type.Model.Animations, WorldGenerationConfig.GoblinWalkSpeed);
         // The dodge side: fixed at spawn from the starting cell, so the same goblin always breaks
         // the same way out of a charged throw's line
@@ -142,6 +157,36 @@ public sealed class Goblin : Mob
     /// <see cref="WorldGenerationConfig.GoblinStoneMax"/>.</summary>
     public void AddAmmo(int amount) =>
         Ammo = Math.Clamp(Ammo + amount, 0, WorldGenerationConfig.GoblinStoneMax);
+
+    /// <summary>Torches this goblin still carries; it equips one while it is dark and they drop on
+    /// death.</summary>
+    public int Torches { get; private set; }
+
+    /// <summary>Whether a carried torch is out: one is left and the manager last read it as dark
+    /// (<see cref="SetDark"/>).</summary>
+    public bool TorchLit => Torches > 0 && _dark;
+
+    /// <summary>The manager's per-frame light reading for this goblin: whether a carried torch
+    /// would be out (<see cref="GoblinTorches.Lit"/>).</summary>
+    public void SetDark(float night, bool underground) => _dark = GoblinTorches.Lit(1, night, underground);
+
+    /// <summary>
+    /// Where a lit torch's flame burns in the world (the off hand's anchor through the body
+    /// effect, the same matrices the renderer draws the torch with), or null while none is out.
+    /// The world's fire gathering reads it, so a torch-bearing goblin lights its area and sheds
+    /// embers.
+    /// </summary>
+    public Vector3? TorchFlamePoint
+    {
+        get
+        {
+            if (!TorchLit) return null;
+            var feet = Position - new Vector3(0f, BodyHalfHeight, 0f);
+            var rig = RigCache.GetOrAdd(Type, static type => PlayerRig.FromBbmodel(type.Model));
+            var anchor = Animation.HandAnchor(OffHandPart, rig, feet, Facing) * BodyEffect(feet);
+            return anchor.Translation;
+        }
+    }
 
     /// <summary>Whether the goblin currently stands on the ground.</summary>
     public bool IsGrounded { get; private set; }

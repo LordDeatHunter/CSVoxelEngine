@@ -103,6 +103,7 @@ public class RenderManager : IDisposable
     private uint _goblinTexture;
     // The flint item: the stone a goblin holds while it still has ammo.
     private byte _flintId;
+    private byte _torchId;
 
     /// <summary>Blockbench project behind the player model; a missing or broken file falls back to built-in Steve.</summary>
     public const string PlayerModelPath = "assets/models/player/player.bbmodel";
@@ -820,6 +821,7 @@ public class RenderManager : IDisposable
                 _goblinRig.TextureWidth, _goblinRig.TextureHeight, srgb: true);
         }
         _flintId = ContentRegistry.RequireItem("flint").Id;
+        _torchId = ContentRegistry.RequireBlock("torch").Id;
         ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes, atlasIsSrgb: true);
         // The damage numbers are laid out from the HUD's font; without one there is nothing to draw
         if (ui.Font is { } font)
@@ -3652,6 +3654,16 @@ public class RenderManager : IDisposable
                 SetDrawUniforms(held, held * viewProj, 1f, light);
                 stone.Render();
                 BindUnit(0, TextureTarget.Texture2DArray, _goblinTexture);
+            }
+
+            // A lit torch rides the off hand, where the flint rides the right; the world's fire
+            // gathering reads the same point (Goblin.TorchFlamePoint)
+            if (goblin.TorchLit && _torchId != 0 && blockCubes.Get(_torchId) is { } torchCube)
+            {
+                var off = Matrix4x4.CreateScale(Goblin.HeldTorchScale)
+                          * goblin.Animation.HandAnchor(Goblin.OffHandPart, _goblinRig, feet, goblin.Facing) * effect;
+                SetDrawUniforms(off, off * viewProj, 1f, light);
+                torchCube.Render();
             }
         }
 
