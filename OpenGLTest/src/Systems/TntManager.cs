@@ -26,8 +26,14 @@ public class TntManager
     private readonly List<PrimedTnt> _primed = [];
     // Spawned while iterating _primed (chained TNT); drained after the tick
     private readonly List<(Vector3 Position, byte BlockId)> _pendingSpawns = [];
+    // Centres of the blasts of the last Update, for the world's camera shake
+    private readonly List<Vector3> _blasts = [];
 
     public IReadOnlyList<PrimedTnt> Primed => _primed;
+
+    /// <summary>The centre of every blast the last <see cref="Update"/> set off, in detonation order;
+    /// valid until the next one. The world shakes the local camera by them (<see cref="BlastShake"/>).</summary>
+    public IReadOnlyList<Vector3> Blasts => _blasts;
 
     /// <summary>
     /// Primes a cube at the centre of the cell the block occupied. The cube carries
@@ -77,6 +83,7 @@ public class TntManager
         FluidManager fluids, FallingBlockManager falling, LeafParticleSystem? leaves = null,
         LeafDecayManager? leafDecay = null)
     {
+        _blasts.Clear();
         foreach (var tnt in _primed)
             tnt.Update(deltaTime, chunks);
 
@@ -105,6 +112,7 @@ public class TntManager
         FluidManager fluids, FallingBlockManager falling, LeafParticleSystem? leaves = null,
         LeafDecayManager? leafDecay = null)
     {
+        _blasts.Add(center);
         var radius = BlastRadius;
         var radiusSq = radius * radius;
         var touchedChunks = new HashSet<Vector3>();

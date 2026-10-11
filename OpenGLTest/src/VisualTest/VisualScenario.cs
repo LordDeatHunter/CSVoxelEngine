@@ -165,6 +165,7 @@ public sealed class VisualScenario
             },
             "mine" => new VisualStep { Op = "mine", Seconds = ReadSeconds(element, index) },
             "place" => new VisualStep { Op = "place" },
+            "prime" => new VisualStep { Op = "prime", Pos = ReadPos(element, index, "prime") },
             "fly" => new VisualStep
             {
                 Op = "fly",
@@ -210,7 +211,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, fly, give, spawn, grow, damage, view, player, select or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, give, spawn, grow, damage, view, player, select or screenshot."),
         };
     }
 

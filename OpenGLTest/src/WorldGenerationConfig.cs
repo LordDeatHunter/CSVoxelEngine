@@ -1404,6 +1404,15 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // never puffs
     public const float FootstepDustMinSpeed = 4f;
 
+    // --- TNT blast shake (ShakeFalloff): a blast shakes the local camera with this much trauma
+    // inside TntManager.BlastRadius, falling off as radius / distance and gone at the range.
+    // Cosmetic: singleplayer and a client, never a headless server. ---
+    public const float BlastShakeStrength = 1f;
+    public const float BlastShakeRangeBlocks = 48f;
+    // A client sees a blast as a primed-TNT mirror leaving the server's snapshot with at most this
+    // much of its locally burnt-down fuse left (the server only drops a cube when it detonates)
+    public const float BlastMirrorFuseSlackSeconds = 0.5f;
+
     // --- Wind (Wind.cs, SH-27) ---
     // One slowly turning wind shared by leaf sway, fire smoke and the cloud drift.
     /// <summary>Wind heading at lighting time 0, degrees from +X toward +Z.</summary>

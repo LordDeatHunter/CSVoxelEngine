@@ -1,0 +1,38 @@
+{
+  // World-event effects: run with VOXEL_TIME=147 and VOXEL_SCRIPT=visual-examples/world-events.json
+  // from OpenGLTest/. Shots land in visual/world-events/.
+  // Particles and blasts are RNG- and frame-rate-driven, so this is a presence check judged by eye,
+  // never a pixel instrument.
+  //
+  // Stands on the flat, bare desert patch torches.json uses (sand at y 9, so the feet are at 10; the
+  // desert spawns no mobs). From the eye (253.5, 11.62, -4.5) a ground-top cell centre dz cells
+  // ahead is pitch -atan(1.62 / dz) at yaw -90.
+  //   tnt-fuse   a TNT block three cells ahead, primed (the `prime` op is a firestarter strike that
+  //              never misses), seen from nine blocks back while the 1 s fuse strobes
+  //   tnt-blast  the frames right after the blast: the crater, its debris and drops, and the camera
+  //              shaken off its line (compare the horizon with tnt-fuse)
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [253.5, 30, -4.5], "yaw": -90, "pitch": -28.37 },
+    { "op": "wait", "seconds": 14 },
+    { "op": "teleport", "pos": [253.5, 11.63, -4.5], "yaw": -90, "pitch": -28.37 },
+    { "op": "walk", "keys": ["C"], "seconds": 0.15 },
+    { "op": "wait", "seconds": 1.5 },
+
+    // LEG 1 — the fuse and the blast shake.
+    { "op": "give", "block": "tnt", "count": 1 },
+    { "op": "look", "yaw": -90, "pitch": -28.37 },
+    { "op": "place" },
+    { "op": "teleport", "pos": [253.5, 11.63, 1.5], "yaw": -90, "pitch": -7.2 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "prime", "pos": [253, 10, -8] },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "tnt-fuse", "hideHud": true },
+    { "op": "wait", "seconds": 0.45 },
+    { "op": "screenshot", "name": "tnt-blast-a", "hideHud": true },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "tnt-blast-b", "hideHud": true },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "tnt-after", "hideHud": true }
+  ]
+}

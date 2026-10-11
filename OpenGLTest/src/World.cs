@@ -1064,11 +1064,23 @@ public class World : IItemUseWorld
             if (!_netTntSeen.Contains(id))
                 _netTntRemovals.Add(id);
         foreach (var id in _netTntRemovals)
-            _netTnt.Remove(id);
+        {
+            // The server drops a cube only when it detonates, so a mirror leaving the snapshot with
+            // its locally burnt fuse spent is a blast: shake the camera at its last position
+            if (_netTnt.Remove(id, out var gone)
+                && gone.FuseRemaining <= WorldGenerationConfig.BlastMirrorFuseSlackSeconds)
+                ShakeForBlast(gone.Position);
+        }
 
         _tntManager.ReplaceMirrors(_netTnt.Values);
         _falling.ReplaceMirrors(_netFalling);
     }
+
+    /// <summary>Shakes the local camera for a TNT blast at <paramref name="centre"/>, by its distance
+    /// (<see cref="ShakeFalloff"/>). Cosmetic: singleplayer and a client.</summary>
+    private void ShakeForBlast(Vector3 centre) =>
+        Camera.AddShake(ShakeFalloff.Trauma(WorldGenerationConfig.BlastShakeStrength, TntManager.BlastRadius,
+            WorldGenerationConfig.BlastShakeRangeBlocks, Vector3.Distance(Camera.Position, centre)));
 
     /// <summary>Whether any station block entity (campfire, quern, kiln, cast mold) is tracked,
     /// so a server with none sends no station snapshots.</summary>
@@ -1337,6 +1349,26 @@ public class World : IItemUseWorld
     /// and the low-health vignette all follow it), so a script can film the low-health HUD.</summary>
     internal void DamagePlayer(int amount) => _health.TakeDamage(amount);
 
+    /// <summary>Scenario seam: primes the primable block (TNT) in <paramref name="cell"/> the way a
+    /// firestarter strike does, minus its chance roll, so a script can film a blast. False when the
+    /// cell holds nothing primable.</summary>
+    internal bool TestPrimeTnt(Vector3 cell)
+    {
+        var x = MathUtils.FloorToInt(cell.X);
+        var y = MathUtils.FloorToInt(cell.Y);
+        var z = MathUtils.FloorToInt(cell.Z);
+        IItemUseWorld use = this;
+        if (!_chunkManager.TryGetCell(x, y, z, out var id, out _) || !use.IsPrimedTntBlock(id))
+            return false;
+        var at = new Vector3(x, y, z);
+        if (!use.RemoveCellForPrime(at))
+            return false;
+        use.SpawnPrimedTnt(at, id);
+        use.ScheduleFluidAround(at);
+        use.MarkLodColumnEdited(x, y, z);
+        return true;
+    }
+
     /// <summary>Scenario seam: makes the player's model play one reaction or swing, so a script can film it.</summary>
     internal void TestPlayerAction(string action)
     {
@@ -1491,6 +1523,10 @@ public class World : IItemUseWorld
         }
 
         _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager, _falling, _leaves, _leafDecay);
+        // Every blast this frame shakes the local camera by its distance; a server's camera is nobody
+        if (!_serverMode)
+            foreach (var blast in _tntManager.Blasts)
+                ShakeForBlast(blast);
         _falling.Update((float)deltaTime, _chunkManager, _dropManager, _fluidManager, _lodManager);
         _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager, windTime: LightingTime);
         _debris.Update((float)deltaTime, _chunkManager);

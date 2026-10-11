@@ -76,6 +76,16 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 Advance();
                 break;
 
+            case "prime":
+                // A firestarter strike that never misses: the scripted keyboard cannot equip a tool
+                // instance, and the strike's chance roll would make a blast scenario flaky
+                if (!world.TestPrimeTnt(step.Pos!.Value))
+                    throw new InvalidOperationException(
+                        $"Step {_step + 1} primes {step.Pos}, which holds no primable block.");
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} prime {step.Pos}");
+                Advance();
+                break;
+
             case "fly":
                 world.Camera.TestSetFlight(step.On);
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} fly {(step.On ? "on" : "off")}");

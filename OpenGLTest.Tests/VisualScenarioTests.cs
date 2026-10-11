@@ -216,6 +216,21 @@ public sealed class VisualScenarioTests
         Assert.False(off.Steps[0].On);
     }
 
+    [Fact]
+    public void PrimeNamesTheCellToPrimeAndTheUnknownOpErrorListsIt()
+    {
+        var scenario = VisualScenario.Parse("""{ "steps": [{ "op": "prime", "pos": [4, 11, -6] }] }""", "tour");
+        Assert.Equal("prime", scenario.Steps[0].Op);
+        Assert.Equal(new System.Numerics.Vector3(4f, 11f, -6f), scenario.Steps[0].Pos);
+
+        var missing = Assert.Throws<InvalidOperationException>(
+            () => VisualScenario.Parse("""{ "steps": [{ "op": "prime" }] }""", "bad"));
+        Assert.Contains("'pos'", missing.Message);
+        var unknown = Assert.Throws<InvalidOperationException>(
+            () => VisualScenario.Parse("""{ "steps": [{ "op": "dance" }] }""", "bad"));
+        Assert.Contains("prime", unknown.Message);
+    }
+
     [Theory]
     [InlineData("""{ "steps": [{ "op": "dance" }] }""", "dance")]
     [InlineData("""{ "steps": [{ "op": "teleport", "pos": [1, 2] }] }""", "exactly 3")]

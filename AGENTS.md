@@ -708,6 +708,7 @@ OpenGLTest/
     TopplingTree.cs            # a felled tree: the wood TreeSupport finds cut off plus its canopy, meshed once in
                                #   a 16^3 scratch chunk, swung flat around the cut, then popped out as drops
     LeafParticle.cs            # one falling leaf billboard (sway, tumble, rest, fade); LeafParticleSystem owns them
+    ShakeFalloff.cs            # GL-free camera-shake trauma of a world event (blast, tree thud) by its distance
     FaceLight.cs               # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters
     CutoutMipmap.cs            # GL-free coverage-preserving mip chain for cutout tiles (alpha rescaled per level)
     LightFlicker.cs            # GL-free per-cell flicker phase + curve for the campfire point lights
@@ -2968,6 +2969,16 @@ overshoot or jiggle.
   with `BiomeTint.VertexTint` of the mean opaque skin colour (`LandingDust.SkinColour`). Sprinting
   on foot over a `footstepDust` block (grounded, not sneaking, not in water, really moving) puffs once
   per foot strike of the gait: `PlayerModel.WalkPhase` crossing π/2 + kπ (`FootstepDust.FootfallsBetween`).
+- **World-event effects** (cosmetic: singleplayer and a client, never a headless server). A TNT blast
+  shakes the local camera (`World.ShakeForBlast`): `ShakeFalloff.Trauma` is `BlastShakeStrength` inside
+  `TntManager.BlastRadius`, falls off as radius / distance and eases to zero at `BlastShakeRangeBlocks`,
+  never growing with distance. Singleplayer reads the centres `TntManager.Blasts` reports for the frame;
+  a client, which never ticks TNT, takes a primed-TNT mirror leaving the server's snapshot with its
+  locally burnt fuse within `BlastMirrorFuseSlackSeconds` as the blast (the server drops a cube only when
+  it detonates). Tests: `BlastEffectTests`. `visual-examples/world-events.json` (`VOXEL_TIME=147`) films
+  these effects; its blasts use the scenario op `prime` (`{ "op": "prime", "pos": [x, y, z] }`,
+  `World.TestPrimeTnt`), a firestarter strike on the TNT block in that cell that never misses, since
+  `give` cannot equip a tool instance and the strike's chance roll would make the scenario flaky.
 - **Remote players** (protocol 7): the `PlayerState` flags carry cosmetic `Sneaking`, `Swimming`,
   `Sprinting` and `Airborne` bits (rebroadcast untrusted, never acted on) and every `PlayerList`
   entry ends with the player's last `NetPlayerAction` and a counter that moves per swing, so
