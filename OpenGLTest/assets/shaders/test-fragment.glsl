@@ -44,6 +44,14 @@ uniform sampler2DArray uMaterialAtlas;
 // it stays 0 wherever that buffer is not bound (the item debugger), so the buffer is never read.
 uniform int uMaterialCount;
 uniform float uOreSpecScale;  // WorldGenerationConfig.OreSpecLinearScale
+// Ore twinkle (OreTwinkle is the twin): the flash strength (0, the default, switches it off), the
+// share of texels that twinkle at all, the min/max flashes per second, the flash's half-width in
+// cycles and the distance fade window.
+uniform float uOreTwinkle;
+uniform float uOreTwinkleDensity;
+uniform vec2 uOreTwinkleRate;
+uniform float uOreTwinkleWidth;
+uniform vec2 uOreTwinkleFade;
 // Snow glints: the snow tile's atlas slice, the glint strength (0, the default and the
 // ItemDebugger's, switches the term off) and the share of texels carrying a glinting facet.
 uniform float uSnowLayer;
@@ -540,6 +548,22 @@ float SnowGlint(vec3 wp, vec3 N, vec3 T, vec3 B, vec3 V) {
     return smoothstep(0.988, 0.996, dot(facet, H));
 }
 
+// Ore twinkle: a uOreTwinkleDensity share of an ore tile's texels flash now and then, each on its
+// own rate and phase. The texel is hashed from its place on the face's own plane in texture-pixel
+// space exactly as the snow glint does (SnowTexels is the tile's pixel grid), salted so the two
+// never pick the same texels; a twinkling texel lights once per cycle, a short squared tent of
+// half-width uOreTwinkleWidth around mid-cycle. 0..1, before the caller's sun and distance gates.
+// GL-free twin: OreTwinkle.Flash / Cycle.
+float OreTwinkle(vec3 wp, vec3 N, vec3 T, vec3 B, float t) {
+    vec2 texel = floor(vec2(dot(wp, T), dot(wp, B)) * SnowTexels);
+    float plane = floor(dot(wp, N) * SnowTexels + 0.5);
+    vec3 h = vec3(Pcg3d(uvec3(ivec3(int(texel.x), int(texel.y), int(plane))) + uvec3(0u, 0u, 0x9E3779B9u))) / 4294967295.0;
+    if (h.x >= uOreTwinkleDensity) return 0.0;
+    float cyc = fract(t * mix(uOreTwinkleRate.x, uOreTwinkleRate.y, h.y) + h.z);
+    float k = max(1.0 - abs(cyc - 0.5) / uOreTwinkleWidth, 0.0);
+    return k * k;
+}
+
 // Schlick fresnel with the water/wet-surface F0 of 0.06, shared by the ore path and the wet
 // sheen. GL-free twin: SurfaceFresnel.Schlick. The water surface keeps its own inline copies,
 // which carry the inside-view total-internal-reflection variants.
@@ -698,6 +722,17 @@ void main() {
             // near-black texels far more than the same add did in display space; uOreSpecScale
             // (WorldGenerationConfig.OreSpecLinearScale) brings the lift back to the old look.
             col += uSunColor * (spec * uSunIntensity * uOreSpecScale) * tint * nearFade;
+
+            // Ore twinkle: now and then a texel flashes with the sun (see OreTwinkle). Gated like the
+            // snow glint by the direct sun the face really gets - skylight, a thresholded shadow and
+            // cloud shadow, the sun on the face's side - and faded out with distance well before a
+            // texel turns subpixel. Untinted, so a flash reads as white sun on any ore.
+            if (uOreTwinkle > 0.0) {
+                float gate = fSun * smoothstep(0.6, 0.95, shadow) * smoothstep(0.0, 0.15, ndl)
+                           * smoothstep(0.0, 0.2, uSunIntensity) * (1.0 - smoothstep(uOreTwinkleFade.x, uOreTwinkleFade.y, dist));
+                if (gate > 0.0)
+                    col += uSunColor * (uSunIntensity * uOreTwinkle * gate * OreTwinkle(fWorldPos, N, fTangent, fBitangent, uTime));
+            }
         }
     }
 

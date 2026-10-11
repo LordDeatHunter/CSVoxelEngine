@@ -723,6 +723,25 @@ public const float DayLengthSeconds = 1200f;
     /// </summary>
     public const float OreSpecLinearScale = 0.1f;
 
+    // --- Ore twinkle (test-fragment.glsl, OreTwinkle) ---
+    /// <summary>
+    /// Brightness of an ore twinkle at its peak, as a multiple of the direct sun (uOreTwinkle): a
+    /// single texel, so like a snow glint it is meant to reach white. 0 switches the term off.
+    /// </summary>
+    public const float OreTwinkleStrength = 1.5f;
+    /// <summary>Share of an ore tile's texels that twinkle at all (uOreTwinkleDensity).</summary>
+    public const float OreTwinkleDensity = 0.04f;
+    /// <summary>Slowest and fastest twinkle, in flashes per second; each texel hashes its own rate between.</summary>
+    public const float OreTwinkleRateMin = 0.2f;
+    public const float OreTwinkleRateMax = 0.5f;
+    /// <summary>Half-width of a flash as a fraction of its texel's cycle: the flash lights
+    /// 2 * this of the cycle, so twinkles stay occasional.</summary>
+    public const float OreTwinkleWidth = 0.04f;
+    /// <summary>Distances from the eye, in blocks, over which the twinkle fades out, before a 32 px
+    /// texel turns subpixel and a flash would only shimmer.</summary>
+    public const float OreTwinkleFadeNearBlocks = 12f;
+    public const float OreTwinkleFadeFarBlocks = 28f;
+
     // --- Snow sparkle (test-fragment.glsl) ---
     /// <summary>
     /// Brightness of a snow glint (uSnowSparkle), as a multiple of the direct sun: the sun

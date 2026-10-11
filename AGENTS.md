@@ -480,6 +480,19 @@ translucent but its tile is opaque, so it needs no alpha handling in the translu
 `VOXEL_TIME=405` places a patch of ice on the frozen plain and frames the highlight, the grazing
 sheen and an overhead view.
 
+The **ore twinkle** rides the material path itself (`oreTile`, a non-zero `material.metallic`,
+inside the near fade): an `OreTwinkleDensity` share of the texels, hashed with `Pcg3d` from the
+texel's place on the face's plane exactly like the snow glint (salted so the two never pick the same
+texels), flash once per cycle on their own hashed rate (`OreTwinkleRateMin..Max` per second) and
+phase, a squared tent of half-width `OreTwinkleWidth` (in cycles) around mid-cycle, added untinted as
+`OreTwinkleStrength` times the direct sun. Gated like the snow glint by skylight, a thresholded
+shadow and cloud shadow and the sun on the face's side, and faded out between
+`OreTwinkleFadeNearBlocks` and `OreTwinkleFadeFarBlocks`, so ore in a cave (no skylight) never
+twinkles. Twin `OreTwinkle` (`Cycle`, `Flash`, `Gate`; `OreTwinkleTests`); `uOreTwinkle` 0 switches
+it off. `ores.json`'s spawn spot now sits under a canopy, so `visual-examples/ore-twinkle.json`
+(`VOXEL_TIME=147`) lays coal, malachite and obsidian on the frozen plain and takes four shots 0.4 s
+apart.
+
 **Chunk meshing.** The column terrain a build reads (heights for the sun seeding, water levels,
 the tint climate) comes from the 3x3 chunk columns around it, resolved once:
 `Chunk.GenerateMeshData` (the one caller of `GenerateMeshDataFromSnapshot`), right after the neighbour resolve and the empty/enclosed early
@@ -678,6 +691,7 @@ OpenGLTest/
     IceGlint.cs                # GL-free twin of the ice tile term: fresnel sky sheen weight, gated sun highlight
     LavaPulse.cs               # GL-free twin of the lava glow pulse: the slow noise field and the brightness factor
     GlassSheen.cs              # GL-free twin of the glass sheen: fresnel weight and the sky folded into the blend
+    OreTwinkle.cs              # GL-free twin of the ore twinkle: per-texel cycle, the flash tent, sun/distance gate
     ChunkGenerationWorker.cs   # background threads creating chunks around every streaming focus (one
                                #   ChunkScanFrontier per focus, served round-robin)
     Camera.cs                  # FPS camera pose, view/proj cache, shoulder/orbit modes; movement+physics and the DDA

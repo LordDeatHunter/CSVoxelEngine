@@ -842,6 +842,14 @@ public class RenderManager : IDisposable
         // and a world with no reflective tiles safe.
         program.SetUniform("uMaterialCount", materialSsbo != 0 ? TileMaterials.ByLayer.Length : 0);
         program.SetUniform("uOreSpecScale", WorldGenerationConfig.OreSpecLinearScale);
+        // Texels of the reflective tiles flashing now and then in the sun (OreTwinkle)
+        program.SetUniform("uOreTwinkle", WorldGenerationConfig.OreTwinkleStrength);
+        program.SetUniform("uOreTwinkleDensity", WorldGenerationConfig.OreTwinkleDensity);
+        program.SetUniform("uOreTwinkleRate",
+            new Vector2(WorldGenerationConfig.OreTwinkleRateMin, WorldGenerationConfig.OreTwinkleRateMax));
+        program.SetUniform("uOreTwinkleWidth", WorldGenerationConfig.OreTwinkleWidth);
+        program.SetUniform("uOreTwinkleFade",
+            new Vector2(WorldGenerationConfig.OreTwinkleFadeNearBlocks, WorldGenerationConfig.OreTwinkleFadeFarBlocks));
         // The snow glints key off the snow block's own tile; strength 0 (a program that never sets
         // it, like the ItemDebugger's) leaves the term off whatever slice that is.
         program.SetUniform("uSnowLayer", (float)ContentRegistry.RequireBlock("snow").Top);

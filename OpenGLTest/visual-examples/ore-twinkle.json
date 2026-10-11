@@ -1,0 +1,41 @@
+{
+  // Ore twinkle check: run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/ore-twinkle.json
+  // Shots land in visual/ore-twinkle/. ores.json's spawn spot now sits under a canopy, so this lays
+  // the three reflective tiles - coal, malachite and obsidian, left to right - in a row on the barren
+  // frozen plain of snow-sparkle.json ((-1112, 584), ground 18 under a snow drift, flat for six blocks
+  // around) under a high noon sun, then hovers a few blocks off them with an empty hand. Now and then
+  // single texels flash bright on the sunlit faces (OreTwinkle, test-fragment.glsl); a_..d_ are 0.4 s
+  // apart, so the flashes sit on different texels in each. The flashes are gone in shade, at night
+  // and past a couple of dozen blocks.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-1111.5, 50.5, 584.5], "yaw": -90, "pitch": -30 },
+    { "op": "wait", "seconds": 16 },
+    { "op": "teleport", "pos": [-1111.5, 21.4, 584.5], "yaw": -90, "pitch": -31 },
+    { "op": "wait", "seconds": 1 },
+
+    { "op": "give", "block": "coal_ore", "count": 1 },
+    { "op": "look", "yaw": -104, "pitch": -30 },
+    { "op": "place" },
+    { "op": "give", "block": "malachite_ore", "count": 1 },
+    { "op": "look", "yaw": -90, "pitch": -31 },
+    { "op": "place" },
+    { "op": "give", "block": "obsidian", "count": 1 },
+    { "op": "look", "yaw": -76, "pitch": -30 },
+    { "op": "place" },
+    // An empty hotbar slot keeps the first-person held block out of the shots
+    { "op": "select", "slot": 9 },
+    { "op": "wait", "seconds": 0.5 },
+
+    { "op": "teleport", "pos": [-1111.5, 22.0, 583.0], "yaw": -90, "pitch": -24 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "a", "hideHud": true },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "b", "hideHud": true },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "c", "hideHud": true },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "d", "hideHud": true }
+  ]
+}
