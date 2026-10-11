@@ -42,10 +42,9 @@ files waits in TODO.md instead, since there are none to use yet.
   (`PlacePopTests`).
 - [x] **Water splash for every entity.** A `WaterSplashTracker` per body (player, mobs, drops, projectiles, falling cubes, primed TNT) stepped by `World.UpdateSplashes`; `WaterSplash.Count/Speed` grow along `ImpactStrength` from `WaterSplashMinSpeed`, pale chips off the fluid column top, never off lava (`WaterSplashTests`, `world-events.json`).
 - [x] **Damage direction arc.** `DamageDirection` keeps the blow's world direction (fed by `Camera.TakeHit`, on a client by the `PlayerStatus` knockback that came with lost health) and the vignette pass draws it as `uHitArc`; falls and lava show none (`damage-arc.json`).
-- [ ] **Mob hit sparks.** A punch, slice or throw that connects throws a few pale chips from the
-  contact point. *Hook:* `World.StrikeMob` (all three paths go through it), then
-  `BlockDebrisSystem.Puff` with `DebrisLook.Colour`; on a client, the predicted connect the
-  hit-stop already uses.
+- [x] **Mob hit sparks.** A punch, slice or throw that connects throws pale chips from the
+  contact point: `BlockDebrisSystem.Spark` at `World.StrikeMob` (singleplayer) and at the client's
+  predicted connect, the same one the hit-stop reads; never a server (`MobHitSparkTests`).
 - [ ] **Drop landing bounce.** Item drops hop once or twice when they land instead of stopping
   dead. *Hook:* the drop physics landing in `DropManager`, a restitution that dies off under a
   minimum speed (or a `MathUtils.EaseOutBounce` offset on the drawn height only).

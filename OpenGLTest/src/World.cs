@@ -2857,7 +2857,11 @@ public class World : IItemUseWorld
             _punchTimer = 0f;
             var weight = PunchSwing();
             if (_clientMode)
+            {
                 RaiseIntent(WorldIntent.AttackWith(player.Eye, player.ViewDirection, NetAttackKind.Punch));
+                // The predicted connect sparks too, like the hit-stop's freeze below
+                SpawnHitSparks(target, player.Eye);
+            }
             else
                 StrikeMob(target, Combat.PunchDamage(held), player.Eye);
             // The punch connected, so the swing holds at full extension for a beat (cosmetic: the
@@ -2943,7 +2947,8 @@ public class World : IItemUseWorld
                 RaiseIntent(WorldIntent.AttackWith(player.Eye, player.ViewDirection,
                     returnSwing ? NetAttackKind.SliceReturn : NetAttackKind.Slice));
                 // Predicted, like the punch's: the server lands the swing on its own mobs
-                connected = HasSliceTarget(player.Eye, player.ViewDirection);
+                connected = HasSliceTarget(player.Eye, player.ViewDirection, out var predicted);
+                if (predicted != null) SpawnHitSparks(predicted, player.Eye);
             }
             else
             {
@@ -3023,15 +3028,20 @@ public class World : IItemUseWorld
 
     /// <summary>Whether a slice from <paramref name="origin"/> along <paramref name="direction"/> would
     /// strike anything: some mob in the forward hemisphere with a clear line of sight, the targets
-    /// <see cref="ApplySliceDamage"/> picks from.</summary>
-    private bool HasSliceTarget(Vector3 origin, Vector3 direction)
+    /// <see cref="ApplySliceDamage"/> picks from. <paramref name="first"/> is that mob (null when
+    /// nothing would be struck), which a client's predicted hit-sparks land on.</summary>
+    private bool HasSliceTarget(Vector3 origin, Vector3 direction, out Mob? first)
     {
+        first = null;
         for (var i = 0; i < _mobs.Count; i++)
         {
             var mob = _mobs[i];
             if (Combat.InFrontHemisphere(origin, direction, mob.Position, out _)
                 && !BlockRaycaster.SegmentHitsBlock(origin, mob.Position, _chunkManager))
+            {
+                first = mob;
                 return true;
+            }
         }
         return false;
     }
@@ -3043,8 +3053,23 @@ public class World : IItemUseWorld
         var hits = mob.HitsTaken;
         mob.TakeDamage(damage);
         ShowLandedHit(mob, hits);
+        SpawnHitSparks(mob, from);
         var away = new Vector3(mob.Position.X - from.X, 0f, mob.Position.Z - from.Z);
         mob.Shove(away, WorldGenerationConfig.SlimePunchShoveSpeed);
+    }
+
+    // A connecting hit throws a few pale chips off the mob's body where the striker faces it
+    // (cosmetic: a server draws nothing, and a client sparks its own predicted connect instead)
+    private void SpawnHitSparks(Mob mob, Vector3 from)
+    {
+        if (_serverMode) return;
+        var toward = from - mob.Position;
+        toward.Y = 0f;
+        var direction = toward.LengthSquared() > 1e-6f ? Vector3.Normalize(toward) : Vector3.UnitZ;
+        var contact = mob.Position + direction * (mob.BodyHalfExtent * 0.6f);
+        _debris.Spark(contact, WorldGenerationConfig.HitSparkColor, mob.BodyHalfExtent * 0.5f,
+            WorldGenerationConfig.HitSparkCount, WorldGenerationConfig.HitSparkSpeed,
+            WorldGenerationConfig.HitSparkSize);
     }
 
     /// <summary>The floating damage numbers over struck mobs (see <see cref="DamageNumberPool"/>).</summary>
@@ -3734,6 +3759,9 @@ public class World : IItemUseWorld
             {
                 if (!_clientMode)
                     StrikeMob(hit, projectile.Damage, projectile.Origin);
+                else
+                    // The cosmetic copy's connect sparks where it stops on the mirrored mob
+                    SpawnHitSparks(hit, projectile.Origin);
                 _thrown.RemoveAt(i);
                 continue;
             }

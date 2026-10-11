@@ -1540,6 +1540,15 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // sRGB colour of the goo when the slime's model has no skin to read its green from
     public static readonly Vector3 SlimeSplatFallbackColor = new(0.45f, 0.78f, 0.35f);
 
+    // --- Mob hit sparks (BlockDebrisSystem.Spark): a punch, slice or thrown hit that connects
+    // throws a few pale chips off the mob's body where the striker faces it. Cosmetic:
+    // singleplayer and a client (its predicted connect), never a server. ---
+    public const int HitSparkCount = 6;
+    // Blocks per second the sparks fly out at
+    public const float HitSparkSpeed = 2.8f;
+    public const float HitSparkSize = 0.07f;
+    public static readonly Vector3 HitSparkColor = new(1f, 0.96f, 0.8f);
+
     // --- Mob death poof (GroundDust.DeathPoof): a mob whose death animation just ended bursts
     // into chips of its own skin colour (LandingDust.SkinColour of its model), so a goblin throws
     // goblin-coloured chips and a slime its green. Cosmetic: singleplayer and a client, never a server. ---

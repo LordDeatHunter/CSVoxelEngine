@@ -105,6 +105,17 @@ public class BlockDebrisSystem
         Spray(origin, BlockType.Air, DebrisLook.Colour, BiomeTint.VertexTint(colourSrgb), count, speed, size,
             radius, lift: 1.3f, random ?? Random.Shared);
 
+    /// <summary>
+    /// Throws <paramref name="count"/> pale chips of one flat <paramref name="colourSrgb"/> (a
+    /// connecting hit's spark, <see cref="DebrisLook.Colour"/>) out of a body at
+    /// <paramref name="origin"/> that is <paramref name="radius"/> across: they burst from around
+    /// it at about <paramref name="speed"/> blocks per second, mostly sideways.
+    /// </summary>
+    public void Spark(Vector3 origin, Vector3 colourSrgb, float radius, int count, float speed, float size,
+        Random? random = null) =>
+        Spray(origin, BlockType.Air, DebrisLook.Colour, BiomeTint.VertexTint(colourSrgb), count, speed, size,
+            radius, lift: 0.8f, random ?? Random.Shared);
+
     // The ring launch Puff, Skirt and Splat share: headings spread round the ring with a jitter (so
     // even a three-chip puff fans out), each starting innerRadius plus up to radius out along its
     // heading, flying at 60-100 % of speed sideways and lift..2 lift of it upward, plus a shared
