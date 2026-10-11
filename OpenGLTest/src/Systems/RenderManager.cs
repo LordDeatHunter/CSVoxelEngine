@@ -4245,7 +4245,7 @@ public class RenderManager : IDisposable
         int fps, bool showProfiler, Camera? camera = null, bool showCoordinates = true,
         PauseMenuView? menu = null, SettingsMenuView? settings = null,
         int health = PlayerHealth.MaxHealth, float damageFlash = 0f, HotbarNameFade? hotbarName = null,
-        HotbarPickupPop? hotbarPops = null)
+        HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0)
     {
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         ui.Begin(window.Size, window.FramebufferSize, UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
@@ -4277,6 +4277,8 @@ public class RenderManager : IDisposable
             ui.DrawCrosshair();
         if (camera != null && HasCompassEquipped(inventory))
             ui.DrawCompass(camera.Yaw, camera.Position, showCoordinates);
+        else if (camera != null && HasClockEquipped(inventory))
+            ui.DrawClock(Clock.DayNumber(lightingTime), Clock.Readout(lightingTime));
         ui.DrawFps(fps);
         if (showProfiler)
             ui.DrawProfiler(FrameProfiler.Lines);
@@ -4393,6 +4395,27 @@ public class RenderManager : IDisposable
             }
         }
         return _compassId.HasValue && inventory.ContainsInHotbar(_compassId.Value);
+    }
+
+    // The clock item id, resolved once like the compass's
+    private byte? _clockId;
+    private bool _clockResolved;
+
+    private bool HasClockEquipped(Inventory inventory)
+    {
+        if (!_clockResolved)
+        {
+            _clockResolved = true;
+            try
+            {
+                _clockId = ContentRegistry.RequireItem("clock").Id;
+            }
+            catch (InvalidOperationException)
+            {
+                _clockId = null;
+            }
+        }
+        return _clockId.HasValue && inventory.ContainsInHotbar(_clockId.Value);
     }
     public void Dispose()
     {

@@ -2641,7 +2641,7 @@ public class World : IItemUseWorld
         SettingsMenuView? settings = null)
     {
         renderManager.RenderUI(_window!, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings,
-            _health.Health, _health.DamageFlash, _hotbarName, _hotbarPops);
+            _health.Health, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime);
     }
     
     /// <summary>

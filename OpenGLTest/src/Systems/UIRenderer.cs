@@ -564,6 +564,20 @@ public class UIRenderer : IDisposable
     }
 
     /// <summary>
+    /// The held clock's readout: the same top-centre panel the compass uses, showing the day
+    /// number and the time of day (see <see cref="Clock"/>). Drawn only while the clock is in
+    /// the hotbar, like the compass.
+    /// </summary>
+    public void DrawClock(int day, string timeOfDay)
+    {
+        var cx = _screenSize.X * 0.5f;
+        DrawRect(new Vector2(cx, CompassTop + CompassHeight * 0.5f),
+            new Vector2(CompassWidth, CompassHeight), PanelBackground);
+        DrawTextCentred($"Day {day}   {timeOfDay}", cx, CompassTop + CompassReadoutTop,
+            _countScale, Rgba.White);
+    }
+
+    /// <summary>
     /// RPG-style compass: a translucent bar across the top centre showing a 120-degree
     /// window of the horizon around the camera heading, with cardinal labels every 45
     /// degrees (N in red), minor ticks every 15, a centre caret, the numeric heading on

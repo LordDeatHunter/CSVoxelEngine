@@ -1,0 +1,8 @@
+{
+  "result": "item/clock",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/copper_ingot", "count": 4 },
+    { "item": "item/mud_brick", "count": 1 }
+  ]
+}

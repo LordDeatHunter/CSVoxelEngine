@@ -128,9 +128,9 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Ash fertilizer.** Using `ash` on a tree grows it `AshGrowthPulses` pulses through the
   reactive growth path (`use.action: "grow_tree"`, `GrowTreeItem`, `TreeSpeciesRegistry.ForBlock`),
   spending one; refused on anything that is not a tree (`GrowTreeItemTests`).
-- [ ] **Clock.** While held, the HUD shows the time of day and the day number. *Hook:* the held
-  item HUD path the compass uses (`Compass`), reading `World.LightingTime` and
-  `WorldGenerationConfig.DayLengthSeconds`.
+- [x] **Clock.** While it sits in the hotbar the HUD shows the time of day and the day number in
+  the compass's place (`Clock.DayNumber`/`Readout` over the lighting clock, `UIRenderer.DrawClock`,
+  crafted from copper ingots and a mud brick; `ClockTests`).
 - [ ] **Use time with a usage animation.** Usable items (the firestarter, the bandage and the
   fertilizer) take time: holding right-click plays a use animation, the use happens only when it
   completes, and letting go early cancels it and spends nothing. Do it after the bandage and the
