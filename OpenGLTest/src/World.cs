@@ -1341,8 +1341,8 @@ public class World : IItemUseWorld
         _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager, windTime: LightingTime);
         _debris.Update((float)deltaTime, _chunkManager);
         _querns.Animate((float)deltaTime);
-        _slimes?.AnimateMirrors((float)deltaTime);
-        _goblins?.AnimateMirrors((float)deltaTime);
+        _slimes?.AnimateMirrors((float)deltaTime, _debris);
+        _goblins?.AnimateMirrors((float)deltaTime, _debris);
         _tntManager.AnimateMirrors((float)deltaTime);
         _fireCells.Clear();
         _fireCells.AddRange(_campfires.LitCells);
@@ -1737,7 +1737,8 @@ public class World : IItemUseWorld
         if (_slimes != null)
         {
             // The lighting clock's night, so the ring rolls larger slimes after dark
-            _slimes.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, DayCycle.NightFactor(LightingTime));
+            _slimes.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, DayCycle.NightFactor(LightingTime),
+                _serverMode ? null : _debris);
             if (!_serverMode && _slimes.DamageDealtThisFrame > 0)
             {
                 _health.TakeDamage(_slimes.DamageDealtThisFrame);
@@ -1750,7 +1751,7 @@ public class World : IItemUseWorld
         // manager only reports the damage and the health pool stays here.
         if (_goblins != null)
         {
-            _goblins.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets);
+            _goblins.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, _serverMode ? null : _debris);
             var goblinDamage = _goblins.DamageDealtThisFrame;
             if (!_serverMode && goblinDamage > 0)
             {

@@ -65,13 +65,16 @@ public sealed class SlimeManager : IMobPopulation
     }
 
     /// <summary>Advances the death and spawn clocks of the slimes without simulating them (a
-    /// client never ticks the AI), dropping the ones whose death is over.</summary>
-    public void AnimateMirrors(float deltaTime)
+    /// client never ticks the AI), dropping the ones whose death is over. A finished death bursts
+    /// into the mob's skin colour (<paramref name="debris"/>, null when nothing draws it).</summary>
+    public void AnimateMirrors(float deltaTime, BlockDebrisSystem? debris = null)
     {
         for (var i = _slimes.Count - 1; i >= 0; i--)
         {
             _slimes[i].AnimateMirror(deltaTime);
-            if (_slimes[i].IsRemovable) _slimes.RemoveAt(i);
+            if (!_slimes[i].IsRemovable) continue;
+            if (debris != null) GroundDust.DeathPoof(_slimes[i], debris);
+            _slimes.RemoveAt(i);
         }
     }
 
@@ -96,7 +99,8 @@ public sealed class SlimeManager : IMobPopulation
 
     /// <summary>Ticks the slimes against the one local player (singleplayer and the tests); see
     /// <see cref="Update(float, ChunkManager, DropManager, IReadOnlyList{IMobTarget}, float)"/>.</summary>
-    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, Camera camera, float night = 0f)
+    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, Camera camera, float night = 0f,
+        BlockDebrisSystem? debris = null)
     {
         if (camera == null)
         {
@@ -106,7 +110,7 @@ public sealed class SlimeManager : IMobPopulation
 
         _singleTarget.Clear();
         _singleTarget.Add(camera);
-        Update(deltaTime, chunks, drops, _singleTarget, night);
+        Update(deltaTime, chunks, drops, _singleTarget, night, debris);
     }
 
     /// <summary>
@@ -119,7 +123,7 @@ public sealed class SlimeManager : IMobPopulation
     /// lighting clock's <see cref="DayCycle.NightFactor"/>, which the ring spawn's size roll reads.
     /// </summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, IReadOnlyList<IMobTarget> targets,
-        float night = 0f)
+        float night = 0f, BlockDebrisSystem? debris = null)
     {
         DamageDealtThisFrame = 0;
         if (chunks == null || targets == null) return;
@@ -138,7 +142,11 @@ public sealed class SlimeManager : IMobPopulation
 
             if (slime.IsDying)
             {
-                if (slime.IsRemovable) _slimes.RemoveAt(i);
+                if (slime.IsRemovable)
+                {
+                    if (debris != null) GroundDust.DeathPoof(slime, debris);
+                    _slimes.RemoveAt(i);
+                }
                 continue;
             }
 

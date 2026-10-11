@@ -33,10 +33,9 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Pickup pop on the hotbar.** `HotbarPickupPop`, on a rising count of the same item.
 - [x] **Low-health vignette pulse.** `LowHealthVignette`, a heartbeat term in the damage vignette pass (`low-health.json`).
 
-- [ ] **Mob death poof.** A mob bursts into skin-coloured chips when its death animation ends.
-  *Hook:* the `Mob.IsRemovable` transition in each manager, then `GroundDust.Splat` /
-  `DebrisLook.Colour` with `LandingDust.SkinColour` (the goblin's mean skin colour, not the
-  slime's). Singleplayer and a client, whose mirrors play the death too; never a server.
+- [x] **Mob death poof.** A mob bursts into skin-coloured chips when its death animation ends:
+  `GroundDust.DeathPoof` (`LandingDust.SkinColour`, `MobDeathPoof*`) at each manager's
+  `IsRemovable` removal, singleplayer and a client, never a server (`MobDeathPoofTests`).
 - [ ] **Placement pop.** A placed block scales in from a little under full size with a small
   overshoot. *Hook:* `RenderManager.RenderBlockPop` already pops a block on every mining hit; fire
   it on placement with a `MathUtils.EaseOutBack` scale-in instead of the hit's out-and-back.
@@ -75,6 +74,13 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Water edge foam.** One water-fragment term over thin view-ray depth, top faces only (`water-foam.json`).
 - [x] **Stars.** Dome-only star field, turned with the sun and hidden by clouds (`night-sky.json`).
   - [x] *Twinkle:* per-star rate and phase hashed from its cell.
+- [ ] **Stars hold still.** The stars sweep around the sky once a day today (`StarField.SpinOf` /
+  `ToStarSpace`, `uStarSpin`); they should stay put and only fade in over dusk and out over
+  dawn. *Hook:* delete the spin: `StarField` loses `SpinOf`/`ToStarSpace`, `sky-fragment.glsl`
+  feeds the view ray straight to `Stars`, and `SkyDomeFrame.StarSpin` and its `SkyRenderer`
+  uniform go with them, leaving `StarField.Visibility` as the only clock. Update `StarFieldTests`
+  (the pinned-star test goes), the shader-sync table's stars row and the AGENTS.md stars
+  paragraph. `night-sky.json` is the check.
 - [x] **Sun lens glare.** `SunGlare.Intensity` from alignment, sun height and cloud cover (`night-sky.json`).
 - [x] **Snow sparkle.** Hashed per-texel glints on the snow tile; only shows with a low sun, since noon snow clips to white (`snow-sparkle.json`, `VOXEL_TIME=405`).
 
@@ -103,6 +109,14 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Natural cotton.** `cotton_plant` + `cotton`, clumped by the reusable `PlantClumps` rule on the dry forest fringe (`cotton.json`).
 - [x] **Torch.** `torch`, light 14, `needsSupport`; branch + coal -> 4 (`torches.json`).
   - [x] *Wall-mounted:* `wall_torch` with `facing` + `support: "attached"`; `BlockSupport` is the one support rule.
+- [ ] **Charred torch top.** The torch's top face shows the stick's wood: the model's `up` uv
+  `[7, 6, 9, 8]` lands on the char band plus two wood rows, because top and bottom faces mirror v
+  in `ModelBaker` (`FlipV`). Give the torch a top tile of its own. *Hook:* let
+  `tools/generate-torch-texture.py` also write `torch_top.png` (a charred square with a faint
+  ember centre, listed in `USER_TODO.md`), and point the `up` faces of `block/torch.json` and
+  `block/wall_torch.json` at a `"torch_top"` texture variable (any uv crop: the whole tile is the
+  top). A new PNG under `assets/textures/blocks` becomes an atlas slice by the file glob and the
+  block's cutout mips cover it, so no csproj edit. `torches.json`.
 - [x] **Glass pane.** `glass_pane`; 6 glass -> 16 (`panes.json`).
   - [x] *Neighbour connectivity:* `pane` renderer (`PaneShape` + `PaneEmitter`), arms toward panes and solid cubes, matching hitboxes.
 
@@ -157,6 +171,21 @@ files waits in TODO.md instead, since there are none to use yet.
   + a tile from a `tools/` script (placeholder, listed in `USER_TODO.md`). Enables the ruined
   pillars.
 - [x] **Cobblestone wall.** `cobblestone_wall`: the pane renderer with `"pane": {"post": 8, "arm": 6}`, full-height arms and `cullSelf` so stacked walls meet seamlessly (`PaneProfileTests`, `fences.json`).
+- [ ] **Placement takes the plant's cell.** Right-clicking tall grass, a dead shrub, a flower or
+  a cotton plant while holding a block should replace the plant with the block instead of
+  filling the cell across the hit face. The flag already exists (`replaceableByPlacement`, read
+  by `Placement.TargetCell`/`CanOccupy`; layered snow is its one user), so this is JSON plus a
+  test. *Hook:* add `"replaceableByPlacement": true` to `tall_grass`, `dead_shrub`, `flower` and
+  `cotton_plant` (all already `solid: false`, which the registry check wants). `PlacementTests`:
+  aiming at a plant fills the plant's own cell and the plant is gone.
+- [ ] **Attacks pass through plants.** A mob behind tall grass cannot be punched or sliced
+  today: the line of sight (`BlockRaycaster.SegmentHitsBlock`) stops on the plant's hitbox.
+  Plants should not be cover. *Hook:* a `blocksSight` block flag (default true, a `BlockType`
+  mirror array like `Occludes`) read by the LOS walk only: `Raycast` gets a sight-only switch
+  that `SegmentHitsBlock` sets, so a flagged cell is walked through, while the aim ray still
+  targets it for mining. Set `"blocksSight": false` on `tall_grass`, `dead_shrub`, `flower` and
+  `cotton_plant` (the goblin's throw check and `MobInterest` share the test, so a goblin throws
+  through grass too). Test: a mob behind a plant is struck, one behind stone is not.
 
 ## Enemies
 

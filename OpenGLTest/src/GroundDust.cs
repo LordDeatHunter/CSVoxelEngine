@@ -140,6 +140,20 @@ public sealed class GroundDust
     }
 
     /// <summary>
+    /// A mob whose death animation just ended bursts into chips of its own skin colour
+    /// (<see cref="LandingDust.SkinColour"/> of its model: a goblin's mean skin colour, a slime's
+    /// green), spread by its body width. Returns how many chips it spawned.
+    /// </summary>
+    public static int DeathPoof(Mob mob, BlockDebrisSystem debris, Random? random = null)
+    {
+        var colour = LandingDust.SkinColour(mob.Type.Model, WorldGenerationConfig.MobDeathPoofFallbackColor);
+        var count = WorldGenerationConfig.MobDeathPoofCount;
+        debris.Splat(mob.Position, colour, mob.BodyHalfExtent, count,
+            WorldGenerationConfig.MobDeathPoofSpeed, WorldGenerationConfig.MobDeathPoofSize, random);
+        return count;
+    }
+
+    /// <summary>
     /// A body whose feet are at <paramref name="feet"/> landed after falling
     /// <paramref name="fallBlocks"/>: kicks up the puff <see cref="LandingDust"/> sizes, of the block
     /// under the feet. Returns how many chips it spawned (0 for a short fall or no ground found).

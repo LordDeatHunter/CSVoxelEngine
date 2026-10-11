@@ -65,13 +65,16 @@ public sealed class GoblinManager : IMobPopulation
     }
 
     /// <summary>Advances the death and spawn clocks of the goblins without simulating them (a
-    /// client never ticks the AI), dropping the ones whose death is over.</summary>
-    public void AnimateMirrors(float deltaTime)
+    /// client never ticks the AI), dropping the ones whose death is over. A finished death bursts
+    /// into the mob's skin colour (<paramref name="debris"/>, null when nothing draws it).</summary>
+    public void AnimateMirrors(float deltaTime, BlockDebrisSystem? debris = null)
     {
         for (var i = _goblins.Count - 1; i >= 0; i--)
         {
             _goblins[i].AnimateMirror(deltaTime);
-            if (_goblins[i].IsRemovable) _goblins.RemoveAt(i);
+            if (!_goblins[i].IsRemovable) continue;
+            if (debris != null) GroundDust.DeathPoof(_goblins[i], debris);
+            _goblins.RemoveAt(i);
         }
     }
 
@@ -101,7 +104,8 @@ public sealed class GoblinManager : IMobPopulation
 
     /// <summary>Ticks the goblins against the one local player (singleplayer and the tests); see
     /// <see cref="Update(float, ChunkManager, DropManager, IReadOnlyList{IMobTarget})"/>.</summary>
-    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, Camera camera)
+    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, Camera camera,
+        BlockDebrisSystem? debris = null)
     {
         if (camera == null)
         {
@@ -111,7 +115,7 @@ public sealed class GoblinManager : IMobPopulation
 
         _singleTarget.Clear();
         _singleTarget.Add(camera);
-        Update(deltaTime, chunks, drops, _singleTarget);
+        Update(deltaTime, chunks, drops, _singleTarget, debris);
     }
 
     /// <summary>
@@ -124,7 +128,8 @@ public sealed class GoblinManager : IMobPopulation
     /// <see cref="IMobTarget.TakeHit"/> and is summed into <see cref="DamageDealtThisFrame"/>. With
     /// no targets nothing chases, despawns or spawns.
     /// </summary>
-    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, IReadOnlyList<IMobTarget> targets)
+    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, IReadOnlyList<IMobTarget> targets,
+        BlockDebrisSystem? debris = null)
     {
         DamageDealtThisFrame = 0;
         if (chunks == null || targets == null) return;
@@ -143,7 +148,11 @@ public sealed class GoblinManager : IMobPopulation
 
             if (goblin.IsDying)
             {
-                if (goblin.IsRemovable) _goblins.RemoveAt(i);
+                if (goblin.IsRemovable)
+                {
+                    if (debris != null) GroundDust.DeathPoof(goblin, debris);
+                    _goblins.RemoveAt(i);
+                }
                 continue;
             }
 

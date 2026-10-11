@@ -1539,6 +1539,16 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float SlimeSplatSize = 0.1f;
     // sRGB colour of the goo when the slime's model has no skin to read its green from
     public static readonly Vector3 SlimeSplatFallbackColor = new(0.45f, 0.78f, 0.35f);
+
+    // --- Mob death poof (GroundDust.DeathPoof): a mob whose death animation just ended bursts
+    // into chips of its own skin colour (LandingDust.SkinColour of its model), so a goblin throws
+    // goblin-coloured chips and a slime its green. Cosmetic: singleplayer and a client, never a server. ---
+    public const int MobDeathPoofCount = 12;
+    // Blocks per second the chips fly out at, between a landing splat and a mining burst
+    public const float MobDeathPoofSpeed = 2.4f;
+    public const float MobDeathPoofSize = 0.1f;
+    // sRGB colour of the chips when the mob's model has no skin to read one from
+    public static readonly Vector3 MobDeathPoofFallbackColor = new(0.62f, 0.5f, 0.42f);
     // A grey textureless block tile (its mean grey is BiomeTintTextureGrey) that a plain-colour chip
     // wears on every face, so BiomeTint.VertexTint lands the chip on its target colour
     public const string ColourChipTile = "grass_top_textureless";
