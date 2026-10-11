@@ -66,13 +66,14 @@ public static class LeafCluster
     /// <c>k + 1</c>, so it widens downward. A pad is a flat cap resting on the tip: the disc of
     /// horizontal radius <c>max(1, radius - 1)</c> at the tip's own level, the disc of
     /// <paramref name="radius"/> one level above, and nothing below the tip, so the limb under it
-    /// stays bare. Every shape is nested in its radius: an offset inside
+    /// stays bare. A fan adds the full disc of <paramref name="radius"/> one level below the tip,
+    /// so the crown has some depth. Every shape is nested in its radius: an offset inside
     /// the shape at radius <c>r'</c> is inside it at every <c>r &gt;= r'</c>, which is what keeps
     /// the decay manager's full-radius, best-first offset table exact at a smaller radius.
     /// </summary>
     public static bool InShape(LeafClusterShape shape, int radius, int dx, int dy, int dz)
     {
-        if (shape == LeafClusterShape.Pad)
+        if (shape is LeafClusterShape.Pad or LeafClusterShape.Fan)
         {
             int horizontal = dx * dx + dz * dz;
             if (dy == 0)
@@ -80,7 +81,8 @@ public static class LeafCluster
                 int m = Math.Max(1, radius - 1);
                 return horizontal <= m * m;
             }
-            return dy == 1 && horizontal <= radius * radius;
+            if (dy == 1) return horizontal <= radius * radius;
+            return shape == LeafClusterShape.Fan && dy == -1 && horizontal <= radius * radius;
         }
         if (shape == LeafClusterShape.Cone)
         {

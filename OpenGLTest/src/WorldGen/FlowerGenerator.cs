@@ -49,7 +49,9 @@ public static class FlowerGenerator
 
     /// <summary>Whether the surface column (x, z) grows a flower, before the terrain checks.</summary>
     public static bool TryGetFlower(int x, int z) =>
-        PlantClumps.TryGetMember(Clumps, WorldGenerationConfig.Seed, x, z, OpennessGate, out _, out _);
+        // An oasis disc is a dense meadow whatever the clump rule says
+        OasisGenerator.IsDisc(x, z)
+        || PlantClumps.TryGetMember(Clumps, WorldGenerationConfig.Seed, x, z, OpennessGate, out _, out _);
 
     /// <summary>
     /// Stamps flowers onto the surface: one block above the heightmap, into air only, and

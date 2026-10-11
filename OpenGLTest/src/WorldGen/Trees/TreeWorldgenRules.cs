@@ -11,6 +11,10 @@ public sealed class TreeWorldgenRules
     /// <summary>The biomes the species grows in; non-empty, no duplicates.</summary>
     public required IReadOnlyList<Biome> Biomes { get; init; }
 
+    /// <summary>Whether the species is planted only inside an oasis disc (an oasis palm), never
+    /// by the ordinary biome placement.</summary>
+    public bool Oasis { get; init; }
+
     /// <summary>Chance per candidate column, 0..1.</summary>
     public required float Density { get; init; }
 

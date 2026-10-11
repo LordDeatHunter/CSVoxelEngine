@@ -333,7 +333,7 @@ public static class TerrainGenerator
     /// closes on forest ground just before the desert instead of being cut off in a wall. The fade
     /// only covers the last stretch before the line, so forest lakes elsewhere keep their depth.
     /// </summary>
-    private static float SurfaceWaterGate(float desertWeight) =>
+    internal static float SurfaceWaterGate(float desertWeight) =>
         1f - MathUtils.SmoothStep(WorldGenerationConfig.WaterDesertFadeStart,
             WorldGenerationConfig.WaterDesertFadeEnd, desertWeight);
 
@@ -687,6 +687,7 @@ public static class TerrainGenerator
         var intensity = new float[count];
         var biomes = new Biome[count];
         var waterLevel = new int[count];
+        var oasis = new bool[count];
 
         var baseX = (float)chunkX * Chunk.Size;
         var baseZ = (float)chunkZ * Chunk.Size;
@@ -739,6 +740,20 @@ public static class TerrainGenerator
                 }
 
                 waterLevel[i] = WaterLevelFor(biome, gate, riverWeight, lakeWeight, lakeSurface);
+
+                // An oasis: a hashed deep-desert site marks its disc (the fill and the far LOD
+                // wear grass there) and carves its flat pond into the heightmap
+                if (WorldGenerationConfig.OasesEnabled
+                    && OasisGenerator.TryGetDisc((int)worldX, (int)worldZ, out var oasisX, out var oasisZ,
+                        out var oasisSurface))
+                {
+                    oasis[i] = true;
+                    if (OasisGenerator.IsPond((int)worldX, (int)worldZ) && oasisSurface < heightF)
+                    {
+                        heightF = MathF.Min(heightF, oasisSurface - WorldGenerationConfig.OasisDepth);
+                        waterLevel[i] = oasisSurface;
+                    }
+                }
 
                 // A hot spring: a cold, hashed site carves its small pond and holds its own warm
                 // surface, which SnowGenerator never freezes and whose vents steam
@@ -813,7 +828,7 @@ public static class TerrainGenerator
         Climate(chunkX << Chunk.SizeShift, chunkZ << Chunk.SizeShift, out var cornerWarmth, out var cornerWetness);
 
         return new ColumnData(heights, dirtDepth, entrance, intensity, biomes, bed, waterLevel,
-            cornerWarmth, cornerWetness);
+            cornerWarmth, cornerWetness, oasis);
     }
 
     /// <summary>

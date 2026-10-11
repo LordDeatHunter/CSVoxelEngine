@@ -218,6 +218,7 @@ internal static class TreeSpeciesCompiler
         return new TreeWorldgenRules
         {
             Biomes = biomes.ToArray(),
+            Oasis = w.Oasis ?? false,
             Density = density,
             Spacing = spacing,
             MaxSlope = maxSlope,

@@ -440,8 +440,11 @@ public class Chunk : IDisposable
             for (var z = 0; z < Size; z++)
             {
                 var i = (x << SizeShift) | z;
+                // An oasis column is filled as forest so its ring wears grass (the stored biome
+                // stays the desert's; see OasisGenerator)
+                var fillBiome = column.Oasis[i] ? Biome.Forest : column.Biomes[i];
                 ColumnCache.GenerateColumn(_blocks, (int)Position.X, (int)Position.Z, x, z, column.Heights[i], column.Bed[i], column.DirtDepth[i],
-                    lowerBoundY, column.Biomes[i]);
+                    lowerBoundY, fillBiome);
             }
         }
 

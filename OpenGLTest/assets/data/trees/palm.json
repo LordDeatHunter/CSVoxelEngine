@@ -1,0 +1,37 @@
+{
+  // The oasis palm: a tall trunk with a fan crown at the top, planted only inside an oasis disc
+  // (worldgen.oasis), never by the ordinary desert placement. It reuses the umbrella growth logic
+  // (bare limbs under their leaf pads read as fronds); a dedicated palm logic is still open. Its
+  // own wood and leaf blocks (palm_log, palm_leaves) so the decay and crumble rules resolve the
+  // palm, never an oak sharing the same ids.
+  "wood": "block/palm_log",
+  "leaves": "block/palm_leaves",
+  "growth": {
+    "logic": "umbrella",
+    "signalEnergy": 20,
+    "upProbability": 4,
+    "lowestBranchHeight": 8,
+    "maturitySteps": [30, 45]
+  },
+  "thickness": {
+    "tipPx": 2,
+    "pipeExponent": 1.5,
+    "maxPx": 12,
+    "girthProfile": [[0, 1.6], [0.5, 1.2], [1, 1.0]],
+    "trunkShape": "circle",
+    "rim": "block"
+  },
+  "leafCluster": { "shape": "fan", "radius": 3, "hydration": 5, "tipMaxPx": 3, "minRadius": 1, "fullRadiusPx": 12 },
+  "features": [ { "type": "roots", "depth": 3 } ],
+  "lod": { "crownHeight": [10, 13], "crownRadius": 3, "profile": "column" },
+  "worldgen": {
+    "biomes": ["desert"],
+    "oasis": true,
+    "density": 0.5,
+    "spacing": 1,
+    "maxSlope": 1,
+    "minSoil": 0,
+    "minGround": 1,
+    "maxGround": 120
+  }
+}

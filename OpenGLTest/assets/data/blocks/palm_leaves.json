@@ -1,0 +1,16 @@
+{
+  // The palm's fronds: a foliage-tinted leaf block like the oak's, wearing the oak leaf tile as a
+  // placeholder. Its own block, so the leaf-decay rule resolves the palm (its own cluster shape
+  // and radius) and never the oak.
+  "name": "Palm Leaves",
+  "model": { "parent": "block/cube_all", "textures": { "all": "oak_leaves" } },
+  "hardness": 1,
+  "movementSpeed": 0.5,
+  "cutout": true,
+  "sway": true,
+  "biomeTint": { "palette": "foliage", "faces": { "all": { "tile": "oak_leaves_textureless" } } },
+  "occludes": false,
+  "castsAO": false,
+  "light": { "passes": true },
+  "loot": "leaves"
+}

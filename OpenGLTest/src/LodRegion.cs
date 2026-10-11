@@ -751,6 +751,15 @@ public class LodRegion : IDisposable
                     // beach sampling.
                     var cellLevel = TerrainGenerator.WaterLevelAt(centreX, centreZ);
                     if (maxOwn >= cellLevel) cellLevel = TerrainGenerator.NoWater;
+
+                    // An oasis: the same pure site the chunk fill and Compute read turns the
+                    // cell's material to grass and its pond to the oasis' own surface
+                    if (WorldGenerationConfig.OasesEnabled
+                        && OasisGenerator.TryGetDisc(centreX, centreZ, out _, out _, out var oasisSurface))
+                    {
+                        cellBiome = Biome.Forest;
+                        if (OasisGenerator.IsPond(centreX, centreZ)) cellLevel = oasisSurface;
+                    }
                     waterLevels[(i + 1) * heightGrid + (j + 1)] = cellLevel;
                     seaFloor[(i + 1) * heightGrid + (j + 1)] = FloorMaterial(maxOwn, cellLevel, cellBiome);
 

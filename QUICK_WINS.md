@@ -122,44 +122,7 @@ files waits in TODO.md instead, since there are none to use yet.
   on it is sprung back up at `SlimeBlockBounceRestitution` of its impact and bills no fall
   damage (`FallTracker`'s cushioned landing); mobs and drops later. Tile from
   `tools/generate-slime-block-texture.py` (`SlimeBlockTests`).
-- [ ] **Bandage.** Cotton -> bandage; using one restores some health, the first heal in the game.
-  *Hook:* a new `use.action: "heal"` (`ItemUseAction` + `ItemFactory`), spending one, refused at
-  full health. On a server it is the `Use` intent against that player's own `PlayerHealth`.
-- [x] **Ash fertilizer.** Using `ash` on a tree grows it `AshGrowthPulses` pulses through the
-  reactive growth path (`use.action: "grow_tree"`, `GrowTreeItem`, `TreeSpeciesRegistry.ForBlock`),
-  spending one; refused on anything that is not a tree (`GrowTreeItemTests`).
-- [x] **Clock.** While it sits in the hotbar the HUD shows the time of day and the day number in
-  the compass's place (`Clock.DayNumber`/`Readout` over the lighting clock, `UIRenderer.DrawClock`,
-  crafted from copper ingots and a mud brick; `ClockTests`).
-- [x] **Use time with a usage animation.** Usable items declare `use.seconds`: holding
-  right-click charges a use pose (`PlayerModel.StartUseCharge`/`WithUse`, one generic raise) and
-  the use runs only at completion, letting go early cancels it and spends nothing
-  (`World.TryBeginUseCharge`/`UpdateUseCharge`; the firestarter, bandage and ash declare times;
-  the item debugger has a USE mode; `UseTimeTests`). A server still takes the completed Use intent
-  on trust (a known gap).
-
-- [x] **Door.** `oak_door` + `oak_door_upper` through the `upperHalf` field (`TallBlock`): placement needs both cells, breaking either half removes both (`RemoveTallBlock`) and drops one door, both halves share one `DoorState` (`DoorTests`, `doors.json`).
-- [x] **Acorn.** An oak-leaf drop (its own `oak_leaves` loot table) that plants an oak sapling on
-  dirt or grass with a `plant_tree` use, and a `SaplingManager` clock that pulses it one growth
-  step per jittered `SaplingPulseSeconds` up to the species' maturity (in memory only, a known
-  gap) (`SaplingManagerTests`, `AcornTests`).
-- [x] **Flint from gravel.** Mining gravel drops flint about one time in six instead of the block
-  (`assets/data/loot/gravel.json`, the block's `loot` field; `ContentTests`).
-- [x] **Cactus prick.** A `contactDamage` block field (the cactus sets 1) ticked by
-  `ContactDamage.Touches`/`Tick` every `ContactDamage.TickSeconds` while a body box is flush
-  against the cell (never for the cell it stands on top of); the local pool in singleplayer and
-  each `ServerPlayer`'s status on a server, creative and flying immune (`ContactDamageTests`).
-- [x] **Stone bricks.** `stone_bricks`, four from four stone, a grey running-bond tile from
-  `tools/generate-stone-brick-texture.py` (`ContentTests`).
-- [x] **Cobblestone wall.** `cobblestone_wall`: the pane renderer with `"pane": {"post": 8, "arm": 6}`, full-height arms and `cullSelf` so stacked walls meet seamlessly (`PaneProfileTests`, `fences.json`).
-- [x] **Placement takes the plant's cell.** Tall grass, dead shrubs, flowers and cotton plants set
-  `replaceableByPlacement`, so aiming at one fills its own cell and discards it (four JSON files;
-  `PlacementTests`).
-- [x] **Attacks pass through plants.** A `blocksSight` block flag (default true, a `BlockType`
-  mirror) read only by the sight-only ray walk `SegmentHitsBlock` sets, so a plant never stops a
-  punch, a slice or a goblin's throw check while it still aims for mining; the four plants set
-  `blocksSight: false` (`SightTests`).
-
+- [x] **Bandage.** `HealItem` + `use.action: "heal"` (`PlayerHealth.Heal`, refused at full health, `BandageHealAmount`), sprite from `tools/generate-bandage-texture.py`; `HealItemTests`.
 ## Enemies
 
 - [x] **Slime size variants.** `SlimeSize`, sizes 1-3 scaling body, health, damage and loot; saved and sent (`slime-sizes.json`).
@@ -218,74 +181,7 @@ files waits in TODO.md instead, since there are none to use yet.
   per 32-block cell from a pure hash, into air only (`BoulderGenerator`; `SceneryTests`).
   *Hook:* one candidate per coarse cell hash (the `PlantClumps` cell pattern), stamped per chunk
   and clipped at its border; no far-LOD bump.
-- [ ] **Reeds at shores.** A cross-model plant in clumps on the columns at the water's edge.
-  *Hook:* `PlantClumps` with its own spec, gated on `height` against the column's `WaterLevel`;
-  `needsSupport`, so a flow washes it away.
-- [ ] **Lily pads on ponds.** A flat pad on still lake surfaces, not the ocean or rivers.
-  *Hook:* a worldgen-only stamp on the cell above a lake's top water cell. `needsSupport` cannot
-  hold on water without a fluid support kind, so leave it off.
-- [ ] **Glow mushrooms.** A small mushroom with a dim coloured light on deep cave floors.
-  *Hook:* `light.emission` + `light.color` (one of the 8 palette slots), stamped after the carvers
-  on cave floors well under `height`.
-- [ ] **Stalactites and stalagmites.** Stone points hanging from cave ceilings, with stalagmites
-  rising from the floor under them. *Hook:* one model block each, `needsSupport` with the new
-  `support: "above"` for the stalactite (build the hanging lantern first) and `below` for the
-  stalagmite, stamped after the carvers so a stalagmite stands under its drip point.
-- [ ] **Snow on canopies.** Taiga spruce crowns get snow on their top leaves. *Hook:*
-  `SnowGenerator` already runs last; let it treat a leaf top as ground in a cold column.
-- [ ] **Desert well.** One rare hand-stamped structure: a sandstone ring around water. *Hook:* a
-  per-cell hash, stamped clipped to each chunk the way trees cross chunk borders; no template
-  system.
-- [ ] **Geode.** A rare hollow sphere deep in rock, lined with a new crystal block. *Hook:* a
-  stage after the carvers (it adds blocks, which the carvers never do). A home for `P-28` /
-  `P-47`.
-- [ ] **Meteor crater.** A rare bowl lined with obsidian. *Hook:* a hashed site that cuts the
-  heightmap the way `TerrainGenerator.TryLakeSite` does, so the far LOD agrees.
-- [ ] **Oasis.** A rare green pocket deep in the desert: a pond ringed by grass, with denser
-  flora and its own tree. *Hook:* a hashed site like `TryLakeSite`, allowed only where
-  `SurfaceWaterGate` keeps ordinary lakes out today, carving its pond into the heightmap and its
-  water level into `ColumnData`. The far LOD wears sand on every desert cell, so the oasis surface
-  needs its own column mark for the LOD to show grass.
-  - [ ] *Sub-step (flora):* reeds (above), tall grass and flowers inside the site, through
-    `PlantClumps` and the existing generators, gated to the oasis disc.
-  - [ ] *Sub-step (palm tree):* a `palm` species file: a tall, gently leaning, branchless trunk
-    with a fan crown at the top. Likely a new `IGrowthLogic` (no forks until the top) and a fan
-    leaf cluster shape, with tiles from `tools/generate-tree-textures.ps1` like the baobab's.
-    `worldgen.biomes` cannot tell an oasis from the desert, so the oasis stamp plants it (or a
-    new oasis gate in `TreeWorldgenRules`).
-
-- [ ] **Mountain snow caps.** Peaks above a height get snow even in warm biomes. *Hook:*
-  `SnowGenerator`'s cold weight gets an altitude term over `MountainRockHeight`, and the far LOD's
-  snow rule must read the same function; a pure-function test pins that the two agree.
-- [ ] **Gravel and sand pockets.** Blobs of gravel or sand inside stone, so mining can cause a
-  small collapse. *Hook:* a stage after the carvers (like `LavaGenerator.Stamp`) with a 3D noise
-  gate and a depth band. They are `falls` blocks, so `FallingBlockManager` handles the cascade.
-- [ ] **Flower meadows.** Dense flower patches in open forest. *Hook:* the `PlantClumps` rule with
-  a larger cell and radius than cotton, gated by `TerrainGenerator.ForestOpenness` so they appear
-  only in the open stretches; reuses the existing flower block.
-- [ ] **Dead trees.** Leafless trunks scattered through the desert and frozen plains. *Hook:* a
-  `dead_tree` species file reusing the oak wood and growth logic, with `leaves` omitted (supported
-  for leafless species) and a sparse `worldgen` block listing the desert and frozen biomes.
-- [ ] **Ruined pillars.** Rare broken stone-brick columns, 2-4 blocks tall, with some bricks
-  missing. *Hook:* a per-cell hash like the desert well, stamped clipped to the chunk. Needs stone
-  bricks.
-- [ ] **Hot springs.** A small pond in cold biomes that does not freeze, with steam rising. *Hook:*
-  a hashed site like `TryLakeSite` gated to `ColdWeight`, exempt in `SnowGenerator`'s freeze;
-  steam from a dedicated `FireParticleSystem` instance fed from water-top vent cells, like the lava
-  vents. The far LOD draws it as water.
-- [ ] **Underground pools.** Water pockets on cave floors between sea level and the lava band.
-  *Hook:* a mirror of `LavaGenerator.Stamp`: a patch mask plus a per-cell roll, above `LavaMaxY`
-  and buried under terrain, with source water; the fluid wake path already handles breaches.
-- [ ] **Climate-scaled grass.** Tall grass is denser in wet climates and sparse in dry ones.
-  *Hook:* the density roll in `FoliageGenerator` reads wetness from `Climate` /
-  `ColumnData.CornerWetness`.
-- [ ] **Cairns.** A small cobblestone stack on mountain tops as a landmark. *Hook:* a per-cell
-  hash, placed only on a local height maximum above `MountainRockHeight`, 3 blocks tall with a
-  one-block hat. A slice of `P-58`.
-- [ ] **Sea stacks.** Rock pillars rising out of the shallow ocean near the coast. *Hook:* a hashed
-  site that raises the heightmap in `TerrainGenerator.Compute` within a small radius (so the LOD
-  agrees), only where the column is Ocean and shallow; the top is stone with a sand skirt.
-
+- [x] **Reeds at shores.** `ReedGenerator` over `PlantClumps`, gated to the shallow water edge, replacing the shallow cell; `PondPlantTests`.
 ## UI
 
 - [x] **Hotbar item name fade.** `HotbarNameFade` over the hearts; `select` scenario op (`hotbar.json`).

@@ -37,6 +37,18 @@ public static class TreeGenerator
     /// <summary>The worldgen species of each biome (indexed by the enum value), null where none grows.</summary>
     private static readonly TreeSpecies?[] SpeciesByBiome;
 
+    /// <summary>The species planted inside an oasis disc, or null when none declares
+    /// <c>worldgen.oasis</c>.</summary>
+    private static readonly TreeSpecies? OasisSpecies;
+
+    /// <summary>The species planted at a column: an oasis' own palm inside a disc, else the
+    /// biome's ordinary tree. The one rule the placement, the shape cache and the batch all read,
+    /// so they never disagree about what grows in a column.</summary>
+    private static TreeSpecies? SpeciesAt(int x, int z) =>
+        OasisSpecies != null && OasisGenerator.IsDisc(x, z)
+            ? OasisSpecies
+            : SpeciesByBiome[(int)TerrainGenerator.BiomeAt(x, z)];
+
     private static readonly bool[] LeafById = new bool[256];
 
     // Wood and leaves of every species with a canopy: what disturbs the far-LOD canopy. A
@@ -73,7 +85,11 @@ public static class TreeGenerator
         var biomes = Enum.GetValues<Biome>();
         SpeciesByBiome = new TreeSpecies?[biomes.Max(b => (int)b) + 1];
         foreach (var biome in biomes)
-            SpeciesByBiome[(int)biome] = Species.FirstOrDefault(s => s.Worldgen?.GrowsIn(biome) == true);
+            // An oasis species is never the biome's ordinary tree: it is admitted inside a disc
+            // instead (OasisSpecies below)
+            SpeciesByBiome[(int)biome] = Species.FirstOrDefault(s =>
+                s.Worldgen?.GrowsIn(biome) == true && s.Worldgen.Oasis == false);
+        OasisSpecies = Species.FirstOrDefault(s => s.Worldgen?.Oasis == true);
 
         foreach (var species in Species)
         {
@@ -477,7 +493,7 @@ public static class TreeGenerator
         if (own >= MaxDensity)
             return false;
 
-        var found = SpeciesByBiome[(int)TerrainGenerator.BiomeAt(x, z)];
+        var found = SpeciesAt(x, z);
         if (found?.Worldgen == null)
             return false;
         var rules = found.Worldgen;

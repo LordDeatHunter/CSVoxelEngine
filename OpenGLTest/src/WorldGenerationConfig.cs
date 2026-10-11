@@ -2259,6 +2259,18 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int SeaStackMinHeight = 3;
     public const int SeaStackMaxHeight = 6;
 
+    // --- Oases (OasisGenerator): a green pocket deep in the desert, its own pond and palm ---
+    public const bool OasesEnabled = true;
+    public const int OasisCellShift = 7;
+    public const float OasisChance = 0.25f;
+    // The whole disc's radius, and the pond's inner one
+    public const int OasisRadius = 6;
+    public const int OasisPondRadius = 2;
+    // Blocks under the pond's surface its flat floor is carved to
+    public const int OasisDepth = 2;
+    // Height above the pond's surface a palm's base needs (its own ground, so it rings the pond)
+    public const int OasisPalmMinGround = 1;
+
     // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
     // first notices a player (the same moment its first-throw delay starts) ---
     public const float GoblinNoticePipSeconds = 0.9f;

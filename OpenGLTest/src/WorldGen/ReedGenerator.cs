@@ -30,7 +30,9 @@ public static class ReedGenerator
 
     /// <summary>Whether the surface column (x, z) is a reed clump member, before the terrain checks.</summary>
     public static bool TryGetReed(int x, int z) =>
-        PlantClumps.TryGetMember(Clumps, WorldGenerationConfig.Seed, x, z, null, out _, out _);
+        // An oasis pond edge is reedy whatever the clump rule says
+        OasisGenerator.IsDisc(x, z)
+        || PlantClumps.TryGetMember(Clumps, WorldGenerationConfig.Seed, x, z, null, out _, out _);
 
     /// <summary>
     /// Stamps reeds at the water's edge: one cell above the ground where the ground sits within

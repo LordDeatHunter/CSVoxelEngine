@@ -430,9 +430,12 @@ public sealed class TreeGrowthTests
             var fluids = new FluidManager();
             var decay = new LeafDecayManager();
 
-            var result = Grow(new TreeGrowthWriter(), tree, rootX, 40, fluids, decay);
+            // Enough pulses that a mature tree of any species still has room to grow (the loop
+            // shifts columns as species are added, and some columns are tighter than others)
+            var result = Grow(new TreeGrowthWriter(), tree, rootX, 120, fluids, decay);
 
-            Assert.True(result.MeshCellsWritten > 0, $"{species.Name} wrote nothing");
+            Assert.True(result.MeshCellsWritten > 0,
+                $"{species.Name} wrote nothing ({result.Status}, nodes +{result.NodesAdded})");
             Assert.True(fluids.PendingCells > 0, $"{species.Name}: no fluid cell scheduled");
             Assert.True(decay.PendingCells > 0, $"{species.Name}: no decay cell scheduled");
 

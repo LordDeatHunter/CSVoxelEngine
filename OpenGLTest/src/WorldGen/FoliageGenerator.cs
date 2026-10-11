@@ -51,6 +51,8 @@ public static class FoliageGenerator
     /// <summary>Whether the forest surface column (x, z) grows a grass tuft.</summary>
     public static bool TryGetGrassTuft(int x, int z)
     {
+        // An oasis disc is a dense meadow whatever the patch noise says
+        if (OasisGenerator.IsDisc(x, z)) return true;
         if (!TerrainGenerator.IsForest(x, z)) return false;
         if (GrassPatchNoise.GetNoise(x, z) <= WorldGenerationConfig.GrassPatchThreshold) return false;
         // Denser where the climate is wetter (Climate's own wetness, the tint's input)

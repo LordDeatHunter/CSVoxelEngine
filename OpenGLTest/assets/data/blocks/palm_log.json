@@ -1,0 +1,19 @@
+{
+  // The palm's trunk: the tree_wood renderer like every log, with the oak log's art as a
+  // placeholder (its own palm tiles are still open). Its own block, so the leaf-decay and crumble
+  // rules can never confuse it with an oak.
+  "name": "Palm Log",
+  "model": {
+    "parent": "block/cube_column",
+    "textures": { "end": "oak_log_top", "side": "oak_log_side" }
+  },
+  "hardness": 24,
+  "renderer": "tree_wood",
+  "sfx": "hit_wood",
+  "requiresTool": true,
+  "tools": { "axe": 1 },
+  "wood": {
+    "tipHardness": 0.25,
+    "loot": [ { "minThickness": 0, "loot": "wood" }, { "minThickness": 7, "loot": "self" } ]
+  }
+}

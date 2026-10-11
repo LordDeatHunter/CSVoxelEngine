@@ -140,6 +140,10 @@ public sealed class TreeSpeciesDefinition
         /// <summary>Chance per candidate column, 0..1. Required.</summary>
         public float? Density { get; set; }
 
+        /// <summary>Whether the species is planted only inside an oasis disc (an oasis palm), the
+        /// biomes list then only naming the climate it belongs to. Default false.</summary>
+        public bool? Oasis { get; set; }
+
         /// <summary>Minimum gap to another trunk in blocks, at least 0. Required.</summary>
         public int? Spacing { get; set; }
 
