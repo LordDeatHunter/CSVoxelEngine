@@ -80,6 +80,24 @@ public sealed class RemotePlayerAnimationTests
     }
 
     [Fact]
+    public void TheFloatingFlagPosesTheSurfaceFloatOverTheSwim()
+    {
+        var remote = NewRemote();
+        var eye = new Vector3(0f, 1.62f, 0f);
+
+        remote.SetTarget(eye, -90f, 0f, NetPlayerFlags.Swimming | NetPlayerFlags.Floating);
+        for (var i = 0; i < 120; i++) remote.Update(Dt);
+        Assert.True(remote.Model.SwimBlend > 0.9f);
+        Assert.True(remote.Model.FloatBlend > 0.9f);
+
+        // Under water (or from an older client that never sets the bit) it is the plain swim
+        remote.SetTarget(eye, -90f, 0f, NetPlayerFlags.Swimming);
+        for (var i = 0; i < 120; i++) remote.Update(Dt);
+        Assert.True(remote.Model.SwimBlend > 0.9f);
+        Assert.True(remote.Model.FloatBlend < 0.05f);
+    }
+
+    [Fact]
     public void ARemotePlayerRunsWhenTheFlagSaysSprintAndTheyMove()
     {
         var remote = NewRemote();

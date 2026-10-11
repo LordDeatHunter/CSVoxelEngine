@@ -72,6 +72,9 @@ public sealed class GameServerTests : IDisposable
         /// <summary>The newest <see cref="NetMessage.EntityList"/> received, decoded.</summary>
         public List<NetEntity>? Entities;
 
+        /// <summary>Each listed player's movement flags from the newest <see cref="NetMessage.PlayerList"/>, by name.</summary>
+        public readonly Dictionary<string, NetPlayerFlags> ListedFlags = new();
+
         public void Drain(NetworkClient client)
         {
             while (client.Inbound.TryDequeue(out var payload))
@@ -132,6 +135,23 @@ public sealed class GameServerTests : IDisposable
                             entities.Add(new NetEntity(kind, id, position, yaw, health, ammo, itemId, velocity));
                         }
                         Entities = entities;
+                        break;
+                    }
+                    case NetMessage.PlayerList:
+                    {
+                        // The record shape GameServer.BroadcastPlayerList writes
+                        var count = reader.ReadInt();
+                        for (var i = 0; i < count; i++)
+                        {
+                            reader.ReadInt();
+                            var name = reader.ReadString();
+                            reader.ReadVector3();
+                            reader.ReadFloat();
+                            reader.ReadFloat();
+                            ListedFlags[name] = (NetPlayerFlags)reader.ReadByte();
+                            reader.ReadByte();
+                            reader.ReadByte();
+                        }
                         break;
                     }
                 }
@@ -1207,5 +1227,28 @@ public sealed class GameServerTests : IDisposable
             Tick(0.05);
         Assert.Equal(last, PlayerOf(client).Position);
         Assert.Empty(inbox.PlayerCorrections);
+    }
+
+    [Fact]
+    public void TheCosmeticFloatingFlagReachesTheOtherClientsUntouched()
+    {
+        using var floater = Connect("Floater");
+        using var watcher = Connect("Watcher");
+        var watching = InboxOf(watcher);
+        const NetPlayerFlags floating = NetPlayerFlags.Swimming | NetPlayerFlags.Floating;
+
+        // The server records the flags byte as sent and rebroadcasts it in the player list, so a bit
+        // newer than another client's reader (the surface float) is neither refused nor stripped
+        var sw = Stopwatch.StartNew();
+        while ((!watching.ListedFlags.TryGetValue("Floater", out var listed) || listed != floating)
+               && sw.Elapsed.TotalSeconds < 15)
+        {
+            SendModes(floater, floating);
+            PumpFor(0.05);
+            DrainAll();
+        }
+
+        Assert.Equal(floating, watching.ListedFlags["Floater"]);
+        Assert.Equal(NetworkStatus.Handshaken, floater.Status);
     }
 }

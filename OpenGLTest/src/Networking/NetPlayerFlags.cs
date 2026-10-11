@@ -20,4 +20,8 @@ public enum NetPlayerFlags : byte
     Swimming = 8,
     Sprinting = 16,
     Airborne = 32,
+    // At rest at the top of deep water (WaterPhase.Float, always with Swimming): the surface-float
+    // pose. Like the rest it is rebroadcast as the raw byte, which no reader rejects, so an older
+    // client simply ignores it and poses the swim.
+    Floating = 64,
 }

@@ -128,6 +128,7 @@ public sealed class RemotePlayer
             verticalVelocity: airborne ? vy : 0f,
             sneaking: _flags.HasFlag(NetPlayerFlags.Sneaking),
             swimming: _flags.HasFlag(NetPlayerFlags.Swimming),
-            swimForward: headingForward, swimSide: headingSide);
+            swimForward: headingForward, swimSide: headingSide,
+            floating: _flags.HasFlag(NetPlayerFlags.Floating));
     }
 }

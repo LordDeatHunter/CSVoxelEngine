@@ -512,11 +512,15 @@ public static class Program
             writer.Write(camera.Pitch);
             // The modes ride along as a request: the server decides whether this player may be
             // creative (and with it, whether its catalog grants are accepted)
-            var supported = camera.IsGrounded || camera.IsFlying || camera.IsInWater;
+            // The water pose follows the body's depth like the local model: a wader walks, a floater
+            // takes the surface float, and both it and a submerged swimmer swim
+            var waterPhase = camera.IsFlying ? WaterPhase.Dry : camera.WaterPhase;
+            var supported = camera.IsGrounded || camera.IsFlying || waterPhase >= WaterPhase.Float;
             writer.Write((byte)((camera.IsCreative ? NetPlayerFlags.Creative : NetPlayerFlags.None)
                 | (camera.IsFlying ? NetPlayerFlags.Flying : NetPlayerFlags.None)
                 | (camera.IsSneaking ? NetPlayerFlags.Sneaking : NetPlayerFlags.None)
-                | (camera.IsInWater && !camera.IsFlying ? NetPlayerFlags.Swimming : NetPlayerFlags.None)
+                | (waterPhase >= WaterPhase.Float ? NetPlayerFlags.Swimming : NetPlayerFlags.None)
+                | (waterPhase == WaterPhase.Float ? NetPlayerFlags.Floating : NetPlayerFlags.None)
                 | (camera.IsSprinting ? NetPlayerFlags.Sprinting : NetPlayerFlags.None)
                 | (!supported ? NetPlayerFlags.Airborne : NetPlayerFlags.None)));
             writer.Write(netCorrectionAck);

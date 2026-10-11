@@ -2671,6 +2671,12 @@ overshoot or jiggle.
   `Sprinting` and `Airborne` bits (rebroadcast untrusted, never acted on) and every `PlayerList`
   entry ends with the player's last `NetPlayerAction` and a counter that moves per swing, so
   `RemotePlayer` poses the model and replays punches, slices and throws.
+  A seventh cosmetic bit, `NetPlayerFlags.Floating` (64), rides beside `Swimming` while the sender
+  is in `WaterPhase.Float`, so others see the surface float (`PlayerModel.Update`'s `floating`); the
+  client now sets `Swimming` only from `Float` up, so a wader walks for everyone. No protocol version
+  moved: the server stores the flags byte raw and rebroadcasts it, and no reader rejects an unknown
+  bit, so an older client just poses the swim (`GameServerTests.TheCosmeticFloatingFlagReachesTheOtherClientsUntouched`,
+  `RemotePlayerAnimationTests`).
 - **HUD feedback** (GL-free state fed once a frame from what the HUD already shows, so singleplayer and a
   client's mirrored inventory and health behave alike): `HotbarNameFade` shows the selected item's name
   over the hearts after a slot or item switch, `HotbarPickupPop` bumps a slot whose count rises (never a
