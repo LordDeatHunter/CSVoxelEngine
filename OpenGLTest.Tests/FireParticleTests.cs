@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Xunit;
 
@@ -166,5 +167,31 @@ public sealed class FireParticleTests
                 Assert.Equal(coarse.Z, fine.Z, 4);
             }
         }
+    }
+
+    [Fact]
+    public void PickupSparksAreBrightBriefAndRise()
+    {
+        foreach (var seed in Enumerable.Range(0, 8))
+        {
+            var particle = new FireParticle(new Vector3(0f, 1f, 0f), FireParticleKind.Spark, new Random(seed));
+            var startY = particle.Position.Y;
+            var color = particle.Color;
+            Assert.True(color.R > 200 && color.G > 200 && color.B > 120, "a spark is not bright");
+            Assert.True(particle.Alpha > 0.5f, "a fresh spark is not visible");
+
+            var died = false;
+            for (var i = 0; i < 240 && !died; i++)
+                died = !particle.Update(1f / 60f);
+
+            Assert.True(died, "a spark never died");
+            Assert.True(particle.Position.Y > startY, "a spark did not rise");
+        }
+
+        // A one-off burst adds that many motes to the system
+        var system = new FireParticleSystem();
+        system.Puff(new Vector3(1f, 1f, 1f), 5, 0.5f, FireParticleKind.Spark, new Random(1));
+        Assert.Equal(5, system.Particles.Count);
+        Assert.All(system.Particles, p => Assert.Equal(FireParticleKind.Spark, p.Kind));
     }
 }

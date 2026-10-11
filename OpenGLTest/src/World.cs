@@ -1689,7 +1689,13 @@ public class World : IItemUseWorld
             foreach (var blockId in _dropManager.Collected)
                 pickedUp |= Inventory.Add(blockId);
             if (pickedUp)
+            {
                 _sfx?.Play(SfxLibrary.PickupGroup);
+                // Bright motes pop where the drop was collected, at the chest
+                _fire.Puff(Camera.Position - new Vector3(0f, WorldGenerationConfig.PickupSparkleDrop, 0f),
+                    WorldGenerationConfig.PickupSparkleCount, WorldGenerationConfig.PickupSparkleSpread,
+                    FireParticleKind.Spark);
+            }
         }
 
         _tntManager.Update((float)deltaTime, _chunkManager, _lodManager, _dropManager, _fluidManager, _falling, _leaves, _leafDecay);

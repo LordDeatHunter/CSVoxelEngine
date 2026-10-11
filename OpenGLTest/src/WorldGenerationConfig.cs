@@ -2077,6 +2077,17 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float HotbarFlashSeconds = 0.35f;
     public const float HotbarFlashAlpha = 0.6f;
 
+    // --- Pickup sparkle (FireParticleKind.Spark): a few bright motes pop where a drop is collected,
+    // at the collector's chest. Cosmetic: singleplayer only (a client's pickups are server-side). ---
+    public const int PickupSparkleCount = 5;
+    public const float PickupSparkleSpread = 0.5f;
+    // Blocks below the eye the motes start at (the chest, where a collected drop arrives)
+    public const float PickupSparkleDrop = 0.35f;
+    public const float SparkLifetime = 0.45f;
+    // Blocks per second a spark rises at, and its size
+    public const float SparkRise = 1.6f;
+    public const float SparkSize = 0.12f;
+
     // --- Low-health vignette (LowHealthVignette, vignette-fragment.glsl) ---
     // Below the threshold (a fraction of the pool) the screen edge pulses red like a slow
     // heartbeat, its strength rising from the min to the max as health falls to nothing. Between

@@ -57,8 +57,8 @@ files waits in TODO.md instead, since there are none to use yet.
   sprite's mean colour at the hand (`ToolShatter.ColourOf` at `World.DamageTool`) and its hotbar
   slot flashes white and fades (`HotbarPickupPop.Flash`, `ToolShatterTests`,
   `HotbarPickupPopTests`).
-- [ ] **Pickup sparkle.** A few bright motes pop where a drop is collected. *Hook:* the collector
-  credit in `DropManager`, `FireParticle`-style billboards. A slice of `V-5`.
+- [x] **Pickup sparkle.** A few bright motes (`FireParticleKind.Spark`) pop at the chest where a
+  drop is collected, singleplayer only (`PickupSparkle*`, `FireParticleTests`).
 - [x] **Surfacing droplets.** `SurfacingDroplets` (timing and a seed per surfacing, read in `Camera.RefreshEyeWaterState`); hashed discs with trails as the vignette pass's `uDroplets` term, none from lava (`surfacing-droplets.json`).
 - [ ] **Goblin notice pip.** A "!" billboard pops over a goblin's head when it first notices the
   player. *Hook:* `Goblin`'s first-throw-delay start (its noticing moment) and the healthbar

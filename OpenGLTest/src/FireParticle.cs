@@ -11,6 +11,10 @@ public enum FireParticleKind : byte
     /// <summary>A pale puff off lava that just hardened: drawn like smoke (blended, unlit) but
     /// lighter, quicker to rise and swell, and shorter lived.</summary>
     Steam,
+
+    /// <summary>A bright mote where a drop was just collected: drawn like smoke but small, quick
+    /// to rise, warm and brief.</summary>
+    Spark,
 }
 
 /// <summary>
@@ -30,6 +34,7 @@ public sealed class FireParticle
     {
         FireParticleKind.Ember => 1f - MathUtils.Clamp01(_age / _lifetime),
         FireParticleKind.Steam => WorldGenerationConfig.SteamAlpha * (1f - MathUtils.Clamp01(_age / _lifetime)),
+        FireParticleKind.Spark => 0.9f * (1f - MathUtils.Clamp01(_age / _lifetime)),
         _ => 0.45f * (1f - MathUtils.Clamp01(_age / _lifetime)),
     };
 
@@ -37,6 +42,7 @@ public sealed class FireParticle
     {
         FireParticleKind.Ember => EmberColor(_age / _lifetime),
         FireParticleKind.Steam => ((byte)236, (byte)238, (byte)242),
+        FireParticleKind.Spark => ((byte)255, (byte)238, (byte)170),
         _ => ((byte)110, (byte)110, (byte)115),
     };
 
@@ -85,6 +91,16 @@ public sealed class FireParticle
                 (rng.NextSingle() * 2f - 1f) * 0.3f);
             Size = WorldGenerationConfig.SteamSize * (0.8f + 0.4f * rng.NextSingle());
             _grow = WorldGenerationConfig.SteamGrow;
+        }
+        else if (kind == FireParticleKind.Spark)
+        {
+            _lifetime = WorldGenerationConfig.SparkLifetime * (0.7f + 0.6f * rng.NextSingle());
+            _velocity = new Vector3(
+                (rng.NextSingle() * 2f - 1f) * 0.4f,
+                WorldGenerationConfig.SparkRise * (0.8f + 0.4f * rng.NextSingle()),
+                (rng.NextSingle() * 2f - 1f) * 0.4f);
+            Size = WorldGenerationConfig.SparkSize * (0.8f + 0.4f * rng.NextSingle());
+            _grow = 0f;
         }
         else
         {
