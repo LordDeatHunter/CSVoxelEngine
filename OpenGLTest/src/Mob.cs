@@ -110,13 +110,27 @@ public abstract class Mob
     private float _landingSpeed;
     private float _landingGravity;
 
+    /// <summary>The drop in blocks this mob lands from unhurt (<see cref="MobFallDamage"/>); a slime
+    /// adds its own hop's apex, so its hops never hurt it.</summary>
+    public virtual float SafeFallBlocks => WorldGenerationConfig.MobSafeFallBlocks;
+
     /// <summary>
     /// Records that the body just landed at <paramref name="impactSpeed"/> blocks per second under
     /// <paramref name="gravity"/>, for the owner's landing dust to take (<see cref="TryTakeLanding"/>).
-    /// Two landings before a take keep the harder one; nothing but the cosmetic dust reads it.
+    /// Two landings before a take keep the harder one; nothing but the cosmetic dust reads it. The
+    /// landing also bills its fall (<see cref="MobFallDamage"/> over <see cref="SafeFallBlocks"/>)
+    /// unless the feet were <paramref name="inWater"/>; only a mob's own physics lands, which runs in
+    /// the authoritative simulation alone, so a client's mirror never takes fall damage.
     /// </summary>
-    protected void NoteLanding(float impactSpeed, float gravity)
+    protected void NoteLanding(float impactSpeed, float gravity, bool inWater = false)
     {
+        if (!inWater)
+        {
+            var damage = MobFallDamage.Damage(LandingDust.FallFromImpactSpeed(impactSpeed, gravity),
+                SafeFallBlocks, MaxHealth);
+            if (damage > 0) TakeDamage(damage);
+        }
+
         if (impactSpeed <= _landingSpeed) return;
         _landingSpeed = impactSpeed;
         _landingGravity = gravity;

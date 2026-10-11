@@ -129,6 +129,17 @@ public sealed class Slime : Mob
     /// <inheritdoc />
     public override float DeathSeconds => 0.45f;
 
+    /// <summary>The shared safe fall plus the apex of this slime's own land hop (v² / 2g), so a hop on
+    /// flat ground, however big the slime, never hurts it; a fall off a cliff past that still does.</summary>
+    public override float SafeFallBlocks
+    {
+        get
+        {
+            var lift = HopVelocity(Vector3.UnitX, inWater: false, Size).Y;
+            return base.SafeFallBlocks + lift * lift / (2f * Gravity);
+        }
+    }
+
     /// <summary>Whether the slime is crouching for a hop it is about to launch.</summary>
     public bool IsWindingUp => _windup > 0f;
 
@@ -255,7 +266,7 @@ public sealed class Slime : Mob
         if (!wasGrounded && IsGrounded)
         {
             _squash.Impulse(-MathF.Min(fallSpeed, 20f) * LandKickPerSpeed);
-            NoteLanding(fallSpeed, Gravity);
+            NoteLanding(fallSpeed, Gravity, _inWater);
         }
 
         float target;

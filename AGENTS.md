@@ -2487,6 +2487,15 @@ round-robin over them under the global caps and despawn by the distance to the n
 follow real players" under "Multiple players and chat"); the `Update(..., Camera)` overloads wrap
 the camera as a one-target list.
 
+**Shared mob rules** live once in `Mob` (or a GL-free helper beside it), so each manager applies them
+with one call, and they run only in the authoritative simulation (singleplayer and the server; a
+client's mirrors are advanced by `Mob.AnimateMirror` alone). **Fall damage**: every landing a mob's
+physics reports (`Mob.NoteLanding`, which also feeds the landing dust) bills `MobFallDamage.Damage`
+over the drop its impact speed implies: free up to `Mob.SafeFallBlocks` (`MobSafeFallBlocks`; a slime
+adds its own hop's apex, so its hops never hurt it), then `MobFallDamagePerBlockShare` of the mob's
+full health (at least 1) per whole block past it, and nothing when the feet were in water
+(`MobFallDamageTests`).
+
 The first entity is the **slime** (`Slime` + `Systems/SlimeManager.cs`), owned by `World`. It hops
 toward the player, damages on contact only while airborne (a slime merely bobbing in water is
 harmless), is shoved (harmlessly) by the player when grounded, floats to the surface of water like an

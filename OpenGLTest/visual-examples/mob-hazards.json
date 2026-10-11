@@ -1,0 +1,27 @@
+{
+  // Shared mob hazards: run with VOXEL_SCRIPT=visual-examples/mob-hazards.json VOXEL_TIME=147 from
+  // OpenGLTest/. Shots land in visual/mob-hazards/.
+  // The camera hovers (flying makes it immune to the goblins' stones) and watches each mob's
+  // healthbar of five hearts.
+
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "fly" },
+
+    // FALL DAMAGE (MobFallDamage): the flat desert chunk of ground-dust.json (ground top y 10 at
+    // x 168, z 136). Facing +X, the left goblin drops one block and keeps all its hearts; the right
+    // one drops eight and lands with most of them gone, red with the hit flash.
+    { "op": "teleport", "pos": [163.5, 13.5, 136.5], "yaw": 0, "pitch": -8 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "spawn", "entity": "goblin", "pos": [169.5, 12.0, 134.5] },
+    { "op": "spawn", "entity": "goblin", "pos": [169.5, 19.0, 138.5] },
+    { "op": "wait", "seconds": 0.85 },
+    { "op": "screenshot", "name": "goblin-fall" },
+    // A size-2 slime dropped nine blocks (past its own hop's apex) loses hearts too
+    { "op": "damage", "amount": 100 },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "spawn", "entity": "slime", "pos": [169.5, 20.0, 136.5], "size": 2 },
+    { "op": "wait", "seconds": 0.9 },
+    { "op": "screenshot", "name": "slime-fall" }
+  ]
+}

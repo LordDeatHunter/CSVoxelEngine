@@ -1471,6 +1471,14 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int MobHardCapFactor = 15;
     public const int MobHardCap = MobNaturalCap * MobHardCapFactor;
 
+    // --- Mob fall damage (MobFallDamage, Mob.NoteLanding) ---
+    // A mob landing from more than its safe height takes this share of its own full health (at least
+    // 1) per whole block past it, so the rule suits a small and a large pool alike. The safe height is
+    // MobSafeFallBlocks; a slime adds its own hop's apex, so its hops never hurt it. Landing in water
+    // is free, and only the authoritative simulation bills it.
+    public const float MobSafeFallBlocks = 3f;
+    public const float MobFallDamagePerBlockShare = 0.1f;
+
     // --- Slimes (SlimeManager) ---
     // Forest mobs that hop at the player. Natural spawns appear on dry forest surface in a ring
     // around the player and are culled when they stray too far. Damage only lands while a slime
