@@ -192,9 +192,9 @@ files waits in TODO.md instead, since there are none to use yet.
   `GoblinPackAlertRadiusBlocks` (12), which skip their first-throw delay so the pack throws
   together (`Goblin.TakeJustNoticed`/`AlertPack`, `GoblinManager.AlertPackAround`;
   `GoblinPackAlertTests`).
-- [ ] **Pack spawning.** A goblin ring spawn rolls a group of 1-3 within 3 blocks of the chosen
-  cell. *Hook:* `GoblinManager`'s call into `MobSpawner.TryFindSurfaceSpawn`, with a repeated
-  search for the neighbours; every member respects `MobCaps`' natural cap.
+- [x] **Pack spawning.** A ring spawn rolls one to `GoblinPackMaxSize` (3) goblins, the rest of
+  the pack landing within `GoblinPackSpawnRadiusBlocks` of the found cell, each member re-checked
+  against the shared natural cap (`GoblinManager.TryFindPackMate`; `GoblinPackSpawnTests`).
 - [x] **Torch-safe ground.** `MobSpawner.TryFindSurfaceSpawn` refuses a cell with block light at or over `MobSpawnBlockLightLimit` (`MobSpawner.IsLitByBlocks` over `EntityLight.Sample`) (`TorchSafeSpawnTests`).
 - [x] **Size-scaled knockback.** `SlimeSize.ShoveSpeed` (the shove over the body scale) in `Slime.Shove`; a split child's launch is unscaled (`SlimeKnockbackTests`).
 - [x] **Despawn fade.** Both managers' despawn branch calls `Mob.BeginDying()` without loot, so the mob plays its death pose and leaves `LivingCount` (`mob-hazards.json`).

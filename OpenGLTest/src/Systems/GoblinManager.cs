@@ -412,7 +412,33 @@ public sealed class GoblinManager : IMobPopulation
         _spawnCursor = index + 1;
 
         if (TryFindSpawn(chunks, targets[index].Eye, out var position))
+        {
+            // A ring spawn rolls a pack: the found cell leads, and one to two more join it within
+            // GoblinPackSpawnRadiusBlocks while the shared natural cap still has room
+            var pack = 1 + Random.Shared.Next(WorldGenerationConfig.GoblinPackMaxSize);
             Spawn(position);
+            for (var member = 1; member < pack && _caps.AllowsNaturalSpawn; member++)
+            {
+                if (TryFindPackMate(chunks, position, out var mate))
+                    Spawn(mate);
+            }
+        }
+    }
+
+    // A pack mate's spot: the same dry-surface search, ringed on the leader's cell rather than the
+    // player
+    private static bool TryFindPackMate(ChunkManager chunks, Vector3 leader, out Vector3 position)
+    {
+        if (!MobSpawner.TryFindSurfaceSpawn(chunks, leader, 1f,
+                WorldGenerationConfig.GoblinPackSpawnRadiusBlocks, WorldGenerationConfig.GoblinPackSpawnTries,
+                out var x, out var groundY, out var z))
+        {
+            position = default;
+            return false;
+        }
+
+        position = new Vector3(x + 0.5f, groundY + 1 + Goblin.Height * 0.5f, z + 0.5f);
+        return true;
     }
 
     /// <summary>The goblin's spawn ring through <see cref="MobSpawner.TryFindSurfaceSpawn"/>,
