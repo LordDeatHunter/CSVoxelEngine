@@ -118,9 +118,10 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Fence.** `oak_fence`: the `pane` block object (`post`, `arm`, `rails` in px) becomes a `PaneProfile` that `PaneShape`/`PaneEmitter` read; panes join only their own shape (`PaneProfileTests`, `fences.json`).
 - [x] **Trapdoor.** `oak_trapdoor`: the `open` block object (model + hitbox) makes a block openable, open bit = state bit 2 (`DoorState`), toggled by `World.TryToggleOpenable` in the right-click chain (`OpenableTests`, `doors.json`).
 - [x] **Hanging lantern.** `lantern` (torch + copper ingot, emission 15) on the general `support: "above"` rule (`BlockType.SupportAbove`); tile from `tools/generate-lantern-texture.py` (`HangingBlockTests`, `lanterns.json`).
-- [ ] **Slime block.** A block that bounces a landing body back up, crafted from slimeballs, which
-  have no use today. *Hook:* a `bounce` block flag read where the player's landing is detected
-  (`FallTracker.LandedDrop`, `PlayerPhysics`), cancelling the fall damage; mobs and drops later.
+- [x] **Slime block.** A `bounce` block flag (a slime block, nine slimeballs): a body that lands
+  on it is sprung back up at `SlimeBlockBounceRestitution` of its impact and bills no fall
+  damage (`FallTracker`'s cushioned landing); mobs and drops later. Tile from
+  `tools/generate-slime-block-texture.py` (`SlimeBlockTests`).
 - [ ] **Bandage.** Cotton -> bandage; using one restores some health, the first heal in the game.
   *Hook:* a new `use.action: "heal"` (`ItemUseAction` + `ItemFactory`), spending one, refused at
   full health. On a server it is the `Use` intent against that player's own `PlayerHealth`.

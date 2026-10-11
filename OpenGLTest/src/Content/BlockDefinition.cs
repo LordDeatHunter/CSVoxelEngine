@@ -67,6 +67,14 @@ public sealed class BlockDefinition
     /// </summary>
     public bool? FootstepDust { get; set; }
 
+    /// <summary>
+    /// Whether the block springs a landing body back up (a slime block): the landing bills no fall
+    /// damage and the body is thrown up again at <see cref="WorldGenerationConfig.SlimeBlockBounceRestitution"/>
+    /// of its impact once that reaches <see cref="WorldGenerationConfig.SlimeBlockBounceMinSpeed"/>.
+    /// Default false; only read for the block under a landing body's feet.
+    /// </summary>
+    public bool? Bounce { get; set; }
+
     public bool? Occludes { get; set; }
     public bool? CullSelf { get; set; }
     public bool? CastsAO { get; set; }

@@ -34,11 +34,13 @@ public sealed class FallTracker
     /// <summary>
     /// Feeds one observation and returns the fall damage it lands, 0 when nothing lands.
     /// The first observation only seeds the state. A landing (grounded after airborne) bills
-    /// the drop from the peak feet height unless <paramref name="creative"/> or
-    /// <paramref name="inWater"/>; <paramref name="flying"/> and a step larger than
+    /// the drop from the peak feet height unless <paramref name="creative"/>,
+    /// <paramref name="inWater"/> or <paramref name="cushioned"/> (a bounce block caught it,
+    /// which springs the body back up); <paramref name="flying"/> and a step larger than
     /// <paramref name="maxStepBlocks"/> reset the peak to the current feet.
     /// </summary>
-    public int Observe(float feet, bool grounded, bool flying, bool inWater, bool creative, float maxStepBlocks)
+    public int Observe(float feet, bool grounded, bool flying, bool inWater, bool creative, float maxStepBlocks,
+        bool cushioned = false)
     {
         var damage = 0;
         LandedDrop = 0f;
@@ -71,7 +73,7 @@ public sealed class FallTracker
         {
             var drop = _fallPeakFeet - feet;
             LandedDrop = MathF.Max(0f, drop);
-            if (!creative && !inWater)
+            if (!creative && !inWater && !cushioned)
                 damage = PlayerHealth.FallDamage(drop);
             _fallPeakFeet = feet;
             _wasGrounded = true;

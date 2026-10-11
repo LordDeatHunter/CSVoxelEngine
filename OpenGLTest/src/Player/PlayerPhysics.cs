@@ -424,9 +424,21 @@ internal sealed class PlayerPhysics
         if (collidedY)
         {
             if (frameMovement.Y < 0f)
+            {
                 camera.SetGrounded(true);
-
-            _verticalVelocity = 0f;
+                // A bounce block (a slime block) springs the body back up at a share of its
+                // impact; the grounded frame is what the fall tracker reads as a cushioned
+                // landing, so it never bills damage. Anything else stops dead.
+                var impact = -_verticalVelocity;
+                _verticalVelocity = impact >= WorldGenerationConfig.SlimeBlockBounceMinSpeed
+                                    && BounceBelow(camera, chunkManager)
+                    ? impact * WorldGenerationConfig.SlimeBlockBounceRestitution
+                    : 0f;
+            }
+            else
+            {
+                _verticalVelocity = 0f;
+            }
         }
         else
         {
@@ -435,6 +447,20 @@ internal sealed class PlayerPhysics
 
         camera.UpdateShoulderOffset(chunkManager, deltaTime);
         camera.RefreshEyeWaterState(chunkManager);
+    }
+
+    /// <summary>
+    /// Whether the cell under the body's feet is a bounce block: the block the feet just landed
+    /// on, read a hair below the feet so a body resting flush on a block top finds that block
+    /// rather than its own (air) cell.
+    /// </summary>
+    public static bool BounceBelow(Camera camera, ChunkManager chunks)
+    {
+        var feetY = camera.Position.Y - EyeHeight;
+        var cellY = MathUtils.FloorToInt(feetY - 0.05f);
+        var id = chunks.GetBlockGlobal(MathUtils.FloorToInt(camera.Position.X), cellY,
+            MathUtils.FloorToInt(camera.Position.Z));
+        return BlockType.BouncesAt(id);
     }
 
     /// <summary>

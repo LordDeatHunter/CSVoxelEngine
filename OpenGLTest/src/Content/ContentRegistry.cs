@@ -1725,6 +1725,7 @@ public static class ContentRegistry
                 throw new InvalidOperationException(
                     $"Block '{path}' sets footstepDust on a fluid: nobody runs on a fluid, so it can never puff.");
             var footstepDust = definition.FootstepDust ?? false;
+            var bounce = definition.Bounce ?? false;
 
             var material = ParseMaterial(definition.Material, path);
 
@@ -1776,6 +1777,7 @@ public static class ContentRegistry
                 Friction = friction,
                 PebbleWeight = pebbleWeight,
                 FootstepDust = footstepDust,
+                Bounces = bounce,
                 CullSelf = definition.CullSelf ?? false,
                 // Tree wood is drawn at any thickness down to a 1 px twig, so it never darkens
                 // its neighbours, whatever the file says (forced here, where CastsAoById is mirrored)
@@ -1855,6 +1857,7 @@ public static class ContentRegistry
             BlockType.FrictionById[id] = type.Friction;
             BlockType.PebbleWeightById[id] = type.PebbleWeight;
             BlockType.FootstepDustById[id] = type.FootstepDust;
+            BlockType.BounceById[id] = type.Bounces;
             BlockType.CastsAoById[id] = type.CastsAmbientOcclusion;
             BlockType.TreeWoodById[id] = treeWood;
             BlockType.PaneById[id] = pane;

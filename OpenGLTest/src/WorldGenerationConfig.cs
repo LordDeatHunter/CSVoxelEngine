@@ -2077,6 +2077,11 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float HotbarFlashSeconds = 0.35f;
     public const float HotbarFlashAlpha = 0.6f;
 
+    // --- Slime block (the block "bounce" flag): a body that lands on one is thrown back up at
+    // this share of its impact and bills no fall damage; below the minimum it just rests ---
+    public const float SlimeBlockBounceRestitution = 0.8f;
+    public const float SlimeBlockBounceMinSpeed = 5f;
+
     // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
     // first notices a player (the same moment its first-throw delay starts) ---
     public const float GoblinNoticePipSeconds = 0.9f;

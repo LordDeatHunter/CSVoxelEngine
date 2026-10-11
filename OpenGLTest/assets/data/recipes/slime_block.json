@@ -1,0 +1,7 @@
+{
+  "result": "block/slime_block",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/slimeball", "count": 9 }
+  ]
+}

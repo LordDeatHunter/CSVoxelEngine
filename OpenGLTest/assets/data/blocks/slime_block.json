@@ -1,0 +1,10 @@
+{
+  // A bounce pad: a body that lands on it springs back up at a share of its impact instead of
+  // stopping, and the landing bills no fall damage (the "bounce" flag; see PlayerPhysics and
+  // FallTracker). Crafted from nine slimeballs (recipes/slime_block.json). The tile is a
+  // placeholder from tools/generate-slime-block-texture.py.
+  "name": "Slime Block",
+  "model": { "parent": "block/cube_all", "textures": { "all": "slime_block" } },
+  "hardness": 3,
+  "bounce": true
+}

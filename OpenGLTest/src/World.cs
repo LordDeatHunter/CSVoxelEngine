@@ -2397,8 +2397,10 @@ public class World : IItemUseWorld
 
         var beforeHp = _health.Health;
         var feet = Camera.Position.Y - Camera.EyeHeight;
+        // A bounce block under the feet cushioned the landing (PlayerPhysics sprang the body back
+        // up): it still counts as a landing, but bills no damage
         var damage = _fall.Observe(feet, Camera.IsGrounded, Camera.IsFlying, Camera.IsInWater, Camera.IsCreative,
-            FallTracker.DefaultMaxStepBlocks);
+            FallTracker.DefaultMaxStepBlocks, cushioned: PlayerPhysics.BounceBelow(Camera, _chunkManager));
         if (damage > 0)
             _health.TakeDamage(damage);
 
