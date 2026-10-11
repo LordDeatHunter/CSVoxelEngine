@@ -1,5 +1,5 @@
 {
-  // Trapdoor check: run with VOXEL_TIME=147 (noon) and VOXEL_SCRIPT=visual-examples/doors.json.
+  // Trapdoor and door check: run with VOXEL_TIME=147 (noon) and VOXEL_SCRIPT=visual-examples/doors.json.
   // Shots land in visual/doors/.
   //
   // The flat desert patch of torches.json: the player hovers at (253, -5) (sand at y 9, feet at
@@ -13,6 +13,12 @@
   //   trapdoors-open    the far one clicked open: it stands up against the side of its cell
   //                     nearest the camera, the near one stays shut
   //   trapdoors-oblique the same from the front left
+  //   Then two oak doors, both placed looking (mostly) north from the start: (1, 10, -3) and
+  //   (2, 10, -3), each two cells tall, the panel across the side of its cell nearest the camera.
+  //   doors-closed      both shut side by side, windows over their upper halves
+  //   doors-one-open    the right one clicked open on its upper half: both halves swing together
+  //                     a quarter turn about the left-hand hinge, into the cell
+  //   doors-oblique     the same from the front right
   "steps": [
     { "op": "fly", "on": true },
     { "op": "teleport", "pos": [253.5, 30, -4.5], "yaw": -90, "pitch": -30 },
@@ -36,6 +42,26 @@
     { "op": "screenshot", "name": "trapdoors-open", "hideHud": true },
     { "op": "teleport", "pos": [250.5, 12.5, -3.5], "yaw": -50, "pitch": -25 },
     { "op": "wait", "seconds": 0.5 },
-    { "op": "screenshot", "name": "trapdoors-oblique", "hideHud": true }
+    { "op": "screenshot", "name": "trapdoors-oblique", "hideHud": true },
+
+    { "op": "teleport", "pos": [253.5, 11.63, -4.5], "yaw": -70, "pitch": -15 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "give", "block": "oak_door", "count": 2 },
+    { "op": "look", "yaw": -56.31, "pitch": -24.19 },
+    { "op": "place" },
+    { "op": "look", "yaw": -71.57, "pitch": -27.13 },
+    { "op": "place" },
+    { "op": "look", "yaw": -63, "pitch": -5 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "doors-closed", "hideHud": true },
+
+    { "op": "look", "yaw": -52.33, "pitch": -2.1 },
+    { "op": "place" },
+    { "op": "look", "yaw": -63, "pitch": -5 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "doors-one-open", "hideHud": true },
+    { "op": "teleport", "pos": [258.5, 12.5, -3.5], "yaw": -128, "pitch": -12 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "doors-oblique", "hideHud": true }
   ]
 }

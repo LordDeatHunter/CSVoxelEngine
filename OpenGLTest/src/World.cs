@@ -2841,6 +2841,10 @@ public class World : IItemUseWorld
         // invisible part cells standing (see RevertMultiblock)
         else if (Multiblock.IsMultiblockCell(brokenId))
             RevertMultiblock(blockPos, brokenId, chunk, dropsLoot);
+        // Either half of a door takes the other down with it and drops the door once (see
+        // RemoveTallBlock)
+        else if (TallBlock.TryGetPartner(brokenId, blockPos, out var partnerCell, out var partnerId))
+            RemoveTallBlock(blockPos, brokenId, partnerCell, partnerId, chunk, dropsLoot, player);
         // Everything else rolls its loot table, but only once a block was actually cleared
         else if (chunk.RemoveBlockAt(blockPos, _chunkManager))
         {
@@ -3130,6 +3134,33 @@ public class World : IItemUseWorld
             if (cell != blockPos)
                 RaiseBlockEdited(cell);
         }
+    }
+
+    /// <summary>
+    /// Mining either half of a two-cell block (a door, <see cref="TallBlock"/>): the mined cell is
+    /// cleared and drops the lower half once when <paramref name="dropsLoot"/>, and the other half,
+    /// if it is still there, goes through the hooks a mined cell does (fluid and leaf-decay
+    /// schedules, the far LOD, the blocks it held up, a falls block above it, the client's
+    /// prediction report) without dropping anything of its own.
+    /// </summary>
+    private void RemoveTallBlock(Vector3 blockPos, byte brokenId, Vector3 partnerCell, byte partnerId, Chunk chunk,
+        bool dropsLoot, PlayerContext player)
+    {
+        if (!chunk.RemoveBlockAt(blockPos, _chunkManager)) return;
+        if (dropsLoot)
+            _dropManager.SpawnLoot(TallBlock.LowerOf(brokenId), blockPos);
+
+        int px = (int)partnerCell.X, py = (int)partnerCell.Y, pz = (int)partnerCell.Z;
+        if (!_chunkManager.TryGetCell(px, py, pz, out var id, out _) || id != partnerId) return;
+        if (_chunkManager.ChunkAt(px, py, pz) is not { } partnerChunk
+            || !partnerChunk.RemoveBlockAt(partnerCell, _chunkManager)) return;
+        _fluidManager.ScheduleAround(partnerCell);
+        _leafDecay.ScheduleAround(partnerCell);
+        NotifyLodEdit(px, py, pz);
+        PopUnsupportedAround(partnerCell, player);
+        if (!_clientMode)
+            _falling.TryTopple(_chunkManager, _lodManager, _fluidManager, px, py + 1, pz);
+        RaiseBlockEdited(partnerCell);
     }
 
     /// <summary>Runs right after a structure went up, so the managers that own its behaviour
@@ -3802,9 +3833,9 @@ public class World : IItemUseWorld
     }
 
     /// <summary>
-    /// Right-click on an openable block (a trapdoor; <see cref="BlockType.Openable"/>): flips its
-    /// open bit (<see cref="DoorState"/>) whatever is in hand, so a held block never places
-    /// against it. The flip is a state write through <see cref="Chunk.SetStateAt"/> (saved,
+    /// Right-click on an openable block (a trapdoor, either half of a door;
+    /// <see cref="BlockType.Openable"/>): flips its open bit (<see cref="DoorState"/>), and a
+    /// door's other half with it, whatever is in hand, so a held block never places against it. The flip is a state write through <see cref="Chunk.SetStateAt"/> (saved,
     /// journaled to clients and remeshed at once) with the edit-path hooks, and a client reports
     /// it as part of its prediction. Returns whether the click belonged to an openable block.
     /// </summary>
@@ -3813,7 +3844,13 @@ public class World : IItemUseWorld
         if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
         if (!_chunkManager.TryGetCell((int)hit.X, (int)hit.Y, (int)hit.Z, out var id, out var state)) return false;
         if (BlockType.ById[id] is not { Openable: true }) return false;
-        ToggleOpenCell(hit, DoorState.Toggle(state));
+        var toggled = DoorState.Toggle(state);
+        ToggleOpenCell(hit, toggled);
+        // Both halves of a door share one state: the other half swings with the clicked one
+        if (TallBlock.TryGetPartner(id, hit, out var partner, out var partnerId)
+            && _chunkManager.TryGetCell((int)partner.X, (int)partner.Y, (int)partner.Z, out var held, out _)
+            && held == partnerId)
+            ToggleOpenCell(partner, toggled);
         return true;
     }
 
@@ -3977,6 +4014,10 @@ public class World : IItemUseWorld
         // A placed leaf is decoration, not canopy: persistent, so no missing tip ever decays it
         if (TreeGenerator.IsLeaf(blockId) && state == 0) state = LeafState.Encode(0, persistent: true);
 
+        // A door needs the cell above free for its upper half too, or nothing is placed or spent
+        var upperId = BlockType.ById[blockId]?.UpperHalfId ?? 0;
+        if (upperId != 0 && !CanPlaceUpperHalf(placePos + Vector3.UnitY, upperId)) return false;
+
         if (!chunk.PlaceBlockAt(placePos, blockId, _chunkManager, state)) return false;
 
         // A full solid cube can raise or re-tile the far LOD's surface. Anything else never
@@ -3994,7 +4035,33 @@ public class World : IItemUseWorld
         _fluidManager.ScheduleAround(placePos);
         _leafDecay.ScheduleAround(placePos);
         BlockEdited?.Invoke((int)placePos.X, (int)placePos.Y, (int)placePos.Z, blockId, state);
+        if (upperId != 0)
+            PlaceUpperHalf(placePos + Vector3.UnitY, upperId, state);
         return true;
+    }
+
+    /// <summary>Whether a door's upper half <paramref name="upperId"/> may go into
+    /// <paramref name="cell"/>: loaded, holding nothing a placement may not take over, no live
+    /// falling cube in it and no player's body in the way.</summary>
+    private bool CanPlaceUpperHalf(Vector3 cell, byte upperId)
+    {
+        int x = (int)cell.X, y = (int)cell.Y, z = (int)cell.Z;
+        if (!_chunkManager.TryGetCell(x, y, z, out var id, out var state) || !Placement.CanOccupy(id, state))
+            return false;
+        if (_falling.OverlapsAny(x, y, z)) return false;
+        return !(BlockType.IsSolid(upperId) && BodyBlocksPlacement(cell));
+    }
+
+    /// <summary>Writes a door's upper half over its just-placed lower half, with the same state
+    /// byte, and runs the placement hooks for it.</summary>
+    private void PlaceUpperHalf(Vector3 cell, byte upperId, byte state)
+    {
+        int x = (int)cell.X, y = (int)cell.Y, z = (int)cell.Z;
+        if (_chunkManager.ChunkAt(x, y, z) is not { } chunk || !chunk.PlaceBlockAt(cell, upperId, _chunkManager, state))
+            return;
+        _fluidManager.ScheduleAround(cell);
+        _leafDecay.ScheduleAround(cell);
+        BlockEdited?.Invoke(x, y, z, upperId, state);
     }
     
     public ChunkManager GetChunkManager() => _chunkManager;

@@ -1,0 +1,34 @@
+{
+    // One half of a closed door facing north (the authored facing): a 3 px panel across the
+    // cell's south side, the side nearest the player who placed it looking north. Two half-width
+    // boxes, so no face covers a whole cell side (a facing block is turned to the other three
+    // facings and must shade flat on all of them); the buried faces between them are left out.
+    // UVs are left to the defaults, which crop each face out of the half's tile.
+    "textures": {
+        "particle": "#texture"
+    },
+    "elements": [
+        {
+            "from": [0, 0, 13],
+            "to": [8, 16, 16],
+            "faces": {
+                "north": { "texture": "#texture" },
+                "south": { "texture": "#texture", "cullface": "south" },
+                "west": { "texture": "#texture", "cullface": "west" },
+                "up": { "texture": "#texture", "cullface": "up" },
+                "down": { "texture": "#texture", "cullface": "down" }
+            }
+        },
+        {
+            "from": [8, 0, 13],
+            "to": [16, 16, 16],
+            "faces": {
+                "north": { "texture": "#texture" },
+                "south": { "texture": "#texture", "cullface": "south" },
+                "east": { "texture": "#texture", "cullface": "east" },
+                "up": { "texture": "#texture", "cullface": "up" },
+                "down": { "texture": "#texture", "cullface": "down" }
+            }
+        }
+    ]
+}

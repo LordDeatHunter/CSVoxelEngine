@@ -336,6 +336,14 @@ public sealed record BlockType
     /// <see cref="Placement.TryMount"/>.</summary>
     public byte WallBlockId { get; internal set; }
 
+    /// <summary>The upper half of a two-cell block whose lower half this is (a door), or 0; see
+    /// <see cref="TallBlock"/>.</summary>
+    public byte UpperHalfId { get; internal set; }
+
+    /// <summary>The lower half of a two-cell block whose upper half this is (a door's top), or 0;
+    /// see <see cref="TallBlock"/>.</summary>
+    public byte LowerHalfId { get; internal set; }
+
     /// <summary>The block whose item this one is picked as (a wall torch picks its torch), or 0
     /// when it is picked as itself; see <see cref="PickId"/>.</summary>
     public byte ItemBlockId { get; internal set; }

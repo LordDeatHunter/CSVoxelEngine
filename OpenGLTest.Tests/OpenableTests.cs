@@ -99,7 +99,8 @@ public sealed class OpenableTests : IDisposable
     public void ARightClickOpensAndClosesATrapdoorWhateverIsInHand()
     {
         _world = new SupportTestWorld();
-        var trapdoor = Openable().First(t => t.Hitboxes.Length > 0).Id;
+        // A one-cell openable block (a door's halves are covered by DoorTests)
+        var trapdoor = Openable().First(t => t.UpperHalfId == 0 && t.LowerHalfId == 0).Id;
         var planks = ContentRegistry.RequireBlock("oak_planks").Id;
         var ground = _world.Top;
         var (x, z) = (8, 6);

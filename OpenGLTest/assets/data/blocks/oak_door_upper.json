@@ -1,0 +1,19 @@
+{
+  // The upper half of an oak door (oak_door.json names it as its upperHalf): never held, picked as
+  // the door, and dropping nothing of its own, since breaking either half drops the one door. Its
+  // state byte (the facing and the open bit) is always written together with the lower half's.
+  "name": "Oak Door",
+  "model": { "parent": "block/door_closed", "textures": { "texture": "oak_door_top" } },
+  "facing": "horizontal",
+  "open": {
+    "model": { "parent": "block/door_open", "textures": { "texture": "oak_door_top" } },
+    "hitbox": { "min": [0, 0, 0], "max": [0.1875, 1, 1] }
+  },
+  "hasItem": false,
+  "loot": "none",
+  "hardness": 4,
+  "sfx": "hit_wood",
+  "castsAO": false,
+  "collidesByHitbox": true,
+  "hitbox": { "min": [0, 0, 0.8125], "max": [1, 1, 1] }
+}

@@ -1079,6 +1079,37 @@ public static class ContentRegistry
     }
 
     /// <summary>
+    /// Resolves a block's <c>upperHalf</c>: the block filling the cell above it (a door's top). The
+    /// two halves share one state byte, so they must agree on <c>facing</c> and <c>open</c>; the
+    /// lower half is the item and the drop, so only it may be held; each half belongs to one pair;
+    /// and neither may topple, pop or flow away from the other.
+    /// </summary>
+    private static byte ResolveUpperHalf(string name, string path, byte ownerId)
+    {
+        if (!TryResolve(name, out var id) || id == BlockType.Air || ItemRegistry.IsItem(id))
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in upperHalf, which is not a registered block.");
+        if (id == ownerId)
+            throw new InvalidOperationException($"Block '{path}' names itself in upperHalf.");
+        var lower = BlockType.ById[ownerId]!;
+        var upper = BlockType.ById[id]!;
+        if (!lower.HasItem || upper.HasItem)
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in upperHalf; the lower half must be held and the upper half must set hasItem: false.");
+        if (upper.UpperHalfId != 0 || upper.LowerHalfId != 0 || upper.ItemBlockId != 0 || lower.LowerHalfId != 0)
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in upperHalf, but one of the two already belongs to another block; a half belongs to one pair.");
+        if (lower.HasHorizontalFacing != upper.HasHorizontalFacing || lower.Openable != upper.Openable)
+            throw new InvalidOperationException(
+                $"Block '{path}' and its upperHalf '{name}' disagree on facing or open; the halves share one state byte.");
+        foreach (var half in new[] { lower, upper })
+            if (half.Fluid || half.Falls || half.NeedsSupport || half.StackMax >= 2)
+                throw new InvalidOperationException(
+                    $"Block '{path}' pairs with upperHalf '{name}', but '{half.Name}' is a fluid, falls, needs support or stacks; a half must stand with its partner.");
+        return id;
+    }
+
+    /// <summary>
     /// Checks each item's declared use against the finished tables: a fluid action needs a real
     /// fluid block to work on and an item to turn into (the hotbar swaps one for the other),
     /// while a stack action needs a real stackable block and no result (it spends from its
@@ -1505,6 +1536,7 @@ public static class ContentRegistry
         var hardenPending = new List<(byte Id, string? To, string? Touching, string Path)>();
         var multiblockPending = new List<(byte Id, string? Part, string? Source, string Path)>();
         var wallPending = new List<(byte Id, string Wall, string Path)>();
+        var upperPending = new List<(byte Id, string Upper, string Path)>();
 
         foreach (var (name, path) in files)
         {
@@ -1766,6 +1798,8 @@ public static class ContentRegistry
             }
             if (definition.WallBlock != null)
                 wallPending.Add((id, definition.WallBlock, path));
+            if (definition.UpperHalf != null)
+                upperPending.Add((id, definition.UpperHalf, path));
             if (definition.BiomeTint != null)
             {
                 var (palette, faces) = BiomeTintFaces.Expand(definition.BiomeTint, path);
@@ -1833,6 +1867,15 @@ public static class ContentRegistry
             var wallId = ResolveWallBlock(wall, pendingPath, pendingId);
             types[pendingId].WallBlockId = wallId;
             types[wallId].ItemBlockId = pendingId;
+        }
+
+        // And a door's upper half may load before or after its lower half
+        foreach (var (pendingId, upper, pendingPath) in upperPending)
+        {
+            var upperId = ResolveUpperHalf(upper, pendingPath, pendingId);
+            types[pendingId].UpperHalfId = upperId;
+            types[upperId].LowerHalfId = pendingId;
+            types[upperId].ItemBlockId = pendingId;
         }
 
         BlockType.Types = types;

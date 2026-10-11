@@ -131,6 +131,15 @@ public sealed class BlockDefinition
     public OpenDefinition? Open { get; set; }
 
     /// <summary>
+    /// Makes this block the lower half of a block two cells tall (a door): the block named here
+    /// fills the cell above it. Placement writes both halves with one state byte (and needs both
+    /// cells free), breaking either removes the other and drops this block once, and an openable
+    /// pair opens and shuts together. The upper half must set <c>hasItem: false</c> and agree with
+    /// this block on <c>facing</c> and <c>open</c>.
+    /// </summary>
+    public string? UpperHalf { get; set; }
+
+    /// <summary>
     /// The block a placement against a block's side becomes instead of this one (a torch's
     /// <c>"block/wall_torch"</c>), facing away from the wall it was placed on; a placement on top
     /// keeps this block and one under a ceiling is refused. The wall block needs

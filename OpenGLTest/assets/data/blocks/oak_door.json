@@ -1,0 +1,23 @@
+{
+  // An oak door, two cells tall: this is its lower half and its item; the upper half
+  // (oak_door_upper.json) is written above it by the placement, which needs both cells free. Both
+  // halves share one state byte meaning (DoorState: the facing from the placing player's look and
+  // the open bit): right-click on either swings both open or shut, and breaking either takes the
+  // other down too and drops one door. Closed, the panel stands across the side of its cell
+  // nearest whoever placed it; open, it swings into the cell about its left-hand hinge. Three
+  // from six planks (recipes/oak_door.json).
+  "name": "Oak Door",
+  "model": { "parent": "block/door_closed", "textures": { "texture": "oak_door_bottom" } },
+  "facing": "horizontal",
+  "facingFromLook": true,
+  "open": {
+    "model": { "parent": "block/door_open", "textures": { "texture": "oak_door_bottom" } },
+    "hitbox": { "min": [0, 0, 0], "max": [0.1875, 1, 1] }
+  },
+  "upperHalf": "block/oak_door_upper",
+  "hardness": 4,
+  "sfx": "hit_wood",
+  "castsAO": false,
+  "collidesByHitbox": true,
+  "hitbox": { "min": [0, 0, 0.8125], "max": [1, 1, 1] }
+}
