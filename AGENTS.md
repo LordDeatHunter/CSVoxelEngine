@@ -604,6 +604,8 @@ OpenGLTest/
     FallTracker.cs             # GL-free fall-damage rule: peak/grounded chain fed one feet height at a time
                                #   (singleplayer's UpdateHealth and each ServerPlayer's accepted states)
     ThrowZoom.cs               # GL-free throw charge zoom: the FOV target from the charge and its spring step
+    DamageDirection.cs         # GL-free damage direction arc: the last blow's world direction, its fade and
+                               #   its screen direction from the view yaw (the vignette pass's third term)
     Player/                    # the player's rig shape and movement simulation
       PlayerRig.cs             # the posed shape: pivots, cuboids, skin palette, mesh building (Blockbench or Steve)
       PlayerPhysics.cs         # walk/fly/swim input -> body position, voxel collision (static BodyCollides),
@@ -2642,6 +2644,15 @@ overshoot or jiggle.
   fall or an item change), and `LowHealthVignette.Intensity` is a slow red edge heartbeat below
   `LowHealthThreshold`, off while dead or creative, drawn as a second term (`uLowHealth`) of the damage
   vignette's one full-screen pass. `visual-examples/hotbar.json` and `low-health.json` film them.
+  The **damage direction arc** is that pass's third term (`uHitArc`, `uHitArcDir`): a red glow on the
+  screen edge toward where the last blow came from, held then faded (`DamageArc*` knobs). The camera
+  owns a GL-free `DamageDirection` that keeps the blow's *world* direction and recomputes the screen
+  direction from the current view yaw every frame (`Camera.DamageArcScreenDirection`), so the arc keeps
+  pointing at the attacker while the player turns. It is fed by `Camera.TakeHit` (the mob's real
+  knockback direction, so a goblin stone from 12 blocks points right, which the nearest-mob direction
+  `NotifyPlayerHurt` gives `AddHitKick` would not) and, on a client, by `Camera.AddDamageDirection` from
+  a `PlayerStatus` knockback that came with lost health; a fall or lava tick has no direction and shows
+  none. `visual-examples/damage-arc.json` films it, `DamageDirectionTests` locks it down.
 - **Floating damage numbers**: a landed hit floats its damage over the mob (`World.DamageNumbers`, a
   fixed `DamageNumberPool` of `DamageNumberCapacity` that replaces its oldest number when full),
   drawn by `DamageNumberRenderer` right after the healthbars with their billboard shader and the HUD's

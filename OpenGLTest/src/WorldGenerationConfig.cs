@@ -1602,6 +1602,10 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float LowHealthMinStrength = 0.35f;
     public const float LowHealthMaxStrength = 0.85f;
     public const float LowHealthPulseFloor = 0.35f;
+    // Damage direction arc (DamageDirection, vignette-fragment.glsl): a red arc on the screen edge
+    // toward where the last mob blow came from, full for the hold and then faded out smoothly.
+    public const float DamageArcHoldSeconds = 0.4f;
+    public const float DamageArcFadeSeconds = 1.1f;
 
     // --- Multiplayer networking (NetProtocol, GameServer, NetworkClient) ---
     // The server broadcasts the player list on this cadence; clients send their own state at the

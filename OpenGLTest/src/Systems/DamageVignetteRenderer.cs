@@ -47,19 +47,27 @@ public sealed class DamageVignetteRenderer : IDisposable
     /// Draws the vignette over the current framebuffer. <paramref name="strength"/> is the 0..1
     /// damage flash and <paramref name="lowHealth"/> the 0..1 low-health pulse
     /// (<see cref="LowHealthVignette.Intensity"/>), a second, broader edge term of the same pass;
-    /// <paramref name="time"/> advances the grain and the flash's flicker. When both are zero the
-    /// draw is skipped entirely.
+    /// <paramref name="time"/> advances the grain and the flash's flicker. <paramref name="hitArc"/>
+    /// is the 0..1 damage direction arc (<see cref="DamageDirection.Intensity"/>), a third term drawn
+    /// on the screen edge along <paramref name="hitArcDirection"/> (a unit screen direction, x right,
+    /// y up). When all three are zero the draw is skipped entirely.
     /// </summary>
-    public void Render(Vector2D<int> size, float strength, float lowHealth, float time)
+    public void Render(Vector2D<int> size, float strength, float lowHealth, float time,
+        float hitArc = 0f, Vector2 hitArcDirection = default)
     {
         var s = MathUtils.Clamp01(strength);
         var low = MathUtils.Clamp01(lowHealth);
-        if ((s <= 0.001f && low <= 0.001f) || size.X <= 0 || size.Y <= 0) return;
+        // A degenerate direction draws no arc rather than a spot at an arbitrary edge
+        var arcDirection = hitArcDirection.LengthSquared() > 1e-6f ? Vector2.Normalize(hitArcDirection) : Vector2.Zero;
+        var arc = arcDirection == Vector2.Zero ? 0f : MathUtils.Clamp01(hitArc);
+        if ((s <= 0.001f && low <= 0.001f && arc <= 0.001f) || size.X <= 0 || size.Y <= 0) return;
 
         _shader.Use();
         _shader.SetUniform("uResolution", new Vector2(size.X, size.Y));
         _shader.SetUniform("uStrength", s);
         _shader.SetUniform("uLowHealth", low);
+        _shader.SetUniform("uHitArc", arc);
+        _shader.SetUniform("uHitArcDir", arcDirection);
         _shader.SetUniform("uTime", time);
         _gl.BindVertexArray(_vao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);

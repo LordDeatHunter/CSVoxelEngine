@@ -633,11 +633,15 @@ public static class Program
                 var status = PlayerStatusCodec.Read(reader);
                 w.Camera.SetModes(status.Modes.HasFlag(NetPlayerFlags.Creative),
                     status.Modes.HasFlag(NetPlayerFlags.Flying));
+                var healthBefore = w.Health;
                 w.ApplyNetworkHealth(status.Health);
                 var knockback = status.Knockback;
                 // AddKnockback normalises the direction itself and keeps a lift-only hit's pop
                 if (knockback.LengthSquared() > 0f || status.Lift > 0f)
                     w.Camera.AddKnockback(knockback, knockback.Length(), status.Lift);
+                // A shove that came with lost health was a blow: the damage arc points back at it
+                if (status.Health < healthBefore)
+                    w.Camera.AddDamageDirection(knockback);
                 if (status.Dead && !netDead)
                 {
                     netDead = true;

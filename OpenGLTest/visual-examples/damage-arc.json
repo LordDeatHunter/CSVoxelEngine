@@ -1,0 +1,36 @@
+{
+  // Damage direction arc: run with VOXEL_SCRIPT=visual-examples/damage-arc.json VOXEL_TIME=147 from
+  // OpenGLTest/. Shots land in visual/damage-arc/.
+  // A survival player stands in the open forest clearing goblins.json uses (ground at y 9..10 over
+  // x -56..-32, z 32..68) facing -Z, and one goblin is spawned 8 blocks to the +X side, i.e. on the
+  // player's right, inside its 4-12 block throw band. Its first stone flies after the 1 s first-throw
+  // delay plus the throw clip's wind-up, so the "hit-*" shots bracket the impact: at least one shows
+  // the red arc on the RIGHT edge (with the hit flash). Look and screenshot steps do not tick the
+  // world, so the last two shots are the same instant as "hit-4" seen from other facings:
+  //   turned-to-goblin: facing +X, the arc moves to the TOP edge
+  //   turned-away:      facing -X, the arc moves to the BOTTOM edge
+  // The HUD stays on: the arc is drawn in the UI pass.
+  "steps": [
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "teleport", "pos": [-43.5, 12.0, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "base" },
+    { "op": "spawn", "entity": "goblin", "pos": [-35.5, 60.5] },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "hit-1" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "hit-2" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "hit-3" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "hit-4" },
+    { "op": "look", "yaw": 0, "pitch": -5 },
+    { "op": "screenshot", "name": "turned-to-goblin" },
+    { "op": "look", "yaw": 180, "pitch": -5 },
+    { "op": "screenshot", "name": "turned-away" },
+    { "op": "wait", "seconds": 1.8 },
+    { "op": "look", "yaw": -90, "pitch": -5 },
+    { "op": "screenshot", "name": "faded" }
+  ]
+}

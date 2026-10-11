@@ -48,6 +48,14 @@ public class Camera : IMobTarget
     /// update narrows the view toward it and springs back once it goes null.
     /// </summary>
     public float? ThrowCharge { get; set; }
+    /// <summary>How strongly the damage direction arc shows, 0..1 (see <see cref="DamageDirection"/>).</summary>
+    public float DamageArcStrength => _damageArc.Intensity;
+    /// <summary>
+    /// Where on screen the damage direction arc sits: a unit direction from the screen centre, x to
+    /// the right and y up, recomputed from the current view yaw so it keeps pointing at the attacker
+    /// while the player turns.
+    /// </summary>
+    public Vector2 DamageArcScreenDirection => _damageArc.ScreenDirection(Yaw);
     /// <summary>
     /// Creative mode (toggled with [C]): walking behaves like survival, but block placing
     /// costs nothing, breaking drops nothing, and double-tapping Space toggles flight.
@@ -265,6 +273,8 @@ public class Camera : IMobTarget
     // The throw charge zoom's spring and its clamped degrees (ThrowZoom); added to the FOV, never set over it
     private Spring _throwZoom = ThrowZoom.CreateSpring();
     private float _throwZoomDegrees;
+    // Where the last billed blow came from, for the damage direction arc (aged in UpdateHeadMotion)
+    private readonly DamageDirection _damageArc = new();
     private float _sneakBlend;
     private float _prevVerticalVelocity;
     private bool _wasGrounded;
@@ -629,6 +639,7 @@ public class Camera : IMobTarget
         if (!HoldPunchFov)
             _fovPunch.Step(0f, deltaTime);
         _throwZoomDegrees = ThrowZoom.Step(ref _throwZoom, ThrowZoom.TargetDegrees(ThrowCharge), deltaTime);
+        _damageArc.Update(deltaTime);
         _currentFov = DefaultFov + _sprintFov + MathUtils.Clamp(_fovPunch.Value, -6f, 6f) + _throwZoomDegrees;
 
         // A landing dips the view in proportion to the fall that ended just now.
@@ -948,13 +959,25 @@ public class Camera : IMobTarget
     public bool IsImmune => IsCreative || IsFlying;
 
     /// <summary>
-    /// A mob hit on the local player: only the knockback is applied here. The
-    /// <paramref name="damage"/> is deliberately ignored, because <see cref="World"/> applies the
-    /// mob manager's <c>DamageDealtThisFrame</c> to its own health pool (and shakes the view)
-    /// exactly as before mobs had targets.
+    /// A mob hit on the local player: only the knockback is applied here, and the damage direction
+    /// arc turns toward the blow. The <paramref name="damage"/> is otherwise ignored, because
+    /// <see cref="World"/> applies the mob manager's <c>DamageDealtThisFrame</c> to its own health
+    /// pool (and shakes the view) exactly as before mobs had targets.
     /// </summary>
-    public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift) =>
+    public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift)
+    {
+        if (damage > 0)
+            AddDamageDirection(awayHorizontal);
         AddKnockback(awayHorizontal, knockbackSpeed, lift);
+    }
+
+    /// <summary>
+    /// A billed blow pushed the player along <paramref name="awayHorizontal"/>: the damage direction
+    /// arc points back toward where it came from and fades (see <see cref="DamageDirection"/>). A
+    /// zero direction (a fall, lava) shows no arc. Singleplayer feeds it from <see cref="TakeHit"/>;
+    /// a multiplayer client from the knockback of a <c>PlayerStatus</c> that also lowered its health.
+    /// </summary>
+    public void AddDamageDirection(Vector3 awayHorizontal) => _damageArc.Hit(awayHorizontal);
 
     public Matrix4x4 GetViewMatrix()
     {
