@@ -307,6 +307,14 @@ public class World : IItemUseWorld
     /// <summary>Current HP, 0-100, drawn as 10 hearts in the HUD.</summary>
     public int Health => _health.Health;
 
+    /// <summary>The HUD toast line (the day change, a first pickup, a full inventory), drawn while
+    /// its alpha is above zero.</summary>
+    public HudToast Toast { get; } = new();
+
+    // The sun's elevation last frame, for the dawn watch behind the day toast
+    private float _lastSunElevation;
+    private bool _sunElevationKnown;
+
     /// <summary>The death line posted on the first dead frame, waiting for the UI to drain it into
     /// the chat (<see cref="TakeDeathMessage"/>); null while alive.</summary>
     private string? _pendingDeathMessage;
@@ -2540,6 +2548,13 @@ public class World : IItemUseWorld
         UpdateCactusContact(deltaTime);
         _health.Update(deltaTime);
 
+        // The day toast: the line appears the moment the sun rises through dawn, once a day
+        var elevation = DayCycle.SunDirection(LightingTime).Y;
+        if (_sunElevationKnown && DayToast.CrossedDawn(_lastSunElevation, elevation))
+            Toast.Show($"Day {Clock.DayNumber(LightingTime)}");
+        _lastSunElevation = elevation;
+        _sunElevationKnown = true;
+
         if (_health.Health < beforeHp)
         {
             Camera.AddShake(Math.Clamp((beforeHp - _health.Health) / 40f, 0.2f, 1f));
@@ -2778,7 +2793,7 @@ public class World : IItemUseWorld
         SettingsMenuView? settings = null)
     {
         renderManager.RenderUI(_window!, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings,
-            _health.Health, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime);
+            _health.Health, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime, Toast);
     }
     
     /// <summary>

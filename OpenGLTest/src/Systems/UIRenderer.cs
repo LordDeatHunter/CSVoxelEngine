@@ -45,6 +45,9 @@ public class UIRenderer : IDisposable
     private const float SlotSize = HotbarLayout.SlotSize;
     private const float SlotGap = HotbarLayout.SlotGap;
     private const float BottomMargin = HotbarLayout.BottomMargin;
+    // The toast row sits this far above the item-name row, so the two never overlap
+    private const float ToastRowGap = 26f;
+
     private const float SlotBorder = 2f;
     private const float SelectedBorder = 3f;
 
@@ -502,6 +505,23 @@ public class UIRenderer : IDisposable
                     RectTransform(centre with { X = centre.X - HeartDrawWidth * 0.25f }, halfSize),
                     Rgba.White, _heartTexture);
         }
+    }
+
+    /// <summary>
+    /// One toast line (<see cref="HudToast"/>) centred a little above the item-name row, at
+    /// <paramref name="alpha"/>. The chat log sits bottom-left, clear of the centred hotbar.
+    /// </summary>
+    public void DrawToast(string text, float alpha)
+    {
+        var a = MathUtils.Clamp01(alpha);
+        if (_font == null || a <= 0.004f || string.IsNullOrEmpty(text)) return;
+
+        var heartsTop = HotbarLayout.Top(_screenSize) - HeartGap - HeartDrawHeight;
+        var top = heartsTop - HotbarNameGap - CountCapHeight - ToastRowGap;
+        _textFade = a;
+        var size = _font.MeasureSize(text, _countScale);
+        DrawText(text, new Vector2((_screenSize.X - size.X) * 0.5f, top), _countScale, Rgba.White);
+        _textFade = 1f;
     }
 
     /// <summary>

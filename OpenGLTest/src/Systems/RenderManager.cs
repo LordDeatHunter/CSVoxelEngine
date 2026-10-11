@@ -4257,7 +4257,7 @@ public class RenderManager : IDisposable
         int fps, bool showProfiler, Camera? camera = null, bool showCoordinates = true,
         PauseMenuView? menu = null, SettingsMenuView? settings = null,
         int health = PlayerHealth.MaxHealth, float damageFlash = 0f, HotbarNameFade? hotbarName = null,
-        HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0)
+        HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0, HudToast? toast = null)
     {
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         ui.Begin(window.Size, window.FramebufferSize, UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
@@ -4296,6 +4296,9 @@ public class RenderManager : IDisposable
             ui.DrawProfiler(FrameProfiler.Lines);
         var heading = camera != null ? Compass.HeadingFromYaw(camera.Yaw) : 0f;
         ui.DrawHotbar(inventory, heading, time, hotbarPops);
+        // The day/first-pickup/full-inventory toast rides above the item-name row
+        if (toast is { Alpha: > 0f, Text.Length: > 0 })
+            ui.DrawToast(toast.Text, toast.Alpha);
         if (!view.IsOpen && (menu == null || !menu.IsOpen))
         {
             ui.DrawHearts(health);
