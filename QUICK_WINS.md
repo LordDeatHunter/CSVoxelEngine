@@ -183,8 +183,10 @@ files waits in TODO.md instead, since there are none to use yet.
   and a shove and the stone stops, while a miss shatters as before (`GoblinManager.UpdateStones`,
   `GoblinStoneTests`).
 - [x] **Ledge caution.** `Mob.IsLedgeAhead` over `LedgeProbe` (live cells, not the heightmap): no step or hop landing more than `MobLedgeMaxDropBlocks` down unless the target is lower (`LedgeCautionTests`, `mob-hazards.json`).
-- [ ] **Goblin dodge.** A goblin sidesteps when a charged throw is aimed at it. *Hook:* the
-  throw-charge state and the player's facing, read in the goblin's stance. Singleplayer first.
+- [x] **Goblin dodge.** A charged throw (at least `GoblinDodgeChargeThreshold`) aimed at a goblin
+  (inside `GoblinDodgeConeDegrees` and within `GoblinDodgeRangeBlocks`) makes it sidestep out of
+  the line while the aim holds, its side fixed at spawn; singleplayer passes the local arm's aim
+  (`GoblinManager.IsAimedAt`, `Goblin.Decide`; `GoblinDodgeTests`).
 
 - [ ] **Pack alert.** When a goblin notices the player, goblins within 12 blocks skip their
   first-throw delay. *Hook:* the noticing moment in `GoblinManager`, then one pass over nearby

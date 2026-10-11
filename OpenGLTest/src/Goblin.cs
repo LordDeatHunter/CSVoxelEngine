@@ -88,6 +88,9 @@ public sealed class Goblin : Mob
     private bool _losBlocked;
     private Vector3 _aimTarget;
     private bool _hitWall;
+    // Which way the goblin sidesteps a charged throw aimed at it: fixed per goblin at spawn from
+    // its cell, so the same goblin always breaks the same way instead of jittering
+    private readonly float _dodgeSide;
     private float _noticePipElapsed = WorldGenerationConfig.GoblinNoticePipSeconds;
     private bool _noticed;
 
@@ -95,6 +98,9 @@ public sealed class Goblin : Mob
     {
         Ammo = Math.Max(0, ammo);
         Animation = new EntityAnimator(type.Model.Animations, WorldGenerationConfig.GoblinWalkSpeed);
+        // The dodge side: fixed at spawn from the starting cell, so the same goblin always breaks
+        // the same way out of a charged throw's line
+        _dodgeSide = ((MathUtils.FloorToInt(position.X) + MathUtils.FloorToInt(position.Z)) & 1) == 0 ? 1f : -1f;
         // A fresh goblin notices the player before its first throw rather than throwing on its
         // first grounded frame; unjittered so scripted shots repeat.
         _throwCooldown = WorldGenerationConfig.GoblinFirstThrowDelaySeconds;
@@ -283,7 +289,8 @@ public sealed class Goblin : Mob
     /// where it is, still falling, floating and animating, or strolling toward
     /// <paramref name="wander"/> when one is given (<see cref="Mob.WanderGoal"/>).
     /// </summary>
-    public void Update(float deltaTime, ChunkManager chunks, IMobTarget? player, Vector3? wander = null)
+    public void Update(float deltaTime, ChunkManager chunks, IMobTarget? player, Vector3? wander = null,
+        bool dodgeAimedThrow = false)
     {
         if (deltaTime <= 0f || chunks == null) return;
 
@@ -330,7 +337,7 @@ public sealed class Goblin : Mob
                 _facingKnown = true;
             }
 
-            move = Decide(dist, toward, chunks, player);
+            move = Decide(dist, toward, chunks, player, dodgeAimedThrow);
         }
         else if (wander is { } goal && !IsDying && !Animation.IsActionPlaying)
         {
@@ -392,9 +399,14 @@ public sealed class Goblin : Mob
 
     // Chooses this frame's horizontal move (a unit vector or zero) and starts a throw or swing
     // when one is due.
-    private Vector3 Decide(float dist, Vector3 toward, ChunkManager chunks, IMobTarget player)
+    private Vector3 Decide(float dist, Vector3 toward, ChunkManager chunks, IMobTarget player,
+        bool dodgeAimedThrow)
     {
         if (Animation.IsActionPlaying) return Vector3.Zero;
+
+        // A charged throw aimed at it: sidestep out of the line (the side fixed per goblin so it
+        // never jitters), never throw or swing while the aim holds
+        if (dodgeAimedThrow) return new Vector3(-toward.Z, 0f, toward.X) * _dodgeSide;
 
         // Given up: turn and run, never throw or swing
         if (IsFleeing) return -toward;

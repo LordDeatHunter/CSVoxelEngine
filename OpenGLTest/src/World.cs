@@ -1831,7 +1831,10 @@ public class World : IItemUseWorld
         if (_goblins != null)
         {
             _goblins.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, _serverMode ? null : _debris,
-                _slimes?.Slimes);
+                _slimes?.Slimes,
+                aimOrigin: _serverMode || _clientMode ? null : Camera.Position,
+                aimDirection: _serverMode || _clientMode ? null : Camera.LastAimDirection,
+                aimCharge: _serverMode || _clientMode ? 0f : Camera.ThrowCharge ?? 0f);
             var goblinDamage = _goblins.DamageDealtThisFrame;
             if (!_serverMode && goblinDamage > 0)
             {

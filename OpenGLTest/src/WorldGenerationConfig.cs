@@ -2099,6 +2099,12 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float GoblinFleeHealthShare = 0.25f;
     public const float GoblinFleeSpeedFactor = 1.4f;
 
+    // --- Goblin dodge (GoblinManager.IsAimedAt): a charged throw aimed at a goblin (at least this
+    // charge, within the cone and range) makes it sidestep out of the line while the aim holds ---
+    public const float GoblinDodgeChargeThreshold = 0.5f;
+    public const float GoblinDodgeConeDegrees = 12f;
+    public const float GoblinDodgeRangeBlocks = 20f;
+
     // --- Goblin notice pip (NoticePipRenderer): a "!" pops over a goblin's head the moment it
     // first notices a player (the same moment its first-throw delay starts) ---
     public const float GoblinNoticePipSeconds = 0.9f;

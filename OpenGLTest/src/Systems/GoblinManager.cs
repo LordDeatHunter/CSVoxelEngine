@@ -149,7 +149,8 @@ public sealed class GoblinManager : IMobPopulation
     /// <summary>Ticks the goblins against the one local player (singleplayer and the tests); see
     /// <see cref="Update(float, ChunkManager, DropManager, IReadOnlyList{IMobTarget})"/>.</summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, Camera camera,
-        BlockDebrisSystem? debris = null, IReadOnlyList<Slime>? slimes = null)
+        BlockDebrisSystem? debris = null, IReadOnlyList<Slime>? slimes = null, Vector3? aimOrigin = null,
+        Vector3? aimDirection = null, float aimCharge = 0f)
     {
         if (camera == null)
         {
@@ -159,7 +160,23 @@ public sealed class GoblinManager : IMobPopulation
 
         _singleTarget.Clear();
         _singleTarget.Add(camera);
-        Update(deltaTime, chunks, drops, _singleTarget, debris, slimes);
+        Update(deltaTime, chunks, drops, _singleTarget, debris, slimes, aimOrigin, aimDirection, aimCharge);
+    }
+
+    /// <summary>
+    /// Whether a charged throw from <paramref name="origin"/> along <paramref name="direction"/> is
+    /// aimed at a body at <paramref name="target"/>: inside the cone
+    /// (<see cref="WorldGenerationConfig.GoblinDodgeConeDegrees"/>) and within
+    /// <see cref="WorldGenerationConfig.GoblinDodgeRangeBlocks"/>. The dodge rule's reading of the
+    /// aim; the caller owns the charge threshold.
+    /// </summary>
+    internal static bool IsAimedAt(Vector3 target, Vector3 origin, Vector3 direction)
+    {
+        var to = target - origin;
+        var distance = to.Length();
+        if (distance < 1e-3f || distance > WorldGenerationConfig.GoblinDodgeRangeBlocks) return false;
+        var cosine = MathF.Cos(WorldGenerationConfig.GoblinDodgeConeDegrees * (MathF.PI / 180f));
+        return Vector3.Dot(direction, to / distance) >= cosine;
     }
 
     /// <summary>
@@ -170,14 +187,21 @@ public sealed class GoblinManager : IMobPopulation
     /// the despawn radius of every target is culled, and the spawn ring cycles over the targets
     /// under the one shared cap and timer. Every hit reaches its target through
     /// <see cref="IMobTarget.TakeHit"/> and is summed into <see cref="DamageDealtThisFrame"/>. With
-    /// no targets nothing chases, despawns or spawns.
+    /// no targets nothing chases, despawns or spawns. A charged throw
+    /// (<paramref name="aimCharge"/>, at least
+    /// <see cref="WorldGenerationConfig.GoblinDodgeChargeThreshold"/>) aimed at a goblin from
+    /// <paramref name="aimOrigin"/> along <paramref name="aimDirection"/> makes that goblin
+    /// sidestep out of the line while the aim holds; singleplayer passes the local arm's aim.
     /// </summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, IReadOnlyList<IMobTarget> targets,
-        BlockDebrisSystem? debris = null, IReadOnlyList<Slime>? slimes = null)
+        BlockDebrisSystem? debris = null, IReadOnlyList<Slime>? slimes = null, Vector3? aimOrigin = null,
+        Vector3? aimDirection = null, float aimCharge = 0f)
     {
         DamageDealtThisFrame = 0;
         if (chunks == null || targets == null) return;
 
+        var dodgeAimed = aimCharge >= WorldGenerationConfig.GoblinDodgeChargeThreshold
+                         && aimOrigin.HasValue && aimDirection.HasValue;
         var despawnSquared = WorldGenerationConfig.GoblinDespawnRadiusBlocks
             * WorldGenerationConfig.GoblinDespawnRadiusBlocks;
 
@@ -186,8 +210,9 @@ public sealed class GoblinManager : IMobPopulation
             var goblin = _goblins[i];
             // Its noticed target while it keeps interest (Mob.PickTarget), else a wander goal
             var chased = goblin.PickTarget(targets, deltaTime, chunks);
+            var dodge = dodgeAimed && IsAimedAt(goblin.Position, aimOrigin!.Value, aimDirection!.Value);
             goblin.Update(deltaTime, chunks, chased >= 0 && !goblin.IsDying ? targets[chased] : null,
-                chased < 0 ? goblin.WanderGoal(targets.Count, deltaTime) : null);
+                chased < 0 ? goblin.WanderGoal(targets.Count, deltaTime) : null, dodge);
             goblin.UpdateHazards(deltaTime, chunks);
 
             if (goblin.IsDying)
