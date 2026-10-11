@@ -417,6 +417,15 @@ of the screen height. The strength is `DamageFringe.Strength` of the vignette's 
 it lasts only the first `DamageFringeSeconds` of the flash; a client mirrors the flash with its health.
 `DamageFringeTests`; `visual-examples/damage-fringe.json` (`VOXEL_TIME` 147).
 
+**Underwater wobble.** With the eye under water (`PostEffects.Underwater`, the eased underwater amount
+the world shader's `uUnderwater` also carries, 0 in lava) the post pass moves the point each pixel
+shows by `UnderwaterWobble.Offset` (two slow waves across the screen, up to
+`UnderwaterWobbleScreenShare` of its height) and hands that point to FXAA, so every tap reads around
+the swayed coordinate; a no-edge pixel then returns its bilinear colour at the point rather than the
+nearest texel, so the sway never steps a whole pixel. The clock is wrapped on the CPU at the waves'
+common period (`UnderwaterWobble.WrapTime`), so it never jumps. `UnderwaterWobbleTests`;
+`visual-examples/underwater-wobble.json` (`VOXEL_TIME` 147).
+
 **Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
 heading turns slowly (`WorldGenerationConfig.Wind*`), with `Wind.Offset` its bounded closed-form
 integral. Leaf sway reads it in both vertex shaders (`uWind`, the direction scaled by `WindLean`,
@@ -906,6 +915,7 @@ OpenGLTest/
     EyeAdaptation.cs           # GL-free exposure target from the voxel light at the eye, eased slower into the dark
     BiomeGrade.cs              # GL-free post colour grade from the eye's climate: warm over desert, cool over snow, eased
     DamageFringe.cs            # GL-free twin of the post pass's damage chromatic fringe: strength from the flash, edge weight
+    UnderwaterWobble.cs        # GL-free twin of the post pass's underwater screen sway: the offset and its wrapped clock
     BlockLightPalette.cs       # GL-free 8-slot block-light colour palette (slot 0 = the default warm torch colour)
     LightTint.cs               # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
     BiomeTint.cs               # GL-free biome tint: Climate -> palette -> vertex tint on a 16-block lattice, Gain, Shade, CellTint

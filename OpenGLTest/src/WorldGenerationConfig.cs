@@ -201,6 +201,12 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>Largest red/blue shift at the screen corners right at the hit, as a share of the screen height.</summary>
     public const float DamageFringeScreenShare = 0.006f;
 
+    // --- Underwater wobble (UnderwaterWobble, post-fragment.glsl's uUnderwater) ---
+    /// <summary>How far the image sways on each axis with the eye under water, as a share of the screen height.</summary>
+    public const float UnderwaterWobbleScreenShare = 0.003f;
+    /// <summary>How fast the sway waves roll, in radians per second.</summary>
+    public const float UnderwaterWobbleSpeed = 1.6f;
+
     /// <summary>FXAA's floor on the edge-direction reduction (post-fragment.glsl's
     /// uFxaaReduceMin): keeps the direction from blowing up on near-flat luma, so faint
     /// gradients are not smeared across <see cref="FxaaSpanMax"/> pixels.</summary>

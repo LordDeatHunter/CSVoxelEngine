@@ -1,0 +1,28 @@
+// Underwater wobble check (UnderwaterWobble, post-fragment.glsl's uUnderwater): with the eye under
+// water the image sways gently, FXAA reading around the swayed point; above water nothing moves.
+// Run from OpenGLTest/:
+//   $env:VOXEL_SCRIPT='visual-examples/underwater-wobble.json'; $env:VOXEL_TIME='147'
+//   bin/Release/net9.0/silkgltriangle.exe
+// Flying, so the pose holds and only the clock moves between the paired shots: the two underwater
+// shots differ by the sway (edges shifted a few pixels, bent by the waves), the two dry ones do not.
+// The open-sea column is sky.json's (floor -8, sea level 0).
+{
+  "steps": [
+    { "op": "wait", "seconds": 5 },
+    { "op": "fly" },
+    { "op": "teleport", "pos": [360.5, -3.5, 136.5], "yaw": 110, "pitch": -25 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "under_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.9 },
+    { "op": "screenshot", "name": "under_b", "hideHud": true },
+    // Looking up at the surface: the Snell window sways with the rest.
+    { "op": "teleport", "pos": [360.5, -3.5, 136.5], "yaw": 110, "pitch": 70 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "under_up", "hideHud": true },
+    { "op": "teleport", "pos": [360.5, 6.5, 136.5], "yaw": 110, "pitch": -25 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "dry_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.9 },
+    { "op": "screenshot", "name": "dry_b", "hideHud": true }
+  ]
+}

@@ -1849,9 +1849,11 @@ public class RenderManager : IDisposable
         ActiveUnit(0);
         // The eye adaptation (SetLighting) scales the exposure up in the dark; the biome grade tints
         // the finished image faintly warm over the desert and cool over the snow; the damage flash
-        // (the vignette's, PlayerHealth.DamageFlash) splits the screen edges for a moment after a hit
+        // (the vignette's, PlayerHealth.DamageFlash) splits the screen edges for a moment after a hit;
+        // the eye under water (not lava, an opaque glow) sways the image (UnderwaterWobble)
         _post.Render(_viewportSize, new PostEffects(WorldGenerationConfig.TonemapExposure * _eyeExposure, _grade,
-            DamageFringe.Strength(damageFlash)));
+            DamageFringe.Strength(damageFlash), _eyeInLava ? 0f : MathUtils.SmoothStep(_underwaterT),
+            UnderwaterWobble.WrapTime(_timeD)));
         BindUnit(0, TextureTarget.Texture2D, 0);
     }
 

@@ -27,6 +27,13 @@ uniform vec3 uGrade;
 // red and blue, read up to uFringeShare of the screen height apart at the corners. 0 draws none.
 uniform float uDamageFringe;
 uniform float uFringeShare;
+// The underwater wobble (UnderwaterWobble): with the eye under water every pixel is read from a point
+// swayed by two slow waves across the screen, and FXAA reads around that same point. 0 draws none.
+uniform float uUnderwater;
+uniform float uTime;          // seconds, wrapped on the CPU
+uniform float uWobbleShare;   // most a pixel sways, as a share of the screen height
+uniform float uWobbleSpeed;
+uniform float uWobbleWaves;   // waves across the screen
 
 out vec4 FragColor;
 
@@ -113,8 +120,10 @@ vec3 Fxaa(vec2 pos)
     // direction-tap fetches. Most of a frame (sky, flat faces, fog) takes this branch, which is
     // what keeps the pass near a millisecond at 1080p; it also stops low-contrast texture
     // detail from being blurred along a false edge.
+    // A swayed point (the underwater wobble) sits between texel centres, so it keeps its exact
+    // filtered colour instead of the nearest texel's, or the sway would step a whole pixel at a time
     if (lumaMax - lumaMin < max(uFxaaEdgeThresholdMin, lumaMax * uFxaaEdgeThreshold))
-        return rgbM;
+        return uUnderwater > 0.0 ? DisplayBilinear(pos) : rgbM;
 
     vec2 dir;
     dir.x = -((lumaNW + lumaNE) - (lumaSW + lumaSE));
@@ -135,7 +144,16 @@ vec3 Fxaa(vec2 pos)
 
 void main()
 {
-    vec3 c = Fxaa(gl_FragCoord.xy);
+    // The underwater wobble moves the point this pixel shows (UnderwaterWobble.Offset); everything
+    // below, FXAA included, reads around that point
+    vec2 pos = gl_FragCoord.xy;
+    if (uUnderwater > 0.0) {
+        vec2 uv = gl_FragCoord.xy / uResolution;
+        pos += vec2(sin(uv.y * uWobbleWaves * 6.2831853 + uTime * uWobbleSpeed),
+                    cos(uv.x * uWobbleWaves * 6.2831853 + uTime * uWobbleSpeed * 0.83))  // VerticalSpeedShare
+             * (uUnderwater * uWobbleShare * uResolution.y);
+    }
+    vec3 c = Fxaa(pos);
     // The damage fringe: red and blue read from either side of the pixel along the line from the
     // screen centre, nothing in the middle and the most at the corners (DamageFringe.EdgeWeight)
     if (uDamageFringe > 0.0) {
@@ -143,8 +161,8 @@ void main()
         float d = length(fromCentre);
         vec2 shift = fromCentre / max(d, 1e-4)
                    * (uDamageFringe * smoothstep(0.2, 0.7, d) * uFringeShare * uResolution.y);
-        c.r = DisplayBilinear(gl_FragCoord.xy + shift).r;
-        c.b = DisplayBilinear(gl_FragCoord.xy - shift).b;
+        c.r = DisplayBilinear(pos + shift).r;
+        c.b = DisplayBilinear(pos - shift).b;
     }
     // The grade after the anti-aliasing, so FXAA keeps judging edges on the image itself
     c = min(c * uGrade, vec3(1.0));
