@@ -31,7 +31,7 @@ Each row is a test that fails on harmless tuning and proves nothing.
 Rewrite rule of thumb: ask "what bug would make this fail?" If the answer is "someone retuned a value", delete it.
 
 ## Fixture and idioms
-- `TestContent.cs` loads content headlessly (`ContentRegistry.Load` + `TextureAtlas.RegisterTilesWithoutUpload` + `ContentRegistry.BakeModels`). Reuse it; do not hand-build content.
+- `Support/TestContent.cs` loads content headlessly (`ContentRegistry.Load` + `TextureAtlas.RegisterTilesWithoutUpload` + `ContentRegistry.BakeModels`). Reuse it; do not hand-build content.
 - Worldgen needs no GL: `new Chunk(null!, pos, generateBlockData: true)` then `GetLocalBlock`. Worldgen is seeded through `WorldSeed`; tests use `WorldSeed.Default`. Never call `WorldSeed.Apply` while a World is live.
 - Name the test after the rule (`NoRiverChannelCrossesAnElevatedPond`), not the method under test.
 - Mesh tests: compare the greedy and non-greedy outputs (`GenerateMeshData(manager, greedy: false)` is the seam; see `GreedyMeshingTests`).

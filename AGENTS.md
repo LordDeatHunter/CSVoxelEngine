@@ -130,7 +130,7 @@ STEP + move one pulse, MATURE jumps to the step this seed rolls for maturity
 bumps the seed and keeps the step. Features (the buttress fins) apply only from that maturity step
 on, so the mature step is exactly the worldgen tree (`GrowToMaturity`). Flat ground has no carved
 cells, so the roots feature never shows here. The tree is rasterised with `TreeRasterizer` and meshed
-by `CellBatchMesher` (`OpenGLTest/src/CellBatchMesher.cs`): the real chunk mesher run over scratch
+by `CellBatchMesher` (`OpenGLTest/src/Chunks/CellBatchMesher.cs`): the real chunk mesher run over scratch
 chunks at the cells' real chunk positions, padded by a ring of empty chunks, so thin tree-wood tubes,
 wide-trunk shells, the pixel-rim bevel, leaves and the biome tint look as in game, with no clipping at
 16-block seams. `DebugSceneRenderer.RenderTree` rebuilds the meshes only when the state's `Version`
@@ -194,7 +194,7 @@ screenshot's `hideHud` drives. The chat commands are `/help`, `/tp x y z`, `/giv
 
 `X` also raises the **frame profiler overlay** under the FPS counter, and prints the same
 snapshot to the console once a second so a headless run's log carries it. Console writes go
-through the async `Log` queue (`OpenGLTest/src/Log.cs`), so a slow terminal never stalls the
+through the async `Log` queue (`OpenGLTest/src/Core/Log.cs`), so a slow terminal never stalls the
 frame that logged; `Log.Shutdown` drains it on exit. Each row is a section
 of the frame — `camera`, the three `chunk*` rows from `ChunkManager.Update`, `lod`, `entities`,
 `fluidWake`, `fluidTick`, `raycast`, `breaking`, plus the `progUpdate` input shell and the
@@ -218,7 +218,7 @@ draws land in `uiPass`, so compare that row with `X` on and off before reading i
 `Program.OnLoad` and the `RenderManager` constructor each print one startup line — build
 configuration, debugger, GC mode and CPU count, then the GL
 renderer, vendor and version (which must report a 4.6 core context) — so a measurement always
-records which build and which GPU produced it. Timing lives in `OpenGLTest/src/FrameProfiler.cs`;
+records which build and which GPU produced it. Timing lives in `OpenGLTest/src/Core/FrameProfiler.cs`;
 wrap new work in `FrameProfiler.Begin`/`End` (main thread only) rather than adding another ad-hoc
 stopwatch.
 
@@ -741,7 +741,7 @@ default, or `foliage`) and a `faces` map keyed by face name (`north`..`down`, or
 model's face (one quad; the leaves use it on every face), or `{ "overlay", "base"? }`, a tinted
 cutout tile drawn *over* the face with `base` optionally replacing the untinted tile beneath (the
 grass side: a `dirt` base, then `grass_side_textureless`). `ContentRegistry.ResolveBiomeTints`
-resolves it in `BakeModels` into `BlockType.BiomeTint` (`Content/BiomeTintFaces.cs`: `Palette` plus
+resolves it in `BakeModels` into `BlockType.BiomeTint` (`Content/Blocks/BiomeTintFaces.cs`: `Palette` plus
 per-face `Base`/`Tinted` tiles, `NoTile` where a face has none) and throws naming the file unless
 the block `BakesGreedy` and is not translucent, so both mesh paths can treat every tinted face as a
 plain cube face; an `overlay` is further refused on a cutout block, which has no opaque base quad.
@@ -841,285 +841,428 @@ its weight decode (both read `vColor.a` at location 1).
 
 ```
 OpenGLTest/
-  src/
+  VoxelEngine.csproj           # the game (net9.0); <None Update> rules copy assets/ to the output directory
+  src/                         # the app entry and the core types only (Program, World and its phase/seed/load gate, BlockType)
     Program.cs                 # entry point, wires window callbacks, input polling; the AppScreen
                                #   flow (Menu/Loading/Playing/Saving) and the deferred open/save
-    LaunchMode.cs              # GL-free rule: VOXEL_SCRIPT/SPAWN/LOOK bypass the menu (storeless world)
     World.cs                   # owns Camera, ChunkManager, ChunkGenerationWorker, LodManager; raycast block edit API;
                                #   optional save store, Loading phase, FlushAll/autosave, SaveAndDispose
-    WorldSeed.cs               # the runtime world seed: Apply reseeds worldgen + resets caches/LOD edits; BeginWorld/EndWorld
     WorldPhase.cs              # Loading / Playing / Disposed
     WorldLoadGate.cs           # GL-free: when a loading world may play (ready sphere meshed, or timeout); load progress
-    Chunk.cs                   # 16^3 block storage (byte IDs), state/snapshot save-restore and mesh upload; worldgen
-                               #   column fill and mesh/light generation live in Systems/Chunks/ (ColumnCache/ChunkMesher/ChunkLighting)
-    MeshScratch.cs             # per-thread scratch buffers of the binary greedy mesh pass
-    CellBatchMesher.cs         # GL-free: meshes any TreeCell set with the real chunk mesher over scratch chunks
-                               #   at their real positions inside an empty ring (the item debugger's TREES tab)
-    TopplingTree.cs            # a felled tree: the wood TreeSupport finds cut off plus its canopy, meshed once in
-                               #   a 16^3 scratch chunk, swung flat around the cut, then popped out as drops
-    LeafParticle.cs            # one falling leaf billboard (sway, tumble, rest, fade); LeafParticleSystem owns them
-    ShakeFalloff.cs            # GL-free camera-shake trauma of a world event (blast, tree thud) by its distance
-    BlastImpulse.cs            # GL-free TNT blast shove: away from the centre, falling to zero at the radius
-    FallingBlockLanding.cs     # a falling cube written back as a block: cell, block, fall, submerged (its dust)
-    WaterSplash.cs             # GL-free splash rule (droplets by crossing speed) + Track: a body's droplets off the water top
-    WaterSplashTracker.cs      # GL-free per-body water crossing memory: in water last frame, speed from its own height
-    FaceLight.cs               # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters
-    CutoutMipmap.cs            # GL-free coverage-preserving mip chain for cutout tiles (alpha rescaled per level)
-    LightFlicker.cs            # GL-free per-cell flicker phase + curve for the campfire point lights
-    SelectionOutlineMesh.cs    # GL-free selection outline: the 12 box edges as thin beams (no glLineWidth)
-    SelectionPulse.cs          # GL-free twin of the outline's breathing opacity (steady while mining)
-    LeafBacklight.cs           # GL-free twin of the leaf backlight: lobe around the sun, sun and light-through gates
-    GrassShimmer.cs            # GL-free twin of the grass wind shimmer: gust-carried bands, distance fade, the face gate
-    IceGlint.cs                # GL-free twin of the ice tile term: fresnel sky sheen weight, gated sun highlight
-    LavaPulse.cs               # GL-free twin of the lava glow pulse: the slow noise field and the brightness factor
-    GlassSheen.cs              # GL-free twin of the glass sheen: fresnel weight and the sky folded into the blend
-    OreTwinkle.cs              # GL-free twin of the ore twinkle: per-texel cycle, the flash tent, sun/distance gate
-    DeepWaterFog.cs            # the deep-water darkness curve: per-channel fog dim from the eye's depth, red first
-    WaterGlitter.cs            # GL-free twin of the sun glitter on water: mirror lobe, sparkle life and spot, gate
-    ChunkGenerationWorker.cs   # background threads creating chunks around every streaming focus (one
-                               #   ChunkScanFrontier per focus, served round-robin)
-    Camera.cs                  # FPS camera pose, view/proj cache, shoulder/orbit modes; movement+physics and the DDA
-                               #   raycast live in Player/PlayerPhysics.cs and Systems/Interaction/BlockRaycaster.cs
-    LodRegion.cs               # far-terrain LOD: region columns meshed at reduced resolution from heightmaps; per-column chunk-Y ranges for burial
-    LodSkyExposure.cs          # GL-free coarse sky exposure the LOD mesher bakes into Vertex.Sun from its column-top grids
-    LodSurface.cs              # per-column far-LOD surface overrides (edited top height + tile), beside LodRegion's caps
-    FluidState.cs              # encoding of the per-block state byte for fluid cells (source / falling / level 1-7)
+    WorldSeed.cs               # the runtime world seed: Apply reseeds worldgen + resets caches/LOD edits; BeginWorld/EndWorld
     BlockType.cs               # runtime block record built from JSON, plus the per-id lookup tables
                                #   the mesher and gameplay read (ById, Emission, IsSolid/Occludes/...)
-    Mining.cs                  # GL-free mining rules: the tools/requiresTool gate, block damage per
-                               #   hit and hit pace shared by the break loop and the tests
-    PlayerContext.cs           # who an interaction runs for: eye, aim, inventory, creative (local camera or a
-                               #   server's connected player), threaded through every World interaction path
-    RightClickOutcome.cs       # what claimed a right-click: a station, the item's use, or a placement
-    Combat.cs                  # GL-free punch rules: the forward cone (3 blocks, 30° half-angle)
-                               #   and entity damage, shared by the punch loop and the tests
-    SliceCombo.cs              # the blade's two-phase slice combo: press/queue/advance state
-    FallTracker.cs             # GL-free fall-damage rule: peak/grounded chain fed one feet height at a time
-                               #   (singleplayer's UpdateHealth and each ServerPlayer's accepted states)
-    ThrowZoom.cs               # GL-free throw charge zoom: the FOV target from the charge and its spring step
-    DamageDirection.cs         # GL-free damage direction arc: the last blow's world direction, its fade and
-                               #   its screen direction from the view yaw (the vignette pass's third term)
-    SurfacingDroplets.cs       # GL-free timing of the droplets streaking down after the eye surfaces from water
-    WaterImmersion.cs, WaterPhase.cs  # GL-free water depth states: the submerged share of the body and
-                               #   its phase (Dry / Wade / Float / Swim)
-    Player/                    # the player's rig shape and movement simulation
-      PlayerRig.cs             # the posed shape: pivots, cuboids, skin palette, mesh building (Blockbench or Steve)
-      PlayerPhysics.cs         # walk/fly/swim input -> body position, voxel collision (static BodyCollides),
-                               #   auto-step, knockback, water state
-      PlayerBodyProbe.cs       # GL-free body probes over the live chunk map: known (loaded), grounded,
-                               #   in water, in lava; what the server judges a remote player's body by
-    Mob.cs                     # abstract base of every hostile (Slime, Goblin): position, health,
-                               #   facing, hit flash, body box, TakeDamage/Shove
-    IMobTarget.cs              # what a mob chases and hurts: eye, immunity, TakeHit (Camera, ServerPlayer)
-    MobTargets.cs              # GL-free target rules: body contact, nearest non-immune target, min distance
-    MobCaps.cs, IMobPopulation.cs  # the natural and hard mob caps every kind shares, over the
-                               #   living count each registered manager reports
-    MobFallDamage.cs           # GL-free mob fall damage: a share of the mob's pool per block past its safe height
-    MobLava.cs                 # GL-free mob lava rule: body box in a burning fluid, damage per tick
-    MobLoot.cs                 # GL-free loot toss: the up-and-out launch a killed mob's drops get
-    ContactDamage.cs           # GL-free contact damage a body takes standing against a cactus
-    GoblinTorches.cs           # GL-free torch roll for a goblin spawn (night, depth, one uniform roll)
-    ChatCommands.cs            # the chat command table: /help, /tp, /give, /time and their rights
-    DeathMessages.cs           # the death line from the blow PlayerHealth recorded
-    MobInterest.cs             # GL-free per-mob interest: sight checks, losing a hidden target, idle
-                               #   time, the idle despawn gate and wander goals
-    LedgeProbe.cs              # GL-free ledge caution: the drop to the first ground ahead, safe-step rule
-    SlimeMerge.cs              # GL-free slime merge: who merges (same size, touching, past the cooldown),
-                               #   the merged size, centre and health
-    SlimeSize.cs               # GL-free per-size slime stats: body scale, health, contact damage,
-                               #   loot rolls, each 1 + (size - 1) * its config step; the spawn size roll
-    DayCycle.cs                # GL-free sun direction, dayness and night factor of the lighting clock
+    Audio/                     # sound: the sfx library, mixer and manager, the ambience bed
+      AmbienceManager.cs       # looping day/night ambience with a slow crossfade
+      SfxLibrary.cs            # maps the loose .wav files under a folder onto sound groups
+      SfxManager.cs            # one-shot sound effects built on the same NAudio stack as AmbienceManager
+      SfxMixer.cs              # mixes any number of overlapping 16-bit stereo 44100 Hz clips over a silent baseline
+    Chunks/                    # chunk storage, generation workers, meshing and lighting, column terrain and
+                               #   world sources, the streaming foci, the light query entities read (EntityLight)
+      CellBatchMesher.cs       # GL-free: meshes any TreeCell set with the real chunk mesher over scratch chunks
+                               #   at their real positions inside an empty ring (the item debugger's TREES tab)
+      Chunk.cs                 # 16^3 block storage (byte IDs), state/snapshot save-restore and mesh upload; worldgen
+                               #   column fill and mesh/light generation live in Chunks/ (ColumnCache/ChunkMesher/ChunkLighting)
+      ChunkGenerationWorker.cs # background threads creating chunks around every streaming focus (one
+                               #   ChunkScanFrontier per focus, served round-robin)
+      ChunkKey.cs              # packs a chunk position into one long, so the chunk
+                               #   dictionaries hash one integer instead of three floats
+      ChunkLighting.cs         # the wide light-volume flood (sun + coloured lamp) + corner light queries
+      ChunkManager.cs          # chunk lifecycle: load/unload, dirty tracking, mesh scheduling, all against
+                               #   a focus list (unload only outside every focus's radius)
+      ChunkMap.cs              # the loaded-chunk table (ChunkManager.Chunks): a ConcurrentDictionary keyed on a packed ChunkKey long
+      ChunkMesher.cs           # the greedy pass + per-voxel procedural emitters + water-surface codes
+      ChunkScanFrontier.cs     # the shared resume point for the chunk-generation workers' closest-first offset scan (PERF_TODO C3)
+      ColumnCache.cs           # the process-global column-data cache, its accessors and the column fill
+      ColumnTerrain.cs         # one chunk column's terrain: heights, water levels, corner climate (warmth, wetness)
+      EntityLight.cs           # GL-free world light query for entity draws (drops, pops, debris, the player, ...)
+      EntityLightSample.cs     # sun and block light (each 0..1) one entity draw is lit with
+      FaceLight.cs             # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters
+      GeneratedWorldSource.cs  # the default IWorldSource: ColumnCache.Get + Chunk.GenerateBlockData, byte-identical
+                               #   to the path before world sources existed
+      IColumnSource.cs         # the seam a mesh build, the fluid-surface query and the pop/debris tint read
+                               #   chunk-column terrain through (ChunkManager.ColumnSource): IsReady + TryGet
+      ImportedMapSource.cs     # an IWorldSource over a pre-built map folder (<world>/import/), worldgen outside it
+      IWorldSource.cs          # where a world's terrain comes from (extends IColumnSource): GetColumn (a complete
+                               #   ColumnData), Supplies, Fill(chunk); thread-safe, deterministic (see "World sources")
+      MeshScratch.cs           # per-thread scratch buffers of the binary greedy mesh pass
+      PaneEmitter.cs           # a pane cell from the padded snapshot: post + arms, no face between
+                               #   connected panes, caps culled against a same-shaped pane above/below
+      StreamingFocus.cs        # the published focus chunks (camera, or every connected player on a server):
+                               #   an immutable array swapped only when a focus changes chunk
+      WorldgenColumnSource.cs  # the singleplayer/generated-server IColumnSource over ColumnCache; a server
+                               #   with a custom world source uses that source, the client's is the ClientChunkStreamer
+    Content/                   # the data-driven content pipeline (ContentRegistry) — see "Content" below
+      ContentRegistry.cs       # loads assets/data + assets/models, assigns byte ids, fills the tables
+      Blocks/                  # block-side enums and resolved tables (renderer, break, attack, use, biome tint faces)
+        BlockRenderer.cs, BlockBreakAction.cs,
+          AttackPattern.cs, ItemUseAction.cs  # geometry/break/attack/use enums
+        BiomeTintFaces.cs      # a block's resolved biomeTint: palette + per-face base/tinted tiles
+      Definitions/             # the JSON DTOs
+        BlockDefinition.cs, ItemDefinition.cs,
+          LootTableDefinition.cs, ModelDefinition.cs  # JSON DTOs
+        CastRecipeDefinition.cs # (fired mold, material) -> result + cooling
+        CookRecipeDefinition.cs # JSON shape of assets/data/recipes/cook/<name>.json
+        CrushRecipeDefinition.cs # JSON shape of assets/data/recipes/crush/<name>.json
+        EntityDefinition.cs    # JSON shape of assets/data/entities/<name>.json
+        MeltRecipeDefinition.cs # block/item -> (material, ml)
+        MoltenMaterialDefinition.cs # a molten metal: id, tile, tint
+        RecipeDefinition.cs    # JSON shape of assets/data/recipes/<name>.json
+        TagDefinition.cs       # JSON shape of assets/data/tags/<name>.json
+        TreeSpeciesDefinition.cs # JSON DTO of assets/data/trees/<species>.json
+      Loot/                    # compiled loot tables, loot context, wood loot bands
+        LootTable.cs, LootContext.cs  # compiled loot tables and the world cell they roll at
+        WoodLootBand.cs        # one thickness band of a tree_wood block's loot (self or a table)
+      Models/                  # Minecraft model format and Blockbench projects: parents, baking, quads
+        ModelBaker.cs, BakedModel.cs, BakedQuad.cs  # elements -> atlas-ready quads + full-cube flags
+        BbmodelLoader.cs       # Blockbench .bbmodel: groups (nested, with Parent),
+                               #   cubes, per-face UVs, the skin texture and the
+                               #   keyframe `animations`; rest rotations rejected
+                               #   (the player's posing is procedural, entities
+                               #   animate from their clips)
+        BlockModel.cs, ModelLoader.cs  # Minecraft model format: parent chains, #texture refs
+      Recipes/                 # compiled craft, cook, crush, melt and cast recipes
+        CastRecipe.cs          # (fired mold, material) -> result + cooling
+        CookRecipe.cs          # one compiled campfire recipe: raw input, cooked result and seconds on the fire
+        CraftingRecipe.cs      # one compiled crafting recipe: what it makes and what one craft consumes
+        CrushRecipe.cs         # one compiled quern recipe: crushable input and the crushed result
+        MeltRecipe.cs          # block/item -> (material, ml)
+      Shapes/                  # hitboxes and the shape resolvers (pane, multiblock, tree wood, snow, facing, break overlay)
+        BlockHitbox.cs         # one axis-aligned selection box in cell-local 0..1 space
+        BlockShape.cs          # the one live-world box resolver (raycast, outline, pop,
+                               #   shape collision): tree wood, snow, pane, facing, plain
+        BreakOverlayUv.cs      # cell-space crop of the block-breaking crack sprite for one hitbox face
+        HorizontalFacing.cs    # quarter turns about a footprint's centre: points, boxes,
+                               #   baked models (multiblocks at size 2, facing blocks at 1)
+        MultiblockShape.cs     # the 2x2x2 volume's geometry: rotating a point, a
+                               #   direction or a whole baked model to a facing
+        PaneProfile.cs         # one pane block's dimensions (its "pane" JSON): post and
+                               #   arm widths, the rails an arm fills, interned; its boxes
+        PaneShape.cs           # the pane renderer's shape: which neighbours get an arm,
+                               #   post/arm boxes, the cached hitboxes per arm mask
+        SnowShape.cs           # state-aware hitbox shape of layered snow
+        TreeWoodShape.cs       # the one tree_wood shape rule: which cells connect (parent
+                               #   edges, never detached wood), node and tube hitboxes,
+                               #   body overlap and the bevelled pixel-rim boxes (RimBoxes)
+      Stations/                # GL-free render constants of the kiln, quern and casting passes, molten materials
+        KilnRenderer.cs, QuernRenderer.cs,
+          CastingRenderer.cs   # GL-free placement/animation
+                               #   constants tying a station's render pass to its
+                               #   authored model (the kiln opening and its bowl,
+                               #   fire and fuel spots; the mold pocket levels and
+                               #   the cooling dissolve curves)
+        MoltenMaterial.cs      # a molten metal: id, tile, tint
+        SpritePose.cs          # the face-up pose and size-dependent resting lift
+                               #   shared by every item sprite lying on a station
+                               #   (the cooled cast, kiln fuel)
+    Core/                      # GL-free utilities: math, springs, vectors, color space, logging, the frame
+                               #   profiler, launch mode, voxel coordinates, file IO, the vendored FastNoiseLite
+                               #   (never reformat) and every tuning constant (WorldGenerationConfig)
+      ColorSpace.cs            # exact sRGB transfer functions
+      FastNoiseLite.cs         # vendored, don't reformat
+      FileUtils.cs             # ReadFile: reads a file by path (assets are opened relative to the working directory)
+      FrameProfiler.cs         # per-frame CPU timing, collected on every frame, plus
+                               #   per-pass GPU timing, which is gated by GpuTimingGate
+      LaunchMode.cs            # GL-free rule: VOXEL_SCRIPT/SPAWN/LOOK bypass the menu (storeless world)
+      Log.cs                   # async console sink: every diagnostic line is enqueued and written by one background thread in order
+      MathUtils.cs             # lerp/easing/pulse helpers for animation curves + shared constants
+      Spring.cs                # a damped spring that carries its own velocity
+      Vector2Utils.cs          # extension operations on Vector2 mirroring Vector3Utils
+      Vector3Utils.cs          # extension operations on Vector3 that are repeated across gameplay, physics and render code
+      VoxelCoords.cs           # chunk/world coordinate math shared by generation, physics and scheduling code
+      WorldGenerationConfig.cs # all tuning constants (view radius, per-frame budgets, thread counts) and every worldgen knob (seed, ravine, cave, carver)
+    Data/                      # Vertex struct (32 B: float pos, rgba, float tile-local UV, sun/block bytes, a normal/sway/tint
+                               #   ushort, ushort array-texture layer), cube geometry, frustum/plane math, direction tables
+      CubeVertexPositions.cs   # the eight named corner positions of the unit cube
+      Frustum.cs               # the six normalized view-frustum planes of a view-projection
+                               #   matrix and an allocation-free AABB visibility test
+      Plane.cs                 # one plane (normal + distance): Normalize and the signed distance to a point
+      Rgba.cs                  # straight (non-premultiplied) 8-bit RGBA color, matching the packing Vertex expects
+      UvRect.cs                # an axis-aligned region of one slice of an array texture, in 0..1 UV space
+      Vector3Directions.cs     # integer companion to CardinalDirections, in the SAME
+                               #   order (Up, Down, Left, Right, Forward, Backward)
+      Vertex.cs                # the one vertex layout every textured mesh shares (chunks, LOD, drops, icons, UI, sun)
+    Effects/                   # GL-free twins of shader terms, by sub-domain
+      Climate/                 # the biome tint lattice and palettes, the eye's climate
+        BiomeTint.cs           # GL-free biome tint: Climate -> palette -> vertex tint on a 16-block lattice, Gain, Shade, CellTint
+        BiomeTintField.cs      # one palette's four lattice corners over a 16-block field, sampled bilinearly
+        BiomeTintFields.cs     # a mesh build's grass and foliage fields, both from one climate evaluation per corner
+        BiomeTintPalette.cs    # Grass / Foliage: which palette a biomeTint block reads
+        EyeClimate.cs          # GL-free climate at a world column from an IColumnSource's stored corner climate (no worldgen)
+      Lighting/                # the block-light palette, its two-slot tint code and the campfire flicker
+        BlockLightPalette.cs   # GL-free 8-slot block-light colour palette (slot 0 = the default warm torch colour)
+        LightFlicker.cs        # GL-free per-cell flicker phase + curve for the campfire point lights
+        LightTint.cs           # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
+      Post/                    # the post pass and screen-space effects: tonemap, eye
+                               #   adaptation, biome grade, contact AO, godrays, underwater wobble
+        BiomeGrade.cs          # GL-free post colour grade from the eye's climate: warm over desert, cool over snow, eased
+        ContactAo.cs           # GL-free twin of contact-ao-fragment.glsl (SH-28)
+        ContactAoTaps.cs       # the nine raw window depths the contact AO pass reads around one pixel (ContactAo.Occlusion)
+        EyeAdaptation.cs       # GL-free exposure target from the voxel light at the eye, eased slower into the dark
+        Godrays.cs             # GL-free twin of the godrays' strength (facing, sun height, cloud, wet), scatter and phase
+        Tonemap.cs             # the C# twin of post-fragment.glsl's tonemap, used only
+                               #   by tests: exposure, then a per-channel clamp to 0..1
+        UnderwaterWobble.cs    # GL-free twin of the post pass's underwater screen sway: the offset and its wrapped clock
+      Sky/                     # sun, moon, stars, aurora, glare, silver lining, wind and the day cycle
+        Aurora.cs              # GL-free twin of the aurora's fade (eye coldness x star visibility) and its wrapped noise drift
+        CloudSilverLining.cs   # GL-free twin of the clouds' silver lining: sun gate, forward lobe, thinness along the view
+        DayCycle.cs            # GL-free sun direction, dayness and night factor of the lighting clock
                                #   (RenderManager.SetLighting and the slime size roll both read it)
-    Goblin.cs                  # the goblin: body physics, throw-then-melee AI, clip/event contract
-                               #   (ValidateContent), animation-driven release/impact events
-    GoblinAim.cs               # GL-free low-arc ballistic solver for the thrown stones
-    AnimationClip.cs           # GL-free Blockbench keyframe clip: per-bone rotation/position/scale
+        Moonlight.cs           # GL-free key-light rule: sun by day, moon at night, handed over with both dark
+        MoonPhase.cs           # GL-free moon: the day's phase (steps at noon), its light direction, lit share, visibility
+        SkyPalette.cs          # GL-free zenith/horizon/glow sky palette and the C# reference of SkySample
+        StarField.cs           # GL-free twin of the night dome's star field (cells, hash, visibility)
+        SunGlare.cs            # GL-free sun lens glare: per-frame intensity and its sky falloff
+        Wind.cs                # the one wind of the world: a horizontal direction that turns slowly
+                               #   and steadily with the lighting clock (window time plus VOXEL_TIME)
+      Surfaces/                # per-tile terms of test-fragment.glsl: glass, grass, ice, lava, leaves, ore
+        GlassSheen.cs          # GL-free twin of the glass sheen: fresnel weight and the sky folded into the blend
+        GrassShimmer.cs        # GL-free twin of the grass wind shimmer: gust-carried bands, distance fade, the face gate
+        IceGlint.cs            # GL-free twin of the ice tile term: fresnel sky sheen weight, gated sun highlight
+        LavaPulse.cs           # GL-free twin of the lava glow pulse: the slow noise field and the brightness factor
+        LeafBacklight.cs       # GL-free twin of the leaf backlight: lobe around the sun, sun and light-through gates
+        OreTwinkle.cs          # GL-free twin of the ore twinkle: per-texel cycle, the flash tent, sun/distance gate
+      Water/                   # deep-water fog, the wet waterline fresnel, sun glitter
+        DeepWaterFog.cs        # the deep-water darkness curve: per-channel fog dim from the eye's depth, red first
+        SurfaceFresnel.cs      # GL-free twin of the surface fresnel terms in test-fragment.glsl:
+                               #   the shared Schlick helper the ore path reads
+        WaterGlitter.cs        # GL-free twin of the sun glitter on water: mirror lobe, sparkle life and spot, gate
+    Entities/                  # mobs (Mob base, Slime, Goblin and their GL-free rules), item drops, projectiles,
+                               #   primed TNT, falling blocks, damage numbers, the entity animator and clips
+      AnimationClip.cs         # GL-free Blockbench keyframe clip: per-bone rotation/position/scale
                                #   tracks, linear/catmull-rom/step, loop/once/hold, timeline events
-    EntityAnimator.cs          # GL-free per-entity animator: idle/walk locomotion + one-shot action
+      ContactDamage.cs         # GL-free contact damage a body takes standing against a cactus
+      DamageNumber.cs          # one floating damage number in a DamageNumberPool: where it started, the damage it shows
+      DamageNumberPool.cs      # the floating damage numbers over struck mobs, in one fixed array: a hit claims a free slot
+      EntityAnimator.cs        # GL-free per-entity animator: idle/walk locomotion + one-shot action
                                #   layer, events, parent-chain part matrices, HandAnchor
-    Placement.cs               # GL-free placement rules: which cell a right-click fills (a stack
+      EntityModel.cs           # a runtime entity model: the cubes parsed from a Blockbench project
+      EntityType.cs            # one entity kind loaded from assets/data/entities/<name>.json: its display name, health pool
+      FallingBlock.cs          # a gravity-affected block (sand, gravel) in flight
+      FallingBlockLanding.cs   # a falling cube written back as a block: cell, block, fall, submerged (its dust)
+      Goblin.cs                # the goblin: body physics, throw-then-melee AI, clip/event contract
+                               #   (ValidateContent), animation-driven release/impact events
+      GoblinAim.cs             # GL-free low-arc ballistic solver for the thrown stones
+      GoblinTorches.cs         # GL-free torch roll for a goblin spawn (night, depth, one uniform roll)
+      MobCaps.cs, IMobPopulation.cs  # the natural and hard mob caps every kind shares, over the
+                                     #   living count each registered manager reports
+      IMobTarget.cs            # what a mob chases and hurts: eye, immunity, TakeHit (Camera, ServerPlayer)
+      ItemDrop.cs              # a collectable left behind by mining: usually a block, sometimes a pure item (see Item)
+      LedgeProbe.cs            # GL-free ledge caution: the drop to the first ground ahead, safe-step rule
+      Mob.cs                   # abstract base of every hostile (Slime, Goblin): position, health,
+                               #   facing, hit flash, body box, TakeDamage/Shove
+      MobFallDamage.cs         # GL-free mob fall damage: a share of the mob's pool per block past its safe height
+      MobInterest.cs           # GL-free per-mob interest: sight checks, losing a hidden target, idle
+                               #   time, the idle despawn gate and wander goals
+      MobLava.cs               # GL-free mob lava rule: body box in a burning fluid, damage per tick
+      MobLoot.cs               # GL-free loot toss: the up-and-out launch a killed mob's drops get
+      MobTargets.cs            # GL-free target rules: body contact, nearest non-immune target, min distance
+      PrimedTnt.cs             # a primed TNT block: a full-size cube that falls under gravity and
+                               #   collides with blocks axis by axis like the player and the item drops
+      Slime.cs                 # a slime: a gel cube that hops toward the player and only hurts on contact while it is off the ground
+      SlimeMerge.cs            # GL-free slime merge: who merges (same size, touching, past the cooldown),
+                               #   the merged size, centre and health
+      SlimeSize.cs             # GL-free per-size slime stats: body scale, health, contact damage,
+                               #   loot rolls, each 1 + (size - 1) * its config step; the spawn size roll
+      ThrownProjectile.cs      # a thrown item or a goblin stone in flight: falls under Gravity,
+                               #   its damage scaled by the charge, hits a mob or stops on a block
+    Graphics/                  # GL resource wrappers: Mesh, Shader, textures and the atlases,
+                               #   the block/item mesh caches, cutout mips, tile materials
+      BlockCubeCache.cs        # lazily built cube meshes, one per block type
+      CutoutMipmap.cs          # GL-free coverage-preserving mip chain for cutout tiles (alpha rescaled per level)
+      ItemMeshCache.cs         # lazily built extruded-sprite meshes plus their GL textures, one per Item
+      Mesh.cs                  # an indexed triangle mesh in the shared Vertex layout
+      Shader.cs                # a compiled GL program from vertex/fragment sources, with
+                               #   an optional defines prefix (the CHUNK_DRAW variants)
+      TextureAtlas.cs          # loads the individual block textures in
+                               #   assets/textures/blocks/*.png into one TEXTURE_2D_ARRAY at startup
+      TextureLoader.cs         # uploads textures for the shared Vertex layout
+      TileMaterials.cs         # the per-atlas-layer material table the world fragment shader indexes by fLayer
+    Interaction/               # GL-free block interaction rules: raycast, mining, combat, placement, support,
+                               #   doors and tall blocks, multiblocks, the selection outline, chat commands
+      BlockRaycaster.cs        # the DDA block raycast + line-of-sight segment test, split out of Camera.cs
+      BlockSupport.cs          # GL-free needsSupport rule: the cell holding a block up (below, or
+                               #   behind the front of a support "attached" block)
+      ChatCommands.cs          # the chat command table: /help, /tp, /give, /time and their rights
+      Combat.cs                # GL-free punch rules: the forward cone (3 blocks, 30° half-angle)
+                               #   and entity damage, shared by the punch loop and the tests
+      DoorState.cs             # GL-free state byte of an openable block: facing in bits 0-1, the
+                               #   open bit 2, the index into its eight pre-turned shapes
+      Mining.cs                # GL-free mining rules: the tools/requiresTool gate, block damage per
+                               #   hit and hit pace shared by the break loop and the tests
+      Multiblock.cs            # GL-free multiblock structure rules: the eight cells of the 2x2x2
+                               #   volume, the state byte (facing + offset from the anchor),
+                               #   anchor resolution, the integrity check, Convert and Revert
+      MultiblockPlacement.cs   # which 2x2x2 volume a right-click meant: the right-down/right-up/
+                               #   left-down/left-up search and the facing the opening takes
+      Placement.cs             # GL-free placement rules: which cell a right-click fills (a stack
                                #   flagged replaceableByPlacement, layered snow, is taken over in
                                #   place), what a placement may write over, and TryMount (a torch
                                #   on a block's side becomes its wallBlock, facing the hit normal)
-    BlockSupport.cs            # GL-free needsSupport rule: the cell holding a block up (below, or
-                               #   behind the front of a support "attached" block)
-    DoorState.cs               # GL-free state byte of an openable block: facing in bits 0-1, the
-                               #   open bit 2, the index into its eight pre-turned shapes
-    TallBlock.cs               # GL-free two-cell block rules (a door): each half's partner cell
+      RightClickOutcome.cs     # what claimed a right-click: a station, the item's use, or a placement
+      SelectionOutlineMesh.cs  # GL-free selection outline: the 12 box edges as thin beams (no glLineWidth)
+      SelectionPulse.cs        # GL-free twin of the outline's breathing opacity (steady while mining)
+      SliceCombo.cs            # the blade's two-phase slice combo: press/queue/advance state
+      TallBlock.cs             # GL-free two-cell block rules (a door): each half's partner cell
                                #   and block, and the lower half every half drops and picks as
-    Multiblock.cs              # GL-free multiblock structure rules: the eight cells of the 2x2x2
-                               #   volume, the state byte (facing + offset from the anchor),
-                               #   anchor resolution, the integrity check, Convert and Revert
-    MultiblockPlacement.cs     # which 2x2x2 volume a right-click meant: the right-down/right-up/
-                               #   left-down/left-up search and the facing the opening takes
-    WorldGenerationConfig.cs   # all tuning constants (view radius, per-frame budgets, thread counts) and every worldgen knob (seed, ravine, cave, carver)
-    MathUtils.cs               # lerp/easing/pulse helpers for animation curves + shared constants
-    SkyPalette.cs              # GL-free zenith/horizon/glow sky palette and the C# reference of SkySample
-    StarField.cs               # GL-free twin of the night dome's star field (cells, hash, visibility)
-    SunGlare.cs                # GL-free sun lens glare: per-frame intensity and its sky falloff
-    CloudSilverLining.cs       # GL-free twin of the clouds' silver lining: sun gate, forward lobe, thinness along the view
-    MoonPhase.cs               # GL-free moon: the day's phase (steps at noon), its light direction, lit share, visibility
-    Moonlight.cs               # GL-free key-light rule: sun by day, moon at night, handed over with both dark
-    Aurora.cs                  # GL-free twin of the aurora's fade (eye coldness x star visibility) and its wrapped noise drift
-    EyeClimate.cs              # GL-free climate at a world column from an IColumnSource's stored corner climate (no worldgen)
-    EyeAdaptation.cs           # GL-free exposure target from the voxel light at the eye, eased slower into the dark
-    BiomeGrade.cs              # GL-free post colour grade from the eye's climate: warm over desert, cool over snow, eased
-    DamageFringe.cs            # GL-free twin of the post pass's damage chromatic fringe: strength from the flash, edge weight
-    UnderwaterWobble.cs        # GL-free twin of the post pass's underwater screen sway: the offset and its wrapped clock
-    Godrays.cs                 # GL-free twin of the godrays' strength (facing, sun height, cloud, wet), scatter and phase
-    BlockLightPalette.cs       # GL-free 8-slot block-light colour palette (slot 0 = the default warm torch colour)
-    LightTint.cs               # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
-    BiomeTint.cs               # GL-free biome tint: Climate -> palette -> vertex tint on a 16-block lattice, Gain, Shade, CellTint
-    BiomeTintPalette.cs        # Grass / Foliage: which palette a biomeTint block reads
-    BiomeTintField.cs          # one palette's four lattice corners over a 16-block field, sampled bilinearly
-    BiomeTintFields.cs         # a mesh build's grass and foliage fields, both from one climate evaluation per corner
-    Mesh.cs, Shader.cs, TextureLoader.cs, FileUtils.cs, FastNoiseLite.cs (vendored, don't reformat)
-    Data/                      # Vertex struct (32 B: float pos, rgba, float tile-local UV, sun/block bytes, a normal/sway/tint
-                               #   ushort, ushort array-texture layer), cube geometry, frustum/plane math, direction tables
-    Content/                   # the data-driven content pipeline (see "Content" below)
-      ContentRegistry.cs       # loads assets/data + assets/models, assigns byte ids, fills the tables
-      BlockDefinition.cs, ItemDefinition.cs, LootTableDefinition.cs, ModelDefinition.cs  # JSON DTOs
-      BlockModel.cs, ModelLoader.cs         # Minecraft model format: parent chains, #texture refs
-      ModelBaker.cs, BakedModel.cs, BakedQuad.cs   # elements -> atlas-ready quads + full-cube flags
-      LootTable.cs, LootContext.cs          # compiled loot tables and the world cell they roll at
-      BbmodelLoader.cs                      # Blockbench .bbmodel: groups (nested, with Parent),
-                                            #   cubes, per-face UVs, the skin texture and the
-                                            #   keyframe `animations`; rest rotations rejected
-                                            #   (the player's posing is procedural, entities
-                                            #   animate from their clips)
-      BlockRenderer.cs, BlockBreakAction.cs, AttackPattern.cs, ItemUseAction.cs  # geometry/break/attack/use enums
-      BiomeTintFaces.cs                     # a block's resolved biomeTint: palette + per-face base/tinted tiles
-      SnowShape.cs                          # state-aware hitbox shape of layered snow
-      BlockShape.cs                         # the one live-world box resolver (raycast, outline, pop,
-                                            #   shape collision): tree wood, snow, pane, facing, plain
-      PaneShape.cs                          # the pane renderer's shape: which neighbours get an arm,
-                                            #   post/arm boxes, the cached hitboxes per arm mask
-      PaneProfile.cs                        # one pane block's dimensions (its "pane" JSON): post and
-                                            #   arm widths, the rails an arm fills, interned; its boxes
-      HorizontalFacing.cs                   # quarter turns about a footprint's centre: points, boxes,
-                                            #   baked models (multiblocks at size 2, facing blocks at 1)
-      TreeWoodShape.cs                      # the one tree_wood shape rule: which cells connect (parent
-                                            #   edges, never detached wood), node and tube hitboxes,
-                                            #   body overlap and the bevelled pixel-rim boxes (RimBoxes)
-      TreeSpeciesDefinition.cs              # JSON DTO of assets/data/trees/<species>.json
-      WoodLootBand.cs                       # one thickness band of a tree_wood block's loot (self or a table)
-      MultiblockShape.cs                    # the 2x2x2 volume's geometry: rotating a point, a
-                                            #   direction or a whole baked model to a facing
-      KilnRenderer.cs, QuernRenderer.cs, CastingRenderer.cs  # GL-free placement/animation
-                                            #   constants tying a station's render pass to its
-                                            #   authored model (the kiln opening and its bowl,
-                                            #   fire and fuel spots; the mold pocket levels and
-                                            #   the cooling dissolve curves)
-      SpritePose.cs                         # the face-up pose and size-dependent resting lift
-                                            #   shared by every item sprite lying on a station
-                                            #   (the cooled cast, kiln fuel)
-      MoltenMaterial.cs, MoltenMaterialDefinition.cs  # a molten metal: id, tile, tint
-      MeltRecipe.cs, MeltRecipeDefinition.cs          # block/item -> (material, ml)
-      CastRecipe.cs, CastRecipeDefinition.cs          # (fired mold, material) -> result + cooling
-    Saves/                     # GL-free world saves (see "Saves")
-      WorldInfo.cs             # one listed world: world.json metadata + its folder (slug fixed at creation);
-                               #   SourceName = the raw world.json `source` (null when absent), Source = it
-                               #   resolved (`generated` when unset), read by the dedicated server only
-      WorldStore.cs            # the saves root: list (most recent first), create, rename, delete, touch;
-                               #   writes `source` back only when set, so an unset one never appears
-      WorldSources.cs          # the server's named world sources (generated, imported): Create(name, worldDir)
-      ColumnFileCodec.cs       # an imported column file: magic CVXL, version, Deflate body of ColumnData
-                               #   (heights, bed, water levels, biomes, dirt depth, corner climate)
-      ImportedMapWriter.cs     # writes an imported map (columns/*.col + chunks/*.bin); ExportGenerated seeds
-                               #   one from any IWorldSource (tool/test use)
-      WorldNames.cs            # name normalising, the "Unnamed World" default, unique numeric suffix, folder slug
-      WorldSeedParser.cs       # seed field -> seed: empty = random, integer verbatim, else FNV-1a hash
-      SaveNames.cs             # block/ and item/ namespaced content names, so saves never store raw ids
-      ChunkSnapshot.cs         # immutable copy of a chunk's blocks, state bytes and player-placed cells
-      ChunkSaveCodec.cs        # the chunk file format: block-name palette + Deflate body
-      ChunkSaveStore.cs        # one world's chunk files + side cars: pending map, index, async writer thread
-      LodEditState.cs          # lod-edits.bin: export/import of the LOD caps, surface overrides, canopy markers
-      PlayerSaveData.cs        # the player.json shape: pose, modes, health, clock, inventory + hotbar
-      PlayerSaveCodec.cs       # reads/writes player.json
-      EntitySaveData.cs        # the entities.json shape: mobs (health/facing/velocity/ammo) and drops
-      EntitySaveCodec.cs       # reads/writes entities.json
-      MobSaveCodec.cs          # a live Mob -> its EntitySaveData form (per-kind ammo)
-      ServerPlayerSaves.cs     # a hosted world's per-player files: players/<name slug>.json via the store
-      ServerInfo.cs            # one saved server: display name, host, port, last connected (servers.json)
-      ServerStore.cs           # servers.json: list, add, delete, touch (unique names, most recent first)
-    Networking/                # GL-free multiplayer protocol and client (see "Multiple players and chat")
-      NetProtocol.cs           # NetMessage ids, length-prefixed framing, PacketWriter/PacketReader
-      ServerAddress.cs         # host[:port] parsing and formatting (the default port)
-      NetworkClient.cs         # the client: connect + handshake, reader thread, inbound queue, sends
-      RemotePlayer.cs          # another player as the client sees them: pose smoothing + a PlayerModel
+    Items/                     # the Item class hierarchy ItemFactory hands out per use action, and the registry
+      BlockItem.cs             # the Item every placeable block also is, so hotbar,
+                               #   drops and recipes resolve both through ItemRegistry
+      BucketPickupItem.cs      # scoops a targeted fluid source into the item (empty bucket)
+      BucketPlaceItem.cs       # pours a fluid source into the targeted cell (full bucket), becoming the empty item again
+      ConvertMultiblockItem.cs # the converter's right-click: find the volume, convert in place
+      CrucibleInventory.cs     # GL-free helper that adds a crucible and hands back its stack
+      CrucibleItem.cs          # a vessel whose molten contents ride on its own ItemStack
+      FirestarterItem.cs       # the firestarter's own code class: the worked example of a per-item override
+      GrowTreeItem.cs          # grows the tree the targeted cell belongs to by a few pulses (ash on a trunk or a canopy)
+      HealItem.cs              # restores health (a bandage): heals the player the use
+                               #   runs for by WorldGenerationConfig.BandageHealAmount
+      IgniteItem.cs            # strikes a spark at the aimed block: a dry TNT block primes, a fully built firepit lights
+      IItemUseWorld.cs         # what an Item override may query and change during Item.OnUse
+      Item.cs, ItemFactory.cs  # the abstract item; the per-use.action factory building the singletons
+      ItemRegistry.cs          # every item by shared byte id: pure items (vine, branch, flint, ...) plus
+                               #   one BlockItem per placeable block
+      ItemUseResult.cs         # outcome of Item.OnUse: did the use take effect, what
+                               #   the tool morphs into, and whether the player punches
+      PlaceStackItem.cs        # builds up a multi-state block (flint or obsidian on a pebble pile)
+      PlainItem.cs             # a plain pickup: no right-click behavior (vine, branch, compass)
+      PlantTreeItem.cs         # plants a sapling of the item's Item.UseTreeName species
+                               #   on the aimed ground (an acorn on dirt or grass)
+    Juice/                     # game-feel rules: camera shake, kick, FOV and tilt terms, hit-stop,
+                               #   damage direction and fringe, the low-health vignette, pops and shatters
+      BlastImpulse.cs          # GL-free TNT blast shove: away from the centre, falling to zero at the radius
+      DamageDirection.cs       # GL-free damage direction arc: the last blow's world direction, its fade and
+                               #   its screen direction from the view yaw (the vignette pass's third term)
+      DamageFringe.cs          # GL-free twin of the post pass's damage chromatic fringe: strength from the flash, edge weight
+      LowHealthVignette.cs     # the low-health warning: how strongly the screen edge pulses red
+      PlacePop.cs              # GL-free twin of the placement pop: the growth a freshly placed
+                               #   block's pop box is drawn with (RenderManager.RenderBlockPop)
+      ShakeFalloff.cs          # GL-free camera-shake trauma of a world event (blast, tree thud) by its distance
+      SprintFov.cs             # GL-free rule of the sprint FOV widening: how many
+                               #   degrees the view eases out by while the player sprints
+      StrafeTilt.cs            # GL-free rule of the strafe camera tilt: the view
+                               #   rolls a little toward the side the player strafes to
+      SurfacingDroplets.cs     # GL-free timing of the droplets streaking down after the eye surfaces from water
+      SwingHitStop.cs          # GL-free hit-stop of one swing clock (PlayerModel's punch or slice)
+      ThrowZoom.cs             # GL-free throw charge zoom: the FOV target from the charge and its spring step
+      ToolShatter.cs           # GL-free rules of a tool that ran out of durability
+    Lod/                       # far-terrain LOD: region builds, the manager, sky exposure, surface overrides
+      LodManager.cs            # LOD region lifecycle: worker thread builds, main thread uploads/unloads, burial flags
+      LodRegion.cs             # far-terrain LOD: region columns meshed at reduced resolution from heightmaps; per-column chunk-Y ranges for burial
+      LodSkyExposure.cs        # GL-free coarse sky exposure the LOD mesher bakes into Vertex.Sun from its column-top grids
+      LodSurface.cs            # per-column far-LOD surface overrides (edited top height + tile), beside LodRegion's caps
+    Networking/                # the GL-free multiplayer protocol, client, server-side player and
+                               #   the intent/validation rules (see "Multiple players and chat")
+      AttackPacing.cs          # GL-free: the shortest gap between two punches or slice swings
+      BreakProgress.cs         # GL-free: a player's mining on the server, judged against the held item's hits
       ChunkNetCodec.cs         # chunk blocks/state and column terrain (heights, water levels, corner climate),
                                #   Deflate-compressed
       ClientChunkStreamer.cs   # requests streamed chunks/columns and applies them, no worldgen; the
                                #   client's IColumnSource
-      LodNetCodec.cs           # a far-LOD region's mesh on the wire
       ClientLodStreamer.cs     # requests and applies server-built far regions
-      NetEntity.cs             # NetEntityKind/NetEntity and NetCellChange
-      InventoryNetCodec.cs     # the server-owned inventory on the wire (the save JSON shape)
+      ClientPrediction.cs      # GL-free: a client's pending predictions vs the server's answers (sequence ids)
       InventoryIntent.cs       # one client inventory intent (select, drop, equip, craft, creative grant/clear, pick)
       InventoryIntentCodec.cs  # its bounds-checked wire form
       InventoryIntentRules.cs  # GL-free: what the server accepts of an intent, against that player's inventory
+      InventoryNetCodec.cs     # the server-owned inventory on the wire (the save JSON shape)
+      LodNetCodec.cs           # a far-LOD region's mesh on the wire
+      MovementRules.cs         # GL-free movement rubberband: speed clamp, then collision, rise and hover checks
+      MovementState.cs         # a player's per-connection movement memory (airborne-still time)
+      MoveVerdict.cs           # Accepted / Clamped / Rejected
+      NetEntity.cs             # NetEntityKind/NetEntity and NetCellChange
+      NetPlayerAction.cs       # the swing a player just made, as the server rebroadcasts it in each
+                               #   player list entry (with a counter that moves on every new one)
+      NetPlayerFlags.cs        # the PlayerState flags byte (creative, flying), a request to the server
+      NetProtocol.cs           # NetMessage ids, length-prefixed framing, PacketWriter/PacketReader
+      NetValidation.cs         # server movement, edit-reach, intent-eye and visible-face sanity rules
+      NetworkClient.cs         # the client: connect + handshake, reader thread, inbound queue, sends
+      OperatorList.cs          # who may be creative: ops.json in the world folder plus --op, matched by save slug
+      PlayerStatusCodec.cs     # PlayerStatusData (modes, health, dead, knockback) and its bounds-checked wire form
+      RateLimiter.cs           # GL-free token bucket (a player's edit rate)
+      RemotePlayer.cs          # another player as the client sees them: pose smoothing + a PlayerModel
+      ServerAddress.cs         # host[:port] parsing and formatting (the default port)
       ServerPlayer.cs          # a connected player on the server: own Inventory, creative/flight flags, pose,
                                #   its PlayerContext, newest sequence id, mining progress, edit rate, attack pace,
                                #   its PlayerHealth/fall tracking/respawn eye, mob-hit sink, correction numbers
-      NetPlayerFlags.cs        # the PlayerState flags byte (creative, flying), a request to the server
-      PlayerStatusCodec.cs     # PlayerStatusData (modes, health, dead, knockback) and its bounds-checked wire form
-      NetValidation.cs         # server movement, edit-reach, intent-eye and visible-face sanity rules
-      MovementRules.cs         # GL-free movement rubberband: speed clamp, then collision, rise and hover checks
-      MoveVerdict.cs           # Accepted / Clamped / Rejected
-      MovementState.cs         # a player's per-connection movement memory (airborne-still time)
-      OperatorList.cs          # who may be creative: ops.json in the world folder plus --op, matched by save slug
+      StationNetCodec.cs       # the StationState snapshot: campfires, querns, kilns, cast molds
       WorldIntent.cs           # one client world intent (break start/complete, place, use, throw, attack)
       WorldIntentCodec.cs      # its bounds-checked wire form, with the sequence id
-      BreakProgress.cs         # GL-free: a player's mining on the server, judged against the held item's hits
-      RateLimiter.cs           # GL-free token bucket (a player's edit rate)
-      AttackPacing.cs          # GL-free: the shortest gap between two punches or slice swings
-      ClientPrediction.cs      # GL-free: a client's pending predictions vs the server's answers (sequence ids)
-      StationNetCodec.cs       # the StationState snapshot: campfires, querns, kilns, cast molds
-    UI/                        # UI state, layout and rules, mostly GL-free (UIRenderer draws them)
-      PauseMenu.cs             # pause menu pages, hit kinds, view and PauseMenuLayout (RESUME/SETTINGS/SAVE & QUIT)
-      SettingsMenu.cs          # settings page rows, tabs, sliders and SettingsLayout (shared by both menus)
-      MainMenu.cs              # main-menu pages, hit kinds, fields, keys, actions and MainMenuView
-      MainMenuLayout.cs        # main-menu geometry + HitAt: buttons, scrolled world rows, fields, delete popup
-      MainMenuController.cs    # every main-menu page transition, key rule and WorldStore call (tested)
-      TextFieldState.cs        # one single-line text field: printable-ASCII typing rules and length cap
-      SearchFieldState.cs      # a dropdown search field's query, suggestion cursor and scroll
-      InventorySearch.cs       # GL-free matching of owned items and recipes behind the search field
-      LoadingScreen.cs         # LoadingScreenView (eased monotone progress, fade-out) + LoadingScreenLayout (spinner)
-      ScrollList.cs            # scrolled equal-height row math: clamp, visible range, row at a point
-      UiCanvas.cs              # the virtual UI canvas: reference size, uniform scale, scissor rects
-      InventoryPanelLayout.cs  # [E] panel geometry, tabs, the search field, the catalog buttons, rows and scrollbar hit-testing
-      InventoryView.cs         # [E] panel selection/scroll/focus state; ResetForNewWorld between worlds
-      CreativeCatalog.cs       # GL-free browsable catalog of every item, grouped by pool and name-sorted
-      HotbarLayout.cs          # hotbar strip geometry shared by the draw, its hit-test and the panel
-      CraftCardLayout.cs, CraftCardLayoutCache.cs  # the crafting card's layout and its memo
-      CraftingSession.cs       # the crafting tab's open recipe, copies and fed reservations
-      Inventory.cs, ItemStack.cs  # the three pools, the hotbar, stacks and their components
-      BitmapFont.cs            # TrueType font baked into a GL atlas; CPU glyph layout (printable ASCII)
-      TextWrap.cs              # GL-free word wrap against a measure delegate
-      GameSettings.cs          # player settings with JSON persistence (settings.json)
-      Compass.cs               # HUD compass heading math
-      Chat.cs                  # ChatKind/ChatMessage, ChatView (log/input/history) and ChatLayout
-      CrosshairState.cs        # throw charge, break progress and hit marker, handed to the UI pass
-      HitMarker.cs             # the crosshair's connecting-hit X: its flash clock and fade
-      HudToast.cs              # one hold-then-fade HUD line (the day toast, a first find, packs full)
-      DayToast.cs              # the dawn watch behind "Day N"
-      HotbarNameFade.cs        # the selected item's name over the hearts after a switch
-      HotbarPickupPop.cs       # the bump a hotbar slot gets when its count rises
-      LookLabel.cs             # the look-at label's rule: name, "Unknown", the mineable flag
-      LookLabelState.cs        # what one frame's label draws: text, flags, cell, state byte, light
-      ItemTooltip.cs           # the hover panel's lines, built from the item's own fields
-      ScreenshotPaths.cs       # where F2's capture lands and what it is called
-      Primitives.cs            # Vertex-layout mesh factories for simple shapes
-    Items/                     # the Item class hierarchy ItemFactory hands out per use action
-      Item.cs, ItemFactory.cs  # the abstract item; the per-use.action factory building the singletons
-      ItemRegistry.cs          # every item by shared byte id: pure items (vine, branch, flint, ...) plus
-                               #   one BlockItem per placeable block
-      CrucibleItem.cs          # a vessel whose molten contents ride on its own ItemStack
-      CrucibleInventory.cs     # GL-free helper that adds a crucible and hands back its stack
-      ConvertMultiblockItem.cs # the converter's right-click: find the volume, convert in place
-    Systems/
-      WindowManager.cs         # Silk.NET window setup
+    Particles/                 # every particle system (debris, bubbles, fire, leaves,
+                               #   splashes, dust) and its renderer; the ParticleRing buffer
+      BlockDebris.cs           # one chunk of mining debris: a small cube textured as the block it broke off from
+      BlockDebrisSystem.cs     # owns the live mining debris: small textured cubes chipped off
+                               #   on every mining hit plus a bigger burst when the block breaks
+      BubbleParticle.cs        # one exhaled bubble: a small billboard that rises off the player's mouth while the eye is submerged
+      BubbleParticleRenderer.cs # draws every live BubbleParticle as a camera-facing billboard in one dynamic draw
+      BubbleParticleSystem.cs  # live exhaled bubbles: spawns them at the player's mouth while the eye is submerged
+      DebrisLook.cs            # what a BlockDebris chip looks like, i.e. which cached cube BlockCubeCache draws it with
+      FireParticle.cs          # one fire particle: an ember, a smoke puff or a steam puff
+      FireParticleRenderer.cs  # draws every live FireParticle as a camera-facing billboard
+      FireParticleSystem.cs    # live fire particles: embers and smoke rising off every lit cell the caller feeds in
+      FootstepDust.cs          # the sprint footstep dust rule, GL-free: when a footfall happens
+                               #   (FootfallsBetween) and whether it kicks up a puff (Kicks)
+      GroundDust.cs            # the cosmetic ground dust: a landing from a real fall kicks up a puff of chips of the block landed on
+      LandingDust.cs           # the landing-dust rule, GL-free: how many chips a landing kicks up and how fast they fly
+      LeafParticle.cs          # one falling leaf billboard (sway, tumble, rest, fade); LeafParticleSystem owns them
+      LeafParticleRenderer.cs  # the falling leaves as one back-to-front billboard draw
+      LeafParticleSystem.cs    # falling leaves: ambient fall off canopy near the camera + bursts where it was disturbed
+      ParticleRing.cs          # a fixed-capacity, order-preserving particle store
+      PopBoxEmitter.cs         # the mining pop's geometry: each hitbox drawn as a box sampling its crop of the block's face tiles
+      WaterSplash.cs           # GL-free splash rule (droplets by crossing speed) + Track: a body's droplets off the water top
+      WaterSplashTracker.cs    # GL-free per-body water crossing memory: in water last frame, speed from its own height
+    Platform/                  # Silk.NET window and input setup
       InputManager.cs          # keyboard/mouse context
+      WindowManager.cs         # Silk.NET window setup
+    Player/                    # the player: camera, physics, water phases, body probes, health,
+                               #   fall tracking, the rig and model, sprint toggle, death messages
+      Camera.cs                # FPS camera pose, view/proj cache, shoulder/orbit modes; movement+physics and the DDA
+                               #   raycast live in Player/PlayerPhysics.cs and Interaction/BlockRaycaster.cs
+      DeathMessages.cs         # the death line from the blow PlayerHealth recorded
+      FallTracker.cs           # GL-free fall-damage rule: peak/grounded chain fed one feet height at a time
+                               #   (singleplayer's UpdateHealth and each ServerPlayer's accepted states)
+      PlayerBodyProbe.cs       # GL-free body probes over the live chunk map: known (loaded), grounded,
+                               #   in water, in lava; what the server judges a remote player's body by
+      PlayerContext.cs         # who an interaction runs for: eye, aim, inventory, creative (local camera or a
+                               #   server's connected player), threaded through every World interaction path
+      PlayerHealth.cs          # the player's survival pool, 0-100 HP drawn as 10 hearts (1 heart = 10 HP)
+      PlayerModel.cs           # blocky Minecraft-like player model with two-segment limbs
+      PlayerPhysics.cs         # walk/fly/swim input -> body position, voxel collision (static BodyCollides),
+                               #   auto-step, knockback, water state
+      PlayerRig.cs             # the posed shape: pivots, cuboids, skin palette, mesh building (Blockbench or Steve)
+      SprintToggle.cs          # the sprint latch, GL-free: flipped on each fresh press
+                               #   with the sprint-toggle setting on, else it follows the key
+      WaterImmersion.cs, WaterPhase.cs  # GL-free water depth states: the submerged share of the body and
+                                        #   its phase (Dry / Wade / Float / Swim)
+    Rendering/                 # the GL render passes and their GL-free gates: RenderManager,
+                               #   UIRenderer, the chunk draw batch and geometry pools,
+                               #   shadows, clouds, sky dome, post, rays, healthbars
+      ChunkDrawBatch.cs        # persistent-mapped 3-slot ring of DrawElementsIndirectCommands +
+                               #   the vec4(origin, alpha) ChunkInfo SSBO read via gl_DrawID
+      ChunkGeometryPool.cs     # the two shared chunk vertex/index buffers (opaque, translucent):
+                               #   BufferStorage VBO+EBO+VAO, NamedBufferSubData uploads, grow by copy
+      CloudCopies.cs           # the GL-free arithmetic behind the cloud layer's 3x3
+                               #   sweep: where each copy of the field sits this frame
+      CloudCover.cs            # whether the cloud layer, as CloudRenderer draws it, stands between an eye and the sky along a ray
+      CloudRenderer.cs         # draws the cloud layer: one static mesh built once from CloudField
+      CloudShadowTexture.cs    # the cloud-shadow coverage map: one R8 GL_TEXTURE_2D of CloudField.Cells texels per side
+      ContactAoRenderer.cs     # the screen-space contact AO pass (SH-28, contact-ao-fragment.glsl, twin ContactAo)
+      DamageNumberRenderer.cs  # draws the floating damage numbers (DamageNumberPool)
+                               #   as world-space text that always faces the camera
+      DamageVignetteRenderer.cs # full-screen damage vignette: one oversized triangle with
+                                #   a radial fragment gradient, drawn inside the UI pass
+      EntityHealthbarRenderer.cs # five hearts floating above every live mob, always facing the camera
+      GeometryAllocator.cs     # GL-free first-fit free list with coalescing, in units of
+                               #   64 vertices / 96 indices; hands out the pools' GeometrySlices
+      GodraysRenderer.cs       # the godrays: a half-res shadow-map march over dry air, then a radial composite toward the sun
+      GpuTimingGate.cs         # the GL-free decision behind the per-pass GPU timer queries
+      HalfResTarget.cs         # the GL-free sizing arithmetic behind the half-resolution underwater-rays render target
+      MeshBufferPool.cs        # recycles the vertex and index lists a mesh build fills
+      NoticePipRenderer.cs     # draws the "!" a goblin pops over its head the moment it first notices a player
+      PostEffects.cs           # the post pass's per-frame camera effects (exposure, grade, ...) handed to PostProcessRenderer
+      PostProcessRenderer.cs   # the frame's final full-screen pass: one oversized triangle
+                               #   (the shape SkyRenderer draws) shaded by post-fragment.glsl
+      ReflectionEntities.cs    # the live entities RenderManager.RenderReflection may draw into the water mirror
+      ReflectionReuse.cs       # the GL-free decision behind the reflection pass's temporal reuse
       RenderManager.cs         # GL state, world/selection/UI passes, viewport
                                #   RenderMenuFrame: a world-less frame (main menu or the opaque
                                #   loading/saving screen) straight into framebuffer 0, no HDR,
@@ -1157,147 +1300,325 @@ OpenGLTest/
                                #   RenderContactAo: the multiplicative screen-space contact AO
                                #   (ContactAoRenderer) drawn through the colour-only HDR FBO while
                                #   sampling the HDR depth texture, placed mid entity pass
+      ShadowCascade.cs         # one sun shadow cascade: radius, map size, depth FBO/texture, texel-stepped centre (StepCentre) and light view-proj
+      SkyDomeFrame.cs          # what the sky dome needs each frame beyond its SkyPalette: the night sky's stars
+      SkyRenderer.cs           # the full-screen sky dome pass (sky-fragment.glsl)
+      TextureUnitCache.cs      # the GL-free bookkeeping behind the render-state rebind cache (PERF_TODO R5)
       UIRenderer.cs            # every UI draw: HUD, hotbar, inventory, pause/settings menus,
                                #   DrawMainMenu (all main-menu pages) and DrawLoadingScreen
       UITextCache.cs           # memoised per-frame HUD strings (FPS, compass, coordinates, counts)
-      ShadowCascade.cs         # one sun shadow cascade: radius, map size, depth FBO/texture, texel-stepped centre (StepCentre) and light view-proj
-      PostEffects.cs           # the post pass's per-frame camera effects (exposure, grade, ...) handed to PostProcessRenderer
-      GodraysRenderer.cs       # the godrays: a half-res shadow-map march over dry air, then a radial composite toward the sun
       UnderwaterRaysRenderer.cs # additive full-screen sun shafts while the eye is submerged
-      SkyRenderer.cs           # the full-screen sky dome pass (sky-fragment.glsl)
-      ChunkGeometryPool.cs     # the two shared chunk vertex/index buffers (opaque, translucent):
-                               #   BufferStorage VBO+EBO+VAO, NamedBufferSubData uploads, grow by copy
-      GeometryAllocator.cs     # GL-free first-fit free list with coalescing, in units of
-                               #   64 vertices / 96 indices; hands out the pools' GeometrySlices
-      ChunkDrawBatch.cs        # persistent-mapped 3-slot ring of DrawElementsIndirectCommands +
-                               #   the vec4(origin, alpha) ChunkInfo SSBO read via gl_DrawID
-      ChunkManager.cs          # chunk lifecycle: load/unload, dirty tracking, mesh scheduling, all against
-                               #   a focus list (unload only outside every focus's radius)
-      StreamingFocus.cs        # the published focus chunks (camera, or every connected player on a server):
-                               #   an immutable array swapped only when a focus changes chunk
-      Interaction/             # GL-free interaction logic
-        BlockRaycaster.cs      # the DDA block raycast + line-of-sight segment test, split out of Camera.cs
-      Chunks/                  # GL-free chunk mesh/light/column generation, split out of Chunk.cs
-        ChunkMesher.cs         # the greedy pass + per-voxel procedural emitters + water-surface codes
-        PaneEmitter.cs         # a pane cell from the padded snapshot: post + arms, no face between
-                               #   connected panes, caps culled against a same-shaped pane above/below
-        ChunkLighting.cs       # the wide light-volume flood (sun + coloured lamp) + corner light queries
-        ColumnCache.cs         # the process-global column-data cache, its accessors and the column fill
-        IColumnSource.cs       # the seam a mesh build, the fluid-surface query and the pop/debris tint read
-                               #   chunk-column terrain through (ChunkManager.ColumnSource): IsReady + TryGet
-        ColumnTerrain.cs       # one chunk column's terrain: heights, water levels, corner climate (warmth, wetness)
-        WorldgenColumnSource.cs # the singleplayer/generated-server IColumnSource over ColumnCache; a server
-                               #   with a custom world source uses that source, the client's is the ClientChunkStreamer
-        IWorldSource.cs        # where a world's terrain comes from (extends IColumnSource): GetColumn (a complete
-                               #   ColumnData), Supplies, Fill(chunk); thread-safe, deterministic (see "World sources")
-        GeneratedWorldSource.cs # the default IWorldSource: ColumnCache.Get + Chunk.GenerateBlockData, byte-identical
-                               #   to the path before world sources existed
-        ImportedMapSource.cs   # an IWorldSource over a pre-built map folder (<world>/import/), worldgen outside it
-      LodManager.cs            # LOD region lifecycle: worker thread builds, main thread uploads/unloads, burial flags
+    Saves/                     # GL-free world saves: stores, codecs, names, world sources (see "Saves")
+      ChunkSaveCodec.cs        # the chunk file format: block-name palette + Deflate body
+      ChunkSaveStore.cs        # one world's chunk files + side cars: pending map, index, async writer thread
+      ChunkSnapshot.cs         # immutable copy of a chunk's blocks, state bytes and player-placed cells
+      ColumnFileCodec.cs       # an imported column file: magic CVXL, version, Deflate body of ColumnData
+                               #   (heights, bed, water levels, biomes, dirt depth, corner climate)
+      EntitySaveCodec.cs       # reads/writes entities.json
+      EntitySaveData.cs        # the entities.json shape: mobs (health/facing/velocity/ammo) and drops
+      ImportedMapWriter.cs     # writes an imported map (columns/*.col + chunks/*.bin); ExportGenerated seeds
+                               #   one from any IWorldSource (tool/test use)
+      LodEditState.cs          # lod-edits.bin: export/import of the LOD caps, surface overrides, canopy markers
+      MobSaveCodec.cs          # a live Mob -> its EntitySaveData form (per-kind ammo)
+      PlayerSaveCodec.cs       # reads/writes player.json
+      PlayerSaveData.cs        # the player.json shape: pose, modes, health, clock, inventory + hotbar
+      SaveNames.cs             # block/ and item/ namespaced content names, so saves never store raw ids
+      ServerInfo.cs            # one saved server: display name, host, port, last connected (servers.json)
+      ServerPlayerSaves.cs     # a hosted world's per-player files: players/<name slug>.json via the store
+      ServerStore.cs           # servers.json: list, add, delete, touch (unique names, most recent first)
+      WorldInfo.cs             # one listed world: world.json metadata + its folder (slug fixed at creation);
+                               #   SourceName = the raw world.json `source` (null when absent), Source = it
+                               #   resolved (`generated` when unset), read by the dedicated server only
+      WorldNames.cs            # name normalising, the "Unnamed World" default, unique numeric suffix, folder slug
+      WorldSeedParser.cs       # seed field -> seed: empty = random, integer verbatim, else FNV-1a hash
+      WorldSources.cs          # the server's named world sources (generated, imported): Create(name, worldDir)
+      WorldStore.cs            # the saves root: list (most recent first), create, rename, delete, touch;
+                               #   writes `source` back only when set, so an unset one never appears
+    Simulation/                # the main-thread simulations World owns: fluids (with their state/flow
+                               #   rules), gravity, TNT, leaf decay, tree growth, saplings, the stations
+                               #   (campfire, quern, kiln, casting), drops, the mob managers and spawner
+      CampfireManager.cs       # block-entity registry for campfires: lit branch piles with a per-branch burn timer
+      CastingManager.cs        # one cast per mold cell: pour from a held crucible, cool, collect
+      DropCollector.cs         # one player a drop may fly to on a multiplayer server
+      DropManager.cs           # owns the live item drops: spawns them where blocks break, pulls nearby ones towards the player
+      FallingBlockManager.cs   # owns gravity-affected blocks: topples a falls block
+                               #   into a FallingBlock entity when its support goes away
+      FluidFlow.cs             # the one definition of which way a fluid flows
       FluidManager.cs          # the fluid tick: scheduled cells, level recompute + spread, batched remeshes
+      FluidState.cs            # encoding of the per-block state byte for fluid cells (source / falling / level 1-7)
+      GoblinManager.cs         # goblins: AI tick, their thrown stones, melee damage at the impact
+                               #   event, loot + carried flint on death, ring spawning
+      KilnManager.cs           # kiln block entities keyed by anchor: fuel, ignition, the crucible
+                               #   slot and its melt loop, plus the multiblock integrity sweep
       LeafDecayManager.cs      # leaf decay + orphaned-wood crumble: a fixed tick over scheduled cells,
                                #   hydration from live tips (ScheduleAround/ScheduleBox from every edit path)
+      MobSpawner.cs            # the shared dry-forest-surface ring spawn search
+      QuernManager.cs          # block-entity registry for querns: one crushable unit per cell plus a one-rotation spin timer
+      SaplingManager.cs        # the saplings planted in the world (an acorn, or any
+                               #   ItemUseAction.PlantTree use), GL-free and main thread only
+      SlimeManager.cs          # slimes: hop AI tick, contact damage, loot, ring spawning
+      TntManager.cs            # owns the live primed TNT: spawns cubes where firestarter
+                               #   strikes and blasts light TNT, ticks their fuses
+      TopplingTree.cs          # a felled tree: the wood TreeSupport finds cut off plus its canopy, meshed once in
+                               #   a 16^3 scratch chunk, swung flat around the cut, then popped out as drops
+      TreeGrowthResult.cs      # the outcome of one TreeGrowthWriter call: its status,
+                               #   the root cell, the added nodes and the written cells
+      TreeGrowthStatus.cs      # what one TreeGrowthWriter.Grow call did
       TreeGrowthWriter.cs      # reactive growth on the live world: rebuild a column's tree from its wood
                                #   state bytes (or plant a sapling), GrowFurther in a WorldTreeSpace, write
                                #   the difference back; TreeGrowthResult.cs / TreeGrowthStatus.cs are its result
-      LeafParticleSystem.cs    # falling leaves: ambient fall off canopy near the camera + bursts where it was disturbed
-      LeafParticleRenderer.cs  # the falling leaves as one back-to-front billboard draw
-      KilnManager.cs           # kiln block entities keyed by anchor: fuel, ignition, the crucible
-                               #   slot and its melt loop, plus the multiblock integrity sweep
-      CastingManager.cs        # one cast per mold cell: pour from a held crucible, cool, collect
-      SlimeManager.cs          # slimes: hop AI tick, contact damage, loot, ring spawning
-      GoblinManager.cs         # goblins: AI tick, their thrown stones, melee damage at the impact
-                               #   event, loot + carried flint on death, ring spawning
-      MobSpawner.cs            # the shared dry-forest-surface ring spawn search
-    WorldGen/
-      TerrainGenerator.cs      # the 2D half: owns every 2D noise channel and the biome split; Compute -> ColumnData
+    UI/                        # UI state, layout and rules, mostly GL-free (UIRenderer draws them): canvas, font, settings
+      BitmapFont.cs            # TrueType font baked into a GL atlas; CPU glyph layout (printable ASCII)
+      GameSettings.cs          # player settings with JSON persistence (settings.json)
+      Primitives.cs            # Vertex-layout mesh factories for simple shapes
+      ScrollList.cs            # scrolled equal-height row math: clamp, visible range, row at a point
+      TextWrap.cs              # GL-free word wrap against a measure delegate
+      UiCanvas.cs              # the virtual UI canvas: reference size, uniform scale, scissor rects
+      Hud/                     # HUD widgets: chat, clock, compass, crosshair state,
+                               #   toasts, hotbar feedback, look label, tooltips, screenshots
+        Chat.cs                # ChatKind/ChatMessage, ChatView (log/input/history) and ChatLayout
+        Clock.cs               # pure clock math behind the HUD's held-clock readout (see UIRenderer.DrawClock)
+        Compass.cs             # HUD compass heading math
+        CrosshairState.cs      # throw charge, break progress and hit marker, handed to the UI pass
+        DayToast.cs            # the dawn watch behind "Day N"
+        HitMarker.cs           # the crosshair's connecting-hit X: its flash clock and fade
+        HotbarNameFade.cs      # the selected item's name over the hearts after a switch
+        HotbarPickupPop.cs     # the bump a hotbar slot gets when its count rises
+        HudToast.cs            # one hold-then-fade HUD line (the day toast, a first find, packs full)
+        ItemTooltip.cs         # the hover panel's lines, built from the item's own fields
+        LookLabel.cs           # the look-at label's rule: name, "Unknown", the mineable flag
+        LookLabelState.cs      # what one frame's label draws: text, flags, cell, state byte, light
+        ScreenshotPaths.cs     # where F2's capture lands and what it is called
+      InventoryPanel/          # inventory, item stacks, hotbar, the [E] panel, crafting cards and session, creative catalog, search
+        CraftCardLayout.cs, CraftCardLayoutCache.cs  # the crafting card's layout and its memo
+        CraftingSession.cs     # the crafting tab's open recipe, copies and fed reservations
+        CreativeCatalog.cs     # GL-free browsable catalog of every item, grouped by pool and name-sorted
+        HotbarLayout.cs        # hotbar strip geometry shared by the draw, its hit-test and the panel
+        Inventory.cs, ItemStack.cs  # the three pools, the hotbar, stacks and their components
+        InventoryPanelLayout.cs # [E] panel geometry, tabs, the search field, the catalog buttons, rows and scrollbar hit-testing
+        InventorySearch.cs     # GL-free matching of owned items and recipes behind the search field
+        InventoryView.cs       # [E] panel selection/scroll/focus state; ResetForNewWorld between worlds
+        SearchFieldState.cs    # a dropdown search field's query, suggestion cursor and scroll
+      Menus/                   # main, pause and settings menus, the loading screen, text fields
+        LoadingScreen.cs       # LoadingScreenView (eased monotone progress, fade-out) + LoadingScreenLayout (spinner)
+        MainMenu.cs            # main-menu pages, hit kinds, fields, keys, actions and MainMenuView
+        MainMenuController.cs  # every main-menu page transition, key rule and WorldStore call (tested)
+        MainMenuLayout.cs      # main-menu geometry + HitAt: buttons, scrolled world rows, fields, delete popup
+        PauseMenu.cs           # pause menu pages, hit kinds, view and PauseMenuLayout (RESUME/SETTINGS/SAVE & QUIT)
+        SettingsMenu.cs        # settings page rows, tabs, sliders and SettingsLayout (shared by both menus)
+        TextFieldState.cs      # one single-line text field: printable-ASCII typing rules and length cap
+    VisualTest/                # the VOXEL_SCRIPT scenario runner: parsed scenario, director, scripted keyboard, PNG capture
+      ScriptedKeyboard.cs      # an IKeyboard whose pressed keys are set by code instead of the OS
+      VisualCapture.cs         # reads the finished frame back from the GPU and writes it as a PNG
+      VisualDirector.cs        # runs a VisualScenario inside the live game
+      VisualScenario.cs        # a scripted in-game run:
+                               #   teleport/look/wait/walk/mine/place/fly/give/spawn/grow/screenshot
+                               #   steps loaded from JSON (VOXEL_SCRIPT)
+    WorldGen/                  # procedural worldgen: terrain, biomes, caves and worms, the
+                               #   tree front end and batches, clouds, the generational cache
       Biome.cs                 # the Forest / Desert / Ocean / Taiga / Frozen enum
+      CaveNode.cs, Worm.cs     # one tunnel sphere (center + radius); a worm's node array plus its AABB
+      CloudField.cs            # the cloud layer as a 2D grid of cells, each holding 0..CloudMaxLevels stacked slabs
       ColumnData.cs            # per-chunk-column arrays: Heights (ravines cut in), DirtDepth, EntranceWeight,
                                #   CaveIntensity, Biomes, Bed (pre-ravine profile: decides wetness), WaterLevel,
                                #   CornerWarmth/CornerWetness (the climate at the column's tint lattice point)
-      WorldgenReads.cs         # test hook: a flag-gated counter of worldgen entries, noted on a ColumnCache
-                               #   miss and in TerrainGenerator.Climate (off in production)
+      GenerationalCache.cs     # the shared eviction policy behind the deterministic worldgen caches (PERF_TODO D2)
+      NoiseCaves.cs            # 3D-noise caves (cheese rooms, wide/narrow spaghetti, deep caverns) on a strided lattice
+      SplitMix64.cs            # deterministic integer-hash PRNG so worms don't depend on System.Random internals
+      TerrainGenerator.cs      # the 2D half: owns every 2D noise channel and the biome split; Compute -> ColumnData
+      TreeBatch.cs             # every tree of one 64x64 XZ cell grown together in one VirtualTreeSpace
       TreeGenerator.cs         # the tree worldgen front end: which columns root which species (worldgen
                                #   rules), stamping the rasterised cells into chunks, the far-LOD canopy
                                #   lookups (TryGetCanopy, the crown proxy) and the felled-canopy markers
-      TreeBatch.cs             # every tree of one 64x64 XZ cell grown together in one VirtualTreeSpace
-      Trees/                   # the tree growth engine (see "Trees")
-        TreeGraph.cs, TreeGrower.cs        # the node graph; Pulse / GrowToMaturity / GrowSteps / GrowFurther
-        GrowthSignal.cs, TreeDirections.cs, TreeCellKey.cs  # a pulse step, the six face dirs, cell keys
-        IGrowthLogic.cs, GrowthLogicRegistry.cs            # growth.logic: the direction chooser + its table
-        OakGrowthLogic.cs, ConiferGrowthLogic.cs, CactusGrowthLogic.cs,
-          BaobabGrowthLogic.cs, UmbrellaGrowthLogic.cs     # oak, conifer, cactus (pitchfork arms),
-                                                           #   baobab, umbrella (bare limbs) logics
-        ITreeFeature.cs, TreeFeatureRegistry.cs, TreeFeatureSpec.cs  # features[]: post-growth stages
-        RootsFeature.cs, ButtressFeature.cs                # roots down into carved air; buttress fins
-        TreeRasterizer.cs, TreeCell.cs     # graph -> wood/shell/leaf cells with their state bytes
-        ShellOffset.cs, TrunkShape.cs, TrunkRim.cs  # wide-trunk shells: offsets, footprint, rim style
-        LeafCluster.cs, LeafClusterShape.cs         # leaves around live tips and their hydration
-        TreeSpecies.cs, TreeSpeciesCompiler.cs, TreeSpeciesRegistry.cs,
-          TreeWorldgenRules.cs             # compiled species, its validation, the registry, worldgen rules
-        ITreeSpace.cs, VirtualTreeSpace.cs, WorldTreeSpace.cs, TreeCellReader.cs  # what a tree may grow
-                                           #   into: worldgen heightmap view, live-world view, world reads
-        TreeSupport.cs, TreeSupportResult.cs  # which wood stands: paths to an anchor (felling, crumbling)
-        WoodState.cs, LeafState.cs         # the wood and leaf meanings of the per-block state byte
-        LodCrownProxy.cs, LodCrownProfile.cs  # the far-LOD crown silhouette of a species
-      SnowGenerator.cs         # cold weather: freezes surface water to ice, lays one layered-snow cell per cold column
-      IceSpikeGenerator.cs     # rare single-column ice spikes on the barren frozen plains
-      PlantClumps.cs           # GL-free clumped-plant rule over a PlantClumpSpec (cell, jitter, radius, core, falloff)
-      CottonGenerator.cs       # wild cotton clumps on the dry forest fringe (PlantClumps + a climate gate)
-      FallenLogGenerator.cs    # a rare 3-5 cell detached oak log lying on the forest floor
-      BoulderGenerator.cs      # a rare 2-4 cell stone or cobblestone blob on the forest/taiga floor
-      CairnGenerator.cs        # a 3-cell cobblestone stack with a pebble hat on a local summit
-      RuinedPillarGenerator.cs # broken stone columns standing on the surface
-      DesertWellGenerator.cs   # the desert's ring-and-roof well, dug into sand over sandstone
-      SeaStackGenerator.cs     # stone stacks rising out of the sea near a shore
-      OasisGenerator.cs        # a desert oasis: a water disc, a grass ring and palms (worldgen.oasis)
-      ReedGenerator.cs         # shore reeds on the shallow water edge (PlantClumps)
-      LilyPadGenerator.cs      # lily pads floating on ponds (PlantClumps)
-      GlowMushroomGenerator.cs # lit mushrooms on dry, dark cave floors
-      CaveFormationGenerator.cs# stalactites and stalagmites in cave rooms
-      GeodeGenerator.cs        # a hollow, crystal-lined sphere deep in solid stone
-      MeteorGenerator.cs       # a blast crater with scattered meteor rock
-      HotSpringGenerator.cs    # steaming cave water bodies
-      UndergroundPoolGenerator.cs # still cave pools on carved floors
-      GravelPocketGenerator.cs # gravel and sand pockets buried in stone (falls blocks, see "Gravel pockets")
-      FlowerGenerator.cs       # meadow flowers on warm, open grass
-      NoiseCaves.cs            # 3D-noise caves (cheese rooms, wide/narrow spaghetti, deep caverns) on a strided lattice
+      WorldgenReads.cs         # test hook: a flag-gated counter of worldgen entries, noted on a ColumnCache
+                               #   miss and in TerrainGenerator.Climate (off in production)
+      WorldgenStats.cs         # lock-free worldgen timing from the generation workers and
+                               #   the LOD builder, drained once a second by FrameProfiler
       WormCarver.cs            # worm-carved tunnels: per-XZ-cell deterministic paths, cached, carved sphere by sphere
-      LavaGenerator.cs         # deep lava pockets: cave floors at/below LavaMaxY pond over inside patch mask + pool roll
-      CaveNode.cs, Worm.cs     # one tunnel sphere (center + radius); a worm's node array plus its AABB
-      SplitMix64.cs            # deterministic integer-hash PRNG so worms don't depend on System.Random internals
+      Features/                # every surface and underground feature generator (see "Biomes")
+        BoulderGenerator.cs    # a rare 2-4 cell stone or cobblestone blob on the forest/taiga floor
+        BranchPileGenerator.cs # crossed-stick branch piles: up to 4 long thin logs sharing one air cell above the ground
+        CairnGenerator.cs      # a 3-cell cobblestone stack with a pebble hat on a local summit
+        CaveFormationGenerator.cs # stalactites and stalagmites in cave rooms
+        CoalGenerator.cs       # coal ore veins: the same threshold-on-3D-noise deposits as MalachiteGenerator
+        CottonGenerator.cs     # wild cotton clumps on the dry forest fringe (PlantClumps + a climate gate)
+        DesertWellGenerator.cs # the desert's ring-and-roof well, dug into sand over sandstone
+        FallenLogGenerator.cs  # a rare 3-5 cell detached oak log lying on the forest floor
+        FlowerGenerator.cs     # meadow flowers on warm, open grass
+        FoliageGenerator.cs    # ground cover: a grass tuft on dry forest grass and a dead shrub on desert sand
+        GeodeGenerator.cs      # a hollow, crystal-lined sphere deep in solid stone
+        GlowMushroomGenerator.cs # lit mushrooms on dry, dark cave floors
+        GravelPocketGenerator.cs # gravel and sand pockets buried in stone (falls blocks, see "Gravel pockets")
+        HotSpringGenerator.cs  # steaming cave water bodies
+        IceSpikeGenerator.cs   # rare single-column ice spikes on the barren frozen plains
+        LavaGenerator.cs       # deep lava pockets: cave floors at/below LavaMaxY pond over inside patch mask + pool roll
+        LilyPadGenerator.cs    # lily pads floating on ponds (PlantClumps)
+        MalachiteGenerator.cs  # malachite ore veins: sparse large blobs where a
+                               #   low-frequency 3D OpenSimplex2 field exceeds its threshold
+        MeteorGenerator.cs     # a blast crater with scattered meteor rock
+        OasisGenerator.cs      # a desert oasis: a water disc, a grass ring and palms (worldgen.oasis)
+        PebbleGenerator.cs     # ankle-high stones in rare patches: 1-3 small boxes sharing one air cell above the surface
+        PlantClumps.cs         # GL-free clumped-plant rule over a PlantClumpSpec (cell, jitter, radius, core, falloff)
+        PlantClumpSpec.cs      # the shape of one clumped plant scatter for PlantClumps:
+                               #   at most one clump per square cell of CellSize blocks
+        ReedGenerator.cs       # shore reeds on the shallow water edge (PlantClumps)
+        RuinedPillarGenerator.cs # broken stone columns standing on the surface
+        SeaStackGenerator.cs   # stone stacks rising out of the sea near a shore
+        SnowGenerator.cs       # cold weather: freezes surface water to ice, lays one layered-snow cell per cold column
+        UndergroundPoolGenerator.cs # still cave pools on carved floors
+      Trees/                   # the tree growth engine (see "Trees")
+        GrowthSignal.cs, TreeDirections.cs, TreeCellKey.cs  # a pulse step, the six face dirs, cell keys
+        ITreeSpace.cs, VirtualTreeSpace.cs,
+          WorldTreeSpace.cs, TreeCellReader.cs  # what a tree may grow
+                                                #   into: worldgen heightmap view, live-world view, world reads
+        WoodState.cs, LeafState.cs  # the wood and leaf meanings of the per-block state byte
+        TreeGraph.cs, TreeGrower.cs  # the node graph; Pulse / GrowToMaturity / GrowSteps / GrowFurther
+        TreeSpecies.cs, TreeSpeciesCompiler.cs,
+          TreeSpeciesRegistry.cs, TreeWorldgenRules.cs  # compiled species, its validation, the registry, worldgen rules
+        TreeSupport.cs, TreeSupportResult.cs  # which wood stands: paths to an anchor (felling, crumbling)
+        Features/              # features[]: post-growth stages (roots, buttress) and their registry
+          RootsFeature.cs, ButtressFeature.cs  # roots down into carved air; buttress fins
+          ITreeFeature.cs, TreeFeatureRegistry.cs,
+            TreeFeatureSpec.cs # features[]: post-growth stages
+        Logics/                # growth.logic direction choosers and their registry
+          OakGrowthLogic.cs, ConiferGrowthLogic.cs,
+            CactusGrowthLogic.cs, BaobabGrowthLogic.cs,
+            UmbrellaGrowthLogic.cs  # oak, conifer, cactus (pitchfork arms),
+                                    #   baobab, umbrella (bare limbs) logics
+          IGrowthLogic.cs, GrowthLogicRegistry.cs  # growth.logic: the direction chooser + its table
+        Shape/                 # rasterising a graph: cells, leaf clusters, trunk shapes and rims, the far-LOD crown proxy
+          LeafCluster.cs, LeafClusterShape.cs  # leaves around live tips and their hydration
+          LodCrownProxy.cs, LodCrownProfile.cs  # the far-LOD crown silhouette of a species
+          ShellOffset.cs, TrunkShape.cs, TrunkRim.cs  # wide-trunk shells: offsets, footprint, rim style
+          TreeRasterizer.cs, TreeCell.cs  # graph -> wood/shell/leaf cells with their state bytes
   assets/shaders/, assets/textures/   # GLSL shaders; block tiles (loaded into a TEXTURE_2D_ARRAY,
                                       #   one slice per file, at startup), item sprites, crosshair
+  assets/textures/blocks/             # block tiles, one TEXTURE_2D_ARRAY slice per file in sorted name order
+  assets/textures/blocks_material/    # index-parallel normal/metallic tiles (the material atlas); only the ores
+  assets/textures/items/              # item sprites
+  assets/textures/environment/        # sun, moon and the break-progress frames
+  assets/textures/particles/          # particle sprites (bubble)
+  assets/textures/ui/                 # HUD icons (hearts); crosshair.png sits in textures/ itself
   assets/fonts/                       # TTF for the UI text
+  assets/sfx/                         # mined-block hit groups (<group>.wav / <group>_N.wav, see `sfx`) and item pickups
+  assets/sfx/ambience/                # the forest and night ambience beds
   assets/data/blocks/<name>.json      # one file per block; the file name is its string id
   assets/data/items/<name>.json       # vine, branch, flint, bucket, water_bucket, lava_bucket
   assets/data/loot/<name>.json        # stone, wood, leaves, pebble
+  assets/data/tags/<tag>.json         # tool tags (axe, pickaxe) a block's `tools` requirement names
   assets/data/entities/<name>.json    # slime, goblin: display name, hp, loot table, optional model
   assets/data/trees/<species>.json    # tree species (oak, spruce, cactus, baobab, stone_pine): wood and
                                       #   leaves, growth, thickness, leaf cluster, features, LOD crown, worldgen
   assets/data/molten/<name>.json      # molten materials (copper): tile + tint the liquid is drawn with
+  assets/data/recipes/<out>.json      # crafting recipes: result, count, ingredients
+  assets/data/recipes/cook/<in>.json  # campfire recipes: input -> result after cookSeconds
+  assets/data/recipes/crush/<in>.json # quern recipes: input -> crushed result
   assets/data/recipes/melt/<in>.json  # what a block or item melts into, and how many ml
   assets/data/recipes/cast/<out>.json # (fired mold + material) -> result, amount and cooling time
   assets/models/block/<name>.json     # Minecraft Java block models, incl. the built-in parents
                                       #   cube, cube_all, cube_column, cube_bottom_top
   assets/models/entity/<name>.bbmodel # Blockbench entity projects (slime, goblin with its four
                                       #   clips) + <name>.png skins
+  assets/models/player/               # the player rig (player.bbmodel) and its skin
+  visual-examples/                    # the VOXEL_SCRIPT scenario JSONs (see `VOXEL_SCRIPT`)
 OpenGLTest.ItemDebugger/              # the item/entity/tree preview tool (ITEMS, ENTITIES and TREES tabs)
+  VoxelEngine.ItemDebugger.csproj     # the project file (references the game project)
+  AnimationClock.cs                   # the playback controls of the item debugger's timeline
+  AssetRoot.cs                        # points the process at the engine's assets directory before any content loads
+  DebuggerTab.cs                      # which grid the item debugger's left panel shows, and
+                                      #   so what the scene previews: the player holding an item
+  DebugSceneRenderer.cs               # a minimal standalone renderer for the item debugger: content registry, block atlas
   EntityPreviewState.cs               # GL-free state of the ENTITIES tab
+  ItemDebuggerProgram.cs              # standalone item-debugger entry point: a window showing the player model holding the selected item
+  ItemDebuggerUi.cs                   # immediate-mode UI for the item debugger: an item grid on the left
+  ItemDisplayEditor.cs                # editable copy of the selected item's display block plus the debugger-only renderer tweaks
+  ItemJsonDisplayWriter.cs            # writes an item's display block back into its JSON file
+  PlayerPreviewState.cs               # GL-free state behind the item debugger's player animations (the ITEMS tab)
   TreePreviewState.cs                 # GL-free state of the TREES tab: species, seed, step, per-step
                                       #   snapshots, ground plane and framing bounds
 OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple players and chat")
-  ServerProgram.cs                    # content load, world/port prompts, headless World + tick loop
-  GameServer.cs                       # TCP listener, per-connection reader threads, main-thread Pump
+  VoxelEngine.Server.csproj           # the project file (references the game project)
   AssetRoot.cs                        # locate assets/ walking up from the server's working directory
-tools/generate-goblin-skin.ps1        # deterministic generator of goblin.png; its header pins the UV layout
-tools/generate-leaf-textureless.ps1   # deterministic grey leaf tiles for the biome tint (scaled to BiomeTintTextureGrey)
-tools/generate-plank-texture.py       # deterministic oak_planks tile (stdlib PNG writer)
-tools/generate-lantern-texture.py     # deterministic lantern tile; its header pins the uv of every model part
-tools/generate-door-textures.py       # deterministic oak trapdoor (and door) tiles (stdlib PNG writer)
-tools/generate-tree-textures.ps1      # placeholder baobab / stone pine log and leaf tiles tinted from the oak art
-tools/generate-cotton-textures.py     # deterministic cotton_plant tile and cotton item sprite (stdlib PNG writer)
-tools/generate-torch-texture.py       # deterministic torch tile; its header pins the stick the torch models crop
+  GameServer.cs                       # TCP listener, per-connection reader threads, main-thread Pump
+  ServerProgram.cs                    # content load, world/port prompts, headless World + tick loop
+OpenGLTest.Tests/                     # xUnit tests, headless (no window); a test sits beside the area
+                                      #   of the code it tests (by the type under test), a probe beside
+                                      #   the area it probes, a helper of several areas in Support/
+  VoxelEngine.Tests.csproj            # the test project (references the game, the server and the item debugger)
+  Support/                     # cross-area fixtures: TestContent (the headless content load),
+                               #   MeshTestWorld, MobTestWorld, FlatWorldSource, StampedTree,
+                               #   WideTreeSpecies, TreeWorldgenFixture and the three [CollectionDefinition]s
+  Audio/                       # the sfx library and the ambience bed
+  Chunks/                      # chunk storage, keys and map, generation workers, meshing
+                               #   (greedy, smooth light, sway), the column cache, world sources,
+                               #   streaming foci, EntityLight; the replay and mesh-cost probes
+  Content/                     # the registry and its baked tables: blocks, models, shapes (panes,
+                               #   tree wood, multiblocks), loot, recipes, kiln and molds (flat)
+  Core/                        # the Core utilities and the src-root types (World lifecycle, WorldSeed, WorldLoadGate)
+  Effects/                     # mirrors src/Effects: one folder per sub-domain of shader twins
+    Climate/                   # the biome tint field and its chunk, LOD, pop and texture consumers
+    Lighting/                  # the campfire flicker and the block-light tint code
+    Post/                      # biome grade, contact AO, eye adaptation, godrays, underwater wobble
+    Sky/                       # aurora, silver lining, moon, moonlight, sky palette, stars, glare, wind
+    Surfaces/                  # glass, grass, ice, lava, leaf and ore twins, the snow sparkle shader term
+    Water/                     # deep-water fog, the waterline fresnel, sun glitter, the shore foam shader term
+  Entities/                    # the Mob base and the shared mob rules (caps, targets, notice, interest, fall,
+                               #   lava, ledge, loot), clips and the animator, drops, projectiles, damage numbers
+    Goblins/                   # goblin AI, aim and stones, flee, dodge, pack alert,
+                               #   torches, the content contract (a size split of Entities)
+    Slimes/                    # slime sizes, hops, knockback, split and merge (a size split of Entities)
+  Graphics/                    # shader defines and the chunk-draw shader guard, cutout mips, tile materials
+  Interaction/                 # raycast and targeting, mining, combat and the slice combo,
+                               #   placement, support, doors and stairs, multiblocks, the selection
+                               #   outline, chat commands; its own helper SupportTestWorld
+  ItemDebugger/                # the OpenGLTest.ItemDebugger project: the timeline, the
+                               #   preview states, the display editor and its JSON writer
+  Items/                       # item uses (acorn, converter, firestarter, heal, grow-tree,
+                               #   timed use) and the hierarchy; its own helper StubItemUseWorld
+  Juice/                       # game-feel rules: blast shake, damage direction and fringe,
+                               #   hit-stop, the vignette, pops, FOV and tilt, droplets, tool shatter
+  Lod/                         # far-LOD regions, the manager, build pool and buffers, column caps, surface
+                               #   overrides and their save state, sky exposure; the build-cost probe
+  Networking/                  # protocol and codecs, client streaming and prediction, the server,
+                               #   intent and movement rules, loopback client/server tests (flat)
+  Particles/                   # every particle system and the dust, splash and pop emitters
+  Player/                      # camera, physics, water phases and swimming, health and fall tracking,
+                               #   the player model, creative, sprint, the saved-player restore
+  Rendering/                   # render-pass gates and buffers: geometry pools and the allocator,
+                               #   shadows, clouds, reflection reuse, GPU timing, half-res targets,
+                               #   text batching, healthbars; the geometry-layout probe
+  Saves/                       # codecs and stores of world, chunk, player, entity
+                               #   and server saves, names, seed parsing, world sources
+  Simulation/                  # the main-thread simulations: fluids, falling blocks, leaf decay, tree growth
+                               #   and felling, saplings, the stations, drops, the mob managers and spawning
+  UI/                          # the canvas, settings, scroll lists, text wrap
+    Hud/                       # chat, clock, compass, hit marker, hotbar feedback,
+                               #   toasts, tooltips, the look label, screenshot paths
+    InventoryPanel/            # the inventory and its save shape, the [E] panel layout, crafting cards, the creative catalog, search
+    Menus/                     # main and pause menus, the loading screen, text fields
+  VisualTest/                  # scenario parsing and ops, PNG capture
+  WorldGen/                    # terrain, biomes, lakes, ravines, clouds, the generational
+                               #   cache, the tree front end and batches, worldgen stats
+    Features/                  # every feature generator (mirrors src/WorldGen/Features)
+    Trees/                     # the tree growth engine, flat over src's Trees/Shape, Logics and Features
+tools/                                # asset generators: tiles, sprites, models and clips, each re-run byte-identical
+  generate-acorn-texture.py           # deterministic generator of the acorn sprite (acorn.png)
+  generate-bandage-texture.py         # deterministic generator of the bandage sprite (bandage.png)
+  generate-cave-plants.py             # deterministic generator of the glow mushroom tile (glow_mushroom.png)
+  generate-clock-texture.py           # deterministic generator of the clock sprite (clock.png)
+  generate-cotton-textures.py         # deterministic cotton_plant tile and cotton item sprite (stdlib PNG writer)
+  generate-crystal-texture.py         # deterministic generator of the crystal tile (crystal_block.png)
+  generate-door-textures.py           # deterministic oak trapdoor (and door) tiles (stdlib PNG writer)
+  generate-goblin-clips.py            # deterministic generator of the goblin's animation clips (goblin.bbmodel)
+  generate-goblin-skin.ps1            # deterministic generator of goblin.png; its header pins the UV layout
+  generate-lantern-texture.py         # deterministic lantern tile; its header pins the uv of every model part
+  generate-leaf-textureless.ps1       # deterministic grey leaf tiles for the biome tint (scaled to BiomeTintTextureGrey)
+  generate-plank-texture.py           # deterministic oak_planks tile (stdlib PNG writer)
+  generate-pond-plants.py             # deterministic generator of the pond plants' art
+  generate-slime-block-texture.py     # deterministic generator of the slime block tile (slime_block.png)
+  generate-stone-brick-texture.py     # deterministic generator of the stone brick tile (stone_bricks.png)
+  generate-torch-texture.py           # deterministic torch tile; its header pins the stick the torch models crop
+  generate-tree-textures.ps1          # placeholder baobab / stone pine log and leaf tiles tinted from the oak art
 ```
 
 ## Content: blocks, items, models and loot are data
@@ -1817,7 +2138,7 @@ read a proxy rolled from the same placement: the species' `lod` crown height and
 solo shapes, the batches and both canopy tables are `GenerationalCache` sites (`TreeShapeCache*`,
 `TreeBatchCache*`, `TreeCanopyCache*`, `TreeProxyCanopyCache*` in `WorldGenerationConfig`).
 
-**Leaf decay** (`Systems/LeafDecayManager.cs`, owned by `World`, main thread only, never while
+**Leaf decay** (`Simulation/LeafDecayManager.cs`, owned by `World`, main thread only, never while
 loading, the `leafDecay` profiler row) is a `FluidManager`-style scheduled-cell simulation. An edit
 schedules the cells around it (`ScheduleAround`/`ScheduleBox`, which grow the box by
 `ScheduleReach` so callers never know a radius — see the edit-path invariant below); a tick
@@ -1849,7 +2170,7 @@ real chunk mesher in one 16³ scratch chunk (`TopplingTree.BuildMeshData`) and d
 `TopplingTree.TakeDrops`.
 
 **Reactive growth** (`World.TryGrowTree(species, x, yHint, z, steps)`, refused while loading or
-for an unknown species; the `grow` scenario op calls it). `TreeGrowthWriter` (`Systems/`, GL-free,
+for an unknown species; the `grow` scenario op calls it). `TreeGrowthWriter` (`Simulation/`, GL-free,
 main thread; `TreeGrowthResult`/`TreeGrowthStatus` Grew / Planted / NoGround / NotGrowable) scans
 the target column for the species' root and rebuilds the tree with `TreeGraph.FromWorld` (a
 breadth-first walk over child edges only, so detached and cut-off wood is never reached; every node
@@ -1869,7 +2190,7 @@ id, one `LeafDecayManager.ScheduleBox` over the written box (pruning is left to 
 `ChunkManager.MarkDirty` per touched chunk and `TreeGenerator.PoisonCanopy(x, z, 0)` plus
 `LodManager.MarkEditedColumn` per changed column.
 
-**The sapling clock** (`Systems/SaplingManager.cs`, owned by `World`, main thread only, skipped on
+**The sapling clock** (`Simulation/SaplingManager.cs`, owned by `World`, main thread only, skipped on
 a client): a `plant_tree` use (an acorn on dirt or grass, `World.PlantTree`, which maps the hit
 cell and face to the ground cell) plants through the writer's Planted branch and schedules the root
 cell; every `SaplingPulseSeconds` (jittered by `SaplingPulseJitter`) the manager grows it one pulse
@@ -1880,7 +2201,7 @@ leaves a half-grown sapling standing until it is grown again by hand (see the kn
 
 **The item debugger's TREES tab** (`OpenGLTest.ItemDebugger/TreePreviewState.cs`, see "Build and
 run") grows any species pulse by pulse over flat grass at a fixed seed through `GrowSteps`, and
-meshes it with `CellBatchMesher` (`src/CellBatchMesher.cs`): the real chunk mesher over as many
+meshes it with `CellBatchMesher` (`src/Chunks/CellBatchMesher.cs`): the real chunk mesher over as many
 scratch chunks as the cells span, each at its real position inside an empty one-chunk ring, so a
 wide or tall tree is never clipped at a chunk seam and wears the real biome tint.
 
@@ -1941,7 +2262,7 @@ Every shipped copper form — the malachite chunk, crushed copper, the ingot and
 has a melt recipe, so **a cast melts back into exactly what it took**: `MetalworksRecipeTests`
 asserts that conservation as a relation rather than pinning any ml figure.
 
-**The kiln** (`Systems/KilnManager.cs`, keyed by the structure's anchor cell) is the furnace half.
+**The kiln** (`Simulation/KilnManager.cs`, keyed by the structure's anchor cell) is the furnace half.
 Right-clicking it with an item declaring `fuel.burnSeconds` stores a unit, up to
 `KilnManager.MaxFuel` of **one** kind; a firestarter only lights a kiln that has fuel
 (`CanIgnite`), and igniting spends the first unit at once, so four coal burn for four minutes and
@@ -1961,7 +2282,7 @@ and shrinking to nothing as the last unit melts — so the charge is never invis
 out. Breaking the structure drops the stored fuel and the crucible at the mined cell — the metal
 inside is lost.
 
-**Casting** (`Systems/CastingManager.cs`, one `CastState` per mold cell) is the other half.
+**Casting** (`Simulation/CastingManager.cs`, one `CastState` per mold cell) is the other half.
 Right-clicking a fired mold with a crucible binds that tool instance and pours at
 `CastingManager.PourMlPerSecond`, draining the stack a little every frame; the pour **pauses**
 (losing nothing) when the crucible is deselected, carried out of `World.InteractionReach`, emptied
@@ -1999,7 +2320,7 @@ Rules that follow from this:
 
 - **Never call GL functions (buffer uploads, `Mesh` creation/disposal, pool uploads/frees through `ChunkGeometryPool`, shader use) off the main thread.** Background work must only produce plain data handed over via the concurrent queues.
 - A chunk is only meshed when its block data is ready **and all 6 cardinal neighbors exist with ready data** (`HasAllNeighbors`) — meshing reads neighbor blocks for face culling and cross-chunk AO. Breaking this reintroduces holes/seams at chunk borders (see git history). That scheduling check can go stale (the mesh task waits on the semaphore and an unload may take a neighbor away meanwhile), so `Chunk.GenerateMeshData` re-resolves the whole 3x3x3 neighbourhood once up front and returns `null` when a face neighbor is gone; callers must then re-mark the chunk dirty rather than apply anything. Only the edge/corner neighbors may be absent, and those read as air (they feed light and fluid corner heights only). The same holds for the 3x3 chunk **columns** a build reads (`ChunkManager.ColumnSource`, see "Chunk meshing"): `ProcessDirtyChunks` drops, and `ImmediateRemesh` re-adds once, a chunk whose nine columns are not all `IColumnSource.IsReady` (an all-air chunk, whose build reads no column, is exempt; a fully enclosed one cannot be told apart without its columns and waits too), `ClientChunkStreamer.ApplyColumn` re-dirties the 3x3 chunk columns on arrival, which is what wakes it, and a build that still finds a column missing returns `null` like a vanished neighbour. The worldgen source is always ready, so singleplayer and the server never wait. A mesh build reaches worldgen only through `WorldgenColumnSource` and the seed-hashed pebble, branch-pile and snow emitters, which is why a seed swap still waits for `ChunkManager.DrainMeshWork`.
-- Shared state uses `ConcurrentDictionary`/`ConcurrentQueue`; `Chunk.IsBlockDataReady` is `volatile`. Keep new shared state lock-free in the same style. `ChunkManager.Chunks` is a `ChunkMap` (`Systems/ChunkMap.cs`) wrapping a `ConcurrentDictionary<long, Chunk>` — it is a wrapper, never a `Dictionary` behind a lock, because chunk-gen workers write it and mesh-build pool workers read it.
+- Shared state uses `ConcurrentDictionary`/`ConcurrentQueue`; `Chunk.IsBlockDataReady` is `volatile`. Keep new shared state lock-free in the same style. `ChunkManager.Chunks` is a `ChunkMap` (`Chunks/ChunkMap.cs`) wrapping a `ConcurrentDictionary<long, Chunk>` — it is a wrapper, never a `Dictionary` behind a lock, because chunk-gen workers write it and mesh-build pool workers read it.
 - Editing a block on a chunk border must also remesh the affected neighbor chunk(s) — block edits use `ChunkManager.ImmediateRemesh` / `MarkDirty`.
 - Performance tuning knobs all live in `WorldGenerationConfig`; change constants there rather than hardcoding budgets elsewhere.
 - Animation curves (interpolation, easing, one-shot pulses) belong in `MathUtils`, not inline in gameplay or render code — everything time-driven should be lerped through one of those helpers rather than snapped.
@@ -2010,12 +2331,12 @@ Other invariants:
 - Blocks are `byte` IDs; `0` is air. Everything else about a block comes from `assets/data/blocks/<name>.json` through `ContentRegistry` (see "Content" above), never from a new `switch` on the id. Hot paths read the flat mirrors (`BlockType.IsSolid/Occludes/CastsAO`, `BlockType.Emission`, `BlockType.PassesLightById`) rather than `BlockType.ById[...]`, so keep new per-id flags in that shape.
 - **Per-block state byte**: alongside `Chunk._blocks` each chunk has a lazily allocated `volatile byte[]? _state` (null = all zero), read through `Chunk.GetLocalState` / `ChunkManager.GetStateGlobal` / `TryGetCell` and written only by `Chunk.SetBlockRaw` (no remesh, no scheduling — the fluid tick batches those). Six features share it, one per block: a **horizontal facing** (a `facing: "horizontal"` block such as the wall torch: bits 0-1 the facing, rest 0, written by placement through `Placement.TryMount`), **fluid levels** (`FluidState` decodes it as source `0`, falling `8` or flowing level `1..7`), **stack counts** (a `stackMax` block's 0 = untouched worldgen, 1..`stackMax` an explicit pile), a **multiblock's facing and offset** (`Multiblock.EncodeState`, `facing | dx<<2 | dy<<3 | dz<<4`, written by `Multiblock.Convert` through `SetBlockRaw`), **tree wood** (`WoodState` on a `tree_wood` block: bits 0-3 the thickness code, `FullCube` = 15 being a whole 16 px cell, bits 4-6 the parent direction in `Chunk.CubeFaces` order or `ParentRoot`/`ParentDetached`, bit 7 the shell flag) and **leaves** (`LeafState` on a leaf block: bits 0-2 the hydration, bit 3 the persistent flag) — see `### Trees`. The tree states are written by `TreeGenerator.Stamp` into the generated state array, by `TreeGrowthWriter` and `LeafDecayManager` through `SetBlockRaw`, and by placement, which passes an explicit state to `PlaceBlockAt` (`World.PlaceBlockAtFace` gives a placed log `WoodState.Detached` and a placed leaf a persistent `LeafState`). Which meaning a byte carries is decided entirely by the block id that owns the cell, so a new user must pick a block kind, never a spare bit. **Every write that is not one of those zeroes it** (`RemoveBlockAt`, `ClearBlockAt` and `PlaceBlockAt` with its default state `0` — which also treats a fluid cell as replaceable), and `Multiblock.Revert` likewise writes its source block with an explicit `0`, so a stale level, count, offset, thickness or hydration can never outlive the block that owned it. Meshing gets it as a second padded snapshot from `FillPaddedSnapshot(padded, paddedState, neighbors, neighborStates)`, filled from the neighbourhood `TryResolveNeighbors` resolved for the build; the fluid simulation must read cells through `TryGetCell`/`ChunkAt`, never `GetBlockGlobal`, which reports unloaded chunks as air. A seventh meaning belongs to the **openable** blocks (an `open` object in their JSON: the trapdoor, and both halves of a door, which always carry the same byte): `DoorState`, the facing in bits 0-1 like any facing block plus `DoorState.OpenBit` (bit 2), the rest zero; placement writes it closed, and the right-click toggle (`World.TryToggleOpenable`) flips the bit alone through `Chunk.SetStateAt`. The mesher and `BlockShape` index a facing block's pre-turned models and boxes with `BlockType.ShapeIndex(state, count)` (`state & (count - 1)`), so four-shape blocks keep reading the facing and an openable block's eight read the open bit too.
 - **Station block entities**: `CampfireManager`, `QuernManager`, `KilnManager` and `CastingManager` are all owned by `World`, all **main thread only** and all in-memory only — a lit campfire, a spinning quern, a kiln's fuel and crucible and a mold's cast progress are lost on a restart, a save & quit or a chunk reload, even though the chunk's blocks and state bytes around them are saved (see "Saves"). Each is keyed by the cell (the kiln by its structure's anchor), each is ticked from `World.Update` and each has a `NotifyBlockRemoved` that `World.RemoveBlock` calls so a broken station drops what it held. `World.FireCells` gathers every burning cell (campfires and lit kilns) once a frame and feeds both the fire billboards (`FireParticleSystem.SpawnOffset`) and the warm point lights (`RenderManager.FireLightOffset`), so a new fire source only has to appear in that list. Their render passes — `RenderQuerns`, `RenderKilns`, `RenderCastings` — sit inside the existing `entityPass` profiler span rather than adding sections of their own. On a multiplayer server they tick in the server's `World.Update` and a pour is bound to the pouring player (`CastState.PourSource`, its `PlayerContext`, which pauses once the player left); a client never ticks them: its managers are display-only mirrors replaced by the server's `StationState` snapshot (each manager's `WriteNet`/`ReadNet`, `StationNetCodec`), and only a quern top keeps turning between snapshots (`QuernManager.Animate`).
-- **Fluid tick**: `Systems/FluidManager.cs` (owned by `World`, main thread only) is a *scheduled-cell* simulation, not a scan. `World.Update` calls it once per frame after `UpdateToppling`; it runs whole ticks every `WorldGenerationConfig.FluidTickSeconds` (0.25 s), at most `MaxFluidTicksPerFrame` of them per frame, and drops the leftover time so a hitch never leaves it spiralling. Each tick takes the set of cells scheduled by the previous one (packed as `long`, 21 bits per axis — the same budget `ChunkKey` (`src/ChunkKey.cs`) uses to pack a **chunk** position for `ChunkMap` and for `ChunkManager`'s dirty/queued/generating/placement dictionaries; `FluidManager`'s packer is block-scale, `ChunkKey`'s is chunk-scale, and neither floors nor truncates differently from `VoxelCoords.ChunkPosOf`), recomputes every **non-source** fluid cell from its neighbours (Minecraft's `getNewLiquid`: two adjacent sources over ground that cannot drain become a source themselves, fluid directly above means falling, otherwise one level thinner than the fullest neighbour, and nothing left means the cell drains to air), then spreads it downwards, or sideways toward the nearest hole within `FluidSlopeSearchDistance` (ties spread evenly). The level rules are per-fluid data (`flow.*` on the block: lava updates every other tick, spreads 3 instead of 7 and never forms new sources). Contact hardening runs before all of it: a fluid cell touching its `hardensTouching` fluid becomes `hardensTo` (lava beside water becomes cobblestone), and a flow settling against a fluid that hardens on its touch crusts over the same way, so water reaching lava also yields cobblestone whichever side ticks first. Spreading only ever writes into non-fluid `IsReplaceable` cells, popping the fragile block it washes away through `DropManager.SpawnLoot`; a cell that already holds fluid recomputes itself on its own tick. Writes go through `Chunk.SetBlockRaw` and dirty only the cell's own chunk plus the face-adjacent chunk on each axis where the cell sits on a border, batched into `MarkDirty` at the end of the tick — not `ImmediateRemesh`, and never `MarkAreaDirty`, because a fluid passes light and casts no AO. A cell reschedules itself and its neighbourhood exactly when it changed or wrote into a neighbour, so settled water costs nothing.
+- **Fluid tick**: `Simulation/FluidManager.cs` (owned by `World`, main thread only) is a *scheduled-cell* simulation, not a scan. `World.Update` calls it once per frame after `UpdateToppling`; it runs whole ticks every `WorldGenerationConfig.FluidTickSeconds` (0.25 s), at most `MaxFluidTicksPerFrame` of them per frame, and drops the leftover time so a hitch never leaves it spiralling. Each tick takes the set of cells scheduled by the previous one (packed as `long`, 21 bits per axis — the same budget `ChunkKey` (`src/Chunks/ChunkKey.cs`) uses to pack a **chunk** position for `ChunkMap` and for `ChunkManager`'s dirty/queued/generating/placement dictionaries; `FluidManager`'s packer is block-scale, `ChunkKey`'s is chunk-scale, and neither floors nor truncates differently from `VoxelCoords.ChunkPosOf`), recomputes every **non-source** fluid cell from its neighbours (Minecraft's `getNewLiquid`: two adjacent sources over ground that cannot drain become a source themselves, fluid directly above means falling, otherwise one level thinner than the fullest neighbour, and nothing left means the cell drains to air), then spreads it downwards, or sideways toward the nearest hole within `FluidSlopeSearchDistance` (ties spread evenly). The level rules are per-fluid data (`flow.*` on the block: lava updates every other tick, spreads 3 instead of 7 and never forms new sources). Contact hardening runs before all of it: a fluid cell touching its `hardensTouching` fluid becomes `hardensTo` (lava beside water becomes cobblestone), and a flow settling against a fluid that hardens on its touch crusts over the same way, so water reaching lava also yields cobblestone whichever side ticks first. Spreading only ever writes into non-fluid `IsReplaceable` cells, popping the fragile block it washes away through `DropManager.SpawnLoot`; a cell that already holds fluid recomputes itself on its own tick. Writes go through `Chunk.SetBlockRaw` and dirty only the cell's own chunk plus the face-adjacent chunk on each axis where the cell sits on a border, batched into `MarkDirty` at the end of the tick — not `ImmediateRemesh`, and never `MarkAreaDirty`, because a fluid passes light and casts no AO. A cell reschedules itself and its neighbourhood exactly when it changed or wrote into a neighbour, so settled water costs nothing.
 - **Waking worldgen water**: the sea is generated as static source cells, so a cave or entrance carved into a land column beside it would leave a wall of water standing against worldgen air that nothing ever schedules. `FluidManager.WakeLoadedChunks(chunks)` — called from `World.Update` each frame, immediately before the fluid tick — fixes that by scheduling the frontier of its water against a carved cavity when it loads, so the sea pours into whatever breached it exactly like Minecraft water does when you dig into an ocean. Only cells at or below their column's natural terrain top count (`FluidManager.IsCarvedFlowTarget`), so open air above the terrain — a ravine, a beach, a hillside — is never woken and generated water stays static across it. It has two halves: the **interior**, collected on the generation worker at the end of `Chunk.GenerateBlockData` into `Chunk.FluidFrontier` (local block indices of every fluid cell with a `FluidManager.IsCarvedFlowTarget` neighbour in -X/+X/-Z/+Z/-Y — never +Y, since water does not flow upward and every sea-surface cell has air above it; only its own `_blocks` are read, so worldgen stays a pure per-chunk function), and the **borders**, which need both chunks loaded and are therefore scanned on the main thread over the shared 16x16 plane of each face neighbour, scheduling whichever side holds the fluid when the other side is a carved cavity (the vertical faces only ever schedule the fluid above the hole). Chunks entirely above every level they could share with a neighbour (`ColumnData.MaxWaterLevel`, never below `SeaLevel`) skip the border scan — generated water cannot reach them, and player-placed water is woken by the edit paths. The queue of newly generated chunks is `ChunkManager.TryDequeueLoaded`; a consumer must re-check that the chunk is still the live one at its position, because an unload can race the queue. Once the frontier has settled, it costs nothing again. Deep lava pockets wake through the same path: the frontier scan is fluid-generic, and chunks at or below `LavaMaxY` report theirs even when they never held sea water.
 - **Every block edit path must call `FluidManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the water beside the edit will never notice it: `World.RemoveBlock`, `World.FellWood` (per cleared cell, and in both single-block branches), `World.TryPlaceBlockFromRaycast`, `TntManager.Detonate` (`ScheduleBox` over the blast box grown by one; the blast also **skips fluid cells**, since a dry crater under water would just refill from every side) and bucket edits through `FluidManager.SetCellImmediate`, which is the only fluid write that remeshes synchronously. Mining never takes a fluid out: `RemoveBlock` returns early on `BlockType.IsFluid`, so only a bucket removes fluids.
-- **Every block edit path must also call `LeafDecayManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the leaves near the edit never re-derive their hydration: a cut limb's canopy would hang forever, and an orphaned wood cell would never crumble. `Systems/LeafDecayManager.cs` (owned by `World` as `_leafDecay`, main thread only) grows each scheduled box by its `ScheduleReach` itself, so a caller passes only the edited cells. The current call sites: `World.RemoveBlock`; `World.FellWood` (`ScheduleAround` in both single-block branches, one `ScheduleBox` over the whole felled batch, never one per cell); `World.PlaceBlockAtFace`, which every placement goes through (`TryPlaceBlockFromRaycast` and the item-use `IItemUseWorld.PlaceBlockAtFace`); the `IItemUseWorld` bucket and TNT-prime wrappers (`ScoopFluidCell`, `PourFluidCell`, `RemoveCellForPrime`), scheduled for uniformity; `TntManager.Detonate` (`ScheduleBox` over the blast box); and `TreeGrowthWriter` (one `ScheduleBox` over the box it wrote). A new edit path adds its call next to its `FluidManager.ScheduleAround`.
-- **Gravity**: `Systems/FallingBlockManager.cs` (owned by `World`, main thread only) topples `falls` blocks into `FallingBlock` entities and writes rested cubes back as blocks. Every edit path that can unsupport one must call `TryTopple` above it (`World.RemoveBlock`, `World.FellWood` per cleared cell, `World.TryPlaceBlockFromRaycast` at the placed cell, `TntManager.Detonate` via `CheckColumn` bottom-up over the blast box); fluids never count as support, so fluid edits need no hook. A landing cube slides with chance (8 - solid neighbours of its support) / 8 toward a random clear side, corners included (a corner needs its two flanking sides and the three cells above it clear), committing to its direction across landings, and drops straight once past the edge. Sand stacks on sand: a falls-block support never slides, so towers rebuild. A calm landing converts at once so a collapsing tower settles bottom-up instead of interpenetrating, and a cube that would rest over air pops out as a drop instead of floating. A live cube owns its cell: `TryPlaceBlockFromRaycast` refuses placements into one, cubes shove the player aside one-way (`Camera.PushOutOf`, never through walls, never while flying), and a cube motionless-but-unsettled for 5 s breaks into its usual loot instead of hovering. Shorelines generate from sand (`TerrainGenerator.IsBeachHeight`, gravel-capped where `IsGravelPatch`); the far LOD wears sand and gravel there too, the gravel read with one noise eval per cell.
-- **TNT**: `Systems/TntManager.cs` (owned by `World`, main thread only, never ticked on a client) runs the primed cubes (`PrimedTnt`). A cube lit by hand burns `TntManager.PlayerFuseSeconds` (1 s) and one lit by another blast `ChainFuseSeconds` (0.5 s), so a chain stays prompt; `PrimedTnt.WhiteFlash` ramps its strobe from 4 to 16 Hz over whatever fuse it was given (`FirestarterTests`). A blast shoves everything loose within `BlastRadius` away from its centre (`BlastImpulse.At`: `BlastPushMaxSpeed` at the centre falling linearly to zero at the radius, the direction tipped up by `BlastPushUpBias`, never growing with distance): at the end of `Detonate`'s clearing, before the falling-block sweep (so sand the blast undermines falls straight), the other primed TNT (`PrimedTnt.Push`, chained cubes at spawn), the drops (`DropManager.ApplyBlastImpulse`, the blast's own loot included) and the falling cubes in the air (`FallingBlock.Push`); then `World.PushFromBlast` takes each centre `TntManager.Blasts` reports and shoves the living mobs (`Mob.Shove`, sideways) and the players through `IMobTarget.TakeHit` with no damage: the local camera's knockback in singleplayer, each `ServerPlayer`'s queued knockback on a server (its `PlayerStatus` carries it to the client); a creative, flying or dead player is immune. Gameplay, so a client, which never ticks TNT, pushes nothing (`BlastEffectTests`).
+- **Every block edit path must also call `LeafDecayManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the leaves near the edit never re-derive their hydration: a cut limb's canopy would hang forever, and an orphaned wood cell would never crumble. `Simulation/LeafDecayManager.cs` (owned by `World` as `_leafDecay`, main thread only) grows each scheduled box by its `ScheduleReach` itself, so a caller passes only the edited cells. The current call sites: `World.RemoveBlock`; `World.FellWood` (`ScheduleAround` in both single-block branches, one `ScheduleBox` over the whole felled batch, never one per cell); `World.PlaceBlockAtFace`, which every placement goes through (`TryPlaceBlockFromRaycast` and the item-use `IItemUseWorld.PlaceBlockAtFace`); the `IItemUseWorld` bucket and TNT-prime wrappers (`ScoopFluidCell`, `PourFluidCell`, `RemoveCellForPrime`), scheduled for uniformity; `TntManager.Detonate` (`ScheduleBox` over the blast box); and `TreeGrowthWriter` (one `ScheduleBox` over the box it wrote). A new edit path adds its call next to its `FluidManager.ScheduleAround`.
+- **Gravity**: `Simulation/FallingBlockManager.cs` (owned by `World`, main thread only) topples `falls` blocks into `FallingBlock` entities and writes rested cubes back as blocks. Every edit path that can unsupport one must call `TryTopple` above it (`World.RemoveBlock`, `World.FellWood` per cleared cell, `World.TryPlaceBlockFromRaycast` at the placed cell, `TntManager.Detonate` via `CheckColumn` bottom-up over the blast box); fluids never count as support, so fluid edits need no hook. A landing cube slides with chance (8 - solid neighbours of its support) / 8 toward a random clear side, corners included (a corner needs its two flanking sides and the three cells above it clear), committing to its direction across landings, and drops straight once past the edge. Sand stacks on sand: a falls-block support never slides, so towers rebuild. A calm landing converts at once so a collapsing tower settles bottom-up instead of interpenetrating, and a cube that would rest over air pops out as a drop instead of floating. A live cube owns its cell: `TryPlaceBlockFromRaycast` refuses placements into one, cubes shove the player aside one-way (`Camera.PushOutOf`, never through walls, never while flying), and a cube motionless-but-unsettled for 5 s breaks into its usual loot instead of hovering. Shorelines generate from sand (`TerrainGenerator.IsBeachHeight`, gravel-capped where `IsGravelPatch`); the far LOD wears sand and gravel there too, the gravel read with one noise eval per cell.
+- **TNT**: `Simulation/TntManager.cs` (owned by `World`, main thread only, never ticked on a client) runs the primed cubes (`PrimedTnt`). A cube lit by hand burns `TntManager.PlayerFuseSeconds` (1 s) and one lit by another blast `ChainFuseSeconds` (0.5 s), so a chain stays prompt; `PrimedTnt.WhiteFlash` ramps its strobe from 4 to 16 Hz over whatever fuse it was given (`FirestarterTests`). A blast shoves everything loose within `BlastRadius` away from its centre (`BlastImpulse.At`: `BlastPushMaxSpeed` at the centre falling linearly to zero at the radius, the direction tipped up by `BlastPushUpBias`, never growing with distance): at the end of `Detonate`'s clearing, before the falling-block sweep (so sand the blast undermines falls straight), the other primed TNT (`PrimedTnt.Push`, chained cubes at spawn), the drops (`DropManager.ApplyBlastImpulse`, the blast's own loot included) and the falling cubes in the air (`FallingBlock.Push`); then `World.PushFromBlast` takes each centre `TntManager.Blasts` reports and shoves the living mobs (`Mob.Shove`, sideways) and the players through `IMobTarget.TakeHit` with no damage: the local camera's knockback in singleplayer, each `ServerPlayer`'s queued knockback on a server (its `PlayerStatus` carries it to the client); a creative, flying or dead player is immune. Gameplay, so a client, which never ticks TNT, pushes nothing (`BlastEffectTests`).
 - Worldgen must stay deterministic and thread-safe (`FastNoiseLite.GetNoise` is read-only after setup; noise instances are configured once in static constructors and never re-tuned per call). All noise seeds derive from `WorldGenerationConfig.Seed` plus fixed per-channel offsets (`TerrainGenerator.MakeNoise`); `Seed` reads `WorldSeed.Value`, which `WorldSeed.Apply` sets (rebuilding every noise from it) before a World is built, never while one is live (see "Saves"). Before player edits, terrain obeys:
   - **Nothing generated is ever solid above `height(x,z)`** — heights come from `ColumnCache.Get(...).Heights` (or the `ColumnCache.GetHeights` wrapper) and already include ravines, which are cut into the heightmap so the far LOD sees them too. The ravine cut fades out across the shore band (`OceanShoreWeight`..0.5), so it never slices the ocean's edge; the block at `height` is solid unless a cave or entrance carved it.
   - Both carvers only ever **remove** blocks: `Chunk.GenerateBlockData` fills the columns (grass at depth 0, dirt down to `DirtDepth`, stone below), then `NoiseCaves.Carve` and `WormCarver.Carve` clear air out of the result and `_solidCount` is recounted.
@@ -2130,7 +2451,7 @@ pure function of the seed: only **deltas** and the seed are written.
 ## Multiple players and chat
 
 A dedicated **server** is a fourth project (`OpenGLTest.Server/`, `dotnet run --project
-OpenGLTest.Server/Server.csproj -c Release`, working directory with `assets/` up the tree — the
+OpenGLTest.Server/VoxelEngine.Server.csproj -c Release`, working directory with `assets/` up the tree — the
 program sets its own current directory to the assets parent so `FileUtils`' relative `assets/...`
 paths resolve). It is a **CLI**: it loads content headlessly (`ContentRegistry.Load` +
 `TextureAtlas.RegisterTilesWithoutUpload` + `ContentRegistry.BakeModels`, the `TestContent`
@@ -2166,7 +2487,7 @@ game, which is what lets a headless World run `Update` over real terrain (the LO
 drops real builds when its pool is null). `ServerWorldTests` locks this down.
 
 **World sources.** Where a world's terrain comes from is one seam, `IWorldSource`
-(`Systems/Chunks/IWorldSource.cs`). It extends `IColumnSource`, so the mesher's column reads and
+(`Chunks/IWorldSource.cs`). It extends `IColumnSource`, so the mesher's column reads and
 the server's column answers read the same object, and adds three members: `GetColumn(cx, cz)`, the
 complete `ColumnData` of a chunk column (heights, bed, water levels, biomes, dirt depth, corner
 climate; never null); `Supplies(cx, cz)`, whether the source supplies that column and its whole
@@ -2214,7 +2535,7 @@ starts at the generated origin surface, harmless since it is creative and flying
 settle then re-settles it on the source's terrain). A generated chunk beside a supplied column
 therefore generates as if the source were not there (see the known gaps).
 
-**`ImportedMapSource`** (`Systems/Chunks/ImportedMapSource.cs`) is the non-generating source: a map
+**`ImportedMapSource`** (`Chunks/ImportedMapSource.cs`) is the non-generating source: a map
 folder (`<world>/import/` on a server, `ImportedMapSource.DirectoryName`) holding
 `columns/<cx>_<cz>.col` and `chunks/<cx>_<cy>_<cz>.bin`. A column file is `ColumnFileCodec`
 (`Saves/ColumnFileCodec.cs`): the magic `CVXL`, a version byte (1), then a Deflate body of 256
@@ -2381,7 +2702,7 @@ server camera and `World.Inventory` never collect.
 
 **World intents.** A client never writes a cell: every world action is a `WorldIntent` the server
 replays for the sending player through the singleplayer rules. Each `ServerPlayer` owns a
-`PlayerContext` (`OpenGLTest/src/PlayerContext.cs`: eye, aim, view direction, its inventory, its
+`PlayerContext` (`OpenGLTest/src/Player/PlayerContext.cs`: eye, aim, view direction, its inventory, its
 server creative flag) that `World` runs every interaction path through instead of the camera
 (singleplayer builds one from its camera, whose raycasts keep the third-person rules). An intent
 is refused (and nothing applied) when its sequence id is not above the player's last
@@ -2450,7 +2771,7 @@ slack. On top of that clamp the movement rubberband rejects an illegal move (bel
 player is removed on disconnect (its context marked absent, so a pour bound to it pauses).
 
 **Streaming around every player.** Chunks load around **every** connected player, not around the
-server camera: `World.Focus` (`Systems/StreamingFocus.cs`) publishes an immutable array of focus
+server camera: `World.Focus` (`Chunks/StreamingFocus.cs`) publishes an immutable array of focus
 chunks — every `ServerPlayer`'s chunk on a server with players online (players sharing a chunk
 count once), the camera otherwise (singleplayer, a client, and a server while nobody is online) —
 swapped with `Volatile.Write` only when a focus changes chunk or the set changes, so a still frame
@@ -2674,7 +2995,7 @@ of crashing the game. Remote players are `RemotePlayer`s whose
 connection, or SAVE & QUIT while connected, disposes the client world and returns to the
 multiplayer page.
 
-**Chat** is universal: `ChatView`/`ChatLayout` (`OpenGLTest/src/UI/Chat.cs`, GL-free, tested) hold
+**Chat** is universal: `ChatView`/`ChatLayout` (`OpenGLTest/src/UI/Hud/Chat.cs`, GL-free, tested) hold
 a 100-line log, a 200-char input, arrow-key history and the open flag. `T` opens it from a clean
 play state, `Enter` sends, `Escape` closes; while it is open the keyboard is withheld from the
 camera exactly like a focused inventory field, and the log sits bottom-left above the hotbar
@@ -2788,7 +3109,7 @@ desert so a pond closes on its own rim) — see the Water invariant below.
 A desert column is sand over `SandstoneDepth` sandstone blocks, then stone; a frozen column is bare
 rock (the snow pass covers it); a ravined (bare-stone) column keeps those rules.
 
-**Cold weather** (`WorldGen/SnowGenerator.cs`) runs last of the surface features and reads
+**Cold weather** (`WorldGen/Features/SnowGenerator.cs`) runs last of the surface features and reads
 `SnowGenerator.ColdWeightAt` — the climate's `TerrainGenerator.ColdWeight` (a biome-generation input)
 so the snow and freeze lines fade in as a column cools rather than snapping at a biome border,
 **raised by altitude** above `MountainRockHeight` and full at `MountainSnowFullHeight`, so a warm
@@ -2799,7 +3120,7 @@ solid ground (or the ice) and dusts the canopy tops of a cold column's trees, so
 forest reads white from above (`SnowCanopyTests`). A snow cell's depth is drawn from `SnowGenerator.DepthAt` when its state
 byte is 0 and from the state byte when a player stacks it (`SnowShape`); each layer is 1/16 of a
 block, so a full stack is solid and partial layers are walked through (`BlockType.IsSolidCell`).
-`WorldGen/IceSpikeGenerator.cs` grows occasional single-column ice spikes on the frozen plains.
+`WorldGen/Features/IceSpikeGenerator.cs` grows occasional single-column ice spikes on the frozen plains.
 
 `ColumnData.Biomes` carries the per-column classification for the chunk mesher and the far LOD
 (`ColumnCache.GetBiomes`); the LOD samples it per cell and wears the matching tile (snow for a cold
@@ -2881,7 +3202,7 @@ a healthbar. The punch, the slice, the player's thrown items (`ThrownProjectile.
 against each mob's body box, so a tall goblin is hit through its head and shins) and the healthbars
 (`EntityHealthbarRenderer`, buffers sized by `WorldGenerationConfig.MobsMaxAlive`, the hard cap
 below) all read that one list. The render passes keep one list per kind, because the meshes differ; `ReflectionEntities`
-carries both. Ring spawning on dry, loaded forest surface goes through `Systems/MobSpawner.cs`
+carries both. Ring spawning on dry, loaded forest surface goes through `Simulation/MobSpawner.cs`
 (`TryFindSurfaceSpawn`), and each manager wraps it with its own radii and body-centre offset.
 **Two global caps** bound every kind together (`MobCaps`, owned by `World` and handed to each manager,
 which registers itself as an `IMobPopulation`; a manager built alone caps itself): the ring spawners
@@ -2943,7 +3264,7 @@ more than `MobLedgeMaxDropBlocks` under its feet unless its target stands lower 
 bottomless drop and water a soft landing), so a cautious mob never takes the fall damage above
 (`LedgeCautionTests`).
 
-The first entity is the **slime** (`Slime` + `Systems/SlimeManager.cs`), owned by `World`. It hops
+The first entity is the **slime** (`Slime` + `Simulation/SlimeManager.cs`), owned by `World`. It hops
 toward the player, damages on contact only while airborne (a slime merely bobbing in water is
 harmless), is shoved (harmlessly) by the player when grounded, floats to the surface of water like an
 item drop (its water hops keep a land hop's total speed but halve the vertical and move it into the
@@ -3008,7 +3329,7 @@ leaves first, carrying the pair's share of their pools (`SlimeMerge.MergedHealth
 at most once an update; only the authoritative simulation merges, and a client sees the pair leave
 its snapshot (playing their death pop) and the merged slime arrive (`SlimeMergeTests`).
 
-The second entity is the **goblin** (`Goblin` + `Systems/GoblinManager.cs`, owned by `World`), a short
+The second entity is the **goblin** (`Goblin` + `Simulation/GoblinManager.cs`, owned by `World`), a short
 forest raider that throws the flint it carries and then closes for a club swing. It spawns like the
 slime: dry forest surface, a 20-40 block ring, under the shared natural mob cap and despawn beyond
 `GoblinDespawnRadiusBlocks`. It has no light or time keying. Its **ammo** is a count of the ordinary
@@ -3441,5 +3762,5 @@ touch a file that violates one of them, fixing it is in scope.
 - XML doc comments (`/// <summary>`) on classes and non-obvious public methods; brief `//` comments explaining *why* for tricky logic. Match the existing density — the code is moderately commented.
 - **New blocks go in JSON, not C#.** When a block has to behave differently, prefer a new data flag on `BlockDefinition`/`BlockType` that every call site reads over another per-id branch in gameplay code — the point of the content registry is that `World`, `TntManager` and the mesher ask "what does this block do?" instead of "which block is this?".
 - `FastNoiseLite.cs` is vendored third-party code — do not reformat or refactor it.
-- xUnit tests live in `OpenGLTest.Tests/` — run `dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release`. They cover headless logic and simulated gameplay without a window (fixture: `TestContent.cs`); add a test with every feature instead of a throwaway script — but only when there is a *rule* to lock down. A test must assert behavior (a gate, a formula, a state transition, an invariant that survives content tuning), never a constant, a layout number, a content literal or a starting-stock/seed count (`Assert.Equal(1, inventory holds one converter)` is exactly as pointless as pinning a block's hardness) — see the `functional-tests` skill's ban list for the full rule and rewrite table. Verify feel-in-game by running the game and using the `X` debug overlay (FPS, position, grounded state). Watch the console for chunk generation errors — worker threads catch and log exceptions rather than crashing.
+- xUnit tests live in `OpenGLTest.Tests/` — run `dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release`. They cover headless logic and simulated gameplay without a window (fixture: `Support/TestContent.cs`); add a test with every feature instead of a throwaway script — but only when there is a *rule* to lock down. A test must assert behavior (a gate, a formula, a state transition, an invariant that survives content tuning), never a constant, a layout number, a content literal or a starting-stock/seed count (`Assert.Equal(1, inventory holds one converter)` is exactly as pointless as pinning a block's hardness) — see the `functional-tests` skill's ban list for the full rule and rewrite table. Verify feel-in-game by running the game and using the `X` debug overlay (FPS, position, grounded state). Watch the console for chunk generation errors — worker threads catch and log exceptions rather than crashing.
 - Branch naming follows feature work off `master` (current work is on `worldgen`). Commit messages are short imperative sentences ("Add block placement", "Fix performance").

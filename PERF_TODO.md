@@ -229,7 +229,7 @@ needs, not the history.
   snapshot**. The property is therefore "the once-a-second snapshot standing when `X` is pressed
   already carries GPU figures instead of `--`", and a fixed duty cycle preserves it **by
   construction**. **What shipped:** `GpuTimingGate.ShouldTime(bool overlayOn, long frameIndex)`
-  (`src/Systems/GpuTimingGate.cs:52`) — GL-free and unit-tested on the `ReflectionReuse` precedent,
+  (`src/Rendering/GpuTimingGate.cs:52`) — GL-free and unit-tested on the `ReflectionReuse` precedent,
   because `RenderManager` needs a live GL context and **no test in this suite has one**;
   `WorldGenerationConfig.GpuTimingIdleInterval = 8` (`:291`), which keeps
   `ceil(fps / GpuTimingIdleInterval)` samples per always-run pass in every publish window (~12 at
@@ -463,7 +463,7 @@ needs, not the history.
   integer add or compare per **call**. The token is documented for a cold reader in the hand-off at the
   end of this file.
 - **D1 · The chunk tables are keyed on a packed `long`, and `Vector3` stayed the outward key.**
-  `ChunkManager.Chunks` is now a `ChunkMap` (`Systems/ChunkMap.cs`) over a private
+  `ChunkManager.Chunks` is now a `ChunkMap` (`Chunks/ChunkMap.cs`) over a private
   `ConcurrentDictionary<long, Chunk>` (`ChunkManager.cs:22`), and `_dirtyChunks` /
   `_queuedChunkPositions` (`:115-116`), `_generatingMeshes` (`:125`) and C6's `_playerPlacedByChunk`
   (`:163`) hold packed keys directly. **The key type does not change outward.** `Chunks` still takes
@@ -485,7 +485,7 @@ needs, not the history.
   enforces" — stays **literally true and unedited**. Making the wrapper bump `ChunkRemovalVersion`
   would have looked like a strengthening and would in fact have changed C3's contract while
   invalidating the sentence that records it. Do not do it later either.
-- **D1 · The packer is `ChunkKey` (`src/ChunkKey.cs`), 21 bits an axis, reusing `FluidManager`'s
+- **D1 · The packer is `ChunkKey` (`src/Chunks/ChunkKey.cs`), 21 bits an axis, reusing `FluidManager`'s
   budget line for line.** `Pack(cx, cy, cz)` is
   `((cx & PackMask) << 42) | ((cy & PackMask) << 21) | (cz & PackMask)` (`ChunkKey.cs:31-37`)
   against `FluidManager`'s identical expression (`FluidManager.cs:36-37,938-939`), and `SignExtend`
@@ -900,7 +900,7 @@ needs, not the history.
   field; `regions ([0-9]+)/([0-9]+)` is unambiguous. Counting at *enqueue* rather than at upload is
   deliberate: a build dropped out of range by `ApplyCompletedMeshes` still cost a worker its full
   build, so this measures **builder** throughput. **Keep this instrument** — it is the only way
-  anything about LOD builder throughput is measurable at all, and `OpenGLTest.Tests/LodBuildCostProbe.cs`
+  anything about LOD builder throughput is measurable at all, and `OpenGLTest.Tests/Lod/LodBuildCostProbe.cs`
   (a measurement harness, not a regression guard — it asserts no timing) is the cheapest way a future
   round re-prices the builder.
 - **D3.** `ChunkDrawBatch.PassCount` deleted. The private `_passCount` field stays — it is the real
@@ -941,7 +941,7 @@ needs, not the history.
   count is zero. So submission order *is* visually load-bearing for overlapping semi-transparent
   debris cubes. All four systems are consumed purely as `IReadOnlyList<T>`, so one shared
   `internal sealed class ParticleRing<T> : IReadOnlyList<T>`
-  (`OpenGLTest/src/Systems/ParticleRing.cs`, the `ChunkScanFrontier` precedent for a GL-free internal
+  (`OpenGLTest/src/Particles/ParticleRing.cs`, the `ChunkScanFrontier` precedent for a GL-free internal
   helper with its own headless facts) with **oldest-first indexing and an oldest-first enumerator**
   reproduces `List<T>`'s submission sequence exactly — a stronger guarantee than a modular walk, with
   **zero renderer changes**. `RemoveAt(0)` is O(1) (clear the head slot, advance `_head`); interior
@@ -2226,7 +2226,7 @@ instance); that is a director change and belongs to whichever round wants it.
 change can break.** *If a future change removes a position from `ChunkManager.Chunks` or from
 `_queuedChunkPositions` anywhere other than `UnloadDistantChunks` without bumping
 `ChunkRemovalVersion`, the frontier can starve that chunk.* Nothing structurally prevents it:
-`Chunks` is a **public** `ConcurrentDictionary` and `OpenGLTest.Tests/MeshingTests.cs` already removes
+`Chunks` is a **public** `ConcurrentDictionary` and `OpenGLTest.Tests/Chunks/MeshingTests.cs` already removes
 through it. The single-site property is a convention, not an enforced invariant. Two related rules
 travel with it: the version bump is published **after** the unload loop and must never be moved up
 (a loaded chunk lives in **both** dictionaries, so a position becomes needed at the
