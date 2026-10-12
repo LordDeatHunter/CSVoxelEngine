@@ -23,7 +23,7 @@ public sealed class GpuTimingGateTests
     public void OverlayOnTimesEveryFrame()
     {
         // While the X overlay is up the gate is wide open: this path is byte-identical to the
-        // always-on behaviour that shipped before the gate existed.
+        // always-on behavior that shipped before the gate existed.
         var frames = 100L * Interval;
         for (var i = 0L; i < frames; i++)
         {

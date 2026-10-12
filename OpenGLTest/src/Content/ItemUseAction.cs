@@ -9,7 +9,7 @@ namespace silkgltriangle;
 /// </summary>
 public enum ItemUseAction
 {
-    /// <summary>No use behaviour.</summary>
+    /// <summary>No use behavior.</summary>
     None,
 
     /// <summary>Scoops the targeted fluid source into the item (bucket).</summary>

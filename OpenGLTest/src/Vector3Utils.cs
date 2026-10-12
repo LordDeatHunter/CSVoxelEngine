@@ -6,7 +6,7 @@ namespace silkgltriangle;
 /// <summary>
 /// Extension operations on <see cref="Vector3"/> that are repeated across gameplay, physics
 /// and render code. System.Numerics types cannot gain new operator overloads, so everything
-/// here is an extension method with the same behaviour the call sites previously inlined.
+/// here is an extension method with the same behavior the call sites previously inlined.
 /// </summary>
 public static class Vector3Utils
 {

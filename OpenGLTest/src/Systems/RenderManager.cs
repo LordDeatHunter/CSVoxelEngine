@@ -2098,7 +2098,7 @@ public class RenderManager : IDisposable
 
         // Clouds in the mirror are what makes the reflection readable on open water (the dome
         // alone is only a smooth gradient). The mirror flips triangle winding, so cull front faces
-        // here to keep the same "nearest exterior surface wins" behaviour RenderClouds relies on.
+        // here to keep the same "nearest exterior surface wins" behavior RenderClouds relies on.
         if (_clouds != null && savedCamPos.Y >= WaterPlaneY)
         {
             gl.Enable(EnableCap.Blend);
@@ -2926,7 +2926,7 @@ public class RenderManager : IDisposable
 
         _chunkDraws.Draw(LodGeometry.Vao, chunkShader, _locChunkDrawBase);
 
-        // Later chunk passes reuse this program and need the cutout behaviour back.
+        // Later chunk passes reuse this program and need the cutout behavior back.
         chunkShader.SetUniform(_locChunkAlphaCutoff, WorldGenerationConfig.AlphaCutoff);
     }
 

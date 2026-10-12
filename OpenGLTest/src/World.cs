@@ -486,7 +486,7 @@ public class World : IItemUseWorld
     /// and drops (<see cref="EntitySaveCodec.FileName"/>) are spawned once loading finishes, each
     /// as soon as its chunk is loaded (<see cref="RestorePendingEntities"/>). A world with
     /// a store starts <see cref="WorldPhase.Loading"/>; null (the default) keeps the old
-    /// regenerate-and-forget behaviour and starts <see cref="WorldPhase.Playing"/> at once.
+    /// regenerate-and-forget behavior and starts <see cref="WorldPhase.Playing"/> at once.
     /// </summary>
     /// <remarks>
     /// Passing null for <paramref name="gl"/>, the three pools, <paramref name="window"/> and
@@ -3699,7 +3699,7 @@ public class World : IItemUseWorld
         RaiseBlockEdited(partnerCell);
     }
 
-    /// <summary>Runs right after a structure went up, so the managers that own its behaviour
+    /// <summary>Runs right after a structure went up, so the managers that own its behavior
     /// can start tracking it.</summary>
     private void OnMultiblockConverted(Vector3 anchor, int facing, BlockType anchorType)
     {

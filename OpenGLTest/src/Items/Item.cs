@@ -22,7 +22,7 @@ public enum ItemAnimationMode
 /// per-world state (count, durability, cooldown, rename, enchantments) lives on
 /// <see cref="ItemStack"/> instead.
 ///
-/// Behaviour families subclass this (bucket pickup/place, stack placing, igniting) and a single
+/// Behavior families subclass this (bucket pickup/place, stack placing, igniting) and a single
 /// item can go further with its own code class registered in
 /// <see cref="ItemFactory.CustomCreators"/> (see <see cref="FirestarterItem"/>). Gameplay asks
 /// "what does this item do" through the virtuals below instead of branching on ids.
@@ -98,7 +98,7 @@ public abstract class Item
     /// <summary>Milliseconds between hits while mining; see <see cref="Mining"/>.</summary>
     public float HitDelayMs { get; internal init; } = Mining.DefaultHitGapMs;
 
-    /// <summary>Attack behaviour the left-click drives; see <see cref="AttackPattern"/>.</summary>
+    /// <summary>Attack behavior the left-click drives; see <see cref="AttackPattern"/>.</summary>
     public AttackPattern Attack { get; internal init; } = AttackPattern.Punch;
 
     /// <summary>Damage one left-click hit removes from a block's hardness; the bare-hand
@@ -166,7 +166,7 @@ public abstract class Item
     public virtual bool TargetsFluids => false;
 
     /// <summary>
-    /// Right-click behaviour while holding this item, against whatever the player is aiming
+    /// Right-click behavior while holding this item, against whatever the player is aiming
     /// at. Pure decision + effect logic through <paramref name="ctx"/>; the caller
     /// (<c>World.TryUseSelected</c>) applies the returned morph and punch. The base answers
     /// "nothing happens" so plain pickups need no override. <paramref name="stack"/> is the

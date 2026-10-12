@@ -5,7 +5,7 @@ namespace silkgltriangle.Tests;
 
 /// <summary>
 /// The item debugger's player animation modes: every mode exists, drives the real <see cref="PlayerModel"/>,
-/// and one-shots replay. Behaviour only: no pose numbers.
+/// and one-shots replay. Behavior only: no pose numbers.
 /// </summary>
 public sealed class PlayerPreviewStateTests
 {

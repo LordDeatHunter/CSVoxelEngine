@@ -68,7 +68,7 @@ namespace silkgltriangle;
 /// that index of the focus snapshot it sampled. The main thread republishes that snapshot between
 /// frames, so the workers can sample different snapshots - a focus that crossed a chunk border, or a
 /// slot that now belongs to another player because someone joined or left. Either way the slot's
-/// centre no longer matches its node and the call resets to index 0 - the behaviour this class
+/// centre no longer matches its node and the call resets to index 0 - the behavior this class
 /// replaced - so disagreement degrades to the pre-C3 full scan and never below it. A NaN centre
 /// never compares equal and therefore always full-scans.</para>
 ///

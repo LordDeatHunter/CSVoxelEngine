@@ -54,7 +54,7 @@ public sealed class LodBufferPoolTests
         Assert.Equal(1, lod.PooledTranslucentVertexLists);
 
         // ...while a chunk mesher only fills them for fluid or glass, so the chunk pool's
-        // behaviour is unchanged: an untouched translucent list is left to the GC.
+        // behavior is unchanged: an untouched translucent list is left to the GC.
         var chunk = new MeshBufferPool();
         chunk.Return(chunk.RentVertices(), chunk.RentIndices(),
             chunk.RentTranslucentVertices(), chunk.RentTranslucentIndices());

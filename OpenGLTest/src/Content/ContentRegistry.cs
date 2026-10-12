@@ -1681,7 +1681,7 @@ public static class ContentRegistry
                 throw new InvalidOperationException(
                     $"Block '{path}' has flow.range {range}; expected 1..7 (the state byte holds levels 1..7).");
 
-            // A fluid's behaviour follows from being a fluid, so the registry forces it rather
+            // A fluid's behavior follows from being a fluid, so the registry forces it rather
             // than trusting the file: nothing collides with water, it darkens no face, it has
             // no inventory slot or loot, and it is never support-fragile (it is what pops
             // those blocks). It stays replaceable, which is set below for every block.

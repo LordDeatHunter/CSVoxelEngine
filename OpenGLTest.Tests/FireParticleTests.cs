@@ -21,7 +21,7 @@ namespace silkgltriangle.Tests;
 /// lifetime) and mining debris near 40 of 512. So C12(a)'s measured value is nil-to-negligible for
 /// three systems and small for this one; what the change actually buys is a clean, shared,
 /// order-preserving invariant in place of four hand-rolled O(n) evictions. It landed because the
-/// argument is clean and the behaviour is pinned, not because it removes milliseconds.</para>
+/// argument is clean and the behavior is pinned, not because it removes milliseconds.</para>
 /// </summary>
 public sealed class FireParticleTests
 {

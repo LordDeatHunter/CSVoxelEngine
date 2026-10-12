@@ -859,7 +859,7 @@ public class Inventory
         foreach (var type in BlockType.Types.Values)
             if (type.HasItem && !type.Fluid)
                 _blocks[type.Id] = StartingStock;
-        // One bucket, since water needs one to reach, plus the axe, found by behaviour and
+        // One bucket, since water needs one to reach, plus the axe, found by behavior and
         // display name the way the compass below is.
         if (ItemRegistry.FindByAction(ItemUseAction.PickupFluid) is { } bucket)
             _tools.Add(new ItemStack(_nextToolInstance++, bucket));

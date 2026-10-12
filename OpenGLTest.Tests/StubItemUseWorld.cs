@@ -6,7 +6,7 @@ namespace silkgltriangle.Tests;
 /// <summary>
 /// Headless <see cref="IItemUseWorld"/> for item <c>OnUse</c> tests: queries answer from plain
 /// fields, effects only record that they were asked for. <see cref="World"/> drags in every
-/// manager and its worker threads, so item behaviour is pinned through this stub.
+/// manager and its worker threads, so item behavior is pinned through this stub.
 /// </summary>
 internal sealed class StubItemUseWorld : IItemUseWorld
 {

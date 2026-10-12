@@ -32,7 +32,7 @@ namespace silkgltriangle;
 ///
 /// <para><b>What that buys.</b> Because indexing and enumeration here are OLDEST-FIRST, this type
 /// reproduces <see cref="List{T}"/>'s sequence element for element under the same operations, so
-/// every renderer keeps its existing behaviour with ZERO renderer changes. That is a stronger
+/// every renderer keeps its existing behavior with ZERO renderer changes. That is a stronger
 /// guarantee than the "head index plus a modular walk in the renderers" PERF_TODO's C12(a) bullet
 /// proposed: a modular walk would have to be repeated correctly at each of the four call sites and
 /// would be one edit away from silently re-sorting the debris pass, whereas an

@@ -53,12 +53,7 @@ public class Camera : IMobTarget
     public int SwimStrokeCount => _physics.SwimStrokeCount;
     /// <summary>Current vertical FOV in degrees: the base FOV plus the eased sprint widening plus the punch
     /// pinch plus the throw charge zoom.</summary>
-    public float CurrentFov => _currentFov;
-    /// <summary>The eased sprint widening in degrees, 0 at rest (see <see cref="SprintFov"/>).</summary>
-    public float SprintFovDegrees => _sprintFov;
-    /// <summary>The sprung throw charge zoom in degrees: negative while a throw winds up, 0 at rest
-    /// (see <see cref="ThrowZoom"/>).</summary>
-    public float ThrowZoomDegrees => _throwZoomDegrees;
+    public float CurrentFov { get; private set; } = DefaultFov;
     /// <summary>
     /// The 0..1 charge of the throw the player is winding up, or null when none. The world sets it
     /// every frame from the player's arm (<see cref="PlayerModel.ThrowCharge"/>); the next head-motion
@@ -105,7 +100,7 @@ public class Camera : IMobTarget
     /// shoulder-surf; in orbit mode it lerps toward the movement direction or, after a
     /// click, toward the camera aim (see <see cref="NotifyPlayerAction"/>).
     /// </summary>
-    public float PlayerYaw => IsOrbit ? _orbitPlayerYaw : Yaw;
+    public float PlayerYaw => IsOrbit ? OrbitPlayerYaw : Yaw;
     /// <summary>View eye: the head in first person, the pulled-in shoulder camera in third.</summary>
     public Vector3 RenderEye => Position + _shoulderOffset;
     /// <summary>
@@ -113,7 +108,7 @@ public class Camera : IMobTarget
     /// <c>ShoulderTransitionSeconds</c>. The camera offset, the view direction and the
     /// head opacity all ride this, so toggling never snaps.
     /// </summary>
-    public float ShoulderBlend => MathUtils.SmoothStep(_shoulderBlendT);
+    public float ShoulderBlend => MathUtils.SmoothStep(ShoulderBlendT);
     /// <summary>
     /// Direction the screen looks along. Equals the head facing in first person; in
     /// shoulder-surf it tilts from the offset camera back onto the crosshair aim point,
@@ -128,7 +123,6 @@ public class Camera : IMobTarget
     /// </summary>
     public Vector3 LastAimDirection { get; private set; } = -Vector3.UnitZ;
     [Obsolete("Renamed to IsCreative.")]
-    public bool IsNoclip => IsCreative;
     public float VerticalVelocity => _physics.VerticalVelocity;
 
     /// <summary>
@@ -196,46 +190,8 @@ public class Camera : IMobTarget
     private static float DefaultFov => GameSettings.FieldOfView;
     private static float MouseSensitivity => GameSettings.MouseSensitivity;
 
-    private const float BaseSpeed = 8f;
-    // Shift while walking is a regular sprint; the giga boost is flight-only.
-    private const float SprintMultiplier = 1.5f;
-    private const float FlyBoostMultiplier = 10f;
-    private const float Gravity = 34f;
-    private const float JumpSpeed = 11f;
-    private const float PlayerHeight = 1.8f;
     /// <summary>Eye above the feet; the player model roots itself here.</summary>
     public const float EyeHeight = 1.62f;
-    private const float PlayerRadius = 0.30f;
-    private const float CollisionStepSize = 0.05f;
-    // How fast a mob knockback shove decays; larger stops the slide sooner.
-    private const float KnockbackDamping = 6f;
-    private const float GroundMinResponse = 0.02f;
-    private const float GroundSlideScale = 10f;
-    private const float AirAccelRate = 6f;
-    private const float SwimAccelRate = 4.5f;
-    private const float FlyAccelRate = 6f;
-
-    // Auto-step heights: sprinting runs up a full block, plain walking only half a block,
-    // so a one-block terrain step still has to be jumped (or run at) on foot. StepClearance
-    // is a hair of extra lift so a block top the feet land exactly on is not read as a
-    // collision because of float rounding.
-    private const float WalkStepHeight = 0.5f;
-    private const float SprintStepHeight = 1f;
-    private const float StepClearance = 0.001f;
-
-    // Swimming. Water has no gravity term: vertical speed eases toward a target instead, so it
-    // stays capped by SwimUpSpeed/SinkSpeed however long the player stays under.
-    private const float SwimSpeedFactor = 0.5f;
-    private const float SwimUpSpeed = 4f;
-    private const float SinkSpeed = -2f;
-    private const float WaterDrag = 6f;
-    // Pushing into a bank while holding Space lifts the player over it, so getting out of
-    // water never needs a ramp
-    private const float SwimExitBoost = 6f;
-    // How far above the feet a fluid surface has to reach before it counts as swimmable
-    private const float SwimDepth = 0.9f;
-    // How hard a flow carries a swimmer along it, in blocks/s
-    private const float FlowPushSpeed = 2f;
 
     // Shoulder-surf framing, in blocks, relative to the head eye. RPG-style:
     // behind, above and out to the right shoulder. The view direction stays parallel
@@ -264,12 +220,8 @@ public class Camera : IMobTarget
     private Vector3 _shoulderOffset = Vector3.Zero;
     private Vector3 _shoulderViewDir = Vector3.Zero;
     // Linear 0..1 timer behind ShoulderBlend; toggling mid-glide reverses smoothly.
-    private float _shoulderBlendT;
     // Orbit body facing (degrees) plus its smoothed lateral rig offset, both glided.
-    private float _orbitPlayerYaw;
     private float _shoulderSide = ShoulderSideOffset;
-    private bool _hasActionTarget;
-    private float _actionYaw;
 
     // Set to "x,y,z" to start the eye at an exact spot instead of the surface spawn
     private const string SpawnOverrideVariable = "VOXEL_SPAWN";
@@ -284,7 +236,6 @@ public class Camera : IMobTarget
     private static readonly Vector2 SpawnLook = SpawnOrientation();
 
     private float _aspectRatio = 16f / 10f;
-    private float _currentFov = DefaultFov;
     private float _bobPhase;
     private float _bobBlend;
     private float _runBlend;
@@ -302,7 +253,6 @@ public class Camera : IMobTarget
     // Extra degrees of the sprint widening, eased by SprintFov.Step; added to the FOV, never set over it
     private float _sprintFov;
     // Roll toward the strafe side in radians, eased by StrafeTilt.Step; added to _roll, never set over it
-    private float _strafeTilt;
     // The throw charge zoom's spring and its clamped degrees (ThrowZoom); added to the FOV, never set over it
     private Spring _throwZoom = ThrowZoom.CreateSpring();
     private float _throwZoomDegrees;
@@ -327,12 +277,11 @@ public class Camera : IMobTarget
     public float KickRoll => _kickRoll.Value;
 
     /// <summary>The eased strafe tilt in radians: positive leans the view right (see <see cref="StrafeTilt"/>).</summary>
-    public float StrafeTiltRoll => _strafeTilt;
+    public float StrafeTiltRoll { get; private set; }
 
     /// <summary>0..1 how far the death view has fallen over; set by the world while a death plays.</summary>
     public float DeathProgress
     {
-        get => _deathProgress;
         set => _deathProgress = MathUtils.Clamp01(value);
     }
 
@@ -462,7 +411,7 @@ public class Camera : IMobTarget
 
     /// <summary>
     /// Builds the camera. Headless tests pass nulls: no window to resize with and no mouse to
-    /// capture. The game always passes both, so its behaviour is unchanged.
+    /// capture. The game always passes both, so its behavior is unchanged.
     /// </summary>
     /// <param name="window">The window to follow for the aspect ratio, or null headless.</param>
     /// <param name="input">The input context whose mouse turns the view, or null headless.</param>
@@ -562,10 +511,10 @@ public class Camera : IMobTarget
         _physics.ResetMotion();
         _shoulderOffset = Vector3.Zero;
         _shoulderViewDir = Vector3.Zero;
-        _shoulderBlendT = IsShoulderSurf ? 1f : 0f;
-        _orbitPlayerYaw = yaw;
+        ShoulderBlendT = IsShoulderSurf ? 1f : 0f;
+        OrbitPlayerYaw = yaw;
         _shoulderSide = Mode == CameraMode.Shoulder ? ShoulderSideOffset : 0f;
-        _hasActionTarget = false;
+        HasActionTarget = false;
     }
 
     /// <summary>
@@ -592,7 +541,7 @@ public class Camera : IMobTarget
         float? bobStrafe = null, Vector3? shoulderOffset = null, Vector3? shoulderViewDir = null,
         Vector3? shakeOffset = null, float? shakeRoll = null)
     {
-        if (fov.HasValue) _currentFov = fov.Value;
+        if (fov.HasValue) CurrentFov = fov.Value;
         if (roll.HasValue) _roll = roll.Value;
         if (bobHeight.HasValue) _bobHeight = bobHeight.Value;
         if (bobStrafe.HasValue) _bobStrafe = bobStrafe.Value;
@@ -610,8 +559,8 @@ public class Camera : IMobTarget
     public void NotifyPlayerAction()
     {
         if (!IsOrbit) return;
-        _actionYaw = Yaw;
-        _hasActionTarget = true;
+        ActionYaw = Yaw;
+        HasActionTarget = true;
     }
 
     /// <summary>
@@ -629,7 +578,6 @@ public class Camera : IMobTarget
     /// Knocks the player back from a mob hit: a horizontal shove that decays over a few tenths of
     /// a second — the normal collision still stops it, so a hit can never push the player through
     /// a wall — plus a small upward pop. Flight ignores both (and cannot be hit).
-    /// </summary>
     /// While set, mouse movement no longer turns the view (the [E] panel owns the cursor).
     /// Position still updates so reopening the game never jumps the look.
     /// </summary>
@@ -637,13 +585,7 @@ public class Camera : IMobTarget
 
     private void OnMouseMove(IMouse mouse, Vector2 position)
     {
-        if (SuppressLook)
-        {
-            _lastMousePosition = position;
-            _firstMouseMovement = false;
-            return;
-        }
-        if (_firstMouseMovement)
+        if (SuppressLook || _firstMouseMovement)
         {
             _lastMousePosition = position;
             _firstMouseMovement = false;
@@ -676,7 +618,7 @@ public class Camera : IMobTarget
         _throwZoomDegrees = ThrowZoom.Step(ref _throwZoom, ThrowZoom.TargetDegrees(ThrowCharge), deltaTime);
         _damageArc.Update(deltaTime);
         _droplets.Update(deltaTime);
-        _currentFov = DefaultFov + _sprintFov + MathUtils.Clamp(_fovPunch.Value, -6f, 6f) + _throwZoomDegrees;
+        CurrentFov = DefaultFov + _sprintFov + MathUtils.Clamp(_fovPunch.Value, -6f, 6f) + _throwZoomDegrees;
 
         // A landing dips the view in proportion to the fall that ended just now.
         if (!_wasGrounded && IsGrounded && !IsFlying && _prevVerticalVelocity < -4f)
@@ -700,10 +642,10 @@ public class Camera : IMobTarget
                      - MathUtils.Clamp(_landDip.Value, -4f, 12f) * LandDipScale
                      - SneakEyeDrop * _sneakBlend - DeathDropBlocks * death;
         _bobStrafe = MathF.Cos(_bobPhase) * bobStrafe * _bobBlend;
-        _strafeTilt = StrafeTilt.Step(_strafeTilt,
+        StrafeTiltRoll = StrafeTilt.Step(StrafeTiltRoll,
             StrafeTilt.TargetRadians(strafe, IsFlying, dead: _deathProgress > 0f), deltaTime);
         _roll = MathF.Sin(_bobPhase) * RunRoll * _runBlend * _bobBlend
-                + MathUtils.Clamp(_kickRoll.Value, -0.12f, 0.12f) + DeathRollRadians * death + _strafeTilt;
+                + MathUtils.Clamp(_kickRoll.Value, -0.12f, 0.12f) + DeathRollRadians * death + StrafeTiltRoll;
     }
 
     /// <summary>
@@ -768,8 +710,8 @@ public class Camera : IMobTarget
             Mode = (CameraMode)(((int)Mode + 1) % 3);
             if (Mode == CameraMode.Orbit)
             {
-                _orbitPlayerYaw = Yaw;
-                _hasActionTarget = false;
+                OrbitPlayerYaw = Yaw;
+                HasActionTarget = false;
             }
             Log.WriteLine($"Camera {Mode}");
         }
@@ -780,7 +722,7 @@ public class Camera : IMobTarget
     internal void UpdateShoulderOffset(ChunkManager chunkManager, float deltaTime)
     {
         var forward = GetForwardVector();
-        if (!IsShoulderSurf && _shoulderBlendT <= 0f)
+        if (!IsShoulderSurf && ShoulderBlendT <= 0f)
         {
             _shoulderOffset = Vector3.Zero;
             _shoulderViewDir = forward;
@@ -868,9 +810,6 @@ public class Camera : IMobTarget
     /// trying the smallest lift first, and returns the first one that clears the ledge and travels
     /// the full frame movement. Returns null when the obstacle is taller than <paramref name="stepHeight"/>
     /// (or the head is boxed in), leaving the caller's normally blocked position in place.
-    /// </summary>
-    /// </summary>
-    /// </summary>
     /// against the body does not count, exactly like <see cref="OverlapsPlayer"/>.
     /// </summary>
 
@@ -889,12 +828,10 @@ public class Camera : IMobTarget
     internal void TestSetMode(CameraMode mode)
     {
         Mode = mode;
-        _shoulderBlendT = IsShoulderSurf ? 1f : 0f;
-        if (mode == CameraMode.Orbit)
-        {
-            _orbitPlayerYaw = Yaw;
-            _hasActionTarget = false;
-        }
+        ShoulderBlendT = IsShoulderSurf ? 1f : 0f;
+        if (mode != CameraMode.Orbit) return;
+        OrbitPlayerYaw = Yaw;
+        HasActionTarget = false;
     }
     internal void SetMovementFactor(float factor) => MovementFactor = factor;
     internal void SetGroundFriction(float friction) => GroundFriction = friction;
@@ -907,13 +844,17 @@ public class Camera : IMobTarget
     internal void SetEyeInWater(bool inWater) => IsEyeInWater = inWater;
     internal void SetInLava(bool inLava) => IsInLava = inLava;
     internal void SetEyeInLava(bool inLava) => IsEyeInLava = inLava;
-    internal void SetShoulderBlendT(float t) => _shoulderBlendT = t;
-    internal float ShoulderBlendT => _shoulderBlendT;
-    internal void SetOrbitPlayerYaw(float yaw) => _orbitPlayerYaw = yaw;
-    internal float OrbitPlayerYaw => _orbitPlayerYaw;
-    internal bool HasActionTarget => _hasActionTarget;
-    internal float ActionYaw => _actionYaw;
-    internal void ClearActionTarget() => _hasActionTarget = false;
+    internal void SetShoulderBlendT(float t) => ShoulderBlendT = t;
+    internal float ShoulderBlendT { get; private set; }
+
+    internal void SetOrbitPlayerYaw(float yaw) => OrbitPlayerYaw = yaw;
+    internal float OrbitPlayerYaw { get; private set; }
+
+    internal bool HasActionTarget { get; private set; }
+
+    internal float ActionYaw { get; private set; }
+
+    internal void ClearActionTarget() => HasActionTarget = false;
 
     /// <summary>Ground acceleration response for a top-face friction, 0..1 (see <see cref="PlayerPhysics"/>).</summary>
     internal static float GroundAccelRate(float friction) => PlayerPhysics.GroundAccelRate(friction);
@@ -982,21 +923,12 @@ public class Camera : IMobTarget
                 _ => Position + new Vector3(0f, 0f, pushes[2]),
             };
 
-            if (!_physics.IsColliding(candidate, chunkManager))
-            {
-                Position = candidate;
-                return;
-            }
+            if (_physics.IsColliding(candidate, chunkManager)) continue;
+
+            Position = candidate;
+            return;
         }
     }
-
-    /// <summary>
-    /// Whether an entity cube at <paramref name="center"/> with the given half extent touches
-    /// the player's body box. Bodies only touch when they genuinely overlap: a face flush
-    /// against the body does not count, exactly like <see cref="OverlapsPlayer"/>.
-    /// </summary>
-    public bool BodyTouches(Vector3 center, float halfExtent) =>
-        MobTargets.BodyTouches(Position, center, halfExtent);
 
     /// <inheritdoc />
     Vector3 IMobTarget.Eye => Position;
@@ -1045,7 +977,7 @@ public class Camera : IMobTarget
     }
 
     public Matrix4x4 GetProjectionMatrix() =>
-        Matrix4x4.CreatePerspectiveFieldOfView(MathUtils.ToRadians(_currentFov), _aspectRatio, NearPlane, FarPlane);
+        Matrix4x4.CreatePerspectiveFieldOfView(MathUtils.ToRadians(CurrentFov), _aspectRatio, NearPlane, FarPlane);
 
     /// <summary>
     /// View * projection, cached per distinct camera pose (PERF_TODO R7). Twenty-two call
@@ -1074,8 +1006,8 @@ public class Camera : IMobTarget
     /// <summary>
     /// The view frustum of <see cref="GetViewProjection"/>, built once per distinct camera
     /// pose (PERF_TODO R11). Three passes - RenderWorld, CullWater and RenderLod - used to
-    /// derive this independently from the identical unchanged matrix, paying six plane
-    /// extractions and normalisations three times a frame. The shadow and mirror frusta are
+    /// derive this independently of the identical unchanged matrix, paying six plane
+    /// extractions and normalizations three times a frame. The shadow and mirror frusta are
     /// built from the shadow cascades' <c>ViewProj</c> / <c>_reflViewProj</c> and are deliberately not
     /// routed through here.
     /// </summary>
@@ -1114,7 +1046,7 @@ public class Camera : IMobTarget
     /// </summary>
     private ViewProjKey CurrentViewProjKey() =>
         new(Position, _shoulderViewDir, _shoulderOffset, Yaw, Pitch, _roll, _bobHeight, _bobStrafe,
-            _physics.ShakeOffset, _physics.ShakeRoll, _currentFov, _aspectRatio);
+            _physics.ShakeOffset, _physics.ShakeRoll, CurrentFov, _aspectRatio);
 
     /// <summary>
     /// Bit-for-bit key comparison. Deliberately not <c>==</c> or the record's generated

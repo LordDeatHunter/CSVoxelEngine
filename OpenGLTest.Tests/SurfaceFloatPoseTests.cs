@@ -7,7 +7,7 @@ namespace silkgltriangle.Tests;
 /// <summary>
 /// The player's surface-float pose (<see cref="PlayerModel"/> with <c>floating</c>): upright and straight
 /// like standing, the arms sculling low beside the hips, the legs hanging, blended in and out of the
-/// swim pose and handed back to it for a stroke. Behaviour only: no pose numbers.
+/// swim pose and handed back to it for a stroke. Behavior only: no pose numbers.
 /// </summary>
 public sealed class SurfaceFloatPoseTests
 {

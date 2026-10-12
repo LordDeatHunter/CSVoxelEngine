@@ -6,10 +6,10 @@ namespace silkgltriangle;
 
 /// <summary>
 /// Builds the <see cref="Item"/> singletons from parsed JSON. The <c>use.action</c> string picks
-/// the behaviour family; a single item goes further by registering its own code class in
+/// the behavior family; a single item goes further by registering its own code class in
 /// <see cref="CustomCreators"/> under its file name (see the firestarter default), which wins
 /// over the action mapping. A new <c>use.action</c> value needs a new <see cref="Item"/>
-/// subclass plus one arm here — that is deliberate: behaviour is code, data stays in JSON.
+/// subclass plus one arm here — that is deliberate: behavior is code, data stays in JSON.
 /// </summary>
 public static class ItemFactory
 {
@@ -50,7 +50,7 @@ public static class ItemFactory
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,
     /// so e.g. "firestarter" always builds a <see cref="FirestarterItem"/> whatever its action
-    /// string says. Add one line here plus the class to give an item its own behaviour.
+    /// string says. Add one line here plus the class to give an item its own behavior.
     /// </summary>
     public static readonly Dictionary<string, Func<ItemSpec, Item>> CustomCreators =
         new(StringComparer.Ordinal)

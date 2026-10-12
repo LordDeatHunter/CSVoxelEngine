@@ -277,7 +277,7 @@ public sealed class LodManagerTests
     /// (FindClosestNeededRegion fills _queued, which is the only thing MarkEditedColumn will mark),
     /// so the producer half is exercised too.
     ///
-    /// Amended for item C5, and the amendment is a real behaviour change rather than a test fix:
+    /// Amended for item C5, and the amendment is a real behavior change rather than a test fix:
     /// a claim from either path now registers its key in <c>_building</c> for the duration of the
     /// build, and TakeDirtyRegion deliberately REFUSES to hand out a region that is still being
     /// built (it skips it without removing, so the dirty mark survives for a later spin). The
@@ -320,7 +320,7 @@ public sealed class LodManagerTests
 
     /// <summary>Covers item C11's common case: the LodGen worker calls TakeDirtyRegion on every
     /// spin and the set is empty for nearly all of them, so the empty walk must stay correct (and,
-    /// unobservably from here, allocate nothing). Behaviour only — the fact cannot see whether a
+    /// unobservably from here, allocate nothing). Behavior only — the fact cannot see whether a
     /// key snapshot was taken.</summary>
     [Fact]
     public void AnEmptyDirtySetReturnsNull()

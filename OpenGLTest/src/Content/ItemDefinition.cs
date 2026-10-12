@@ -34,7 +34,7 @@ public sealed class ItemDefinition
     public float? ThrowDamage { get; set; }
 
     /// <summary>
-    /// Attack behaviour the left-click drives: <c>punch</c> (default) or <c>slice</c>. See
+    /// Attack behavior the left-click drives: <c>punch</c> (default) or <c>slice</c>. See
     /// <see cref="AttackPattern"/>.
     /// </summary>
     public string? Attack { get; set; }

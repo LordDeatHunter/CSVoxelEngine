@@ -151,7 +151,7 @@ public sealed class UnderwaterRaysRenderer : IDisposable
         _gl.BindVertexArray(0);
 
         // Leave no unit holding this pass's own render target, so next frame's march never runs
-        // with it bound - defined behaviour either way (the march reads only units 1 and 4), but
+        // with it bound - defined behavior either way (the march reads only units 1 and 4), but
         // it matches the convention CopyScene and every other pass here follows.
         _gl.ActiveTexture(TextureUnit.Texture5);
         _gl.BindTexture(TextureTarget.Texture2D, 0);

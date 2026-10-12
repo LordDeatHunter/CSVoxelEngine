@@ -4,7 +4,7 @@ using Xunit;
 
 namespace silkgltriangle.Tests;
 
-/// <summary>First-cut survival: fall damage curve, lava burns, pool/flash behaviour.</summary>
+/// <summary>First-cut survival: fall damage curve, lava burns, pool/flash behavior.</summary>
 public sealed class HealthTests
 {
     public HealthTests()

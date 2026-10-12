@@ -8,7 +8,7 @@ namespace silkgltriangle.Tests;
 /// Which cell a right-click fills and what it may write over. A stack that opts in
 /// (<c>replaceableByPlacement</c>) is taken over in place while it is not solid, so a block placed
 /// against a partial snow drift replaces it; a full stack and every unflagged block keep the
-/// ordinary "fill the cell across the hit face" behaviour.
+/// ordinary "fill the cell across the hit face" behavior.
 /// </summary>
 public sealed class PlacementTests
 {

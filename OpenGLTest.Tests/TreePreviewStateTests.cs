@@ -10,7 +10,7 @@ namespace silkgltriangle.Tests;
 /// The item debugger's TREES tab state: deterministic scrubbing (same species, seed and step give
 /// the same cells, in any visiting order), the step clamp, the mature step being the worldgen
 /// tree, features from maturity on, a new seed leaving the step alone, framing that contains the
-/// tree and fits the view, the ground plane, name lookup and the rebuild version. Behaviour only:
+/// tree and fits the view, the ground plane, name lookup and the rebuild version. Behavior only:
 /// no step counts, cell counts or species literals beyond what the registry holds.
 /// </summary>
 public sealed class TreePreviewStateTests

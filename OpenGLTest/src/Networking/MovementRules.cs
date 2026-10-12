@@ -9,7 +9,7 @@ namespace silkgltriangle;
 /// it only refuses the positions that body could not have reached.
 /// <list type="number">
 /// <item>The speed clamp (<see cref="NetValidation.AcceptMove"/>) runs first and keeps its
-/// converging behaviour: a too-fast move is <see cref="MoveVerdict.Clamped"/>, never corrected, and
+/// converging behavior: a too-fast move is <see cref="MoveVerdict.Clamped"/>, never corrected, and
 /// the rules below judge the clamped point.</item>
 /// <item>Without the flight flag (flight is noclip), a move whose body would overlap a solid cell
 /// (<see cref="PlayerPhysics.BodyCollides"/>, the client's collision rule) is

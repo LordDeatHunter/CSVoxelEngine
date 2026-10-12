@@ -7,7 +7,7 @@ namespace silkgltriangle.Tests;
 /// <summary>
 /// Pins <see cref="ChunkMap"/>'s contract - the wrapper that keeps <c>Vector3</c> as the outward
 /// chunk key while storing entries under a packed <c>long</c>. These facts deliberately assert
-/// the OUTWARD behaviour only; the packing itself is pinned by <c>ChunkKeyTests</c>.
+/// the OUTWARD behavior only; the packing itself is pinned by <c>ChunkKeyTests</c>.
 /// <para>
 /// Negative controls. Each fact below fails against a specific way the wrapper can be written
 /// wrongly: an overload forwarding to the wrong dictionary operation (set-then-get), the

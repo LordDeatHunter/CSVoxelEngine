@@ -213,7 +213,7 @@ public sealed class BlockDefinition
     public MaterialDefinition? Material { get; set; }
 
     /// <summary>Fluid tuning; only legal on a block with <see cref="Fluid"/>. Omitted means
-    /// water behaviour: every tick, full 7-block range, infinite sources, never hardens.</summary>
+    /// water behavior: every tick, full 7-block range, infinite sources, never hardens.</summary>
     public FlowDefinition? Flow { get; set; }
 
     /// <summary>"model" | "tree_wood" | "pebbles" | "branch_pile" | "snow_layers" |
@@ -386,7 +386,7 @@ public sealed class BlockDefinition
         public string? Overlay { get; set; }
     }
 
-    /// <summary>Voxel light behaviour of a block.</summary>
+    /// <summary>Voxel light behavior of a block.</summary>
     public sealed class LightDefinition
     {
         /// <summary>Light this block emits, 0-15.</summary>

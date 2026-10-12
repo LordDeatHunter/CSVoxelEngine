@@ -8,7 +8,7 @@ namespace silkgltriangle.Tests;
 /// <summary>
 /// The item debugger's ENTITIES tab state: data-driven modes (one per authored clip plus HURT),
 /// one-shots that keep replaying and swallow their own events, the hurt pulse, name lookup, and a
-/// walk that settles back onto the idle pose. Behaviour only: no clip lengths or keyframe values.
+/// walk that settles back onto the idle pose. Behavior only: no clip lengths or keyframe values.
 /// </summary>
 public sealed class EntityPreviewStateTests
 {

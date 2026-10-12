@@ -8,7 +8,7 @@
         <Nullable>annotations</Nullable>
         <AssemblyName>ItemDebugger</AssemblyName>
         <RootNamespace>silkgltriangle</RootNamespace>
-        <!-- Match the game's runtime behaviour so the preview is the shipping renderer. -->
+        <!-- Match the game's runtime behavior so the preview is the shipping renderer. -->
         <RollForward>LatestMajor</RollForward>
         <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
         <TieredPGO>true</TieredPGO>

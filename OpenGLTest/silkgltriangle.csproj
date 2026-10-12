@@ -9,7 +9,7 @@
         <!-- Lets the net9.0 app run on a newer major runtime (e.g. a 10.x-only
              user-local install in ~/.dotnet) without installing 9.x everywhere. -->
         <RollForward>LatestMajor</RollForward>
-        <!-- PERF_TODO item 10: lock the measured runtime behaviour in. Workstation + background
+        <!-- PERF_TODO item 10: lock the measured runtime behavior in. Workstation + background
              collections keep Gen2 pauses off the frame path; TieredPGO is the startup/steady-state
              tradeoff the Release measurements were taken with. Server GC deliberately off. -->
         <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>

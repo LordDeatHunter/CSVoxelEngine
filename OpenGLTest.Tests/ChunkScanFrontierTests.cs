@@ -43,7 +43,7 @@ public sealed class ChunkScanFrontierTests
 
     /// <summary>
     /// The pre-C3 scan, verbatim: walk the closest-first offsets from the centre and return the
-    /// first needed position. This is the behaviour the frontier must reproduce.
+    /// first needed position. This is the behavior the frontier must reproduce.
     /// </summary>
     private static Vector3? Reference(Vector3 center, Func<Vector3, bool> isNeeded)
     {
