@@ -189,14 +189,14 @@ public static class LodSurface
     /// cannot tell a placed torch from a removal, and would read it as a sub-surface dig and cap
     /// the column. Removals are always recorded.
     /// <para>
-    /// Call sites — every path that edits a cell must call this (World does it through
-    /// World.NotifyLodEdit), so add the next edit path here:
+    /// Call sites — every path that edits a cell must call this (World's edit paths do it
+    /// through BlockEditor.NotifyLodEdit), so add the next edit path here:
     /// <list type="bullet">
-    /// <item>World.RemoveBlock (mining, including the mined cell of a multiblock)</item>
-    /// <item>World.FellWood (the lowest felled cell per column)</item>
+    /// <item>BlockEditor.RemoveBlock (mining, including the mined cell of a multiblock)</item>
+    /// <item>BlockEditor.FellWood (the lowest felled cell per column)</item>
     /// <item>IItemUseWorld.MarkLodColumnEdited (item uses: the TNT a firestarter primes)</item>
-    /// <item>World.PlaceBlockAtFace (surface-solid placements only)</item>
-    /// <item>World.TryConvertMultiblock and World.RevertMultiblock (all eight cells)</item>
+    /// <item>BlockPlacer.PlaceBlockAtFace (surface-solid placements only)</item>
+    /// <item>BlockEditor.TryConvertMultiblock and BlockEditor.RevertMultiblock (all eight cells)</item>
     /// <item>FallingBlockManager.TryTopple (the highest then the lowest cell of the toppled run)
     /// and its Settle (a surface-solid landing)</item>
     /// <item>TntManager.Detonate (the highest then the lowest blasted cell per column)</item>

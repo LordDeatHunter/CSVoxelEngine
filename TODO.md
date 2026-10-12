@@ -344,7 +344,7 @@ single-arc player.
   this", clearer fed/needed counts). Stations reuse this UI, get their own, or craft in-world as
   the campfire/quern do (see `P-2`).
 - [ ] **`U-4` · Inventory QoL** — P1, M.
-  Shift-click, stack move/split, drag, and a bound drop key (`World.ThrowSelected` exists but
+  Shift-click, stack move/split, drag, and a bound drop key (`ThrowAction.ThrowSelected` exists but
   appears unbound).
 - [ ] **`U-5` · Death / respawn screen** — P1, S. Pairs `P-10`. **Milestone 1.**
 - [ ] **`U-7` · Creative palette + dev commands** — P1, M.

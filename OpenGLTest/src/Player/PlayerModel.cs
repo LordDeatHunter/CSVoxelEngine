@@ -568,7 +568,7 @@ public class PlayerModel
 
     public void StartThrowCharge() => _throwCharge01 = 0f;
 
-    /// <summary>Starts the timed-use pose (see <see cref="World.TryBeginUseCharge"/>).</summary>
+    /// <summary>Starts the timed-use pose (see <see cref="VoxelEngine.Interaction.RightClickAction.TryBeginUseCharge"/>).</summary>
     public void StartUseCharge() => _useCharge01 = 0f;
 
     /// <summary>Advances the timed-use pose; <paramref name="charge01"/> is the hold's share.</summary>

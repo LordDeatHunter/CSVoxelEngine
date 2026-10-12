@@ -1621,7 +1621,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float SteamGrow = 0.35f;
     public const float SteamAlpha = 0.6f;
 
-    // --- Tree fall thud (TopplingTree.TryTakeLanding -> World.ThudTree): the moment a felled tree
+    // --- Tree fall thud (TopplingTree.TryTakeLanding -> BlockEditor.ThudTree): the moment a felled tree
     // swings flat it shakes the local camera (ShakeFalloff: this strength, scaled by how much of
     // TreeThudFullWoodCells of wood fell, full within the near radius, gone at the range), bursts
     // leaves off its landed canopy and kicks the ground's dust up under the trunk at a few points.

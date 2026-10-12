@@ -45,7 +45,7 @@ public sealed class MobHitSparkTests : IDisposable
 
     private static void Punch(World world)
     {
-        world.UpdateBlockBreaking(Dt, isHolding: true);
+        world.LeftClick.UpdateBlockBreaking(Dt, isHolding: true);
         for (var i = 0; i < 60; i++)
             world.Player.Update(Dt, 0f);
     }
@@ -75,7 +75,7 @@ public sealed class MobHitSparkTests : IDisposable
         _world.GetChunkManager().Headless = true;
         var eye = new Vector3(0.5f, 300f, 0.5f);
         _world.Camera.TestTeleport(eye, yaw: -90f, pitch: 0f);
-        _world.ApplyNetworkEntities([new NetEntity(NetEntityKind.Slime, 7, eye + new Vector3(0f, 0f, -2f), 0f, 3, 0, 0,
+        _world.ClientMirror.ApplyNetworkEntities([new NetEntity(NetEntityKind.Slime, 7, eye + new Vector3(0f, 0f, -2f), 0f, 3, 0, 0,
             Vector3.Zero)]);
 
         Punch(_world);

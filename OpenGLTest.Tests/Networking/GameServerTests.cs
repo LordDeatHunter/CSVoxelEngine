@@ -1046,7 +1046,7 @@ public sealed class GameServerTests : IDisposable
         try
         {
             mirror.GetChunkManager().Headless = true;
-            mirror.ApplyNetworkEntities(inbox.Entities!);
+            mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
             var mirrored = Assert.Single(mirror.Slimes);
             Assert.Equal(served.Size, mirrored.Size);
             Assert.Equal(served.Health, mirrored.Health);

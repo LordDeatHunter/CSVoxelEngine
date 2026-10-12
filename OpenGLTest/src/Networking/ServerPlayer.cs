@@ -285,7 +285,7 @@ public sealed class ServerPlayer : IMobTarget
 
     // Standing against a cactus pricks: one tick per ContactDamage.TickSeconds while the reported
     // body box touches one; creative and flying are immune. The same rule singleplayer's
-    // World.UpdateCactusContact runs on its own pool.
+    // LocalPlayer.UpdateCactusContact runs on its own pool.
     private void UpdateCactusContact(float dt, ChunkManager chunks)
     {
         var touching = PlayerBodyProbe.IsKnown(Position, chunks);

@@ -2211,7 +2211,7 @@ systems present, plausible positions, blended correctly, no missing pass, debris
 re-sorted — while the headless order facts are what pin eviction order. It was run twice end to end
 with all six shots opened.
 **There is no fire leg, and the reason is structural rather than a missing pose.** The only ignition
-site is `CampfireManager.Ignite`, reached only from `World.TryUseSelected`'s branch gated on
+site is `CampfireManager.Ignite`, reached only from `RightClickAction.TryUseSelected`'s branch gated on
 `Inventory.SelectedToolInstance > 0`. A firestarter is a **tool**, but `VisualDirector`'s `give`
 equips through `Inventory.EquipStackable`, which writes a **non-tool** slot with instance 0, so the
 guard fails and ignition is never called — verified headlessly against a real `Inventory` and

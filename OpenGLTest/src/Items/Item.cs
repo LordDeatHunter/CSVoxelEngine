@@ -173,7 +173,7 @@ public abstract class Item
     /// <summary>
     /// Right-click behavior while holding this item, against whatever the player is aiming
     /// at. Pure decision + effect logic through <paramref name="ctx"/>; the caller
-    /// (<c>World.TryUseSelected</c>) applies the returned morph and punch. The base answers
+    /// (<c>WorldItemUse.DispatchUse</c>) applies the returned morph and punch. The base answers
     /// "nothing happens" so plain pickups need no override. <paramref name="stack"/> is the
     /// selected tool instance, or null for stackable (misc) items like flint.
     /// </summary>

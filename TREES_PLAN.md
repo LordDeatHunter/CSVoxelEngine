@@ -295,9 +295,9 @@ bands }`:
    layer per tick (mining still fells through `TopplingTree`). Freezing: any read that lands in an
    unloaded chunk drops the cell from the schedule, never decays it. `ScheduleReach` = max leafy
    `leafRadius` + 1 (the +1 for a parent that turns into a tip); `ScheduleAround`/`ScheduleBox`
-   grow the edited extent by it, so callers never know the radius. Hooks: `World.RemoveBlock`,
+   grow the edited extent by it, so callers never know the radius. Hooks: `BlockEditor.RemoveBlock`,
    all three `FellWood` branches (one box over the batch clear, never per cell),
-   `PlaceBlockAtFace` (placed leaves get `LeafState.Encode(0, persistent: true)` beside the wood
+   `BlockPlacer.PlaceBlockAtFace` (placed leaves get `LeafState.Encode(0, persistent: true)` beside the wood
    `Detached` line), the bucket/prime `IItemUseWorld` wrappers (interface unchanged) and
    `TntManager.Detonate`/`Update` through a new defaulted `leafDecay` parameter. Fluids never
    wash leaves (they are not replaceable), so the fluid tick has no hook. Chunk loads schedule
@@ -722,8 +722,8 @@ widens the far rings' proxy sweep slightly and shows no cost in the totals above
 - Content plumbing: `src/Content/ContentRegistry.cs`, `BlockDefinition.cs`, `BlockRenderer.cs`
   and `src/BlockType.cs` (wood family/level tables removed).
 - Meshing: `src/Chunk.cs` (the tapered-wood emitter becomes the `tree_wood` emitter).
-- Gameplay: `src/TopplingTree.cs`, `src/World.cs` (`FellWood`, `RemoveBlock`, placement,
-  decay hooks) and `src/Mining.cs`.
+- Gameplay: `src/TopplingTree.cs`, `src/Interaction/BlockEditor.cs` (`FellWood`, `RemoveBlock`)
+  and `BlockPlacer.cs` (placement), their decay hooks, and `src/Mining.cs`.
 - LOD: `src/LodRegion.cs` (canopy reads).
 - Saves: `src/Saves/ChunkSaveCodec.cs` / `WorldInfo` (format version).
 - `OpenGLTest/assets/data/blocks/*`: the wood, leaves and cactus JSON.

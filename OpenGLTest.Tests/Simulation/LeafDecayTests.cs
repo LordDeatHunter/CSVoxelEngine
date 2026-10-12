@@ -608,7 +608,7 @@ public sealed class LeafDecayTests
 
     /// <summary>The wood a sequence of fells drops besides the cut cells themselves: each cut is
     /// felled through <see cref="TopplingTree.Collect"/> and everything it took is cleared, as
-    /// <c>World.FellWood</c> would, before the next cut.</summary>
+    /// <c>BlockEditor.FellWood</c> would, before the next cut.</summary>
     private static HashSet<(int X, int Y, int Z)> FelledBy(StampedTree tree, List<(int X, int Y, int Z)> cuts)
     {
         var felled = new HashSet<(int X, int Y, int Z)>();

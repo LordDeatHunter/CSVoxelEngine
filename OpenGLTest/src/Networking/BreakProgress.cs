@@ -23,9 +23,10 @@ public enum BreakVerdict
 
 /// <summary>
 /// One player's mining on the server, the authoritative twin of the client's hold-to-mine loop in
-/// <see cref="World.UpdateBlockBreaking"/>. <see cref="Start"/> records the target, the held item
-/// and when mining began; <see cref="Complete"/> breaks the block only when the hits the held item
-/// lands at its pace since then add up to the block's hardness, exactly as the client counts them:
+/// <see cref="VoxelEngine.Interaction.LeftClickAction.UpdateBlockBreaking"/>. <see cref="Start"/>
+/// records the target, the held item and when mining began; <see cref="Complete"/> breaks the
+/// block only when the hits the held item lands at its pace since then add up to the block's
+/// hardness, exactly as the client counts them:
 /// the first hit lands the moment mining starts and one more every
 /// <see cref="Mining.HitGapSeconds"/>, each removing <see cref="Mining.BlockDamage"/>. A changed
 /// target or held item restarts the break, a refused tool never completes it, and a creative

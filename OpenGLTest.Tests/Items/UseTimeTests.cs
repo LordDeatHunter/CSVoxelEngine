@@ -37,7 +37,7 @@ public sealed class UseTimeTests : IDisposable
         WorldSeed.Apply(WorldSeed.Default);
         _world = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
         _world.GetChunkManager().Headless = true;
-        _world.ApplyNetworkHealth(40);
+        _world.ClientMirror.ApplyNetworkHealth(40);
 
         bandage = ContentRegistry.RequireItem("bandage");
         Assert.True(_world.Inventory.Add(bandage.Id));
@@ -53,19 +53,19 @@ public sealed class UseTimeTests : IDisposable
         var world = NewClientWorld(out var bandage);
         Assert.True(bandage.UseSeconds > 0f, "the bandage declares no use.seconds");
 
-        Assert.True(world.TryBeginUseCharge());
-        Assert.True(world.IsUseCharging);
+        Assert.True(world.RightClick.TryBeginUseCharge());
+        Assert.True(world.RightClick.IsUseCharging);
 
         // Holding for less than the item's seconds does nothing yet
         for (var t = 0f; t < bandage.UseSeconds - 0.15f; t += Dt)
-            world.UpdateUseCharge(Dt);
+            world.RightClick.UpdateUseCharge(Dt);
         Assert.Equal(40, world.Health);
-        Assert.True(world.IsUseCharging);
+        Assert.True(world.RightClick.IsUseCharging);
 
         // Completing the hold runs the use: healed, one bandage spent
         for (var t = 0f; t < 0.4f; t += Dt)
-            world.UpdateUseCharge(Dt);
-        Assert.False(world.IsUseCharging);
+            world.RightClick.UpdateUseCharge(Dt);
+        Assert.False(world.RightClick.IsUseCharging);
         Assert.Equal(40 + WorldGenerationConfig.BandageHealAmount, world.Health);
         Assert.Equal(0, world.Inventory.CountFor(bandage.Id));
     }
@@ -74,11 +74,11 @@ public sealed class UseTimeTests : IDisposable
     public void ReleasingEarlyCancelsAndSpendsNothing()
     {
         var world = NewClientWorld(out var bandage);
-        Assert.True(world.TryBeginUseCharge());
-        world.UpdateUseCharge(Dt * 5);
-        world.CancelUseCharge();
+        Assert.True(world.RightClick.TryBeginUseCharge());
+        world.RightClick.UpdateUseCharge(Dt * 5);
+        world.RightClick.CancelUseCharge();
 
-        Assert.False(world.IsUseCharging);
+        Assert.False(world.RightClick.IsUseCharging);
         Assert.Equal(40, world.Health);
         Assert.Equal(1, world.Inventory.CountFor(bandage.Id));
     }
@@ -93,8 +93,8 @@ public sealed class UseTimeTests : IDisposable
         world.Inventory.Select(1);
         Assert.Equal(cotton.Id, world.Inventory.SelectedBlockId);
         Assert.False(cotton.UseSeconds > 0f);
-        Assert.False(world.TryBeginUseCharge());
-        Assert.False(world.IsUseCharging);
+        Assert.False(world.RightClick.TryBeginUseCharge());
+        Assert.False(world.RightClick.IsUseCharging);
         _ = bandage;
     }
 }

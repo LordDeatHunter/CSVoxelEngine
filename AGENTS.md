@@ -171,7 +171,7 @@ The app opens a window and grabs the mouse. Controls: WASD to move, mouse to loo
 
 **HUD and feedback.** The crosshair is drawn as five pieces cropped out of its 16x16 texture (a
 center dot and four pills): the arms slide outward with the eased `Camera.ThrowCharge` while a throw
-is charged, a ring of dots around it fills with `World.Crosshair.BreakProgress` (0 in creative or
+is charged, a ring of dots around it fills with `LeftClickAction.Crosshair.BreakProgress` (0 in creative or
 with no target), and the hit marker flashes an X at the two connecting-hit sites the hit-stop uses (a
 landed punch or slice), fading over `HitMarker.Seconds` (`HitMarkerTests`). At the top of the
 screen the **look-at label** shows the targeted block: its name and a small spinning 3D render of
@@ -179,7 +179,7 @@ it, pushed below the compass or clock strip while one is equipped (`UIRenderer.D
 its `LookLabelTop` over `BlockCubeCache`), the name in red while the held item cannot mine
 it, and "Unknown" with a flat dark silhouette until its item has been obtained; creative mode and a
 block with no item at all always know, and `X` adds id, state, sun/block light and cell debug lines
-(`LookLabel`, `World.LookAt`, `LookLabelTests`, `look-label.json`). "Obtained" is the inventory's own
+(`LookLabel`, `LeftClickAction.LookAt`, `LookLabelTests`, `look-label.json`). "Obtained" is the inventory's own
 set (`Inventory.Knows`, marked in `Add`, saved as names in `player.json` and riding the
 `InventoryNetCodec` snapshot, so a server's player and a client agree), which also drives the
 "New: <name>" toast on a first pickup or `/give`. `HudToast` draws one line above the item-name row
@@ -190,7 +190,7 @@ first-find toast; `HotbarNameFade` shows the selected item's name after a slot o
 saves the finished frame through `VisualCapture`; F1 toggles `hudVisible`, the gate the scenario
 screenshot's `hideHud` drives. The chat commands are `/help`, `/tp x y z`, `/give <item> [count]`
 (the last two needing rights) and `/time day|night|<seconds>`; the death line is
-`DeathMessages.For` over the blow `PlayerHealth` recorded, drained into the chat (`TakeDeathMessage`).
+`DeathMessages.For` over the blow `PlayerHealth` recorded, drained into the chat (`LocalPlayer.TakeDeathMessage`).
 
 `X` also raises the **frame profiler overlay** under the FPS counter, and prints the same
 snapshot to the console once a second so a headless run's log carries it. Console writes go
@@ -222,7 +222,7 @@ records which build and which GPU produced it. Timing lives in `OpenGLTest/src/C
 wrap new work in `FrameProfiler.Begin`/`End` (main thread only) rather than adding another ad-hoc
 stopwatch.
 
-Standing in water switches the player to **swimming** (`Camera.IsInWater`, recomputed every frame by `PlayerPhysics.UpdateWaterState` from the real fluid surface heights under the body): movement is a series of **burst strokes** rather than a steady paddle: a stroke (ready at once on entering the water, then every `SwimStrokeSeconds`) *sets* the horizontal speed to `SwimBurstSpeed` along the WASD direction (0.6x backing up), which then glides off under `SwimGlideDrag` until the next one; Space and Ctrl stroke straight up (`SwimBurstUp`) or down (`SwimBurstDown`), the vertical speed gliding toward the gentle `SinkSpeed` through `MathUtils.Damp`, and no input means no stroke (`Camera.SwimStrokeCount` moves on each, which is how the body starts its stroke animation on the same frame; see "Animation juice"; with the eye under water, not in lava, each one also lets out a burst of `SwimStrokeBubble*` bubbles just in front of the head through `BubbleParticleSystem.TrackSwimStrokes`, run by `World.UpdateBubbles` in singleplayer and on a client, never on a server). Swimming into a bank while holding Space adds `SwimExitBoost` so the player can climb out without a ramp. Flight ignores water entirely, and a player standing on the bottom of a shallow puddle still jumps normally. Flowing water also pushes the player and floating item drops along its flow direction (`ChunkManager.GetFluidFlowGlobal`, Minecraft's `FlowingFluid.getFlow`: a horizontal vector summed from how much lower each neighboring cell's surface sits, zero in a still pool). `Camera.IsEyeInWater` is the separate eye-only test and is the source of truth for the underwater tint.
+Standing in water switches the player to **swimming** (`Camera.IsInWater`, recomputed every frame by `PlayerPhysics.UpdateWaterState` from the real fluid surface heights under the body): movement is a series of **burst strokes** rather than a steady paddle: a stroke (ready at once on entering the water, then every `SwimStrokeSeconds`) *sets* the horizontal speed to `SwimBurstSpeed` along the WASD direction (0.6x backing up), which then glides off under `SwimGlideDrag` until the next one; Space and Ctrl stroke straight up (`SwimBurstUp`) or down (`SwimBurstDown`), the vertical speed gliding toward the gentle `SinkSpeed` through `MathUtils.Damp`, and no input means no stroke (`Camera.SwimStrokeCount` moves on each, which is how the body starts its stroke animation on the same frame; see "Animation juice"; with the eye under water, not in lava, each one also lets out a burst of `SwimStrokeBubble*` bubbles just in front of the head through `BubbleParticleSystem.TrackSwimStrokes`, run by `AmbientEffects.UpdateBubbles` in singleplayer and on a client, never on a server). Swimming into a bank while holding Space adds `SwimExitBoost` so the player can climb out without a ramp. Flight ignores water entirely, and a player standing on the bottom of a shallow puddle still jumps normally. Flowing water also pushes the player and floating item drops along its flow direction (`ChunkManager.GetFluidFlowGlobal`, Minecraft's `FlowingFluid.getFlow`: a horizontal vector summed from how much lower each neighboring cell's surface sits, zero in a still pool). `Camera.IsEyeInWater` is the separate eye-only test and is the source of truth for the underwater tint.
 
 **Water depth states.** Beside `IsInWater` (which keeps its meaning) the camera reports how deep the
 body stands: `Camera.ImmersionShare`, the share of `PlayerPhysics.PlayerHeight` under the highest fluid
@@ -299,7 +299,7 @@ uploaded pre-linearized: `BlockLightPalette.Linear` goes up once per frame as th
 smooth `fBlockTint` (mirroring `LightTint.Decode`), the plain (entity) path reads
 `uBlockLightPalette[uEntityTint]`, and the fragment's torch term is `fBlockTint * pow(...)` in
 place of the old single `uTorchColor`; a GLSL constant that stands for one is written as its
-decoded value with the sRGB original in a comment. At the end of `World.Render` the `postPass`
+decoded value with the sRGB original in a comment. At the end of `WorldRenderer.Render` the `postPass`
 section calls `RenderManager.RenderPostProcess`, which binds framebuffer 0 and runs
 `PostProcessRenderer` (`post-fragment.glsl`): exposure (`WorldGenerationConfig.TonemapExposure`),
 a per-channel clamp to 0..1 (what the old 8-bit target did, so snow and white sand clip to white
@@ -438,7 +438,7 @@ post-fragment.glsl reads red and blue from either side of each pixel along the l
 center (`DisplayBilinear`, after FXAA, before the grade), by `uDamageFringe` times
 `DamageFringe.EdgeWeight` (nothing in the middle, full at the corners) times `DamageFringeScreenShare`
 of the screen height. The strength is `DamageFringe.Strength` of the vignette's own damage flash
-(`PlayerHealth.DamageFlash`, which `World.Render` now hands to `RenderManager.RenderPostProcess`), so
+(`PlayerHealth.DamageFlash`, which `WorldRenderer.Render` now hands to `RenderManager.RenderPostProcess`), so
 it lasts only the first `DamageFringeSeconds` of the flash; a client mirrors the flash with its health.
 `DamageFringeTests`; `visual-examples/damage-fringe.json` (`VOXEL_TIME` 147).
 
@@ -515,7 +515,7 @@ keeps a band about that reach wide in the world rather than a tap radius wide on
 `SelectionPulseMinOpacity` (70 %) and full opacity, one breath every `SelectionPulsePeriodSeconds`:
 `selection-fragment.glsl` scales the outline's `uOpacity` by `1 - uPulseDepth * (0.5 + 0.5 sin)` of
 `uTime`, and `SelectionPulse` is its GL-free twin (`Depth(mining)` is what `RenderBlockSelection`
-uploads, `Opacity` the curve). While the block is being mined (`World._isBreaking`, passed as
+uploads, `Opacity` the curve). While the block is being mined (`LeftClickAction.IsBreaking`, passed as
 `RenderBlockSelection`'s `mining`) the depth is 0, so the outline holds steady at full and the crack
 overlay stays readable; the face highlight (`uDisplayMix` 1) never pulses. The outline beams draw
 with back faces culled, so each pixel blends exactly one face of a beam: with both faces blended an
@@ -846,8 +846,11 @@ OpenGLTest/
   src/                         # the app entry and the core types only (Program, World and its phase/seed/load gate, BlockType)
     Program.cs                 # entry point, wires window callbacks, input polling; the AppScreen
                                #   flow (Menu/Loading/Playing/Saving) and the deferred open/save
-    World.cs                   # owns Camera, ChunkManager, ChunkGenerationWorker, LodManager; raycast block edit API;
-                               #   optional save store, Loading phase, FlushAll/autosave, SaveAndDispose
+    World.cs                   # the composition root: owns Camera, ChunkManager, ChunkGenerationWorker, LodManager,
+                               #   the simulations and the per-job components (BlockEditor, BlockPlacer, LeftClickAction,
+                               #   RightClickAction, ThrowAction, LocalPlayer, ClientMirror, WorldPersistence, WorldRenderer,
+                               #   ...); runs Update/UpdateClient/UpdateLoading, the Loading phase and SaveAndDispose,
+                               #   and holds the dedicated server's public facade (BreakBlockFor, TryUseSelected, ...)
     WorldPhase.cs              # Loading / Playing / Disposed
     WorldLoadGate.cs           # GL-free: when a loading world may play (ready sphere meshed, or timeout); load progress
     WorldSeed.cs               # the runtime world seed: Apply reseeds worldgen + resets caches/LOD edits; BeginWorld/EndWorld
@@ -1080,7 +1083,14 @@ OpenGLTest/
       TextureLoader.cs         # uploads textures for the shared Vertex layout
       TileMaterials.cs         # the per-atlas-layer material table the world fragment shader indexes by fLayer
     Interaction/               # GL-free block interaction rules: raycast, mining, combat, placement, support,
-                               #   doors and tall blocks, multiblocks, the selection outline, chat commands
+                               #   doors and tall blocks, multiblocks, the selection outline, chat commands;
+                               #   and the World components that run them for a player: block edits,
+                               #   placement, left and right click, throws, station clicks, mob strikes
+      BlockEditor.cs           # World component: the removal edit paths (RemoveBlock, FellWood, tall blocks),
+                               #   multiblock convert/revert, toppling-tree landing, the prediction report, LOD notify
+      BlockInteractions.cs     # World component: the campfire, quern, kiln and cast mold right-clicks, openables
+      BlockPlacer.cs           # World component: placement (PlaceBlockAtFace and its callers), the place pop,
+                               #   pick block, the last placement hit
       BlockRaycaster.cs        # the DDA block raycast + line-of-sight segment test, split out of Camera.cs
       BlockSupport.cs          # GL-free needsSupport rule: the cell holding a block up (below, or
                                #   behind the front of a support "attached" block)
@@ -1089,8 +1099,11 @@ OpenGLTest/
                                #   and entity damage, shared by the punch loop and the tests
       DoorState.cs             # GL-free state byte of an openable block: facing in bits 0-1, the
                                #   open bit 2, the index into its eight pre-turned shapes
+      LeftClickAction.cs       # World component: the crosshair target, mining (UpdateBlockBreaking), punch and
+                               #   slice, the look-at label and crosshair state
       Mining.cs                # GL-free mining rules: the tools/requiresTool gate, block damage per
                                #   hit and hit pace shared by the break loop and the tests
+      MobStrikes.cs            # World component: a landed hit's damage, shove, sparks and floating number
       Multiblock.cs            # GL-free multiblock structure rules: the eight cells of the 2x2x2
                                #   volume, the state byte (facing + offset from the anchor),
                                #   anchor resolution, the integrity check, Convert and Revert
@@ -1100,12 +1113,14 @@ OpenGLTest/
                                #   flagged replaceableByPlacement, layered snow, is taken over in
                                #   place), what a placement may write over, and TryMount (a torch
                                #   on a block's side becomes its wallBlock, facing the hit normal)
+      RightClickAction.cs      # World component: the right-click chain (TryUseSelected) and the timed use charge
       RightClickOutcome.cs     # what claimed a right-click: a station, the item's use, or a placement
       SelectionOutlineMesh.cs  # GL-free selection outline: the 12 box edges as thin beams (no glLineWidth)
       SelectionPulse.cs        # GL-free twin of the outline's breathing opacity (steady while mining)
       SliceCombo.cs            # the blade's two-phase slice combo: press/queue/advance state
       TallBlock.cs             # GL-free two-cell block rules (a door): each half's partner cell
                                #   and block, and the lower half every half drops and picks as
+      ThrowAction.cs           # World component: Q drops, the throw charge and release, the projectiles in flight
     Items/                     # the Item class hierarchy ItemFactory hands out per use action, and the registry
       BlockItem.cs             # the Item every placeable block also is, so hotbar,
                                #   drops and recipes resolve both through ItemRegistry
@@ -1129,6 +1144,8 @@ OpenGLTest/
       PlainItem.cs             # a plain pickup: no right-click behavior (vine, branch, compass)
       PlantTreeItem.cs         # plants a sapling of the item's Item.UseTreeName species
                                #   on the aimed ground (an acorn on dirt or grass)
+      WorldItemUse.cs          # World component: the one IItemUseWorld implementation, DispatchUse and the
+                               #   dispatching player (bucket, pile, prime, heal, grow and plant wrappers)
     Juice/                     # game-feel rules: camera shake, kick, FOV and tilt terms, hit-stop,
                                #   damage direction and fringe, the low-health vignette, pops and shatters
       BlastImpulse.cs          # GL-free TNT blast shove: away from the center, falling to zero at the radius
@@ -1161,6 +1178,8 @@ OpenGLTest/
       ClientChunkStreamer.cs   # requests streamed chunks/columns and applies them, no worldgen; the
                                #   client's IColumnSource
       ClientLodStreamer.cs     # requests and applies server-built far regions
+      ClientMirror.cs          # World component, client mode: applies the server's cells, entities, stations,
+                               #   health and player list (ApplyNetwork*, SyncRemotePlayers)
       ClientPrediction.cs      # GL-free: a client's pending predictions vs the server's answers (sequence ids)
       InventoryIntent.cs       # one client inventory intent (select, drop, equip, craft, creative grant/clear, pick)
       InventoryIntentCodec.cs  # its bounds-checked wire form
@@ -1190,6 +1209,8 @@ OpenGLTest/
       WorldIntentCodec.cs      # its bounds-checked wire form, with the sequence id
     Particles/                 # every particle system (debris, bubbles, fire, leaves,
                                #   splashes, dust) and its renderer; the ParticleRing buffer
+      AmbientEffects.cs        # World component: cosmetic world effects (steam puffs, lava vents, spring steam,
+                               #   torch flames, bubbles, water splashes, blast shake)
       BlockDebris.cs           # one chunk of mining debris: a small cube textured as the block it broke off from
       BlockDebrisSystem.cs     # owns the live mining debris: small textured cubes chipped off
                                #   on every mining hit plus a bigger burst when the block breaks
@@ -1220,7 +1241,9 @@ OpenGLTest/
                                #   raycast live in Player/PlayerPhysics.cs and Interaction/BlockRaycaster.cs
       DeathMessages.cs         # the death line from the blow PlayerHealth recorded
       FallTracker.cs           # GL-free fall-damage rule: peak/grounded chain fed one feet height at a time
-                               #   (singleplayer's UpdateHealth and each ServerPlayer's accepted states)
+                               #   (singleplayer's LocalPlayer.UpdateHealth and each ServerPlayer's accepted states)
+      LocalPlayer.cs           # World component: the local player's spawn settle, health, death and respawn,
+                               #   body model, hurt and punch feedback, the saved-player apply, its PlayerContext
       PlayerBodyProbe.cs       # GL-free body probes over the live chunk map: known (loaded), grounded,
                                #   in water, in lava; what the server judges a remote player's body by
       PlayerContext.cs         # who an interaction runs for: eye, aim, inventory, creative (local camera or a
@@ -1309,6 +1332,7 @@ OpenGLTest/
                                #   DrawMainMenu (all main-menu pages) and DrawLoadingScreen
       UITextCache.cs           # memoized per-frame HUD strings (FPS, compass, coordinates, counts)
       UnderwaterRaysRenderer.cs # additive full-screen sun shafts while the eye is submerged
+      WorldRenderer.cs         # World component: the world's frame (Render, every pass in order) and its UI (RenderUI)
     Saves/                     # GL-free world saves: stores, codecs, names, world sources (see "Saves")
       ChunkSaveCodec.cs        # the chunk file format: block-name palette + Deflate body
       ChunkSaveStore.cs        # one world's chunk files + side cars: pending map, index, async writer thread
@@ -1331,6 +1355,8 @@ OpenGLTest/
                                #   SourceName = the raw world.json `source` (null when absent), Source = it
                                #   resolved (`generated` when unset), read by the dedicated server only
       WorldNames.cs            # name normalizing, the "Unnamed World" default, unique numeric suffix, folder slug
+      WorldPersistence.cs      # World component: autosave, FlushAll, the player and entity capture and the
+                               #   pending entity restore (player.json, entities.json, lod-edits.bin)
       WorldSeedParser.cs       # seed field -> seed: empty = random, integer verbatim, else FNV-1a hash
       WorldSources.cs          # the server's named world sources (generated, imported): Create(name, worldDir)
       WorldStore.cs            # the saves root: list (most recent first), create, rename, delete, touch;
@@ -1342,6 +1368,8 @@ OpenGLTest/
       CastingManager.cs        # one cast per mold cell: pour from a held crucible, cool, collect
       DropCollector.cs         # one player a drop may fly to on a multiplayer server
       DropManager.cs           # owns the live item drops: spawns them where blocks break, pulls nearby ones toward the player
+      DropPickup.cs            # World component: the per-frame drop collection (the local player, or every
+                               #   connected player on a server, plus goblin scavenging)
       FallingBlockManager.cs   # owns gravity-affected blocks: topples a falls block
                                #   into a FallingBlock entity when its support goes away
       FluidFlow.cs             # the one definition of which way a fluid flows
@@ -1702,7 +1730,7 @@ trailing commas.
 | `support` | `"below"` | which neighbor holds a `needsSupport` block up: `below`, `above` (the cell over it: a hanging lantern, so it is placed against a block's underside, or wherever a solid block stands over the target cell; `BlockType.SupportAbove`) or `attached` (the cell behind its front, opposite the `facing` in its state byte: a wall torch). Only with `needsSupport`; `attached` also needs `facing` |
 | `facing` | none | `"horizontal"`: the state byte's low two bits are a facing (north -Z 0, south +Z 1, west -X 2, east +X 3); the model (no full-face quads) and `hitbox` are authored facing north and pre-turned to all four (`BlockType.RotatedModels`/`RotatedHitboxes`, `HorizontalFacing`). Only on the `model` renderer, never with `fluid`, `falls` or `stackMax` |
 | `facingFromLook` | false | a placement faces the block along the placing player's horizontal look (`Placement.LookFacing`: the dominant horizontal axis of `PlayerContext.ViewDirection`, so a server replays a `Place` intent by that player's own aim), whatever face was hit: stairs placed looking north climb north. Only with `facing`, never with `support: "attached"` |
-| `open` | none | makes the block openable: `{"model": m, "hitbox": h}`, both required, authored facing north like the closed model and hitbox. Right-click (`World.TryToggleOpenable`, in the right-click chain after the stations) flips `DoorState.OpenBit` in the state byte whatever is in hand, and the block is then drawn with `m` and hit (and, with `collidesByHitbox`, collided) with `h`; `RotatedModels`/`RotatedHitboxes` hold the four closed facings then the four open ones. Only with `facing`. `oak_trapdoor` |
+| `open` | none | makes the block openable: `{"model": m, "hitbox": h}`, both required, authored facing north like the closed model and hitbox. Right-click (`BlockInteractions.TryToggleOpenable`, in the right-click chain after the stations) flips `DoorState.OpenBit` in the state byte whatever is in hand, and the block is then drawn with `m` and hit (and, with `collidesByHitbox`, collided) with `h`; `RotatedModels`/`RotatedHitboxes` hold the four closed facings then the four open ones. Only with `facing`. `oak_trapdoor` |
 | `upperHalf` | none | makes this block the lower half of a block two cells tall (`TallBlock`): the named block fills the cell above it. Placement writes both halves with one state byte and is refused, spending nothing, unless the upper cell is free too; breaking either half takes the other down through the hooks mining runs and drops this block once; an openable pair opens and shuts together. The upper half needs `hasItem: false` (it is picked as this block, `BlockType.PickId`), the same `facing` and `open` as this block, and neither half may be a fluid, fall, need support or stack. `oak_door` -> `oak_door_upper` |
 | `wallBlock` | none | the block a placement against a block's side becomes, facing the hit normal (leaning away from the wall); on top the block places as itself, under a ceiling it is refused (`Placement.TryMount`). The wall block needs `facing` and `support: "attached"`, and is picked as this block (`BlockType.PickId`). `torch` -> `wall_torch` |
 | `replaceableByPlacement` | false | a block placement aimed at this block fills the block's own cell and discards it, instead of filling the cell across the hit face, so a block placed against a partial snow drift rests on the ground instead of hovering a layer above it. Only fires while the cell is not solid, so a full snow stack stays an ordinary block, and the displaced block drops nothing. Independent of `needsSupport`, which is what a flow or a bucket may overwrite. Illegal on an always-solid block, which could never honor it |
@@ -1748,7 +1776,7 @@ per-corner AO path indexes neighbor deltas by `Chunk.CubeFaces` corner order, wh
 breaks, so a multiblock shades flat on every facing.
 
 **Conversion** is a right-click with an item whose `use.action` is `convert_multiblock`
-(`ConvertMultiblockItem` -> `World.TryConvertMultiblock` -> `MultiblockPlacement.TryFindVolume`).
+(`ConvertMultiblockItem` -> `BlockEditor.TryConvertMultiblock` -> `MultiblockPlacement.TryFindVolume`).
 The clicked cell is one corner and the volume always extends **into** the face that was hit, away
 from the player; which of the four volumes containing that corner is taken is decided in screen
 terms in the order **right-down, right-up, left-down, left-up** (`CandidateOrder`), where
@@ -1758,18 +1786,18 @@ opening ends up facing the player: on a side face that is the hit normal itself,
 bottom face (where the normal says nothing about where the player stands) it is the player's own
 horizontal view direction, reversed.
 
-**Mining any of the eight cells** reverts the rest (`World.RemoveBlock` -> `RevertMultiblock` ->
+**Mining any of the eight cells** reverts the rest (`BlockEditor.RemoveBlock` -> `RevertMultiblock` ->
 `Multiblock.Revert`): the mined cell is cleared and rolls the structure's own loot table (the
 kiln's yields the one `mud_bricks` that cell was built from), and every other cell still holding
 the anchor or part id becomes the source block again with a **zeroed** state byte.
 Both `Convert` and `Revert` write through `Chunk.SetBlockRaw` and only collect the chunk
-positions they touched, because the remesh follows the `FellWood` batch idiom — one
+positions they touched, because the remesh follows the `BlockEditor.FellWood` batch idiom — one
 `ChunkManager.ImmediateRemeshWithBorders` on the clicked or mined cell's chunk so the click frame
 already shows the change, and `Chunk.RemeshAfterBatchEdit` (the asynchronous `MarkAreaDirty`
 rebuild a felled tree and a TNT crater already use) on the rest — never a loop of eight immediate
 remeshes.
 
-Nothing but mining goes through `RemoveBlock`, so a **blast** would otherwise leave the rest of a
+Nothing but mining goes through `BlockEditor.RemoveBlock`, so a **blast** would otherwise leave the rest of a
 structure standing as invisible solid blocks. `KilnManager.Update` doubles as the integrity sweep
 for that: it re-checks `Multiblock.IsIntact` every frame, freezes while any cell is in an unloaded
 chunk (`anyUnloaded`, so a half-loaded structure is never mangled) and otherwise reverts,
@@ -1795,8 +1823,8 @@ as far as its boxes reach on every facing, and a floor slab is stood on at its t
 **Stairs** (`cobblestone_stairs`, `oak_planks_stairs`, four from six of their block) are a
 `facing: "horizontal"` block with `facingFromLook`: `Placement.TryMount`'s look overload writes
 `Placement.LookFacing` of the placing `PlayerContext.ViewDirection` into the state byte's low two
-bits (`World.PlaceBlockAtFace` takes the view from the placing player, the item-use path from
-`ActiveContext`), so the step rises the way the player looked. The `block/stairs` parent is
+bits (`BlockPlacer.PlaceBlockAtFace` takes the view from the placing player, the item-use path from
+`WorldItemUse.ActiveContext`), so the step rises the way the player looked. The `block/stairs` parent is
 authored facing north (tall step over the north half) and split into three boxes so no face
 covers a whole cell side (`ValidateFacingBake`); the two `hitbox` boxes turn with it
 (`RotatedHitboxes`) and the body collides with them, so the walk step climbs them. On a client
@@ -1804,9 +1832,9 @@ in third person the predicted facing reads the camera's view while the server re
 so a placement near a 45-degree look may be corrected. `StairTests` covers the rules.
 
 The **lantern** hangs under a ceiling: `support: "above"` (`BlockSupport.SupportOffset` returns
-+Y for a `BlockType.SupportAbove` block), so `World.PlaceBlockAtFace`'s support check only lets it
++Y for a `BlockType.SupportAbove` block), so `BlockPlacer.PlaceBlockAtFace`'s support check only lets it
 in where a solid block stands over the target cell (a placement against a block's underside), and
-every pop path that asks `BlockSupport` (mining's `PopUnsupportedAround`, the blast scan, leaf
+every pop path that asks `BlockSupport` (mining's `BlockEditor.PopUnsupportedAround`, the blast scan, leaf
 decay) takes it down with that block. It lights like the torch (emission 15, the default warm
 color), is non-solid, and crafts from a torch and a copper ingot. Its model crops a cage, a lid
 and a chain out of one opaque tile from `tools/generate-lantern-texture.py`, whose header notes
@@ -1837,7 +1865,7 @@ The **trapdoor** (`oak_trapdoor`, two from six planks) is a 3 px hatch on the ce
 `facing` with `facingFromLook` plus an `open` object (schema table), so it opens by right-click
 into a panel standing against the side of its cell nearest whoever placed it. The open bit is the
 `DoorState` meaning of the state byte (see the state-byte invariant), the toggle is
-`World.TryToggleOpenable`, a raw state write through `Chunk.SetStateAt` (saved, journaled to
+`BlockInteractions.TryToggleOpenable`, a raw state write through `Chunk.SetStateAt` (saved, journaled to
 clients, remeshed at once) with the fluid and leaf-decay schedules and `World.BlockEdited`; a
 client predicts it and the server replays the `Use` intent through the same chain. Both models
 (`block/trapdoor_bottom`, `block/trapdoor_open`) are split in half-width boxes so no face spans a
@@ -1848,13 +1876,13 @@ The **door** (`oak_door`, three from six planks) is two blocks, `oak_door` (the 
 item and the drop) naming `oak_door_upper` as its `upperHalf` (schema table, `TallBlock`), both
 openable facing blocks on the `block/door_closed` / `block/door_open` parents: shut, a 3 px panel
 across the side of the cell nearest the placer; open, swung a quarter turn about its left-hand
-hinge into the cell. `World.PlaceBlockAtFace` checks the upper cell (`CanPlaceUpperHalf`: loaded,
+hinge into the cell. `BlockPlacer.PlaceBlockAtFace` checks the upper cell (`CanPlaceUpperHalf`: loaded,
 free for a placement, no falling cube or player body) before writing the lower half, then writes
 the upper half with the same state (`PlaceUpperHalf`, with the fluid, leaf-decay and
-`BlockEdited` hooks); `World.RemoveBlock` hands either half to `RemoveTallBlock`, which drops the
+`BlockEdited` hooks); `BlockEditor.RemoveBlock` hands either half to `RemoveTallBlock`, which drops the
 lower half once and clears the partner through the hooks mining runs (fluid, leaf decay, far LOD,
 `PopUnsupportedAround`, a falls block above it, `BlockEdited`), the multiblock revert in
-miniature; `TryToggleOpenable` writes the clicked half's new state to its partner too. A blast
+miniature; `BlockInteractions.TryToggleOpenable` writes the clicked half's new state to its partner too. A blast
 clears cells without these hooks, so it can leave one half standing (like a multiblock without
 a sweep); breaking that orphan drops the door as usual. The door tiles are from
 `tools/generate-door-textures.py`, the pull on the center line because of the mirrored uv.
@@ -1895,7 +1923,7 @@ fills where it stands instead of hovering beside it (`PlacementTests`).
 ```
 
 `name` and `texture` are all a plain pickup needs. An optional `use` object gives the item a
-right-click behavior (`World.TryUseSelected` -> `TryUseItem`):
+right-click behavior (`RightClickAction.TryUseSelected` -> `WorldItemUse.DispatchUse`):
 
 ```json
 { "name": "Bucket", "texture": "assets/textures/items/bucket.png",
@@ -1905,7 +1933,7 @@ right-click behavior (`World.TryUseSelected` -> `TryUseItem`):
 | field | meaning |
 |---|---|
 | `use.action` | `pickup_fluid` (scoop the targeted fluid source into the item), `place_fluid` (pour one into the targeted cell), `place_stack` (build a stack block up), `ignite_campfire` (strike a branch pile, or a kiln that has fuel), `convert_multiblock` (turn a 2x2x2 volume into a structure), `heal` (restore health to the user, refused at full health) or `grow_tree` (grow the tree the aimed cell belongs to, `AshGrowthPulses` pulses) |
-| `use.seconds` | seconds holding right-click takes before the use runs: the world charges a use pose (`PlayerModel.StartUseCharge`/`WithUse`) and only runs the use at completion, so letting go early cancels it and spends nothing (`World.TryBeginUseCharge`/`UpdateUseCharge`/`CancelUseCharge`, beside the throw charge). 0 (omitted) keeps the old instant use. The firestarter's `useDelay` stays the cooldown after a use |
+| `use.seconds` | seconds holding right-click takes before the use runs: the world charges a use pose (`PlayerModel.StartUseCharge`/`WithUse`) and only runs the use at completion, so letting go early cancels it and spends nothing (`RightClickAction.TryBeginUseCharge`/`UpdateUseCharge`/`CancelUseCharge`, the twin of `ThrowAction`'s throw charge). 0 (omitted) keeps the old instant use. The firestarter's `useDelay` stays the cooldown after a use |
 | `use.block` | for `convert_multiblock`, the **source** block the volume must be built from (`block/mud_bricks`); for `place_stack`, the stack block it builds |
 | `use.result` (`convert_multiblock`) | the multiblock **anchor** block the volume becomes (`block/mud_brick_kiln`). The registry checks at startup that the anchor really is a `multiblock` renderer built from that very source, so a mismatched pair names its file instead of failing in play. The converter itself is spent by nothing and never morphs |
 | `use.fluid` | the fluid block the action works on; must be a block with `fluid: true` || `use.result` | the item this one becomes on success; must be an item, and the two normally point at each other |
@@ -1956,7 +1984,7 @@ exist: `leaves.json` (shared by every `*_leaves` block) and `wood.json` (the thi
 
 Every destruction path rolls through one place: `DropManager.RollLoot` (a block with no table
 drops itself, `LootTable.None` drops nothing) and its spawning wrapper `SpawnLoot`. Mining
-(`World.RemoveBlock`), blasts (`TntManager.Detonate`), felled trees (`TopplingTree.TakeDrops`) and
+(`BlockEditor.RemoveBlock`), blasts (`TntManager.Detonate`), felled trees (`TopplingTree.TakeDrops`) and
 decaying leaves and crumbling orphaned wood (`LeafDecayManager`) all go through it, with the
 cell's state byte in `LootContext.State` so tree wood picks its thickness band, so a block's
 yield never depends on how it came down.
@@ -2162,7 +2190,7 @@ chunk drops the cell from the schedule (it freezes, never decays), and a chunk l
 nothing. Tuning: `LeafDecayTickSeconds`, `MaxLeafDecayTicksPerFrame`, `MaxLeafDecayCellsPerFrame`,
 `MaxLeafDecayBacklogCells`.
 
-**Felling** (`World.FellWood` -> `TopplingTree.Collect`). Mining tree wood fells the cells that
+**Felling** (`BlockEditor.FellWood` -> `TopplingTree.Collect`). Mining tree wood fells the cells that
 lose every path to an anchor once the cut cell is gone, through the GL-free bounded search
 `TreeSupport` (`TreeSupportResult` Supported / Unsupported / Unknown): links are parent edges
 (`TreeSupport.Links`) plus vertical shell-to-shell adjacency, anchors are root cells and shells
@@ -2196,7 +2224,7 @@ id, one `LeafDecayManager.ScheduleBox` over the written box (pruning is left to 
 `LodManager.MarkEditedColumn` per changed column.
 
 **The sapling clock** (`Simulation/SaplingManager.cs`, owned by `World`, main thread only, skipped on
-a client): a `plant_tree` use (an acorn on dirt or grass, `World.PlantTree`, which maps the hit
+a client): a `plant_tree` use (an acorn on dirt or grass, `WorldItemUse.PlantTree`, which maps the hit
 cell and face to the ground cell) plants through the writer's Planted branch and schedules the root
 cell; every `SaplingPulseSeconds` (jittered by `SaplingPulseJitter`) the manager grows it one pulse
 through the same `TryGrowTree` path, up to the species' `MaturityStepsAt` for its own root cell and
@@ -2233,7 +2261,7 @@ named by their result, cook files by their input, and a reverse recipe by
 **Cast molds** are the worked example. `mold_pickaxe` / `mold_axe` are pressed from three mudballs
 (`recipes/mold_pickaxe.json`, `mold_axe.json`), uncraft back into three
 (`recipes/mudball_from_mold_*.json`) and fire into `fired_mold_pickaxe` / `fired_mold_axe` by
-right-clicking a lit branch pile with the mold hotbarred (`World.TryCookOrCollect` ->
+right-clicking a lit branch pile with the mold hotbarred (`BlockInteractions.TryCookOrCollect` ->
 `CampfireManager.TryPlaceFood`, `recipes/cook/mold_*.json`); a fired mold never uncrafts. They are all
 `hasItem` slab blocks whose models under `assets/models/block/` are generated by
 `tools/generate-mold-models.ps1` and never hand-edited: the script reads each sprite's alpha
@@ -2301,8 +2329,8 @@ a finished cast; metal still cooling is lost. Like the campfire, quern and kiln 
 progress is in-memory only: it does not survive a restart or a save & quit (see "Saves"), and an unloaded mold cell freezes
 rather than being forgotten.
 
-The right-click chain in `World.TryUseSelected` runs `TryCookOrCollect` -> `TryQuernInteract` ->
-`TryKilnInteract` -> `TryCastInteract` -> the item's own `use` action or block placement, and the
+The right-click chain in `RightClickAction.TryUseSelected` runs `TryCookOrCollect` -> `TryQuernInteract` ->
+`TryKilnInteract` -> `TryCastInteract` (all on `BlockInteractions`) -> the item's own `use` action or block placement, and the
 first one that claims the click wins. On a kiln: an empty hand lifts the crucible out (and puts it
 straight back when the tools pool is full), a crucible stands one in, a melt input charges it, fuel
 goes into the hearth, a **firestarter falls through** to its own `Item.OnUse` so it can strike and
@@ -2334,13 +2362,13 @@ Other invariants:
 
 - World/chunk coordinates: `Chunk.Position` is in chunk units; world pos = chunk pos × `Chunk.Size` (16). Chunks are cubic and stacked vertically too (3D chunk grid, not 2D columns).
 - Blocks are `byte` IDs; `0` is air. Everything else about a block comes from `assets/data/blocks/<name>.json` through `ContentRegistry` (see "Content" above), never from a new `switch` on the id. Hot paths read the flat mirrors (`BlockType.IsSolid/Occludes/CastsAO`, `BlockType.Emission`, `BlockType.PassesLightById`) rather than `BlockType.ById[...]`, so keep new per-id flags in that shape.
-- **Per-block state byte**: alongside `Chunk._blocks` each chunk has a lazily allocated `volatile byte[]? _state` (null = all zero), read through `Chunk.GetLocalState` / `ChunkManager.GetStateGlobal` / `TryGetCell` and written only by `Chunk.SetBlockRaw` (no remesh, no scheduling — the fluid tick batches those). Six features share it, one per block: a **horizontal facing** (a `facing: "horizontal"` block such as the wall torch: bits 0-1 the facing, rest 0, written by placement through `Placement.TryMount`), **fluid levels** (`FluidState` decodes it as source `0`, falling `8` or flowing level `1..7`), **stack counts** (a `stackMax` block's 0 = untouched worldgen, 1..`stackMax` an explicit pile), a **multiblock's facing and offset** (`Multiblock.EncodeState`, `facing | dx<<2 | dy<<3 | dz<<4`, written by `Multiblock.Convert` through `SetBlockRaw`), **tree wood** (`WoodState` on a `tree_wood` block: bits 0-3 the thickness code, `FullCube` = 15 being a whole 16 px cell, bits 4-6 the parent direction in `Chunk.CubeFaces` order or `ParentRoot`/`ParentDetached`, bit 7 the shell flag) and **leaves** (`LeafState` on a leaf block: bits 0-2 the hydration, bit 3 the persistent flag) — see `### Trees`. The tree states are written by `TreeGenerator.Stamp` into the generated state array, by `TreeGrowthWriter` and `LeafDecayManager` through `SetBlockRaw`, and by placement, which passes an explicit state to `PlaceBlockAt` (`World.PlaceBlockAtFace` gives a placed log `WoodState.Detached` and a placed leaf a persistent `LeafState`). Which meaning a byte carries is decided entirely by the block id that owns the cell, so a new user must pick a block kind, never a spare bit. **Every write that is not one of those zeroes it** (`RemoveBlockAt`, `ClearBlockAt` and `PlaceBlockAt` with its default state `0` — which also treats a fluid cell as replaceable), and `Multiblock.Revert` likewise writes its source block with an explicit `0`, so a stale level, count, offset, thickness or hydration can never outlive the block that owned it. Meshing gets it as a second padded snapshot from `FillPaddedSnapshot(padded, paddedState, neighbors, neighborStates)`, filled from the neighborhood `TryResolveNeighbors` resolved for the build; the fluid simulation must read cells through `TryGetCell`/`ChunkAt`, never `GetBlockGlobal`, which reports unloaded chunks as air. A seventh meaning belongs to the **openable** blocks (an `open` object in their JSON: the trapdoor, and both halves of a door, which always carry the same byte): `DoorState`, the facing in bits 0-1 like any facing block plus `DoorState.OpenBit` (bit 2), the rest zero; placement writes it closed, and the right-click toggle (`World.TryToggleOpenable`) flips the bit alone through `Chunk.SetStateAt`. The mesher and `BlockShape` index a facing block's pre-turned models and boxes with `BlockType.ShapeIndex(state, count)` (`state & (count - 1)`), so four-shape blocks keep reading the facing and an openable block's eight read the open bit too.
-- **Station block entities**: `CampfireManager`, `QuernManager`, `KilnManager` and `CastingManager` are all owned by `World`, all **main thread only** and all in-memory only — a lit campfire, a spinning quern, a kiln's fuel and crucible and a mold's cast progress are lost on a restart, a save & quit or a chunk reload, even though the chunk's blocks and state bytes around them are saved (see "Saves"). Each is keyed by the cell (the kiln by its structure's anchor), each is ticked from `World.Update` and each has a `NotifyBlockRemoved` that `World.RemoveBlock` calls so a broken station drops what it held. `World.FireCells` gathers every burning cell (campfires and lit kilns) once a frame and feeds both the fire billboards (`FireParticleSystem.SpawnOffset`) and the warm point lights (`RenderManager.FireLightOffset`), so a new fire source only has to appear in that list. Their render passes — `RenderQuerns`, `RenderKilns`, `RenderCastings` — sit inside the existing `entityPass` profiler span rather than adding sections of their own. On a multiplayer server they tick in the server's `World.Update` and a pour is bound to the pouring player (`CastState.PourSource`, its `PlayerContext`, which pauses once the player left); a client never ticks them: its managers are display-only mirrors replaced by the server's `StationState` snapshot (each manager's `WriteNet`/`ReadNet`, `StationNetCodec`), and only a quern top keeps turning between snapshots (`QuernManager.Animate`).
-- **Fluid tick**: `Simulation/FluidManager.cs` (owned by `World`, main thread only) is a *scheduled-cell* simulation, not a scan. `World.Update` calls it once per frame after `UpdateToppling`; it runs whole ticks every `WorldGenerationConfig.FluidTickSeconds` (0.25 s), at most `MaxFluidTicksPerFrame` of them per frame, and drops the leftover time so a hitch never leaves it spiraling. Each tick takes the set of cells scheduled by the previous one (packed as `long`, 21 bits per axis — the same budget `ChunkKey` (`src/Chunks/ChunkKey.cs`) uses to pack a **chunk** position for `ChunkMap` and for `ChunkManager`'s dirty/queued/generating/placement dictionaries; `FluidManager`'s packer is block-scale, `ChunkKey`'s is chunk-scale, and neither floors nor truncates differently from `VoxelCoords.ChunkPosOf`), recomputes every **non-source** fluid cell from its neighbors (Minecraft's `getNewLiquid`: two adjacent sources over ground that cannot drain become a source themselves, fluid directly above means falling, otherwise one level thinner than the fullest neighbor, and nothing left means the cell drains to air), then spreads it downwards, or sideways toward the nearest hole within `FluidSlopeSearchDistance` (ties spread evenly). The level rules are per-fluid data (`flow.*` on the block: lava updates every other tick, spreads 3 instead of 7 and never forms new sources). Contact hardening runs before all of it: a fluid cell touching its `hardensTouching` fluid becomes `hardensTo` (lava beside water becomes cobblestone), and a flow settling against a fluid that hardens on its touch crusts over the same way, so water reaching lava also yields cobblestone whichever side ticks first. Spreading only ever writes into non-fluid `IsReplaceable` cells, popping the fragile block it washes away through `DropManager.SpawnLoot`; a cell that already holds fluid recomputes itself on its own tick. Writes go through `Chunk.SetBlockRaw` and dirty only the cell's own chunk plus the face-adjacent chunk on each axis where the cell sits on a border, batched into `MarkDirty` at the end of the tick — not `ImmediateRemesh`, and never `MarkAreaDirty`, because a fluid passes light and casts no AO. A cell reschedules itself and its neighborhood exactly when it changed or wrote into a neighbor, so settled water costs nothing.
+- **Per-block state byte**: alongside `Chunk._blocks` each chunk has a lazily allocated `volatile byte[]? _state` (null = all zero), read through `Chunk.GetLocalState` / `ChunkManager.GetStateGlobal` / `TryGetCell` and written only by `Chunk.SetBlockRaw` (no remesh, no scheduling — the fluid tick batches those). Six features share it, one per block: a **horizontal facing** (a `facing: "horizontal"` block such as the wall torch: bits 0-1 the facing, rest 0, written by placement through `Placement.TryMount`), **fluid levels** (`FluidState` decodes it as source `0`, falling `8` or flowing level `1..7`), **stack counts** (a `stackMax` block's 0 = untouched worldgen, 1..`stackMax` an explicit pile), a **multiblock's facing and offset** (`Multiblock.EncodeState`, `facing | dx<<2 | dy<<3 | dz<<4`, written by `Multiblock.Convert` through `SetBlockRaw`), **tree wood** (`WoodState` on a `tree_wood` block: bits 0-3 the thickness code, `FullCube` = 15 being a whole 16 px cell, bits 4-6 the parent direction in `Chunk.CubeFaces` order or `ParentRoot`/`ParentDetached`, bit 7 the shell flag) and **leaves** (`LeafState` on a leaf block: bits 0-2 the hydration, bit 3 the persistent flag) — see `### Trees`. The tree states are written by `TreeGenerator.Stamp` into the generated state array, by `TreeGrowthWriter` and `LeafDecayManager` through `SetBlockRaw`, and by placement, which passes an explicit state to `PlaceBlockAt` (`BlockPlacer.PlaceBlockAtFace` gives a placed log `WoodState.Detached` and a placed leaf a persistent `LeafState`). Which meaning a byte carries is decided entirely by the block id that owns the cell, so a new user must pick a block kind, never a spare bit. **Every write that is not one of those zeroes it** (`RemoveBlockAt`, `ClearBlockAt` and `PlaceBlockAt` with its default state `0` — which also treats a fluid cell as replaceable), and `Multiblock.Revert` likewise writes its source block with an explicit `0`, so a stale level, count, offset, thickness or hydration can never outlive the block that owned it. Meshing gets it as a second padded snapshot from `FillPaddedSnapshot(padded, paddedState, neighbors, neighborStates)`, filled from the neighborhood `TryResolveNeighbors` resolved for the build; the fluid simulation must read cells through `TryGetCell`/`ChunkAt`, never `GetBlockGlobal`, which reports unloaded chunks as air. A seventh meaning belongs to the **openable** blocks (an `open` object in their JSON: the trapdoor, and both halves of a door, which always carry the same byte): `DoorState`, the facing in bits 0-1 like any facing block plus `DoorState.OpenBit` (bit 2), the rest zero; placement writes it closed, and the right-click toggle (`BlockInteractions.TryToggleOpenable`, through `ToggleOpenCell`) flips the bit alone through `Chunk.SetStateAt`. The mesher and `BlockShape` index a facing block's pre-turned models and boxes with `BlockType.ShapeIndex(state, count)` (`state & (count - 1)`), so four-shape blocks keep reading the facing and an openable block's eight read the open bit too.
+- **Station block entities**: `CampfireManager`, `QuernManager`, `KilnManager` and `CastingManager` are all owned by `World`, all **main thread only** and all in-memory only — a lit campfire, a spinning quern, a kiln's fuel and crucible and a mold's cast progress are lost on a restart, a save & quit or a chunk reload, even though the chunk's blocks and state bytes around them are saved (see "Saves"). Each is keyed by the cell (the kiln by its structure's anchor), each is ticked from `World.Update` and each has a `NotifyBlockRemoved` that `BlockEditor.RemoveBlock` calls so a broken station drops what it held. `World.FireCells` gathers every burning cell (campfires and lit kilns) once a frame and feeds both the fire billboards (`FireParticleSystem.SpawnOffset`) and the warm point lights (`RenderManager.FireLightOffset`), so a new fire source only has to appear in that list. Their render passes — `RenderQuerns`, `RenderKilns`, `RenderCastings` — sit inside the existing `entityPass` profiler span rather than adding sections of their own. On a multiplayer server they tick in the server's `World.Update` and a pour is bound to the pouring player (`CastState.PourSource`, its `PlayerContext`, which pauses once the player left); a client never ticks them: its managers are display-only mirrors replaced by the server's `StationState` snapshot (each manager's `WriteNet`/`ReadNet`, `StationNetCodec`), and only a quern top keeps turning between snapshots (`QuernManager.Animate`).
+- **Fluid tick**: `Simulation/FluidManager.cs` (owned by `World`, main thread only) is a *scheduled-cell* simulation, not a scan. `World.Update` calls it once per frame after `BlockEditor.UpdateToppling`; it runs whole ticks every `WorldGenerationConfig.FluidTickSeconds` (0.25 s), at most `MaxFluidTicksPerFrame` of them per frame, and drops the leftover time so a hitch never leaves it spiraling. Each tick takes the set of cells scheduled by the previous one (packed as `long`, 21 bits per axis — the same budget `ChunkKey` (`src/Chunks/ChunkKey.cs`) uses to pack a **chunk** position for `ChunkMap` and for `ChunkManager`'s dirty/queued/generating/placement dictionaries; `FluidManager`'s packer is block-scale, `ChunkKey`'s is chunk-scale, and neither floors nor truncates differently from `VoxelCoords.ChunkPosOf`), recomputes every **non-source** fluid cell from its neighbors (Minecraft's `getNewLiquid`: two adjacent sources over ground that cannot drain become a source themselves, fluid directly above means falling, otherwise one level thinner than the fullest neighbor, and nothing left means the cell drains to air), then spreads it downwards, or sideways toward the nearest hole within `FluidSlopeSearchDistance` (ties spread evenly). The level rules are per-fluid data (`flow.*` on the block: lava updates every other tick, spreads 3 instead of 7 and never forms new sources). Contact hardening runs before all of it: a fluid cell touching its `hardensTouching` fluid becomes `hardensTo` (lava beside water becomes cobblestone), and a flow settling against a fluid that hardens on its touch crusts over the same way, so water reaching lava also yields cobblestone whichever side ticks first. Spreading only ever writes into non-fluid `IsReplaceable` cells, popping the fragile block it washes away through `DropManager.SpawnLoot`; a cell that already holds fluid recomputes itself on its own tick. Writes go through `Chunk.SetBlockRaw` and dirty only the cell's own chunk plus the face-adjacent chunk on each axis where the cell sits on a border, batched into `MarkDirty` at the end of the tick — not `ImmediateRemesh`, and never `MarkAreaDirty`, because a fluid passes light and casts no AO. A cell reschedules itself and its neighborhood exactly when it changed or wrote into a neighbor, so settled water costs nothing.
 - **Waking worldgen water**: the sea is generated as static source cells, so a cave or entrance carved into a land column beside it would leave a wall of water standing against worldgen air that nothing ever schedules. `FluidManager.WakeLoadedChunks(chunks)` — called from `World.Update` each frame, immediately before the fluid tick — fixes that by scheduling the frontier of its water against a carved cavity when it loads, so the sea pours into whatever breached it exactly like Minecraft water does when you dig into an ocean. Only cells at or below their column's natural terrain top count (`FluidManager.IsCarvedFlowTarget`), so open air above the terrain — a ravine, a beach, a hillside — is never woken and generated water stays static across it. It has two halves: the **interior**, collected on the generation worker at the end of `Chunk.GenerateBlockData` into `Chunk.FluidFrontier` (local block indices of every fluid cell with a `FluidManager.IsCarvedFlowTarget` neighbor in -X/+X/-Z/+Z/-Y — never +Y, since water does not flow upward and every sea-surface cell has air above it; only its own `_blocks` are read, so worldgen stays a pure per-chunk function), and the **borders**, which need both chunks loaded and are therefore scanned on the main thread over the shared 16x16 plane of each face neighbor, scheduling whichever side holds the fluid when the other side is a carved cavity (the vertical faces only ever schedule the fluid above the hole). Chunks entirely above every level they could share with a neighbor (`ColumnData.MaxWaterLevel`, never below `SeaLevel`) skip the border scan — generated water cannot reach them, and player-placed water is woken by the edit paths. The queue of newly generated chunks is `ChunkManager.TryDequeueLoaded`; a consumer must re-check that the chunk is still the live one at its position, because an unload can race the queue. Once the frontier has settled, it costs nothing again. Deep lava pockets wake through the same path: the frontier scan is fluid-generic, and chunks at or below `LavaMaxY` report theirs even when they never held sea water.
-- **Every block edit path must call `FluidManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the water beside the edit will never notice it: `World.RemoveBlock`, `World.FellWood` (per cleared cell, and in both single-block branches), `World.TryPlaceBlockFromRaycast`, `TntManager.Detonate` (`ScheduleBox` over the blast box grown by one; the blast also **skips fluid cells**, since a dry crater under water would just refill from every side) and bucket edits through `FluidManager.SetCellImmediate`, which is the only fluid write that remeshes synchronously. Mining never takes a fluid out: `RemoveBlock` returns early on `BlockType.IsFluid`, so only a bucket removes fluids.
-- **Every block edit path must also call `LeafDecayManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the leaves near the edit never re-derive their hydration: a cut limb's canopy would hang forever, and an orphaned wood cell would never crumble. `Simulation/LeafDecayManager.cs` (owned by `World` as `_leafDecay`, main thread only) grows each scheduled box by its `ScheduleReach` itself, so a caller passes only the edited cells. The current call sites: `World.RemoveBlock`; `World.FellWood` (`ScheduleAround` in both single-block branches, one `ScheduleBox` over the whole felled batch, never one per cell); `World.PlaceBlockAtFace`, which every placement goes through (`TryPlaceBlockFromRaycast` and the item-use `IItemUseWorld.PlaceBlockAtFace`); the `IItemUseWorld` bucket and TNT-prime wrappers (`ScoopFluidCell`, `PourFluidCell`, `RemoveCellForPrime`), scheduled for uniformity; `TntManager.Detonate` (`ScheduleBox` over the blast box); and `TreeGrowthWriter` (one `ScheduleBox` over the box it wrote). A new edit path adds its call next to its `FluidManager.ScheduleAround`.
-- **Gravity**: `Simulation/FallingBlockManager.cs` (owned by `World`, main thread only) topples `falls` blocks into `FallingBlock` entities and writes rested cubes back as blocks. Every edit path that can unsupport one must call `TryTopple` above it (`World.RemoveBlock`, `World.FellWood` per cleared cell, `World.TryPlaceBlockFromRaycast` at the placed cell, `TntManager.Detonate` via `CheckColumn` bottom-up over the blast box); fluids never count as support, so fluid edits need no hook. A landing cube slides with chance (8 - solid neighbors of its support) / 8 toward a random clear side, corners included (a corner needs its two flanking sides and the three cells above it clear), committing to its direction across landings, and drops straight once past the edge. Sand stacks on sand: a falls-block support never slides, so towers rebuild. A calm landing converts at once so a collapsing tower settles bottom-up instead of interpenetrating, and a cube that would rest over air pops out as a drop instead of floating. A live cube owns its cell: `TryPlaceBlockFromRaycast` refuses placements into one, cubes shove the player aside one-way (`Camera.PushOutOf`, never through walls, never while flying), and a cube motionless-but-unsettled for 5 s breaks into its usual loot instead of hovering. Shorelines generate from sand (`TerrainGenerator.IsBeachHeight`, gravel-capped where `IsGravelPatch`); the far LOD wears sand and gravel there too, the gravel read with one noise eval per cell.
+- **Every block edit path must call `FluidManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the water beside the edit will never notice it: `BlockEditor.RemoveBlock`, `BlockEditor.FellWood` (per cleared cell, and in both single-block branches), `BlockPlacer.PlaceBlockAtFace` (which every placement ends in: `BlockPlacer.TryPlaceBlockFromRaycast` through `PlaceAgainstFace`, and the item-use `IItemUseWorld.PlaceBlockAtFace`), `BlockInteractions.ToggleOpenCell`, `TntManager.Detonate` (`ScheduleBox` over the blast box grown by one; the blast also **skips fluid cells**, since a dry crater under water would just refill from every side) and bucket edits through `FluidManager.SetCellImmediate` (`WorldItemUse`'s `ScoopFluidCell`/`PourFluidCell`), which is the only fluid write that remeshes synchronously. Mining never takes a fluid out: `BlockEditor.RemoveBlock` returns early on `BlockType.IsFluid`, so only a bucket removes fluids.
+- **Every block edit path must also call `LeafDecayManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the leaves near the edit never re-derive their hydration: a cut limb's canopy would hang forever, and an orphaned wood cell would never crumble. `Simulation/LeafDecayManager.cs` (owned by `World` as `_leafDecay`, main thread only) grows each scheduled box by its `ScheduleReach` itself, so a caller passes only the edited cells. The current call sites: `BlockEditor.RemoveBlock`; `BlockEditor.FellWood` (`ScheduleAround` in both single-block branches, one `ScheduleBox` over the whole felled batch, never one per cell); `BlockPlacer.PlaceBlockAtFace`, which every placement goes through (`BlockPlacer.TryPlaceBlockFromRaycast` and the item-use `IItemUseWorld.PlaceBlockAtFace`); the `IItemUseWorld` bucket and TNT-prime wrappers on `WorldItemUse` (`ScoopFluidCell`, `PourFluidCell`, `RemoveCellForPrime`), scheduled for uniformity; `BlockInteractions.ToggleOpenCell`; `TntManager.Detonate` (`ScheduleBox` over the blast box); and `TreeGrowthWriter` (one `ScheduleBox` over the box it wrote). A new edit path adds its call next to its `FluidManager.ScheduleAround`.
+- **Gravity**: `Simulation/FallingBlockManager.cs` (owned by `World`, main thread only) topples `falls` blocks into `FallingBlock` entities and writes rested cubes back as blocks. Every edit path that can unsupport one must call `TryTopple` above it (`BlockEditor.RemoveBlock`, `BlockEditor.FellWood` per cleared cell, `BlockPlacer.PlaceAgainstFace` at the placed cell (the path of `BlockPlacer.TryPlaceBlockFromRaycast`) and `WorldItemUse`'s `IItemUseWorld.AfterPlaced` after an item's own placement, `TntManager.Detonate` via `CheckColumn` bottom-up over the blast box); fluids never count as support, so fluid edits need no hook. A landing cube slides with chance (8 - solid neighbors of its support) / 8 toward a random clear side, corners included (a corner needs its two flanking sides and the three cells above it clear), committing to its direction across landings, and drops straight once past the edge. Sand stacks on sand: a falls-block support never slides, so towers rebuild. A calm landing converts at once so a collapsing tower settles bottom-up instead of interpenetrating, and a cube that would rest over air pops out as a drop instead of floating. A live cube owns its cell: `BlockPlacer.PlaceBlockAtFace` refuses placements into one, cubes shove the player aside one-way (`Camera.PushOutOf`, never through walls, never while flying), and a cube motionless-but-unsettled for 5 s breaks into its usual loot instead of hovering. Shorelines generate from sand (`TerrainGenerator.IsBeachHeight`, gravel-capped where `IsGravelPatch`); the far LOD wears sand and gravel there too, the gravel read with one noise eval per cell.
 - **TNT**: `Simulation/TntManager.cs` (owned by `World`, main thread only, never ticked on a client) runs the primed cubes (`PrimedTnt`). A cube lit by hand burns `TntManager.PlayerFuseSeconds` (1 s) and one lit by another blast `ChainFuseSeconds` (0.5 s), so a chain stays prompt; `PrimedTnt.WhiteFlash` ramps its strobe from 4 to 16 Hz over whatever fuse it was given (`FirestarterTests`). A blast shoves everything loose within `BlastRadius` away from its center (`BlastImpulse.At`: `BlastPushMaxSpeed` at the center falling linearly to zero at the radius, the direction tipped up by `BlastPushUpBias`, never growing with distance): at the end of `Detonate`'s clearing, before the falling-block sweep (so sand the blast undermines falls straight), the other primed TNT (`PrimedTnt.Push`, chained cubes at spawn), the drops (`DropManager.ApplyBlastImpulse`, the blast's own loot included) and the falling cubes in the air (`FallingBlock.Push`); then `World.PushFromBlast` takes each center `TntManager.Blasts` reports and shoves the living mobs (`Mob.Shove`, sideways) and the players through `IMobTarget.TakeHit` with no damage: the local camera's knockback in singleplayer, each `ServerPlayer`'s queued knockback on a server (its `PlayerStatus` carries it to the client); a creative, flying or dead player is immune. Gameplay, so a client, which never ticks TNT, pushes nothing (`BlastEffectTests`).
 - Worldgen must stay deterministic and thread-safe (`FastNoiseLite.GetNoise` is read-only after setup; noise instances are configured once in static constructors and never re-tuned per call). All noise seeds derive from `WorldGenerationConfig.Seed` plus fixed per-channel offsets (`TerrainGenerator.MakeNoise`); `Seed` reads `WorldSeed.Value`, which `WorldSeed.Apply` sets (rebuilding every noise from it) before a World is built, never while one is live (see "Saves"). Before player edits, terrain obeys:
   - **Nothing generated is ever solid above `height(x,z)`** — heights come from `ColumnCache.Get(...).Heights` (or the `ColumnCache.GetHeights` wrapper) and already include ravines, which are cut into the heightmap so the far LOD sees them too. The ravine cut fades out across the shore band (`OceanShoreWeight`..0.5), so it never slices the ocean's edge; the block at `height` is solid unless a cave or entrance carved it.
@@ -2427,7 +2455,7 @@ pure function of the seed: only **deltas** and the seed are written.
 - **`World.SaveAndDispose(renderManager)`** is the teardown, main thread only and blocking: the
   camera detaches, the generation and LOD workers are stopped and joined
   (`WorkerStopJoinTimeoutMs` each) and the mesh runners drained (`MeshDrainTimeoutMs`) first, then
-  `FlushAll` hands every modified chunk, the LOD edit state, the player and the entities to the
+  `WorldPersistence.FlushAll` hands every modified chunk, the LOD edit state, the player and the entities to the
   store, then the store shuts down (`SaveWriterShutdownTimeoutSeconds`). Only when every join and
   the drain succeeded are the chunk and LOD slices released to the shared pools, the toppling-tree
   meshes disposed and `WorldSeed.EndWorld` run; `RenderManager.ForgetWorld` drops its references
@@ -2438,7 +2466,7 @@ pure function of the seed: only **deltas** and the seed are written.
   with the could-not-open notice. The World owns
   the store's `Shutdown`: never shut it down again, and give the next World a **new**
   `ChunkSaveStore` over the same folder.
-- **Autosave** runs every `AutosaveIntervalSeconds` (at most `MaxAutosaveSnapshotsPerCall`
+- **Autosave** (`WorldPersistence.Autosave`) runs every `AutosaveIntervalSeconds` (at most `MaxAutosaveSnapshotsPerCall`
   snapshots a call, the rest on following frames) after the fluid tick, under the one `save`
   profiler row, which is entered nowhere else.
 - **Player and entities.** `player.json` never stores a position before the spawn settled, so a
@@ -2482,7 +2510,7 @@ unexpected exception alike, and the signal handlers wait for it (bounded by
 edits however it is stopped. Server mode sets `ChunkManager.Headless` (finished meshes are marked and their light
 published by `Chunk.MarkMeshedHeadless`, the geometry dropped — a headless world has no pools),
 hovers the camera creative+flying so mobs cannot hurt it (and therefore never saves that camera
-as the player: `CapturePlayer` writes back the `player.json` the world was opened with, kept as
+as the player: `WorldPersistence.CapturePlayer` writes back the `player.json` the world was opened with, kept as
 `_hostedPlayer`, with only the lighting clock refreshed — its inventory too is written back as it
 was opened, since every connected player carries their own — or for a world that had none no pose,
 no creative or flight, no respawn eye and no inventory, so a survival world opened after hosting is
@@ -2525,7 +2553,7 @@ describe the live world go through it:
   draws no canopy bumps (its trees are in its blocks) and no gravel caps; an unsupplied column keeps
   every worldgen read verbatim, so a generated region is byte-identical to the build without a
   source;
-- `World.TryGroundHeight` and the spawn settle (`EnsureSpawnSettled`, whose water test is now the
+- `World.TryGroundHeight` and the spawn settle (`LocalPlayer.EnsureSpawnSettled`, whose water test is now the
   column's stored `WaterLevel`, the same value `TerrainGenerator.IsWaterColumn` evaluates for a
   generated column);
 - `MobSpawner.TryFindSurfaceSpawn` (heights and water from the column; a supplied column's forest
@@ -2634,7 +2662,7 @@ climate) instead of the heights alone, so a client derives nothing from worldgen
 milliseconds) and `NetEntityKind.FallingBlock` (5; `ItemId` the block), and an older client is
 refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's size; the layout
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
-whose reported size differs is replaced (`World.KindMatches`). A
+whose reported size differs is replaced (`ClientMirror.KindMatches`). A
 `WorldIntent` is the sequence id, a `NetIntentKind` byte, the eye and the unit aim the action was
 made from, then that kind's fields (`WorldIntent`): `BreakStart`/`BreakComplete(cell)`,
 `Place(hit cell, face normal)`, `Use(cell under the crosshair, optional)`, `Throw(charge 0..1)`,
@@ -2697,7 +2725,7 @@ spends nothing; creative grants and clears only while `ServerPlayer.Creative`; p
 `World.ThrowSelected(wholeStack, eye, forward, inventory)` from that player's eye and look and out
 of that player's inventory, never the server camera — and **always** answers with a full
 `InventoryState` snapshot to that player alone, accepted or not, so a refused intent rubberbands
-the client's optimistic copy. Drops are picked up per player: a server-mode `World` reads the
+the client's optimistic copy. Drops are picked up per player: a server-mode world's `DropPickup.Update` reads the
 connected players from `World.ServerPlayers` (the server's list) and `DropManager.Update`'s
 multi-collector overload (`DropCollector`) flies each drop in a loaded chunk to the nearest player
 whose inventory has room (a drop in an unloaded chunk is neither collected nor simulated; one
@@ -2708,7 +2736,8 @@ server camera and `World.Inventory` never collect.
 **World intents.** A client never writes a cell: every world action is a `WorldIntent` the server
 replays for the sending player through the singleplayer rules. Each `ServerPlayer` owns a
 `PlayerContext` (`OpenGLTest/src/Player/PlayerContext.cs`: eye, aim, view direction, its inventory, its
-server creative flag) that `World` runs every interaction path through instead of the camera
+server creative flag) that every interaction path (`BlockEditor`, `BlockPlacer`, `LeftClickAction`,
+`RightClickAction`, `ThrowAction`, `WorldItemUse`) runs through instead of the camera
 (singleplayer builds one from its camera, whose raycasts keep the third-person rules). An intent
 is refused (and nothing applied) when its sequence id is not above the player's last
 (`ServerPlayer.AcceptSeq`); a **dead** player's intent is judged right after that, before every
@@ -2728,7 +2757,8 @@ empty. Then, by kind:
   `Mining.BlockDamage`, summed in float — `BreakProgress.RequiredSeconds`), less
   `NetBreakSlackSeconds` of jitter, never with a tool `Mining.CanMine` refuses, and never after the
   target or the held item changed; a server-creative player breaks at once. The break itself is
-  `World.BreakBlockFor`, i.e. the full `RemoveBlock`: felling (`FellWood`, which now runs on the
+  `World.BreakBlockFor` (forwarding to `BlockEditor.BreakBlockFor`), i.e. the full
+  `BlockEditor.RemoveBlock`: felling (`FellWood`, which now runs on the
   server), multiblock revert, loot through `DropManager.SpawnLoot` (picked up by the nearest player
   with room), a station's hand-back, needs-support pops, toppling and the fluid, leaf-decay, LOD
   and canopy hooks.
@@ -2737,14 +2767,14 @@ empty. Then, by kind:
   the camera ray's face; the far side of a wall never qualifies). `World.TryPlaceSelectedBlockAt`
   then places the player's **selected** block (owned, placeable, one spent unless creative) under
   the placement rules (`Placement`, no live falling cube, fragile blocks on solid ground, and no
-  connected player's body in the cell — `World.BodyBlocksPlacement` checks every `ServerPlayer`, the
+  connected player's body in the cell — `BlockPlacer.BodyBlocksPlacement` checks every `ServerPlayer`, the
   server camera is nobody), with the world's own state byte (a placed log `WoodState.Detached`, a
   placed leaf persistent).
 - **Use** — `World.TryUseSelected(InteractionReach, context, out outcome, allowPlace: false)`: the
   right-click chain (campfire, quern, kiln, cast mold, then the held item's `OnUse` — bucket, pile,
   firestarter on TNT or a kiln, converter) aimed by the player's ray and spending from its
   inventory, short of the placement fallback. The item-use tail reads the dispatching player
-  (`World._activeContext`), and a chance roll goes through `IItemUseWorld.NextUseRoll`
+  (`WorldItemUse._activeContext`), and a chance roll goes through `IItemUseWorld.NextUseRoll`
   (`World.UseRoll`, a test seam).
 - **Throw** — `World.ThrowFor` launches the selected throwable at the intent's charge from the eye.
 - **Attack** — a punch needs a non-slicing hand and a slice a slicing weapon, each at most once per
@@ -2797,7 +2827,7 @@ camera-bound: the server builds far regions per client request.
 
 **Player status** is server-owned. Each `ServerPlayer` owns a `PlayerHealth` (`Status`, with
 `Health`/`IsDead`), a `FallTracker` (`FallTracker.cs`, the GL-free peak/grounded chain lifted out
-of singleplayer's `World.UpdateHealth`, which still uses it with `DefaultMaxStepBlocks`), a
+of singleplayer's `LocalPlayer.UpdateHealth`, which still uses it with `DefaultMaxStepBlocks`), a
 `RespawnEye` and a mob-hit sink. The server never simulates a player's body; it probes its own
 loaded chunks around the reported position (`Player/PlayerBodyProbe.cs`: `IsKnown` — the feet
 cell's chunk and the one `NetGroundProbeBlocks` below are loaded —, `Grounded` — the body lowered
@@ -2817,7 +2847,7 @@ over and cleared by `TakePendingKnockback`); one more goes out at join, so a ret
 health (or death) is mirrored at once. The status is saved with the player (health and respawn
 eye in `players/<slug>.json`). A **dead** player stays where it died: its states still record
 look, flags and modes but never move it, and every intent but `Respawn` is refused. The client
-mirrors all of it: `World.ApplyNetworkHealth` (client mode only; lower health is taken as damage
+mirrors all of it: `ClientMirror.ApplyNetworkHealth` (client mode only; lower health is taken as damage
 with the flash and a singleplayer-sized shake, higher is restored outright), `UpdateClient`
 fading the flash, `Camera.AddKnockback` for the shove (the client's own physics applies it) and
 `SetModes`; a client never bills itself damage. On the first dead status the client sends a
@@ -2925,7 +2955,7 @@ the streamed water level too. The far LOD is the server's: a `ClientLodStreamer`
 regions (`LodRegionData`, at most `NetLodInFlightMax` outstanding, an unanswered one re-sent only
 after `NetLodResendSeconds`), whose `LodNetCodec` payload is the server's finished vertices with
 the tint and the canopy bumps already baked, so the client's `LodManager` never reads `ColumnCache`
-or `TreeGenerator`; for the same reason `World.NotifyLodEdit` and the inline
+or `TreeGenerator`; for the same reason `BlockEditor.NotifyLodEdit` and the inline
 `TreeGenerator.PoisonCanopy`/`LodManager.MarkEditedColumn` sites in `RemoveBlock` and `FellWood`
 return early in client mode, so a client edit never touches `LodSurface`, `LodRegion.ColumnCaps`
 or `TreeGenerator.CanopyDisturbed`. `WorldgenReads` (off in production) is the counter
@@ -2933,13 +2963,13 @@ or `TreeGenerator.CanopyDisturbed`. `WorldgenReads` (off in production) is the c
 meshes with no worldgen call and edits without moving the far-LOD tables, and
 `StreamedTerrainMeshTests` that a mesh built from streamed columns is byte-identical to the
 worldgen one (a tinted surface and a submerged floor).
-`World.ApplyNetworkEntities`/`ApplyNetworkBlockChanges`/`Inventory.Import` apply the server's
+`ClientMirror.ApplyNetworkEntities`/`ApplyNetworkBlockChanges`/`Inventory.Import` apply the server's
 entities, cell changes and inventory mirror. Only the mob kinds (`NetEntity.IsMob`) enter the mob
 reconcile; primed TNT and falling blocks become **display-only mirrors**, and only in client mode
 (`ApplyNetworkMirrors`, so a singleplayer world can never acquire a cube its `Update` would tick
 and detonate): a primed TNT is reconciled by id (`PrimedTnt.Mirror` / `MirrorSetState`, so its
 strobe clock survives snapshots, the fuse clamped so a bad pair cannot divide the flash by zero),
-falling cubes are rebuilt wholesale (`FallingBlockManager.ReplaceMirrors`), and `World.Render`
+falling cubes are rebuilt wholesale (`FallingBlockManager.ReplaceMirrors`), and `WorldRenderer.Render`
 draws both through the usual `_tntManager.Primed`/`_falling.Falling` lists. A client never calls
 `TntManager.Update` or `FallingBlockManager.Update`, so a mirror never moves, lands or detonates
 (the cells it leaves arrive as `BlockChanges`); `UpdateClient` only burns the TNT fuse down
@@ -2958,13 +2988,13 @@ server answers.** Every action runs locally first as a prediction and raises
 target (or the held item changes) and `BreakComplete` when its own hits reach the hardness (a
 creative client breaks once per `ClientCreativeBreakSeconds` rather than per frame, to stay
 inside the edit rate); a claimed right-click raises `Place` (the hit cell and face its placement
-used, `World._lastPlaceHit`) or `Use`; a released throw raises `Throw`; a landed punch or slice
+used, `BlockPlacer.LastPlaceHit`) or `Use`; a released throw raises `Throw`; a landed punch or slice
 raises `Attack`. Intents carry `Camera.Position` and the head ray the camera aimed along
 (`Camera.LastAimDirection`), so the server's first-person ray lands on the same cell. Every cell
-the prediction changed is reported first through `World.BlockEdited` — mining (`RemoveBlock`, plus
-the seven cells a multiblock revert gives back), placement, the bucket's
+the prediction changed is reported first through `World.BlockEdited` — mining (`BlockEditor.RemoveBlock`, plus
+the seven cells a multiblock revert gives back), placement, the `WorldItemUse` bucket wrappers
 `ScoopFluidCell`/`PourFluidCell`, the stack writers `SetPileCount`/`SetPileComposition`, all eight
-cells of a `TryConvertMultiblock` and `RemoveCellForPrime` — and staged in `ClientPrediction`,
+cells of a `BlockEditor.TryConvertMultiblock` and `RemoveCellForPrime` — and staged in `ClientPrediction`,
 which tags them (and, for place/use/throw and every inventory intent, the inventory) with the
 intent's sequence id. A server cell value for a predicted cell — a `BlockChanges` broadcast, or a
 `BlockCorrection` answering an older intent — is held back until that prediction's
@@ -2972,8 +3002,9 @@ intent's sequence id. A server cell value for a predicted cell — a `BlockChang
 prediction applies at once; and an `InventoryState` older than the newest inventory-predicting
 intent is dropped, since the answer to that intent follows and includes it. A client fells
 nothing, topples nothing, primes no TNT, rolls no loot, lets no station hand anything back and
-damages no mob itself (`RemoveBlock`, `TryPlaceBlockFromRaycast`, `IItemUseWorld.AfterPlaced`,
-`SpawnPrimedTnt`, `UpdatePunch`, `UpdateSlice` and `UpdateThrown` are guarded by `_clientMode`):
+damages no mob itself (`BlockEditor.RemoveBlock`, `BlockPlacer.PlaceAgainstFace`, `WorldItemUse`'s
+`AfterPlaced` and `SpawnPrimedTnt`, `LeftClickAction.UpdatePunch`/`UpdateSlice` and
+`ThrowAction.UpdateThrown` are guarded by `_clientMode`):
 the server's broadcasts carry every consequence, its mobs' health arrives in `EntityList`, mined
 loot arrives as drops it picks up into the player's server inventory, and a throw flies locally
 only as a cosmetic copy. The purely cosmetic leaf particles and mining debris, the player model,
@@ -2981,14 +3012,14 @@ the station mirrors' quern animation and fire particles, the mirrored TNT fuses 
 `World.UpdateClient` so nothing hangs in mid-air. `UpdateNetwork` sends `PlayerState` every
 `NetPlayerStateSeconds`, carrying the newest correction it applied (`netCorrectionAck`); chat
 feeds `ChatView`, `TimeSync` calls `World.SetLightingTime`,
-`PlayerList` reconciles `World.SyncRemotePlayers`, `StationState` replaces the station mirrors
-(`World.ApplyNetworkStations`), `PlayerStatus` sets the camera's modes and mirrors health, death
+`PlayerList` reconciles `ClientMirror.SyncRemotePlayers`, `StationState` replaces the station mirrors
+(`ClientMirror.ApplyNetworkStations`), `PlayerStatus` sets the camera's modes and mirrors health, death
 and knockback (and starts the automatic respawn, see "Player status"), `PlayerCorrection` snaps
 the camera and makes the next state go out at once with its ack, and `InventoryState` is
 imported as the truth when it is current.
 Inventory edits are predicted then sent (`Program.SendInventoryIntent`): the hotbar keys and `Q`
 are intents only, while the wheel (`Program.MirrorSelection`), a middle-click pick
-(`World.TryPickTargetedBlock(inventory, out id)` -> `PickBlock`), an [E]-panel hotbar equip, a
+(`BlockPlacer.TryPickTargetedBlock(inventory, out id)` -> `PickBlock`), an [E]-panel hotbar equip, a
 craft (the fed members read before `CraftingSession.Craft` spends the reservation) and a creative
 catalog grant or clear apply locally at once and send their intent, so the server's answer keeps
 them or snaps them back. Each server message is handled inside a
@@ -3202,7 +3233,7 @@ Every hostile derives from the abstract **`Mob`** (`Mob.cs`). It exposes `Type`,
 center), `Health`/`IsDead`, `Facing` (yaw, the model faces -Z at 0), `HitFlash`, and the body box as
 `BodyHalfExtent`/`BodyHalfHeight`. `HeadAboveCenter` is where the healthbar sits. It also has
 `TakeDamage` and `Shove`. `World` rebuilds one `_mobs` list each frame (`RefreshMobs`), after every mob
-manager has run and before `UpdateThrown`, so a mob killed or despawned this frame is never hit or given
+manager has run and before `ThrowAction.UpdateThrown`, so a mob killed or despawned this frame is never hit or given
 a healthbar. The punch, the slice, the player's thrown items (`ThrownProjectile.Update`, an AABB overlap
 against each mob's body box, so a tall goblin is hit through its head and shins) and the healthbars
 (`EntityHealthbarRenderer`, buffers sized by `WorldGenerationConfig.MobsMaxAlive`, the hard cap
@@ -3297,11 +3328,11 @@ room for). The parent lives on, so a killing blow, a second hit below half and t
 split. Only the authoritative simulation deals damage, so a client's mirror never splits.
 `visual-examples/slime-split.json` (`VOXEL_TIME=147`) hits a large slime across its half line and films
 the children and their own split. The player fights back with
-the left-click punch (`World.UpdatePunch` + `Combat`): a mob inside the forward 3-block, 30°-half-angle
+the left-click punch (`LeftClickAction.UpdatePunch` + `Combat`): a mob inside the forward 3-block, 30°-half-angle
 cone with line of sight takes the held item's `entityDamage` and a knockback shove, and while one is in
 the cone mining stands down (attack-first). `Mining.EntityDamage` is the bare-hand baseline (1) an item
 overrides with its `entityDamage` (primitive tools 3, copper tools 5, obsidian blade 6). The obsidian
-blade (`attack: "slice"`) instead swings a two-phase sweep (`World.UpdateSlice` + `SliceCombo`): each
+blade (`attack: "slice"`) instead swings a two-phase sweep (`LeftClickAction.UpdateSlice` + `SliceCombo`): each
 swing hits the nearest two mobs in a forward hemisphere of the same reach with line of sight, the
 buffered return swing is at half power, and the damage lands at the swing's impact frame rather than on
 the click, with the arm and blade carried across the front by `PlayerModel`.
@@ -3353,7 +3384,8 @@ stones never pile up as pickups. The rules:
 - **The throw.** It aims at the chest seen when the throw starts, plays the `throw` clip, and spawns
   the stone only at that clip's `release` event (`Goblin.TryTakeThrowRelease`, one stone per release).
 - **Stones.** A stone is a plain `ThrownProjectile` owned by the manager (`GoblinManager.Stones`).
-  `World.Projectiles` merges the stones with the player's throws, so they render and mirror with no
+  `ThrowAction.RefreshProjectiles` merges the stones with the player's throws into one projectile list,
+  so they render and mirror with no
   new plumbing. A stone deals `GoblinStoneDamage` when it touches the player's body.
 - **Melee.** Out of ammo, the goblin closes to `GoblinStandoffBlocks` and plays the `melee` clip when
   in reach and off `GoblinMeleeCooldownSeconds`. The damage and knockback land at that clip's `impact`
@@ -3548,7 +3580,7 @@ overshoot or jiggle.
   float's share), its arms scull slowly beside the hips (upper arms a little out and forward, forearms
   bent forward, the hands sweeping out and in together) and its legs hang with a faint flutter. It eases
   in over the swim pose through `MathUtils.Damp` and back out during a stroke (a floater swimming off
-  strokes in the swim pose) or once the body stops floating. `World.UpdatePlayerModel` feeds the swim
+  strokes in the swim pose) or once the body stops floating. `LocalPlayer.UpdatePlayerModel` feeds the swim
   pose only from `Float` up (a wader walks with no water pose) and `floating` in `Float`. The item
   debugger's `SURFACE` mode (`ITEM_DEBUGGER_PLAYER_ANIM=surface`) previews it, `SurfaceFloatPoseTests`
   locks it down and `visual-examples/water-depth.json` (`VOXEL_TIME=147`) films a poured puddle (wade),
@@ -3574,21 +3606,21 @@ overshoot or jiggle.
   lowered *view and model only* — the body and its collision keep their size, so the server's
   movement rules (which derive the feet from the eye) are unaffected.
   The **throw charge zoom** (`ThrowZoom`, `ThrowZoom*` knobs) is a third FOV term *added* beside the
-  sprint widening and the pinch: `World.UpdatePlayerModel` copies the arm's `PlayerModel.ThrowCharge`
+  sprint widening and the pinch: `LocalPlayer.UpdatePlayerModel` copies the arm's `PlayerModel.ThrowCharge`
   into `Camera.ThrowCharge` (like `HoldPunchFov`), and the next head-motion update springs the view
   toward `ThrowZoom.TargetDegrees` (narrower with the eased charge, 0 with none) through an
   under-damped `Spring`, so a release or cancel springs back with a small wide overshoot, clamped at
   half the zoom. Singleplayer and a client alike (it reads only the local arm);
   `visual-examples/throw-zoom.json` films it, `ThrowZoomTests` locks it down.
 - **Hit-stop** (`SwingHitStop`, `HitStop*` knobs): a punch or slice that connects
-  (`World.UpdatePunch`/`UpdateSlice`; on a client the *predicted* connect, a mob in the cone or
+  (`LeftClickAction.UpdatePunch`/`UpdateSlice`; on a client the *predicted* connect, a mob in the cone or
   hemisphere with line of sight, since the server's verdict comes too late) calls
   `PlayerModel.HitStop`, which holds that swing at its impact pose (full extension, or
   `SliceImpactProgress`) and then replays the rest faster, so the swing still ends when it would have:
   the slice combo, the jab pace and `AttackPacing` never see it, and the world, mobs and movement
   never stop. `Camera.HoldPunchFov` holds the pinch while `PlayerModel.IsHitStopped`. The item
   debugger never requests one. `visual-examples/hit-stop.json` films it.
-- **Death in singleplayer** plays for `World.DeathPlaySeconds` (the view tips over, the body falls)
+- **Death in singleplayer** plays for `LocalPlayer.DeathPlaySeconds` (the view tips over, the body falls)
   before the respawn; a client has no death screen and still snaps back.
 - **Mob death poof.** A mob bursts into skin-colored chips when its death animation ends
   (`BlockDebrisSystem` + `DebrisLook.Color`, `LandingDust.SkinColor`), the same pool the slime
@@ -3620,7 +3652,7 @@ overshoot or jiggle.
   on foot over a `footstepDust` block (grounded, not sneaking, not in water, really moving) puffs once
   per foot strike of the gait: `PlayerModel.WalkPhase` crossing π/2 + kπ (`FootstepDust.FootfallsBetween`).
 - **World-event effects** (cosmetic: singleplayer and a client, never a headless server). A TNT blast
-  shakes the local camera (`World.ShakeForBlast`): `ShakeFalloff.Trauma` is `BlastShakeStrength` inside
+  shakes the local camera (`AmbientEffects.ShakeForBlast`): `ShakeFalloff.Trauma` is `BlastShakeStrength` inside
   `TntManager.BlastRadius`, falls off as radius / distance and eases to zero at `BlastShakeRangeBlocks`,
   never growing with distance. Singleplayer reads the centers `TntManager.Blasts` reports for the frame;
   a client, which never ticks TNT, takes a primed-TNT mirror leaving the server's snapshot with its
@@ -3635,21 +3667,21 @@ overshoot or jiggle.
   block in the newest or previous snapshot, as if it fell `FallingBlockDustClientFallBlocks`
   (`FallingBlockDustTests`). Lava hardening gives off steam: `FluidManager.HardenedCells` lists every
   cell contact hardening turned solid in the frame (the touching rule and a flow arriving hardened),
-  and `World.PuffSteam` puffs `SteamPuffSmoke` pale `FireParticleKind.Steam` particles (drawn blended
+  and `AmbientEffects.PuffSteam` puffs `SteamPuffSmoke` pale `FireParticleKind.Steam` particles (drawn blended
   like smoke, lighter, quicker and briefer) off the top of each through `FireParticleSystem.Puff` on
   the campfire instance, at most `SteamPuffMaxCellsPerFrame` cells within `FireParticleRadius` a frame,
   since a waking cave pocket hardens dozens a frame far below; a client puffs where a `BlockChanges`
   entry turns a fluid into its own `hardensTo` block (a flow crusting against lava is missed there)
   (`SteamPuffTests`). A felled tree hitting the ground thuds: `TopplingTree.TryTakeLanding` is true
-  exactly once, on the update its swing reaches flat, and `World.ThudTree` then takes the blocks'
+  exactly once, on the update its swing reaches flat, and `BlockEditor.ThudTree` then takes the blocks'
   rest cells (`TopplingTree.GatherLanded`, the cells `TakeDrops` drops at), bursts
   `LeafParticleBurstThud` leaves off the landed canopy, kicks the ground's dust up under at most
   `TreeThudDustPoints` points of the landed trunk (`GroundDust.TreeThud`) and shakes the camera by its
   distance to the trunk (`ShakeFalloff`, `TreeThudShakeStrength` scaled by the wood that fell over
   `TreeThudFullWoodCells`). Singleplayer only: a server skips it, and a client sees no toppling tree
   at all (`TreeThudTests`). Anything that enters or leaves water splashes: every body keeps a
-  `WaterSplashTracker` (the player's in `World`, a field on `Mob`, `ItemDrop`, `ThrownProjectile`,
-  `FallingBlock` and `PrimedTnt`), which `World.UpdateSplashes` steps each frame through
+  `WaterSplashTracker` (the player's in `AmbientEffects`, a field on `Mob`, `ItemDrop`, `ThrownProjectile`,
+  `FallingBlock` and `PrimedTnt`), which `AmbientEffects.UpdateSplashes` steps each frame through
   `WaterSplash.Track` from the body's lowest point (the player by `Camera.IsInWater`, the rest by that
   point being under its cell's fluid surface). The tracker measures the vertical speed from the body's
   own height between frames (so a client mirror's 10 Hz jumps read as the speed over the snapshot),
@@ -3665,7 +3697,7 @@ overshoot or jiggle.
   heads burn: the mesher records the chunk-local point of every block with a JSON `flame` (turned to the
   cell's facing) in `ChunkMeshData.FlamePoints` beside `HotFluidVents`, kept on `Chunk.FlamePoints` by
   `UpdateMesh` and dropped by `Chunk.MarkMeshedHeadless`, since a server never draws one; each frame
-  `World.UpdateTorchFlames` gathers the points within `TorchFlameRadius` of the eye from the
+  `AmbientEffects.UpdateTorchFlames` gathers the points within `TorchFlameRadius` of the eye from the
   `Renderable` chunks (nearest first, at most `TorchFlameMaxEmitters`) into a third
   `FireParticleSystem` (`TorchEmberPerSecond`, `TorchSmokePerSecond`, no spawn offset, the spawn scatter
   `TorchFlameJitter` and the particle scale `TorchFlameScale`, both constructor parameters, the scale
@@ -3674,7 +3706,7 @@ overshoot or jiggle.
   `VOXEL_TIME=700` ends on close shots of a floor and a wall torch).
   `visual-examples/world-events.json` (`VOXEL_TIME=147`) films
   these effects; its blasts use the scenario op `prime` (`{ "op": "prime", "pos": [x, y, z] }`,
-  `World.TestPrimeTnt`), a firestarter strike on the TNT block in that cell that never misses, since
+  `WorldItemUse.TestPrimeTnt`), a firestarter strike on the TNT block in that cell that never misses, since
   `give` cannot equip a tool instance and the strike's chance roll would make the scenario flaky.
 - **Remote players** (protocol 7): the `PlayerState` flags carry cosmetic `Sneaking`, `Swimming`,
   `Sprinting` and `Airborne` bits (rebroadcast untrusted, never acted on) and every `PlayerList`
@@ -3698,7 +3730,7 @@ overshoot or jiggle.
   direction from the current view yaw every frame (`Camera.DamageArcScreenDirection`), so the arc keeps
   pointing at the attacker while the player turns. It is fed by `Camera.TakeHit` (the mob's real
   knockback direction, so a goblin stone from 12 blocks points right, which the nearest-mob direction
-  `NotifyPlayerHurt` gives `AddHitKick` would not) and, on a client, by `Camera.AddDamageDirection` from
+  `LocalPlayer.NotifyPlayerHurt` gives `AddHitKick` would not) and, on a client, by `Camera.AddDamageDirection` from
   a `PlayerStatus` knockback that came with lost health; a fall or lava tick has no direction and shows
   none. `visual-examples/damage-arc.json` films it, `DamageDirectionTests` locks it down.
   **Surfacing droplets** are a fourth term of the same pass (`uDroplets`, `uDropletTime`,
@@ -3713,7 +3745,7 @@ overshoot or jiggle.
   fixed `DamageNumberPool` of `DamageNumberCapacity` that replaces its oldest number when full),
   drawn by `DamageNumberRenderer` right after the healthbars with their billboard shader and the HUD's
   font atlas. Singleplayer sees every accepted `Mob.TakeDamage` through `Mob.HitsTaken` /
-  `LastHitDamage` (compared around `StrikeMob`, which punch, slice and throws all use); a client,
+  `LastHitDamage` (compared around `MobStrikes.StrikeMob`, which punch, slice and throws all use); a client,
   which never damages a mob, floats the health drop between two `EntityList` snapshots, plus the health
   left on a mob that leaves the snapshot within `DamageNumberDeathRangeBlocks` of the camera (the
   server stops listing a mob the moment it dies, so that is the killing blow). A headless server keeps
@@ -3737,10 +3769,17 @@ touch a file that violates one of them, fixing it is in scope.
   No source file goes past ~1000 lines without a stated reason. `World.cs`,
   `RenderManager.cs`, `UIRenderer.cs`, `ContentRegistry.cs`, `Program.cs`, `Chunk.cs`,
   `Camera.cs`, `ChunkManager.cs` are the current offenders — keep shrinking them, never
-  grow them.
+  grow them. `World.cs` (about 1,140 lines, down from 4,700) has a stated reason: it is the
+  composition root that builds and owns the per-job components (`BlockEditor`, `BlockPlacer`,
+  `LeftClickAction`, `RightClickAction`, `ThrowAction`, `BlockInteractions`, `WorldItemUse`,
+  `MobStrikes`, `AmbientEffects`, `LocalPlayer`, `ClientMirror`, `WorldPersistence`,
+  `DropPickup`, `WorldRenderer`) and keeps the order-sensitive `Update`/`UpdateClient` frame
+  orchestration. The next candidates to move out of it are `Update`'s mob target/damage block
+  and `PushFromBlast`.
 - **No god directories.** Keep any one folder under ~30 files and group by domain. The `src/`
   root holds the app entry and core types only; a new file goes into the folder of its area
-  (a new feature area gets a new folder), never into a catch-all.
+  (a new feature area gets a new folder), never into a catch-all. `Networking/` is at 30
+  files: split it into `Client/` and `Server/` subfolders before adding another.
 - **Namespaces mirror the folder tree.** Root namespace is `VoxelEngine`; a file in
   `OpenGLTest/src/WorldGen/Trees/` declares `namespace VoxelEngine.WorldGen.Trees;`, and only
   the six files directly in `src/` (Program, World, WorldPhase, WorldLoadGate, WorldSeed,

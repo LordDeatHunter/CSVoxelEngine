@@ -66,14 +66,14 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 _keys.ReleaseAll();
                 world.Update(deltaTime, _keys);
                 FrameProfiler.Begin(ProfileSection.Breaking);
-                world.UpdateBlockBreaking(deltaTime, isHolding: true);
+                world.LeftClick.UpdateBlockBreaking(deltaTime, isHolding: true);
                 FrameProfiler.End(ProfileSection.Breaking);
                 TickTimed(deltaTime, step, "mine");
                 break;
 
             case "place":
                 FrameProfiler.Begin(ProfileSection.UsePlace);
-                world.TryUseSelected(World.InteractionReach);
+                world.RightClick.TryUseSelected(World.InteractionReach);
                 FrameProfiler.End(ProfileSection.UsePlace);
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} place/use");
                 Advance();
@@ -82,7 +82,7 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
             case "prime":
                 // A firestarter strike that never misses: the scripted keyboard cannot equip a tool
                 // instance, and the strike's chance roll would make a blast scenario flaky
-                if (!world.TestPrimeTnt(step.Pos!.Value))
+                if (!world.ItemUse.TestPrimeTnt(step.Pos!.Value))
                     throw new InvalidOperationException(
                         $"Step {_step + 1} primes {step.Pos}, which holds no primable block.");
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} prime {step.Pos}");
@@ -148,7 +148,7 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
 
             case "damage":
                 if (step.Target == "player")
-                    world.DamagePlayer(step.Amount);
+                    world.LocalPlayer.DamagePlayer(step.Amount);
                 else
                     world.DamageAllMobs(step.Amount);
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} damage {step.Target} by {step.Amount}");
@@ -167,7 +167,7 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 break;
 
             case "player":
-                world.TestPlayerAction(step.Action!);
+                world.LocalPlayer.TestPlayerAction(step.Action!);
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} player {step.Action}");
                 Advance();
                 break;

@@ -16,7 +16,7 @@ public enum WorldPhase
     /// <summary>
     /// <see cref="World.SaveAndDispose"/> has run: the workers are stopped, the save is flushed and
     /// the world's geometry is released. <see cref="World.Update"/> is a no-op and
-    /// <see cref="World.Render"/> must not be called.
+    /// <see cref="Rendering.WorldRenderer.Render"/> must not be called.
     /// </summary>
     Disposed
 }

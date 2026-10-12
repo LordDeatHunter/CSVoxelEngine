@@ -37,24 +37,24 @@ files waits in TODO.md instead, since there are none to use yet.
   `GroundDust.DeathPoof` (`LandingDust.SkinColor`, `MobDeathPoof*`) at each manager's
   `IsRemovable` removal, singleplayer and a client, never a server (`MobDeathPoofTests`).
 - [x] **Placement pop.** A placed block pops in a little too big and settles with one small
-  overshoot: `PlacePop.Grow` (EaseOutBack) fired at `PlaceBlockAtFace` and drawn through the
+  overshoot: `PlacePop.Grow` (EaseOutBack) fired at `BlockPlacer.PlaceBlockAtFace` and drawn through the
   mining pop's `RenderBlockPop` in the select pass, independent of the mining hit's pulse
   (`PlacePopTests`).
-- [x] **Water splash for every entity.** A `WaterSplashTracker` per body (player, mobs, drops, projectiles, falling cubes, primed TNT) stepped by `World.UpdateSplashes`; `WaterSplash.Count/Speed` grow along `ImpactStrength` from `WaterSplashMinSpeed`, pale chips off the fluid column top, never off lava (`WaterSplashTests`, `world-events.json`).
+- [x] **Water splash for every entity.** A `WaterSplashTracker` per body (player, mobs, drops, projectiles, falling cubes, primed TNT) stepped by `AmbientEffects.UpdateSplashes`; `WaterSplash.Count/Speed` grow along `ImpactStrength` from `WaterSplashMinSpeed`, pale chips off the fluid column top, never off lava (`WaterSplashTests`, `world-events.json`).
 - [x] **Damage direction arc.** `DamageDirection` keeps the blow's world direction (fed by `Camera.TakeHit`, on a client by the `PlayerStatus` knockback that came with lost health) and the vignette pass draws it as `uHitArc`; falls and lava show none (`damage-arc.json`).
 - [x] **Mob hit sparks.** A punch, slice or throw that connects throws pale chips from the
-  contact point: `BlockDebrisSystem.Spark` at `World.StrikeMob` (singleplayer) and at the client's
+  contact point: `BlockDebrisSystem.Spark` at `MobStrikes.StrikeMob` (singleplayer) and at the client's
   predicted connect, the same one the hit-stop reads; never a server (`MobHitSparkTests`).
 - [x] **Drop landing bounce.** A drop that lands hops back up once or twice (`BounceDamping`
   restitution, dying off under `BounceMinImpact`) instead of stopping dead (`DropBounceTests`).
-- [x] **Steam on lava hardening.** `FluidManager.HardenedCells` (both hardening rules) -> `World.PuffSteam`, a pale `FireParticleKind.Steam` through `FireParticleSystem.Puff`; a client puffs where a `BlockChanges` entry turns a fluid into its `hardensTo` (`SteamPuffTests`, `world-events.json`).
-- [x] **Tree fall thud.** `TopplingTree.TryTakeLanding` fires once at flat -> `World.ThudTree`: a leaf burst off the landed canopy, `GroundDust.TreeThud` under the trunk, a `ShakeFalloff` shake scaled by the wood that fell (`TreeThudTests`).
-- [x] **TNT blast shake.** `ShakeFalloff.Trauma` (full inside `BlastRadius`, zero at `BlastShakeRangeBlocks`) from `TntManager.Blasts` through `World.ShakeForBlast`; a client shakes where a primed mirror vanishes with its fuse spent (`BlastEffectTests`); the `prime` scenario op strikes a cube without the firestarter's miss chance.
+- [x] **Steam on lava hardening.** `FluidManager.HardenedCells` (both hardening rules) -> `AmbientEffects.PuffSteam`, a pale `FireParticleKind.Steam` through `FireParticleSystem.Puff`; a client puffs where a `BlockChanges` entry turns a fluid into its `hardensTo` (`SteamPuffTests`, `world-events.json`).
+- [x] **Tree fall thud.** `TopplingTree.TryTakeLanding` fires once at flat -> `BlockEditor.ThudTree`: a leaf burst off the landed canopy, `GroundDust.TreeThud` under the trunk, a `ShakeFalloff` shake scaled by the wood that fell (`TreeThudTests`).
+- [x] **TNT blast shake.** `ShakeFalloff.Trauma` (full inside `BlastRadius`, zero at `BlastShakeRangeBlocks`) from `TntManager.Blasts` through `AmbientEffects.ShakeForBlast`; a client shakes where a primed mirror vanishes with its fuse spent (`BlastEffectTests`); the `prime` scenario op strikes a cube without the firestarter's miss chance.
 - [x] **TNT fuse halved.** `TntManager.PlayerFuseSeconds` 1 s, the chain fuse unchanged; `PrimedTnt.WhiteFlash` speeds its strobe over the fuse it gets (`FirestarterTests`).
 - [x] **TNT blast pushes entities.** `BlastImpulse.At` (`BlastPushMaxSpeed` at the center, zero at `BlastRadius`, tipped up by `BlastPushUpBias`) on other primed TNT, drops (`DropManager.ApplyBlastImpulse`), falling cubes, mobs (`Mob.Shove`) and players through `IMobTarget.TakeHit` (a server's queued knockback); creative, flying and dead players immune (`BlastEffectTests`).
 - [x] **Falling block landing dust.** `FallingBlockManager.Landings` -> `GroundDust.LandBlock` -> `BlockDebrisSystem.Skirt`, sized by `LandingDust.FallingBlockCount/Speed` from `FallingBlock.FallBlocks`; a client puffs at a `BlockChanges` write beside a mirrored cube (`FallingBlockDustTests`).
 - [x] **Tool break shatter.** A tool whose durability runs out shatters into chips of its
-  sprite's mean color at the hand (`ToolShatter.ColorOf` at `World.DamageTool`) and its hotbar
+  sprite's mean color at the hand (`ToolShatter.ColorOf` at `WorldItemUse.DamageTool`) and its hotbar
   slot flashes white and fades (`HotbarPickupPop.Flash`, `ToolShatterTests`,
   `HotbarPickupPopTests`).
 - [x] **Pickup sparkle.** A few bright motes (`FireParticleKind.Spark`) pop at the chest where a
@@ -111,12 +111,12 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Glass pane.** `glass_pane`; 6 glass -> 16 (`panes.json`).
   - [x] *Neighbor connectivity:* `pane` renderer (`PaneShape` + `PaneEmitter`), arms toward panes and solid cubes, matching hitboxes.
 
-- [x] **Torch flame particles.** The `flame` block field (turned with the facing, `BlockType.FlamePoints`) -> `ChunkMeshData.FlamePoints` (dropped headless) -> `World.UpdateTorchFlames`, a third `FireParticleSystem` with spawn-scatter and scale parameters: small embers plus smoke, no point light (`TorchFlameTests`, `torches.json` flame shots at 700).
+- [x] **Torch flame particles.** The `flame` block field (turned with the facing, `BlockType.FlamePoints`) -> `ChunkMeshData.FlamePoints` (dropped headless) -> `AmbientEffects.UpdateTorchFlames`, a third `FireParticleSystem` with spawn-scatter and scale parameters: small embers plus smoke, no point light (`TorchFlameTests`, `torches.json` flame shots at 700).
 - [x] **Planks.** `oak_planks`, four from an `oak_log`; tile from `tools/generate-plank-texture.py` (`planks.json`).
 - [x] **Slab.** `cobblestone_slab` and `oak_planks_slab` on a `block/slab` parent, colliding by a 0..0.5 `hitbox` (`BuildingBlockTests`, `planks.json`).
 - [x] **Stairs.** `cobblestone_stairs` / `oak_planks_stairs`: `facing: "horizontal"` plus the new `facingFromLook` flag, which `Placement.LookFacing` reads from the placing `PlayerContext`'s view (`StairTests`).
 - [x] **Fence.** `oak_fence`: the `pane` block object (`post`, `arm`, `rails` in px) becomes a `PaneProfile` that `PaneShape`/`PaneEmitter` read; panes join only their own shape (`PaneProfileTests`, `fences.json`).
-- [x] **Trapdoor.** `oak_trapdoor`: the `open` block object (model + hitbox) makes a block openable, open bit = state bit 2 (`DoorState`), toggled by `World.TryToggleOpenable` in the right-click chain (`OpenableTests`, `doors.json`).
+- [x] **Trapdoor.** `oak_trapdoor`: the `open` block object (model + hitbox) makes a block openable, open bit = state bit 2 (`DoorState`), toggled by `BlockInteractions.TryToggleOpenable` in the right-click chain (`OpenableTests`, `doors.json`).
 - [x] **Hanging lantern.** `lantern` (torch + copper ingot, emission 15) on the general `support: "above"` rule (`BlockType.SupportAbove`); tile from `tools/generate-lantern-texture.py` (`HangingBlockTests`, `lanterns.json`).
 - [x] **Slime block.** A `bounce` block flag (a slime block, nine slimeballs): a body that lands
   on it is sprung back up at `SlimeBlockBounceRestitution` of its impact and bills no fall
@@ -189,14 +189,14 @@ files waits in TODO.md instead, since there are none to use yet.
 
 - [x] **Crosshair hit marker.** `HitMarker` flashes at the two connecting-hit sites the hit-stop uses (a landed punch or slice) and `UIRenderer.DrawCrosshair` draws the X, fading over `HitMarker.Seconds` (`HitMarkerTests`).
 - [x] **Crosshair spreads while charging.** the crosshair is drawn as five pieces cropped out of its 16x16 texture (a center dot and four pills); the arms slide outward with `Camera.ThrowCharge` (eased) while the dot stays put, and snap back on release.
-- [x] **Mining progress ring.** a ring of `CrosshairRingSegments` dots around the crosshair, the lit share following `World.Crosshair.BreakProgress` (0 in creative or with no target, so it never shows there).
+- [x] **Mining progress ring.** a ring of `CrosshairRingSegments` dots around the crosshair, the lit share following `LeftClickAction.Crosshair.BreakProgress` (0 in creative or with no target, so it never shows there).
 - [x] **Look-at label.** The block under the crosshair shows its name and a small spinning 3D
   render of it at the top of the screen, below the compass or clock strip while one is equipped
   (`UIRenderer.DrawLookLabel` and its `LookLabelTop` over `BlockCubeCache`), the name in red while
   the held item cannot mine it, and "Unknown" with a flat dark silhouette until its item has been
   obtained; creative mode and a block with no item at all (`hasItem` false) always know, and `X`
   adds id, state byte, sun/block light and chunk/cell debug lines. `LookLabel` is the rule,
-  `World.LookAt` the raycast's state, and "obtained" is `Inventory`'s own set, marked in `Add`,
+  `LeftClickAction.LookAt` the raycast's state, and "obtained" is `Inventory`'s own set, marked in `Add`,
   saved as names in `player.json` (an optional field) and riding the `InventoryNetCodec` snapshot
   (`LookLabelTests`, `InventoryTests`, `look-label.json`).
 - [x] **Chat fades when closed.** `ChatView` keeps an arrival clock per line and `AlphaAt` holds it opaque through `HoldSeconds`, eases it out over `FadeSeconds` and pins it at 1 while the log is open (the draw skips fully faded lines) (`ChatViewTests`).
@@ -213,5 +213,5 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **HUD scale.** already covered: the settings page's GUI Scale row (`GameSettings.GuiScaleIndex` over `GuiScales`, 0.5x..2x, `RequestedGuiScale` feeding `UiCanvas.EffectiveScale`) scales the HUD across the 75-150 % band and beyond; a continuous slider would duplicate the tested setting.
 - [x] **Sprint toggle option.** the `Sprint Toggle` controls setting plus `SprintToggle.Step` driving `Camera.SprintHeld` (a fresh press flips the latch; off, the key is held as before) (`SprintToggleTests`).
 - [x] **Worlds list details.** the row's second line is `MainMenuLayout.WorldDetailText`: the seed plus the last-played moment (`WorldInfo.LastPlayedUnixMs`, local `yyyy-MM-dd HH:mm`), or "never played" (`MainMenuLayoutTests`).
-- [x] **Death message.** `DeathMessages.For` over the blow recorded in `PlayerHealth` (`DamageSource` plus the mob's display name through `IMobTarget.TakeHit`; the fall, lava and the cactus name themselves); `World.TakeDeathMessage` drains it into the chat, and a server broadcasts its own once per death (`DeathMessageTests`).
+- [x] **Death message.** `DeathMessages.For` over the blow recorded in `PlayerHealth` (`DamageSource` plus the mob's display name through `IMobTarget.TakeHit`; the fall, lava and the cactus name themselves); `LocalPlayer.TakeDeathMessage` drains it into the chat, and a server broadcasts its own once per death (`DeathMessageTests`).
 - [x] **Inventory-full warning.** `DropManager.BlockedCollectors` reports a drop within a collector's reach that its pool refused, and the world shows "Inventory full" through `HudToast` on the transition into the blocked state only (a goblin's own refusal is its index, never the player's; a client reads its own mirror the same way) (`InventoryFullWarningTests`).

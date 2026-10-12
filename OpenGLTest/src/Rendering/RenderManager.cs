@@ -197,7 +197,7 @@ public class RenderManager : IDisposable
     private SkyRenderer? _skyDome;
 
     // The frame's resolve pass: tonemaps the HDR scene target into the default framebuffer at
-    // the end of World.Render, before the UI (RenderPostProcess). Null until LoadResources.
+    // the end of WorldRenderer.Render, before the UI (RenderPostProcess). Null until LoadResources.
     private PostProcessRenderer? _post;
     private ContactAoRenderer? _contactAo;
 
@@ -1877,7 +1877,7 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// Resolves the HDR scene target into the default framebuffer (exposure, clamp tonemap,
-    /// sRGB encode and dither in post-fragment.glsl). Runs at the end of World.Render; the UI then
+    /// sRGB encode and dither in post-fragment.glsl). Runs at the end of WorldRenderer.Render; the UI then
     /// draws on top of the result in gamma space. The scene texture is unbound from unit 0 again
     /// afterwards so next frame's render target never sits on a sampler unit.
     /// <paramref name="damageFlash"/> is the player's damage flash (<see cref="PlayerHealth.DamageFlash"/>),
@@ -1902,7 +1902,7 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// Multiplies the screen-space contact AO (SH-28, <see cref="ContactAoRenderer"/>) into the
-    /// HDR scene color. World.Render calls it mid entity pass: after everything that writes
+    /// HDR scene color. WorldRenderer.Render calls it mid entity pass: after everything that writes
     /// honest depth (terrain, drops, stations, TNT, falling blocks, slimes) and before the
     /// depth-less or blended draws (healthbars, the first-person head, debris, player, held item),
     /// the selection outline, water, clouds and particles, none of which own the depth it reads.
@@ -2688,7 +2688,7 @@ public class RenderManager : IDisposable
     /// the draw target (which is why CopyScene exists). A half-res depth alongside this one would be
     /// additive cost, not a saving - see R3 in PERF_TODO.md, which shares this machinery.
     /// Both draws sit inside this one method, so the RaysPass GPU bracket around the call in
-    /// World.RenderFrame still measures the whole pass and FrameProfiler needs no change.</summary>
+    /// WorldRenderer.Render still measures the whole pass and FrameProfiler needs no change.</summary>
     public void RenderUnderwaterRays(Camera? camera)
     {
         if (camera == null || _rays == null || _eyeInLava) return;
@@ -4422,7 +4422,7 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// The loading screen fading out over the first playing frames, drawn translucently over
-    /// whatever the frame already holds. Program calls it after <c>World.RenderUI</c>, where
+    /// whatever the frame already holds. Program calls it after <c>WorldRenderer.RenderUI</c>, where
     /// framebuffer 0 is already bound. Render thread only.
     /// </summary>
     public void RenderLoadingOverlay(IWindow window, LoadingScreenView loading, double time)

@@ -28,13 +28,13 @@ namespace VoxelEngine.Rendering;
 ///
 /// <para>The loss that actually bites.</para>
 /// A pass that does not run every frame can go dark entirely. <c>SelectPass</c> is bracketed inside
-/// <c>if (_hasSelectedBlock)</c> (World.cs:525-548); with the gate closed, the chance of a frame
-/// both running that pass and being a timed frame falls by the interval, so it can collect zero
-/// samples across a whole publish window and read <c>--</c> in the first snapshot after <c>X</c>
-/// where an always-on build showed a figure. That is a real, partial loss of the very property this
-/// gate is meant to preserve, and it is accepted rather than engineered around. If it is ever
-/// judged unacceptable the alternative is an arming window — force a few fully timed frames on the
-/// off-to-on transition — instead of a fixed duty cycle.
+/// <c>if (LeftClick.HasSelectedBlock)</c> (WorldRenderer.Render's select pass); with the gate
+/// closed, the chance of a frame both running that pass and being a timed frame falls by the
+/// interval, so it can collect zero samples across a whole publish window and read <c>--</c> in
+/// the first snapshot after <c>X</c> where an always-on build showed a figure. That is a real,
+/// partial loss of the very property this gate is meant to preserve, and it is accepted rather
+/// than engineered around. If it is ever judged unacceptable the alternative is an arming window
+/// — force a few fully timed frames on the off-to-on transition — instead of a fixed duty cycle.
 /// </summary>
 internal static class GpuTimingGate
 {

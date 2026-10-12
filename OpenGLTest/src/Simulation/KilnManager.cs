@@ -32,7 +32,7 @@ namespace VoxelEngine.Simulation;
 ///
 /// <para>
 /// The per-frame <see cref="Update"/> doubles as the structure's integrity sweep: nothing but
-/// mining goes through <c>World.RemoveBlock</c>, so a blast that takes a cell (a part
+/// mining goes through <c>BlockEditor.RemoveBlock</c>, so a blast that takes a cell (a part
 /// <em>or</em> the anchor) would otherwise leave the rest standing as invisible solid blocks.
 /// <see cref="KilnState.AnchorId"/> is what lets the sweep revert a kiln whose anchor cell is
 /// already gone. Only kilns get this: a future multiblock that is not a kiln would need its own

@@ -122,7 +122,7 @@ public sealed class ClientIntentFlowTests : IDisposable
                     foreach (var cell in _cells)
                         if (_prediction.Offer(cell, seq))
                             _apply.Add(cell);
-                    world.ApplyNetworkBlockChanges(_apply);
+                    world.ClientMirror.ApplyNetworkBlockChanges(_apply);
                     break;
                 }
                 case NetMessage.BlockChanges:
@@ -131,7 +131,7 @@ public sealed class ClientIntentFlowTests : IDisposable
                     foreach (var cell in _cells)
                         if (_prediction.Offer(cell, null))
                             _apply.Add(cell);
-                    world.ApplyNetworkBlockChanges(_apply);
+                    world.ClientMirror.ApplyNetworkBlockChanges(_apply);
                     break;
                 case NetMessage.IntentResult:
                 {
@@ -139,7 +139,7 @@ public sealed class ClientIntentFlowTests : IDisposable
                     _results[seq] = reader.ReadBool();
                     _apply.Clear();
                     _prediction.Resolve(seq, _apply);
-                    world.ApplyNetworkBlockChanges(_apply);
+                    world.ClientMirror.ApplyNetworkBlockChanges(_apply);
                     break;
                 }
                 case NetMessage.InventoryState:
@@ -176,7 +176,7 @@ public sealed class ClientIntentFlowTests : IDisposable
         HandleInbound();
         _streamer!.Update(_client!.Camera.Position, Dt);
         _client.Update(Dt, null);
-        _client.UpdateBlockBreaking(Dt, mining);
+        _client.LeftClick.UpdateBlockBreaking(Dt, mining);
 
         var sw = Stopwatch.StartNew();
         while (_prediction.LastSeq > 0 && !_results.ContainsKey(_prediction.LastSeq) && sw.Elapsed.TotalSeconds < 5)
@@ -277,7 +277,7 @@ public sealed class ClientIntentFlowTests : IDisposable
         var down = MathF.Atan2(toFloor.Y, new Vector2(toFloor.X, toFloor.Z).Length()) * 180f / MathF.PI;
         _client.Camera.TestTeleport(_client.Camera.Position, 0f, down);
         Frame();
-        Assert.True(_client.TryUseSelected(World.InteractionReach));
+        Assert.True(_client.RightClick.TryUseSelected(World.InteractionReach));
         var placed = floorAhead + Vector3.UnitY;
         Assert.Equal(Dirt, ClientCell(placed));
         sw.Restart();

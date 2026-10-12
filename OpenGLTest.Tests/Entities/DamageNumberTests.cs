@@ -148,15 +148,15 @@ public sealed class DamageNumberTests : IDisposable
         var near = world.Camera.Position + new Vector3(2f, 0f, 0f);
 
         // A newly listed mob is no hit
-        world.ApplyNetworkEntities([Slime(7, near, 5)]);
+        world.ClientMirror.ApplyNetworkEntities([Slime(7, near, 5)]);
         Assert.Equal(0, world.DamageNumbers.Count);
 
-        world.ApplyNetworkEntities([Slime(7, near, 3)]);
+        world.ClientMirror.ApplyNetworkEntities([Slime(7, near, 3)]);
         Assert.Equal(1, world.DamageNumbers.Count);
         Assert.Equal(2, Active(world.DamageNumbers)[0].Amount);
 
         // Healing back up shows nothing
-        world.ApplyNetworkEntities([Slime(7, near, 4)]);
+        world.ClientMirror.ApplyNetworkEntities([Slime(7, near, 4)]);
         Assert.Equal(1, world.DamageNumbers.Count);
     }
 
@@ -170,9 +170,9 @@ public sealed class DamageNumberTests : IDisposable
         var far = world.Camera.Position
                   + new Vector3(WorldGenerationConfig.DamageNumberDeathRangeBlocks * 2f, 0f, 0f);
 
-        world.ApplyNetworkEntities([Slime(7, near, 4), Slime(8, far, 4)]);
+        world.ClientMirror.ApplyNetworkEntities([Slime(7, near, 4), Slime(8, far, 4)]);
         // The server stops listing both: the near one died, the far one is out of sight
-        world.ApplyNetworkEntities([]);
+        world.ClientMirror.ApplyNetworkEntities([]);
 
         Assert.Equal(1, world.DamageNumbers.Count);
         Assert.Equal(4, Active(world.DamageNumbers)[0].Amount);

@@ -5,7 +5,7 @@ namespace VoxelEngine.Items;
 
 /// <summary>
 /// What an <see cref="Item"/> override may query and change during <see cref="Item.OnUse"/>.
-/// Implemented once by <see cref="World"/>; item code never touches managers directly, so
+/// Implemented once by <see cref="WorldItemUse"/>; item code never touches managers directly, so
 /// overrides stay headless-testable against a stub. Queries read the live world, effects write
 /// it, and the inventory tail (cooldown, durability, spending) runs through the selected slot.
 /// </summary>

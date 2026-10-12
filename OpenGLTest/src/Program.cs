@@ -644,7 +644,7 @@ public static class Program
                     var actionSeq = reader.ReadByte();
                     remoteScratch.Add(new RemotePlayerSnapshot(id, name, eye, yaw, pitch, flags, action, actionSeq));
                 }
-                w.SyncRemotePlayers(remoteScratch, netPlayerId);
+                w.ClientMirror.SyncRemotePlayers(remoteScratch, netPlayerId);
                 break;
             }
             case NetMessage.BlockCorrection:
@@ -656,7 +656,7 @@ public static class Program
                 netApplyScratch.Clear();
                 foreach (var change in netCellsScratch.Where(change => prediction.Offer(change, seq)))
                     netApplyScratch.Add(change);
-                w.ApplyNetworkBlockChanges(netApplyScratch);
+                w.ClientMirror.ApplyNetworkBlockChanges(netApplyScratch);
                 break;
             }
             case NetMessage.IntentResult:
@@ -667,13 +667,13 @@ public static class Program
                 var accepted = reader.ReadBool();
                 netApplyScratch.Clear();
                 prediction.Resolve(seq, netApplyScratch);
-                w.ApplyNetworkBlockChanges(netApplyScratch);
+                w.ClientMirror.ApplyNetworkBlockChanges(netApplyScratch);
                 if (!accepted && debugEnabled)
                     Log.WriteLine($"Multiplayer: the server refused intent #{seq}");
                 break;
             }
             case NetMessage.StationState:
-                w.ApplyNetworkStations(reader);
+                w.ClientMirror.ApplyNetworkStations(reader);
                 break;
             case NetMessage.PlayerStatus:
             {
@@ -684,7 +684,7 @@ public static class Program
                 w.Camera.SetModes(status.Modes.HasFlag(NetPlayerFlags.Creative),
                     status.Modes.HasFlag(NetPlayerFlags.Flying));
                 var healthBefore = w.Health;
-                w.ApplyNetworkHealth(status.Health);
+                w.ClientMirror.ApplyNetworkHealth(status.Health);
                 var knockback = status.Knockback;
                 // AddKnockback normalizes the direction itself and keeps a lift-only hit's pop
                 if (knockback.LengthSquared() > 0f || status.Lift > 0f)
@@ -755,7 +755,7 @@ public static class Program
                     var velocity = reader.ReadVector3();
                     netEntitiesScratch.Add(new NetEntity(kind, id, position, yaw, health, ammo, itemId, velocity));
                 }
-                w.ApplyNetworkEntities(netEntitiesScratch);
+                w.ClientMirror.ApplyNetworkEntities(netEntitiesScratch);
                 break;
             }
             case NetMessage.BlockChanges:
@@ -766,7 +766,7 @@ public static class Program
                 netApplyScratch.Clear();
                 foreach (var change in netCellsScratch.Where(change => prediction.Offer(change, null)))
                     netApplyScratch.Add(change);
-                w.ApplyNetworkBlockChanges(netApplyScratch);
+                w.ClientMirror.ApplyNetworkBlockChanges(netApplyScratch);
                 break;
             }
             case NetMessage.InventoryState:
@@ -944,7 +944,7 @@ public static class Program
     private static void RequestThrowSelected(bool wholeStack)
     {
         if (!SendInventoryIntent(InventoryIntent.Drop(wholeStack)))
-            world!.ThrowSelected(wholeStack);
+            world!.Throws.ThrowSelected(wholeStack);
     }
 
     /// <summary>
@@ -1023,7 +1023,7 @@ public static class Program
         netRespawnTimer = 0f;
         prediction = new ClientPrediction();
         if (world == null) return;
-        world.ClearRemotePlayers();
+        world.ClientMirror.ClearRemotePlayers();
         world.BlockEdited = null;
         world.IntentRaised = null;
     }
@@ -1466,11 +1466,11 @@ public static class Program
         var rightPressed = rightHeld && !rightWasDown;
         switch (rightHeld)
         {
-            case true when w.IsUseCharging:
-                w.UpdateUseCharge((float)deltaTime);
+            case true when w.RightClick.IsUseCharging:
+                w.RightClick.UpdateUseCharge((float)deltaTime);
                 break;
-            case true when w.IsThrowCharging:
-                w.UpdateThrowCharge((float)deltaTime);
+            case true when w.Throws.IsThrowCharging:
+                w.Throws.UpdateThrowCharge((float)deltaTime);
                 break;
             case true when rightPressed || placeTimer >= MAX_PLACE_TIMER:
             {
@@ -1478,19 +1478,19 @@ public static class Program
                 FrameProfiler.Begin(ProfileSection.UsePlace);
                 // A timed use (use.seconds) charges instead of firing on the click, and runs only
                 // when the hold completes; anything else uses or places on the click
-                var claimed = w.TryBeginUseCharge() || w.TryUseSelected(World.InteractionReach);
+                var claimed = w.RightClick.TryBeginUseCharge() || w.RightClick.TryUseSelected(World.InteractionReach);
                 FrameProfiler.End(ProfileSection.UsePlace);
                 if (!claimed)
-                    w.TryBeginThrowCharge();
+                    w.Throws.TryBeginThrowCharge();
                 break;
             }
-            case false when w.IsThrowCharging || w.IsUseCharging:
+            case false when w.Throws.IsThrowCharging || w.RightClick.IsUseCharging:
             {
                 FrameProfiler.Begin(ProfileSection.UsePlace);
-                if (w.IsUseCharging)
-                    w.CancelUseCharge();
+                if (w.RightClick.IsUseCharging)
+                    w.RightClick.CancelUseCharge();
                 else
-                    w.ReleaseThrow();
+                    w.Throws.ReleaseThrow();
                 placeTimer = 0;
                 FrameProfiler.End(ProfileSection.UsePlace);
                 break;
@@ -1499,8 +1499,8 @@ public static class Program
         rightWasDown = rightDown;
         if (!rightHeld && (inventoryView.IsOpen || pauseMenuView.IsOpen || chatView.IsOpen))
         {
-            if (w.IsThrowCharging) w.CancelThrowCharge();
-            if (w.IsUseCharging) w.CancelUseCharge();
+            if (w.Throws.IsThrowCharging) w.Throws.CancelThrowCharge();
+            if (w.RightClick.IsUseCharging) w.RightClick.CancelUseCharge();
         }
 
         // The menu freezes the simulation: the world keeps rendering behind the overlay
@@ -1519,11 +1519,11 @@ public static class Program
             // The chat log fades its old lines while closed; its clock runs every playing frame
             chatView.Update((float)deltaTime);
             // A death posts one system line (singleplayer; a server broadcasts its own)
-            if (w.TakeDeathMessage() is { } death)
+            if (w.LocalPlayer.TakeDeathMessage() is { } death)
                 chatView.AddSystem(death);
 
             FrameProfiler.Begin(ProfileSection.Breaking);
-            w.UpdateBlockBreaking(deltaTime,
+            w.LeftClick.UpdateBlockBreaking(deltaTime,
                 !inventoryView.IsOpen && !chatView.IsOpen
                 && inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true);
             FrameProfiler.End(ProfileSection.Breaking);
@@ -1535,7 +1535,7 @@ public static class Program
                 // A pick selects the slot already holding the block or equips it into the
                 // selected one; while connected the inventory is the server's, so the pick is
                 // also sent as an intent, or the next inventory sync would undo it.
-                if (w.TryPickTargetedBlock(w.Inventory, out var pickedId))
+                if (w.Placer.TryPickTargetedBlock(w.Inventory, out var pickedId))
                     SendInventoryIntent(InventoryIntent.PickBlock(pickedId));
             }
             middleWasPressed = middlePressed;
@@ -2208,7 +2208,7 @@ public static class Program
         renderManager.EndGpuPass(ProfileSection.Lighting);
         FrameProfiler.End(ProfileSection.Lighting);
 
-        world.Render(renderManager);
+        world.Renderer.Render(renderManager);
 
         FrameProfiler.Begin(ProfileSection.RenderShell);
         fpsTimer += deltaTime;
@@ -2226,7 +2226,7 @@ public static class Program
         var hideHud = !hudVisible
             || (visualDirector?.TakeScreenshot == true && visualDirector.ScreenshotHideHud);
         if (!hideHud)
-            world.RenderUI(renderManager, inventoryView,
+            world.Renderer.RenderUI(renderManager, inventoryView,
                 (float)world.LightingTime, shownFps, debugEnabled,
                 showCoordinates: true, menu: pauseMenuView, settings: settingsMenuView);
         // The chat log and input draw over the HUD; hidden with the HUD and behind the pause menu.

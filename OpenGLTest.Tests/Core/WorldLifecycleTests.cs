@@ -188,11 +188,11 @@ public sealed class WorldLifecycleTests : IDisposable
         var rock = EquipRock(world);
         var before = world.Inventory.CountFor(rock);
         Assert.True(before > 1);
-        world.ThrowSelected();
+        world.Throws.ThrowSelected();
         Assert.Empty(world.Drops);
         Assert.Equal(before, world.Inventory.CountFor(rock));
-        Assert.False(world.TryBeginThrowCharge());
-        Assert.False(world.TryUseSelected(World.InteractionReach));
+        Assert.False(world.Throws.TryBeginThrowCharge());
+        Assert.False(world.RightClick.TryUseSelected(World.InteractionReach));
 
         var progress = new List<float> { world.LoadProgress };
         Assert.True(RunUntil(world, () => world.IsLoaded, LoadWallSeconds, () => progress.Add(world.LoadProgress)),
@@ -209,7 +209,7 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Equal(new Vector3(0f, High, 0f), world.Camera.Position);
 
         // Playing now: the same throw spends a unit and drops it
-        world.ThrowSelected();
+        world.Throws.ThrowSelected();
         Assert.Single(world.Drops);
         Assert.Equal(before - 1, world.Inventory.CountFor(rock));
 
@@ -286,7 +286,7 @@ public sealed class WorldLifecycleTests : IDisposable
         var goblinHealth = goblin.Health;
 
         var rock = EquipRock(first);
-        first.ThrowSelected();
+        first.Throws.ThrowSelected();
         var thrown = Assert.Single(first.Drops);
         var dropPosition = thrown.Position;
         var dropVelocity = thrown.Velocity;

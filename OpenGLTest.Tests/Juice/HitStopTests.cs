@@ -252,7 +252,7 @@ public sealed class HitStopTests : IDisposable
         // A goblin two blocks straight ahead, its body centered on the aim line.
         Assert.True(world.SpawnEntity("goblin", eye + new Vector3(0f, -Goblin.Height * 0.5f, -2f)));
 
-        world.UpdateBlockBreaking(Dt, isHolding: true);
+        world.LeftClick.UpdateBlockBreaking(Dt, isHolding: true);
         var held = false;
         for (var i = 0; i < 60; i++)
         {
@@ -272,12 +272,12 @@ public sealed class HitStopTests : IDisposable
         _world.GetChunkManager().Headless = true;
         var eye = new Vector3(0.5f, 300f, 0.5f);
         _world.Camera.TestTeleport(eye, yaw: -90f, pitch: 0f);
-        _world.ApplyNetworkEntities([new NetEntity(NetEntityKind.Slime, 7, eye + new Vector3(0f, 0f, -2f), 0f, 3, 0, 0,
+        _world.ClientMirror.ApplyNetworkEntities([new NetEntity(NetEntityKind.Slime, 7, eye + new Vector3(0f, 0f, -2f), 0f, 3, 0, 0,
             Vector3.Zero)]);
         var sent = 0;
         _world.IntentRaised += _ => sent++;
 
-        _world.UpdateBlockBreaking(Dt, isHolding: true);
+        _world.LeftClick.UpdateBlockBreaking(Dt, isHolding: true);
         var held = false;
         for (var i = 0; i < 60; i++)
         {
@@ -297,7 +297,7 @@ public sealed class HitStopTests : IDisposable
         var world = NewWorld(out _);
 
         // With nothing in front the click still swings the fist (the swing really plays)...
-        world.UpdateBlockBreaking(Dt, isHolding: true);
+        world.LeftClick.UpdateBlockBreaking(Dt, isHolding: true);
         Assert.True(world.Player.MineT < 1f);
         // ...and never holds it.
         for (var i = 0; i < 60; i++)
