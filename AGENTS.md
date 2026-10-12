@@ -3399,6 +3399,40 @@ overshoot or jiggle.
   `ITEM_DEBUGGER_SHOT_AT` for scripted captures. A new player animation gets a mode in
   `PlayerPreviewState`, a new mob animation a mode in `EntityPreviewState`.
 
+## Code organization (standing rules)
+
+These are standing rules for every change to this codebase, not a one-off task list. When you
+touch a file that violates one of them, fixing it is in scope.
+
+- **No god classes.** One class, one coherent job. Past roughly 700 lines a class is a smell:
+  move the stray responsibilities out into a well-named class (composition, not `partial`).
+  No source file goes past ~1000 lines without a stated reason. `World.cs`,
+  `RenderManager.cs`, `UIRenderer.cs`, `ContentRegistry.cs`, `Program.cs`, `Chunk.cs`,
+  `Camera.cs`, `ChunkManager.cs` are the current offenders — keep shrinking them, never
+  grow them.
+- **No god directories.** Keep any one folder under ~30 files and group by domain. The `src/`
+  root holds the app entry and core types only; a new file goes into the folder of its area
+  (a new feature area gets a new folder), never into a catch-all.
+- **Namespaces mirror the folder tree.** Root namespace is `VoxelEngine`; a file in
+  `WorldGen/Trees/` declares `namespace VoxelEngine.WorldGen.Trees;`. Never park a new file in
+  the root namespace out of convenience; never add an unrelated type to whichever namespace a
+  file happened to have. Each project keeps a short, deliberate `GlobalUsings.cs` for its own
+  sub-namespaces, so cross-area references stay one blank line, not a using wall.
+- **American English** in identifiers, comments and docs — `color` (not colour), `behavior`,
+  `initializer`, `center`, `gray`, `normalize`, `canceled`, `traveled`, `catalog`, `license`,
+  `meter`. Applies to renames of existing symbols too.
+- **No dead code.** Delete unused private fields, methods, parameters, locals and `using`
+  directives on sight; git keeps the history. Do not keep anything "for later". Build warnings
+  must stay at zero.
+- **No duplication.** A rule that exists twice becomes one shared (and, where it is a rule,
+  tested) helper. The GL-free-twin pattern (a `Foo` next to a `FooRenderer`) is the same idea
+  for shader/renderer pairs: one definition, two consumers.
+- **Early returns over nesting.** Guard clauses at the top of a method, `continue`/`break` over
+  a wrapped loop body. A loop body that still nests past ~3 levels gets an extracted method.
+- **Keep this file honest.** When a file moves or splits, update the Layout section and any
+  path references in this document; stale docs send the next agent to a file that no longer
+  exists.
+
 ## Conventions
 
 - C# with file-scoped namespaces, one type per file, `_camelCase` private fields, PascalCase public members. Primary constructors are used where natural (`ChunkManager(GL gl)`).
