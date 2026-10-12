@@ -23,7 +23,7 @@ The game is one project under `OpenGLTest/`; the item debugger (`OpenGLTest.Item
 ## Build and run
 
 ```powershell
-dotnet build OpenGLTest.sln -c Release
+dotnet build VoxelEngine.sln -c Release
 dotnet run --project OpenGLTest/VoxelEngine.csproj -c Release
 ```
 
@@ -35,9 +35,11 @@ explicit `-c Release`, and Rider's run configuration follows the solution config
 dropdown, which must be set to `Release | Any CPU`. Use `-c Debug` only when you need
 breakpoints. The startup line `Build: Release | debugger ...` confirms which one is running.
 
-Both csprojs target **net9.0**. On a machine that only has the .NET 10 SDK installed, prefix every
-`dotnet` command with `DOTNET_ROLL_FORWARD=LatestMajor` (and use the SDK's own launcher, e.g.
-`~/.dotnet/dotnet.exe`) or the build and the tests refuse to run at all.
+All csprojs target **net9.0**, but the code uses C# 14 (null-conditional assignment such as
+`mouse?.MouseUp += ...`, first-class span conversions), so building needs the **.NET 10 SDK**: an
+older SDK (e.g. the 9.0.100 in `~/.dotnet`) fails with CS0079/CS0131/CS0411. Use the SDK 10 launcher
+and, on a machine that only has the 10 runtime, prefix every `dotnet` command with
+`DOTNET_ROLL_FORWARD=LatestMajor` or the build and the tests refuse to run at all.
 
 **Launch flow.** The game boots to the **main menu** with the cursor free (`Program` owns an
 explicit `AppScreen` of Menu / Loading / Playing / Saving; every page rule, key rule and store

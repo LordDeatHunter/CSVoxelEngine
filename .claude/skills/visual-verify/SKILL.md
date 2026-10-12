@@ -14,7 +14,7 @@ Build/test cannot prove a rendering or feel change. Use a scripted scenario, not
 
 ## Run recipe (PowerShell, Release)
 ```
-~/.dotnet/dotnet.exe build OpenGLTest.sln -c Release
+dotnet build VoxelEngine.sln -c Release
 $env:VOXEL_SCRIPT = "<abs path to scenario.json>"   # e.g. OpenGLTest/visual-examples/water.json
 $env:VOXEL_TIME = "147"                              # optional, see table
 Start-Process OpenGLTest/bin/Release/net9.0/VoxelEngine.exe -WorkingDirectory OpenGLTest `

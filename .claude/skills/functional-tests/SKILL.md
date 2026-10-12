@@ -8,10 +8,10 @@ description: Rules and recipes for writing xUnit tests in CSVoxelEngine (OpenGLT
 Tests live in `OpenGLTest.Tests/` (headless, no window). Run:
 
 ```
-~/.dotnet/dotnet.exe test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release
+DOTNET_ROLL_FORWARD=LatestMajor dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release
 ```
 
-(Plain `dotnet` has no SDK on this machine. Release only.) There is no CI, so a feature's tests are the only regression net.
+(The code needs the .NET 10 SDK, the system `dotnet`; the 9.0.100 in `~/.dotnet` cannot compile it. Release only.) There is no CI, so a feature's tests are the only regression net.
 
 ## When to add a test
 Add one with every feature **only when there is a rule to lock down**: a gate, a formula, a state transition, a conservation law, an invariant that must survive content tuning. If the only thing you could assert is a number you just typed in a JSON file, write no test.

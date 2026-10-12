@@ -10,7 +10,7 @@ This skill is the procedure for applying them without breaking the world.
 
 ## Non-negotiables
 
-- **Release only.** `DOTNET_ROLL_FORWARD=LatestMajor dotnet build OpenGLTest.sln -c Release` and
+- **Release only.** `DOTNET_ROLL_FORWARD=LatestMajor dotnet build VoxelEngine.sln -c Release` and
   `dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release` (~50 s, 2400+ tests).
   Never verify in Debug; the game's behavior claims are Release measurements.
 - **The build and tests stay green between commits.** A cleanup commit that leaves the tree
@@ -79,6 +79,29 @@ method at a time, keep the suite green, prefer:
 - `continue` for a wrapped loop body,
 - an extracted method when the body still nests past ~3 levels,
 - `MathUtils` helpers for any curve you are tempted to inline.
+
+## Running a cleanup task through the workflow
+
+One cleanup task is one `plan-and-implement` run (Workflow tool, `name: 'plan-and-implement'`),
+never several in parallel: they share one working tree. Pass the task plus this `extraContext`,
+and `maxFixRounds: 1`:
+
+> Cleanup run; read AGENTS.md "Code organization (standing rules)" and the code-cleanup skill.
+> Do NOT add or edit tests except what a move/rename/namespace change forces; no visual scenarios,
+> no in-game verification. The only gate is a zero-warning Release build plus the existing xUnit
+> suite, all passing. Toolchain: the code needs the .NET 10 SDK. Ignore the `~/.dotnet/dotnet.exe`
+> and `OpenGLTest.sln` in the preamble; use `DOTNET_ROLL_FORWARD=LatestMajor dotnet build
+> VoxelEngine.sln -c Release` and `DOTNET_ROLL_FORWARD=LatestMajor dotnet test
+> OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release` (system dotnet; set
+> `$env:DOTNET_ROLL_FORWARD` first in PowerShell). Do not commit, stash or branch. The tree is
+> CRLF: follow the crlf-safe-edit skill. Behavior-preserving only: move code verbatim before
+> touching it. Update AGENTS.md Layout paths for anything moved. Leave `.claude/worktrees`,
+> `.sisyphus`, `.run` alone. The reviewer checks the diff against the rules and the plan, and does
+> not ask for new tests or scenario runs.
+
+After a green run, stage the touched paths explicitly and commit with a one-line subject (no body
+beyond the trailer). Task order: folder moves, namespaces, American English, one god class per
+run, then dead code / duplication / early returns slice by slice.
 
 ## Reporting
 
