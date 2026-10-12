@@ -19,7 +19,7 @@ Run from `OpenGLTest/` so `assets/` resolves:
 
 ```powershell
 $env:VOXEL_DEBUG="1"; $env:VOXEL_TIME="60"; $env:VOXEL_SCRIPT="visual-examples/perf-fly.json"
-dotnet run --project silkgltriangle.csproj -c Release --no-build
+dotnet run --project VoxelEngine.csproj -c Release --no-build
 ```
 
 Two profiler traps, read before trusting a number:
@@ -1115,7 +1115,7 @@ Tie-break wording, also fixed before the capture: "within +/-15 % of A" means
 and if C fails its bar the round lands nothing whatever B does.
 
 **The harness.** A self-contained scratchpad console project (net9.0, Release, workstation
-concurrent GC, `TieredPGO`, matching `silkgltriangle.csproj`) referencing **nothing** from the
+concurrent GC, `TieredPGO`, matching `VoxelEngine.csproj`) referencing **nothing** from the
 engine. It rebuilds the workload locally: the radius-16 closest-first offset ring (17077 offsets —
 the exact count `ChunkGenerationWorker.BuildSortedOffsets` produces at `ChunkRadius` 16), plus local
 copies of the `ChunkKey` pack expression and of `MathUtils.FloorToInt`. 6.83 M probe-groups per
@@ -2990,8 +2990,8 @@ this file's own instruments — see the carried-debt bullet below.
 - **Build and test.** The system `dotnet` has **no SDK**; use `~/.dotnet/dotnet.exe`.
   Build: `~/.dotnet/dotnet.exe build OpenGLTest.sln -c Release` (Release only — it is the sole
   configuration measured or shipped here). Tests:
-  `DOTNET_ROLL_FORWARD=LatestMajor ~/.dotnet/dotnet.exe test OpenGLTest.Tests/silkgltriangle.Tests.csproj -c Release`.
-  All code lives in the `silkgltriangle` namespace even though the solution is `OpenGLTest.sln`.
+  `DOTNET_ROLL_FORWARD=LatestMajor ~/.dotnet/dotnet.exe test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release`.
+  All code lives in the `VoxelEngine` root namespace even though the solution is `VoxelEngine.sln`.
 - **The suite baseline, and how the series moved it.** **790 total / 786 passed / 4 failed** at
   9b7a244, rising to **797 / 793 / 4** by the D5 round's HEAD (8b743c7) — which is exactly what this
   round re-measured before touching anything. R6's three `GpuTimingGateTests` facts take it to

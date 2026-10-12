@@ -6,8 +6,8 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>default</LangVersion>
         <Nullable>annotations</Nullable>
-        <AssemblyName>ItemDebugger</AssemblyName>
-        <RootNamespace>silkgltriangle</RootNamespace>
+        <AssemblyName>VoxelEngine.ItemDebugger</AssemblyName>
+        <RootNamespace>VoxelEngine.ItemDebugger</RootNamespace>
         <!-- Match the game's runtime behavior so the preview is the shipping renderer. -->
         <RollForward>LatestMajor</RollForward>
         <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
@@ -17,7 +17,7 @@
     <ItemGroup>
         <!-- Reuses the engine: content registry, shaders, player rig and item/block mesh caches.
              Referencing the Exe project is deliberate - one source of truth for the renderer. -->
-        <ProjectReference Include="..\OpenGLTest\silkgltriangle.csproj" />
+        <ProjectReference Include="..\OpenGLTest\VoxelEngine.csproj" />
     </ItemGroup>
 
 </Project>

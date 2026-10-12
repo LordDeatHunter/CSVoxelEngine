@@ -27,7 +27,7 @@ public static class AssetRoot
 
     private static IEnumerable<string> DirectoriesWithAssets()
     {
-        // Source tree first (it owns silkgltriangle.csproj), so saves persist across builds.
+        // Source tree first (it owns VoxelEngine.csproj), so saves persist across builds.
         foreach (var candidate in Candidates())
         {
             if (IsEngineSource(candidate)) yield return candidate;
@@ -45,7 +45,7 @@ public static class AssetRoot
     }
 
     private static bool IsEngineSource(string directory) =>
-        File.Exists(Path.Combine(directory, "silkgltriangle.csproj")) && HasAssets(directory);
+        File.Exists(Path.Combine(directory, "VoxelEngine.csproj")) && HasAssets(directory);
 
     private static bool HasAssets(string directory) =>
         File.Exists(Path.Combine(directory, "assets", "data", "items", "bucket.json"));

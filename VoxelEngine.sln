@@ -1,20 +1,20 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "silkgltriangle", "OpenGLTest\silkgltriangle.csproj", "{C0271B8A-B5FE-408B-8542-57C88C379BA9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoxelEngine", "OpenGLTest\VoxelEngine.csproj", "{C0271B8A-B5FE-408B-8542-57C88C379BA9}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "OpenGLTest.Tests", "OpenGLTest.Tests", "{1BD04747-6B95-FB64-D10A-20CF10F4A431}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "silkgltriangle.Tests", "OpenGLTest.Tests\silkgltriangle.Tests.csproj", "{2E00A964-7827-4F3B-8E9A-AE9DD08D79FC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoxelEngine.Tests", "OpenGLTest.Tests\VoxelEngine.Tests.csproj", "{2E00A964-7827-4F3B-8E9A-AE9DD08D79FC}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "OpenGLTest", "OpenGLTest", "{44486EBC-36CE-BEBB-F5AC-9FC6AE93CBD1}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "OpenGLTest.ItemDebugger", "OpenGLTest.ItemDebugger", "{297E1F7F-FC7A-6612-0C4C-3BA0F187E652}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ItemDebugger", "OpenGLTest.ItemDebugger\ItemDebugger.csproj", "{BC19C8D6-FFAB-4279-9CBD-2A08DCA41AB5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoxelEngine.ItemDebugger", "OpenGLTest.ItemDebugger\VoxelEngine.ItemDebugger.csproj", "{BC19C8D6-FFAB-4279-9CBD-2A08DCA41AB5}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "OpenGLTest.Server", "OpenGLTest.Server", "{E5007977-0127-BB9E-6F56-E9E051152AFD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Server", "OpenGLTest.Server\Server.csproj", "{5D4BFC54-5F7B-4E02-B845-A169D11A9578}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoxelEngine.Server", "OpenGLTest.Server\VoxelEngine.Server.csproj", "{5D4BFC54-5F7B-4E02-B845-A169D11A9578}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

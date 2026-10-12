@@ -18,9 +18,9 @@
 
     <ItemGroup>
         <!-- The test project drives internal seams (GenerateMeshData(greedy), BakesGreedy, TiledUv) -->
-        <InternalsVisibleTo Include="silkgltriangle.Tests" />
+        <InternalsVisibleTo Include="VoxelEngine.Tests" />
         <!-- The item debugger previews mobs the way a client drives them (NetworkSetState) -->
-        <InternalsVisibleTo Include="ItemDebugger" />
+        <InternalsVisibleTo Include="VoxelEngine.ItemDebugger" />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="Silk.NET.Input" Version="2.22.0" />

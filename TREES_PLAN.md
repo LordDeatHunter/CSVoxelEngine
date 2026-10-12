@@ -738,7 +738,7 @@ meshing and `Chunk.RemeshAfterBatchEdit`.
 ## Verification
 Every phase:
 - `dotnet build OpenGLTest.sln -c Release`;
-- `dotnet test OpenGLTest.Tests/silkgltriangle.Tests.csproj -c Release`. Rule tests only, with
+- `dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release`. Rule tests only, with
   no pinned constants (the functional-tests skill).
 
 From phase 3 on:

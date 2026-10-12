@@ -13,9 +13,9 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\OpenGLTest\silkgltriangle.csproj" />
-        <ProjectReference Include="..\OpenGLTest.ItemDebugger\ItemDebugger.csproj" />
-        <ProjectReference Include="..\OpenGLTest.Server\Server.csproj" />
+        <ProjectReference Include="..\OpenGLTest\VoxelEngine.csproj" />
+        <ProjectReference Include="..\OpenGLTest.ItemDebugger\VoxelEngine.ItemDebugger.csproj" />
+        <ProjectReference Include="..\OpenGLTest.Server\VoxelEngine.Server.csproj" />
     </ItemGroup>
 
 </Project>
