@@ -1,12 +1,12 @@
 export const meta = {
   name: 'plan-and-implement',
-  description: 'Sonnet scouts the codebase, Fable designs the plan, Opus implements it step by step, then build/test + Fable acceptance review (Fable steps fall back to Opus if Fable is unavailable)',
+  description: 'Sonnet scouts the codebase, Opus designs the plan, Opus implements it step by step, then build/test + Opus acceptance review (set ARCHITECT_MODEL to "fable" to go back to Fable, which falls back to Opus if unavailable)',
   whenToUse: 'A feature, refactor, or bug fix in CSVoxelEngine that deserves a plan before code. Pass the task as args: a string, or {task, extraContext?, maxFixRounds?, dryRun?}. dryRun stops after the plan.',
   phases: [
     { title: 'Scout', detail: 'Sonnet maps the relevant code from four angles', model: 'sonnet' },
-    { title: 'Architect', detail: 'Fable drafts the plan, Sonnet answers its open questions, Fable red-teams and finalizes', model: 'fable' },
+    { title: 'Architect', detail: 'Opus drafts the plan, Sonnet answers its open questions, Opus red-teams and finalizes', model: 'opus' },
     { title: 'Implement', detail: 'Opus implements each plan step in order, building after each', model: 'opus' },
-    { title: 'Verify', detail: 'Opus runs build + tests and fixes failures; Fable checks the diff against the plan', model: 'fable' },
+    { title: 'Verify', detail: 'Opus runs build + tests and fixes failures; Opus checks the diff against the plan', model: 'opus' },
   ],
 }
 
@@ -29,6 +29,14 @@ The system "dotnet" has no SDK — always use ~/.dotnet/dotnet.exe:
 `.trim()
 
 const TASK = `TASK:\n${task}${extraContext ? `\n\nADDITIONAL CONTEXT FROM THE USER:\n${extraContext}` : ''}`
+
+// ---------------------------------------------------------------------------
+// Architect model
+// ---------------------------------------------------------------------------
+// The model for every architect-role agent: the plan draft, the open-question revision, the red-team,
+// the final plan and the acceptance review. Opus by default; set it to 'fable' to use Fable again, in
+// which case the wrapper below falls back to Opus when Fable is unavailable.
+const ARCHITECT_MODEL = 'opus'
 
 // ---------------------------------------------------------------------------
 // Fable fallback
@@ -246,7 +254,7 @@ Open questions:
 ${r.openQuestions.map(q => `- ${q}`).join('\n') || '- (none)'}`).join('\n\n')
 
 // ---------------------------------------------------------------------------
-// Phase 2 — Architect (Fable). Draft → resolve open questions via Sonnet → red-team → finalize.
+// Phase 2 — Architect (ARCHITECT_MODEL). Draft → resolve open questions via Sonnet → red-team → finalize.
 // ---------------------------------------------------------------------------
 phase('Architect')
 
@@ -269,11 +277,11 @@ ${TASK}
 ## Scout reports
 ${scoutDigest}`
 
-let plan = await agentWithFallback(planPrompt, { label: 'architect:draft', phase: 'Architect', model: 'fable', schema: PLAN_SCHEMA })
+let plan = await agentWithFallback(planPrompt, { label: 'architect:draft', phase: 'Architect', model: ARCHITECT_MODEL, schema: PLAN_SCHEMA })
 if (!plan) throw new Error('Architect returned no plan')
 log(`Draft plan: ${plan.steps.length} step(s), ${plan.openQuestions.length} open question(s)`)
 
-// Resolve open questions with Sonnet scouts, then let Fable fold the answers in.
+// Resolve open questions with Sonnet scouts, then let the architect fold the answers in.
 if (plan.openQuestions.length) {
   const answers = (await parallel(plan.openQuestions.map((q, i) => () =>
     agent(`${REPO}\n\n${TASK}\n\nYou are a read-only scout answering one precise question for the architect. Do NOT modify files.
@@ -299,10 +307,10 @@ ${answers.map(a => `Q: ${a.question}\nA (${a.confidence} confidence): ${a.answer
 
 Revise the plan in light of the answers. Convert each answered question into either a concrete step change or an explicit assumption.
 Leave openQuestions empty unless an answer was low-confidence AND the choice materially changes the design.`,
-    { label: 'architect:resolve', phase: 'Architect', model: 'fable', schema: PLAN_SCHEMA }) || plan
+    { label: 'architect:resolve', phase: 'Architect', model: ARCHITECT_MODEL, schema: PLAN_SCHEMA }) || plan
 }
 
-// Red-team the plan with an independent Fable critic, then revise once if needed.
+// Red-team the plan with an independent critic, then revise once if needed.
 const critique = await agentWithFallback(`${REPO}
 
 You are an adversarial reviewer of an implementation plan. Your job is to find where it FAILS: missing steps, a step that will not build on its own,
@@ -317,7 +325,7 @@ ${scoutDigest}
 
 ## Plan under review
 ${JSON.stringify(plan, null, 2)}`,
-  { label: 'architect:red-team', phase: 'Architect', model: 'fable', effort: 'high', schema: CRITIQUE_SCHEMA })
+  { label: 'architect:red-team', phase: 'Architect', model: ARCHITECT_MODEL, effort: 'high', schema: CRITIQUE_SCHEMA })
 
 const seriousIssues = critique ? critique.issues.filter(i => i.severity !== 'minor') : []
 if (critique && (critique.verdict === 'needs-revision' || seriousIssues.length)) {
@@ -337,7 +345,7 @@ ${critique.issues.map(i => `[${i.severity}] step ${i.stepId}: ${i.issue}\n  sugg
 
 Produce the final plan. Address every blocker and major issue (verify the reviewer's claims against the code before accepting them —
 if a claim is wrong, keep your design and record why in assumptions). Fold in minor issues where cheap.`,
-    { label: 'architect:final', phase: 'Architect', model: 'fable', schema: PLAN_SCHEMA }) || plan
+    { label: 'architect:final', phase: 'Architect', model: ARCHITECT_MODEL, schema: PLAN_SCHEMA }) || plan
 } else {
   log('Red-team: plan is sound')
 }
@@ -414,7 +422,7 @@ ${step.testsToAdd && step.testsToAdd.length ? `Tests to add: ${step.testsToAdd.j
 }
 
 // ---------------------------------------------------------------------------
-// Phase 4 — Verify. Opus makes build + tests green; Fable checks the diff against the plan.
+// Phase 4 — Verify. Opus makes build + tests green; the architect checks the diff against the plan.
 // Up to maxFixRounds gap-fix rounds.
 // ---------------------------------------------------------------------------
 phase('Verify')
@@ -453,7 +461,7 @@ ${implemented.map(r => `- [${r.stepId}] ${r.status}: ${r.summary}${r.deviations.
 ## Verifier report
 build: ${verification ? verification.buildPassed : 'unknown'}, tests: ${verification ? verification.testsPassed : 'unknown'} — ${verification ? verification.testSummary : 'no report'}
 ${verification && verification.unresolved.length ? `unresolved: ${verification.unresolved.join('; ')}` : ''}`,
-    { label: `review:acceptance${round ? `:r${round}` : ''}`, phase: 'Verify', model: 'fable', schema: REVIEW_SCHEMA })
+    { label: `review:acceptance${round ? `:r${round}` : ''}`, phase: 'Verify', model: ARCHITECT_MODEL, schema: REVIEW_SCHEMA })
 
   const blocking = review ? review.gaps.filter(g => g.severity !== 'minor') : []
   const green = verification && verification.buildPassed && verification.testsPassed
